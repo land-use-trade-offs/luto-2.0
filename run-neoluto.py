@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-28
-# Last modified: 2021-05-12
+# Last modified: 2021-05-14
 #
 
 import os.path
@@ -13,7 +13,6 @@ import numpy as np
 
 # Load data module and initialise with ANO Scenario 236.
 import luto.data as data
-data.init_ano(236)
 
 from luto.economics.cost import get_cost_matrix
 from luto.economics.quantity import get_quantity_matrix, get_quantity_fn
@@ -82,4 +81,21 @@ def run():
 
     return df, precost, postcost
 
+def run_normalised():
+    highpos = timethis( solve
+                      , lumap
+                      , t_ij
+                      , c_rj
+                      , q_rj
+                      , d_j
+                      , 100000 # p_j
+                      , x_rj
+                      , pen_norm = True )
+    df, precost, postcost = inspect(lumap, highpos, d_j, q_rj, c_rj)
+
+    print(df)
+    print("LU Cost Prior:", precost)
+    print("LU Cost Posterior:", postcost)
+
+    return df, precost, postcost
 

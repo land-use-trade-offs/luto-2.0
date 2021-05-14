@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-05-12
+# Last modified: 2021-05-14
 #
 
 import numpy as np
@@ -13,41 +13,25 @@ import gurobipy as gp
 from gurobipy import GRB
 
 from luto.tools import timethis
-from luto.economics.facade import AER
 import luto.data as data
 
-class Solver():
-    """Create Solver object to solve LUTO linear programmes."""
-
-    def __init__( self
-                , aer                        # AER facade object.
-                , programme = "maxprofit"    # Which linear programme to use.
-                ):
-
-        self.aer = aer
-        self.shape = self.aer.shape
-
-    def solve(self, year):
-        """Return the land-use map, i.e. the highpos array, for `year`."""
-        return solve_lu_map(self.aer.get_aer_matrix(year))
-
-    def solve_to_year(self, end_year):
-        """Return land-use maps, i.e. the highpos brick, from 0 to `year`."""
-        highpos = np.zeros((end_year, self.shape[1]))
-        for year in range(end_year):
-            print("Solving year %d / %d." % (year, end_year))
-            highpos[year] = self.solve(year)
-        return highpos
-
-def solve( lumap    # Present land-use map in highpos format.
-         , t_ij     # Transition cost from commodity i to j at any cell.
-         , c_rj     # Cost of producing commodity j at cell r.
-         , q_rj     # Yield of commodity j at cell r.
-         , d_j      # Demand for commodity j.
-         , p_j      # Cost per unit surplus or deficit of commodity j.
-         , x_rj     # Possible/allowed land uses j at cell r.
+def solve( lumap # Present land-use map in highpos format.
+         , t_ij  # Transition cost from commodity i to j at any cell.
+         , c_rj  # Cost of producing commodity j at cell r.
+         , q_rj  # Yield of commodity j at cell r.
+         , d_j   # Demand for commodity j.
+         , p_j   # Penalty level or cost/unit surplus or deficit of commodity j.
+         , x_rj  # Possible/allowed land uses j at cell r.
+         , pen_norm = False # If `True`, normalise penalties against demands.
          ):
-    """Return new lu map. Least-cost, surplus/deficit penalties as costs."""
+    """Return new lu map. Least-cost, surplus/deficit penalties as costs.
+
+    All inputs are Numpy arrays of the appropriate shapes, except for p_j which
+    may either be a scalar --- in which case that value is assumed for all j ---
+    or a numpy array. If `pen_norm` is set to `True` the penalties will be
+    normalised by dividing out the demands. This would typically be
+    accompanied by a high, scalar, value for p_j.
+    """
 
     # Extract the shape of the problem.
     nlus = t_ij.shape[0]
@@ -55,6 +39,15 @@ def solve( lumap    # Present land-use map in highpos format.
 
     # Obtain transition costs to commodity j at cell r using present lumap.
     t_rj = np.stack(tuple(t_ij[lumap[r]] for r in range(ncells)))
+
+    # Assume p_j is only passed as a scalar or a Numpy array.
+    if type(p_j) != np.ndarray:
+        p_j = np.repeat(p_j, nlus // 2)
+
+    # If `pen_norm` is `True` perform the normalisation.
+    if pen_norm:
+        d_j_safe = np.where(d_j == 0, 1e-10, d_j) # Avoid division by zero.
+        p_j = p_j / d_j_safe
 
     try:
         # Make Gurobi model instance.
