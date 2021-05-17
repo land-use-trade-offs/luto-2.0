@@ -88,7 +88,7 @@ def run_normalised():
                       , c_rj
                       , q_rj
                       , d_j
-                      , 100000 # p_j
+                      , 10**6 # p_j
                       , x_rj
                       , pen_norm = True )
     df, precost, postcost = inspect(lumap, highpos, d_j, q_rj, c_rj)
