@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-05-14
+# Last modified: 2021-05-18
 #
 
 import numpy as np
@@ -37,8 +37,14 @@ def solve( lumap # Present land-use map in highpos format.
     nlus = t_ij.shape[0]
     ncells = lumap.size
 
-    # Obtain transition costs to commodity j at cell r using present lumap.
-    t_rj = np.stack(tuple(t_ij[lumap[r]] for r in range(ncells)))
+    # Transition costs to commodity j at cell r using present lumap (in AUD/ha).
+    t_rj_audperha = np.stack(tuple(t_ij[lumap[r]] for r in range(ncells)))
+
+    # Areas in hectares for each cell, stacked for each land-use (identical).
+    realarea_rj = np.stack((data.REAL_AREA,) * nlus, axis=1)
+
+    # Transition costs to commodity j at cell r converted to AUD per cell.
+    t_rj = t_rj_audperha * realarea_rj
 
     # Assume p_j is only passed as a scalar or a Numpy array.
     if type(p_j) != np.ndarray:

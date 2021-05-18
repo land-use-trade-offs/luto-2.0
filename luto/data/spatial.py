@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-13
-# Last modified: 2021-04-30
+# Last modified: 2021-05-18
 #
 
 import importlib
@@ -22,7 +22,7 @@ costs = pd.read_csv(os.path.join(INPUT_DIR, 'data-sla06.csv'))
 # Concordance between LUTO cells and SLA06 IDs or other units of aggregation.
 cells = pd.read_csv(os.path.join(INPUT_DIR, 'cell-sla06.csv'))
 
-# Extract the sorted list of land uses from the data and produce derivative lists.
+# Extract sorted list of land uses from the data and produce derivative lists.
 lus = sorted(costs['SPREAD_CLASS'].unique().tolist())
 nlus = len(lus)
 luirrs = [(lu, irr) for lu in lus for irr in (0, 1)]

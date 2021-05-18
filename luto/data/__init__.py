@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-05-14
+# Last modified: 2021-05-18
 #
 
 import os.path
@@ -24,6 +24,9 @@ import luto.data.spatial as spatial
 # Raw (spatial-) economic data.
 fpath = os.path.join(INPUT_DIR, "col-lu-irr-plugged.feather")
 RAWEC = spatial.read_data_feather(fpath)
+
+# Actual hectares per cell, including projection corrections.
+REAL_AREA = np.load(os.path.join(INPUT_DIR, 'realArea.npy'))
 
 # ---------------------------------- #
 # Temporal and spatio-temporal data. #
