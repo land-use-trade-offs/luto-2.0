@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-28
-# Last modified: 2021-05-19
+# Last modified: 2021-05-20
 #
 
 import os.path
@@ -66,8 +66,7 @@ x_rj = data.x_rj
 
 def run():
     highpos = timethis( solve
-                      , lumap
-                      , t_ij
+                      , t_rj
                       , c_rj
                       , q_rj
                       , d_j
@@ -83,8 +82,7 @@ def run():
 
 def run_normalised():
     highpos = timethis( solve
-                      , lumap
-                      , t_ij
+                      , t_rj
                       , c_rj
                       , q_rj
                       , d_j

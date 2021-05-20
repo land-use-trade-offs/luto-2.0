@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-05-19
+# Last modified: 2021-05-20
 #
 
 import numpy as np
@@ -15,8 +15,7 @@ from gurobipy import GRB
 from luto.tools import timethis
 import luto.data as data
 
-def solve( lumap # Present land-use map in highpos format. [ Not necessary now ]
-         , t_rj  # Transition cost to commodity j at cell r.
+def solve( t_rj  # Transition cost to commodity j at cell r --- with lumap info.
          , c_rj  # Cost of producing commodity j at cell r.
          , q_rj  # Yield of commodity j at cell r.
          , d_j   # Demand for commodity j.
@@ -26,6 +25,8 @@ def solve( lumap # Present land-use map in highpos format. [ Not necessary now ]
          ):
     """Return new lu map. Least-cost, surplus/deficit penalties as costs.
 
+    Note that the t_rj transition-cost matrix _includes_ the information of the
+    current land-use map, which therefore is not passed seperately.
     All inputs are Numpy arrays of the appropriate shapes, except for p_j which
     may either be a scalar --- in which case that value is assumed for all j ---
     or a numpy array. If `pen_norm` is set to `True` the penalties will be
@@ -34,8 +35,8 @@ def solve( lumap # Present land-use map in highpos format. [ Not necessary now ]
     """
 
     # Extract the shape of the problem.
-    nlus = t_ij.shape[0]
-    ncells = lumap.size
+    ncells = t_rj.shape[0]
+    nlus = t_rj.shape[1]
 
     # Assume p_j is only passed as a scalar or a Numpy array.
     if type(p_j) != np.ndarray:

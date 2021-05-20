@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-30
-# Last modified: 2021-05-19
+# Last modified: 2021-05-20
 #
 
 import os.path
@@ -19,14 +19,11 @@ def amortise(dollars, year):
     """Return amortised `dollars` for `year`. Interest 10% over 100 years."""
     return -1 * npf.pmt(0.1, 100, pv=dollars, fv=0, when='begin')
 
-def get_transition_matrix(year):
-    """Return the t_ij land-use to land-use transition matrix for `year`."""
+def get_transition_matrix(year, lumap):
+    """Return the t_rj matrix for `year` based on `lumap`."""
 
     # Raw transition-cost matrix is in AUD/Ha. Set NaNs to zero and amortise.
-    return np.nan_to_num(amortise(data.TCOSTMATRIX, year))
-
-def t_ij2t_rj(t_ij, lumap):
-    """Return cell-by-LU tmatrix from LU-to-LU matrix and LU map."""
+    t_ij = np.nan_to_num(amortise(data.TCOSTMATRIX, year))
 
     # Infer number land-uses and cells from t_ij and lumap matrices.
     nlus = t_ij.shape[0]
