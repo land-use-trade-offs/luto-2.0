@@ -73,17 +73,12 @@ def highpos2gtiff(highpos, out_name):
     ind = np.where(MASK == False, highpos[ind], 255)
     name = data.OUTPUT_DIR + '/' + ('%s.tif' % out_name)
 
-    try:  # Delete if exists.
-        os.remove(name)
-    except:
-        pass
-
-    out_dataset_n = driver.Create(name,
-                                        ncols,
-                                        nrows,
-                                        1,
-                                        GDT_Byte,
-                                        ['COMPRESS=LZW'])
+    out_dataset_n = driver.Create( name
+                                 , ncols
+                                 , nrows
+                                 , 1
+                                 , GDT_Byte
+                                 , ['COMPRESS=LZW'] )
     out_dataset_n.SetGeoTransform(transform)
     out_dataset_n.SetProjection(projection)
 
