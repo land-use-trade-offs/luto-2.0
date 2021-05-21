@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-30
-# Last modified: 2021-05-20
+# Last modified: 2021-05-21
 #
 
 import os.path
@@ -20,7 +20,7 @@ def amortise(dollars, year):
     return -1 * npf.pmt(0.1, 100, pv=dollars, fv=0, when='begin')
 
 def get_transition_matrix(year, lumap):
-    """Return the t_rj matrix for `year` based on `lumap`."""
+    """Return t_rj transition-cost matrix for `year` and `lumap` in AUD/cell."""
 
     # Raw transition-cost matrix is in AUD/Ha. Set NaNs to zero and amortise.
     t_ij = np.nan_to_num(amortise(data.TCOSTMATRIX, year))

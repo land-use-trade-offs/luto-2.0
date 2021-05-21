@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-05-18
+# Last modified: 2021-05-21
 #
 
 import os.path
@@ -14,6 +14,7 @@ import numpy as np
 
 # This declaration before imports to avoid complaints. TODO better solution.
 INPUT_DIR = 'input'
+OUTPUT_DIR = 'output'
 
 # ------------- #
 # Spatial data. #
