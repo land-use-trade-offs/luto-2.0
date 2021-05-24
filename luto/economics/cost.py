@@ -41,6 +41,7 @@ def get_cost(lu, year):
     # Water costs.
     # ------------ #
     if '_irr' in lu:
+        # Water delivery costs in AUD/ha.
         wc = data.RAWEC['WC', lu]
     else:
         wc = 0

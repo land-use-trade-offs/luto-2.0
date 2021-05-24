@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-28
-# Last modified: 2021-05-20
+# Last modified: 2021-05-24
 #
 
 import os.path
@@ -78,7 +78,7 @@ def run():
     print("LU Cost Prior:", precost)
     print("LU Cost Posterior:", postcost)
 
-    return df, precost, postcost
+    return df, precost, postcost, highpos
 
 def run_normalised():
     highpos = timethis( solve
@@ -95,5 +95,5 @@ def run_normalised():
     print("LU Cost Prior:", precost)
     print("LU Cost Posterior:", postcost)
 
-    return df, precost, postcost
+    return df, precost, postcost, highpos
 
