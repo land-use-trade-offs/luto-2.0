@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-30
-# Last modified: 2021-05-21
+# Last modified: 2021-05-27
 #
 
 import os.path
@@ -34,6 +34,11 @@ def get_transition_matrix(year, lumap):
 
     # Areas in hectares for each cell, stacked for each land-use (identical).
     realarea_rj = np.stack((data.REAL_AREA,) * nlus, axis=1)
+
+    # Total aq lic costs = aq req [Ml/ha] x area/cell [ha] x lic price [AUD/Ml].
+    wr_rj = data.RAWEC['WR'].to_numpy() # Water required in Ml/ha.
+    wp_rj = data.RAWEC['WP'].to_numpy() # Water licence price in AUD/Ml.
+    aqlic_rj = wr_rj * realarea_rj * wp_rj # The total switching costs.
 
     # Transition costs to commodity j at cell r converted to AUD per cell.
     t_rj = t_rj_audperha * realarea_rj
