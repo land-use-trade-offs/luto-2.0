@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-05-20
+# Last modified: 2021-05-28
 #
 
 import numpy as np
@@ -164,10 +164,10 @@ def inspect(lumap, highpos, d_j, q_rj, c_rj):
 
         df.loc[lu] = [ precount_dry
                      , predeviation
-                     , predevfrac
+                     , 100 * predevfrac
                      , postcount_dry
                      , postdeviation
-                     , postdevfrac
+                     , 100 * postdevfrac
                      , postcount_dry - precount_dry
                      , 100 * (postcount_dry - precount_dry) / precount_dry
                      , postdeviation - predeviation
@@ -176,10 +176,10 @@ def inspect(lumap, highpos, d_j, q_rj, c_rj):
         lu_irr = lu.replace('_dry', '_irr')
         df.loc[lu_irr] = [ precount_irr
                          , predeviation
-                         , predevfrac
+                         , 100 * predevfrac
                          , postcount_irr
                          , postdeviation
-                         , postdevfrac
+                         , 100 * postdevfrac
                          , postcount_irr - precount_irr
                          , 100 * (postcount_irr - precount_irr) / precount_irr
                          , postdeviation - predeviation

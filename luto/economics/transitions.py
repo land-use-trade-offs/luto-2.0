@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-30
-# Last modified: 2021-05-27
+# Last modified: 2021-05-28
 #
 
 import os.path
@@ -38,9 +38,21 @@ def get_transition_matrix(year, lumap):
     # Total aq lic costs = aq req [Ml/ha] x area/cell [ha] x lic price [AUD/Ml].
     wr_rj = data.RAWEC['WR'].to_numpy() # Water required in Ml/ha.
     wp_rj = data.RAWEC['WP'].to_numpy() # Water licence price in AUD/Ml.
-    aqlic_rj = wr_rj * realarea_rj * wp_rj # The total switching costs.
+    aqlic_rj = np.nan_to_num(wr_rj * realarea_rj * wp_rj) # The total lic costs.
+
+    # Switching from and to an _irr land-use can still incur licence costs.
+    tdelta_rj = np.zeros((ncells, nlus))
+    for r in range(ncells):
+        j = lumap[r]
+        if j % 2 == 1: # If it is currently an irrigated land use.
+            # If licence cheaper than now, no pay. If not, pay difference.
+            tdelta_rj[r] = np.where( aqlic_rj[r] <= aqlic_rj[r, j]
+                                   , 0
+                                   , aqlic_rj[r] - aqlic_rj[r, j] )
+        else: # If it is currently a non-irrigated land use.
+            tdelta_rj[r] = aqlic_rj[r]
 
     # Transition costs to commodity j at cell r converted to AUD per cell.
-    t_rj = t_rj_audperha * realarea_rj
+    t_rj = t_rj_audperha * realarea_rj + tdelta_rj
 
     return t_rj
