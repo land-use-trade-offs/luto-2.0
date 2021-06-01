@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-28
-# Last modified: 2021-05-24
+# Last modified: 2021-06-01
 #
 
 import os.path
@@ -86,7 +86,7 @@ def run_normalised():
                       , c_rj
                       , q_rj
                       , d_j
-                      , 10**6 # p_j
+                      , 10**16 # p_j
                       , x_rj
                       , pen_norm = True )
     df, precost, postcost = inspect(lumap, highpos, d_j, q_rj, c_rj)

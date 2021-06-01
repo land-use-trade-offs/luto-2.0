@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-05-28
+# Last modified: 2021-06-01
 #
 
 import numpy as np
@@ -46,6 +46,9 @@ def solve( t_rj  # Transition cost to commodity j at cell r --- with lumap info.
     if pen_norm:
         d_j_safe = np.where(d_j == 0, 1e-10, d_j) # Avoid division by zero.
         p_j = p_j / d_j_safe
+
+    print("d_j:", "\n", d_j)
+    print("p_j:", "\n", p_j)
 
     try:
         # Make Gurobi model instance.

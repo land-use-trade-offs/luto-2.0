@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-30
-# Last modified: 2021-05-28
+# Last modified: 2021-06-01
 #
 
 import os.path
@@ -17,13 +17,13 @@ import luto.data as data
 
 def amortise(dollars, year):
     """Return amortised `dollars` for `year`. Interest 10% over 100 years."""
-    return -1 * npf.pmt(0.1, 100, pv=dollars, fv=0, when='begin')
+    return -1 * npf.pmt(0.05, 100, pv=dollars, fv=0, when='begin')
 
 def get_transition_matrix(year, lumap):
     """Return t_rj transition-cost matrix for `year` and `lumap` in AUD/cell."""
 
-    # Raw transition-cost matrix is in AUD/Ha. Set NaNs to zero and amortise.
-    t_ij = np.nan_to_num(amortise(data.TCOSTMATRIX, year))
+    # Raw transition-cost matrix is in AUD/Ha. Set NaNs to zero.
+    t_ij = np.nan_to_num(data.TCOSTMATRIX)
 
     # Infer number land-uses and cells from t_ij and lumap matrices.
     nlus = t_ij.shape[0]
@@ -54,5 +54,8 @@ def get_transition_matrix(year, lumap):
 
     # Transition costs to commodity j at cell r converted to AUD per cell.
     t_rj = t_rj_audperha * realarea_rj + tdelta_rj
+
+    # Amortise the lump-sum transition cost.
+    t_rj = amortise(t_rj, year)
 
     return t_rj

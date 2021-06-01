@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-26
-# Last modified: 2021-05-21
+# Last modified: 2021-06-01
 #
 
 import numpy as np
@@ -12,7 +12,7 @@ import numpy as np
 import luto.data as data
 
 def get_quantity(lu, year):
-    """Return quantity (yield) in tonne/cell of `lu` in `year` as 1D Numpy array."""
+    """Return yield in tonne/cell of `lu` in `year` as 1D Numpy array."""
 
     # Every crop or animal x irrigation status has its own yieldincrease.
     #
