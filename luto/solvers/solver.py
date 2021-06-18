@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-06-01
+# Last modified: 2021-06-18
 #
 
 import numpy as np
@@ -112,29 +112,23 @@ def solve( t_rj  # Transition cost to commodity j at cell r --- with lumap info.
 def inspect(lumap, highpos, d_j, q_rj, c_rj):
 
     # Prepare the pandas.DataFrame.
-    columns = [ "Cells [#]"
-              , "Excess [units]"
-              , "Excess [%]"
-              , "Cells [#]"
-              , "Excess [units]"
-              , "Excess [%]"
-              , "Cells [#]"
-              , "Cells [%]"
-              , "Excess [units]"
-              , "Excess [%]" ]
-    categories = [ "Input LU Map"
-                 , "Input LU Map"
-                 , "Input LU Map"
-                 , "Output LU Map"
-                 , "Output LU Map"
-                 , "Output LU Map"
-                 , "Delta"
-                 , "Delta"
-                 , "Delta"
-                 , "Delta" ]
-    mcols = pd.MultiIndex.from_arrays([categories, columns])
+    columns = [ "Pre Cells [#]"
+              , "Pre Costs [AUD]"
+              , "Pre Deviation [units]"
+              , "Pre Deviation [%]"
+              , "Post Cells [#]"
+              , "Post Costs [AUD]"
+              , "Post Deviation [units]"
+              , "Post Deviation [%]"
+              , "Delta Total Cells [#]"
+              , "Delta Total Cells [%]"
+              , "Delta Costs [AUD]"
+              , "Delta Costs [%]"
+              , "Delta Moved Cells [#]"
+              , "Delta Deviation [units]"
+              , "Delta Deviation [%]" ]
     index = data.LANDUSES
-    df = pd.DataFrame(index=index, columns=mcols)
+    df = pd.DataFrame(index=index, columns=columns)
 
     precost = 0
     postcost = 0
@@ -151,6 +145,9 @@ def inspect(lumap, highpos, d_j, q_rj, c_rj):
         prequantity_dry = prewhere_dry @ q_rj.T[k]
         prequantity_irr = prewhere_irr @ q_rj.T[k+1]
 
+        precost_dry = prewhere_dry @ c_rj.T[k]
+        precost_irr = prewhere_irr @ c_rj.T[k+1]
+
         postwhere_dry = np.where(highpos == k, 1, 0)
         postwhere_irr = np.where(highpos == k+1, 1, 0)
         postcount_dry = postwhere_dry.sum()
@@ -158,6 +155,8 @@ def inspect(lumap, highpos, d_j, q_rj, c_rj):
         postquantity_dry = postwhere_dry @ q_rj.T[k]
         postquantity_irr = postwhere_irr @ q_rj.T[k+1]
 
+        postcost_dry = postwhere_dry @ c_rj.T[k]
+        postcost_irr = postwhere_irr @ c_rj.T[k+1]
 
         predeviation = prequantity_dry + prequantity_irr - d_j[j]
         predevfrac = predeviation / d_j[j]
@@ -166,32 +165,46 @@ def inspect(lumap, highpos, d_j, q_rj, c_rj):
         postdevfrac = postdeviation / d_j[j]
 
         df.loc[lu] = [ precount_dry
+                     , precost_dry
                      , predeviation
                      , 100 * predevfrac
                      , postcount_dry
+                     , postcost_dry
                      , postdeviation
                      , 100 * postdevfrac
                      , postcount_dry - precount_dry
                      , 100 * (postcount_dry - precount_dry) / precount_dry
-                     , postdeviation - predeviation
-                     , 100 * (postdeviation - predeviation) / predeviation ]
+                     , postcost_dry - precost_dry
+                     , 100 * (postcost_dry - precost_dry) / precost_dry
+                     , np.sum(postwhere_dry - (prewhere_dry*postwhere_dry))
+                     , np.abs(postdeviation) - np.abs(predeviation)
+                     , 100 * ( np.abs(postdeviation) - np.abs(predeviation)
+                             / predeviation ) ]
 
         lu_irr = lu.replace('_dry', '_irr')
         df.loc[lu_irr] = [ precount_irr
+                         , precost_irr
                          , predeviation
                          , 100 * predevfrac
                          , postcount_irr
+                         , postcost_irr
                          , postdeviation
                          , 100 * postdevfrac
                          , postcount_irr - precount_irr
                          , 100 * (postcount_irr - precount_irr) / precount_irr
-                         , postdeviation - predeviation
-                         , 100 * (postdeviation - predeviation) / predeviation ]
+                         , postcost_irr - precost_irr
+                         , 100 * (postcost_irr - precost_irr) / precost_irr
+                         , np.sum(postwhere_irr - (prewhere_irr*postwhere_irr))
+                         , np.abs(postdeviation) - np.abs(predeviation)
+                         , 100 * ( np.abs(postdeviation) - np.abs(predeviation)
+                                 / predeviation ) ]
 
         precost += prewhere_dry @ c_rj.T[k] + prewhere_irr @ c_rj.T[k+1]
         postcost += postwhere_dry @ c_rj.T[k] + postwhere_irr @ c_rj.T[k+1]
 
-    return df, precost, postcost
+    df.loc['total'] = [df[col].sum() for col in df.columns]
+
+    return df
 
 if __name__ == '__main__':
 

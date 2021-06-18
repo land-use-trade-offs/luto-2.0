@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-28
-# Last modified: 2021-06-01
+# Last modified: 2021-06-18
 #
 
 import os.path
@@ -72,13 +72,12 @@ def run():
                       , d_j
                       , p_j
                       , x_rj )
-    df, precost, postcost = inspect(lumap, highpos, d_j, q_rj, c_rj)
+
+    df = inspect(lumap, highpos, d_j, q_rj, c_rj)
 
     print(df)
-    print("LU Cost Prior:", precost)
-    print("LU Cost Posterior:", postcost)
 
-    return df, precost, postcost, highpos
+    return df, highpos
 
 def run_normalised():
     highpos = timethis( solve
@@ -89,11 +88,10 @@ def run_normalised():
                       , 10**16 # p_j
                       , x_rj
                       , pen_norm = True )
-    df, precost, postcost = inspect(lumap, highpos, d_j, q_rj, c_rj)
+
+    df = inspect(lumap, highpos, d_j, q_rj, c_rj)
 
     print(df)
-    print("LU Cost Prior:", precost)
-    print("LU Cost Posterior:", postcost)
 
-    return df, precost, postcost, highpos
+    return df, highpos
 
