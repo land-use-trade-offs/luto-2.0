@@ -4,10 +4,14 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-05-21
-# Last modified: 2021-05-21
+# Last modified: 2021-06-21
 #
 
 import time
+import os.path
+
+import pandas as pd
+import numpy as np
 
 from luto.tools.gtiffutils import highpos2gtiff
 
@@ -46,4 +50,42 @@ def mergeorderly(dict1, dict2):
         else:
             merged[key] = dict2[key]
     return merged
+
+def crosstabulate(before, after, labels):
+    """Return a cross-tabulation matrix as a Pandas DataFrame."""
+
+    # The base DataFrame
+    ct = pd.crosstab(before, after, margins=True)
+
+    # Replace the numbered row labels with corresponding entries in `labels`.
+    rows = [labels[int(i)] for i in ct.index if i != 'All']
+    # The sum row was excluded, now add it back.
+    rows.append('All')
+
+    # Replace the numbered column labels with corresponding entries in `labels`.
+    cols = [labels[int(i)] for i in ct.columns if i != 'All']
+    # The sum column was excluded, now add it back.
+    cols.append('All')
+
+    # Replace the row and column labels.
+    ct.index = rows
+    ct.columns = cols
+
+    return ct
+
+def ctabnpystocsv(before, after, labels):
+    """Write cross-tabulation of `before` and `after` from .npys to .csv."""
+
+    # Load the .npy arrays.
+    pre = np.load(before)
+    post = np.load(after)
+
+    # Get the file names as strings without extension.
+    prename = os.path.splitext(os.path.basename(before))[0]
+    postname = os.path.splitext(os.path.basename(after))[0]
+    dirname = os.path.dirname(before)
+
+    # Produce the cross tabulation and write the file to dir of first file.
+    ct = crosstabulate(pre, post, labels)
+    ct.to_csv(os.path.join(dirname, prename + str(2) + postname + ".csv"))
 
