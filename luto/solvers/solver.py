@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-06-18
+# Last modified: 2021-06-25
 #
 
 import numpy as np
@@ -15,44 +15,51 @@ from gurobipy import GRB
 from luto.tools import timethis
 import luto.data as data
 
+# Default constraint settings.
+constraints = { 'water': True
+              , 'nutrients': True
+              , 'carbon': True
+              , 'biodiversity': True
+              }
+
 def solve( t_rj  # Transition cost to commodity j at cell r --- with lumap info.
          , c_rj  # Cost of producing commodity j at cell r.
          , q_rj  # Yield of commodity j at cell r.
          , d_j   # Demand for commodity j.
-         , p_j   # Penalty level or cost/unit surplus or deficit of commodity j.
+         , p     # Penalty level. Multiplies cost per unit surplus or deficits.
          , x_rj  # Possible/allowed land uses j at cell r.
-         , pen_norm = False # If `True`, normalise penalties against demands.
+         , constraints = constraints # Which constraints to use (default all).
          ):
     """Return new lu map. Least-cost, surplus/deficit penalties as costs.
 
     Note that the t_rj transition-cost matrix _includes_ the information of the
     current land-use map, which therefore is not passed seperately.
-    All inputs are Numpy arrays of the appropriate shapes, except for p_j which
-    may either be a scalar --- in which case that value is assumed for all j ---
-    or a numpy array. If `pen_norm` is set to `True` the penalties will be
-    normalised by dividing out the demands. This would typically be
-    accompanied by a high, scalar, value for p_j.
+
+    All inputs are Numpy arrays of the appropriate shapes, except for p which
+    is a scalar multiplier.
+
+    To run with only a subset of the constraints, pass a custom `constraints`
+    dictionary. Format {key: value} where 'key' is a string, one of 'water',
+    'nutrients', 'carbon' or 'biodiversity' and 'value' is either True or False.
     """
 
     # Extract the shape of the problem.
     ncells = t_rj.shape[0]
     nlus = t_rj.shape[1]
 
-    # Assume p_j is only passed as a scalar or a Numpy array.
-    if type(p_j) != np.ndarray:
-        p_j = np.repeat(p_j, nlus // 2)
+    # Calculate the penalty units for each land use j as its maximum cost.
+    p_j = np.zeros(nlus // 2)
+    for j in range(nlus // 2):
+        k = 2 * j
+        p_j[j] = max( c_rj.T[k].max()
+                    , c_rj.T[k+1].max() )
 
-    # If `pen_norm` is `True` perform the normalisation.
-    if pen_norm:
-        d_j_safe = np.where(d_j == 0, 1e-10, d_j) # Avoid division by zero.
-        p_j = p_j / d_j_safe
-
-    print("d_j:", "\n", d_j)
-    print("p_j:", "\n", p_j)
+    # Apply the multiplier.
+    p_j *= p
 
     try:
         # Make Gurobi model instance.
-        model = gp.Model('PseudoLUTO demdriv/comswitch v0.02')
+        model = gp.Model('neoLUTO v0.03')
         # model.Params.Method = 1    # Use dual simplex only. Save memory.
 
         # Land-use indexed list of ncells-sized decision variable vectors.
@@ -64,7 +71,6 @@ def solve( t_rj  # Transition cost to commodity j at cell r --- with lumap info.
         # Set the objective function and the model sense.
         objective = ( sum( c_rj.T[j] @ X[j]              # Cost of producing.
                          + t_rj.T[j] @ X[j]              # Cost of switching.
-                         # + V[j]
                            for j in range(nlus) )        # For each land use.
                     + sum( V[k]
                            for k in range(nlus // 2) ) # Cost of surpl/defct.
@@ -73,12 +79,6 @@ def solve( t_rj  # Transition cost to commodity j at cell r --- with lumap info.
 
         # Constraint that all of every cell is used for some land use.
         model.addConstr(sum(X) == np.ones(ncells))
-
-        # Constraints that penalise deficits and surpluses, respectively.
-        # model.addConstrs( p_j[j] * (d_j[j] - q_rj.T[j] @ X[j]) <= V[j]
-                          # for j in range(nlus) )
-        # model.addConstrs( p_j[j] * (q_rj.T[j] @ X[j] - d_j[j]) <= V[j]
-                          # for j in range(nlus) )
 
         # Constraints that penalise deficits and surpluses, respectively.
         # Demands per actual land-use, irrespective of irrigation status.
@@ -90,6 +90,24 @@ def solve( t_rj  # Transition cost to commodity j at cell r --- with lumap info.
                         * ( ( q_rj.T[2*j]   @ X[2*j]
                             + q_rj.T[2*j+1] @ X[2*j+1] ) - d_j[j] ) <= V[j]
                           for j in range(nlus // 2) )
+
+        # Only add the following constraints if requested.
+
+        # Water use capped, per catchment, at volume consumed in base year.
+        if constraints['water']:
+            # For each catchment
+            for c, cap in watercaps:
+                model.addConstrs( w_rj.T[2*j+1] @ X[2*j+1] <= cap
+                                  for j in range(nlus // 2) )
+
+        if constraints['nutrients']:
+            ...
+
+        if constraints['carbon']:
+            ...
+
+        if constraints['biodiversity']:
+            ...
 
         # Magic.
         model.optimize()

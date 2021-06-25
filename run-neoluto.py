@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-28
-# Last modified: 2021-06-18
+# Last modified: 2021-06-25
 #
 
 import os.path
@@ -45,7 +45,7 @@ q_rj = get_quantity_matrix(year)
 # d_j = np.zeros(int(data.NLUS / 2)) # Prepare the demands array - one cell per LU.
 # p_j = np.zeros(int(data.NLUS / 2)) # Prepare the penalty array - one cell per LU.
 d_j = np.zeros(data.NLUS // 2) # Prepare the demands array - one cell per LU.
-p_j = np.zeros(data.NLUS // 2) # Prepare the penalty array - one cell per LU.
+# p_j = np.zeros(data.NLUS // 2) # Prepare the penalty array - one cell per LU.
 
 for j in range(data.NLUS // 2):
     k = 2 * j
@@ -54,7 +54,7 @@ for j in range(data.NLUS // 2):
     #        [ yield of j for all r ] . [ all r where j occurs ]
     d_j[j] = ( q_rj.T[k]   @ np.where(lumap == k, 1, 0)
              + q_rj.T[k+1] @ np.where(lumap == k+1, 1, 0) )
-    p_j[j] = max(c_rj.T[k].max(), c_rj.T[k+1].max())
+    # p_j[j] = max(c_rj.T[k].max(), c_rj.T[k+1].max())
 # for j in range(data.NLUS):
     # d_j[j] = q_rj.T[j]   @ np.where(lumap == j, 1, 0)
     # p_j[j] = c_rj.T[j].mean()
@@ -64,13 +64,13 @@ x_rj = data.x_rj
 # x_rj = np.ones((data.NCELLS, data.NLUS), dtype=np.int8) # data.x_rj
 # x_rj = np.random.randint(2, size=(data.NCELLS, data.NLUS), dtype=np.int8)
 
-def run():
+def run(p=1):
     highpos = timethis( solve
                       , t_rj
                       , c_rj
                       , q_rj
                       , d_j
-                      , p_j
+                      , p
                       , x_rj )
 
     df = inspect(lumap, highpos, d_j, q_rj, c_rj)
@@ -79,15 +79,14 @@ def run():
 
     return df, highpos
 
-def run_normalised():
+def run_decigoogol_penalty():
     highpos = timethis( solve
                       , t_rj
                       , c_rj
                       , q_rj
                       , d_j
-                      , 10**16 # p_j
-                      , x_rj
-                      , pen_norm = True )
+                      , 10**10
+                      , x_rj )
 
     df = inspect(lumap, highpos, d_j, q_rj, c_rj)
 
