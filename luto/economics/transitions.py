@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-30
-# Last modified: 2021-06-04
+# Last modified: 2021-06-28
 #
 
 import os.path
@@ -15,8 +15,8 @@ import numpy_financial as npf
 
 import luto.data as data
 
-def amortise(dollars, year):
-    """Return amortised `dollars` for `year`. Interest 10% over 100 years."""
+def amortise(dollars):
+    """Return amortised `dollars` for `year`. Interest 5% over 100 years."""
     return -1 * npf.pmt(0.05, 100, pv=dollars, fv=0, when='begin')
 
 def get_transition_matrix(year, lumap):
@@ -56,8 +56,5 @@ def get_transition_matrix(year, lumap):
 
     # Transition costs to commodity j at cell r converted to AUD per cell.
     t_rj = t_rj_audperha * realarea_rj + tdelta_rj
-
-    # Amortise the lump-sum transition cost.
-    t_rj = amortise(t_rj, year)
 
     return t_rj

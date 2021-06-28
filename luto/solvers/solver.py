@@ -95,10 +95,11 @@ def solve( t_rj  # Transition cost to commodity j at cell r --- with lumap info.
 
         # Water use capped, per catchment, at volume consumed in base year.
         if constraints['water']:
-            # For each catchment
-            for c, cap in watercaps:
-                model.addConstrs( w_rj.T[2*j+1] @ X[2*j+1] <= cap
-                                  for j in range(nlus // 2) )
+            ...
+            # # For each catchment
+            # for c, cap in watercaps:
+                # model.addConstrs( w_rj.T[2*j+1] @ X[2*j+1] <= cap
+                                  # for j in range(nlus // 2) )
 
         if constraints['nutrients']:
             ...

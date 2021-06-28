@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-05-21
+# Last modified: 2021-06-28
 #
 
 import numpy as np
@@ -34,8 +34,8 @@ def get_cost(lu, year):
     # Turn QC into actual cost per quantity, i.e. divide by quantity.
     qc = data.RAWEC['QC', lu] / data.RAWEC['Q1', lu]
 
-    # Multiply by quantity (containing trends) for quantity costs per cell.
-    qc *= get_quantity(lu, year)
+    # Multiply by quantity (w/ trends) for q-costs per ha. Divide for per cell.
+    qc *= get_quantity(lu, year) / data.REAL_AREA
 
     # ------------ #
     # Water costs.
