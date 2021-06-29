@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-30
-# Last modified: 2021-06-28
+# Last modified: 2021-06-29
 #
 
 import os.path
@@ -15,9 +15,9 @@ import numpy_financial as npf
 
 import luto.data as data
 
-def amortise(dollars):
-    """Return amortised `dollars` for `year`. Interest 5% over 100 years."""
-    return -1 * npf.pmt(0.05, 100, pv=dollars, fv=0, when='begin')
+def amortise(cost, rate=0.05, horizon=30):
+    """Return amortised `cost` at `rate`interest over `horizon` years."""
+    return -1 * npf.pmt(rate, horizon, pv=cost, fv=0, when='begin')
 
 def get_transition_matrix(year, lumap):
     """Return t_rj transition-cost matrix for `year` and `lumap` in AUD/cell."""
