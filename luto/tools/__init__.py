@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-05-21
-# Last modified: 2021-06-21
+# Last modified: 2021-06-30
 #
 
 import time
@@ -87,5 +87,101 @@ def ctabnpystocsv(before, after, labels):
 
     # Produce the cross tabulation and write the file to dir of first file.
     ct = crosstabulate(pre, post, labels)
-    ct.to_csv(os.path.join(dirname, prename + str(2) + postname + ".csv"))
+    ct.to_csv(os.path.join(prename + str(2) + postname + ".csv"))
 
+def inspect(lumap, highpos, d_j, q_rj, c_rj, landuses):
+
+    # Prepare the pandas.DataFrame.
+    columns = [ "Pre Cells [#]"
+              , "Pre Costs [AUD]"
+              , "Pre Deviation [units]"
+              , "Pre Deviation [%]"
+              , "Post Cells [#]"
+              , "Post Costs [AUD]"
+              , "Post Deviation [units]"
+              , "Post Deviation [%]"
+              , "Delta Total Cells [#]"
+              , "Delta Total Cells [%]"
+              , "Delta Costs [AUD]"
+              , "Delta Costs [%]"
+              , "Delta Moved Cells [#]"
+              , "Delta Deviation [units]"
+              , "Delta Deviation [%]" ]
+    index = landuses
+    df = pd.DataFrame(index=index, columns=columns)
+
+    precost = 0
+    postcost = 0
+
+    # Reduced land-use list with half of the land-uses.
+    lus = [lu for lu in landuses if '_dry' in lu]
+
+    for j, lu in enumerate(lus):
+        k = 2*j
+        prewhere_dry = np.where(lumap == k, 1, 0)
+        prewhere_irr = np.where(lumap == k+1, 1, 0)
+        precount_dry = prewhere_dry.sum()
+        precount_irr = prewhere_irr.sum()
+        prequantity_dry = prewhere_dry @ q_rj.T[k]
+        prequantity_irr = prewhere_irr @ q_rj.T[k+1]
+
+        precost_dry = prewhere_dry @ c_rj.T[k]
+        precost_irr = prewhere_irr @ c_rj.T[k+1]
+
+        postwhere_dry = np.where(highpos == k, 1, 0)
+        postwhere_irr = np.where(highpos == k+1, 1, 0)
+        postcount_dry = postwhere_dry.sum()
+        postcount_irr = postwhere_irr.sum()
+        postquantity_dry = postwhere_dry @ q_rj.T[k]
+        postquantity_irr = postwhere_irr @ q_rj.T[k+1]
+
+        postcost_dry = postwhere_dry @ c_rj.T[k]
+        postcost_irr = postwhere_irr @ c_rj.T[k+1]
+
+        predeviation = prequantity_dry + prequantity_irr - d_j[j]
+        predevfrac = predeviation / d_j[j]
+
+        postdeviation = postquantity_dry + postquantity_irr - d_j[j]
+        postdevfrac = postdeviation / d_j[j]
+
+        df.loc[lu] = [ precount_dry
+                     , precost_dry
+                     , predeviation
+                     , 100 * predevfrac
+                     , postcount_dry
+                     , postcost_dry
+                     , postdeviation
+                     , 100 * postdevfrac
+                     , postcount_dry - precount_dry
+                     , 100 * (postcount_dry - precount_dry) / precount_dry
+                     , postcost_dry - precost_dry
+                     , 100 * (postcost_dry - precost_dry) / precost_dry
+                     , np.sum(postwhere_dry - (prewhere_dry*postwhere_dry))
+                     , np.abs(postdeviation) - np.abs(predeviation)
+                     , 100 * ( np.abs(postdeviation) - np.abs(predeviation)
+                             / predeviation ) ]
+
+        lu_irr = lu.replace('_dry', '_irr')
+        df.loc[lu_irr] = [ precount_irr
+                         , precost_irr
+                         , predeviation
+                         , 100 * predevfrac
+                         , postcount_irr
+                         , postcost_irr
+                         , postdeviation
+                         , 100 * postdevfrac
+                         , postcount_irr - precount_irr
+                         , 100 * (postcount_irr - precount_irr) / precount_irr
+                         , postcost_irr - precost_irr
+                         , 100 * (postcost_irr - precost_irr) / precost_irr
+                         , np.sum(postwhere_irr - (prewhere_irr*postwhere_irr))
+                         , np.abs(postdeviation) - np.abs(predeviation)
+                         , 100 * ( np.abs(postdeviation) - np.abs(predeviation)
+                                 / predeviation ) ]
+
+        precost += prewhere_dry @ c_rj.T[k] + prewhere_irr @ c_rj.T[k+1]
+        postcost += postwhere_dry @ c_rj.T[k] + postwhere_irr @ c_rj.T[k+1]
+
+    df.loc['total'] = [df[col].sum() for col in df.columns]
+
+    return df

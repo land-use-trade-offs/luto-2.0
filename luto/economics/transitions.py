@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-30
-# Last modified: 2021-06-29
+# Last modified: 2021-06-30
 #
 
 import os.path
@@ -56,5 +56,8 @@ def get_transition_matrix(year, lumap):
 
     # Transition costs to commodity j at cell r converted to AUD per cell.
     t_rj = t_rj_audperha * realarea_rj + tdelta_rj
+
+    # Amortise the transition costs.
+    t_rj = amortise(t_rj)
 
     return t_rj

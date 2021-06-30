@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-28
-# Last modified: 2021-06-29
+# Last modified: 2021-06-30
 #
 
 import os.path
@@ -18,9 +18,10 @@ from luto.economics.cost import get_cost_matrix
 from luto.economics.quantity import get_quantity_matrix
 from luto.economics.transitions import get_transition_matrix
 
-from luto.solvers.solver import solve, inspect
+from luto.solvers.solver import solve
 
-from luto.tools import timethis
+from luto.tools import timethis, inspect, ctabnpystocsv
+from luto.tools.highposgtiff import write_highpos_gtiff
 
 # Required input data - for now, just year zero.
 #
@@ -54,7 +55,7 @@ for j in range(data.NLUS // 2):
 # Possible land uses j at cell r.
 x_rj = data.x_rj
 
-def run(p=1):
+def run(p=1, write=True):
     highpos = timethis( solve
                       , t_rj
                       , c_rj
@@ -63,9 +64,18 @@ def run(p=1):
                       , p
                       , x_rj )
 
-    df = inspect(lumap, highpos, d_j, q_rj, c_rj)
+    df = inspect(lumap, highpos, d_j, q_rj, c_rj, data.LANDUSES)
 
     print(df)
+
+    if write:
+        np.save('highpos.npy', highpos)
+        df.to_csv('diff.csv')
+        write_highpos_gtiff('highpos.npy', 'highpos')
+        ctabnpystocsv( os.path.join(data.INPUT_DIR, 'lumap.npy')
+                     , 'highpos.npy'
+                     , data.LANDUSES )
+
 
     return df, highpos
 
@@ -78,7 +88,7 @@ def run_decigoogol_penalty():
                       , 10**10
                       , x_rj )
 
-    df = inspect(lumap, highpos, d_j, q_rj, c_rj)
+    df = inspect(lumap, highpos, d_j, q_rj, c_rj, data.LANDUSES)
 
     print(df)
 
