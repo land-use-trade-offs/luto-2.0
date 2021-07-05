@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-28
-# Last modified: 2021-06-30
+# Last modified: 2021-07-05
 #
 
 import os.path
@@ -19,6 +19,7 @@ from luto.economics.quantity import get_quantity_matrix
 from luto.economics.transitions import get_transition_matrix
 
 from luto.solvers.solver import solve
+from luto.solvers.stacksolver import solve as stacksolve
 
 from luto.tools import timethis, inspect, ctabnpystocsv
 from luto.tools.highposgtiff import write_highpos_gtiff
@@ -135,3 +136,42 @@ def run_random(ncells, nlus, p=1):
 
     return highpos
 
+def runstack_random(ncells, nlus, p=1):
+    """Run stacked model w/ random data, penalty-level `p` and shape ncells, nlus."""
+
+    # Bogus lumap.
+    lumap = np.random.randint(nlus, size=ncells)
+
+    # Transition cost matrix.
+    t_ij = 10 * np.random.random((nlus, nlus))
+    for i in range(nlus): t_ij[i, i] = 0
+
+    t_rj = np.stack(tuple(t_ij[lumap[r]] for r in range(ncells)))
+    tm_rj = 0.1 * t_rj
+
+    # Production cost matrix.
+    c_rj = 10 * np.random.random((ncells, nlus))
+    cm_rj = 0.1 * c_rj
+
+    # Yield matrix.
+    q_rj = 10 * np.random.random((ncells, nlus))
+    qm_rj = 5 * q_rj
+
+    # Demands.
+    d_j = 20 * np.random.random(nlus)
+
+    # Exclude matrix.
+    x_rj = np.ones((ncells, nlus)) # np.random.randint(2, size=(ncells, nlus), dtype=np.int8)
+
+    highpos, mngmnt = timethis( stacksolve
+                              , t_rj
+                              , tm_rj
+                              , c_rj
+                              , cm_rj
+                              , q_rj
+                              , qm_rj
+                              , d_j
+                              , p
+                              , x_rj )
+
+    return highpos, mngmnt

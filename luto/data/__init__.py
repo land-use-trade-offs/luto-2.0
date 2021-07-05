@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-05-21
+# Last modified: 2021-07-02
 #
 
 import os.path
@@ -21,6 +21,10 @@ OUTPUT_DIR = 'output'
 # ------------- #
 
 import luto.data.spatial as spatial
+
+# ------------------- #
+# Agro-economic data. #
+# ------------------- #
 
 # Raw (spatial-) economic data.
 fpath = os.path.join(INPUT_DIR, "col-lu-irr-plugged.feather")
