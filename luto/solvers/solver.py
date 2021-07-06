@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-06-30
+# Last modified: 2021-07-06
 #
 
 import numpy as np
@@ -12,14 +12,40 @@ import pandas as pd
 import gurobipy as gp
 from gurobipy import GRB
 
-import luto.data as data
-
 # Default constraint settings.
 constraints = { 'water': True
               , 'nutrients': True
               , 'carbon': True
               , 'biodiversity': True
               }
+
+def coursify(array, resfactor):
+    """Return course-grained version of array, coursened by `resfactor`."""
+    # Every index * `resfactor` is sampled. New array length varies.
+    return array[::resfactor]
+
+def uncoursify(array, resfactor, presize=None):
+    """Return array inflated by `resfactor`. Inverse of `coursify()`."""
+
+    r, j = array.shape
+    dtype = array.dtype
+
+    if presize is None:
+        bshape = (r * resfactor, j)
+        brray = np.ones(bshape, dtype=dtype)
+    else:
+        brray = np.ones((presize, j), dtype=dtype)
+
+    for i in range(0, len(brray), resfactor):
+        for k in range(resfactor):
+            brray[i+k] = array[i // resfactor]
+
+    return brray
+
+
+
+
+
 
 def solve( t_rj  # Transition cost to commodity j at cell r --- with lumap info.
          , c_rj  # Cost of producing commodity j at cell r.

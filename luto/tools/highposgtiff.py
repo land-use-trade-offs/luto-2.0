@@ -5,7 +5,7 @@
 # Original author: Carla Archibald (c.archibald@deakin.edu.au)
 # Adaptation: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-06-25
-# Last modified: 2021-06-25
+# Last modified: 2021-07-06
 #
 
 import os.path
@@ -18,7 +18,7 @@ from rasterio import features
 from geopandas import GeoDataFrame
 from shapely.geometry import Point
 
-import luto.data as data
+# import luto.data as data
 
 def write_highpos_gtiff(highpos, fname):
     """Write a GeoTIFF `fname.tif` from `highpos` Numpy array.
@@ -38,7 +38,7 @@ def write_highpos_gtiff(highpos, fname):
     highpos['SID'] = highpos.index
 
     # Read in LUTO cell ID concordance
-    LUTO_sid_xy = pd.read_csv(os.path.join(data.INPUT_DIR, 'xy-lutoid.csv'))
+    LUTO_sid_xy = pd.read_csv(os.path.join('input', 'xy-lutoid.csv'))
 
     # Join high_pos with LUTO cell ID concordance
     highpos_xy = pd.merge( left=LUTO_sid_xy
@@ -53,7 +53,7 @@ def write_highpos_gtiff(highpos, fname):
     gdf.plot(column='LU_Class')
 
     # Set up raster meta using NLUM raster
-    rst = rasterio.open(os.path.join(data.INPUT_DIR, 'nlum-raster.tif'))
+    rst = rasterio.open(os.path.join('input', 'nlum-raster.tif'))
     meta = rst.meta.copy()
     meta.update(compress='lzw')
 

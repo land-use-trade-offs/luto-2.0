@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-07-05
-# Last modified: 2021-07-05
+# Last modified: 2021-07-06
 #
 
 import numpy as np
@@ -12,7 +12,7 @@ import pandas as pd
 import gurobipy as gp
 from gurobipy import GRB
 
-import luto.data as data
+from luto.tools import timethis
 
 def solve( t_rj  # Transition cost to commodity j at cell r --- with lumap info.
          , tm_rj # Additional cost for management of commodity j at cell r.
@@ -72,7 +72,7 @@ def solve( t_rj  # Transition cost to commodity j at cell r --- with lumap info.
         model.addConstr(sum(X) == np.ones(ncells))
 
         # Constraint to ensure management applies only to the selected land use.
-        model.addConstrs( M[j] @ X[j] <= 1 for j in range(nlus))
+        model.addConstrs( M[j] - X[j] <= 1 for j in range(nlus))
         # model.addConstrs( np.ones(ncells) @ (M[j] - X[j]) <= 0
                           # for j in range(nlus) )
 
@@ -104,3 +104,43 @@ def solve( t_rj  # Transition cost to commodity j at cell r --- with lumap info.
     except AttributeError:
         print('Encountered an attribute error')
 
+def runstack_random(ncells, nlus, p=1):
+    """Run stacked model w/ rand data, penalty-level `p`, shape ncells, nlus."""
+
+    # Bogus lumap.
+    lumap = np.random.randint(nlus, size=ncells)
+
+    # Transition cost matrix.
+    t_ij = 10 * np.random.random((nlus, nlus))
+    for i in range(nlus): t_ij[i, i] = 0
+
+    t_rj = np.stack(tuple(t_ij[lumap[r]] for r in range(ncells)))
+    tm_rj = 0.1 * t_rj
+
+    # Production cost matrix.
+    c_rj = 10 * np.random.random((ncells, nlus))
+    cm_rj = 0.1 * c_rj
+
+    # Yield matrix.
+    q_rj = 10 * np.random.random((ncells, nlus))
+    qm_rj = 5 * q_rj
+
+    # Demands.
+    d_j = 20 * np.random.random(nlus)
+
+    # Exclude matrix.
+    x_rj = np.ones((ncells, nlus))
+    # np.random.randint(2, size=(ncells, nlus), dtype=np.int8)
+
+    highpos, mngmnt = timethis( solve
+                              , t_rj
+                              , tm_rj
+                              , c_rj
+                              , cm_rj
+                              , q_rj
+                              , qm_rj
+                              , d_j
+                              , p
+                              , x_rj )
+
+    return highpos, mngmnt
