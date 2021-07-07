@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-28
-# Last modified: 2021-07-05
+# Last modified: 2021-07-07
 #
 
 import os.path
@@ -18,7 +18,7 @@ from luto.economics.cost import get_cost_matrix
 from luto.economics.quantity import get_quantity_matrix
 from luto.economics.transitions import get_transition_matrix
 
-from luto.solvers.solver import solve
+from luto.solvers.solver import solve, coursify, uncoursify
 from luto.solvers.stacksolver import solve as stacksolve
 
 from luto.tools import timethis, inspect, ctabnpystocsv
@@ -95,7 +95,7 @@ def run_decigoogol_penalty():
 
     return df, highpos
 
-def run_random(ncells, nlus, p=1):
+def run_random(ncells, nlus, p=1, resfactor=1):
     """Run model with random data, penalty-level `p` and shape ncells, nlus."""
 
     # `nlus` needs to be an even number because land-uses come as dry/irr pairs.
@@ -121,18 +121,34 @@ def run_random(ncells, nlus, p=1):
         d_j = 10 * np.random.random(nlus)
 
         # Exclude matrix.
-        x_rj = np.random.randint(2, size=(ncells, nlus), dtype=np.int8)
+        x_rj = np.ones_like(t_rj) # np.random.randint(2, size=(ncells, nlus), dtype=np.int8)
 
-        # x_rj[2] = 0
-        # x_rj[2, 2] = 1
+        if resfactor == 1:
+            highpos = timethis( solve
+                            , t_rj
+                            , c_rj
+                            , q_rj
+                            , d_j
+                            , p
+                            , x_rj )
+        else:
+            print("Applying resfactor =", str(resfactor) + ".")
 
-        highpos = timethis( solve
-                        , t_rj
-                        , c_rj
-                        , q_rj
-                        , d_j
-                        , p
-                        , x_rj )
+            print("Course-graining input arrays...")
+            t_rj = coursify(t_rj, resfactor)
+            c_rj = coursify(c_rj, resfactor)
+            q_rj = coursify(q_rj, resfactor)
+            x_rj = coursify(x_rj, resfactor)
+
+            highpos = timethis( solve
+                            , t_rj
+                            , c_rj
+                            , q_rj
+                            , d_j
+                            , p
+                            , x_rj )
+            print("Inflating highpos output array to original original extent...")
+            highpos = uncoursify(highpos, resfactor, presize=ncells)
 
     return highpos
 

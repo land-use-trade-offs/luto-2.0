@@ -27,25 +27,22 @@ def coursify(array, resfactor):
 def uncoursify(array, resfactor, presize=None):
     """Return array inflated by `resfactor`. Inverse of `coursify()`."""
 
-    r, j = array.shape
-    dtype = array.dtype
+    # Determine the shape of the output array as well as the dtype.
+    if presize is None: presize = resfactor * array.shape[0]
+    bshape = list(array.shape)
+    bshape[0] = presize
+    bshape = tuple(bshape)
+    brray = np.ones(bshape, dtype=array.dtype)
 
-    if presize is None:
-        bshape = (r * resfactor, j)
-        brray = np.ones(bshape, dtype=dtype)
-    else:
-        brray = np.ones((presize, j), dtype=dtype)
-
-    for i in range(0, len(brray), resfactor):
+    # Output will be length presize. Second for-loop to fill out tail end.
+    for i in range(0, len(brray) - resfactor, resfactor):
         for k in range(resfactor):
             brray[i+k] = array[i // resfactor]
+    i += resfactor
+    for k in range(presize - (array.shape[0]-1)*resfactor):
+        brray[i+k] = array[i // resfactor]
 
     return brray
-
-
-
-
-
 
 def solve( t_rj  # Transition cost to commodity j at cell r --- with lumap info.
          , c_rj  # Cost of producing commodity j at cell r.
