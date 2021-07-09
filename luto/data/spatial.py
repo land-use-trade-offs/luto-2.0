@@ -110,7 +110,3 @@ def wherelu(df=None):
     """
     if df is None: df = colluirr()
     return df['Q1'].where(pd.isna, True).where(pd.notna, False)
-
-
-
-
