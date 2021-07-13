@@ -4,10 +4,9 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-07-09
-# Last modified: 2021-07-09
+# Last modified: 2021-07-12
 #
 
-import importlib
 import os.path
 
 import pandas as pd
