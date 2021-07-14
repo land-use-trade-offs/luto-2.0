@@ -43,7 +43,11 @@ REAL_AREA = np.load(os.path.join(INPUT_DIR, 'realArea.npy'))
 import luto.data.temporal as temporal
 
 # Yield increases.
-YIELDINCREASE = temporal.yieldincrease
+fpath = os.path.join(INPUT_DIR, "yieldincreases-c9.hdf5")
+YIELDINCREASE = pd.read_hdf(fpath, 'yieldincreases')
+
+# Legacy
+YIELDINCREASES = temporal.yieldincrease
 
 # Climate-change damage bricks (NYEARS x NCELLS).
 AG_DRYLAND_DAMAGE = temporal.ag_dryland_damage
