@@ -4,13 +4,64 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-06-28
+# Last modified: 2021-07-14
 #
 
 import numpy as np
 
 import luto.data as data
 from luto.economics.quantity import get_quantity
+
+
+def get_cost_ag(lu, lm, year):
+    """Return production cost [AUD/cell] of `lu`+`lm` in `year` as np array.
+
+    `lu`: land use (e.g. 'winterCereals' or 'beef').
+    `lm`: land management (e.g. 'dry', 'irr', 'org').
+    `year`: number of years from base year, counting from zero.
+    """
+
+    # ------------ #
+    # Fixed costs. #
+    # ------------ #
+    fc = 0
+    for c in ['FLC', 'FOC', 'FDC']:
+        fc += data.AGEC[c, lm, lu].copy()
+
+    # ----------- #
+    # Area costs.
+    # ----------- #
+    ac = data.AGEC['AC', lm, lu]
+
+    # --------------- #
+    # Quantity costs.
+    # --------------- #
+
+    # Turn QC into actual cost per quantity, i.e. divide by quantity.
+    qc = data.AGEC['QC', lm, lu] / data.AGEC['Q1', lm, lu]
+
+    # Multiply by quantity (w/ trends) for q-costs per ha. Divide for per cell.
+    qc *= get_quantity(lu, year) / data.REAL_AREA
+
+    # ------------ #
+    # Water costs.
+    # ------------ #
+    if lm == 'irr':
+        # Water delivery costs in AUD/ha.
+        wc = data.AGEC['WC', lm, lu]
+    else:
+        wc = 0
+
+    # ------------ #
+    # Total costs.
+    # ------------ #
+    tc = fc + (qc + ac + wc) * data.DIESEL_PRICE_PATH[year]
+
+    # Costs so far in AUD/ha. Now convert to AUD/cell.
+    cost = tc * data.REAL_AREA
+
+    return cost.values
+
 
 def get_cost(lu, year):
     """Return cost in AUD/cell of producing `lu` in `year` as 1D Numpy array."""
