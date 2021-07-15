@@ -4,13 +4,13 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-07-14
+# Last modified: 2021-07-15
 #
 
 import numpy as np
 
 import luto.data as data
-from luto.economics.quantity import get_quantity
+from luto.economics.quantity import get_quantity, get_quantity_ag
 
 
 def get_cost_ag(lu, lm, year):
@@ -41,7 +41,7 @@ def get_cost_ag(lu, lm, year):
     qc = data.AGEC['QC', lm, lu] / data.AGEC['Q1', lm, lu]
 
     # Multiply by quantity (w/ trends) for q-costs per ha. Divide for per cell.
-    qc *= get_quantity(lu, year) / data.REAL_AREA
+    qc *= get_quantity_ag(lu, lm, year) / data.REAL_AREA
 
     # ------------ #
     # Water costs.
@@ -62,6 +62,13 @@ def get_cost_ag(lu, lm, year):
 
     return cost.values
 
+def get_cost_matrix(lm, year):
+    """Return c_rj matrix of costs/cell per lu under `lm` in `year`."""
+    c_rj = np.zeros((data.NCELLS, len(data.RLANDUSES)))
+    for j, lu in enumerate(data.RLANDUSES):
+        c_rj[:, j] = get_cost_ag(lu, lm, year)
+    # Make sure all NaNs are replaced by zeroes.
+    return np.nan_to_num(c_rj)
 
 def get_cost(lu, year):
     """Return cost in AUD/cell of producing `lu` in `year` as 1D Numpy array."""
@@ -107,7 +114,7 @@ def get_cost(lu, year):
 
     return cost.values
 
-def get_cost_matrix(year):
+def get_cost_matrix_old(year):
     """Return c_rj matrix of unit costs per cell per lu as 2D Numpy array."""
     c_rj = np.zeros((data.NCELLS, data.NLUS))
     for j, lu in enumerate(data.LANDUSES):
