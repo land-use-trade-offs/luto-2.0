@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-07-14
+# Last modified: 2021-07-16
 #
 
 import os.path
@@ -62,6 +62,11 @@ DIESEL_PRICE_PATH = temporal.diesel_price_path
 
 # Raw transition cost matrix.
 TCOSTMATRIX = np.load(os.path.join(INPUT_DIR, 'tmatrix-audperha.npy'))
+
+# Raw transition cost matrix. In AUD/ha and ordered lexicographically.
+fpath = os.path.join(INPUT_DIR, 'tmatrix.csv')
+TMATRIX = pd.read_csv(fpath, index_col=0)
+TMATRIX = TMATRIX.sort_index(axis='index').sort_index(axis='columns')
 
 # Boolean x_rj matrix identifying allowed land uses j for each cell r.
 x_rj = spatial.wherelu(RAWEC).values.astype(np.int8)
