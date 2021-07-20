@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-07-07
+# Last modified: 2021-07-20
 #
 
 import numpy as np
@@ -44,14 +44,91 @@ def uncoursify(array, resfactor, presize=None):
 
     return brray
 
-def solve( t_rj  # Transition cost to commodity j at cell r --- with lumap info.
-         , c_rj  # Cost of producing commodity j at cell r.
-         , q_rj  # Yield of commodity j at cell r.
-         , d_j   # Demand for commodity j.
-         , p     # Penalty level. Multiplies cost per unit surplus or deficits.
-         , x_rj  # Possible/allowed land uses j at cell r.
-         , constraints = constraints # Which constraints to use (default all).
+def solve( t_mrj  # Transition cost matrices.
+         , c_mrj  # Production cost matrices.
+         , q_mrj  # Yield matrices.
+         , d_j    # Demands.
+         , p      # Penalty level.
+         , x_mrj  # Exclude matrices.
+         , constraints = constraints # Constraints to use (default all).
          ):
+    """Return land-use, land-man maps under constraints and minimised costs."""
+
+    # Extract the shape of the problem.
+    nlms = t_mrj.shape[0]    # Number of land-management types (m index).
+    ncells = t_mrj.shape[1] # Number of cells in spatial domain (r index).
+    nlus = t_mrj.shape[2]   # Number of land-uses (j index).
+
+    # Penalty units for each j as maximum cost.
+    p_j = np.zeros(nlus)
+    for j in range(nlus):
+        p_j[j] = c_mrj.T.max()
+    # Apply the penalty-level multiplier.
+    p_j *= p
+
+
+    try:
+        # Make Gurobi model instance.
+        model = gp.Model('neoLUTO v0.1.0')
+
+        # Land-use indexed lists of ncells-sized decision variable vectors.
+        X_dry = [ model.addMVar(ncells, ub=x_mrj[0, :, j], name='X_dry')
+                  for j in range(nlus) ]
+        X_irr = [ model.addMVar(ncells, ub=x_mrj[1, :, j], name='X_irr')
+                  for j in range(nlus) ]
+
+        # Decision variables to minimise the deviations.
+        V = model.addMVar(nlus, name='V')
+
+        # Set the objective function and the model sense.
+        objective = ( sum( # Production costs.
+                           c_mrj[0].T[j] @ X_dry[j]
+                         + c_mrj[1].T[j] @ X_irr[j]
+                           # Transition costs.
+                         + t_mrj[0].T[j] @ X_dry[j]
+                         + t_mrj[1].T[j] @ X_irr[j]
+                           # Penalties.
+                         + V[j]
+                           # For all land uses.
+                           for j in range(nlus) )
+                    )
+        model.setObjective(objective, GRB.MINIMIZE)
+
+        # Constraint that all of every cell is used for some land use.
+        model.addConstr( sum( X_dry
+                            + X_irr ) == np.ones(ncells) )
+
+        # Constraints that penalise deficits and surpluses, respectively.
+        model.addConstrs( p_j[j]
+                        * ( d_j[j] - ( q_mrj[0].T[j] @ X_dry[j]
+                                     + q_mrj[1].T[j] @ X_irr[j] ) ) <= V[j]
+                          for j in range(nlus) )
+        model.addConstrs( p_j[j]
+                        * ( ( q_mrj[0].T[j] @ X_dry[j]
+                            + q_mrj[1].T[j] @ X_irr[j] ) - d_j[j] ) <= V[j]
+                          for j in range(nlus) )
+
+        # Only add the following constraints if requested.
+
+        # Magic.
+        model.optimize()
+
+    except gp.GurobiError as e:
+        print('Gurobi error code', str(e.errno), ':', str(e))
+
+    except AttributeError:
+        print('Encountered an attribute error')
+
+
+
+def solve_old( t_rj  # Transition cost to commodity j at cell r - w lumap info.
+             , c_rj  # Cost of producing commodity j at cell r.
+             , q_rj  # Yield of commodity j at cell r.
+             , d_j   # Demand for commodity j.
+             , p     # Penalty level. Multiplies cost/unit surplus or deficits.
+             , x_rj  # Possible/allowed land uses j at cell r.
+             , constraints = constraints # Constraints to use (default all).
+             ):
     """Return new lu map. Least-cost, surplus/deficit penalties as costs.
 
     Note that the t_rj transition-cost matrix _includes_ the information of the
