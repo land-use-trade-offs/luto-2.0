@@ -3,7 +3,7 @@
 # run-neoluto.py - to run neoLUTO.
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
-# Created: 2021-04-28
+# Created: 2021-07-28
 # Last modified: 2021-07-28
 #
 
@@ -14,44 +14,35 @@ import numpy as np
 # Load data module and initialise with ANO Scenario 236.
 import luto.data as data
 
-from luto.economics.cost import get_cost_matrix_old
-from luto.economics.quantity import get_quantity_matrix_old
-from luto.economics.transitions import get_transition_matrix_old
+from luto.economics.cost import get_cost_matrix
+from luto.economics.quantity import get_quantity_matrix
+from luto.economics.transitions import get_transition_matrix
 
 from luto.solvers.solver import coursify, uncoursify
-from luto.solvers.solver import solve_old as solve
+from luto.solvers.solver import solve
 
 from luto.tools import timethis, inspect, ctabnpystocsv
 from luto.tools.highposgtiff import write_highpos_gtiff
 
-# Required input data - for now, just year zero.
-#
+# Required input data.
 year = 0
+lumap = np.load(os.path.join(data.INPUT_DIR, 'lumap.npy'))
+lmmap = np.load(os.path.join(data.INPUT_DIR, 'lmmap.npy'))
+t_mrj = get_transition_matrix_old(year, lumap)
+c_mrj = get_cost_matrix_old(year)
+q_mrj = get_quantity_matrix_old(year)
 
-# Present land-use map in highpos format. Based on oldLUTO's SID array.
-lumap = np.load(os.path.join(data.INPUT_DIR, 'lumap-dryirr.npy'))
+nlms = t_mrj.shape[0]
+ncells = t_mrj.shape[1]
+nlus = t_rmj.shape[2]
 
-# Transition cost to commodity j at cell r.
-t_rj = get_transition_matrix_old(year, lumap)
+d_j = np.zeros(data.NLUS) # Prepare the demands array - one cell per LU.
 
-# Cost of producing commodity j at cell r.
-c_rj = get_cost_matrix_old(year)
-
-# Yield of commodity j at cell r.
-q_rj = get_quantity_matrix_old(year)
-
-# Demand and penalty for surplus/deficit for commodity j.
-#
-# As a first-order, semi-realistic, base-line demand, use current production.
-d_j = np.zeros(data.NLUS // 2) # Prepare the demands array - one cell per LU.
-
-for j in range(data.NLUS // 2):
-    k = 2 * j
+for j in range(nlus):
     # The demand for LU j is the dot product of the yield vector with a
     # summation vector indicating where LU actually occurs as per SID array.
-    #        [ yield of j for all r ] . [ all r where j occurs ]
-    d_j[j] = ( q_rj.T[k]   @ np.where(lumap == k, 1, 0)
-             + q_rj.T[k+1] @ np.where(lumap == k+1, 1, 0) )
+    d_j[j] = ( q_mrj[0].T[j] @ np.where( (lumap==j) & (lmmap==0), 1, 0)
+             + q_mrj[1].T[j] @ np.where( (lumap==j) & (lmmap==1), 1, 0) )
 
 # Default penalty level.
 p = 1
@@ -59,12 +50,12 @@ p = 1
 # Possible land uses j at cell r.
 x_rj = data.x_rj
 
-params_data = { "t_rj" : t_rj
-              , "c_rj" : c_rj
-              , "q_rj" : q_rj
+params_data = { "t_mrj" : t_rj
+              , "c_mrj" : c_rj
+              , "q_mrj" : q_rj
               , "d_j"  : d_j
               , "p"    : p
-              , "x_rj" : x_rj
+              , "x_mrj" : x_rj
               }
 
 def randomparams(ncells, nlus, p=1):

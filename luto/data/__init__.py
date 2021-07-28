@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-07-16
+# Last modified: 2021-07-28
 #
 
 import os.path
@@ -21,7 +21,7 @@ OUTPUT_DIR = 'output'
 # ------------- #
 
 import luto.data.spatial as spatial
-
+from luto.data.economic import exclude
 # ------------------- #
 # Agro-economic data. #
 # ------------------- #
@@ -70,6 +70,9 @@ TMATRIX = TMATRIX.sort_index(axis='index').sort_index(axis='columns')
 
 # Boolean x_rj matrix identifying allowed land uses j for each cell r.
 x_rj = spatial.wherelu(RAWEC).values.astype(np.int8)
+
+# Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
+x_mrj = exclude(AGEC)
 
 # List of land uses - i.e. land-use x irrigation status combinations.
 if spatial.landuses == temporal.landuses:

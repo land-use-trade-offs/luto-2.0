@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-07-20
+# Last modified: 2021-07-28
 #
 
 import numpy as np
@@ -55,7 +55,7 @@ def solve( t_mrj  # Transition cost matrices.
     """Return land-use, land-man maps under constraints and minimised costs."""
 
     # Extract the shape of the problem.
-    nlms = t_mrj.shape[0]    # Number of land-management types (m index).
+    nlms = t_mrj.shape[0]   # Number of land-management types (m index).
     ncells = t_mrj.shape[1] # Number of cells in spatial domain (r index).
     nlus = t_mrj.shape[2]   # Number of land-uses (j index).
 

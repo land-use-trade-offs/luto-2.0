@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-07-09
-# Last modified: 2021-07-12
+# Last modified: 2021-07-28
 #
 
 import os.path
@@ -49,4 +49,16 @@ def concord(concordance, data, columns=None, lus=None, lms=None):
 
     return df
 
+def exclude(df):
+    """Return exclude matrix inferred from passed AGEC mjr-dataframe."""
+    # The set of all land-management tyoes.
+    lms = {t[1] for t in df.columns}
 
+    # Any economic variable will do. Here, choose `Q1`.
+    dfq = df['Q1']
+
+    # Build a tuple of slices, each slice a boolean exclude matrix for a lm.
+    slices = tuple( dfq[lm].where(pd.isna, True).where(pd.notna, False)
+                    for lm in lms )
+
+    return np.stack(slices)
