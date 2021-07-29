@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-07-09
-# Last modified: 2021-07-28
+# Last modified: 2021-07-29
 #
 
 import os.path
@@ -51,7 +51,7 @@ def concord(concordance, data, columns=None, lus=None, lms=None):
 
 def exclude(df):
     """Return exclude matrix inferred from passed AGEC mjr-dataframe."""
-    # The set of all land-management tyoes.
+    # The set of all land-management types.
     lms = {t[1] for t in df.columns}
 
     # Any economic variable will do. Here, choose `Q1`.

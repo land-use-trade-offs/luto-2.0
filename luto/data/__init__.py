@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-07-28
+# Last modified: 2021-07-29
 #
 
 import os.path
@@ -86,6 +86,10 @@ else:
 RLANDUSES = [ lu.replace('_dry', '')
               for j, lu in enumerate(LANDUSES)
               if j % 2 ==0 ]
+
+# Land-management types.
+LANDMANS = [ 'dry', 'irr' ]
+NLMS = len(LANDMANS)
 
 # Number of land uses.
 NLUS = len(LANDUSES)

@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-26
-# Last modified: 2021-07-15
+# Last modified: 2021-07-29
 #
 
 import numpy as np
@@ -43,6 +43,11 @@ def get_quantity_matrix(lm, year):
         q_rj[:, j] = get_quantity_ag(lu, lm, year)
     # Make sure all NaNs are replaced by zeroes.
     return np.nan_to_num(q_rj)
+
+def get_quantity_matrices(year):
+    """Return q_rmj matrix of quantities per cell as 3D Numpy array."""
+    return np.stack(tuple( get_quantity_matrix(lm, year)
+                           for lm in data.LANDMANS ))
 
 def get_quantity(lu, year):
     """Return yield in tonne/cell of `lu` in `year` as 1D Numpy array."""

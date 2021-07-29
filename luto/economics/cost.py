@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-07-15
+# Last modified: 2021-07-29
 #
 
 import numpy as np
@@ -69,6 +69,10 @@ def get_cost_matrix(lm, year):
         c_rj[:, j] = get_cost_ag(lu, lm, year)
     # Make sure all NaNs are replaced by zeroes.
     return np.nan_to_num(c_rj)
+
+def get_cost_matrices(year):
+    """Return c_rmj matrix of costs per cell as 3D Numpy array."""
+    return np.stack(tuple(get_cost_matrix(lm, year) for lm in data.LANDMANS))
 
 def get_cost(lu, year):
     """Return cost in AUD/cell of producing `lu` in `year` as 1D Numpy array."""

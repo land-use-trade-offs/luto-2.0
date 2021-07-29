@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-30
-# Last modified: 2021-07-20
+# Last modified: 2021-07-29
 #
 
 import os.path
@@ -21,8 +21,8 @@ def amortise(cost, rate=0.05, horizon=30):
     """Return amortised `cost` at `rate`interest over `horizon` years."""
     return -1 * npf.pmt(rate, horizon, pv=cost, fv=0, when='begin')
 
-def get_transition_matrix(year, lumap, lmmap):
-    """Return t_rj transition-cost matrices.
+def get_transition_matrices(year, lumap, lmmap):
+    """Return t_mrj transition-cost matrices.
 
     A transition-cost matrix gives the cost of switching a certain cell r to
     a certain land-use j under a certain land-management. The base costs are
@@ -44,10 +44,10 @@ def get_transition_matrix(year, lumap, lmmap):
     Returns
     -------
 
-    (numpy.ndarray, numpy.ndarray, ..., numpy.ndarray)
-        Tuple of t_rj transition-cost matrices. Entries correspond to the
+    numpy.ndarray
+        t_mrj transition-cost matrices. The m-slices correspond to the
         different land-management versions of the land-use `j` to switch _to_.
-        Entries: 0 = conventional dry-land, 1 = conventional irrigated.
+        With m==0 conventional dry-land, m==1 conventional irrigated.
     """
 
     # Raw transition-cost matrix is in AUD/Ha and lexigraphically ordered.
@@ -94,7 +94,10 @@ def get_transition_matrix(year, lumap, lmmap):
     t_rj_todry = amortise(t_rj * realarea_rj + tdelta_todry_rj)
     t_rj_toirr = amortise(t_rj * realarea_rj + tdelta_toirr_rj)
 
-    return t_rj_todry, t_rj_toirr
+    # Stack the t_rj matrices into one t_mrj array.
+    t_mrj = np.stack((t_rj_todry, t_rj_toirr))
+
+    return t_mrj
 
 def get_transition_matrix_old(year, lumap):
     """Return t_rj transition-cost matrix for `year` and `lumap` in AUD/cell."""

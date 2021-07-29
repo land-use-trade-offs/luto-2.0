@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-07-28
+# Last modified: 2021-07-29
 #
 
 import numpy as np
@@ -18,6 +18,15 @@ constraints = { 'water': True
               , 'carbon': True
               , 'biodiversity': True
               }
+
+def slyce(a, axis, start, stop, step):
+    """Return a view of the slice along the requested axis.
+
+    Using trick from Leland Hepworth on Stack Overflow as found here:
+    [ https://stackoverflow.com/questions/24398708/
+      slicing-a-numpy-array-along-a-dynamically-specified-axis ]
+    """
+    return a[(slice(None),) * (axis % a.ndim) + (slice(start, stop, step),)]
 
 def coursify(array, resfactor):
     """Return course-grained version of array, coursened by `resfactor`."""
@@ -54,10 +63,8 @@ def solve( t_mrj  # Transition cost matrices.
          ):
     """Return land-use, land-man maps under constraints and minimised costs."""
 
-    # Extract the shape of the problem.
-    nlms = t_mrj.shape[0]   # Number of land-management types (m index).
-    ncells = t_mrj.shape[1] # Number of cells in spatial domain (r index).
-    nlus = t_mrj.shape[2]   # Number of land-uses (j index).
+    # Extract the shape of the problem (# land-man types, cells and land-uses).
+    nlms, ncells, nlus = t_mrj.shape
 
     # Penalty units for each j as maximum cost.
     p_j = np.zeros(nlus)
@@ -65,7 +72,6 @@ def solve( t_mrj  # Transition cost matrices.
         p_j[j] = c_mrj.T.max()
     # Apply the penalty-level multiplier.
     p_j *= p
-
 
     try:
         # Make Gurobi model instance.
@@ -90,8 +96,7 @@ def solve( t_mrj  # Transition cost matrices.
                            # Penalties.
                          + V[j]
                            # For all land uses.
-                           for j in range(nlus) )
-                    )
+                           for j in range(nlus) ) )
         model.setObjective(objective, GRB.MINIMIZE)
 
         # Constraint that all of every cell is used for some land use.
@@ -112,6 +117,27 @@ def solve( t_mrj  # Transition cost matrices.
 
         # Magic.
         model.optimize()
+
+        # Collect optimised decision variables in tuple of 1D Numpy arrays.
+        prestack_dry = tuple(X_dry[j].X for j in range(nlus))
+        stack_dry = np.stack(prestack_dry)
+        highpos_dry = stack_dry.argmax(axis=0)
+
+        prestack_irr = tuple(X_irr[j].X for j in range(nlus))
+        stack_irr = np.stack(prestack_irr)
+        highpos_irr = stack_irr.argmax(axis=0)
+
+        lumap = np.where( stack_dry.max(axis=0) >= stack_irr.max(axis=0)
+                        , highpos_dry, highpos_irr )
+
+        lmmap = np.where( stack_dry.max(axis=0) >= stack_irr.max(axis=0)
+                        , 0, 1 )
+
+
+        return lumap, lmmap
+
+
+
 
     except gp.GurobiError as e:
         print('Gurobi error code', str(e.errno), ':', str(e))
