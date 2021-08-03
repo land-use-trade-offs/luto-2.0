@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-08-02
+# Last modified: 2021-08-03
 #
 
 import os.path
@@ -63,3 +63,25 @@ TMATRIX = TMATRIX.sort_index(axis='index').sort_index(axis='columns')
 
 # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
 x_mrj = exclude(AGEC)
+
+lulist = { 'Apples'
+         , 'Citrus'
+         , 'Cotton'
+         , 'Grapes'
+         , 'Hay'
+         , 'Nuts'
+         , 'Other non-cereal crops'
+         , 'Pears'
+         , 'Plantation fruit'
+         , 'Rice'
+         , 'Stone fruit'
+         , 'Sugar'
+         , 'Summer cereals'
+         , 'Summer legumes'
+         , 'Summer oilseeds'
+         , 'Tropical stone fruit'
+         , 'Vegetables'
+         , 'Winter cereals'
+         , 'Winter legumes'
+         , 'Winter oilseeds'
+         }
