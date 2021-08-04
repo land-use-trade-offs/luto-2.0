@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-08-03
+# Last modified: 2021-08-04
 #
 
 import os.path
@@ -12,10 +12,8 @@ import os.path
 import pandas as pd
 import numpy as np
 
+from luto.settings import INPUT_DIR, OUTPUT_DIR
 from luto.data.economic import exclude
-
-INPUT_DIR = 'input'
-OUTPUT_DIR = 'output'
 
 # Load the agro-economic data (constructed w/ fns from data.economic module).
 fpath = os.path.join(INPUT_DIR, "agec-c9.hdf5")
@@ -24,12 +22,15 @@ AGEC = pd.read_hdf(fpath, 'agec')
 # Derive NCELLS (number of spatial cells) from AGEC.
 NCELLS, = AGEC.index.shape
 
-# Derive LANDUSES (land-uses) set from AGEC.
-LANDUSES = {t[2] for t in AGEC.columns}
-NLUS = len(LANDUSES)
+# Derive LANDUSES (land-uses) from AGEC.
+LANDUSES = {t[2] for t in AGEC.columns} # Set comprehension, unique entries.
+LANDUSES = list(LANDUSES) # Turn into list.
+NLUS = len(LANDUSES) # Ensure lexicographic order.
 
-# Derive LANDMANS (land-managements) set from AGEC.
-LANDMANS = {t[1] for t in AGEC.columns}
+# Derive LANDMANS (land-managements) from AGEC.
+LANDMANS = {t[1] for t in AGEC.columns} # Set comprehension, unique entries.
+LANDMANS = list(LANDMANS) # Turn into list.
+LANDMANS.sort() # Ensure lexicographic order.
 NLMS = len(LANDMANS)
 
 # Actual hectares per cell, including projection corrections.
@@ -63,25 +64,3 @@ TMATRIX = TMATRIX.sort_index(axis='index').sort_index(axis='columns')
 
 # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
 x_mrj = exclude(AGEC)
-
-lulist = { 'Apples'
-         , 'Citrus'
-         , 'Cotton'
-         , 'Grapes'
-         , 'Hay'
-         , 'Nuts'
-         , 'Other non-cereal crops'
-         , 'Pears'
-         , 'Plantation fruit'
-         , 'Rice'
-         , 'Stone fruit'
-         , 'Sugar'
-         , 'Summer cereals'
-         , 'Summer legumes'
-         , 'Summer oilseeds'
-         , 'Tropical stone fruit'
-         , 'Vegetables'
-         , 'Winter cereals'
-         , 'Winter legumes'
-         , 'Winter oilseeds'
-         }

@@ -4,14 +4,13 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-07-28
-# Last modified: 2021-07-30
+# Last modified: 2021-08-04
 #
 
 import os.path
 
 import numpy as np
 
-# Load data module and initialise with ANO Scenario 236.
 import luto.data as data
 
 from luto.economics.cost import get_cost_matrices
