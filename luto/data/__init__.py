@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-08-04
+# Last modified: 2021-08-05
 #
 
 import os.path
@@ -25,7 +25,8 @@ NCELLS, = AGEC.index.shape
 # Derive LANDUSES (land-uses) from AGEC.
 LANDUSES = {t[2] for t in AGEC.columns} # Set comprehension, unique entries.
 LANDUSES = list(LANDUSES) # Turn into list.
-NLUS = len(LANDUSES) # Ensure lexicographic order.
+LANDUSES.sort() # Ensure lexicographic order.
+NLUS = len(LANDUSES)
 
 # Derive LANDMANS (land-managements) from AGEC.
 LANDMANS = {t[1] for t in AGEC.columns} # Set comprehension, unique entries.
