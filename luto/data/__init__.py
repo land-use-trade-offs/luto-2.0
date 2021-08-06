@@ -4,10 +4,10 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-08-05
+# Last modified: 2021-08-06
 #
 
-import os.path
+import os
 
 import pandas as pd
 import numpy as np
@@ -37,6 +37,15 @@ NLMS = len(LANDMANS)
 # Actual hectares per cell, including projection corrections.
 REAL_AREA = np.load(os.path.join(INPUT_DIR, 'real-area.npy'))
 
+# Initial (2010) land-use map.
+LUMAP = np.load(os.path.join(INPUT_DIR, 'lumap.npy'))
+
+# Initial (2010) land-man map.
+LMMAP = np.load(os.path.join(INPUT_DIR, 'lmmap.npy'))
+
+# The base year, i.e. year == 0.
+ANNUM = 2010
+
 # ---------------------------------- #
 # Temporal and spatio-temporal data. #
 # ---------------------------------- #
@@ -64,4 +73,4 @@ TMATRIX = pd.read_csv(fpath, index_col=0)
 TMATRIX = TMATRIX.sort_index(axis='index').sort_index(axis='columns')
 
 # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
-x_mrj = exclude(AGEC)
+X_MRJ = exclude(AGEC)
