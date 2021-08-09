@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-08-06
+# Last modified: 2021-08-09
 #
 
 import numpy as np
@@ -21,25 +21,31 @@ from luto.solvers.solver import solve
 
 
 class Data():
-    """Provide simple object to mimic 'data' namespace from `luto.data`"""
+    """Provide simple object to mimic 'data' namespace from `luto.data`."""
 
     def __init__( self
                 , lumap # Land-use map from which spatial domain is inferred.
+                , resfactor # Spatial course-graining factor.
                 ):
         """Initialise Data object based on land-use map `lumap`."""
+
         # Most data is taken over as is.
         for key in bdata.__dict__:
             if key.isupper():
              self.__dict__[key] = bdata.__dict__[key]
-        # Spatial data is sub-setted based on the lumap.
-        mask = lumap == 0 # TODO: This needs to be lumap != -1.
-        self.NCELLS = mask.sum()
-        self.AGEC = bdata.AGEC.iloc[mask]
-        self.REAL_AREA = bdata.REAL_AREA[mask]
-        self.AG_DRYLAND_DAMAGE = bdata.AG_DRYLAND_DAMAGE[:, mask]
-        self.AG_PASTURE_DAMAGE = bdata.AG_PASTURE_DAMAGE[:, mask]
-        self.LUMAP = bdata.LUMAP[mask]
-        self.LMMAP = bdata.LMMAP[mask]
+
+        # Masks from lumap and via resfactor.
+        self.mask_lu = 0 # TODO: This needs to be -1.
+        self.mask = lumap == self.mask_lu # TODO: This needs to be != .
+
+        # Spatial data is sub-setted based on the above masks.
+        self.NCELLS = self.mask.sum()
+        self.AGEC = bdata.AGEC.iloc[self.mask]
+        self.REAL_AREA = bdata.REAL_AREA[self.mask]
+        self.AG_DRYLAND_DAMAGE = bdata.AG_DRYLAND_DAMAGE[:, self.mask]
+        self.AG_PASTURE_DAMAGE = bdata.AG_PASTURE_DAMAGE[:, self.mask]
+        self.LUMAP = bdata.LUMAP[self.mask]
+        self.LMMAP = bdata.LMMAP[self.mask]
 
 # Placeholder for module-global data object. To be set by `prep()`.
 data = None
@@ -47,9 +53,13 @@ data = None
 # Is the model ready for the next simulation step? Set by `prep()`.
 ready = False
 
+# Optionally course grain spatial domain. (Set to 1 to bypass.)
+resfactor = 1
+
 # Containers for simulation output. First entry from base data.
 lumaps = [bdata.LUMAP]
 lmmaps = [bdata.LMMAP]
+shapes = []
 
 def get_year():
     """Return the current time step, i.e. number of years since ANNUM."""
@@ -59,12 +69,20 @@ def is_ready():
     """Return True if model ready for next simulation step, False otherwise."""
     return ready
 
-def get_shape():
-    """Return the current shape (NLMS, NCELLS, NLUS) of the problem."""
-    NLMS = bdata.NLMS
-    NCELLS, = data.AGEC.index.shape
-    NLUS = bdata.NLUS
-    return NLMS, NCELLS, NLUS
+def get_resfactor():
+    """Return the resfactor (spatial course-graining factor)."""
+    return resfactor
+
+def set_resfactor(factor):
+    global resfactor
+    resfactor = factor
+
+def get_shape(year=None):
+    """Return the shape (NLMS, NCELLS, NLUS) of the problem at `year`."""
+    if year is None:
+        return data.NLMS, data.NCELLS, data.NLUS
+    else:
+        return shapes[year]
 
 # Obtain local versions of get_*_matrices.
 def get_c_mrj():
@@ -74,16 +92,21 @@ def get_q_mrj():
 def get_t_mrj():
     return get_transition_matrices( data
                                   , get_year()
-                                  , data.LUMAP # TODO: really: lumaps[-1][mask]
-                                  , data.LMMAP # TODO: really: lmmaps[-1][mask]
+                                  , lumaps[-1][data.mask]
+                                  , lmmaps[-1][data.mask]
                                   )
 def get_x_mrj():
     return exclude(data.AGEC)
 
+def reconstitute(rlumap):
+    """Return lumap reconstituted to original size spatial domain."""
+    indices = np.cumsum(data.mask) - 1
+    return np.where(data.mask, rlumap[indices], data.mask_lu)
+
 def prep():
     """Prepare for the next simulation step."""
     global data, ready
-    data = Data(lumaps[-1])
+    data = Data(lumaps[-1], resfactor)
     ready = True
 
 def step( d_j # Demands.
@@ -92,24 +115,48 @@ def step( d_j # Demands.
     """Solve the upcoming time step (year)."""
     global ready
     if not is_ready(): prep()
+
+    shapes.append(get_shape())
+
+    # Magic.
     lumap, lmmap = solve( get_t_mrj()
                         , get_c_mrj()
                         , get_q_mrj()
                         , d_j
                         , p
                         , get_x_mrj() )
-    # TODO: Below appends should not append the outputs of solve directly. They
-    # should first be reconstituted to the original spatial domain. Otherwise
-    # (amongst other things), the next iteration will fail to apply the mask.
-    lumaps.append(lumap)
-    lmmaps.append(lmmap)
+
+    lumaps.append(reconstitute(lumap))
+    lmmaps.append(reconstitute(lmmap))
+
     ready = False
 
 def info():
     """Return information about state of the simulation."""
+
     print( "Current time step (year):"
          , str(get_year())
          , "(" + str(bdata.ANNUM + get_year()) + ")")
+
+    if resfactor == 1:
+        print("Resfactor set at 1. Spatial course graining bypassed.")
+    else:
+        print( "Resfactor set at %i." % resfactor
+             , "Sampling one of every %i cells in spatial domain." % resfactor )
+
+
+    if get_year() > 0:
+        print()
+        print("Year", "\t", "Cells [#]", "\t", "Cells [%]")
+    for year in range(get_year()):
+        ncells = get_shape(year)[1]
+        percentage = 100 * ncells / bdata.NCELLS
+        print( year + bdata.ANNUM
+             , "\t"
+             , ncells, "\t\t"
+             , "%.2f%%" % percentage )
+        if year == get_year()-1: print()
+
     if is_ready():
         print("Simulation is ready to solve next time step. Run `step()`")
     else:
@@ -124,6 +171,7 @@ def get_results(year=None):
 
 def demands():
     """Return demands based on current production."""
+    if not is_ready(): prep()
     lumap = data.LUMAP
     lmmap = data.LMMAP
     _, _, nlus = get_shape()

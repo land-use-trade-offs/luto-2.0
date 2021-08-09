@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-07-30
-# Last modified: 2021-07-30
+# Last modified: 2021-08-09
 #
 
 import numpy as np
@@ -12,12 +12,6 @@ import pandas as pd
 import gurobipy as gp
 from gurobipy import GRB
 
-# Default constraint settings.
-constraints = { 'water': True
-              , 'nutrients': True
-              , 'carbon': True
-              , 'biodiversity': True
-              }
 
 def coursify(array, resfactor, mrj=True):
     """Return course-grained version of array, coursened by `resfactor`."""
