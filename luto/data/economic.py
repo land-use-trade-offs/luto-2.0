@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-07-09
-# Last modified: 2021-08-12
+# Last modified: 2021-08-13
 #
 
 import os.path
@@ -47,6 +47,29 @@ def build_agec_crops(concordance, data, columns=None, lus=None, lms=None):
     agec_crops.columns = pd.MultiIndex.from_tuples(ts)
 
     return agec_crops
+
+def build_agec_lvstk(data):
+    """Return LUTO-cell wise, multi-indexed column-landuse DataFrame."""
+
+    # Get only the columns that vary with the land-use.
+    animals = [ c for c in data.columns if 'BEEF' in c
+                                        or 'SHEEP' in c
+                                        or 'DAIRY' in c ]
+    agec_lvstk = data[animals]
+
+    # Prepare columns for multi-indexing, i.e. turn into a list of tuples.
+    cols = agec_lvstk.columns.to_list()
+    cols = [tuple(c.split(sep='_')) for c in cols]
+    cols = [(c[0]+'_'+c[1], c[2]) if c[0]=='WR' else c for c in cols]
+    cols = [ (c[0] + '_' + c[1] + '_' + c[3] + '_' +c[4], c[2])
+             if c[0]=='FEED' else c for c in cols ]
+
+    # Make and set the multi-index.
+    mcolindex = pd.MultiIndex.from_tuples(cols)
+    agec_lvstk.columns = mcolindex
+
+    return agec_lvstk
+
 
 def concord(concordance, data, columns=None, lus=None, lms=None):
     """Return LUTO-cell wise, multi-indexed column-landuse-landman DataFrame."""

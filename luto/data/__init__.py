@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-08-06
+# Last modified: 2021-08-13
 #
 
 import os
@@ -16,20 +16,21 @@ from luto.settings import INPUT_DIR, OUTPUT_DIR
 from luto.data.economic import exclude
 
 # Load the agro-economic data (constructed w/ fns from data.economic module).
-fpath = os.path.join(INPUT_DIR, "agec-c9.hdf5")
-AGEC = pd.read_hdf(fpath, 'agec')
+fpath = os.path.join(INPUT_DIR, "agec-crops-c9.hdf5")
+AGEC_CROPS = pd.read_hdf(fpath, 'agec_crops')
+fpath = os.path.join(INPUT_DIR, "agec-lvstk-c9.hdf5")
+AGEC_LVSTK = pd.read_hdf(fpath, 'agec_lvstk')
 
 # Derive NCELLS (number of spatial cells) from AGEC.
-NCELLS, = AGEC.index.shape
+NCELLS, = AGEC_CROPS.index.shape
 
-# Derive LANDUSES (land-uses) from AGEC.
-LANDUSES = {t[2] for t in AGEC.columns} # Set comprehension, unique entries.
-LANDUSES = list(LANDUSES) # Turn into list.
+# Read in lexicographically ordered list of land uses.
+LANDUSES = np.load(os.path.join(INPUT_DIR, 'landuses.npy')).tolist()
 LANDUSES.sort() # Ensure lexicographic order.
 NLUS = len(LANDUSES)
 
 # Derive LANDMANS (land-managements) from AGEC.
-LANDMANS = {t[1] for t in AGEC.columns} # Set comprehension, unique entries.
+LANDMANS = {t[1] for t in AGEC_CROPS.columns} # Set comp., unique entries.
 LANDMANS = list(LANDMANS) # Turn into list.
 LANDMANS.sort() # Ensure lexicographic order.
 NLMS = len(LANDMANS)
@@ -73,4 +74,4 @@ TMATRIX = pd.read_csv(fpath, index_col=0)
 TMATRIX = TMATRIX.sort_index(axis='index').sort_index(axis='columns')
 
 # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
-X_MRJ = exclude(AGEC)
+X_MRJ = exclude(AGEC_CROPS)
