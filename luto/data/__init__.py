@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-08-13
+# Last modified: 2021-08-16
 #
 
 import os
@@ -26,8 +26,19 @@ NCELLS, = AGEC_CROPS.index.shape
 
 # Read in lexicographically ordered list of land uses.
 LANDUSES = np.load(os.path.join(INPUT_DIR, 'landuses.npy')).tolist()
+LANDUSES.remove('Non-agricultural land') # Remove this non land-use.
 LANDUSES.sort() # Ensure lexicographic order.
 NLUS = len(LANDUSES)
+
+# Some useful sub-sets of the land uses.
+CROPS = [ lu for lu in LANDUSES if 'Beef' not in lu
+                                and 'Sheep' not in lu
+                                and 'Dairy' not in lu
+                                and 'Unallocated' not in lu
+                                and 'Non-agricultural' not in lu ]
+LVSTK = [ lu for lu in LANDUSES if 'Beef' in lu
+                                or 'Sheep' in lu
+                                or 'Dairy' in lu ]
 
 # Derive LANDMANS (land-managements) from AGEC.
 LANDMANS = {t[1] for t in AGEC_CROPS.columns} # Set comp., unique entries.
