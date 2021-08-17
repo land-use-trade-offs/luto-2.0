@@ -4,12 +4,12 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-08-16
+# Last modified: 2021-08-17
 #
 
 import numpy as np
 
-from luto.economics.quantity import get_quantity, get_yield_pot
+from luto.economics.quantity import get_quantity, get_yield_pot, lvs_veg_types
 
 def get_cost_crop( data # Data object or module.
                  , lu   # Land use.
@@ -77,24 +77,8 @@ def get_cost_lvstk( data # Data object or module.
     `lm`: land management (e.g. 'dry', 'irr', 'org').
     `year`: number of years from base year, counting from zero.
     """
-
-    # Determine type of livestock.
-    if 'beef' in lu.lower():
-        lvstype = 'BEEF'
-    elif 'sheep' in lu.lower():
-        lvstype = 'SHEEP'
-    elif 'dairy' in lu.lower():
-        lvstype = 'DAIRY'
-    else:
-        raise KeyError("Livestock type '%s' not identified." % lu)
-
-    # Determine type of vegetation.
-    if 'native' in lu.lower():
-        vegtype = 'NVEG'
-    elif 'sown' in lu.lower():
-        vegtype = 'SOWN'
-    else:
-        raise KeyError("Vegetation type '%s' not identified." % lu)
+    # Get livestock and vegetation type.
+    lvstype, vegtype = lsv_veg_types(lu)
 
     # Get the yield potential.
     yield_pot = get_yield_pot(data, lvstype, vegtype)
@@ -112,7 +96,13 @@ def get_cost_lvstk( data # Data object or module.
               )
 
     # Total costs are quantity plus fixed costs.
-    return cost_qw + cost_fa
+    cost = cost_qw + cost_fa
+
+    # Costs so far in AUD/ha. Now convert to AUD/cell.
+    cost *= data.REAL_AREA
+
+    return cost.to_numpy()
+
 
 def get_cost( data # Data object or module.
             , lu   # Land use.

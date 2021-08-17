@@ -4,11 +4,33 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-26
-# Last modified: 2021-08-16
+# Last modified: 2021-08-17
 #
 
 import numpy as np
 
+def lvs_veg_types(lu):
+    """Return livestock and vegetation types of the livestock land-use `lu`."""
+
+    # Determine type of livestock.
+    if 'beef' in lu.lower():
+        lvstype = 'BEEF'
+    elif 'sheep' in lu.lower():
+        lvstype = 'SHEEP'
+    elif 'dairy' in lu.lower():
+        lvstype = 'DAIRY'
+    else:
+        raise KeyError("Livestock type '%s' not identified." % lu)
+
+    # Determine type of vegetation.
+    if 'native' in lu.lower():
+        vegtype = 'NVEG'
+    elif 'sown' in lu.lower():
+        vegtype = 'SOWN'
+    else:
+        raise KeyError("Vegetation type '%s' not identified." % lu)
+
+    return lvstype, vegtype
 
 def get_yield_pot( data # Data object or module.
                  , lvstype # Livestock type (one of 'BEEF', 'SHEEP' or 'DAIRY')
@@ -43,6 +65,51 @@ def get_yield_pot( data # Data object or module.
         potential *= 2
 
     return potential
+
+def get_quantity_lvstk( data # Data object or module.
+                      , lu   # Land use.
+                      , lm   # Land management.
+                      , year # Number of years post base-year ('annum').
+                      ):
+    """Return lvstk yield [tonne/cell] of `lu`+`lm` in `year` as 1D Numpy array.
+
+    `data`: data object/module -- assumes fields like in `luto.data`.
+    `lu`: land use (e.g. 'winterCereals' or 'beef').
+    `lm`: land management (e.g. 'dry', 'irr', 'org').
+    `year`: number of years from base year, counting from zero.
+    """
+    # Get livestock and vegetation type.
+    lvstype, vegtype = lsv_veg_types(lu)
+
+    # Get the yield potential.
+    yield_pot = get_yield_pot(data, lvstype, vegtype)
+
+    # Beef yields composed of just beef (Q1) and live exports (Q3).
+    if lvstype == 'BEEF': # F1 * Q1 + F3 * Q3.
+        quantity = ( ( data.AGEC_LVSTK['F1', lvstype]
+                     * data.AGEC_LVSTK['Q1', lvstype] )
+                   + ( data.AGEC_LVSTK['F3', lvstype]
+                     * data.AGEC_LVSTK['Q3', lvstype] ) )
+    # Sheep yields composed of sheep meat (Q1)+live exports (Q3) or wool (Q2).
+    elif lvstype == 'SHEEP': # (F1 * Q1 + F3 * Q3) or F2 * Q2.
+        quantity = ( ( data.AGEC_LVSTK['F1', lvstype]
+                     * data.AGEC_LVSTK['Q1', lvstype] )
+                   + ( data.AGEC_LVSTK['F3', lvstype]
+                     * data.AGEC_LVSTK['Q3', lvstype] ) )
+    # Dairy yields composed of just dairy (Q1).
+    elif lvstype == 'DAIRY': # F1 * Q1.
+        quantity = ( data.AGEC_LVSTK['F1', lvstype]
+                   * data.AGEC_LVSTK['Q1', lvstype] )
+    else:
+        raise KeyError("Livestock type '%s' not identified." % lvstype)
+
+    # Quantity is base quantity times the yield potential.
+    quantity *= yield_pot
+
+    # Quantities so far in tonnes/ha. Now convert to tonnes/cell.
+    quantity *= data.REAL_AREA
+
+    return quantity
 
 def get_quantity_crop( data # Data object or module.
                      , lu   # Land use.
