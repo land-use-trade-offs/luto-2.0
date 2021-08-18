@@ -4,12 +4,36 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-08-17
+# Last modified: 2021-08-18
 #
 
 import numpy as np
 
-from luto.economics.quantity import get_quantity, get_yield_pot, lvs_veg_types
+from luto.economics.quantity import get_yield_pot
+
+
+def lvs_veg_types(lu):
+    """Return livestock and vegetation types of the livestock land-use `lu`."""
+
+    # Determine type of livestock.
+    if 'beef' in lu.lower():
+        lvstype = 'BEEF'
+    elif 'sheep' in lu.lower():
+        lvstype = 'SHEEP'
+    elif 'dairy' in lu.lower():
+        lvstype = 'DAIRY'
+    else:
+        raise KeyError("Livestock type '%s' not identified." % lu)
+
+    # Determine type of vegetation.
+    if 'native' in lu.lower():
+        vegtype = 'NVEG'
+    elif 'sown' in lu.lower():
+        vegtype = 'SOWN'
+    else:
+        raise KeyError("Vegetation type '%s' not identified." % lu)
+
+    return lvstype, vegtype
 
 def get_cost_crop( data # Data object or module.
                  , lu   # Land use.
@@ -32,22 +56,25 @@ def get_cost_crop( data # Data object or module.
         fc += data.AGEC_CROPS[c, lm, lu].copy()
 
     # ----------- #
-    # Area costs.
+    # Area costs. #
     # ----------- #
     ac = data.AGEC_CROPS['AC', lm, lu]
 
     # --------------- #
-    # Quantity costs.
+    # Quantity costs. #
     # --------------- #
+    qc = data.AGEC_CROPS['QC', lm, lu]
 
+    # TODO: below unnecessary but YIELDINCREASES perhaps need to be applied?
     # Turn QC into actual cost per quantity, i.e. divide by quantity.
-    qc = data.AGEC_CROPS['QC', lm, lu] / data.AGEC_CROPS['Q1', lm, lu]
-
+    # qc = data.AGEC_CROPS['QC', lm, lu] / data.AGEC_CROPS['Yield', lm, lu]
     # Multiply by quantity (w/ trends) for q-costs per ha. Divide for per cell.
-    qc *= get_quantity(data, lu, lm, year) / data.REAL_AREA
+    # TODO: Is this step still required with the new data set? No, most likely
+    # not. Better to apply the trend (YIELDINCREASE) separately here.
+    #qc *= get_quantity(data, lu, lm, year) / data.REAL_AREA
 
     # ------------ #
-    # Water costs.
+    # Water costs. #
     # ------------ #
     if lm == 'irr':
         # Water delivery costs in AUD/ha.
@@ -56,7 +83,7 @@ def get_cost_crop( data # Data object or module.
         wp = 0
 
     # ------------ #
-    # Total costs.
+    # Total costs. #
     # ------------ #
     tc = fc + (qc + ac + wp) * data.DIESEL_PRICE_PATH[year]
 
@@ -118,7 +145,7 @@ def get_cost( data # Data object or module.
     """
     # If it is a crop, it is known how to get the costs.
     if lu in data.CROPS:
-        return get_cost_crops(data, lu, lm, year)
+        return get_cost_crop(data, lu, lm, year)
     # If it is livestock, it is known how to get the costs.
     elif lu in data.LVSTK:
         return get_cost_lvstk(data, lu, lm, year)

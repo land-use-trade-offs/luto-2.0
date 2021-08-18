@@ -31,12 +31,12 @@ LANDUSES.sort() # Ensure lexicographic order.
 NLUS = len(LANDUSES)
 
 # Some useful sub-sets of the land uses.
-CROPS = [ lu for lu in LANDUSES if 'Beef' not in lu
+LU_CROPS = [ lu for lu in LANDUSES if 'Beef' not in lu
                                 and 'Sheep' not in lu
                                 and 'Dairy' not in lu
                                 and 'Unallocated' not in lu
                                 and 'Non-agricultural' not in lu ]
-LVSTK = [ lu for lu in LANDUSES if 'Beef' in lu
+LU_LVSTK = [ lu for lu in LANDUSES if 'Beef' in lu
                                 or 'Sheep' in lu
                                 or 'Dairy' in lu ]
 
@@ -45,6 +45,16 @@ LANDMANS = {t[1] for t in AGEC_CROPS.columns} # Set comp., unique entries.
 LANDMANS = list(LANDMANS) # Turn into list.
 LANDMANS.sort() # Ensure lexicographic order.
 NLMS = len(LANDMANS)
+
+# List of products. Everything upper case to avoid mistakes.
+PR_CROPS = [s.upper() for s in LU_CROPS]
+PR_LVSTK = [ ('' if 'DAIRY' in s.upper() else p+' ') + s.upper()
+             for s in LU_LVSTK
+             for p in ['LIVEXPORT', 'DOMCONSUM'] ]
+PR_LVSTK += [ 'WOOL ' + s.upper() for s in LU_LVSTK if 'SHEEP' in s.upper() ]
+PRODUCTS = PR_CROPS + PR_LVSTK
+PRODUCTS.sort() # Ensure lexicographic order.
+
 
 # Actual hectares per cell, including projection corrections.
 REAL_AREA = np.load(os.path.join(INPUT_DIR, 'real-area.npy'))
