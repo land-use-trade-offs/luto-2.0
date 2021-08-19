@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-08-18
+# Last modified: 2021-08-19
 #
 
 import os
@@ -48,12 +48,48 @@ NLMS = len(LANDMANS)
 
 # List of products. Everything upper case to avoid mistakes.
 PR_CROPS = [s.upper() for s in LU_CROPS]
-PR_LVSTK = [ ('' if 'DAIRY' in s.upper() else p+' ') + s.upper()
-             for s in LU_LVSTK
+PR_LVSTK = [ s.upper() + ' ' + p
+             for s in LU_LVSTK if 'DAIRY' not in s.upper()
              for p in ['LIVEXPORT', 'DOMCONSUM'] ]
-PR_LVSTK += [ 'WOOL ' + s.upper() for s in LU_LVSTK if 'SHEEP' in s.upper() ]
+PR_LVSTK += [s.upper() for s in LU_LVSTK if 'DAIRY' in s.upper()]
+PR_LVSTK += ['WOOL ' + s.upper() for s in LU_LVSTK if 'SHEEP' in s.upper()]
 PRODUCTS = PR_CROPS + PR_LVSTK
 PRODUCTS.sort() # Ensure lexicographic order.
+
+# Some land-uses map to multiple products -- a dict and matrix to capture this.
+# Crops land-uses and products are one-one. Livestock is more complicated.
+LU2PR_DICT = {key: [key.upper()] if key in LU_CROPS else [] for key in LANDUSES}
+for lu in LU_LVSTK:
+    for PR in PR_LVSTK:
+        if lu.upper() in PR:
+            LU2PR_DICT[lu] = LU2PR_DICT[lu] + [PR]
+
+def dict2matrix(d, fromlist, tolist):
+    """Return 0-1 matrix mapping 'from-vectors' to 'to-vectors' using dict d."""
+    A = np.zeros((len(tolist), len(fromlist)), dtype=np.int)
+    for j, jstr in enumerate(fromlist):
+        for istr in LU2PR_DICT[jstr]:
+            i = tolist.index(istr)
+            A[i, j] = True
+    return A
+
+LU2PR = dict2matrix(LU2PR_DICT, LANDUSES, PRODUCTS)
+
+# List of commodities. Everything lower case to avoid mistakes.
+# Basically collapse 'nveg' and 'sown' products and remove duplicates.
+COMMODITIES = { ( s.replace(' - NATIVE VEGETATION', '')
+                   .replace(' - SOWN PASTURE', '')
+                   .lower() )
+                for s in PRODUCTS }
+COMMODITIES = list(COMMODITIES)
+COMMODITIES.sort()
+CM_CROPS = [s for s in COMMODITIES if s in [k.lower() for k in LU_CROPS]]
+
+# Some commodities map to multiple products -- dict and matrix to capture this.
+# Crops commodities and products are one-one. Livestock is more complicated.
+CM2PR_DICT = { key.lower(): [key.upper()] if key in CM_CROPS else []
+               for key in COMMODITIES }
+
 
 
 # Actual hectares per cell, including projection corrections.
