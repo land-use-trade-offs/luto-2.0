@@ -4,36 +4,13 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-08-18
+# Last modified: 2021-08-20
 #
 
 import numpy as np
 
-from luto.economics.quantity import get_yield_pot
+from luto.economics.quantity import get_yield_pot, lvs_veg_types
 
-
-def lvs_veg_types(lu):
-    """Return livestock and vegetation types of the livestock land-use `lu`."""
-
-    # Determine type of livestock.
-    if 'beef' in lu.lower():
-        lvstype = 'BEEF'
-    elif 'sheep' in lu.lower():
-        lvstype = 'SHEEP'
-    elif 'dairy' in lu.lower():
-        lvstype = 'DAIRY'
-    else:
-        raise KeyError("Livestock type '%s' not identified." % lu)
-
-    # Determine type of vegetation.
-    if 'native' in lu.lower():
-        vegtype = 'NVEG'
-    elif 'sown' in lu.lower():
-        vegtype = 'SOWN'
-    else:
-        raise KeyError("Vegetation type '%s' not identified." % lu)
-
-    return lvstype, vegtype
 
 def get_cost_crop( data # Data object or module.
                  , lu   # Land use.

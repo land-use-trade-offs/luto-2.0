@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-30
-# Last modified: 2021-08-06
+# Last modified: 2021-08-20
 #
 
 import os.path
@@ -63,6 +63,7 @@ def get_transition_matrices(data, year, lumap, lmmap):
 
     # Total aq lic costs = aq req [Ml/ha] x area/cell [ha] x lic price [AUD/Ml].
     wr_rj = data.AGEC['WR', 'irr'].to_numpy() # Water required in Ml/ha.
+    # TODO: Note that the water licence price will NOT be 'WP any more.
     wp_rj = data.AGEC['WP', 'irr'].to_numpy() # Water licence price in AUD/Ml.
     aqlic_rj = np.nan_to_num(wr_rj * realarea_rj * wp_rj) # The total lic costs.
 

@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-08-19
+# Last modified: 2021-08-20
 #
 
 import os
@@ -52,7 +52,7 @@ PR_LVSTK = [ s.upper() + ' ' + p
              for s in LU_LVSTK if 'DAIRY' not in s.upper()
              for p in ['LIVEXPORT', 'DOMCONSUM'] ]
 PR_LVSTK += [s.upper() for s in LU_LVSTK if 'DAIRY' in s.upper()]
-PR_LVSTK += ['WOOL ' + s.upper() for s in LU_LVSTK if 'SHEEP' in s.upper()]
+PR_LVSTK += [s.upper() + ' WOOL' for s in LU_LVSTK if 'SHEEP' in s.upper()]
 PRODUCTS = PR_CROPS + PR_LVSTK
 PRODUCTS.sort() # Ensure lexicographic order.
 
@@ -68,7 +68,7 @@ def dict2matrix(d, fromlist, tolist):
     """Return 0-1 matrix mapping 'from-vectors' to 'to-vectors' using dict d."""
     A = np.zeros((len(tolist), len(fromlist)), dtype=np.int)
     for j, jstr in enumerate(fromlist):
-        for istr in LU2PR_DICT[jstr]:
+        for istr in d[jstr]:
             i = tolist.index(istr)
             A[i, j] = True
     return A
@@ -89,7 +89,24 @@ CM_CROPS = [s for s in COMMODITIES if s in [k.lower() for k in LU_CROPS]]
 # Crops commodities and products are one-one. Livestock is more complicated.
 CM2PR_DICT = { key.lower(): [key.upper()] if key in CM_CROPS else []
                for key in COMMODITIES }
+for key, value in CM2PR_DICT.items():
+    if len(key.split())==1:
+        head = key.split()[0]
+        tail = 0
+    else:
+        head = key.split()[0]
+        tail = key.split()[1]
+    for PR in PR_LVSTK:
+        if tail==0 and head.upper() in PR:
+            CM2PR_DICT[key] = CM2PR_DICT[key] + [PR]
+            print(key, PR)
+        elif (head.upper()) in PR and (tail.upper() in PR):
+            CM2PR_DICT[key] = CM2PR_DICT[key] + [PR]
+            print(key, PR)
+        else:
+            ... # Do nothing, this should be a crop.
 
+PR2CM = dict2matrix(CM2PR_DICT, COMMODITIES, PRODUCTS).T # Note the transpose.
 
 
 # Actual hectares per cell, including projection corrections.

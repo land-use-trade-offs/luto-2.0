@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-07-30
+# Last modified: 2021-08-20
 #
 
 import numpy as np
@@ -21,10 +21,12 @@ constraints = { 'water': True
 
 def solve( t_mrj  # Transition cost matrices.
          , c_mrj  # Production cost matrices.
-         , q_mrj  # Yield matrices.
-         , d_j    # Demands.
+         , q_mrp  # Yield matrices -- note the `p` index instead of `j`.
+         , d_c    # Demands -- note the `c` index instead of `j`.
          , p      # Penalty level.
          , x_mrj  # Exclude matrices.
+         , lu2pr_pj # Conversion matrix: land-use to product(s).
+         , pr2cm_cp # Conversion matrix: product(s) to commodity.
          , constraints = constraints # Constraints to use (default all).
          ):
     """Return land-use, land-man maps under constraints and minimised costs.
@@ -37,15 +39,17 @@ def solve( t_mrj  # Transition cost matrices.
     'nutrients', 'carbon' or 'biodiversity' and 'value' is either True or False.
     """
 
-    # Extract the shape of the problem (# land-man types, cells and land-uses).
-    nlms, ncells, nlus = t_mrj.shape
+    # Extract the shape of the problem.
+    nlms, ncells, nlus = t_mrj.shape # Number of landmans, cells, landuses.
+    _, _, nprs = q_mrp.shape # Number of products.
+    ncms = d_c.shape # Number of commodities.
 
     # Penalty units for each j as maximum cost.
-    p_j = np.zeros(nlus)
-    for j in range(nlus):
-        p_j[j] = c_mrj.T.max()
+    p_c = np.zeros(ncms)
+    for c in range(ncms):
+        p_c[j] = c_mrj.T.max()
     # Apply the penalty-level multiplier.
-    p_j *= p
+    p_c *= p
 
     try:
         # Make Gurobi model instance.
@@ -78,14 +82,33 @@ def solve( t_mrj  # Transition cost matrices.
                             + X_irr ) == np.ones(ncells) )
 
         # Constraints that penalise deficits and surpluses, respectively.
-        model.addConstrs( p_j[j]
-                        * ( d_j[j] - ( q_mrj[0].T[j] @ X_dry[j]
-                                     + q_mrj[1].T[j] @ X_irr[j] ) ) <= V[j]
-                          for j in range(nlus) )
-        model.addConstrs( p_j[j]
-                        * ( ( q_mrj[0].T[j] @ X_dry[j]
-                            + q_mrj[1].T[j] @ X_irr[j] ) - d_j[j] ) <= V[j]
-                          for j in range(nlus) )
+        #
+
+        # Conversion matrix lu to cm. TODO: To come directly from data module.
+        lu2cm_cj = pr2cm_cp @ lu2pr_pj
+        # Quantities. First by land-use/land-man, then com/land-man, then com.
+        q_dry_j = np.array([ (q_mrp[0] @ lu2pr_pj).T[j].T @ X_dry[j]
+                             for j in range(nlus) ])
+        q_irr_j = np.array([ (q_mrp[1] @ lu2pr_pj).T[j].T @ X_dry[j]
+                             for j in range(nlus) ])
+        q_dry_c = lu2cm_cj @ q_dry_j
+        q_irr_c = lu2cm_cj @ q_irr_j
+        q_c = q_dry_c + q_irr_c
+
+        model.addConstrs( p_c[c] * (d_c[c] - q_c[c]) <= V[c]
+                          for c in range(ncms) )
+        model.addConstrs( p_c[c] * (q_c[c] - d_c[c]) <= V[c]
+                          for c in range(ncms) )
+
+        # Non landuse-product-commodity version. For reference:
+        # model.addConstrs( p_j[j]
+                        # * ( d_j[j] - ( q_mrj[0].T[j] @ X_dry[j]
+                                     # + q_mrj[1].T[j] @ X_irr[j] ) ) <= V[j]
+                          # for j in range(nlus) )
+        # model.addConstrs( p_j[j]
+                        # * ( ( q_mrj[0].T[j] @ X_dry[j]
+                            # + q_mrj[1].T[j] @ X_irr[j] ) - d_j[j] ) <= V[j]
+                          # for j in range(nlus) )
 
         # Only add the following constraints if requested.
 

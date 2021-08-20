@@ -4,16 +4,39 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-26
-# Last modified: 2021-08-18
+# Last modified: 2021-08-20
 #
 
 import numpy as np
 
-from luto.economics.cost import lvs_veg_type
+
+def lvs_veg_types(lu):
+    """Return livestock and vegetation types of the livestock land-use `lu`."""
+
+    # Determine type of livestock.
+    if 'beef' in lu.lower():
+        lvstype = 'BEEF'
+    elif 'sheep' in lu.lower():
+        lvstype = 'SHEEP'
+    elif 'dairy' in lu.lower():
+        lvstype = 'DAIRY'
+    else:
+        raise KeyError("Livestock type '%s' not identified." % lu)
+
+    # Determine type of vegetation.
+    if 'native' in lu.lower():
+        vegtype = 'NVEG'
+    elif 'sown' in lu.lower():
+        vegtype = 'SOWN'
+    else:
+        raise KeyError("Vegetation type '%s' not identified." % lu)
+
+    return lvstype, vegtype
 
 def get_yield_pot( data # Data object or module.
                  , lvstype # Livestock type (one of 'BEEF', 'SHEEP' or 'DAIRY')
                  , vegtype # Vegetation type (one of 'NVEG' or 'SOWN')
+                 , lm # Land-management type.
                  ):
     """Return the yield potential for livestock and vegetation type."""
 
@@ -46,7 +69,7 @@ def get_yield_pot( data # Data object or module.
     return potential
 
 def get_quantity_lvstk( data # Data object or module.
-                      , pr   # Livestock +  product like 'nveg-grazed wool').
+                      , pr   # Livestock + product like 'nveg-grazed wool').
                       , lm   # Land management.
                       , year # Number of years post base-year ('annum').
                       ):
@@ -61,24 +84,44 @@ def get_quantity_lvstk( data # Data object or module.
     lvstype, vegtype = lvs_veg_types(pr)
 
     # Get the yield potential.
-    yield_pot = get_yield_pot(data, lvstype, vegtype)
+    yield_pot = get_yield_pot(data, lvstype, vegtype, lm)
 
-    # Beef yields composed of just beef (Q1) and live exports (Q3).
-    if lvstype == 'BEEF': # F1 * Q1 + F3 * Q3.
-        quantity = ( ( data.AGEC_LVSTK['F1', lvstype]
-                     * data.AGEC_LVSTK['Q1', lvstype] )
-                   + ( data.AGEC_LVSTK['F3', lvstype]
-                     * data.AGEC_LVSTK['Q3', lvstype] ) )
-    # Sheep yields composed of sheep meat (Q1)+live exports (Q3) or wool (Q2).
-    elif lvstype == 'SHEEP': # (F1 * Q1 + F3 * Q3) or F2 * Q2.
-        quantity = ( ( data.AGEC_LVSTK['F1', lvstype]
-                     * data.AGEC_LVSTK['Q1', lvstype] )
-                   + ( data.AGEC_LVSTK['F3', lvstype]
-                     * data.AGEC_LVSTK['Q3', lvstype] ) )
-    # Dairy yields composed of just dairy (Q1).
-    elif lvstype == 'DAIRY': # F1 * Q1.
-        quantity = ( data.AGEC_LVSTK['F1', lvstype]
-                   * data.AGEC_LVSTK['Q1', lvstype] )
+    # Determine base quantity case-by-case.
+    #
+
+    # Beef yields just beef (Q1) and live exports (Q3).
+    if lvstype == 'BEEF': # (F1 * Q1) or (F3 * Q3).
+        if 'DOMCONSUM' in pr:
+            quantity = ( data.AGEC_LVSTK['F1', lvstype]
+                       * data.AGEC_LVSTK['Q1', lvstype] )
+        elif 'LIVEXPORT' in pr:
+            quantity = ( data.AGEC_LVSTK['F3', lvstype]
+                       * data.AGEC_LVSTK['Q3', lvstype] )
+        else:
+            raise KeyError("Unknown %s product. Check `pr` key." % lvstype)
+
+    # Sheep yield sheep meat (Q1), wool (Q2) or live exports (Q3).
+    elif lvstype == 'SHEEP': # (F1 * Q1), (F2 * Q2) or (F3 * Q3).
+        if 'DOMCONSUM' in pr:
+            quantity = ( data.AGEC_LVSTK['F1', lvstype]
+                       * data.AGEC_LVSTK['Q1', lvstype] )
+        elif 'WOOL' in pr:
+            quantity = ( data.AGEC_LVSTK['F2', lvstype]
+                       * data.AGEC_LVSTK['Q2', lvstype] )
+        elif 'LIVEXPORT' in pr:
+            quantity = ( data.AGEC_LVSTK['F3', lvstype]
+                       * data.AGEC_LVSTK['Q3', lvstype] )
+        else:
+            raise KeyError("Unknown %s product. Check `pr` key." % lvstype)
+
+    # Dairy yields just dairy (Q1).
+    elif lvstype == 'DAIRY': # (F1 * Q1).
+        if 'DAIRY' in pr: # No 'elif', just keeping structure consistent.
+            quantity = ( data.AGEC_LVSTK['F1', lvstype]
+                       * data.AGEC_LVSTK['Q1', lvstype] )
+        else:
+            raise KeyError("Unknown %s product. Check `pr` key." % lvstype)
+
     else:
         raise KeyError("Livestock type '%s' not identified." % lvstype)
 
@@ -143,15 +186,15 @@ def get_quantity( data # Data object or module.
         raise KeyError("Land use '%s' not found in data." % pr)
 
 def get_quantity_matrix(data, lm, year):
-    """Return q_rj matrix of quantities per cell per pr as 2D Numpy array."""
+    """Return q_rp matrix of quantities per cell per pr as 2D Numpy array."""
     # TODO: LANDUSES to change to COMMODITIES
-    q_rj = np.zeros((data.NCELLS, len(data.LANDUSES)))
+    q_rp = np.zeros((data.NCELLS, len(data.PRODUCTS)))
     for j, pr in enumerate(data.LANDUSES):
-        q_rj[:, j] = get_quantity(data, pr, lm, year)
+        q_rp[:, j] = get_quantity(data, pr, lm, year)
     # Make sure all NaNs are replaced by zeroes.
-    return np.nan_to_num(q_rj)
+    return np.nan_to_num(q_rp)
 
 def get_quantity_matrices(data, year):
-    """Return q_rmj matrix of quantities per cell as 3D Numpy array."""
+    """Return q_rmp matrix of quantities per cell as 3D Numpy array."""
     return np.stack(tuple( get_quantity_matrix(data, lm, year)
                            for lm in data.LANDMANS ))
