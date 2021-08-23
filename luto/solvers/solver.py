@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-08-20
+# Last modified: 2021-08-23
 #
 
 import numpy as np
@@ -62,7 +62,7 @@ def solve( t_mrj  # Transition cost matrices.
                   for j in range(nlus) ]
 
         # Decision variables to minimise the deviations.
-        V = model.addMVar(nlus, name='V')
+        V = model.addMVar(ncms, name='V')
 
         # Set the objective function and the model sense.
         objective = ( sum( # Production costs.
@@ -72,7 +72,7 @@ def solve( t_mrj  # Transition cost matrices.
                          + t_mrj[0].T[j] @ X_dry[j]
                          + t_mrj[1].T[j] @ X_irr[j]
                            # Penalties.
-                         + V[j]
+                           + V[j] # TODO: Runs over c instead of j.
                            # For all land uses.
                            for j in range(nlus) ) )
         model.setObjective(objective, GRB.MINIMIZE)
@@ -84,16 +84,26 @@ def solve( t_mrj  # Transition cost matrices.
         # Constraints that penalise deficits and surpluses, respectively.
         #
 
-        # Conversion matrix lu to cm. TODO: To come directly from data module.
-        lu2cm_cj = pr2cm_cp @ lu2pr_pj
-        # Quantities. First by land-use/land-man, then com/land-man, then com.
-        q_dry_j = np.array([ (q_mrp[0] @ lu2pr_pj).T[j].T @ X_dry[j]
-                             for j in range(nlus) ])
-        q_irr_j = np.array([ (q_mrp[1] @ lu2pr_pj).T[j].T @ X_dry[j]
-                             for j in range(nlus) ])
-        q_dry_c = lu2cm_cj @ q_dry_j
-        q_irr_c = lu2cm_cj @ q_irr_j
-        q_c = q_dry_c + q_irr_c
+        # Awkward matrix multiplication to get around gp.MLinExpr limitations.
+        # X_dry_pr = [ sum(lu2pr_pj.T[j, p] * X_dry[j] for j in range(nlus))
+                     # for p in range(nprs) ]
+        # X_irr_pr = [ sum(lu2pr_pj.T[j, p] * X_irr[j] for j in range(nlus))
+                     # for p in range(nprs) ]
+
+        X_dry_pr = [ X_dry[j] for p in range(nprs) for j in range(nlus)
+                     if lu2pr_pj[p, j] ]
+        X_irr_pr = [ X_irr[j] for p in range(nprs) for j in range(nlus)
+                     if lu2pr_pj[p, j] ]
+
+        # Gurobi official workaround:
+        q_dry_p = [ sp.diags(q_mrp[0].T[p]) @ X_dry_pr[p]
+                    for p in range(nprs) ]
+        q_irr_p = [ sp.diags(q_mrp[0].T[p]) @ X_irr_pr[p]
+                    for p in range(nprs) ]
+        q_dry_c = [ q_dry_p[p] for c in range(ncms) for p in range(nprs)
+                    if pr2cm_cp[c, p] ]
+        q_irr_c = [ q_irr_p[p] for c in range(ncms) for p in range(nprs)
+                    if pr2cm_cp[c, p] ]
 
         model.addConstrs( p_c[c] * (d_c[c] - q_c[c]) <= V[c]
                           for c in range(ncms) )
@@ -151,3 +161,36 @@ def solve( t_mrj  # Transition cost matrices.
 
     except AttributeError:
         print('Encountered an attribute error')
+
+if __name__ == '__main__':
+
+    nlms = 2
+    ncells = 10
+    nlus = 5
+    nprs = 7
+    ncms = 6
+
+    t_mrj = 10 * np.random.random((nlms, ncells, nlus))
+    q_mrj = 10 * np.random.random((nlms, ncells, nlus))
+    c_mrj = 10 * np.random.random((nlms, ncells, nlus))
+    x_mrj = 10 * np.random.random((nlms, ncells, nlus))
+
+    p = 1
+
+    lu2pr_pj = np.array([ [1., 0., 0., 0., 0.]
+                        , [1., 0., 0., 0., 0.]
+                        , [0., 1., 0., 0., 0.]
+                        , [0., 1., 0., 0., 0.]
+                        , [0., 0., 1., 0., 0.]
+                        , [0., 0., 0., 1., 0.]
+                        , [0., 0., 0., 0., 1.]
+                        ])
+
+    pr2cm_cp = np.array([ [1., 1., 0., 0., 0., 0., 0.]
+                        , [0., 0., 1., 0., 0., 0., 0.]
+                        , [0., 0., 0., 1., 0., 0., 0.]
+                        , [0., 0., 0., 0., 1., 0., 0.]
+                        , [0., 0., 0., 0., 0., 1., 0.]
+                        , [0., 0., 0., 0., 0., 0., 1.]
+                        ])
+
