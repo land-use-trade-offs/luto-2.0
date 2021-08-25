@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-08-20
+# Last modified: 2021-08-25
 #
 
 import os
@@ -26,8 +26,7 @@ NCELLS, = AGEC_CROPS.index.shape
 
 # Read in lexicographically ordered list of land uses.
 LANDUSES = np.load(os.path.join(INPUT_DIR, 'landuses.npy')).tolist()
-LANDUSES.remove('Non-agricultural land') # Remove this non land-use.
-LANDUSES.sort() # Ensure lexicographic order.
+LANDUSES.sort() # Ensure lexicographic order - should be superfluous.
 NLUS = len(LANDUSES)
 
 # Some useful sub-sets of the land uses.
@@ -77,8 +76,8 @@ LU2PR = dict2matrix(LU2PR_DICT, LANDUSES, PRODUCTS)
 
 # List of commodities. Everything lower case to avoid mistakes.
 # Basically collapse 'nveg' and 'sown' products and remove duplicates.
-COMMODITIES = { ( s.replace(' - NATIVE VEGETATION', '')
-                   .replace(' - SOWN PASTURE', '')
+COMMODITIES = { ( s.replace(' - NATURAL LAND', '')
+                   .replace(' - MODIFIED LAND', '')
                    .lower() )
                 for s in PRODUCTS }
 COMMODITIES = list(COMMODITIES)
@@ -130,8 +129,8 @@ fpath = os.path.join(INPUT_DIR, "yieldincreases-c9.hdf5")
 YIELDINCREASE = pd.read_hdf(fpath, 'yieldincreases')
 
 # Climate damages to pastures and dryland as NYEARS x NCELLS shaped bricks.
-AG_PASTURE_DAMAGE = np.load(os.path.join(INPUT_DIR, 'ag-pasture-damage.npy'))
-AG_DRYLAND_DAMAGE = np.load(os.path.join(INPUT_DIR, 'ag-dryland-damage.npy'))
+# AG_PASTURE_DAMAGE = np.load(os.path.join(INPUT_DIR, 'ag-pasture-damage.npy'))
+# AG_DRYLAND_DAMAGE = np.load(os.path.join(INPUT_DIR, 'ag-dryland-damage.npy'))
 
 # Price paths.
 price_paths = pd.read_csv(os.path.join(INPUT_DIR, 'pricepaths.csv'))

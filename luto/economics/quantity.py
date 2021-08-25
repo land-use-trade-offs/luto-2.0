@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-26
-# Last modified: 2021-08-20
+# Last modified: 2021-08-25
 #
 
 import numpy as np
@@ -179,7 +179,7 @@ def get_quantity( data # Data object or module.
     if pr in data.CROPS:
         return get_quantity_crop(data, pr, lm, year)
     # If it is livestock, it is known how to get the quantities.
-    elif pr in data.LVSTK: # TODO: Change into a list of livestock _products_.
+    elif pr in data.LVSTK:
         return get_quantity_lvstk(data, pr, lm, year)
     # If it is none of the above, it is not known how to get the quantities.
     else:
@@ -187,7 +187,6 @@ def get_quantity( data # Data object or module.
 
 def get_quantity_matrix(data, lm, year):
     """Return q_rp matrix of quantities per cell per pr as 2D Numpy array."""
-    # TODO: LANDUSES to change to COMMODITIES
     q_rp = np.zeros((data.NCELLS, len(data.PRODUCTS)))
     for j, pr in enumerate(data.LANDUSES):
         q_rp[:, j] = get_quantity(data, pr, lm, year)

@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-08-20
+# Last modified: 2021-08-25
 #
 
 import numpy as np
@@ -90,7 +90,7 @@ def get_cost_lvstk( data # Data object or module.
     # Quantity and water costs.
     cost_qw = ( data.AGEC_LVSTK['QC', lvstype] # Quantity costs.
               + ( data.AGEC_LVSTK['WR_DRN', lvstype] # Drinking water required.
-                * data.WATER_DELIVERY_COSTS )# Cost of water delivery.
+                * data.WATER_DELIVERY_COSTS ) # Cost of water delivery.
               ) * yield_pot # Yield potential.
     # Fixed and area costs.
     cost_fa = ( data.AGEC_LVSTK['AC', lvstype] # Area costs.

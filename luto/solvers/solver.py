@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-08-24
+# Last modified: 2021-08-25
 #
 
 import numpy as np
@@ -168,16 +168,6 @@ def solve( t_mrj  # Transition cost matrices.
     except AttributeError:
         print('Encountered an attribute error')
 
-        # Non landuse-product-commodity version. For reference:
-        # model.addConstrs( p_j[j]
-                        # * ( d_j[j] - ( q_mrj[0].T[j] @ X_dry[j]
-                                     # + q_mrj[1].T[j] @ X_irr[j] ) ) <= V[j]
-                          # for j in range(nlus) )
-        # model.addConstrs( p_j[j]
-                        # * ( ( q_mrj[0].T[j] @ X_dry[j]
-                            # + q_mrj[1].T[j] @ X_irr[j] ) - d_j[j] ) <= V[j]
-                          # for j in range(nlus) )
-
 if __name__ == '__main__':
 
     nlms = 2
@@ -191,13 +181,15 @@ if __name__ == '__main__':
     t_mrj[:, :, -1] = 0 # LU == 4 everywhere.
 
     q_mrp = 1 * np.ones((nlms, ncells, nprs))
+    q_mrp[:, :, -2] = 0 # An 'unallocated' landuse.
     c_mrj = 1 * np.ones((nlms, ncells, nlus))
+    c_mrj[:, :, -2] = 0 # An 'unallocated' landuse.
     x_mrj = 1 * np.ones((nlms, ncells, nlus))
 
-    p = 1000
+    p = 5
 
     d_c = np.zeros(ncms)
-    d_c[3] = 1
+    #d_c[3] = 1
 
     lu2pr_pj = np.array([ [1, 0, 0, 0, 0]
                         , [1, 0, 0, 0, 0]

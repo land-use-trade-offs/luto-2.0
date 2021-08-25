@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-08-09
+# Last modified: 2021-08-25
 #
 
 import numpy as np
@@ -35,12 +35,13 @@ class Data():
              self.__dict__[key] = bdata.__dict__[key]
 
         # Masks from lumap and via resfactor.
-        self.mask_lu = 0 # TODO: This needs to be -1.
-        self.mask = lumap == self.mask_lu # TODO: This needs to be != .
+        self.mask_lu = -1
+        self.mask = lumap != self.mask_lu
 
         # Spatial data is sub-setted based on the above masks.
         self.NCELLS = self.mask.sum()
-        self.AGEC = bdata.AGEC.iloc[self.mask]
+        self.AGEC_CROPS = bdata.AGEC.iloc[self.mask]
+        self.AGEC_LVSTK = bdata.AGEC.iloc[self.mask]
         self.REAL_AREA = bdata.REAL_AREA[self.mask]
         self.AG_DRYLAND_DAMAGE = bdata.AG_DRYLAND_DAMAGE[:, self.mask]
         self.AG_PASTURE_DAMAGE = bdata.AG_PASTURE_DAMAGE[:, self.mask]
