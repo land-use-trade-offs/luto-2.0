@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-08-25
+# Last modified: 2021-08-27
 #
 
 import numpy as np
@@ -90,7 +90,7 @@ def get_cost_lvstk( data # Data object or module.
     # Quantity and water costs.
     cost_qw = ( data.AGEC_LVSTK['QC', lvstype] # Quantity costs.
               + ( data.AGEC_LVSTK['WR_DRN', lvstype] # Drinking water required.
-                * data.WATER_DELIVERY_COSTS ) # Cost of water delivery.
+                * data.WATER_DELIVERY_PRICE ) # Cost of water delivery.
               ) * yield_pot # Yield potential.
     # Fixed and area costs.
     cost_fa = ( data.AGEC_LVSTK['AC', lvstype] # Area costs.
@@ -121,14 +121,17 @@ def get_cost( data # Data object or module.
     `year`: number of years from base year, counting from zero.
     """
     # If it is a crop, it is known how to get the costs.
-    if lu in data.CROPS:
+    if lu in data.LU_CROPS:
         return get_cost_crop(data, lu, lm, year)
     # If it is livestock, it is known how to get the costs.
-    elif lu in data.LVSTK:
+    elif lu in data.LU_LVSTK:
         return get_cost_lvstk(data, lu, lm, year)
+    # If neither crop nor livestock but in LANDUSES it is unallocated land.
+    elif lu in data.LANDUSES:
+        return np.zeros(data.NCELLS)
     # If it is none of the above, it is not known how to get the costs.
     else:
-        raise KeyError("Land use '%s' not found in data." % lu)
+        raise KeyError("Land use '%s' not found in data.LANDUSES" % lu)
 
 def get_cost_matrix(data, lm, year):
     """Return c_rj matrix of costs/cell per lu under `lm` in `year`."""

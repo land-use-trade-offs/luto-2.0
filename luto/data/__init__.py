@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-08-25
+# Last modified: 2021-08-27
 #
 
 import os
@@ -31,13 +31,13 @@ NLUS = len(LANDUSES)
 
 # Some useful sub-sets of the land uses.
 LU_CROPS = [ lu for lu in LANDUSES if 'Beef' not in lu
-                                and 'Sheep' not in lu
-                                and 'Dairy' not in lu
-                                and 'Unallocated' not in lu
-                                and 'Non-agricultural' not in lu ]
+                                  and 'Sheep' not in lu
+                                  and 'Dairy' not in lu
+                                  and 'Unallocated' not in lu
+                                  and 'Non-agricultural' not in lu ]
 LU_LVSTK = [ lu for lu in LANDUSES if 'Beef' in lu
-                                or 'Sheep' in lu
-                                or 'Dairy' in lu ]
+                                   or 'Sheep' in lu
+                                   or 'Dairy' in lu ]
 
 # Derive LANDMANS (land-managements) from AGEC.
 LANDMANS = {t[1] for t in AGEC_CROPS.columns} # Set comp., unique entries.
@@ -98,10 +98,8 @@ for key, value in CM2PR_DICT.items():
     for PR in PR_LVSTK:
         if tail==0 and head.upper() in PR:
             CM2PR_DICT[key] = CM2PR_DICT[key] + [PR]
-            print(key, PR)
         elif (head.upper()) in PR and (tail.upper() in PR):
             CM2PR_DICT[key] = CM2PR_DICT[key] + [PR]
-            print(key, PR)
         else:
             ... # Do nothing, this should be a crop.
 
@@ -119,6 +117,42 @@ LMMAP = np.load(os.path.join(INPUT_DIR, 'lmmap.npy'))
 
 # The base year, i.e. year == 0.
 ANNUM = 2010
+
+# ----------- #
+# Water data. #
+# ----------- #
+
+# Water requirements by land use.
+wr_lvstk = pd.DataFrame()
+for lu in LU_LVSTK:
+    if 'beef' in lu.lower():
+        animal = 'BEEF'
+    if 'sheep' in lu.lower():
+        animal = 'SHEEP'
+    if 'dairy' in lu.lower():
+        animal = 'DAIRY'
+    wr_lvstk[lu] = AGEC_LVSTK['WR_IRR', animal]
+wr_crops = data.AGEC_CROPS['WR', 'irr']
+wr_rj = pd.concat([wr_crops, wr_lvstk], axis=1)
+for lu in data.LANDUSES:
+    if lu not in data.LU_CROPS and lu not in data.LU_LVSTK:
+        wr_rj[lu] = 0
+wr_rj.sort_index(axis=1, inplace=True)
+WR_rj = np.nan_to_num(wr_rj)
+
+WATER_LICENCE_PRICE = np.load(os.path.join( INPUT_DIR
+                                           , 'water-licence-price.npy') )
+WATER_DELIVERY_PRICE = np.load(os.path.join( INPUT_DIR
+                                           , 'water-delivery-price.npy') )
+# ----------------------- #
+# Livestock related data. #
+# ----------------------- #
+
+FEED_REQ = np.load(os.path.join(INPUT_DIR, 'feed-req.npy'))
+PASTURE_KG_DM_HA = np.load(os.path.join(INPUT_DIR, 'pasture-kg-dm-ha.npy'))
+SAFE_PUR_NATL = np.load(os.path.join(INPUT_DIR, 'safe-pur-natl'))
+SAFE_PUR_MODL = np.load(os.path.join(INPUT_DIR, 'safe-pur-modl'))
+
 
 # ---------------------------------- #
 # Temporal and spatio-temporal data. #
