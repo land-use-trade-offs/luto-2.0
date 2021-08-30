@@ -49,6 +49,10 @@ class Data():
         self.WATER_REQUIRED = bdata.WATER_REQUIRED[self.mask]
         self.WATER_LICENCE_PRICE = bdata.WATER_LICENCE_PRICE[self.mask]
         self.WATER_DELIVERY_PRICE = bdata.WATER_DELIVERY_PRICE[self.mask]
+        self.FEED_REQ = bdata.FEED_REQ[self.mask]
+        self.PASTURE_KG_DM_HA = bdata.PASTURE_KG_DM_HA[self.mask]
+        self.SAFE_PUR_MODL = bdata.SAFE_PUR_MODL[self.mask]
+        self.SAFE_PUR_NATL = bdata.SAFE_PUR_NATL[self.mask]
 
 # Placeholder for module-global data object. To be set by `prep()`.
 data = None
