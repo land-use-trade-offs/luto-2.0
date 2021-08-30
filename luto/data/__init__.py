@@ -138,7 +138,8 @@ for lu in LANDUSES:
     if lu not in LU_CROPS and lu not in LU_LVSTK:
         wr_rj[lu] = 0
 wr_rj.sort_index(axis=1, inplace=True)
-WR_rj = np.nan_to_num(wr_rj)
+
+WATER_REQUIRED = np.nan_to_num(wr_rj)
 
 WATER_LICENCE_PRICE = np.load(os.path.join( INPUT_DIR
                                            , 'water-licence-price.npy') )
