@@ -85,7 +85,7 @@ def get_cost_lvstk( data # Data object or module.
     lvstype, vegtype = lvs_veg_types(lu)
 
     # Get the yield potential.
-    yield_pot = get_yield_pot(data, lvstype, vegtype)
+    yield_pot = get_yield_pot(data, lvstype, vegtype, lm)
 
     # Quantity and water costs.
     cost_qw = ( data.AGEC_LVSTK['QC', lvstype] # Quantity costs.
