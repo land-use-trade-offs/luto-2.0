@@ -177,7 +177,7 @@ def get_quantity( data # Data object or module.
     """
     # If it is a crop, it is known how to get the quantities.
     if pr in data.PR_CROPS:
-        return get_quantity_crop(data, pr, lm, year)
+        return get_quantity_crop(data, pr.capitalise(), lm, year)
     # If it is livestock, it is known how to get the quantities.
     elif pr in data.PR_LVSTK:
         return get_quantity_lvstk(data, pr, lm, year)
