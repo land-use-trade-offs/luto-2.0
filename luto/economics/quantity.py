@@ -176,10 +176,10 @@ def get_quantity( data # Data object or module.
     `year`: number of years from base year, counting from zero.
     """
     # If it is a crop, it is known how to get the quantities.
-    if pr in data.CROPS:
+    if pr in data.LU_CROPS:
         return get_quantity_crop(data, pr, lm, year)
     # If it is livestock, it is known how to get the quantities.
-    elif pr in data.LVSTK:
+    elif pr in data.LU_LVSTK:
         return get_quantity_lvstk(data, pr, lm, year)
     # If it is none of the above, it is not known how to get the quantities.
     else:
