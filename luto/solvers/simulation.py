@@ -94,7 +94,7 @@ def get_shape(year=None):
 # Obtain local versions of get_*_matrices.
 def get_c_mrj():
     return get_cost_matrices(data, get_year())
-def get_q_mrj():
+def get_q_mrp():
     return get_quantity_matrices(data, get_year())
 def get_t_mrj():
     return get_transition_matrices( data
@@ -128,7 +128,7 @@ def step( d_j # Demands.
     # Magic.
     lumap, lmmap = solve( get_t_mrj()
                         , get_c_mrj()
-                        , get_q_mrj()
+                        , get_q_mrp()
                         , d_j
                         , p
                         , get_x_mrj() )

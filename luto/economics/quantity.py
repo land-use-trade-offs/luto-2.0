@@ -176,10 +176,10 @@ def get_quantity( data # Data object or module.
     `year`: number of years from base year, counting from zero.
     """
     # If it is a crop, it is known how to get the quantities.
-    if pr in data.LU_CROPS:
+    if pr in data.PR_CROPS:
         return get_quantity_crop(data, pr, lm, year)
     # If it is livestock, it is known how to get the quantities.
-    elif pr in data.LU_LVSTK:
+    elif pr in data.PR_LVSTK:
         return get_quantity_lvstk(data, pr, lm, year)
     # If it is none of the above, it is not known how to get the quantities.
     else:
@@ -188,12 +188,12 @@ def get_quantity( data # Data object or module.
 def get_quantity_matrix(data, lm, year):
     """Return q_rp matrix of quantities per cell per pr as 2D Numpy array."""
     q_rp = np.zeros((data.NCELLS, len(data.PRODUCTS)))
-    for j, pr in enumerate(data.LANDUSES):
+    for j, pr in enumerate(data.PRODUCTS):
         q_rp[:, j] = get_quantity(data, pr, lm, year)
     # Make sure all NaNs are replaced by zeroes.
     return np.nan_to_num(q_rp)
 
 def get_quantity_matrices(data, year):
-    """Return q_rmp matrix of quantities per cell as 3D Numpy array."""
+    """Return q_mrp matrix of quantities per cell as 3D Numpy array."""
     return np.stack(tuple( get_quantity_matrix(data, lm, year)
                            for lm in data.LANDMANS ))
