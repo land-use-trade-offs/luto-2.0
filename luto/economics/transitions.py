@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-30
-# Last modified: 2021-08-27
+# Last modified: 2021-08-30
 #
 
 import os.path
@@ -16,6 +16,26 @@ import numpy_financial as npf
 def amortise(cost, rate=0.05, horizon=30):
     """Return amortised `cost` at `rate`interest over `horizon` years."""
     return -1 * npf.pmt(rate, horizon, pv=cost, fv=0, when='begin')
+
+def get_exclude_matrices(data, lumap):
+    """Return x_mrj exclude matrices."""
+    # To be excluded based on SA2 data.
+    x_sa2 = data.EXCLUDE
+
+    # Raw transition-cost matrix is in AUD/Ha and lexigraphically ordered.
+    t_ij = data.TMATRIX.to_numpy()
+
+    # Infer number of cells from lumap array.
+    ncells = lumap.shape[0]
+
+    # Transition costs to commodity j at cell r using present lumap (in AUD/ha).
+    t_rj = np.stack(tuple(t_ij[lumap[r]] for r in range(ncells)))
+
+    # To be excluded based on disallowed switches.
+    x_trn = np.where(np.isnan(t_rj), 0, 1)
+
+    # Overal exclusion as elementwise, logical `and` of the exclude matrices.
+    return x_sa2 * x_trn
 
 def get_transition_matrices(data, year, lumap, lmmap):
     """Return t_mrj transition-cost matrices.

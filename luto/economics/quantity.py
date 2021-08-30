@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-26
-# Last modified: 2021-08-25
+# Last modified: 2021-08-30
 #
 
 import numpy as np
@@ -24,10 +24,10 @@ def lvs_veg_types(lu):
         raise KeyError("Livestock type '%s' not identified." % lu)
 
     # Determine type of vegetation.
-    if 'native' in lu.lower():
-        vegtype = 'NVEG'
-    elif 'sown' in lu.lower():
-        vegtype = 'SOWN'
+    if 'natural' in lu.lower():
+        vegtype = 'NATL'
+    elif 'modified' in lu.lower():
+        vegtype = 'MODL'
     else:
         raise KeyError("Vegetation type '%s' not identified." % lu)
 
@@ -55,10 +55,10 @@ def get_yield_pot( data # Data object or module.
     potential = data.FEED_REQ * data.PASTURE_KG_DM_HA / denominator
 
     # Multiply potential by appropriate SAFE_PUR.
-    if vegtype == 'NVEG':
-        potential *= data.SAFE_PUR_NVEG
-    elif vegtype == 'SOWN':
-        potential *= data.SAFE_PUR_SOWN
+    if vegtype == 'NATL':
+        potential *= data.SAFE_PUR_NATL
+    elif vegtype == 'MODL':
+        potential *= data.SAFE_PUR_MODL
     else:
         raise KeyError("Vegetation type '%s' not identified." % vegtype)
 

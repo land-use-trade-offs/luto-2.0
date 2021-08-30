@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-08-25
+# Last modified: 2021-08-30
 #
 
 import numpy as np
@@ -16,7 +16,8 @@ import luto.data as bdata
 from luto.data.economic import exclude
 from luto.economics.cost import get_cost_matrices
 from luto.economics.quantity import get_quantity_matrices
-from luto.economics.transitions import get_transition_matrices
+from luto.economics.transitions import ( get_transition_matrices
+                                       , get_exclude_matrices )
 from luto.solvers.solver import solve
 
 
@@ -43,8 +44,6 @@ class Data():
         self.AGEC_CROPS = bdata.AGEC.iloc[self.mask]
         self.AGEC_LVSTK = bdata.AGEC.iloc[self.mask]
         self.REAL_AREA = bdata.REAL_AREA[self.mask]
-        self.AG_DRYLAND_DAMAGE = bdata.AG_DRYLAND_DAMAGE[:, self.mask]
-        self.AG_PASTURE_DAMAGE = bdata.AG_PASTURE_DAMAGE[:, self.mask]
         self.LUMAP = bdata.LUMAP[self.mask]
         self.LMMAP = bdata.LMMAP[self.mask]
 
@@ -97,7 +96,7 @@ def get_t_mrj():
                                   , lmmaps[-1][data.mask]
                                   )
 def get_x_mrj():
-    return exclude(data.AGEC)
+    return get_exclude_matrices(data, lumaps[-1][data.mask])
 
 def reconstitute(rlumap):
     """Return lumap reconstituted to original size spatial domain."""

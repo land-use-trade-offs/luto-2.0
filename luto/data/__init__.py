@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-08-27
+# Last modified: 2021-08-30
 #
 
 import os
@@ -181,4 +181,4 @@ TMATRIX = pd.read_csv(fpath, index_col=0)
 TMATRIX = TMATRIX.sort_index(axis='index').sort_index(axis='columns')
 
 # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
-X_MRJ = exclude(AGEC_CROPS)
+EXCLUDE = np.load('x-mrj.npy')
