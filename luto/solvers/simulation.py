@@ -47,6 +47,8 @@ class Data():
         self.LUMAP = bdata.LUMAP[self.mask]
         self.LMMAP = bdata.LMMAP[self.mask]
         self.WATER_REQUIRED = bdata.WATER_REQUIRED[self.mask]
+        self.WATER_LICENCE_PRICE = bdata.WATER_LICENCE_PRICE[self.mask]
+        self.WATER_DELIVERY_PRICE = bdata.WATER_DELIVERY_PRICE[self.mask]
 
 # Placeholder for module-global data object. To be set by `prep()`.
 data = None
