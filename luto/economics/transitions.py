@@ -23,7 +23,7 @@ def get_exclude_matrices(data, lumap):
     x_sa2 = data.EXCLUDE
 
     # Raw transition-cost matrix is in AUD/Ha and lexigraphically ordered.
-    t_ij = data.TMATRIX.to_numpy()
+    t_ij = data.TMATRIX
 
     # Infer number of cells from lumap array.
     ncells = lumap.shape[0]
@@ -69,7 +69,7 @@ def get_transition_matrices(data, year, lumap, lmmap):
     """
 
     # Raw transition-cost matrix is in AUD/Ha and lexigraphically ordered.
-    t_ij = data.TMATRIX.to_numpy()
+    t_ij = data.TMATRIX
 
     # Infer number land-uses and cells from t_ij and lumap matrices.
     nlus = t_ij.shape[0]

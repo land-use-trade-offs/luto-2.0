@@ -132,10 +132,10 @@ for lu in LU_LVSTK:
     if 'dairy' in lu.lower():
         animal = 'DAIRY'
     wr_lvstk[lu] = AGEC_LVSTK['WR_IRR', animal]
-wr_crops = data.AGEC_CROPS['WR', 'irr']
+wr_crops = AGEC_CROPS['WR', 'irr']
 wr_rj = pd.concat([wr_crops, wr_lvstk], axis=1)
-for lu in data.LANDUSES:
-    if lu not in data.LU_CROPS and lu not in data.LU_LVSTK:
+for lu in LANDUSES:
+    if lu not in LU_CROPS and lu not in LU_LVSTK:
         wr_rj[lu] = 0
 wr_rj.sort_index(axis=1, inplace=True)
 WR_rj = np.nan_to_num(wr_rj)
@@ -150,8 +150,8 @@ WATER_DELIVERY_PRICE = np.load(os.path.join( INPUT_DIR
 
 FEED_REQ = np.load(os.path.join(INPUT_DIR, 'feed-req.npy'))
 PASTURE_KG_DM_HA = np.load(os.path.join(INPUT_DIR, 'pasture-kg-dm-ha.npy'))
-SAFE_PUR_NATL = np.load(os.path.join(INPUT_DIR, 'safe-pur-natl'))
-SAFE_PUR_MODL = np.load(os.path.join(INPUT_DIR, 'safe-pur-modl'))
+SAFE_PUR_NATL = np.load(os.path.join(INPUT_DIR, 'safe-pur-natl.npy'))
+SAFE_PUR_MODL = np.load(os.path.join(INPUT_DIR, 'safe-pur-modl.npy'))
 
 
 # ---------------------------------- #
@@ -176,9 +176,7 @@ DIESEL_PRICE_PATH = price_paths['diesel_price_path']
 # --------------- #
 
 # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
-fpath = os.path.join(INPUT_DIR, 'tmatrix.csv')
-TMATRIX = pd.read_csv(fpath, index_col=0)
-TMATRIX = TMATRIX.sort_index(axis='index').sort_index(axis='columns')
+TMATRIX = np.load(os.path.join(INPUT_DIR, 'tmatrix.npy'))
 
 # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
-EXCLUDE = np.load('x-mrj.npy')
+EXCLUDE = np.load(os.path.join(INPUT_DIR, 'x-mrj.npy'))

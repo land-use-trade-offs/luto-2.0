@@ -41,8 +41,8 @@ class Data():
 
         # Spatial data is sub-setted based on the above masks.
         self.NCELLS = self.mask.sum()
-        self.AGEC_CROPS = bdata.AGEC.iloc[self.mask]
-        self.AGEC_LVSTK = bdata.AGEC.iloc[self.mask]
+        self.AGEC_CROPS = bdata.AGEC_CROPS.iloc[self.mask]
+        self.AGEC_LVSTK = bdata.AGEC_LVSTK.iloc[self.mask]
         self.REAL_AREA = bdata.REAL_AREA[self.mask]
         self.LUMAP = bdata.LUMAP[self.mask]
         self.LMMAP = bdata.LMMAP[self.mask]
