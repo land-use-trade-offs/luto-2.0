@@ -46,6 +46,7 @@ class Data():
         self.REAL_AREA = bdata.REAL_AREA[self.mask]
         self.LUMAP = bdata.LUMAP[self.mask]
         self.LMMAP = bdata.LMMAP[self.mask]
+        self.WATER_REQUIRED = bdata.WATER_REQUIRED[self.mask]
 
 # Placeholder for module-global data object. To be set by `prep()`.
 data = None
