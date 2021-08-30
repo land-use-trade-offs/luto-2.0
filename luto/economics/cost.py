@@ -82,7 +82,7 @@ def get_cost_lvstk( data # Data object or module.
     `year`: number of years from base year, counting from zero.
     """
     # Get livestock and vegetation type.
-    lvstype, vegtype = lsv_veg_types(lu)
+    lvstype, vegtype = lvs_veg_types(lu)
 
     # Get the yield potential.
     yield_pot = get_yield_pot(data, lvstype, vegtype)
