@@ -87,7 +87,7 @@ def get_transition_matrices(data, year, lumap, lmmap):
     # aqlic_rj = np.nan_to_num(wr_rj * realarea_rj * wlic_rj) # The total lic costs.
 
     # Total aq lic costs = aq req [Ml/ha] x area/cell [ha] x lic price [AUD/Ml].
-    aq_lic_rj = ( (data.WATER_REQUIRED * realarea_rj).T
+    aqlic_rj = ( (data.WATER_REQUIRED * realarea_rj).T
                 * data.WATER_LICENCE_PRICE ).T
 
     # Switching to irr, from and to an irr land-use, may incur licence costs.
