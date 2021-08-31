@@ -108,10 +108,10 @@ def get_t_mrj():
 def get_x_mrj():
     return get_exclude_matrices(data, lumaps[-1][data.mask])
 
-def reconstitute(rlumap):
-    """Return lumap reconstituted to original size spatial domain."""
+def reconstitute(l_map, filler=-1 ):
+    """Return l?map reconstituted to original size spatial domain."""
     indices = np.cumsum(data.mask) - 1
-    return np.where(data.mask, rlumap[indices], data.mask_lu)
+    return np.where(data.mask, l_map[indices], filler)
 
 def prep():
     """Prepare for the next simulation step."""
@@ -138,8 +138,8 @@ def step( d_j # Demands.
                         , data.LU2PR
                         , data.PR2CM )
 
-    lumaps.append(reconstitute(lumap))
-    lmmaps.append(reconstitute(lmmap))
+    lumaps.append(reconstitute(lumap, filler=data.mask_lu))
+    lmmaps.append(reconstitute(lmmap, filler=0))
 
     ready = False
 
