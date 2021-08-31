@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-08-30
+# Last modified: 2021-08-31
 #
 
 import os
@@ -54,6 +54,7 @@ PR_LVSTK += [s.upper() for s in LU_LVSTK if 'DAIRY' in s.upper()]
 PR_LVSTK += [s.upper() + ' WOOL' for s in LU_LVSTK if 'SHEEP' in s.upper()]
 PRODUCTS = PR_CROPS + PR_LVSTK
 PRODUCTS.sort() # Ensure lexicographic order.
+NPRS = len(PRODUCTS)
 
 # Some land-uses map to multiple products -- a dict and matrix to capture this.
 # Crops land-uses and products are one-one. Livestock is more complicated.
@@ -83,6 +84,7 @@ COMMODITIES = { ( s.replace(' - NATURAL LAND', '')
 COMMODITIES = list(COMMODITIES)
 COMMODITIES.sort()
 CM_CROPS = [s for s in COMMODITIES if s in [k.lower() for k in LU_CROPS]]
+NCMS = len(COMMODITIES)
 
 # Some commodities map to multiple products -- dict and matrix to capture this.
 # Crops commodities and products are one-one. Livestock is more complicated.

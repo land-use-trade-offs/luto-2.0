@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-08-30
+# Last modified: 2021-08-31
 #
 
 import numpy as np
@@ -34,6 +34,8 @@ class Data():
         for key in bdata.__dict__:
             if key.isupper():
              self.__dict__[key] = bdata.__dict__[key]
+        self.LU2PR = bdata.LU2PR
+        self.PR2CM = bdata.PR2CM
 
         # Masks from lumap and via resfactor.
         self.mask_lu = -1
@@ -41,6 +43,7 @@ class Data():
 
         # Spatial data is sub-setted based on the above masks.
         self.NCELLS = self.mask.sum()
+        self.EXCLUDE = bdata.EXCLUDE[:, self.mask, :]
         self.AGEC_CROPS = bdata.AGEC_CROPS.iloc[self.mask]
         self.AGEC_LVSTK = bdata.AGEC_LVSTK.iloc[self.mask]
         self.REAL_AREA = bdata.REAL_AREA[self.mask]
@@ -131,7 +134,9 @@ def step( d_j # Demands.
                         , get_q_mrp()
                         , d_j
                         , p
-                        , get_x_mrj() )
+                        , get_x_mrj()
+                        , data.LU2PR
+                        , data.PR2CM )
 
     lumaps.append(reconstitute(lumap))
     lmmaps.append(reconstitute(lmmap))
