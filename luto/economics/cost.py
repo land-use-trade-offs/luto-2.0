@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-08-30
+# Last modified: 2021-09-01
 #
 
 import numpy as np
@@ -99,7 +99,9 @@ def get_cost_lvstk( data # Data object or module.
               + data.AGEC_LVSTK['FDC', lvstype] # Depreciation costs.
               )
 
-    # TODO: if statement for irrigated on the cost_fa to multiply by 2.
+    # Irrigation doubles the fixed and area costs.
+    if lm == 'irr':
+        cost_fa *= 2
 
     # Total costs are quantity plus fixed costs.
     cost = cost_qw + cost_fa

@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-07-09
-# Last modified: 2021-08-31
+# Last modified: 2021-09-01
 #
 
 import os.path
@@ -37,11 +37,6 @@ def build_agec_crops(concordance, data, columns=None, lus=None, lms=None):
 
     # Some columns have to go.
     agec_crops = agec_crops.drop(['CELL_ID', 'SA2_ID'], axis=1)
-    # TODO: Below is a rudiment?
-    columns = [ col for col in columns
-                if col != 'SA2_ID'
-                if col != 'LU_DESC'
-                if col != 'Irrigation' ]
 
     # The merge flattens the multi-index to tuples, so unflatten here.
     ts = [(t[0], lms[t[1]], t[2]) for t in agec_crops.columns]
