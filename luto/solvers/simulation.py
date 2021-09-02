@@ -7,10 +7,11 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-08-31
+# Last modified: 2021-09-02
 #
 
 import numpy as np
+from scipy.interpolate import interp1d
 
 import luto.data as bdata
 from luto.data.economic import exclude
@@ -37,7 +38,7 @@ class Data():
         self.LU2PR = bdata.LU2PR
         self.PR2CM = bdata.PR2CM
 
-        # Masks from lumap and via resfactor.
+        # Masks from lumap and via resfactor. True means _included_.
         self.mask_lu = -1
         self.mask = lumap != self.mask_lu
 
@@ -108,10 +109,28 @@ def get_t_mrj():
 def get_x_mrj():
     return get_exclude_matrices(data, lumaps[-1][data.mask])
 
-def reconstitute(l_map, filler=-1 ):
+def reconstitute(l_map, filler=-1):
     """Return l?map reconstituted to original size spatial domain."""
     indices = np.cumsum(data.mask) - 1
     return np.where(data.mask, l_map[indices], filler)
+
+def uncoursify(lxmap, rfmask):
+    """Restore the l?map to pre-resfactored extent."""
+
+    if rfmask.sum() != lxmap.shape[0]:
+        raise ValueError("Map and mask shapes do not match.")
+    else:
+        # Array with all x-coordinates on the larger map.
+        domain = np.arange(rfmask.shape[0])
+        # Array of x-coordinates on larger map of entries in lxmap.
+        xs = domain[rfmask]
+        # Instantiate an interpolation function.
+        f = interp1d(xs, lxmap, kind='nearest', fill_value='extrapolate')
+        # The uncoursified map is obtained by interpolating the missing values.
+        return f(domain).astype(np.int8)
+
+def resmask(lxmap, resfactor):
+    return lxmap[::resfactor]
 
 def prep():
     """Prepare for the next simulation step."""
