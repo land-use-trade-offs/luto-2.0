@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-08-31
+# Last modified: 2021-09-02
 #
 
 import os
@@ -107,6 +107,10 @@ for key, value in CM2PR_DICT.items():
 
 PR2CM = dict2matrix(CM2PR_DICT, COMMODITIES, PRODUCTS).T # Note the transpose.
 
+# NLUM mask.
+fpath = os.path.join(settings.INPUT_DIR, 'NLUM_2010-11_mask.tif')
+with rasterio.open(fpath) as rst:
+    NLUM_MASK = rst.read(1)
 
 # Actual hectares per cell, including projection corrections.
 REAL_AREA = np.load(os.path.join(INPUT_DIR, 'real-area.npy'))

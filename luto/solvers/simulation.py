@@ -38,9 +38,15 @@ class Data():
         self.LU2PR = bdata.LU2PR
         self.PR2CM = bdata.PR2CM
 
-        # Masks from lumap and via resfactor. True means _included_.
-        self.mask_lu = -1
-        self.mask = lumap != self.mask_lu
+        # Mask from lumap.
+        self.mask_lu_code = -1 # The lu code to exclude.
+        self.lumask = lumap != self.mask_lu_code # True means _included_.
+        # Mask from resfactor is superimposed on lumap mask.
+        if resfactor != 1:
+            self.rfmask = resmask(bdata.LUMAP, resfactor)
+            self.mask = self.lumask * self.rfmask
+        else:
+            self.mask = self.lumask
 
         # Spatial data is sub-setted based on the above masks.
         self.NCELLS = self.mask.sum()
@@ -111,26 +117,35 @@ def get_x_mrj():
 
 def reconstitute(l_map, filler=-1):
     """Return l?map reconstituted to original size spatial domain."""
-    indices = np.cumsum(data.mask) - 1
-    return np.where(data.mask, l_map[indices], filler)
+    indices = np.cumsum(data.lumask) - 1
+    return np.where(data.lumask, l_map[indices], filler)
 
-def uncoursify(lxmap, rfmask):
+def uncoursify(lxmap):
     """Restore the l?map to pre-resfactored extent."""
 
-    if rfmask.sum() != lxmap.shape[0]:
+    if data.mask.sum() != lxmap.shape[0]:
         raise ValueError("Map and mask shapes do not match.")
     else:
         # Array with all x-coordinates on the larger map.
-        domain = np.arange(rfmask.shape[0])
+        domain = np.arange(data.mask.shape[0])
         # Array of x-coordinates on larger map of entries in lxmap.
-        xs = domain[rfmask]
+        xs = domain[data.mask]
         # Instantiate an interpolation function.
         f = interp1d(xs, lxmap, kind='nearest', fill_value='extrapolate')
         # The uncoursified map is obtained by interpolating the missing values.
         return f(domain).astype(np.int8)
 
-def resmask(lxmap, resfactor):
-    return lxmap[::resfactor]
+def resmask(lxmap, resfactor, sampling='linear'):
+    if sampling == 'linear':
+        xs = np.zeros_like(lxmap)
+        xs[::resfactor] = 1
+        return xs.astype(bool)
+    elif sampling == 'quadratic':
+        ...
+        # nlum_mask = data.NLUM_MASK.copy()
+        # rf_nlum = nlum_mask[::resfactor, ::resfactor]
+    else:
+        raise ValueError("Unknown sampling style: %s" % sampling)
 
 def prep():
     """Prepare for the next simulation step."""
@@ -157,7 +172,12 @@ def step( d_j # Demands.
                         , data.LU2PR
                         , data.PR2CM )
 
-    lumaps.append(reconstitute(lumap, filler=data.mask_lu))
+    # First undo the doings of resfactor.
+    lumap = uncoursify(lumap)
+    lmmap = uncoursify(lmmap)
+
+    # Then put the excluded land-use and land-man back where they were.
+    lumaps.append(reconstitute(lumap, filler=data.mask_lu_code))
     lmmaps.append(reconstitute(lmmap, filler=0))
 
     ready = False
