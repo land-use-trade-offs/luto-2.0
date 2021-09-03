@@ -100,19 +100,6 @@ def is_verbose():
     """Return whether Gurobi output is printed to console."""
     return verbose
 
-# def get_step():
-    # """Return the current time step, i.e. number of years since ANNUM."""
-    # return year - bdata.ANNUM
-
-# def get_year():
-    # """The current calendar year, i.e. ANNUM + current, zero-based time step."""
-    # return year
-
-# def set_year(yr):
-    # """Set the year. For direct runs of a particular year."""
-    # global year
-    # year = yr
-
 def get_resfactor():
     """Return the resfactor (spatial course-graining factor)."""
     return resfactor
