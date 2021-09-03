@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-08-25
+# Last modified: 2021-09-03
 #
 
 import numpy as np
@@ -20,6 +20,11 @@ constraints = { 'water': True
               , 'biodiversity': True
               }
 
+# Silent Gurobi environment.
+silent = gp.Env(empty=True)
+silent.setParam('OutputFlag', 0)
+silent.start()
+
 def solve( t_mrj  # Transition cost matrices.
          , c_mrj  # Production cost matrices.
          , q_mrp  # Yield matrices -- note the `p` index instead of `j`.
@@ -29,6 +34,7 @@ def solve( t_mrj  # Transition cost matrices.
          , lu2pr_pj # Conversion matrix: land-use to product(s).
          , pr2cm_cp # Conversion matrix: product(s) to commodity.
          , constraints = constraints # Constraints to use (default all).
+         , verbose = False # Print Gurobi output to console if True.
          ):
     """Return land-use, land-man maps under constraints and minimised costs.
 
@@ -39,6 +45,8 @@ def solve( t_mrj  # Transition cost matrices.
     dictionary. Format {key: value} where 'key' is a string, one of 'water',
     'nutrients', 'carbon' or 'biodiversity' and 'value' is either True or False.
     """
+
+    global silent
 
     # Extract the shape of the problem.
     nlms, ncells, nlus = t_mrj.shape # Number of landmans, cells, landuses.
@@ -54,7 +62,10 @@ def solve( t_mrj  # Transition cost matrices.
 
     try:
         # Make Gurobi model instance.
-        model = gp.Model('neoLUTO v0.1.0')
+        if verbose:
+            model = gp.Model('neoLUTO v0.1.0')
+        else:
+            model = gp.Model('neoLUTO v0.1.0', env=silent)
 
         # ------------------- #
         # Decision variables. #
@@ -217,5 +228,6 @@ if __name__ == '__main__':
                         , lu2pr_pj
                         , pr2cm_cp
                         , constraints = constraints
+                        , verbose = True
                         )
     print(lumap)

@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-09-02
+# Last modified: 2021-09-03
 #
 
 import numpy as np
@@ -20,6 +20,7 @@ from luto.economics.quantity import get_quantity_matrices
 from luto.economics.transitions import ( get_transition_matrices
                                        , get_exclude_matrices )
 from luto.solvers.solver import solve
+from luto.tools.plotmap import plotmap
 
 
 class Data():
@@ -64,6 +65,9 @@ class Data():
         self.SAFE_PUR_MODL = bdata.SAFE_PUR_MODL[self.mask]
         self.SAFE_PUR_NATL = bdata.SAFE_PUR_NATL[self.mask]
 
+# Print Gurobi output to console if True.
+verbose = False
+
 # Placeholder for module-global data object. To be set by `prep()`.
 data = None
 
@@ -74,17 +78,40 @@ ready = False
 resfactor = 1
 
 # Containers for simulation output. First entry from base data.
-lumaps = [bdata.LUMAP]
-lmmaps = [bdata.LMMAP]
-shapes = []
+lumaps = {bdata.ANNUM: bdata.LUMAP}
+lmmaps = {bdata.ANNUM: bdata.LMMAP}
+shapes = {bdata.ANNUM: (bdata.NLMS, bdata.NCELLS, bdata.NLUS)}
+# lumaps = [bdata.LUMAP]
+# lmmaps = [bdata.LMMAP]
+# shapes = [(bdata.NLMS, bdata.NCELLS, bdata.NLUS)]
 
-def get_year():
-    """Return the current time step, i.e. number of years since ANNUM."""
-    return len(lumaps) - 1
+def sync_years(base, target):
+    global base_year, target_year, target_index
+    base_year = base
+    target_year = target
+    target_index = target - bdata.ANNUM - 1
 
-def is_ready():
-    """Return True if model ready for next simulation step, False otherwise."""
-    return ready
+def set_verbose(flag):
+    """Print Gurobi output to console if set to True."""
+    global verbose
+    verbose = flag
+
+def is_verbose():
+    """Return whether Gurobi output is printed to console."""
+    return verbose
+
+# def get_step():
+    # """Return the current time step, i.e. number of years since ANNUM."""
+    # return year - bdata.ANNUM
+
+# def get_year():
+    # """The current calendar year, i.e. ANNUM + current, zero-based time step."""
+    # return year
+
+# def set_year(yr):
+    # """Set the year. For direct runs of a particular year."""
+    # global year
+    # year = yr
 
 def get_resfactor():
     """Return the resfactor (spatial course-graining factor)."""
@@ -101,35 +128,35 @@ def get_shape(year=None):
     else:
         return shapes[year]
 
-# Obtain local versions of get_*_matrices.
+# Local matrix-getters. Zero-based (sans ANNUM off set), so get_step().
 def get_c_mrj():
-    return get_cost_matrices(data, get_year())
+    return get_cost_matrices(data, target_index)
 def get_q_mrp():
-    return get_quantity_matrices(data, get_year())
+    return get_quantity_matrices(data, target_index)
 def get_t_mrj():
     return get_transition_matrices( data
-                                  , get_year()
-                                  , lumaps[-1][data.mask]
-                                  , lmmaps[-1][data.mask]
+                                  , target_index
+                                  , lumaps[base_year][data.mask]
+                                  , lmmaps[base_year][data.mask]
                                   )
 def get_x_mrj():
-    return get_exclude_matrices(data, lumaps[-1][data.mask])
+    return get_exclude_matrices(data, lumaps[base_year][data.mask])
 
 def reconstitute(l_map, filler=-1):
     """Return l?map reconstituted to original size spatial domain."""
     indices = np.cumsum(data.lumask) - 1
     return np.where(data.lumask, l_map[indices], filler)
 
-def uncoursify(lxmap):
+def uncoursify(lxmap, mask):
     """Restore the l?map to pre-resfactored extent."""
 
-    if data.mask.sum() != lxmap.shape[0]:
+    if mask.sum() != lxmap.shape[0]:
         raise ValueError("Map and mask shapes do not match.")
     else:
         # Array with all x-coordinates on the larger map.
-        domain = np.arange(data.mask.shape[0])
+        domain = np.arange(mask.shape[0])
         # Array of x-coordinates on larger map of entries in lxmap.
-        xs = domain[data.mask]
+        xs = domain[mask]
         # Instantiate an interpolation function.
         f = interp1d(xs, lxmap, kind='nearest', fill_value='extrapolate')
         # The uncoursified map is obtained by interpolating the missing values.
@@ -147,47 +174,131 @@ def resmask(lxmap, resfactor, sampling='linear'):
     else:
         raise ValueError("Unknown sampling style: %s" % sampling)
 
-def prep():
-    """Prepare for the next simulation step."""
-    global data, ready
-    data = Data(lumaps[-1], resfactor)
-    ready = True
-
-def step( d_j # Demands.
-        , p   # Penalty level.
+def step( base    # Base year from which the data is taken.
+        , target  # Year to be solved for.
+        , demands # Demands in the form of a d_c array.
+        , penalty # Penalty level.
         ):
-    """Solve the upcoming time step (year)."""
-    global ready
-    if not is_ready(): prep()
+    """Solve the linear programme using the `base` lumap for `target` year."""
 
-    shapes.append(get_shape())
+    global data
+    data = Data(lumaps[base], resfactor)
+
+    # Synchronise base and target years across module so matrix-getters know.
+    sync_years(base, target)
 
     # Magic.
     lumap, lmmap = solve( get_t_mrj()
                         , get_c_mrj()
                         , get_q_mrp()
-                        , d_j
+                        , demands
+                        , penalty
+                        , get_x_mrj()
+                        , data.LU2PR
+                        , data.PR2CM
+                        , verbose=is_verbose() )
+
+    # First undo the doings of resfactor.
+    lumap = uncoursify(lumap, data.mask)
+    lmmap = uncoursify(lmmap, data.mask)
+
+    # Then put the excluded land-use and land-man back where they were.
+    lumaps[target] = reconstitute(lumap, filler=data.mask_lu_code)
+    lmmaps[target] = reconstitute(lmmap, filler=0)
+
+    # And update the shapes dictionary.
+    shapes[target] = get_shape()
+
+
+def _step( d_c       # Demands.
+         , p         # Penalty level.
+         , year=None # Target year (next year if None).
+         ):
+    """Solve the upcoming time step (year)."""
+
+    global data
+    data = Data(lumaps[get_year()], resfactor)
+
+    # Set year to *year before* target year, so matrix-getters get it right.
+    if year is not None: set_year(year-1)
+
+    # Magic.
+    lumap, lmmap = solve( get_t_mrj()
+                        , get_c_mrj()
+                        , get_q_mrp()
+                        , d_c
                         , p
                         , get_x_mrj()
                         , data.LU2PR
-                        , data.PR2CM )
+                        , data.PR2CM
+                        , verbose=verbose )
 
     # First undo the doings of resfactor.
-    lumap = uncoursify(lumap)
-    lmmap = uncoursify(lmmap)
+    lumap = uncoursify(lumap, data.mask)
+    lmmap = uncoursify(lmmap, data.mask)
+
+    # Set year to actual target year here, so results are filed correctly.
+    set_year(get_year() + 1)
 
     # Then put the excluded land-use and land-man back where they were.
-    lumaps.append(reconstitute(lumap, filler=data.mask_lu_code))
-    lmmaps.append(reconstitute(lmmap, filler=0))
+    lumaps[get_year()] = reconstitute(lumap, filler=data.mask_lu_code)
+    lmmaps[get_year()] = reconstitute(lmmap, filler=0)
 
-    ready = False
+    # And update the shapes dictionary.
+    shapes[get_year()] = get_shape()
+
+def run( base
+       , target
+       , demands
+       , penalty
+       , style='sequential'
+       , resfactor=1
+       , verbose=False
+       ):
+    """Run the simulation."""
+
+    # The number of times the solver is to be called.
+    steps = target - base
+
+    # Set the options if applicable.
+    if resfactor != 1: set_resfactor(resfactor)
+    if verbose: set_verbose(verbose)
+
+    # Run the simulation up to `year` sequentially.
+    if style == 'sequential':
+        if len(demands.shape) != 2:
+            raise ValueError( "Demands need to be a time series array of "
+                              "shape (years, commodities) and years > 0." )
+        elif target - base > demands.shape[0]:
+            raise ValueError( "Not enough years in demands time series.")
+        else:
+            print( "Running neoLUTO from base year %s through to %s."
+                 % (base, target) )
+            for s in range(steps):
+                print( "* Solving linear program for year %s..."
+                     % (base + s + 1), end = ' ' )
+                step(base + s, base + s + 1 , demands[s], penalty)
+                print("Done.")
+
+    # Run the simulation from ANNUM to `year` + 1 directly.
+    elif style == 'direct':
+        # If demands is a time series, choose the appropriate entry.
+        if len(demands.shape) == 2:
+            demands = demands[target - bdata.ANNUM - 1]
+        print( "Running neoLUTO for year %s directly from base year %s."
+             % (target, base) )
+        print( "* Solving linear program for year %s..."
+             % target, end = ' ' )
+        step(base, target, demands, penalty)
+        print("Done.")
+
+    else:
+        raise ValueError("Unkown style: %s." % style)
 
 def info():
     """Return information about state of the simulation."""
 
-    print( "Current time step (year):"
-         , str(get_year())
-         , "(" + str(bdata.ANNUM + get_year()) + ")")
+    print("Years solved: %i." % (len(lumaps)-1))
 
     if resfactor == 1:
         print("Resfactor set at 1. Spatial course graining bypassed.")
@@ -195,28 +306,24 @@ def info():
         print( "Resfactor set at %i." % resfactor
              , "Sampling one of every %i cells in spatial domain." % resfactor )
 
+    print()
 
-    if get_year() > 0:
-        print()
-        print("Year", "\t", "Cells [#]", "\t", "Cells [%]")
-    for year in range(get_year()):
-        ncells = get_shape(year)[1]
-        percentage = 100 * ncells / bdata.NCELLS
-        print( year + bdata.ANNUM
-             , "\t"
-             , ncells, "\t\t"
-             , "%.2f%%" % percentage )
-        if year == get_year()-1: print()
+    print("{:<6} {:<10} {:<10}".format("Year", "Cells [#]", "Cells [%]"))
+    for year, shape in shapes.items():
+        _, ncells, _ = shape
+        fraction = ncells / bdata.NCELLS
+        print("{:<6} {:>10,} {:>.2%}".format(year, ncells, fraction))
 
-    if is_ready():
-        print("Simulation is ready to solve next time step. Run `step()`")
-    else:
-        print("Simulation is not ready to solve next time step. Run `prep()`.")
+    print()
+
+def show_map(year):
+    """Show a plot of the lumap of `year`."""
+    plotmap(lumaps[year])
 
 def get_results(year=None):
     """Return the simulation results for `year` or all if `year is None`."""
     if year is None:
-        return np.stack(lumaps), np.stack(lmmaps)
+        return lumaps, lmmaps
     else:
         return lumaps[year], lmmaps[year]
 

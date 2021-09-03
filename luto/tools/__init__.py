@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-05-21
-# Last modified: 2021-06-30
+# Last modified: 2021-09-03
 #
 
 import time
@@ -13,7 +13,7 @@ import os.path
 import pandas as pd
 import numpy as np
 
-from luto.tools.gtiffutils import highpos2gtiff
+# from luto.tools.gtiffutils import highpos2gtiff
 
 def timethis(function, *args, **kwargs):
     """Generic wrapper to time functions."""
