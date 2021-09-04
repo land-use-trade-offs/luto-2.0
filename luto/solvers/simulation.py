@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-09-03
+# Last modified: 2021-09-04
 #
 
 import numpy as np
@@ -196,44 +196,6 @@ def step( base    # Base year from which the data is taken.
     # And update the shapes dictionary.
     shapes[target] = get_shape()
 
-
-def _step( d_c       # Demands.
-         , p         # Penalty level.
-         , year=None # Target year (next year if None).
-         ):
-    """Solve the upcoming time step (year)."""
-
-    global data
-    data = Data(lumaps[get_year()], resfactor)
-
-    # Set year to *year before* target year, so matrix-getters get it right.
-    if year is not None: set_year(year-1)
-
-    # Magic.
-    lumap, lmmap = solve( get_t_mrj()
-                        , get_c_mrj()
-                        , get_q_mrp()
-                        , d_c
-                        , p
-                        , get_x_mrj()
-                        , data.LU2PR
-                        , data.PR2CM
-                        , verbose=verbose )
-
-    # First undo the doings of resfactor.
-    lumap = uncoursify(lumap, data.mask)
-    lmmap = uncoursify(lmmap, data.mask)
-
-    # Set year to actual target year here, so results are filed correctly.
-    set_year(get_year() + 1)
-
-    # Then put the excluded land-use and land-man back where they were.
-    lumaps[get_year()] = reconstitute(lumap, filler=data.mask_lu_code)
-    lmmaps[get_year()] = reconstitute(lmmap, filler=0)
-
-    # And update the shapes dictionary.
-    shapes[get_year()] = get_shape()
-
 def run( base
        , target
        , demands
@@ -295,17 +257,17 @@ def info():
 
     print()
 
-    print("{:<6} {:<10} {:<10}".format("Year", "Cells [#]", "Cells [%]"))
+    print("{:<6} {:>10} {:>10}".format("Year", "Cells [#]", "Cells [%]"))
     for year, shape in shapes.items():
         _, ncells, _ = shape
         fraction = ncells / bdata.NCELLS
-        print("{:<6} {:>10,} {:>.2%}".format(year, ncells, fraction))
+        print("{:<6} {:>10,} {:>10.2%}".format(year, ncells, fraction))
 
     print()
 
 def show_map(year):
     """Show a plot of the lumap of `year`."""
-    plotmap(lumaps[year])
+    plotmap(lumaps[year], labels=bdata.LU2DESC)
 
 def get_results(year=None):
     """Return the simulation results for `year` or all if `year is None`."""

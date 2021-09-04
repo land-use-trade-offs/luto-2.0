@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-09-03
+# Last modified: 2021-09-04
 #
 
 import os
@@ -29,6 +29,9 @@ NCELLS, = AGEC_CROPS.index.shape
 LANDUSES = np.load(os.path.join(INPUT_DIR, 'landuses.npy')).tolist()
 LANDUSES.sort() # Ensure lexicographic order - should be superfluous.
 NLUS = len(LANDUSES)
+
+LU2DESC = {i: lu for i, lu in enumerate(LANDUSES)}
+LU2DESC[-1] = 'Non-agricultural land'
 
 # Some useful sub-sets of the land uses.
 LU_CROPS = [ lu for lu in LANDUSES if 'Beef' not in lu
