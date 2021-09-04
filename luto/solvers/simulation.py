@@ -276,7 +276,9 @@ def get_results(year=None):
     else:
         return lumaps[year], lmmaps[year]
 
-def demands():
+demands = np.zeros((99, len(bdata.COMMODITIES)))
+
+def _demands():
     """Return demands based on current production."""
     if not is_ready(): prep()
     lumap = data.LUMAP
