@@ -6,7 +6,7 @@
 # Adaptation: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Colour scheme by: Carla Archibald (c.archibald@deakin.edu.au)
 # Created: 2021-09-01
-# Last modified: 2021-09-07
+# Last modified: 2021-09-08
 #
 
 import os.path
@@ -116,7 +116,8 @@ def plotmap(lumap, labels=True):
                                                                , code=i ) )
                     for i, lu in enumerate(list(id2desc.values())) ]
     else: # Use random colour scheme and labels.
-        cmap = matplotlib.colors.ListedColormap(np.random.rand(nlus, 3))
+        # cmap = matplotlib.colors.ListedColormap(np.random.rand(nlus, 3))
+        cmap = matplotlib.colors.ListedColormap(clist)
         im = plt.imshow(themap, cmap=cmap, resample=False)
         patches = [ mpatches.Patch( color=cmap(i)
                                   , label="LU {code}".format(code=i) )

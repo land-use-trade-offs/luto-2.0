@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-09-04
+# Last modified: 2021-09-08
 #
 
 import numpy as np
@@ -27,8 +27,9 @@ class Data():
     """Provide simple object to mimic 'data' namespace from `luto.data`."""
 
     def __init__( self
+                , bdata # Data object like `luto.data`.
                 , lumap # Land-use map from which spatial domain is inferred.
-                , resfactor # Spatial course-graining factor.
+                , resmask=None # Spatial course-graining mask.
                 ):
         """Initialise Data object based on land-use map `lumap`."""
 
@@ -43,9 +44,9 @@ class Data():
         self.mask_lu_code = -1 # The lu code to exclude.
         self.lumask = lumap != self.mask_lu_code # True means _included_.
         # Mask from resfactor is superimposed on lumap mask.
-        if resfactor != 1:
-            self.rfmask = resmask(bdata.LUMAP, resfactor)
-            self.mask = self.lumask * self.rfmask
+        if resmask is not None:
+            self.resmask = resmask
+            self.mask = self.lumask * self.resmask
         else:
             self.mask = self.lumask
 
@@ -75,15 +76,14 @@ data = None
 ready = False
 
 # Optionally course grain spatial domain. (Set to 1 to bypass.)
-resfactor = 1
+resfactor = False
+resmask = None
+resmult = 1
 
 # Containers for simulation output. First entry from base data.
 lumaps = {bdata.ANNUM: bdata.LUMAP}
 lmmaps = {bdata.ANNUM: bdata.LMMAP}
 shapes = {bdata.ANNUM: (bdata.NLMS, bdata.NCELLS, bdata.NLUS)}
-# lumaps = [bdata.LUMAP]
-# lmmaps = [bdata.LMMAP]
-# shapes = [(bdata.NLMS, bdata.NCELLS, bdata.NLUS)]
 
 def sync_years(base, target):
     global base_year, target_year, target_index
@@ -100,13 +100,25 @@ def is_verbose():
     """Return whether Gurobi output is printed to console."""
     return verbose
 
-def get_resfactor():
-    """Return the resfactor (spatial course-graining factor)."""
+def is_resfactor():
+    """Return whether resfactor (spatial course-graining) is on."""
     return resfactor
 
-def set_resfactor(factor):
-    global resfactor
-    resfactor = factor
+def get_resfactor():
+    """Return current spatial course-graining mask and correction factor."""
+    if is_resfactor():
+        return resmask, resmult
+    else:
+        raise ValueError("Resfactor (spatial course-graining) is off.")
+
+def set_resfactor(factor, sampling='quadratic'):
+    global resfactor, resmask, resmult
+    if factor and factor != 1:
+        resfactor = True
+        resmask, resmult = rfparams(bdata.LUMAP, factor, sampling=sampling)
+    else:
+        resfactor = False
+        resmask, resmult = None, 1
 
 def get_shape(year=None):
     """Return the shape (NLMS, NCELLS, NLUS) of the problem at `year`."""
@@ -115,17 +127,17 @@ def get_shape(year=None):
     else:
         return shapes[year]
 
-# Local matrix-getters. Zero-based (sans ANNUM off set), so get_step().
+# Local matrix-getters with resfactor multiplier.
 def get_c_mrj():
-    return get_cost_matrices(data, target_index)
+    return resmult * get_cost_matrices(data, target_index)
 def get_q_mrp():
-    return get_quantity_matrices(data, target_index)
+    return resmult * get_quantity_matrices(data, target_index)
 def get_t_mrj():
-    return get_transition_matrices( data
-                                  , target_index
-                                  , lumaps[base_year][data.mask]
-                                  , lmmaps[base_year][data.mask]
-                                  )
+    return resmult * get_transition_matrices( data
+                                            , target_index
+                                            , lumaps[base_year][data.mask]
+                                            , lmmaps[base_year][data.mask]
+                                            )
 def get_x_mrj():
     return get_exclude_matrices(data, lumaps[base_year][data.mask])
 
@@ -149,15 +161,21 @@ def uncoursify(lxmap, mask):
         # The uncoursified map is obtained by interpolating the missing values.
         return f(domain).astype(np.int8)
 
-def resmask(lxmap, resfactor, sampling='linear'):
+def rfparams(lxmap, resfactor, sampling='linear'):
+    """Return course-graining mask and correction given map and strategy."""
     if sampling == 'linear':
         xs = np.zeros_like(lxmap)
         xs[::resfactor] = 1
-        return xs.astype(bool)
+        xs = xs.astype(bool)
+        factor = xs.shape[0] / xs.sum()
+        return xs, factor
     elif sampling == 'quadratic':
-        ...
-        # nlum_mask = data.NLUM_MASK.copy()
-        # rf_nlum = nlum_mask[::resfactor, ::resfactor]
+        rf_mask = bdata.NLUM_MASK.copy()
+        nonzeroes = np.nonzero(rf_mask)
+        rf_mask[::resfactor, ::resfactor] = 0
+        xs = np.where(rf_mask[nonzeroes] == 0, True, False)
+        factor = xs.shape[0] / xs.sum()
+        return xs, factor
     else:
         raise ValueError("Unknown sampling style: %s" % sampling)
 
@@ -169,7 +187,7 @@ def step( base    # Base year from which the data is taken.
     """Solve the linear programme using the `base` lumap for `target` year."""
 
     global data
-    data = Data(lumaps[base], resfactor)
+    data = Data(bdata, lumaps[base], resmask)
 
     # Synchronise base and target years across module so matrix-getters know.
     sync_years(base, target)
@@ -201,7 +219,7 @@ def run( base
        , demands
        , penalty
        , style='sequential'
-       , resfactor=1
+       , resfactor=False
        , verbose=False
        ):
     """Run the simulation."""
@@ -210,7 +228,7 @@ def run( base
     steps = target - base
 
     # Set the options if applicable.
-    if resfactor != 1: set_resfactor(resfactor)
+    set_resfactor(resfactor, sampling='linear')
     if verbose: set_verbose(verbose)
 
     # Run the simulation up to `year` sequentially.
