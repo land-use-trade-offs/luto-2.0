@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-09-08
+# Last modified: 2021-09-09
 #
 
 import numpy as np
@@ -141,13 +141,20 @@ def get_t_mrj():
 def get_x_mrj():
     return get_exclude_matrices(data, lumaps[base_year][data.mask])
 
-def reconstitute(l_map, filler=-1):
-    """Return l?map reconstituted to original size spatial domain."""
-    indices = np.cumsum(data.lumask) - 1
-    return np.where(data.lumask, l_map[indices], filler)
+def reconstitute(lxmap, filler=-1):
+    """Return lxmap reconstituted to original size spatial domain."""
+    # First case is when resfactor is False/1.
+    if data.lumask.sum() == lxmap.shape[0]:
+        indices = np.cumsum(data.lumask) - 1
+        return np.where(data.lumask, lxmap[indices], filler)
+    # If this is not the case, then the remaining map is filled out differently.
+    elif lxmap.shape != data.lumask.shape:
+        raise ValueError("Map not of right shape.")
+    else:
+        return np.where(data.lumask, lxmap, filler)
 
 def uncoursify(lxmap, mask):
-    """Restore the l?map to pre-resfactored extent."""
+    """Restore the lxmap to pre-resfactored extent."""
 
     if mask.sum() != lxmap.shape[0]:
         raise ValueError("Map and mask shapes do not match.")
@@ -203,9 +210,15 @@ def step( base    # Base year from which the data is taken.
                         , data.PR2CM
                         , verbose=is_verbose() )
 
-    # First undo the doings of resfactor.
+    # First undo the doings of resfactor. NOTE: Should be data.mask?
     lumap = uncoursify(lumap, data.mask)
     lmmap = uncoursify(lmmap, data.mask)
+    # unmask = np.logical_and(data.lumask, np.logical_not(data.resmask))
+    # lumap = uncoursify(lumap, unmask)
+    # lmmap = uncoursify(lmmap, unmask)
+
+    lumaps[9999] = lumap
+    lmmaps[9999] = lmmap
 
     # Then put the excluded land-use and land-man back where they were.
     lumaps[target] = reconstitute(lumap, filler=data.mask_lu_code)

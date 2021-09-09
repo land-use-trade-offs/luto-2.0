@@ -6,7 +6,7 @@
 # Adaptation: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Colour scheme by: Carla Archibald (c.archibald@deakin.edu.au)
 # Created: 2021-09-01
-# Last modified: 2021-09-08
+# Last modified: 2021-09-09
 #
 
 import os.path
@@ -122,6 +122,47 @@ def plotmap(lumap, labels=True):
         patches = [ mpatches.Patch( color=cmap(i)
                                   , label="LU {code}".format(code=i) )
                     for i in range(len(lus)) ]
+
+    # Attach legend to plot.
+    plt.legend( handles=patches
+              , loc='lower left'
+              , bbox_to_anchor=(0, 0)
+              , borderaxespad=0
+              , ncol=3
+              , fontsize='xx-small'
+              , frameon=False
+              )
+
+    # Finally.
+    plt.show()
+
+def _plotmap(lumap):
+
+    # Reconstitute the 2D array.
+    themap = mask2D.copy()
+    themap[nonzeroes] = lumap
+
+    def clr(lu): return mcolors.hex2color(desc2col[id2desc[lu]])
+    colourise = np.vectorize(clr)
+
+    themapc = np.transpose(colourise(themap), (1, 2, 0))
+
+    # Land uses and their number. For colour maps and legends.
+    lus = np.unique(themap)
+    nlus, = lus.shape
+
+    # Build the legend.
+    im = plt.imshow(themapc, interpolation='none')
+
+    # Get the colours.
+    colours = [im.cmap(lu) for lu in lus]
+
+    # Make patches of each colour.
+    patches = [ mpatches.Patch( color=mcolors.hex2color(desc2col[id2desc[lus[i]]])
+                              , label="{lu} ({l})".format( lu=id2desc[lus[i]]
+                                                         , l=lus[i] ) )
+                for i in range(nlus) ]
+
 
     # Attach legend to plot.
     plt.legend( handles=patches
