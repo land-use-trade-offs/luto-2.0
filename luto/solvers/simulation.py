@@ -213,9 +213,6 @@ def step( base    # Base year from which the data is taken.
     # First undo the doings of resfactor. NOTE: Should be data.mask?
     lumap = uncoursify(lumap, data.mask)
     lmmap = uncoursify(lmmap, data.mask)
-    # unmask = np.logical_and(data.lumask, np.logical_not(data.resmask))
-    # lumap = uncoursify(lumap, unmask)
-    # lmmap = uncoursify(lmmap, unmask)
 
     lumaps[9999] = lumap
     lmmaps[9999] = lmmap
