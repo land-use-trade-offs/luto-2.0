@@ -7,11 +7,11 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-09-09
+# Last modified: 2021-09-10
 #
 
 import numpy as np
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d, NearestNDInterpolator
 
 import luto.data as bdata
 from luto.data.economic import exclude
@@ -77,6 +77,7 @@ ready = False
 
 # Optionally course grain spatial domain. (Set to 1 to bypass.)
 resfactor = False
+ressamp = None
 resmask = None
 resmult = 1
 
@@ -111,10 +112,11 @@ def get_resfactor():
     else:
         raise ValueError("Resfactor (spatial course-graining) is off.")
 
-def set_resfactor(factor, sampling='quadratic'):
-    global resfactor, resmask, resmult
+def set_resfactor(factor, sampling):
+    global resfactor, ressamp, resmask, resmult
     if factor and factor != 1:
         resfactor = True
+        ressamp = sampling
         resmask, resmult = rfparams(bdata.LUMAP, factor, sampling=sampling)
     else:
         resfactor = False
@@ -147,26 +149,40 @@ def reconstitute(lxmap, filler=-1):
     if data.lumask.sum() == lxmap.shape[0]:
         indices = np.cumsum(data.lumask) - 1
         return np.where(data.lumask, lxmap[indices], filler)
-    # If this is not the case, then the remaining map is filled out differently.
-    elif lxmap.shape != data.lumask.shape:
+    # With resfactor on, then the map is filled out differently.
+    elif lxmap.shape != data.lumask.shape: # Uncoursify returns full size maps.
         raise ValueError("Map not of right shape.")
     else:
         return np.where(data.lumask, lxmap, filler)
 
-def uncoursify(lxmap, mask):
-    """Restore the lxmap to pre-resfactored extent."""
+def uncourse1D(lxmap, mask):
+    # Array with all x-coordinates on the larger map.
+    allindices = np.arange(mask.shape[0])
+    # Array of x-coordinates on larger map of entries in lxmap.
+    knownindices = allindices[mask]
+    # Instantiate an interpolation function.
+    f = interp1d(knownindices, lxmap, kind='nearest', fill_value='extrapolate')
+    # The uncoursified map is obtained by interpolating the missing values.
+    return f(allindices).astype(np.int8)
 
+def uncourse2D(lxmap, mask):
+    # Arrays with all x, y -coordinates on the larger map.
+    allindices = np.nonzero(bdata.NLUM_MASK)
+    # Arrays with x, y -coordinates on the larger map of entries in lxmap.
+    knownindices = tuple(np.stack(allindices)[:, mask])
+    # Instantiate an interpolation function.
+    f = NearestNDInterpolator(knownindices, lxmap)
+    # The uncoursified map is obtained by interpolating the missing values.
+    return f(allindices).astype(np.int8)
+
+def uncoursify(lxmap, mask, sampling):
+    """Restore the lxmap to pre-resfactored extent."""
     if mask.sum() != lxmap.shape[0]:
         raise ValueError("Map and mask shapes do not match.")
-    else:
-        # Array with all x-coordinates on the larger map.
-        domain = np.arange(mask.shape[0])
-        # Array of x-coordinates on larger map of entries in lxmap.
-        xs = domain[mask]
-        # Instantiate an interpolation function.
-        f = interp1d(xs, lxmap, kind='nearest', fill_value='extrapolate')
-        # The uncoursified map is obtained by interpolating the missing values.
-        return f(domain).astype(np.int8)
+    elif sampling == 'linear':
+        return uncourse1D(lxmap, mask)
+    elif sampling == 'quadratic':
+        return uncourse2D(lxmap, mask)
 
 def rfparams(lxmap, resfactor, sampling='linear'):
     """Return course-graining mask and correction given map and strategy."""
@@ -210,12 +226,10 @@ def step( base    # Base year from which the data is taken.
                         , data.PR2CM
                         , verbose=is_verbose() )
 
-    # First undo the doings of resfactor. NOTE: Should be data.mask?
-    lumap = uncoursify(lumap, data.mask)
-    lmmap = uncoursify(lmmap, data.mask)
-
-    lumaps[9999] = lumap
-    lmmaps[9999] = lmmap
+    # First undo the doings of resfactor if it is set.
+    if is_resfactor:
+        lumap = uncoursify(lumap, data.mask, sampling=ressamp)
+        lmmap = uncoursify(lmmap, data.mask, sampling=ressamp)
 
     # Then put the excluded land-use and land-man back where they were.
     lumaps[target] = reconstitute(lumap, filler=data.mask_lu_code)
@@ -238,7 +252,7 @@ def run( base
     steps = target - base
 
     # Set the options if applicable.
-    set_resfactor(resfactor, sampling='linear')
+    set_resfactor(resfactor, sampling='quadratic')
     if verbose: set_verbose(verbose)
 
     # Run the simulation up to `year` sequentially.
