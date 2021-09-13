@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-09-10
+# Last modified: 2021-09-13
 #
 
 import numpy as np
@@ -320,19 +320,60 @@ def get_results(year=None):
 
 demands = np.zeros((99, len(bdata.COMMODITIES)))
 
-def _demands():
+def lumap2x_mrj(lumap, lmmap):
+    """Return land-use maps in decision-variable (X_mrj) format."""
+    drystack = []
+    irrstack = []
+    for j in range(28):
+        jmap = np.where(lumap==j, 1, 0) # One boolean map for each land use.
+        jdrymap = np.where(lmmap==0, jmap, 0) # Keep only dryland version.
+        jirrmap = np.where(lmmap==1, jmap, 0) # Keep only irrigated version.
+        drystack.append(jdrymap)
+        irrstack.append(jirrmap)
+    x_dry_rj = np.stack(drystack, axis=1)
+    x_irr_rj = np.stack(irrstack, axis=1)
+    return np.stack((x_dry_rj, x_irr_rj)) # In x_mrj format.
+
+def get_demands():
     """Return demands based on current production."""
-    if not is_ready(): prep()
-    lumap = data.LUMAP
-    lmmap = data.LMMAP
-    _, _, nlus = get_shape()
-    q_mrj = get_q_mrj()
 
-    d_j = np.zeros(nlus) # Prepare the demands array - one cell per LU.
-    for j in range(nlus):
-        # The demand for LU j is the dot product of the yield vector with a
-        # summation vector indicating where LU actually occurs as per SID array.
-        d_j[j] = ( q_mrj[0].T[j] @ np.where((lumap==j) & (lmmap==0), 1, 0)
-                + q_mrj[1].T[j] @ np.where((lumap==j) & (lmmap==1), 1, 0) )
+    # Acquire local names for maps, matrices and shapes.
+    lumap = bdata.LUMAP
+    lmmap = bdata.LMMAP
 
-    return d_j
+    lu2pr_pj = bdata.LU2PR
+    pr2cm_cp = bdata.PR2CM
+
+    nlus = bdata.NLUS
+    ncells = bdata.NCELLS
+    nprs = bdata.NPRS
+    ncms = bdata.NCMS
+
+    # Get the maps in decision-variable format.
+    X_dry, X_irr = lumap2x_mrj(lumap, lmmap)
+    X_dry = X_dry.T
+    X_irr = X_irr.T
+
+    # Get the quantity matrices.
+    q_mrp = get_quantity_matrices(bdata, 0)
+
+    X_dry_pr = [ X_dry[j] for p in range(nprs) for j in range(nlus)
+                    if lu2pr_pj[p, j] ]
+    X_irr_pr = [ X_irr[j] for p in range(nprs) for j in range(nlus)
+                    if lu2pr_pj[p, j] ]
+
+    # Quantities in PR/p representation by land-management (dry/irr).
+    q_dry_p = [ q_mrp[0].T[p] @ X_dry_pr[p] for p in range(nprs) ]
+    q_irr_p = [ q_mrp[0].T[p] @ X_irr_pr[p] for p in range(nprs) ]
+
+    # Transform quantities to CM/c representation by land-man (dry/irr).
+    q_dry_c = [ sum(q_dry_p[p] for p in range(nprs) if pr2cm_cp[c, p])
+                for c in range(ncms) ]
+    q_irr_c = [ sum(q_irr_p[p] for p in range(nprs) if pr2cm_cp[c, p])
+                for c in range(ncms) ]
+
+    # Total quantities in CM/c representation.
+    q_c = [q_dry_c[c] + q_irr_c[c] for c in range(ncms)]
+
+    # Return current production as demands.
+    return np.array(q_c)
