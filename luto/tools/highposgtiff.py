@@ -2,10 +2,11 @@
 #
 # highposgtiff.py - to make GeoTIFFs from highpos files.
 #
-# Original author: Carla Archibald (c.archibald@deakin.edu.au)
-# Adaptation: Fjalar de Haan (f.dehaan@deakin.edu.au)
+# Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
+# Based on code by: Brett Bryan (b.bryan@deakin.edu.au)
+#
 # Created: 2021-06-25
-# Last modified: 2021-07-06
+# Last modified: 2021-09-15
 #
 
 import os.path
@@ -18,56 +19,32 @@ from rasterio import features
 from geopandas import GeoDataFrame
 from shapely.geometry import Point
 
-# import luto.data as data
+import luto.settings as settings
 
-def write_highpos_gtiff(highpos, fname):
-    """Write a GeoTIFF `fname.tif` from `highpos` Numpy array.
+def write_lumap_gtiff(lumap, fname, nodata=-9999):
+    """Write a GeoTiff based on the input lumap and the NLUM mask."""
 
-    The following files are assumed to live in data.INPUT_DIR:
+    # Open the file, distill the NLUM mask and get the meta data.
+    fpath_src = os.path.join(settings.INPUT_DIR, 'NLUM_2010-11_mask.tif')
+    with rasterio.open(fpath_src) as src:
+        NLUM_mask = src.read(1) == 1
+        meta = src.meta.copy()
 
-        xy-lutoid.csv    - Concordance of LUTO cell ids with X, Y coordinates.
-        nlum-raster.tif  - NLUM raster.
-    """
+    # These keys set afresh when exporting the GeoTiff.
+    for key in ('dtype', 'nodata'):
+        meta.pop(key)
+    meta.update(compress = 'lzw', driver = 'GTiff')
 
-    # Convert to pandas dataframe
-    highpos = np.load(highpos)
-    highpos = pd.DataFrame(highpos)
-    highpos.columns = ['LU_Class']
+    # Reconstitute the 2D map using the NLUM mask and the lumap array.
+    array_2D = np.zeros(NLUM_mask.shape, dtype=np.float32) + nodata
+    nonzeroes = np.nonzero(NLUM_mask)
+    array_2D[nonzeroes] = lumap
 
-    # Create SID column which corresponds to teh LUTO cell id
-    highpos['SID'] = highpos.index
-
-    # Read in LUTO cell ID concordance
-    LUTO_sid_xy = pd.read_csv(os.path.join('input', 'xy-lutoid.csv'))
-
-    # Join high_pos with LUTO cell ID concordance
-    highpos_xy = pd.merge( left=LUTO_sid_xy
-                         , right=highpos
-                         , left_on='SID'
-                         , right_on='SID' )
-
-    # Convert pandas to geopandas dataframe
-    geometry = [Point(xy) for xy in zip(highpos_xy.X, highpos_xy.Y)]
-    df = highpos_xy.drop(['X', 'Y', 'SID'], axis=1)
-    gdf = GeoDataFrame(df, crs="EPSG:4283", geometry=geometry)
-    gdf.plot(column='LU_Class')
-
-    # Set up raster meta using NLUM raster
-    rst = rasterio.open(os.path.join('input', 'nlum-raster.tif'))
-    meta = rst.meta.copy()
-    meta.update(compress='lzw')
-
-    with rasterio.open(fname + '.tif', 'w+', **meta) as out:
-        out_arr = out.read(1)
-        # Create a generator of geom, value pairs to use in rasterizing
-        shapes = ( (geom,value)
-                 for geom, value in zip(gdf.geometry, gdf.LU_Class) )
-        burned = features.rasterize( shapes=shapes
-                                   , fill=0
-                                   , out=out_arr
-                                   , transform=out.transform )
-        out.write_band(1, burned)
-
-
-
-
+    # Write the GeoTiff.
+    with rasterio.open( fname
+                      , 'w+'
+                      , dtype = 'float32'
+                      , nodata = nodata
+                      , **meta
+                      ) as dst:
+        dst.write_band(1, array_2D)
