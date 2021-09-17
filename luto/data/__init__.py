@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-09-04
+# Last modified: 2021-09-17
 #
 
 import os
@@ -155,6 +155,7 @@ WATER_LICENCE_PRICE = np.load(os.path.join( INPUT_DIR
                                            , 'water-licence-price.npy') )
 WATER_DELIVERY_PRICE = np.load(os.path.join( INPUT_DIR
                                            , 'water-delivery-price.npy') )
+
 # ----------------------- #
 # Livestock related data. #
 # ----------------------- #
@@ -163,7 +164,6 @@ FEED_REQ = np.load(os.path.join(INPUT_DIR, 'feed-req.npy'))
 PASTURE_KG_DM_HA = np.load(os.path.join(INPUT_DIR, 'pasture-kg-dm-ha.npy'))
 SAFE_PUR_NATL = np.load(os.path.join(INPUT_DIR, 'safe-pur-natl.npy'))
 SAFE_PUR_MODL = np.load(os.path.join(INPUT_DIR, 'safe-pur-modl.npy'))
-
 
 # ---------------------------------- #
 # Temporal and spatio-temporal data. #

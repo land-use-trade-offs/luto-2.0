@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-09-13
+# Last modified: 2021-09-17
 #
 
 import numpy as np
@@ -184,7 +184,7 @@ def uncoursify(lxmap, mask, sampling):
     elif sampling == 'quadratic':
         return uncourse2D(lxmap, mask)
 
-def rfparams(lxmap, resfactor, sampling='linear'):
+def rfparams(lxmap, resfactor, sampling):
     """Return course-graining mask and correction given map and strategy."""
     if sampling == 'linear':
         xs = np.zeros_like(lxmap)
