@@ -93,9 +93,12 @@ def get_transition_matrices(data, year, lumap, lmmap):
         # IRR -> IRR / Difference with current licence paid or refunded.
         if lm == 1:
             tdelta_toirr_rj[r] = aqlic_rj[r] - aqlic_rj[r, lu]
-        # DRY -> IRR / Licence cost + infrastructure cost @8kAUD/ha.
-        else:
+        # DRY -> IRR / Licence cost + infrastructure cost @10kAUD/ha.
+        elif lm == 0:
             tdelta_toirr_rj[r] = aqlic_rj[r] + (10**4 * realarea_rj[r])
+        # ___ -> IRR / This case does not (yet) exist.
+        else:
+            raise ValueError("Unknown land management: %s." % lu)
 
     # Switching to dry, from and to an irr land-use, may incur licence refund.
     tdelta_todry_rj = np.zeros((ncells, nlus))
@@ -105,7 +108,12 @@ def get_transition_matrices(data, year, lumap, lmmap):
         # IRR -> DRY / Current licence refunded.
         if lm == 1:
             tdelta_todry_rj[r] = - aqlic_rj[r, lu]
-        # DRY -> DRY / No additional costs.
+        # DRY -> DRY / Incurs cost @3kAUD/ha.
+        elif lm == 0:
+            tdelta_todry_rj[r] = 3000 * realarea_rj[r]
+        # ___ -> IRR / This case does not (yet) exist.
+        else:
+            raise ValueError("Unknown land management: %s." % lu)
 
     # Transition costs in AUD/ha converted to AUD per cell and amortised.
     t_rj_todry = amortise(t_rj * realarea_rj + tdelta_todry_rj)
