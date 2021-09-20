@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-30
-# Last modified: 2021-08-30
+# Last modified: 2021-09-20
 #
 
 import os.path
@@ -81,11 +81,6 @@ def get_transition_matrices(data, year, lumap, lmmap):
     # Areas in hectares for each cell, stacked for each land-use (identical).
     realarea_rj = np.stack((data.REAL_AREA,) * nlus, axis=1).astype(np.float64)
 
-    # wr_rj = data.WR_rj # Water required in Ml/ha.
-    # TODO: Note that the water licence price will NOT be 'WP any more.
-    # wlic_rj = data.AGEC['WP', 'irr'].to_numpy() # Water licence price in AUD/Ml.
-    # aqlic_rj = np.nan_to_num(wr_rj * realarea_rj * wlic_rj) # The total lic costs.
-
     # Total aq lic costs = aq req [Ml/ha] x area/cell [ha] x lic price [AUD/Ml].
     aqlic_rj = ( (data.WATER_REQUIRED * realarea_rj).T
                 * data.WATER_LICENCE_PRICE ).T
@@ -95,10 +90,10 @@ def get_transition_matrices(data, year, lumap, lmmap):
     for r in range(ncells):
         lu = lumap[r]
         lm = lmmap[r]
-        # IRR -> DRY / Difference with current licence paid or refunded.
+        # IRR -> IRR / Difference with current licence paid or refunded.
         if lm == 1:
             tdelta_toirr_rj[r] = aqlic_rj[r] - aqlic_rj[r, lu]
-        # DRY -> DRY / Licence cost + infrastructure cost @10kAUD/ha.
+        # DRY -> IRR / Licence cost + infrastructure cost @8kAUD/ha.
         else:
             tdelta_toirr_rj[r] = aqlic_rj[r] + (10**4 * realarea_rj[r])
 

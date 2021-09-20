@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-09-17
+# Last modified: 2021-09-20
 #
 
 import numpy as np
@@ -29,7 +29,7 @@ class Data():
     def __init__( self
                 , bdata # Data object like `luto.data`.
                 , lumap # Land-use map from which spatial domain is inferred.
-                , resmask=None # Spatial course-graining mask.
+                , resmask=None # Spatial coarse-graining mask.
                 ):
         """Initialise Data object based on land-use map `lumap`."""
 
@@ -75,7 +75,7 @@ data = None
 # Is the model ready for the next simulation step? Set by `prep()`.
 ready = False
 
-# Optionally course grain spatial domain. (Set to 1 to bypass.)
+# Optionally coarse grain spatial domain. (Set to 1 to bypass.)
 resfactor = False
 ressamp = None
 resmask = None
@@ -102,15 +102,15 @@ def is_verbose():
     return verbose
 
 def is_resfactor():
-    """Return whether resfactor (spatial course-graining) is on."""
+    """Return whether resfactor (spatial coarse-graining) is on."""
     return resfactor
 
 def get_resfactor():
-    """Return current spatial course-graining mask and correction factor."""
+    """Return current spatial coarse-graining mask and correction factor."""
     if is_resfactor():
         return resmask, resmult
     else:
-        raise ValueError("Resfactor (spatial course-graining) is off.")
+        raise ValueError("Resfactor (spatial coarse-graining) is off.")
 
 def set_resfactor(factor, sampling):
     global resfactor, ressamp, resmask, resmult
@@ -155,7 +155,7 @@ def reconstitute(lxmap, filler=-1):
     else:
         return np.where(data.lumask, lxmap, filler)
 
-def uncourse1D(lxmap, mask):
+def uncoarse1D(lxmap, mask):
     # Array with all x-coordinates on the larger map.
     allindices = np.arange(mask.shape[0])
     # Array of x-coordinates on larger map of entries in lxmap.
@@ -165,7 +165,7 @@ def uncourse1D(lxmap, mask):
     # The uncoursified map is obtained by interpolating the missing values.
     return f(allindices).astype(np.int8)
 
-def uncourse2D(lxmap, mask):
+def uncoarse2D(lxmap, mask):
     # Arrays with all x, y -coordinates on the larger map.
     allindices = np.nonzero(bdata.NLUM_MASK)
     # Arrays with x, y -coordinates on the larger map of entries in lxmap.
@@ -180,12 +180,12 @@ def uncoursify(lxmap, mask, sampling):
     if mask.sum() != lxmap.shape[0]:
         raise ValueError("Map and mask shapes do not match.")
     elif sampling == 'linear':
-        return uncourse1D(lxmap, mask)
+        return uncoarse1D(lxmap, mask)
     elif sampling == 'quadratic':
-        return uncourse2D(lxmap, mask)
+        return uncoarse2D(lxmap, mask)
 
 def rfparams(lxmap, resfactor, sampling):
-    """Return course-graining mask and correction given map and strategy."""
+    """Return coarse-graining mask and correction given map and strategy."""
     if sampling == 'linear':
         xs = np.zeros_like(lxmap)
         xs[::resfactor] = 1
@@ -292,7 +292,7 @@ def info():
     print("Years solved: %i." % (len(lumaps)-1))
 
     if resfactor == 1:
-        print("Resfactor set at 1. Spatial course graining bypassed.")
+        print("Resfactor set at 1. Spatial coarse graining bypassed.")
     else:
         print( "Resfactor set at %i." % resfactor
              , "Sampling one of every %i cells in spatial domain." % resfactor )
@@ -334,12 +334,13 @@ def lumap2x_mrj(lumap, lmmap):
     x_irr_rj = np.stack(irrstack, axis=1)
     return np.stack((x_dry_rj, x_irr_rj)) # In x_mrj format.
 
-def get_demands():
-    """Return demands based on current production."""
+def get_production(lumap=None, lmmap=None):
+    """Return production levels of commodities from input- or base-data maps."""
 
     # Acquire local names for maps, matrices and shapes.
-    lumap = bdata.LUMAP
-    lmmap = bdata.LMMAP
+    if lumap is None or lmmap is None:
+        lumap = bdata.LUMAP
+        lmmap = bdata.LMMAP
 
     lu2pr_pj = bdata.LU2PR
     pr2cm_cp = bdata.PR2CM
