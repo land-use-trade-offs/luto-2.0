@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-09-03
+# Last modified: 2021-09-21
 #
 
 import numpy as np
@@ -53,10 +53,16 @@ def solve( t_mrj  # Transition cost matrices.
     _, _, nprs = q_mrp.shape # Number of products.
     ncms, = d_c.shape # Number of commodities.
 
-    # Penalty units for each j as maximum cost.
-    p_c = np.zeros(ncms)
-    for c in range(ncms):
-        p_c[c] = c_mrj.T.max()
+    # Penalty units for each j as maximum cost, mapped to CM/c representation.
+    # There is mixed counting in this as the mapping is not one-one.
+    p_j = np.zeros(nlus)
+    for j in range(nlus):
+        p_j[j] = c_mrj.T[j].max() # Get maximum cost for each land use.
+    lu2com_cj = pr2com_cp @ lu2pr_pj # The mapping from LU/j to CM/c space.
+    # Scale rows to obtain averages of costs instead of sums.
+    l2c_cj = lu2com_cj / lu2com_cj.sum(axis=1)[:, np.newaxis]
+    p_c = l2c_cj @ p_j # Map maximum costs to CM/c representation.
+
     # Apply the penalty-level multiplier.
     p_c *= p
 
