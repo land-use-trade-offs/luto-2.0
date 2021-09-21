@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-30
-# Last modified: 2021-09-20
+# Last modified: 2021-09-21
 #
 
 import os.path
@@ -105,12 +105,12 @@ def get_transition_matrices(data, year, lumap, lmmap):
     for r in range(ncells):
         lu = lumap[r]
         lm = lmmap[r]
-        # IRR -> DRY / Current licence refunded.
+        # IRR -> DRY / Current licence refunded but incurring cost @3kAUD/ha.
         if lm == 1:
-            tdelta_todry_rj[r] = - aqlic_rj[r, lu]
-        # DRY -> DRY / Incurs cost @3kAUD/ha.
+            tdelta_todry_rj[r] = - aqlic_rj[r, lu] + (3000 * realarea_rj[r])
+        # DRY -> DRY / Incurs no cost.
         elif lm == 0:
-            tdelta_todry_rj[r] = 3000 * realarea_rj[r]
+            ...
         # ___ -> IRR / This case does not (yet) exist.
         else:
             raise ValueError("Unknown land management: %s." % lu)
