@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-09-20
+# Last modified: 2021-09-28
 #
 
 import numpy as np
@@ -291,12 +291,14 @@ def info():
 
     print("Years solved: %i." % (len(lumaps)-1))
 
-    if resfactor == 1:
-        print("Resfactor set at 1. Spatial coarse graining bypassed.")
+    if is_resfactor():
+        _, rmult = get_resfactor()
+        rf = int(np.sqrt(rmult))
+        print( "Resfactor set at %i." % rf
+             , "Sampling one in every %i x %i cells of spatial domain."
+             % (rf, rf) )
     else:
-        print( "Resfactor set at %i." % resfactor
-             , "Sampling one of every %i cells in spatial domain." % resfactor )
-
+        print("Resfactor not set. Spatial coarse graining bypassed.")
     print()
 
     print("{:<6} {:>10} {:>10}".format("Year", "Cells [#]", "Cells [%]"))
