@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-09-28
+# Last modified: 2021-09-29
 #
 
 import numpy as np
@@ -183,6 +183,8 @@ def uncoursify(lxmap, mask, sampling):
         return uncoarse1D(lxmap, mask)
     elif sampling == 'quadratic':
         return uncoarse2D(lxmap, mask)
+    else:
+        raise ValueError("Unidentified problem.")
 
 def rfparams(lxmap, resfactor, sampling):
     """Return coarse-graining mask and correction given map and strategy."""
@@ -227,7 +229,8 @@ def step( base    # Base year from which the data is taken.
                         , verbose=is_verbose() )
 
     # First undo the doings of resfactor if it is set.
-    if is_resfactor:
+    if is_resfactor():
+        print("In `step()` - about to run `uncoursify()`")
         lumap = uncoursify(lumap, data.mask, sampling=ressamp)
         lmmap = uncoursify(lmmap, data.mask, sampling=ressamp)
 

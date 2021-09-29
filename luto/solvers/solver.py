@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-09-28
+# Last modified: 2021-09-29
 #
 
 import numpy as np
@@ -102,7 +102,7 @@ def solve( t_mrj  # Transition cost matrices.
                     + sum( # Penalties.
                            V[c] for c in range(ncms) )
                     )
-        model.setObjective(objective / 10**6, GRB.MINIMIZE)
+        model.setObjective(objective, GRB.MINIMIZE)
 
         # ------------ #
         # Constraints. #
