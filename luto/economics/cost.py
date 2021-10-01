@@ -4,12 +4,12 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-09-01
+# Last modified: 2021-10-01
 #
 
 import numpy as np
 
-from luto.economics.quantity import get_yield_pot, lvs_veg_types
+from luto.economics.quantity import get_yield_pot, lvs_veg_types, get_quantity
 
 
 def get_cost_crop( data # Data object or module.
@@ -25,44 +25,31 @@ def get_cost_crop( data # Data object or module.
     `year`: number of years from base year, counting from zero.
     """
 
-    # ------------ #
-    # Fixed costs. #
-    # ------------ #
+    # Fixed costs as FLC + FOC + FDC.
     fc = 0
     for c in ['FLC', 'FOC', 'FDC']:
         fc += data.AGEC_CROPS[c, lm, lu].copy()
 
-    # ----------- #
-    # Area costs. #
-    # ----------- #
+    # Area costs.
     ac = data.AGEC_CROPS['AC', lm, lu]
 
-    # --------------- #
-    # Quantity costs. #
-    # --------------- #
-    qc = data.AGEC_CROPS['QC', lm, lu]
+    # Quantity costs as cost per tonne x tonne per cell / hectare per cell
+    qc = ( data.AGEC_CROPS['QC', lm, lu]
+         * get_quantity(data, lu.upper(), lm, year) # lu.upper() only for crops.
+         / data.REAL_AREA )
 
-    # TODO: below unnecessary but YIELDINCREASES perhaps need to be applied?
-    # Turn QC into actual cost per quantity, i.e. divide by quantity.
-    # qc = data.AGEC_CROPS['QC', lm, lu] / data.AGEC_CROPS['Yield', lm, lu]
-    # Multiply by quantity (w/ trends) for q-costs per ha. Divide for per cell.
-    # TODO: Is this step still required with the new data set? No, most likely
-    # not. Better to apply the trend (YIELDINCREASE) separately here.
-    #qc *= get_quantity(data, lu, lm, year) / data.REAL_AREA
-
-    # ------------ #
-    # Water costs. #
-    # ------------ #
+    # Water costs as water required in Ml per hectare x delivery price per Ml.
     if lm == 'irr':
-        # Water delivery costs in AUD/ha.
-        wp = data.AGEC_CROPS['WP', lm, lu]
-    else:
-        wp = 0
+        wc = data.AGEC_CROPS['WR', lm] * data.AGEC_CROPS['WP', lm, lu]
+    elif lm == 'dry':
+        wc = 0
+    else: # Passed lm is neither `dry` nor `irr`.
+        raise KeyError("Unknown %s land management. Check `lm` key." % lm)
 
     # ------------ #
     # Total costs. #
     # ------------ #
-    tc = fc + (qc + ac + wp) * data.DIESEL_PRICE_PATH[year]
+    tc = fc + (qc + ac + wc)
 
     # Costs so far in AUD/ha. Now convert to AUD/cell.
     cost = tc * data.REAL_AREA
@@ -84,27 +71,30 @@ def get_cost_lvstk( data # Data object or module.
     # Get livestock and vegetation type.
     lvstype, vegtype = lvs_veg_types(lu)
 
-    # Get the yield potential.
+    # Get the yield potential, i.e. the total number of heads per hectare.
     yield_pot = get_yield_pot(data, lvstype, vegtype, lm)
 
-    # Quantity and water costs.
-    cost_qw = ( data.AGEC_LVSTK['QC', lvstype] # Quantity costs.
-              + ( data.AGEC_LVSTK['WR_DRN', lvstype] # Drinking water required.
-                * data.WATER_DELIVERY_PRICE ) # Cost of water delivery.
-              ) * yield_pot # Yield potential.
+    # Quantity costs as costs per head x heads per hectare.
+    cost_q = data.AGEC_LVSTK['QC', lvstype] * yield_pot
+
+    # Water costs as water requirements x delivery price x heads per hectare
+    if lm == 'irr': # Irrigation water if required.
+        WR_IRR = data.AGEC_LVSTK['WR_IRR', lvstype]
+    elif lm == 'dry': # No irrigation water if not required.
+        WR_IRR = 0
+    else: # Passed lm is neither `dry` nor `irr`.
+        raise KeyError("Unknown %s land management. Check `lm` key." % lm)
+    WR_DRN = data.AGEC_LVSTK['WR_DRN', lvstype] # Drinking water required.
+    cost_w = (WR_DRN + WR_IRR) * data.WATER_DELIVERY_PRICE * yield_pot
+
     # Fixed and area costs.
     cost_fa = ( data.AGEC_LVSTK['AC', lvstype] # Area costs.
               + data.AGEC_LVSTK['FOC', lvstype] # Operational costs.
               + data.AGEC_LVSTK['FLC', lvstype] # Labour costs.
-              + data.AGEC_LVSTK['FDC', lvstype] # Depreciation costs.
-              )
+              + data.AGEC_LVSTK['FDC', lvstype] ) # Depreciation costs.
 
-    # Irrigation doubles the fixed and area costs.
-    if lm == 'irr':
-        cost_fa *= 2
-
-    # Total costs are quantity plus fixed costs.
-    cost = cost_qw + cost_fa
+    # Total costs are quantity + water + fixed + area costs.
+    cost = cost_q + cost_w + cost_fa
 
     # Costs so far in AUD/ha. Now convert to AUD/cell.
     cost *= data.REAL_AREA

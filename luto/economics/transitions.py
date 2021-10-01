@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-30
-# Last modified: 2021-09-21
+# Last modified: 2021-10-01
 #
 
 import os.path
@@ -98,9 +98,9 @@ def get_transition_matrices(data, year, lumap, lmmap):
             tdelta_toirr_rj[r] = aqlic_rj[r] + (10**4 * realarea_rj[r])
         # ___ -> IRR / This case does not (yet) exist.
         else:
-            raise ValueError("Unknown land management: %s." % lu)
+            raise ValueError("Unknown land management: %s." % lm)
 
-    # Switching to dry, from and to an irr land-use, may incur licence refund.
+    # Switching to dry, from dry or irr land-use, may incur licence refund.
     tdelta_todry_rj = np.zeros((ncells, nlus))
     for r in range(ncells):
         lu = lumap[r]
@@ -113,7 +113,7 @@ def get_transition_matrices(data, year, lumap, lmmap):
             ...
         # ___ -> IRR / This case does not (yet) exist.
         else:
-            raise ValueError("Unknown land management: %s." % lu)
+            raise ValueError("Unknown land management: %s." % lm)
 
     # Transition costs in AUD/ha converted to AUD per cell and amortised.
     t_rj_todry = amortise(t_rj * realarea_rj + tdelta_todry_rj)

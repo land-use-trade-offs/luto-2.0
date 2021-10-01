@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-09-17
+# Last modified: 2021-10-01
 #
 
 import os
@@ -141,7 +141,14 @@ for lu in LU_LVSTK:
         animal = 'SHEEP'
     if 'dairy' in lu.lower():
         animal = 'DAIRY'
-    wr_lvstk[lu] = AGEC_LVSTK['WR_IRR', animal]
+    if 'modified' in lu.lower():
+        wr_lvstk[lu] = ( AGEC_LVSTK['WR_DRN', animal]
+                       * AGEC_LVSTK['WR_IRR', animal] )
+    elif 'natural' in lu.lower():
+        wr_lvstk[lu] = AGEC_LVSTK['WR_DRN', animal]
+    else:
+        raise ValueError("Unknown land use: %s." % lu)
+
 wr_crops = AGEC_CROPS['WR', 'irr']
 wr_rj = pd.concat([wr_crops, wr_lvstk], axis=1)
 for lu in LANDUSES:
@@ -151,8 +158,11 @@ wr_rj.sort_index(axis=1, inplace=True)
 
 WATER_REQUIRED = np.nan_to_num(wr_rj)
 
+# Spatially explicit costs of a water licence per Ml.
 WATER_LICENCE_PRICE = np.load(os.path.join( INPUT_DIR
                                            , 'water-licence-price.npy') )
+
+# Spatially explicit costs of water delivery per Ml.
 WATER_DELIVERY_PRICE = np.load(os.path.join( INPUT_DIR
                                            , 'water-delivery-price.npy') )
 
