@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-26
-# Last modified: 2021-08-30
+# Last modified: 2021-10-04
 #
 
 import numpy as np
@@ -35,7 +35,7 @@ def lvs_veg_types(lu):
 
 def get_yield_pot( data # Data object or module.
                  , lvstype # Livestock type (one of 'BEEF', 'SHEEP' or 'DAIRY')
-                 , vegtype # Vegetation type (one of 'NVEG' or 'SOWN')
+                 , vegtype # Vegetation type (one of 'NATL' or 'MODL')
                  , lm # Land-management type.
                  ):
     """Return the yield potential for livestock and vegetation type."""

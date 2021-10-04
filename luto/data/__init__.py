@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-10-01
+# Last modified: 2021-10-04
 #
 
 import os
@@ -15,6 +15,7 @@ import rasterio
 
 from luto.settings import INPUT_DIR, OUTPUT_DIR
 from luto.data.economic import exclude
+from luto.economics.quantity import lvs_veg_types
 
 # Load the agro-economic data (constructed w/ fns from data.economic module).
 fpath = os.path.join(INPUT_DIR, "agec-crops-c9.hdf5")
@@ -132,31 +133,37 @@ ANNUM = 2010
 # Water data. #
 # ----------- #
 
-# Water requirements by land use.
-wr_lvstk = pd.DataFrame()
-for lu in LU_LVSTK:
-    if 'beef' in lu.lower():
-        animal = 'BEEF'
-    if 'sheep' in lu.lower():
-        animal = 'SHEEP'
-    if 'dairy' in lu.lower():
-        animal = 'DAIRY'
-    if 'modified' in lu.lower():
-        wr_lvstk[lu] = ( AGEC_LVSTK['WR_DRN', animal]
-                       * AGEC_LVSTK['WR_IRR', animal] )
-    elif 'natural' in lu.lower():
-        wr_lvstk[lu] = AGEC_LVSTK['WR_DRN', animal]
-    else:
-        raise ValueError("Unknown land use: %s." % lu)
+# Water requirements by land use -- LVSTK.
+aq_req_lvstk_dry = pd.DataFrame()
+aq_req_lvstk_irr = pd.DataFrame()
 
-wr_crops = AGEC_CROPS['WR', 'irr']
-wr_rj = pd.concat([wr_crops, wr_lvstk], axis=1)
+# The rj-indexed arrays have zeroes where j is not livestock.
 for lu in LANDUSES:
-    if lu not in LU_CROPS and lu not in LU_LVSTK:
-        wr_rj[lu] = 0
-wr_rj.sort_index(axis=1, inplace=True)
+    if lu in LU_LVSTK:
+        # First find out which animal is involved.
+        animal, _ = lvs_veg_types(lu)
+        # Water requirements per head are for drinking and irrigation.
+        aq_req_lvstk_dry[lu] = AGEC_LVSTK['WR_DRN', animal]
+        aq_req_lvstk_irr[lu] = ( AGEC_LVSTK['WR_DRN', animal]
+                               * AGEC_LVSTK['WR_IRR', animal] )
+    else:
+        aq_req_lvstk_dry[lu] = 0.0
+        aq_req_lvstk_irr[lu] = 0.0
 
-WATER_REQUIRED = np.nan_to_num(wr_rj)
+# Water requirements by land use -- CROPS.
+aq_req_crops_irr = pd.DataFrame()
+
+# The rj-indexed arrays has zeroes where j is not a crop.
+for lu in LANDUSES:
+    if lu in LU_CROPS:
+        aq_req_crops_irr[lu] = AGEC_CROPS['WR', 'irr']
+    else:
+        aq_req_crops_irr[lu] = 0.0
+
+AQ_REQ_CROPS_DRY_RJ = np.zeros((NCELLS, NLUS), dtype=np.int8)
+AQ_REQ_CROPS_IRR_RJ = aq_req_crops_irr.to_numpy()
+AQ_REQ_LVSTK_DRY_RJ = aq_req_lvstk_dry.to_numpy()
+AQ_REQ_LVSTK_IRR_RJ = aq_req_lvstk_irr.to_numpy()
 
 # Spatially explicit costs of a water licence per Ml.
 WATER_LICENCE_PRICE = np.load(os.path.join( INPUT_DIR
