@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-10-04
+# Last modified: 2021-10-05
 #
 
 import os
@@ -156,7 +156,7 @@ aq_req_crops_irr = pd.DataFrame()
 # The rj-indexed arrays has zeroes where j is not a crop.
 for lu in LANDUSES:
     if lu in LU_CROPS:
-        aq_req_crops_irr[lu] = AGEC_CROPS['WR', 'irr']
+        aq_req_crops_irr[lu] = AGEC_CROPS['WR', 'irr', lu]
     else:
         aq_req_crops_irr[lu] = 0.0
 

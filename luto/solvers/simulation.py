@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-10-04
+# Last modified: 2021-10-05
 #
 
 import numpy as np
@@ -58,10 +58,10 @@ class Data():
         self.REAL_AREA = bdata.REAL_AREA[self.mask]
         self.LUMAP = bdata.LUMAP[self.mask]
         self.LMMAP = bdata.LMMAP[self.mask]
-        self.AQ_REQ_CROPS_DRY_RJ = bdata.AQ_REQ_CROPS_DRY_RJ[self.mask] 
-        self.AQ_REQ_CROPS_IRR_RJ = bdata.AQ_REQ_CROPS_IRR_RJ[self.mask] 
-        self.AQ_REQ_LVSTK_DRY_RJ = bdata.AQ_REQ_LVSTK_DRY_RJ[self.mask] 
-        self.AQ_REQ_LVSTK_IRR_RJ = bdata.AQ_REQ_LVSTK_IRR_RJ[self.mask] 
+        self.AQ_REQ_CROPS_DRY_RJ = bdata.AQ_REQ_CROPS_DRY_RJ[self.mask]
+        self.AQ_REQ_CROPS_IRR_RJ = bdata.AQ_REQ_CROPS_IRR_RJ[self.mask]
+        self.AQ_REQ_LVSTK_DRY_RJ = bdata.AQ_REQ_LVSTK_DRY_RJ[self.mask]
+        self.AQ_REQ_LVSTK_IRR_RJ = bdata.AQ_REQ_LVSTK_IRR_RJ[self.mask]
         self.WATER_LICENCE_PRICE = bdata.WATER_LICENCE_PRICE[self.mask]
         self.WATER_DELIVERY_PRICE = bdata.WATER_DELIVERY_PRICE[self.mask]
         self.FEED_REQ = bdata.FEED_REQ[self.mask]
@@ -233,7 +233,6 @@ def step( base    # Base year from which the data is taken.
 
     # First undo the doings of resfactor if it is set.
     if is_resfactor():
-        print("In `step()` - about to run `uncoursify()`")
         lumap = uncoursify(lumap, data.mask, sampling=ressamp)
         lmmap = uncoursify(lmmap, data.mask, sampling=ressamp)
 

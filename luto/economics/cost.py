@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-10-01
+# Last modified: 2021-10-05
 #
 
 import numpy as np
@@ -40,7 +40,7 @@ def get_cost_crop( data # Data object or module.
 
     # Water costs as water required in Ml per hectare x delivery price per Ml.
     if lm == 'irr':
-        wc = data.AGEC_CROPS['WR', lm] * data.AGEC_CROPS['WP', lm, lu]
+        wc = data.AGEC_CROPS['WR', lm, lu] * data.AGEC_CROPS['WP', lm, lu]
     elif lm == 'dry':
         wc = 0
     else: # Passed lm is neither `dry` nor `irr`.

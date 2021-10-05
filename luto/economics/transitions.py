@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-30
-# Last modified: 2021-10-04
+# Last modified: 2021-10-05
 #
 
 import os.path
@@ -94,7 +94,7 @@ def get_transition_matrices(data, year, lumap, lmmap):
                          - data.AQ_REQ_CROPS_IRR_RJ[r, lu]
                          - data.AQ_REQ_LVSTK_IRR_RJ[r, lu] )
             # To pay: net water requirements x licence price.
-            tdelta_toirr_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE
+            tdelta_toirr_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r]
 
         # DRY -> IRR / Licence difference + infrastructure cost @10kAUD/ha.
         elif lm == 0:
@@ -104,7 +104,7 @@ def get_transition_matrices(data, year, lumap, lmmap):
                          - data.AQ_REQ_CROPS_DRY_RJ[r, lu]
                          - data.AQ_REQ_LVSTK_DRY_RJ[r, lu] )
             # To pay: net water requirements x licence price and 10kAUD.
-            tdelta_toirr_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE + 10**4
+            tdelta_toirr_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r] + 10E3
 
         # ___ -> IRR / This case does not (yet) exist.
         else:
@@ -123,7 +123,7 @@ def get_transition_matrices(data, year, lumap, lmmap):
                          - data.AQ_REQ_CROPS_IRR_RJ[r, lu]
                          - data.AQ_REQ_LVSTK_IRR_RJ[r, lu] )
             # To pay: net water requirements x licence price and 3000.
-            tdelta_todry_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE + 3000
+            tdelta_todry_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r] + 3000
 
         # DRY -> DRY / Licence difference costs.
         elif lm == 0:
@@ -133,7 +133,7 @@ def get_transition_matrices(data, year, lumap, lmmap):
                          - data.AQ_REQ_CROPS_DRY_RJ[r, lu]
                          - data.AQ_REQ_LVSTK_DRY_RJ[r, lu] )
             # To pay: net water requirements x licence price.
-            tdelta_todry_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE
+            tdelta_todry_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r]
 
         # ___ -> IRR / This case does not (yet) exist.
         else:
