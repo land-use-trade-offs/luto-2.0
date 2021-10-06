@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-10-05
+# Last modified: 2021-10-06
 #
 
 import numpy as np
@@ -90,7 +90,8 @@ lmmaps = {bdata.ANNUM: bdata.LMMAP}
 shapes = {bdata.ANNUM: (bdata.NLMS, bdata.NCELLS, bdata.NLUS)}
 
 def sync_years(base, target):
-    global base_year, target_year, target_index
+    global data, base_year, target_year, target_index
+    data = Data(bdata, lumaps[base], resmask)
     base_year = base
     target_year = target
     target_index = target - bdata.ANNUM - 1
@@ -213,9 +214,6 @@ def step( base    # Base year from which the data is taken.
         , penalty # Penalty level.
         ):
     """Solve the linear programme using the `base` lumap for `target` year."""
-
-    global data
-    data = Data(bdata, lumaps[base], resmask)
 
     # Synchronise base and target years across module so matrix-getters know.
     sync_years(base, target)
@@ -372,7 +370,7 @@ def get_production(lumap=None, lmmap=None):
 
     # Quantities in PR/p representation by land-management (dry/irr).
     q_dry_p = [ q_mrp[0].T[p] @ X_dry_pr[p] for p in range(nprs) ]
-    q_irr_p = [ q_mrp[0].T[p] @ X_irr_pr[p] for p in range(nprs) ]
+    q_irr_p = [ q_mrp[1].T[p] @ X_irr_pr[p] for p in range(nprs) ]
 
     # Transform quantities to CM/c representation by land-man (dry/irr).
     q_dry_c = [ sum(q_dry_p[p] for p in range(nprs) if pr2cm_cp[c, p])

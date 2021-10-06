@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-09-29
+# Last modified: 2021-10-06
 #
 
 import numpy as np
@@ -123,7 +123,7 @@ def solve( t_mrj  # Transition cost matrices.
 
         # Quantities in PR/p representation by land-management (dry/irr).
         q_dry_p = [ q_mrp[0].T[p] @ X_dry_pr[p] for p in range(nprs) ]
-        q_irr_p = [ q_mrp[0].T[p] @ X_irr_pr[p] for p in range(nprs) ]
+        q_irr_p = [ q_mrp[1].T[p] @ X_irr_pr[p] for p in range(nprs) ]
 
         # Transform quantities to CM/c representation by land-man (dry/irr).
         q_dry_c = [ sum(q_dry_p[p] for p in range(nprs) if pr2cm_cp[c, p])

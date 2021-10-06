@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-30
-# Last modified: 2021-10-05
+# Last modified: 2021-10-06
 #
 
 import os.path
@@ -12,6 +12,8 @@ import os.path
 import numpy as np
 import pandas as pd
 import numpy_financial as npf
+
+from luto.economics.quantity import lvs_veg_types, get_yield_pot
 
 def amortise(cost, rate=0.05, horizon=30):
     """Return amortised `cost` at `rate`interest over `horizon` years."""
@@ -78,8 +80,15 @@ def get_transition_matrices(data, year, lumap, lmmap):
     # Transition costs to commodity j at cell r using present lumap (in AUD/ha).
     t_rj = np.stack(tuple(t_ij[lumap[r]] for r in range(ncells)))
 
-    # Areas in hectares for each cell, stacked for each land-use (identical).
-    realarea_rj = np.stack((data.REAL_AREA,) * nlus, axis=1).astype(np.float64)
+    # Convert water requirements for LVSTK from per head to per hectare.
+    AQ_REQ_LVSTK_DRY_RJ = data.AQ_REQ_LVSTK_DRY_RJ.copy()
+    AQ_REQ_LVSTK_IRR_RJ = data.AQ_REQ_LVSTK_IRR_RJ.copy()
+    for lu in data.LANDUSES:
+        if lu in data.LU_LVSTK:
+            lvs, veg = lvs_veg_types(lu)
+            j = data.LANDUSES.index(lu)
+            AQ_REQ_LVSTK_DRY_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'dry')
+            AQ_REQ_LVSTK_IRR_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'irr')
 
     # Switching to irr, from dry or irr land-use, may incur licence cost/refund.
     tdelta_toirr_rj = np.zeros((ncells, nlus))
@@ -90,9 +99,9 @@ def get_transition_matrices(data, year, lumap, lmmap):
         if lm == 1:
             # Net water requirements.
             aq_req_net = ( data.AQ_REQ_CROPS_IRR_RJ[r]
-                         + data.AQ_REQ_LVSTK_IRR_RJ[r]
+                         +      AQ_REQ_LVSTK_IRR_RJ[r]
                          - data.AQ_REQ_CROPS_IRR_RJ[r, lu]
-                         - data.AQ_REQ_LVSTK_IRR_RJ[r, lu] )
+                         -      AQ_REQ_LVSTK_IRR_RJ[r, lu] )
             # To pay: net water requirements x licence price.
             tdelta_toirr_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r]
 
@@ -100,9 +109,9 @@ def get_transition_matrices(data, year, lumap, lmmap):
         elif lm == 0:
             # Net water requirements.
             aq_req_net = ( data.AQ_REQ_CROPS_IRR_RJ[r]
-                         + data.AQ_REQ_LVSTK_IRR_RJ[r]
+                         +      AQ_REQ_LVSTK_IRR_RJ[r]
                          - data.AQ_REQ_CROPS_DRY_RJ[r, lu]
-                         - data.AQ_REQ_LVSTK_DRY_RJ[r, lu] )
+                         -      AQ_REQ_LVSTK_DRY_RJ[r, lu] )
             # To pay: net water requirements x licence price and 10kAUD.
             tdelta_toirr_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r] + 10E3
 
@@ -119,9 +128,9 @@ def get_transition_matrices(data, year, lumap, lmmap):
         if lm == 1:
             # Net water requirements.
             aq_req_net = ( data.AQ_REQ_CROPS_DRY_RJ[r]
-                         + data.AQ_REQ_LVSTK_DRY_RJ[r]
+                         +      AQ_REQ_LVSTK_DRY_RJ[r]
                          - data.AQ_REQ_CROPS_IRR_RJ[r, lu]
-                         - data.AQ_REQ_LVSTK_IRR_RJ[r, lu] )
+                         -      AQ_REQ_LVSTK_IRR_RJ[r, lu] )
             # To pay: net water requirements x licence price and 3000.
             tdelta_todry_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r] + 3000
 
@@ -129,9 +138,9 @@ def get_transition_matrices(data, year, lumap, lmmap):
         elif lm == 0:
             # Net water requirements.
             aq_req_net = ( data.AQ_REQ_CROPS_DRY_RJ[r]
-                         + data.AQ_REQ_LVSTK_DRY_RJ[r]
+                         +      AQ_REQ_LVSTK_DRY_RJ[r]
                          - data.AQ_REQ_CROPS_DRY_RJ[r, lu]
-                         - data.AQ_REQ_LVSTK_DRY_RJ[r, lu] )
+                         -      AQ_REQ_LVSTK_DRY_RJ[r, lu] )
             # To pay: net water requirements x licence price.
             tdelta_todry_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r]
 
@@ -140,8 +149,8 @@ def get_transition_matrices(data, year, lumap, lmmap):
             raise ValueError("Unknown land management: %s." % lm)
 
     # Transition costs are base + water costs and converted AUD/ha -> AUD/cell.
-    t_rj_todry = (t_rj + tdelta_todry_rj) * realarea_rj
-    t_rj_toirr = (t_rj + tdelta_toirr_rj) * realarea_rj
+    t_rj_todry = (t_rj + tdelta_todry_rj) * data.REAL_AREA[:, np.newaxis]
+    t_rj_toirr = (t_rj + tdelta_toirr_rj) * data.REAL_AREA[:, np.newaxis]
 
     # Transition costs are amortised.
     t_rj_todry = amortise(t_rj_todry)
