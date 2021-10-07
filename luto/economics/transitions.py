@@ -104,12 +104,12 @@ def get_transition_matrices(data, year, lumap, lmmap):
                          -      AQ_REQ_LVSTK_IRR_RJ[r, j] )
             # To pay: net water requirements x licence price.
             tdelta_toirr_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r]
-            # Additional cost for crop->crop for irr infrastructure @10kAUD/ha.
-            infradelta_j = np.zeros(nlus)
-            infradelta_j[data.LU_CROPS_INDICES] = 10E3
-            infradelta_j[j] = 0 # No cost if land-use does not change.
-            # Additional cost added to total to pay.
-            tdelta_toirr_rj[r] += infradelta_j
+            # Extra costs for crop -> crop for irr infrastructure @10kAUD/ha.
+            if j in data.LU_CROPS_INDICES:
+                infradelta_j = np.zeros(nlus)
+                infradelta_j[data.LU_CROPS_INDICES] = 10E3
+                infradelta_j[j] = 0 # No cost if land-use does not change.
+                tdelta_toirr_rj[r] += infradelta_j # Add cost to total to pay.
 
         # DRY -> IRR / Licence difference + infrastructure cost @10kAUD/ha.
         elif m == 0:
