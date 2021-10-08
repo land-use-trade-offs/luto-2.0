@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-30
-# Last modified: 2021-10-07
+# Last modified: 2021-10-08
 #
 
 import os.path
@@ -104,12 +104,12 @@ def get_transition_matrices(data, year, lumap, lmmap):
                          -      AQ_REQ_LVSTK_IRR_RJ[r, j] )
             # To pay: net water requirements x licence price.
             tdelta_toirr_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r]
-            # Extra costs for crop -> crop for irr infrastructure @10kAUD/ha.
-            if j in data.LU_CROPS_INDICES:
-                infradelta_j = np.zeros(nlus)
-                infradelta_j[data.LU_CROPS_INDICES] = 10E3
-                infradelta_j[j] = 0 # No cost if land-use does not change.
-                tdelta_toirr_rj[r] += infradelta_j # Add cost to total to pay.
+            # Extra costs for irr infra change @10kAUD/ha if not lvstk -> lvstk.
+            infradelta_j = 1E4 * np.ones(nlus)
+            infradelta_j[j] = 0 # No extra cost if no land-use change at all.
+            if j in data.LU_LVSTK_INDICES: # No extra cost within lvstk lus.
+                infradelta_j[data.LU_LVSTK_INDICES] = 0
+            tdelta_toirr_rj[r] += infradelta_j # Add cost to total to pay.
 
         # DRY -> IRR / Licence difference + infrastructure cost @10kAUD/ha.
         elif m == 0:
@@ -119,7 +119,7 @@ def get_transition_matrices(data, year, lumap, lmmap):
                          - data.AQ_REQ_CROPS_DRY_RJ[r, j]
                          -      AQ_REQ_LVSTK_DRY_RJ[r, j] )
             # To pay: net water requirements x licence price and 10kAUD.
-            tdelta_toirr_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r] + 10E3
+            tdelta_toirr_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r] + 1E4
 
         # ___ -> IRR / This case does not (yet) exist.
         else:

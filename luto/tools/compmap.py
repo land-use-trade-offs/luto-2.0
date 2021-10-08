@@ -5,7 +5,7 @@
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 #
 # Created: 2021-09-17
-# Last modified: 2021-10-06
+# Last modified: 2021-10-08
 #
 
 import numpy as np
@@ -51,12 +51,22 @@ def crossmap_irrstat(lumap_old, lmmap_old, lumap_new, lmmap_new, landuses=None):
     crosstab.index = index
 
     # Calculate net switches to land use (negative means switch away).
-    switches = crosstab.iloc[-1, 0:-1] - crosstab.iloc[0:-1, -1]
+    df = pd.DataFrame()
+    cells2011 = crosstab.iloc[-1, :]
+    cells2010 = crosstab.iloc[:, -1]
+    df['Cells 2010 [ # ]'] = cells2010
+    df['Cells 2011 [ # ]'] = cells2011
+    df.fillna(0, inplace=True)
+    df = df.astype(np.int64)
+    switches = df['Cells 2011 [ # ]']-  df['Cells 2010 [ # ]']
     nswitches = np.abs(switches).sum()
-    switches['Total'] = nswitches
-    switches['Total [%]'] = int(np.around(100 * nswitches / lumap_old.shape[0]))
+    pswitches = int(np.around(100 * nswitches / lumap_old.shape[0]))
 
-    return crosstab, switches
+    df['Switches [ # ]'] = switches
+    df['Switches [ % ]'] = 100 * switches / cells2010
+    df.loc['Total'] = cells2010.sum(), cells2011.sum(), nswitches, pswitches
+
+    return crosstab, df
 
 
 
