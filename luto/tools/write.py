@@ -55,3 +55,5 @@ def write(data, sim):
     df['Surplus'] = diff
     df['Commodity'] = data.COMMODITIES
     df.to_csv(os.path.join(path, 'demand-surplus-deficit.csv'), index=False)
+
+    np.save('decvars-mrj.npy', sim.dvars[2011])

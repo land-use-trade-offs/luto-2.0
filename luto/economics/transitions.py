@@ -78,8 +78,9 @@ def get_transition_matrices(data, year, lumap, lmmap):
     nlus = t_ij.shape[0]
     ncells = lumap.shape[0]
 
-    # The cost matrices are needed as well.
+    # The cost matrices are needed as well -- but in per hectare form.
     c_mrj = get_cost_matrices(data, year)
+    c_mrj /= data.REAL_AREA[:, np.newaxis]
 
     # Transition costs to commodity j at cell r using present lumap (in AUD/ha).
     t_rj = np.stack(tuple(t_ij[lumap[r]] for r in range(ncells)))
@@ -95,12 +96,7 @@ def get_transition_matrices(data, year, lumap, lmmap):
             AQ_REQ_LVSTK_IRR_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'irr')
 
     # Foregone income is incurred @ 3x production cost unless ...
-    odelta_todry_rj = 3 * c_mrj[0]
-    odelta_toirr_rj = 3 * c_mrj[1]
-
-    # ... the switch is to an unallocated land use.
-    odelta_todry_rj.T[data.LU_UNALL_INDICES] = 0
-    odelta_toirr_rj.T[data.LU_UNALL_INDICES] = 0
+    odelta_rj = np.zeros((ncells, nlus))
 
     # Switching may incur water licence cost/refund and infrastructure costs.
     wdelta_toirr_rj = np.zeros((ncells, nlus))
@@ -110,10 +106,15 @@ def get_transition_matrices(data, year, lumap, lmmap):
         j = lumap[r] # Current land-use index.
         m = lmmap[r] # Current land-man index.
 
+        # Foregone income is incurred @ 3x production cost unless ...
+        odelta_rj[r] = 3 * c_mrj[m, r, j] * np.ones(nlus)
+        # ... the switch is to the same land-use (regardless or irr status) ...
+        odelta_rj[r, j] = 0
+        # ... or if it is to an unallocated land use.
+        odelta_rj[r, data.LU_UNALL_INDICES] = 0
+
         # DRY -> {DRY, IRR} (i.e. cases _from_ dry land uses.)
         if m == 0:
-            # Just switching dry -> irr does not incur the foregone income cost.
-            odelta_toirr_rj[r, j] = 0
 
             # -------------------------------------------------------------- #
             # DRY -> DRY / Licence difference costs.                         #
@@ -141,8 +142,6 @@ def get_transition_matrices(data, year, lumap, lmmap):
 
         # IRR -> {DRY, IRR} (i.e. cases _from_ irrigated land uses.)
         elif m == 1:
-            # Just switching irr -> dry does not incur the foregone income cost.
-            odelta_todry_rj[r, j] = 0
 
             # -------------------------------------------------------------- #
             # IRR -> DRY / Licence diff. plus additional costs at @3kAUD/ha. #
@@ -181,11 +180,11 @@ def get_transition_matrices(data, year, lumap, lmmap):
     # Add the various deltas to the base costs and convert to AUD/cell.
     t_rj_todry = ( t_rj                            # Base switching costs.
                  + wdelta_todry_rj                 # Water-related costs.
-                 + odelta_todry_rj                 # Foregone income costs.
+                 + odelta_rj                       # Foregone income costs.
                  ) * data.REAL_AREA[:, np.newaxis] # Conversion to AUD/cell.
     t_rj_toirr = ( t_rj                            # Base switching costs.
                  + wdelta_toirr_rj                 # Water-related costs.
-                 + odelta_toirr_rj                 # Foregone income costs.
+                 + odelta_rj                       # Foregone income costs.
                  ) * data.REAL_AREA[:, np.newaxis] # Conversion to AUD/cell.
 
     # Transition costs are amortised.
