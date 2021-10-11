@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-10-06
+# Last modified: 2021-10-11
 #
 
 import numpy as np
@@ -88,6 +88,7 @@ resmult = 1
 lumaps = {bdata.ANNUM: bdata.LUMAP}
 lmmaps = {bdata.ANNUM: bdata.LMMAP}
 shapes = {bdata.ANNUM: (bdata.NLMS, bdata.NCELLS, bdata.NLUS)}
+dvars = {}
 
 def sync_years(base, target):
     global data, base_year, target_year, target_index
@@ -219,15 +220,15 @@ def step( base    # Base year from which the data is taken.
     sync_years(base, target)
 
     # Magic.
-    lumap, lmmap = solve( get_t_mrj()
-                        , get_c_mrj()
-                        , get_q_mrp()
-                        , demands
-                        , penalty
-                        , get_x_mrj()
-                        , data.LU2PR
-                        , data.PR2CM
-                        , verbose=is_verbose() )
+    lumap, lmmap, X_mrj = solve( get_t_mrj()
+                               , get_c_mrj()
+                               , get_q_mrp()
+                               , demands
+                               , penalty
+                               , get_x_mrj()
+                               , data.LU2PR
+                               , data.PR2CM
+                               , verbose=is_verbose() )
 
     # First undo the doings of resfactor if it is set.
     if is_resfactor():
@@ -240,6 +241,9 @@ def step( base    # Base year from which the data is taken.
 
     # And update the shapes dictionary.
     shapes[target] = get_shape()
+
+    # Save the raw decision variables.
+    dvars[target] = X_mrj
 
 def run( base
        , target

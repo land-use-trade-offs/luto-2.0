@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-10-07
+# Last modified: 2021-10-11
 #
 
 import os
@@ -43,9 +43,11 @@ LU_CROPS = [ lu for lu in LANDUSES if 'Beef' not in lu
 LU_LVSTK = [ lu for lu in LANDUSES if 'Beef' in lu
                                    or 'Sheep' in lu
                                    or 'Dairy' in lu ]
+LU_UNALL = [ lu for lu in LANDUSES if 'Unallocated' in lu ]
 
 LU_CROPS_INDICES = [LANDUSES.index(lu) for lu in LANDUSES if lu in LU_CROPS]
 LU_LVSTK_INDICES = [LANDUSES.index(lu) for lu in LANDUSES if lu in LU_LVSTK]
+LU_UNALL_INDICES = [LANDUSES.index(lu) for lu in LANDUSES if lu in LU_UNALL]
 
 # Derive LANDMANS (land-managements) from AGEC.
 LANDMANS = {t[1] for t in AGEC_CROPS.columns} # Set comp., unique entries.

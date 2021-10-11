@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-10-06
+# Last modified: 2021-10-11
 #
 
 import numpy as np
@@ -55,16 +55,35 @@ def solve( t_mrj  # Transition cost matrices.
 
     # Penalty units for each j as maximum cost, mapped to CM/c representation.
     # There is mixed counting in this as the mapping is not one-one.
-    p_j = np.zeros(nlus)
-    for j in range(nlus):
-        p_j[j] = c_mrj.T[j].max() # Get maximum cost for each land use.
-    lu2cm_cj = pr2cm_cp @ lu2pr_pj # The mapping from LU/j to CM/c space.
-    # Scale rows to obtain averages of costs instead of sums.
-    l2c_cj = lu2cm_cj / lu2cm_cj.sum(axis=1)[:, np.newaxis]
-    p_c = l2c_cj @ p_j # Map maximum costs to CM/c representation.
+    # p_j = np.zeros(nlus)
+    # for j in range(nlus):
+        # p_j[j] = c_mrj.T[j].max() # Get maximum cost for each land use.
+    # lu2cm_cj = pr2cm_cp @ lu2pr_pj # The mapping from LU/j to CM/c space.
+    # # Scale rows to obtain averages of costs instead of sums.
+    # l2c_cj = lu2cm_cj / lu2cm_cj.sum(axis=1)[:, np.newaxis]
+    # p_c = l2c_cj @ p_j # Map maximum costs to CM/c representation.
 
+    # # Apply the penalty-level multiplier.
+    # p_c *= p
+
+    # Cost per tonne = cost per hectare / tonnes per hectare.
+
+    # Cost per hectare in PR/p representation:
+    c_rp_dry = (lu2pr_pj @ c_mrj[0].T).T
+    c_rp_irr = (lu2pr_pj @ c_mrj[1].T).T
+    c_mrp = np.stack((c_rp_dry, c_rp_irr))
+
+    # Divide by quantity per hectare to obtain cost per tonne.
+    qprime_mrp = np.where(q_mrp != 0, q_mrp, np.inf) # Avoid division by zero.
+    cpert_mrp = c_mrp / qprime_mrp
+    # Cost per tonne in PR/p representation.
+    c_p = [cpert_mrp.T[p].max() for p in range(nprs)]
+    # Commodities from multiple sources get average costs.
+    p2c_cp = pr2cm_cp / pr2cm_cp.sum(axis=1)[:, np.newaxis]
+    # Finally, cost per tonne in CM/c representation.
+    c_c = p2c_cp @ c_p
     # Apply the penalty-level multiplier.
-    p_c *= p
+    p_c = p * c_c
 
     try:
         # Make Gurobi model instance.
@@ -162,6 +181,11 @@ def solve( t_mrj  # Transition cost matrices.
         # Magic.
         model.optimize()
 
+        # Collect optimised decision variables in one X_mrj Numpy array.
+        X_dry_rj = np.stack([X_dry[j] for j in range(nlus)])
+        X_irr_rj = np.stack([X_irr[j] for j in range(nlus)])
+        X_mrj = np.stack((X_dry, X_irr))
+
         # Collect optimised decision variables in tuple of 1D Numpy arrays.
         prestack_dry = tuple(X_dry[j].X for j in range(nlus))
         stack_dry = np.stack(prestack_dry)
@@ -177,7 +201,7 @@ def solve( t_mrj  # Transition cost matrices.
         lmmap = np.where( stack_dry.max(axis=0) >= stack_irr.max(axis=0)
                         , 0, 1 )
 
-        return lumap, lmmap
+        return lumap, lmmap, X_mrj
 
     except gp.GurobiError as e:
         print('Gurobi error code', str(e.errno), ':', str(e))
