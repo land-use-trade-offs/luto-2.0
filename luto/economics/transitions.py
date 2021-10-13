@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-04-30
-# Last modified: 2021-10-11
+# Last modified: 2021-10-13
 #
 
 import os.path
@@ -95,8 +95,12 @@ def get_transition_matrices(data, year, lumap, lmmap):
             AQ_REQ_LVSTK_DRY_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'dry')
             AQ_REQ_LVSTK_IRR_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'irr')
 
-    # Foregone income is incurred @ 3x production cost unless ...
-    odelta_rj = np.zeros((ncells, nlus))
+    # Foregone income is incurred @ 3x new production cost unless ...
+    odelta_todry_rj = 3 * c_mrj[0]
+    odelta_toirr_rj = 3 * c_mrj[1]
+    # ... it is to an unallocated land use or ...
+    odelta_todry_rj[:, data.LU_UNALL_INDICES] = 0
+    odelta_toirr_rj[:, data.LU_UNALL_INDICES] = 0
 
     # Switching may incur water licence cost/refund and infrastructure costs.
     wdelta_toirr_rj = np.zeros((ncells, nlus))
@@ -106,12 +110,9 @@ def get_transition_matrices(data, year, lumap, lmmap):
         j = lumap[r] # Current land-use index.
         m = lmmap[r] # Current land-man index.
 
-        # Foregone income is incurred @ 3x production cost unless ...
-        odelta_rj[r] = 3 * c_mrj[m, r, j] * np.ones(nlus)
-        # ... the switch is to the same land-use (regardless or irr status) ...
-        odelta_rj[r, j] = 0
-        # ... or if it is to an unallocated land use.
-        odelta_rj[r, data.LU_UNALL_INDICES] = 0
+        # ... the switch is to the same land-use (regardless or irr status).
+        odelta_todry_rj[r, j] = 0
+        odelta_toirr_rj[r, j] = 0
 
         # DRY -> {DRY, IRR} (i.e. cases _from_ dry land uses.)
         if m == 0:
@@ -180,11 +181,11 @@ def get_transition_matrices(data, year, lumap, lmmap):
     # Add the various deltas to the base costs and convert to AUD/cell.
     t_rj_todry = ( t_rj                            # Base switching costs.
                  + wdelta_todry_rj                 # Water-related costs.
-                 + odelta_rj                       # Foregone income costs.
+                 + odelta_todry_rj                 # Foregone income costs.
                  ) * data.REAL_AREA[:, np.newaxis] # Conversion to AUD/cell.
     t_rj_toirr = ( t_rj                            # Base switching costs.
                  + wdelta_toirr_rj                 # Water-related costs.
-                 + odelta_rj                       # Foregone income costs.
+                 + odelta_toirr_rj                 # Foregone income costs.
                  ) * data.REAL_AREA[:, np.newaxis] # Conversion to AUD/cell.
 
     # Transition costs are amortised.

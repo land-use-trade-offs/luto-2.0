@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-10-11
+# Last modified: 2021-10-13
 #
 
 import numpy as np
@@ -184,7 +184,7 @@ def solve( t_mrj  # Transition cost matrices.
         # Collect optimised decision variables in one X_mrj Numpy array.
         X_dry_rj = np.stack([X_dry[j] for j in range(nlus)])
         X_irr_rj = np.stack([X_irr[j] for j in range(nlus)])
-        X_mrj = np.stack((X_dry, X_irr))
+        X_mrj = np.stack((X_dry.X, X_irr.X))
 
         # Collect optimised decision variables in tuple of 1D Numpy arrays.
         prestack_dry = tuple(X_dry[j].X for j in range(nlus))
