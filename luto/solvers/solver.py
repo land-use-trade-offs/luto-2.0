@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-10-13
+# Last modified: 2021-10-14
 #
 
 import numpy as np
@@ -12,13 +12,6 @@ import pandas as pd
 import scipy.sparse as sp
 import gurobipy as gp
 from gurobipy import GRB
-
-# Default constraint settings.
-constraints = { 'water': True
-              , 'nutrients': True
-              , 'carbon': True
-              , 'biodiversity': True
-              }
 
 # Silent Gurobi environment.
 silent = gp.Env(empty=True)
@@ -33,20 +26,23 @@ def solve( t_mrj  # Transition cost matrices.
          , x_mrj  # Exclude matrices.
          , lu2pr_pj # Conversion matrix: land-use to product(s).
          , pr2cm_cp # Conversion matrix: product(s) to commodity.
-         , constraints = constraints # Constraints to use (default all).
+         , targets = None # Targets to use.
          , verbose = False # Print Gurobi output to console if True.
          ):
     """Return land-use, land-man maps under constraints and minimised costs.
 
     All inputs are Numpy arrays of the appropriate shapes, except for `p` which
-    is a scalar and `constraints` which is a dictionary.
+    is a scalar and `targets` which is a dictionary.
 
     To run with only a subset of the constraints, pass a custom `constraints`
     dictionary. Format {key: value} where 'key' is a string, one of 'water',
     'nutrients', 'carbon' or 'biodiversity' and 'value' is either True or False.
     """
 
-    global silent
+    # global silent
+
+    # Ensure there is a dictionary to test against.
+    if targets is None: targets = {}
 
     # Extract the shape of the problem.
     nlms, ncells, nlus = t_mrj.shape # Number of landmans, cells, landuses.
@@ -102,7 +98,7 @@ def solve( t_mrj  # Transition cost matrices.
         X_irr = [ model.addMVar(ncells, ub=x_mrj[1, :, j], name='X_irr')
                   for j in range(nlus) ]
 
-        # Decision variables to minimise the deviations.
+        # Decision variables to minimise the deviations from demand.
         V = model.addMVar(ncms, name='V')
 
         # ------------------- #
@@ -159,19 +155,36 @@ def solve( t_mrj  # Transition cost matrices.
         model.addConstrs( p_c[c] * (q_c[c] - d_c[c]) <= V[c]
                           for c in range(ncms) )
 
-        # Only add the following constraints if requested.
+        # Only add the following constraints if target provided.
 
         # Water use capped, per catchment, at volume consumed in base year.
-        if constraints['water']:
+        if 'water' in targets:
+
+            # Get the cap for each catchment and the number of catchments.
+            cap = targets['water']
+            ncatchments = cap.shape[0]
+
+            # Decision variables to minimise exceeding the cap by catchment.
+            W = model.addMVar(ncatchments, name='W')
+
+            # Water use by catchment, less the cap, should be minimised.
+            # Water module should return catchment, based on masks. There
+            # should likely be a 4-indexed array w_cmrj with c the catchment
+            # index.
+            water_use = [ w_mrj[0].T @ X_dry[j]
+                        + w_mrj[1].T @ X_irr[j]
+                          for j in range(nlus) ]
+
+            model.addConstrs( for c in range(ncatchments) )
+
+
+        if 'nutrients' in targets:
             ...
 
-        if constraints['nutrients']:
+        if 'carbon' in targets:
             ...
 
-        if constraints['carbon']:
-            ...
-
-        if constraints['biodiversity']:
+        if 'biodiversity' in targets:
             ...
 
         # -------------------------- #
