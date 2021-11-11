@@ -166,6 +166,7 @@ def solve( t_mrj  # Transition cost matrices.
 
             # Decision variables to minimise exceeding the cap by catchment.
             W = model.addMVar(ncatchments, name='W')
+            w_slack = model.addMVar(ncatchments, name='w_slack')
 
             # Water use by catchment, less the cap, should be minimised.
             # Water module should return catchment, based on masks. There
@@ -175,7 +176,7 @@ def solve( t_mrj  # Transition cost matrices.
                         + w_mrj[1].T @ X_irr[j]
                           for j in range(nlus) ]
 
-            model.addConstrs( for c in range(ncatchments) )
+            # model.addConstrs( for c in range(ncatchments) )
 
 
         if 'nutrients' in targets:
