@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-10-14
+# Last modified: 2021-11-12
 #
 
 import numpy as np
@@ -12,6 +12,8 @@ import pandas as pd
 import scipy.sparse as sp
 import gurobipy as gp
 from gurobipy import GRB
+
+import settings
 
 # Silent Gurobi environment.
 silent = gp.Env(empty=True)
@@ -48,19 +50,6 @@ def solve( t_mrj  # Transition cost matrices.
     nlms, ncells, nlus = t_mrj.shape # Number of landmans, cells, landuses.
     _, _, nprs = q_mrp.shape # Number of products.
     ncms, = d_c.shape # Number of commodities.
-
-    # Penalty units for each j as maximum cost, mapped to CM/c representation.
-    # There is mixed counting in this as the mapping is not one-one.
-    # p_j = np.zeros(nlus)
-    # for j in range(nlus):
-        # p_j[j] = c_mrj.T[j].max() # Get maximum cost for each land use.
-    # lu2cm_cj = pr2cm_cp @ lu2pr_pj # The mapping from LU/j to CM/c space.
-    # # Scale rows to obtain averages of costs instead of sums.
-    # l2c_cj = lu2cm_cj / lu2cm_cj.sum(axis=1)[:, np.newaxis]
-    # p_c = l2c_cj @ p_j # Map maximum costs to CM/c representation.
-
-    # # Apply the penalty-level multiplier.
-    # p_c *= p
 
     # Cost per tonne = cost per hectare / tonnes per hectare.
 
@@ -164,17 +153,37 @@ def solve( t_mrj  # Transition cost matrices.
             cap = targets['water']
             ncatchments = cap.shape[0]
 
+            # Get the water use.
+            water_use = [ w_mrj[0].T @ X_dry[j]
+                        + w_mrj[1].T @ X_irr[j]
+                          for j in range(nlus) ]
+
+            # Add the hard constraint if required.
+            if settings.WATER_CONSTRAINT_TYPE == 'hard':
+                # Water use should remain strictly below the cap.
+                model.addConstr(water_use < cap)
+
+            elif settings.WATER_CONSTRAINT_TYPE == 'soft':
+                # Add water variable to minimise to objective function.
+                W = model.addVar(name='W')
+                newobjective = objective + W
+                model.setObjective(newobjective, GRB.MINIMIZE)
+                # Slack variable to deal with less-than constraint.
+                w_slack = model.addMVar(ncatchments, name='w_slack')
+                model.addConstr(water_use + w_slack - cap <=   W)
+                model.addConstr(water_use + w_slack - cap >= - W)
+
+            else:
+                ... # Raise exception.
+
+
+
             # Decision variables to minimise exceeding the cap by catchment.
-            W = model.addMVar(ncatchments, name='W')
-            w_slack = model.addMVar(ncatchments, name='w_slack')
 
             # Water use by catchment, less the cap, should be minimised.
             # Water module should return catchment, based on masks. There
             # should likely be a 4-indexed array w_cmrj with c the catchment
             # index.
-            water_use = [ w_mrj[0].T @ X_dry[j]
-                        + w_mrj[1].T @ X_irr[j]
-                          for j in range(nlus) ]
 
             # model.addConstrs( for c in range(ncatchments) )
 
