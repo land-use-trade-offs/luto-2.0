@@ -13,7 +13,7 @@ import scipy.sparse as sp
 import gurobipy as gp
 from gurobipy import GRB
 
-import settings
+import luto.settings as settings
 
 # Silent Gurobi environment.
 silent = gp.Env(empty=True)
