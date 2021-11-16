@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-10-11
+# Last modified: 2021-11-16
 #
 
 import os
@@ -177,6 +177,11 @@ WATER_LICENCE_PRICE = np.load(os.path.join( INPUT_DIR
 # Spatially explicit costs of water delivery per Ml.
 WATER_DELIVERY_PRICE = np.load(os.path.join( INPUT_DIR
                                            , 'water-delivery-price.npy') )
+
+# River regions.
+rivregs = pd.read_hdf(os.path.join(INPUT_DIR, 'rivregs.hdf5'))
+RIVREGS = rivregs['HR_RIVREGS_ID'].to_numpy() # River region ids as integers.
+RIVREGDICT = dict(rivregs.groupby('HR_RIVREG_ID').first()['HR_RIVREG_NAME'])
 
 # ----------------------- #
 # Livestock related data. #
