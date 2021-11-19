@@ -37,6 +37,14 @@ def mask_aqrec_matrices(data, year, mask):
     """Return masked version of get_aqrec_matrices."""
     return mask[np.newaxis, :, np.newaxis] * get_aqrec_matrices(data, year)
 
+def get_aqyld_matrices( data # Data object or module.
+                      , year # Number of years post base-year ('annum').
+                      ):
+    """..."""
+    ...
+
+
+
 """
 Water logic.
 

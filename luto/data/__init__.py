@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-11-16
+# Last modified: 2021-11-19
 #
 
 import os
@@ -182,6 +182,11 @@ WATER_DELIVERY_PRICE = np.load(os.path.join( INPUT_DIR
 rivregs = pd.read_hdf(os.path.join(INPUT_DIR, 'rivregs.hdf5'))
 RIVREGS = rivregs['HR_RIVREGS_ID'].to_numpy() # River region ids as integers.
 RIVREGDICT = dict(rivregs.groupby('HR_RIVREG_ID').first()['HR_RIVREG_NAME'])
+
+# Water yields -- run off from a cell into catchment by vegetation type.
+water_yield_base = pd.read_hdf(os.path.join(INPUT_DIR, 'water-yield-baselines'))
+WATER_YIELD_BASE_DR_ML_HA = water_yield_base['WATER_YIELD_BASE_DR_ML_HA']
+WATER_YIELD_BASE_SR_ML_HA = water_yield_base['WATER_YIELD_BASE_SR_ML_HA']
 
 # ----------------------- #
 # Livestock related data. #
