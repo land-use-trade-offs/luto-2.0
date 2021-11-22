@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-11-15
-# Last modified: 2021-11-16
+# Last modified: 2021-11-22
 #
 
 import numpy as np
@@ -37,11 +37,14 @@ def mask_aqrec_matrices(data, year, mask):
     """Return masked version of get_aqrec_matrices."""
     return mask[np.newaxis, :, np.newaxis] * get_aqrec_matrices(data, year)
 
-def get_aqyld_matrices( data # Data object or module.
-                      , year # Number of years post base-year ('annum').
-                      ):
-    """..."""
-    ...
+def get_aqyld_matrix( data # Data object or module.
+                    , year # Number of years post base-year ('annum').
+                    ):
+    """Return an rj matrix of the water yields, per cell, by land use."""
+    cols = tuple(      data.WATER_YIELD_BASE_DR_ML_HA if lu in natural
+                  else data.WATER_YIELD_BASE_SR_ML_HA
+                  for lu in data.LANDUSES )
+    return np.stack(cols, axis=1)
 
 
 
@@ -51,7 +54,7 @@ Water logic.
 The limits are related to the pre-European inflows into rivers. As a proxy
 for these inflows are used the flows that would result if all cells had
 deeply-rooted vegetation. The values from 1985 are used for this as these
-do not incorporate climate change corrections on rainfal. So the limit is
+do not incorporate climate change corrections on rainfall. So the limit is
 a _lower_ limit, it is a bottom, not a cap.
 
 Performance relative to the cap is then composed of two parts:

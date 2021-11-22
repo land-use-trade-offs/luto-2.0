@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-11-19
+# Last modified: 2021-11-22
 #
 
 import os
@@ -12,6 +12,7 @@ import os
 import pandas as pd
 import numpy as np
 import rasterio
+import h5py
 
 from luto.settings import INPUT_DIR, OUTPUT_DIR
 from luto.data.economic import exclude
@@ -180,13 +181,21 @@ WATER_DELIVERY_PRICE = np.load(os.path.join( INPUT_DIR
 
 # River regions.
 rivregs = pd.read_hdf(os.path.join(INPUT_DIR, 'rivregs.hdf5'))
-RIVREGS = rivregs['HR_RIVREGS_ID'].to_numpy() # River region ids as integers.
+RIVREGS = rivregs['HR_RIVREG_ID'].to_numpy() # River region ids as integers.
 RIVREGDICT = dict(rivregs.groupby('HR_RIVREG_ID').first()['HR_RIVREG_NAME'])
 
 # Water yields -- run off from a cell into catchment by vegetation type.
-water_yield_base = pd.read_hdf(os.path.join(INPUT_DIR, 'water-yield-baselines'))
-WATER_YIELD_BASE_DR_ML_HA = water_yield_base['WATER_YIELD_BASE_DR_ML_HA']
-WATER_YIELD_BASE_SR_ML_HA = water_yield_base['WATER_YIELD_BASE_SR_ML_HA']
+water_yield_base = pd.read_hdf(os.path.join( INPUT_DIR
+                                           , 'water-yield-baselines.hdf5' ))
+WATER_YIELD_BASE_DR_ML_HA = water_yield_base['WATER_YIELD_DR_ML_HA'].to_numpy()
+WATER_YIELD_BASE_SR_ML_HA = water_yield_base['WATER_YIELD_SR_ML_HA'].to_numpy()
+
+fname_dr = 'Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean.h5'
+fname_sr = 'Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean.h5'
+
+f = h5py.File(fname, 'r')
+
+water_yields_dr = ...
 
 # ----------------------- #
 # Livestock related data. #
