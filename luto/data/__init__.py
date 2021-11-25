@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-11-22
+# Last modified: 2021-11-25
 #
 
 import os
@@ -190,12 +190,11 @@ water_yield_base = pd.read_hdf(os.path.join( INPUT_DIR
 WATER_YIELD_BASE_DR_ML_HA = water_yield_base['WATER_YIELD_DR_ML_HA'].to_numpy()
 WATER_YIELD_BASE_SR_ML_HA = water_yield_base['WATER_YIELD_SR_ML_HA'].to_numpy()
 
-fname_dr = 'Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean.h5'
-fname_sr = 'Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean.h5'
+fname_dr = os.path.join(INPUT_DIR, 'water-yields-ssp245-dr-ml-ha.hdf5')
+fname_sr = os.path.join(INPUT_DIR, 'water-yields-ssp245-sr-ml-ha.hdf5')
 
-f = h5py.File(fname, 'r')
-
-water_yields_dr = ...
+WATER_YIELDS_DR = h5py.File(fname_dr, 'r')['water-yields-ssp245-dr-ml-ha']
+WATER_YIELDS_SR = h5py.File(fname_sr, 'r')['water-yields-ssp245-sr-ml-ha']
 
 # ----------------------- #
 # Livestock related data. #

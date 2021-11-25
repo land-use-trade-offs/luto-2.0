@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-11-15
-# Last modified: 2021-11-22
+# Last modified: 2021-11-25
 #
 
 import numpy as np
@@ -41,10 +41,22 @@ def get_aqyld_matrix( data # Data object or module.
                     , year # Number of years post base-year ('annum').
                     ):
     """Return an rj matrix of the water yields, per cell, by land use."""
-    cols = tuple(      data.WATER_YIELD_BASE_DR_ML_HA if lu in natural
-                  else data.WATER_YIELD_BASE_SR_ML_HA
+    cols = tuple(      data.WATER_YIELDS_DR_ML_HA if lu in natural
+                  else data.WATER_YIELDS_SR_ML_HA
                   for lu in data.LANDUSES )
     return np.stack(cols, axis=1)
+
+def get_aqyld_net_matrices(data, year):
+    """Return an mrj matrix of net water yields, by irrigation status."""
+    # Get the water yields -- disregarding irrigation but as mrj matrix.
+    aqyld_rj = get_aqyld_matrix(data, year)
+    aqyld_mrj = np.stack((aqyld_rj, aqyld_rj))
+
+    # Get the water requirements for irrigation and livestock drinking water.
+    aqreq_mrj = get_aqreq_matrices(data, year)
+
+    # Net water yield is normal yield less the water requirements.
+    return aqyld_mrj - aqreq_mrj
 
 
 
