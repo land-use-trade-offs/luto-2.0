@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-10-11
+# Last modified: 2021-11-26
 #
 
 import numpy as np
@@ -64,6 +64,12 @@ class Data():
         self.AQ_REQ_LVSTK_IRR_RJ = bdata.AQ_REQ_LVSTK_IRR_RJ[self.mask]
         self.WATER_LICENCE_PRICE = bdata.WATER_LICENCE_PRICE[self.mask]
         self.WATER_DELIVERY_PRICE = bdata.WATER_DELIVERY_PRICE[self.mask]
+        self.WATER_YIELD_BASE_DR = bdata.WATER_YIELD_BASE_DR[self.mask]
+        self.WATER_YIELD_BASE_SR = bdata.WATER_YIELD_BASE_SR[self.mask]
+        # TODO: These are HDF5 bricks - perhaps keep yearly slices outside?
+        # self.WATER_YIELDS_DR = bdata.WATER_YIELDS_DR[self.mask]
+        # self.WATER_YIELDS_SR = bdata.WATER_YIELDS_SR[self.mask]
+        self.MASK_MDB = bdata.MASK_MDB[self.mask]
         self.FEED_REQ = bdata.FEED_REQ[self.mask]
         self.PASTURE_KG_DM_HA = bdata.PASTURE_KG_DM_HA[self.mask]
         self.SAFE_PUR_MODL = bdata.SAFE_PUR_MODL[self.mask]
@@ -148,6 +154,11 @@ def get_t_mrj():
 def get_x_mrj():
     return get_exclude_matrices(data, lumaps[base_year][data.mask])
 
+def get_limits():
+    limits = {}
+    limits['water'] = get_water_stress(data, target_index, data.MASK_MDB)
+    return limits
+
 def reconstitute(lxmap, filler=-1):
     """Return lxmap reconstituted to original size spatial domain."""
     # First case is when resfactor is False/1.
@@ -213,6 +224,7 @@ def step( base    # Base year from which the data is taken.
         , target  # Year to be solved for.
         , demands # Demands in the form of a d_c array.
         , penalty # Penalty level.
+        # , limits  # (Environmental) limits as additional soft/hard constraints.
         ):
     """Solve the linear programme using the `base` lumap for `target` year."""
 
@@ -228,6 +240,7 @@ def step( base    # Base year from which the data is taken.
                                , get_x_mrj()
                                , data.LU2PR
                                , data.PR2CM
+                               , get_limits()
                                , verbose=is_verbose() )
 
     # First undo the doings of resfactor if it is set.
@@ -278,7 +291,7 @@ def run( base
                 step(base + s, base + s + 1 , demands[s], penalty)
                 print("Done.")
 
-    # Run the simulation from ANNUM to `year` + 1 directly.
+    # Run the simulation from ANNUM to `target` year directly.
     elif style == 'direct':
         # If demands is a time series, choose the appropriate entry.
         if len(demands.shape) == 2:

@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-11-12
+# Last modified: 2021-11-26
 #
 
 import numpy as np
@@ -28,13 +28,13 @@ def solve( t_mrj  # Transition cost matrices.
          , x_mrj  # Exclude matrices.
          , lu2pr_pj # Conversion matrix: land-use to product(s).
          , pr2cm_cp # Conversion matrix: product(s) to commodity.
-         , targets = None # Targets to use.
+         , limits = None # Targets to use.
          , verbose = False # Print Gurobi output to console if True.
          ):
     """Return land-use, land-man maps under constraints and minimised costs.
 
     All inputs are Numpy arrays of the appropriate shapes, except for `p` which
-    is a scalar and `targets` which is a dictionary.
+    is a scalar and `limits` which is a dictionary.
 
     To run with only a subset of the constraints, pass a custom `constraints`
     dictionary. Format {key: value} where 'key' is a string, one of 'water',
@@ -44,7 +44,7 @@ def solve( t_mrj  # Transition cost matrices.
     # global silent
 
     # Ensure there is a dictionary to test against.
-    if targets is None: targets = {}
+    if limits is None: limits = {}
 
     # Extract the shape of the problem.
     nlms, ncells, nlus = t_mrj.shape # Number of landmans, cells, landuses.
@@ -146,55 +146,23 @@ def solve( t_mrj  # Transition cost matrices.
 
         # Only add the following constraints if target provided.
 
-        # Water use capped, per catchment, at volume consumed in base year.
-        if 'water' in targets:
+        if 'water' in limits:
+            # Obtain the water yields and limits by catchment.
+            w_mrj = limits['water']
 
-            # Get the cap for each catchment and the number of catchments.
-            cap = targets['water']
-            ncatchments = cap.shape[0]
+            # Staying above water-stress limit as a hard constraint.
+            w_constraint = sum( w_mrj[0].T[j] @ X_dry[j]
+                                for j in range(nlus) ) >= 0
 
-            # Get the water use.
-            water_use = [ w_mrj[0].T @ X_dry[j]
-                        + w_mrj[1].T @ X_irr[j]
-                          for j in range(nlus) ]
+            model.addConstr(w_constraint)
 
-            # Add the hard constraint if required.
-            if settings.WATER_CONSTRAINT_TYPE == 'hard':
-                # Water use should remain strictly below the cap.
-                model.addConstr(water_use < cap)
-
-            elif settings.WATER_CONSTRAINT_TYPE == 'soft':
-                # Add water variable to minimise to objective function.
-                W = model.addVar(name='W')
-                newobjective = objective + W
-                model.setObjective(newobjective, GRB.MINIMIZE)
-                # Slack variable to deal with less-than constraint.
-                w_slack = model.addMVar(ncatchments, name='w_slack')
-                model.addConstr(water_use + w_slack - cap <=   W)
-                model.addConstr(water_use + w_slack - cap >= - W)
-
-            else:
-                ... # Raise exception.
-
-
-
-            # Decision variables to minimise exceeding the cap by catchment.
-
-            # Water use by catchment, less the cap, should be minimised.
-            # Water module should return catchment, based on masks. There
-            # should likely be a 4-indexed array w_cmrj with c the catchment
-            # index.
-
-            # model.addConstrs( for c in range(ncatchments) )
-
-
-        if 'nutrients' in targets:
+        if 'nutrients' in limits:
             ...
 
-        if 'carbon' in targets:
+        if 'carbon' in limits:
             ...
 
-        if 'biodiversity' in targets:
+        if 'biodiversity' in limits:
             ...
 
         # -------------------------- #

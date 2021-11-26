@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-11-25
+# Last modified: 2021-11-26
 #
 
 import os
@@ -187,14 +187,18 @@ RIVREGDICT = dict(rivregs.groupby('HR_RIVREG_ID').first()['HR_RIVREG_NAME'])
 # Water yields -- run off from a cell into catchment by vegetation type.
 water_yield_base = pd.read_hdf(os.path.join( INPUT_DIR
                                            , 'water-yield-baselines.hdf5' ))
-WATER_YIELD_BASE_DR_ML_HA = water_yield_base['WATER_YIELD_DR_ML_HA'].to_numpy()
-WATER_YIELD_BASE_SR_ML_HA = water_yield_base['WATER_YIELD_SR_ML_HA'].to_numpy()
+WATER_YIELD_BASE_DR = water_yield_base['WATER_YIELD_DR_ML_HA'].to_numpy()
+WATER_YIELD_BASE_SR = water_yield_base['WATER_YIELD_SR_ML_HA'].to_numpy()
 
 fname_dr = os.path.join(INPUT_DIR, 'water-yields-ssp245-dr-ml-ha.hdf5')
 fname_sr = os.path.join(INPUT_DIR, 'water-yields-ssp245-sr-ml-ha.hdf5')
 
 WATER_YIELDS_DR = h5py.File(fname_dr, 'r')['water-yields-ssp245-dr-ml-ha']
 WATER_YIELDS_SR = h5py.File(fname_sr, 'r')['water-yields-ssp245-sr-ml-ha']
+
+# Masks.
+MASK_MDB = np.load(os.path.join(INPUT_DIR, 'mdbmask.npy'))
+
 
 # ----------------------- #
 # Livestock related data. #

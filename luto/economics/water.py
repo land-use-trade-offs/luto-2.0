@@ -4,12 +4,13 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-11-15
-# Last modified: 2021-11-25
+# Last modified: 2021-11-26
 #
 
 import numpy as np
 
 from luto.economics.quantity import get_yield_pot, lvs_veg_types, get_quantity
+import luto.settings as settings
 
 def get_aqreq_matrices( data # Data object or module.
                       , year # Number of years post base-year ('annum').
@@ -41,13 +42,13 @@ def get_aqyld_matrix( data # Data object or module.
                     , year # Number of years post base-year ('annum').
                     ):
     """Return an rj matrix of the water yields, per cell, by land use."""
-    cols = tuple(      data.WATER_YIELDS_DR_ML_HA if lu in natural
-                  else data.WATER_YIELDS_SR_ML_HA
+    cols = tuple(      data.WATER_YIELDS_DR[year]  if 'natural' in lu
+                  else data.WATER_YIELDS_SR[year]
                   for lu in data.LANDUSES )
     return np.stack(cols, axis=1)
 
-def get_aqyld_net_matrices(data, year):
-    """Return an mrj matrix of net water yields, by irrigation status."""
+def get_water_stress(data, year, mask=None):
+    """Return, by cell, how much the water yield is above the stress level."""
     # Get the water yields -- disregarding irrigation but as mrj matrix.
     aqyld_rj = get_aqyld_matrix(data, year)
     aqyld_mrj = np.stack((aqyld_rj, aqyld_rj))
@@ -55,10 +56,20 @@ def get_aqyld_net_matrices(data, year):
     # Get the water requirements for irrigation and livestock drinking water.
     aqreq_mrj = get_aqreq_matrices(data, year)
 
-    # Net water yield is normal yield less the water requirements.
-    return aqyld_mrj - aqreq_mrj
+    # Calculate the water stress threshold.
+    stresshold = ( settings.WATER_YIELD_STRESS_FRACTION
+                 * data.WATER_YIELD_BASE_DR[:, np.newaxis] )
 
+    # Net water yield is yield less requirements (use) less base level yields.
+    water_stress = ( aqyld_mrj # Water yields, dependent on land use.
+                   - aqreq_mrj # Water requirements for irr. and livestock.
+                   - stresshold ) # Yields below this level mean stress.
 
+    # Apply a mask if provided -- e.g. for catchment specific stress.
+    if mask is not None:
+        water_stress *= mask[:, np.newaxis]
+
+    return water_stress
 
 """
 Water logic.
