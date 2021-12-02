@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-11-26
+# Last modified: 2021-12-02
 #
 
 import numpy as np
@@ -19,6 +19,7 @@ from luto.economics.cost import get_cost_matrices
 from luto.economics.quantity import get_quantity_matrices
 from luto.economics.transitions import ( get_transition_matrices
                                        , get_exclude_matrices )
+from luto.economics.water import get_water_stress
 from luto.solvers.solver import solve
 from luto.tools.plotmap import plotmap
 
@@ -28,6 +29,7 @@ class Data():
 
     def __init__( self
                 , bdata # Data object like `luto.data`.
+                # , year # Year (zero-based). To slice HDF5 bricks.
                 , lumap # Land-use map from which spatial domain is inferred.
                 , resmask=None # Spatial coarse-graining mask.
                 ):
@@ -66,14 +68,15 @@ class Data():
         self.WATER_DELIVERY_PRICE = bdata.WATER_DELIVERY_PRICE[self.mask]
         self.WATER_YIELD_BASE_DR = bdata.WATER_YIELD_BASE_DR[self.mask]
         self.WATER_YIELD_BASE_SR = bdata.WATER_YIELD_BASE_SR[self.mask]
-        # TODO: These are HDF5 bricks - perhaps keep yearly slices outside?
-        # self.WATER_YIELDS_DR = bdata.WATER_YIELDS_DR[self.mask]
-        # self.WATER_YIELDS_SR = bdata.WATER_YIELDS_SR[self.mask]
         self.MASK_MDB = bdata.MASK_MDB[self.mask]
         self.FEED_REQ = bdata.FEED_REQ[self.mask]
         self.PASTURE_KG_DM_HA = bdata.PASTURE_KG_DM_HA[self.mask]
         self.SAFE_PUR_MODL = bdata.SAFE_PUR_MODL[self.mask]
         self.SAFE_PUR_NATL = bdata.SAFE_PUR_NATL[self.mask]
+
+        # Slice this year off HDF5 bricks. TODO: This field is not in luto.data.
+        self.WATER_YIELD_NUNC_DR = bdata.WATER_YIELDS_DR[year, self.mask]
+        self.WATER_YIELD_NUNC_SR = bdata.WATER_YIELDS_SR[year, self.mask]
 
 # Print Gurobi output to console if True.
 verbose = False

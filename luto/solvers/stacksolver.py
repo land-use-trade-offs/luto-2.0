@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-07-05
-# Last modified: 2021-11-30
+# Last modified: 2021-12-02
 #
 
 import numpy as np
@@ -126,7 +126,7 @@ def runstack_random(ncells, nlus, p=1):
     qm_rj = .5 * q_rj
 
     # Demands.
-    d_j = 200 * np.random.random(nlus)
+    d_j = 100 * np.random.random(nlus)
 
     # Exclude matrix.
     x_rj = np.ones((ncells, nlus))
