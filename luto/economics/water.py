@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-11-15
-# Last modified: 2021-11-26
+# Last modified: 2021-12-03
 #
 
 import numpy as np
@@ -42,8 +42,8 @@ def get_aqyld_matrix( data # Data object or module.
                     , year # Number of years post base-year ('annum').
                     ):
     """Return an rj matrix of the water yields, per cell, by land use."""
-    cols = tuple(      data.WATER_YIELDS_DR[year]  if 'natural' in lu
-                  else data.WATER_YIELDS_SR[year]
+    cols = tuple(      data.WATER_YIELD_NUNC_DR  if 'natural' in lu
+                  else data.WATER_YIELD_NUNC_SR
                   for lu in data.LANDUSES )
     return np.stack(cols, axis=1)
 

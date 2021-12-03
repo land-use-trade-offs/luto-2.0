@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-12-02
+# Last modified: 2021-12-03
 #
 
 import numpy as np
@@ -29,7 +29,7 @@ class Data():
 
     def __init__( self
                 , bdata # Data object like `luto.data`.
-                # , year # Year (zero-based). To slice HDF5 bricks.
+                , year # Year (zero-based). To slice HDF5 bricks.
                 , lumap # Land-use map from which spatial domain is inferred.
                 , resmask=None # Spatial coarse-graining mask.
                 ):
@@ -51,6 +51,7 @@ class Data():
             self.mask = self.lumask * self.resmask
         else:
             self.mask = self.lumask
+        mindices = np.where(self.mask)[0]
 
         # Spatial data is sub-setted based on the above masks.
         self.NCELLS = self.mask.sum()
@@ -75,8 +76,8 @@ class Data():
         self.SAFE_PUR_NATL = bdata.SAFE_PUR_NATL[self.mask]
 
         # Slice this year off HDF5 bricks. TODO: This field is not in luto.data.
-        self.WATER_YIELD_NUNC_DR = bdata.WATER_YIELDS_DR[year, self.mask]
-        self.WATER_YIELD_NUNC_SR = bdata.WATER_YIELDS_SR[year, self.mask]
+        self.WATER_YIELD_NUNC_DR = bdata.WATER_YIELDS_DR[year][mindices]
+        self.WATER_YIELD_NUNC_SR = bdata.WATER_YIELDS_SR[year][mindices]
 
 # Print Gurobi output to console if True.
 verbose = False
@@ -101,10 +102,10 @@ dvars = {}
 
 def sync_years(base, target):
     global data, base_year, target_year, target_index
-    data = Data(bdata, lumaps[base], resmask)
     base_year = base
     target_year = target
     target_index = target - bdata.ANNUM - 1
+    data = Data(bdata, target_index, lumaps[base], resmask)
 
 def set_verbose(flag):
     """Print Gurobi output to console if set to True."""
