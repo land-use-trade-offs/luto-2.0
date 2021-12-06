@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-11-15
-# Last modified: 2021-12-03
+# Last modified: 2021-12-06
 #
 
 import numpy as np
@@ -57,7 +57,7 @@ def get_water_stress(data, year, mask=None):
     aqreq_mrj = get_aqreq_matrices(data, year)
 
     # Calculate the water stress threshold.
-    stresshold = ( settings.WATER_YIELD_STRESS_FRACTION
+    stresshold = ( (1 - settings.WATER_YIELD_STRESS_FRACTION)
                  * data.WATER_YIELD_BASE_DR[:, np.newaxis] )
 
     # Net water yield is yield less requirements (use) less base level yields.

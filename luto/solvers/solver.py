@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-12-03
+# Last modified: 2021-12-06
 #
 
 import numpy as np
@@ -148,7 +148,7 @@ def solve( t_mrj  # Transition cost matrices.
 
         if 'water' in limits:
             # Obtain the water yields and limits by catchment.
-            w_mrj = limits['water']
+            w_mrj = np.nan_to_num(limits['water'])
 
             # Staying above water-stress limit as a hard constraint.
             w_constraint = sum( w_mrj[0].T[j] @ X_dry[j]
@@ -156,6 +156,7 @@ def solve( t_mrj  # Transition cost matrices.
                                 for j in range(nlus) ) >= 0
 
             model.addConstr(w_constraint)
+            print("Applied water constraints.")
 
         if 'nutrients' in limits:
             ...
@@ -174,8 +175,8 @@ def solve( t_mrj  # Transition cost matrices.
         model.optimize()
 
         # Collect optimised decision variables in one X_mrj Numpy array.
-        X_dry_rj = np.stack([X_dry[j] for j in range(nlus)])
-        X_irr_rj = np.stack([X_irr[j] for j in range(nlus)])
+        X_dry_rj = np.stack([X_dry[j].X for j in range(nlus)])
+        X_irr_rj = np.stack([X_irr[j].X for j in range(nlus)])
         X_mrj = np.stack((X_dry_rj, X_irr_rj))
 
         # Collect optimised decision variables in tuple of 1D Numpy arrays.
