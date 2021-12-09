@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2021-12-06
+# Last modified: 2021-12-09
 #
 
 import numpy as np
@@ -150,13 +150,30 @@ def solve( t_mrj  # Transition cost matrices.
             # Obtain the water yields and limits by catchment.
             w_mrj = np.nan_to_num(limits['water'])
 
-            # Staying above water-stress limit as a hard constraint.
-            w_constraint = sum( w_mrj[0].T[j] @ X_dry[j]
-                              + w_mrj[1].T[j] @ X_irr[j]
-                                for j in range(nlus) ) >= 0
+            if settings.WATER_CONSTRAINT_TYPE == 'hard':
+                # Staying above water-stress limit as a hard constraint.
+                w_constraint = sum( w_mrj[0].T[j] @ X_dry[j]
+                                  + w_mrj[1].T[j] @ X_irr[j]
+                                    for j in range(nlus) ) >= 0
 
-            model.addConstr(w_constraint)
-            print("Applied water constraints.")
+                model.addConstr(w_constraint)
+                print("Applied water limits as hard constraint.")
+            elif settings.WATER_CONSTRAINT_TYPE == 'soft':
+                # Introduce slack variable.
+                w = model.addVar(name='W')
+                w_constraint = sum( w_mrj[0].T[j] @ X_dry[j]
+                                  + w_mrj[1].T[j] @ X_irr[j]
+                                    for j in range(nlus) ) >= 0
+                W = w_constraint - w
+                # Replace objective with augmented version.
+                model.setObjective(model.getObjective() + W)
+                print("Applied water limits as soft constraint.")
+            elif settings.WATER_CONSTRAINT_TYPE is None:
+                print( "Water limits provided."
+                     , "Constraint turned off by settings." )
+            else:
+                print( "Water limits provided but no constraint type set."
+                     , "Ignoring water constraints altogether." )
 
         if 'nutrients' in limits:
             ...
