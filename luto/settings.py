@@ -25,8 +25,8 @@ DATA_DIR = '../../data/neoluto-data/new-data-and-domain'
 # ('hard', 'soft' or 'none') and an optional requirement to further minimise.
 
 # Water:
-WATER_CONSTRAINT_TYPE = 'hard' # or 'soft' or 'none'.
+WATER_CONSTRAINT_TYPE = 'hard' # or 'soft' or None.
 WATER_CONSTRAINT_MINIMISE = False # or True. Whether to also minimise.
 WATER_CONSTRAINT_WEIGHT = 1.0 # Minimisation weight in objective function.
-WATER_YIELD_STRESS_FRACTION = 25 # 3.0 # Water stress if yields below this fraction.
+WATER_YIELD_STRESS_FRACTION = 0.4 # 3.0 # Water stress if yields below this fraction.
 
