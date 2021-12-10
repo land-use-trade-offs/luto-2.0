@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-12-03
+# Last modified: 2021-12-10
 #
 
 import numpy as np
@@ -74,6 +74,7 @@ class Data():
         self.PASTURE_KG_DM_HA = bdata.PASTURE_KG_DM_HA[self.mask]
         self.SAFE_PUR_MODL = bdata.SAFE_PUR_MODL[self.mask]
         self.SAFE_PUR_NATL = bdata.SAFE_PUR_NATL[self.mask]
+        self.RIVREGS = bdata.RIVREGS[self.mask]
 
         # Slice this year off HDF5 bricks. TODO: This field is not in luto.data.
         self.WATER_YIELD_NUNC_DR = bdata.WATER_YIELDS_DR[year][mindices]
@@ -159,8 +160,16 @@ def get_x_mrj():
     return get_exclude_matrices(data, lumaps[base_year][data.mask])
 
 def get_limits():
+    # Limits are a dictionary with heterogeneous value sets.
     limits = {}
-    limits['water'] = get_water_stress(data, target_index, data.MASK_MDB)
+
+    # Water limits.
+    stresses = [] # A list of the water stress by river region.
+    for region in np.unique(data.RIVREGS):
+        mask = np.where(data.RIVREGS == region, True, False)
+        stress = np.nan_to_num(get_water_stress(data, target_index, mask))
+        stresses.append(stress)
+        limits['water'] = stresses
     return limits
 
 def reconstitute(lxmap, filler=-1):
