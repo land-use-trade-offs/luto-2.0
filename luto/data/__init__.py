@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-11-26
+# Last modified: 2021-12-14
 #
 
 import os
@@ -15,6 +15,7 @@ import rasterio
 import h5py
 
 from luto.settings import INPUT_DIR, OUTPUT_DIR
+import luto.settings as settings
 from luto.data.economic import exclude
 from luto.economics.quantity import lvs_veg_types
 
@@ -32,6 +33,7 @@ LANDUSES = np.load(os.path.join(INPUT_DIR, 'landuses.npy')).tolist()
 LANDUSES.sort() # Ensure lexicographic order - should be superfluous.
 NLUS = len(LANDUSES)
 
+# Construct land-use index dictionary (distinct from LU_IDs!)
 LU2DESC = {i: lu for i, lu in enumerate(LANDUSES)}
 LU2DESC[-1] = 'Non-agricultural land'
 
@@ -74,6 +76,12 @@ for lu in LU_LVSTK:
     for PR in PR_LVSTK:
         if lu.upper() in PR:
             LU2PR_DICT[lu] = LU2PR_DICT[lu] + [PR]
+
+# A reverse dictionary for convenience.
+PR2LU_DICT = {}
+for key, val in data.LU2PR_DICT.items():
+    for pr in val:
+        PR2LU_DICT[pr] = key
 
 def dict2matrix(d, fromlist, tolist):
     """Return 0-1 matrix mapping 'from-vectors' to 'to-vectors' using dict d."""
@@ -199,6 +207,13 @@ WATER_YIELDS_SR = h5py.File(fname_sr, 'r')['water-yields-ssp245-sr-ml-ha']
 # Masks.
 MASK_MDB = np.load(os.path.join(INPUT_DIR, 'mdbmask.npy'))
 
+# ---------------------------------------------------------------------------- #
+# Climate change impact data.                                                  #
+# ---------------------------------------------------------------------------- #
+
+fname = 'climate-change-impacts-' + settings.RCP + '.hdf5'
+fpath = os.path.join(INPUT_DIR, fname)
+CLIMATE_CHANGE_IMPACT = pd.read_hdf(fpath)
 
 # ----------------------- #
 # Livestock related data. #
@@ -216,10 +231,6 @@ SAFE_PUR_MODL = np.load(os.path.join(INPUT_DIR, 'safe-pur-modl.npy'))
 # Yield increases.
 fpath = os.path.join(INPUT_DIR, "yieldincreases-c9.hdf5")
 YIELDINCREASE = pd.read_hdf(fpath, 'yieldincreases')
-
-# Climate damages to pastures and dryland as NYEARS x NCELLS shaped bricks.
-# AG_PASTURE_DAMAGE = np.load(os.path.join(INPUT_DIR, 'ag-pasture-damage.npy'))
-# AG_DRYLAND_DAMAGE = np.load(os.path.join(INPUT_DIR, 'ag-dryland-damage.npy'))
 
 # Price paths.
 price_paths = pd.read_csv(os.path.join(INPUT_DIR, 'pricepaths.csv'))

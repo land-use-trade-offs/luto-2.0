@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-11-15
-# Last modified: 2021-12-07
+# Last modified: 2021-12-14
 #
 
 import numpy as np
@@ -70,6 +70,15 @@ def get_water_stress(data, year, mask=None):
         water_stress *= mask[:, np.newaxis]
 
     return water_stress
+
+def get_useonyld(data, year, mask=None):
+    """..."""
+
+    # Use over 1985-yield in 2010, i.e. the base line.
+
+    # Use over 1985-yield in 2010 + year index, i.e. the current fraction.
+
+    return fraction
 
 """
 Water logic.
