@@ -4,11 +4,26 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-26
-# Last modified: 2021-10-04
+# Last modified: 2021-12-16
 #
 
 import numpy as np
+from scipy.interpolate import interp1d
 
+
+def get_ccimpact(data, lu, lm, year):
+    """Return climate change impact multiplier at (zero-based) year index."""
+
+    # Convert year index to calendar year.
+    year += data.ANNUM
+
+    # First make linear interpolation function.
+    xs = sorted({t[2] for t in data.CLIMATE_CHANGE_IMPACT.columns})
+    yys = data.CLIMATE_CHANGE_IMPACT[lm, lu]
+    f = interp1d(xs, yys, kind='linear', fill_value='extrapolate')
+
+    # Return the interpolated values.
+    return f(year)
 
 def lvs_veg_types(lu):
     """Return livestock and vegetation types of the livestock land-use `lu`."""
@@ -177,13 +192,19 @@ def get_quantity( data # Data object or module.
     """
     # If it is a crop, it is known how to get the quantities.
     if pr in data.PR_CROPS:
-        return get_quantity_crop(data, pr.capitalize(), lm, year)
+        q = get_quantity_crop(data, pr.capitalize(), lm, year)
     # If it is livestock, it is known how to get the quantities.
     elif pr in data.PR_LVSTK:
-        return get_quantity_lvstk(data, pr, lm, year)
+        q = get_quantity_lvstk(data, pr, lm, year)
     # If it is none of the above, it is not known how to get the quantities.
     else:
         raise KeyError("Land use '%s' not found in data." % pr)
+
+    # Apply climate change impact multiplier.
+    lu = data.PR2LU_DICT[pr]
+    q *= get_ccimpact(data, lu, lm, year)
+
+    return q
 
 def get_quantity_matrix(data, lm, year):
     """Return q_rp matrix of quantities per cell per pr as 2D Numpy array."""

@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-12-14
+# Last modified: 2021-12-16
 #
 
 import os
@@ -79,7 +79,7 @@ for lu in LU_LVSTK:
 
 # A reverse dictionary for convenience.
 PR2LU_DICT = {}
-for key, val in data.LU2PR_DICT.items():
+for key, val in LU2PR_DICT.items():
     for pr in val:
         PR2LU_DICT[pr] = key
 
@@ -190,7 +190,14 @@ WATER_DELIVERY_PRICE = np.load(os.path.join( INPUT_DIR
 # River regions.
 rivregs = pd.read_hdf(os.path.join(INPUT_DIR, 'rivregs.hdf5'))
 RIVREGS = rivregs['HR_RIVREG_ID'].to_numpy() # River region ids as integers.
-RIVREGDICT = dict(rivregs.groupby('HR_RIVREG_ID').first()['HR_RIVREG_NAME'])
+RIVREGDICT = dict( rivregs.groupby('HR_RIVREG_ID')
+                          .first()['HR_RIVREG_NAME'] )
+
+# Drainage divisions
+draindivs = pd.read_hdf(os.path.join(INPUT_DIR, 'draindivs.hdf5'))
+DRAINDIVS = draindivs['HR_DRAINDIV_ID'].to_numpy() # Drainage div ids as ints.
+DRAINDIVDICT = dict( draindivs.groupby('HR_DRAINDIV_ID')
+                              .first()['HR_DRAINDIV_NAME'] )
 
 # Water yields -- run off from a cell into catchment by vegetation type.
 water_yield_base = pd.read_hdf(os.path.join( INPUT_DIR
