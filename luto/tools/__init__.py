@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-05-21
-# Last modified: 2021-09-17
+# Last modified: 2021-12-17
 #
 
 import time
@@ -12,6 +12,22 @@ import os.path
 
 import pandas as pd
 import numpy as np
+
+
+def lumap2x_mrj(lumap, lmmap):
+    """Return land-use maps in decision-variable (X_mrj) format."""
+    drystack = []
+    irrstack = []
+    for j in range(28):
+        jmap = np.where(lumap==j, 1, 0) # One boolean map for each land use.
+        jdrymap = np.where(lmmap==0, jmap, 0) # Keep only dryland version.
+        jirrmap = np.where(lmmap==1, jmap, 0) # Keep only irrigated version.
+        drystack.append(jdrymap)
+        irrstack.append(jirrmap)
+    x_dry_rj = np.stack(drystack, axis=1)
+    x_irr_rj = np.stack(irrstack, axis=1)
+    return np.stack((x_dry_rj, x_irr_rj)) # In x_mrj format.
+
 
 def timethis(function, *args, **kwargs):
     """Generic wrapper to time functions."""

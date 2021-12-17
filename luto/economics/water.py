@@ -4,13 +4,16 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-11-15
-# Last modified: 2021-12-14
+# Last modified: 2021-12-17
 #
 
 import numpy as np
+import pandas as pd
 
 from luto.economics.quantity import get_yield_pot, lvs_veg_types, get_quantity
 import luto.settings as settings
+from luto.tools import lumap2x_mrj
+
 
 def get_aqreq_matrices( data # Data object or module.
                       , year # Number of years post base-year ('annum').
@@ -28,26 +31,53 @@ def get_aqreq_matrices( data # Data object or module.
             AQ_REQ_LVSTK_IRR_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'irr')
 
     # Each array has zeroes where the other has entries.
-    aq_req_dry_rj = data.AQ_REQ_CROPS_DRY_RJ + AQ_REQ_LVSTK_DRY_RJ
-    aq_req_irr_rj = data.AQ_REQ_CROPS_IRR_RJ + AQ_REQ_LVSTK_IRR_RJ
+    aq_req_dry_rj = ( np.nan_to_num(data.AQ_REQ_CROPS_DRY_RJ)
+                    + np.nan_to_num(AQ_REQ_LVSTK_DRY_RJ) )
+    aq_req_irr_rj = ( np.nan_to_num(data.AQ_REQ_CROPS_IRR_RJ)
+                    + np.nan_to_num(AQ_REQ_LVSTK_IRR_RJ) )
+
+    # Turn Ml/ha into Ml/cell.
+    aq_req_dry_rj *= data.REAL_AREA[:, np.newaxis]
+    aq_req_irr_rj *= data.REAL_AREA[:, np.newaxis]
 
     # Return as mrj stack.
     return np.stack((aq_req_dry_rj, aq_req_irr_rj))
 
-def mask_aqrec_matrices(data, year, mask):
-    """Return masked version of get_aqrec_matrices."""
-    return mask[np.newaxis, :, np.newaxis] * get_aqrec_matrices(data, year)
+def mask_aqreq_matrices(data, year, mask):
+    """Return masked version of `get_aqrec_matrices()`."""
+    return mask[np.newaxis, :, np.newaxis] * get_aqreq_matrices(data, year)
 
 def get_aqyld_matrix( data # Data object or module.
-                    , year # Number of years post base-year ('annum').
+                    , year = None # Number of years post base-year ('annum').
                     ):
     """Return an rj matrix of the water yields, per cell, by land use."""
-    cols = tuple(      data.WATER_YIELD_NUNC_DR  if 'natural' in lu
-                  else data.WATER_YIELD_NUNC_SR
-                  for lu in data.LANDUSES )
-    return np.stack(cols, axis=1)
 
-def get_water_stress(data, year, mask=None):
+    # If no year is provided, use the base yields of 1985.
+    if year is None:
+        yld_dr = data.WATER_YIELD_BASE_DR
+        yld_sr = data.WATER_YIELD_BASE_SR
+    else:
+        yld_dr = data.WATER_YIELD_NUNC_DR
+        yld_sr = data.WATER_YIELD_NUNC_SR
+
+    # Select the appropriate root depth for each land use.
+    cols = tuple(      yld_dr  if 'natural' in lu
+                  else yld_sr
+                  for lu in data.LANDUSES )
+
+    # Stack the columns and convert from per ha to per cell.
+    return np.stack(cols, axis=1) * data.REAL_AREA[:, np.newaxis]
+
+def get_aqyld_matrices(data, year):
+    """Return mrj matrix of water yields."""
+    aqyld_rj = get_aqyld_matrix(data, year)
+    return np.stack((aqyld_rj, aqyld_rj))
+
+def mask_aqyld_matrices(data, year, mask):
+    """Return masked version of `get_aqyld_matrices()`."""
+    return mask[np.newaxis, :, np.newaxis] * get_aqyld_matrices(data, year)
+
+def _get_water_stress(data, year, mask=None):
     """Return, by cell, how much the water yield is above the stress level."""
     # Get the water yields -- disregarding irrigation but as mrj matrix.
     aqyld_rj = get_aqyld_matrix(data, year)
@@ -71,14 +101,40 @@ def get_water_stress(data, year, mask=None):
 
     return water_stress
 
-def get_useonyld(data, year, mask=None):
-    """..."""
+def get_water_totals(data, year=0, lumap=None, lmmap=None):
+    """Return a data frame with water yield and use totals as well as stress."""
 
-    # Use over 1985-yield in 2010, i.e. the base line.
+    # Default to 2010 land-use and land-management maps.
+    if lumap is None:
+        lumap = data.LUMAP
+    if lmmap is None:
+        lmmap = data.LMMAP
 
-    # Use over 1985-yield in 2010 + year index, i.e. the current fraction.
+    # Get the lumap+lmmap in decision variable format.
+    X_mrj = lumap2x_mrj(lumap, lmmap)
 
-    return fraction
+    # Prepare a data frame.
+    df = pd.DataFrame( columns=[ 'HR_DRAINDIV_NAME'
+                               , 'TOT_WATER_YIELD_ML'
+                               , 'TOT_WATER_USE_ML'
+                               , 'WATER_STRESS' ] )
+
+    # Loop, calculate and collect in data frame.
+    for div in data.DRAINDIV_DICT:
+        mask = np.where(data.DRAINDIVS == div, True, False)
+        na = np.where(data.LUMAP == -1, True, False)
+        use = (mask_aqreq_matrices(data, year, mask) * X_mrj).sum()
+        yldag = (mask_aqyld_matrices(data, year, mask) * X_mrj).sum()
+        yldna = ( data.WATER_YIELD_BASE_DR
+                * mask * na * data.REAL_AREA).sum()
+        yld = yldag + yldna
+        stress = use / yld
+        df.loc[div] = ( data.DRAINDIV_DICT[div]
+                      , yld
+                      , use
+                      , stress )
+
+    return df
 
 """
 Water logic.

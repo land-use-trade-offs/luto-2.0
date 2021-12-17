@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-12-16
+# Last modified: 2021-12-17
 #
 
 import numpy as np
@@ -22,6 +22,7 @@ from luto.economics.transitions import ( get_transition_matrices
 from luto.economics.water import get_water_stress
 from luto.solvers.solver import solve
 from luto.tools.plotmap import plotmap
+from luto.tools import lumap2x_mrj
 
 
 class Data():
@@ -354,20 +355,6 @@ def get_results(year=None):
         return lumaps[year], lmmaps[year]
 
 demands = np.zeros((99, len(bdata.COMMODITIES)))
-
-def lumap2x_mrj(lumap, lmmap):
-    """Return land-use maps in decision-variable (X_mrj) format."""
-    drystack = []
-    irrstack = []
-    for j in range(28):
-        jmap = np.where(lumap==j, 1, 0) # One boolean map for each land use.
-        jdrymap = np.where(lmmap==0, jmap, 0) # Keep only dryland version.
-        jirrmap = np.where(lmmap==1, jmap, 0) # Keep only irrigated version.
-        drystack.append(jdrymap)
-        irrstack.append(jirrmap)
-    x_dry_rj = np.stack(drystack, axis=1)
-    x_irr_rj = np.stack(irrstack, axis=1)
-    return np.stack((x_dry_rj, x_irr_rj)) # In x_mrj format.
 
 def get_production(lumap=None, lmmap=None):
     """Return production levels of commodities from input- or base-data maps."""

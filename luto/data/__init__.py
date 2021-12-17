@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2021-12-16
+# Last modified: 2021-12-17
 #
 
 import os
@@ -190,13 +190,13 @@ WATER_DELIVERY_PRICE = np.load(os.path.join( INPUT_DIR
 # River regions.
 rivregs = pd.read_hdf(os.path.join(INPUT_DIR, 'rivregs.hdf5'))
 RIVREGS = rivregs['HR_RIVREG_ID'].to_numpy() # River region ids as integers.
-RIVREGDICT = dict( rivregs.groupby('HR_RIVREG_ID')
+RIVREG_DICT = dict( rivregs.groupby('HR_RIVREG_ID')
                           .first()['HR_RIVREG_NAME'] )
 
 # Drainage divisions
 draindivs = pd.read_hdf(os.path.join(INPUT_DIR, 'draindivs.hdf5'))
 DRAINDIVS = draindivs['HR_DRAINDIV_ID'].to_numpy() # Drainage div ids as ints.
-DRAINDIVDICT = dict( draindivs.groupby('HR_DRAINDIV_ID')
+DRAINDIV_DICT = dict( draindivs.groupby('HR_DRAINDIV_ID')
                               .first()['HR_DRAINDIV_NAME'] )
 
 # Water yields -- run off from a cell into catchment by vegetation type.
@@ -210,6 +210,10 @@ fname_sr = os.path.join(INPUT_DIR, 'water-yields-ssp245-sr-ml-ha.hdf5')
 
 WATER_YIELDS_DR = h5py.File(fname_dr, 'r')['water-yields-ssp245-dr-ml-ha']
 WATER_YIELDS_SR = h5py.File(fname_sr, 'r')['water-yields-ssp245-sr-ml-ha']
+
+# Water yields for current year -- placeholder with year zero.
+WATER_YIELD_NUNC_DR = WATER_YIELDS_DR[0]
+WATER_YIELD_NUNC_SR = WATER_YIELDS_SR[0]
 
 # Masks.
 MASK_MDB = np.load(os.path.join(INPUT_DIR, 'mdbmask.npy'))
