@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-11-15
-# Last modified: 2021-12-17
+# Last modified: 2022-01-10
 #
 
 import numpy as np
@@ -55,7 +55,7 @@ def get_aqyld_matrix( data # Data object or module.
     # If no year is provided, use the base yields of 1985.
     if year is None:
         yld_dr = data.WATER_YIELD_BASE_DR
-        yld_sr = data.WATER_YIELD_BASE_SR
+        yld_sr = yld_dr # data.WATER_YIELD_BASE_SR
     else:
         yld_dr = data.WATER_YIELD_NUNC_DR
         yld_sr = data.WATER_YIELD_NUNC_SR
