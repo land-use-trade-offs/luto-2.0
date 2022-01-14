@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2022-01-13
+# Last modified: 2022-01-14
 #
 
 import os
@@ -167,7 +167,7 @@ for lu in LANDUSES:
 # Water requirements by land use -- CROPS.
 aq_req_crops_irr = pd.DataFrame()
 
-# The rj-indexed arrays has zeroes where j is not a crop.
+# The rj-indexed arrays have zeroes where j is not a crop.
 for lu in LANDUSES:
     if lu in LU_CROPS:
         aq_req_crops_irr[lu] = AGEC_CROPS['WR', 'irr', lu]
