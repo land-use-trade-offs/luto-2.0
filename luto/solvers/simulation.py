@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2021-12-17
+# Last modified: 2022-01-17
 #
 
 import numpy as np
@@ -168,7 +168,7 @@ def get_limits():
     stresses = [] # A list of the water stress by river region.
     for region in [7]: # 7 == MDB. # np.unique(data.DRAINDIVS):
         mask = np.where(data.DRAINDIVS == region, True, False)
-        stress = np.nan_to_num(get_water_stress(data, target_index, mask))
+        stress = get_water_stress(data, target_index, mask)
         stresses.append(stress)
         limits['water'] = stresses
     return limits

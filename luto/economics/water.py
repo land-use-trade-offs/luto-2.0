@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-11-15
-# Last modified: 2022-01-10
+# Last modified: 2022-01-17
 #
 
 import numpy as np
@@ -17,6 +17,7 @@ from luto.tools import lumap2x_mrj
 
 def get_aqreq_matrices( data # Data object or module.
                       , year # Number of years post base-year ('annum').
+                      , mask=None # Mask for the desired region.
                       ):
     """Return w_mrj water requirement matrices by lm, cell and lu."""
 
@@ -41,11 +42,11 @@ def get_aqreq_matrices( data # Data object or module.
     aq_req_irr_rj *= data.REAL_AREA[:, np.newaxis]
 
     # Return as mrj stack.
-    return np.stack((aq_req_dry_rj, aq_req_irr_rj))
-
-def mask_aqreq_matrices(data, year, mask):
-    """Return masked version of `get_aqrec_matrices()`."""
-    return mask[np.newaxis, :, np.newaxis] * get_aqreq_matrices(data, year)
+    aq_req_mrj = np.stack((aq_req_dry_rj, aq_req_irr_rj))
+    if mask is None:
+        return aq_req_mrj
+    else:
+        return mask[np.newaxis, :, np.newaxis] * aq_req_mrj
 
 def get_aqyld_matrix( data # Data object or module.
                     , year = None # Number of years post base-year ('annum').
@@ -68,14 +69,14 @@ def get_aqyld_matrix( data # Data object or module.
     # Stack the columns and convert from per ha to per cell.
     return np.stack(cols, axis=1) * data.REAL_AREA[:, np.newaxis]
 
-def get_aqyld_matrices(data, year):
-    """Return mrj matrix of water yields."""
-    aqyld_rj = get_aqyld_matrix(data, year)
-    return np.stack((aqyld_rj, aqyld_rj))
-
-def mask_aqyld_matrices(data, year, mask):
+def get_aqyld_matrices(data, year, mask=None):
     """Return masked version of `get_aqyld_matrices()`."""
-    return mask[np.newaxis, :, np.newaxis] * get_aqyld_matrices(data, year)
+    aqyld_rj = get_aqyld_matrix(data, year)
+    aqyld_mrj = np.stack((aqyld_rj, aqyld_rj))
+    if mask is None:
+        return aqyld_mrj
+    else:
+        return mask[np.newaxis, :, np.newaxis] * aqyld_mrj
 
 def _get_water_stress(data, year, mask=None):
     """Return, by cell, how much the water yield is above the stress level."""
@@ -101,6 +102,17 @@ def _get_water_stress(data, year, mask=None):
 
     return water_stress
 
+def get_water_stress(data, year, mask=None):
+    """Return (base, year) tuple of (use, yld) tuples for region `mask`."""
+
+    use_base = get_aqreq_matrices(data, 0, mask)
+    yld_base = get_aqyld_matrices(data, None, mask)
+    use_year = get_aqreq_matrices(data, year, mask)
+    yld_year = get_aqyld_matrices(data, year, mask)
+
+    return (use_base, yld_base), (use_year, yld_year)
+
+
 def get_water_totals(data, year=0, lumap=None, lmmap=None):
     """Return a data frame with water yield and use totals as well as stress."""
 
@@ -123,8 +135,8 @@ def get_water_totals(data, year=0, lumap=None, lmmap=None):
     for div in data.DRAINDIV_DICT:
         mask = np.where(data.DRAINDIVS == div, True, False)
         na = np.where(data.LUMAP == -1, True, False)
-        use = (mask_aqreq_matrices(data, year, mask) * X_mrj).sum()
-        yldag = (mask_aqyld_matrices(data, year, mask) * X_mrj).sum()
+        use = (get_aqreq_matrices(data, year, mask) * X_mrj).sum()
+        yldag = (get_aqyld_matrices(data, year, mask) * X_mrj).sum()
         yldna = ( data.WATER_YIELD_BASE_DR
                 * mask * na * data.REAL_AREA).sum()
         yld = yldag + yldna

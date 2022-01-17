@@ -153,11 +153,26 @@ def solve( t_mrj  # Transition cost matrices.
 
             if settings.WATER_CONSTRAINT_TYPE == 'hard':
                 # Staying above water-stress limit as a hard constraint.
-                for w_mrj in stresses:
-                    w_constraint = sum( w_mrj[0].T[j] @ X_dry[j]
-                                      + w_mrj[1].T[j] @ X_irr[j]
-                                        for j in range(nlus) ) >= 0
-                    model.addConstr(w_constraint)
+                # NOTE (20220117): Base year stresses can be calculated
+                # separately a priori and made available in data module.
+                for ( (u_base_mrj, y_base_mrj)
+                    , (u_year_mrj, y_year_mrj) ) in stresses:
+
+                    use_base = sum( u_base_mrj[0].T[j] @ X_dry[j]
+                                  + u_base_mrj[1].T[j] @ X_irr[j]
+                                    for j in range(nlus) )
+                    yld_base = sum( y_base_mrj[0].T[j] @ X_dry[j]
+                                  + y_base_mrj[1].T[j] @ X_irr[j]
+                                    for j in range(nlus) )
+
+                    # model.addConstr(w_constraint)
+
+
+                # for w_mrj in stresses:
+                    # w_constraint = sum( w_mrj[0].T[j] @ X_dry[j]
+                                      # + w_mrj[1].T[j] @ X_irr[j]
+                                        # for j in range(nlus) ) >= 0
+                    # model.addConstr(w_constraint)
                 print("Applied water limits as hard constraint.")
 
             elif settings.WATER_CONSTRAINT_TYPE == 'soft':
