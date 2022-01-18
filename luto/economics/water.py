@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-11-15
-# Last modified: 2022-01-17
+# Last modified: 2022-01-18
 #
 
 import numpy as np
@@ -102,15 +102,36 @@ def _get_water_stress(data, year, mask=None):
 
     return water_stress
 
-def get_water_stress(data, year, mask=None):
-    """Return (base, year) tuple of (use, yld) tuples for region `mask`."""
+def get_water_stress_basefrac(data, mask=None):
+    """Return use / yld base fraction for region `mask`."""
+    # Get the 2010 lumap+lmmap in decision var format.
+    X_mrj = lumap2x_mrj(data.LUMAP, data.LMMAP)
 
-    use_base = get_aqreq_matrices(data, 0, mask)
-    yld_base = get_aqyld_matrices(data, None, mask)
+    # Calculate the 2010 use and the 1985 (pre-European proxy) yield.
+    use_base = (get_aqreq_matrices(data, 0, mask) * X_mrj).sum()
+    if mask is None:
+        yld_base = ( data.WATER_YIELD_BASE_DR
+                   * data.REAL_AREA
+                   ).sum()
+    else:
+        yld_base = ( data.WATER_YIELD_BASE_DR
+                   * data.REAL_AREA
+                   * mask
+                   ).sum()
+    # (get_aqyld_matrices(data, None, mask) * X_mrj).sum()
+
+    # Return the water stress as the fraction of use over yield.
+    return use_base / yld_base
+
+def get_water_stress(data, year, mask=None):
+    """Return tuple of (use, yld) for region `mask` in `year`."""
+
+    # Get the use and yield, ready for multiplication by X_mrj and summing.
     use_year = get_aqreq_matrices(data, year, mask)
     yld_year = get_aqyld_matrices(data, year, mask)
 
-    return (use_base, yld_base), (use_year, yld_year)
+    # Return the tuple.
+    return use_year, yld_year
 
 
 def get_water_totals(data, year=0, lumap=None, lmmap=None):
@@ -136,6 +157,9 @@ def get_water_totals(data, year=0, lumap=None, lmmap=None):
         mask = np.where(data.DRAINDIVS == div, True, False)
         na = np.where(data.LUMAP == -1, True, False)
         use = (get_aqreq_matrices(data, year, mask) * X_mrj).sum()
+        # yldag = ( data.WATER_YIELD_BASE_DR
+                # * mask * data.REAL_AREA
+                # ).sum()
         yldag = (get_aqyld_matrices(data, year, mask) * X_mrj).sum()
         yldna = ( data.WATER_YIELD_BASE_DR
                 * mask * na * data.REAL_AREA).sum()

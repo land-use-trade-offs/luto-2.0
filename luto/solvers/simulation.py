@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2022-01-17
+# Last modified: 2022-01-18
 #
 
 import numpy as np
@@ -19,7 +19,7 @@ from luto.economics.cost import get_cost_matrices
 from luto.economics.quantity import get_quantity_matrices
 from luto.economics.transitions import ( get_transition_matrices
                                        , get_exclude_matrices )
-from luto.economics.water import get_water_stress
+from luto.economics.water import get_water_stress, get_water_stress_basefrac
 from luto.solvers.solver import solve
 from luto.tools.plotmap import plotmap
 from luto.tools import lumap2x_mrj
@@ -168,8 +168,9 @@ def get_limits():
     stresses = [] # A list of the water stress by river region.
     for region in [7]: # 7 == MDB. # np.unique(data.DRAINDIVS):
         mask = np.where(data.DRAINDIVS == region, True, False)
+        basefrac = get_water_stress_basefrac(data, mask)
         stress = get_water_stress(data, target_index, mask)
-        stresses.append(stress)
+        stresses.append(basefrac, stress)
         limits['water'] = stresses
     return limits
 

@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2022-01-17
+# Last modified: 2022-01-18
 #
 
 import numpy as np
@@ -153,19 +153,16 @@ def solve( t_mrj  # Transition cost matrices.
 
             if settings.WATER_CONSTRAINT_TYPE == 'hard':
                 # Staying above water-stress limit as a hard constraint.
-                # NOTE (20220117): Base year stresses can be calculated
-                # separately a priori and made available in data module.
-                for ( (u_base_mrj, y_base_mrj)
-                    , (u_year_mrj, y_year_mrj) ) in stresses:
-
-                    use_base = sum( u_base_mrj[0].T[j] @ X_dry[j]
-                                  + u_base_mrj[1].T[j] @ X_irr[j]
+                for basefrac, (u_year_mrj, y_year_mrj) in stresses:
+                    use_year = sum( u_year_mrj[0].T[j] @ X_dry[j]
+                                  + u_year_mrj[1].T[j] @ X_irr[j]
                                     for j in range(nlus) )
-                    yld_base = sum( y_base_mrj[0].T[j] @ X_dry[j]
-                                  + y_base_mrj[1].T[j] @ X_irr[j]
+                    yld_year = sum( y_year_mrj[0].T[j] @ X_dry[j]
+                                  + y_year_mrj[1].T[j] @ X_irr[j]
                                     for j in range(nlus) )
+                    w_constraint = basefrac >= use_year / yld_year
 
-                    # model.addConstr(w_constraint)
+                    model.addConstr(w_constraint)
 
 
                 # for w_mrj in stresses:
@@ -177,6 +174,7 @@ def solve( t_mrj  # Transition cost matrices.
 
             elif settings.WATER_CONSTRAINT_TYPE == 'soft':
                 # Introduce slack variable.
+                # NOTE (20220118): This is not yet the use/yield constraint.
                 for w_mrj in stresses:
                     w = model.addMVar(1)
                     stress = sum( w_mrj[0].T[j] @ X_dry[j]
