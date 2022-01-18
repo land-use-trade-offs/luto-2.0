@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2022-01-14
+# Last modified: 2022-01-18
 #
 
 import os
@@ -159,7 +159,7 @@ for lu in LANDUSES:
         # Water requirements per head are for drinking and irrigation.
         aq_req_lvstk_dry[lu] = AGEC_LVSTK['WR_DRN', animal]
         aq_req_lvstk_irr[lu] = ( AGEC_LVSTK['WR_DRN', animal]
-                               * AGEC_LVSTK['WR_IRR', animal] )
+                               + AGEC_LVSTK['WR_IRR', animal] )
     else:
         aq_req_lvstk_dry[lu] = 0.0
         aq_req_lvstk_irr[lu] = 0.0
