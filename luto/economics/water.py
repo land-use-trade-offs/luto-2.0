@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-11-15
-# Last modified: 2022-01-18
+# Last modified: 2022-01-20
 #
 
 import numpy as np
@@ -46,7 +46,7 @@ def get_aqreq_matrices( data # Data object or module.
     if mask is None:
         return aq_req_mrj
     else:
-        return mask[np.newaxis, :, np.newaxis] * aq_req_mrj
+        return mask[:, np.newaxis] * aq_req_mrj
 
 def get_aqyld_matrix( data # Data object or module.
                     , year = None # Number of years post base-year ('annum').
@@ -76,7 +76,7 @@ def get_aqyld_matrices(data, year, mask=None):
     if mask is None:
         return aqyld_mrj
     else:
-        return mask[np.newaxis, :, np.newaxis] * aqyld_mrj
+        return mask[:, np.newaxis] * aqyld_mrj
 
 def _get_water_stress(data, year, mask=None):
     """Return, by cell, how much the water yield is above the stress level."""

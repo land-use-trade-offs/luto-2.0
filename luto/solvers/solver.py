@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-02-22
-# Last modified: 2022-01-18
+# Last modified: 2022-01-20
 #
 
 import numpy as np
@@ -160,16 +160,8 @@ def solve( t_mrj  # Transition cost matrices.
                     yld_year = sum( y_year_mrj[0].T[j] @ X_dry[j]
                                   + y_year_mrj[1].T[j] @ X_irr[j]
                                     for j in range(nlus) )
-                    w_constraint = basefrac >= use_year / yld_year
+                    model.addConstr(use_year <= basefrac * yld_year)
 
-                    model.addConstr(w_constraint)
-
-
-                # for w_mrj in stresses:
-                    # w_constraint = sum( w_mrj[0].T[j] @ X_dry[j]
-                                      # + w_mrj[1].T[j] @ X_irr[j]
-                                        # for j in range(nlus) ) >= 0
-                    # model.addConstr(w_constraint)
                 print("Applied water limits as hard constraint.")
 
             elif settings.WATER_CONSTRAINT_TYPE == 'soft':

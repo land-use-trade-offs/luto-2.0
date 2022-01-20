@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2022-01-18
+# Last modified: 2022-01-20
 #
 
 import numpy as np
@@ -52,7 +52,7 @@ class Data():
             self.mask = self.lumask * self.resmask
         else:
             self.mask = self.lumask
-        mindices = np.where(self.mask)[0]
+        self.mindices = np.where(self.mask)[0]
 
         # Spatial data is sub-setted based on the above masks.
         self.NCELLS = self.mask.sum()
@@ -76,10 +76,11 @@ class Data():
         self.SAFE_PUR_MODL = bdata.SAFE_PUR_MODL[self.mask]
         self.SAFE_PUR_NATL = bdata.SAFE_PUR_NATL[self.mask]
         self.RIVREGS = bdata.RIVREGS[self.mask]
+        self.CLIMATE_CHANGE_IMPACT = bdata.CLIMATE_CHANGE_IMPACT[self.mask]
 
         # Slice this year off HDF5 bricks. TODO: This field is not in luto.data.
-        self.WATER_YIELD_NUNC_DR = bdata.WATER_YIELDS_DR[year][mindices]
-        self.WATER_YIELD_NUNC_SR = bdata.WATER_YIELDS_SR[year][mindices]
+        self.WATER_YIELD_NUNC_DR = bdata.WATER_YIELDS_DR[year][self.mindices]
+        self.WATER_YIELD_NUNC_SR = bdata.WATER_YIELDS_SR[year][self.mindices]
 
 # Print Gurobi output to console if True.
 verbose = False
@@ -167,10 +168,10 @@ def get_limits():
     # Water limits.
     stresses = [] # A list of the water stress by river region.
     for region in [7]: # 7 == MDB. # np.unique(data.DRAINDIVS):
-        mask = np.where(data.DRAINDIVS == region, True, False)
+        mask = np.where(data.DRAINDIVS == region, True, False)[data.mindices]
         basefrac = get_water_stress_basefrac(data, mask)
         stress = get_water_stress(data, target_index, mask)
-        stresses.append(basefrac, stress)
+        stresses.append((basefrac, stress))
         limits['water'] = stresses
     return limits
 
