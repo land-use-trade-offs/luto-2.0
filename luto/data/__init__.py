@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2022-01-20
+# Last modified: 2022-01-21
 #
 
 import os
@@ -62,7 +62,7 @@ NLMS = len(LANDMANS)
 PR_CROPS = [s.upper() for s in LU_CROPS]
 PR_LVSTK = [ s.upper() + ' ' + p
              for s in LU_LVSTK if 'DAIRY' not in s.upper()
-             for p in ['LIVEXPORT', 'DOMCONSUM'] ]
+             for p in ['LEXP', 'MEAT'] ]
 PR_LVSTK += [s.upper() for s in LU_LVSTK if 'DAIRY' in s.upper()]
 PR_LVSTK += [s.upper() + ' WOOL' for s in LU_LVSTK if 'SHEEP' in s.upper()]
 PRODUCTS = PR_CROPS + PR_LVSTK
@@ -240,8 +240,8 @@ SAFE_PUR_MODL = np.load(os.path.join(INPUT_DIR, 'safe-pur-modl.npy'))
 # ---------------------------------- #
 
 # Yield increases.
-fpath = os.path.join(INPUT_DIR, "yieldincreases-c9.hdf5")
-YIELDINCREASE = pd.read_hdf(fpath, 'yieldincreases')
+fpath = os.path.join(INPUT_DIR, "yieldincreases-bau2022.csv")
+YIELDINCREASE = pd.read_csv(fpath, header=[0,1])
 
 # Price paths.
 price_paths = pd.read_csv(os.path.join(INPUT_DIR, 'pricepaths.csv'))

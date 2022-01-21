@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-26
-# Last modified: 2021-12-16
+# Last modified: 2022-01-21
 #
 
 import numpy as np
@@ -106,10 +106,10 @@ def get_quantity_lvstk( data # Data object or module.
 
     # Beef yields just beef (Q1) and live exports (Q3).
     if lvstype == 'BEEF': # (F1 * Q1) or (F3 * Q3).
-        if 'DOMCONSUM' in pr:
+        if 'MEAT' in pr:
             quantity = ( data.AGEC_LVSTK['F1', lvstype]
                        * data.AGEC_LVSTK['Q1', lvstype] )
-        elif 'LIVEXPORT' in pr:
+        elif 'LEXP' in pr:
             quantity = ( data.AGEC_LVSTK['F3', lvstype]
                        * data.AGEC_LVSTK['Q3', lvstype] )
         else:
@@ -117,13 +117,13 @@ def get_quantity_lvstk( data # Data object or module.
 
     # Sheep yield sheep meat (Q1), wool (Q2) or live exports (Q3).
     elif lvstype == 'SHEEP': # (F1 * Q1), (F2 * Q2) or (F3 * Q3).
-        if 'DOMCONSUM' in pr:
+        if 'MEAT' in pr:
             quantity = ( data.AGEC_LVSTK['F1', lvstype]
                        * data.AGEC_LVSTK['Q1', lvstype] )
         elif 'WOOL' in pr:
             quantity = ( data.AGEC_LVSTK['F2', lvstype]
                        * data.AGEC_LVSTK['Q2', lvstype] )
-        elif 'LIVEXPORT' in pr:
+        elif 'LEXP' in pr:
             quantity = ( data.AGEC_LVSTK['F3', lvstype]
                        * data.AGEC_LVSTK['Q3', lvstype] )
         else:
@@ -161,19 +161,10 @@ def get_quantity_crop( data # Data object or module.
     `year`: number of years from base year, counting from zero.
     """
 
-    # Every crop x irrigation status has its own yieldincrease.
-    #
-    # Crops grow on land which incurs dryland damage if not irrigated.
-    if lm == 'dry':
-        quantity = ( data.AGEC_CROPS['Yield', lm, pr].to_numpy()
-                   # TODO: New damage trends. * data.AG_DRYLAND_DAMAGE[year]
-                   * data.YIELDINCREASE[lm, pr][year] )
-    # If the land is irrigated there is no such damage.
-    else:
-        quantity = ( data.AGEC_CROPS['Yield', lm, pr].to_numpy()
-                   * data.YIELDINCREASE[lm, pr][year] )
+    # Get the raw quantities in tonnes/ha from data.
+    quantity = data.AGEC_CROPS['Yield', lm, pr].to_numpy()
 
-    # Quantities so far in tonnes/ha. Now convert to tonnes/cell.
+    # Convert to tonnes/cell.
     quantity *= data.REAL_AREA
 
     return quantity
@@ -199,6 +190,9 @@ def get_quantity( data # Data object or module.
     # If it is none of the above, it is not known how to get the quantities.
     else:
         raise KeyError("Land use '%s' not found in data." % pr)
+
+    # Apply yield increase multiplier.
+    q *= data.YIELDINCREASE[lm, pr][year]
 
     # Apply climate change impact multiplier.
     lu = data.PR2LU_DICT[pr]

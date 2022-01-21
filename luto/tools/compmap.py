@@ -5,7 +5,7 @@
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 #
 # Created: 2021-09-17
-# Last modified: 2021-10-08
+# Last modified: 2022-01-21
 #
 
 import numpy as np
@@ -16,6 +16,8 @@ def crossmap(oldmap, newmap, landuses=None):
 
     # Produce the cross-tabulation matrix with optional labels.
     crosstab = pd.crosstab(oldmap, newmap, margins=True)
+    # Make sure the cross-tabulation matrix is square.
+    crosstab = crosstab.reindex(crosstab.index, axis=1, fill_value=0)
     if landuses is not None:
         lus = landuses + ['Total']
         crosstab.columns = lus
@@ -43,28 +45,32 @@ def crossmap_irrstat(lumap_old, lmmap_old, lumap_new, lmmap_new, landuses=None):
 
     # Produce the cross-tabulation matrix with labels.
     crosstab = pd.crosstab(highpos_old, highpos_new, margins=True)
-    columns = [ludict[i] for i in crosstab.columns if i != 'All']
-    columns.append('All')
-    index = [ludict[i] for i in crosstab.index if i != 'All']
-    index.append('All')
-    crosstab.columns = columns
-    crosstab.index = index
+    # Make sure the cross-tabulation matrix is square.
+    crosstab = crosstab.reindex(crosstab.index, axis=1, fill_value=0)
+    names = [ludict[i] for i in crosstab.columns if i != 'All']
+    names.append('All')
+    # columns = [ludict[i] for i in crosstab.columns if i != 'All']
+    # columns.append('All')
+    # index = [ludict[i] for i in crosstab.index if i != 'All']
+    # index.append('All')
+    crosstab.columns = names
+    crosstab.index = names
 
     # Calculate net switches to land use (negative means switch away).
     df = pd.DataFrame()
-    cells2011 = crosstab.iloc[-1, :]
-    cells2010 = crosstab.iloc[:, -1]
-    df['Cells 2010 [ # ]'] = cells2010
-    df['Cells 2011 [ # ]'] = cells2011
+    cells_prior = crosstab.iloc[:, -1]
+    cells_after = crosstab.iloc[-1, :]
+    df['Cells prior [ # ]'] = cells_prior
+    df['Cells after [ # ]'] = cells_after
     df.fillna(0, inplace=True)
     df = df.astype(np.int64)
-    switches = df['Cells 2011 [ # ]']-  df['Cells 2010 [ # ]']
+    switches = df['Cells after [ # ]']-  df['Cells prior [ # ]']
     nswitches = np.abs(switches).sum()
     pswitches = int(np.around(100 * nswitches / lumap_old.shape[0]))
 
     df['Switches [ # ]'] = switches
-    df['Switches [ % ]'] = 100 * switches / cells2010
-    df.loc['Total'] = cells2010.sum(), cells2011.sum(), nswitches, pswitches
+    df['Switches [ % ]'] = 100 * switches / cells_prior
+    df.loc['Total'] = cells_prior.sum(), cells_after.sum(), nswitches, pswitches
 
     return crosstab, df
 
