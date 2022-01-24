@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2022-01-20
+# Last modified: 2022-01-24
 #
 
 import numpy as np
@@ -329,7 +329,7 @@ def info():
 
     if is_resfactor():
         _, rmult = get_resfactor()
-        rf = int(np.sqrt(rmult))
+        rf = int(np.sqrt(rmult).round())
         print( "Resfactor set at %i." % rf
              , "Sampling one in every %i x %i cells of spatial domain."
              % (rf, rf) )
