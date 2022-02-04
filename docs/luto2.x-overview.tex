@@ -1,0 +1,52 @@
+\documentclass{draft}
+
+\author[]{Fjalar~J~de~Haan\thanks{\textit{Corresponding author. Email:}~f.dehaan@deakin.edu.au,~fjalar@fjalar.org}}
+
+\affil[]{Planet A, Centre for Integrative Ecology, \mbox{Deakin University, Australia}}
+
+\date{}
+
+\everymath{\displaystyle}
+\begin{document}
+
+\title{LUTO 2.x (neoLUTO)}
+
+\maketitle
+
+\begin{abstract}
+	\noindent This document provides an overview of the LUTO 2.x modelling software package.
+\end{abstract}
+
+\tableofcontents
+
+\newpage
+
+\section{Introduction}
+This document provides an overview of the software package of LUTO II\@. It describes its architecture, the mathematical model behind the cost-minimising dynamics, the data required and how to build them from the raw datasets. It also gives instructions on how to set up and run the model.
+
+% more on luto pedigree
+
+The LUTO models simulate land-use change. The models are spatially explicit and the modelled territory is discretised into $1 \times 1$ km\textsuperscript{2} (approximately) grid cells. These grid cells are represented in the model as 1D arrays. A \emph{land use} is, as the name suggests, the way land is used, which typically means what kind of crop is grown or what type of livestock grazes on it. There is a list of land uses considered and these are represented by integer values (e.g. `Apples' $ = 1$, `Dairy' $ = 7$). Thus, at the heart of it, land-use change is modelled by a changing integer array. This integer array is called the land-use map or \emph{lumap} for short.
+
+The mechanisms driving the dynamics are economic. In the original CSIRO LUTO, the economic rationale was profit maximisation, i.e.\ farmers were supposed to cultivate whatever would profit them most (subject to some risk-based thresholds). In LUTO II the economic rationale is more systemic. The idea is that the agricultural system tries to meet demands (inputs to the model) the best it can, subject to certain constraints, while trying to minimise the total cost of production. Thus, using a yearly time step, the model is fed new demands and the model's solver produces a new land-use map.
+
+Minimising cost while meeting demand means the model is trading off the expenditure of production against the yield of the crop or livestock. In addition to this, there are \emph{transition costs} associated with switching from one land use to another. This means that if a grid cell changes from growing apples to raising cattle, there is not only the new production cost to be paid (which may be lower) but also a transition cost. These transition costs subsume various costs of switching (including infrastructural investments and changed irrigation costs). Transition costs introduce `memory' into the model, avoiding that the land-use map changes unrealistically much at each time step as it attempts to meet demand at lowest cost.
+
+LUTO II, like its progenitor, is an optimisation model. The economic rationale is formalised as a linear programme, which is then solved using external, commercial, black-box, closed-source solver software (GUROBI for LUTO II and CPLEX for LUTO I). The mathematical model of LUTO II is an actual linear programme but an alternative solver prototype using binary decision variables is also part of the package.
+
+% constraints
+
+
+\section{Architecture of the model}
+
+\subsection{Solvers}\label{subsec:solvers}
+
+\section{Optimisation mathematics}\label{sec:mathematics}
+
+\section{Data requirements}
+
+\section{Running the model}
+
+
+\end{document}
+
