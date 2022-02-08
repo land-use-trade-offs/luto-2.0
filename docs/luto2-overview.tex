@@ -1,7 +1,5 @@
 \documentclass{draft}
 
-\usepackage{dirtree}
-
 \author[]{Fjalar~J~de~Haan\thanks{\textit{Corresponding author. Email:}~f.dehaan@deakin.edu.au,~fjalar@fjalar.org}}
 
 \affil[]{Planet A, Centre for Integrative Ecology, \mbox{Deakin University, Australia}}
@@ -74,7 +72,7 @@ The user interface of the model is the \mintinline{python}{luto.solvers.simulati
 \label{fig:package}
 \end{figure}
 
-\subsection{Loading data}
+\subsection{Loading data (\mintinline{python}{luto.data})}\label{subsec:data}
 The main idea behind the \mintinline{python}{luto.data} module is to have a namespace for all input data and parameters. For example, importing the module, by issuing
 \begin{minted}{python}
 	import luto.data as data
@@ -94,25 +92,53 @@ To avoid confusion and force useful errors, the three lists (\mintinline{python}
 
 The situation with the land-uses, products and commodities make the \mintinline{python}{luto.data} module cluttered, hard to read and a potential source of future bugs. The schema can likely be simplified to just two lists and some processing could be factored out while other things can be turned into file reads. At the moment however, the module works and once loaded the complications are at any rate not so visible.
 
+Since the model avoids global dependencies, the \mintinline{python}{luto.data} loaded module needs to be explicitly passed as an argument to all functions that need it. While this may appear as complicating things unnecessarily, there are two key advantages to this approach:
+\begin{enumerate}
+	\item Many functions would take very long to import if they had the \mintinline{python}{luto.data} module as a hard-coded dependency. Those functions are now fairly light weight.
+	\item One can also pass a \emph{different} data object to those functions. For example, some small dummy object for testing purposes. The \mintinline{python}{luto.simulation} module makes extensive use of this possibility by creating derivative data objects with many grid cells masked out to save computational space and time (see Section~\ref{subsec:solvers}).
+\end{enumerate}
+
+The \mintinline{python}{luto.data} sub-package has several modules but only the \texttt{/__init__.py} is used to load it. The modules
+\mintinline{python}{luto.data.spatial} and \mintinline{python}{luto.data.temporal} are legacy code. The \mintinline{python}{luto.data.economic} module, however, is used in the data preparation (see Section~\ref{sec:dataprep}).
+
+\subsection{Economic calculations (\mintinline{python}{luto.economics})}
+The sub-package \mintinline{python}{luto.economics} is concerned with calculating the production costs, transition costs and yields related to the land uses. This sub-package also contains a module to calculate water uses and yields. All functions in these modules are pure and most require a data object as an argument.
+
+The calculations in this sub-package are typically returned in a matrix format, including `matrices' with more than two indices. This is partially because it is the natural format from the perspective of the mathematical formulation and GUROBI solver API. It also enables the use of some linear algebra tools making for compacter code. This at the expense of a lot of matrices of various shapes in the model. To keep overview and avoid errors, the following convention were used: A matrix data type is denoted by a letter followed by an underscore and a list of indices, e.g. \mintinline{python}{c_mrj}. The letter relates to the quantity in question (here `cost') and the indices run over various ranges, depending on what the axis represents. See Table~\ref{tab:indices} for the constantly recurring indices and the sets they enumerate.
+\begin{table}
+\centering
+\begin{tabular}{lllll}
+Index   & Set         & Range                                                & Set in LUTO II                                           & Range in LUTO II                                     \\
+$ r $ & Grid cells  & $7 \times 10^7$ &                                                          & \mintinline{python}{data.NCELLS}  \\
+$ j $ & Land uses   & 28                                                   & \mintinline{python}{data.LANDUSES}    & \mintinline{python}{data.NLUS}    \\
+$ j $ & Land man's   & 2                                                   & \mintinline{python}{data.LANDMANS}    & \mintinline{python}{data.NLMS}    \\
+$ p $ & Products    & 32                                                   & \mintinline{python}{data.PRODUCTS}    & \mintinline{python}{data.NPRS}    \\
+$ c $ & Commodities & 26                                                   & \mintinline{python}{data.COMMODITIES} & \mintinline{python}{data.NCMS}
+\end{tabular}
+\caption{Common indices for matrix-like quantities.}
+\label{tab:indices}
+\end{table}
+
+
+\subsubsection{Production costs (\mintinline{python}{luto.economics.cost})}
+A major part of the optimisation logic are the annual production costs, i.e.\ what it costs to have a certain crop or livestock on a particular grid cell. These costs depend not only on the land use, but also on spatial location as well as the land-management type (whether it is irrigated or not) and the year. The \mintinline{python}{cost} module provides several functions to calculate these annual production costs. Of these, \mintinline{python}{get_cost_matrices()} provides the costs in the matrix format used by the solver. The actual cost calculations are done in separate functions (\mintinline{python}{get_cost_crop()} and \mintinline{python}{get_cost_lvstk()}). If one wants just the production costs of a certain land use and land management combination in a certain year, there is the function \mintinline{python}{get_cost(data, lu, lm, year)}, which returns a 1D spatial array with the cost per grid cell.
+
+
+
+\subsubsection{Transition costs (\mintinline{python}{luto.economics.transitions})}
+\ldots
+
+\subsubsection{Yields (\mintinline{python}{luto.economics.quantity})}
+\ldots
 Since the functions for e.g.\ cost calculations, receive a \mintinline{python}{data} object as an argument % slicing the spatial extent...
+ Extensive use of this is being made by the \mintinline{python}{luto.simulation} module...
 
-
-
-Since the model avoids global dependencies, the \mintinline{python}{luto.data} loaded module needs to be passed as an argument to all functions that need it. 
-
-
-
-% Loading versus post-processing
-
-% class data
-
-% legacy code
-
-\subsection{Calculating costs}
-\subsubsection{Production costs}
+ \subsubsection{Production costs}
 \subsubsection{Transition costs}
 
 \subsection{Solving and running}\label{subsec:solvers}
+
+% simulation module and Data class.
 
 \section{Optimisation mathematics}\label{sec:mathematics}
 
