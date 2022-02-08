@@ -57,15 +57,33 @@ The user interface of the model is the \mintinline{python}{luto.solvers.simulati
 \vbox{%
 \dirtree{%
 .1 /.
-	.2 \textbf{luto/} \DTcomment{main sub-package, i.e.\ `src'}.
-		.3 \textbf{data/} \DTcomment{loading of inputs}.
-		.3 \textbf{economics/} \DTcomment{cost calculations}.
-		.3 \textbf{reporting/} \DTcomment{derivative output calculations}.
-		.3 \textbf{solvers/} \DTcomment{functions and interface to run model}.
-		.3 \textbf{tools/} \DTcomment{utility functions}.
-	.2 \textbf{input/} \DTcomment{*.npy, *.csv and *.hdf5 data files}.
-	.2 \textbf{output/} \DTcomment{model results, lumaps and lmmaps etc.}.
-	.2 \textbf{docs/} \DTcomment{documentation, including this file}.
+.2 \textbf{luto/} \DTcomment{main sub-package, i.e.\ `src'}.
+	.3 \textbf{data/} \DTcomment{loading of inputs}.
+		.4 __init__.py \DTcomment{actual data module}.
+		.4 economic.py \DTcomment{data preparation functions}.
+		.4 spatial.py \DTcomment{legacy code}.
+		.4 temporal.py \DTcomment{legacy code}.
+	.3 \textbf{economics/} \DTcomment{costs, yields and water calculations}.
+		.4 cost.py \DTcomment{production cost functions}.
+		.4 quantity.py \DTcomment{yield functions}.
+		.4 transitions.py \DTcomment{transition cost functions}.
+		.4 water.py \DTcomment{water use and yield functions}.
+	.3 \textbf{reporting/} \DTcomment{derivative output calculations}.
+	.3 \textbf{solvers/} \DTcomment{functions and interface to run model}.
+		.4 resfactor.py \DTcomment{functions for spatial coarse graining}.
+		.4 simulation.py \DTcomment{interface module for running simulations}.
+		.4 solvers.py \DTcomment{solver function calling GUROBI}.
+		.4 stacksolver.py \DTcomment{alternative solver (toy model stage}.
+	.3 \textbf{tools/} \DTcomment{utility functions}.
+		.4 __init__.py \DTcomment{various utility functions}.
+		.4 compmap.py \DTcomment{cross-tabulation functions}.
+		.4 highposgtiff.py \DTcomment{to write lumaps to geotiffs}.
+		.4 plotmap.py \DTcomment{lumap viewer using matplotlib}.
+		.4 write.py \DTcomment{write simulation output to files in a dir}.
+	.3 settings.py \DTcomment{settings like file locations and parameters}.
+.2 \textbf{input/} \DTcomment{*.npy, *.csv and *.hdf5 data files}.
+.2 \textbf{output/} \DTcomment{model results, lumaps and lmmaps etc.}.
+.2 \textbf{docs/} \DTcomment{documentation, including this file}.
 }
 }
 \caption{Directory structure of LUTO II Python package.}
