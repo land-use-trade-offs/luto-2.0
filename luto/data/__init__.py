@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-22
-# Last modified: 2022-01-21
+# Last modified: 2022-02-11
 #
 
 import os
@@ -205,11 +205,16 @@ water_yield_base = pd.read_hdf(os.path.join( INPUT_DIR
 WATER_YIELD_BASE_DR = water_yield_base['WATER_YIELD_DR_ML_HA'].to_numpy()
 WATER_YIELD_BASE_SR = water_yield_base['WATER_YIELD_SR_ML_HA'].to_numpy()
 
-fname_dr = os.path.join(INPUT_DIR, 'water-yields-ssp245-dr-ml-ha.hdf5')
-fname_sr = os.path.join(INPUT_DIR, 'water-yields-ssp245-sr-ml-ha.hdf5')
+fname_dr = os.path.join( INPUT_DIR
+         , 'Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean.h5' )
+fname_sr = os.path.join( INPUT_DIR
+         , 'Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean.h5' )
 
-WATER_YIELDS_DR = h5py.File(fname_dr, 'r')['water-yields-ssp245-dr-ml-ha']
-WATER_YIELDS_SR = h5py.File(fname_sr, 'r')['water-yields-ssp245-sr-ml-ha']
+wy_dr_file = h5py.File(fname_dr, 'r')
+wy_sr_file = h5py.File(fname_sr, 'r')
+
+WATER_YIELDS_DR = wy_dr_file[list(wy_dr_file.keys())[0]][:]
+WATER_YIELDS_SR = wy_sr_file[list(wy_sr_file.keys())[0]][:]
 
 # Water yields for current year -- placeholder with year zero.
 WATER_YIELD_NUNC_DR = WATER_YIELDS_DR[0]
