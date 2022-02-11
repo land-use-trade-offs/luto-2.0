@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2022-01-24
+# Last modified: 2022-02-11
 #
 
 import numpy as np
@@ -70,7 +70,6 @@ class Data():
         self.WATER_DELIVERY_PRICE = bdata.WATER_DELIVERY_PRICE[self.mask]
         self.WATER_YIELD_BASE_DR = bdata.WATER_YIELD_BASE_DR[self.mask]
         self.WATER_YIELD_BASE_SR = bdata.WATER_YIELD_BASE_SR[self.mask]
-        self.MASK_MDB = bdata.MASK_MDB[self.mask]
         self.FEED_REQ = bdata.FEED_REQ[self.mask]
         self.PASTURE_KG_DM_HA = bdata.PASTURE_KG_DM_HA[self.mask]
         self.SAFE_PUR_MODL = bdata.SAFE_PUR_MODL[self.mask]

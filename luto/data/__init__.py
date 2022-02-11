@@ -220,8 +220,6 @@ WATER_YIELDS_SR = wy_sr_file[list(wy_sr_file.keys())[0]][:]
 WATER_YIELD_NUNC_DR = WATER_YIELDS_DR[0]
 WATER_YIELD_NUNC_SR = WATER_YIELDS_SR[0]
 
-# Masks.
-MASK_MDB = np.load(os.path.join(INPUT_DIR, 'mdbmask.npy'))
 
 # ---------------------------------------------------------------------------- #
 # Climate change impact data.                                                  #
