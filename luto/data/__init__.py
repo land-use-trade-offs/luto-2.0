@@ -246,11 +246,6 @@ SAFE_PUR_MODL = np.load(os.path.join(INPUT_DIR, 'safe-pur-modl.npy'))
 fpath = os.path.join(INPUT_DIR, "yieldincreases-bau2022.csv")
 YIELDINCREASE = pd.read_csv(fpath, header=[0,1])
 
-# Price paths.
-price_paths = pd.read_csv(os.path.join(INPUT_DIR, 'pricepaths.csv'))
-DIESEL_PRICE_PATH = price_paths['diesel_price_path']
-
-
 # --------------- #
 # All other data. #
 # --------------- #
