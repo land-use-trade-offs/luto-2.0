@@ -1,0 +1,61 @@
+cff-version: 1.2.0
+message: "Please cite the LUTO II codebase as below."
+
+authors:
+  - family-names: Haan
+    name-particle: de
+    given-names: Fjalar J.
+    email: fjalar@fjalar.org
+	orcid: 'https://orcid.org/0000-0003-4715-0842'
+	affiliation: "Deakin University"
+
+  - family-names: Archibald
+    given-names: Carla L.
+    email: c.archibald@deakin.edu.au
+    orcid: 'https://orcid.org/0000-0003-1640-8396'
+    affiliation: "Centre for Integrative Ecology, School of Life & Environmental Science, Deakin University"
+
+  - family-names: Hadjikakou
+    given-names: Michalis
+    email: m.hadjikakou@deakin.edu.au
+    orcid: 'https://orcid.org/0000-0002-3667-3982'
+    affiliation: "Centre for Integrative Ecology (CIE), School of Life and Environmental Sciences, Deakin University, Burwood, Victoria, Australia
+
+  - family-names: Khan
+    given-names : Md Shakil
+    email: shakil.khan.rmit@gmail.com
+    affiliation: "Deakin University"
+
+  - family-names: Marcos-Martinez
+    given-names: Raymundo
+    email: mar77v@csiro.au
+    orcid: 'https://orcid.org/0000-0002-7925-7081'
+    affiliation: "CSIRO Land and Water"
+
+  - family-names: Navarro
+    given-names: Javier
+    email: javi.navarro@csiro.au
+    orcid: 'https://orcid.org/0000-0001-7945-0693'
+    affiliation: "CSIRO Agriculture and Food"
+
+  - family names: Nazari
+    given-names: Asef
+    email: asef.nazari@deakin.edu.au
+    orcid: 'https://orcid.org/0000-0003-4955-9684'
+    affiliation: "Deakin University, School of IT"
+
+  - family-names: Thiruvady
+    given-names: Dhananjay Raghavan
+    email: dhananjay.thiruvady@deakin.edu.au
+	orcid: 'https://orcid.org/0000-0002-8011-933X'
+	affiliation: "Deakin University"
+
+  - family-names: Bryan
+    given-names: Brett A.
+    email: b.bryan@deakin.edu.au
+    orcid: 'https://orcid.org/0000-0003-4834-5641'
+    affiliation: "Deakin University"
+
+title: "LUTO II (Land-Use Trade-Offs II)"
+version: II 1.0.x (dev)
+license: GPL-3.0+

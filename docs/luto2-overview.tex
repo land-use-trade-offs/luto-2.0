@@ -108,7 +108,7 @@ There are complications to this picture. The most notable being the following. T
 
 To avoid confusion and force useful errors, the three lists (\mintinline{python}{data.LANDUSES}, \mintinline{python}{data.PRODUCTS}, \mintinline{python}{data.COMMODITIES}) use different cases (sentence, all upper and all lower case, respectively). Nevertheless, the lists are produced by inferring the list of land-uses from the agricultural data and a host of string manipulations. This is clearly error prone in light of future extensions. Moreover, the \emph{conversions} from e.g.\ land-use to product representation, which are necessary to set up the linear programme in the solver, employ conversion matrices. These matrices are defined in the \mintinline{python}{luto.data} module following the above logic.
 
-The situation with the land-uses, products and commodities make the \mintinline{python}{luto.data} module cluttered, hard to read and a potential source of future bugs. The schema can likely be simplified to just two lists and some processing could be factored out while other things can be turned into file reads. At the moment however, the module works and once loaded the complications are at any rate not so visible.
+The situation with the land-uses, products and commodities makes the \mintinline{python}{luto.data} module cluttered, hard to read and a potential source of future bugs. The schema can likely be simplified to just two lists and some processing could be factored out while other things can be turned into file reads. At the moment however, the module works and once loaded the complications are at any rate not so visible.
 
 Since the model avoids global dependencies, the \mintinline{python}{luto.data} loaded module needs to be explicitly passed as an argument to all functions that need it. While this may appear as complicating things unnecessarily, there are two key advantages to this approach:
 \begin{enumerate}
@@ -129,7 +129,7 @@ The calculations in this sub-package are typically returned in a matrix format, 
 Index   & Set         & Range                                                & Set in LUTO II                                           & Range in LUTO II                                     \\
 $ r $ & Grid cells  & $7 \times 10^7$ &                                                          & \mintinline{python}{data.NCELLS}  \\
 $ j $ & Land uses   & 28                                                   & \mintinline{python}{data.LANDUSES}    & \mintinline{python}{data.NLUS}    \\
-$ j $ & Land man's   & 2                                                   & \mintinline{python}{data.LANDMANS}    & \mintinline{python}{data.NLMS}    \\
+$ m $ & Land man's   & 2                                                   & \mintinline{python}{data.LANDMANS}    & \mintinline{python}{data.NLMS}    \\
 $ p $ & Products    & 32                                                   & \mintinline{python}{data.PRODUCTS}    & \mintinline{python}{data.NPRS}    \\
 $ c $ & Commodities & 26                                                   & \mintinline{python}{data.COMMODITIES} & \mintinline{python}{data.NCMS}
 \end{tabular}
@@ -141,10 +141,22 @@ $ c $ & Commodities & 26                                                   & \mi
 \subsubsection{Production costs (\mintinline{python}{luto.economics.cost})}
 A major part of the optimisation logic are the annual production costs, i.e.\ what it costs to have a certain crop or livestock on a particular grid cell. These costs depend not only on the land use, but also on spatial location as well as the land-management type (whether it is irrigated or not) and the year. The \mintinline{python}{cost} module provides several functions to calculate these annual production costs. Of these, \mintinline{python}{get_cost_matrices()} provides the costs in the matrix format used by the solver. The actual cost calculations are done in separate functions (\mintinline{python}{get_cost_crop()} and \mintinline{python}{get_cost_lvstk()}). If one wants just the production costs of a certain land use and land management combination in a certain year, there is the function \mintinline{python}{get_cost(data, lu, lm, year)}, which returns a 1D spatial array with the cost per grid cell.
 
+Production costs of crops are computed as \emph{fixed} plus \emph{area} plus \emph{quantity} costs. The fixed costs in turn are the sum of fixed \emph{labour}, \emph{operational} and \emph{depreciation} costs. These component costs come from data and only few operations are involved in the computation of the total production cost. Additionally, if it concerns an irrigated crop, there are water costs which are the product of the volume of water required and the delivery costs.
 
+A similar breakdown holds for livestock production costs, with some amendments. The quantity costs in the data are now given per head so multiplication by a `yield potential' (number of heads per hectare) is necessary. In the water costs, now drinking water also needs to be included (regardless of whether the pasture is irrigated or not).
 
 \subsubsection{Transition costs (\mintinline{python}{luto.economics.transitions})}
-\ldots
+The transition costs are the costs of changing the land-use or land-management on a certain cell. The key function in this module is \mintinline{python}{get_transition_matrices()} which returns the transition matrices in a $t_{mrj}$ format. Thus the entry $t_{1, 3, 7}$ is the cost of switching cell number 3 (which is the fourth cell, arrays are zero based) to land use 7 (`Grapes') under land management 1 (`irr', i.e.\ irrigation). The knowledge about what the land-use and land-management it is switching \emph{from} is subsumed in the $t_{mrj}$ matrix, so naturally the current lumap and lmmap are arguments to the \mintinline{python}{get_transition_matrices()} function. 
+
+The actual transition costs are computed from a number of parts:
+\begin{enumerate}
+	\item `Raw' transition costs from one land use to another
+	\item The difference in water licence costs after and before
+	\item Irrigation infrastructure costs, if applicable
+	\item Foregone income at 3 times the annual production costs
+\end{enumerate}
+
+Finally, the costs are amortised at 5\% with a horizon of 30 years.
 
 \subsubsection{Yields (\mintinline{python}{luto.economics.quantity})}
 \ldots
