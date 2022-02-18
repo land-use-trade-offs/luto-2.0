@@ -7,16 +7,24 @@ The LUTO II modelling framework was developed at Deakin University by Fjalar de 
 
 # Pedigree #
 
-LUTO II is based on the original LUTO as regards its overall approach to land-use change modelling. In particular aspects like discretising the land-use map at a 1x1 square kilometres scale representing it as a 1D array with the land-uses as integers. The original LUTO model was developed at the Commonwealth Scientific and Industrial Research Organisation (CSIRO) between 201x and 201x and published under the GNU GPLv3 in 2021. The code and more information about the original LUTO model can be at [luto@csiro](https://data.csiro.au/collection/csiro:52376v1) and should be cited as Bryan, Brett; Nolan, Martin; Stock, Florian; Graham, Paul; Dunstall, Simon; Ernst, Andreas; Connor, Jeff (2021): Land Use Trade-Offs (LUTO) Model. v1. CSIRO. Software Collection. [https://doi.org/10.25919/y8ee-sk45](https://doi.org/10.25919/y8ee-sk45).
+LUTO II is based on the original LUTO as regards its overall approach to land-use change modelling. In particular aspects like discretising the land-use map at a 1x1 square kilometres scale and representing it as a 1D array with land-uses as integers. The code and more information about the original LUTO model can be found at [luto@csiro](https://data.csiro.au/collection/csiro:52376v1) and should be cited as: Bryan, Brett; Nolan, Martin; Stock, Florian; Graham, Paul; Dunstall, Simon; Ernst, Andreas; Connor, Jeff (2021): Land Use Trade-Offs (LUTO) Model. v1. CSIRO. Software Collection. [https://doi.org/10.25919/y8ee-sk45](https://doi.org/10.25919/y8ee-sk45).
 
-The LUTO II code base is, however, a new model, written completely from scratch. The LUTO II economic logic governing land-use change is very different from that of the original LUTO. While the original LUTO is based on the assumption that farmers try to optimise their profits, the leading LUTO II assumption is that the overall agricultural system tries to minimise its costs of production (including costs of switching between agricultural commodities). Both LUTOs are optimisation models but different commercial solvers are used (CPLEX in original LUTO, GUROBI in LUTO II).
+The LUTO II code base is, however, a new model, written completely from scratch - there is no original LUTO code in the LUTO II code base. The LUTO II economic logic governing land-use change is very different from that of the original LUTO. While the original LUTO is based on the assumption that farmers try to optimise their profits, the leading LUTO II assumption is that the overall agricultural system tries to minimise its costs of production (including costs of switching between agricultural commodities). Whilst the original LUTO allowed switching from a current land-use to an alternative in a one-way fashion, LUTO II features full commodity switching. Both LUTOs are optimisation models but different commercial solvers are used (CPLEX in original LUTO, GUROBI in LUTO II). The spatial domains are different in extent, with LUTO II's being nearly 10 times as large. The data requirements to run LUTO II are consequentially different and heavier. There is no backwards compatibility whatsoever.
+
+# Documentation #
+
+# Copyright #
+
+# Licence #
+	LUTO II is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with this program. If not, see [<https://www.gnu.org/licenses/>](https://www.gnu.org/licenses/).
+
+# Authors and Citation #
+See the [CITATION.cff](CITATION.cff) file for the LUTO II authors and how to cite the code base.
 
 
-
-
-
-LUTO II is therefore an optimisation model with a linear programme at heart. To do the actual solving, the model interfaces with commercial solver GUROBI.
-
-The original LUTO (i.e. LUTO I) was developed at the Commonwealth Scientific and Industrial Research Organisation (CSIRO) between 201x and 201x and published under the GNU GPLv3 in 2021.
 
 
