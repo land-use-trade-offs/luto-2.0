@@ -3,7 +3,7 @@ LUTO II - Land-Use Trade-Offs modelling framework
 
 LUTO II is version two of the Land-Use Trade-Offs model. The model predicts future spatial land-use distributions based on a economic cost-minimisation logic under various constraints, including environmental limits.
 
-The LUTO II modelling framework was developed at Deakin University by Fjalar de Haan, Brett Bryan and colleagues (see [CITATION.cff](CITATION.cff))
+The LUTO II modelling framework was developed at Deakin University by Fjalar de Haan, Brett Bryan and colleagues (see [CITATION.cff](CITATION.cff)). It it the product of the Land-Use Futures project which is a collaboration between ClimateWorks Australia, the CSIRO and Deakin University (see [luf@cwa](https://www.climateworksaustralia.org/project/land-use-futures/).
 
 
 LUTO II is therefore an optimisation model with a linear programme at heart. To do the actual solving, the model interfaces with commercial solver GUROBI.
