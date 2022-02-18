@@ -12,8 +12,10 @@ LUTO II is based on the original LUTO as regards its overall approach to land-us
 The LUTO II code base is, however, a new model, written completely from scratch - there is no original LUTO code in the LUTO II code base. The LUTO II economic logic governing land-use change is very different from that of the original LUTO. While the original LUTO is based on the assumption that farmers try to optimise their profits, the leading LUTO II assumption is that the overall agricultural system tries to minimise its costs of production (including costs of switching between agricultural commodities). Whilst the original LUTO allowed switching from a current land-use to an alternative in a one-way fashion, LUTO II features full commodity switching. Both LUTOs are optimisation models but different commercial solvers are used (CPLEX in original LUTO, GUROBI in LUTO II). The spatial domains are different in extent, with LUTO II's being nearly 10 times as large. The data requirements to run LUTO II are consequentially different and heavier. There is no backwards compatibility whatsoever.
 
 # Documentation #
+Documentation, including instructions on how to set up and run LUTO II can be found at [docs/luto2-overview.pdf](docs/luto2-overview.pdf).
 
 # Copyright #
+Copyright 2021 Fjalar J. de Haan and Brett A. Bryan, Deakin University.
 
 # Licence #
 LUTO II is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
