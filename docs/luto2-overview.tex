@@ -73,7 +73,7 @@ The user interface of the model is the \mintinline{python}{luto.solvers.simulati
 		.4 resfactor.py \DTcomment{functions for spatial coarse graining}.
 		.4 simulation.py \DTcomment{interface module for running simulations}.
 		.4 solvers.py \DTcomment{solver function calling GUROBI}.
-		.4 stacksolver.py \DTcomment{alternative solver (toy model stage}.
+		.4 stacksolver.py \DTcomment{alternative solver (toy model stage)}.
 	.3 \textbf{tools/} \DTcomment{utility functions}.
 		.4 __init__.py \DTcomment{various utility functions}.
 		.4 compmap.py \DTcomment{cross-tabulation functions}.
@@ -146,7 +146,7 @@ Production costs of crops are computed as \emph{fixed} plus \emph{area} plus \em
 A similar breakdown holds for livestock production costs, with some amendments. The quantity costs in the data are now given per head so multiplication by a `yield potential' (number of heads per hectare) is necessary. In the water costs, now drinking water also needs to be included (regardless of whether the pasture is irrigated or not).
 
 \subsubsection{Transition costs (\mintinline{python}{luto.economics.transitions})}
-The transition costs are the costs of changing the land-use or land-management on a certain cell. The key function in this module is \mintinline{python}{get_transition_matrices()} which returns the transition matrices in a $t_{mrj}$ format. Thus the entry $t_{1, 3, 7}$ is the cost of switching cell number 3 (which is the fourth cell, arrays are zero based) to land use 7 (`Grapes') under land management 1 (`irr', i.e.\ irrigation). The knowledge about what the land-use and land-management it is switching \emph{from} is subsumed in the $t_{mrj}$ matrix, so naturally the current lumap and lmmap are arguments to the \mintinline{python}{get_transition_matrices()} function. 
+The transition costs are the costs of changing the land-use or land-management on a certain cell. The key function in this module is \mintinline{python}{get_transition_matrices()} which returns the transition matrices in a $t_{mrj}$ format. Thus the entry $t_{1, 3, 7}$ is the cost of switching cell number 3 (which is the fourth cell, arrays are zero based) to land use 7 (`Grapes') under land management 1 (`irr', i.e.\ irrigation). The knowledge about what the land-use and land-management it is switching \emph{from} is subsumed in the $t_{mrj}$ matrix, so naturally the current lumap and lmmap are arguments to the \mintinline{python}{get_transition_matrices()} function.
 
 The actual transition costs are computed from a number of parts:
 \begin{enumerate}
@@ -159,15 +159,54 @@ The actual transition costs are computed from a number of parts:
 Finally, the costs are amortised at 5\% with a horizon of 30 years.
 
 \subsubsection{Yields (\mintinline{python}{luto.economics.quantity})}
-\ldots
+
+Yields refer to the quantities of \emph{product} that can be obtained from a land use on a certain grid cell. While a land use has only one associated production cost, it can have several associated yields --- for example, as mentioned before, a land use like `Sheep - natural land' yields `SHEEP - NATURAL LAND MEAT' as well as `SHEEP - NATURAL LAND WOOL'.
+
+The functions in the \mintinline{python}{luto.economics.quantity} module are parallel to their counterparts in the \mintinline{python}{costs} module --- with the crucial distinction that costs are for land uses, while yields pertain to products. Thus the module features the following functions. \mintinline{python}{get_quantity_matrices()} provides the yields in the matrix format used by the solver. The actual yield calculations are done in separate functions (\mintinline{python}{get_quantity_crop()} and \mintinline{python}{get_quantity_lvstk()}). If one wants just the yields of a certain product and land management combination in a certain year, there is the function \mintinline{python}{get_quantity(data, pr, lm, year)}, which returns a 1D spatial array with the cost per grid cell.
+
+The yields for crops come directly from the input data and are only converted from per hectare to per cell units (in \mintinline{python}{get_quantity_crop()}). Also, for crops the correspondence between land uses and products is one-one. The calculations for livestock (in \mintinline{python}{get_quantity_lvstk()}) yields are a bit more involved and will be discussed below. The function \mintinline{python}{get_quantity()}, which branches to the before mentioned functions, additionally applies two multipliers, (1) the climate change impacts (via \mintinline{python}{get_ccimpact()}, interpolating input data) and (2) yield increases, i.e.\ productivity increases (directly from data).
+
+The function \mintinline{python}{get_quantity_lvstk()} first infers which livestock and vegetation type are involved by calling the function \mintinline{python}{lvs_veg_types()} which determines this based on the product string. So, `SHEEP - NATURAL LAND WOOL' corresponds to livestock type `SHEEP' and vegetation type `NATL' (i.e.\ natural). This information is then used to calculate a \emph{yield potential} using the function \mintinline{python}{get_yield_pot()} which effectively is how many heads per hectare can be yielded.
+
+The livestock yield data holds both the total herd size and the fraction available for use (e.g.\ slaughter or export). The product of these to factors gives a per-head, per-hectare yield. Thus \mintinline{python}{get_quantity_lvstk()} multiplies this by the yield potential and converts from per-hectare to per-cell units.
+
+\subsection{Solving and running (\mintinline{python}{luto.solvers})}\label{subsec:solvers}
+
+The heart of the model, that is, where the next land use map is actually computed is the \mintinline{python}{solve()} function --- `the solver' --- in the \mintinline{python}{luto.solvers.solver} module. This function takes all relevant input matrices, the demands, constraints and two conversion matrices as arguments and returns the new land-use and land-man' maps. Since this function solves the system for one time step at a time and a considerable list of arguments is required, there is an interface to solving the model provided in \mintinline{python}{luto.solvers.simulation}. The \mintinline{python}{simulation} module takes care of computing the input matrices, keeps track of the solved lumaps and lmmaps and provides a number of convenience functions. Section~\ref{sec:running} describes in some detail how to use the \mintinline{python}{simulation} module.
+
+\subsubsection{Spatial coarse graining and spatial sub-setting}
+
+\emph{Resfactor (lossy)}
+
+To facilitate faster testing, one can run the model in a `coarse-grained' fashion. The idea is simply to present the solver with a sampled subset of the spatial domain and correspondingly sliced matrices. This facility is called `resfactor' after a similar functionality in LUTO I. The sampling can be either linear or quadratic, which means that if a sampling rate of $n$ is given, either every $n$\textsuperscript{th} or every $n \times n$\textsuperscript{th} cell is included. The linear mode produces sampling artefacts, so the quadratic mode should always be used. The sampling is implemented with a multiplicative mask. The following three functions are involved in recovering the maps from the coarse-grained solver output: \mintinline{python}{simulation.uncourse1D()}, \mintinline{python}{simulation.uncourse2D()} and \mintinline{python}{simulation.uncoursify()}.
+
+Thought the resfactor can be set manually with the \mintinline{python}{simulation.set_resfactor()} function, for consistent settings it is recommended to instead pass the resfactor as an argument to \mintinline{python}{simulation.run()}.
+
+The speed up is slightly better than proportional to the fraction of cells sampled. It should be superfluous to note that solving a coarse-grained map and then resizing the outputs does not provide the same results as an actual solve on the full map. Simulation results obtained with spatial coarse graining are to be used for quick inspections and sense checking in testing contexts only.
+
+\emph{Subsetting (lossless)}
+
+Since the grid cells with land use `Non-agricultural land' are not changed by the solver, there is no loss in solving the lumap with these cells excluded and reinserting them afterwards. This is precisely what is done when the solving is done using the \mintinline{python}{luto.solvers.simulation} interface. Like the spatial coarse graining, the sub-setting of the input map is achieved with a multiplicative map. In fact, when coarse graining is on, the two masks are indeed multiplied. The removed cells are re-inserted post-solve by the \mintinline{python}{simulation.reconstitute()} function. The speed up is proportional to the fraction of `Non-agricultural land' cells in the lumap and there is no loss of accuracy as there is no approximation.
+
+Not only the lumap and lmmap are spatially explicit and therefore amenable to this sort of sub-setting or coarse-graining. In fact, many of the input data are spatially explicit and calculations could be sped up considerably if e.g.\ costs and yields were computed on the same fraction of the cells as the lumap and lmmap. The functions in the \mintinline{python}{luto.economics} module are agnostic to the spatial extent and pure, so if they were passed a data object on a different, smaller, spatial domain, they would not mind.
+
+\emph{The} \mintinline{python}{class Data}
+
+To make use of this, the \mintinline{python}{luto.solvers.simulation} module contains a class definition for a data object that can be spatially subsetted. This is a simple class with no methods. All it aims to do is to expose the same fields (at any rate the upper-case fields) as the \mintinline{python}{luto.data} module but defined on the masked spatial domain. To achieve this, it copies all the upper-case fields and applies the combined (multiplied) masks of resfactor and the lossless subsetting described earlier to the spatial fields.
+
+// Local matrix getters.
+
+\emph{The} \mintinline{python}{simulation.step()} \emph{function}
+
+To call the solver, the \mintinline{python}{luto.simulation} module uses the \mintinline{python}{simulation.step()} function.
+
+
+% resfactor
+
+% stacksolver
+
 Since the functions for e.g.\ cost calculations, receive a \mintinline{python}{data} object as an argument % slicing the spatial extent...
- Extensive use of this is being made by the \mintinline{python}{luto.simulation} module...
-
- \subsubsection{Production costs}
-\subsubsection{Transition costs}
-
-\subsection{Solving and running}\label{subsec:solvers}
-
+Extensive use of this is being made by the \mintinline{python}{luto.simulation} module
 % simulation module and Data class.
 
 \section{Optimisation mathematics}\label{sec:mathematics}

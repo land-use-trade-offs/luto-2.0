@@ -7,7 +7,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-08-06
-# Last modified: 2022-02-11
+# Last modified: 2022-02-21
 #
 
 import numpy as np
@@ -255,7 +255,7 @@ def step( base    # Base year from which the data is taken.
                                , get_x_mrj()
                                , data.LU2PR
                                , data.PR2CM
-                               , None # get_limits()
+                               , get_limits()
                                , verbose=is_verbose() )
 
     # First undo the doings of resfactor if it is set.

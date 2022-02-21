@@ -4,7 +4,7 @@
 #
 # Author: Fjalar de Haan (f.dehaan@deakin.edu.au)
 # Created: 2021-03-26
-# Last modified: 2022-01-21
+# Last modified: 2022-02-21
 #
 
 import numpy as np
@@ -192,11 +192,11 @@ def get_quantity( data # Data object or module.
         raise KeyError("Land use '%s' not found in data." % pr)
 
     # Apply yield increase multiplier.
-    # q *= data.YIELDINCREASE[lm, pr][year]
+    q *= data.YIELDINCREASE[lm, pr][year]
 
     # Apply climate change impact multiplier.
     lu = data.PR2LU_DICT[pr]
-    # q *= get_ccimpact(data, lu, lm, year)
+    q *= get_ccimpact(data, lu, lm, year)
 
     return q
 
