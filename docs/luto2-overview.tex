@@ -174,6 +174,45 @@ The livestock yield data holds both the total herd size and the fraction availab
 
 The heart of the model, that is, where the next land use map is actually computed is the \mintinline{python}{solve()} function --- `the solver' --- in the \mintinline{python}{luto.solvers.solver} module. This function takes all relevant input matrices, the demands, constraints and two conversion matrices as arguments and returns the new land-use and land-man' maps. Since this function solves the system for one time step at a time and a considerable list of arguments is required, there is an interface to solving the model provided in \mintinline{python}{luto.solvers.simulation}. The \mintinline{python}{simulation} module takes care of computing the input matrices, keeps track of the solved lumaps and lmmaps and provides a number of convenience functions. Section~\ref{sec:running} describes in some detail how to use the \mintinline{python}{simulation} module.
 
+\subsubsection{The solver (\mintinline{python}{luto.solvers.solver})}
+
+The full signature of the \mintinline{python}{solve()} function is:
+
+\begin{minted}{python}
+def solve( t_mrj  # Transition cost matrices.
+         , c_mrj  # Production cost matrices.
+         , q_mrp  # Yield matrices (n.b.\ `p' index not `j').
+         , d_c    # Demands (n.b.\ `c' index not `j').
+         , p      # Penalty factor.
+         , x_mrj  # Exclude matrices.
+         , lu2pr_pj # Conversion matrix: land-use to product(s).
+         , pr2cm_cp # Conversion matrix: product(s) to commodity.
+         , limits = None # Targets to use.
+         , verbose = False # Print Gurobi output if True.
+         )
+\end{minted}
+
+The first three arguments are the data matrices. Note the indexing convention indicating that these are 3D arrays, indexed by $m$ for the land-management (irrigation or dry land), $r$ for the grid cell number and either $j$ or $p$ for the land-use or product index. The \mintinline{python}{luto.economics} modules have functions that return these matrices in precisely the desired format. They are \mintinline{python}{get_transition_matrices()}, \mintinline{python}{get_cost_matrices()} and \mintinline{python}{get_quantity_matrices()}, respectively (in the appropriately named modules in the \mintinline{python}{luto.economics} sub package).
+
+The fourth (`d_c') and fifth (`p') argument are the demands and the penalty factor, respectively. The demands need to be provided as a 1D array indexed by the commodities in \mintinline{python}{data.COMMODITIES} in lexicographic order. The penalty factor penalises over- and under production. The size of the penalty is the maximum (across the spatial domain) cost per tonne deviation from demand of a commodity times the penalty factor. Setting the penalty factor higher will urge the solver to try harder to meet demands exactly. Penalty factors of the order of 100 or 1000 were typical in testing situations.
+
+The sixth argument, `x_mrj', is obtained using a \mintinline{python}{get_exclude_matrices()} function, which can be found in the \mintinline{python}{luto.economics.transitions} module. The exclude matrices do what their name suggests, the tell the solver which cells cannot have certain land-use and land-management combinations. These exclusions are implemented consisely by making the upper bounds of the decision variables equal to the corresponding values (either zero or one) in the exclude matrices. Thus, if a cell---land-use---land-man combination is disallowed, its upper bound is equal to its lower bound is equal to zero. Testing suggests that the GUROBI solver, then, disregards these decision variables altogether, possibly giving some performance gain.
+
+The seventh (`lu2pr_pj') and eighth (`pr2cm_cp') arguments are conversion matrices. What is converted is `vectors' of quantities of agricultural `stuff' from one representation (land-use, product or commodity) to another. The \mintinline{python}{lu2pr_pj} matrix is used to convert `vectors' of land-uses ($j$-index) to `vectors' of products ($p$-index). The \mintinline{python}{pr2cm_cp} matrix is used to convert `vectors' of products ($p$-index) to `vectors' of commodities ($c$-index). The conversion is by way of matrix multiplication. For example, if \mintinline{python}{v_j} are quantities in land-use representation, then \mintinline{python}{v_p = lu2pr_pj @ v_j} (the `\mintinline{python}{@}' denoting Python matrix multiplication) gives the quantities in the product representation (hence the $p$-index). These matrices are vailable from the \mintinline{python}{luto.data} module as \mintinline{python}{data.LU2PR} and \mintinline{python}{data.PR2CM}. These mappings between representations are not one-to-one so these matrices are \emph{not} invertible (they are not even square).
+
+The ninth argument, `limits', asks for a dictionary of the environmental limits to include in the solving process. If \mintinline{python}{None} is passed, the solver just solves without any environmental constraints. The only environmental constraint currently implemented is water use. To use water constraints, pass a limits dictionary with an appropriate value set under the key `water'. The format of the limits for water can be inferred from the \mintinline{python}{simulation.get_limits()} method. One can set the limits per catchment (`river region').
+
+Water limits are calculated by comparing the water use (from irrigation and drinking water) divided by a water yield (how much still runs off into the catchment with a reference fraction --- the base fraction. The limits dictionary should provide, for each catchment, the base fraction (which is not to be exceeded) and the use and yield matrices in $u_{mrj}$ and $y_{mrj}$ format, respectively. These matrices and the base fraction can be obtained from the \mintinline{python}{luto.economics.water} module via the \mintinline{python}{get_water_stress()} and \mintinline{python}{get_water_basefrac()} functions. These functions accept masks as arguments to tailor their outputs to the appropriate catchment.
+
+The tenth and last argument, the `verbose' option, switches whether the GUROBI solver output is printed to the terminal. If set to \mintinline{python}{False} (the default) the solver (that is, \mintinline{python}{solve()}) will still print relevant information to the terminal (what year is being solved etc.)
+
+Apart from the complications of the conversions between representations discussed above, the solver is a relatively straightforward implementation of the linear programme discussed in Section~\ref{sec:mathematics}. It should be noted that the decision variables (split out explicitly as a `dryland' and `irrigated' set) are continuous. This means that, in principle, fractional allocation of land uses is possible. In other words, it is technically possible that a cell is $\textstyle\frac{4}{7}$ apples and $\textstyle\frac{3}{7}$ sugarcane. For larger lumaps (in the order of thousands of cells or more) this does not seem to occur much anymore. The solver, in fact, \emph{flattens} the lumap before returning it so any fractional allocations are not detectable in the output lumap anymore. However, the decision variables are also returned for inspection, if one is interested. 
+
+\emph{The stacksolver}
+An alternative solver is provided in the module \mintinline{python}{luto.solvers.stacksolver}. This module contains a \mintinline{python}{solver()} function very much like the one described above. The difference is the way in which it deals with the land-managements. This solver is only a proof-of-principle toy model and the module is self contained. The stacksolver can be run using the provide function \mintinline{python}{runstack_random()} which runs it with random number entries for the various input matrices. One passes it the size of the problem (how many cells, how many land uses) as well as the penalty factor and it returns the lumap and lmmap.
+
+The stacksolver was written to circumvent a scaling problem with the normal solver. The way the normal solver is set up involves making a set of decision variables and accompanying data matrices for every \emph{combination} of land managements. This quickly gets too computationally and memory intense. The stacksolver instead introduces a set of binary decision variables for each new land management and computes the associated costs and yields of every combination adding up the \emph{increments} each land management would entail. This scales much more favourably in the number of land managements. 
+
 \subsubsection{Spatial coarse graining and spatial sub-setting}
 
 \emph{Resfactor (lossy)}
@@ -194,20 +233,43 @@ Not only the lumap and lmmap are spatially explicit and therefore amenable to th
 
 To make use of this, the \mintinline{python}{luto.solvers.simulation} module contains a class definition for a data object that can be spatially subsetted. This is a simple class with no methods. All it aims to do is to expose the same fields (at any rate the upper-case fields) as the \mintinline{python}{luto.data} module but defined on the masked spatial domain. To achieve this, it copies all the upper-case fields and applies the combined (multiplied) masks of resfactor and the lossless subsetting described earlier to the spatial fields.
 
-// Local matrix getters.
+For convenience, the \mintinline{python}{luto.solvers.simulation} module has four local getter methods to get the current production cost, yield or transition cost matrices (\mintinline{python}{get_c_mrj()}, \mintinline{python}{get_q_mrp()}, \mintinline{python}{get_t_mrj()} and \mintinline{python}{get_x_mrj()} respectively). These getter take no arguments and exploit the state kept in the \mintinline{python}{luto.solvers.simulation} to ensure the right data object, base and target years and coarse-graining multipliers are used. The \mintinline{python}{simulation.step()} and thus \mintinline{python}{simulation.run()} methods call these local matrix getters.
 
-\emph{The} \mintinline{python}{simulation.step()} \emph{function}
+\subsubsection{Stepping and running using the simulation module}
 
-To call the solver, the \mintinline{python}{luto.simulation} module uses the \mintinline{python}{simulation.step()} function.
+\emph{The} \mintinline{python}{simulation.step()} \emph{method}
+
+To call the solver, the \mintinline{python}{luto.solvers.simulation} module uses a stepper function called \mintinline{python}{simulation.step()}. This is a simple wrapper around a call to the solver. It synchronises the simulation module (Which makes sure the right matrices are used), it undoes the effects of spatial coarse graining and subsetting whenever relevant and stores the outputs in the right places.
+
+The synchronisation is achieved with a call to the \mintinline{python}{simulation.sync_years()} function. This function wants the \emph{base} and \emph{target} years as arguments. The base year is the year from which the lumap and lmmap are used. The target year is the year that is solved for. The supporting data, e.g.\ the cost and yield matrices, from the year before the target year are used. This is because there are year-dependent multipliers (e.g.\ yield increases) that act on the data. Thus, if the base year is 2010 and the target year is 2011, then the lumap and lmmap as well as the supporting data of 2010 will be used as the starting point. If the base year is 2010 and the target year is 2030, then the lumap and lmmap of 2010 are used with the supporting data of 2029. The \mintinline{python}{simulation.sync_years()} function synchronises those years across the module and instantiates a new \mintinline{python}{Data} object. This object takes into account any coarse graining and subsetting as discussed earlier. Note that the coarse graining (resfactor) has to be set seperately. Either by calling \mintinline{python}{simulation.set_resfactor()} or by providing it as an argument to the \mintinline{python}{simulation.run()} function --- this latter option is to be preferred.
+
+The \mintinline{python}{simulation.step()} method places the solved maps in dictionaries called \mintinline{python}{simulation.lumaps} and \mintinline{python}{simulation.lmmaps} both of which use the calendar years as keys. When first loaded, the \mintinline{python}{luto.solvers.simulation} automatically places the lumap and lmmap from the \mintinline{python}{luto.data} module in the dictionary under the starting year set in \mintinline{python}{data.ANNUM}, which is 2010 by default. Similarly the shapes (i.e.\ the spatial extents) as well as the decision variables are stored in dictionaries (again with years as keys) called \mintinline{python}{shapes} and \mintinline{python}{dvars}, respectively.
+
+In addition to the base and target year, two additional arguments need to be passed to the \mintinline{python}{simulation.step()} method: the demands and the penalty factor. The stepper wants the demands and the penalty factor in the same format as the solver itself, see above for the details.
+
+\emph{The} \mintinline{python}{simulation.run()} \emph{method}
+
+The \mintinline{python}{simulation.step()} method is really only for internal or testing use. Actual simulations should be carried out with the \mintinline{python}{simulation.run()} method. The full signature with some explanatory comments is:
+
+\begin{minted}{python}
+def run( base               # Base year.
+       , target             # Target year.
+       , demands            # Demands, 1D or 2D array.
+       , penalty            # Penalty factor.
+       , style='sequential' # Solve target year or all years.
+       , resfactor=False    # Coarse graining factor (quadratic).
+       , verbose=False      # Whether to print GUROBI output.
+       )
+\end{minted}
+
+The `base', `target' and `penalty' arguments are like explained for the \mintinline{python}{simulation.step()} method. The coarse graining factor can be set here using the \mintinline{python}{resfactor=...} option. If it is set to \mintinline{python}{False}, coarse graining is bypassed altogether. If one fills out, e.g.\ \mintinline{python}{resfactor=3}, each $3 \times 3$ square is treated as a single grid cell. The `verbose' option switches whether the GUROBI solver output is printed to the terminal, it is passed directly to the solver.
+
+An important switch is the \mintinline{python}{style=...} option. If this is set \mintinline{python}{style='direct'} only the target year will be solved for. That is, one output lumap and one lmmap will be produced. If \mintinline{python}{style='sequential'}, however, all intermediate years are also solved and each subsequent year takes the previous output map as its basis. To match these options, the demands can be passed either as a 1D, commodity indexed, array (see \mintinline{python}{simulation.step()} above) or as a 2D time series --- i.e.\ a horizontally stacked array of 1D demand arrays. The shape of a 2D time series demands array is \mintinline{python}{(number_of_years, number_of_commodities)}. If \mintinline{python}{simulation.run()} is given a time series demands array but \mintinline{python}{style='direct'} is set, then the appropriate entry in the 2D array will be chosen automatically. Thus, if a demand time series is provided, one can run either `direct' or `sequential' style runs. If a 1D demand array is provided, one can only run `direct' style.
 
 
-% resfactor
 
 % stacksolver
 
-Since the functions for e.g.\ cost calculations, receive a \mintinline{python}{data} object as an argument % slicing the spatial extent...
-Extensive use of this is being made by the \mintinline{python}{luto.simulation} module
-% simulation module and Data class.
 
 \section{Optimisation mathematics}\label{sec:mathematics}
 
