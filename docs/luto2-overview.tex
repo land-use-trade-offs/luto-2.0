@@ -1,21 +1,44 @@
-\documentclass{draft}
+\documentclass[12pt,a4paper,twoside]{article}
 
-\author[]{Fjalar~J~de~Haan\thanks{\textit{Corresponding author. Email:}~f.dehaan@deakin.edu.au,~fjalar@fjalar.org}}
+\usepackage[round]{natbib}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{comment}
+\usepackage{authblk}
+\usepackage{balance}
+\usepackage[shortlabels]{enumitem}
+\usepackage[parfill]{parskip}
+\usepackage{appendix}
+\usepackage{float}
+\usepackage[labelfont=bf]{caption}
+\usepackage{enumitem}
+\usepackage{framed}
+\usepackage{tcolorbox}
+\usepackage{xfrac}
+\usepackage{dirtree}
+\usepackage{underscore}
+\usepackage{setspace}
+\usepackage{minted}
+\usemintedstyle{trac}
+\newminted{python}{fontsize=\scriptsize, linenos}
+\usepackage{hyperref}
+\floatstyle{boxed}
+\restylefloat{figure}
+
+\author[]{Fjalar~J~de~Haan\thanks{\textit{Corresponding author. Email:}fjalar@fjalar.org}}
 
 \affil[]{Planet A, Centre for Integrative Ecology, \mbox{Deakin University, Australia}}
 
 \date{}
 
-%\everymath{\displaystyle}
 \begin{document}
 
 \title{LUTO II (neoLUTO)}
 
 \maketitle
-
-\begin{abstract}
-	\noindent This document provides an overview of the LUTO II modelling software package.
-\end{abstract}
 
 \tableofcontents
 
@@ -49,7 +72,7 @@ A small number of design principles has generally been adhered to, though not in
 	\item Dependencies should be few. Generally, the external dependencies are limited to Numpy and Pandas (almost everything uses these) and things like HDF5 libraries. Dependencies on other LUTO modules are used where unavoidable, e.g.\ in a module where many things come together. Again, in \mintinline{python}{luto.solvers.simulation} there are of course plenty of internal imports.
 \end{itemize}
 
-The user interface of the model is the \mintinline{python}{luto.solvers.simulation} module. Importing this module will implicitly load the \mintinline{python}{data} module. It will use the parameters set in the \mintinline{python}{luto.settings} module. At this point, those parameters are limited to directory locations and some settings relating to the water constraints. If all the requisite data is available where it should be (\texttt{input/} by default), this is sufficient to run the model. One can run `interactively', that is, from the prompt of a Python interpreter or call the functions of the \mintinline{python}{luto.solvers.simulation} module from a run script. Preparing the input data and setting up the model to run is discussed in Sections~\ref{sec:dataprep} and~\ref{sec:running}, respectively.
+The user interface of the model is the \mintinline{python}{luto.solvers.simulation} module. Importing this module will implicitly load the \mintinline{python}{data} module. It will use the parameters set in the \mintinline{python}{luto.settings} module. At this point, those parameters are limited to directory locations and some settings relating to the water constraints. If all the requisite data is available where it should be (\texttt{input/} by default), this is sufficient to run the model. One can run `interactively', that is, from the prompt of a Python interpreter or call the functions of the \mintinline{python}{luto.solvers.simulation} module from a run script. Preparing the input data and setting up the model to run is discussed in Section~\ref{sec:running}.
 
 \floatstyle{plain}
 \restylefloat{figure}
@@ -61,8 +84,6 @@ The user interface of the model is the \mintinline{python}{luto.solvers.simulati
 	.3 \textbf{data/} \DTcomment{loading of inputs}.
 		.4 __init__.py \DTcomment{actual data module}.
 		.4 economic.py \DTcomment{data preparation functions}.
-		.4 spatial.py \DTcomment{legacy code}.
-		.4 temporal.py \DTcomment{legacy code}.
 	.3 \textbf{economics/} \DTcomment{costs, yields and water calculations}.
 		.4 cost.py \DTcomment{production cost functions}.
 		.4 quantity.py \DTcomment{yield functions}.
@@ -70,7 +91,6 @@ The user interface of the model is the \mintinline{python}{luto.solvers.simulati
 		.4 water.py \DTcomment{water use and yield functions}.
 	.3 \textbf{reporting/} \DTcomment{derivative output calculations}.
 	.3 \textbf{solvers/} \DTcomment{functions and interface to run model}.
-		.4 resfactor.py \DTcomment{functions for spatial coarse graining}.
 		.4 simulation.py \DTcomment{interface module for running simulations}.
 		.4 solvers.py \DTcomment{solver function calling GUROBI}.
 		.4 stacksolver.py \DTcomment{alternative solver (toy model stage)}.
@@ -93,16 +113,13 @@ The user interface of the model is the \mintinline{python}{luto.solvers.simulati
 \subsection{Loading data (\mintinline{python}{luto.data})}\label{subsec:data}
 The main idea behind the \mintinline{python}{luto.data} module is to have a namespace for all input data and parameters. For example, importing the module, by issuing
 \begin{minted}{python}
-	import luto.data as data
+import luto.data as data
 \end{minted}
 will make the list of land uses available as \mintinline{python}{data.LANDUSES}. Data is made available in three ways, (1) by reading the data directly from a file, typically a *.npy, *.csv or *.hdf5 file, by (2) post-processing data read from file to some extent, or (3) by defining variables in the code directly (i.e.\ `magic numbers'). This third option is obviously to be avoided and the only magic number is the starting year, 2010, which is added to the year index (zero-based) whenever an actual calendar year is required.
 
-The files required by the \mintinline{python}{luto.data} module are:
-\begin{itemize}
-	\item \ldots
-\end{itemize}
+The \mintinline{python}{luto.data} module needs a number of input files to be present at the right place. See Section~\ref{sec:running} and in specific Section~\ref{subsec:dataprep} for more information on the data preparation.
 
-The data in the files is used to \emph{infer} various parameters of the modelling problem. In other words, in principle, the code knows nothing about the particulars of the modelling problem under consideration. Things like the spatial extent (number of grid cells), the lists of land uses and land managements and so on, the model obtains from inspecting the data files. This has the obvious advantage that the model is not tied to a certain number of cells or a particular set of land uses.
+The data in the files are used to \emph{infer} various parameters of the modelling problem. In other words, in principle, the code knows nothing about the particulars of the modelling problem under consideration. Things like the spatial extent (number of grid cells), the lists of land uses and land managements and so on, the model obtains from inspecting the data files. (More precisely, the data build script does this. See Section~\ref{subsec:dataprep}.) This has the obvious advantage that the model is not tied to a certain number of cells or a particular set of land uses.
 
 There are complications to this picture. The most notable being the following. The list of \emph{land uses} (whatever lives on the land) is not the same as, and not in a one-one relation with, the list of \emph{products} those land uses yield. For example, `Sheep - natural land' (a land use) yields `SHEEP - NATURAL LAND MEAT' as well as `SHEEP - NATURAL LAND WOOL'. To complicate matters further, the list of \emph{commodities} that are demanded (the time series of which are a key input to the model) are not the same nor in a one-one relationshep with either the list of land uses or products. For example, the demand for wool is indifferent to whether the sheep grazed on natural or modified land. So, in the list of products there is just `sheep wool'.
 
@@ -117,7 +134,7 @@ Since the model avoids global dependencies, the \mintinline{python}{luto.data} l
 \end{enumerate}
 
 The \mintinline{python}{luto.data} sub-package has several modules but only the \texttt{/__init__.py} is used to load it. The modules
-\mintinline{python}{luto.data.spatial} and \mintinline{python}{luto.data.temporal} are legacy code. The \mintinline{python}{luto.data.economic} module, however, is used in the data preparation (see Section~\ref{sec:dataprep}).
+\mintinline{python}{luto.data.spatial} and \mintinline{python}{luto.data.temporal} are legacy code. The \mintinline{python}{luto.data.economic} module, however, is used in the data preparation (see Section~\ref{subsec:dataprep}).
 
 \subsection{Economic calculations (\mintinline{python}{luto.economics})}
 The sub-package \mintinline{python}{luto.economics} is concerned with calculating the production costs, transition costs and yields related to the land uses. This sub-package also contains a module to calculate water uses and yields. All functions in these modules are pure and most require a data object as an argument.
@@ -206,12 +223,12 @@ Water limits are calculated by comparing the water use (from irrigation and drin
 
 The tenth and last argument, the `verbose' option, switches whether the GUROBI solver output is printed to the terminal. If set to \mintinline{python}{False} (the default) the solver (that is, \mintinline{python}{solve()}) will still print relevant information to the terminal (what year is being solved etc.)
 
-Apart from the complications of the conversions between representations discussed above, the solver is a relatively straightforward implementation of the linear programme discussed in Section~\ref{sec:mathematics}. It should be noted that the decision variables (split out explicitly as a `dryland' and `irrigated' set) are continuous. This means that, in principle, fractional allocation of land uses is possible. In other words, it is technically possible that a cell is $\textstyle\frac{4}{7}$ apples and $\textstyle\frac{3}{7}$ sugarcane. For larger lumaps (in the order of thousands of cells or more) this does not seem to occur much anymore. The solver, in fact, \emph{flattens} the lumap before returning it so any fractional allocations are not detectable in the output lumap anymore. However, the decision variables are also returned for inspection, if one is interested. 
+Apart from the complications of the conversions between representations discussed above, the solver is a relatively straightforward implementation of the linear programme discussed in Section~\ref{sec:mathematics}. It should be noted that the decision variables (split out explicitly as a `dryland' and `irrigated' set) are continuous. This means that, in principle, fractional allocation of land uses is possible. In other words, it is technically possible that a cell is $\frac{4}{7}$ apples and $\frac{3}{7}$ sugarcane. For larger lumaps (in the order of thousands of cells or more) this does not seem to occur much anymore. The solver, in fact, \emph{flattens} the lumap before returning it so any fractional allocations are not detectable in the output lumap anymore. However, the decision variables are also returned for inspection, if one is interested.
 
 \emph{The stacksolver}
 An alternative solver is provided in the module \mintinline{python}{luto.solvers.stacksolver}. This module contains a \mintinline{python}{solver()} function very much like the one described above. The difference is the way in which it deals with the land-managements. This solver is only a proof-of-principle toy model and the module is self contained. The stacksolver can be run using the provide function \mintinline{python}{runstack_random()} which runs it with random number entries for the various input matrices. One passes it the size of the problem (how many cells, how many land uses) as well as the penalty factor and it returns the lumap and lmmap.
 
-The stacksolver was written to circumvent a scaling problem with the normal solver. The way the normal solver is set up involves making a set of decision variables and accompanying data matrices for every \emph{combination} of land managements. This quickly gets too computationally and memory intense. The stacksolver instead introduces a set of binary decision variables for each new land management and computes the associated costs and yields of every combination adding up the \emph{increments} each land management would entail. This scales much more favourably in the number of land managements. 
+The stacksolver was written to circumvent a scaling problem with the normal solver. The way the normal solver is set up involves making a set of decision variables and accompanying data matrices for every \emph{combination} of land managements. This quickly gets too computationally and memory intense. The stacksolver instead introduces a set of binary decision variables for each new land management and computes the associated costs and yields of every combination adding up the \emph{increments} each land management would entail. This scales much more favourably in the number of land managements.
 
 \subsubsection{Spatial coarse graining and spatial sub-setting}
 
@@ -235,7 +252,7 @@ To make use of this, the \mintinline{python}{luto.solvers.simulation} module con
 
 For convenience, the \mintinline{python}{luto.solvers.simulation} module has four local getter methods to get the current production cost, yield or transition cost matrices (\mintinline{python}{get_c_mrj()}, \mintinline{python}{get_q_mrp()}, \mintinline{python}{get_t_mrj()} and \mintinline{python}{get_x_mrj()} respectively). These getter take no arguments and exploit the state kept in the \mintinline{python}{luto.solvers.simulation} to ensure the right data object, base and target years and coarse-graining multipliers are used. The \mintinline{python}{simulation.step()} and thus \mintinline{python}{simulation.run()} methods call these local matrix getters.
 
-\subsubsection{Stepping and running using the simulation module}
+\subsubsection{Stepping and running using the simulation module}\label{subsubsec:steprun}
 
 \emph{The} \mintinline{python}{simulation.step()} \emph{method}
 
@@ -264,19 +281,280 @@ def run( base               # Base year.
 
 The `base', `target' and `penalty' arguments are like explained for the \mintinline{python}{simulation.step()} method. The coarse graining factor can be set here using the \mintinline{python}{resfactor=...} option. If it is set to \mintinline{python}{False}, coarse graining is bypassed altogether. If one fills out, e.g.\ \mintinline{python}{resfactor=3}, each $3 \times 3$ square is treated as a single grid cell. The `verbose' option switches whether the GUROBI solver output is printed to the terminal, it is passed directly to the solver.
 
-An important switch is the \mintinline{python}{style=...} option. If this is set \mintinline{python}{style='direct'} only the target year will be solved for. That is, one output lumap and one lmmap will be produced. If \mintinline{python}{style='sequential'}, however, all intermediate years are also solved and each subsequent year takes the previous output map as its basis. To match these options, the demands can be passed either as a 1D, commodity indexed, array (see \mintinline{python}{simulation.step()} above) or as a 2D time series --- i.e.\ a horizontally stacked array of 1D demand arrays. The shape of a 2D time series demands array is \mintinline{python}{(number_of_years, number_of_commodities)}. If \mintinline{python}{simulation.run()} is given a time series demands array but \mintinline{python}{style='direct'} is set, then the appropriate entry in the 2D array will be chosen automatically. Thus, if a demand time series is provided, one can run either `direct' or `sequential' style runs. If a 1D demand array is provided, one can only run `direct' style.
+An important switch is the \mintinline{python}{style=...} option. If this is set \mintinline{python}{style='direct'} only the target year will be solved for. That is, one output lumap and one lmmap will be produced. If \mintinline{python}{style='sequential'}, however, all intermediate years are also solved and each subsequent year takes the previous output map as its basis. To match these options, the demands can be passed either as a 1D, commodity indexed, array (see \mintinline{python}{simulation.step()} above) or as a 2D time series --- i.e.\ a stacked array of 1D demand arrays. The shape of a 2D time series demands array is \mintinline{python}{(number_of_years, number_of_commodities)}. If \mintinline{python}{simulation.run()} is given a time series demands array but \mintinline{python}{style='direct'} is set, then the appropriate entry in the 2D array will be chosen automatically. Thus, if a demand time series is provided, one can run either `direct' or `sequential' style runs. If a 1D demand array is provided, one can only run `direct' style.
 
-
-
-% stacksolver
-
-
+\newpage
 \section{Optimisation mathematics}\label{sec:mathematics}
 
-\section{Data requirements and preparation}\label{sec:dataprep}
+This section describes the linear programme at the heart of the solver. However, the formulae in the following are not \emph{precisely} what is implemented in code. Differences to keep in mind are:
+\begin{itemize}
+	\item The equations in Section~\ref{subsec:cbwevc} do not explicitly mention the land managements. That is, the $m$-index is not used. One can just think of the set of land uses to be twice as large, with every land use occuring once as a dryland and once as an irrigated version. (Indeed, an earlier implementation treated irrigated land uses like this.)
+	\item The complications regarding land-uses, products and commodities (see Section\ref{subsec:data}) are completely ignored.
+	\item Not all constraints in Sections~\ref{subsec:cbwevc} and~\ref{subsec:cbwslm} are implemented and all environmental constraints are ignored in Section~\ref{subsec:comparison}.
+\end{itemize}
 
-\section{Running the model}\label{sec:running}
+This section first presents the linear programme that is actually implemented (Section~\ref{subsec:cbwevc}). Then the stacksolver mathematical programme is presented (Section~\ref{subsec:cbwslm}). Then a comparison is made between the two approaches (Section~\ref{subsec:comparison}).
+
+\newpage
+
+\subsection{Cost-Based With Environmental Constraints}\label{subsec:cbwevc}
+
+\everymath{\displaystyle}
+\begin{equation}
+	{\setstretch{2}
+	\begin{array}{l c}
+	\text{Minimise} \quad & \sum_{r \in R, j \in J} c_{rj} x_{rj}
+					+ \sum_{r \in R, j \in J} t_{rj} x_{rj}
+					+ \sum_{j \in J} \Delta_j, \\
+
+	\text{subject to} \quad
+	& \sum_{j \in J} x_{rj}  = 1, \\
+	& 0 \leq x_{rj} \leq 1, \\
+	& \Delta_j \leq p_j (d_j - \sum_{r \in R} q_{rj} x_{rj}) \leq \Delta_j \quad (j \in J \backslash B), \\
+	& \sum_{r \in C_c, j \in J} w_{rj} x_{rj} \leq \bar{w}_c, \\
+	& \sum_{r \in C_c, j \in J} n_{rj} x_{rj} \leq \bar{n}_c, \\
+	& \sum_{r \in R, j \in J} k_{rj} x_{rj} \leq \bar{k}, \\
+	& \sum_{j \in B} b_{rj} x_{rj} \geq \bar{b}_j.
+
+	\end{array}}
+\end{equation}
+\everymath{}
+
+\textbf{Sets and indices:}
+\begin{itemize}
+	\item $R$ is the set of all cells, indexed by $r$.
+	\item $C_c \subset R$ is the (sub) set of cells in catchment $C_c$, indexed by $r$. The $c$ run over all the catchments considered.
+	\item $J$ is the set of all land uses, indexed by $j$.
+	\item $B \subset J$ is the (sub) set of biodiversity land uses, indexed by $j$.
+\end{itemize}
+
+\textbf{Decision variables:}
+\begin{itemize}
+	\item $x_{rj}$ is the proportion of cell $r$ allocated to land-use $j$.
+\end{itemize}
+
+\textbf{Coefficients:}
+\begin{itemize}
+	\item $c_{rj}$ is the cost per cell of producing land use $j$ at cell $r$.
+	\item $t_{rj}$ is the cost of switching cell $r$ to land use $j$ (this incorporates knowledge of the current land use).
+	\item $\Delta_j$ is a dummy variable representing how much production deviates from demand. This because the deviation is an absolute value. See the corresponding constraints.
+	\item $d_{j}$ is the demand for land use $j$.
+	\item $p_j$ is a penalty factor representing the cost of producing a unit too much or too little of land use $j$. E.g.\ an export or import cost.
+	\item $q_{rj}$ is the yield of land use $j$ at cell $r$.
+	\item $w_{rj}$ is the water use by land use $j$ at cell $r$.
+	\item $\bar{w}_c$ is the limit to water use in catchment $C_c$.
+	\item $n_{rj}$ is the nutrient runoff from land use $j$ at cell $r$.
+	\item $\bar{n}_c$ is the limit to nutrient runoffs in catchment $C_c$.
+	\item $k_{rj}$ is the carbon emissions at cell $r$ for land use $j$.
+	\item $\bar{k}$ is the carbon budget.
+	\item $b_{rj}$ is the conversion factor from cell to the natural units of a land-use $j \in B$. For example, if the target for land-use $j$ is in tonnes, the factor measures how many tonnes would be yielded at cell $r$.
+	\item $\bar{b}_j$. The target for land use $j \in B$ in the relevant units.
+\end{itemize}
+
+\newpage
+
+\subsection{Cost-Based With Stackable Land-Managements}\label{subsec:cbwslm}
+
+The same notation conventions are used as in Section\~ref{subsec:cbwevc} with the addition of the $m_{rj}$ decision variables representing the land managements.
+
+\everymath{\displaystyle}
+\begin{equation}
+	{\setstretch{2}
+	\begin{array}{l c}
+	\text{Minimise} \quad & \sum_{r \in R, j \in J} c_{rj} x_{rj}
+				    + \sum_{r \in R, j \in J} c'_{rj} m_{rj}
+					+ \sum_{r \in R, j \in J} t_{rj} x_{rj}
+					+ \sum_{j \in J} \Delta_j, \\
+
+	\text{subject to} \quad
+	& x_{rj}, m_{rj} \in \{0, 1\}, \\
+	& \sum_{j \in J} x_{rj}  = 1, \\
+	& m_{rj} - x_{rj} \leq 0, \\
+	& \Delta_j \leq p_j (d_j - \sum_{r \in R} q_{rj} x_{rj}) \leq \Delta_j \quad (j \in J \backslash B), \\
+	& \sum_{r \in C_c, j \in J} w_{rj} x_{rj} \leq \bar{w}_c, \\
+	& \sum_{r \in C_c, j \in J} n_{rj} x_{rj} \leq \bar{n}_c, \\
+	& \sum_{r \in R, j \in J} k_{rj} x_{rj} \leq \bar{k}, \\
+	& \sum_{j \in B} b_{rj} x_{rj} \geq \bar{b}_j.
+
+	\end{array}}
+\end{equation}
+\everymath{}
+
+\newpage
+
+\subsection{Two Ways to Include Land-Managements}\label{subsec:comparison}
+
+1. Each land-man (indexed by $m$) has its own $rj$-indexed set of decision variables and accompanying cost data. Since a combination of land-mans is also a land-man, this grows as $2^m$ --- exponential in $m$.
+
+\everymath{\displaystyle}
+\begin{equation}
+	{\setstretch{2}
+	\begin{array}{l c}
+	\text{Minimise} \quad & \sum_{m \in M, r \in R, j \in J} c_{mrj} x_{mrj}
+					+ \sum_{r \in R, j \in J} t_{mrj} x_{mrj}
+					+ \sum_{j \in J} \Delta_j, \\
+
+	\text{subject to} \quad
+	& 0 \leq x_{mrj} \leq 1, \\
+	& \sum_{m \in M, j \in J} x_{mrj}  = 1, \\
+	& \Delta_j \leq p_j (d_j - \sum_{m \in M, r \in R} q_{mrj} x_{mrj}) \leq \Delta_j.
+
+	\end{array}}
+\end{equation}
+\everymath{}
+
+2. Each land-man is represented by its own $rj$-indexed boolean decision variable. Combinations are now a matter of switching the relevant land-mans on or off. This grows linear in $m$.
+
+\everymath{\displaystyle}
+\begin{equation}
+	{\setstretch{2}
+	\begin{array}{l c}
+	\text{Minimise} \quad &
+	                  \sum_{r \in R, j \in J} c_{rj} x_{rj}
+				    + \sum_{m \in M, r \in R, j \in J} c'_{mrj} x'_{mrj}
+					\\
+					\quad &
+					+ \sum_{r \in R, j \in J} t_{rj} x_{rj}
+					+ \sum_{m \in M, r \in R, j \in J} t'_{mrj} x'_{mrj}
+					\\
+					\quad &
+					+ \sum_{j \in J} \Delta_j, \\
+
+	\text{subject to} \quad
+	& x_{rj}, x'_{mrj} \in \{0, 1\}, \\
+	& \sum_{j \in J} x_{rj}  = 1, \\
+	& x'_{mrj} - x_{rj} \leq 0, \\
+	& \Delta_j \leq p_j (d_j - q_j) \leq \Delta_j, \\
+	& \text{where } q_j = \sum_{r \in R} q_{rj} x_{rj}
+	                    + \sum_{m \in M, r \in R} q'_{mrj} x'_{mrj}.
+	\end{array}}
+\end{equation}
+\everymath{}
+
+\section{Setting up and running the model}\label{sec:running}
+
+This section aims to provide a step plan to setting up and running LUTO II from scratch. From scratch is understood as having access to the source (in which this documentation ought to be included) and to, at least, the raw input data. A Unix-like environment (i.e.\ bash) is assumed.
+
+\subsection{Setting up the source code}
+
+The LUTO II code is hosted on GitHub at \url{https://github.com/land-use-trade-offs}. The exact location of the repository may change but at the time of writing the url is \url{https://github.com/land-use-trade-offs/luto2-dev.git}. Thus to download the entire LUTO II package in a directory (inside the present working directory) called \mintinline{bash}{neoluto} issue:
+\begin{minted}{bash}
+git clone https://github.com/land-use-trade-offs/luto2-dev.git neoluto
+\end{minted}
+The directory \mintinline{bash}{neoluto} (or whatever other name was chosen) does not need to exist yet but if it exists it needs to be empty. Note that the LUTO II package contains a directory \mintinline{bash}{luto} so cloning into a directory also named \mintinline{bash}{luto} creates confusing paths. When this cloning has been successfully completed, the directory \mintinline{bash}{neoluto} contains the directory structure listed in Figure~\ref{fig:package} with some extra, licence-related, files and a readme and such.
+
+In principle, nothing needs to be changed to the code or the directory structure. Once the input data is in place, the model can run.
+
+\subsection{Building and copying the input data}\label{subsec:dataprep}
+
+LUTO II needs the following files to be present:
+\begin{itemize}
+\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}\setlength{\itemindent}{-.3cm}
+	\item \mintinline{bash}{agec-crops-c9.hdf5}
+	\item \mintinline{bash}{agec-lvstk-c9.hdf5}
+	\item \mintinline{bash}{climate-change-impacts-rcp2p6.hdf5}
+	\item \mintinline{bash}{climate-change-impacts-rcp4p5.hdf5}
+	\item \mintinline{bash}{climate-change-impacts-rcp6p0.hdf5}
+	\item \mintinline{bash}{climate-change-impacts-rcp8p5.hdf5}
+	\item \mintinline{bash}{draindivs.hdf5}
+	\item \mintinline{bash}{feed-req.npy}
+	\item \mintinline{bash}{landuses.npy}
+	\item \mintinline{bash}{lmmap.npy}
+	\item \mintinline{bash}{lumap.npy}
+	\item \mintinline{bash}{pasture-kg-dm-ha.npy}
+	\item \mintinline{bash}{potential-irrigation-areas.npy}
+	\item \mintinline{bash}{prec-over-175mm.npy}
+	\item \mintinline{bash}{real-area.npy}
+	\item \mintinline{bash}{rivregs.hdf5}
+	\item \mintinline{bash}{safe-pur-modl.npy}
+	\item \mintinline{bash}{safe-pur-natl.npy}
+	\item \mintinline{bash}{tmatrix.npy}
+	\item \mintinline{bash}{water-delivery-price.npy}
+	\item \mintinline{bash}{water-licence-price.npy}
+	\item \mintinline{bash}{water-yield-baselines.hdf5}
+	\item \mintinline{bash}{x-mrj.npy}
+	\item [] ---
+	\item \mintinline{bash}{NLUM_2010-11_mask.tif}
+	\item \mintinline{bash}{Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean.h5}
+	\item \mintinline{bash}{Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean.h5}
+	\item \mintinline{bash}{yieldincreases-bau2022.csv}
+\end{itemize}
+These input files are expected in \mintinline{bash}{input} directory but a different directory can be set in the \mintinline{bash}{settings.py} file. The files \emph{above} the dash can be copied into the \mintinline{bash}{input} directory if they are available pre-made. If they are not available they can be \emph{built} using the build script in \mintinline{bash}{luto/data/build.ipynb} (more on this below). The files \emph{under} the dash need to be available and copied in the \mintinline{bash}{input} directory directly.
+
+Note that the yield-increases file is simply a CSV file with yearly multipliers. The `bau2022' label is because the model was being set up for a BAU run in 2022, a different name can be set in the \mintinline{bash}{luto.data} module that loads it. The RCP can be set in the \mintinline{bash}{settings.py} file but this only affects the choice of climate change impacts HDF5 file. If another RCP is chosen, one can change the accompanying water yield file name in the \mintinline{bash}{luto.data} module.
+
+The format for the yield-increases CSV is the following: First row, each cell contains either 'dry' or 'irr'. Second row, each cell contains the product name --- \emph{not} the land-use name, multiple things may be yielded from a land use with different multipliers. (See the code of the \mintinline{python}{luto.data} module for how the product names are generated from the land-use names.) Product names are in all upper case. The first two rows are the headers which will be read in as a multi-indexed Pandas dataframe. Subsequent rows are the multipliers, the first one of those being all ones. See also Table~\ref{tab:yieldincreases}.
+
+\begin{table}
+\centering
+\begin{tabular}{rrr}
+dry    & dry                        & $\ldots$ \\
+APPLES & BEEF - MODIFIED LAND LEXP  & \\
+1      & 1                          & \\
+1.00372497691957 & 1.00984498317271 & \\
+$\vdots$      &                       & $\ddots$
+\end{tabular}
+\caption{Format of the yield-increases CSV file.}
+\label{tab:yieldincreases}
+\end{table}
+
+To build the files listed \emph{above} the dash, one needs the raw data files and the build script (\mintinline{bash}{luto/data/build.ipynb}). The build script also provides information about the format the model expects the input data to have. One exception being the yield-increases CSV file. The raw data files required are:
+\begin{itemize}
+\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}\setlength{\itemindent}{-.3cm}
+	\item \mintinline{bash}{cell_LU_mapping.h5}
+	\item \mintinline{bash}{cell_zones_df.h5}
+	\item \mintinline{bash}{tmatrix-categories.csv}
+	\item \mintinline{bash}{tmatrix-cat2lus.csv}
+	\item \mintinline{bash}{cell_livestock_data.h5}
+	\item \mintinline{bash}{SA2_crop_data.h5}
+	\item \mintinline{bash}{cell_biophysical_df.h5}
+	\item \mintinline{bash}{NLUM_SPREAD_LU_ID_Mapped_Concordance.h5}
+	\item \mintinline{bash}{SA2_climate_damage_mult.h5}
+\end{itemize}
+One straightforward way to produce the required input files is to copy the build script into the same directory as the raw data files. Then simply run the script, for example by issuing:
+
+\begin{minted}{bash}
+ipython build.ipynb
+\end{minted}
+This produces all the required files above the dash (and a few others). Then simply move or copy the produced files into the \mintinline{bash}{input} directory.
+
+\subsection{Running LUTO II}
+When all the input files are present, the LUTO II model can be run. To do this, first start a Python interpreter in the root of the package (the directory into which the code was cloned, e.g.\ \mintinline{bash}{neoluto}).Then load the \mintinline{python}{simulation} module, for example, like this:
+\begin{minted}{python}
+import luto.simulation as sim
+\end{minted}
+See Section~\ref{subsubsec:steprun} for more on stepping and running with the \mintinline{python}{simulation} module. Assuming one has loaded a demand vector into a variable called \mintinline{python}{demands}, one can now do a targeted run for, say, 2030 by issuing:
+\begin{minted}{python}
+sim.run( 2010
+       , 2030
+       , demands
+       , 1000
+       , style='direct'
+       , resfactor=False
+       , verbose=True )
+\end{minted}
+This run uses 2010 as the base year, a penalty level of 1000, no spatial coarse graining and prints the GUROBI output to the terminal. If one wants a run from 2010 to 2030 including all intervening years, one can issue:
+\begin{minted}{python}
+sim.run( 2010
+       , 2030
+       , demands
+       , 1000
+       , style='sequential'
+       , resfactor=False
+       , verbose=True )
+\end{minted}
+Either way, now one can use \mintinline{python}{sim.info()} to see which output lumaps and lmmaps are now available. After a single targeted run, there should be two sets of maps (base and target), while a sequential run would yield target $-$ base $+1$ maps. A map can be inspected using \mintinline{python}{sim.show_map(year)} (the legend and colour scheme may not be correct).
+
+The lumaps and lmmaps are stored in \mintinline{python}{sim.lumaps} and \mintinline{python}{lmmaps}, respectively. The \mintinline{python}{luto.tools.write} module provides a convenience function to extract the results for a specific target year and produce maps and statistics. To do this for the year 2030, issue:
+\begin{minted}{python}
+from luto.tools.write import write
+write(sim.data, sim, 2030)
+\end{minted}
+Where for \mintinline{python}{sim.data} one can also pass the normal data module (if it is loaded). The results will then be written in a directory with the present date as the name (e.g.\ 20220224) in the root directory of the package. This directory contains the maps as well as some crosstabulations for testing.
+
+
+
+
 
 
 \end{document}
-
