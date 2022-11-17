@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "Please cite the LUTO II codebase as below."
+message: "Please cite the LUTO 2.0 codebase as below."
 
 authors:
   - family-names: Haan
@@ -56,6 +56,6 @@ authors:
     orcid: 'https://orcid.org/0000-0003-4834-5641'
     affiliation: "Deakin University"
 
-title: "LUTO II (Land-Use Trade-Offs II)"
-version: II 1.0.x (dev)
+title: "LUTO 2.0 (Land-Use Trade-Offs Model Version 2.0)"
+version: 2.0 (dev)
 license: GPL-3.0+
