@@ -1,13 +1,27 @@
-#!/bin/env python3
+# Copyright 2022 Fjalar J. de Haan and Brett A. Bryan at Deakin University
 #
-# plotmap.py - to plot neoLUTO spatial arrays.
+# This file is part of LUTO 2.0.
 #
-# Based on code by: Brett Bryan (b.bryan@deakin.edu.au)
-# Adaptation: Fjalar de Haan (f.dehaan@deakin.edu.au)
-# Colour scheme by: Carla Archibald (c.archibald@deakin.edu.au)
-# Created: 2021-09-01
-# Last modified: 2021-09-09
+# LUTO 2.0 is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
 #
+# LUTO 2.0 is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+# A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# LUTO 2.0. If not, see <https://www.gnu.org/licenses/>.
+
+"""
+To plot neoLUTO spatial arrays.
+
+Based on code by: Brett Bryan (b.bryan@deakin.edu.au)
+Adaptation: Fjalar de Haan (f.dehaan@deakin.edu.au)
+Colour scheme by: Carla Archibald (c.archibald@deakin.edu.au)
+"""
+
 
 import os.path
 import sys
