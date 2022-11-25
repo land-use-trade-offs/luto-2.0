@@ -1,18 +1,18 @@
 # Copyright 2022 Fjalar J. de Haan and Brett A. Bryan at Deakin University
 #
 # This file is part of LUTO 2.0.
-# 
+#
 # LUTO 2.0 is free software: you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
-# 
+#
 # LUTO 2.0 is distributed in the hope that it will be useful, but WITHOUT ANY
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 # A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License along with
-# LUTO 2.0. If not, see <https://www.gnu.org/licenses/>. 
+# LUTO 2.0. If not, see <https://www.gnu.org/licenses/>.
 
 """
 Data about transitions costs.
@@ -28,13 +28,18 @@ import numpy_financial as npf
 from luto.economics.quantity import lvs_veg_types, get_yield_pot
 from luto.economics.cost import get_cost_matrices
 
-def amortise(cost, rate=0.05, horizon=30):
-    """Return amortised `cost` at `rate`interest over `horizon` years."""
-    return -1 * npf.pmt(rate, horizon, pv=cost, fv=0, when='begin')
+import luto.settings as settings
+
+
+def amortise(cost, rate = settings.DISCOUNT_RATE, horizon = settings.AMORTISATION_PERIOD):
+    """Return NPV of future `cost` amortised to annual value at discount `rate` over `horizon` years."""
+    return -1 * npf.pmt(rate, horizon, pv = cost, fv = 0, when = 'begin')
+
 
 def get_exclude_matrices(data, lumap):
     """Return x_mrj exclude matrices."""
-    # To be excluded based on SA2 data.
+
+    # Boolean exclusion matrix based on SA2 data.
     x_sa2 = data.EXCLUDE
 
     # Raw transition-cost matrix is in AUD/Ha and lexigraphically ordered.
@@ -47,10 +52,11 @@ def get_exclude_matrices(data, lumap):
     t_rj = np.stack(tuple(t_ij[lumap[r]] for r in range(ncells)))
 
     # To be excluded based on disallowed switches.
-    x_trn = np.where(np.isnan(t_rj), 0, 1)
+    x_rj = np.where(np.isnan(t_rj), 0, 1)
 
-    # Overal exclusion as elementwise, logical `and` of the exclude matrices.
-    return x_sa2 * x_trn
+    # Overal exclusion as elementwise, logical `and` of the 0/1 exclude matrices.
+    return (x_sa2 * x_rj).astype(np.int8)
+
 
 def get_transition_matrices(data, year, lumap, lmmap):
     """Return t_mrj transition-cost matrices.
@@ -94,8 +100,8 @@ def get_transition_matrices(data, year, lumap, lmmap):
     c_mrj = get_cost_matrices(data, year)
     c_mrj /= data.REAL_AREA[:, np.newaxis]
 
-    # Transition costs to commodity j at cell r using present lumap (in AUD/ha).
-    t_rj = np.stack(tuple(t_ij[lumap[r]] for r in range(ncells)))
+    # Transition costs for cell r to change to land-use j calculated based on using lumap (in AUD/ha).
+    t_rj = np.stack( tuple( t_ij[lumap[r]] for r in range(ncells) ) )
 
     # Convert water requirements for LVSTK from per head to per hectare.
     AQ_REQ_LVSTK_DRY_RJ = data.AQ_REQ_LVSTK_DRY_RJ.copy()
@@ -122,7 +128,7 @@ def get_transition_matrices(data, year, lumap, lmmap):
         j = lumap[r] # Current land-use index.
         m = lmmap[r] # Current land-man index.
 
-        # ... the switch is to the same land-use (regardless or irr status).
+        # ... the switch is to the same land-use and irr status).
         odelta_todry_rj[r, j] = 0
         odelta_toirr_rj[r, j] = 0
 
@@ -179,6 +185,7 @@ def get_transition_matrices(data, year, lumap, lmmap):
                          -      AQ_REQ_LVSTK_IRR_RJ[r, j] )
             # To pay: net water requirements x licence price.
             wdelta_toirr_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r]
+
             # Extra costs for irr infra change @10kAUD/ha if not lvstk -> lvstk.
             infradelta_j = 1E4 * np.ones(nlus)
             infradelta_j[j] = 0 # No extra cost if no land-use change at all.
@@ -201,7 +208,7 @@ def get_transition_matrices(data, year, lumap, lmmap):
                  ) * data.REAL_AREA[:, np.newaxis] # Conversion to AUD/cell.
 
     # Transition costs are amortised.
-    t_rj_todry = amortise(t_rj_todry)
+    t_rj_todry = amortise(t_rj_todry)                     ######################### Annual costs should not be amortised
     t_rj_toirr = amortise(t_rj_toirr)
 
     # Stack the t_rj matrices into one t_mrj array.

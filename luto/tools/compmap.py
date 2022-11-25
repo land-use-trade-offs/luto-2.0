@@ -1,34 +1,35 @@
 # Copyright 2022 Fjalar J. de Haan and Brett A. Bryan at Deakin University
 #
 # This file is part of LUTO 2.0.
-# 
+#
 # LUTO 2.0 is free software: you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
-# 
+#
 # LUTO 2.0 is distributed in the hope that it will be useful, but WITHOUT ANY
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 # A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License along with
-# LUTO 2.0. If not, see <https://www.gnu.org/licenses/>. 
+# LUTO 2.0. If not, see <https://www.gnu.org/licenses/>.
 
 """
-To compare neoLUTO spatial arrays.
+To compare LUTO 2.0 spatial arrays.
 """
 
 
 import numpy as np
 import pandas as pd
 
-def crossmap(oldmap, newmap, landuses=None):
+def crossmap(oldmap, newmap, landuses = None):
     """Return cross-tabulation matrix and net switching counts."""
 
     # Produce the cross-tabulation matrix with optional labels.
-    crosstab = pd.crosstab(oldmap, newmap, margins=True)
+    crosstab = pd.crosstab(oldmap, newmap, margins = True)
+
     # Make sure the cross-tabulation matrix is square.
-    crosstab = crosstab.reindex(crosstab.index, axis=1, fill_value=0)
+    crosstab = crosstab.reindex(crosstab.index, axis = 1, fill_value = 0)
     if landuses is not None:
         lus = landuses + ['Total']
         crosstab.columns = lus

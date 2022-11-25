@@ -25,17 +25,24 @@ from scipy.interpolate import interp1d
 
 def get_ccimpact(data, lu, lm, year):
     """Return climate change impact multiplier at (zero-based) year index."""
+    
+    # Check if land-use exists in CLIMATE_CHANGE_IMPACT (e.g., dryland Pears/Rice do not occur), if not return zeros
+    if lu not in {t[0] for t in data.CLIMATE_CHANGE_IMPACT[lm].columns}:
+        cci = np.zeros((data.NCELLS))
+        
+    else: # Calculate the quantities
+        # Convert year index to calendar year.
+        year += data.ANNUM
+    
+        # First make linear interpolation function.
+        xs = sorted({t[2] for t in data.CLIMATE_CHANGE_IMPACT.columns})
+        yys = data.CLIMATE_CHANGE_IMPACT[lm, lu]
+        f = interp1d(xs, yys, kind = 'linear', fill_value = 'extrapolate')
+        cci = f(year)
+        
+    # Return the interpolated values.                                        ################## Normalise ccimpact multipliers such that 2010 == 1
+    return cci
 
-    # Convert year index to calendar year.
-    year += data.ANNUM
-
-    # First make linear interpolation function.
-    xs = sorted({t[2] for t in data.CLIMATE_CHANGE_IMPACT.columns})
-    yys = data.CLIMATE_CHANGE_IMPACT[lm, lu]
-    f = interp1d(xs, yys, kind='linear', fill_value='extrapolate')
-
-    # Return the interpolated values.
-    return f(year)
 
 def lvs_veg_types(lu):
     """Return livestock and vegetation types of the livestock land-use `lu`."""
@@ -60,12 +67,13 @@ def lvs_veg_types(lu):
 
     return lvstype, vegtype
 
+
 def get_yield_pot( data # Data object or module.
                  , lvstype # Livestock type (one of 'BEEF', 'SHEEP' or 'DAIRY')
                  , vegtype # Vegetation type (one of 'NATL' or 'MODL')
                  , lm # Land-management type.
                  ):
-    """Return the yield potential for livestock and vegetation type."""
+    """Return the yield potential (head/ha) for livestock by land cover type."""
 
     # Factors varying as a function of `lvstype`.
     dse_per_head = { 'BEEF': 8
@@ -87,7 +95,7 @@ def get_yield_pot( data # Data object or module.
     elif vegtype == 'MODL':
         potential *= data.SAFE_PUR_MODL
     else:
-        raise KeyError("Vegetation type '%s' not identified." % vegtype)
+        raise KeyError("Land cover type '%s' not identified." % vegtype)
 
     # Multiply potential by appropriate irrigation factor.
     if lm == 'irr':
@@ -95,28 +103,35 @@ def get_yield_pot( data # Data object or module.
 
     return potential
 
+
 def get_quantity_lvstk( data # Data object or module.
-                      , pr   # Livestock + product like 'nveg-grazed wool').
+                      , pr   # Livestock + product like 'SHEEP - MODIFIED LAND WOOL').
                       , lm   # Land management.
                       , year # Number of years post base-year ('annum').
                       ):
-    """Return lvstk yield [tonne/cell] of `pr`+`lm` in `year` as 1D Numpy array.
-
+    """Return livestock yield of `pr`+`lm` in `year` as 1D Numpy array...
+    
     `data`: data object/module -- assumes fields like in `luto.data`.
     `pr`: product (like 'wool from nveg grazing sheep').
     `lm`: land management (e.g. 'dry', 'irr', 'org').
     `year`: number of years from base year, counting from zero.
+    
+    ...in the following units:
+    
+    BEEF and SHEEP meat (1) and live exports (3) in tonnes of meat per cell,
+    SHEEP wool (2) in tonnes per cell,
+    DAIRY (1) in kilolitres milk per cell.
     """
-    # Get livestock and vegetation type.
+    
+    # Get livestock and land cover type.
     lvstype, vegtype = lvs_veg_types(pr)
 
     # Get the yield potential.
     yield_pot = get_yield_pot(data, lvstype, vegtype, lm)
 
     # Determine base quantity case-by-case.
-    #
 
-    # Beef yields just beef (Q1) and live exports (Q3).
+    # Beef yields just beef (1) and live exports (3) (both in tonnes of meat per ha).
     if lvstype == 'BEEF': # (F1 * Q1) or (F3 * Q3).
         if 'MEAT' in pr:
             quantity = ( data.AGEC_LVSTK['F1', lvstype]
@@ -127,7 +142,7 @@ def get_quantity_lvstk( data # Data object or module.
         else:
             raise KeyError("Unknown %s product. Check `pr` key." % lvstype)
 
-    # Sheep yield sheep meat (Q1), wool (Q2) or live exports (Q3).
+    # Sheep yield sheep meat (1), wool (2) or live exports (3).
     elif lvstype == 'SHEEP': # (F1 * Q1), (F2 * Q2) or (F3 * Q3).
         if 'MEAT' in pr:
             quantity = ( data.AGEC_LVSTK['F1', lvstype]
@@ -141,11 +156,12 @@ def get_quantity_lvstk( data # Data object or module.
         else:
             raise KeyError("Unknown %s product. Check `pr` key." % lvstype)
 
-    # Dairy yields just dairy (Q1).
+    # Dairy yields just dairy (1, kilolitres of milk per ha).
     elif lvstype == 'DAIRY': # (F1 * Q1).
         if 'DAIRY' in pr: # No 'elif', just keeping structure consistent.
             quantity = ( data.AGEC_LVSTK['F1', lvstype]
-                       * data.AGEC_LVSTK['Q1', lvstype] )
+                       * data.AGEC_LVSTK['Q1', lvstype] 
+                       / 1000 ) # Convert to KL
         else:
             raise KeyError("Unknown %s product. Check `pr` key." % lvstype)
 
@@ -160,26 +176,34 @@ def get_quantity_lvstk( data # Data object or module.
 
     return quantity
 
+
 def get_quantity_crop( data # Data object or module.
                      , pr   # Product -- equivalent to land use for crops.
                      , lm   # Land management.
                      , year # Number of years post base-year ('annum').
                      ):
-    """Return crop yield [tonne/cell] of `pr`+`lm` in `year` as 1D Numpy array.
+    """Return crop yield (tonne/cell) of `pr`+`lm` in `year` as 1D Numpy array.
 
     `data`: data object/module -- assumes fields like in `luto.data`.
     `pr`: product -- equivalent to land use for crops (e.g. 'winterCereals').
-    `lm`: land management (e.g. 'dry', 'irr', 'org').
+    `lm`: land management (e.g. 'dry', 'irr').
     `year`: number of years from base year, counting from zero.
     """
-
-    # Get the raw quantities in tonnes/ha from data.
-    quantity = data.AGEC_CROPS['Yield', lm, pr].to_numpy()
-
-    # Convert to tonnes/cell.
-    quantity *= data.REAL_AREA
-
+    
+    # Check if land-use exists in AGEC_CROPS (e.g., dryland Pears/Rice do not occur), if not return zeros
+    if pr not in data.AGEC_CROPS['Yield', lm].columns:
+        quantity = np.zeros((data.NCELLS))
+        
+    else: # Calculate the quantities
+        
+        # Get the raw quantities in tonnes/ha from data.
+        quantity = data.AGEC_CROPS['Yield', lm, pr].copy().to_numpy()
+    
+        # Convert to tonnes/cell.
+        quantity *= data.REAL_AREA 
+    
     return quantity
+
 
 def get_quantity( data # Data object or module.
                 , pr   # The stuff yielded.
@@ -196,21 +220,24 @@ def get_quantity( data # Data object or module.
     # If it is a crop, it is known how to get the quantities.
     if pr in data.PR_CROPS:
         q = get_quantity_crop(data, pr.capitalize(), lm, year)
+        
     # If it is livestock, it is known how to get the quantities.
     elif pr in data.PR_LVSTK:
         q = get_quantity_lvstk(data, pr, lm, year)
+        
     # If it is none of the above, it is not known how to get the quantities.
     else:
         raise KeyError("Land use '%s' not found in data." % pr)
 
-    # Apply yield increase multiplier.
-    q *= data.YIELDINCREASE[lm, pr][year]
+    # Apply yield increase multiplier.                                     ***************** Turned off yield modifiers for now
+    # q *= data.YIELDINCREASE[lm, pr][year]
 
     # Apply climate change impact multiplier.
-    lu = data.PR2LU_DICT[pr]
-    q *= get_ccimpact(data, lu, lm, year)
+    # lu = data.PR2LU_DICT[pr]
+    # q *= get_ccimpact(data, lu, lm, year)
 
     return q
+
 
 def get_quantity_matrix(data, lm, year):
     """Return q_rp matrix of quantities per cell per pr as 2D Numpy array."""
@@ -219,6 +246,7 @@ def get_quantity_matrix(data, lm, year):
         q_rp[:, j] = get_quantity(data, pr, lm, year)
     # Make sure all NaNs are replaced by zeroes.
     return np.nan_to_num(q_rp)
+
 
 def get_quantity_matrices(data, year):
     """Return q_mrp matrix of quantities per cell as 3D Numpy array."""

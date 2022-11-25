@@ -1,18 +1,18 @@
 # Copyright 2022 Fjalar J. de Haan and Brett A. Bryan at Deakin University
 #
 # This file is part of LUTO 2.0.
-# 
+#
 # LUTO 2.0 is free software: you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
-# 
+#
 # LUTO 2.0 is distributed in the hope that it will be useful, but WITHOUT ANY
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 # A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License along with
-# LUTO 2.0. If not, see <https://www.gnu.org/licenses/>. 
+# LUTO 2.0. If not, see <https://www.gnu.org/licenses/>.
 
 """
 Pure helper functions and other tools.
@@ -26,19 +26,37 @@ import pandas as pd
 import numpy as np
 
 
-def lumap2x_mrj(lumap, lmmap):
+def lumap2x_mrj_old(lumap, lmmap):
     """Return land-use maps in decision-variable (X_mrj) format."""
+
     drystack = []
     irrstack = []
     for j in range(28):
-        jmap = np.where(lumap==j, 1, 0) # One boolean map for each land use.
-        jdrymap = np.where(lmmap==0, jmap, 0) # Keep only dryland version.
-        jirrmap = np.where(lmmap==1, jmap, 0) # Keep only irrigated version.
-        drystack.append(jdrymap)
-        irrstack.append(jirrmap)
-    x_dry_rj = np.stack(drystack, axis=1)
-    x_irr_rj = np.stack(irrstack, axis=1)
-    return np.stack((x_dry_rj, x_irr_rj)) # In x_mrj format.
+        jmap = np.where( lumap == j, 1, 0 )                  # One boolean map for each land use.
+        drystack.append( np.where( lmmap == 0, jmap, 0 ) )   # Keep only dryland version.
+        irrstack.append( np.where( lmmap == 1, jmap, 0 ) )   # Keep only irrigated version.
+
+    x_dry_rj = np.stack( drystack, axis = 1 )
+    x_irr_rj = np.stack( irrstack, axis = 1 )
+
+    return np.stack((x_dry_rj, x_irr_rj))         # In x_mrj format.
+
+
+def lumap2x_mrj(lumap, lmmap):
+    """Return land-use maps in decision-variable (X_mrj) format.
+       Where 'm' is land mgt, 'r' is cell, and 'j' is land-use."""
+
+    # Set up a container array of shape m, r, j.
+    x_mrj = np.zeros((2, lumap.shape[0], 28), dtype = bool)
+
+    # Populate the 3D land-use, land mgt mask.
+    for j in range(28):
+        jmap = np.where( lumap == j, True, False ).astype(bool)    # One boolean map for each land use.
+        x_mrj[0, :, j] = np.where( lmmap == False, jmap, False )   # Keep only dryland version.
+        x_mrj[1, :, j] = np.where( lmmap == True, jmap, False )    # Keep only irrigated version.
+
+    return x_mrj
+
 
 
 def timethis(function, *args, **kwargs):
