@@ -46,8 +46,8 @@ def create_new_dataset():
     nlum_inpath = 'N:/Planet-A/Data-Master/National_Landuse_Map/'
     
     # Set data output paths
-    raw_data = RAW_DATA # '../raw_data/'
-    outpath = INPUT_DIR
+    raw_data = RAW_DATA + '/' # '../raw_data/'
+    outpath = INPUT_DIR + '/'
     
     # Delete the data folders' contents
     for file in os.scandir(outpath): os.remove(file.path)
