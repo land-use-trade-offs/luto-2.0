@@ -196,10 +196,10 @@ for lu in LANDUSES:
     else:
         aq_req_crops_irr[lu] = 0.0
 
-AQ_REQ_CROPS_DRY_RJ = np.zeros((NCELLS, NLUS), dtype = np.int8)                                  ######################### Not required - large array of zeros
-AQ_REQ_CROPS_IRR_RJ = np.nan_to_num( aq_req_crops_irr.to_numpy( dtype = np.float32 ) )
-AQ_REQ_LVSTK_DRY_RJ = np.nan_to_num( aq_req_lvstk_dry.to_numpy( dtype = np.float32 ) )
-AQ_REQ_LVSTK_IRR_RJ = np.nan_to_num( aq_req_lvstk_irr.to_numpy( dtype = np.float32 ) )
+# Add together as they have nans where not lvstk/crops
+AQ_REQ_DRY_RJ = np.nan_to_num(aq_req_lvstk_dry.to_numpy(dtype = np.float32))
+AQ_REQ_IRR_RJ = np.nan_to_num(aq_req_crops_irr.to_numpy(dtype = np.float32)) + \
+                np.nan_to_num(aq_req_lvstk_irr.to_numpy(dtype = np.float32))
 
 # Spatially explicit costs of a water licence per ML.
 WATER_LICENCE_PRICE = np.nan_to_num( pd.read_hdf(os.path.join(INPUT_DIR, 'water_licence_price.h5')).to_numpy() )
