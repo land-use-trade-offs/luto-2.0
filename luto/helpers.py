@@ -19,7 +19,7 @@ LUTO 2.0 temporary helper code.
 """
 
 
-from luto.data.dataprep import create_new_dataset
+from luto.dataprep import create_new_dataset
 create_new_dataset()
 
 

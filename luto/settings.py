@@ -36,6 +36,7 @@ pd.set_option('display.float_format', '{:,.4f}'.format)
 INPUT_DIR = 'input'
 OUTPUT_DIR = 'output'
 DATA_DIR = 'input'
+RAW_DATA = '../raw_data'
 
 # ---------------------------------------------------------------------------- #
 # Parameters.                                                                  #
