@@ -28,33 +28,33 @@ import numpy as np
 
 def lumap2x_mrj_old(lumap, lmmap):
     """Return land-use maps in decision-variable (X_mrj) format."""
-
+    
     drystack = []
     irrstack = []
     for j in range(28):
         jmap = np.where( lumap == j, 1, 0 )                  # One boolean map for each land use.
         drystack.append( np.where( lmmap == 0, jmap, 0 ) )   # Keep only dryland version.
         irrstack.append( np.where( lmmap == 1, jmap, 0 ) )   # Keep only irrigated version.
-
+    
     x_dry_rj = np.stack( drystack, axis = 1 )
     x_irr_rj = np.stack( irrstack, axis = 1 )
-
+    
     return np.stack((x_dry_rj, x_irr_rj))         # In x_mrj format.
 
 
 def lumap2x_mrj(lumap, lmmap):
     """Return land-use maps in decision-variable (X_mrj) format.
        Where 'm' is land mgt, 'r' is cell, and 'j' is land-use."""
-
-    # Set up a container array of shape m, r, j.
+    
+    # Set up a container array of shape m, r, j. 
     x_mrj = np.zeros((2, lumap.shape[0], 28), dtype = bool)
-
-    # Populate the 3D land-use, land mgt mask.
+    
+    # Populate the 3D land-use, land mgt mask. 
     for j in range(28):
         jmap = np.where( lumap == j, True, False ).astype(bool)    # One boolean map for each land use.
         x_mrj[0, :, j] = np.where( lmmap == False, jmap, False )   # Keep only dryland version.
         x_mrj[1, :, j] = np.where( lmmap == True, jmap, False )    # Keep only irrigated version.
-
+    
     return x_mrj
 
 

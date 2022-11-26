@@ -229,12 +229,12 @@ def get_quantity( data # Data object or module.
     else:
         raise KeyError("Land use '%s' not found in data." % pr)
 
-    # Apply yield increase multiplier.                                     ***************** Turned off yield modifiers for now
-    # q *= data.YIELDINCREASE[lm, pr][year]
+    # Apply yield increase multiplier.
+    q *= data.YIELDINCREASE[lm, pr][year]
 
     # Apply climate change impact multiplier.
-    # lu = data.PR2LU_DICT[pr]
-    # q *= get_ccimpact(data, lu, lm, year)
+    lu = data.PR2LU_DICT[pr]
+    q *= get_ccimpact(data, lu, lm, year)
 
     return q
 

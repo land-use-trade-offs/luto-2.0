@@ -31,7 +31,7 @@ import luto.settings as settings
 from luto.economics.cost import get_cost_matrices
 from luto.economics.quantity import get_quantity_matrices
 from luto.economics.transitions import (get_transition_matrices, get_exclude_matrices)
-from luto.economics.water import get_water_req
+from luto.economics.water import get_aqreq_limits
 from luto.solvers.solver import solve
 from luto.tools.plotmap import plotmap
 from luto.tools import lumap2x_mrj
@@ -57,39 +57,38 @@ class Data():
 
         # Mask from lumap.
         self.mask_lu_code = -1 # The lu code to exclude.
-        self.lumask = lumap != self.mask_lu_code # True means _included_.
+        self.lumask = lumap != self.mask_lu_code   # True means _included_. Boolean dtype.
         # Mask from resfactor is superimposed on lumap mask.
         if resmask is not None:
             # self.resmask = resmask
-            self.mask = self.lumask * resmask
+            self.mask = self.lumask * resmask      # Boolean dtype
         else:
-            self.mask = self.lumask
+            self.mask = self.lumask                # Boolean dtype
         self.mindices = np.where(self.mask)[0].astype(np.int32)
 
         # Spatial data is sub-setted based on the above masks.
         self.NCELLS = self.mask.sum()
         self.EXCLUDE = bdata.EXCLUDE[:, self.mask, :]
-        self.AGEC_CROPS = bdata.AGEC_CROPS.iloc[self.mask]
-        self.AGEC_LVSTK = bdata.AGEC_LVSTK.iloc[self.mask]
-        self.REAL_AREA = bdata.REAL_AREA[self.mask]
-        self.LUMAP = bdata.LUMAP[self.mask]
-        self.LMMAP = bdata.LMMAP[self.mask]
-        self.AQ_REQ_CROPS_DRY_RJ = bdata.AQ_REQ_CROPS_DRY_RJ[self.mask]         # No need for this as it is always zero
-        self.AQ_REQ_CROPS_IRR_RJ = bdata.AQ_REQ_CROPS_IRR_RJ[self.mask]         # Irrigation water requirements for crops
-        self.AQ_REQ_LVSTK_DRY_RJ = bdata.AQ_REQ_LVSTK_DRY_RJ[self.mask]         # Drinking water for livestock
-        self.AQ_REQ_LVSTK_IRR_RJ = bdata.AQ_REQ_LVSTK_IRR_RJ[self.mask]         # Irrigation water requirements for pasture plus drinking water for livestock
-        self.WATER_LICENCE_PRICE = bdata.WATER_LICENCE_PRICE[self.mask]
-        self.WATER_DELIVERY_PRICE = bdata.WATER_DELIVERY_PRICE[self.mask]
-        self.WATER_YIELD_BASE_DR = bdata.WATER_YIELD_BASE_DR                    # No mask
-        self.WATER_YIELD_BASE_SR = bdata.WATER_YIELD_BASE_SR[self.mask]
-        self.FEED_REQ = bdata.FEED_REQ[self.mask]
-        self.PASTURE_KG_DM_HA = bdata.PASTURE_KG_DM_HA[self.mask]
-        self.SAFE_PUR_MODL = bdata.SAFE_PUR_MODL[self.mask]
-        self.SAFE_PUR_NATL = bdata.SAFE_PUR_NATL[self.mask]
-        self.RIVREG_ID = bdata.RIVREG_ID[self.mask]
-        self.DRAINDIV_ID = bdata.DRAINDIV_ID[self.mask]
-        self.DRAINDIV_DICT = bdata.DRAINDIV_DICT
+        self.AGEC_CROPS = bdata.AGEC_CROPS.iloc[self.mask]                      # MultiIndex Dataframe [4218733 rows x 342 columns]
+        self.AGEC_LVSTK = bdata.AGEC_LVSTK.iloc[self.mask]                      # MultiIndex Dataframe [4218733 rows x 39 columns]
+        self.REAL_AREA = bdata.REAL_AREA[self.mask]                             # Actual Float32
+        self.LUMAP = bdata.LUMAP[self.mask]                                     # Int8
+        self.LMMAP = bdata.LMMAP[self.mask]                                     # Int8
+        self.AQ_REQ_IRR_RJ = bdata.AQ_REQ_IRR_RJ[self.mask]                     # Water requirements for irrigated landuses
+        self.AQ_REQ_DRY_RJ = bdata.AQ_REQ_DRY_RJ[self.mask]                     # Water requirements for dryland landuses
+        self.WATER_LICENCE_PRICE = bdata.WATER_LICENCE_PRICE[self.mask]         # Int16
+        self.WATER_DELIVERY_PRICE = bdata.WATER_DELIVERY_PRICE[self.mask]       # Float32
+        self.WATER_YIELD_BASE_DR = bdata.WATER_YIELD_BASE_DR                    # Float32, no mask
+        self.WATER_YIELD_BASE_SR = bdata.WATER_YIELD_BASE_SR[self.mask]         # Float32
+        self.FEED_REQ = bdata.FEED_REQ[self.mask]                               # Float32 
+        self.PASTURE_KG_DM_HA = bdata.PASTURE_KG_DM_HA[self.mask]               # Int16  
+        self.SAFE_PUR_MODL = bdata.SAFE_PUR_MODL[self.mask]                     # Float32
+        self.SAFE_PUR_NATL = bdata.SAFE_PUR_NATL[self.mask]                     # Float32
+        self.RIVREG_ID = bdata.RIVREG_ID[self.mask]                             # Int16
+        self.DRAINDIV_ID = bdata.DRAINDIV_ID[self.mask]                         # Int8
         self.CLIMATE_CHANGE_IMPACT = bdata.CLIMATE_CHANGE_IMPACT[self.mask]
+        self.RIVREG_DICT = bdata.RIVREG_DICT
+        self.DRAINDIV_DICT = bdata.DRAINDIV_DICT
 
         # Slice this year off HDF5 bricks. TODO: This field is not in luto.data.
         # self.WATER_YIELD_NUNC_DR = bdata.WATER_YIELDS_DR[year][self.mindices]
@@ -177,9 +176,9 @@ def get_limits():
     print('Getting environmental limits...', end = ' ')
     # Limits is a dictionary with heterogeneous value sets.
     limits = {}
-
+    
     aqreq_mrj, aqreq_limits = get_aqreq_limits(data)
-
+    
     limits['water'] = [aqreq_mrj, aqreq_limits]
 
     # # Water limits.
@@ -190,7 +189,7 @@ def get_limits():
     #     stress = get_water_stress(data, target_index, mask)
     #     stresses.append((basefrac, stress))
     #     limits['water'] = stresses
-
+    
     print('Done.')
     return limits
 
@@ -260,8 +259,8 @@ def rfparams(lxmap, factor, sampling):
     else:
         raise ValueError("Unknown sampling: %s" % sampling)
 
-
-
+    
+    
 def step( base    # Base year from which the data is taken.
         , target  # Year to be solved for.
         , demands # Demands in the form of a d_c array.
@@ -309,7 +308,7 @@ def run( base
        # , resfactor = False
        ):
     """Run the simulation."""
-
+    
     # The number of times the solver is to be called.
     steps = target - base
 
@@ -384,11 +383,11 @@ def get_results(year = None):
 
 def get_production(year):
     """Return total production of commodities for a specific year...
-
-    Can return base year production (e.g., year = 2010) or can return production for
+       
+    Can return base year production (e.g., year = 2010) or can return production for 
     a simulated year if one exists (i.e., year = 2030) check sim.info()).
-
-    Includes the impacts of land-use change, productivity increases, and
+    
+    Includes the impacts of land-use change, productivity increases, and 
     climate change on yield."""
 
     # Acquire local names for matrices and shapes.
@@ -434,26 +433,17 @@ def get_production(year):
 # Main code                                                                                                                #
 ############################################################################################################################
 
-# Placeholder for module-global data object. To be set by `prep()`.
-# data = None
-
-# Is the model ready for the next simulation step? Set by `prep()`.
-# ready = False
-
-# resfactor = True
-# ressamp = None    # 'linear' or 'quadratic'
-# resmask = None
-# resmult = 1
-
 # Containers for simulation output. First entry from base data.
 lumaps = {bdata.ANNUM: bdata.LUMAP}
 lmmaps = {bdata.ANNUM: bdata.LMMAP}
 shapes = {bdata.ANNUM: (bdata.NLMS, bdata.NCELLS, bdata.NLUS)}
 dvars = {}
 
-# Provide agricultural commodity demands.
-rnd = (np.random.rand(100, len(bdata.COMMODITIES)) + 1) # random numbers [-0.5 - +0.5], shape = 100 years x 26 commodities. Placeholder demand multiplier.
-prod_2010 = get_production(bdata.ANNUM)
-d_c = prod_2010 + (prod_2010 * rnd / 10) # Demands calculated as random +/- difference compared to 2010 production
-
-### Demands needs to be a timeseries from 2010 to target year
+# Provide agricultural commodity demands as timeseries from 2010 to target year.
+# rnd = (np.random.rand(100, len(bdata.COMMODITIES)) + 1) # random numbers [-0.5 - +0.5], shape = 100 years x 26 commodities. Placeholder demand multiplier.
+# prod_2010 = get_production(bdata.ANNUM)
+# d_c = prod_2010 + (prod_2010 * rnd / 10) # Demands calculated as random +/- difference compared to 2010 production
+# d_c = np.round(d_c).astype(np.int32)
+# np.save('input/d_c.npy', d_c)
+d_c = np.load('input/d_c.npy') # Saved so as to be reproducible
+### 

@@ -27,7 +27,7 @@ def crossmap(oldmap, newmap, landuses = None):
 
     # Produce the cross-tabulation matrix with optional labels.
     crosstab = pd.crosstab(oldmap, newmap, margins = True)
-
+    
     # Make sure the cross-tabulation matrix is square.
     crosstab = crosstab.reindex(crosstab.index, axis = 1, fill_value = 0)
     if landuses is not None:

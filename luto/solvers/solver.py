@@ -76,16 +76,16 @@ def solve( t_mrj          # Transition cost matrices.
     # # Divide by quantity per hectare to obtain cost per tonne.
     # qprime_mrp = np.where(q_mrp != 0, q_mrp, np.inf) # Avoid division by zero.
     # cpert_mrp = c_mrp / qprime_mrp
-
+    
     # # Cost per tonne in PR/p representation.
     # c_p = [cpert_mrp.T[p].max() for p in range(nprs)]
-
+    
     # # Commodities from multiple sources get average costs.
     # p2c_cp = pr2cm_cp / pr2cm_cp.sum(axis=1)[:, np.newaxis]
-
+    
     # # Finally, cost per tonne in CM/c representation.
     # c_c = p2c_cp @ c_p
-
+    
     # # Apply the penalty-level multiplier.
     # p_c = penalty * c_c
 
@@ -102,7 +102,7 @@ def solve( t_mrj          # Transition cost matrices.
         # Land-use indexed lists of ncells-sized decision variable vectors.
         X_dry = [ model.addMVar(ncells, ub = x_mrj[0, :, j], name = 'X_dry')
                   for j in range(nlus) ]
-
+        
         X_irr = [ model.addMVar(ncells, ub = x_mrj[1, :, j], name = 'X_irr')
                   for j in range(nlus) ]
 
@@ -117,30 +117,30 @@ def solve( t_mrj          # Transition cost matrices.
         # objective = ( sum( # Production costs.
         #                    c_mrj[0].T[j] @ X_dry[j]
         #                  + c_mrj[1].T[j] @ X_irr[j]
-
+                         
         #                    # Transition costs.
         #                  + t_mrj[0].T[j] @ X_dry[j]
         #                  + t_mrj[1].T[j] @ X_irr[j]
-
+                         
         #                    # For all land uses.
         #                    for j in range(nlus) )
-
+                     
         #             + sum( # Penalties.
         #                    V[c] for c in range(ncms) )
         #             )
 
-        # BB mod 1
+        # BB mod 1        
         # objective = ( sum( # Production costs + transition costs.
         #                    ( c_mrj[0].T[j] + t_mrj[0].T[j] ) @ X_dry[j]
         #                  + ( c_mrj[1].T[j] + t_mrj[1].T[j] ) @ X_irr[j]
-
+                         
         #                    # For all land uses.
         #                    for j in range(nlus) )
-
+                     
         #             + sum( # Penalties.
         #                    V[c] for c in range(ncms) )
         #             )
-
+        
         #BB mod 2
         # Pre-calculate sum of production and transition costs and apply penalty
         ct_mrj = (c_mrj + t_mrj) / penalty
@@ -150,17 +150,17 @@ def solve( t_mrj          # Transition cost matrices.
                          # + ct_mrj[1].T[j] @ X_irr[j]
                            ct_mrj[0, :, j] @ X_dry[j]  # using matrix indexing and slicing
                          + ct_mrj[1, :, j] @ X_irr[j]
-
+                         
                            # For all land uses.
                            for j in range(nlus) )
-
+                     
                     + sum( # Add variables for ensuring demand of each commodity is met (approximately).
                            V[c] for c in range(ncms) )
                     )
 
-
+        
         model.setObjective(objective, GRB.MINIMIZE)
-
+        
 
         # ------------ #
         # Constraints. #
@@ -168,7 +168,7 @@ def solve( t_mrj          # Transition cost matrices.
 
         # Constraint that all of every cell is used for some land use.
         model.addConstr( sum( X_dry + X_irr ) == np.ones(ncells) )
-
+        
         # Constraints to penalise under and over production compared to demand.
 
         # Transform decision vars from LU/j to PR/p representation.
@@ -191,27 +191,27 @@ def solve( t_mrj          # Transition cost matrices.
         q_c = [q_dry_c[c] + q_irr_c[c] for c in range(ncms)]
 
         # Finally, add the constraint in the CM/c representation.
-        model.addConstrs( (d_c[c] - q_c[c]) <= V[c]
+        model.addConstrs( (d_c[c] - q_c[c]) <= V[c] 
                           for c in range(ncms) )
-        model.addConstrs( (q_c[c] - d_c[c]) <= V[c]
+        model.addConstrs( (q_c[c] - d_c[c]) <= V[c] 
                           for c in range(ncms) )
 
         # Only add the following constraints if target provided.
 
         if 'water' in limits:
-
+            
             # Returns water requirements for agriculture in mrj format and region-specific water use limits
             aqreq_mrj, aqreq_limits = limits['water']
-
+            
             # Ensure water use remains below limit for each region
             for region, aqreq_reg_limit, ind in aqreq_limits:
-
+                
                 aqreq_region = sum( aqreq_mrj[0, ind, j] @ X_dry[j][ind]
-                              + aqreq_mrj[1, ind, j] @ X_irr[j][ind]
-                                for j in range(nlus) )
-
+                                  + aqreq_mrj[1, ind, j] @ X_irr[j][ind]
+                                    for j in range(nlus) )
+                
                 model.addConstr(aqreq_region <= aqreq_reg_limit)
-                print('...added water limits %s <= %s ML' % (region, aqreq_reg_limit))
+                print('...water limit region %s <= %s ML' % (region, aqreq_reg_limit))
 
 
         if 'nutrients' in limits:
@@ -229,17 +229,17 @@ def solve( t_mrj          # Transition cost matrices.
 
         st = time.time()
         print('Starting solve... ', time.ctime())
-
+        
         # Magic.
         model.optimize()
-
+        
         ft = time.time()
         print('Completed solve...', time.ctime())
         print('Found optimal objective value', round(model.objVal, 2), 'in', round(ft - st), 'seconds\n')
-
+        
         print('Collecting results...', end = '')
-
-        # Collect optimised decision variables in one X_mrj Numpy array.
+              
+        # Collect optimised decision variables in one X_mrj Numpy array.              
         X_dry_rj = np.stack([X_dry[j].X for j in range(nlus)])
         X_irr_rj = np.stack([X_irr[j].X for j in range(nlus)])
         X_mrj = np.stack((X_dry_rj, X_irr_rj))
@@ -258,10 +258,10 @@ def solve( t_mrj          # Transition cost matrices.
 
         lmmap = np.where( stack_dry.max(axis=0) >= stack_irr.max(axis=0)
                         , 0, 1 )
-
+        
         print('Done\n')
         print('Total processing time...', round(time.time() - start_time), 'seconds')
-
+        
         return lumap, lmmap, X_mrj
 
     except gp.GurobiError as e:
@@ -269,7 +269,7 @@ def solve( t_mrj          # Transition cost matrices.
 
     except AttributeError:
         print('Encountered an attribute error')
-
+        
 
 
 

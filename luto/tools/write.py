@@ -30,36 +30,36 @@ from luto.tools.compmap import *
 
 # Summarise and write outputs to file. 'year' is calendar year (e.g., 2030)
 def write(data, sim, year):
-
+    
     # Create a directory for the files.
     path = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
-    path = 'output/' + path
+    path = 'output/' + path 
     if not os.path.exists(path):
         os.mkdir(path)
-
+    
     print('\nWriting outputs to', path, '\n')
-
+    
 
     # Write out the target year numpy arrays
     lumap_fname = 'lumap' + str(year) + '.npy'
     lmmap_fname = 'lmmap' + str(year) + '.npy'
     np.save(os.path.join(path, lumap_fname), sim.lumaps[year])
     np.save(os.path.join(path, lmmap_fname), sim.lmmaps[year])
-
+    
     # Write out the 2010 GeoTiffs for land-use and land management
     lumap_fname = 'lumap' + str(data.ANNUM) + '.tiff'
     lmmap_fname = 'lmmap' + str(data.ANNUM) + '.tiff'
     write_lumap_gtiff(sim.lumaps[data.ANNUM], os.path.join(path, lumap_fname))
     write_lumap_gtiff(sim.lmmaps[data.ANNUM], os.path.join(path, lmmap_fname))
-
+    
     # Write out the target year GeoTiffs for land-use and land management
     lumap_fname = 'lumap' + str(year) + '.tiff'
     lmmap_fname = 'lmmap' + str(year) + '.tiff'
     write_lumap_gtiff(sim.lumaps[year], os.path.join(path, lumap_fname))
     write_lumap_gtiff(sim.lmmaps[year], os.path.join(path, lmmap_fname))
-
+    
     # Calculate data for quantity comparison
-    prod_base = sim.get_production(data.ANNUM)     # Get commodity quantities produced in 2010
+    prod_base = sim.get_production(data.ANNUM)     # Get commodity quantities produced in 2010 
     prod_targ = sim.get_production(year)           # Get commodity quantities produced in target year
     demands = sim.d_c[year - data.ANNUM]           # Get commodity demands for target year
     abs_diff = prod_targ - demands                 # Diff between taget year production and demands in absolute terms (i.e. tonnes etc)
@@ -73,8 +73,9 @@ def write(data, sim, year):
     df['Abs_diff (tonnes, KL)'] = abs_diff
     df['Prop_diff (%)'] = prop_diff
     df.to_csv(os.path.join(path, 'quantity_comparison.csv'), index = False)
-
-    np.save('decvars-mrj.npy', sim.dvars[year])
+    
+    # Save decision variables. Commented out as the output is 1.8GB
+    # np.save(os.path.join(path, 'decvars-mrj.npy'), sim.dvars[year])
 
     LUS = ['Non-agricultural land'] + data.LANDUSES
 

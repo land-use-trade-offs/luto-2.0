@@ -38,7 +38,7 @@ def amortise(cost, rate = settings.DISCOUNT_RATE, horizon = settings.AMORTISATIO
 
 def get_exclude_matrices(data, lumap):
     """Return x_mrj exclude matrices."""
-
+    
     # Boolean exclusion matrix based on SA2 data.
     x_sa2 = data.EXCLUDE
 
@@ -104,15 +104,15 @@ def get_transition_matrices(data, year, lumap, lmmap):
     t_rj = np.stack( tuple( t_ij[lumap[r]] for r in range(ncells) ) )
 
     # Convert water requirements for LVSTK from per head to per hectare.
-    AQ_REQ_LVSTK_DRY_RJ = data.AQ_REQ_LVSTK_DRY_RJ.copy()
-    AQ_REQ_LVSTK_IRR_RJ = data.AQ_REQ_LVSTK_IRR_RJ.copy()
+    AQ_REQ_DRY_RJ = data.AQ_REQ_DRY_RJ.copy()
+    AQ_REQ_IRR_RJ = data.AQ_REQ_IRR_RJ.copy()
     for lu in data.LANDUSES:
         if lu in data.LU_LVSTK:
             lvs, veg = lvs_veg_types(lu)
             j = data.LANDUSES.index(lu)
-            AQ_REQ_LVSTK_DRY_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'dry')
-            AQ_REQ_LVSTK_IRR_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'irr')
-
+            AQ_REQ_DRY_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'dry')
+            AQ_REQ_IRR_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'irr')
+            
     # Foregone income is incurred @ 3x new production cost unless ...
     odelta_todry_rj = 3 * c_mrj[0]
     odelta_toirr_rj = 3 * c_mrj[1]
@@ -140,10 +140,8 @@ def get_transition_matrices(data, year, lumap, lmmap):
             # -------------------------------------------------------------- #
 
             # Net water requirements.
-            aq_req_net = ( data.AQ_REQ_CROPS_DRY_RJ[r]
-                         +      AQ_REQ_LVSTK_DRY_RJ[r]
-                         - data.AQ_REQ_CROPS_DRY_RJ[r, j]
-                         -      AQ_REQ_LVSTK_DRY_RJ[r, j] )
+            aq_req_net = ( data.AQ_REQ_DRY_RJ[r]
+                         - data.AQ_REQ_DRY_RJ[r, j] )
             # To pay: net water requirements x licence price.
             wdelta_todry_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r]
 
@@ -152,10 +150,8 @@ def get_transition_matrices(data, year, lumap, lmmap):
             # -------------------------------------------------------------- #
 
             # Net water requirements.
-            aq_req_net = ( data.AQ_REQ_CROPS_IRR_RJ[r]
-                         +      AQ_REQ_LVSTK_IRR_RJ[r]
-                         - data.AQ_REQ_CROPS_DRY_RJ[r, j]
-                         -      AQ_REQ_LVSTK_DRY_RJ[r, j] )
+            aq_req_net = ( data.AQ_REQ_IRR_RJ[r]
+                         - data.AQ_REQ_DRY_RJ[r, j] )
             # To pay: net water requirements x licence price and 10kAUD.
             wdelta_toirr_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r] + 1E4
 
@@ -167,10 +163,8 @@ def get_transition_matrices(data, year, lumap, lmmap):
             # ---------------------------------------------------------------#
 
             # Net water requirements.
-            aq_req_net = ( data.AQ_REQ_CROPS_DRY_RJ[r]
-                         +      AQ_REQ_LVSTK_DRY_RJ[r]
-                         - data.AQ_REQ_CROPS_IRR_RJ[r, j]
-                         -      AQ_REQ_LVSTK_IRR_RJ[r, j] )
+            aq_req_net = ( data.AQ_REQ_DRY_RJ[r]
+                         - data.AQ_REQ_IRR_RJ[r, j] )
             # To pay: net water requirements x licence price and 3000.
             wdelta_todry_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r] + 3000
 
@@ -179,13 +173,11 @@ def get_transition_matrices(data, year, lumap, lmmap):
             # -------------------------------------------------------------- #
 
             # Net water requirements.
-            aq_req_net = ( data.AQ_REQ_CROPS_IRR_RJ[r]
-                         +      AQ_REQ_LVSTK_IRR_RJ[r]
-                         - data.AQ_REQ_CROPS_IRR_RJ[r, j]
-                         -      AQ_REQ_LVSTK_IRR_RJ[r, j] )
+            aq_req_net = ( data.AQ_REQ_IRR_RJ[r]
+                         - data.AQ_REQ_IRR_RJ[r, j] )
             # To pay: net water requirements x licence price.
             wdelta_toirr_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r]
-
+            
             # Extra costs for irr infra change @10kAUD/ha if not lvstk -> lvstk.
             infradelta_j = 1E4 * np.ones(nlus)
             infradelta_j[j] = 0 # No extra cost if no land-use change at all.

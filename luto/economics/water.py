@@ -31,31 +31,24 @@ def get_aqreq_matrices( data ): # Data object or module.
     """Return w_mrj water requirement matrices by lm, cell and lu."""
 
     # Convert water requirements for LVSTK from per head to per hectare.
-    AQ_REQ_LVSTK_DRY_RJ = data.AQ_REQ_LVSTK_DRY_RJ.copy()
-    AQ_REQ_LVSTK_IRR_RJ = data.AQ_REQ_LVSTK_IRR_RJ.copy()
+    AQ_REQ_DRY_RJ = data.AQ_REQ_DRY_RJ.copy()
+    AQ_REQ_IRR_RJ = data.AQ_REQ_IRR_RJ.copy()
     for lu in data.LANDUSES:
         if lu in data.LU_LVSTK:
             lvs, veg = lvs_veg_types(lu)
             j = data.LANDUSES.index(lu)
-            AQ_REQ_LVSTK_DRY_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'dry')
-            AQ_REQ_LVSTK_IRR_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'irr')
-
-    # Each array has zeroes where the other has entries.
-    # aq_req_dry_rj = ( np.nan_to_num(data.AQ_REQ_CROPS_DRY_RJ)
-    #                 + np.nan_to_num(AQ_REQ_LVSTK_DRY_RJ) )
-    aq_req_dry_rj = np.nan_to_num(AQ_REQ_LVSTK_DRY_RJ)
-    aq_req_irr_rj = ( np.nan_to_num(data.AQ_REQ_CROPS_IRR_RJ)
-                    + np.nan_to_num(AQ_REQ_LVSTK_IRR_RJ) )
+            AQ_REQ_DRY_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'dry')
+            AQ_REQ_IRR_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'irr')
 
     # Turn Ml/ha into Ml/cell.
-    aq_req_dry_rj *= data.REAL_AREA[:, np.newaxis]
-    aq_req_irr_rj *= data.REAL_AREA[:, np.newaxis]
+    AQ_REQ_DRY_RJ *= data.REAL_AREA[:, np.newaxis]
+    AQ_REQ_IRR_RJ *= data.REAL_AREA[:, np.newaxis]
 
     # Return as mrj stack.
-    aq_req_mrj = np.stack((aq_req_dry_rj, aq_req_irr_rj))
-
+    aq_req_mrj = np.stack((AQ_REQ_DRY_RJ, AQ_REQ_IRR_RJ))
+    
     return aq_req_mrj
-
+    
 
 # def get_aqyld_matrix( data # Data object or module.
 #                     , year = None # Number of years post base-year ('annum').
@@ -87,47 +80,59 @@ def get_aqreq_matrices( data ): # Data object or module.
 #         return aqyld_mrj
 #     else:
 #         return mask[:, np.newaxis] * aqyld_mrj
-
+    
 
 
 def get_aqreq_limits(data):
-    """Return aqreq_mrj and water use targets for regions in settings.WATER_DRAINDIVS."""
-
-    # Get the 2010 lumap + lmmap in decision variable format.
+    """Return aqreq_mrj and water use targets for regions in settings."""
+    
+    # Get the 2010 lumap + lmmap in mrj decision variable format.
     X_mrj = lumap2x_mrj(data.LUMAP, data.LMMAP)
-
+    
     aqreq_mrj = get_aqreq_matrices(data)
-
+    
     aqreq_limits = []
-
-    # Loop through specified drainage divisions
-    for region in settings.WATER_DRAINDIVS:
-
+    
+    # Set up data for river regions or drainage divisions
+    if settings.WATER_REGION_DEF == 'RR':
+        regions = settings.WATER_RIVREGS
+        region_id = data.RIVREG_ID
+        
+    elif settings.WATER_REGION_DEF == 'DD':
+        regions = settings.DRAINDIVS
+        region_id = data.DRAINDIV_ID
+        
+    else: print('Incorrect option for WATER_REGION_DEF in settings')
+    
+    # Loop through specified water regions
+    for region in regions:
+        
         # Get indices of cells in region
-        ind = np.flatnonzero(data.DRAINDIV_ID == region).astype(np.int32)
-
+        ind = np.flatnonzero(region_id == region).astype(np.int32)
+        
         # Calculate the 2010 water requiremnents by agriculture for region.
-        aqreq_reg_limit = (aqreq_mrj[:, ind, :] * X_mrj[:, ind, :]).sum()
-
+        aqreq_reg_limit = (aqreq_mrj[:, ind, :] * 
+                               X_mrj[:, ind, :]).sum()
+        
         # Append to list
         aqreq_limits.append((region, aqreq_reg_limit, ind))
-
+        
     return aqreq_mrj, aqreq_limits
 
 
-def get_target():
-
-    # aquse_limits = [] # A list of water use limits by drainage division.
-    # for region in np.unique(data.DRAINDIV_ID):  # 7 == MDB
-    #     mask = np.where(data.DRAINDIV_ID == region, True, False)[data.mindices]
-    #     basefrac = get_water_stress_basefrac(data, mask)
-    #     stress = get_water_stress(data, target_index, mask)
-    #     stresses.append((basefrac, stress))
-
-    region = 7
-    ddiv_ind = np.flatnonzero(data.DRAINDIV_ID == region).astype(np.int32)
-
-    return ddiv_ind
+# def get_target():
+        
+#     # aquse_limits = [] # A list of water use limits by drainage division.
+#     # for region in np.unique(data.DRAINDIV_ID):  # 7 == MDB
+#     #     mask = np.where(data.DRAINDIV_ID == region, True, False)[data.mindices]
+#     #     basefrac = get_water_stress_basefrac(data, mask)
+#     #     stress = get_water_stress(data, target_index, mask)
+#     #     stresses.append((basefrac, stress))
+    
+#     region = 7
+#     ddiv_ind = np.flatnonzero(data.DRAINDIV_ID == region).astype(np.int32)
+    
+#     return ddiv_ind
 
 # def get_water_stress(data, year, mask=None):
 #     """Return tuple of (use, yld) for region `mask` in `year`."""
@@ -169,10 +174,10 @@ def get_target():
 
 # def get_water_stress_basefrac(data, mask=None):
 #     """Return use / yld base fraction for region `mask`."""
-
+    
 #     # Get the 2010 lumap+lmmap in decision var format.
 #     X_mrj = lumap2x_mrj(data.LUMAP, data.LMMAP)
-
+    
 #     # Calculate the 2010 use and the 1985 (pre-European proxy) yield.
 #     use_base = (get_aqreq_matrices(data, 0, mask) * X_mrj).sum()
 #     if mask is None:
@@ -191,38 +196,38 @@ def get_target():
 
 
 
-def get_water_totals(data, year, lumap, lmmap):
+def get_water_totals(data, lumap, lmmap):
     """Return a data frame with water use totals."""
-
-    # Get land-use and land management maps from sim object and slice to ag cells
+    
+    # Get land-use and land management maps from sim object and slice to ag cells    
     lumap = lumap[data.mindices]
     lmmap = lmmap[data.mindices]
 
     # Get the lumap+lmmap in decision variable format.
     X_mrj = lumap2x_mrj(lumap, lmmap)
-
+    
     # Get 2010 water requirement in mrj format
     aqreq_mrj = get_aqreq_matrices(data)
 
     # Prepare a data frame.
     df = pd.DataFrame( columns=[ 'HR_DRAINDIV_NAME'
-                               , 'TOT_WATER_REQ_YEAR_' + str(year) + '_ML' ] )
+                               , 'TOT_WATER_REQ_ML' ] )
 
     # Loop, calculate and collect in data frame.
     for div in settings.WATER_DRAINDIVS:
 
         # Get indices of cells in region
         ind = np.flatnonzero(data.DRAINDIV_ID == div).astype(np.int32)
-
+        
         # Calculate the water requirements by agriculture for region.
         aqreq_reg_limit = (aqreq_mrj[:, ind, :] * X_mrj[:, ind, :]).sum()
-
+        
         df.loc[div] = ( data.DRAINDIV_DICT[div], aqreq_reg_limit)
 
     return df
 
 """
-Water logic.
+Water logic. [NOT YET IMPLEMENTED]
 
 The limits are related to the pre-European inflows into rivers. As a proxy
 for these inflows are used the flows that would result if all cells had
