@@ -439,11 +439,3 @@ lmmaps = {bdata.ANNUM: bdata.LMMAP}
 shapes = {bdata.ANNUM: (bdata.NLMS, bdata.NCELLS, bdata.NLUS)}
 dvars = {}
 
-# Provide agricultural commodity demands as timeseries from 2010 to target year.
-# rnd = (np.random.rand(100, len(bdata.COMMODITIES)) + 1) # random numbers [-0.5 - +0.5], shape = 100 years x 26 commodities. Placeholder demand multiplier.
-# prod_2010 = get_production(bdata.ANNUM)
-# d_c = prod_2010 + (prod_2010 * rnd / 10) # Demands calculated as random +/- difference compared to 2010 production
-# d_c = np.round(d_c).astype(np.int32)
-# np.save('input/d_c.npy', d_c)
-d_c = np.load('input/d_c.npy') # Saved so as to be reproducible
-### 

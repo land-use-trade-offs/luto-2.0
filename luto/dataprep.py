@@ -39,6 +39,7 @@ def create_new_dataset():
     ############### Copy key input data layers from their source folders to the raw_data folder for processing
     
     # Set data input paths
+    luto_1D_inpath = 'N:/Planet-A/Data-Master/LUTO_2.0_input_data/Input_data/1D_Parameter_Timeseries/'
     luto_2D_inpath = 'N:/Planet-A/Data-Master/LUTO_2.0_input_data/Input_data/2D_Spatial_Snapshot/'
     luto_4D_inpath = 'N:/Planet-A/Data-Master/LUTO_2.0_input_data/Input_data/4D_Spatial_SSP_Timeseries/'
     fdh_inpath = 'N:/Planet-A/LUF-Modelling/fdh-archive/data/neoluto-data/new-data-and-domain/'
@@ -72,6 +73,8 @@ def create_new_dataset():
     shutil.copyfile(nlum_inpath + 'NLUM_2010-11_mask.tif', outpath + 'NLUM_2010-11_mask.tif')
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean.h5', outpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean.h5')
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean.h5', outpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean.h5')
+
+    shutil.copyfile(luto_1D_inpath + 'd_c.npy', outpath + 'd_c.npy')
     
     
     
@@ -418,6 +421,7 @@ def create_new_dataset():
     
     # Save to HDF5
     agec_lvstk.to_hdf(outpath + 'agec_lvstk.h5', key = 'agec_lvstk', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    
     
     
     

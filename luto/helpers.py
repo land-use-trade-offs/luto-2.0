@@ -18,20 +18,30 @@
 LUTO 2.0 temporary helper code.
 """
 
+# To run LUTO, execute steps 1-4 below...
 
+# 1. Refresh input data (if required)
 from luto.dataprep import create_new_dataset
 create_new_dataset()
 
+# 2. Load temporary agricultural commodity demands as timeseries from 2010 to target year.
+import numpy as np
+d_c = np.load('input/d_c.npy')
 
+# 3. Run the simulation and profile memory use
 %load_ext memory_profiler
 import luto.simulation as sim
-%memit sim.run( 2010, 2030, sim.d_c ) #, 1000000, style = 'snapshot', resfactor = False )
+%memit sim.run( 2010, 2030, d_c )
 
-import luto.simulation as sim
-sim.run( 2010, 2030, sim.d_c )
-
+# 4. Write the ouputs to file
 from luto.tools.write import write
 write(sim.data, sim, 2030)
+
+
+import luto.simulation as sim
+sim.run( 2010, 2030, d_c )
+
+
 
 from luto.economics.water import *
 data = sim.data

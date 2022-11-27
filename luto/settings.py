@@ -51,7 +51,7 @@ DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 5             # set to 1 to run at full spatial resolution
+RESFACTOR = 1             # set to 1 to run at full spatial resolution
 # SAMPLING = 'linear'     # Converts non-nodata cells to 1D array and selects every n'th cell for modelling
 SAMPLING = 'quadratic'    # Selects cell from every n x n block from 2D array (raster map) for modelling (better as more regularly spaced)
 

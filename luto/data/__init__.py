@@ -272,3 +272,6 @@ TMATRIX = np.load(os.path.join(INPUT_DIR, 'tmatrix.npy'))
 
 # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
 EXCLUDE = np.load(os.path.join(INPUT_DIR, 'x_mrj.npy'))
+
+    
+    
