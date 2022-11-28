@@ -34,8 +34,9 @@ import luto.simulation as sim
 %memit sim.run( 2010, 2030, d_c )
 
 # 4. Write the ouputs to file
-from luto.tools.write import write
-write(sim.data, sim, 2030)
+from luto.tools.write import *
+write(sim, 2030, d_c)
+get_water_totals(data, sim, 2030)
 
 
 import luto.simulation as sim

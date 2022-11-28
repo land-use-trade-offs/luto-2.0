@@ -90,7 +90,7 @@ WATER_CONSTRAINT_MINIMISE = False       # or True. Whether to also minimise wate
 WATER_CONSTRAINT_WEIGHT = 1.0           # Minimisation weight in objective function.
 WATER_YIELD_STRESS_FRACTION = 0.4       # Water stress if yields below this fraction.
 
-WATER_REGION_DEF = 'RR'                 # 'RR' for River Region or 'DD' for Drainage Division
+WATER_REGION_DEF = 'RR'                 # 'RR' for River Region, 'DD' for Drainage Division
 WATER_DRAINDIVS = list(range(1, 14, 1)) # List of drainage divisions to apply irrigation constraints to e.g., [1, 2].
 WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions to apply irrigation constraints to e.g., [1, 2].
 

@@ -33,13 +33,19 @@ def get_aqreq_matrices( data ): # Data object or module.
     # Convert water requirements for LVSTK from per head to per hectare.
     AQ_REQ_DRY_RJ = data.AQ_REQ_DRY_RJ.copy()
     AQ_REQ_IRR_RJ = data.AQ_REQ_IRR_RJ.copy()
-    for lu in data.LANDUSES:
-        if lu in data.LU_LVSTK:
-            lvs, veg = lvs_veg_types(lu)
-            j = data.LANDUSES.index(lu)
-            AQ_REQ_DRY_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'dry')
-            AQ_REQ_IRR_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'irr')
-
+    # for lu in data.LANDUSES:
+    #     if lu in data.LU_LVSTK:
+    #         lvs, veg = lvs_veg_types(lu)
+    #         j = data.LANDUSES.index(lu)
+    #         AQ_REQ_DRY_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'dry')
+    #         AQ_REQ_IRR_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'irr')
+    
+    for lu in data.LU_LVSTK: # Simplified loop
+        lvs, veg = lvs_veg_types(lu)
+        j = data.LANDUSES.index(lu)
+        AQ_REQ_DRY_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'dry')
+        AQ_REQ_IRR_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'irr')
+        
     # Turn Ml/ha into Ml/cell.
     AQ_REQ_DRY_RJ *= data.REAL_AREA[:, np.newaxis]
     AQ_REQ_IRR_RJ *= data.REAL_AREA[:, np.newaxis]
@@ -99,7 +105,7 @@ def get_aqreq_limits(data):
         region_id = data.RIVREG_ID
         
     elif settings.WATER_REGION_DEF == 'DD':
-        regions = settings.DRAINDIVS
+        regions = settings.WATER_DRAINDIVS
         region_id = data.DRAINDIV_ID
         
     else: print('Incorrect option for WATER_REGION_DEF in settings')
@@ -196,35 +202,6 @@ def get_aqreq_limits(data):
 
 
 
-def get_water_totals(data, lumap, lmmap):
-    """Return a data frame with water use totals."""
-    
-    # Get land-use and land management maps from sim object and slice to ag cells    
-    lumap = lumap[data.mindices]
-    lmmap = lmmap[data.mindices]
-
-    # Get the lumap+lmmap in decision variable format.
-    X_mrj = lumap2x_mrj(lumap, lmmap)
-    
-    # Get 2010 water requirement in mrj format
-    aqreq_mrj = get_aqreq_matrices(data)
-
-    # Prepare a data frame.
-    df = pd.DataFrame( columns=[ 'HR_DRAINDIV_NAME'
-                               , 'TOT_WATER_REQ_ML' ] )
-
-    # Loop, calculate and collect in data frame.
-    for div in settings.WATER_DRAINDIVS:
-
-        # Get indices of cells in region
-        ind = np.flatnonzero(data.DRAINDIV_ID == div).astype(np.int32)
-        
-        # Calculate the water requirements by agriculture for region.
-        aqreq_reg_limit = (aqreq_mrj[:, ind, :] * X_mrj[:, ind, :]).sum()
-        
-        df.loc[div] = ( data.DRAINDIV_DICT[div], aqreq_reg_limit)
-
-    return df
 
 """
 Water logic. [NOT YET IMPLEMENTED]

@@ -108,43 +108,16 @@ def solve( t_mrj          # Transition cost matrices.
 
         # Decision variables to minimise the deviations from demand.
         V = model.addMVar(ncms, name = 'V')
+        
 
         # ------------------- #
         # Objective function. #
         # ------------------- #
 
-        # Set the objective function.
-        # objective = ( sum( # Production costs.
-        #                    c_mrj[0].T[j] @ X_dry[j]
-        #                  + c_mrj[1].T[j] @ X_irr[j]
-                         
-        #                    # Transition costs.
-        #                  + t_mrj[0].T[j] @ X_dry[j]
-        #                  + t_mrj[1].T[j] @ X_irr[j]
-                         
-        #                    # For all land uses.
-        #                    for j in range(nlus) )
-                     
-        #             + sum( # Penalties.
-        #                    V[c] for c in range(ncms) )
-        #             )
-
-        # BB mod 1        
-        # objective = ( sum( # Production costs + transition costs.
-        #                    ( c_mrj[0].T[j] + t_mrj[0].T[j] ) @ X_dry[j]
-        #                  + ( c_mrj[1].T[j] + t_mrj[1].T[j] ) @ X_irr[j]
-                         
-        #                    # For all land uses.
-        #                    for j in range(nlus) )
-                     
-        #             + sum( # Penalties.
-        #                    V[c] for c in range(ncms) )
-        #             )
-        
-        #BB mod 2
         # Pre-calculate sum of production and transition costs and apply penalty
         ct_mrj = (c_mrj + t_mrj) / penalty
-
+        
+        # Specify objective function
         objective = ( sum( # Production costs + transition costs.
                          #   ct_mrj[0].T[j] @ X_dry[j]
                          # + ct_mrj[1].T[j] @ X_irr[j]
@@ -158,7 +131,6 @@ def solve( t_mrj          # Transition cost matrices.
                            V[c] for c in range(ncms) )
                     )
 
-        
         model.setObjective(objective, GRB.MINIMIZE)
         
 
@@ -201,6 +173,7 @@ def solve( t_mrj          # Transition cost matrices.
         if 'water' in limits:
             
             # Returns water requirements for agriculture in mrj format and region-specific water use limits
+            print('Adding water constraints by', settings.WATER_REGION_DEF)
             aqreq_mrj, aqreq_limits = limits['water']
             
             # Ensure water use remains below limit for each region
@@ -211,7 +184,7 @@ def solve( t_mrj          # Transition cost matrices.
                                     for j in range(nlus) )
                 
                 model.addConstr(aqreq_region <= aqreq_reg_limit)
-                print('...water limit region %s <= %s ML' % (region, aqreq_reg_limit))
+                # print('...water limit region %s <= %s ML' % (region, aqreq_reg_limit))
 
 
         if 'nutrients' in limits:

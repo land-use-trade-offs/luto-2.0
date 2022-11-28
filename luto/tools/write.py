@@ -27,9 +27,12 @@ import pandas as pd
 
 from luto.tools.highposgtiff import *
 from luto.tools.compmap import *
+from luto.economics.water import *
+import luto.settings as settings
+
 
 # Summarise and write outputs to file. 'year' is calendar year (e.g., 2030)
-def write(data, sim, year):
+def write(sim, year, d_c):
     
     # Create a directory for the files.
     path = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
@@ -47,10 +50,10 @@ def write(data, sim, year):
     np.save(os.path.join(path, lmmap_fname), sim.lmmaps[year])
     
     # Write out the 2010 GeoTiffs for land-use and land management
-    lumap_fname = 'lumap' + str(data.ANNUM) + '.tiff'
-    lmmap_fname = 'lmmap' + str(data.ANNUM) + '.tiff'
-    write_lumap_gtiff(sim.lumaps[data.ANNUM], os.path.join(path, lumap_fname))
-    write_lumap_gtiff(sim.lmmaps[data.ANNUM], os.path.join(path, lmmap_fname))
+    lumap_fname = 'lumap' + str(sim.data.ANNUM) + '.tiff'
+    lmmap_fname = 'lmmap' + str(sim.data.ANNUM) + '.tiff'
+    write_lumap_gtiff(sim.lumaps[sim.data.ANNUM], os.path.join(path, lumap_fname))
+    write_lumap_gtiff(sim.lmmaps[sim.data.ANNUM], os.path.join(path, lmmap_fname))
     
     # Write out the target year GeoTiffs for land-use and land management
     lumap_fname = 'lumap' + str(year) + '.tiff'
@@ -59,14 +62,14 @@ def write(data, sim, year):
     write_lumap_gtiff(sim.lmmaps[year], os.path.join(path, lmmap_fname))
     
     # Calculate data for quantity comparison
-    prod_base = sim.get_production(data.ANNUM)     # Get commodity quantities produced in 2010 
+    prod_base = sim.get_production(sim.data.ANNUM)     # Get commodity quantities produced in 2010 
     prod_targ = sim.get_production(year)           # Get commodity quantities produced in target year
-    demands = sim.d_c[year - data.ANNUM]           # Get commodity demands for target year
+    demands = d_c[year - sim.data.ANNUM]           # Get commodity demands for target year
     abs_diff = prod_targ - demands                 # Diff between taget year production and demands in absolute terms (i.e. tonnes etc)
     prop_diff = (abs_diff / prod_targ) * 100       # Diff between taget year production and demands in relative terms (i.e. %)
 
     df = pd.DataFrame()
-    df['Commodity'] = data.COMMODITIES
+    df['Commodity'] = sim.data.COMMODITIES
     df['Prod_base_year (tonnes, KL)'] = prod_base
     df['Prod_targ_year (tonnes, KL)'] = prod_targ
     df['Demand (tonnes, KL)'] = demands
@@ -77,14 +80,14 @@ def write(data, sim, year):
     # Save decision variables. Commented out as the output is 1.8GB
     # np.save(os.path.join(path, 'decvars-mrj.npy'), sim.dvars[year])
 
-    LUS = ['Non-agricultural land'] + data.LANDUSES
+    LUS = ['Non-agricultural land'] + sim.data.LANDUSES
 
-    ctlu, swlu = crossmap(sim.lumaps[data.ANNUM], sim.lumaps[year], LUS)
-    ctlm, swlm = crossmap(sim.lmmaps[data.ANNUM], sim.lmmaps[year])
+    ctlu, swlu = crossmap(sim.lumaps[sim.data.ANNUM], sim.lumaps[year], LUS)
+    ctlm, swlm = crossmap(sim.lmmaps[sim.data.ANNUM], sim.lmmaps[year])
 
-    cthp, swhp = crossmap_irrstat( sim.lumaps[data.ANNUM], sim.lmmaps[data.ANNUM]
+    cthp, swhp = crossmap_irrstat( sim.lumaps[sim.data.ANNUM], sim.lmmaps[sim.data.ANNUM]
                                  , sim.lumaps[year], sim.lmmaps[year]
-                                 , data.LANDUSES )
+                                 , sim.data.LANDUSES )
 
     ctlu.to_csv(os.path.join(path, 'crosstab-lumap.csv'))
     ctlm.to_csv(os.path.join(path, 'crosstab-lmmap.csv'))
@@ -95,3 +98,56 @@ def write(data, sim, year):
     cthp.to_csv(os.path.join(path, 'crosstab-irrstat.csv'))
     swhp.to_csv(os.path.join(path, 'switches-irrstat.csv'))
 
+
+
+def get_water_totals(data, sim, year):
+    """Calculate water use totals. 
+       Takes a data object, a simulation object, and a numeric year (e.g., 2030) as input."""
+    
+    # Get land-use and land management maps from sim object and slice to ag cells    
+    lumap = sim.lumaps[year][data.mindices]
+    lmmap = sim.lmmaps[year][data.mindices]
+
+    # Get the lumap + lmmap in decision variable format.
+    X_mrj = lumap2x_mrj(lumap, lmmap)
+    
+    # Get 2010 water requirement in mrj format
+    aqreq_mrj = get_aqreq_matrices(data)
+
+    # Prepare a data frame.
+    df = pd.DataFrame( columns=[ 'REGION_ID'
+                               , 'REGION_NAME'
+                               , 'WATER_USE_LIMIT_ML'
+                               , 'TOT_WATER_REQ_ML' ] )
+
+    # Get water use limits used as constraints in model
+    _, aqreq_limits = get_aqreq_limits(data)
+
+
+    # Set up data for river regions or drainage divisions
+    if settings.WATER_REGION_DEF == 'RR':
+        regions = settings.WATER_RIVREGS
+        region_id = data.RIVREG_ID
+        region_dict = data.RIVREG_DICT
+        
+    elif settings.WATER_REGION_DEF == 'DD':
+        regions = settings.WATER_DRAINDIVS
+        region_id = data.DRAINDIV_ID
+        region_dict = data.DRAINDIV_DICT
+        
+    else: print('Incorrect option for WATER_REGION_DEF in settings')
+    
+    # Loop through specified water regions
+    for i, region in enumerate(regions):
+        
+        # Get indices of cells in region
+        ind = np.flatnonzero(region_id == region).astype(np.int32)
+        
+        # Calculate the 2010 water requiremnents by agriculture for region.
+        aqreq_reg = (aqreq_mrj[:, ind, :] * 
+                               X_mrj[:, ind, :]).sum()
+        
+        # Add to dataframe
+        df.loc[i] = (region, region_dict[region], aqreq_limits[i][1], aqreq_reg)
+    
+    df.to_csv(os.path.join(path, 'water_demand_vs_use.csv'), index = False)
