@@ -3,6 +3,8 @@ LUTO 2.0 - Land-Use Trade-Offs modelling framework
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7370415.svg)](https://doi.org/10.5281/zenodo.7370415) (2.0.1-beta version)
 
+<a href="https://doi.org/10.5281/zenodo.7370605"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.7370605.svg" alt="DOI"></a> (2.0.1-beta input data)
+
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7359222.svg)](https://doi.org/10.5281/zenodo.7359222) (2.0.0-alpha base version)
 
 LUTO 2.0 is version two of the Land-Use Trade-Offs model. The model predicts future spatial land-use distributions based on a economic cost-minimisation logic under various constraints, including environmental limits. The model is contained in a Python package (the framework) and can be run interactively or in a scripted manner (for batch runs).
