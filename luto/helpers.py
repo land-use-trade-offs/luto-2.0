@@ -36,7 +36,6 @@ import luto.simulation as sim
 # 4. Write the ouputs to file
 from luto.tools.write import *
 write(sim, 2030, d_c)
-get_water_totals(data, sim, 2030)
 
 
 import luto.simulation as sim

@@ -100,19 +100,18 @@ def write(sim, year, d_c):
 
 
 
-def get_water_totals(data, sim, year):
     """Calculate water use totals. 
        Takes a data object, a simulation object, and a numeric year (e.g., 2030) as input."""
     
     # Get land-use and land management maps from sim object and slice to ag cells    
-    lumap = sim.lumaps[year][data.mindices]
-    lmmap = sim.lmmaps[year][data.mindices]
+    lumap = sim.lumaps[year][sim.data.mindices]
+    lmmap = sim.lmmaps[year][sim.data.mindices]
 
     # Get the lumap + lmmap in decision variable format.
     X_mrj = lumap2x_mrj(lumap, lmmap)
     
     # Get 2010 water requirement in mrj format
-    aqreq_mrj = get_aqreq_matrices(data)
+    aqreq_mrj = get_aqreq_matrices(sim.data)
 
     # Prepare a data frame.
     df = pd.DataFrame( columns=[ 'REGION_ID'
@@ -121,19 +120,19 @@ def get_water_totals(data, sim, year):
                                , 'TOT_WATER_REQ_ML' ] )
 
     # Get water use limits used as constraints in model
-    _, aqreq_limits = get_aqreq_limits(data)
+    _, aqreq_limits = get_aqreq_limits(sim.data)
 
 
     # Set up data for river regions or drainage divisions
     if settings.WATER_REGION_DEF == 'RR':
         regions = settings.WATER_RIVREGS
-        region_id = data.RIVREG_ID
-        region_dict = data.RIVREG_DICT
+        region_id = sim.data.RIVREG_ID
+        region_dict = sim.data.RIVREG_DICT
         
     elif settings.WATER_REGION_DEF == 'DD':
         regions = settings.WATER_DRAINDIVS
-        region_id = data.DRAINDIV_ID
-        region_dict = data.DRAINDIV_DICT
+        region_id = sim.data.DRAINDIV_ID
+        region_dict = sim.data.DRAINDIV_DICT
         
     else: print('Incorrect option for WATER_REGION_DEF in settings')
     
