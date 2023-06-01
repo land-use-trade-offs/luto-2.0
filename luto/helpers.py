@@ -95,7 +95,7 @@ agec_crops_fdh = pd.read_hdf('N:/Planet-A/LUF-Modelling/fdh-archive/data/neoluto
 
 agec_crops_fdh_neo.equals(agec_crops_fdh)
 
-
+AGEC_CROPS.columns.get_level_values(2).unique()
 
 
 for lu in sim.bdata.LANDUSES:

@@ -25,7 +25,7 @@ import h5py
 from luto.settings import INPUT_DIR, OUTPUT_DIR, SSP, RCP
 from luto.economics.quantity import lvs_veg_types
 
-# Load the agro-economic data (constructed using dataprep.py or fns from data.economic module).
+# Load the agro-economic data (constructed using dataprep.py).
 AGEC_CROPS = pd.read_hdf( os.path.join(INPUT_DIR, 'agec_crops.h5') )
 AGEC_LVSTK = pd.read_hdf( os.path.join(INPUT_DIR, 'agec_lvstk.h5') )
 
