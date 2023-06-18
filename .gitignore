@@ -1,4 +1,4 @@
-# Ignore everything:
+# Ignore the following folders:
 .spyproject/
 **/__pycache__/
 
