@@ -1,0 +1,6 @@
+# Ignore everything:
+.spyproject/
+**/__pycache__/
+
+# Except this very file:
+!.gitignore

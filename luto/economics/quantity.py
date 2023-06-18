@@ -89,7 +89,7 @@ def get_yield_pot( data # Data object or module.
     # Base potential.
     potential = data.FEED_REQ * data.PASTURE_KG_DM_HA / denominator
 
-    # Multiply potential by appropriate SAFE_PUR.
+    # Multiply potential by appropriate SAFE_PUR (safe pasture utilisation rate).
     if vegtype == 'NATL':
         potential *= data.SAFE_PUR_NATL
     elif vegtype == 'MODL':
@@ -173,7 +173,10 @@ def get_quantity_lvstk( data # Data object or module.
 
     # Quantities so far in tonnes/ha. Now convert to tonnes/cell.
     quantity *= data.REAL_AREA
-
+                  
+    # Incorporate resfactor
+    quantity *= data.RESMULT
+    
     return quantity
 
 
@@ -201,7 +204,10 @@ def get_quantity_crop( data # Data object or module.
     
         # Convert to tonnes/cell.
         quantity *= data.REAL_AREA 
-    
+                  
+        # Incorporate resfactor
+        quantity *= data.RESMULT
+
     return quantity
 
 

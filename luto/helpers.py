@@ -35,12 +35,27 @@ import luto.simulation as sim
 
 # 4. Write the ouputs to file
 from luto.tools.write import *
-write(sim, 2030, d_c)
+path = get_path()
+write_outputs(sim, 2030, d_c, path)
 
 
+
+# Minimalist run code
+import numpy as np
+d_c = np.load('input/d_c.npy')
 import luto.simulation as sim
 sim.run( 2010, 2030, d_c )
+from luto.tools.write import *
+path = get_path()
+write_outputs(sim, 2030, d_c, path)
 
+
+
+
+write_files(sim, path)
+write_production(sim, 2030, d_c, path)
+write_water(sim, 2030, path)
+write_ghg(sim, 2030, path)
 
 
 from luto.economics.water import *
@@ -51,13 +66,13 @@ df_2030 = get_water_totals(data, sim.lumaps[2030], sim.lmmaps[2030])
 
 
 # Example of code to inspect things 
-sim.bdata.AQ_REQ_CROPS_DRY_RJ
+sim.bdata.WREQ_CROPS_DRY_RJ
 
 import sys
-sys.getsizeof(sim.data.AQ_REQ_LVSTK_DRY_RJ)
+sys.getsizeof(sim.data.WREQ_LVSTK_DRY_RJ)
 
 import luto.simulation as sim
-t_mrj, c_mrj, q_mrp, x_mrj = temp(2010, 2030, sim.d_c, 1000)
+t_mrj, c_mrj, q_mrp, l_mrj = temp(2010, 2030, sim.d_c, 1000)
 
 #Check compare output maps
 import numpy as np
@@ -95,7 +110,12 @@ agec_crops_fdh = pd.read_hdf('N:/Planet-A/LUF-Modelling/fdh-archive/data/neoluto
 
 agec_crops_fdh_neo.equals(agec_crops_fdh)
 
+
 AGEC_CROPS.columns.get_level_values(2).unique()
+
+AGGHG_CROPS.columns.levels
+
+AGGHG_CROPS.loc[0:10, (slice(None), 'dry', 'Winter cereals')]
 
 
 for lu in sim.bdata.LANDUSES:
@@ -104,8 +124,10 @@ for lu in sim.bdata.LANDUSES:
     else:
         print(lu, 'False')
         
-        
-        
+def i(array):
+    print('Size in memory {:.2f} MB'.format(array.itemsize * array.size / 2**20))
+    print('Shape %s' % str(array.shape))
+    print('Datatype %s' % str(array.dtype))
 
 def temp( base    # Base year from which the data is taken.
         , target  # Year to be solved for.

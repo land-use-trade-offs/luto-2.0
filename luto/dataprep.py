@@ -56,7 +56,8 @@ def create_new_dataset():
     
     # Copy in the raw data files from their source
     shutil.copyfile(fdh_inpath + 'tmatrix-cat2lus.csv', raw_data + 'tmatrix_cat2lus.csv')
-    shutil.copyfile(fdh_inpath + 'tmatrix-categories.csv', raw_data + 'tmatrix_categories.csv')
+    # shutil.copyfile(fdh_inpath + 'tmatrix-categories.csv', raw_data + 'tmatrix_categories.csv')
+    shutil.copyfile(fdh_inpath + 'transitions_costs_20230607.xlsx', raw_data + 'transitions_costs_20230607.xlsx')    
 
     shutil.copyfile(profit_map_inpath + 'NLUM_SPREAD_LU_ID_Mapped_Concordance.h5', raw_data + 'NLUM_SPREAD_LU_ID_Mapped_Concordance.h5')
     shutil.copyfile(profit_map_inpath + 'cell_ag_data.h5', raw_data + 'cell_ag_data.h5')
@@ -64,7 +65,9 @@ def create_new_dataset():
     shutil.copyfile(luto_2D_inpath + 'cell_LU_mapping.h5', raw_data + 'cell_LU_mapping.h5')
     shutil.copyfile(luto_2D_inpath + 'cell_zones_df.h5', raw_data + 'cell_zones_df.h5')
     shutil.copyfile(luto_2D_inpath + 'cell_livestock_data.h5', raw_data + 'cell_livestock_data.h5')
+    shutil.copyfile(luto_2D_inpath + 'SA2_livestock_GHG_data.h5', raw_data + 'SA2_livestock_GHG_data.h5')
     shutil.copyfile(luto_2D_inpath + 'SA2_crop_data.h5', raw_data + 'SA2_crop_data.h5')
+    shutil.copyfile(luto_2D_inpath + 'SA2_crop_GHG_data.h5', raw_data + 'SA2_crop_GHG_data.h5')
     shutil.copyfile(luto_2D_inpath + 'cell_biophysical_df.h5', raw_data + 'cell_biophysical_df.h5')
     shutil.copyfile(luto_2D_inpath + 'SA2_climate_damage_mult.h5', raw_data + 'SA2_climate_damage_mult.h5')
     
@@ -75,7 +78,6 @@ def create_new_dataset():
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean.h5', outpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean.h5')
 
     shutil.copyfile(luto_1D_inpath + 'd_c.npy', outpath + 'd_c.npy')
-    
     
     
     
@@ -91,7 +93,13 @@ def create_new_dataset():
     # cell_ag = pd.read_hdf(raw_data + 'cell_ag_data.h5')
     
     # Read in from-to costs in category-to-category format
-    tmcat = pd.read_csv(raw_data + 'tmatrix_categories.csv', index_col = 0)
+    # tmcat = pd.read_csv(raw_data + 'tmatrix_categories.csv', index_col = 0)
+    tmcat = pd.read_excel( raw_data + 'transitions_costs_20230607.xlsx'
+                         , sheet_name = 'Current'
+                         , usecols = 'B:M'
+                         , skiprows = 5
+                         , nrows = 11
+                         , index_col = 0)
     
     # Read the categories to land-uses concordance
     cat2lus = pd.read_csv(raw_data + 'tmatrix_cat2lus.csv').to_numpy()
@@ -99,9 +107,15 @@ def create_new_dataset():
     # Read livestock data
     lvstk = pd.read_hdf(raw_data + 'cell_livestock_data.h5')
     
+    # Read livestock GHG emissions data
+    lvstkGHG = pd.read_hdf(raw_data + 'SA2_livestock_GHG_data.h5')
+    
     # Read crops data
     crops = pd.read_hdf(raw_data + 'SA2_crop_data.h5')
-    
+        
+    # Read crops GHG emissions data
+    cropsGHG = pd.read_hdf(raw_data + 'SA2_crop_GHG_data.h5')
+
     # Read biophysical data
     bioph = pd.read_hdf(raw_data + 'cell_biophysical_df.h5')
     
@@ -173,7 +187,6 @@ def create_new_dataset():
     
     
     
-    
     ############### Create tmatrix -- transition cost matrix
     
     # Produce a dictionary for ease of look up.
@@ -235,8 +248,8 @@ def create_new_dataset():
     ut_ptable = ut.pivot_table(index = 'SA2_ID', columns = ['IRRIGATION', 'LU_DESC'])['LU_ID']
     x_dry = concordance.merge(ut_ptable[0], on = 'SA2_ID', how = 'left')
     x_irr = concordance.merge(ut_ptable[1], on = 'SA2_ID', how = 'left')
-    x_dry = x_dry.drop(columns=['CELL_ID', 'SA2_ID'])
-    x_irr = x_irr.drop(columns=['CELL_ID', 'SA2_ID'])
+    x_dry = x_dry.drop(columns = ['CELL_ID', 'SA2_ID'])
+    x_irr = x_irr.drop(columns = ['CELL_ID', 'SA2_ID'])
     
     # Some land uses never occur at all (like dryland rice or grazing on irrigated natural land).
     for lu in landuses:
@@ -249,7 +262,7 @@ def create_new_dataset():
     x_dry['Unallocated - modified land'] = 22
     x_irr['Unallocated - modified land'] = np.nan
     
-    # 'Unallocated - natural land' is never irrigated. Occurs where t_mrj allows it.  
+    # 'Unallocated - natural land' is never irrigated. Occurs where transitions costs matrix (i.e., t_mrj) allows it.  
     x_dry['Unallocated - natural land'] = 23                                                             
     x_irr['Unallocated - natural land'] = np.nan
     
@@ -421,6 +434,59 @@ def create_new_dataset():
     
     # Save to HDF5
     agec_lvstk.to_hdf(outpath + 'agec_lvstk.h5', key = 'agec_lvstk', mode = 'w', format = 'fixed', index = False, complevel = 9)
+        
+        
+        
+    
+    ############### Agricultural Greenhouse Gas Emissions - crops
+        
+    # Produce a multi-indexed version of the crops data.
+    cropsGHG_ptable = cropsGHG.drop('LU_ID', axis = 1).pivot_table(index = 'SA2_ID', columns = ['IRRIGATION', 'LU_DESC'])
+    
+    # Merge to create a cell-based table.
+    agGHG_crops = concordance.merge( cropsGHG_ptable
+                                  , left_on = 'SA2_ID'
+                                  , right_on = cropsGHG_ptable.index
+                                  , how = 'left' )
+    
+    # Drop unnecessary columns and fill NaNs with zeros.
+    agGHG_crops = agGHG_crops.drop(['CELL_ID', 'SA2_ID'], axis = 1).fillna(0)
+    
+    # The merge flattens the multi-index to tuples, so unflatten back to multi-index
+    lms = ['dry', 'irr']
+    ts = [(t[0], lms[t[1]], t[2]) for t in agGHG_crops.columns]
+    agGHG_crops.columns = pd.MultiIndex.from_tuples(ts)
+    
+    # Convert 64 bit columns to 32 bit to save memory and space
+    f64_cols = agGHG_crops.select_dtypes(include = ["float64"]).columns
+    agGHG_crops[f64_cols] = agGHG_crops[f64_cols].apply(pd.to_numeric, downcast = 'float')
+    
+    # Save to HDF5
+    agGHG_crops.to_hdf(outpath + 'agGHG_crops.h5', key = 'agGHG_crops', mode = 'w', format = 'fixed', index = False, complevel = 9)
+        
+        
+        
+    
+    ############### Agricultural Greenhouse Gas Emissions - livestock
+
+    # Merge to create a cell-based table.
+    agGHG_lvstk = concordance.merge( lvstkGHG
+                                   , left_on = 'SA2_ID'
+                                   , right_on = lvstkGHG.index
+                                   , how = 'left' )
+    
+    # Drop unnecessary columns and fill NaNs with zeros.
+    agGHG_lvstk = agGHG_lvstk.drop(['CELL_ID', 'SA2_ID'], axis = 1).fillna(0)
+    
+    # Unflatten to multi-index
+    agGHG_lvstk.columns = pd.MultiIndex.from_tuples(agGHG_lvstk.columns)
+    
+    # Convert 64 bit columns to 32 bit to save memory and space
+    f64_cols = agGHG_lvstk.select_dtypes(include = ["float64"]).columns
+    agGHG_lvstk[f64_cols] = agGHG_lvstk[f64_cols].apply(pd.to_numeric, downcast = 'float')
+    
+    # Save to HDF5
+    agGHG_lvstk.to_hdf(outpath + 'agGHG_lvstk.h5', key = 'agGHG_lvstk', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
     
     

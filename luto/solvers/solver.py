@@ -32,15 +32,17 @@ import luto.settings as settings
 gurenv = gp.Env(empty = True)
 gurenv.setParam('Method', settings.SOLVE_METHOD)
 gurenv.setParam('OutputFlag', settings.VERBOSE)
+gurenv.setParam('OptimalityTol', settings.OPTIMALITY_TOLERANCE)
 gurenv.start()
 
 
 def solve( t_mrj          # Transition cost matrices.
          , c_mrj          # Production cost matrices.
+         , g_mrj          # Greenhouse gas emissions matrices.
+         , w_mrj          # Water requirements matrices.
+         , x_mrj          # Exclude matrices.
          , q_mrp          # Yield matrices -- note the `p` (product) index instead of `j` (land-use).
          , d_c            # Demands -- note the `c` ('commodity') index instead of `j` (land-use).
-         , penalty        # Penalty level.
-         , x_mrj          # Exclude matrices.
          , lu2pr_pj       # Conversion matrix: land-use to product(s).
          , pr2cm_cp       # Conversion matrix: product(s) to commodity.
          , limits = None  # Targets to use.
@@ -66,39 +68,17 @@ def solve( t_mrj          # Transition cost matrices.
     _, _, nprs = q_mrp.shape # Number of products.
     ncms, = d_c.shape # Number of commodities.
 
-    # Cost per tonne = cost per hectare / tonnes per hectare.
-
-    # Cost per hectare in PR/p representation:
-    # c_rp_dry = (lu2pr_pj @ c_mrj[0].T).T
-    # c_rp_irr = (lu2pr_pj @ c_mrj[1].T).T
-    # c_mrp = np.stack((c_rp_dry, c_rp_irr))
-
-    # # Divide by quantity per hectare to obtain cost per tonne.
-    # qprime_mrp = np.where(q_mrp != 0, q_mrp, np.inf) # Avoid division by zero.
-    # cpert_mrp = c_mrp / qprime_mrp
-    
-    # # Cost per tonne in PR/p representation.
-    # c_p = [cpert_mrp.T[p].max() for p in range(nprs)]
-    
-    # # Commodities from multiple sources get average costs.
-    # p2c_cp = pr2cm_cp / pr2cm_cp.sum(axis=1)[:, np.newaxis]
-    
-    # # Finally, cost per tonne in CM/c representation.
-    # c_c = p2c_cp @ c_p
-    
-    # # Apply the penalty-level multiplier.
-    # p_c = penalty * c_c
-
     try:
         print('\nSetting up the model...', time.ctime() + '\n')
 
         # Make Gurobi model instance.
-        model = gp.Model('LUTO 2.0', env = gurenv)
-
+        model = gp.Model('LUTO ' + settings.VERSION, env = gurenv)
+        
         # ------------------- #
         # Decision variables. #
         # ------------------- #
-
+        print('Adding decision variables...', time.ctime() + '\n')
+        
         # Land-use indexed lists of ncells-sized decision variable vectors.
         X_dry = [ model.addMVar(ncells, ub = x_mrj[0, :, j], name = 'X_dry')
                   for j in range(nlus) ]
@@ -106,29 +86,26 @@ def solve( t_mrj          # Transition cost matrices.
         X_irr = [ model.addMVar(ncells, ub = x_mrj[1, :, j], name = 'X_irr')
                   for j in range(nlus) ]
 
-        # Decision variables to minimise the deviations from demand.
+        # Decision variables, one for each commodity, to minimise the deviations from demand.
         V = model.addMVar(ncms, name = 'V')
         
-
         # ------------------- #
         # Objective function. #
         # ------------------- #
-
+        print('Setting up objective function...', time.ctime() + '\n')
+        
         # Pre-calculate sum of production and transition costs and apply penalty
-        ct_mrj = (c_mrj + t_mrj) / penalty
+        ct_mrj = (c_mrj + t_mrj) / settings.PENALTY
         
         # Specify objective function
-        objective = ( sum( # Production costs + transition costs.
-                         #   ct_mrj[0].T[j] @ X_dry[j]
-                         # + ct_mrj[1].T[j] @ X_irr[j]
-                           ct_mrj[0, :, j] @ X_dry[j]  # using matrix indexing and slicing
-                         + ct_mrj[1, :, j] @ X_irr[j]
-                         
-                           # For all land uses.
-                           for j in range(nlus) )
-                     
-                    + sum( # Add variables for ensuring demand of each commodity is met (approximately).
-                           V[c] for c in range(ncms) )
+        objective = ( 
+                     # Production costs + transition costs for all land uses.
+                     sum( ct_mrj[0, :, j] @ X_dry[j]
+                        + ct_mrj[1, :, j] @ X_irr[j]
+                          for j in range(nlus) )
+                    
+                     # Add deviation-from-demand variables for ensuring demand of each commodity is met (approximately). 
+                     + sum( V[c] for c in range(ncms) )
                     )
 
         model.setObjective(objective, GRB.MINIMIZE)
@@ -137,7 +114,8 @@ def solve( t_mrj          # Transition cost matrices.
         # ------------ #
         # Constraints. #
         # ------------ #
-
+        print('Setting up constraints...', time.ctime() + '\n')
+        
         # Constraint that all of every cell is used for some land use.
         model.addConstr( sum( X_dry + X_irr ) == np.ones(ncells) )
         
@@ -150,8 +128,8 @@ def solve( t_mrj          # Transition cost matrices.
                      if lu2pr_pj[p, j] ]
 
         # Quantities in PR/p representation by land-management (dry/irr).
-        q_dry_p = [ q_mrp[0].T[p] @ X_dry_pr[p] for p in range(nprs) ]
-        q_irr_p = [ q_mrp[1].T[p] @ X_irr_pr[p] for p in range(nprs) ]
+        q_dry_p = [ q_mrp[0, :, p] @ X_dry_pr[p] for p in range(nprs) ]
+        q_irr_p = [ q_mrp[1, :, p] @ X_irr_pr[p] for p in range(nprs) ]
 
         # Transform quantities to CM/c representation by land management (dry/irr).
         q_dry_c = [ sum(q_dry_p[p] for p in range(nprs) if pr2cm_cp[c, p])
@@ -160,77 +138,109 @@ def solve( t_mrj          # Transition cost matrices.
                     for c in range(ncms) ]
 
         # Total quantities in CM/c representation.
-        q_c = [q_dry_c[c] + q_irr_c[c] for c in range(ncms)]
+        q_c = [ q_dry_c[c] + q_irr_c[c] for c in range(ncms) ]
 
         # Finally, add the constraint in the CM/c representation.
-        model.addConstrs( (d_c[c] - q_c[c]) <= V[c] 
+        print('Adding constraints...', time.ctime() + '\n')
+        
+        model.addConstrs((d_c[c] - q_c[c]) <= V[c] 
                           for c in range(ncms) )
-        model.addConstrs( (q_c[c] - d_c[c]) <= V[c] 
+        model.addConstrs((q_c[c] - d_c[c]) <= V[c] 
                           for c in range(ncms) )
 
-        # Only add the following constraints if target provided.
+        # Only add the following constraints if limits are provided.
 
         if 'water' in limits:
+            print('Adding water constraints by', settings.WATER_REGION_DEF + '...', time.ctime())
             
             # Returns water requirements for agriculture in mrj format and region-specific water use limits
-            print('Adding water constraints by', settings.WATER_REGION_DEF)
-            aqreq_mrj, aqreq_limits = limits['water']
+            w_limits = limits['water']
             
             # Ensure water use remains below limit for each region
-            for region, aqreq_reg_limit, ind in aqreq_limits:
+            for region, wreq_reg_limit, ind in w_limits:
                 
-                aqreq_region = sum( aqreq_mrj[0, ind, j] @ X_dry[j][ind]
-                                  + aqreq_mrj[1, ind, j] @ X_irr[j][ind]
-                                    for j in range(nlus) )
+                wreq_region = sum( w_mrj[0, ind, j] @ X_dry[j][ind]
+                                 + w_mrj[1, ind, j] @ X_irr[j][ind]
+                                   for j in range(nlus) )
                 
-                model.addConstr(aqreq_region <= aqreq_reg_limit)
-                # print('...water limit region %s <= %s ML' % (region, aqreq_reg_limit))
+                model.addConstr(wreq_region <= wreq_reg_limit)
+                if settings.VERBOSE == 1:
+                    print('    ...setting water limit for %s <= %.2f ML' % (region, wreq_reg_limit))
 
 
-        if 'nutrients' in limits:
-            ...
+        if 'ghg' in limits:
+            print('\nAdding GHG emissions constraints...', time.ctime() + '\n')
+            
+            # Returns GHG emissions limits 
+            ghg_limits = limits['ghg']
+                
+            ghg_emissions = sum( g_mrj[0, :, j] @ X_dry[j]
+                               + g_mrj[1, :, j] @ X_irr[j]
+                                 for j in range(nlus) )
+            
+            print('    ...setting {:,.0f}% GHG emissions reduction target: {:,.0f} tCO2e'.format(
+                          settings.GHG_REDUCTION_PERCENTAGE, ghg_limits )
+                 )
+            model.addConstr(ghg_emissions <= ghg_limits)
 
-        if 'carbon' in limits:
-            ...
+            
 
         if 'biodiversity' in limits:
             ...
+            
+        if 'nutrients' in limits:
+            ...
+
 
         # -------------------------- #
         # Solve and extract results. #
         # -------------------------- #
 
         st = time.time()
-        print('Starting solve... ', time.ctime())
+        print('Starting solve... ', time.ctime(), '\n')
         
         # Magic.
         model.optimize()
         
         ft = time.time()
-        print('Completed solve...', time.ctime())
+        print('Completed solve... ', time.ctime())
         print('Found optimal objective value', round(model.objVal, 2), 'in', round(ft - st), 'seconds\n')
         
-        print('Collecting results...', end = '')
-              
+        print('Collecting results...', end = ' ')
+        
         # Collect optimised decision variables in one X_mrj Numpy array.              
-        X_dry_rj = np.stack([X_dry[j].X for j in range(nlus)])
-        X_irr_rj = np.stack([X_irr[j].X for j in range(nlus)])
-        X_mrj = np.stack((X_dry_rj, X_irr_rj))
+        X_dry_rj = np.stack([X_dry[j].X for j in range(nlus)]).T.astype(np.float32)
+        X_irr_rj = np.stack([X_irr[j].X for j in range(nlus)]).T.astype(np.float32)
+        
+        # Save and load for testing - DELETE
+        np.save('X_dry_rj.npy', X_dry_rj)
+        np.save('X_irr_rj.npy', X_irr_rj)
+        X_dry_rj = np.load('X_dry_rj.npy')
+        X_irr_rj = np.load('X_irr_rj.npy')
+        
+        """Note that output decision variables are mostly 0 or 1 but in some cases they are somewhere in between which creates issues 
+           when converting to maps etc. as individual cells can have non-zero values for multiple land-uses and land management type.
+           This code creates a boolean X_mrj output matrix and ensure that each cell has one and only one land-use and land management"""
+        
+        # Stack dryland and irrigated decision variables and get the shape
+        X_mrj = np.stack((X_dry_rj, X_irr_rj)) # Float32
+        X_mrj_shape = X_mrj.shape
+        
+        # Reshape so that cells are along the first axis and land management and use are flattened along second axis i.e. (XXXXXXX, 56)
+        X_mrj = np.moveaxis(X_mrj, 1, 0)
+        X_mrj = X_mrj.reshape(X_mrj.shape[0], -1)
+        
+        # Boolean matrix where the maximum value for each cell across all land management types and land uses is True
+        X_mrj = X_mrj.argmax(axis = 1)[:, np.newaxis] == range(X_mrj.shape[1])
+        
+        # Reshape to mrj structure
+        X_mrj = X_mrj.reshape((X_mrj_shape[1], X_mrj_shape[0], X_mrj_shape[2]))
+        X_mrj = np.moveaxis(X_mrj, 0, 1)
 
-        # Collect optimised decision variables in tuple of 1D Numpy arrays.
-        prestack_dry = tuple(X_dry[j].X for j in range(nlus))
-        stack_dry = np.stack(prestack_dry)
-        highpos_dry = stack_dry.argmax(axis=0)
-
-        prestack_irr = tuple(X_irr[j].X for j in range(nlus))
-        stack_irr = np.stack(prestack_irr)
-        highpos_irr = stack_irr.argmax(axis=0)
-
-        lumap = np.where( stack_dry.max(axis=0) >= stack_irr.max(axis=0)
-                        , highpos_dry, highpos_irr )
-
-        lmmap = np.where( stack_dry.max(axis=0) >= stack_irr.max(axis=0)
-                        , 0, 1 )
+        
+        # Calculate 1D array (maps) of land-use and land management
+        lumap = X_mrj.sum(axis = 0).argmax(axis = 1).astype('int8')
+        lmmap = X_mrj.sum(axis = 2).argmax(axis = 0).astype('int8')
         
         print('Done\n')
         print('Total processing time...', round(time.time() - start_time), 'seconds')

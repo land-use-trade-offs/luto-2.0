@@ -22,12 +22,16 @@ import numpy as np
 import rasterio
 import h5py
 
-from luto.settings import INPUT_DIR, OUTPUT_DIR, SSP, RCP
+from luto.settings import INPUT_DIR, OUTPUT_DIR, SSP, RCP, RESFACTOR
 from luto.economics.quantity import lvs_veg_types
 
 # Load the agro-economic data (constructed using dataprep.py).
 AGEC_CROPS = pd.read_hdf( os.path.join(INPUT_DIR, 'agec_crops.h5') )
 AGEC_LVSTK = pd.read_hdf( os.path.join(INPUT_DIR, 'agec_lvstk.h5') )
+
+#Load greenhouse gas emissions from agriculture
+AGGHG_CROPS = pd.read_hdf( os.path.join(INPUT_DIR, 'agGHG_crops.h5') )
+AGGHG_LVSTK = pd.read_hdf( os.path.join(INPUT_DIR, 'agGHG_lvstk.h5') )
 
 # Derive NCELLS (number of spatial cells) from AGEC.
 NCELLS, = AGEC_CROPS.index.shape
@@ -164,15 +168,46 @@ LMMAP = pd.read_hdf(os.path.join(INPUT_DIR, 'lmmap.h5')).to_numpy()
 ANNUM = 2010
 
 
+###############################################################
+# Masking and spatial coarse graining.                                                 
+###############################################################
 
+# Set resfactor multiplier
+RESMULT = RESFACTOR ** 2
+
+# Mask out non-agricultural land (i.e., -1) from lumap (True means included cells. Boolean dtype.)
+MASK_LU_CODE = -1 
+LUMASK = LUMAP != MASK_LU_CODE  
+
+# Return combined land-use and resfactor mask
+if RESFACTOR > 1:
     
-# ----------- #
-# Water data. #
-# ----------- #
+    # Create resfactor mask for spatial coarse-graining.
+    rf_mask = NLUM_MASK.copy()
+    nonzeroes = np.nonzero(rf_mask)
+    rf_mask[::RESFACTOR, ::RESFACTOR] = 0
+    resmask = np.where(rf_mask[nonzeroes] == 0, True, False)
+
+    # Superimpose resfactor mask upon land-use map mask (Boolean).
+    MASK = LUMASK * resmask
+    
+elif RESFACTOR == 1:
+    MASK = LUMASK
+    
+else: 
+    raise KeyError('RESFACTOR setting invalid')
+
+# Create a mask indices array for subsetting arrays
+MINDICES = np.where(MASK)[0].astype(np.int32)
+        
+        
+###############################################################
+# Water data.                                                 
+###############################################################
 
 # Water requirements by land use -- LVSTK.
-aq_req_lvstk_dry = pd.DataFrame()
-aq_req_lvstk_irr = pd.DataFrame()
+wreq_lvstk_dry = pd.DataFrame()
+wreq_lvstk_irr = pd.DataFrame()
 
 # The rj-indexed arrays have zeroes where j is not livestock.
 for lu in LANDUSES:
@@ -180,26 +215,26 @@ for lu in LANDUSES:
         # First find out which animal is involved.
         animal, _ = lvs_veg_types(lu)
         # Water requirements per head are for drinking and irrigation.
-        aq_req_lvstk_dry[lu] = AGEC_LVSTK['WR_DRN', animal]
-        aq_req_lvstk_irr[lu] = ( AGEC_LVSTK['WR_DRN', animal] + AGEC_LVSTK['WR_IRR', animal] )
+        wreq_lvstk_dry[lu] = AGEC_LVSTK['WR_DRN', animal]
+        wreq_lvstk_irr[lu] = ( AGEC_LVSTK['WR_DRN', animal] + AGEC_LVSTK['WR_IRR', animal] )
     else:
-        aq_req_lvstk_dry[lu] = 0.0
-        aq_req_lvstk_irr[lu] = 0.0
+        wreq_lvstk_dry[lu] = 0.0
+        wreq_lvstk_irr[lu] = 0.0
 
 # Water requirements by land use -- CROPS.
-aq_req_crops_irr = pd.DataFrame()
+wreq_crops_irr = pd.DataFrame()
 
 # The rj-indexed arrays have zeroes where j is not a crop.
 for lu in LANDUSES:
     if lu in LU_CROPS:
-        aq_req_crops_irr[lu] = AGEC_CROPS['WR', 'irr', lu]
+        wreq_crops_irr[lu] = AGEC_CROPS['WR', 'irr', lu]
     else:
-        aq_req_crops_irr[lu] = 0.0
+        wreq_crops_irr[lu] = 0.0
 
 # Add together as they have nans where not lvstk/crops
-AQ_REQ_DRY_RJ = np.nan_to_num(aq_req_lvstk_dry.to_numpy(dtype = np.float32))
-AQ_REQ_IRR_RJ = np.nan_to_num(aq_req_crops_irr.to_numpy(dtype = np.float32)) + \
-                np.nan_to_num(aq_req_lvstk_irr.to_numpy(dtype = np.float32))
+WREQ_DRY_RJ = np.nan_to_num(wreq_lvstk_dry.to_numpy(dtype = np.float32))
+WREQ_IRR_RJ = np.nan_to_num(wreq_crops_irr.to_numpy(dtype = np.float32)) + \
+              np.nan_to_num(wreq_lvstk_irr.to_numpy(dtype = np.float32))
 
 # Spatially explicit costs of a water licence per ML.
 WATER_LICENCE_PRICE = np.nan_to_num( pd.read_hdf(os.path.join(INPUT_DIR, 'water_licence_price.h5')).to_numpy() )

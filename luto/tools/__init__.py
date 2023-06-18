@@ -21,28 +21,64 @@ Pure helper functions and other tools.
 
 import time
 import os.path
-
 import pandas as pd
 import numpy as np
 
-
-def lumap2x_mrj_old(lumap, lmmap):
-    """Return land-use maps in decision-variable (X_mrj) format."""
-    
-    drystack = []
-    irrstack = []
-    for j in range(28):
-        jmap = np.where( lumap == j, 1, 0 )                  # One boolean map for each land use.
-        drystack.append( np.where( lmmap == 0, jmap, 0 ) )   # Keep only dryland version.
-        irrstack.append( np.where( lmmap == 1, jmap, 0 ) )   # Keep only irrigated version.
-    
-    x_dry_rj = np.stack( drystack, axis = 1 )
-    x_irr_rj = np.stack( irrstack, axis = 1 )
-    
-    return np.stack((x_dry_rj, x_irr_rj))         # In x_mrj format.
+from luto.economics.quantity import get_quantity_matrices
 
 
-def lumap2x_mrj(lumap, lmmap):
+def show_map(year):
+    """Show a plot of the lumap of `year`."""
+    plotmap(lumaps[year], labels = bdata.LU2DESC)
+    
+    
+def get_production(sim, year):
+    """Return total production of commodities for a specific year...
+       
+    Can return base year production (e.g., year = 2010) or can return production for 
+    a simulated year if one exists (i.e., year = 2030) check sim.info()).
+    
+    Includes the impacts of land-use change, productivity increases, and 
+    climate change on yield."""
+
+    # Acquire local names for matrices and shapes.
+    lu2pr_pj = sim.data.LU2PR
+    pr2cm_cp = sim.data.PR2CM
+    nlus = sim.data.NLUS
+    nprs = sim.data.NPRS
+    ncms = sim.data.NCMS
+
+    # Get the maps in decision-variable format. 0/1 array of shape j, r
+    X_dry = sim.dvars[year][0].T
+    X_irr = sim.dvars[year][1].T
+
+    # Get the quantity matrices. Quantity array of shape m, r, p
+    q_mrp = get_quantity_matrices(sim.data, year - sim.data.ANNUM)
+
+    X_dry_pr = [ X_dry[j] for p in range(nprs) for j in range(nlus)
+                    if lu2pr_pj[p, j] ]
+    X_irr_pr = [ X_irr[j] for p in range(nprs) for j in range(nlus)
+                    if lu2pr_pj[p, j] ]
+
+    # Quantities in product (PR/p) representation by land management (dry/irr).
+    q_dry_p = [ q_mrp[0, :, p] @ X_dry_pr[p] for p in range(nprs) ]
+    q_irr_p = [ q_mrp[1, :, p] @ X_irr_pr[p] for p in range(nprs) ]
+
+    # Transform quantities to commodity (CM/c) representation by land management (dry/irr).
+    q_dry_c = [ sum(q_dry_p[p] for p in range(nprs) if pr2cm_cp[c, p])
+                for c in range(ncms) ]
+    q_irr_c = [ sum(q_irr_p[p] for p in range(nprs) if pr2cm_cp[c, p])
+                for c in range(ncms) ]
+
+    # Total quantities in commodity (CM/c) representation.
+    q_c = [q_dry_c[c] + q_irr_c[c] for c in range(ncms)]
+
+    # Return total commodity production.
+    return np.array(q_c)
+
+
+
+def lumap2l_mrj(lumap, lmmap):
     """Return land-use maps in decision-variable (X_mrj) format.
        Where 'm' is land mgt, 'r' is cell, and 'j' is land-use."""
     
@@ -55,7 +91,7 @@ def lumap2x_mrj(lumap, lmmap):
         x_mrj[0, :, j] = np.where( lmmap == False, jmap, False )   # Keep only dryland version.
         x_mrj[1, :, j] = np.where( lmmap == True, jmap, False )    # Keep only irrigated version.
     
-    return x_mrj
+    return x_mrj.astype(bool)
 
 
 
@@ -117,6 +153,7 @@ def crosstabulate(before, after, labels):
 
     return ct
 
+
 def ctabnpystocsv(before, after, labels):
     """Write cross-tabulation of `before` and `after` from .npys to .csv."""
 
@@ -132,6 +169,7 @@ def ctabnpystocsv(before, after, labels):
     # Produce the cross tabulation and write the file to dir of first file.
     ct = crosstabulate(pre, post, labels)
     ct.to_csv(os.path.join(prename + str(2) + postname + ".csv"))
+
 
 def inspect(lumap, highpos, d_j, q_rj, c_rj, landuses):
 

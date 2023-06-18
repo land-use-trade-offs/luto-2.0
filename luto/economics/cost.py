@@ -64,9 +64,16 @@ def get_cost_crop( data # Data object or module.
         else: # Passed lm is neither `dry` nor `irr`.
             raise KeyError("Unknown %s land management. Check `lm` key." % lm)
             
-        # Total costs in $/ha converted to $/cell. Convert to numpy array.
-        costs_t = ( (costs_q + costs_a + costs_f + costs_w) * data.REAL_AREA ).to_numpy()
-
+        # Total costs in $/ha. 
+        costs_t = costs_q + costs_a + costs_f + costs_w
+        
+        # Convert to $/cell.
+        costs_t *= data.REAL_AREA
+        
+        # Incorporate resfactor
+        costs_t *= data.RESMULT
+        
+    # Return costs as numpy array.
     return costs_t
 
 
@@ -115,7 +122,11 @@ def get_cost_lvstk( data # Data object or module.
 
     # Costs so far in AUD/ha. Now convert to AUD/cell.
     costs_t *= data.REAL_AREA
-
+              
+    # Incorporate resfactor
+    costs_t *= data.RESMULT
+    
+    # Return costs as numpy array.
     return costs_t.to_numpy()
 
 
@@ -160,7 +171,8 @@ def get_cost_matrix(data, lm, year):
 
 
 def get_cost_matrices(data, year):
-    """Return c_rmj matrix of costs per cell as 3D Numpy array."""
+    """Return c_mrj matrix of costs per cell as 3D Numpy array."""
     
     return np.stack(tuple( get_cost_matrix(data, lm, year)
-                           for lm in data.LANDMANS ))
+                           for lm in data.LANDMANS )
+                    ).astype(np.float32)

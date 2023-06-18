@@ -14,14 +14,15 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO 2.0. If not, see <https://www.gnu.org/licenses/>.
 
-"""
-LUTO 2.0 settings.
-"""
-
+""" LUTO model settings. """
 
 import os
 import pandas as pd
 
+# ---------------------------------------------------------------------------- #
+# LUTO model version.                                                                 #
+# ---------------------------------------------------------------------------- #
+VERSION = '2.0.2'
 
 ############### Set some Spyder options
 pd.set_option('display.width', 470)
@@ -51,9 +52,7 @@ DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 1             # set to 1 to run at full spatial resolution
-# SAMPLING = 'linear'     # Converts non-nodata cells to 1D array and selects every n'th cell for modelling
-SAMPLING = 'quadratic'    # Selects cell from every n x n block from 2D array (raster map) for modelling (better as more regularly spaced)
+RESFACTOR = 3             # set to 1 to run at full spatial resolution
 
 # How does the model run over time 
 STYLE = 'snapshot'       # runs for target year only
@@ -62,7 +61,9 @@ STYLE = 'snapshot'       # runs for target year only
 # Penalty in objective function
 PENALTY = 1000000
 
-# Set Gurobi parameters
+# ---------------------------------------------------------------------------- #
+# Gurobi parameters
+# ---------------------------------------------------------------------------- #
 
 # Select Gurobi algorithm used to solve continuous models or the initial root relaxation of a MIP model.
 # Set solve method. Default is automatic. Dual simplex uses less memory.
@@ -79,10 +80,21 @@ SOLVE_METHOD = 1
 """
 
 # Print detailed output to screen
-VERBOSE = 0
+VERBOSE = 1
 
-# Environmental constraint settings. In general there is some sort of 'cap'
-# ('hard', 'soft' or 'none') and an optional requirement to further minimise.
+# Relax the tolerance for proving optimality
+OPTIMALITY_TOLERANCE = 1e-2
+
+"""Default value:	1e-6
+   Minimum value:	1e-9
+   Maximum value:	1e-2"""
+
+# ---------------------------------------------------------------------------- #
+# Environmental parameters
+# ---------------------------------------------------------------------------- #
+
+# Greenhouse gas emissions
+GHG_REDUCTION_PERCENTAGE = 20
 
 # Water:
 WATER_CONSTRAINT_TYPE = 'hard'          # or 'soft' or None.
@@ -93,7 +105,6 @@ WATER_YIELD_STRESS_FRACTION = 0.4       # Water stress if yields below this frac
 WATER_REGION_DEF = 'RR'                 # 'RR' for River Region, 'DD' for Drainage Division
 WATER_DRAINDIVS = list(range(1, 14, 1)) # List of drainage divisions to apply irrigation constraints to e.g., [1, 2].
 WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions to apply irrigation constraints to e.g., [1, 2].
-
 
 """ DRAINAGE DIVISIONS
  1: 'Tanami-Timor Sea Coast',

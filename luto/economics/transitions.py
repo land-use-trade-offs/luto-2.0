@@ -27,8 +27,10 @@ import numpy_financial as npf
 
 from luto.economics.quantity import lvs_veg_types, get_yield_pot
 from luto.economics.cost import get_cost_matrices
+from luto.economics.water import get_wreq_matrices
 
 import luto.settings as settings
+from luto.tools import lumap2l_mrj
 
 
 def amortise(cost, rate = settings.DISCOUNT_RATE, horizon = settings.AMORTISATION_PERIOD):
@@ -37,36 +39,56 @@ def amortise(cost, rate = settings.DISCOUNT_RATE, horizon = settings.AMORTISATIO
 
 
 def get_exclude_matrices(data, lumap):
-    """Return x_mrj exclude matrices."""
-    
-    # Boolean exclusion matrix based on SA2 data.
-    x_sa2 = data.EXCLUDE
+    """Return x_mrj exclude matrices.
 
-    # Raw transition-cost matrix is in AUD/Ha and lexigraphically ordered.
+    An exclude matrix indicates whether switching land-use for a certain cell r 
+    with land-use i to all other land-uses j under all land management types 
+    (i.e., dryland, irrigated) m is possible. 
+
+    Parameters
+    ----------
+
+    data: object/module
+        Data object or module with fields like in `luto.data`.
+    lumap : numpy.ndarray
+        Present land-use map, i.e. highpos (shape=ncells, dtype=int).
+
+    Returns
+    -------
+
+    numpy.ndarray
+        x_mrj exclude matrix. The m-slices correspond to the
+        different land-management versions of the land-use `j` to switch _to_.
+        With m==0 conventional dry-land, m==1 conventional irrigated.
+    """    
+    # Boolean exclusion matrix based on SA2/NLUM agricultural land-use data (in mrj structure).
+    # Effectively, this ensures that in any SA2 region the only combinations of land-use and land management
+    # that can occur in the future are those that occur in 2010 (i.e., base_year)
+    x_mrj = data.EXCLUDE
+
+    # Raw transition-cost matrix is in $/ha and lexicographically ordered by land-use.
     t_ij = data.TMATRIX
+    
+    # Transition costs from current land-use to all other land-uses j using current land-use map (in $/ha).
+    t_rj = t_ij[lumap]
 
-    # Infer number of cells from lumap array.
-    ncells = lumap.shape[0]
+    # To be excluded based on disallowed switches as specified in transition cost matrix i.e., where t_rj is NaN.
+    t_rj = np.where(np.isnan(t_rj), 0, 1)
 
-    # Transition costs to commodity j at cell r using present lumap (in AUD/ha).
-    t_rj = np.stack(tuple(t_ij[lumap[r]] for r in range(ncells)))
-
-    # To be excluded based on disallowed switches.
-    x_rj = np.where(np.isnan(t_rj), 0, 1)
-
-    # Overal exclusion as elementwise, logical `and` of the 0/1 exclude matrices.
-    return (x_sa2 * x_rj).astype(np.int8)
+    # Overall exclusion as elementwise, logical `and` of the 0/1 exclude matrices.
+    x_mrj = (x_mrj * t_rj).astype(np.int8)
+    
+    return x_mrj
 
 
 def get_transition_matrices(data, year, lumap, lmmap):
     """Return t_mrj transition-cost matrices.
 
-    A transition-cost matrix gives the cost of switching a certain cell r to
-    a certain land-use j under a certain land-management m. The base costs are
-    taken from the raw transition costs in the `data` module and additional
-    costs are added depending on the land-management (e.g. costs of irrigation
-    infrastructure). Switching costs further depend on both the current and the
-    future land-use, so the present land-use map is needed.
+    A transition-cost matrix gives the cost of switching a cell r from its 
+    current land-use and land management type to every other land-use and land 
+    management type. The base costs are taken from the raw transition costs in 
+    the `data` module and additional costs are added depending on the land 
+    management type (e.g. costs of irrigation infrastructure). 
 
     Parameters
     ----------
@@ -76,134 +98,93 @@ def get_transition_matrices(data, year, lumap, lmmap):
     year : int
         Number of years from base year, counting from zero.
     lumap : numpy.ndarray
-        Present land-use map, i.e. highpos (shape=ncells, dtype=int).
+        Present land-use map, i.e. highpos (shape = ncells, dtype=int).
     lmmap : numpy.ndarray
-        Present land-management map (shape=ncells, dtype=int).
+        Present land-management map (shape = ncells, dtype=int).
 
     Returns
     -------
 
     numpy.ndarray
         t_mrj transition-cost matrices. The m-slices correspond to the
-        different land-management versions of the land-use `j` to switch _to_.
-        With m==0 conventional dry-land, m==1 conventional irrigated.
+        different land management types, r is grid cell, and j is land-use.
     """
-
-    # Raw transition-cost matrix is in AUD/Ha and lexigraphically ordered.
+    
+    # Return l_mrj (Boolean) for current land-use and land management
+    l_mrj = lumap2l_mrj(lumap, lmmap)
+    
+    
+    # -------------------------------------------------------------- #
+    # Establishment costs (upfront, amortised to annual).            #
+    # -------------------------------------------------------------- #
+            
+    # Raw transition-cost matrix is in $/ha and lexigraphically ordered (shape: land-use x land-use).
     t_ij = data.TMATRIX
 
-    # Infer number land-uses and cells from t_ij and lumap matrices.
-    nlus = t_ij.shape[0]
-    ncells = lumap.shape[0]
-
-    # The cost matrices are needed as well -- but in per hectare form.
-    c_mrj = get_cost_matrices(data, year)
-    c_mrj /= data.REAL_AREA[:, np.newaxis]
-
-    # Transition costs for cell r to change to land-use j calculated based on using lumap (in AUD/ha).
-    t_rj = np.stack( tuple( t_ij[lumap[r]] for r in range(ncells) ) )
-
-    # Convert water requirements for LVSTK from per head to per hectare.
-    AQ_REQ_DRY_RJ = data.AQ_REQ_DRY_RJ.copy()
-    AQ_REQ_IRR_RJ = data.AQ_REQ_IRR_RJ.copy()
-    for lu in data.LANDUSES:
-        if lu in data.LU_LVSTK:
-            lvs, veg = lvs_veg_types(lu)
-            j = data.LANDUSES.index(lu)
-            AQ_REQ_DRY_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'dry')
-            AQ_REQ_IRR_RJ[:, j] *= get_yield_pot(data, lvs, veg, 'irr')
+    # Non-irrigation related transition costs for cell r to change to land-use j calculated based on lumap (in $/ha).
+    t_rj = t_ij[lumap]
+        
+    # Amortise upfront costs to annualised costs
+    t_rj = amortise(t_rj)
+    
+    
+    # -------------------------------------------------------------- #
+    # Opportunity costs (annual).                                    #    
+    # -------------------------------------------------------------- #
             
-    # Foregone income is incurred @ 3x new production cost unless ...
-    odelta_todry_rj = 3 * c_mrj[0]
-    odelta_toirr_rj = 3 * c_mrj[1]
-    # ... it is to an unallocated land use or ...
-    odelta_todry_rj[:, data.LU_UNALL_INDICES] = 0
-    odelta_toirr_rj[:, data.LU_UNALL_INDICES] = 0
+    # Get cost matrices and convert from $/cell to $/ha.
+    c_mrj = get_cost_matrices(data, year) / data.REAL_AREA[:, np.newaxis]
+    
+    # Calculate production cost of current land-use and land management for each grid cell r.
+    c_r = (c_mrj * l_mrj).sum(axis = 0).sum(axis = 1)
+    
+    # Opportunity cost calculated as the diff in production cost between current land-use and all other land-uses j
+    o_delta_mrj = c_mrj - c_r[:, np.newaxis]
+    
+    # Cost for switching to Unallocated - modified land is zero
+    o_delta_mrj[0, :, data.LU_UNALL_INDICES] = 0
+    
+    # Cost for switching to the same land-use and irr status is zero.
+    o_delta_mrj = np.where(l_mrj, 0, o_delta_mrj)
+    
+    
+    # -------------------------------------------------------------- #
+    # Water license costs (upfront, amortised to annual).            #
+    # -------------------------------------------------------------- #
+    
+    # Get water requirements from current agriculture, converting water requirements for LVSTK from ML per head to ML per hectare.
+    w_mrj = get_wreq_matrices(data)
+    
+    # Calculate water requirements of current land-use and land management 
+    w_r = (w_mrj * l_mrj).sum(axis = 0).sum(axis = 1)
+    
+    # Net water requirements calculated as the diff in water requirements between current land-use and all other land-uses j.
+    w_net_mrj = w_mrj - w_r[:, np.newaxis]
+    
+    # Water license cost calculated as net water requirements (ML/ha) x licence price ($/ML).
+    w_delta_mrj = w_net_mrj * data.WATER_LICENCE_PRICE[:, np.newaxis]
+    
+    # When land-use changes from dryland to irrigated add $10k per hectare
+    w_delta_mrj[1] = np.where(l_mrj[0], w_delta_mrj[1] + 10000, w_delta_mrj[1])
 
-    # Switching may incur water licence cost/refund and infrastructure costs.
-    wdelta_toirr_rj = np.zeros((ncells, nlus))
-    wdelta_todry_rj = np.zeros((ncells, nlus))
+    # When land-use changes from irrigated to dryland add $3k per hectare
+    w_delta_mrj[0] = np.where(l_mrj[1], w_delta_mrj[0] + 3000, w_delta_mrj[0])
+    
+    # Amortise upfront costs to annualised costs
+    w_delta_mrj = amortise(w_delta_mrj)
+    
+    
+    # -------------------------------------------------------------- #
+    # Total costs.                                                   #
+    # -------------------------------------------------------------- #
+    
+    # Sum annualised costs of land-use and land management transition in $ per cell
+    t_mrj = (w_delta_mrj + o_delta_mrj + t_rj) * data.REAL_AREA[:, np.newaxis]
 
-    for r in range(ncells):
-        j = lumap[r] # Current land-use index.
-        m = lmmap[r] # Current land-man index.
-
-        # ... the switch is to the same land-use and irr status).
-        odelta_todry_rj[r, j] = 0
-        odelta_toirr_rj[r, j] = 0
-
-        # DRY -> {DRY, IRR} (i.e. cases _from_ dry land uses.)
-        if m == 0:
-
-            # -------------------------------------------------------------- #
-            # DRY -> DRY / Licence difference costs.                         #
-            # -------------------------------------------------------------- #
-
-            # Net water requirements.
-            aq_req_net = ( data.AQ_REQ_DRY_RJ[r]
-                         - data.AQ_REQ_DRY_RJ[r, j] )
-            # To pay: net water requirements x licence price.
-            wdelta_todry_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r]
-
-            # -------------------------------------------------------------- #
-            # DRY -> IRR / Licence diff. + infrastructure cost @10kAUD/ha.   #
-            # -------------------------------------------------------------- #
-
-            # Net water requirements.
-            aq_req_net = ( data.AQ_REQ_IRR_RJ[r]
-                         - data.AQ_REQ_DRY_RJ[r, j] )
-            # To pay: net water requirements x licence price and 10kAUD.
-            wdelta_toirr_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r] + 1E4
-
-        # IRR -> {DRY, IRR} (i.e. cases _from_ irrigated land uses.)
-        elif m == 1:
-
-            # -------------------------------------------------------------- #
-            # IRR -> DRY / Licence diff. plus additional costs at @3kAUD/ha. #
-            # ---------------------------------------------------------------#
-
-            # Net water requirements.
-            aq_req_net = ( data.AQ_REQ_DRY_RJ[r]
-                         - data.AQ_REQ_IRR_RJ[r, j] )
-            # To pay: net water requirements x licence price and 3000.
-            wdelta_todry_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r] + 3000
-
-            # -------------------------------------------------------------- #
-            # IRR -> IRR / Difference with current licence paid or refunded. #
-            # -------------------------------------------------------------- #
-
-            # Net water requirements.
-            aq_req_net = ( data.AQ_REQ_IRR_RJ[r]
-                         - data.AQ_REQ_IRR_RJ[r, j] )
-            # To pay: net water requirements x licence price.
-            wdelta_toirr_rj[r] = aq_req_net * data.WATER_LICENCE_PRICE[r]
-            
-            # Extra costs for irr infra change @10kAUD/ha if not lvstk -> lvstk.
-            infradelta_j = 1E4 * np.ones(nlus)
-            infradelta_j[j] = 0 # No extra cost if no land-use change at all.
-            if j in data.LU_LVSTK_INDICES: # No extra cost within lvstk lus.
-                infradelta_j[data.LU_LVSTK_INDICES] = 0
-            wdelta_toirr_rj[r] += infradelta_j # Add cost to total to pay.
-
-        # ??? -> ___ / This case does not (yet) exist.
-        else:
-            raise ValueError("Unknown land management: %s." % m)
-
-    # Add the various deltas to the base costs and convert to AUD/cell.
-    t_rj_todry = ( t_rj                            # Base switching costs.
-                 + wdelta_todry_rj                 # Water-related costs.
-                 + odelta_todry_rj                 # Foregone income costs.
-                 ) * data.REAL_AREA[:, np.newaxis] # Conversion to AUD/cell.
-    t_rj_toirr = ( t_rj                            # Base switching costs.
-                 + wdelta_toirr_rj                 # Water-related costs.
-                 + odelta_toirr_rj                 # Foregone income costs.
-                 ) * data.REAL_AREA[:, np.newaxis] # Conversion to AUD/cell.
-
-    # Transition costs are amortised.
-    t_rj_todry = amortise(t_rj_todry)                     ######################### Annual costs should not be amortised
-    t_rj_toirr = amortise(t_rj_toirr)
-
-    # Stack the t_rj matrices into one t_mrj array.
-    t_mrj = np.stack((t_rj_todry, t_rj_toirr))
-
+    # Ensure cost for switching to the same land-use and land management is zero.
+    t_mrj = np.where(l_mrj, 0, t_mrj)
+    
+    # Consider resfactor
+    t_mrj *= data.RESMULT
+    
     return t_mrj
