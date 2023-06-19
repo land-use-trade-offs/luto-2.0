@@ -1,0 +1,15 @@
+geopandas
+gurobipy==9.5
+h5py
+matplotlib
+numpy
+numpy-financial
+pandas
+rasterio
+scikit-learn
+scipy
+scipy
+shapely
+tables
+py-spy
+bpython

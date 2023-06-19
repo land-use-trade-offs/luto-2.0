@@ -35,6 +35,7 @@ from luto.economics.water import get_aqreq_limits
 from luto.solvers.solver import solve
 from luto.tools.plotmap import plotmap
 from luto.tools import lumap2x_mrj
+from luto.tools.write import write
 
 
 class Data():
@@ -266,6 +267,7 @@ def step( base    # Base year from which the data is taken.
         , demands # Demands in the form of a d_c array.
         # , penalty # Penalty level.
         # , limits  # (Environmental) limits as additional soft/hard constraints.
+        , cluster_size,
         ):
     """Solve the linear programme using the `base` lumap for `target` year."""
 
@@ -281,6 +283,7 @@ def step( base    # Base year from which the data is taken.
                                , get_x_mrj()
                                , data.LU2PR
                                , data.PR2CM
+                               , cluster_size
                                , limits = get_limits()
                                )
 
@@ -304,8 +307,9 @@ def run( base
        , target
        , demands
        # , penalty
-       # , style = 'snapshot'
-       # , resfactor = False
+       , style = settings.STYLE
+       , resfactor = settings.RESFACTOR
+       , cluster_size = settings.CLUSTER_SIZE
        ):
     """Run the simulation."""
     
@@ -314,36 +318,36 @@ def run( base
 
     # Set the options if applicable.
     # set_resfactor(resfactor, sampling= 'quadratic')
-    set_resfactor(settings.RESFACTOR, settings.SAMPLING)
+    set_resfactor(resfactor, settings.SAMPLING)
 
     # Run the simulation up to `year` sequentially.
-    if settings.STYLE == 'timeseries':
+    if style == 'timeseries':
         if len(demands.shape) != 2:
             raise ValueError( "Demands need to be a time series array of "
                               "shape (years, commodities) and years > 0." )
         elif target - base > demands.shape[0]:
             raise ValueError( "Not enough years in demands time series.")
         else:
-            print( "\nRunning LUTO 2.0 timeseries from %s to %s at resfactor %s." % (base, target, settings.RESFACTOR) )
+            print( "\nRunning LUTO 2.0 timeseries from %s to %s at resfactor %s." % (base, target, resfactor) )
             for s in range(steps):
                 print( "\n-------------------------------------------------" )
                 print( "Running for year %s..." % (base + s + 1) )
                 print( "-------------------------------------------------\n" )
-                step(base + s, base + s + 1 , demands[s])
+                step(base + s, base + s + 1 , demands[s], cluster_size)
 
     # Run the simulation from ANNUM to `target` year directly.
-    elif settings.STYLE == 'snapshot':
+    elif style == 'snapshot':
         # If demands is a time series, choose the appropriate entry.
         if len(demands.shape) == 2:
             demands = demands[target - bdata.ANNUM ] # - 1]                        ### Demands needs to be a timeseries from 2010 to target year                   # ******************* check the -1 is correct indexing
-        print( "\nRunning LUTO 2.0 snapshot for %s at resfactor %s." % (target, settings.RESFACTOR) )
+        print( "\nRunning LUTO 2.0 snapshot for %s at resfactor %s." % (target, resfactor) )
         print( "\n-------------------------------------------------" )
         print( "Running for year %s..." % target )
         print( "-------------------------------------------------\n" )
-        step(base, target, demands)
+        step(base, target, demands, cluster_size)
 
     else:
-        raise ValueError("Unkown style: %s." % settings.STYLE)
+        raise ValueError("Unknown style: %s." % style)
 
 
 def info():
@@ -426,7 +430,6 @@ def get_production(year):
 
     # Return total commodity production.
     return np.array(q_c)
-
 
 
 ############################################################################################################################

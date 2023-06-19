@@ -56,11 +56,15 @@ RESFACTOR = 1             # set to 1 to run at full spatial resolution
 SAMPLING = 'quadratic'    # Selects cell from every n x n block from 2D array (raster map) for modelling (better as more regularly spaced)
 
 # How does the model run over time 
-STYLE = 'snapshot'       # runs for target year only
-# STYLE = 'timeseries'   # runs each year from base year to target year
+# STYLE = 'snapshot'       # runs for target year only
+STYLE = 'timeseries'   # runs each year from base year to target year
 
 # Penalty in objective function
 PENALTY = 1000000
+
+# Column generation options
+USE_COLUMN_GENERATION = True  # enable or disable using column generation for the solve
+CLUSTER_SIZE = 1000           # initial max cluster size for the column generation solve
 
 # Set Gurobi parameters
 

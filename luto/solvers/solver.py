@@ -26,35 +26,31 @@ import scipy.sparse as sp
 import gurobipy as gp
 from gurobipy import GRB
 
+import cProfile
+
 import luto.settings as settings
+from luto.solvers.solve_column_generation import solve_using_column_generation
 
 # Set Gurobi environment.
 gurenv = gp.Env(empty = True)
 gurenv.setParam('Method', settings.SOLVE_METHOD)
-gurenv.setParam('OutputFlag', settings.VERBOSE)
+# gurenv.setParam('OutputFlag', settings.VERBOSE)
+gurenv.setParam("Threads", 1)
+gurenv.setParam("WorkLimit", 3600)
 gurenv.start()
 
 
-def solve( t_mrj          # Transition cost matrices.
-         , c_mrj          # Production cost matrices.
-         , q_mrp          # Yield matrices -- note the `p` (product) index instead of `j` (land-use).
-         , d_c            # Demands -- note the `c` ('commodity') index instead of `j` (land-use).
-         , penalty        # Penalty level.
-         , x_mrj          # Exclude matrices.
-         , lu2pr_pj       # Conversion matrix: land-use to product(s).
-         , pr2cm_cp       # Conversion matrix: product(s) to commodity.
-         , limits = None  # Targets to use.
-         ):
-    """Return land-use and land management maps under constraints and minimised costs.
-
-    All inputs are Numpy arrays of the appropriate shapes, except for `p` which
-    is a scalar and `limits` which is a dictionary.
-
-    To run with only a subset of the constraints, pass a custom `constraints`
-    dictionary. Format {key: value} where 'key' is a string, one of 'water',
-    'nutrients', 'carbon' or 'biodiversity' and 'value' is either True or False.
-    """
-
+def solve_no_clustering(
+    t_mrj,
+    c_mrj,
+    q_mrp,
+    d_c,
+    penalty,
+    x_mrj,
+    lu2pr_pj,
+    pr2cm_cp,
+    limits,
+):
     # Set up a timer
     start_time = time.time()
 
@@ -62,9 +58,9 @@ def solve( t_mrj          # Transition cost matrices.
     if limits is None: limits = {}
 
     # Extract the shape of the problem.
-    nlms, ncells, nlus = t_mrj.shape # Number of landmans, cells, landuses.
-    _, _, nprs = q_mrp.shape # Number of products.
-    ncms, = d_c.shape # Number of commodities.
+    nlms, ncells, nlus = t_mrj.shape  # Number of landmans, cells, landuses.
+    _, _, nprs = q_mrp.shape  # Number of products.
+    ncms, = d_c.shape  # Number of commodities.
 
     # Cost per tonne = cost per hectare / tonnes per hectare.
 
@@ -76,16 +72,16 @@ def solve( t_mrj          # Transition cost matrices.
     # # Divide by quantity per hectare to obtain cost per tonne.
     # qprime_mrp = np.where(q_mrp != 0, q_mrp, np.inf) # Avoid division by zero.
     # cpert_mrp = c_mrp / qprime_mrp
-    
+
     # # Cost per tonne in PR/p representation.
     # c_p = [cpert_mrp.T[p].max() for p in range(nprs)]
-    
+
     # # Commodities from multiple sources get average costs.
     # p2c_cp = pr2cm_cp / pr2cm_cp.sum(axis=1)[:, np.newaxis]
-    
+
     # # Finally, cost per tonne in CM/c representation.
     # c_c = p2c_cp @ c_p
-    
+
     # # Apply the penalty-level multiplier.
     # p_c = penalty * c_c
 
@@ -102,7 +98,7 @@ def solve( t_mrj          # Transition cost matrices.
         # Land-use indexed lists of ncells-sized decision variable vectors.
         X_dry = [ model.addMVar(ncells, ub = x_mrj[0, :, j], name = 'X_dry')
                   for j in range(nlus) ]
-        
+
         X_irr = [ model.addMVar(ncells, ub = x_mrj[1, :, j], name = 'X_irr')
                   for j in range(nlus) ]
 
@@ -132,7 +128,6 @@ def solve( t_mrj          # Transition cost matrices.
                     )
 
         model.setObjective(objective, GRB.MINIMIZE)
-        
 
         # ------------ #
         # Constraints. #
@@ -159,33 +154,32 @@ def solve( t_mrj          # Transition cost matrices.
         q_irr_c = [ sum(q_irr_p[p] for p in range(nprs) if pr2cm_cp[c, p])
                     for c in range(ncms) ]
 
+
         # Total quantities in CM/c representation.
         q_c = [q_dry_c[c] + q_irr_c[c] for c in range(ncms)]
 
         # Finally, add the constraint in the CM/c representation.
-        model.addConstrs( (d_c[c] - q_c[c]) <= V[c] 
+        model.addConstrs( (d_c[c] - q_c[c]) <= V[c]
                           for c in range(ncms) )
-        model.addConstrs( (q_c[c] - d_c[c]) <= V[c] 
+        model.addConstrs( (q_c[c] - d_c[c]) <= V[c]
                           for c in range(ncms) )
 
         # Only add the following constraints if target provided.
 
         if 'water' in limits:
-            
             # Returns water requirements for agriculture in mrj format and region-specific water use limits
             print('Adding water constraints by', settings.WATER_REGION_DEF)
             aqreq_mrj, aqreq_limits = limits['water']
-            
+
             # Ensure water use remains below limit for each region
             for region, aqreq_reg_limit, ind in aqreq_limits:
-                
+
                 aqreq_region = sum( aqreq_mrj[0, ind, j] @ X_dry[j][ind]
                                   + aqreq_mrj[1, ind, j] @ X_irr[j][ind]
                                     for j in range(nlus) )
-                
+
                 model.addConstr(aqreq_region <= aqreq_reg_limit)
                 # print('...water limit region %s <= %s ML' % (region, aqreq_reg_limit))
-
 
         if 'nutrients' in limits:
             ...
@@ -242,14 +236,61 @@ def solve( t_mrj          # Transition cost matrices.
 
     except AttributeError:
         print('Encountered an attribute error')
-        
 
+
+def solve(t_mrj  # Transition cost matrices.
+          , c_mrj  # Production cost matrices.
+          , q_mrp  # Yield matrices -- note the `p` (product) index instead of `j` (land-use).
+          , d_c  # Demands -- note the `c` ('commodity') index instead of `j` (land-use).
+          , penalty  # Penalty level.
+          , x_mrj  # Exclude matrices.
+          , lu2pr_pj  # Conversion matrix: land-use to product(s).
+          , pr2cm_cp  # Conversion matrix: product(s) to commodity.
+          , cluster_size  # Size of clusters used for column generation, if enabled.
+          , limits = None  # Targets to use.
+          ):
+    """Return land-use and land management maps under constraints and minimised costs.
+
+    All inputs are Numpy arrays of the appropriate shapes, except for `p` which
+    is a scalar and `limits` which is a dictionary.
+
+    To run with only a subset of the constraints, pass a custom `constraints`
+    dictionary. Format {key: value} where 'key' is a string, one of 'water',
+    'nutrients', 'carbon' or 'biodiversity' and 'value' is either True or False.
+    """
+    solver_args = [
+        t_mrj,
+        c_mrj,
+        q_mrp,
+        d_c,
+        penalty,
+        x_mrj,
+        lu2pr_pj,
+        pr2cm_cp,
+        limits,
+    ]
+
+    if settings.USE_COLUMN_GENERATION:
+        solve_function = solve_using_column_generation
+        solver_args.append(cluster_size)
+
+    else:
+        solve_function = solve_no_clustering
+
+    p = cProfile.Profile()
+    p.enable()
+
+    lumap, lmmap, X_mrj = solve_function(*solver_args)
+
+    p.disable()
+    p.dump_stats("solve_profile.prof")
+
+    return lumap, lmmap, X_mrj
 
 
 # Toy model
 
 if __name__ == '__main__':
-
     nlms = 2
     ncells = 10
     nlus = 5
