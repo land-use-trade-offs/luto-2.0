@@ -68,6 +68,7 @@ def solve( t_mrj          # Transition cost matrices.
     _, _, nprs = q_mrp.shape # Number of products.
     ncms, = d_c.shape # Number of commodities.
 
+
     try:
         print('\nSetting up the model...', time.ctime() + '\n')
 

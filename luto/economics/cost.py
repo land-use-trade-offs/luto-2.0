@@ -43,18 +43,17 @@ def get_cost_crop( data # Data object or module.
     else: # Calculate the total costs 
             
         # Variable costs (quantity costs and area costs)        
-        # Quantity costs in $/ha (calculated as cost per tonne x tonne per cell / hectare per cell)
+        # Quantity costs (calculated as cost per tonne x tonne per cell x resfactor)
         costs_q = ( data.AGEC_CROPS['QC', lm, lu]
-             * get_quantity(data, lu.upper(), lm, year)   # lu.upper() only for crops as needs to be in product format in get_quantity().
-             / data.REAL_AREA )                           # Convert back to $/ha from $/cell      
+                  * get_quantity(data, lu.upper(), lm, year) )  # lu.upper() only for crops as needs to be in product format in get_quantity().  
         
         # Area costs.
         costs_a = data.AGEC_CROPS['AC', lm, lu]
     
-        # Fixed costs as FLC + FOC + FDC.
-        costs_f = 0
-        for c in ['FLC', 'FOC', 'FDC']:
-            costs_f += data.AGEC_CROPS[c, lm, lu].copy()
+        # Fixed costs
+        costs_f = ( data.AGEC_CROPS['FLC', lm, lu]    # Fixed labour costs.
+                  + data.AGEC_CROPS['FOC', lm, lu]    # Fixed operating costs.
+                  + data.AGEC_CROPS['FDC', lm, lu] )  # Fixed depreciation costs.
 
         # Water costs as water required in ML per hectare x delivery price per ML.
         if lm == 'irr':
@@ -65,13 +64,16 @@ def get_cost_crop( data # Data object or module.
             raise KeyError("Unknown %s land management. Check `lm` key." % lm)
             
         # Total costs in $/ha. 
-        costs_t = costs_q + costs_a + costs_f + costs_w
+        costs_t = costs_a + costs_f + costs_w
         
         # Convert to $/cell.
         costs_t *= data.REAL_AREA
         
         # Incorporate resfactor
         costs_t *= data.RESMULT
+        
+        # Add quantity costs which has already been adjusted for REAL_AREA and RESMULT via get_quantity
+        costs_t += costs_q
         
     # Return costs as numpy array.
     return costs_t
