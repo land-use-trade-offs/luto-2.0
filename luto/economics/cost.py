@@ -66,13 +66,10 @@ def get_cost_crop( data # Data object or module.
         # Total costs in $/ha. 
         costs_t = costs_a + costs_f + costs_w
         
-        # Convert to $/cell.
+        # Convert to $/cell including resfactor.
         costs_t *= data.REAL_AREA
         
-        # Incorporate resfactor
-        costs_t *= data.RESMULT
-        
-        # Add quantity costs which has already been adjusted for REAL_AREA and RESMULT via get_quantity
+        # Add quantity costs which has already been adjusted for REAL_AREA/resfactor via get_quantity
         costs_t += costs_q
         
     # Return costs as numpy array.
@@ -94,7 +91,7 @@ def get_cost_lvstk( data # Data object or module.
     # Get livestock and vegetation type.
     lvstype, vegtype = lvs_veg_types(lu)
 
-    # Get the yield potential, i.e. the total number of heads per hectare.
+    # Get the yield potential, i.e. the total number of head per hectare.
     yield_pot = get_yield_pot(data, lvstype, vegtype, lm)
 
     # Variable costs - quantity-dependent costs as costs per head x heads per hectare.
@@ -116,17 +113,15 @@ def get_cost_lvstk( data # Data object or module.
     else: # Passed lm is neither `dry` nor `irr`.
         raise KeyError("Unknown %s land management. Check `lm` key." % lm)
         
-    WR_DRN = data.AGEC_LVSTK['WR_DRN', lvstype] # Drinking water required.
-    costs_w = (WR_DRN + WR_IRR) * data.WATER_DELIVERY_PRICE * yield_pot
+    # Water delivery costs equal drinking water plus irrigation water req per head * yield (head/ha)
+    costs_w = (data.AGEC_LVSTK['WR_DRN', lvstype] + WR_IRR) * yield_pot
+    costs_w *= data.WATER_DELIVERY_PRICE  # $/ha
 
     # Total costs ($/ha) are variable (quantity + area) + fixed + water costs.
     costs_t = costs_q + costs_a + costs_f + costs_w
 
-    # Costs so far in AUD/ha. Now convert to AUD/cell.
+    # Convert costs to $ per cell including resfactor.
     costs_t *= data.REAL_AREA
-              
-    # Incorporate resfactor
-    costs_t *= data.RESMULT
     
     # Return costs as numpy array.
     return costs_t.to_numpy()
@@ -177,4 +172,4 @@ def get_cost_matrices(data, year):
     
     return np.stack(tuple( get_cost_matrix(data, lm, year)
                            for lm in data.LANDMANS )
-                    ).astype(np.float32)
+                   ).astype(np.float32)

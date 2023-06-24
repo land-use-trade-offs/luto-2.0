@@ -212,12 +212,7 @@ def solve( t_mrj          # Transition cost matrices.
         # Collect optimised decision variables in one X_mrj Numpy array.              
         X_dry_rj = np.stack([X_dry[j].X for j in range(nlus)]).T.astype(np.float32)
         X_irr_rj = np.stack([X_irr[j].X for j in range(nlus)]).T.astype(np.float32)
-        
-        # Save and load for testing - DELETE
-        np.save('X_dry_rj.npy', X_dry_rj)
-        np.save('X_irr_rj.npy', X_irr_rj)
-        X_dry_rj = np.load('X_dry_rj.npy')
-        X_irr_rj = np.load('X_irr_rj.npy')
+
         
         """Note that output decision variables are mostly 0 or 1 but in some cases they are somewhere in between which creates issues 
            when converting to maps etc. as individual cells can have non-zero values for multiple land-uses and land management type.

@@ -68,10 +68,10 @@ def lvs_veg_types(lu):
     return lvstype, vegtype
 
 
-def get_yield_pot( data # Data object or module.
+def get_yield_pot( data    # Data object or module.
                  , lvstype # Livestock type (one of 'BEEF', 'SHEEP' or 'DAIRY')
                  , vegtype # Vegetation type (one of 'NATL' or 'MODL')
-                 , lm # Land-management type.
+                 , lm      # Land-management type.
                  ):
     """Return the yield potential (head/ha) for livestock by land cover type."""
 
@@ -158,7 +158,7 @@ def get_quantity_lvstk( data # Data object or module.
 
     # Dairy yields just dairy (1, kilolitres of milk per ha).
     elif lvstype == 'DAIRY': # (F1 * Q1).
-        if 'DAIRY' in pr: # No 'elif', just keeping structure consistent.
+        if 'DAIRY' in pr: 
             quantity = ( data.AGEC_LVSTK['F1', lvstype]
                        * data.AGEC_LVSTK['Q1', lvstype] 
                        / 1000 ) # Convert to KL
@@ -167,15 +167,13 @@ def get_quantity_lvstk( data # Data object or module.
 
     else:
         raise KeyError("Livestock type '%s' not identified." % lvstype)
-
+        
+    ############## Need to apply yield change to yield_pot not here
     # Quantity is base quantity times the yield potential.
     quantity *= yield_pot
 
-    # Quantities so far in tonnes/ha. Now convert to tonnes/cell.
+    # Convert quantities in tonnes/ha to tonnes/cell including resfactor.
     quantity *= data.REAL_AREA
-                  
-    # Incorporate resfactor
-    quantity *= data.RESMULT
     
     return quantity
 
@@ -202,11 +200,8 @@ def get_quantity_crop( data # Data object or module.
         # Get the raw quantities in tonnes/ha from data.
         quantity = data.AGEC_CROPS['Yield', lm, pr].copy().to_numpy()
     
-        # Convert to tonnes/cell.
+        # Convert to tonnes per cell including resfactor.
         quantity *= data.REAL_AREA 
-                  
-        # Incorporate resfactor
-        quantity *= data.RESMULT
 
     return quantity
 

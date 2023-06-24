@@ -57,7 +57,7 @@ class Data():
         self.AGEC_LVSTK = bdata.AGEC_LVSTK.iloc[self.MASK]                      # MultiIndex Dataframe [4218733 rows x 39 columns]
         self.AGGHG_CROPS = bdata.AGGHG_CROPS.iloc[self.MASK]                    # MultiIndex Dataframe [4218733 rows x ? columns]
         self.AGGHG_LVSTK = bdata.AGGHG_LVSTK.iloc[self.MASK]                    # MultiIndex Dataframe [4218733 rows x ? columns]
-        self.REAL_AREA = bdata.REAL_AREA[self.MASK]                             # Actual Float32
+        self.REAL_AREA = bdata.REAL_AREA[self.MASK] * bdata.RESMULT             # Actual Float32
         self.LUMAP = bdata.LUMAP[self.MASK]                                     # Int8
         self.LMMAP = bdata.LMMAP[self.MASK]                                     # Int8
         self.L_MRJ = lumap2l_mrj(self.LUMAP, self.LMMAP)                        # Boolean [2, 4218733, 28]

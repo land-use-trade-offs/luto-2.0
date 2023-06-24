@@ -83,7 +83,7 @@ SOLVE_METHOD = 1
 VERBOSE = 1
 
 # Relax the tolerance for proving optimality
-OPTIMALITY_TOLERANCE = 1e-2
+OPTIMALITY_TOLERANCE = 1e-6
 
 """Default value:	1e-6
    Minimum value:	1e-9

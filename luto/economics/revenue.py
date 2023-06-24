@@ -50,11 +50,11 @@ def get_revenue_crop( data # Data object or module.
 
 
 def get_revenue_lvstk( data # Data object or module.
-                  , lu   # Land use.
-                  , lm   # Land management.
-                  , year # Number of years post base-year ('annum').
-                  ):
-    """Return lvstk prod. cost [AUD/cell] of `lu`+`lm` in `year` as np array.
+                     , lu   # Land use.
+                     , lm   # Land management.
+                     , year # Number of years post base-year ('annum').
+                     ):
+    """Return livestock revenue [AUD/cell] of `lu`+`lm` in `year` as np array.
 
     `data`: data object/module -- assumes fields like in `luto.data`.
     `lu`: land use (e.g. 'Winter cereals' or 'Beef - natural land').
@@ -66,7 +66,9 @@ def get_revenue_lvstk( data # Data object or module.
 
     # Get the yield potential, i.e. the total number of heads per hectare.
     yield_pot = get_yield_pot(data, lvstype, vegtype, lm)
-
+    
+    # Revenue in $ per cell (includes RESMULT via get_quantity)
+    
     # Variable costs - quantity-dependent costs as costs per head x heads per hectare.
     costs_q = data.AGEC_LVSTK['QC', lvstype] * yield_pot
 
@@ -92,14 +94,11 @@ def get_revenue_lvstk( data # Data object or module.
     # Total costs ($/ha) are variable (quantity + area) + fixed + water costs.
     costs_t = costs_q + costs_a + costs_f + costs_w
 
-    # Costs so far in AUD/ha. Now convert to AUD/cell.
+    # Costs so far in AUD/ha. Now convert to AUD/cell including resfactor.
     costs_t *= data.REAL_AREA
-              
-    # Incorporate resfactor
-    costs_t *= data.RESMULT
     
     # Return costs as numpy array.
-    return costs_t.to_numpy()
+    return costs_t
 
 
 def get_cost( data # Data object or module.

@@ -25,7 +25,6 @@ import numpy as np
 import pandas as pd
 import numpy_financial as npf
 
-from luto.economics.quantity import lvs_veg_types, get_yield_pot
 from luto.economics.cost import get_cost_matrices
 from luto.economics.water import get_wreq_matrices
 
@@ -178,13 +177,13 @@ def get_transition_matrices(data, year, lumap, lmmap):
     # Total costs.                                                   #
     # -------------------------------------------------------------- #
     
-    # Sum annualised costs of land-use and land management transition in $ per cell
-    t_mrj = (w_delta_mrj + o_delta_mrj + t_rj) * data.REAL_AREA[:, np.newaxis]
+    # Sum annualised costs of land-use and land management transition in $ per ha
+    t_mrj = w_delta_mrj + o_delta_mrj + t_rj
 
     # Ensure cost for switching to the same land-use and land management is zero.
     t_mrj = np.where(l_mrj, 0, t_mrj)
     
-    # Consider resfactor
-    t_mrj *= data.RESMULT
+    # Convert to $ per cell including resfactor
+    t_mrj *= data.REAL_AREA[:, np.newaxis]
     
     return t_mrj

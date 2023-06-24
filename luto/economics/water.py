@@ -42,8 +42,8 @@ def get_wreq_matrices( data ):
             w_mrj[0, :, j] = w_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry')
             w_mrj[1, :, j] = w_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr')
     
-    # Incorporate resfactor
-    w_mrj *= data.RESMULT
+    # Convert to ML per cell and incorporate resfactor
+    w_mrj *= data.REAL_AREA[:, np.newaxis]
     
     return w_mrj
 
@@ -54,9 +54,10 @@ def get_wuse_limits( data ):
        Currently set such that water limits are set at 2010 agricultural water requirements.
     """
     
-    # Get water requirements of agriculture in ML per hectare in mrj format.
+    # Get water requirements of agriculture in ML per cell in mrj format.
     w_mrj = get_wreq_matrices(data)
     
+    # Set up empty list to hold water use limits data
     wuse_limits = []
     
     # Set up data for river regions or drainage divisions
@@ -80,9 +81,6 @@ def get_wuse_limits( data ):
         wuse_reg_limit = (     w_mrj[:, ind, :] * 
                           data.L_MRJ[:, ind, :]
                          ).sum() 
-        
-        # Consider resfactor
-        wuse_reg_limit *= data.RESMULT
         
         # Append to list
         wuse_limits.append((region, wuse_reg_limit, ind))

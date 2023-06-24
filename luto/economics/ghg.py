@@ -56,11 +56,11 @@ def get_ghg_crop( data # Data object or module.
         # Calculate total GHG emissions in kg of CO2eq/ha
         ghg_t = data.AGGHG_CROPS.loc[:, (slice(None), lm, lu)].sum(axis = 1)
         
-        # Convert to tonnes of CO2e per cell. 
-        ghg_t = ghg_t.to_numpy() * data.REAL_AREA / 1000
+        # Convert to tonnes of CO2e per ha. 
+        ghg_t = ghg_t.to_numpy() / 1000
         
-        # Incorporate resfactor
-        ghg_t *= data.RESMULT 
+        # Convert to tonnes GHG per cell including resfactor
+        ghg_t *= data.REAL_AREA
         
     # Return total greenhouse gas emissions as numpy array.
     return ghg_t
@@ -106,15 +106,15 @@ def get_ghg_lvstk( data # Data object or module.
                  data.AGGHG_CROPS['CO2E_KG_HA_PEST_PROD', 'irr', 'Hay'] + \
                  data.AGGHG_CROPS['CO2E_KG_HA_SOIL_N_SURP', 'irr', 'Hay'] + \
                  data.AGGHG_CROPS['CO2E_KG_HA_SOWING', 'irr', 'Hay'] 
+       
+    # Convert to tonnes of CO2e per ha. 
+    ghg_t = ghg_t.to_numpy() / 1000
     
-    # Covnert to tonnes of CO2e per cell
-    ghg_t *= data.REAL_AREA / 1000
-            
-    # Incorporate resfactor
-    ghg_t *= data.RESMULT 
+    # Convert to tonnes CO2e per cell including resfactor
+    ghg_t *= data.REAL_AREA
     
-    # Return data as numpy array
-    return ghg_t.to_numpy()
+    # Return total greenhouse gas emissions as numpy array.
+    return ghg_t
 
 
 def get_ghg( data # Data object or module.

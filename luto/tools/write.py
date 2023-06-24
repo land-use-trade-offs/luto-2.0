@@ -124,7 +124,9 @@ def write_water(sim, year, path):
     df = pd.DataFrame( columns=[ 'REGION_ID'
                                , 'REGION_NAME'
                                , 'WATER_USE_LIMIT_ML'
-                               , 'TOT_WATER_REQ_ML' ] )
+                               , 'TOT_WATER_REQ_ML'
+                               , 'ABS_DIFF_ML'
+                               , 'PROPORTION_%'  ] )
 
     # Get water use limits used as constraints in model
     wuse_limits = get_wuse_limits(sim.data)
@@ -154,10 +156,26 @@ def write_water(sim, year, path):
                     sim.dvars[year][:, ind, :]
                    ).sum()
         
+        # Calculate absolute and proportional difference between water use target and actual water use
+        wul = wuse_limits[i][1]
+        abs_diff = wreq_reg - wul
+        if wul > 0:
+            prop_diff = (wreq_reg / wul) * 100
+        else:
+            prop_diff = np.nan
+        
         # Add to dataframe
-        df.loc[i] = (region, region_dict[region], wuse_limits[i][1], wreq_reg)
+        df.loc[i] = ( region
+                    , region_dict[region]
+                    , wul
+                    , wreq_reg 
+                    , abs_diff
+                    , prop_diff )
     
-    df.to_csv(os.path.join(path, 'water_demand_vs_use.csv'), index = False)
+    # Write to CSV with 2 DP
+    df.to_csv( os.path.join(path, 'water_demand_vs_use.csv')
+             , index = False
+             , float_format = '{:0,.2f}'.format)
     
 
 def write_ghg(sim, year, path):
