@@ -294,7 +294,7 @@ SAFE_PUR_MODL = pd.read_hdf(os.path.join(INPUT_DIR, 'safe_pur_modl.h5')).to_nump
 
 # Yield increases.
 fpath = os.path.join(INPUT_DIR, "yieldincreases_bau2022.csv")
-YIELDINCREASE = pd.read_csv(fpath, header = [0,1]).astype(np.float32)
+BAU_PROD_INCR = pd.read_csv(fpath, header = [0,1]).astype(np.float32)
 
 
 

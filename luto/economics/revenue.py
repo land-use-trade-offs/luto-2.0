@@ -23,10 +23,10 @@ import numpy as np
 from luto.economics.quantity import get_yield_pot, lvs_veg_types, get_quantity
 
 def get_revenue_crop( data # Data object or module.
-                 , lu   # Land use.
-                 , lm   # Land management.
-                 , year # Number of years post base-year ('annum').
-                 ):
+                    , lu   # Land use.
+                    , lm   # Land management.
+                    , year # Number of years post base-year ('annum').
+                    ):
     """Return crop profit [AUD/cell] of `lu`+`lm` in `year` as np array.
 
     `data`: data object/module -- assumes fields like in `luto.data`.
@@ -43,7 +43,8 @@ def get_revenue_crop( data # Data object or module.
                   
         # Revenue in $ per cell (includes RESMULT via get_quantity)
         rev_t = ( data.AGEC_CROPS['P1', lm, lu]
-                * get_quantity(data, lu.upper(), lm, year) )  # lu.upper() only for crops as needs to be in product format in get_quantity().
+                * get_quantity( data, lu.upper(), lm, year )  # lu.upper() only for crops as needs to be in product format in get_quantity().
+                )
         
     # Return costs as numpy array.
     return rev_t
@@ -65,31 +66,45 @@ def get_revenue_lvstk( data # Data object or module.
     lvstype, vegtype = lvs_veg_types(lu)
 
     # Get the yield potential, i.e. the total number of heads per hectare.
-    yield_pot = get_yield_pot(data, lvstype, vegtype, lm)
+    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, year)
     
     # Revenue in $ per cell (includes RESMULT via get_quantity)
-    
-    # Variable costs - quantity-dependent costs as costs per head x heads per hectare.
-    costs_q = data.AGEC_LVSTK['QC', lvstype] * yield_pot
+    if lvstype == 'BEEF':
+        rev = yield_pot * (  # Meat                           # Stocking density (head/ha)
+                           ( data.AGEC_LVSTK['F1', lvstype]   # Fraction of herd producing (0 - 1)
+                           * data.AGEC_LVSTK['Q1', lvstype]   # Quantity produced per head (meat tonnes/head)
+                           * data.AGEC_LVSTK['P1', lvstype] ) # Price per unit quantity ($/tonne of meat)
+                           + # Live exports
+                           ( data.AGEC_LVSTK['F3', lvstype]   # Fraction of herd producing (0 - 1) 
+                           * data.AGEC_LVSTK['Q3', lvstype]   # Quantity produced per head (animal weight tonnes/head)
+                           * data.AGEC_LVSTK['P3', lvstype] ) # Price per unit quantity ($/tonne of animal)
+                          )    
 
-    # Variable costs - area-dependent costs per hectare.
-    costs_a = data.AGEC_LVSTK['AC', lvstype]
-    
-    # Fixed costs
-    costs_f = ( data.AGEC_LVSTK['FOC', lvstype]   # Fixed operating costs.
-              + data.AGEC_LVSTK['FLC', lvstype]   # Fixed labour costs.
-              + data.AGEC_LVSTK['FDC', lvstype] ) # Fixed depreciation costs.
-    
-    # Water costs in $/ha calculated as water requirements (ML/head) x heads per hectare x delivery price ($/ML)
-    if lm == 'irr': # Irrigation water if required.
-        WR_IRR = data.AGEC_LVSTK['WR_IRR', lvstype]
-    elif lm == 'dry': # No irrigation water if not required.
-        WR_IRR = 0
-    else: # Passed lm is neither `dry` nor `irr`.
-        raise KeyError("Unknown %s land management. Check `lm` key." % lm)
+    elif lvstype == 'SHEEP':
+        rev = yield_pot * (  # Meat                           # Stocking density (head/ha)
+                           ( data.AGEC_LVSTK['F1', lvstype]   # Fraction of herd producing (0 - 1) 
+                           * data.AGEC_LVSTK['Q1', lvstype]   # Quantity produced per head (meat tonnes/head)
+                           * data.AGEC_LVSTK['P1', lvstype] ) # Price per unit quantity ($/tonne of meat)
+                           + # Wool
+                           ( data.AGEC_LVSTK['F2', lvstype]   # Fraction of herd producing (0 - 1) 
+                           * data.AGEC_LVSTK['Q2', lvstype]   # Quantity produced per head (wool tonnes/head)
+                           * data.AGEC_LVSTK['P2', lvstype] ) # Price per unit quantity ($/tonne wool)
+                           + # Live exports
+                           ( data.AGEC_LVSTK['F3', lvstype]   # Fraction of herd producing (0 - 1) 
+                           * data.AGEC_LVSTK['Q3', lvstype]   # Quantity produced per head (animal weight tonnes/head)
+                           * data.AGEC_LVSTK['P3', lvstype] ) # Price per unit quantity ($/tonne of animal)
+                          )    
+
+    elif lvstype == 'DAIRY':
+        rev = yield_pot * (  # Milk                           # Stocking density (head/ha)
+                           ( data.AGEC_LVSTK['F1', lvstype]   # Fraction of herd producing (0 - 1) 
+                           * data.AGEC_LVSTK['Q1', lvstype]   # Quantity produced per head (milk litres/head)
+                           * data.AGEC_LVSTK['P1', lvstype] ) # Price per unit quantity
+                          )    
+
+    else:  # Livestock type is unknown.
+        raise KeyError("Unknown %s livestock type. Check `lvstype`." % lvstype)
         
-    WR_DRN = data.AGEC_LVSTK['WR_DRN', lvstype] # Drinking water required.
-    costs_w = (WR_DRN + WR_IRR) * data.WATER_DELIVERY_PRICE * yield_pot
 
     # Total costs ($/ha) are variable (quantity + area) + fixed + water costs.
     costs_t = costs_q + costs_a + costs_f + costs_w

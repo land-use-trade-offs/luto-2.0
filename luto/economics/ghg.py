@@ -93,7 +93,7 @@ def get_ghg_lvstk( data # Data object or module.
     lvstype, vegtype = lvs_veg_types(lu)
 
     # Get the yield potential, i.e. the total number of heads per hectare.
-    yield_pot = get_yield_pot(data, lvstype, vegtype, lm)
+    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, year)
     
     # Calculate total GHG emissions in kg CO2e per hectare
     ghg_t = data.AGGHG_LVSTK.loc[:, (lvstype, slice(None))].sum(axis = 1) * yield_pot

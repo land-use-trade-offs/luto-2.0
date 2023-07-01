@@ -92,7 +92,7 @@ def get_cost_lvstk( data # Data object or module.
     lvstype, vegtype = lvs_veg_types(lu)
 
     # Get the yield potential, i.e. the total number of head per hectare.
-    yield_pot = get_yield_pot(data, lvstype, vegtype, lm)
+    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, year)
 
     # Variable costs - quantity-dependent costs as costs per head x heads per hectare.
     costs_q = data.AGEC_LVSTK['QC', lvstype] * yield_pot

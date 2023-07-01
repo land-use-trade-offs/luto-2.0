@@ -35,7 +35,6 @@ def create_new_dataset():
     print('Beginning input data refresh at', time.strftime("%H:%M:%S", time.localtime()) + '...')
     
     
-    
     ############### Copy key input data layers from their source folders to the raw_data folder for processing
     
     # Set data input paths

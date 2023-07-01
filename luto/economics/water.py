@@ -35,12 +35,11 @@ def get_wreq_matrices( data ):
     w_mrj = np.stack((data.WREQ_DRY_RJ, data.WREQ_IRR_RJ))
     
     # Covert water requirements units from ML/head to ML/ha
-    for lu in data.LANDUSES:
+    for j, lu in enumerate(data.LANDUSES):
         if lu in data.LU_LVSTK:
             lvs, veg = lvs_veg_types(lu)
-            j = data.LANDUSES.index(lu)
-            w_mrj[0, :, j] = w_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry')
-            w_mrj[1, :, j] = w_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr')
+            w_mrj[0, :, j] = w_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', year)
+            w_mrj[1, :, j] = w_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', year)
     
     # Convert to ML per cell and incorporate resfactor
     w_mrj *= data.REAL_AREA[:, np.newaxis]

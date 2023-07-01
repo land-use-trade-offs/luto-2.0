@@ -70,20 +70,19 @@ PENALTY = 1000000
 SOLVE_METHOD = 1
 
 """ SOLVE METHODS
- 'automatic':                       -1
- 'primal simplex':                   0
- 'dual simplex':                     1
- 'barrier':                          2
- 'concurrent':                       3
- 'deterministic concurrent':         4
- 'deterministic concurrent simplex': 5
-"""
+   'automatic':                       -1
+   'primal simplex':                   0
+   'dual simplex':                     1
+   'barrier':                          2
+   'concurrent':                       3
+   'deterministic concurrent':         4
+   'deterministic concurrent simplex': 5 """
 
 # Print detailed output to screen
 VERBOSE = 1
 
 # Relax the tolerance for proving optimality
-OPTIMALITY_TOLERANCE = 1e-6
+OPTIMALITY_TOLERANCE = 1e-2
 
 """Default value:	1e-6
    Minimum value:	1e-9

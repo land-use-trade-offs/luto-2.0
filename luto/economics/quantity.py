@@ -72,6 +72,7 @@ def get_yield_pot( data    # Data object or module.
                  , lvstype # Livestock type (one of 'BEEF', 'SHEEP' or 'DAIRY')
                  , vegtype # Vegetation type (one of 'NATL' or 'MODL')
                  , lm      # Land-management type.
+                 , year    # Number of years post 2010
                  ):
     """Return the yield potential (head/ha) for livestock by land cover type."""
 
@@ -87,21 +88,29 @@ def get_yield_pot( data    # Data object or module.
                   * grassfed_factor[lvstype] )
 
     # Base potential.
-    potential = data.FEED_REQ * data.PASTURE_KG_DM_HA / denominator
+    yield_pot = data.FEED_REQ * data.PASTURE_KG_DM_HA / denominator
 
     # Multiply potential by appropriate SAFE_PUR (safe pasture utilisation rate).
     if vegtype == 'NATL':
-        potential *= data.SAFE_PUR_NATL
+        yield_pot *= data.SAFE_PUR_NATL
     elif vegtype == 'MODL':
-        potential *= data.SAFE_PUR_MODL
+        yield_pot *= data.SAFE_PUR_MODL
     else:
         raise KeyError("Land cover type '%s' not identified." % vegtype)
 
-    # Multiply potential by appropriate irrigation factor.
+    # Multiply livestock yield potential by appropriate irrigation factor (i.e., 2).
     if lm == 'irr':
-        potential *= 2
-
-    return potential
+        yield_pot *= 2
+    
+    # Apply climate change yield impact multiplier.
+    lu = data.PR2LU_DICT[pr]
+    yield_pot *= get_ccimpact(data, lu, lm, year)
+    
+    # Here we can add a productivity multiplier for sustainable intensification
+    # to increase pasture growth and yield potential (i.e., head/ha)
+    # yield_pot *= yield_mult 
+    
+    return yield_pot
 
 
 def get_quantity_lvstk( data # Data object or module.
@@ -127,7 +136,7 @@ def get_quantity_lvstk( data # Data object or module.
     lvstype, vegtype = lvs_veg_types(pr)
 
     # Get the yield potential.
-    yield_pot = get_yield_pot(data, lvstype, vegtype, lm)
+    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, year)
 
     # Determine base quantity case-by-case.
 
@@ -142,8 +151,8 @@ def get_quantity_lvstk( data # Data object or module.
         else:
             raise KeyError("Unknown %s product. Check `pr` key." % lvstype)
 
-    # Sheep yield sheep meat (1), wool (2) or live exports (3).
-    elif lvstype == 'SHEEP': # (F1 * Q1), (F2 * Q2) or (F3 * Q3).
+    # Sheep yield sheep meat (1), wool (2), and live exports (3).
+    elif lvstype == 'SHEEP': # (F1 * Q1), (F2 * Q2), (F3 * Q3).
         if 'MEAT' in pr:
             quantity = ( data.AGEC_LVSTK['F1', lvstype]
                        * data.AGEC_LVSTK['Q1', lvstype] )
@@ -168,7 +177,6 @@ def get_quantity_lvstk( data # Data object or module.
     else:
         raise KeyError("Livestock type '%s' not identified." % lvstype)
         
-    ############## Need to apply yield change to yield_pot not here
     # Quantity is base quantity times the yield potential.
     quantity *= yield_pot
 
@@ -230,12 +238,8 @@ def get_quantity( data # Data object or module.
     else:
         raise KeyError("Land use '%s' not found in data." % pr)
 
-    # Apply yield increase multiplier.
-    q *= data.YIELDINCREASE[lm, pr][year]
-
-    # Apply climate change impact multiplier.
-    lu = data.PR2LU_DICT[pr]
-    q *= get_ccimpact(data, lu, lm, year)
+    # Apply productivity increase multiplier by product.
+    q *= data.BAU_PROD_INCR[lm, pr][year]
 
     return q
 
