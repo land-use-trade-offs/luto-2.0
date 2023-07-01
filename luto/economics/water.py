@@ -27,7 +27,7 @@ import luto.settings as settings
 from luto.tools import lumap2l_mrj
 
 
-def get_wreq_matrices( data ): 
+def get_wreq_matrices(data, year): 
     """ Convert water requirements for LVSTK from ML per head to ML per hectare.
         Return w_mrj water requirement matrices by land management, cell, and land-use type."""
     
@@ -38,7 +38,7 @@ def get_wreq_matrices( data ):
     for j, lu in enumerate(data.LANDUSES):
         if lu in data.LU_LVSTK:
             lvs, veg = lvs_veg_types(lu)
-            w_mrj[0, :, j] = w_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', year)
+            w_mrj[0, :, j] = w_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', year)  # Water reqs depend on stocking rate 
             w_mrj[1, :, j] = w_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', year)
     
     # Convert to ML per cell and incorporate resfactor
@@ -54,7 +54,7 @@ def get_wuse_limits( data ):
     """
     
     # Get water requirements of agriculture in ML per cell in mrj format.
-    w_mrj = get_wreq_matrices(data)
+    w_mrj = get_wreq_matrices(data, 0)  # 0 gets water requirements from base year (i.e., 2010)
     
     # Set up empty list to hold water use limits data
     wuse_limits = []

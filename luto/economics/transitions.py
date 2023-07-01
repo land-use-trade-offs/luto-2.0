@@ -152,7 +152,7 @@ def get_transition_matrices(data, year, lumap, lmmap):
     # -------------------------------------------------------------- #
     
     # Get water requirements from current agriculture, converting water requirements for LVSTK from ML per head to ML per hectare.
-    w_mrj = get_wreq_matrices(data)
+    w_mrj = get_wreq_matrices(data, year)
     
     # Calculate water requirements of current land-use and land management 
     w_r = (w_mrj * l_mrj).sum(axis = 0).sum(axis = 1)

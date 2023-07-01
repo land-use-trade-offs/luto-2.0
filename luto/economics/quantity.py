@@ -39,8 +39,8 @@ def get_ccimpact(data, lu, lm, year):
         yys = data.CLIMATE_CHANGE_IMPACT[lm, lu]
         f = interp1d(xs, yys, kind = 'linear', fill_value = 'extrapolate')
         cci = f(year)
-        
-    # Return the interpolated values.                                        ################## Normalise ccimpact multipliers such that 2010 == 1
+    
+    # Return the interpolated values
     return cci
 
 
@@ -59,9 +59,9 @@ def lvs_veg_types(lu):
 
     # Determine type of vegetation.
     if 'natural' in lu.lower():
-        vegtype = 'NATL'
+        vegtype = 'natural land'
     elif 'modified' in lu.lower():
-        vegtype = 'MODL'
+        vegtype = 'modified land'
     else:
         raise KeyError("Vegetation type '%s' not identified." % lu)
 
@@ -91,9 +91,9 @@ def get_yield_pot( data    # Data object or module.
     yield_pot = data.FEED_REQ * data.PASTURE_KG_DM_HA / denominator
 
     # Multiply potential by appropriate SAFE_PUR (safe pasture utilisation rate).
-    if vegtype == 'NATL':
+    if vegtype == 'natural land':
         yield_pot *= data.SAFE_PUR_NATL
-    elif vegtype == 'MODL':
+    elif vegtype == 'modified land':
         yield_pot *= data.SAFE_PUR_MODL
     else:
         raise KeyError("Land cover type '%s' not identified." % vegtype)
@@ -103,12 +103,13 @@ def get_yield_pot( data    # Data object or module.
         yield_pot *= 2
     
     # Apply climate change yield impact multiplier.
-    lu = data.PR2LU_DICT[pr]
-    yield_pot *= get_ccimpact(data, lu, lm, year)
+    # lu = data.PR2LU_DICT[pr]
+    lu = lvstype.capitalize() + ' - ' + vegtype  # Convert to 'lu' 
+    # yield_pot *= get_ccimpact(data, lu, lm, year)
     
     # Here we can add a productivity multiplier for sustainable intensification
     # to increase pasture growth and yield potential (i.e., head/ha)
-    # yield_pot *= yield_mult 
+    # yield_pot *= yield_mult  ***Still to do***
     
     return yield_pot
 

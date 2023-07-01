@@ -110,7 +110,7 @@ def get_g_mrj():
 
 def get_w_mrj():
     print('Getting water requirement matrices...', end = ' ')
-    output = get_wreq_matrices(data)
+    output = get_wreq_matrices(data, target_index)
     print('Done.')
     return output.astype(np.float32)
 
