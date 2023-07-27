@@ -118,7 +118,7 @@ def write_water(sim, year, path):
        target year (e.g., 2030), and an output path as input."""
     
     # Get 2010 water requirement in mrj format
-    w_mrj = get_wreq_matrices(sim.data, year) 
+    w_mrj = get_wreq_matrices(sim.data, 0) 
 
     # Prepare a data frame.
     df = pd.DataFrame( columns=[ 'REGION_ID'

@@ -161,8 +161,9 @@ def solve( t_mrj          # Transition cost matrices.
                           for c in range(ncms) )
         model.addConstrs((q_c[c] - d_c[c]) <= V[c] 
                           for c in range(ncms) )
-
-        # Only add the following constraints if 'limits' are provided.
+        
+        
+        # Only add the following constraints if 'limits' are provided. *********************************
 
         if 'water' in limits:
             print('Adding water constraints by', settings.WATER_REGION_DEF + '...', time.ctime())
