@@ -27,6 +27,12 @@ import shutil, os, time
 from luto.settings import INPUT_DIR, RAW_DATA
 
 
+
+with h5py.File(luto_3D_inpath + 'tCO2_ha_ep_block.h5', 'r') as h5f:
+    brick = h5f['Trees_tCO2_ha'][...]  # (91, 6956407)
+
+    
+    
 def create_new_dataset():
     """Creates a new LUTO input dataset from source data"""
     
@@ -40,6 +46,7 @@ def create_new_dataset():
     # Set data input paths
     luto_1D_inpath = 'N:/Planet-A/Data-Master/LUTO_2.0_input_data/Input_data/1D_Parameter_Timeseries/'
     luto_2D_inpath = 'N:/Planet-A/Data-Master/LUTO_2.0_input_data/Input_data/2D_Spatial_Snapshot/'
+    luto_3D_inpath = 'N:/Planet-A/Data-Master/LUTO_2.0_input_data/Input_data/3D_Spatial_Timeseries/'
     luto_4D_inpath = 'N:/Planet-A/Data-Master/LUTO_2.0_input_data/Input_data/4D_Spatial_SSP_Timeseries/'
     fdh_inpath = 'N:/Planet-A/LUF-Modelling/fdh-archive/data/neoluto-data/new-data-and-domain/'
     profit_map_inpath = 'N:/Planet-A/Data-Master/Profit_map/'
