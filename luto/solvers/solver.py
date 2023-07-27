@@ -18,7 +18,6 @@
 Provides minimalist Solver class and pure helper functions.
 """
 
-
 import time
 import numpy as np
 import pandas as pd
@@ -38,6 +37,7 @@ gurenv.start()
 
 def solve( t_mrj          # Transition cost matrices.
          , c_mrj          # Production cost matrices.
+         , r_mrj          # Production revenue matrices.
          , g_mrj          # Greenhouse gas emissions matrices.
          , w_mrj          # Water requirements matrices.
          , x_mrj          # Exclude matrices.
@@ -93,16 +93,29 @@ def solve( t_mrj          # Transition cost matrices.
         # ------------------- #
         # Objective function. #
         # ------------------- #
-        print('Setting up objective function...', time.ctime() + '\n')
+        print('Setting up objective function to %s...' % settings.OBJECTIVE, time.ctime() + '\n')
         
-        # Pre-calculate sum of production and transition costs and apply penalty
-        ct_mrj = (c_mrj + t_mrj) / settings.PENALTY
-        
+      
+        if settings.OBJECTIVE == 'maximise revenue':
+                    
+            # Pre-calculate revenue minus (production and transition) costs
+            obj_mrj = ( r_mrj - (c_mrj + t_mrj) ) * -1 / settings.PENALTY
+         
+        elif settings.OBJECTIVE == 'minimise cost':
+            
+            # Pre-calculate sum of production and transition costs
+            obj_mrj = (c_mrj + t_mrj) / settings.PENALTY
+            
+        else:
+            print('Unknown objective')
+
+            
+            
         # Specify objective function
         objective = ( 
                      # Production costs + transition costs for all land uses.
-                     sum( ct_mrj[0, :, j] @ X_dry[j]
-                        + ct_mrj[1, :, j] @ X_irr[j]
+                     sum( obj_mrj[0, :, j] @ X_dry[j]
+                        + obj_mrj[1, :, j] @ X_irr[j]
                           for j in range(nlus) )
                     
                      # Add deviation-from-demand variables for ensuring demand of each commodity is met (approximately). 
@@ -149,7 +162,7 @@ def solve( t_mrj          # Transition cost matrices.
         model.addConstrs((q_c[c] - d_c[c]) <= V[c] 
                           for c in range(ncms) )
 
-        # Only add the following constraints if limits are provided.
+        # Only add the following constraints if 'limits' are provided.
 
         if 'water' in limits:
             print('Adding water constraints by', settings.WATER_REGION_DEF + '...', time.ctime())
@@ -179,7 +192,7 @@ def solve( t_mrj          # Transition cost matrices.
                                + g_mrj[1, :, j] @ X_irr[j]
                                  for j in range(nlus) )
             
-            print('    ...setting {:,.0f}% GHG emissions reduction target: {:,.0f} tCO2e'.format(
+            print('    ...setting {:,.0f}% GHG emissions reduction target: {:,.0f} tCO2e\n'.format(
                           settings.GHG_REDUCTION_PERCENTAGE, ghg_limits )
                  )
             model.addConstr(ghg_emissions <= ghg_limits)

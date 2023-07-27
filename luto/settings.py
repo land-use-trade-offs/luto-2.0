@@ -44,8 +44,8 @@ RAW_DATA = '../raw_data'
 # ---------------------------------------------------------------------------- #
 
 # Climate change assumptions. Options include '126', '245', '370', '585'
-SSP = '245' # 'rcp4p5' # Representative Concentration Pathway string identifier.
-RCP = 'rcp' + SSP[1] + 'p' + SSP[2]
+SSP = '245' 
+RCP = 'rcp' + SSP[1] + 'p' + SSP[2]  # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
 # Economic parameters
 DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
@@ -57,6 +57,11 @@ RESFACTOR = 3             # set to 1 to run at full spatial resolution
 # How does the model run over time 
 STYLE = 'snapshot'       # runs for target year only
 # STYLE = 'timeseries'   # runs each year from base year to target year
+
+# Define the objective function
+OBJECTIVE = 'maximise revenue'
+# OBJECTIVE = 'minimize cost'
+
 
 # Penalty in objective function
 PENALTY = 1000000

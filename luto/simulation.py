@@ -28,6 +28,7 @@ import luto.data as bdata
 import luto.settings as settings
 
 from luto.economics.cost import get_cost_matrices
+from luto.economics.revenue import get_rev_matrices
 from luto.economics.water import get_wreq_matrices, get_wuse_limits
 from luto.economics.ghg import get_ghg_matrices, get_ghg_limits
 from luto.economics.quantity import get_quantity_matrices
@@ -95,8 +96,15 @@ def sync_years(base, target):
 # Local matrix-getters with resfactor multiplier.
 
 def get_c_mrj():
-    print('Getting cost of production matrices...', end = ' ')
+    print('Getting production cost matrices...', end = ' ')
     output = get_cost_matrices(data, target_index)
+    print('Done.')
+    return output.astype(np.float32)
+
+
+def get_r_mrj():
+    print('Getting production revenue matrices...', end = ' ')
+    output = get_rev_matrices(data, target_index)
     print('Done.')
     return output.astype(np.float32)
 
@@ -178,6 +186,7 @@ def step( base    # Base year from which the data is taken.
     # Magic.
     lumaps[target], lmmaps[target], dvars[target] = solve( get_t_mrj()
                                                          , get_c_mrj()
+                                                         , get_r_mrj()
                                                          , get_g_mrj()
                                                          , get_w_mrj()
                                                          , get_x_mrj()

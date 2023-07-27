@@ -114,7 +114,7 @@ def create_new_dataset():
         
     # Read crops GHG emissions data
     cropsGHG = pd.read_hdf(raw_data + 'SA2_crop_GHG_data.h5')
-
+    
     # Read biophysical data
     bioph = pd.read_hdf(raw_data + 'cell_biophysical_df.h5')
     
@@ -345,7 +345,8 @@ def create_new_dataset():
     luid_desc = lmap.groupby('LU_ID').first()['LU_DESC'].astype(str)
     
     # Loop through RCPs and format climate change impacts table
-    for rcp in rcps: # rcp = 'rcp2p6'
+    for rcp in rcps: 
+        # rcp = 'rcp2p6'
         
         # Slice off RCP and turn into pivot table.
         cci_ptable = cci_raw[rcp].pivot_table(index = 'SA2_ID', columns = ['IRRIGATION', 'LU_ID'])
@@ -356,7 +357,7 @@ def create_new_dataset():
         # Not all columns are needed.
         cci = cci.drop(['CELL_ID', 'SA2_ID'], axis = 1)
     
-        # Land-uses as strings and years as integers.
+        # Convert land management types to strings and years to integers.
         lmid_desc = {0: 'dry', 1: 'irr'}
         coltups = [ (int(col[0][3:]), lmid_desc[col[1]], luid_desc[col[2]])
                     for col in cci.columns ]
@@ -371,7 +372,7 @@ def create_new_dataset():
         cci.sort_index(axis = 1, inplace = True)
         
         # Convert to float32
-        cci = cci.astype(np.float32)
+        # cci = cci.astype(np.float32)
         
         # Write to HDF5 file.
         fname = outpath + 'climate_change_impacts_' + rcp + '.h5'

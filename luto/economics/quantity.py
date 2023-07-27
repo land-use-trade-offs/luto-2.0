@@ -15,7 +15,7 @@
 # LUTO 2.0. If not, see <https://www.gnu.org/licenses/>. 
 
 """
-Pure functions for quantities of comm's and alt. land uses.
+Pure functions for calculating the production quantities of agricutlural commodities.
 """
 
 
@@ -26,17 +26,23 @@ from scipy.interpolate import interp1d
 def get_ccimpact(data, lu, lm, year):
     """Return climate change impact multiplier at (zero-based) year index."""
     
-    # Check if land-use exists in CLIMATE_CHANGE_IMPACT (e.g., dryland Pears/Rice do not occur), if not return zeros
+    # Check if land-use exists in CLIMATE_CHANGE_IMPACT (e.g., dryland Pears/Rice do not occur), if not return ones
     if lu not in {t[0] for t in data.CLIMATE_CHANGE_IMPACT[lm].columns}:
-        cci = np.zeros((data.NCELLS))
+        cci = np.ones((data.NCELLS))
         
     else: # Calculate the quantities
         # Convert year index to calendar year.
         year += data.ANNUM
     
-        # First make linear interpolation function.
-        xs = sorted({t[2] for t in data.CLIMATE_CHANGE_IMPACT.columns})
-        yys = data.CLIMATE_CHANGE_IMPACT[lm, lu]
+        # Interpolate climate change damage for lu, lm, and year for each cell using a linear function.
+        xs = {t[2] for t in data.CLIMATE_CHANGE_IMPACT.columns}  # Returns set {2020, 2050, 2080}
+        xs.add(2010)                                             # Adds the year 2010 and returns set {2010, 2020, 2050, 2080}
+        xs = sorted(xs)                                          # Returns list and ensures sorted lowest to highest [2010, 2020, 2050, 2080]
+        yys = data.CLIMATE_CHANGE_IMPACT[lm, lu].fillna(1)       # Grabs the column and replaces NaNs with ones to avoid issues with calculating water use limits
+        yys.insert(0, '2010', 1)                                 # Insert a new column for 2010 with value of 1 to ensure no climate change impact at 2010
+        yys = yys.astype(np.float32)
+        
+        # Create linear function f and interpolate climate change impact
         f = interp1d(xs, yys, kind = 'linear', fill_value = 'extrapolate')
         cci = f(year)
     
@@ -70,7 +76,7 @@ def lvs_veg_types(lu):
 
 def get_yield_pot( data    # Data object or module.
                  , lvstype # Livestock type (one of 'BEEF', 'SHEEP' or 'DAIRY')
-                 , vegtype # Vegetation type (one of 'NATL' or 'MODL')
+                 , vegtype # Vegetation type (one of 'natural land' or 'modified land')
                  , lm      # Land-management type.
                  , year    # Number of years post 2010
                  ):
@@ -102,13 +108,12 @@ def get_yield_pot( data    # Data object or module.
     if lm == 'irr':
         yield_pot *= 2
     
-    # Apply climate change yield impact multiplier.
+    # Apply climate change yield impact multiplier. Essentially changes the number of head per hectare by a multiplier i.e., 1.2 = a 20% increase.
     # lu = data.PR2LU_DICT[pr]
-    lu = lvstype.capitalize() + ' - ' + vegtype  # Convert to 'lu' 
-    # yield_pot *= get_ccimpact(data, lu, lm, year)
+    lu = lvstype.capitalize() + ' - ' + vegtype  # Convert to 'lu' i.e., 'Beef - modified land'
+    yield_pot *= get_ccimpact(data, lu, lm, year)
     
-    # Here we can add a productivity multiplier for sustainable intensification
-    # to increase pasture growth and yield potential (i.e., head/ha)
+    # Here we can add a productivity multiplier for sustainable intensification to increase pasture growth and yield potential (i.e., head/ha)
     # yield_pot *= yield_mult  ***Still to do***
     
     return yield_pot
@@ -178,10 +183,10 @@ def get_quantity_lvstk( data # Data object or module.
     else:
         raise KeyError("Livestock type '%s' not identified." % lvstype)
         
-    # Quantity is base quantity times the yield potential.
+    # Quantity is base quantity times the yield potential. yield_pot includes climate change impacts.
     quantity *= yield_pot
 
-    # Convert quantities in tonnes/ha to tonnes/cell including resfactor.
+    # Convert quantities in tonnes/ha to tonnes/cell including real_area and resfactor.
     quantity *= data.REAL_AREA
     
     return quantity
@@ -208,8 +213,12 @@ def get_quantity_crop( data # Data object or module.
         
         # Get the raw quantities in tonnes/ha from data.
         quantity = data.AGEC_CROPS['Yield', lm, pr].copy().to_numpy()
+        
+        # Apply climate change yield impact multiplier.
+        lu = pr
+        quantity *= get_ccimpact(data, lu, lm, year)  # get_ccimpact takes land use (lu) as input but lu == pr for crops 
     
-        # Convert to tonnes per cell including resfactor.
+        # Convert to tonnes per cell including real_area and resfactor.
         quantity *= data.REAL_AREA 
 
     return quantity
@@ -239,7 +248,7 @@ def get_quantity( data # Data object or module.
     else:
         raise KeyError("Land use '%s' not found in data." % pr)
 
-    # Apply productivity increase multiplier by product.
+    # Apply productivity increase multiplier by product. Essentially, this is a total factor productivity increase.
     q *= data.BAU_PROD_INCR[lm, pr][year]
 
     return q

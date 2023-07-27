@@ -41,7 +41,7 @@ def get_wreq_matrices(data, year):
             w_mrj[0, :, j] = w_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', year)  # Water reqs depend on stocking rate 
             w_mrj[1, :, j] = w_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', year)
     
-    # Convert to ML per cell and incorporate resfactor
+    # Convert to ML per cell and incorporate REAL_AREA
     w_mrj *= data.REAL_AREA[:, np.newaxis]
     
     return w_mrj
