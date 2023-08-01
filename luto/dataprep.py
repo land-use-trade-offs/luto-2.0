@@ -338,7 +338,14 @@ def create_new_dataset():
     
     # Save to file
     water_yield_baselines.to_hdf(outpath + 'water_yield_baselines.h5', key = 'water_yield_baselines', mode = 'w', format = 'fixed', index = False, complevel = 9)
+        
     
+    
+    
+    ############### Carbon sequestration by trees data
+    
+    # Get carbon stock in natural land and save to file
+    bioph['REMNANT_VEG_T_CO2_HA'].to_hdf(outpath + 'natural_land_t_co2_ha.h5', key = 'natural_land_t_co2_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
     
     

@@ -65,7 +65,7 @@ def get_exclude_matrices(data, lumap):
     # that can occur in the future are those that occur in 2010 (i.e., base_year)
     x_mrj = data.EXCLUDE
 
-    # Raw transition-cost matrix is in $/ha and lexicographically ordered by land-use.
+    # Raw transition-cost matrix is in $/ha and lexicographically ordered by land-use (shape = 28 x 28).
     t_ij = data.TMATRIX
     
     # Transition costs from current land-use to all other land-uses j using current land-use map (in $/ha).
@@ -114,7 +114,7 @@ def get_transition_matrices(data, year, lumap, lmmap):
     
     
     # -------------------------------------------------------------- #
-    # Establishment costs (upfront, amortised to annual).            #
+    # Establishment costs (upfront, amortised to annual, per cell).            #
     # -------------------------------------------------------------- #
             
     # Raw transition-cost matrix is in $/ha and lexigraphically ordered (shape: land-use x land-use).
@@ -123,38 +123,38 @@ def get_transition_matrices(data, year, lumap, lmmap):
     # Non-irrigation related transition costs for cell r to change to land-use j calculated based on lumap (in $/ha).
     t_rj = t_ij[lumap]
         
-    # Amortise upfront costs to annualised costs
-    t_rj = amortise(t_rj)
+    # Amortise upfront costs to annualised costs and converted to $ per cell via REAL_AREA
+    t_rj = amortise(t_rj) * data.REAL_AREA[:, np.newaxis]
     
     
     # -------------------------------------------------------------- #
-    # Opportunity costs (annual).                                    #    
-    # -------------------------------------------------------------- #
-            
-    # Get cost matrices and convert from $/cell to $/ha.
-    c_mrj = get_cost_matrices(data, year) / data.REAL_AREA[:, np.newaxis]
-    
-    # Calculate production cost of current land-use and land management for each grid cell r.
-    c_r = (c_mrj * l_mrj).sum(axis = 0).sum(axis = 1)
-    
-    # Opportunity cost calculated as the diff in production cost between current land-use and all other land-uses j
-    o_delta_mrj = c_mrj - c_r[:, np.newaxis]
-    
-    # Cost for switching to Unallocated - modified land is zero
-    o_delta_mrj[0, :, data.LU_UNALL_INDICES] = 0
-    
-    # Cost for switching to the same land-use and irr status is zero.
-    o_delta_mrj = np.where(l_mrj, 0, o_delta_mrj)
-    
-    
-    # -------------------------------------------------------------- #
-    # Water license costs (upfront, amortised to annual).            #
+    # Opportunity costs (annual).                                    #    *** Turned off due to double-counting. Opportunity costs are effectively considered in the solver as it minimises total cost (or maximises profit).
     # -------------------------------------------------------------- #
     
-    # Get water requirements from current agriculture, converting water requirements for LVSTK from ML per head to ML per hectare.
+    # # Get cost matrices and convert from $/cell to $/ha.
+    # c_mrj = get_cost_matrices(data, year) / data.REAL_AREA[:, np.newaxis]
+    
+    # # Calculate production cost of current land-use and land management for each grid cell r.
+    # c_r = (c_mrj * l_mrj).sum(axis = 0).sum(axis = 1)
+    
+    # # Opportunity cost calculated as the diff in production cost between current land-use and all other land-uses j
+    # o_delta_mrj = c_mrj - c_r[:, np.newaxis]
+    
+    # # Cost for switching to Unallocated - modified land is zero
+    # o_delta_mrj[0, :, data.LU_UNALL_INDICES] = 0
+    
+    # # Cost for switching to the same land-use and irr status is zero.
+    # o_delta_mrj = np.where(l_mrj, 0, o_delta_mrj)
+    
+    
+    # -------------------------------------------------------------- #
+    # Water license costs (upfront, amortised to annual, per cell).  #
+    # -------------------------------------------------------------- #
+    
+    # Get water requirements from current agriculture, converting water requirements for LVSTK from ML per head to ML per cell (inc. REAL_AREA).
     w_mrj = get_wreq_matrices(data, year)
     
-    # Calculate water requirements of current land-use and land management 
+    # Sum total water requirements of current land-use and land management 
     w_r = (w_mrj * l_mrj).sum(axis = 0).sum(axis = 1)
     
     # Net water requirements calculated as the diff in water requirements between current land-use and all other land-uses j.
@@ -163,11 +163,13 @@ def get_transition_matrices(data, year, lumap, lmmap):
     # Water license cost calculated as net water requirements (ML/ha) x licence price ($/ML).
     w_delta_mrj = w_net_mrj * data.WATER_LICENCE_PRICE[:, np.newaxis]
     
-    # When land-use changes from dryland to irrigated add $10k per hectare
-    w_delta_mrj[1] = np.where(l_mrj[0], w_delta_mrj[1] + 10000, w_delta_mrj[1])
+    # When land-use changes from dryland to irrigated add $10k per hectare for establishing irrigation infrastructure
+    new_irrig_cost = 10000 * data.REAL_AREA[:, np.newaxis]
+    w_delta_mrj[1] = np.where(l_mrj[0], w_delta_mrj[1] + new_irrig_cost, w_delta_mrj[1])
 
-    # When land-use changes from irrigated to dryland add $3k per hectare
-    w_delta_mrj[0] = np.where(l_mrj[1], w_delta_mrj[0] + 3000, w_delta_mrj[0])
+    # When land-use changes from irrigated to dryland add $3k per hectare for removing irrigation infrastructure
+    remove_irrig_cost = 3000 * data.REAL_AREA[:, np.newaxis]
+    w_delta_mrj[0] = np.where(l_mrj[1], w_delta_mrj[0] + remove_irrig_cost, w_delta_mrj[0])
     
     # Amortise upfront costs to annualised costs
     w_delta_mrj = amortise(w_delta_mrj)
@@ -178,12 +180,12 @@ def get_transition_matrices(data, year, lumap, lmmap):
     # -------------------------------------------------------------- #
     
     # Sum annualised costs of land-use and land management transition in $ per ha
-    t_mrj = w_delta_mrj + o_delta_mrj + t_rj
+    t_mrj = w_delta_mrj + t_rj # + o_delta_mrj 
 
     # Ensure cost for switching to the same land-use and land management is zero.
     t_mrj = np.where(l_mrj, 0, t_mrj)
     
-    # Convert to $ per cell including resfactor
-    t_mrj *= data.REAL_AREA[:, np.newaxis]
+    # Set costs to nan where transitions are not allowed
+    t_mrj = np.where(get_exclude_matrices(data, lumap) == 0, np.nan, t_mrj)
     
     return t_mrj

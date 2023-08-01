@@ -267,6 +267,13 @@ fname_sr = os.path.join(INPUT_DIR, 'Water_yield_GCM-Ensemble_ssp' + SSP + '_2010
 
 
 
+# ---------------------------------------------------------------------------- #
+# Carbon sequestration by trees data.                                          #
+# ---------------------------------------------------------------------------- #
+
+# Load the agro-economic data (constructed using dataprep.py).
+REMNANT_VEG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'natural_land_t_co2_ha.h5') )
+
 
 
 # ---------------------------------------------------------------------------- #

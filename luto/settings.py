@@ -52,7 +52,7 @@ DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 3             # set to 1 to run at full spatial resolution
+RESFACTOR = 5             # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
 STYLE = 'snapshot'       # runs for target year only
@@ -60,7 +60,7 @@ STYLE = 'snapshot'       # runs for target year only
 
 # Define the objective function
 OBJECTIVE = 'maximise revenue'
-# OBJECTIVE = 'minimize cost'
+# OBJECTIVE = 'minimise cost'
 
 
 # Penalty in objective function

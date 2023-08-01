@@ -111,7 +111,7 @@ def get_yield_pot( data    # Data object or module.
     # Apply climate change yield impact multiplier. Essentially changes the number of head per hectare by a multiplier i.e., 1.2 = a 20% increase.
     # lu = data.PR2LU_DICT[pr]
     lu = lvstype.capitalize() + ' - ' + vegtype  # Convert to 'lu' i.e., 'Beef - modified land'
-    yield_pot *= get_ccimpact(data, lu, lm, year)
+    # yield_pot *= get_ccimpact(data, lu, lm, year)
     
     # Here we can add a productivity multiplier for sustainable intensification to increase pasture growth and yield potential (i.e., head/ha)
     # yield_pot *= yield_mult  ***Still to do***
@@ -216,7 +216,7 @@ def get_quantity_crop( data # Data object or module.
         
         # Apply climate change yield impact multiplier.
         lu = pr
-        quantity *= get_ccimpact(data, lu, lm, year)  # get_ccimpact takes land use (lu) as input but lu == pr for crops 
+        # quantity *= get_ccimpact(data, lu, lm, year)  # get_ccimpact takes land use (lu) as input but lu == pr for crops 
     
         # Convert to tonnes per cell including real_area and resfactor.
         quantity *= data.REAL_AREA 
@@ -225,7 +225,7 @@ def get_quantity_crop( data # Data object or module.
 
 
 def get_quantity( data # Data object or module.
-                , pr   # The stuff yielded.
+                , pr   # Product produced.
                 , lm   # Land management.
                 , year # Number of years post base-year ('annum').
                 ):

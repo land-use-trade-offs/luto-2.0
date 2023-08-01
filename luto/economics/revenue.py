@@ -45,7 +45,7 @@ def get_rev_crop( data # Data object or module.
         rev_t = ( data.AGEC_CROPS['P1', lm, lu]
                 * get_quantity( data, lu.upper(), lm, year )  # lu.upper() only for crops as needs to be in product format in get_quantity().
                 )
-        
+    
     # Return revenue as numpy array.
     return rev_t
 

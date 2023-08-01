@@ -52,7 +52,7 @@ def write_outputs(sim, year, d_c, path):
 def write_files(sim, path):
     """Writes numpy arrays and geotiffs to file"""
     
-    print('\nWriting outputs to', path, '\n')
+    print('\nWriting numpy arrays and geotiff outputs to', path, '\n')
     
     for year in sim.lumaps:
         
@@ -77,13 +77,15 @@ def write_files(sim, path):
 
 def write_production(sim, year, d_c, path):
     """Write out land-use and production data"""
+
+    print('\nWriting production outputs to', path, '\n')
     
     # Calculate data for quantity comparison between base year and target year
     prod_base = get_production(sim, sim.data.ANNUM)     # Get commodity quantities produced in 2010 
     prod_targ = get_production(sim, year)               # Get commodity quantities produced in target year
     demands = d_c[year - sim.data.ANNUM]                # Get commodity demands for target year
     abs_diff = prod_targ - demands                      # Diff between target year production and demands in absolute terms (i.e. tonnes etc)
-    prop_diff = (abs_diff / prod_targ) * 100            # Diff between target year production and demands in relative terms (i.e. %)
+    prop_diff = np.where(prod_targ > 0, (abs_diff / prod_targ) * 100, np.nan) # Diff between target year production and demands in relative terms (i.e. %)
     
     # Write to pandas dataframe
     df = pd.DataFrame()
@@ -113,11 +115,16 @@ def write_production(sim, year, d_c, path):
     swhp.to_csv(os.path.join(path, 'switches-irrstat.csv'))
 
 
-def write_water(sim, year, path):
+def write_water(sim, calendar_year, path):
     """Calculate water use totals. Takes a simulation object, a numeric
-       target year (e.g., 2030), and an output path as input."""
+       target calendar year (e.g., 2030), and an output path as input."""
+
+    print('\nWriting water outputs to', path, '\n')
     
-    # Get 2010 water requirement in mrj format
+    # Convert year index to calendar year.
+    year = calendar_year - data.ANNUM
+    
+    # Get water use for year in mrj format
     w_mrj = get_wreq_matrices(sim.data, year) 
 
     # Prepare a data frame.
@@ -128,9 +135,8 @@ def write_water(sim, year, path):
                                , 'ABS_DIFF_ML'
                                , 'PROPORTION_%'  ] )
 
-    # Get water use limits used as constraints in model
+    # Get 2010 water use limits used as constraints in model
     wuse_limits = get_wuse_limits(sim.data)
-
 
     # Set up data for river regions or drainage divisions
     if settings.WATER_REGION_DEF == 'RR':
@@ -151,13 +157,15 @@ def write_water(sim, year, path):
         # Get indices of cells in region
         ind = np.flatnonzero(region_id == region).astype(np.int32)
         
-        # Calculate the 2010 water requirements by agriculture for region.
+        # Calculate water requirements by agriculture for year and region.
         wreq_reg = (          w_mrj[:, ind, :] * 
                     sim.dvars[year][:, ind, :]
                    ).sum()
         
-        # Calculate absolute and proportional difference between water use target and actual water use
+        # Calculate water use limits
         wul = wuse_limits[i][1]
+        
+        # Calculate absolute and proportional difference between water use target and actual water use
         abs_diff = wreq_reg - wul
         if wul > 0:
             prop_diff = (wreq_reg / wul) * 100
@@ -181,6 +189,8 @@ def write_water(sim, year, path):
 def write_ghg(sim, year, path):
     """Calculate total GHG emissions. Takes a simulation object, a numeric
        target year (e.g., 2030), and an output path as input."""
+
+    print('\nWriting GHG outputs to', path, '\n')
     
     # Get greenhouse gas emissions in mrj format
     g_mrj = get_ghg_matrices(sim.data, year) 

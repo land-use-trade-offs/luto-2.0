@@ -28,8 +28,7 @@ from luto.tools import lumap2l_mrj
 
 
 def get_wreq_matrices(data, year): 
-    """ Convert water requirements for LVSTK from ML per head to ML per hectare.
-        Return w_mrj water requirement matrices by land management, cell, and land-use type."""
+    """Return w_mrj water requirement matrices by land management, cell, and land-use type."""
     
     # Stack water requirements data
     w_mrj = np.stack((data.WREQ_DRY_RJ, data.WREQ_IRR_RJ))
@@ -38,10 +37,11 @@ def get_wreq_matrices(data, year):
     for j, lu in enumerate(data.LANDUSES):
         if lu in data.LU_LVSTK:
             lvs, veg = lvs_veg_types(lu)
-            w_mrj[0, :, j] = w_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', year)  # Water reqs depend on stocking rate 
-            w_mrj[1, :, j] = w_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', year)
+            # w_mrj[0, :, j] = 0                                                         # Ignore drinking water requirements
+            w_mrj[0, :, j] = w_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', year) # Water reqs depend on current stocking rate for drinking water
+            w_mrj[1, :, j] = w_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)    # Water reqs depend on initial stocking rate for irrigation
     
-    # Convert to ML per cell and incorporate REAL_AREA
+    # Convert to ML per cell via REAL_AREA
     w_mrj *= data.REAL_AREA[:, np.newaxis]
     
     return w_mrj

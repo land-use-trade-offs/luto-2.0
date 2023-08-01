@@ -90,6 +90,8 @@ def solve( t_mrj          # Transition cost matrices.
         # Decision variables, one for each commodity, to minimise the deviations from demand.
         V = model.addMVar(ncms, name = 'V')
         
+        
+        
         # ------------------- #
         # Objective function. #
         # ------------------- #
@@ -109,7 +111,6 @@ def solve( t_mrj          # Transition cost matrices.
         else:
             print('Unknown objective')
 
-            
             
         # Specify objective function
         objective = ( 
@@ -161,6 +162,8 @@ def solve( t_mrj          # Transition cost matrices.
                           for c in range(ncms) )
         model.addConstrs((q_c[c] - d_c[c]) <= V[c] 
                           for c in range(ncms) )
+        
+        
 
         # Only add the following constraints if 'limits' are provided.
 

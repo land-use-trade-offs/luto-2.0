@@ -93,7 +93,7 @@ def sync_years(base, target):
     data = Data(bdata, target_index)
 
 
-# Local matrix-getters with resfactor multiplier.
+# Local matrix-getters.
 
 def get_c_mrj():
     print('Getting production cost matrices...', end = ' ')
@@ -153,7 +153,7 @@ def get_limits():
     limits = {}
     
     limits['water'] = get_wuse_limits(data)
-    limits['ghg'] = get_ghg_limits(data)
+    # limits['ghg'] = get_ghg_limits(data)
 
     # # Water limits.
     # wuse_limits = [] # A list of water use limits by drainage division.
