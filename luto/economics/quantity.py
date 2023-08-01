@@ -18,7 +18,6 @@
 Pure functions for calculating the production quantities of agricutlural commodities.
 """
 
-
 import numpy as np
 from scipy.interpolate import interp1d
 
