@@ -64,7 +64,7 @@ OBJECTIVE = 'maximise revenue'
 
 
 # Penalty in objective function
-PENALTY = 1000000
+PENALTY = 1e9
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
@@ -72,7 +72,7 @@ PENALTY = 1000000
 
 # Select Gurobi algorithm used to solve continuous models or the initial root relaxation of a MIP model.
 # Set solve method. Default is automatic. Dual simplex uses less memory.
-SOLVE_METHOD = 1
+SOLVE_METHOD = -1
 
 """ SOLVE METHODS
    'automatic':                       -1
@@ -92,6 +92,8 @@ OPTIMALITY_TOLERANCE = 1e-2
 """Default value:	1e-6
    Minimum value:	1e-9
    Maximum value:	1e-2"""
+
+# THREADS = 100
 
 # ---------------------------------------------------------------------------- #
 # Environmental parameters

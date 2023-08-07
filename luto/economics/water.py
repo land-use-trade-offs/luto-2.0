@@ -27,19 +27,18 @@ import luto.settings as settings
 from luto.tools import lumap2l_mrj
 
 
-def get_wreq_matrices(data, year): 
+def get_wreq_matrices(data, year_idx): 
     """Return w_mrj water requirement matrices by land management, cell, and land-use type."""
     
     # Stack water requirements data
-    w_mrj = np.stack((data.WREQ_DRY_RJ, data.WREQ_IRR_RJ))
+    w_mrj = np.stack(( data.WREQ_DRY_RJ, data.WREQ_IRR_RJ ))
     
     # Covert water requirements units from ML/head to ML/ha
     for j, lu in enumerate(data.LANDUSES):
         if lu in data.LU_LVSTK:
             lvs, veg = lvs_veg_types(lu)
-            # w_mrj[0, :, j] = 0                                                         # Ignore drinking water requirements
-            w_mrj[0, :, j] = w_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', year) # Water reqs depend on current stocking rate for drinking water
-            w_mrj[1, :, j] = w_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)    # Water reqs depend on initial stocking rate for irrigation
+            w_mrj[0, :, j] = w_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', year_idx) # Water reqs depend on current stocking rate for drinking water
+            w_mrj[1, :, j] = w_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)        # Water reqs depend on initial stocking rate for irrigation
     
     # Convert to ML per cell via REAL_AREA
     w_mrj *= data.REAL_AREA[:, np.newaxis]
@@ -53,8 +52,9 @@ def get_wuse_limits( data ):
        Currently set such that water limits are set at 2010 agricultural water requirements.
     """
     
-    # Get water requirements of agriculture in ML per cell in mrj format.
-    w_mrj = get_wreq_matrices(data, 0)  # 0 gets water requirements from base year (i.e., 2010)
+    # Get water requirements of agriculture in ML per cell in mrj format for 2010.
+    year_idx = 0
+    w_mrj = get_wreq_matrices(data, year_idx)  # 0 gets water requirements from base year (i.e., 2010)
     
     # Set up empty list to hold water use limits data
     wuse_limits = []

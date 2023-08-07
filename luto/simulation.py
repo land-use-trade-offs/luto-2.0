@@ -89,7 +89,7 @@ def sync_years(base, target):
     global data, base_year, target_year, target_index
     base_year = base
     target_year = target
-    target_index = target - bdata.ANNUM # - 1                     ************ Changed by BB. I think -1 is wrong. All timeseries data must incude 2010 then dont need -1
+    target_index = target - bdata.ANNUM
     data = Data(bdata, target_index)
 
 

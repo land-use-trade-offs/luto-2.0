@@ -23,17 +23,17 @@ from luto.economics.quantity import get_yield_pot, lvs_veg_types
 import luto.settings as settings
 from luto.tools import lumap2l_mrj
 
-def get_ghg_crop( data # Data object or module.
-                , lu   # Land use.
-                , lm   # Land management.
-                , year # Number of years post base-year ('annum').
+def get_ghg_crop( data     # Data object or module.
+                , lu       # Land use.
+                , lm       # Land management.
+                , year_idx # Number of years post base-year ('annum').
                 ):
     """Return crop GHG emissions [tCO2e/cell] of `lu`+`lm` in `year` as np array.
 
     `data`: data object/module -- assumes fields like in `luto.data`.
     `lu`: land use (e.g. 'Winter cereals' or 'Beef - natural land').
     `lm`: land management (e.g. 'dry', 'irr').
-    `year`: number of years from base year, counting from zero.
+    `year_idx`: number of years from base year, counting from zero.
     
     Crop GHG emissions include:
         'CO2E_KG_HA_CHEM_APPL', 
@@ -66,17 +66,17 @@ def get_ghg_crop( data # Data object or module.
     return ghg_t
 
 
-def get_ghg_lvstk( data # Data object or module.
-                 , lu   # Land use.
-                 , lm   # Land management.
-                 , year # Number of years post base-year ('annum').
+def get_ghg_lvstk( data     # Data object or module.
+                 , lu       # Land use.
+                 , lm       # Land management.
+                 , year_idx # Number of years post base-year ('annum').
                  ):
-    """Return livestock GHG emissions [tCO2e/cell] of `lu`+`lm` in `year` as np array.
+    """Return livestock GHG emissions [tCO2e/cell] of `lu`+`lm` in `year_idx` as np array.
 
     `data`: data object/module -- assumes fields like in `luto.data`.
     `lu`: land use (e.g. 'Winter cereals' or 'Beef - natural land').
     `lm`: land management (e.g. 'dry', 'irr').
-    `year`: number of years from base year, counting from zero.
+    `year_idx`: number of years from base year, counting from zero.
     
     Crop GHG emissions include:    
         'CO2E_KG_HEAD_ENTERIC', 
@@ -93,7 +93,7 @@ def get_ghg_lvstk( data # Data object or module.
     lvstype, vegtype = lvs_veg_types(lu)
 
     # Get the yield potential, i.e. the total number of heads per hectare.
-    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, year)
+    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, year_idx)
     
     # Calculate total GHG emissions in kg CO2e per hectare
     ghg_t = data.AGGHG_LVSTK.loc[:, (lvstype, slice(None))].sum(axis = 1) * yield_pot
@@ -120,22 +120,22 @@ def get_ghg_lvstk( data # Data object or module.
 def get_ghg( data # Data object or module.
            , lu   # Land use.
            , lm   # Land management.
-           , year # Number of years post base-year ('annum').
+           , year_idx # Number of years post base-year ('annum').
            ):
-    """Return GHG emissions [tCO2e/cell] of `lu`+`lm` in `year` as np array.
+    """Return GHG emissions [tCO2e/cell] of `lu`+`lm` in `year_idx` as np array.
 
     `data`: data object/module -- assumes fields like in `luto.data`.
     `lu`: land use (e.g. 'Winter cereals').
     `lm`: land management (e.g. 'dry', 'irr').
-    `year`: number of years from base year, counting from zero.
+    `year_idx`: number of years from base year, counting from zero.
     """
     # If it is a crop, it is known how to get GHG emissions.
     if lu in data.LU_CROPS:
-        return get_ghg_crop(data, lu, lm, year)
+        return get_ghg_crop(data, lu, lm, year_idx)
     
     # If it is livestock, it is known how to get GHG emissions.
     elif lu in data.LU_LVSTK:
-        return get_ghg_lvstk(data, lu, lm, year)
+        return get_ghg_lvstk(data, lu, lm, year_idx)
     
     # If neither crop nor livestock but in LANDUSES it is unallocated land.
     elif lu in data.LANDUSES:
@@ -146,31 +146,31 @@ def get_ghg( data # Data object or module.
         raise KeyError("Land use '%s' not found in data.LANDUSES" % lu)
 
 
-def get_ghg_matrix(data, lm, year):
-    """Return g_rj matrix of tCO2e/cell per lu under `lm` in `year`."""
+def get_ghg_matrix(data, lm, year_idx):
+    """Return g_rj matrix of tCO2e/cell per lu under `lm` in `year_idx`."""
     
     g_rj = np.zeros((data.NCELLS, len(data.LANDUSES)))
     for j, lu in enumerate(data.LANDUSES):
-        g_rj[:, j] = get_ghg(data, lu, lm, year)
+        g_rj[:, j] = get_ghg(data, lu, lm, year_idx)
         
     # Make sure all NaNs are replaced by zeroes.
     return np.nan_to_num(g_rj)
 
 
-def get_ghg_matrices(data, year):
+def get_ghg_matrices(data, year_idx):
     """Return g_mrj matrix of GHG emissions per cell as 3D Numpy array."""
     
-    return np.stack(tuple( get_ghg_matrix(data, lm, year)
+    return np.stack(tuple( get_ghg_matrix(data, lm, year_idx)
                            for lm in data.LANDMANS ))
-
 
 
 
 def get_ghg_limits(data):
     """Return greenhouse gas emissions limits as specified in settings.py."""
     
-    # Get GHG emissions from agriculture in tCO2e per cell in mrj format.
-    g_mrj = get_ghg_matrices(data, 0)
+    # Get GHG emissions from agriculture for 2010 in tCO2e per cell in mrj format.
+    year_idx = 0
+    g_mrj = get_ghg_matrices(data, year_idx)
     
     # Calculate total greenhouse gas emissions of current land-use and land management.
     ghg_limits = (g_mrj * data.L_MRJ).sum() * (1 - settings.GHG_REDUCTION_PERCENTAGE / 100)

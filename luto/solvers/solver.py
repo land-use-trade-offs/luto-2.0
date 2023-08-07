@@ -32,7 +32,7 @@ gurenv = gp.Env(empty = True)
 gurenv.setParam('Method', settings.SOLVE_METHOD)
 gurenv.setParam('OutputFlag', settings.VERBOSE)
 gurenv.setParam('OptimalityTol', settings.OPTIMALITY_TOLERANCE)
-gurenv.start()
+# gurenv.setParam('Threads', settings.THREADS)
 
 
 def solve( t_mrj          # Transition cost matrices.
@@ -101,7 +101,7 @@ def solve( t_mrj          # Transition cost matrices.
         if settings.OBJECTIVE == 'maximise revenue':
                     
             # Pre-calculate revenue minus (production and transition) costs
-            obj_mrj = ( r_mrj - (c_mrj + t_mrj) ) * -1 / settings.PENALTY
+            obj_mrj = -( r_mrj - (c_mrj + t_mrj) ) / settings.PENALTY
          
         elif settings.OBJECTIVE == 'minimise cost':
             
@@ -121,7 +121,7 @@ def solve( t_mrj          # Transition cost matrices.
                     
                      # Add deviation-from-demand variables for ensuring demand of each commodity is met (approximately). 
                      + sum( V[c] for c in range(ncms) )
-                    )
+                    ) 
 
         model.setObjective(objective, GRB.MINIMIZE)
         
