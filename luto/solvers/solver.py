@@ -28,11 +28,12 @@ from gurobipy import GRB
 import luto.settings as settings
 
 # Set Gurobi environment.
-gurenv = gp.Env(empty = True)
+gurenv = gp.Env(logfilename = 'gurobi.log', empty = True) # (empty = True)
 gurenv.setParam('Method', settings.SOLVE_METHOD)
 gurenv.setParam('OutputFlag', settings.VERBOSE)
 gurenv.setParam('OptimalityTol', settings.OPTIMALITY_TOLERANCE)
-# gurenv.setParam('Threads', settings.THREADS)
+gurenv.setParam('Threads', settings.THREADS)
+gurenv.start()
 
 
 def solve( t_mrj          # Transition cost matrices.

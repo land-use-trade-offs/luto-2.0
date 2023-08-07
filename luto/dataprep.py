@@ -27,9 +27,9 @@ import shutil, os, time
 from luto.settings import INPUT_DIR, RAW_DATA
 
 
-
-with h5py.File(luto_3D_inpath + 'tCO2_ha_ep_block.h5', 'r') as h5f:
-    brick = h5f['Trees_tCO2_ha'][...]  # (91, 6956407)
+# Still to do - bring in carbon emissions from environmental plantings
+# with h5py.File(luto_3D_inpath + 'tCO2_ha_ep_block.h5', 'r') as h5f:
+#     brick = h5f['Trees_tCO2_ha'][...]  # (91, 6956407)
 
     
     

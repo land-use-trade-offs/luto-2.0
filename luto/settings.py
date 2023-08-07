@@ -93,13 +93,13 @@ OPTIMALITY_TOLERANCE = 1e-2
    Minimum value:	1e-9
    Maximum value:	1e-2"""
 
-# THREADS = 100
+THREADS = 100
 
 # ---------------------------------------------------------------------------- #
 # Environmental parameters
 # ---------------------------------------------------------------------------- #
 
-# Greenhouse gas emissions
+# Greenhouse gas emissions in % terms
 GHG_REDUCTION_PERCENTAGE = 20
 
 # Water:
