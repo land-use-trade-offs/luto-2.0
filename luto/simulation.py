@@ -34,7 +34,7 @@ from luto.economics.ghg import get_ghg_matrices, get_ghg_limits
 from luto.economics.quantity import get_quantity_matrices
 from luto.economics.transitions import (get_transition_matrices, get_exclude_matrices)
 from luto.solvers.solver import solve
-from luto.tools import lumap2l_mrj
+from luto.tools import lumap2l_mrj, get_production
 
 
 class Data():
@@ -86,7 +86,7 @@ class Data():
 
 
 def sync_years(base, target):
-    global data, base_year, target_index
+    global data, base_year, target_index, d_c
     base_year = base
     target_index = target - bdata.YR_CAL_BASE
     data = Data(bdata, target_index)
@@ -169,7 +169,7 @@ def get_limits():
     
 def step( base    # Base year from which the data is taken.
         , target  # Year to be solved for.
-        , demands # Demands in the form of a demand by commodity by year (d_c) array.
+        , d_c     # Demand in the form of total quantities of agricultural commodities by year (d_c) array.
         ):
     """Solve the linear programme using the `base` lumap for `target` year."""
 
@@ -190,7 +190,7 @@ def step( base    # Base year from which the data is taken.
                                                          , get_w_mrj()
                                                          , get_x_mrj()
                                                          , get_q_mrp()
-                                                         , demands
+                                                         , d_c
                                                          , data.LU2PR
                                                          , data.PR2CM
                                                          , get_limits()
@@ -198,19 +198,21 @@ def step( base    # Base year from which the data is taken.
 
 def run( base
        , target
-       , demands
        ):
     """Run the simulation."""
+    
+    # Get the demand values
+    d_c = bdata.DEMAND_DELTAS_C * get_production(data, data.YR_CAL_BASE, data.L_MRJ)
     
     # The number of times the solver is to be called.
     steps = target - base
     
     # Run the simulation up to `year` sequentially.         *** Not sure that timeseries mode is working ***
     if settings.MODE == 'timeseries':
-        if len(demands.shape) != 2:
+        if len(d_c.shape) != 2:
             raise ValueError( "Demands need to be a time series array of "
                               "shape (years, commodities) and years > 0." )
-        elif target - base > demands.shape[0]:
+        elif target - base > d_c.shape[0]:
             raise ValueError( "Not enough years in demands time series.")
         else:
             print( "\nRunning LUTO %s timeseries from %s to %s at resfactor %s, starting at %s." % (settings.VERSION, base, target, settings.RESFACTOR, time.ctime()) )
@@ -218,20 +220,20 @@ def run( base
                 print( "\n-------------------------------------------------" )
                 print( "Running for year %s..." % (base + s + 1) )
                 print( "-------------------------------------------------\n" )
-                step(base + s, base + s + 1, demands[s])
+                step(base + s, base + s + 1, d_c[s])
                 
                 # Need to fix how the 'base' land-use map is updated in timeseries runs
                 
     # Run the simulation from YR_CAL_BASE to `target` year directly.
     elif settings.MODE == 'snapshot':
         # If demands is a time series, choose the appropriate entry.
-        if len(demands.shape) == 2:
-            demands = demands[target - bdata.YR_CAL_BASE ]       # Demands needs to be a timeseries from 2010 to target year                   # ******************* check the -1 is correct indexing
+        if len(d_c.shape) == 2:
+            d_c = d_c[target - bdata.YR_CAL_BASE ]       # Demands needs to be a timeseries from 2010 to target year                   # ******************* check the -1 is correct indexing
         print( "\nRunning LUTO %s snapshot for %s at resfactor %s, starting at %s" % (settings.VERSION, target, settings.RESFACTOR, time.ctime()) )
         print( "\n-------------------------------------------------" )
         print( "Running for year %s..." % target )
         print( "-------------------------------------------------\n" )
-        step(base, target, demands)
+        step(base, target, d_c)
 
     else:
         raise ValueError("Unkown MODE: %s." % settings.MODE)

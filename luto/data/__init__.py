@@ -36,6 +36,15 @@ AGGHG_LVSTK = pd.read_hdf( os.path.join(INPUT_DIR, 'agGHG_lvstk.h5') )
 # Derive NCELLS (number of spatial cells) from AGEC.
 NCELLS, = AGEC_CROPS.index.shape
 
+
+# Load demand deltas
+DEMAND_DELTAS_C = np.load(os.path.join(INPUT_DIR, 'demand_deltas_c.npy') )
+
+# The base year, i.e. where year index yr_idx == 0.
+YR_CAL_BASE = 2010
+
+
+
 # Read in lexicographically ordered list of land-uses.
 LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'landuses.csv')), header = None)[0].to_list()
 
@@ -164,8 +173,6 @@ LUMAP = pd.read_hdf(os.path.join(INPUT_DIR, 'lumap.h5')).to_numpy()
 # Initial (2010) land management map.
 LMMAP = pd.read_hdf(os.path.join(INPUT_DIR, 'lmmap.h5')).to_numpy()
 
-# The base year, i.e. where year index yr_idx == 0.
-YR_CAL_BASE = 2010
 
 
 ###############################################################

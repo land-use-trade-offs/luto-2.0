@@ -42,9 +42,9 @@ write_outputs(sim, 2030, d_c, path)
 
 # Minimalist run code
 import numpy as np
-d_c = np.load('input/d_c.npy')
+# d_c = np.load('input/d_c.npy')
 import luto.simulation as sim
-sim.run( 2010, 2030, d_c )
+sim.run( 2010, 2030 )
 from luto.tools.write import *
 path = get_path()
 write_outputs(sim, 2030, d_c, path)

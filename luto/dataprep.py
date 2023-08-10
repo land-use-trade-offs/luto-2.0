@@ -84,7 +84,7 @@ def create_new_dataset():
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean.h5', outpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean.h5')
     
     # Load delta demands file
-    shutil.copyfile(luto_1D_inpath + 'd_c.npy', outpath + 'd_c.npy')
+    shutil.copyfile(luto_1D_inpath + 'demand_deltas_c.npy', outpath + 'demand_deltas_c.npy')
     
     
     
