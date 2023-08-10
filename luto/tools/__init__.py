@@ -32,24 +32,6 @@ def show_map(yr_cal):
     plotmap(lumaps[yr_cal], labels = bdata.LU2DESC)
     
 
-
-def get_demand(data, yr_cal, X_mrj):
-    """Return total production of commodities for a specific year...
-    
-    'data' is a sim.data or bdata like object, 'yr_cal' is calendar year, and X_mrj 
-    is land-use and land management in mrj decision-variable format.
-       
-    Can return base year production (e.g., year = 2010) or can return production for 
-    a simulated year if one exists (i.e., year = 2030) check sim.info()).
-    
-    Includes the impacts of land-use change, productivity increases, and 
-    climate change on yield."""
-    
-    # Provide agricultural commodity demands as timeseries from 2010 to target year.
-    d_c = data.DEMAND_DELTAS_C * get_production(data, data.YR_CAL_BASE, data.L_MRJ)
-    # rnd = (np.random.rand(100, len(sim.data.COMMODITIES)) / 2 + 1) # random numbers [1.0 - 1.5], shape = 100 years x 26 commodities. Placeholder demand multiplier.
-    
-
 def get_production(data, yr_cal, X_mrj):
     """Return total production of commodities for a specific year...
     

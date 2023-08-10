@@ -86,7 +86,7 @@ class Data():
 
 
 def sync_years(base, target):
-    global data, base_year, target_index, d_c
+    global data, base_year, target_index
     base_year = base
     target_index = target - bdata.YR_CAL_BASE
     data = Data(bdata, target_index)
@@ -201,8 +201,8 @@ def run( base
        ):
     """Run the simulation."""
     
-    # Get the demand values
-    d_c = bdata.DEMAND_DELTAS_C * get_production(data, data.YR_CAL_BASE, data.L_MRJ)
+    # Get the total demand quantities by commodity by combining the demand deltas with 2010 production
+    d_c = bdata.DEMAND_DELTAS_C * get_production(bdata, bdata.YR_CAL_BASE, lumap2l_mrj(bdata.LUMAP, bdata.LMMAP))
     
     # The number of times the solver is to be called.
     steps = target - base
