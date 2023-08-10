@@ -210,8 +210,7 @@ def run( base
     # Run the simulation up to `year` sequentially.         *** Not sure that timeseries mode is working ***
     if settings.MODE == 'timeseries':
         if len(d_c.shape) != 2:
-            raise ValueError( "Demands need to be a time series array of "
-                              "shape (years, commodities) and years > 0." )
+            raise ValueError( "Demands need to be a time series array of shape (years, commodities) and years > 0." )
         elif target - base > d_c.shape[0]:
             raise ValueError( "Not enough years in demands time series.")
         else:
@@ -228,7 +227,7 @@ def run( base
     elif settings.MODE == 'snapshot':
         # If demands is a time series, choose the appropriate entry.
         if len(d_c.shape) == 2:
-            d_c = d_c[target - bdata.YR_CAL_BASE ]       # Demands needs to be a timeseries from 2010 to target year                   # ******************* check the -1 is correct indexing
+            d_c = d_c[ target - bdata.YR_CAL_BASE ]       # Demands needs to be a timeseries from 2010 to target year                   # ******************* check the -1 is correct indexing
         print( "\nRunning LUTO %s snapshot for %s at resfactor %s, starting at %s" % (settings.VERSION, target, settings.RESFACTOR, time.ctime()) )
         print( "\n-------------------------------------------------" )
         print( "Running for year %s..." % target )

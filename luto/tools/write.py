@@ -42,11 +42,11 @@ def get_path():
     return path
 
 
-def write_outputs(sim, yr_cal, d_c, path):
+def write_outputs(sim, yr_cal, path):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     
     # write_files(sim, path)
-    write_production(sim, yr_cal, d_c, path)
+    write_production(sim, yr_cal, path)
     write_water(sim, yr_cal, path)
     write_ghg(sim, yr_cal, path)
 
@@ -77,7 +77,7 @@ def write_files(sim, path):
         write_gtiff(lmmap, os.path.join(path, lmmap_fname))
 
 
-def write_production(sim.data, yr_cal, d_c, path): data, yr_cal, X_mrj
+def write_production(sim, yr_cal, path): 
     """Write out land-use and production data"""
 
     print('\nWriting production outputs to', path)
@@ -86,8 +86,9 @@ def write_production(sim.data, yr_cal, d_c, path): data, yr_cal, X_mrj
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
     
     # Calculate data for quantity comparison between base year and target year
-    prod_base = get_production(sim.data, sim.data.YR_CAL_BASE)  # Get commodity quantities produced in 2010 
-    prod_targ = get_production(sim.data, yr_cal)                # Get commodity quantities produced in target year
+    prod_base = get_production(sim.data, sim.data.YR_CAL_BASE, sim.data.L_MRJ)  # Get commodity quantities produced in 2010 
+    prod_targ = get_production(sim.data, yr_cal, sim.dvars[yr_cal])                # Get commodity quantities produced in target year
+    d_c = sim.data.DEMAND_DELTAS_C * prod_base
     demands = d_c[yr_idx]                                  # Get commodity demands for target year
     abs_diff = prod_targ - demands                         # Diff between target year production and demands in absolute terms (i.e. tonnes etc)
     prop_diff = ( prod_targ / demands ) * 100              # Target year production as a proportion of demands (%)
