@@ -26,14 +26,14 @@ from luto.economics.quantity import get_yield_pot, lvs_veg_types, get_quantity
 def get_cost_crop( data # Data object or module.
                  , lu   # Land use.
                  , lm   # Land management.
-                 , year # Number of years post base-year ('YR_CAL_BASE').
+                 , yr_idx # Number of years post base-year ('YR_CAL_BASE').
                  ):
-    """Return crop prod. cost [AUD/cell] of `lu`+`lm` in `year` as np array.
+    """Return crop prod. cost [AUD/cell] of `lu`+`lm` in `yr_idx` as np array.
 
     `data`: data object/module -- assumes fields like in `luto.data`.
     `lu`: land use (e.g. 'Winter cereals' or 'Beef - natural land').
     `lm`: land management (e.g. 'dry', 'irr').
-    `year`: number of years from base year, counting from zero.
+    `yr_idx`: number of years from base year, counting from zero.
     """
     
     # Check if land-use exists in AGEC_CROPS (e.g., dryland Pears/Rice do not occur), if not return zeros
@@ -45,7 +45,7 @@ def get_cost_crop( data # Data object or module.
         # Variable costs (quantity costs and area costs)        
         # Quantity costs (calculated as cost per tonne x tonne per cell x resfactor)
         costs_q = ( data.AGEC_CROPS['QC', lm, lu]
-                  * get_quantity(data, lu.upper(), lm, year) )  # lu.upper() only for crops as needs to be in product format in get_quantity().  
+                  * get_quantity(data, lu.upper(), lm, yr_idx) )  # lu.upper() only for crops as needs to be in product format in get_quantity().  
         
         # Area costs.
         costs_a = data.AGEC_CROPS['AC', lm, lu]
@@ -79,20 +79,20 @@ def get_cost_crop( data # Data object or module.
 def get_cost_lvstk( data # Data object or module.
                   , lu   # Land use.
                   , lm   # Land management.
-                  , year # Number of years post base-year ('YR_CAL_BASE').
+                  , yr_idx # Number of years post base-year ('YR_CAL_BASE').
                   ):
-    """Return lvstk prod. cost [AUD/cell] of `lu`+`lm` in `year` as np array.
+    """Return lvstk prod. cost [AUD/cell] of `lu`+`lm` in `yr_idx` as np array.
 
     `data`: data object/module -- assumes fields like in `luto.data`.
     `lu`: land use (e.g. 'Winter cereals' or 'Beef - natural land').
     `lm`: land management (e.g. 'dry', 'irr').
-    `year`: number of years from base year, counting from zero."""
+    `yr_idx`: number of years from base year, counting from zero."""
     
     # Get livestock and vegetation type.
     lvstype, vegtype = lvs_veg_types(lu)
 
     # Get the yield potential, i.e. the total number of head per hectare.
-    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, year)
+    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
 
     # Variable costs - quantity-dependent costs as costs per head x heads per hectare.
     costs_q = data.AGEC_LVSTK['QC', lvstype] * yield_pot
@@ -130,22 +130,22 @@ def get_cost_lvstk( data # Data object or module.
 def get_cost( data # Data object or module.
             , lu   # Land use.
             , lm   # Land management.
-            , year # Number of years post base-year ('YR_CAL_BASE').
+            , yr_idx # Number of years post base-year ('YR_CAL_BASE').
             ):
-    """Return production cost [AUD/cell] of `lu`+`lm` in `year` as np array.
+    """Return production cost [AUD/cell] of `lu`+`lm` in `yr_idx` as np array.
 
     `data`: data object/module -- assumes fields like in `luto.data`.
     `lu`: land use (e.g. 'Winter cereals').
     `lm`: land management (e.g. 'dry', 'irr', 'org').
-    `year`: number of years from base year, counting from zero.
+    `yr_idx`: number of years from base year, counting from zero.
     """
     # If it is a crop, it is known how to get the costs.
     if lu in data.LU_CROPS:
-        return get_cost_crop(data, lu, lm, year)
+        return get_cost_crop(data, lu, lm, yr_idx)
     
     # If it is livestock, it is known how to get the costs.
     elif lu in data.LU_LVSTK:
-        return get_cost_lvstk(data, lu, lm, year)
+        return get_cost_lvstk(data, lu, lm, yr_idx)
     
     # If neither crop nor livestock but in LANDUSES it is unallocated land.
     elif lu in data.LANDUSES:
@@ -156,20 +156,20 @@ def get_cost( data # Data object or module.
         raise KeyError("Land use '%s' not found in data.LANDUSES" % lu)
 
 
-def get_cost_matrix(data, lm, year):
-    """Return c_rj matrix of costs/cell per lu under `lm` in `year`."""
+def get_cost_matrix(data, lm, yr_idx):
+    """Return c_rj matrix of costs/cell per lu under `lm` in `yr_idx`."""
     
     c_rj = np.zeros((data.NCELLS, len(data.LANDUSES)))
     for j, lu in enumerate(data.LANDUSES):
-        c_rj[:, j] = get_cost(data, lu, lm, year)
+        c_rj[:, j] = get_cost(data, lu, lm, yr_idx)
         
     # Make sure all NaNs are replaced by zeroes.
     return np.nan_to_num(c_rj)
 
 
-def get_cost_matrices(data, year):
+def get_cost_matrices(data, yr_idx):
     """Return c_mrj matrix of costs per cell as 3D Numpy array."""
     
-    return np.stack(tuple( get_cost_matrix(data, lm, year)
+    return np.stack(tuple( get_cost_matrix(data, lm, yr_idx)
                            for lm in data.LANDMANS )
                    ).astype(np.float32)

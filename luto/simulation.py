@@ -205,8 +205,8 @@ def run( base
     # The number of times the solver is to be called.
     steps = target - base
     
-    # Run the simulation up to `year` sequentially.         *** Not sure that this is working ***
-    if settings.STYLE == 'timeseries':
+    # Run the simulation up to `year` sequentially.         *** Not sure that timeseries mode is working ***
+    if settings.MODE == 'timeseries':
         if len(demands.shape) != 2:
             raise ValueError( "Demands need to be a time series array of "
                               "shape (years, commodities) and years > 0." )
@@ -218,12 +218,12 @@ def run( base
                 print( "\n-------------------------------------------------" )
                 print( "Running for year %s..." % (base + s + 1) )
                 print( "-------------------------------------------------\n" )
-                step(base + s, base + s + 1 , demands[s], x_mrj)
+                step(base + s, base + s + 1, demands[s])
                 
                 # Need to fix how the 'base' land-use map is updated in timeseries runs
                 
     # Run the simulation from YR_CAL_BASE to `target` year directly.
-    elif settings.STYLE == 'snapshot':
+    elif settings.MODE == 'snapshot':
         # If demands is a time series, choose the appropriate entry.
         if len(demands.shape) == 2:
             demands = demands[target - bdata.YR_CAL_BASE ]       # Demands needs to be a timeseries from 2010 to target year                   # ******************* check the -1 is correct indexing
@@ -234,7 +234,7 @@ def run( base
         step(base, target, demands)
 
     else:
-        raise ValueError("Unkown style: %s." % settings.STYLE)
+        raise ValueError("Unkown MODE: %s." % settings.MODE)
 
 
 

@@ -164,7 +164,7 @@ LUMAP = pd.read_hdf(os.path.join(INPUT_DIR, 'lumap.h5')).to_numpy()
 # Initial (2010) land management map.
 LMMAP = pd.read_hdf(os.path.join(INPUT_DIR, 'lmmap.h5')).to_numpy()
 
-# The base year, i.e. where year == 0.
+# The base year, i.e. where year index yr_idx == 0.
 YR_CAL_BASE = 2010
 
 

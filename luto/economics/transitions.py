@@ -69,7 +69,7 @@ def get_exclude_matrices(data, lumap):
     t_ij = data.TMATRIX
     
     # Transition costs from current land-use to all other land-uses j using current land-use map (in $/ha).
-    t_rj = t_ij[data.LUMAP]
+    t_rj = t_ij[lumap]
 
     # To be excluded based on disallowed switches as specified in transition cost matrix i.e., where t_rj is NaN.
     t_rj = np.where(np.isnan(t_rj), 0, 1)
@@ -80,7 +80,7 @@ def get_exclude_matrices(data, lumap):
     return x_mrj
 
 
-def get_transition_matrices(data, year, lumap, lmmap):
+def get_transition_matrices(data, yr_idx, lumap, lmmap):
     """Return t_mrj transition-cost matrices.
 
     A transition-cost matrix gives the cost of switching a cell r from its 
@@ -94,7 +94,7 @@ def get_transition_matrices(data, year, lumap, lmmap):
 
     data: object/module
         Data object or module with fields like in `luto.data`.
-    year : int
+    yr_idx : int
         Number of years from base year, counting from zero.
     lumap : numpy.ndarray
         Present land-use map, i.e. highpos (shape = ncells, dtype=int).
@@ -132,7 +132,7 @@ def get_transition_matrices(data, year, lumap, lmmap):
     # -------------------------------------------------------------- #
     
     # # Get cost matrices and convert from $/cell to $/ha.
-    # c_mrj = get_cost_matrices(data, year) / data.REAL_AREA[:, np.newaxis]
+    # c_mrj = get_cost_matrices(data, yr_idx) / data.REAL_AREA[:, np.newaxis]
     
     # # Calculate production cost of current land-use and land management for each grid cell r.
     # c_r = (c_mrj * l_mrj).sum(axis = 0).sum(axis = 1)
@@ -152,7 +152,7 @@ def get_transition_matrices(data, year, lumap, lmmap):
     # -------------------------------------------------------------- #
     
     # Get water requirements from current agriculture, converting water requirements for LVSTK from ML per head to ML per cell (inc. REAL_AREA).
-    w_mrj = get_wreq_matrices(data, year)
+    w_mrj = get_wreq_matrices(data, yr_idx)
     
     # Sum total water requirements of current land-use and land management 
     w_r = (w_mrj * l_mrj).sum(axis = 0).sum(axis = 1)

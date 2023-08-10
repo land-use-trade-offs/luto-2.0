@@ -27,7 +27,7 @@ import luto.settings as settings
 from luto.tools import lumap2l_mrj
 
 
-def get_wreq_matrices(data, year_idx): 
+def get_wreq_matrices(data, yr_idx): 
     """Return w_mrj water requirement matrices by land management, cell, and land-use type."""
     
     # Stack water requirements data
@@ -37,7 +37,7 @@ def get_wreq_matrices(data, year_idx):
     for j, lu in enumerate(data.LANDUSES):
         if lu in data.LU_LVSTK:
             lvs, veg = lvs_veg_types(lu)
-            w_mrj[0, :, j] = w_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', year_idx) # Water reqs depend on current stocking rate for drinking water
+            w_mrj[0, :, j] = w_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', yr_idx) # Water reqs depend on current stocking rate for drinking water
             w_mrj[1, :, j] = w_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)        # Water reqs depend on initial stocking rate for irrigation
     
     # Convert to ML per cell via REAL_AREA
@@ -53,8 +53,8 @@ def get_wuse_limits( data ):
     """
     
     # Get water requirements of agriculture in ML per cell in mrj format for 2010.
-    year_idx = 0
-    w_mrj = get_wreq_matrices(data, year_idx)  # 0 gets water requirements from base year (i.e., 2010)
+    yr_idx = 0
+    w_mrj = get_wreq_matrices(data, yr_idx)  # 0 gets water requirements from base year (i.e., 2010)
     
     # Set up empty list to hold water use limits data
     wuse_limits = []
@@ -89,12 +89,12 @@ def get_wuse_limits( data ):
     
 
 # def get_wyld_matrix( data # Data object or module.
-#                     , year = None # Number of years post base-year ('YR_CAL_BASE').
+#                     , yr_idx = None # Number of years post base-year ('YR_CAL_BASE').
 #                     ):
 #     """Return an rj matrix of the water yields, per cell, by land use."""
 
 #     # If no year is provided, use the base yields of 1985.
-#     if year is None:
+#     if yr_idx is None:
 #         yld_dr = data.WATER_YIELD_BASE_DR
 #         yld_sr = data.WATER_YIELD_BASE_SR
 #     else:
@@ -110,9 +110,9 @@ def get_wuse_limits( data ):
 #     return np.stack(cols, axis=1) * data.REAL_AREA[:, np.newaxis]
 
 
-# def get_wyld_matrices(data, year, mask=None):
+# def get_wyld_matrices(data, yr_idx, mask=None):
 #     """Return masked version of `get_wyld_matrices()`."""
-#     wyld_rj = get_wyld_matrix(data, year)
+#     wyld_rj = get_wyld_matrix(data, yr_idx)
 #     wyld_mrj = np.stack((wyld_rj, wyld_rj))
 #     if mask is None:
 #         return wyld_mrj
@@ -136,26 +136,26 @@ def get_wuse_limits( data ):
     
 #     return ddiv_ind
 
-# def get_water_stress(data, year, mask=None):
-#     """Return tuple of (use, yld) for region `mask` in `year`."""
+# def get_water_stress(data, yr_idx, mask=None):
+#     """Return tuple of (use, yld) for region `mask` in `yr_idx`."""
 
 #     # Get the use and yield, ready for multiplication by X_mrj and summing.
-#     use_year = get_wreq_matrices(data, year, mask)
-#     yld_year = get_wyld_matrices(data, year, mask)
+#     use_year = get_wreq_matrices(data, yr_idx, mask)
+#     yld_year = get_wyld_matrices(data, yr_idx, mask)
 
 #     # Return the tuple.
 #     return use_year, yld_year
 
 
 
-# def _get_water_stress(data, year, mask=None):
+# def _get_water_stress(data, yr_idx, mask=None):
 #     """Return, by cell, how much the water yield is above the stress level."""
 #     # Get the water yields -- disregarding irrigation but as mrj matrix.
-#     wyld_rj = get_wyld_matrix(data, year)
+#     wyld_rj = get_wyld_matrix(data, yr_idx)
 #     wyld_mrj = np.stack((wyld_rj, wyld_rj))
 
 #     # Get the water requirements for irrigation and livestock drinking water.
-#     wreq_mrj = get_wreq_matrices(data, year)
+#     wreq_mrj = get_wreq_matrices(data, yr_idx)
 
 #     # Calculate the water stress threshold.
 #     stresshold = ( settings.WATER_YIELD_STRESS_FRACTION

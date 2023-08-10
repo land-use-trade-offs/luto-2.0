@@ -26,16 +26,16 @@ from scipy.interpolate import NearestNDInterpolator
 import luto.settings as settings
 
 
-def recreate_2D_maps(sim, year):
+def recreate_2D_maps(sim, yr_cal):
     """Recreates a full resolution 2D array from masked and resfactored 1D array"""
     
     # First convert back to full resolution 2D array if resfactor is > 1.
     if settings.RESFACTOR > 1:
-        lumap = uncoursify(sim, sim.lumaps[year])
-        lmmap = uncoursify(sim, sim.lmmaps[year])
+        lumap = uncoursify(sim, sim.lumaps[yr_cal])
+        lmmap = uncoursify(sim, sim.lmmaps[yr_cal])
     else:
-        lumap = sim.lumaps[year]
-        lmmap = sim.lmmaps[year]
+        lumap = sim.lumaps[yr_cal]
+        lmmap = sim.lmmaps[yr_cal]
 
     # Then put the excluded land-use and land management types back in the array.
     lumap = reconstitute(lumap, sim.data.LUMASK, filler = sim.data.MASK_LU_CODE).astype(np.int8)

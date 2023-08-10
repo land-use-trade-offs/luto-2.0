@@ -82,12 +82,15 @@ def write_production(sim, yr_cal, d_c, path):
 
     print('\nWriting production outputs to', path)
     
+    # Calculate year index
+    yr_idx = yr_cal - sim.data.YR_CAL_BASE
+    
     # Calculate data for quantity comparison between base year and target year
-    prod_base = get_production(sim, sim.data.YR_CAL_BASE)    # Get commodity quantities produced in 2010 
-    prod_targ = get_production(sim, yr_cal)          # Get commodity quantities produced in target year
-    demands = d_c[yr_cal - sim.data.YR_CAL_BASE]           # Get commodity demands for target year
-    abs_diff = prod_targ - demands                     # Diff between target year production and demands in absolute terms (i.e. tonnes etc)
-    prop_diff = ( prod_targ / demands ) * 100                    # Target year production as a proportion of demands (%)
+    prod_base = get_production(sim, sim.data.YR_CAL_BASE)  # Get commodity quantities produced in 2010 
+    prod_targ = get_production(sim, yr_cal)                # Get commodity quantities produced in target year
+    demands = d_c[yr_idx]                                  # Get commodity demands for target year
+    abs_diff = prod_targ - demands                         # Diff between target year production and demands in absolute terms (i.e. tonnes etc)
+    prop_diff = ( prod_targ / demands ) * 100              # Target year production as a proportion of demands (%)
     
     # Write to pandas dataframe
     df = pd.DataFrame()
@@ -160,7 +163,7 @@ def write_water(sim, yr_cal, path):
         ind = np.flatnonzero(region_id == region).astype(np.int32)
         
         # Calculate water requirements by agriculture for year and region.
-        wreq_reg = (          w_mrj[:, ind, :] * 
+        wreq_reg = (            w_mrj[:, ind, :] * 
                     sim.dvars[yr_cal][:, ind, :]
                    ).sum()
         

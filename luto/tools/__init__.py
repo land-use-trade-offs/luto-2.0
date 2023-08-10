@@ -27,12 +27,12 @@ import numpy as np
 from luto.economics.quantity import get_quantity_matrices
 
 
-def show_map(year):
-    """Show a plot of the lumap of `year`."""
-    plotmap(lumaps[year], labels = bdata.LU2DESC)
+def show_map(yr_cal):
+    """Show a plot of the lumap of `yr_cal`."""
+    plotmap(lumaps[yr_cal], labels = bdata.LU2DESC)
     
     
-def get_production(sim, year):
+def get_production(data, yr_cal):
     """Return total production of commodities for a specific year...
        
     Can return base year production (e.g., year = 2010) or can return production for 
@@ -40,6 +40,44 @@ def get_production(sim, year):
     
     Includes the impacts of land-use change, productivity increases, and 
     climate change on yield."""
+    
+    # Calculate year index (i.e., number of years since 2010)
+    yr_idx = yr_cal - data.YR_CAL_BASE
+    
+    # Get the maps in decision-variable format. 0/1 array of shape j, r
+    X_mrj = sim.dvars[yr_cal]
+    
+    # Get the quantity matrices. Quantity array of shape m, r, p
+    q_mrp = get_quantity_matrices(data, yr_idx)
+    
+    # Convert map of land-use in mrj format to mrp format
+    X_mrp = np.stack( [ X_mrj[:, :, j] for p in range(data.NPRS) 
+                                       for j in range(data.NLUS)
+                                       if data.LU2PR[p, j] 
+                      ], axis = 2 )
+
+    # Sum quantities in product (PR/p) representation.
+    q_p = np.sum( q_mrp * X_mrp, axis = (0, 1), keepdims = False)
+    
+    # Transform quantities to commodity (CM/c) representation.
+    q_c = [ sum( q_p[p] for p in range(data.NPRS) if data.PR2CM[c, p] )
+                        for c in range(data.NCMS) ]
+
+    # Return total commodity production as numpy array.
+    return np.array(q_c)
+
+
+def get_production_copy(sim, yr_cal):
+    """Return total production of commodities for a specific year...
+       
+    Can return base year production (e.g., year = 2010) or can return production for 
+    a simulated year if one exists (i.e., year = 2030) check sim.info()).
+    
+    Includes the impacts of land-use change, productivity increases, and 
+    climate change on yield."""
+    
+    # Calculate year index (i.e., number of years since 2010)
+    yr_idx = yr_cal - sim.data.YR_CAL_BASE
 
     # Acquire local names for matrices and shapes.
     lu2pr_pj = sim.data.LU2PR
@@ -49,11 +87,11 @@ def get_production(sim, year):
     ncms = sim.data.NCMS
 
     # Get the maps in decision-variable format. 0/1 array of shape j, r
-    X_dry = sim.dvars[year][0].T
-    X_irr = sim.dvars[year][1].T
+    X_dry = sim.dvars[yr_cal][0].T
+    X_irr = sim.dvars[yr_cal][1].T
 
     # Get the quantity matrices. Quantity array of shape m, r, p
-    q_mrp = get_quantity_matrices(sim.data, year - sim.data.YR_CAL_BASE)
+    q_mrp = get_quantity_matrices(sim.data, yr_idx)
 
     X_dry_pr = [ X_dry[j] for p in range(nprs) for j in range(nlus)
                     if lu2pr_pj[p, j] ]

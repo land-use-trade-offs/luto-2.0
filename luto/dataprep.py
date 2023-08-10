@@ -44,13 +44,13 @@ def create_new_dataset():
     ############### Copy key input data layers from their source folders to the raw_data folder for processing
     
     # Set data input paths
-    luto_1D_inpath = 'N:/Planet-A/Data-Master/LUTO_2.0_input_data/Input_data/1D_Parameter_Timeseries/'
-    luto_2D_inpath = 'N:/Planet-A/Data-Master/LUTO_2.0_input_data/Input_data/2D_Spatial_Snapshot/'
-    luto_3D_inpath = 'N:/Planet-A/Data-Master/LUTO_2.0_input_data/Input_data/3D_Spatial_Timeseries/'
-    luto_4D_inpath = 'N:/Planet-A/Data-Master/LUTO_2.0_input_data/Input_data/4D_Spatial_SSP_Timeseries/'
-    fdh_inpath = 'N:/Planet-A/LUF-Modelling/fdh-archive/data/neoluto-data/new-data-and-domain/'
-    profit_map_inpath = 'N:/Planet-A/Data-Master/Profit_map/'
-    nlum_inpath = 'N:/Planet-A/Data-Master/National_Landuse_Map/'
+    luto_1D_inpath = 'N:/Data-Master/LUTO_2.0_input_data/Input_data/1D_Parameter_Timeseries/'
+    luto_2D_inpath = 'N:/Data-Master/LUTO_2.0_input_data/Input_data/2D_Spatial_Snapshot/'
+    luto_3D_inpath = 'N:/Data-Master/LUTO_2.0_input_data/Input_data/3D_Spatial_Timeseries/'
+    luto_4D_inpath = 'N:/Data-Master/LUTO_2.0_input_data/Input_data/4D_Spatial_SSP_Timeseries/'
+    fdh_inpath = 'N:/LUF-Modelling/fdh-archive/data/neoluto-data/new-data-and-domain/'
+    profit_map_inpath = 'N:/Data-Master/Profit_map/'
+    nlum_inpath = 'N:/Data-Master/National_Landuse_Map/'
     
     # Set data output paths
     raw_data = RAW_DATA + '/' # '../raw_data/'
@@ -82,7 +82,8 @@ def create_new_dataset():
     shutil.copyfile(nlum_inpath + 'NLUM_2010-11_mask.tif', outpath + 'NLUM_2010-11_mask.tif')
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean.h5', outpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean.h5')
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean.h5', outpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean.h5')
-
+    
+    # Load delta demands file
     shutil.copyfile(luto_1D_inpath + 'd_c.npy', outpath + 'd_c.npy')
     
     
@@ -276,13 +277,9 @@ def create_new_dataset():
     x_dry.sort_index(axis = 'columns', inplace = True)
     x_irr.sort_index(axis = 'columns', inplace = True)
     
-    # Turn into Numpy arrays.
-    x_dry = x_dry.to_numpy()
-    x_irr = x_irr.to_numpy()
-    
     # Turn into 'boolean' arrays.
-    x_dry = np.where(np.isnan(x_dry), 0, 1)
-    x_irr = np.where(np.isnan(x_irr), 0, 1)
+    x_dry = np.where( np.isnan(x_dry.to_numpy()), 0, 1 )
+    x_irr = np.where( np.isnan(x_irr.to_numpy()), 0, 1 )
     
     # Get a list of cropping land-uses and return their indices in lexicographic land-use list.
     lu_crops = [ lu for lu in landuses if 'Beef' not in lu
@@ -357,7 +354,7 @@ def create_new_dataset():
     
     
     
-    ############### Calculate climate impacts 
+    ############### Calculate climate impacts   ***** ADD FACILITY TO TURN OFF CO2 FERTILIZATION???? *****
     
     # Distill list of RCP labels from dataset
     rcps = sorted(list({col[0] for col in cci_raw.columns})) # curly brackets remove duplicates

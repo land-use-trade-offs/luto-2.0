@@ -45,12 +45,12 @@ RAW_DATA = '../raw_data'
 # Parameters.                                                                  #
 # ---------------------------------------------------------------------------- #
 
-# 
-
-
 # Climate change assumptions. Options include '126', '245', '370', '585'
 SSP = '245' 
 RCP = 'rcp' + SSP[1] + 'p' + SSP[2]  # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
+
+# ***** TODO - ADD FACILITY TO TURN OFF CO2 FERTILIZATION in GAEZ climate impact on agricultural productivity *****
+# CO2_FERT_IMPACTS = 'ON'   # or 'OFF'
 
 # Economic parameters
 DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
@@ -60,8 +60,8 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 5             # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
-STYLE = 'snapshot'       # runs for target year only
-# STYLE = 'timeseries'   # runs each year from base year to target year
+MODE = 'snapshot'       # runs for target year only
+# MODE = 'timeseries'   # runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maximise revenue'

@@ -22,7 +22,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 
-def get_ccimpact(data, lu, lm, year):
+def get_ccimpact(data, lu, lm, yr_idx):
     """Return climate change impact multiplier at (zero-based) year index."""
     
     # Check if land-use exists in CLIMATE_CHANGE_IMPACT (e.g., dryland Pears/Rice do not occur), if not return ones
@@ -30,8 +30,8 @@ def get_ccimpact(data, lu, lm, year):
         cci = np.ones((data.NCELLS))
         
     else: # Calculate the quantities
-        # Convert year index to calendar year.
-        year += data.YR_CAL_BASE
+        # Convert year index to calendar year to match the climate impact data which is by calendar year.
+        yr_cal += data.YR_CAL_BASE
     
         # Interpolate climate change damage for lu, lm, and year for each cell using a linear function.
         xs = {t[2] for t in data.CLIMATE_CHANGE_IMPACT.columns}  # Returns set {2020, 2050, 2080}
@@ -43,7 +43,7 @@ def get_ccimpact(data, lu, lm, year):
         
         # Create linear function f and interpolate climate change impact
         f = interp1d(xs, yys, kind = 'linear', fill_value = 'extrapolate')
-        cci = f(year)
+        cci = f(yr_cal)
     
     # Return the interpolated values
     return cci
@@ -77,7 +77,7 @@ def get_yield_pot( data    # Data object or module.
                  , lvstype # Livestock type (one of 'BEEF', 'SHEEP' or 'DAIRY')
                  , vegtype # Vegetation type (one of 'natural land' or 'modified land')
                  , lm      # Land-management type.
-                 , year    # Number of years post 2010
+                 , yr_idx    # Number of years post 2010
                  ):
     """Return the yield potential (head/ha) for livestock by land cover type."""
 
@@ -110,7 +110,7 @@ def get_yield_pot( data    # Data object or module.
     # Apply climate change yield impact multiplier. Essentially changes the number of head per hectare by a multiplier i.e., 1.2 = a 20% increase.
     # lu = data.PR2LU_DICT[pr]
     lu = lvstype.capitalize() + ' - ' + vegtype  # Convert to 'lu' i.e., 'Beef - modified land'
-    # yield_pot *= get_ccimpact(data, lu, lm, year)
+    # yield_pot *= get_ccimpact(data, lu, lm, yr_idx)
     
     # Here we can add a productivity multiplier for sustainable intensification to increase pasture growth and yield potential (i.e., head/ha)
     # yield_pot *= yield_mult  ***Still to do***
@@ -118,17 +118,17 @@ def get_yield_pot( data    # Data object or module.
     return yield_pot
 
 
-def get_quantity_lvstk( data # Data object or module.
-                      , pr   # Livestock + product like 'SHEEP - MODIFIED LAND WOOL').
-                      , lm   # Land management.
-                      , year # Number of years post base-year ('YR_CAL_BASE').
+def get_quantity_lvstk( data   # Data object or module.
+                      , pr     # Livestock + product like 'SHEEP - MODIFIED LAND WOOL').
+                      , lm     # Land management.
+                      , yr_idx # Number of years post base-year ('YR_CAL_BASE').
                       ):
-    """Return livestock yield of `pr`+`lm` in `year` as 1D Numpy array...
+    """Return livestock yield of `pr`+`lm` in `yr_idx` as 1D Numpy array...
     
     `data`: data object/module -- assumes fields like in `luto.data`.
     `pr`: product (like 'wool from nveg grazing sheep').
     `lm`: land management (e.g. 'dry', 'irr', 'org').
-    `year`: number of years from base year, counting from zero.
+    `yr_idx`: number of years from base year, counting from zero.
     
     ...in the following units:
     
@@ -141,7 +141,7 @@ def get_quantity_lvstk( data # Data object or module.
     lvstype, vegtype = lvs_veg_types(pr)
 
     # Get the yield potential.
-    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, year)
+    yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
 
     # Determine base quantity case-by-case.
 
@@ -191,17 +191,17 @@ def get_quantity_lvstk( data # Data object or module.
     return quantity
 
 
-def get_quantity_crop( data # Data object or module.
-                     , pr   # Product -- equivalent to land use for crops.
-                     , lm   # Land management.
-                     , year # Number of years post base-year ('YR_CAL_BASE').
+def get_quantity_crop( data   # Data object or module.
+                     , pr     # Product -- equivalent to land use for crops.
+                     , lm     # Land management.
+                     , yr_idx # Number of years post base-year ('YR_CAL_BASE').
                      ):
-    """Return crop yield (tonne/cell) of `pr`+`lm` in `year` as 1D Numpy array.
+    """Return crop yield (tonne/cell) of `pr`+`lm` in `yr_idx` as 1D Numpy array.
 
     `data`: data object/module -- assumes fields like in `luto.data`.
     `pr`: product -- equivalent to land use for crops (e.g. 'winterCereals').
     `lm`: land management (e.g. 'dry', 'irr').
-    `year`: number of years from base year, counting from zero.
+    `yr_idx`: number of years from base year, counting from zero.
     """
     
     # Check if land-use exists in AGEC_CROPS (e.g., dryland Pears/Rice do not occur), if not return zeros
@@ -215,7 +215,7 @@ def get_quantity_crop( data # Data object or module.
         
         # Apply climate change yield impact multiplier.
         lu = pr
-        # quantity *= get_ccimpact(data, lu, lm, year)  # get_ccimpact takes land use (lu) as input but lu == pr for crops 
+        # quantity *= get_ccimpact(data, lu, lm, yr_idx)  # get_ccimpact takes land use (lu) as input but lu == pr for crops 
     
         # Convert to tonnes per cell including real_area and resfactor.
         quantity *= data.REAL_AREA 
@@ -223,46 +223,46 @@ def get_quantity_crop( data # Data object or module.
     return quantity
 
 
-def get_quantity( data # Data object or module.
-                , pr   # Product produced.
-                , lm   # Land management.
-                , year # Number of years post base-year ('YR_CAL_BASE').
+def get_quantity( data   # Data object or module.
+                , pr     # Product produced.
+                , lm     # Land management.
+                , yr_idx # Number of years post base-year ('YR_CAL_BASE').
                 ):
-    """Return yield in tonne/cell of `pr`+`lm` in `year` as 1D Numpy array.
+    """Return yield in tonne/cell of `pr`+`lm` in `yr_idx` as 1D Numpy array.
 
     `data`: data object/module -- assumes fields like in `luto.data`.
     `pr`: product (like 'winterCereals' or 'wool').
     `lm`: land management (e.g. 'dry', 'irr', 'org').
-    `year`: number of years from base year, counting from zero.
+    `yr_idx`: number of years from base year, counting from zero.
     """
     # If it is a crop, it is known how to get the quantities.
     if pr in data.PR_CROPS:
-        q = get_quantity_crop(data, pr.capitalize(), lm, year)
+        q = get_quantity_crop(data, pr.capitalize(), lm, yr_idx)
         
     # If it is livestock, it is known how to get the quantities.
     elif pr in data.PR_LVSTK:
-        q = get_quantity_lvstk(data, pr, lm, year)
+        q = get_quantity_lvstk(data, pr, lm, yr_idx)
         
     # If it is none of the above, it is not known how to get the quantities.
     else:
         raise KeyError("Land use '%s' not found in data." % pr)
 
     # Apply productivity increase multiplier by product. Essentially, this is a total factor productivity increase.
-    q *= data.BAU_PROD_INCR[lm, pr][year]
+    q *= data.BAU_PROD_INCR[lm, pr][yr_idx]
 
     return q
 
 
-def get_quantity_matrix(data, lm, year):
+def get_quantity_matrix(data, lm, yr_idx):
     """Return q_rp matrix of quantities per cell per pr as 2D Numpy array."""
     q_rp = np.zeros((data.NCELLS, len(data.PRODUCTS)))
     for j, pr in enumerate(data.PRODUCTS):
-        q_rp[:, j] = get_quantity(data, pr, lm, year)
+        q_rp[:, j] = get_quantity(data, pr, lm, yr_idx)
     # Make sure all NaNs are replaced by zeroes.
     return np.nan_to_num(q_rp)
 
 
-def get_quantity_matrices(data, year):
+def get_quantity_matrices(data, yr_idx):
     """Return q_mrp matrix of quantities per cell as 3D Numpy array."""
-    return np.stack(tuple( get_quantity_matrix(data, lm, year)
+    return np.stack(tuple( get_quantity_matrix(data, lm, yr_idx)
                            for lm in data.LANDMANS ))

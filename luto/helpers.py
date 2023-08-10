@@ -76,8 +76,8 @@ t_mrj, c_mrj, q_mrp, l_mrj = temp(2010, 2030, sim.d_c, 1000)
 
 #Check compare output maps
 import numpy as np
-new = np.load('N:/Planet-A/LUF-Modelling/LUTO2_BB/LUTO2/output/2022_11_20__09_23_06/lumap2030.npy')
-old = np.load('N:/Planet-A/LUF-Modelling/LUTO2_BB/LUTO2/output/2022_11_20__09_24_47/lumap2030.npy')
+new = np.load('N:/LUF-Modelling/LUTO2_BB/LUTO2/output/2022_11_20__09_23_06/lumap2030.npy')
+old = np.load('N:/LUF-Modelling/LUTO2_BB/LUTO2/output/2022_11_20__09_24_47/lumap2030.npy')
 ind = np.flatnonzero(old != new)
 ind.shape
 for row in ind:
@@ -89,7 +89,7 @@ for i, j in enumerate(sim.data.COMMODITIES):
     print(j, x[i])
 
 import pandas as pd
-raw_econ = pd.read_hdf('N:/Planet-A/Data-Master/Profit_map/cell_ag_data.h5')
+raw_econ = pd.read_hdf('N:/Data-Master/Profit_map/cell_ag_data.h5')
 raw_yield = raw_econ.groupby(['SPREAD_DESC'], observed = True, as_index = False).agg(CROPS_TONNES = ('CROPS_TONNES', 'sum'),
                                                                                      MEAT_EXCL_LEXP_TONNES = ('MEAT_EXCL_LEXP_TONNES', 'sum'),
                                                                                      MEAT_INCL_LEXP_TONNES = ('MEAT_INCL_LEXP_TONNES', 'sum'),
@@ -101,12 +101,12 @@ raw_yield = raw_econ.groupby(['SPREAD_DESC'], observed = True, as_index = False)
 
 
 
-dem_SSP2 = np.load('N:/Planet-A/LUF-Modelling/fdh-archive/data/neoluto-data/new-data-and-domain/demands-ssp2-2010-2100.npy')
+dem_SSP2 = np.load('N:/LUF-Modelling/fdh-archive/data/neoluto-data/new-data-and-domain/demands-ssp2-2010-2100.npy')
 
 
-agec_crops_fdh_neo = pd.read_hdf('N:/Planet-A/LUF-Modelling/fdh-archive/dev/neoluto/input/agec-crops-c9.hdf5')
+agec_crops_fdh_neo = pd.read_hdf('N:/LUF-Modelling/fdh-archive/dev/neoluto/input/agec-crops-c9.hdf5')
 
-agec_crops_fdh = pd.read_hdf('N:/Planet-A/LUF-Modelling/fdh-archive/data/neoluto-data/new-data-and-domain/agec-crops-c9.hdf5')
+agec_crops_fdh = pd.read_hdf('N:/LUF-Modelling/fdh-archive/data/neoluto-data/new-data-and-domain/agec-crops-c9.hdf5')
 
 agec_crops_fdh_neo.equals(agec_crops_fdh)
 
