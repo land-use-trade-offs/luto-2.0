@@ -26,7 +26,7 @@ from luto.economics.quantity import get_yield_pot, lvs_veg_types, get_quantity
 def get_cost_crop( data # Data object or module.
                  , lu   # Land use.
                  , lm   # Land management.
-                 , year # Number of years post base-year ('annum').
+                 , year # Number of years post base-year ('YR_CAL_BASE').
                  ):
     """Return crop prod. cost [AUD/cell] of `lu`+`lm` in `year` as np array.
 
@@ -79,7 +79,7 @@ def get_cost_crop( data # Data object or module.
 def get_cost_lvstk( data # Data object or module.
                   , lu   # Land use.
                   , lm   # Land management.
-                  , year # Number of years post base-year ('annum').
+                  , year # Number of years post base-year ('YR_CAL_BASE').
                   ):
     """Return lvstk prod. cost [AUD/cell] of `lu`+`lm` in `year` as np array.
 
@@ -130,7 +130,7 @@ def get_cost_lvstk( data # Data object or module.
 def get_cost( data # Data object or module.
             , lu   # Land use.
             , lm   # Land management.
-            , year # Number of years post base-year ('annum').
+            , year # Number of years post base-year ('YR_CAL_BASE').
             ):
     """Return production cost [AUD/cell] of `lu`+`lm` in `year` as np array.
 

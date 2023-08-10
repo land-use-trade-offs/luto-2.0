@@ -53,7 +53,7 @@ def get_production(sim, year):
     X_irr = sim.dvars[year][1].T
 
     # Get the quantity matrices. Quantity array of shape m, r, p
-    q_mrp = get_quantity_matrices(sim.data, year - sim.data.ANNUM)
+    q_mrp = get_quantity_matrices(sim.data, year - sim.data.YR_CAL_BASE)
 
     X_dry_pr = [ X_dry[j] for p in range(nprs) for j in range(nlus)
                     if lu2pr_pj[p, j] ]

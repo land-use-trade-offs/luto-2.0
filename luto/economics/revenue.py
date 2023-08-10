@@ -25,7 +25,7 @@ from luto.economics.quantity import get_yield_pot, lvs_veg_types, get_quantity
 def get_rev_crop( data # Data object or module.
                 , lu   # Land use.
                 , lm   # Land management.
-                , year # Number of years post base-year ('annum').
+                , year # Number of years post base-year ('YR_CAL_BASE').
                 ):
     """Return crop profit [AUD/cell] of `lu`+`lm` in `year` as np array.
 
@@ -53,7 +53,7 @@ def get_rev_crop( data # Data object or module.
 def get_rev_lvstk( data # Data object or module.
                  , lu   # Land use.
                  , lm   # Land management.
-                 , year # Number of years post base-year ('annum').
+                 , year # Number of years post base-year ('YR_CAL_BASE').
                  ):
     """Return livestock revenue [AUD/cell] of `lu`+`lm` in `year` as np array.
 
@@ -115,7 +115,7 @@ def get_rev_lvstk( data # Data object or module.
 def get_rev( data # Data object or module.
             , lu   # Land use.
             , lm   # Land management.
-            , year # Number of years post base-year ('annum').
+            , year # Number of years post base-year ('YR_CAL_BASE').
             ):
     """Return revenue from production [AUD/cell] of `lu`+`lm` in `year` as np array.
 

@@ -51,7 +51,7 @@ def get_exclude_matrices(data, lumap):
         Data object or module with fields like in `luto.data`.
     lumap : numpy.ndarray
         Present land-use map, i.e. highpos (shape=ncells, dtype=int).
-
+        
     Returns
     -------
 
@@ -62,14 +62,14 @@ def get_exclude_matrices(data, lumap):
     """    
     # Boolean exclusion matrix based on SA2/NLUM agricultural land-use data (in mrj structure).
     # Effectively, this ensures that in any SA2 region the only combinations of land-use and land management
-    # that can occur in the future are those that occur in 2010 (i.e., base_year)
+    # that can occur in the future are those that occur in 2010 (i.e., YR_CAL_BASE)
     x_mrj = data.EXCLUDE
 
     # Raw transition-cost matrix is in $/ha and lexicographically ordered by land-use (shape = 28 x 28).
     t_ij = data.TMATRIX
     
     # Transition costs from current land-use to all other land-uses j using current land-use map (in $/ha).
-    t_rj = t_ij[lumap]
+    t_rj = t_ij[data.LUMAP]
 
     # To be excluded based on disallowed switches as specified in transition cost matrix i.e., where t_rj is NaN.
     t_rj = np.where(np.isnan(t_rj), 0, 1)

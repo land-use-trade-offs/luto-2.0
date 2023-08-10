@@ -42,7 +42,7 @@ class Data():
 
     def __init__( self
                 , bdata # Data object like `luto.data`.
-                , year # Year (zero-based). To slice HDF5 bricks.
+                , year # Year index (number of years since 2010). To slice HDF5 bricks.
                 ):
         """Initialise Data object based on land-use map `lumap`."""
 
@@ -86,10 +86,9 @@ class Data():
 
 
 def sync_years(base, target):
-    global data, base_year, target_year, target_index
+    global data, base_year, target_index
     base_year = base
-    target_year = target
-    target_index = target - bdata.ANNUM
+    target_index = target - bdata.YR_CAL_BASE
     data = Data(bdata, target_index)
 
 
@@ -176,12 +175,12 @@ def step( base    # Base year from which the data is taken.
 
     # Synchronise base and target years across module so matrix-getters know.
     sync_years(base, target)
-    
+
     # Add initial masked/resfactored data to data containers
-    if base == data.ANNUM: 
-        lumaps[data.ANNUM] = data.LUMAP
-        lmmaps[data.ANNUM] = data.LMMAP
-        dvars[data.ANNUM]  = data.L_MRJ
+    if base == data.YR_CAL_BASE: 
+        lumaps[base] = data.LUMAP
+        lmmaps[base] = data.LMMAP
+        dvars[base]  = data.L_MRJ
         
     # Magic.
     lumaps[target], lmmaps[target], dvars[target] = solve( get_t_mrj()
@@ -205,11 +204,8 @@ def run( base
     
     # The number of times the solver is to be called.
     steps = target - base
-
-    # # Get the resfactor mask for spatial coarse-graining.
-    # get_resfactor_mask(settings.RESFACTOR)
-
-    # Run the simulation up to `year` sequentially.
+    
+    # Run the simulation up to `year` sequentially.         *** Not sure that this is working ***
     if settings.STYLE == 'timeseries':
         if len(demands.shape) != 2:
             raise ValueError( "Demands need to be a time series array of "
@@ -222,15 +218,15 @@ def run( base
                 print( "\n-------------------------------------------------" )
                 print( "Running for year %s..." % (base + s + 1) )
                 print( "-------------------------------------------------\n" )
-                step(base + s, base + s + 1 , demands[s])
+                step(base + s, base + s + 1 , demands[s], x_mrj)
                 
                 # Need to fix how the 'base' land-use map is updated in timeseries runs
                 
-    # Run the simulation from ANNUM to `target` year directly.
+    # Run the simulation from YR_CAL_BASE to `target` year directly.
     elif settings.STYLE == 'snapshot':
         # If demands is a time series, choose the appropriate entry.
         if len(demands.shape) == 2:
-            demands = demands[target - bdata.ANNUM ] # - 1]                        ### Demands needs to be a timeseries from 2010 to target year                   # ******************* check the -1 is correct indexing
+            demands = demands[target - bdata.YR_CAL_BASE ]       # Demands needs to be a timeseries from 2010 to target year                   # ******************* check the -1 is correct indexing
         print( "\nRunning LUTO %s snapshot for %s at resfactor %s, starting at %s" % (settings.VERSION, target, settings.RESFACTOR, time.ctime()) )
         print( "\n-------------------------------------------------" )
         print( "Running for year %s..." % target )

@@ -165,7 +165,7 @@ LUMAP = pd.read_hdf(os.path.join(INPUT_DIR, 'lumap.h5')).to_numpy()
 LMMAP = pd.read_hdf(os.path.join(INPUT_DIR, 'lmmap.h5')).to_numpy()
 
 # The base year, i.e. where year == 0.
-ANNUM = 2010
+YR_CAL_BASE = 2010
 
 
 ###############################################################

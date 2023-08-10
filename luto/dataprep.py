@@ -342,10 +342,17 @@ def create_new_dataset():
     
     
     
-    ############### Carbon sequestration by trees data
+    ############### Forest and reforestation data
     
-    # Get carbon stock in natural land and save to file
+    # Carbon stock in mature forest on natural land and save to file
     bioph['REMNANT_VEG_T_CO2_HA'].to_hdf(outpath + 'natural_land_t_co2_ha.h5', key = 'natural_land_t_co2_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    
+    # Average annual carbon sequestration by Environmental Plantings (block plantings) and save to file
+    ep_CO2 = bioph.eval('EP_BLOCK_TREES_AVG_T_CO2_HA_YR + EP_BLOCK_DEBRIS_AVG_T_CO2_HA_YR + EP_BLOCK_SOIL_AVG_T_CO2_HA_YR')
+    ep_CO2.to_hdf(outpath + 'EP_BLOCK_AVG_T_CO2_HA_YR.h5', key = 'EP_BLOCK_AVG_T_CO2_HA_YR', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    
+    # Average establishment costs for Environmental PLantings ($/ha) and save to file
+    bioph['EP_EST_COST_$_HA'].to_hdf(outpath + 'EP_EST_COST_$_HA.h5', key = 'EP_EST_COST_$_HA', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
     
     

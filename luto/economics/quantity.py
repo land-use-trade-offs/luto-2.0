@@ -31,7 +31,7 @@ def get_ccimpact(data, lu, lm, year):
         
     else: # Calculate the quantities
         # Convert year index to calendar year.
-        year += data.ANNUM
+        year += data.YR_CAL_BASE
     
         # Interpolate climate change damage for lu, lm, and year for each cell using a linear function.
         xs = {t[2] for t in data.CLIMATE_CHANGE_IMPACT.columns}  # Returns set {2020, 2050, 2080}
@@ -121,7 +121,7 @@ def get_yield_pot( data    # Data object or module.
 def get_quantity_lvstk( data # Data object or module.
                       , pr   # Livestock + product like 'SHEEP - MODIFIED LAND WOOL').
                       , lm   # Land management.
-                      , year # Number of years post base-year ('annum').
+                      , year # Number of years post base-year ('YR_CAL_BASE').
                       ):
     """Return livestock yield of `pr`+`lm` in `year` as 1D Numpy array...
     
@@ -194,7 +194,7 @@ def get_quantity_lvstk( data # Data object or module.
 def get_quantity_crop( data # Data object or module.
                      , pr   # Product -- equivalent to land use for crops.
                      , lm   # Land management.
-                     , year # Number of years post base-year ('annum').
+                     , year # Number of years post base-year ('YR_CAL_BASE').
                      ):
     """Return crop yield (tonne/cell) of `pr`+`lm` in `year` as 1D Numpy array.
 
@@ -226,7 +226,7 @@ def get_quantity_crop( data # Data object or module.
 def get_quantity( data # Data object or module.
                 , pr   # Product produced.
                 , lm   # Land management.
-                , year # Number of years post base-year ('annum').
+                , year # Number of years post base-year ('YR_CAL_BASE').
                 ):
     """Return yield in tonne/cell of `pr`+`lm` in `year` as 1D Numpy array.
 

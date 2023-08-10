@@ -89,7 +89,7 @@ def get_wuse_limits( data ):
     
 
 # def get_wyld_matrix( data # Data object or module.
-#                     , year = None # Number of years post base-year ('annum').
+#                     , year = None # Number of years post base-year ('YR_CAL_BASE').
 #                     ):
 #     """Return an rj matrix of the water yields, per cell, by land use."""
 

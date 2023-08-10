@@ -39,9 +39,14 @@ OUTPUT_DIR = 'output'
 DATA_DIR = 'input'
 RAW_DATA = '../raw_data'
 
+
+
 # ---------------------------------------------------------------------------- #
 # Parameters.                                                                  #
 # ---------------------------------------------------------------------------- #
+
+# 
+
 
 # Climate change assumptions. Options include '126', '245', '370', '585'
 SSP = '245' 
@@ -63,8 +68,6 @@ OBJECTIVE = 'maximise revenue'
 # OBJECTIVE = 'minimise cost'
 
 
-# Penalty in objective function
-PENALTY = 1e9
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
@@ -83,6 +86,9 @@ SOLVE_METHOD = -1
    'deterministic concurrent':         4
    'deterministic concurrent simplex': 5 """
 
+# Penalty in objective function
+PENALTY = 1e9
+
 # Print detailed output to screen
 VERBOSE = 1
 
@@ -93,7 +99,10 @@ OPTIMALITY_TOLERANCE = 1e-2
    Minimum value:	1e-9
    Maximum value:	1e-2"""
 
+# Number of threads to use in parallel algorithms (e.g., barrier)
 THREADS = 100
+
+
 
 # ---------------------------------------------------------------------------- #
 # Environmental parameters

@@ -42,13 +42,13 @@ def get_path():
     return path
 
 
-def write_outputs(sim, year_cal, d_c, path):
+def write_outputs(sim, yr_cal, d_c, path):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     
     # write_files(sim, path)
-    write_production(sim, year_cal, d_c, path)
-    write_water(sim, year_cal, path)
-    write_ghg(sim, year_cal, path)
+    write_production(sim, yr_cal, d_c, path)
+    write_water(sim, yr_cal, path)
+    write_ghg(sim, yr_cal, path)
 
 
 def write_files(sim, path):
@@ -56,36 +56,36 @@ def write_files(sim, path):
     
     print('\nWriting numpy arrays and geotiff outputs to', path)
     
-    for year_cal in sim.lumaps:
+    for yr_cal in sim.lumaps:
         
         # Save raw decision variables (boolean array).
-        X_mrj_fname = 'X_mrj_' + str(year_cal) + '.npy'
-        np.save(os.path.join(path, X_mrj_fname), sim.dvars[year_cal])
+        X_mrj_fname = 'X_mrj_' + str(yr_cal) + '.npy'
+        np.save(os.path.join(path, X_mrj_fname), sim.dvars[yr_cal])
         
         # Write out raw numpy arrays for land-use and land management
-        lumap_fname = 'lumap_' + str(year_cal) + '.npy'
-        lmmap_fname = 'lmmap_' + str(year_cal) + '.npy'
-        np.save(os.path.join(path, lumap_fname), sim.lumaps[year_cal])
-        np.save(os.path.join(path, lmmap_fname), sim.lmmaps[year_cal])
+        lumap_fname = 'lumap_' + str(yr_cal) + '.npy'
+        lmmap_fname = 'lmmap_' + str(yr_cal) + '.npy'
+        np.save(os.path.join(path, lumap_fname), sim.lumaps[yr_cal])
+        np.save(os.path.join(path, lmmap_fname), sim.lmmaps[yr_cal])
 
         # Recreate full resolution 2D arrays and write out GeoTiffs for land-use and land management
-        lumap, lmmap = recreate_2D_maps(sim, year_cal)
+        lumap, lmmap = recreate_2D_maps(sim, yr_cal)
         
-        lumap_fname = 'lumap_' + str(year_cal) + '.tiff'
-        lmmap_fname = 'lmmap_' + str(year_cal) + '.tiff'
+        lumap_fname = 'lumap_' + str(yr_cal) + '.tiff'
+        lmmap_fname = 'lmmap_' + str(yr_cal) + '.tiff'
         write_gtiff(lumap, os.path.join(path, lumap_fname))
         write_gtiff(lmmap, os.path.join(path, lmmap_fname))
 
 
-def write_production(sim, year_cal, d_c, path):
+def write_production(sim, yr_cal, d_c, path):
     """Write out land-use and production data"""
 
     print('\nWriting production outputs to', path)
     
     # Calculate data for quantity comparison between base year and target year
-    prod_base = get_production(sim, sim.data.ANNUM)    # Get commodity quantities produced in 2010 
-    prod_targ = get_production(sim, year_cal)          # Get commodity quantities produced in target year
-    demands = d_c[year_cal - sim.data.ANNUM]           # Get commodity demands for target year
+    prod_base = get_production(sim, sim.data.YR_CAL_BASE)    # Get commodity quantities produced in 2010 
+    prod_targ = get_production(sim, yr_cal)          # Get commodity quantities produced in target year
+    demands = d_c[yr_cal - sim.data.YR_CAL_BASE]           # Get commodity demands for target year
     abs_diff = prod_targ - demands                     # Diff between target year production and demands in absolute terms (i.e. tonnes etc)
     prop_diff = ( prod_targ / demands ) * 100                    # Target year production as a proportion of demands (%)
     
@@ -100,11 +100,11 @@ def write_production(sim, year_cal, d_c, path):
     df.to_csv(os.path.join(path, 'quantity_comparison.csv'), index = False)
 
     # LUS = ['Non-agricultural land'] + sim.data.LANDUSES
-    ctlu, swlu = crossmap(sim.lumaps[sim.data.ANNUM], sim.lumaps[year_cal], sim.data.LANDUSES)
-    ctlm, swlm = crossmap(sim.lmmaps[sim.data.ANNUM], sim.lmmaps[year_cal])
+    ctlu, swlu = crossmap(sim.lumaps[sim.data.YR_CAL_BASE], sim.lumaps[yr_cal], sim.data.LANDUSES)
+    ctlm, swlm = crossmap(sim.lmmaps[sim.data.YR_CAL_BASE], sim.lmmaps[yr_cal])
 
-    cthp, swhp = crossmap_irrstat( sim.lumaps[sim.data.ANNUM], sim.lmmaps[sim.data.ANNUM]
-                                 , sim.lumaps[year_cal], sim.lmmaps[year_cal]
+    cthp, swhp = crossmap_irrstat( sim.lumaps[sim.data.YR_CAL_BASE], sim.lmmaps[sim.data.YR_CAL_BASE]
+                                 , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
                                  , sim.data.LANDUSES )
 
     ctlu.to_csv(os.path.join(path, 'crosstab-lumap.csv'))
@@ -117,17 +117,17 @@ def write_production(sim, year_cal, d_c, path):
     swhp.to_csv(os.path.join(path, 'switches-irrstat.csv'))
 
 
-def write_water(sim, year_cal, path):
+def write_water(sim, yr_cal, path):
     """Calculate water use totals. Takes a simulation object, a numeric
        target calendar year (e.g., 2030), and an output path as input."""
 
     print('\nWriting water outputs to', path)
     
     # Convert calendar year to year index.
-    year_idx = year_cal - sim.data.ANNUM
+    yr_idx = yr_cal - sim.data.YR_CAL_BASE
     
     # Get water use for year in mrj format
-    w_mrj = get_wreq_matrices(sim.data, year_idx) 
+    w_mrj = get_wreq_matrices(sim.data, yr_idx) 
 
     # Prepare a data frame.
     df = pd.DataFrame( columns=[ 'REGION_ID'
@@ -161,7 +161,7 @@ def write_water(sim, year_cal, path):
         
         # Calculate water requirements by agriculture for year and region.
         wreq_reg = (          w_mrj[:, ind, :] * 
-                    sim.dvars[year_cal][:, ind, :]
+                    sim.dvars[yr_cal][:, ind, :]
                    ).sum()
         
         # Calculate water use limits
@@ -188,17 +188,17 @@ def write_water(sim, year_cal, path):
              , float_format = '{:0,.2f}'.format)
     
 
-def write_ghg(sim, year_cal, path):
+def write_ghg(sim, yr_cal, path):
     """Calculate total GHG emissions. Takes a simulation object, a target calendar 
        year (e.g., 2030), and an output path as input."""
 
     print('\nWriting GHG outputs to', path)
         
     # Convert calendar year to year index.
-    year_idx = year_cal - sim.data.ANNUM
+    yr_idx = yr_cal - sim.data.YR_CAL_BASE
 
     # Get greenhouse gas emissions in mrj format
-    g_mrj = get_ghg_matrices(sim.data, year_idx) 
+    g_mrj = get_ghg_matrices(sim.data, yr_idx) 
 
     # Prepare a data frame.
     df = pd.DataFrame( columns=[ 'GHG_EMISSIONS_LIMIT_TCO2e'
@@ -208,7 +208,7 @@ def write_ghg(sim, year_cal, path):
     ghg_limits = get_ghg_limits(sim.data)
 
     # Calculate the GHG emissions from agriculture for year.
-    ghg_emissions = ( g_mrj * sim.dvars[year_cal] ).sum()
+    ghg_emissions = ( g_mrj * sim.dvars[yr_cal] ).sum()
     
     # Add to dataframe
     df.loc[0] = ("{:,.0f}".format(ghg_limits), "{:,.0f}".format(ghg_emissions))

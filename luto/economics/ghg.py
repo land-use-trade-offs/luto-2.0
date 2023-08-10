@@ -26,7 +26,7 @@ from luto.tools import lumap2l_mrj
 def get_ghg_crop( data     # Data object or module.
                 , lu       # Land use.
                 , lm       # Land management.
-                , year_idx # Number of years post base-year ('annum').
+                , year_idx # Number of years post base-year ('YR_CAL_BASE').
                 ):
     """Return crop GHG emissions [tCO2e/cell] of `lu`+`lm` in `year` as np array.
 
@@ -69,7 +69,7 @@ def get_ghg_crop( data     # Data object or module.
 def get_ghg_lvstk( data     # Data object or module.
                  , lu       # Land use.
                  , lm       # Land management.
-                 , year_idx # Number of years post base-year ('annum').
+                 , year_idx # Number of years post base-year ('YR_CAL_BASE').
                  ):
     """Return livestock GHG emissions [tCO2e/cell] of `lu`+`lm` in `year_idx` as np array.
 
@@ -120,7 +120,7 @@ def get_ghg_lvstk( data     # Data object or module.
 def get_ghg( data # Data object or module.
            , lu   # Land use.
            , lm   # Land management.
-           , year_idx # Number of years post base-year ('annum').
+           , year_idx # Number of years post base-year ('YR_CAL_BASE').
            ):
     """Return GHG emissions [tCO2e/cell] of `lu`+`lm` in `year_idx` as np array.
 
