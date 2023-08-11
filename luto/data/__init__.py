@@ -24,6 +24,13 @@ import h5py
 
 from luto.settings import INPUT_DIR, OUTPUT_DIR, SSP, RCP, RESFACTOR
 from luto.economics.quantity import lvs_veg_types
+from luto.tools import lumap2l_mrj, get_production
+
+
+
+###############################################################
+# Agricultural economic data.                                                 
+###############################################################
 
 # Load the agro-economic data (constructed using dataprep.py).
 AGEC_CROPS = pd.read_hdf( os.path.join(INPUT_DIR, 'agec_crops.h5') )
@@ -33,17 +40,23 @@ AGEC_LVSTK = pd.read_hdf( os.path.join(INPUT_DIR, 'agec_lvstk.h5') )
 AGGHG_CROPS = pd.read_hdf( os.path.join(INPUT_DIR, 'agGHG_crops.h5') )
 AGGHG_LVSTK = pd.read_hdf( os.path.join(INPUT_DIR, 'agGHG_lvstk.h5') )
 
+
+
+###############################################################
+# Miscellaneous parameters.                                                 
+###############################################################
+
 # Derive NCELLS (number of spatial cells) from AGEC.
 NCELLS, = AGEC_CROPS.index.shape
-
-
-# Load demand deltas
-DEMAND_DELTAS_C = np.load(os.path.join(INPUT_DIR, 'demand_deltas_c.npy') )
 
 # The base year, i.e. where year index yr_idx == 0.
 YR_CAL_BASE = 2010
 
 
+
+###############################################################
+# Set up lists of land-uses, commodities etc. 
+###############################################################
 
 # Read in lexicographically ordered list of land-uses.
 LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'landuses.csv')), header = None)[0].to_list()
@@ -54,8 +67,6 @@ NLUS = len(LANDUSES)
 # Construct land-use index dictionary (distinct from LU_IDs!)
 LU2DESC = {i: lu for i, lu in enumerate(LANDUSES)}
 LU2DESC[-1] = 'Non-agricultural land'
-
-
 
 # Some useful sub-sets of the land uses.
 LU_CROPS = [ lu for lu in LANDUSES if 'Beef' not in lu
@@ -94,7 +105,6 @@ PRODUCTS.sort() # Ensure lexicographic order.
 NPRS = len(PRODUCTS)
 
 
-
 # Some land-uses map to multiple products -- a dict and matrix to capture this.
 # Crops land-uses and crop products are one-one. Livestock is more complicated.
 LU2PR_DICT = {key: [key.upper()] if key in LU_CROPS else [] for key in LANDUSES}
@@ -121,7 +131,6 @@ def dict2matrix(d, fromlist, tolist):
 LU2PR = dict2matrix(LU2PR_DICT, LANDUSES, PRODUCTS)
 
 
-
 # List of commodities. Everything lower case to avoid mistakes.
 # Basically collapse 'NATURAL LAND' and 'MODIFIED LAND' products and remove duplicates.
 COMMODITIES = { ( s.replace(' - NATURAL LAND', '')
@@ -134,7 +143,6 @@ CM_CROPS = [s for s in COMMODITIES if s in [k.lower() for k in LU_CROPS]]
 
 # Get number of commodities
 NCMS = len(COMMODITIES)
-
 
 
 # Some commodities map to multiple products -- dict and matrix to capture this.
@@ -159,6 +167,10 @@ for key, value in CM2PR_DICT.items():
 PR2CM = dict2matrix(CM2PR_DICT, COMMODITIES, PRODUCTS).T # Note the transpose.
 
 
+
+###############################################################
+# Spatial layers. 
+###############################################################
 
 # NLUM mask.
 with rasterio.open( os.path.join(INPUT_DIR, 'NLUM_2010-11_mask.tif') ) as rst:
@@ -206,7 +218,8 @@ else:
 
 # Create a mask indices array for subsetting arrays
 MINDICES = np.where(MASK)[0].astype(np.int32)
-        
+
+
         
 ###############################################################
 # Water data.                                                 
@@ -262,8 +275,8 @@ water_yield_base = pd.read_hdf(os.path.join( INPUT_DIR, 'water_yield_baselines.h
 WATER_YIELD_BASE_DR = water_yield_base['WATER_YIELD_HIST_DR_ML_HA'].to_numpy()
 WATER_YIELD_BASE_SR = water_yield_base['WATER_YIELD_HIST_SR_ML_HA'].to_numpy()
 
-fname_dr = os.path.join(INPUT_DIR, 'Water_yield_GCM-Ensemble_ssp' + SSP + '_2010-2100_DR_ML_HA_mean.h5')
-fname_sr = os.path.join(INPUT_DIR, 'Water_yield_GCM-Ensemble_ssp' + SSP + '_2010-2100_SR_ML_HA_mean.h5')
+fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + SSP + '_2010-2100_dr_ml_ha.h5')
+fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + SSP + '_2010-2100_sr_ml_ha.h5')
 
 # wy_dr_file = h5py.File(fname_dr, 'r')
 # wy_sr_file = h5py.File(fname_sr, 'r')
@@ -274,26 +287,26 @@ fname_sr = os.path.join(INPUT_DIR, 'Water_yield_GCM-Ensemble_ssp' + SSP + '_2010
 
 
 
-# ---------------------------------------------------------------------------- #
-# Carbon sequestration by trees data.                                          #
-# ---------------------------------------------------------------------------- #
+###############################################################
+# Carbon sequestration by trees data.
+###############################################################
 
 # Load the carbon data.
 REMNANT_VEG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'natural_land_t_co2_ha.h5') )
 
 
 
-# ---------------------------------------------------------------------------- #
-# Climate change impact data.                                                  #
-# ---------------------------------------------------------------------------- #
+###############################################################
+# Climate change impact data.
+###############################################################
 
 CLIMATE_CHANGE_IMPACT = pd.read_hdf(os.path.join(INPUT_DIR, 'climate_change_impacts_' + RCP + '.h5'))
 
 
 
-# ----------------------- #
-# Livestock related data. #
-# ----------------------- #
+###############################################################
+# Livestock related data.
+###############################################################
 
 FEED_REQ = np.nan_to_num( pd.read_hdf(os.path.join(INPUT_DIR, 'feed_req.h5')).to_numpy() )
 PASTURE_KG_DM_HA = pd.read_hdf(os.path.join(INPUT_DIR, 'pasture_kg_dm_ha.h5')).to_numpy()
@@ -302,9 +315,9 @@ SAFE_PUR_MODL = pd.read_hdf(os.path.join(INPUT_DIR, 'safe_pur_modl.h5')).to_nump
 
 
 
-# ---------------------------------- #
-# Temporal and spatio-temporal data. #
-# ---------------------------------- #
+###############################################################
+# Productivity data.
+###############################################################
 
 # Yield increases.
 fpath = os.path.join(INPUT_DIR, "yieldincreases_bau2022.csv")
@@ -312,9 +325,18 @@ BAU_PROD_INCR = pd.read_csv(fpath, header = [0,1]).astype(np.float32)
 
 
 
-# --------------- #
-# All other data. #
-# --------------- #
+###############################################################
+# Demand data.
+###############################################################
+
+# Load demand deltas (multipliers on 2010 production by commodity)
+DEMAND_DELTAS_C = np.load(os.path.join(INPUT_DIR, 'demand_deltas_c.npy') )
+
+
+
+###############################################################
+# Other data.
+###############################################################
 
 # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
 TMATRIX = np.load(os.path.join(INPUT_DIR, 'tmatrix.npy'))

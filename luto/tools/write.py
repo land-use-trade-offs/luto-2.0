@@ -86,10 +86,9 @@ def write_production(sim, yr_cal, path):
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
     
     # Calculate data for quantity comparison between base year and target year
-    prod_base = get_production(sim.data, sim.data.YR_CAL_BASE, sim.data.L_MRJ)  # Get commodity quantities produced in 2010 
+    prod_base = sim.data.PROD_2010_C # get_production(sim.data, sim.data.YR_CAL_BASE, sim.data.L_MRJ)  # Get commodity quantities produced in 2010 
     prod_targ = get_production(sim.data, yr_cal, sim.dvars[yr_cal])                # Get commodity quantities produced in target year
-    d_c = sim.data.DEMAND_DELTAS_C * prod_base
-    demands = d_c[yr_idx]                                  # Get commodity demands for target year
+    demands = sim.data.D_CY[yr_idx]                                  # Get commodity demands for target year
     abs_diff = prod_targ - demands                         # Diff between target year production and demands in absolute terms (i.e. tonnes etc)
     prop_diff = ( prod_targ / demands ) * 100              # Target year production as a proportion of demands (%)
     

@@ -41,8 +41,8 @@ class Data():
     """Provide simple object to mimic 'data' namespace from `luto.data`."""
 
     def __init__( self
-                , bdata # Data object like `luto.data`.
-                , year # Year index (number of years since 2010). To slice HDF5 bricks.
+                , bdata  # Data object like `luto.data`.
+                , yr_idx # Year index (number of years since 2010). To slice HDF5 bricks.
                 ):
         """Initialise Data object based on land-use map `lumap`."""
 
@@ -62,6 +62,8 @@ class Data():
         self.LUMAP = bdata.LUMAP[self.MASK]                                     # Int8
         self.LMMAP = bdata.LMMAP[self.MASK]                                     # Int8
         self.L_MRJ = lumap2l_mrj(self.LUMAP, self.LMMAP)                        # Boolean [2, 4218733, 28]
+        self.PROD_2010_C = prod_2010_c                                          # Float, total agricultural production in 2010, shape n commodities
+        self.D_CY = d_cy                                                        # Float, total demand for agricultural production, shape n commodities by 91 years
         self.WREQ_IRR_RJ = bdata.WREQ_IRR_RJ[self.MASK]                         # Water requirements for irrigated landuses
         self.WREQ_DRY_RJ = bdata.WREQ_DRY_RJ[self.MASK]                         # Water requirements for dryland landuses
         self.WATER_LICENCE_PRICE = bdata.WATER_LICENCE_PRICE[self.MASK]         # Int16
@@ -77,12 +79,10 @@ class Data():
         self.CLIMATE_CHANGE_IMPACT = bdata.CLIMATE_CHANGE_IMPACT[self.MASK]
 
         # Slice this year off HDF5 bricks. TODO: This field is not in luto.data.
-        # self.WATER_YIELD_NUNC_DR = bdata.WATER_YIELDS_DR[year][self.mindices]
-        # self.WATER_YIELD_NUNC_SR = bdata.WATER_YIELDS_SR[year][self.mindices]
         with h5py.File(bdata.fname_dr, 'r') as wy_dr_file:
-            self.WATER_YIELD_NUNC_DR = wy_dr_file[list(wy_dr_file.keys())[0]][year][self.MASK]
+            self.WATER_YIELD_DR = wy_dr_file[list(wy_dr_file.keys())[0]][yr_idx][self.MASK]
         with h5py.File(bdata.fname_sr, 'r') as wy_sr_file:
-            self.WATER_YIELD_NUNC_SR = wy_sr_file[list(wy_sr_file.keys())[0]][year][self.MASK]
+            self.WATER_YIELD_SR = wy_sr_file[list(wy_sr_file.keys())[0]][yr_idx][self.MASK]
 
 
 def sync_years(base, target):
@@ -190,7 +190,7 @@ def step( base    # Base year from which the data is taken.
                                                          , get_w_mrj()
                                                          , get_x_mrj()
                                                          , get_q_mrp()
-                                                         , d_c
+                                                         , d_c         
                                                          , data.LU2PR
                                                          , data.PR2CM
                                                          , get_limits()
@@ -201,17 +201,14 @@ def run( base
        ):
     """Run the simulation."""
     
-    # Get the total demand quantities by commodity by combining the demand deltas with 2010 production
-    d_c = bdata.DEMAND_DELTAS_C * get_production(bdata, bdata.YR_CAL_BASE, lumap2l_mrj(bdata.LUMAP, bdata.LMMAP))
-    
     # The number of times the solver is to be called.
     steps = target - base
     
     # Run the simulation up to `year` sequentially.         *** Not sure that timeseries mode is working ***
     if settings.MODE == 'timeseries':
-        if len(d_c.shape) != 2:
+        if len(d_cy.shape) != 2:
             raise ValueError( "Demands need to be a time series array of shape (years, commodities) and years > 0." )
-        elif target - base > d_c.shape[0]:
+        elif target - base > d_cy.shape[0]:
             raise ValueError( "Not enough years in demands time series.")
         else:
             print( "\nRunning LUTO %s timeseries from %s to %s at resfactor %s, starting at %s." % (settings.VERSION, base, target, settings.RESFACTOR, time.ctime()) )
@@ -219,15 +216,18 @@ def run( base
                 print( "\n-------------------------------------------------" )
                 print( "Running for year %s..." % (base + s + 1) )
                 print( "-------------------------------------------------\n" )
-                step(base + s, base + s + 1, d_c[s])
+                d_c = d_cy[s]
+                step(base + s, base + s + 1, d_c)
                 
                 # Need to fix how the 'base' land-use map is updated in timeseries runs
                 
     # Run the simulation from YR_CAL_BASE to `target` year directly.
     elif settings.MODE == 'snapshot':
         # If demands is a time series, choose the appropriate entry.
-        if len(d_c.shape) == 2:
-            d_c = d_c[ target - bdata.YR_CAL_BASE ]       # Demands needs to be a timeseries from 2010 to target year                   # ******************* check the -1 is correct indexing
+        if len(d_cy.shape) == 2:
+            d_c = d_cy[ target - bdata.YR_CAL_BASE ]       # Demands needs to be a timeseries from 2010 to target year
+        else:
+            d_c = d_cy
         print( "\nRunning LUTO %s snapshot for %s at resfactor %s, starting at %s" % (settings.VERSION, target, settings.RESFACTOR, time.ctime()) )
         print( "\n-------------------------------------------------" )
         print( "Running for year %s..." % target )
@@ -248,3 +248,8 @@ lumaps = {}
 lmmaps = {}
 dvars = {}
 
+# Get the total demand quantities by commodity for 2010 to 2100 by combining the demand deltas with 2010 production
+prod_2010_c = get_production(bdata, bdata.YR_CAL_BASE, lumap2l_mrj(bdata.LUMAP, bdata.LMMAP))
+
+# Demand deltas can be a time series (shape year x commodity) or a single array (shape = n commodites).
+d_cy = bdata.DEMAND_DELTAS_C * prod_2010_c

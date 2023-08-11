@@ -24,16 +24,12 @@ LUTO 2.0 temporary helper code.
 from luto.dataprep import create_new_dataset
 create_new_dataset()
 
-# 2. Load temporary agricultural commodity demands as timeseries from 2010 to target year.
-import numpy as np
-d_c = np.load('input/d_c.npy')
-
-# 3. Run the simulation and profile memory use
+# 2. Run the simulation and profile memory use
 %load_ext memory_profiler
 import luto.simulation as sim
-%memit sim.run( 2010, 2030, d_c )
+%memit sim.run( 2010, 2030 )
 
-# 4. Write the ouputs to file
+# 3. Write the ouputs to file
 from luto.tools.write import *
 path = get_path()
 write_outputs(sim, 2030, path)
@@ -41,10 +37,12 @@ write_outputs(sim, 2030, path)
 
 
 # Minimalist run code
-import numpy as np
-# d_c = np.load('input/d_c.npy')
+from luto.dataprep import create_new_dataset
+create_new_dataset()
+
 import luto.simulation as sim
 sim.run( 2010, 2030 )
+
 from luto.tools.write import *
 path = get_path()
 write_outputs(sim, 2030, path)

@@ -57,7 +57,9 @@ def create_new_dataset():
     outpath = INPUT_DIR + '/'
     
     # Delete the data folders' contents
-    for file in os.scandir(outpath): os.remove(file.path)
+    for file in os.scandir(outpath): 
+        if file.name != '.gitignore':
+            os.remove(file.path)
     for file in os.scandir(raw_data): os.remove(file.path)
     
     # Copy in the raw data files from their source
@@ -66,7 +68,7 @@ def create_new_dataset():
     shutil.copyfile(fdh_inpath + 'transitions_costs_20230607.xlsx', raw_data + 'transitions_costs_20230607.xlsx')    
 
     shutil.copyfile(profit_map_inpath + 'NLUM_SPREAD_LU_ID_Mapped_Concordance.h5', raw_data + 'NLUM_SPREAD_LU_ID_Mapped_Concordance.h5')
-    shutil.copyfile(profit_map_inpath + 'cell_ag_data.h5', raw_data + 'cell_ag_data.h5')
+    # shutil.copyfile(profit_map_inpath + 'cell_ag_data.h5', raw_data + 'cell_ag_data.h5')
 
     shutil.copyfile(luto_2D_inpath + 'cell_LU_mapping.h5', raw_data + 'cell_LU_mapping.h5')
     shutil.copyfile(luto_2D_inpath + 'cell_zones_df.h5', raw_data + 'cell_zones_df.h5')
@@ -80,9 +82,16 @@ def create_new_dataset():
     # Copy data straight to LUTO input folder, no processing required
     shutil.copyfile(fdh_inpath + 'yieldincreases-bau2022.csv', outpath + 'yieldincreases_bau2022.csv')
     shutil.copyfile(nlum_inpath + 'NLUM_2010-11_mask.tif', outpath + 'NLUM_2010-11_mask.tif')
-    shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean.h5', outpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean.h5')
-    shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean.h5', outpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean.h5')
     
+    shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp126_2010-2100_DR_ML_HA_mean.h5', outpath + 'water_yield_ssp126_2010-2100_dr_ml_ha.h5')
+    shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp126_2010-2100_SR_ML_HA_mean.h5', outpath + 'water_yield_ssp126_2010-2100_sr_ml_ha.h5')
+    shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean.h5', outpath + 'water_yield_ssp245_2010-2100_dr_ml_ha.h5')
+    shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean.h5', outpath + 'water_yield_ssp245_2010-2100_sr_ml_ha.h5')
+    shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp370_2010-2100_DR_ML_HA_mean.h5', outpath + 'water_yield_ssp370_2010-2100_dr_ml_ha.h5')
+    shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp370_2010-2100_SR_ML_HA_mean.h5', outpath + 'water_yield_ssp370_2010-2100_sr_ml_ha.h5')
+    shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp585_2010-2100_DR_ML_HA_mean.h5', outpath + 'water_yield_ssp585_2010-2100_dr_ml_ha.h5')
+    shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp585_2010-2100_SR_ML_HA_mean.h5', outpath + 'water_yield_ssp585_2010-2100_sr_ml_ha.h5')
+
     # Load delta demands file
     shutil.copyfile(luto_1D_inpath + 'demand_deltas_c.npy', outpath + 'demand_deltas_c.npy')
     
@@ -95,9 +104,6 @@ def create_new_dataset():
     
     # Read in the cell_zones_df dataframe
     zones = pd.read_hdf(raw_data + 'cell_zones_df.h5')
-    
-    # Read in the cell_ag_data dataframe
-    # cell_ag = pd.read_hdf(raw_data + 'cell_ag_data.h5')
     
     # Read in from-to costs in category-to-category format
     # tmcat = pd.read_csv(raw_data + 'tmatrix_categories.csv', index_col = 0)
@@ -344,12 +350,34 @@ def create_new_dataset():
     # Carbon stock in mature forest on natural land and save to file
     bioph['REMNANT_VEG_T_CO2_HA'].to_hdf(outpath + 'natural_land_t_co2_ha.h5', key = 'natural_land_t_co2_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
-    # Average annual carbon sequestration by Environmental Plantings (block plantings) and save to file
-    ep_CO2 = bioph.eval('EP_BLOCK_TREES_AVG_T_CO2_HA_YR + EP_BLOCK_DEBRIS_AVG_T_CO2_HA_YR + EP_BLOCK_SOIL_AVG_T_CO2_HA_YR')
-    ep_CO2.to_hdf(outpath + 'EP_BLOCK_AVG_T_CO2_HA_YR.h5', key = 'EP_BLOCK_AVG_T_CO2_HA_YR', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
-    # Average establishment costs for Environmental PLantings ($/ha) and save to file
-    bioph['EP_EST_COST_$_HA'].to_hdf(outpath + 'EP_EST_COST_$_HA.h5', key = 'EP_EST_COST_$_HA', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    # Average annual carbon sequestration by Environmental Plantings (block plantings) and save to file
+    s = bioph.eval('EP_BLOCK_TREES_AVG_T_CO2_HA_YR + EP_BLOCK_DEBRIS_AVG_T_CO2_HA_YR + EP_BLOCK_SOIL_AVG_T_CO2_HA_YR')
+    s.to_hdf(outpath + 'ep_block_avg_t_co2_ha_yr.h5', key = 'ep_block_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
+
+    # Average annual carbon sequestration by Environmental Plantings (belt plantings) and save to file
+    s = bioph.eval('EP_BELT_TREES_AVG_T_CO2_HA_YR + EP_BELT_DEBRIS_AVG_T_CO2_HA_YR + EP_BELT_SOIL_AVG_T_CO2_HA_YR')
+    s.to_hdf(outpath + 'ep_belt_avg_t_co2_ha_yr.h5', key = 'ep_belt_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
+
+    # Average annual carbon sequestration by Environmental Plantings (riparian plantings) and save to file
+    s = bioph.eval('EP_RIP_TREES_AVG_T_CO2_HA_YR + EP_RIP_DEBRIS_AVG_T_CO2_HA_YR + EP_RIP_SOIL_AVG_T_CO2_HA_YR')
+    s.to_hdf(outpath + 'ep_rip_avg_t_co2_ha_yr.h5', key = 'ep_rip_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    
+    
+    # Average annual carbon sequestration by Hardwood Plantings (block plantings) and save to file
+    s = bioph.eval('CP_BLOCK_TREES_AVG_T_CO2_HA_YR + CP_BLOCK_DEBRIS_AVG_T_CO2_HA_YR + CP_BLOCK_SOIL_AVG_T_CO2_HA_YR')
+    s.to_hdf(outpath + 'hp_block_avg_t_co2_ha_yr.h5', key = 'hp_block_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
+
+    # Average annual carbon sequestration by Hardwood Plantings (belt plantings) and save to file
+    s = bioph.eval('CP_BELT_TREES_AVG_T_CO2_HA_YR + CP_BELT_DEBRIS_AVG_T_CO2_HA_YR + CP_BELT_SOIL_AVG_T_CO2_HA_YR')
+    s.to_hdf(outpath + 'hp_belt_avg_t_co2_ha_yr.h5', key = 'hp_belt_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
+
+    
+    # Average establishment costs for Environmental Plantings ($/ha) and save to file
+    bioph['EP_EST_COST_HA'].to_hdf(outpath + 'ep_est_cost_ha.h5', key = 'ep_est_cost_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
+
+    # Average establishment costs for Hardwood Plantings ($/ha) and save to file
+    bioph['CP_EST_COST_HA'].to_hdf(outpath + 'hp_est_cost_ha.h5', key = 'hp_est_cost_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
     
     
