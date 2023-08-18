@@ -151,8 +151,8 @@ def get_limits():
     # Limits is a dictionary with heterogeneous value sets.
     limits = {}
     
-    limits['water'] = get_wuse_limits(data)
-    # limits['ghg'] = get_ghg_limits(data)
+    if settings.WATER_USE_LIMITS == 'on': limits['water'] = get_wuse_limits(data)
+    if settings.GHG_EMISSIONS_LIMITS == 'on':  limits['ghg'] = get_ghg_limits(data)
 
     # # Water limits.
     # wuse_limits = [] # A list of water use limits by drainage division.

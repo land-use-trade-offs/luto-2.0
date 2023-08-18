@@ -168,7 +168,7 @@ def solve( t_mrj          # Transition cost matrices.
 
         # Only add the following constraints if 'limits' are provided.
 
-        if 'water' in limits:
+        if settings.WATER_USE_LIMITS == 'on':
             print('Adding water constraints by', settings.WATER_REGION_DEF + '...', time.ctime())
             
             # Returns water requirements for agriculture in mrj format and region-specific water use limits
@@ -186,7 +186,7 @@ def solve( t_mrj          # Transition cost matrices.
                     print('    ...setting water limit for %s <= %.2f ML' % (region, wreq_reg_limit))
 
 
-        if 'ghg' in limits:
+        if settings.GHG_EMISSIONS_LIMITS == 'on':
             print('\nAdding GHG emissions constraints...', time.ctime() + '\n')
             
             # Returns GHG emissions limits 

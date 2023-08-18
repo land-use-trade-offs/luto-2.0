@@ -128,26 +128,6 @@ def get_transition_matrices(data, yr_idx, lumap, lmmap):
     
     
     # -------------------------------------------------------------- #
-    # Opportunity costs (annual).                                    #    *** Turned off due to double-counting. Opportunity costs are effectively considered in the solver as it minimises total cost (or maximises profit).
-    # -------------------------------------------------------------- #
-    
-    # # Get cost matrices and convert from $/cell to $/ha.
-    # c_mrj = get_cost_matrices(data, yr_idx) / data.REAL_AREA[:, np.newaxis]
-    
-    # # Calculate production cost of current land-use and land management for each grid cell r.
-    # c_r = (c_mrj * l_mrj).sum(axis = 0).sum(axis = 1)
-    
-    # # Opportunity cost calculated as the diff in production cost between current land-use and all other land-uses j
-    # o_delta_mrj = c_mrj - c_r[:, np.newaxis]
-    
-    # # Cost for switching to Unallocated - modified land is zero
-    # o_delta_mrj[0, :, data.LU_UNALL_INDICES] = 0
-    
-    # # Cost for switching to the same land-use and irr status is zero.
-    # o_delta_mrj = np.where(l_mrj, 0, o_delta_mrj)
-    
-    
-    # -------------------------------------------------------------- #
     # Water license costs (upfront, amortised to annual, per cell).  #
     # -------------------------------------------------------------- #
     
@@ -164,7 +144,7 @@ def get_transition_matrices(data, yr_idx, lumap, lmmap):
     w_delta_mrj = w_net_mrj * data.WATER_LICENCE_PRICE[:, np.newaxis]
     
     # When land-use changes from dryland to irrigated add $10k per hectare for establishing irrigation infrastructure
-    new_irrig_cost = 10000 * data.REAL_AREA[:, np.newaxis]
+    new_irrig_cost = 7500 * data.REAL_AREA[:, np.newaxis]
     w_delta_mrj[1] = np.where(l_mrj[0], w_delta_mrj[1] + new_irrig_cost, w_delta_mrj[1])
 
     # When land-use changes from irrigated to dryland add $3k per hectare for removing irrigation infrastructure
@@ -180,7 +160,7 @@ def get_transition_matrices(data, yr_idx, lumap, lmmap):
     # -------------------------------------------------------------- #
     
     # Sum annualised costs of land-use and land management transition in $ per ha
-    t_mrj = w_delta_mrj + t_rj # + o_delta_mrj 
+    t_mrj = w_delta_mrj + t_rj
 
     # Ensure cost for switching to the same land-use and land management is zero.
     t_mrj = np.where(l_mrj, 0, t_mrj)

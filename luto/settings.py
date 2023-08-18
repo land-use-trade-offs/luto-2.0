@@ -42,7 +42,7 @@ RAW_DATA = '../raw_data'
 
 
 # ---------------------------------------------------------------------------- #
-# Parameters.                                                                  #
+# Model parameters.                                                                  #
 # ---------------------------------------------------------------------------- #
 
 # Climate change assumptions. Options include '126', '245', '370', '585'
@@ -57,7 +57,7 @@ DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 5             # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 1             # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
 MODE = 'snapshot'       # runs for target year only
@@ -86,7 +86,7 @@ SOLVE_METHOD = -1
    'deterministic concurrent':         4
    'deterministic concurrent simplex': 5 """
 
-# Penalty in objective function
+# Penalty in objective function  *** Needs to be balanced against OPTIMALITY_TOLERANCE to trade-off speed for optimality ***
 PENALTY = 1e9
 
 # Print detailed output to screen
@@ -100,7 +100,7 @@ OPTIMALITY_TOLERANCE = 1e-2
    Maximum value:	1e-2"""
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 100
+THREADS = 200
 
 
 
@@ -108,14 +108,14 @@ THREADS = 100
 # Environmental parameters
 # ---------------------------------------------------------------------------- #
 
+WATER_USE_LIMITS = 'on' # or off
+GHG_EMISSIONS_LIMITS = 'on' # or off
+
 # Greenhouse gas emissions in % terms
 GHG_REDUCTION_PERCENTAGE = 20
 
-# Water:
-WATER_CONSTRAINT_TYPE = 'hard'          # or 'soft' or None.
-WATER_CONSTRAINT_MINIMISE = False       # or True. Whether to also minimise water use.
-WATER_CONSTRAINT_WEIGHT = 1.0           # Minimisation weight in objective function.
-WATER_YIELD_STRESS_FRACTION = 0.4       # Water stress if yields below this fraction.
+# Water parameters (superseded)
+# WATER_YIELD_STRESS_FRACTION = 0.4       # Water stress if yields below this fraction.
 
 WATER_REGION_DEF = 'RR'                 # 'RR' for River Region, 'DD' for Drainage Division
 WATER_DRAINDIVS = list(range(1, 14, 1)) # List of drainage divisions to apply irrigation constraints to e.g., [1, 2].

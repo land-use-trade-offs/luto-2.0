@@ -16,7 +16,8 @@
 
 """
 Script to load and prepare input data based on build.ipynb by F. de Haan
-(now deprecated)
+and Brett Bryan, Deakin University
+
 """
 
 
@@ -26,12 +27,6 @@ import pandas as pd
 import shutil, os, time
 from luto.settings import INPUT_DIR, RAW_DATA
 
-
-# Still to do - bring in carbon emissions from environmental plantings
-# with h5py.File(luto_3D_inpath + 'tCO2_ha_ep_block.h5', 'r') as h5f:
-#     brick = h5f['Trees_tCO2_ha'][...]  # (91, 6956407)
-
-    
     
 def create_new_dataset():
     """Creates a new LUTO input dataset from source data"""
@@ -64,8 +59,7 @@ def create_new_dataset():
     
     # Copy in the raw data files from their source
     shutil.copyfile(fdh_inpath + 'tmatrix-cat2lus.csv', raw_data + 'tmatrix_cat2lus.csv')
-    # shutil.copyfile(fdh_inpath + 'tmatrix-categories.csv', raw_data + 'tmatrix_categories.csv')
-    shutil.copyfile(fdh_inpath + 'transitions_costs_20230607.xlsx', raw_data + 'transitions_costs_20230607.xlsx')    
+    shutil.copyfile(fdh_inpath + 'transitions_costs_20230816.xlsx', raw_data + 'transitions_costs_20230816.xlsx')    
 
     shutil.copyfile(profit_map_inpath + 'NLUM_SPREAD_LU_ID_Mapped_Concordance.h5', raw_data + 'NLUM_SPREAD_LU_ID_Mapped_Concordance.h5')
     # shutil.copyfile(profit_map_inpath + 'cell_ag_data.h5', raw_data + 'cell_ag_data.h5')
@@ -107,7 +101,7 @@ def create_new_dataset():
     
     # Read in from-to costs in category-to-category format
     # tmcat = pd.read_csv(raw_data + 'tmatrix_categories.csv', index_col = 0)
-    tmcat = pd.read_excel( raw_data + 'transitions_costs_20230607.xlsx'
+    tmcat = pd.read_excel( raw_data + 'transitions_costs_20230816.xlsx'
                          , sheet_name = 'Current'
                          , usecols = 'B:M'
                          , skiprows = 5
@@ -391,43 +385,48 @@ def create_new_dataset():
     luid_desc = lmap.groupby('LU_ID').first()['LU_DESC'].astype(str)
     
     # Loop through RCPs and format climate change impacts table
-    for rcp in rcps: 
-        # rcp = 'rcp2p6'
+    for rcp in rcps:    # rcp = 'rcp2p6'
         
-        # Slice off RCP and turn into pivot table.
-        cci_ptable = cci_raw[rcp].pivot_table(index = 'SA2_ID', columns = ['IRRIGATION', 'LU_ID'])
-    
-        # Merge with SA2-Cell concordance to obtain cell-based pivot table.
+        # Slice off RCP data and get rid of MultiIndex.
+        cci_ptable = cci_raw[rcp].reset_index()
+        
+        # Merge with SA2-Cell concordance to obtain cell-based table.
         cci = concordance.merge(cci_ptable, on = 'SA2_ID', how = 'left')
-    
-        # Not all columns are needed.
-        cci = cci.drop(['CELL_ID', 'SA2_ID'], axis = 1)
-    
-        # Convert land management types to strings and years to integers.
-        lmid_desc = {0: 'dry', 1: 'irr'}
-        coltups = [ (int(col[0][3:]), lmid_desc[col[1]], luid_desc[col[2]])
-                    for col in cci.columns ]
-        mcolumns = pd.MultiIndex.from_tuples(coltups)
-        cci.columns = mcolumns
         
-        # Arrange levels of multi-index as (lm, lu, year).
-        cci = cci.swaplevel(0, 1, axis = 'columns')
-        cci = cci.swaplevel(1, 2, axis = 'columns')
+        # Not all columns are needed, drop unwanted cols.
+        cci = cci.drop(['SA2_ID'], axis = 1)
+        
+        # Convert columns to integer (need 64-bit integer which can accomodate NaNs)
+        cci['IRRIGATION'] = cci['IRRIGATION'].astype('Int64')
+        cci['LU_ID'] = cci['LU_ID'].astype('Int64')
+        
+        # Create the MultiIndex structure
+        cci = cci.pivot( index = 'CELL_ID', 
+                         columns = ['IRRIGATION', 'LU_ID'], 
+                         values = ['YR_2020', 'YR_2050', 'YR_2080']
+                       ).dropna( axis = 'columns', how = 'all')
+        
+        # Name the YEAR level and reorder levels
+        cci.columns.set_names('YEAR', level = 0, inplace = True)
+        cci = cci.reorder_levels( ['IRRIGATION', 'LU_ID', 'YEAR'], axis = 1 )
+        
+        # Convert land management/use column names to strings and years to integers.
+        lmid_desc = {0: 'dry', 1: 'irr'}
+        coltups = [ (lmid_desc[col[0]], luid_desc[col[1]], int(col[2][3:])) 
+                    for col in cci.columns ]
+        cci.columns = pd.MultiIndex.from_tuples(coltups)
         
         # Sort land use in lexicographical order
         cci.sort_index(axis = 1, inplace = True)
         
-        # Convert to float32
-        # cci = cci.astype(np.float32)
+        # Check against previous data
+        cci_orig = pd.read_hdf('N:/LUF-Modelling/LUTO2_BB/LUTO2/input/climate_change_impacts_' + rcp + '.h5')
+        print('Climate change impact for', rcp, 'matches previous data =', cci.equals(cci_orig))
         
         # Write to HDF5 file.
         fname = outpath + 'climate_change_impacts_' + rcp + '.h5'
         kname = 'climate_change_impacts_' + rcp 
         cci.to_hdf(fname, key = kname, mode = 'w', format = 'fixed', index = False, complevel = 9)
-        
-        # Note: saving throws an error for rcp2p6: "RuntimeWarning: overflow encountered in long_scalars".
-        # However, seems to be a bug as reading the file back in is exactly equivalent e.g:
-        # pd.read_hdf(fname).equals(cci) returns True
         
         
         
@@ -435,28 +434,36 @@ def create_new_dataset():
     ############### Agricultural economics - crops
         
     # Produce a multi-indexed version of the crops data.
-    crops_ptable = crops.pivot_table(index = 'SA2_ID', columns = ['Irrigation', 'LU_DESC'])
+    # crops_ptable = crops.pivot_table(index = 'SA2_ID', columns = ['Irrigation', 'LU_DESC'])
+    crops_ptable = crops.drop(['LU_DESC', 'Irrigation', 'Area_ABS', 'Prod_ABS'], axis = 1)
     
     # Merge to create a cell-based table.
-    agec_crops = concordance.merge( crops_ptable
-                                  , left_on = 'SA2_ID'
-                                  , right_on = crops_ptable.index
-                                  , how = 'left' )
+    agec_crops = concordance.merge( crops_ptable, on = 'SA2_ID', how = 'left' )
     
     # Drop unnecessary columns.
-    agec_crops = agec_crops.drop(['CELL_ID', 'SA2_ID'], axis = 1)
+    agec_crops = agec_crops.drop(['SA2_ID'], axis = 1)
+    
+    # Convert columns to integer (need 64-bit integer which can accomodate NaNs)
+    agec_crops['IRRIGATION'] = agec_crops['IRRIGATION'].astype('Int64')
+    agec_crops['LU_ID'] = agec_crops['LU_ID'].astype('Int64')
+        
+    # Create the MultiIndex structure
+    agec_crops = agec_crops.pivot( index = 'CELL_ID', 
+                                   columns = ['IRRIGATION', 'LU_ID'], 
+                                   values = ['Yield', 'P1', 'AC', 'QC', 'FDC', 'FLC', 'FOC', 'WR', 'WP']
+                                 ).dropna( axis = 'columns', how = 'all')
     
     # The merge flattens the multi-index to tuples, so unflatten back to multi-index
     lms = ['dry', 'irr']
-    ts = [(t[0], lms[t[1]], t[2]) for t in agec_crops.columns]
+    ts = [(col[0], lms[col[1]], luid_desc[col[2]]) for col in agec_crops.columns]
     agec_crops.columns = pd.MultiIndex.from_tuples(ts)
+            
+    # Sort land use in lexicographical order
+    agec_crops.sort_index(axis = 1, inplace = True)
     
-    # Drop further uneccesary columns
-    agec_crops.drop(['Area_ABS', 'Prod_ABS', 'IRRIGATION', 'LU_ID'], axis = 1, inplace = True)
-    
-    # Convert 64 bit columns to 32 bit to save memory and space
-    f64_cols = agec_crops.select_dtypes(include = ["float64"]).columns
-    agec_crops[f64_cols] = agec_crops[f64_cols].apply(pd.to_numeric, downcast = 'float')
+    # Check against previous data
+    aec_orig = pd.read_hdf('N:/LUF-Modelling/LUTO2_BB/LUTO2/input/agec_crops.h5')
+    print('agec_crops matches previous data =', agec_crops.equals(aec_orig))
     
     # Save to HDF5
     agec_crops.to_hdf(outpath + 'agec_crops.h5', key = 'agec_crops', mode = 'w', format = 'fixed', index = False, complevel = 9)
@@ -467,17 +474,21 @@ def create_new_dataset():
     ############### Agricultural economics - livestock
         
     # Get only the livestock economics columns (i.e., those that vary with land-use).
-    animals = [c for c in lvstk.columns if any(x in c for x in ['BEEF', 'SHEEP', 'DAIRY'])]
-    agec_lvstk = lvstk[animals]
+    lvstk_cols = [c for c in lvstk.columns if any(x in c for x in ['BEEF', 'SHEEP', 'DAIRY'])]
+    agec_lvstk = lvstk[lvstk_cols]
     
     # Prepare columns for multi-indexing (i.e. turn into a list of tuples).
     # cols = agec_lvstk.columns.to_list()
-    cols = [tuple(c.split(sep = '_')) for c in animals]
+    cols = [tuple(c.split(sep = '_')) for c in lvstk_cols]
     cols = [(c[0] + '_' + c[1], c[2]) if c[0] == 'WR' else c for c in cols]
     
     # Make and set the multi-index.
     agec_lvstk.columns = pd.MultiIndex.from_tuples(cols)
     
+    # Check against previous data
+    lvstk_orig = pd.read_hdf('N:/LUF-Modelling/LUTO2_BB/LUTO2/input/agec_lvstk.h5')
+    print('agec_lvstk matches previous data =', agec_lvstk.equals(lvstk_orig))
+
     # Save to HDF5
     agec_lvstk.to_hdf(outpath + 'agec_lvstk.h5', key = 'agec_lvstk', mode = 'w', format = 'fixed', index = False, complevel = 9)
         
@@ -487,26 +498,36 @@ def create_new_dataset():
     ############### Agricultural Greenhouse Gas Emissions - crops
         
     # Produce a multi-indexed version of the crops data.
-    cropsGHG_ptable = cropsGHG.drop('LU_ID', axis = 1).pivot_table(index = 'SA2_ID', columns = ['IRRIGATION', 'LU_DESC'])
+    # cropsGHG_ptable = cropsGHG.drop('LU_ID', axis = 1).pivot_table(index = 'SA2_ID', columns = ['IRRIGATION', 'LU_DESC'])
+    cropsGHG_ptable = cropsGHG.drop('LU_DESC', axis = 1)
     
     # Merge to create a cell-based table.
-    agGHG_crops = concordance.merge( cropsGHG_ptable
-                                  , left_on = 'SA2_ID'
-                                  , right_on = cropsGHG_ptable.index
-                                  , how = 'left' )
+    agGHG_crops = concordance.merge( cropsGHG_ptable, on = 'SA2_ID', how = 'left' )
     
     # Drop unnecessary columns and fill NaNs with zeros.
-    agGHG_crops = agGHG_crops.drop(['CELL_ID', 'SA2_ID'], axis = 1).fillna(0)
+    agGHG_crops = agGHG_crops.drop(['SA2_ID'], axis = 1)
+        
+    # Convert columns to integer (need 64-bit integer which can accomodate NaNs)
+    agGHG_crops['IRRIGATION'] = agGHG_crops['IRRIGATION'].astype('Int64')
+    agGHG_crops['LU_ID'] = agGHG_crops['LU_ID'].astype('Int64')
+            
+    # Create the MultiIndex structure
+    agGHG_crops = agGHG_crops.pivot( index = 'CELL_ID', 
+                                   columns = ['IRRIGATION', 'LU_ID'], 
+                                   values = ['CO2E_KG_HA_FERT_PROD', 'CO2E_KG_HA_PEST_PROD', 'CO2E_KG_HA_IRRIG', 'CO2E_KG_HA_CHEM_APPL', 'CO2E_KG_HA_CROP_MGT', 'CO2E_KG_HA_CULTIV', 'CO2E_KG_HA_HARVEST', 'CO2E_KG_HA_SOWING', 'CO2E_KG_HA_SOIL_N_SURP']
+                                 ).dropna( axis = 'columns', how = 'all')
     
     # The merge flattens the multi-index to tuples, so unflatten back to multi-index
-    lms = ['dry', 'irr']
-    ts = [(t[0], lms[t[1]], t[2]) for t in agGHG_crops.columns]
+    ts = [(col[0], lms[col[1]], luid_desc[col[2]]) for col in agGHG_crops.columns]
     agGHG_crops.columns = pd.MultiIndex.from_tuples(ts)
+                
+    # Sort land use in lexicographical order
+    agGHG_crops.sort_index(axis = 1, inplace = True)
     
-    # Convert 64 bit columns to 32 bit to save memory and space
-    f64_cols = agGHG_crops.select_dtypes(include = ["float64"]).columns
-    agGHG_crops[f64_cols] = agGHG_crops[f64_cols].apply(pd.to_numeric, downcast = 'float')
-    
+    # Check against previous data (note previous data had zeros instead of NaNs)
+    agGHG_orig = pd.read_hdf('N:/LUF-Modelling/LUTO2_BB/LUTO2/input/agGHG_crops.h5')
+    print('agGHG_crops matches previous data =', agGHG_crops.fillna(0).equals(agGHG_orig))
+
     # Save to HDF5
     agGHG_crops.to_hdf(outpath + 'agGHG_crops.h5', key = 'agGHG_crops', mode = 'w', format = 'fixed', index = False, complevel = 9)
         
@@ -514,27 +535,35 @@ def create_new_dataset():
         
     
     ############### Agricultural Greenhouse Gas Emissions - livestock
-
+    
     # Merge to create a cell-based table.
-    agGHG_lvstk = concordance.merge( lvstkGHG
-                                   , left_on = 'SA2_ID'
-                                   , right_on = lvstkGHG.index
+    agGHG_lvstk = concordance.merge( lvstkGHG.stack(level = 0).reset_index()
+                                   , on = 'SA2_ID'
                                    , how = 'left' )
     
-    # Drop unnecessary columns and fill NaNs with zeros.
-    agGHG_lvstk = agGHG_lvstk.drop(['CELL_ID', 'SA2_ID'], axis = 1).fillna(0)
+    # Drop unnecessary columns.
+    agGHG_lvstk = agGHG_lvstk.drop(['SA2_ID'], axis = 1)
     
-    # Unflatten to multi-index
-    agGHG_lvstk.columns = pd.MultiIndex.from_tuples(agGHG_lvstk.columns)
+    # Create the MultiIndex structure
+    agGHG_lvstk = agGHG_lvstk.pivot( index = 'CELL_ID', 
+                                     columns = ['Livestock type'], 
+                                     values = ['CO2E_KG_HEAD_DRN_WATER', 'CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ELEC', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG_HEAD_FODDER', 'CO2E_KG_HEAD_FUEL', 'CO2E_KG_HEAD_IND_LEACH_RUNOFF', 'CO2E_KG_HEAD_IRR_WATER', 'CO2E_KG_HEAD_MANURE_MGT', 'CO2E_KG_HEAD_SEED']
+                                   ).dropna( axis = 'columns', how = 'all')
     
-    # Convert 64 bit columns to 32 bit to save memory and space
-    f64_cols = agGHG_lvstk.select_dtypes(include = ["float64"]).columns
-    agGHG_lvstk[f64_cols] = agGHG_lvstk[f64_cols].apply(pd.to_numeric, downcast = 'float')
+    # Change the level names
+    agGHG_lvstk.columns.set_names(['INDICATOR', 'LIVESTOCK'], level = [0, 1], inplace = True)
+        
+    # Swap column levels
+    agGHG_lvstk = agGHG_lvstk.reorder_levels([1, 0], axis = 1)
+    
+    # Sort land use in lexicographical order
+    agGHG_lvstk.sort_index(axis = 1, inplace = True)    
     
     # Save to HDF5
     agGHG_lvstk.to_hdf(outpath + 'agGHG_lvstk.h5', key = 'agGHG_lvstk', mode = 'w', format = 'fixed', index = False, complevel = 9)
-    
-    
+
+
+
     
     
     # Complete processing and report back
