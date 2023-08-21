@@ -31,7 +31,7 @@ def get_ccimpact(data, lu, lm, yr_idx):
         
     else: # Calculate the quantities
         # Convert year index to calendar year to match the climate impact data which is by calendar year.
-        yr_cal += data.YR_CAL_BASE
+        yr_cal = data.YR_CAL_BASE + yr_idx
     
         # Interpolate climate change damage for lu, lm, and year for each cell using a linear function.
         xs = {t[2] for t in data.CLIMATE_CHANGE_IMPACT.columns}  # Returns set {2020, 2050, 2080}
@@ -108,9 +108,8 @@ def get_yield_pot( data    # Data object or module.
         yield_pot *= 2
     
     # Apply climate change yield impact multiplier. Essentially changes the number of head per hectare by a multiplier i.e., 1.2 = a 20% increase.
-    # lu = data.PR2LU_DICT[pr]
     lu = lvstype.capitalize() + ' - ' + vegtype  # Convert to 'lu' i.e., 'Beef - modified land'
-    # yield_pot *= get_ccimpact(data, lu, lm, yr_idx)
+    yield_pot *= get_ccimpact(data, lu, lm, yr_idx)
     
     # Here we can add a productivity multiplier for sustainable intensification to increase pasture growth and yield potential (i.e., head/ha)
     # yield_pot *= yield_mult  ***Still to do***
@@ -213,9 +212,8 @@ def get_quantity_crop( data   # Data object or module.
         # Get the raw quantities in tonnes/ha from data.
         quantity = data.AGEC_CROPS['Yield', lm, pr].copy().to_numpy()
         
-        # Apply climate change yield impact multiplier.
-        lu = pr
-        # quantity *= get_ccimpact(data, lu, lm, yr_idx)  # get_ccimpact takes land use (lu) as input but lu == pr for crops 
+        # Apply climate change yield impact multiplier. Takes land use (lu) as input rather than product (pr) but lu == pr for crops
+        quantity *= get_ccimpact(data, pr, lm, yr_idx)  
     
         # Convert to tonnes per cell including real_area and resfactor.
         quantity *= data.REAL_AREA 
