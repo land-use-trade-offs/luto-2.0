@@ -109,7 +109,7 @@ THREADS = 200
 # ---------------------------------------------------------------------------- #
 
 WATER_USE_LIMITS = 'on' # or off
-GHG_EMISSIONS_LIMITS = 'on' # or off
+GHG_EMISSIONS_LIMITS = 'off' # or off
 
 # Greenhouse gas emissions in % terms
 GHG_REDUCTION_PERCENTAGE = 20
