@@ -22,6 +22,7 @@ and Brett Bryan, Deakin University
 
 
 # Load libraries
+import csv
 import numpy as np
 import pandas as pd
 import shutil, os, time
@@ -107,7 +108,13 @@ def create_new_dataset():
                          , skiprows = 5
                          , nrows = 11
                          , index_col = 0)
-    
+
+    # Read transition costs from agricultural land to environmental plantings
+    ag_to_new_land_uses = pd.read_excel( raw_data + 'transitions_costs_20230816.xlsx'
+                                , sheet_name = 'Ag_to_new_land-uses'
+                                , usecols = 'B,C'
+                                , index_col = 0)
+
     # Read the categories to land-uses concordance
     cat2lus = pd.read_csv(raw_data + 'tmatrix_cat2lus.csv').to_numpy()
     
@@ -149,19 +156,25 @@ def create_new_dataset():
     ############### Create landuses -- lexicographically ordered list of land-uses (strings)
     
     # Lexicographically ordered list of land-uses
-    landuses = sorted(lmap['LU_DESC'].unique().to_list())
-    landuses.remove('Non-agricultural land')
+    ag_landuses = sorted(lmap['LU_DESC'].unique().to_list())
+    ag_landuses.remove('Non-agricultural land')
     
     # Save to file
-    pd.DataFrame(landuses).to_csv(outpath + 'landuses.csv', index = False, header = False)
-    
+    pd.DataFrame(ag_landuses).to_csv(outpath + 'ag_landuses.csv', index = False, header = False)
+
+    # Create a non-agricultural landuses file
+    non_ag_landuses = ["Environmental Plantings"]
+    with open(outpath + 'non_ag_landuses.csv', 'w') as non_ag_lu_csv:
+        writer = csv.writer(non_ag_lu_csv)
+        for lu in non_ag_landuses:
+            writer.writerow([lu])
     
     
     
     ############### Create lumap -- 2010 land-use mapping.
     
     # Map land-uses by lexicographical index on the map. Use -1 for anything _not_ in the land-use list.
-    lucode = [-1 if (r not in landuses) else landuses.index(r) for r in lmap['LU_DESC']]
+    lucode = [-1 if (r not in ag_landuses) else ag_landuses.index(r) for r in lmap['LU_DESC']]
     
     # Convert to series and downcast to int8
     lumap = pd.to_numeric( pd.Series(lucode), downcast = 'integer' )
@@ -194,31 +207,51 @@ def create_new_dataset():
     
     
     
-    ############### Create tmatrix -- transition cost matrix
+    ############### Create ag_tmatrix -- agricultural transition cost matrix
     
     # Produce a dictionary for ease of look up.
     l2c = dict([(row[1], row[0]) for row in cat2lus])
     
     # Prepare indices.
-    indices = [(lu1, lu2) for lu1 in landuses for lu2 in landuses]
+    indices = [(lu1, lu2) for lu1 in ag_landuses for lu2 in ag_landuses]
     
     # Prepare the DataFrame.
-    t = pd.DataFrame(index = landuses, columns = landuses, dtype = np.float32)
+    t = pd.DataFrame(index = ag_landuses, columns = ag_landuses, dtype = np.float32)
     
     # Fill the DataFrame.
     for i in indices: t.loc[i] = tmcat.loc[l2c[i[0]], l2c[i[1]]]
     
     # Switching to existing land use (i.e. not switching) does not cost anything.
-    for lu in landuses: t.loc[lu, lu] = 0
+    for lu in ag_landuses: t.loc[lu, lu] = 0
     
-    # Extract the actual tmatrix Numpy array.
-    tmatrix = t.to_numpy()
+    # Extract the actual ag_tmatrix Numpy array.
+    ag_tmatrix = t.to_numpy()
     
     # Save numpy array (float32)
-    np.save(outpath + 'tmatrix.npy', tmatrix)
-    
-    
-    
+    np.save(outpath + 'ag_tmatrix.npy', ag_tmatrix)
+
+
+
+
+    ############### Create cost matrices for transitioning from environmental plantings to agricultural land
+    ep_to_ag_t = t.loc['Unallocated - natural land'].to_numpy()
+    # add cost of establishing irrigation for irrigated cells
+    ep_to_ag_t = np.stack([ep_to_ag_t, ep_to_ag_t + 7500])
+
+    np.save(outpath + 'ep_to_ag_tmatrix.npy', ep_to_ag_t)  # shape: (m, j)
+
+
+
+
+    ############### Create cost matrices for transitioning from agricultural land to environmental plantings
+    ag_to_ep_t = ag_to_new_land_uses.to_numpy()
+    # add cost for removal of irrigation for irrigated cells
+    ag_to_ep_t = np.stack([ag_to_ep_t, ag_to_ep_t + 3000])
+
+    np.save(outpath + 'ag_to_ep_tmatrix.npy', ep_to_ag_t)  # shape: (m, j)
+
+
+
     
     ############### Livestock spatial data
     
@@ -259,7 +292,7 @@ def create_new_dataset():
     x_irr = x_irr.drop(columns = ['CELL_ID', 'SA2_ID'])
     
     # Some land uses never occur at all (like dryland rice or grazing on irrigated natural land).
-    for lu in landuses:
+    for lu in ag_landuses:
         if lu not in x_dry.columns:
             x_dry[lu] = np.nan
         if lu not in x_irr.columns:
@@ -282,12 +315,12 @@ def create_new_dataset():
     x_irr = np.where( np.isnan(x_irr.to_numpy()), 0, 1 )
     
     # Get a list of cropping land-uses and return their indices in lexicographic land-use list.
-    lu_crops = [ lu for lu in landuses if 'Beef' not in lu
+    lu_crops = [ lu for lu in ag_landuses if 'Beef' not in lu
                                        and 'Sheep' not in lu
                                        and 'Dairy' not in lu
                                        and 'Unallocated' not in lu
                                        and 'Non-agricultural' not in lu ]
-    clus = [ landuses.index(lu) for lu in lu_crops ]
+    clus = [ ag_landuses.index(lu) for lu in lu_crops ]
     
     # Allow dryland cropping only if precipitation is over 175mm in growing season.
     prec_over_175mm = bioph['AVG_GROW_SEAS_PREC_GE_175_MM_YR'].to_numpy()

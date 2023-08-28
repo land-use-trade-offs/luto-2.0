@@ -55,8 +55,6 @@ write_production(sim, 2030, d_c, path)
 write_water(sim, 2030, path)
 write_ghg(sim, 2030, path)
 
-
-from luto.economics.water import *
 data = sim.data
 df_2010 = get_water_totals(data, sim.lumaps[2010], sim.lmmaps[2010])
 df_2030 = get_water_totals(data, sim.lumaps[2030], sim.lmmaps[2030])
@@ -116,7 +114,7 @@ AGGHG_CROPS.columns.levels
 AGGHG_CROPS.loc[0:10, (slice(None), 'dry', 'Winter cereals')]
 
 
-for lu in sim.bdata.LANDUSES:
+for lu in sim.bdata.AGRICULTURAL_LANDUSES:
     if lu in x_dry.columns:
         print(lu, 'True')
     else:

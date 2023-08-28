@@ -23,16 +23,25 @@ import time
 import os.path
 import pandas as pd
 import numpy as np
+import numpy_financial as npf
+from typing import Tuple
 
-from luto.economics.quantity import get_quantity_matrices
+import luto.economics.agricultural.quantity as ag_quantity
+import luto.economics.non_agricultural.quantity as non_ag_quantity
+import luto.settings as settings
+
+
+def amortise(cost, rate = settings.DISCOUNT_RATE, horizon = settings.AMORTISATION_PERIOD):
+    """Return NPV of future `cost` amortised to annual value at discount `rate` over `horizon` years."""
+    return -1 * npf.pmt(rate, horizon, pv = cost, fv = 0, when = 'begin')
 
 
 def show_map(yr_cal):
     """Show a plot of the lumap of `yr_cal`."""
-    plotmap(lumaps[yr_cal], labels = bdata.LU2DESC)
+    plotmap(lumaps[yr_cal], labels = bdata.AGLU2DESC)
     
 
-def get_production(data, yr_cal, X_mrj):
+def get_production(data, yr_cal, ag_X_mrj, non_ag_X_rk):
     """Return total production of commodities for a specific year...
     
     'data' is a sim.data or bdata like object, 'yr_cal' is calendar year, and X_mrj 
@@ -46,25 +55,32 @@ def get_production(data, yr_cal, X_mrj):
     
     # Calculate year index (i.e., number of years since 2010)
     yr_idx = yr_cal - data.YR_CAL_BASE
-    
+
+    # Get the quantity of each commodity produced by agricultural land uses
     # Get the quantity matrices. Quantity array of shape m, r, p
-    q_mrp = get_quantity_matrices(data, yr_idx)
+    ag_q_mrp = ag_quantity.get_quantity_matrices(data, yr_idx)
     
     # Convert map of land-use in mrj format to mrp format
-    X_mrp = np.stack( [ X_mrj[:, :, j] for p in range(data.NPRS) 
-                                       for j in range(data.NLUS)
-                                       if data.LU2PR[p, j] 
-                      ], axis = 2 )
+    ag_X_mrp = np.stack( [ ag_X_mrj[:, :, j] for p in range(data.NPRS)
+                                             for j in range(data.N_AG_LUS)
+                                             if data.LU2PR[p, j]
+                         ], axis = 2 )
 
     # Sum quantities in product (PR/p) representation.
-    q_p = np.sum( q_mrp * X_mrp, axis = (0, 1), keepdims = False)
+    ag_q_p = np.sum( ag_q_mrp * ag_X_mrp, axis = (0, 1), keepdims = False)
     
     # Transform quantities to commodity (CM/c) representation.
-    q_c = [ sum( q_p[p] for p in range(data.NPRS) if data.PR2CM[c, p] )
-                        for c in range(data.NCMS) ]
+    ag_q_c = [ sum( ag_q_p[p] for p in range(data.NPRS) if data.PR2CM[c, p] )
+                              for c in range(data.NCMS) ]
+
+    # Get the quantity of each commodity produced by non-agricultural land uses
+    # Quantity matrix in the shape of c, r, k
+    q_crk = non_ag_quantity.get_quantity_matrix(data)
+    non_ag_q_c = [ (q_crk[c, :, :] * non_ag_X_rk).sum() for c in range(data.NCMS) ]
 
     # Return total commodity production as numpy array.
-    return np.array(q_c)
+    total_q_c = [ ag_q_c[c] + non_ag_q_c[c] for c in range(data.NCMS) ]
+    return np.array(total_q_c)
 
 
 def get_production_copy(sim, yr_cal):
@@ -82,7 +98,7 @@ def get_production_copy(sim, yr_cal):
     # Acquire local names for matrices and shapes.
     lu2pr_pj = sim.data.LU2PR
     pr2cm_cp = sim.data.PR2CM
-    nlus = sim.data.NLUS
+    nlus = sim.data.N_AG_LUS
     nprs = sim.data.NPRS
     ncms = sim.data.NCMS
 
@@ -116,10 +132,14 @@ def get_production_copy(sim, yr_cal):
 
 
 
-def lumap2l_mrj(lumap, lmmap):
-    """Return land-use maps in decision-variable (X_mrj) format.
-       Where 'm' is land mgt, 'r' is cell, and 'j' is land-use."""
-    
+def lumap2ag_l_mrj(lumap, lmmap):
+    """
+    Return land-use maps in decision-variable (X_mrj) format.
+    Where 'm' is land mgt, 'r' is cell, and 'j' is agricultural land-use.
+
+    Cells used for non-agricultural land uses will have value 0 for all agricultural
+    land uses, i.e. all r.
+    """
     # Set up a container array of shape m, r, j. 
     x_mrj = np.zeros((2, lumap.shape[0], 28), dtype = bool)
     
@@ -131,6 +151,63 @@ def lumap2l_mrj(lumap, lmmap):
     
     return x_mrj.astype(bool)
 
+
+def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
+    """
+    Convert the land-use map to a decision variable X_rk, where 'r' indexes cell and
+    'k' indexes non-agricultural land use.
+
+    Cells used for agricultural purposes have value 0 for all k.
+    """
+    base_code = settings.NON_AGRICULTURAL_LU_BASE_CODE
+    non_ag_lu_codes = list(range(base_code, base_code + num_non_ag_land_uses))
+
+    # Set up a container array of shape r, k.
+    x_rk = np.zeros((lumap.shape[0], num_non_ag_land_uses), dtype=bool)
+
+    for k in range(len(non_ag_lu_codes)):
+        kmap = np.where( lumap == k, True, False )
+        x_rk[:, k] = kmap
+
+    return x_rk.astype(bool)
+
+
+def get_ag_and_non_ag_cells(lumap) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Splits the index of cells based on whether that cell is used for agricultural
+    land, given the lumap.
+
+    Returns
+    -------
+    ( np.ndarray, np.ndarray )
+        Two numpy arrays containing the split cell index.
+    """
+    non_ag_base = settings.NON_AGRICULTURAL_LU_BASE_CODE
+    all_cells = np.array(range(lumap.shape[0]))
+
+    # get all agricultural and non agricultural cells
+    non_agricultural_cells = np.nonzero(lumap >= non_ag_base)[0]
+    agricultural_cells = np.nonzero(~np.isin(all_cells, non_agricultural_cells))[0]
+
+    return agricultural_cells, non_agricultural_cells
+
+
+def get_natural_and_unnatural_lu_cells(data, lumap) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Splits the index of cells based on whether that cell is used for natural
+    land, given the lumap.
+
+    Returns
+    -------
+    ( np.ndarray, np.ndarray )
+        Two numpy arrays containing the split cell index.
+    """
+    all_cells = np.array(range(lumap.shape[0]))
+
+    # get all cells currently being used for natural and unnatural land uses
+    natural_cells = np.nonzero(np.isin(lumap, data.LU_NATURAL))[0]
+    unnatural_cells = np.nonzero(np.isin(all_cells, natural_cells))[0]
+    return natural_cells, unnatural_cells
 
 
 def timethis(function, *args, **kwargs):
