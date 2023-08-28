@@ -19,9 +19,10 @@ Pure functions to calculate greenhouse gas emissions by lm, lu.
 """
 
 import numpy as np
-from luto.economics.quantity import get_yield_pot, lvs_veg_types
+from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
 import luto.settings as settings
-from luto.tools import lumap2l_mrj
+import luto.tools as tools
+
 
 def get_ghg_crop( data     # Data object or module.
                 , lu       # Land use.
@@ -138,7 +139,7 @@ def get_ghg( data # Data object or module.
         return get_ghg_lvstk(data, lu, lm, yr_idx)
     
     # If neither crop nor livestock but in LANDUSES it is unallocated land.
-    elif lu in data.LANDUSES:
+    elif lu in data.AGRICULTURAL_LANDUSES:
         return np.zeros(data.NCELLS)
     
     # If it is none of the above, it is not known how to get the GHG emissions.
@@ -146,21 +147,48 @@ def get_ghg( data # Data object or module.
         raise KeyError("Land use '%s' not found in data.LANDUSES" % lu)
 
 
-def get_ghg_matrix(data, lm, yr_idx):
+def add_ghg_penalties_for_clearing_natural_land(g_rj, data, lumap) -> np.ndarray:
+    """
+    Adds the one-off greenhouse gas penalties to the g_rj matrix for transitioning
+    natural land to unnatural land. The penalty represents the carbon that is emitted
+    when clearing natural land.
+    """
+    _, ncells, n_ag_lus = data.AG_L_MRJ.shape
+    # Set up empty array of penalties
+    penalties_rj = np.zeros((ncells, n_ag_lus))
+    natural_lu_cells, _ = tools.get_natural_and_unnatural_lu_cells(data, lumap)
+
+    # Calculate penalties and add to g_rj matrix
+    penalties = (
+          data.NATURAL_LAND_T_CO2_HA[natural_lu_cells]
+        * data.REAL_AREA[natural_lu_cells]
+    )
+    for lu in data.LU_UNNATURAL:
+        penalties_rj[natural_lu_cells, lu] = penalties
+
+    return g_rj + penalties_rj
+
+
+def get_ghg_matrix(data, lm, yr_idx, lumap):
     """Return g_rj matrix of tCO2e/cell per lu under `lm` in `yr_idx`."""
     
-    g_rj = np.zeros((data.NCELLS, len(data.LANDUSES)))
-    for j, lu in enumerate(data.LANDUSES):
+    g_rj = np.zeros((data.NCELLS, len(data.AGRICULTURAL_LANDUSES)))
+    for j, lu in enumerate(data.AGRICULTURAL_LANDUSES):
         g_rj[:, j] = get_ghg(data, lu, lm, yr_idx)
         
     # Make sure all NaNs are replaced by zeroes.
-    return np.nan_to_num(g_rj)
+    g_rj = np.nan_to_num(g_rj)
+
+    # Add penalties for clearing natural land
+    g_rj = add_ghg_penalties_for_clearing_natural_land(g_rj, data, lumap)
+
+    return g_rj
 
 
-def get_ghg_matrices(data, yr_idx):
+def get_ghg_matrices(data, yr_idx, lumap):
     """Return g_mrj matrix of GHG emissions per cell as 3D Numpy array."""
     
-    return np.stack(tuple( get_ghg_matrix(data, lm, yr_idx)
+    return np.stack(tuple( get_ghg_matrix(data, lm, yr_idx, lumap)
                            for lm in data.LANDMANS ))
 
 
@@ -170,10 +198,10 @@ def get_ghg_limits(data):
     
     # Get GHG emissions from agriculture for 2010 in tCO2e per cell in mrj format.
     yr_idx = 0
-    g_mrj = get_ghg_matrices(data, yr_idx)
+    g_mrj = get_ghg_matrices(data, yr_idx, data.LUMAP)
     
     # Calculate total greenhouse gas emissions of current land-use and land management.
-    ghg_limits = (g_mrj * data.L_MRJ).sum() * (1 - settings.GHG_REDUCTION_PERCENTAGE / 100)
+    ghg_limits = (g_mrj * data.AG_L_MRJ).sum() * (1 - settings.GHG_REDUCTION_PERCENTAGE / 100)
     
     return ghg_limits
 

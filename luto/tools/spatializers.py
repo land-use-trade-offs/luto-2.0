@@ -46,7 +46,7 @@ def recreate_2D_maps(sim, yr_cal):
 
 def reconstitute(lxmap, mask, filler = -1):
     """Return lxmap reconstituted to original 2D size and spatial domain.
-       Add Non-Agricultural Land as -1"""
+       Add Non-Agricultural, Non-Environmental Plantings Land as -1"""
     
     # Check that the number of cells in input map is full resolution. If so, then reconstitute 2D array
     if lxmap.shape[0] == mask.sum():

@@ -20,13 +20,11 @@ import os
 import pandas as pd
 import numpy as np
 import rasterio
-import h5py
 
-from luto.settings import INPUT_DIR, OUTPUT_DIR, SSP, RCP, RESFACTOR
-from luto.economics.quantity import lvs_veg_types
-from luto.tools import lumap2l_mrj, get_production
+from luto.settings import INPUT_DIR, SSP, RCP, RESFACTOR
+from luto.economics.agricultural.quantity import lvs_veg_types
 
-
+import random
 
 ###############################################################
 # Agricultural economic data.                                                 
@@ -39,6 +37,13 @@ AGEC_LVSTK = pd.read_hdf( os.path.join(INPUT_DIR, 'agec_lvstk.h5') )
 #Load greenhouse gas emissions from agriculture
 AGGHG_CROPS = pd.read_hdf( os.path.join(INPUT_DIR, 'agGHG_crops.h5') )
 AGGHG_LVSTK = pd.read_hdf( os.path.join(INPUT_DIR, 'agGHG_lvstk.h5') )
+NATURAL_LAND_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'natural_land_t_co2_ha.h5') ).to_numpy()
+
+# Raw transition cost matrix. In AUD/ha and ordered lexicographically.
+AG_TMATRIX = np.load(os.path.join(INPUT_DIR, 'ag_tmatrix.npy'))
+
+# Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
+EXCLUDE = np.load(os.path.join(INPUT_DIR, 'x_mrj.npy'))
 
 
 
@@ -59,29 +64,38 @@ YR_CAL_BASE = 2010
 ###############################################################
 
 # Read in lexicographically ordered list of land-uses.
-LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'landuses.csv')), header = None)[0].to_list()
+AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'ag_landuses.csv')), header = None)[0].to_list()
+NON_AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'non_ag_landuses.csv')), header = None)[0].to_list()
 
 # Get number of land-uses
-NLUS = len(LANDUSES)
+N_AG_LUS = len(AGRICULTURAL_LANDUSES)
 
 # Construct land-use index dictionary (distinct from LU_IDs!)
-LU2DESC = {i: lu for i, lu in enumerate(LANDUSES)}
-LU2DESC[-1] = 'Non-agricultural land'
+AGLU2DESC = {i: lu for i, lu in enumerate(AGRICULTURAL_LANDUSES)}
+DESC2AGLU = {value: key for key, value in AGLU2DESC.items()}
+AGLU2DESC[-1] = 'Non-agricultural land'
 
 # Some useful sub-sets of the land uses.
-LU_CROPS = [ lu for lu in LANDUSES if 'Beef' not in lu
-                                  and 'Sheep' not in lu
-                                  and 'Dairy' not in lu
-                                  and 'Unallocated' not in lu
-                                  and 'Non-agricultural' not in lu ]
-LU_LVSTK = [ lu for lu in LANDUSES if 'Beef' in lu
-                                   or 'Sheep' in lu
-                                   or 'Dairy' in lu ]
-LU_UNALL = [ lu for lu in LANDUSES if 'Unallocated' in lu ]
+LU_CROPS = [lu for lu in AGRICULTURAL_LANDUSES if 'Beef' not in lu
+            and 'Sheep' not in lu
+            and 'Dairy' not in lu
+            and 'Unallocated' not in lu
+            and 'Non-agricultural' not in lu]
+LU_LVSTK = [lu for lu in AGRICULTURAL_LANDUSES if 'Beef' in lu
+            or 'Sheep' in lu
+            or 'Dairy' in lu]
+LU_UNALL = [lu for lu in AGRICULTURAL_LANDUSES if 'Unallocated' in lu]
+LU_NATURAL = [
+    DESC2AGLU["Beef - natural land"],
+    DESC2AGLU["Dairy - natural land"],
+    DESC2AGLU["Sheep - natural land"],
+    DESC2AGLU["Unallocated - natural land"],
+]
+LU_UNNATURAL = [DESC2AGLU[lu] for lu in AGRICULTURAL_LANDUSES if lu not in LU_NATURAL]
 
-LU_CROPS_INDICES = [LANDUSES.index(lu) for lu in LANDUSES if lu in LU_CROPS]
-LU_LVSTK_INDICES = [LANDUSES.index(lu) for lu in LANDUSES if lu in LU_LVSTK]
-LU_UNALL_INDICES = [LANDUSES.index(lu) for lu in LANDUSES if lu in LU_UNALL]
+LU_CROPS_INDICES = [AGRICULTURAL_LANDUSES.index(lu) for lu in AGRICULTURAL_LANDUSES if lu in LU_CROPS]
+LU_LVSTK_INDICES = [AGRICULTURAL_LANDUSES.index(lu) for lu in AGRICULTURAL_LANDUSES if lu in LU_LVSTK]
+LU_UNALL_INDICES = [AGRICULTURAL_LANDUSES.index(lu) for lu in AGRICULTURAL_LANDUSES if lu in LU_UNALL]
 
 # Derive land management types from AGEC.
 LANDMANS = {t[1] for t in AGEC_CROPS.columns} # Set comp., unique entries.
@@ -107,7 +121,7 @@ NPRS = len(PRODUCTS)
 
 # Some land-uses map to multiple products -- a dict and matrix to capture this.
 # Crops land-uses and crop products are one-one. Livestock is more complicated.
-LU2PR_DICT = {key: [key.upper()] if key in LU_CROPS else [] for key in LANDUSES}
+LU2PR_DICT = {key: [key.upper()] if key in LU_CROPS else [] for key in AGRICULTURAL_LANDUSES}
 for lu in LU_LVSTK:
     for PR in PR_LVSTK:
         if lu.upper() in PR:
@@ -128,7 +142,7 @@ def dict2matrix(d, fromlist, tolist):
             A[i, j] = True
     return A
 
-LU2PR = dict2matrix(LU2PR_DICT, LANDUSES, PRODUCTS)
+LU2PR = dict2matrix(LU2PR_DICT, AGRICULTURAL_LANDUSES, PRODUCTS)
 
 
 # List of commodities. Everything lower case to avoid mistakes.
@@ -169,6 +183,20 @@ PR2CM = dict2matrix(CM2PR_DICT, COMMODITIES, PRODUCTS).T # Note the transpose.
 
 
 ###############################################################
+# Non-agricultural economic data.
+###############################################################
+
+# Load environmental plantings economic data (incl. GHG emissions)
+EP_EST_COST_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_est_cost_ha.h5') ).to_numpy()
+# agricultural land use to environmental plantings raw transition costs:
+AG2EP_TRANSITION_COSTS_HA = np.load( os.path.join(INPUT_DIR, 'ag_to_ep_tmatrix.npy') )
+# EP to agricultural land use transition costs:
+EP2AG_TRANSITION_COSTS_HA = np.load( os.path.join(INPUT_DIR, 'ep_to_ag_tmatrix.npy') )
+EP_BLOCK_AVG_T_C02_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_block_avg_t_co2_ha_yr.h5') ).to_numpy()
+
+
+
+###############################################################
 # Spatial layers. 
 ###############################################################
 
@@ -194,8 +222,8 @@ LMMAP = pd.read_hdf(os.path.join(INPUT_DIR, 'lmmap.h5')).to_numpy()
 # Set resfactor multiplier
 RESMULT = RESFACTOR ** 2
 
-# Mask out non-agricultural land (i.e., -1) from lumap (True means included cells. Boolean dtype.)
-MASK_LU_CODE = -1 
+# Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap (True means included cells. Boolean dtype.)
+MASK_LU_CODE = -1
 LUMASK = LUMAP != MASK_LU_CODE  
 
 # Return combined land-use and resfactor mask
@@ -230,7 +258,7 @@ wreq_lvstk_dry = pd.DataFrame()
 wreq_lvstk_irr = pd.DataFrame()
 
 # The rj-indexed arrays have zeroes where j is not livestock.
-for lu in LANDUSES:
+for lu in AGRICULTURAL_LANDUSES:
     if lu in LU_LVSTK:
         # First find out which animal is involved.
         animal, _ = lvs_veg_types(lu)
@@ -245,7 +273,7 @@ for lu in LANDUSES:
 wreq_crops_irr = pd.DataFrame()
 
 # The rj-indexed arrays have zeroes where j is not a crop.
-for lu in LANDUSES:
+for lu in AGRICULTURAL_LANDUSES:
     if lu in LU_CROPS:
         wreq_crops_irr[lu] = AGEC_CROPS['WR', 'irr', lu]
     else:
@@ -274,6 +302,7 @@ DRAINDIV_DICT = dict(pd.read_hdf(os.path.join(INPUT_DIR, 'draindiv_lut.h5')))   
 water_yield_base = pd.read_hdf(os.path.join( INPUT_DIR, 'water_yield_baselines.h5' ))
 WATER_YIELD_BASE_DR = water_yield_base['WATER_YIELD_HIST_DR_ML_HA'].to_numpy()
 WATER_YIELD_BASE_SR = water_yield_base['WATER_YIELD_HIST_SR_ML_HA'].to_numpy()
+WATER_YIELD_BASE_DIFF = WATER_YIELD_BASE_SR - WATER_YIELD_BASE_DR
 
 fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + SSP + '_2010-2100_dr_ml_ha.h5')
 fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + SSP + '_2010-2100_sr_ml_ha.h5')
@@ -331,18 +360,3 @@ BAU_PROD_INCR = pd.read_csv(fpath, header = [0,1]).astype(np.float32)
 
 # Load demand deltas (multipliers on 2010 production by commodity)
 DEMAND_DELTAS_C = np.load(os.path.join(INPUT_DIR, 'demand_deltas_c.npy') )
-
-
-
-###############################################################
-# Other data.
-###############################################################
-
-# Raw transition cost matrix. In AUD/ha and ordered lexicographically.
-TMATRIX = np.load(os.path.join(INPUT_DIR, 'tmatrix.npy'))
-
-# Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
-EXCLUDE = np.load(os.path.join(INPUT_DIR, 'x_mrj.npy'))
-
-    
-    
