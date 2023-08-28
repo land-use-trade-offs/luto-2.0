@@ -24,8 +24,6 @@ import rasterio
 from luto.settings import INPUT_DIR, SSP, RCP, RESFACTOR
 from luto.economics.agricultural.quantity import lvs_veg_types
 
-import random
-
 ###############################################################
 # Agricultural economic data.                                                 
 ###############################################################
@@ -37,7 +35,6 @@ AGEC_LVSTK = pd.read_hdf( os.path.join(INPUT_DIR, 'agec_lvstk.h5') )
 #Load greenhouse gas emissions from agriculture
 AGGHG_CROPS = pd.read_hdf( os.path.join(INPUT_DIR, 'agGHG_crops.h5') )
 AGGHG_LVSTK = pd.read_hdf( os.path.join(INPUT_DIR, 'agGHG_lvstk.h5') )
-NATURAL_LAND_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'natural_land_t_co2_ha.h5') ).to_numpy()
 
 # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
 AG_TMATRIX = np.load(os.path.join(INPUT_DIR, 'ag_tmatrix.npy'))
@@ -76,15 +73,15 @@ DESC2AGLU = {value: key for key, value in AGLU2DESC.items()}
 AGLU2DESC[-1] = 'Non-agricultural land'
 
 # Some useful sub-sets of the land uses.
-LU_CROPS = [lu for lu in AGRICULTURAL_LANDUSES if 'Beef' not in lu
-            and 'Sheep' not in lu
-            and 'Dairy' not in lu
-            and 'Unallocated' not in lu
-            and 'Non-agricultural' not in lu]
-LU_LVSTK = [lu for lu in AGRICULTURAL_LANDUSES if 'Beef' in lu
-            or 'Sheep' in lu
-            or 'Dairy' in lu]
-LU_UNALL = [lu for lu in AGRICULTURAL_LANDUSES if 'Unallocated' in lu]
+LU_CROPS = [ lu for lu in AGRICULTURAL_LANDUSES if 'Beef' not in lu
+                                                and 'Sheep' not in lu
+                                                and 'Dairy' not in lu
+                                                and 'Unallocated' not in lu
+                                                and 'Non-agricultural' not in lu ]
+LU_LVSTK = [ lu for lu in AGRICULTURAL_LANDUSES if 'Beef' in lu
+                                                or 'Sheep' in lu
+                                                or 'Dairy' in lu ]
+LU_UNALL = [ lu for lu in AGRICULTURAL_LANDUSES if 'Unallocated' in lu ]
 LU_NATURAL = [
     DESC2AGLU["Beef - natural land"],
     DESC2AGLU["Dairy - natural land"],
@@ -322,7 +319,7 @@ fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + SSP + '_2010-2100_sr_ml_h
 
 # Load the carbon data.
 REMNANT_VEG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'natural_land_t_co2_ha.h5') )
-
+NATURAL_LAND_T_CO2_HA = REMNANT_VEG_T_CO2_HA.to_numpy()
 
 
 ###############################################################
