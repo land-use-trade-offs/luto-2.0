@@ -20,7 +20,7 @@ Pure functions to calculate economic profit from land use.
 
 import numpy as np
 
-from luto.economics.quantity import get_yield_pot, lvs_veg_types, get_quantity
+from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
 
 def get_rev_crop( data   # Data object or module.
                 , lu     # Land use.
@@ -133,7 +133,7 @@ def get_rev( data    # Data object or module.
         return get_rev_lvstk(data, lu, lm, yr_idx)
     
     # If neither crop nor livestock but in LANDUSES it is unallocated land.
-    elif lu in data.LANDUSES:
+    elif lu in data.AGRICULTURAL_LANDUSES:
         return np.zeros(data.NCELLS)
     
     # If it is none of the above, it is not known how to get the revenue.
@@ -144,8 +144,8 @@ def get_rev( data    # Data object or module.
 def get_rev_matrix(data, lm, yr_idx):
     """Return r_rj matrix of revenue/cell per lu under `lm` in `yr_idx`."""
     
-    r_rj = np.zeros((data.NCELLS, len(data.LANDUSES)))
-    for j, lu in enumerate(data.LANDUSES):
+    r_rj = np.zeros((data.NCELLS, len(data.AGRICULTURAL_LANDUSES)))
+    for j, lu in enumerate(data.AGRICULTURAL_LANDUSES):
         r_rj[:, j] = get_rev(data, lu, lm, yr_idx)
         
     # Make sure all NaNs are replaced by zeroes.

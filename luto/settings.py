@@ -57,7 +57,7 @@ DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 1             # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 20             # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
 MODE = 'snapshot'       # runs for target year only
@@ -103,6 +103,16 @@ OPTIMALITY_TOLERANCE = 1e-2
 THREADS = 200
 
 
+# ---------------------------------------------------------------------------- #
+# Non-agricultural land usage parameters
+# ---------------------------------------------------------------------------- #
+NON_AGRICULTURAL_LU_BASE_CODE = 100         # Non-agricultural land uses will appear on the land use map
+                                            # offset by this amount (e.g. land use 0 will appear as 100)
+
+# Environmental Plantings Parameters
+ENV_PLANTING_COST_PER_HA_PER_YEAR = 100     # Yearly cost of maintaining one hectare of environmental plantings
+CARBON_PRICE_PER_TONNE = 50                 # Price of carbon per tonne - determines EP revenue in the model
+
 
 # ---------------------------------------------------------------------------- #
 # Environmental parameters
@@ -121,7 +131,11 @@ WATER_REGION_DEF = 'RR'                 # 'RR' for River Region, 'DD' for Draina
 WATER_DRAINDIVS = list(range(1, 14, 1)) # List of drainage divisions to apply irrigation constraints to e.g., [1, 2].
 WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions to apply irrigation constraints to e.g., [1, 2].
 
-""" DRAINAGE DIVISIONS
+""" NON-AGRICULTURAL LAND USES (indexed by k)
+0: 'Environmental Plantings'
+
+
+DRAINAGE DIVISIONS
  1: 'Tanami-Timor Sea Coast',
  2: 'South Western Plateau',
  3: 'South West Coast',
