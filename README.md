@@ -20,6 +20,8 @@ LUTO 2.0 is, however, a new model, written completely from scratch -- there is n
 # Documentation #
 Documentation, including instructions on how to set up and run LUTO 2.0, can be found at [docs/luto2-overview.pdf](docs/luto2-overview.pdf).
 
+LUTO 2.0 comes with a full diagram to illustrate its data preparation, workflow and code logics. The diagram link can be found in [this link](https://www.figma.com/file/7MXDM7vcXRhbUP1Egyt8FM/01_understand-the-input-data?type=whiteboard&node-id=0%3A1&t=JTSMHRDP5K2Cy6yl-1).
+
 # Copyright #
 Copyright 2021 Fjalar J. de Haan and Brett A. Bryan, Deakin University.
 
@@ -32,7 +34,6 @@ You should have received a copy of the GNU General Public License along with thi
 
 # Authors and Citation #
 See the [CITATION.cff](CITATION.cff) file for the LUTO 2.0 authors and how to cite the code base.
-
 
 
 
