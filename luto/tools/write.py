@@ -114,9 +114,10 @@ def write_production(sim, yr_cal, path):
                          , sim.data.NON_AGRICULTURAL_LANDUSES )
     ctlm, swlm = crossmap(sim.lmmaps[sim.data.YR_CAL_BASE], sim.lmmaps[yr_cal])
 
-    cthp, swhp = crossmap_irrstat(sim.lumaps[sim.data.YR_CAL_BASE], sim.lmmaps[sim.data.YR_CAL_BASE]
-                                  , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
-                                  , sim.data.AGRICULTURAL_LANDUSES)
+    cthp, swhp = crossmap_irrstat( sim.lumaps[sim.data.YR_CAL_BASE], sim.lmmaps[sim.data.YR_CAL_BASE]
+                                 , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
+                                 , sim.data.AGRICULTURAL_LANDUSES
+                                 , sim.data.NON_AGRICULTURAL_LANDUSES )
 
     ctlu.to_csv(os.path.join(path, 'crosstab-lumap.csv'))
     ctlm.to_csv(os.path.join(path, 'crosstab-lmmap.csv'))

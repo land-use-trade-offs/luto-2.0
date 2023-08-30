@@ -16,7 +16,6 @@ def get_env_plant_transitions_from_ag(data, lumap, lmmap) -> np.ndarray:
           data.AG_L_MRJ[0, :, :] @ data.AG2EP_TRANSITION_COSTS[0, :]  # agricultural dry land uses contribution
         + data.AG_L_MRJ[1, :, :] @ data.AG2EP_TRANSITION_COSTS[1, :]  # agricultural irrigated land uses contribution
     )
-
     # Amortise upfront costs to annualised costs and converted to $ per cell via REAL_AREA
     ag2ep_transitions_r = tools.amortise(ag2ep_transitions_r) * data.REAL_AREA
 
@@ -115,10 +114,10 @@ def get_exclude_matrices(data, lumap) -> np.ndarray:
     # Environmental plantings exclusions
     env_plant_exclusions = get_exclusions_environmental_plantings(data, lumap)
 
-    # List of all non-agricultural exclusion matrices
+    # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     non_ag_x_matrices = [
-        env_plant_exclusions,
+        env_plant_exclusions.reshape((data.NCELLS, 1)),
     ]
 
     # Stack list and return to get x_rk
-    return np.stack(non_ag_x_matrices).T
+    return np.concatenate(non_ag_x_matrices, axis=1)

@@ -113,7 +113,7 @@ def sync_years(base, target):
 
 def get_ag_c_mrj():
     print('Getting agricultural production cost matrices...', end = ' ')
-    output = ag_cost.get_cost_matrices(data, target_index)
+    output = ag_cost.get_cost_matrices(data, target_index, lumaps[base_year])
     print('Done.')
     return output.astype(np.float32)
 
@@ -183,11 +183,18 @@ def get_non_ag_q_crk():
 
 def get_ag_t_mrj():
     print('Getting agricultural transition cost matrices...', end = ' ')
-    output = ag_transition.get_transition_matrices(data
-                                                   , target_index
-                                                   , base_year
-                                                   , lumaps
-                                                   , lmmaps)
+    output = ag_transition.get_transition_matrices( data
+                                                  , target_index
+                                                  , base_year
+                                                  , lumaps
+                                                  , lmmaps)
+    print('Done.')
+    return output.astype(np.float32)
+
+
+def get_ag_ghg_t_mrj():
+    print('Getting agricultural transitions GHG emissions...', end = ' ')
+    output = ag_ghg.get_ghg_transition_penalties(data, lumaps[base_year])
     print('Done.')
     return output.astype(np.float32)
 
@@ -195,8 +202,8 @@ def get_ag_t_mrj():
 def get_ag_to_non_ag_t_rk():
     print('Getting agricultural to non-agricultural transition cost matrices...', end = ' ')
     output = non_ag_transition.get_from_ag_transition_matrix(data
-                                                             , lumaps[base_year]
-                                                             , lmmaps[base_year])
+                                                           , lumaps[base_year]
+                                                           , lmmaps[base_year])
     print('Done.')
     return output.astype(np.float32)
 
@@ -273,6 +280,7 @@ def step( base    # Base year from which the data is taken.
              , get_ag_w_mrj()
              , get_ag_x_mrj()
              , get_ag_q_mrp()
+             , get_ag_ghg_t_mrj()
              , get_ag_to_non_ag_t_rk()
              , get_non_ag_to_ag_t_mrj()
              , get_non_ag_c_rk()

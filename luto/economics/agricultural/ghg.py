@@ -118,10 +118,10 @@ def get_ghg_lvstk( data     # Data object or module.
     return ghg_t
 
 
-def get_ghg( data # Data object or module.
-           , lu   # Land use.
-           , lm   # Land management.
-           , yr_idx # Number of years post base-year ('YR_CAL_BASE').
+def get_ghg( data    # Data object or module.
+           , lu      # Land use.
+           , lm      # Land management.
+           , yr_idx  # Number of years post base-year ('YR_CAL_BASE').
            ):
     """Return GHG emissions [tCO2e/cell] of `lu`+`lm` in `yr_idx` as np array.
 
@@ -147,15 +147,15 @@ def get_ghg( data # Data object or module.
         raise KeyError("Land use '%s' not found in data.LANDUSES" % lu)
 
 
-def add_ghg_penalties_for_clearing_natural_land(g_rj, data, lumap) -> np.ndarray:
+def get_ghg_transition_penalties(data, lumap) -> np.ndarray:
     """
-    Adds the one-off greenhouse gas penalties to the g_rj matrix for transitioning
-    natural land to unnatural land. The penalty represents the carbon that is emitted
-    when clearing natural land.
+    Gets the one-off greenhouse gas penalties for transitioning natural land to
+    unnatural land. The penalty represents the carbon that is emitted when
+    clearing natural land.
     """
     _, ncells, n_ag_lus = data.AG_L_MRJ.shape
     # Set up empty array of penalties
-    penalties_rj = np.zeros((ncells, n_ag_lus))
+    penalties_rj = np.zeros((ncells, n_ag_lus), dtype=np.float32)
     natural_lu_cells, _ = tools.get_natural_and_unnatural_lu_cells(data, lumap)
 
     # Calculate penalties and add to g_rj matrix
@@ -166,7 +166,8 @@ def add_ghg_penalties_for_clearing_natural_land(g_rj, data, lumap) -> np.ndarray
     for lu in data.LU_UNNATURAL:
         penalties_rj[natural_lu_cells, lu] = penalties
 
-    return g_rj + penalties_rj
+    penalties_mrj = np.stack([penalties_rj] * 2)
+    return penalties_mrj
 
 
 def get_ghg_matrix(data, lm, yr_idx, lumap):
@@ -178,9 +179,6 @@ def get_ghg_matrix(data, lm, yr_idx, lumap):
         
     # Make sure all NaNs are replaced by zeroes.
     g_rj = np.nan_to_num(g_rj)
-
-    # Add penalties for clearing natural land
-    g_rj = add_ghg_penalties_for_clearing_natural_land(g_rj, data, lumap)
 
     return g_rj
 
