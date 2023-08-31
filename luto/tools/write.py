@@ -46,7 +46,7 @@ def get_path():
 def write_outputs(sim, yr_cal, path):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     
-    # write_files(sim, path)
+    write_files(sim, path)
     write_production(sim, yr_cal, path)
     write_water(sim, yr_cal, path)
     write_ghg(sim, yr_cal, path)

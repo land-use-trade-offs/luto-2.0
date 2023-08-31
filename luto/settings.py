@@ -22,7 +22,7 @@ import pandas as pd
 # ---------------------------------------------------------------------------- #
 # LUTO model version.                                                                 #
 # ---------------------------------------------------------------------------- #
-VERSION = '2.0.2'
+VERSION = '2.1'
 
 ############### Set some Spyder options
 pd.set_option('display.width', 470)
@@ -57,7 +57,7 @@ DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 20             # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 1             # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
 MODE = 'snapshot'       # runs for target year only
@@ -75,7 +75,7 @@ OBJECTIVE = 'maximise revenue'
 
 # Select Gurobi algorithm used to solve continuous models or the initial root relaxation of a MIP model.
 # Set solve method. Default is automatic. Dual simplex uses less memory.
-SOLVE_METHOD = -1
+SOLVE_METHOD = 2
 
 """ SOLVE METHODS
    'automatic':                       -1
@@ -118,8 +118,8 @@ CARBON_PRICE_PER_TONNE = 50                 # Price of carbon per tonne - determ
 # Environmental parameters
 # ---------------------------------------------------------------------------- #
 
-WATER_USE_LIMITS = 'on' # or off
-GHG_EMISSIONS_LIMITS = 'off' # or off
+WATER_USE_LIMITS = 'on' # 'on' or 'off'
+GHG_EMISSIONS_LIMITS = 'on' # 'on' or 'off'
 
 # Greenhouse gas emissions in % terms
 GHG_REDUCTION_PERCENTAGE = 20
