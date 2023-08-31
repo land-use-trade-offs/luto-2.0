@@ -16,8 +16,7 @@ def get_rev_env_plantings(data) -> np.ndarray:
         The cost of environmental plantings for each cell. A 1-D array indexed by cell.
     """
     # Multiply carbon reduction by carbon price for each cell and adjust for resfactor.
-    return np.zeros(data.NCELLS)
-    # return data.EP_BLOCK_AVG_T_C02_HA * data.REAL_AREA * settings.CARBON_PRICE_PER_TONNE
+    return data.EP_BLOCK_AVG_T_C02_HA * data.REAL_AREA * settings.CARBON_PRICE_PER_TONNE
 
 
 def get_rev_matrix(data) -> np.ndarray:
