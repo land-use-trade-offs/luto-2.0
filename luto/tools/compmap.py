@@ -56,14 +56,26 @@ def crossmap(oldmap, newmap, ag_landuses = None, non_ag_landuses = None):
 
     return crosstab, switches
 
-def crossmap_irrstat(lumap_old, lmmap_old, lumap_new, lmmap_new, landuses=None):
-    if landuses is not None:
-        ludict = {}
+def crossmap_irrstat( lumap_old
+                    , lmmap_old
+                    , lumap_new
+                    , lmmap_new
+                    , ag_landuses=None
+                    , non_ag_landuses=None ):
+
+    ludict = {}
+    if ag_landuses is not None:
         ludict[-2] = 'Non-agricultural land (dry)'
         ludict[-1] = 'Non-agricultural land (irr)'
-        for j, lu in enumerate(landuses):
+
+        for j, lu in enumerate(ag_landuses):
             ludict[j*2] = lu + ' (dry)'
             ludict[j*2 + 1] = lu + ' (irr)'
+
+    if non_ag_landuses is not None:
+        base = settings.NON_AGRICULTURAL_LU_BASE_CODE
+        for k, lu in enumerate(non_ag_landuses):
+            ludict[k + base] = lu
 
     highpos_old = np.where(lmmap_old == 0, lumap_old * 2, lumap_old * 2 + 1)
     highpos_new = np.where(lmmap_new == 0, lumap_new * 2, lumap_new * 2 + 1)

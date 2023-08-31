@@ -103,17 +103,17 @@ def create_new_dataset():
     # Read in from-to costs in category-to-category format
     # tmcat = pd.read_csv(raw_data + 'tmatrix_categories.csv', index_col = 0)
     tmcat = pd.read_excel( raw_data + 'transitions_costs_20230816.xlsx'
-                         , sheet_name = 'Current'
-                         , usecols = 'B:M'
-                         , skiprows = 5
-                         , nrows = 11
-                         , index_col = 0)
+                          , sheet_name = 'Current'
+                          , usecols = 'B:M'
+                          , skiprows = 5
+                          , nrows = 11
+                          , index_col = 0)
 
     # Read transition costs from agricultural land to environmental plantings
     ag_to_new_land_uses = pd.read_excel( raw_data + 'transitions_costs_20230816.xlsx'
-                                , sheet_name = 'Ag_to_new_land-uses'
-                                , usecols = 'B,C'
-                                , index_col = 0)
+                                       , sheet_name = 'Ag_to_new_land-uses'
+                                       , usecols = 'B,C'
+                                       , index_col = 0 )
 
     # Read the categories to land-uses concordance
     cat2lus = pd.read_csv(raw_data + 'tmatrix_cat2lus.csv').to_numpy()
@@ -163,6 +163,7 @@ def create_new_dataset():
     pd.DataFrame(ag_landuses).to_csv(outpath + 'ag_landuses.csv', index = False, header = False)
 
     # Create a non-agricultural landuses file
+    # Do not sort the whole list alphabetically when adding new landuses to the model.
     non_ag_landuses = ["Environmental Plantings"]
     with open(outpath + 'non_ag_landuses.csv', 'w') as non_ag_lu_csv:
         writer = csv.writer(non_ag_lu_csv)
@@ -233,22 +234,18 @@ def create_new_dataset():
 
 
 
-    ############### Create cost matrices for transitioning from environmental plantings to agricultural land
+    ############### Create cost vector for transitioning from environmental plantings to agricultural land
     ep_to_ag_t = t.loc['Unallocated - natural land'].to_numpy()
     # add cost of establishing irrigation for irrigated cells
-    ep_to_ag_t = np.stack([ep_to_ag_t, ep_to_ag_t + 7500])
-
-    np.save(outpath + 'ep_to_ag_tmatrix.npy', ep_to_ag_t)  # shape: (m, j)
+    np.save(outpath + 'ep_to_ag_tmatrix.npy', ep_to_ag_t)  # shape: (j,)
 
 
 
 
-    ############### Create cost matrices for transitioning from agricultural land to environmental plantings
-    ag_to_ep_t = ag_to_new_land_uses.to_numpy()
+    ############### Create cost vector for transitioning from agricultural land to environmental plantings
+    ag_to_ep_t = ag_to_new_land_uses.to_numpy()[:, 0]
     # add cost for removal of irrigation for irrigated cells
-    ag_to_ep_t = np.stack([ag_to_ep_t, ag_to_ep_t + 3000])
-
-    np.save(outpath + 'ag_to_ep_tmatrix.npy', ep_to_ag_t)  # shape: (m, j)
+    np.save(outpath + 'ag_to_ep_tmatrix.npy', ag_to_ep_t)  # shape: (j,)
 
 
 
