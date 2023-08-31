@@ -57,7 +57,7 @@ DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 20             # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 5            # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
 MODE = 'snapshot'       # runs for target year only
@@ -119,7 +119,7 @@ CARBON_PRICE_PER_TONNE = 50                 # Price of carbon per tonne - determ
 # ---------------------------------------------------------------------------- #
 
 WATER_USE_LIMITS = 'on' # or off
-GHG_EMISSIONS_LIMITS = 'off' # or off
+GHG_EMISSIONS_LIMITS = 'on' # or off
 
 # Greenhouse gas emissions in % terms
 GHG_REDUCTION_PERCENTAGE = 20

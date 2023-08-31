@@ -114,9 +114,10 @@ def write_production(sim, yr_cal, path):
                          , sim.data.NON_AGRICULTURAL_LANDUSES )
     ctlm, swlm = crossmap(sim.lmmaps[sim.data.YR_CAL_BASE], sim.lmmaps[yr_cal])
 
-    cthp, swhp = crossmap_irrstat(sim.lumaps[sim.data.YR_CAL_BASE], sim.lmmaps[sim.data.YR_CAL_BASE]
-                                  , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
-                                  , sim.data.AGRICULTURAL_LANDUSES)
+    cthp, swhp = crossmap_irrstat( sim.lumaps[sim.data.YR_CAL_BASE], sim.lmmaps[sim.data.YR_CAL_BASE]
+                                 , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
+                                 , sim.data.AGRICULTURAL_LANDUSES
+                                 , sim.data.NON_AGRICULTURAL_LANDUSES )
 
     ctlu.to_csv(os.path.join(path, 'crosstab-lumap.csv'))
     ctlm.to_csv(os.path.join(path, 'crosstab-lmmap.csv'))
@@ -211,7 +212,7 @@ def write_ghg(sim, yr_cal, path):
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
 
     # Get greenhouse gas emissions in mrj format
-    ag_g_mrj = ag_ghg.get_ghg_matrices(sim.data, yr_idx, sim.lumaps[yr_cal])
+    ag_g_mrj = ag_ghg.get_ghg_matrices(sim.data, yr_idx)
     non_ag_g_rk = non_ag_ghg.get_ghg_matrix(sim.data)
 
     # Prepare a data frame.
