@@ -12,7 +12,7 @@ def get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
     np.ndarray
         1-D array, indexed by cell.
     """
-    base_ag_to_ep_t = data.AG2EP_TRANSITION_COSTS
+    base_ag_to_ep_t = data.AG2EP_TRANSITION_COSTS_HA
     l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
     base_ag_to_ep_t_mrj = np.broadcast_to(base_ag_to_ep_t, (2, data.NCELLS, base_ag_to_ep_t.shape[0]))
 
@@ -109,7 +109,7 @@ def get_exclusions_environmental_plantings(data, lumap) -> np.ndarray:
     Get an array of cells that cannot be transitioned to environmental plantings.
     """
     # Get (agricultural) land uses that cannot transition to environmental plantings
-    excluded_ag_lus = np.where(np.isnan(data.AG2EP_TRANSITION_COSTS[0]))[0]
+    excluded_ag_lus = np.where(np.isnan(data.AG2EP_TRANSITION_COSTS_HA))[0]
     # Return an array with 0 for every cell that has an excluded land use and 1 otherwise.
     return (~np.isin(lumap, excluded_ag_lus)).astype(int)
 
