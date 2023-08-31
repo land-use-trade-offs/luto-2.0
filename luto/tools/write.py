@@ -212,7 +212,7 @@ def write_ghg(sim, yr_cal, path):
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
 
     # Get greenhouse gas emissions in mrj format
-    ag_g_mrj = ag_ghg.get_ghg_matrices(sim.data, yr_idx, sim.lumaps[yr_cal])
+    ag_g_mrj = ag_ghg.get_ghg_matrices(sim.data, yr_idx)
     non_ag_g_rk = non_ag_ghg.get_ghg_matrix(sim.data)
 
     # Prepare a data frame.

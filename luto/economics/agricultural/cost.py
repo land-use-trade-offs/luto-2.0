@@ -174,8 +174,8 @@ def get_cost_matrices(data, yr_idx, lumap):
     """Return agricultural c_mrj matrix of costs per cell as 3D Numpy array."""
     
     c_mrj = np.stack(tuple( get_cost_matrix(data, lm, yr_idx)
-                           for lm in data.LANDMANS )
-                   ).astype(np.float32)
+                            for lm in data.LANDMANS )
+                    ).astype(np.float32)
 
     # apply the cost of carbon released by transitioning unnatural land to natural land
     ghg_t_mrj = get_ghg_transition_penalties(data, lumap)

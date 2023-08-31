@@ -234,22 +234,18 @@ def create_new_dataset():
 
 
 
-    ############### Create cost matrices for transitioning from environmental plantings to agricultural land
+    ############### Create cost vector for transitioning from environmental plantings to agricultural land
     ep_to_ag_t = t.loc['Unallocated - natural land'].to_numpy()
     # add cost of establishing irrigation for irrigated cells
-    ep_to_ag_t = np.stack([ep_to_ag_t, ep_to_ag_t + 7500])
-
-    np.save(outpath + 'ep_to_ag_tmatrix.npy', ep_to_ag_t)  # shape: (m, j)
+    np.save(outpath + 'ep_to_ag_tmatrix.npy', ep_to_ag_t)  # shape: (j,)
 
 
 
 
-    ############### Create cost matrices for transitioning from agricultural land to environmental plantings
+    ############### Create cost vector for transitioning from agricultural land to environmental plantings
     ag_to_ep_t = ag_to_new_land_uses.to_numpy()[:, 0]
     # add cost for removal of irrigation for irrigated cells
-    ag_to_ep_t = np.stack([ag_to_ep_t, ag_to_ep_t + 3000])
-
-    np.save(outpath + 'ag_to_ep_tmatrix.npy', ag_to_ep_t)  # shape: (m, j)
+    np.save(outpath + 'ag_to_ep_tmatrix.npy', ag_to_ep_t)  # shape: (j,)
 
 
 
