@@ -91,7 +91,7 @@ class Data():
         self.CLIMATE_CHANGE_IMPACT = bdata.CLIMATE_CHANGE_IMPACT[self.MASK]
         self.EP_EST_COST_HA = bdata.EP_EST_COST_HA[self.MASK]                   # Float32
         self.AG2EP_TRANSITION_COSTS_HA = bdata.AG2EP_TRANSITION_COSTS_HA        # Float32
-        self.EP2AG_TRANSITION_COSTS_HA = bdata.AG2EP_TRANSITION_COSTS_HA        # Float32
+        self.EP2AG_TRANSITION_COSTS_HA = bdata.EP2AG_TRANSITION_COSTS_HA        # Float32
         self.EP_BLOCK_AVG_T_C02_HA = bdata.EP_BLOCK_AVG_T_C02_HA[self.MASK]     # Float32
         self.NATURAL_LAND_T_CO2_HA = bdata.NATURAL_LAND_T_CO2_HA[self.MASK]     # Float32
 

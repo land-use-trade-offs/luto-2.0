@@ -223,9 +223,10 @@ def write_ghg(sim, yr_cal, path):
     ghg_limits = ag_ghg.get_ghg_limits(sim.data)
 
     # Calculate the GHG emissions from agriculture for year.
+    ghg_t_2010 = ag_ghg.get_ghg_transition_penalties(sim.data, sim.lumaps[2010])
     ghg_emissions = (
-          ( ag_g_mrj * sim.ag_dvars[yr_cal] ).sum()         # Agricultural contribution
-        + ( non_ag_g_rk * sim.non_ag_dvars[yr_cal] ).sum()  # Non-agricultural contribution
+          ( (ag_g_mrj + ghg_t_2010) * sim.ag_dvars[yr_cal] ).sum()  # Agricultural contribution
+        + ( non_ag_g_rk * sim.non_ag_dvars[yr_cal] ).sum()          # Non-agricultural contribution
     )
     
     # Add to dataframe
