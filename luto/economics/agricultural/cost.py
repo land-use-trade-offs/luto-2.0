@@ -23,6 +23,7 @@ import numpy as np
 
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
 from luto.economics.agricultural.ghg import get_ghg_transition_penalties
+from luto.tools import amortise
 from luto import settings
 
 
@@ -178,6 +179,7 @@ def get_cost_matrices(data, yr_idx, lumap):
                     ).astype(np.float32)
 
     # apply the cost of carbon released by transitioning unnatural land to natural land
-    ghg_t_mrj = get_ghg_transition_penalties(data, lumap)
-    c_mrj += (ghg_t_mrj * settings.CARBON_PRICE_PER_TONNE)
+    ghg_cost_t_mrj = get_ghg_transition_penalties(data, lumap) * settings.CARBON_PRICE_PER_TONNE
+    c_mrj += ghg_cost_t_mrj
+    
     return c_mrj

@@ -186,8 +186,10 @@ PR2CM = dict2matrix(CM2PR_DICT, COMMODITIES, PRODUCTS).T # Note the transpose.
 # Load environmental plantings economic data (incl. GHG emissions)
 EP_EST_COST_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_est_cost_ha.h5') ).to_numpy()
 EP_BLOCK_AVG_T_C02_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_block_avg_t_co2_ha_yr.h5') ).to_numpy()
+
 # Agricultural land use to environmental plantings raw transition costs:
 AG2EP_TRANSITION_COSTS_HA = np.load( os.path.join(INPUT_DIR, 'ag_to_ep_tmatrix.npy') )  # shape: (28,)
+
 # EP to agricultural land use transition costs:
 EP2AG_TRANSITION_COSTS_HA = np.load( os.path.join(INPUT_DIR, 'ep_to_ag_tmatrix.npy') )  # shape: (28,)
 

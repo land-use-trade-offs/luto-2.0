@@ -68,6 +68,7 @@ def get_exclude_matrices(data, base_year: int, lumaps: Dict[int, np.ndarray]):
     # Transition costs from current land-use to all other land-uses j using current land-use map (in $/ha).
     t_rj = np.zeros((data.NCELLS, len(data.AGRICULTURAL_LANDUSES)))
     t_rj[ag_cells, :] = t_ij[lumap[ag_cells]]
+    
     # For non-agricultural cells, use the original 2010 solve's LUs to determine what LUs are possible for a cell
     t_rj[non_ag_cells, :] = t_ij[lumap_2010[non_ag_cells]]
 

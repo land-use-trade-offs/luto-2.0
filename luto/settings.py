@@ -57,7 +57,7 @@ DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 3             # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 9             # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
 MODE = 'snapshot'       # runs for target year only
@@ -87,7 +87,7 @@ SOLVE_METHOD = 2
    'deterministic concurrent simplex': 5 """
 
 # Penalty in objective function  *** Needs to be balanced against OPTIMALITY_TOLERANCE to trade-off speed for optimality ***
-PENALTY = 1e9
+PENALTY = 1e5
 
 # Print detailed output to screen
 VERBOSE = 1
