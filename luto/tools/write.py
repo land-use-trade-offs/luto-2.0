@@ -19,7 +19,7 @@ Writes model output and statistics to files.
 """
 
 
-import os
+import os, math
 from datetime import datetime
 import numpy as np
 import pandas as pd
@@ -37,11 +37,22 @@ import luto.economics.non_agricultural.ghg as non_ag_ghg
 def get_path():
     """Create a folder for storing outputs and return folder name."""
     
+    # Get date and time
     path = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
-    path = 'output/' + path 
+    
+    # Add some shorthand details about the model run
+    post = '_' + settings.OBJECTIVE + '_RF' + str(settings.RESFACTOR) + '_P1e' + str(int(math.log10(settings.PENALTY))) + '_W' + settings.WATER_USE_LIMITS + '_G' + settings.GHG_EMISSIONS_LIMITS
+    
+    # Create path name
+    path = 'output/' + path + post
+    
+    # Create folder 
     if not os.path.exists(path):
         os.mkdir(path)
+    
+    # Return path name
     return path
+
 
 
 def write_outputs(sim, yr_cal, path):

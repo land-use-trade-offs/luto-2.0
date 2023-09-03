@@ -64,8 +64,8 @@ MODE = 'snapshot'       # runs for target year only
 # MODE = 'timeseries'   # runs each year from base year to target year
 
 # Define the objective function
-OBJECTIVE = 'maximise revenue'
-# OBJECTIVE = 'minimise cost'
+# OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
+OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
 
 

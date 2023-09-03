@@ -113,13 +113,13 @@ def solve( ag_t_mrj                  # Agricultural transition cost matrices.
         print('Setting up objective function to %s...' % settings.OBJECTIVE, time.ctime() + '\n')
         
       
-        if settings.OBJECTIVE == 'maximise revenue':
+        if settings.OBJECTIVE == 'maxrev':
                     
             # Pre-calculate revenue minus (production and transition) costs
             ag_obj_mrj = -(ag_r_mrj - (ag_c_mrj + ag_t_mrj + non_ag_to_ag_t_mrj)) / settings.PENALTY
             non_ag_obj_rk = -(non_ag_r_rk - (non_ag_c_rk + ag_to_non_ag_t_rk)) / settings.PENALTY
          
-        elif settings.OBJECTIVE == 'minimise cost':
+        elif settings.OBJECTIVE == 'mincost':
             
             # Pre-calculate sum of production and transition costs
             ag_obj_mrj = (ag_c_mrj + ag_t_mrj + non_ag_to_ag_t_mrj) / settings.PENALTY
