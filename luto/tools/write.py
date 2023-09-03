@@ -21,9 +21,10 @@ Writes model output and statistics to files.
 
 import os
 from datetime import datetime
-
 import numpy as np
 import pandas as pd
+
+import luto.settings as settings
 from luto.tools import get_production
 from luto.tools.spatializers import *
 from luto.tools.compmap import *
@@ -47,9 +48,32 @@ def write_outputs(sim, yr_cal, path):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     
     # write_files(sim, path)
+    write_settings(path)
     write_production(sim, yr_cal, path)
     write_water(sim, yr_cal, path)
     write_ghg(sim, yr_cal, path)
+
+
+def write_settings(path):
+    """Write model run settings"""
+    
+    with open(os.path.join(path, 'model_run_settings.txt'), 'w') as f:
+        f.write('LUTO version %s\n' % settings.VERSION)
+        f.write('SSP %s, RCP %s\n' %(settings.SSP, settings.RCP))
+        f.write('DISCOUNT_RATE: %s\n' % settings.DISCOUNT_RATE)
+        f.write('AMORTISATION_PERIOD: %s\n' % settings.AMORTISATION_PERIOD)
+        f.write('RESFACTOR: %s\n' % settings.RESFACTOR)
+        f.write('MODE: %s\n' % settings.MODE)
+        f.write('OBJECTIVE: %s\n' % settings.OBJECTIVE)
+        f.write('PENALTY: %s\n' % settings.PENALTY)
+        f.write('OPTIMALITY_TOLERANCE: %s\n' % settings.OPTIMALITY_TOLERANCE)
+        f.write('THREADS: %s\n' % settings.THREADS)
+        f.write('ENV_PLANTING_COST_PER_HA_PER_YEAR: %s\n' % settings.ENV_PLANTING_COST_PER_HA_PER_YEAR)
+        f.write('CARBON_PRICE_PER_TONNE: %s\n' % settings.CARBON_PRICE_PER_TONNE)
+        f.write('WATER_USE_LIMITS: %s\n' % settings.WATER_USE_LIMITS)
+        f.write('GHG_EMISSIONS_LIMITS: %s\n' % settings.GHG_EMISSIONS_LIMITS)
+        f.write('GHG_REDUCTION_PERCENTAGE: %s\n' % settings.GHG_REDUCTION_PERCENTAGE)
+        f.write('WATER_REGION_DEF: %s\n' % settings.WATER_REGION_DEF)
 
 
 def write_files(sim, path):

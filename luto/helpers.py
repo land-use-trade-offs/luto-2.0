@@ -50,7 +50,6 @@ write_outputs(sim, 2030, path)
 
 
 
-
 #################################################### Pixel-level data testing code
 
 import pandas as pd
