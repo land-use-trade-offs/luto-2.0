@@ -68,6 +68,7 @@ def get_exclude_matrices(data, base_year: int, lumaps: Dict[int, np.ndarray]):
     # Transition costs from current land-use to all other land-uses j using current land-use map (in $/ha).
     t_rj = np.zeros((data.NCELLS, len(data.AGRICULTURAL_LANDUSES)))
     t_rj[ag_cells, :] = t_ij[lumap[ag_cells]]
+    
     # For non-agricultural cells, use the original 2010 solve's LUs to determine what LUs are possible for a cell
     t_rj[non_ag_cells, :] = t_ij[lumap_2010[non_ag_cells]]
 
@@ -140,36 +141,16 @@ def get_transition_matrices(data, yr_idx, base_year, lumaps, lmmaps):
     # -------------------------------------------------------------- #
     # Water license costs (upfront, amortised to annual, per cell).  #
     # -------------------------------------------------------------- #
-    
-    # Get water requirements from current agriculture, converting water requirements for LVSTK from ML per head to ML per cell (inc. REAL_AREA).
+
     w_mrj = get_wreq_matrices(data, yr_idx)
-    
-    # Sum total water requirements of current land-use and land management 
-    w_r = (w_mrj * l_mrj).sum(axis = 0).sum(axis = 1)
-    
-    # Net water requirements calculated as the diff in water requirements between current land-use and all other land-uses j.
-    w_net_mrj = w_mrj - w_r[:, np.newaxis]
-    
-    # Water license cost calculated as net water requirements (ML/ha) x licence price ($/ML).
-    w_delta_mrj = w_net_mrj * data.WATER_LICENCE_PRICE[:, np.newaxis]
-    
-    # When land-use changes from dryland to irrigated add $10k per hectare for establishing irrigation infrastructure
-    new_irrig_cost = 7500 * data.REAL_AREA[:, np.newaxis]
-    w_delta_mrj[1] = np.where(l_mrj[0], w_delta_mrj[1] + new_irrig_cost, w_delta_mrj[1])
-
-    # When land-use changes from irrigated to dryland add $3k per hectare for removing irrigation infrastructure
-    remove_irrig_cost = 3000 * data.REAL_AREA[:, np.newaxis]
-    w_delta_mrj[0] = np.where(l_mrj[1], w_delta_mrj[0] + remove_irrig_cost, w_delta_mrj[0])
-
-    # Amortise upfront costs to annualised costs
-    w_delta_mrj = tools.amortise(w_delta_mrj)
+    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data)
 
 
     # -------------------------------------------------------------- #
     # Total costs.                                                   #
     # -------------------------------------------------------------- #
 
-    # Sum annualised costs of land-use and land management transition in $ per ha
+    # Sum annualised costs of land-use and land management transition in $ per ha (for agricultural cells)
     t_mrj = np.zeros((n_ag_lms, ncells, n_ag_lus))
     t_mrj[:, ag_cells, :] = w_delta_mrj[:, ag_cells, :] + t_rj[ag_cells, :] # + o_delta_mrj
 

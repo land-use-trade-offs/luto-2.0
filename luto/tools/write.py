@@ -19,11 +19,12 @@ Writes model output and statistics to files.
 """
 
 
-import os
+import os, math
 from datetime import datetime
-
 import numpy as np
 import pandas as pd
+
+import luto.settings as settings
 from luto.tools import get_production
 from luto.tools.spatializers import *
 from luto.tools.compmap import *
@@ -36,20 +37,54 @@ import luto.economics.non_agricultural.ghg as non_ag_ghg
 def get_path():
     """Create a folder for storing outputs and return folder name."""
     
+    # Get date and time
     path = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
-    path = 'output/' + path 
+    
+    # Add some shorthand details about the model run
+    post = '_' + settings.OBJECTIVE + '_RF' + str(settings.RESFACTOR) + '_P1e' + str(int(math.log10(settings.PENALTY))) + '_W' + settings.WATER_USE_LIMITS + '_G' + settings.GHG_EMISSIONS_LIMITS
+    
+    # Create path name
+    path = 'output/' + path + post
+    
+    # Create folder 
     if not os.path.exists(path):
         os.mkdir(path)
+    
+    # Return path name
     return path
+
 
 
 def write_outputs(sim, yr_cal, path):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     
     # write_files(sim, path)
+    write_settings(path)
     write_production(sim, yr_cal, path)
     write_water(sim, yr_cal, path)
     write_ghg(sim, yr_cal, path)
+
+
+def write_settings(path):
+    """Write model run settings"""
+    
+    with open(os.path.join(path, 'model_run_settings.txt'), 'w') as f:
+        f.write('LUTO version %s\n' % settings.VERSION)
+        f.write('SSP %s, RCP %s\n' %(settings.SSP, settings.RCP))
+        f.write('DISCOUNT_RATE: %s\n' % settings.DISCOUNT_RATE)
+        f.write('AMORTISATION_PERIOD: %s\n' % settings.AMORTISATION_PERIOD)
+        f.write('RESFACTOR: %s\n' % settings.RESFACTOR)
+        f.write('MODE: %s\n' % settings.MODE)
+        f.write('OBJECTIVE: %s\n' % settings.OBJECTIVE)
+        f.write('PENALTY: %s\n' % settings.PENALTY)
+        f.write('OPTIMALITY_TOLERANCE: %s\n' % settings.OPTIMALITY_TOLERANCE)
+        f.write('THREADS: %s\n' % settings.THREADS)
+        f.write('ENV_PLANTING_COST_PER_HA_PER_YEAR: %s\n' % settings.ENV_PLANTING_COST_PER_HA_PER_YEAR)
+        f.write('CARBON_PRICE_PER_TONNE: %s\n' % settings.CARBON_PRICE_PER_TONNE)
+        f.write('WATER_USE_LIMITS: %s\n' % settings.WATER_USE_LIMITS)
+        f.write('GHG_EMISSIONS_LIMITS: %s\n' % settings.GHG_EMISSIONS_LIMITS)
+        f.write('GHG_REDUCTION_PERCENTAGE: %s\n' % settings.GHG_REDUCTION_PERCENTAGE)
+        f.write('WATER_REGION_DEF: %s\n' % settings.WATER_REGION_DEF)
 
 
 def write_files(sim, path):
@@ -114,9 +149,10 @@ def write_production(sim, yr_cal, path):
                          , sim.data.NON_AGRICULTURAL_LANDUSES )
     ctlm, swlm = crossmap(sim.lmmaps[sim.data.YR_CAL_BASE], sim.lmmaps[yr_cal])
 
-    cthp, swhp = crossmap_irrstat(sim.lumaps[sim.data.YR_CAL_BASE], sim.lmmaps[sim.data.YR_CAL_BASE]
-                                  , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
-                                  , sim.data.AGRICULTURAL_LANDUSES)
+    cthp, swhp = crossmap_irrstat( sim.lumaps[sim.data.YR_CAL_BASE], sim.lmmaps[sim.data.YR_CAL_BASE]
+                                 , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
+                                 , sim.data.AGRICULTURAL_LANDUSES
+                                 , sim.data.NON_AGRICULTURAL_LANDUSES )
 
     ctlu.to_csv(os.path.join(path, 'crosstab-lumap.csv'))
     ctlm.to_csv(os.path.join(path, 'crosstab-lmmap.csv'))
@@ -211,7 +247,7 @@ def write_ghg(sim, yr_cal, path):
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
 
     # Get greenhouse gas emissions in mrj format
-    ag_g_mrj = ag_ghg.get_ghg_matrices(sim.data, yr_idx, sim.lumaps[yr_cal])
+    ag_g_mrj = ag_ghg.get_ghg_matrices(sim.data, yr_idx)
     non_ag_g_rk = non_ag_ghg.get_ghg_matrix(sim.data)
 
     # Prepare a data frame.
@@ -222,9 +258,10 @@ def write_ghg(sim, yr_cal, path):
     ghg_limits = ag_ghg.get_ghg_limits(sim.data)
 
     # Calculate the GHG emissions from agriculture for year.
+    ghg_t_2010 = ag_ghg.get_ghg_transition_penalties(sim.data, sim.lumaps[2010])
     ghg_emissions = (
-          ( ag_g_mrj * sim.ag_dvars[yr_cal] ).sum()         # Agricultural contribution
-        + ( non_ag_g_rk * sim.non_ag_dvars[yr_cal] ).sum()  # Non-agricultural contribution
+          ( (ag_g_mrj + ghg_t_2010) * sim.ag_dvars[yr_cal] ).sum()  # Agricultural contribution
+        + ( non_ag_g_rk * sim.non_ag_dvars[yr_cal] ).sum()          # Non-agricultural contribution
     )
     
     # Add to dataframe

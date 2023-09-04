@@ -3,7 +3,7 @@ import numpy as np
 import luto.settings as settings
 
 
-def get_cost_env_plantings(data) -> np.ndarray:
+def get_rev_env_plantings(data) -> np.ndarray:
     """
     Parameters
     ----------
@@ -23,7 +23,7 @@ def get_rev_matrix(data) -> np.ndarray:
     """
 
     """
-    env_plantings_rev_matrix = get_cost_env_plantings(data)
+    env_plantings_rev_matrix = get_rev_env_plantings(data)
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     non_agr_rev_matrices = [

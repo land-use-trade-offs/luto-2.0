@@ -89,7 +89,7 @@ LU_NATURAL = [
     DESC2AGLU["Sheep - natural land"],
     DESC2AGLU["Unallocated - natural land"],
 ]
-LU_UNNATURAL = [DESC2AGLU[lu] for lu in AGRICULTURAL_LANDUSES if lu not in LU_NATURAL]
+LU_UNNATURAL = [DESC2AGLU[lu] for lu in AGRICULTURAL_LANDUSES if DESC2AGLU[lu] not in LU_NATURAL]
 
 LU_CROPS_INDICES = [AGRICULTURAL_LANDUSES.index(lu) for lu in AGRICULTURAL_LANDUSES if lu in LU_CROPS]
 LU_LVSTK_INDICES = [AGRICULTURAL_LANDUSES.index(lu) for lu in AGRICULTURAL_LANDUSES if lu in LU_LVSTK]
@@ -186,11 +186,13 @@ PR2CM = dict2matrix(CM2PR_DICT, COMMODITIES, PRODUCTS).T # Note the transpose.
 
 # Load environmental plantings economic data (incl. GHG emissions)
 EP_EST_COST_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_est_cost_ha.h5') ).to_numpy()
-# agricultural land use to environmental plantings raw transition costs:
-AG2EP_TRANSITION_COSTS_HA = np.load( os.path.join(INPUT_DIR, 'ag_to_ep_tmatrix.npy') )
-# EP to agricultural land use transition costs:
-EP2AG_TRANSITION_COSTS_HA = np.load( os.path.join(INPUT_DIR, 'ep_to_ag_tmatrix.npy') )
 EP_BLOCK_AVG_T_C02_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_block_avg_t_co2_ha_yr.h5') ).to_numpy()
+
+# Agricultural land use to environmental plantings raw transition costs:
+AG2EP_TRANSITION_COSTS_HA = np.load( os.path.join(INPUT_DIR, 'ag_to_ep_tmatrix.npy') )  # shape: (28,)
+
+# EP to agricultural land use transition costs:
+EP2AG_TRANSITION_COSTS_HA = np.load( os.path.join(INPUT_DIR, 'ep_to_ag_tmatrix.npy') )  # shape: (28,)
 
 
 
@@ -320,7 +322,7 @@ fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + SSP + '_2010-2100_sr_ml_h
 
 # Load the carbon data.
 REMNANT_VEG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'natural_land_t_co2_ha.h5') )
-NATURAL_LAND_T_CO2_HA = REMNANT_VEG_T_CO2_HA.to_numpy()
+NATURAL_LAND_T_CO2_HA = REMNANT_VEG_T_CO2_HA.to_numpy(dtype = np.float32)
 
 
 ###############################################################

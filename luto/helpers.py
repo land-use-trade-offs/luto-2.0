@@ -50,6 +50,88 @@ write_outputs(sim, 2030, path)
 
 
 
+#################################################### Pixel-level data testing code
+
+import pandas as pd
+import numpy as np
+from luto.tools import amortise
+import luto.simulation as sim
+import luto.economics.agricultural.transitions as ag_transition
+import luto.economics.agricultural.cost as ag_cost
+import luto.economics.agricultural.revenue as ag_revenue
+from luto.economics.agricultural.ghg import get_ghg_transition_penalties
+from luto import settings
+import random as rand
+  
+# Load data object into memory
+data = sim.Data(sim.bdata, 2030)
+
+# Read in the lmap dataframe which contains land-use and land management mapping from 2010, mask and reset index
+lmap = pd.read_hdf('../raw_data/cell_LU_mapping.h5')[data.MASK].reset_index()
+
+# Load cropping and irrigation exclusion factors and mask them
+prec_over_175mm = pd.read_hdf('../raw_data/cell_biophysical_df.h5')['AVG_GROW_SEAS_PREC_GE_175_MM_YR'].to_numpy()[data.MASK]
+pot_irr_areas = pd.read_hdf('../raw_data/cell_zones_df.h5')['POTENTIAL_IRRIGATION_AREAS'].to_numpy()[data.MASK]
+
+# Get array containing cell index values where potential irrigation == 1
+irr_idx = np.nonzero(pot_irr_areas)[0]
+
+# Load land use and land management maps
+lumap = data.LUMAP
+lmmap = data.LMMAP
+lumaps = {2010:lumap}
+lmmaps = {2010:lmmap}
+d = {0:'Dryland', 1:'Irrigated'}
+
+# Calculate the exclude, transistions costs, and cost of production matrices
+x_mrj = ag_transition.get_exclude_matrices(data, 2010, lumaps)
+t_mrj = ag_transition.get_transition_matrices(data, 20, 2010, lumaps, lmmaps)
+gct_mrj = get_ghg_transition_penalties(data, lumap) * settings.CARBON_PRICE_PER_TONNE
+c_mrj = ag_cost.get_cost_matrices(data, 0, lumap) - gct_mrj
+r_mrj = ag_revenue.get_rev_matrices(data, 0)
+
+# Load ag_X_mrj file from a run with the same resfactor
+ag_X_mrj = np.load('output/2023_09_02__14_02_41/ag_X_mrj_2030.npy')
+
+# Get cells which are Sheep - modified land in 2030
+sheep_mod_2030 = ag_X_mrj[..., data.AGRICULTURAL_LANDUSES.index('Sheep - modified land')]
+
+# Get cells which are Unallocated - natural land in 2010
+uall_nat_2010 = lumap == data.AGRICULTURAL_LANDUSES.index('Unallocated - natural land')
+
+# Get cells which change from Unall - nat to Sheep - mod
+xind = np.nonzero( (sheep_mod_2030 * uall_nat_2010)[0] )[0]
+
+def spot_check(r):
+    
+    # Get SA2_ID
+    sa2 = lmap.loc[r, 'SA2_ID'].item()
+    
+    print('\nCELL_ID', r, data.AGRICULTURAL_LANDUSES[lumap[r]], ',', d[lmmap[r]], ', SA2', sa2, ', RF excl', str(prec_over_175mm[r]) + ', IRR excl', str(pot_irr_areas[r]), '\n')
+    
+    # Print unique land-use and land management types in the SA2
+    df = lmap.query('SA2_ID == @sa2')[['IRRIGATION', 'LU_DESC']].drop_duplicates()
+    df = df.sort_values(['IRRIGATION', 'LU_DESC'])
+    print(df)
+    
+    print('\n' + f'{"Dryland land-uses" : <48}{"Irrigated land-uses" : <0}')
+    
+    print(f'{"X" : <4}{"TransCosts" : <12}{"GHG_Costs" : <12}{"Costs" : <10}{"Rev" : <10}{"X" : <4}{"TransCosts" : <12}{"GHG_Costs" : <12}{"Costs" : <10}{"Rev" : <10}')
+            
+    for i in range(len(data.AGRICULTURAL_LANDUSES)):
+        print(f'{x_mrj[0, r, i] : <4}{t_mrj[0, r, i] : <12,.0f}{gct_mrj[0, r, i] : <12,.0f}{c_mrj[0, r, i] : <10,.0f}{r_mrj[0, r, i] : <10,.0f}{x_mrj[1, r, i] : <4}{t_mrj[1, r, i] : <12,.0f}{gct_mrj[1, r, i] : <12,.0f}{c_mrj[1, r, i] : <10,.0f}{r_mrj[1, r, i] : <10,.0f}{data.AGRICULTURAL_LANDUSES[i] : <10}')
+
+r = rand.randint(0, data.NCELLS)
+r = rand.choice(irr_idx)
+r = rand.choice(xind)
+spot_check(r)
+
+####################################################
+
+
+
+
+
 write_files(sim, path)
 write_production(sim, 2030, d_c, path)
 write_water(sim, 2030, path)

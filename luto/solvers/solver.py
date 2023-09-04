@@ -36,29 +36,27 @@ gurenv.setParam('Threads', settings.THREADS)
 gurenv.start()
 
 
-def solve(ag_t_mrj                  # Agricultural transition cost matrices.
-          , ag_c_mrj                # Agricultural production cost matrices.
-          , ag_r_mrj                # Agricultural production revenue matrices.
-          , ag_g_mrj                # Agricultural greenhouse gas emissions matrices.
-          , ag_w_mrj                # Agricultural water requirements matrices.
-          , ag_x_mrj                # Agricultural exclude matrices.
-          , ag_q_mrp                # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
-
-          , ag_to_non_ag_t_rk       # Agricultural to non-agricultural transition cost matrix.
-          , non_ag_to_ag_t_mrj      # Non-agricultural to agricultural transition cost matrices.
-
-          , non_ag_c_rk             # Non-agricultural production cost matrix.
-          , non_ag_r_rk             # Non-agricultural revenue matrix.
-          , non_ag_g_rk             # Non-agricultural greenhouse gas emissions matrix.
-          , non_ag_w_rk             # Non-agricultural water requirements matrix.
-          , non_ag_x_rk             # Non-agricultural exclude matrices.
-          , non_ag_q_crk            # Non-agricultural yield matrix.
-
-          , d_c                     # Demands -- note the `c` ('commodity') index instead of `j` (land-use).
-          , lu2pr_pj                # Conversion matrix: land-use to product(s).
-          , pr2cm_cp                # Conversion matrix: product(s) to commodity.
-          , limits = None           # Targets to use.
-          ):
+def solve( ag_t_mrj                  # Agricultural transition cost matrices.
+         , ag_c_mrj                # Agricultural production cost matrices.
+         , ag_r_mrj                # Agricultural production revenue matrices.
+         , ag_g_mrj                # Agricultural greenhouse gas emissions matrices.
+         , ag_w_mrj                # Agricultural water requirements matrices.
+         , ag_x_mrj                # Agricultural exclude matrices.
+         , ag_q_mrp                # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
+         , ag_ghg_t_mrj            # GHG emissions released during transitions between agricultural land uses.
+         , ag_to_non_ag_t_rk       # Agricultural to non-agricultural transition cost matrix.
+         , non_ag_to_ag_t_mrj      # Non-agricultural to agricultural transition cost matrices.
+         , non_ag_c_rk             # Non-agricultural production cost matrix.
+         , non_ag_r_rk             # Non-agricultural revenue matrix.
+         , non_ag_g_rk             # Non-agricultural greenhouse gas emissions matrix.
+         , non_ag_w_rk             # Non-agricultural water requirements matrix.
+         , non_ag_x_rk             # Non-agricultural exclude matrices.
+         , non_ag_q_crk            # Non-agricultural yield matrix.
+         , d_c                     # Demands -- note the `c` ('commodity') index instead of `j` (land-use).
+         , lu2pr_pj                # Conversion matrix: land-use to product(s).
+         , pr2cm_cp                # Conversion matrix: product(s) to commodity.
+         , limits = None           # Targets to use.
+         ):
     """Return land-use and land management maps under constraints and minimised costs.
 
     All inputs are Numpy arrays of the appropriate shapes, except for `p` which
@@ -68,7 +66,6 @@ def solve(ag_t_mrj                  # Agricultural transition cost matrices.
     dictionary. Format {key: value} where 'key' is a string, one of 'water',
     'nutrients', 'carbon' or 'biodiversity' and 'value' is either True or False.
     """
-
     # Set up a timer
     start_time = time.time()
 
@@ -116,13 +113,13 @@ def solve(ag_t_mrj                  # Agricultural transition cost matrices.
         print('Setting up objective function to %s...' % settings.OBJECTIVE, time.ctime() + '\n')
         
       
-        if settings.OBJECTIVE == 'maximise revenue':
+        if settings.OBJECTIVE == 'maxrev':
                     
             # Pre-calculate revenue minus (production and transition) costs
             ag_obj_mrj = -(ag_r_mrj - (ag_c_mrj + ag_t_mrj + non_ag_to_ag_t_mrj)) / settings.PENALTY
             non_ag_obj_rk = -(non_ag_r_rk - (non_ag_c_rk + ag_to_non_ag_t_rk)) / settings.PENALTY
          
-        elif settings.OBJECTIVE == 'minimise cost':
+        elif settings.OBJECTIVE == 'mincost':
             
             # Pre-calculate sum of production and transition costs
             ag_obj_mrj = (ag_c_mrj + ag_t_mrj + non_ag_to_ag_t_mrj) / settings.PENALTY
@@ -140,11 +137,11 @@ def solve(ag_t_mrj                  # Agricultural transition cost matrices.
 
                      # Production costs + transition costs for all non-agricultural land uses.
                      # Environmental plantings:
-                     + sum( non_ag_obj_rk[:, k] @ X_non_ag[k]
-                            for k in range(n_non_ag_lus) )
+                   + sum( non_ag_obj_rk[:, k] @ X_non_ag[k]
+                          for k in range(n_non_ag_lus) )
                     
                      # Add deviation-from-demand variables for ensuring demand of each commodity is met (approximately). 
-                     + sum( V[c] for c in range(ncms) )
+                   + sum( V[c] for c in range(ncms) )
                     ) 
 
         model.setObjective(objective, GRB.MINIMIZE)
@@ -224,13 +221,16 @@ def solve(ag_t_mrj                  # Agricultural transition cost matrices.
             
             # Returns GHG emissions limits 
             ghg_limits = limits['ghg']
-                
+
+            g_dry_contr = ag_g_mrj[0, :, :] + ag_ghg_t_mrj[0, :, :]
+            g_irr_contr = ag_g_mrj[1, :, :] + ag_ghg_t_mrj[1, :, :]
+
             ghg_emissions = (
-                sum(ag_g_mrj[0, :, j] @ X_ag_dry[j]   # Dryland agriculture contribution
-                  + ag_g_mrj[1, :, j] @ X_ag_irr[j]   # Irrigated agriculture contribution
+                sum(g_dry_contr[:, j] @ X_ag_dry[j]     # Dryland agriculture contribution
+                  + g_irr_contr[:, j] @ X_ag_irr[j]     # Irrigated agriculture contribution
                     for j in range(n_ag_lus) )
 
-              + sum(non_ag_g_rk[:, k] @ X_non_ag[k]   # Non-agricultural contribution
+              + sum(non_ag_g_rk[:, k] @ X_non_ag[k]      # Non-agricultural contribution
                     for k in range(n_non_ag_lus) )
             )
             

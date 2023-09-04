@@ -42,7 +42,7 @@ import luto.economics.non_agricultural.transitions as non_ag_transition
 import luto.economics.non_agricultural.revenue as non_ag_revenue
 
 from luto.solvers.solver import solve
-from luto.tools import lumap2ag_l_mrj, lumap2non_ag_l_mk, get_production
+from luto import tools
 
 
 class Data():
@@ -69,8 +69,8 @@ class Data():
         self.REAL_AREA = bdata.REAL_AREA[self.MASK] * bdata.RESMULT             # Actual Float32
         self.LUMAP = bdata.LUMAP[self.MASK]                                     # Int8
         self.LMMAP = bdata.LMMAP[self.MASK]                                     # Int8
-        self.AG_L_MRJ = lumap2ag_l_mrj(self.LUMAP, self.LMMAP)                  # Boolean [2, 4218733, 28]
-        self.NON_AG_L_RK = lumap2non_ag_l_mk(
+        self.AG_L_MRJ = tools.lumap2ag_l_mrj(self.LUMAP, self.LMMAP)                  # Boolean [2, 4218733, 28]
+        self.NON_AG_L_RK = tools.lumap2non_ag_l_mk(
             self.LUMAP, len(self.NON_AGRICULTURAL_LANDUSES)
         )                                                                       # Int8
         self.PROD_2010_C = prod_2010_c                                          # Float, total agricultural production in 2010, shape n commodities
@@ -90,8 +90,8 @@ class Data():
         self.DRAINDIV_ID = bdata.DRAINDIV_ID[self.MASK]                         # Int8
         self.CLIMATE_CHANGE_IMPACT = bdata.CLIMATE_CHANGE_IMPACT[self.MASK]
         self.EP_EST_COST_HA = bdata.EP_EST_COST_HA[self.MASK]                   # Float32
-        self.AG2EP_TRANSITION_COSTS = bdata.AG2EP_TRANSITION_COSTS_HA           # Float32
-        self.EP2AG_TRANSITION_COSTS = bdata.AG2EP_TRANSITION_COSTS_HA           # Float32
+        self.AG2EP_TRANSITION_COSTS_HA = bdata.AG2EP_TRANSITION_COSTS_HA        # Float32
+        self.EP2AG_TRANSITION_COSTS_HA = bdata.EP2AG_TRANSITION_COSTS_HA        # Float32
         self.EP_BLOCK_AVG_T_C02_HA = bdata.EP_BLOCK_AVG_T_C02_HA[self.MASK]     # Float32
         self.NATURAL_LAND_T_CO2_HA = bdata.NATURAL_LAND_T_CO2_HA[self.MASK]     # Float32
 
@@ -113,7 +113,7 @@ def sync_years(base, target):
 
 def get_ag_c_mrj():
     print('Getting agricultural production cost matrices...', end = ' ')
-    output = ag_cost.get_cost_matrices(data, target_index)
+    output = ag_cost.get_cost_matrices(data, target_index, lumaps[base_year])
     print('Done.')
     return output.astype(np.float32)
 
@@ -141,7 +141,7 @@ def get_non_ag_r_rk():
 
 def get_ag_g_mrj():
     print('Getting agricultural GHG emissions matrices...', end = ' ')
-    output = ag_ghg.get_ghg_matrices(data, target_index, lumaps[base_year])
+    output = ag_ghg.get_ghg_matrices(data, target_index)
     print('Done.')
     return output.astype(np.float32)
 
@@ -183,11 +183,18 @@ def get_non_ag_q_crk():
 
 def get_ag_t_mrj():
     print('Getting agricultural transition cost matrices...', end = ' ')
-    output = ag_transition.get_transition_matrices(data
-                                                   , target_index
-                                                   , base_year
-                                                   , lumaps
-                                                   , lmmaps)
+    output = ag_transition.get_transition_matrices( data
+                                                  , target_index
+                                                  , base_year
+                                                  , lumaps
+                                                  , lmmaps)
+    print('Done.')
+    return output.astype(np.float32)
+
+
+def get_ag_ghg_t_mrj():
+    print('Getting agricultural transitions GHG emissions...', end = ' ')
+    output = ag_ghg.get_ghg_transition_penalties(data, lumaps[base_year])
     print('Done.')
     return output.astype(np.float32)
 
@@ -195,15 +202,16 @@ def get_ag_t_mrj():
 def get_ag_to_non_ag_t_rk():
     print('Getting agricultural to non-agricultural transition cost matrices...', end = ' ')
     output = non_ag_transition.get_from_ag_transition_matrix(data
-                                                             , lumaps[base_year]
-                                                             , lmmaps[base_year])
+                                                           , base_year
+                                                           , lumaps[base_year]
+                                                           , lmmaps[base_year])
     print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_to_ag_t_mrj():
     print('Getting non-agricultural to agricultural transition cost matrices...', end=' ')
-    output = non_ag_transition.get_to_ag_transition_matrix(data, lumaps[base_year])
+    output = non_ag_transition.get_to_ag_transition_matrix(data, base_year, lumaps[base_year], lmmaps[base_year])
     print('Done.')
     return output.astype(np.float32)
 
@@ -273,6 +281,7 @@ def step( base    # Base year from which the data is taken.
              , get_ag_w_mrj()
              , get_ag_x_mrj()
              , get_ag_q_mrp()
+             , get_ag_ghg_t_mrj()
              , get_ag_to_non_ag_t_rk()
              , get_non_ag_to_ag_t_mrj()
              , get_non_ag_c_rk()
@@ -341,10 +350,10 @@ ag_dvars = {}
 non_ag_dvars = {}
 
 # Get the total demand quantities by commodity for 2010 to 2100 by combining the demand deltas with 2010 production
-prod_2010_c = get_production( bdata
+prod_2010_c = tools.get_production( bdata
                             , bdata.YR_CAL_BASE
-                            , lumap2ag_l_mrj(bdata.LUMAP, bdata.LMMAP)
-                            , lumap2non_ag_l_mk(bdata.LUMAP, len(bdata.NON_AGRICULTURAL_LANDUSES))
+                            , tools.lumap2ag_l_mrj(bdata.LUMAP, bdata.LMMAP)
+                            , tools.lumap2non_ag_l_mk(bdata.LUMAP, len(bdata.NON_AGRICULTURAL_LANDUSES))
                             )
 
 # Demand deltas can be a time series (shape year x commodity) or a single array (shape = n commodites).
