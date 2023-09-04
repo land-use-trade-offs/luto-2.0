@@ -113,7 +113,7 @@ def sync_years(base, target):
 
 def get_ag_c_mrj():
     print('Getting agricultural production cost matrices...', end = ' ')
-    output = ag_cost.get_cost_matrices(data, target_index, lumaps[base_year])
+    output = ag_cost.get_cost_matrices(data, target_index)
     print('Done.')
     return output.astype(np.float32)
 

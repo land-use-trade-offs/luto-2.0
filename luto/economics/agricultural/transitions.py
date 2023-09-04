@@ -22,6 +22,8 @@ import numpy as np
 from typing import Dict
 
 from luto.economics.agricultural.water import get_wreq_matrices
+import luto.economics.agricultural.ghg as ag_ghg
+from luto import settings
 import luto.tools as tools
 
 
@@ -144,6 +146,14 @@ def get_transition_matrices(data, yr_idx, base_year, lumaps, lmmaps):
     w_mrj = get_wreq_matrices(data, yr_idx)
     w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data)
 
+    # -------------------------------------------------------------- #
+    # Cardbon costs of transitioning cells.                          #
+    # -------------------------------------------------------------- #
+
+    # apply the cost of carbon released by transitioning unnatural land to natural land
+    ghg_t_mrj = ag_ghg.get_ghg_transition_penalties(data, lumap)
+    ghg_t_mrj_cost = tools.amortise(ghg_t_mrj * settings.CARBON_PRICE_PER_TONNE)
+
 
     # -------------------------------------------------------------- #
     # Total costs.                                                   #
@@ -152,6 +162,7 @@ def get_transition_matrices(data, yr_idx, base_year, lumaps, lmmaps):
     # Sum annualised costs of land-use and land management transition in $ per ha (for agricultural cells)
     t_mrj = np.zeros((n_ag_lms, ncells, n_ag_lus))
     t_mrj[:, ag_cells, :] = w_delta_mrj[:, ag_cells, :] + t_rj[ag_cells, :] # + o_delta_mrj
+    t_mrj += ghg_t_mrj_cost
 
     # Ensure cost for switching to the same land-use and land management is zero.
     t_mrj = np.where(l_mrj, 0, t_mrj)

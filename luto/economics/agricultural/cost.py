@@ -22,8 +22,6 @@ Pure functions to calculate costs of commodities and alt. land uses.
 import numpy as np
 
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
-from luto.economics.agricultural.ghg import get_ghg_transition_penalties
-from luto import settings
 
 
 def get_cost_crop( data # Data object or module.
@@ -170,14 +168,11 @@ def get_cost_matrix(data, lm, yr_idx):
     return np.nan_to_num(c_rj)
 
 
-def get_cost_matrices(data, yr_idx, lumap):
+def get_cost_matrices(data, yr_idx):
     """Return agricultural c_mrj matrix of costs per cell as 3D Numpy array."""
     
     c_mrj = np.stack(tuple( get_cost_matrix(data, lm, yr_idx)
                             for lm in data.LANDMANS )
                     ).astype(np.float32)
 
-    # apply the cost of carbon released by transitioning unnatural land to natural land
-    ghg_t_mrj = get_ghg_transition_penalties(data, lumap)
-    c_mrj += (ghg_t_mrj * settings.CARBON_PRICE_PER_TONNE)
     return c_mrj
