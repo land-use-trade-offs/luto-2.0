@@ -79,6 +79,16 @@ def solve( ag_t_mrj                  # Agricultural transition cost matrices.
     _, _, nprs = ag_q_mrp.shape # Number of products.
     ncms, = d_c.shape # Number of commodities.
 
+    # Make an index of each cell permitted to transform to each land use / land management combination
+    ag_lu2cells = {
+        (m, j): np.where(ag_x_mrj[m, :, j])[0]
+                for j in range(n_ag_lus)
+                for m in range(n_ag_lms)
+    }
+    non_ag_lu2cells = {
+        k: np.where(non_ag_x_rk[:, k])[0]
+           for k in range(n_non_ag_lus)
+    }
 
     try:
         print('\nSetting up the model...', time.ctime() + '\n')
@@ -90,17 +100,35 @@ def solve( ag_t_mrj                  # Agricultural transition cost matrices.
         # Decision variables. #
         # ------------------- #
         print('Adding decision variables...', time.ctime() + '\n')
+
+        # Initialise a sparse, matrix version of the variable for adding constraints later
+        X_ag_dry_vars_jr = np.zeros((n_ag_lus, ncells), dtype=object)
+        X_ag_irr_vars_jr = np.zeros((n_ag_lus, ncells), dtype=object)
+        X_non_ag_vars_kr = np.zeros((n_non_ag_lus, ncells), dtype=object)
         
-        # Land-use indexed lists of ncells-sized decision variable vectors.
-        X_ag_dry = [ model.addMVar(ncells, ub =ag_x_mrj[0, :, j], name ='X_ag_dry')
-                  for j in range(n_ag_lus) ]
+        for j in range(n_ag_lus):
+            dry_lu_cells = ag_lu2cells[0, j]
+            for r in dry_lu_cells:
+                X_ag_dry_vars_jr[j, r] = model.addVar(ub=1, name=f"X_ag_dry_{j}_{r}")
+
+            irr_lu_cells = ag_lu2cells[1, j]
+            for r in irr_lu_cells:
+                X_ag_irr_vars_jr[j, r] = model.addVar(ub=1, name=f"X_ag_irr_{j}_{r}")
+
+        for k in range(n_non_ag_lus):
+            lu_cells = non_ag_lu2cells[k]
+            for r in lu_cells:
+                X_non_ag_vars_kr[k, r] = model.addVar(ub=1, name=f"X_non_ag_{k}_{r}")
+
+        # X_ag_dry = [ model.addMVar(ncells, ub =ag_x_mrj[0, :, j], name ='X_ag_dry')
+        #           for j in range(n_ag_lus) ]
         
-        X_ag_irr = [ model.addMVar(ncells, ub =ag_x_mrj[1, :, j], name ='X_ag_irr')
-                  for j in range(n_ag_lus) ]
+        # X_ag_irr = [ model.addMVar(ncells, ub =ag_x_mrj[1, :, j], name ='X_ag_irr')
+        #           for j in range(n_ag_lus) ]
 
         # Non-agricultural decision variable vectors
-        X_non_ag = [ model.addMVar(ncells, ub =non_ag_x_rk[:, k], name ='X_ep')
-                  for k in range(n_non_ag_lus) ]
+        # X_non_ag = [ model.addMVar(ncells, ub =non_ag_x_rk[:, k], name ='X_ep')
+        #           for k in range(n_non_ag_lus) ]
 
         # Decision variables, one for each commodity, to minimise the deviations from demand.
         V = model.addMVar(ncms, name = 'V')
@@ -128,16 +156,19 @@ def solve( ag_t_mrj                  # Agricultural transition cost matrices.
         else:
             print('Unknown objective')
 
+        ag_obj_mrj = np.nan_to_num(ag_obj_mrj)
+        non_ag_obj_rk = np.nan_to_num(non_ag_obj_rk)
+
         # Specify objective function
         objective = ( 
                      # Production costs + transition costs for all agricultural land uses.
-                     sum( ag_obj_mrj[0, :, j] @ X_ag_dry[j]
-                        + ag_obj_mrj[1, :, j] @ X_ag_irr[j]
+                     sum( ag_obj_mrj[0, :, j][ag_lu2cells[0, j]] @ X_ag_dry_vars_jr[j, ag_lu2cells[0, j]]
+                        + ag_obj_mrj[1, :, j][ag_lu2cells[1, j]] @ X_ag_irr_vars_jr[j, ag_lu2cells[1, j]]
                           for j in range(n_ag_lus) )
 
                      # Production costs + transition costs for all non-agricultural land uses.
                      # Environmental plantings:
-                   + sum( non_ag_obj_rk[:, k] @ X_non_ag[k]
+                   + sum( non_ag_obj_rk[:, k][non_ag_lu2cells[k]] @ X_non_ag_vars_kr[k, non_ag_lu2cells[k]]
                           for k in range(n_non_ag_lus) )
                     
                      # Add deviation-from-demand variables for ensuring demand of each commodity is met (approximately). 
@@ -153,14 +184,17 @@ def solve( ag_t_mrj                  # Agricultural transition cost matrices.
         print('Setting up constraints...', time.ctime() + '\n')
         
         # Constraint that all of every cell is used for some land use.
-        model.addConstr( sum(X_ag_dry + X_ag_irr + X_non_ag ) == np.ones(ncells) )
+        X_sum_r = X_ag_dry_vars_jr.sum(axis=0) + X_ag_irr_vars_jr.sum(axis=0) + X_non_ag_vars_kr.sum(axis=0)
+        for expr in X_sum_r:
+            model.addConstr(expr == 1)
+
         
         # Constraints to penalise under and over production compared to demand.
 
         # Transform agricultural decision vars from LU/j to PR/p representation.
-        X_dry_pr = [ X_ag_dry[j] for p in range(nprs) for j in range(n_ag_lus)
+        X_dry_pr = [ X_ag_dry_vars_jr[j, :] for p in range(nprs) for j in range(n_ag_lus)
                      if lu2pr_pj[p, j] ]
-        X_irr_pr = [ X_ag_irr[j] for p in range(nprs) for j in range(n_ag_lus)
+        X_irr_pr = [ X_ag_irr_vars_jr[j, :] for p in range(nprs) for j in range(n_ag_lus)
                      if lu2pr_pj[p, j] ]
 
         # Quantities in PR/p representation by land-management (dry/irr).
@@ -169,15 +203,15 @@ def solve( ag_t_mrj                  # Agricultural transition cost matrices.
 
         # Transform quantities to CM/c representation by land management (dry/irr).
         ag_q_dry_c = [ sum(ag_q_dry_p[p] for p in range(nprs) if pr2cm_cp[c, p])
-                    for c in range(ncms) ]
+                       for c in range(ncms) ]
         ag_q_irr_c = [ sum(ag_q_irr_p[p] for p in range(nprs) if pr2cm_cp[c, p])
-                    for c in range(ncms) ]
+                       for c in range(ncms) ]
 
         # Add non-agricultural commodity contributions
         # Environmental plantings:
-        non_ag_q_c = [ sum(non_ag_q_crk[c, :, [k]] @ X_non_ag[k] for k in range(n_non_ag_lus))
-                    for c in range(ncms) ]
-
+        non_ag_q_c = [ sum(non_ag_q_crk[c, :, k] @ X_non_ag_vars_kr[k, :] for k in range(n_non_ag_lus))
+                       for c in range(ncms) ]
+        
         # Total quantities in CM/c representation.
         total_q_c = [ ag_q_dry_c[c] + ag_q_irr_c[c] + non_ag_q_c[c] for c in range(ncms) ]
 
@@ -201,17 +235,18 @@ def solve( ag_t_mrj                  # Agricultural transition cost matrices.
 
             # Ensure water use remains below limit for each region
             for region, wreq_reg_limit, ind in w_limits:
-
                 wreq_region = (
-                    sum(ag_w_mrj[0, ind, j] @ X_ag_dry[j][ind]   # Dryland agriculture contribution
-                      + ag_w_mrj[1, ind, j] @ X_ag_irr[j][ind]   # Irrigated agriculture contribution
+                    sum(ag_w_mrj[0, ind, j] @ X_ag_dry_vars_jr[j, ind]   # Dryland agriculture contribution
+                      + ag_w_mrj[1, ind, j] @ X_ag_irr_vars_jr[j, ind]   # Irrigated agriculture contribution
                         for j in range(n_ag_lus))
 
-                  + sum( non_ag_w_rk[ind, k] @ X_non_ag[k][ind]  # Non-agricultural contribution
+                  + sum( non_ag_w_rk[ind, k] @ X_non_ag_vars_kr[k, ind]  # Non-agricultural contribution
                         for k in range(n_non_ag_lus))
                 )
 
-                model.addConstr(wreq_region <= wreq_reg_limit)
+                if wreq_region is not 0:
+                    model.addConstr(wreq_region <= wreq_reg_limit)
+
                 if settings.VERBOSE == 1:
                     print('    ...setting water limit for %s <= %.2f ML' % (region, wreq_reg_limit))
 
@@ -219,18 +254,18 @@ def solve( ag_t_mrj                  # Agricultural transition cost matrices.
         if settings.GHG_EMISSIONS_LIMITS == 'on':
             print('\nAdding GHG emissions constraints...', time.ctime() + '\n')
             
-            # Returns GHG emissions limits 
+            # Returns GHG emissions limits
             ghg_limits = limits['ghg']
 
             g_dry_contr = ag_g_mrj[0, :, :] + ag_ghg_t_mrj[0, :, :]
             g_irr_contr = ag_g_mrj[1, :, :] + ag_ghg_t_mrj[1, :, :]
 
             ghg_emissions = (
-                sum(g_dry_contr[:, j] @ X_ag_dry[j]     # Dryland agriculture contribution
-                  + g_irr_contr[:, j] @ X_ag_irr[j]     # Irrigated agriculture contribution
+                sum(g_dry_contr[:, j] @ X_ag_dry_vars_jr[j, :]     # Dryland agriculture contribution
+                  + g_irr_contr[:, j] @ X_ag_irr_vars_jr[j, :]     # Irrigated agriculture contribution
                     for j in range(n_ag_lus) )
 
-              + sum(non_ag_g_rk[:, k] @ X_non_ag[k]      # Non-agricultural contribution
+              + sum(non_ag_g_rk[:, k] @ X_non_ag_vars_kr[k, :]      # Non-agricultural contribution
                     for k in range(n_non_ag_lus) )
             )
             
@@ -264,10 +299,22 @@ def solve( ag_t_mrj                  # Agricultural transition cost matrices.
         
         print('Collecting results...', end = ' ')
         
-        # Collect optimised decision variables in one X_mrj Numpy array.              
-        X_dry_rj = np.stack([X_ag_dry[j].X for j in range(n_ag_lus)]).T.astype(np.float32)
-        X_irr_rj = np.stack([X_ag_irr[j].X for j in range(n_ag_lus)]).T.astype(np.float32)
-        non_ag_X_rk = np.stack([X_non_ag[k].X for k in range(n_non_ag_lus)]).T.astype(np.float32)
+        # Collect optimised decision variables in one X_mrj Numpy array.
+        X_dry_sol_rj = np.zeros((ncells, n_ag_lus)).astype(np.float32)
+        X_irr_sol_rj = np.zeros((ncells, n_ag_lus)).astype(np.float32)
+        non_ag_X_sol_rk = np.zeros((ncells, n_non_ag_lus)).astype(np.float32)
+
+        # Get agricultural results
+        for j in range(n_ag_lus):
+            for r in ag_lu2cells[0, j]:
+                X_dry_sol_rj[r, j] = X_ag_dry_vars_jr[j, r].X
+            for r in ag_lu2cells[1, j]:
+                X_irr_sol_rj[r, j] = X_ag_irr_vars_jr[j, r].X
+
+        # Get non-agricultural results
+        for k in range(n_non_ag_lus):
+            for r in non_ag_lu2cells[k]:
+                non_ag_X_sol_rk[r, k] = X_non_ag_vars_kr[k, r].X
 
         
         """Note that output decision variables are mostly 0 or 1 but in some cases they are somewhere in between which creates issues 
@@ -276,7 +323,7 @@ def solve( ag_t_mrj                  # Agricultural transition cost matrices.
 
         # Process agricultural land usage information
         # Stack dryland and irrigated decision variables
-        ag_X_mrj = np.stack((X_dry_rj, X_irr_rj))  # Float32
+        ag_X_mrj = np.stack((X_dry_sol_rj, X_irr_sol_rj))  # Float32
         ag_X_mrj_shape = ag_X_mrj.shape
         
         # Reshape so that cells are along the first axis and land management and use are flattened along second axis i.e. (XXXXXXX, 56)
@@ -294,18 +341,18 @@ def solve( ag_t_mrj                  # Agricultural transition cost matrices.
 
         # Process non-agricultural land usage information
         # Boolean matrix where the maximum value for each cell across all non-ag LUs is True
-        non_ag_X_rk_processed = non_ag_X_rk.argmax(axis=1)[:, np.newaxis] == range(n_non_ag_lus)
+        non_ag_X_rk_processed = non_ag_X_sol_rk.argmax(axis=1)[:, np.newaxis] == range(n_non_ag_lus)
 
         # Make land use and land management maps
         # Vector indexed by cell that denotes whether the cell is non-agricultural land (True) or agricultural land (False)
-        non_ag_bools_r = non_ag_X_rk.max(axis=1) > ag_X_mrj.max(axis=(0, 2))
+        non_ag_bools_r = non_ag_X_sol_rk.max(axis=1) > ag_X_mrj.max(axis=(0, 2))
         
         # Calculate 1D array (maps) of land-use and land management, considering only agricultural LUs
         lumap = ag_X_mrj_processed.sum(axis = 0).argmax(axis = 1).astype('int8')
         lmmap = ag_X_mrj_processed.sum(axis = 2).argmax(axis = 0).astype('int8')
 
         # Update lxmaps and processed variable matrices to consider non-agricultural LUs
-        lumap[non_ag_bools_r] = non_ag_X_rk[non_ag_bools_r, :].argmax(axis=1) + settings.NON_AGRICULTURAL_LU_BASE_CODE
+        lumap[non_ag_bools_r] = non_ag_X_sol_rk[non_ag_bools_r, :].argmax(axis=1) + settings.NON_AGRICULTURAL_LU_BASE_CODE
         lmmap[non_ag_bools_r] = 0  # Assume that all non-agricultural land uses are dryland
 
         ag_X_mrj_processed[:, non_ag_bools_r, :] = False
@@ -343,7 +390,7 @@ if __name__ == '__main__':
     q_mrp[:, :, -2] = 0 # An 'unallocated' landuse.
     c_mrj = 1 * np.ones((nlms, ncells, nlus))
     c_mrj[:, :, -2] = 0 # An 'unallocated' landuse.
-    x_mrj = 1 * np.ones((nlms, ncells, nlus))
+    zx_mrj = 1 * np.ones((nlms, ncells, nlus))
 
     p = 5
 
