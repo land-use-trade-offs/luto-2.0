@@ -234,8 +234,7 @@ def solve( ag_t_mrj                  # Agricultural transition cost matrices.
                     for k in range(n_non_ag_lus) )
             )
             
-            print('    ...setting {:,.0f}% GHG emissions reduction target: {:,.0f} tCO2e\n'.format(
-                          settings.GHG_REDUCTION_PERCENTAGE, ghg_limits )
+            print('    ...setting GHG emissions reduction target: {:,.0f} tCO2e\n'.format( ghg_limits )
                  )
             model.addConstr(ghg_emissions <= ghg_limits)
 

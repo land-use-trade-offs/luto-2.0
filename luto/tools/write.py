@@ -58,7 +58,7 @@ def get_path():
 def write_outputs(sim, yr_cal, path):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     
-    # write_files(sim, path)
+    write_files(sim, path)
     write_settings(path)
     write_production(sim, yr_cal, path)
     write_water(sim, yr_cal, path)
@@ -97,7 +97,7 @@ def write_files(sim, path):
         # Save raw agricultural decision variables (boolean array).
         ag_X_mrj_fname = 'ag_X_mrj_' + str(yr_cal) + '.npy'
         np.save(os.path.join(path, ag_X_mrj_fname), sim.ag_dvars[yr_cal])
-
+        
         # Save raw non-agricultural decision variables (boolean array).
         non_ag_X_rk_fname = 'non_ag_X_rk_' + str(yr_cal) + '.npy'
         np.save(os.path.join(path, non_ag_X_rk_fname), sim.non_ag_dvars[yr_cal])

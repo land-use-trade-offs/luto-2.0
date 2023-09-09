@@ -118,11 +118,13 @@ CARBON_PRICE_PER_TONNE = 50                 # Price of carbon per tonne - determ
 # Environmental parameters
 # ---------------------------------------------------------------------------- #
 
-WATER_USE_LIMITS = 'on' # 'on' or 'off'
-GHG_EMISSIONS_LIMITS = 'on' # 'on' or 'off'
+WATER_USE_LIMITS = 'on'         # 'on' or 'off'
+GHG_EMISSIONS_LIMITS = 'on'     # 'on' or 'off'
+GHG_LIMITS_TYPE = 'tonnes'      # 'tonnes' or 'percentage'
 
-# Greenhouse gas emissions in % terms
-GHG_REDUCTION_PERCENTAGE = 50
+# Greenhouse gas emissions 
+GHG_REDUCTION_PERCENTAGE = 50       # in % terms
+GHG_LIMITS = -70 * 1e6   # in tonnes
 
 # Water parameters (superseded)
 # WATER_YIELD_STRESS_FRACTION = 0.4       # Water stress if yields below this fraction.
