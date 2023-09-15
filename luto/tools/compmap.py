@@ -23,30 +23,25 @@ import numpy as np
 import pandas as pd
 
 import luto.settings as settings
+from luto.ag_managements import SORTED_AG_MANAGEMENTS
 
-def crossmap(oldmap, newmap, ag_landuses = None, non_ag_landuses = None):
-    """Return cross-tabulation matrix and net switching counts."""
 
+def lumap_crossmap(oldmap, newmap, ag_landuses, non_ag_landuses):
     # Produce the cross-tabulation matrix with optional labels.
     crosstab = pd.crosstab(oldmap, newmap, margins = True)
-    # Make sure the cross-tabulation matrix is square.
-    if ag_landuses and non_ag_landuses:
-        # for lumap - need to make sure each land use (both agricultural and non-agricultural) appears in the index/columns
-        reindex = (
-              list(range(len(ag_landuses)))
-            + [ settings.NON_AGRICULTURAL_LU_BASE_CODE + lu for lu in range(len(non_ag_landuses)) ]
-            + [ "All" ]
-        )
-        crosstab = crosstab.reindex(reindex, axis = 0, fill_value = 0)
-        crosstab = crosstab.reindex(reindex, axis = 1, fill_value = 0)
 
-        lus = ag_landuses + non_ag_landuses + ['Total']
-        crosstab.columns = lus
-        crosstab.index = lus
+    # Need to make sure each land use (both agricultural and non-agricultural) appears in the index/columns
+    reindex = (
+            list(range(len(ag_landuses)))
+        + [ settings.NON_AGRICULTURAL_LU_BASE_CODE + lu for lu in range(len(non_ag_landuses)) ]
+        + [ "All" ]
+    )
+    crosstab = crosstab.reindex(reindex, axis = 0, fill_value = 0)
+    crosstab = crosstab.reindex(reindex, axis = 1, fill_value = 0)
 
-    else:
-        # for lmmap
-        crosstab = crosstab.reindex(crosstab.index, axis=1, fill_value=0)
+    lus = ag_landuses + non_ag_landuses + ['Total']
+    crosstab.columns = lus
+    crosstab.index = lus
 
     # Calculate net switches to land use (negative means switch away).
     switches = crosstab.iloc[-1, 0:-1] - crosstab.iloc[0:-1, -1]
@@ -55,6 +50,45 @@ def crossmap(oldmap, newmap, ag_landuses = None, non_ag_landuses = None):
     switches['Total [%]'] = int(np.around(100 * nswitches / oldmap.shape[0]))
 
     return crosstab, switches
+
+
+def lmmap_crossmap(oldmap, newmap):
+    # Produce the cross-tabulation matrix with optional labels.
+    crosstab = pd.crosstab(oldmap, newmap, margins = True)
+    crosstab = crosstab.reindex(crosstab.index, axis=1, fill_value=0)
+
+    # Calculate net switches to land use (negative means switch away).
+    switches = crosstab.iloc[-1, 0:-1] - crosstab.iloc[0:-1, -1]
+    nswitches = np.abs(switches).sum()
+    switches['Total'] = nswitches
+    switches['Total [%]'] = int(np.around(100 * nswitches / oldmap.shape[0]))
+
+    return crosstab, switches
+
+
+def ammap_crossmap(oldmap, newmap):
+    # Produce the cross-tabulation matrix with optional labels.
+    crosstab = pd.crosstab(oldmap, newmap, margins = True)
+
+    reindex = list(range(len(SORTED_AG_MANAGEMENTS))) + ['All']
+    crosstab = crosstab.reindex(reindex, axis = 0, fill_value = 0)
+    crosstab = crosstab.reindex(reindex, axis = 1, fill_value = 0)
+
+    crosstab.columns = SORTED_AG_MANAGEMENTS + ['Total']
+    crosstab.index = SORTED_AG_MANAGEMENTS + ['Total']
+
+    # Calculate net switches to land use (negative means switch away).
+    switches = crosstab.iloc[-1, 0:-1] - crosstab.iloc[0:-1, -1]
+    nswitches = np.abs(switches).sum()
+    switches['Total'] = nswitches
+    switches['Total [%]'] = int(np.around(100 * nswitches / oldmap.shape[0]))
+
+    return crosstab, switches
+
+
+
+    
+
 
 def crossmap_irrstat( lumap_old
                     , lmmap_old

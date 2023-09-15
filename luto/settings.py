@@ -57,7 +57,7 @@ DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 1             # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 20            # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
 MODE = 'snapshot'       # runs for target year only
@@ -75,7 +75,7 @@ OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production co
 
 # Select Gurobi algorithm used to solve continuous models or the initial root relaxation of a MIP model.
 # Set solve method. Default is automatic. Dual simplex uses less memory.
-SOLVE_METHOD = 2
+SOLVE_METHOD = 1
 
 """ SOLVE METHODS
    'automatic':                       -1
@@ -133,6 +133,11 @@ WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions to apply irrigat
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)
 0: 'Environmental Plantings'
+
+
+AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)
+0: (None)
+1: 'Asparagopsis taxiformis'
 
 
 DRAINAGE DIVISIONS

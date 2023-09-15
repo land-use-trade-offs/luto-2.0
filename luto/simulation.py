@@ -23,6 +23,7 @@ model that has 'global' varying state.
 
 import numpy as np
 import h5py, time
+from dataclasses import dataclass
 
 import luto.data as bdata
 import luto.settings as settings
@@ -41,7 +42,7 @@ import luto.economics.non_agricultural.quantity as non_ag_quantity
 import luto.economics.non_agricultural.transitions as non_ag_transition
 import luto.economics.non_agricultural.revenue as non_ag_revenue
 
-from luto.solvers.solver import solve
+from luto.solvers.solver import InputData, solve
 from luto import tools
 
 
@@ -69,7 +70,8 @@ class Data():
         self.REAL_AREA = bdata.REAL_AREA[self.MASK] * bdata.RESMULT             # Actual Float32
         self.LUMAP = bdata.LUMAP[self.MASK]                                     # Int8
         self.LMMAP = bdata.LMMAP[self.MASK]                                     # Int8
-        self.AG_L_MRJ = tools.lumap2ag_l_mrj(self.LUMAP, self.LMMAP)                  # Boolean [2, 4218733, 28]
+        self.AMMAP = bdata.AMMAP[self.MASK]                                     # Int8
+        self.AG_L_MRJ = tools.lumap2ag_l_mrj(self.LUMAP, self.LMMAP)            # Boolean [2, 4218733, 28]
         self.NON_AG_L_RK = tools.lumap2non_ag_l_mk(
             self.LUMAP, len(self.NON_AGRICULTURAL_LANDUSES)
         )                                                                       # Int8
@@ -230,6 +232,55 @@ def get_non_ag_x_rk():
     return output
 
 
+def get_ag_man_costs(ag_c_mrj):
+    print('Getting agricultural management options\' cost effects...', end=' ')
+    output = ag_cost.get_agricultural_management_cost_matrices(data, ag_c_mrj, target_index)
+    print('Done.')
+    return output
+
+
+def get_ag_man_ghg(ag_g_mrj):
+    print('Getting agricultural management options\' GHG emission effects...', end=' ')
+    output = ag_ghg.get_agricultural_management_ghg_matrices(data, ag_g_mrj, target_index)
+    print('Done.')
+    return output
+
+
+def get_ag_man_quantity(ag_q_mrp):
+    print('Getting agricultural management options\' quantity effects...', end=' ')
+    output = ag_quantity.get_agricultural_management_quantity_matrices(data, ag_q_mrp, target_index)
+    print('Done.')
+    return output
+
+
+def get_ag_man_revenue(ag_r_mrj):
+    print('Getting agricultural management options\' revenue effects...', end=' ')
+    output = ag_revenue.get_agricultural_management_revenue_matrices(data, ag_r_mrj, target_index)
+    print('Done.')
+    return output
+
+
+def get_ag_man_transitions(ag_t_mrj):
+    print('Getting agricultural management options\' transition cost effects...', end=' ')
+    output = ag_transition.get_agricultural_management_transition_matrices(data, ag_t_mrj, target_index)
+    print('Done.')
+    return output
+
+
+def get_ag_man_water(ag_w_mrj):
+    print('Getting agricultural management options\' water requirement effects...', end=' ')
+    output = ag_water.get_agricultural_management_water_matrices(data, ag_w_mrj, target_index)
+    print('Done.')
+    return output
+
+
+def get_ag_man_limits():
+    print('Getting agricultural management options\' adoption limits...', end=' ')
+    output = ag_transition.get_agricultural_management_adoption_limits(data, target_index)
+    print('Done.')
+    return output
+
+
 def get_limits():
     print('Getting environmental limits...', end = ' ')
     # Limits is a dictionary with heterogeneous value sets.
@@ -250,7 +301,46 @@ def get_limits():
     print('Done.')
     return limits
 
-    
+
+def get_input_data():
+    ag_c_mrj = get_ag_c_mrj()
+    ag_g_mrj = get_ag_g_mrj()
+    ag_q_mrp = get_ag_q_mrp()
+    ag_r_mrj = get_ag_r_mrj()
+    ag_t_mrj = get_ag_t_mrj()
+    ag_w_mrj = get_ag_w_mrj()
+
+    return InputData(
+        ag_t_mrj=ag_t_mrj,
+        ag_c_mrj=ag_c_mrj,
+        ag_r_mrj=ag_r_mrj,
+        ag_g_mrj=ag_g_mrj,
+        ag_w_mrj=ag_w_mrj,
+        ag_x_mrj=get_ag_x_mrj(),
+        ag_q_mrp=ag_q_mrp,
+        ag_ghg_t_mrj=get_ag_ghg_t_mrj(),
+        ag_to_non_ag_t_rk=get_ag_to_non_ag_t_rk(),
+        non_ag_to_ag_t_mrj=get_non_ag_to_ag_t_mrj(),
+        non_ag_c_rk=get_non_ag_c_rk(),
+        non_ag_r_rk=get_non_ag_r_rk(),
+        non_ag_g_rk=get_non_ag_g_rk(),
+        non_ag_w_rk=get_non_ag_w_rk(),
+        non_ag_x_rk=get_non_ag_x_rk(),
+        non_ag_q_crk=get_non_ag_q_crk(),
+        ag_man_c_mrj=get_ag_man_costs(ag_c_mrj),
+        ag_man_g_mrj=get_ag_man_ghg(ag_g_mrj),
+        ag_man_q_mrp=get_ag_man_quantity(ag_q_mrp),
+        ag_man_r_mrj=get_ag_man_revenue(ag_r_mrj),
+        ag_man_t_mrj=get_ag_man_transitions(ag_t_mrj),
+        ag_man_w_mrj=get_ag_man_water(ag_w_mrj),
+        ag_man_limits=get_ag_man_limits(),
+        lu2pr_pj=data.LU2PR,
+        pr2cm_cp=data.PR2CM,
+        limits=get_limits(),
+        desc2aglu=data.DESC2AGLU,
+    )
+
+
 def step( base    # Base year from which the data is taken.
         , target  # Year to be solved for.
         , d_c     # Demand in the form of total quantities of agricultural commodities by year (d_c) array.
@@ -264,6 +354,7 @@ def step( base    # Base year from which the data is taken.
     if base == data.YR_CAL_BASE: 
         lumaps[base] = data.LUMAP
         lmmaps[base] = data.LMMAP
+        ammaps[base] = data.AMMAP
         ag_dvars[base]  = data.AG_L_MRJ
         non_ag_dvars[base] = data.NON_AG_L_RK
 
@@ -272,29 +363,11 @@ def step( base    # Base year from which the data is taken.
     (
         lumaps[target],
         lmmaps[target],
+        ammaps[target],
         ag_dvars[target],
         non_ag_dvars[target],
-    ) = solve( get_ag_t_mrj()
-             , get_ag_c_mrj()
-             , get_ag_r_mrj()
-             , get_ag_g_mrj()
-             , get_ag_w_mrj()
-             , get_ag_x_mrj()
-             , get_ag_q_mrp()
-             , get_ag_ghg_t_mrj()
-             , get_ag_to_non_ag_t_rk()
-             , get_non_ag_to_ag_t_mrj()
-             , get_non_ag_c_rk()
-             , get_non_ag_r_rk()
-             , get_non_ag_g_rk()
-             , get_non_ag_w_rk()
-             , get_non_ag_x_rk()
-             , get_non_ag_q_crk()
-             , d_c
-             , data.LU2PR
-             , data.PR2CM
-             , get_limits()
-             )
+        ag_man_dvars[target],
+    ) = solve(d_c, get_input_data())
 
 def run( base
        , target
@@ -346,14 +419,17 @@ def run( base
 # Containers for simulation output. 
 lumaps = {}
 lmmaps = {}
+ammaps = {}
 ag_dvars = {}
 non_ag_dvars = {}
+ag_man_dvars = {}
 
 # Get the total demand quantities by commodity for 2010 to 2100 by combining the demand deltas with 2010 production
 prod_2010_c = tools.get_production( bdata
                             , bdata.YR_CAL_BASE
                             , tools.lumap2ag_l_mrj(bdata.LUMAP, bdata.LMMAP)
                             , tools.lumap2non_ag_l_mk(bdata.LUMAP, len(bdata.NON_AGRICULTURAL_LANDUSES))
+                            , tools.get_base_am_vars(bdata.NCELLS)
                             )
 
 # Demand deltas can be a time series (shape year x commodity) or a single array (shape = n commodites).

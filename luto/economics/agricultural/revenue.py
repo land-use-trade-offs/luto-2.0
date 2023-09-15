@@ -18,8 +18,10 @@
 Pure functions to calculate economic profit from land use.
 """
 
+from typing import Dict
 import numpy as np
 
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
 
 def get_rev_crop( data   # Data object or module.
@@ -158,3 +160,37 @@ def get_rev_matrices(data, yr_idx):
     return np.stack(tuple( get_rev_matrix(data, lm, yr_idx)
                            for lm in data.LANDMANS )
                     ).astype(np.float32)
+
+
+def get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx):
+    """
+    Applies the effects of using asparagopsis to the revenue data
+    for all relevant agr. land uses.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+    year = 2010 + yr_idx
+
+    # Set up the effects matrix
+    new_r_mrj = np.zeros((2, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    # Update values in the new matrix using the correct multiplier for each LU
+    for lu_idx, lu in enumerate(land_uses):
+        j = lu_codes[lu_idx]
+        multiplier = data.ASPARAGOPSIS_DATA[lu].loc[year, "Productivity"]
+        if multiplier != 1:
+            # The effect is: new value = old value * multiplier - old value
+            # E.g. a multiplier of .95 means a 5% reduction in quantity produced
+            new_r_mrj[:, :, lu_idx] = r_mrj[:, :, j] * (multiplier - 1)
+
+    return new_r_mrj
+
+
+def get_agricultural_management_revenue_matrices(data, r_mrj, yr_idx) -> Dict[str, np.ndarray]:
+    asparagopsis_data = get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx)
+
+    ag_management_data = {
+        "Asparagopsis taxiformis": asparagopsis_data,
+    }
+
+    return ag_management_data
