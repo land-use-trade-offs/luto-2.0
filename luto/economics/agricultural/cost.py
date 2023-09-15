@@ -202,7 +202,7 @@ def get_asparagopsis_effect_c_mrj(data, yr_idx):
             lvstype, vegtype = lvs_veg_types(lu)
             yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
             cost_per_animal = data.ASPARAGOPSIS_DATA[lu].loc[year, "AnnCost_per_animal"]
-            cost_per_cell = cost_per_animal * yield_pot * data.REAL_AREA  # TODO - should this subtract the original c_mrj value from it?
+            cost_per_cell = cost_per_animal * yield_pot * data.REAL_AREA
 
             new_c_mrj[m, :, lu_idx] = cost_per_cell
 

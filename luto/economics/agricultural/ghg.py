@@ -230,6 +230,7 @@ def get_asparagopsis_effect_g_mrj(data, yr_idx):
             reduction_amnt = (
                 data.AGGHG_LVSTK[lvstype, "CO2E_KG_HEAD_ENTERIC"].to_numpy()
                 * ch4_reduction_perc
+                * data.REAL_AREA
             )
             new_g_mrj[:, :, lu_idx] = -reduction_amnt
 
