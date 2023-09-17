@@ -64,8 +64,8 @@ MODE = 'snapshot'       # runs for target year only
 # MODE = 'timeseries'   # runs each year from base year to target year
 
 # Define the objective function
-# OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
-OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
+OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
+# OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
 
 
@@ -86,8 +86,8 @@ SOLVE_METHOD = 1
    'deterministic concurrent':         4
    'deterministic concurrent simplex': 5 """
 
-# Penalty in objective function  *** Needs to be balanced against OPTIMALITY_TOLERANCE to trade-off speed for optimality ***
-PENALTY = 1e5
+# Penalty in objective function  *** Needs to be balanced against OPTIMALITY_TOLERANCE to trade-off speed for optimality ***   1e5 works
+PENALTY = 1e4
 
 # Print detailed output to screen
 VERBOSE = 1
@@ -118,18 +118,21 @@ CARBON_PRICE_PER_TONNE = 50                 # Price of carbon per tonne - determ
 # Environmental parameters
 # ---------------------------------------------------------------------------- #
 
-WATER_USE_LIMITS = 'on' # 'on' or 'off'
-GHG_EMISSIONS_LIMITS = 'on' # 'on' or 'off'
+# Greenhouse gas emissions limits parameters
+GHG_EMISSIONS_LIMITS = 'on'     # 'on' or 'off'
+GHG_LIMITS_TYPE = 'tonnes'      # 'tonnes' or 'percentage'
+GHG_REDUCTION_PERCENTAGE = 50   # reduction in GHG emissions as percentage of 2010 ag emissions
+GHG_LIMITS = -70 * 1e6          # total net GHG emissions in tonnes CO2e
 
-# Greenhouse gas emissions in % terms
-GHG_REDUCTION_PERCENTAGE = 50
+# Water use limits parameters
+WATER_USE_LIMITS = 'on'               # 'on' or 'off'
+WATER_LIMITS_TYPE = 'water_stress'    # 'water_stress' of 'pct_ag'
+WATER_USE_REDUCTION_PERCENTAGE = 0    # reduction in water use as percentage of 2010 irrigation water use
+WATER_STRESS_FRACTION = 0.6           # = 1 - Ratio of consumption to availability. High water stress if yields below this fraction (following Aqueduct classification).
 
-# Water parameters (superseded)
-# WATER_YIELD_STRESS_FRACTION = 0.4       # Water stress if yields below this fraction.
-
-WATER_REGION_DEF = 'RR'                 # 'RR' for River Region, 'DD' for Drainage Division
-WATER_DRAINDIVS = list(range(1, 14, 1)) # List of drainage divisions to apply irrigation constraints to e.g., [1, 2].
-WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions to apply irrigation constraints to e.g., [1, 2].
+WATER_REGION_DEF = 'DD'                 # 'RR' for River Region, 'DD' for Drainage Division
+WATER_DRAINDIVS = list(range(1, 14, 1)) # List of drainage divisions e.g., [1, 2].
+WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions  e.g., [1, 2].
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)
 0: 'Environmental Plantings'

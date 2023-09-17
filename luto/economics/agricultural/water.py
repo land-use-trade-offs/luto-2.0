@@ -87,39 +87,55 @@ def get_wuse_limits(data):
        Currently set such that water limits are set at 2010 agricultural water requirements.
     """
 
-    # Get water requirements of agriculture in ML per cell in mrj format for 2010.
-    yr_idx = 0
-    w_mrj = get_wreq_matrices(data, yr_idx)  # 0 gets water requirements from base year (i.e., 2010)
-
-    # Set up empty list to hold water use limits data
-    wuse_limits = []
-
     # Set up data for river regions or drainage divisions
     if settings.WATER_REGION_DEF == 'RR':
         regions = settings.WATER_RIVREGS
         region_id = data.RIVREG_ID
-
+        
     elif settings.WATER_REGION_DEF == 'DD':
         regions = settings.WATER_DRAINDIVS
         region_id = data.DRAINDIV_ID
-
+        
     else:
         print('Incorrect option for WATER_REGION_DEF in settings')
 
+
+    # Set up empty list to hold water use limits data
+    wuse_limits = []
+    
+    # Calculate water use limits (ML) depending on which type of limits specified in settings
+    if settings.WATER_LIMITS_TYPE == 'pct_ag':
+        
+        # Get water requirements of 2010 agriculture in ML per cell in mrj format for 2010.
+        w_mrj = get_wreq_matrices(data, 0)  # 0 gets water requirements from base year (i.e., 2010)
+        
+        # Multiply by agricultural land use and management map in mrj format and sum for each grid cell
+        w_lim_r = np.sum( w_mrj * data.AG_L_MRJ, axis = (0, 2) )
+    
+    elif settings.WATER_LIMITS_TYPE == 'water_stress':
+        
+        # Calculate water use limits as water yield under deep-rooted plants (i.e., native vegetation) x water stress percentage
+        w_lim_r = data.WATER_YIELD_BASE_DR * settings.WATER_STRESS_FRACTION
+        
+        w_lim_r *= data.REAL_AREA
+    
+    
     # Loop through specified water regions
     for region in regions:
+        
         # Get indices of cells in region
         ind = np.flatnonzero(region_id == region).astype(np.int32)
 
         # Calculate the 2010 water requiremnents by agriculture for region.
-        wuse_reg_limit = (w_mrj[:, ind, :] *
-                          data.AG_L_MRJ[:, ind, :]
-                          ).sum()
+        wuse_reg_limit = np.sum( w_lim_r[ind] )
 
         # Append to list
-        wuse_limits.append((region, wuse_reg_limit, ind))
+        wuse_limits.append( (region, wuse_reg_limit, ind) )
 
     return wuse_limits
+
+
+
 
 
 # def get_wyld_matrix( data # Data object or module.
@@ -143,94 +159,7 @@ def get_wuse_limits(data):
 #     # Stack the columns and convert from per ha to per cell.
 #     return np.stack(cols, axis=1) * data.REAL_AREA[:, np.newaxis]
 
-
-# def get_wyld_matrices(data, yr_idx, mask=None):
-#     """Return masked version of `get_wyld_matrices()`."""
-#     wyld_rj = get_wyld_matrix(data, yr_idx)
-#     wyld_mrj = np.stack((wyld_rj, wyld_rj))
-#     if mask is None:
-#         return wyld_mrj
-#     else:
-#         return mask[:, np.newaxis] * wyld_mrj
-    
-
-
-
-# def get_target():
-        
-#     # wuse_limits = [] # A list of water use limits by drainage division.
-#     # for region in np.unique(data.DRAINDIV_ID):  # 7 == MDB
-#     #     mask = np.where(data.DRAINDIV_ID == region, True, False)[data.mindices]
-#     #     basefrac = get_water_stress_basefrac(data, mask)
-#     #     stress = get_water_stress(data, target_index, mask)
-#     #     stresses.append((basefrac, stress))
-    
-#     region = 7
-#     ddiv_ind = np.flatnonzero(data.DRAINDIV_ID == region).astype(np.int32)
-    
-#     return ddiv_ind
-
-# def get_water_stress(data, yr_idx, mask=None):
-#     """Return tuple of (use, yld) for region `mask` in `yr_idx`."""
-
-#     # Get the use and yield, ready for multiplication by X_mrj and summing.
-#     use_year = get_wreq_matrices(data, yr_idx, mask)
-#     yld_year = get_wyld_matrices(data, yr_idx, mask)
-
-#     # Return the tuple.
-#     return use_year, yld_year
-
-
-
-# def _get_water_stress(data, yr_idx, mask=None):
-#     """Return, by cell, how much the water yield is above the stress level."""
-#     # Get the water yields -- disregarding irrigation but as mrj matrix.
-#     wyld_rj = get_wyld_matrix(data, yr_idx)
-#     wyld_mrj = np.stack((wyld_rj, wyld_rj))
-
-#     # Get the water requirements for irrigation and livestock drinking water.
-#     wreq_mrj = get_wreq_matrices(data, yr_idx)
-
-#     # Calculate the water stress threshold.
-#     stresshold = ( settings.WATER_YIELD_STRESS_FRACTION
-#                  * data.WATER_YIELD_BASE_DR[:, np.newaxis] )
-
-#     # Net water yield is yield less requirements (use) less base level yields.
-#     water_stress = ( wyld_mrj # Water yields, dependent on land use.
-#                    - wreq_mrj # Water requirements for irr. and livestock.
-#                    - stresshold ) # Yields below this level mean stress.
-
-#     # Apply a mask if provided -- e.g. for catchment specific stress.
-#     if mask is not None:
-#         water_stress *= mask[:, np.newaxis]
-
-#     return water_stress
-
-
-
-# def get_water_stress_basefrac(data, mask=None):
-#     """Return use / yld base fraction for region `mask`."""
-    
-#     # Get the 2010 lumap+lmmap in decision var format.
-#     X_mrj = lumap2l_mrj(data.LUMAP, data.LMMAP)
-    
-#     # Calculate the 2010 use and the 1985 (pre-European proxy) yield.
-#     use_base = (get_wreq_matrices(data, 0, mask) * X_mrj).sum()
-#     if mask is None:
-#         yld_base = ( data.WATER_YIELD_BASE_DR
-#                    * data.REAL_AREA
-#                    ).sum()
-#     else:
-#         yld_base = ( data.WATER_YIELD_BASE_DR
-#                    * data.REAL_AREA
-#                    * mask
-#                    ).sum()
-
-#     # Return the water stress as the fraction of use over yield.
-#     return use_base / yld_base
-
-
-
+ 
 
 
 """
