@@ -79,7 +79,7 @@ def get_ghg_lvstk( data     # Data object or module.
     `lm`: land management (e.g. 'dry', 'irr').
     `yr_idx`: number of years from base year, counting from zero.
     
-    Crop GHG emissions include:    
+    Livestock GHG emissions include:    
         'CO2E_KG_HEAD_ENTERIC', 
         'CO2E_KG_HEAD_MANURE_MGT', 
         'CO2E_KG_HEAD_IND_LEACH_RUNOFF', 
@@ -195,12 +195,22 @@ def get_ghg_matrices(data, yr_idx):
 def get_ghg_limits(data):
     """Return greenhouse gas emissions limits as specified in settings.py."""
     
-    # Get GHG emissions from agriculture for 2010 in tCO2e per cell in mrj format.
-    yr_idx = 0
-    g_mrj = get_ghg_matrices(data, yr_idx)
+    # If using GHG emissions as a percentage of 2010 agricultural emissions
+    if settings.GHG_LIMITS_TYPE == 'percentage':
+        # Get GHG emissions from agriculture for 2010 in tCO2e per cell in mrj format.
+        yr_idx = 0
+        g_mrj = get_ghg_matrices(data, yr_idx)
+        
+        # Calculate total greenhouse gas emissions of current land-use and land management.
+        ghg_limits = (g_mrj * data.AG_L_MRJ).sum() * (1 - settings.GHG_REDUCTION_PERCENTAGE / 100)
     
-    # Calculate total greenhouse gas emissions of current land-use and land management.
-    ghg_limits = (g_mrj * data.AG_L_MRJ).sum() * (1 - settings.GHG_REDUCTION_PERCENTAGE / 100)
-    
+    # If using GHG emissions as a total tonnage of CO2e
+    elif settings.GHG_LIMITS_TYPE == 'tonnes':
+        ghg_limits = settings.GHG_LIMITS
+        
+    else: 
+        print('Unknown GHG limit type...')
+        exit()
+        
     return ghg_limits
 

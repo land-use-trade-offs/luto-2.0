@@ -196,7 +196,7 @@ def solve( ag_t_mrj                  # Agricultural transition cost matrices.
         if settings.WATER_USE_LIMITS == 'on':
             print('Adding water constraints by', settings.WATER_REGION_DEF + '...', time.ctime())
 
-            # Returns water requirements for agriculture in mrj format and region-specific water use limits
+            # Returns region-specific water use limits
             w_limits = limits['water']
 
             # Ensure water use remains below limit for each region
@@ -234,8 +234,7 @@ def solve( ag_t_mrj                  # Agricultural transition cost matrices.
                     for k in range(n_non_ag_lus) )
             )
             
-            print('    ...setting {:,.0f}% GHG emissions reduction target: {:,.0f} tCO2e\n'.format(
-                          settings.GHG_REDUCTION_PERCENTAGE, ghg_limits )
+            print('    ...setting GHG emissions reduction target: {:,.0f} tCO2e\n'.format( ghg_limits )
                  )
             model.addConstr(ghg_emissions <= ghg_limits)
 
