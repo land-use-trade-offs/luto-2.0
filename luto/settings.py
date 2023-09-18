@@ -76,7 +76,7 @@ OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
 
 # Select Gurobi algorithm used to solve continuous models or the initial root relaxation of a MIP model.
 # Set solve method. Default is automatic. Dual simplex uses less memory.
-SOLVE_METHOD = 2
+SOLVE_METHOD = 1
 
 """ SOLVE METHODS
    'automatic':                       -1
@@ -137,6 +137,11 @@ WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions  e.g., [1, 2].
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)
 0: 'Environmental Plantings'
+
+
+AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)
+0: (None)
+1: 'Asparagopsis taxiformis'
 
 
 DRAINAGE DIVISIONS

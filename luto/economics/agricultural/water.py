@@ -19,10 +19,12 @@ Pure functions to calculate water use by lm, lu.
 """
 
 
+from typing import Dict
 import numpy as np
 
 import luto.settings as settings
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
 def get_wreq_matrices(data, yr_idx):
@@ -42,6 +44,42 @@ def get_wreq_matrices(data, yr_idx):
     w_mrj *= data.REAL_AREA[:, np.newaxis]
     
     return w_mrj
+
+
+def get_asparagopsis_effect_w_mrj(data, w_mrj, yr_idx):
+    """
+    Applies the effects of using asparagopsis to the water requirements data
+    for all relevant agr. land uses.
+
+    Asparagopsis taxiformis has no effect on the water required.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
+    lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
+    year = 2010 + yr_idx
+
+    # Set up the effects matrix
+    new_w_mrj = np.zeros((2, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    # Update values in the new matrix using the correct multiplier for each LU
+    for lu_idx, lu in enumerate(land_uses):
+        j = lu_codes[lu_idx]
+        multiplier = data.ASPARAGOPSIS_DATA[lu].loc[year, "Water_use"]
+        if multiplier != 1:
+            # The effect is: new value = old value * multiplier - old value
+            # E.g. a multiplier of .95 means a 5% reduction in quantity produced
+            new_w_mrj[:, :, lu_idx] = w_mrj[:, :, j] * (multiplier - 1)
+
+    return new_w_mrj
+
+
+def get_agricultural_management_water_matrices(data, w_mrj, yr_idx) -> Dict[str, np.ndarray]:
+    asparagopsis_data = get_asparagopsis_effect_w_mrj(data, w_mrj, yr_idx)
+
+    ag_management_data = {
+        "Asparagopsis taxiformis": asparagopsis_data,
+    }
+
+    return ag_management_data
 
 
 def get_wuse_limits(data):

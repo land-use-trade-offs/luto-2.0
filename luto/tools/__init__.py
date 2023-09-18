@@ -29,6 +29,7 @@ from typing import Tuple
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 import luto.settings as settings
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
 def amortise(cost, rate = settings.DISCOUNT_RATE, horizon = settings.AMORTISATION_PERIOD):
@@ -41,7 +42,7 @@ def show_map(yr_cal):
     plotmap(lumaps[yr_cal], labels = bdata.AGLU2DESC)
     
 
-def get_production(data, yr_cal, ag_X_mrj, non_ag_X_rk):
+def get_production(data, yr_cal, ag_X_mrj, non_ag_X_rk, ag_man_X_mrj):
     """Return total production of commodities for a specific year...
     
     'data' is a sim.data or bdata like object, 'yr_cal' is calendar year, and X_mrj 
@@ -78,8 +79,25 @@ def get_production(data, yr_cal, ag_X_mrj, non_ag_X_rk):
     q_crk = non_ag_quantity.get_quantity_matrix(data)
     non_ag_q_c = [ (q_crk[c, :, :] * non_ag_X_rk).sum() for c in range(data.NCMS) ]
 
+    # Get quantities produced by agricultural management options
+    j2p = {j: [p for p in range(data.NPRS) if data.LU2PR[p, j]] for j in range(data.N_AG_LUS)}
+    ag_man_q_mrp = ag_quantity.get_agricultural_management_quantity_matrices(data, ag_q_mrp, yr_idx)
+    ag_man_q_c = np.zeros(data.NCMS)
+    for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():
+        am_j_list = [data.DESC2AGLU[lu] for lu in am_lus]
+        ag_man_X_mrp = np.zeros(ag_q_mrp.shape, dtype=np.float32)
+
+        for j_idx, j in enumerate(am_j_list):
+            for p in j2p[j]:
+                ag_man_X_mrp[:, :, p] = ag_man_X_mrj[am][:, :, j_idx]
+
+        ag_man_q_p = np.sum( ag_man_q_mrp[am] * ag_man_X_mrp, axis = (0, 1), keepdims = False)
+
+        ag_man_q_c += [ sum( ag_man_q_p[p] for p in range(data.NPRS) if data.PR2CM[c, p] )
+                              for c in range(data.NCMS) ]
+
     # Return total commodity production as numpy array.
-    total_q_c = [ ag_q_c[c] + non_ag_q_c[c] for c in range(data.NCMS) ]
+    total_q_c = [ ag_q_c[c] + non_ag_q_c[c] + ag_man_q_c[c] for c in range(data.NCMS) ]
     return np.array(total_q_c)
 
 
@@ -141,7 +159,7 @@ def lumap2ag_l_mrj(lumap, lmmap):
     land uses, i.e. all r.
     """
     # Set up a container array of shape m, r, j. 
-    x_mrj = np.zeros((2, lumap.shape[0], 28), dtype = bool)
+    x_mrj = np.zeros((2, lumap.shape[0], 28), dtype = bool)   # TODO - remove 2
     
     # Populate the 3D land-use, land mgt mask. 
     for j in range(28):
@@ -170,6 +188,19 @@ def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
         x_rk[:, k] = kmap
 
     return x_rk.astype(bool)
+
+
+def get_base_am_vars(ncells):
+    """
+    Get the 2010 agricultural management option vars.
+    It is assumed that no agricultural management options were used in 2010, 
+    so get zero arrays in the correct format.
+    """
+    am_vars = {}
+    for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():
+        am_vars[am] = np.zeros((2, ncells, len(am_lus)))  # TODO - remove 2
+
+    return am_vars
 
 
 def get_ag_and_non_ag_cells(lumap) -> Tuple[np.ndarray, np.ndarray]:

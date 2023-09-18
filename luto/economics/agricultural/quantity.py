@@ -18,8 +18,10 @@
 Pure functions for calculating the production quantities of agricutlural commodities.
 """
 
+from typing import Dict
 import numpy as np
 from scipy.interpolate import interp1d
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
 def get_ccimpact(data, lu, lm, yr_idx):
@@ -264,3 +266,38 @@ def get_quantity_matrices(data, yr_idx):
     """Return q_mrp matrix of quantities per cell as 3D Numpy array."""
     return np.stack(tuple( get_quantity_matrix(data, lm, yr_idx)
                            for lm in data.LANDMANS ))
+
+
+def get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx):
+    """
+    Applies the effects of using asparagopsis to the quantity data
+    for all relevant agr. land uses.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+    year = 2010 + yr_idx
+
+    # Set up the effects matrix
+    new_q_mrp = np.zeros((2, data.NCELLS, data.NPRS)).astype(np.float32)
+
+    # Update values in the new matrix using the correct multiplier for each LU
+    for lu, j in zip(land_uses, lu_codes):
+        multiplier = data.ASPARAGOPSIS_DATA[lu].loc[year, "Productivity"]
+        if multiplier != 1:
+            # Apply to all products associated with land use
+            for p in data.LU2PR[j]:
+                # The effect is: effect value = old value * multiplier - old value
+                # E.g. a multiplier of .95 means a 5% reduction in quantity produced
+                new_q_mrp[:, :, p] = q_mrp[:, :, p] * (multiplier - 1)
+
+    return new_q_mrp
+
+
+def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[str, np.ndarray]:
+    asparagopsis_data = get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx)
+
+    ag_management_data = {
+        "Asparagopsis taxiformis": asparagopsis_data,
+    }
+
+    return ag_management_data

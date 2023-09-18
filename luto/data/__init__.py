@@ -181,6 +181,20 @@ PR2CM = dict2matrix(CM2PR_DICT, COMMODITIES, PRODUCTS).T # Note the transpose.
 
 
 ###############################################################
+# Agricultural management options data.
+###############################################################
+asparagopsis_file = os.path.join(INPUT_DIR, "20230907_Asparagopsis_Data.xlsx")
+ASPARAGOPSIS_DATA = {}
+ASPARAGOPSIS_DATA["Beef - natural land"] = pd.read_excel( asparagopsis_file, sheet_name="AT - Cattle (ext)", index_col="Year" )
+ASPARAGOPSIS_DATA["Beef - modified land"] = pd.read_excel( asparagopsis_file, sheet_name="AT - Cattle (int)", index_col="Year" )
+ASPARAGOPSIS_DATA["Sheep - natural land"] = pd.read_excel( asparagopsis_file, sheet_name="AT - Sheep", index_col="Year" )
+ASPARAGOPSIS_DATA["Sheep - modified land"] = ASPARAGOPSIS_DATA["Sheep - natural land"]
+ASPARAGOPSIS_DATA["Dairy - natural land"] = pd.read_excel( asparagopsis_file, sheet_name="AT - Dairy", index_col="Year" )
+ASPARAGOPSIS_DATA["Dairy - modified land"] = ASPARAGOPSIS_DATA["Dairy - natural land"]
+
+
+
+###############################################################
 # Non-agricultural economic data.
 ###############################################################
 
@@ -212,6 +226,9 @@ LUMAP = pd.read_hdf(os.path.join(INPUT_DIR, 'lumap.h5')).to_numpy()
 
 # Initial (2010) land management map.
 LMMAP = pd.read_hdf(os.path.join(INPUT_DIR, 'lmmap.h5')).to_numpy()
+
+# Initial (2010) agricutural management map - no cells are used for alternative agricultural management options
+AMMAP = np.zeros(NCELLS).astype('int8')
 
 
 

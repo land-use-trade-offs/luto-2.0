@@ -21,7 +21,9 @@ Pure functions to calculate costs of commodities and alt. land uses.
 
 import numpy as np
 
+from typing import Dict
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
 def get_cost_crop( data # Data object or module.
@@ -174,5 +176,44 @@ def get_cost_matrices(data, yr_idx):
     c_mrj = np.stack(tuple( get_cost_matrix(data, lm, yr_idx)
                             for lm in data.LANDMANS )
                     ).astype(np.float32)
-
+    
     return c_mrj
+
+
+def get_asparagopsis_effect_c_mrj(data, yr_idx):
+    """
+    Applies the effects of using asparagopsis to the cost data
+    for all relevant agr. land uses.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
+    year = 2010 + yr_idx
+
+    # Set up the effects matrix
+    new_c_mrj = np.zeros((2, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    # Update values in the new matrix
+    for lm in data.LANDMANS:
+        if lm == 'dry':
+            m = 0
+        else:
+            m = 1
+
+        for lu_idx, lu in enumerate(land_uses):
+            lvstype, vegtype = lvs_veg_types(lu)
+            yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
+            cost_per_animal = data.ASPARAGOPSIS_DATA[lu].loc[year, "AnnCost_per_animal"]
+            cost_per_cell = cost_per_animal * yield_pot * data.REAL_AREA
+
+            new_c_mrj[m, :, lu_idx] = cost_per_cell
+
+    return new_c_mrj
+
+
+def get_agricultural_management_cost_matrices(data, c_mrj, yr_idx):
+    asparagopsis_data = get_asparagopsis_effect_c_mrj(data, yr_idx)
+
+    ag_management_data = {
+        "Asparagopsis taxiformis": asparagopsis_data,
+    }
+
+    return ag_management_data

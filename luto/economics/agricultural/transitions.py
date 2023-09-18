@@ -21,6 +21,7 @@ Data about transitions costs.
 import numpy as np
 from typing import Dict
 
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.economics.agricultural.water import get_wreq_matrices
 import luto.economics.agricultural.ghg as ag_ghg
 from luto import settings
@@ -173,3 +174,50 @@ def get_transition_matrices(data, yr_idx, base_year, lumaps, lmmaps):
     t_mrj = np.where(x_mrj == 0, np.nan, t_mrj)
     
     return t_mrj
+
+
+def get_asparagopsis_effect_t_mrj(data):
+    """
+    Gets the transition costs of asparagopsis taxiformis, which are none.
+    Transition/establishment costs are handled in the costs matrix.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
+    return np.zeros((2, data.NCELLS, len(land_uses))).astype(np.float32)
+
+
+def get_agricultural_management_transition_matrices(data, t_mrj, yr_idx) -> Dict[str, np.ndarray]:
+    asparagopsis_data = get_asparagopsis_effect_t_mrj(data)
+
+    ag_management_data = {
+        "Asparagopsis taxiformis": asparagopsis_data,
+    }
+
+    return ag_management_data
+
+
+def get_asparagopsis_adoption_limit(data, yr_idx):
+    """
+    Gets the adoption limit of Asparagopsis taxiformis for each possible land use.
+    """
+    asparagopsis_limits = {}
+    year = 2010 + yr_idx
+    for lu in AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]:
+        j = data.DESC2AGLU[lu]
+        asparagopsis_limits[j] = data.ASPARAGOPSIS_DATA[lu].loc[year, "Technical_Adoption"]
+
+    return asparagopsis_limits
+
+
+def get_agricultural_management_adoption_limits(data, yr_idx) -> Dict[str, dict]:
+    """
+    An adoption limit represents the maximum percentage of cells (for each land use) that can utilise
+    each agricultural management option.
+    """
+    asparagopsis_limits = get_asparagopsis_adoption_limit(data, yr_idx)
+
+    adoption_limits = {
+        "Asparagopsis taxiformis": asparagopsis_limits,
+    }
+
+    return adoption_limits
+

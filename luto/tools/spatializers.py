@@ -33,15 +33,18 @@ def recreate_2D_maps(sim, yr_cal):
     if settings.RESFACTOR > 1:
         lumap = uncoursify(sim, sim.lumaps[yr_cal])
         lmmap = uncoursify(sim, sim.lmmaps[yr_cal])
+        ammap = uncoursify(sim, sim.ammaps[yr_cal])
     else:
         lumap = sim.lumaps[yr_cal]
         lmmap = sim.lmmaps[yr_cal]
+        ammap = sim.ammaps[yr_cal]
 
     # Then put the excluded land-use and land management types back in the array.
     lumap = reconstitute(lumap, sim.data.LUMASK, filler = sim.data.MASK_LU_CODE).astype(np.int8)
     lmmap = reconstitute(lmmap, sim.data.LUMASK, filler = 0).astype(np.int8)
+    ammap = reconstitute(ammap, sim.data.LUMASK, filler = 0).astype(np.int8)
     
-    return lumap, lmmap
+    return lumap, lmmap, ammap
 
 
 def reconstitute(lxmap, mask, filler = -1):
