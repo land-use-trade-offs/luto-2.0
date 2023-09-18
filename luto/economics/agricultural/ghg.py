@@ -18,10 +18,12 @@
 Pure functions to calculate greenhouse gas emissions by lm, lu.
 """
 
+from typing import Dict
 import numpy as np
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
 import luto.settings as settings
 import luto.tools as tools
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
 def get_ghg_crop( data     # Data object or module.
@@ -186,9 +188,10 @@ def get_ghg_matrix(data, lm, yr_idx):
 
 def get_ghg_matrices(data, yr_idx):
     """Return g_mrj matrix of GHG emissions per cell as 3D Numpy array."""
-    
-    return np.stack(tuple( get_ghg_matrix(data, lm, yr_idx)
+
+    g_mrj = np.stack(tuple( get_ghg_matrix(data, lm, yr_idx)
                            for lm in data.LANDMANS ))
+    return g_mrj
 
 
 
@@ -214,3 +217,41 @@ def get_ghg_limits(data):
         
     return ghg_limits
 
+
+def get_asparagopsis_effect_g_mrj(data, yr_idx):
+    """
+    Applies the effects of using asparagopsis to the GHG data
+    for all relevant agr. land uses.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
+    year = 2010 + yr_idx
+
+    # Set up the effects matrix
+    new_g_mrj = np.zeros((2, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    # Update values in the new matrix, taking into account the CH4 reduction of asparagopsis
+    for lu_idx, lu in enumerate(land_uses):
+        ch4_reduction_perc = 1 - data.ASPARAGOPSIS_DATA[lu].loc[year, "MitEff_CH4"]
+
+        if ch4_reduction_perc != 0:
+            # Subtract enteric fermentation emissions multiplied by reduction multiplier
+            lvstype, _ = lvs_veg_types(lu)
+
+            reduction_amnt = (
+                data.AGGHG_LVSTK[lvstype, "CO2E_KG_HEAD_ENTERIC"].to_numpy()
+                * ch4_reduction_perc
+                * data.REAL_AREA
+            )
+            new_g_mrj[:, :, lu_idx] = -reduction_amnt
+
+    return new_g_mrj
+
+
+def get_agricultural_management_ghg_matrices(data, g_mrj, yr_idx) -> Dict[str, np.ndarray]:
+    asparagopsis_data = get_asparagopsis_effect_g_mrj(data, yr_idx)
+
+    ag_management_data = {
+        "Asparagopsis taxiformis": asparagopsis_data,
+    }
+
+    return ag_management_data

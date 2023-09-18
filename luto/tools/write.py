@@ -32,6 +32,7 @@ import luto.economics.agricultural.water as ag_water
 import luto.economics.non_agricultural.water as non_ag_water
 import luto.economics.agricultural.ghg as ag_ghg
 import luto.economics.non_agricultural.ghg as non_ag_ghg
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
 def get_path():
@@ -101,6 +102,12 @@ def write_files(sim, path):
         # Save raw non-agricultural decision variables (boolean array).
         non_ag_X_rk_fname = 'non_ag_X_rk_' + str(yr_cal) + '.npy'
         np.save(os.path.join(path, non_ag_X_rk_fname), sim.non_ag_dvars[yr_cal])
+
+        # Save raw agricultural management decision variables
+        for am in AG_MANAGEMENTS_TO_LAND_USES:
+            snake_case_am = am.lower().replace(" ", "_")
+            am_X_mrj_fname = 'ag_man_X_mrj_' + snake_case_am + "_" + str(yr_cal) + ".npy"
+            np.save(os.path.join(path, am_X_mrj_fname), sim.non_ag_dvars[yr_cal])
         
         # Write out raw numpy arrays for land-use and land management
         lumap_fname = 'lumap_' + str(yr_cal) + '.npy'
@@ -109,12 +116,14 @@ def write_files(sim, path):
         np.save(os.path.join(path, lmmap_fname), sim.lmmaps[yr_cal])
 
         # Recreate full resolution 2D arrays and write out GeoTiffs for land-use and land management
-        lumap, lmmap = recreate_2D_maps(sim, yr_cal)
+        lumap, lmmap, ammap = recreate_2D_maps(sim, yr_cal)
         
         lumap_fname = 'lumap_' + str(yr_cal) + '.tiff'
         lmmap_fname = 'lmmap_' + str(yr_cal) + '.tiff'
+        ammap_fname = 'ammap_' + str(yr_cal) + '.tiff'
         write_gtiff(lumap, os.path.join(path, lumap_fname))
         write_gtiff(lmmap, os.path.join(path, lmmap_fname))
+        write_gtiff(ammap, os.path.join(path, ammap_fname))
 
 
 def write_production(sim, yr_cal, path): 
@@ -127,7 +136,11 @@ def write_production(sim, yr_cal, path):
     
     # Calculate data for quantity comparison between base year and target year
     prod_base = sim.data.PROD_2010_C                # get_production(sim.data, sim.data.YR_CAL_BASE, sim.data.L_MRJ)  # Get commodity quantities produced in 2010
-    prod_targ = get_production(sim.data, yr_cal, sim.ag_dvars[yr_cal], sim.non_ag_dvars[yr_cal])  # Get commodity quantities produced in target year
+    prod_targ = get_production( sim.data
+                              , yr_cal
+                              , sim.ag_dvars[yr_cal]
+                              , sim.non_ag_dvars[yr_cal] 
+                              , sim.ag_man_dvars[yr_cal] )  # Get commodity quantities produced in target year
     demands = sim.data.D_CY[yr_idx]                 # Get commodity demands for target year
     abs_diff = prod_targ - demands                  # Diff between target year production and demands in absolute terms (i.e. tonnes etc)
     prop_diff = ( prod_targ / demands ) * 100       # Target year production as a proportion of demands (%)
@@ -143,11 +156,13 @@ def write_production(sim, yr_cal, path):
     df.to_csv(os.path.join(path, 'quantity_comparison.csv'), index = False)
 
     # LUS = ['Non-agricultural land'] + sim.data.AGRICULTURAL_LANDUSES + sim.data.NON_AGRICULTURAL_LANDUSES
-    ctlu, swlu = crossmap( sim.lumaps[sim.data.YR_CAL_BASE]
-                         , sim.lumaps[yr_cal]
-                         , sim.data.AGRICULTURAL_LANDUSES
-                         , sim.data.NON_AGRICULTURAL_LANDUSES )
-    ctlm, swlm = crossmap(sim.lmmaps[sim.data.YR_CAL_BASE], sim.lmmaps[yr_cal])
+    ctlu, swlu = lumap_crossmap( sim.lumaps[sim.data.YR_CAL_BASE]
+                               , sim.lumaps[yr_cal]
+                               , sim.data.AGRICULTURAL_LANDUSES
+                               , sim.data.NON_AGRICULTURAL_LANDUSES )
+    ctlm, swlm = lmmap_crossmap(sim.lmmaps[sim.data.YR_CAL_BASE], sim.lmmaps[yr_cal])
+
+    ctam, swam = ammap_crossmap(sim.ammaps[sim.data.YR_CAL_BASE], sim.ammaps[yr_cal])
 
     cthp, swhp = crossmap_irrstat( sim.lumaps[sim.data.YR_CAL_BASE], sim.lmmaps[sim.data.YR_CAL_BASE]
                                  , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
@@ -156,9 +171,11 @@ def write_production(sim, yr_cal, path):
 
     ctlu.to_csv(os.path.join(path, 'crosstab-lumap.csv'))
     ctlm.to_csv(os.path.join(path, 'crosstab-lmmap.csv'))
+    ctam.to_csv(os.path.join(path, 'crosstab-ammap.csv'))
 
     swlu.to_csv(os.path.join(path, 'switches-lumap.csv'))
     swlm.to_csv(os.path.join(path, 'switches-lmmap.csv'))
+    swam.to_csv(os.path.join(path, 'switches-ammap.csv'))
 
     cthp.to_csv(os.path.join(path, 'crosstab-irrstat.csv'))
     swhp.to_csv(os.path.join(path, 'switches-irrstat.csv'))
@@ -176,6 +193,7 @@ def write_water(sim, yr_cal, path):
     # Get water use for year in mrj format
     ag_w_mrj = ag_water.get_wreq_matrices(sim.data, yr_idx)
     non_ag_w_rk = non_ag_water.get_wreq_matrix(sim.data)
+    ag_man_w_mrj = ag_water.get_agricultural_management_water_matrices(sim.data, ag_w_mrj, yr_idx)
 
     # Prepare a data frame.
     df = pd.DataFrame( columns=[ 'REGION_ID'
@@ -209,9 +227,15 @@ def write_water(sim, yr_cal, path):
         
         # Calculate water requirements by agriculture for year and region.
         wreq_reg = (
-              ( ag_w_mrj[:, ind, :] * sim.ag_dvars[yr_cal][:, ind, :] ).sum()  # Agricultural contribution
-            + ( non_ag_w_rk[ind, :] * sim.non_ag_dvars[yr_cal][ind, :] ).sum()         # Non-agricultural contribution
+              ( ag_w_mrj[:, ind, :] * sim.ag_dvars[yr_cal][:, ind, :] ).sum()   # Agricultural contribution
+            + ( non_ag_w_rk[ind, :] * sim.non_ag_dvars[yr_cal][ind, :] ).sum()  # Non-agricultural contribution
         )
+
+        for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():                  # Agricultural managements contribution
+            am_j = np.array([sim.data.DESC2AGLU[lu] for lu in am_lus])
+            wreq_reg += ( ag_man_w_mrj[am][:, ind, :]
+                        * sim.ag_man_dvars[yr_cal][am][:, ind[:,np.newaxis], am_j] ).sum()
+
         
         # Calculate water use limits
         wul = wuse_limits[i][1]
@@ -249,6 +273,7 @@ def write_ghg(sim, yr_cal, path):
     # Get greenhouse gas emissions in mrj format
     ag_g_mrj = ag_ghg.get_ghg_matrices(sim.data, yr_idx)
     non_ag_g_rk = non_ag_ghg.get_ghg_matrix(sim.data)
+    ag_man_g_mrj = ag_ghg.get_agricultural_management_ghg_matrices(sim.data, ag_g_mrj, yr_idx)
 
     # Prepare a data frame.
     df = pd.DataFrame( columns=[ 'GHG_EMISSIONS_LIMIT_TCO2e'
@@ -263,7 +288,12 @@ def write_ghg(sim, yr_cal, path):
           ( (ag_g_mrj + ghg_t_2010) * sim.ag_dvars[yr_cal] ).sum()  # Agricultural contribution
         + ( non_ag_g_rk * sim.non_ag_dvars[yr_cal] ).sum()          # Non-agricultural contribution
     )
-    
+
+    for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():          # Agricultural managements contribution
+        am_j = np.array([sim.data.DESC2AGLU[lu] for lu in am_lus])
+        ghg_emissions += ( ag_man_g_mrj[am] 
+                         * sim.ag_man_dvars[yr_cal][am][:, :, am_j] ).sum() 
+
     # Add to dataframe
     df.loc[0] = ("{:,.0f}".format(ghg_limits), "{:,.0f}".format(ghg_emissions))
     
