@@ -70,12 +70,12 @@ def ammap_crossmap(oldmap, newmap):
     # Produce the cross-tabulation matrix with optional labels.
     crosstab = pd.crosstab(oldmap, newmap, margins = True)
 
-    reindex = list(range(len(SORTED_AG_MANAGEMENTS))) + ['All']
+    reindex =  list(range(len(SORTED_AG_MANAGEMENTS) + 1)) + ['All']
     crosstab = crosstab.reindex(reindex, axis = 0, fill_value = 0)
     crosstab = crosstab.reindex(reindex, axis = 1, fill_value = 0)
 
-    crosstab.columns = SORTED_AG_MANAGEMENTS + ['Total']
-    crosstab.index = SORTED_AG_MANAGEMENTS + ['Total']
+    crosstab.columns = ['None'] + SORTED_AG_MANAGEMENTS + ['Total']
+    crosstab.index = ['None'] + SORTED_AG_MANAGEMENTS + ['Total']
 
     # Calculate net switches to land use (negative means switch away).
     switches = crosstab.iloc[-1, 0:-1] - crosstab.iloc[0:-1, -1]

@@ -550,7 +550,7 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
         n_am_options = range(len(am2j.keys()) + 1)
 
         # Make ammap (agricultural management map) using the lumap and lmmap
-        ammap = np.zeros(ncells)
+        ammap = np.zeros(ncells, dtype=np.int8)
         for r in range(ncells):
             cell_j = lumap[r]
             cell_m = lmmap[r]

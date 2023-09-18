@@ -102,6 +102,12 @@ def write_files(sim, path):
         # Save raw non-agricultural decision variables (boolean array).
         non_ag_X_rk_fname = 'non_ag_X_rk_' + str(yr_cal) + '.npy'
         np.save(os.path.join(path, non_ag_X_rk_fname), sim.non_ag_dvars[yr_cal])
+
+        # Save raw agricultural management decision variables
+        for am in AG_MANAGEMENTS_TO_LAND_USES:
+            snake_case_am = am.lower().replace(" ", "_")
+            am_X_mrj_fname = 'ag_man_X_mrj_' + snake_case_am + "_" + str(yr_cal) + ".npy"
+            np.save(os.path.join(path, am_X_mrj_fname), sim.non_ag_dvars[yr_cal])
         
         # Write out raw numpy arrays for land-use and land management
         lumap_fname = 'lumap_' + str(yr_cal) + '.npy'
@@ -110,12 +116,14 @@ def write_files(sim, path):
         np.save(os.path.join(path, lmmap_fname), sim.lmmaps[yr_cal])
 
         # Recreate full resolution 2D arrays and write out GeoTiffs for land-use and land management
-        lumap, lmmap = recreate_2D_maps(sim, yr_cal)
+        lumap, lmmap, ammap = recreate_2D_maps(sim, yr_cal)
         
         lumap_fname = 'lumap_' + str(yr_cal) + '.tiff'
         lmmap_fname = 'lmmap_' + str(yr_cal) + '.tiff'
+        ammap_fname = 'ammap_' + str(yr_cal) + '.tiff'
         write_gtiff(lumap, os.path.join(path, lumap_fname))
         write_gtiff(lmmap, os.path.join(path, lmmap_fname))
+        write_gtiff(ammap, os.path.join(path, ammap_fname))
 
 
 def write_production(sim, yr_cal, path): 
