@@ -90,6 +90,10 @@ def create_new_dataset():
     # Load delta demands file
     shutil.copyfile(luto_1D_inpath + 'demand_deltas_c.npy', outpath + 'demand_deltas_c.npy')
     
+    # Load agricultural management datafiles
+    shutil.copyfile(luto_1D_inpath + '20230907_Asparagopsis_Data.xlsx', outpath + '20230907_Asparagopsis_Data.xlsx')
+    shutil.copyfile(luto_1D_inpath + '20230913_PAG_Data.xlsx', outpath + '20230913_PAG_Data.xlsx')
+    
     
     
     ############### Read data
