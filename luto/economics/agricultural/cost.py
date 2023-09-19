@@ -189,7 +189,7 @@ def get_asparagopsis_effect_c_mrj(data, yr_idx):
     year = 2010 + yr_idx
 
     # Set up the effects matrix
-    new_c_mrj = np.zeros((2, data.NCELLS, len(land_uses))).astype(np.float32)
+    new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
     # Update values in the new matrix
     for lm in data.LANDMANS:
@@ -201,7 +201,7 @@ def get_asparagopsis_effect_c_mrj(data, yr_idx):
         for lu_idx, lu in enumerate(land_uses):
             lvstype, vegtype = lvs_veg_types(lu)
             yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
-            cost_per_animal = data.ASPARAGOPSIS_DATA[lu].loc[year, "AnnCost_per_animal"]
+            cost_per_animal = data.ASPARAGOPSIS_DATA[lu].loc[year, 'AnnCost_per_animal']
             cost_per_cell = cost_per_animal * yield_pot * data.REAL_AREA
 
             new_c_mrj[m, :, lu_idx] = cost_per_cell
@@ -209,11 +209,32 @@ def get_asparagopsis_effect_c_mrj(data, yr_idx):
     return new_c_mrj
 
 
+def get_precision_agriculture_effect_c_mrj(data, yr_idx):
+    """
+    Applies the effects of using precision agriculture to the cost data
+    for all relevant agr. land uses.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
+    year = 2010 + yr_idx
+
+    # Set up the effects matrix
+    new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    for m in range(data.NLMS):
+        for lu_idx, lu in enumerate(land_uses):
+            cost_per_ha = data.PRECISION_AGRICULTURE_DATA[lu].loc[year, 'AnnCost_per_Ha']
+            new_c_mrj[m, :, lu_idx] = cost_per_ha * data.REAL_AREA
+
+    return new_c_mrj
+
+
 def get_agricultural_management_cost_matrices(data, c_mrj, yr_idx):
     asparagopsis_data = get_asparagopsis_effect_c_mrj(data, yr_idx)
+    precision_agriculture_data = get_precision_agriculture_effect_c_mrj(data, yr_idx)
 
     ag_management_data = {
-        "Asparagopsis taxiformis": asparagopsis_data,
+        'Asparagopsis taxiformis': asparagopsis_data,
+        'Precision Agriculture': precision_agriculture_data,
     }
 
     return ag_management_data
