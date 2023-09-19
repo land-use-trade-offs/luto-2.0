@@ -75,7 +75,7 @@ OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
 
 # Select Gurobi algorithm used to solve continuous models or the initial root relaxation of a MIP model.
 # Set solve method. Default is automatic. Dual simplex uses less memory.
-SOLVE_METHOD = 1
+SOLVE_METHOD = 2
 
 """ SOLVE METHODS
    'automatic':                       -1
