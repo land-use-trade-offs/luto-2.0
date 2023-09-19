@@ -223,35 +223,90 @@ def get_asparagopsis_effect_g_mrj(data, yr_idx):
     Applies the effects of using asparagopsis to the GHG data
     for all relevant agr. land uses.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis']
     year = 2010 + yr_idx
 
     # Set up the effects matrix
-    new_g_mrj = np.zeros((2, data.NCELLS, len(land_uses))).astype(np.float32)
+    new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
     # Update values in the new matrix, taking into account the CH4 reduction of asparagopsis
     for lu_idx, lu in enumerate(land_uses):
         ch4_reduction_perc = 1 - data.ASPARAGOPSIS_DATA[lu].loc[year, "MitEff_CH4"]
 
         if ch4_reduction_perc != 0:
-            # Subtract enteric fermentation emissions multiplied by reduction multiplier
-            lvstype, _ = lvs_veg_types(lu)
+            for lm in data.LANDMANS:
+                if lm == 'irr':
+                    m = 0
+                else:
+                    m = 1
 
-            reduction_amnt = (
-                data.AGGHG_LVSTK[lvstype, "CO2E_KG_HEAD_ENTERIC"].to_numpy()
-                * ch4_reduction_perc
-                * data.REAL_AREA
-            )
-            new_g_mrj[:, :, lu_idx] = -reduction_amnt
+                # Subtract enteric fermentation emissions multiplied by reduction multiplier
+                lvstype, vegtype = lvs_veg_types(lu)
+
+                yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
+
+                reduction_amnt = (
+                    data.AGGHG_LVSTK[lvstype, "CO2E_KG_HEAD_ENTERIC"].to_numpy()
+                    * yield_pot
+                    * ch4_reduction_perc
+                    / 1000            # convert to tonnes
+                    * data.REAL_AREA  # adjust for resfactor
+                )
+                new_g_mrj[m, :, lu_idx] = -reduction_amnt
+
+    return new_g_mrj
+
+
+def get_precision_agriculture_effect_g_mrj(data, yr_idx):
+    """
+    Applies the effects of using precision agriculture to the GHG data
+    for all relevant agr. land uses.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
+    year = 2010 + yr_idx
+
+    # Set up the effects matrix
+    new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    # Update values in the new matrix
+    for lu_idx, lu in enumerate(land_uses):
+        lu_data = data.PRECISION_AGRICULTURE_DATA[lu]
+
+        for lm in data.LANDMANS:
+            if lm == 'dry':
+                m = 0
+            else:
+                m = 1
+        
+            for co2e_type in [
+                'CO2E_KG_HA_CHEM_APPL',
+                'CO2E_KG_HA_CROP_MGT',
+                'CO2E_KG_HA_PEST_PROD',
+                'CO2E_KG_HA_SOIL_N_SURP',
+            ]:
+                # Some crop land uses do not emit any GHG emissions, e.g. 'Rice'
+                if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
+                    continue
+
+                reduction_perc = 1 - lu_data.loc[year, co2e_type]
+                reduction_amnt = (
+                    data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy()
+                    * reduction_perc
+                    / 1000            # convert to tonnes
+                    * data.REAL_AREA  # adjust for resfactor
+                )
+                new_g_mrj[m, :, lu_idx] -= reduction_amnt
 
     return new_g_mrj
 
 
 def get_agricultural_management_ghg_matrices(data, g_mrj, yr_idx) -> Dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_g_mrj(data, yr_idx)
+    precision_agriculture_data = get_precision_agriculture_effect_g_mrj(data, yr_idx)
 
     ag_management_data = {
-        "Asparagopsis taxiformis": asparagopsis_data,
+        'Asparagopsis taxiformis': asparagopsis_data,
+        'Precision Agriculture': precision_agriculture_data,
     }
 
     return ag_management_data

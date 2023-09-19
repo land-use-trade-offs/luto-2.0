@@ -182,15 +182,35 @@ PR2CM = dict2matrix(CM2PR_DICT, COMMODITIES, PRODUCTS).T # Note the transpose.
 ###############################################################
 # Agricultural management options data.
 ###############################################################
-asparagopsis_file = os.path.join(INPUT_DIR, "20230907_Asparagopsis_Data.xlsx")
+# Asparagopsis taxiformis data
+asparagopsis_file = os.path.join(INPUT_DIR, '20230907_Asparagopsis_Data.xlsx')
 ASPARAGOPSIS_DATA = {}
-ASPARAGOPSIS_DATA["Beef - natural land"] = pd.read_excel( asparagopsis_file, sheet_name="AT - Cattle (ext)", index_col="Year" )
-ASPARAGOPSIS_DATA["Beef - modified land"] = pd.read_excel( asparagopsis_file, sheet_name="AT - Cattle (int)", index_col="Year" )
-ASPARAGOPSIS_DATA["Sheep - natural land"] = pd.read_excel( asparagopsis_file, sheet_name="AT - Sheep", index_col="Year" )
-ASPARAGOPSIS_DATA["Sheep - modified land"] = ASPARAGOPSIS_DATA["Sheep - natural land"]
-ASPARAGOPSIS_DATA["Dairy - natural land"] = pd.read_excel( asparagopsis_file, sheet_name="AT - Dairy", index_col="Year" )
-ASPARAGOPSIS_DATA["Dairy - modified land"] = ASPARAGOPSIS_DATA["Dairy - natural land"]
+ASPARAGOPSIS_DATA['Beef - natural land'] = pd.read_excel( asparagopsis_file, sheet_name='AT - Cattle (ext)', index_col='Year' )
+ASPARAGOPSIS_DATA['Beef - modified land'] = pd.read_excel( asparagopsis_file, sheet_name='AT - Cattle (int)', index_col='Year' )
+ASPARAGOPSIS_DATA['Sheep - natural land'] = pd.read_excel( asparagopsis_file, sheet_name='AT - Sheep', index_col='Year' )
+ASPARAGOPSIS_DATA['Sheep - modified land'] = ASPARAGOPSIS_DATA['Sheep - natural land']
+ASPARAGOPSIS_DATA['Dairy - natural land'] = pd.read_excel( asparagopsis_file, sheet_name='AT - Dairy', index_col='Year' )
+ASPARAGOPSIS_DATA['Dairy - modified land'] = ASPARAGOPSIS_DATA["Dairy - natural land"]
 
+# Precision agriculture data
+prec_agr_file = os.path.join(INPUT_DIR, '20230913_PAG_Data.xlsx')
+PRECISION_AGRICULTURE_DATA = {}
+cropping_data = pd.read_excel( prec_agr_file, sheet_name='PAG bundle (Broadacre)', index_col='Year' )
+horticulture_data = pd.read_excel( prec_agr_file, sheet_name='PAG bundle (Horticulture)', index_col='Year' )
+
+for lu in ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds',
+           'Winter cereals', 'Winter legumes', 'Winter oilseeds']:
+    # Cropping land uses
+    PRECISION_AGRICULTURE_DATA[lu] = cropping_data
+
+for lu in ['Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']:
+    # Intensive Cropping land uses
+    PRECISION_AGRICULTURE_DATA[lu] = cropping_data
+
+for lu in ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 
+           'Plantation fruit', 'Stone fruit', 'Tropical stone fruit']:
+    # Horticulture land uses
+    PRECISION_AGRICULTURE_DATA[lu] = horticulture_data
 
 
 ###############################################################
