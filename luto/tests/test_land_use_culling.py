@@ -17,7 +17,7 @@ def _generate_mock_mrj_matrix(
     values: list[Any], m: int = 0, r: int = 0, max_m: int = MAX_M, max_r: int = MAX_R
 ):
     """
-    Generates a 3D matrix with shape (max_m, max_r, len(values)), and unpacks the
+    Generates a matrix with shape (max_m, max_r, len(values)), and unpacks the
     `values` into the matrix at coordinates [m, r, :].
 
     Acts as a mock of an `mrj` matrix.
@@ -43,7 +43,7 @@ def test_percentage_cost_mask(
     land_use_costs: randomly generated cost metric for land usage options
     num_valid: the number of land usage options that are considered 'valid' to start with
         - used to construct a dummy x_mrj_mask
-    land_usage_percentage: the percentage of land usage options to cull
+    land_use_cull_percentage: the percentage of land usage options to cull
     """
     m = random.randint(0, MAX_M - 1)
     r = random.randint(0, MAX_R - 1)
