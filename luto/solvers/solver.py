@@ -272,8 +272,7 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
         # Constraints. #
         # ------------ #
         print('Setting up constraints...', time.ctime() + '\n')
-        
-        print("    Setting up 'every cell used for some land use.'...", time.ctime())
+
         # Constraint that all of every cell is used for some land use.
         # Create an array indexed by cell that contains the sums of each cell's variables.
         # Then, loop through the array and add the constraint that each expression must equal 1.
@@ -281,7 +280,6 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
         for expr in X_sum_r:
             model.addConstr(expr == 1)
 
-        print("    Setting up 'ag man variables cannot exceed value of ag variable'...", time.ctime())
         # Constraint handling alternative agricultural management options:
         # Ag. man. variables cannot exceed the value of the agricultural variable.  TODO - uncomment
         for am, am_j_list in am2j.items():
@@ -291,7 +289,6 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
                 for r in ag_lu2cells[1, j]:
                     model.addConstr(X_ag_man_irr_vars_jr[am][j_idx, r] <= X_ag_irr_vars_jr[j, r])
 
-        print("    Setting up 'ag management adoption limits'...", time.ctime())
         # Add adoption limits constraints for agricultural management options.
         for am, am_j_list in am2j.items():
             for j_idx, j in enumerate(am_j_list):
@@ -307,10 +304,8 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
                   + gp.quicksum(X_ag_irr_vars_jr[j, :])
                 )
                 model.addConstr(ag_man_vars_sum <= adoption_limit * all_vars_sum)
-        
-        # Constraints to penalise under and over production compared to demand.
 
-        print("    Transforming ag decision vars...", time.ctime())
+        # Constraints to penalise under and over production compared to demand.
         # Transform agricultural decision vars from LU/j to PR/p representation.
         X_dry_pr = [
             X_ag_dry_vars_jr[j, :]
@@ -325,13 +320,10 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
             if input_data.lu2pr_pj[p, j]
         ]
 
-        print("        Quantities... (gp quicksum)", time.ctime())
-
         # Quantities in PR/p representation by land-management (dry/irr).
         ag_q_dry_p = [gp.quicksum(input_data.ag_q_mrp[0, :, p] * X_dry_pr[p]) for p in range(nprs)]
         ag_q_irr_p = [gp.quicksum(input_data.ag_q_mrp[1, :, p] * X_irr_pr[p]) for p in range(nprs)]
 
-        print("        Transform quantities...", time.ctime())
         # Transform quantities to CM/c representation by land management (dry/irr).
         ag_q_dry_c = [
             gp.quicksum(ag_q_dry_p[p] for p in range(nprs) if input_data.pr2cm_cp[c, p])
@@ -342,10 +334,6 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
             for c in range(ncms)
         ]
 
-        print(
-            "    Get contributions of alternative agr. management options... NEW",
-            time.ctime(),
-        )
         # Repeat to get contributions of alternative agr. management options
         # Convert variables to PR/p representation
         for am, am_j_list in am2j.items():
@@ -370,7 +358,6 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
                 for p in range(nprs)
             ]
 
-            print("        c-based list comps", time.ctime())
             ag_man_q_dry_c = [
                 gp.quicksum(ag_man_q_dry_p[p] for p in range(nprs) if input_data.pr2cm_cp[c, p])
                 for c in range(ncms)
@@ -385,7 +372,6 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
                 ag_q_dry_c[c] += ag_man_q_dry_c[c]
                 ag_q_irr_c[c] += ag_man_q_irr_c[c]
 
-        print("    Non-agricultural commodity contributions...", time.ctime())
         # Calculate non-agricultural commodity contributions
         non_ag_q_c = [
             gp.quicksum(
