@@ -139,14 +139,14 @@ WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions  e.g., [1, 2].
 # ---------------------------------------------------------------------------- #
 
 # How many land uses should remain after culling the most expensive options
-MAX_LAND_USES_PER_CELL = 5
+MAX_LAND_USES_PER_CELL = 8
 
 # Cull this percentage of the most expensive land usage options
-LAND_USAGE_CULL_PERCENTAGE = 0.25
+LAND_USAGE_CULL_PERCENTAGE = 0.2
 
 # CULL_MODE = 'absolute'      # cull to include at most MAX_LAND_USES_PER_CELL
 CULL_MODE = 'percentage'    # cull the LAND_USAGE_THRESHOLD_PERCENTAGE % most expensive options
-
+# CULL_MODE = 'none'          # do no culling
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)
 0: 'Environmental Plantings'
