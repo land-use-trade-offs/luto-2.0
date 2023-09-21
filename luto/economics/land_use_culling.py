@@ -50,7 +50,7 @@ def get_absolute_cost_mask(m, r, x_mrj_mask, costs_mrj):
     return cost_include_mask
 
 
-def apply_agricultural_cell_cost_culling(x_mrj, c_mrj, t_mrj, r_mrj):
+def apply_agricultural_land_use_culling(x_mrj, c_mrj, t_mrj, r_mrj):
     """
     Refine the exclude matrix to cull unprofitable land uses based on the CULL_MODE setting.
     This function modifies the x_mrj matrix in-place.
