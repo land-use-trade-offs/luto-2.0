@@ -93,6 +93,7 @@ def create_new_dataset():
     # Load agricultural management datafiles
     shutil.copyfile(luto_1D_inpath + '20230907_Asparagopsis_Data.xlsx', outpath + '20230907_Asparagopsis_Data.xlsx')
     shutil.copyfile(luto_1D_inpath + '20230913_PAG_Data.xlsx', outpath + '20230913_PAG_Data.xlsx')
+    shutil.copyfile(luto_1D_inpath + '20230919_ECOGRAZE_Data.xlsx', outpath + '20230919_ECOGRAZE_Data.xlsx')
     
     
     
@@ -279,6 +280,14 @@ def create_new_dataset():
     
     # Get water license price and save to file
     bioph['WATER_PRICE_ML_BOM'].to_hdf(outpath + 'water_licence_price.h5', key = 'water_licence_price', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    
+    
+    
+    
+    ############### Soil organic carbon data
+    
+    # Get soil organic carbon data and save to file
+    bioph['SOC_T_HA_TOP_30CM'].to_hdf(outpath + 'soil_carbon_t_ha.h5', key = 'soil_carbon_t_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
     
     
