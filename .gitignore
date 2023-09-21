@@ -2,7 +2,15 @@
 .spyproject/
 **/__pycache__/
 
+# Virtual environments
+venv
+
+# Gurobi environment & logging
+gurobi.env
 gurobi.log
+
+# Testing
+.hypothesis
 
 # Except this very file:
 !.gitignore
