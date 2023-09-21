@@ -9,13 +9,22 @@ from hypothesis import given
 
 from luto.economics import land_use_culling
 
+MAX_M = 2
+MAX_R = 400
 
-def _generate_flat_mrj_matrix(values: list[Any]):
+
+def _generate_mock_mrj_matrix(
+    values: list[Any], m: int = 0, r: int = 0, max_m: int = MAX_M, max_r: int = MAX_R
+):
     """
-    Generates a 3D matrix with shape (1, 1, len(values)).
-    Acts as a mock of an MRJ matrix with m = r = 0
+    Generates a 3D matrix with shape (max_m, max_r, len(values)), and unpacks the
+    `values` into the matrix at coordinates [m, r, :].
+
+    Acts as a mock of an `mrj` matrix.
     """
-    return np.array([[values]])
+    matrix = np.zeros((max_m, max_r, len(values)))
+    matrix[m, r, :] = np.array(values)
+    return matrix
 
 
 @given(
@@ -36,15 +45,18 @@ def test_percentage_cost_mask(
         - used to construct a dummy x_mrj_mask
     land_usage_percentage: the percentage of land usage options to cull
     """
+    m = random.randint(0, MAX_M - 1)
+    r = random.randint(0, MAX_R - 1)
+
     # generate cost metric matrix
-    costs_mrj = _generate_flat_mrj_matrix(land_use_costs)
+    costs_mrj = _generate_mock_mrj_matrix(land_use_costs, m=m, r=r)
 
     # generate random x_mrj_mask based on num_valid
     is_valid_land_use = [True for _ in range(num_valid)] + [
         False for _ in range(len(land_use_costs) - num_valid)
     ]
     random.shuffle(is_valid_land_use)
-    x_mrj_mask = _generate_flat_mrj_matrix(is_valid_land_use)
+    x_mrj_mask = _generate_mock_mrj_matrix(is_valid_land_use, m=m, r=r).astype(bool)
 
     # determine which costs should be excluded
     num_costs_to_exclude = math.ceil(land_use_cull_percentage * num_valid)
@@ -59,7 +71,7 @@ def test_percentage_cost_mask(
         land_use_cull_percentage,
     ):
         cost_mask = land_use_culling.get_percentage_cost_mask(
-            0, 0, x_mrj_mask, costs_mrj
+            m, r, x_mrj_mask, costs_mrj
         )
 
     for i, cost_value in enumerate(land_use_costs):
@@ -86,15 +98,18 @@ def test_absolute_cost_mask(
         - used to construct a dummy x_mrj_mask
     max_land_uses: the maximum number of land use options that should not be culled
     """
+    m = random.randint(0, MAX_M - 1)
+    r = random.randint(0, MAX_R - 1)
+
     # generate cost metric matrix
-    costs_mrj = _generate_flat_mrj_matrix(land_use_costs)
+    costs_mrj = _generate_mock_mrj_matrix(land_use_costs, m=m, r=r)
 
     # generate random x_mrj_mask based on num_valid
     is_valid_land_use = [True for _ in range(num_valid)] + [
         False for _ in range(len(land_use_costs) - num_valid)
     ]
     random.shuffle(is_valid_land_use)
-    x_mrj_mask = _generate_flat_mrj_matrix(is_valid_land_use)
+    x_mrj_mask = _generate_mock_mrj_matrix(is_valid_land_use, m=m, r=r).astype(bool)
 
     # determine which costs should be excluded
     num_costs_to_exclude = max(num_valid - max_land_uses, 0)
@@ -108,7 +123,7 @@ def test_absolute_cost_mask(
         "luto.economics.land_use_culling.MAX_LAND_USES_PER_CELL",
         max_land_uses,
     ):
-        cost_mask = land_use_culling.get_absolute_cost_mask(0, 0, x_mrj_mask, costs_mrj)
+        cost_mask = land_use_culling.get_absolute_cost_mask(m, r, x_mrj_mask, costs_mrj)
 
     if max_land_uses > num_valid:
         assert cost_mask is None
