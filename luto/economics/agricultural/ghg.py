@@ -289,13 +289,15 @@ def get_precision_agriculture_effect_g_mrj(data, yr_idx):
                     continue
 
                 reduction_perc = 1 - lu_data.loc[year, co2e_type]
-                reduction_amnt = (
-                    data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy()
-                    * reduction_perc
-                    / 1000            # convert to tonnes
-                    * data.REAL_AREA  # adjust for resfactor
-                )
-                new_g_mrj[m, :, lu_idx] -= reduction_amnt
+                if reduction_perc != 0:
+                    reduction_amnt = (
+                        np.nan_to_num(data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy(), 0)
+                        * reduction_perc
+                        / 1000            # convert to tonnes
+                        * data.REAL_AREA  # adjust for resfactor
+                    )
+                    reduction_amnt = np.nan_to_num(reduction_amnt, 0)
+                    new_g_mrj[m, :, lu_idx] -= reduction_amnt
 
     return new_g_mrj
 
