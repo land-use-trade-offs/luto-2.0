@@ -441,3 +441,8 @@ def get_water_delta_matrix(w_mrj, l_mrj, data):
     # Amortise upfront costs to annualised costs
     w_delta_mrj = amortise(w_delta_mrj)
     return w_delta_mrj
+
+
+def am_name_snake_case(am_name):
+    """Get snake_case version of the AM name"""
+    return am_name.lower().replace(' ', '_')

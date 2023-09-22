@@ -25,7 +25,7 @@ import numpy as np
 import pandas as pd
 
 import luto.settings as settings
-from luto.tools import get_production
+from luto import tools
 from luto.tools.spatializers import *
 from luto.tools.compmap import *
 import luto.economics.agricultural.water as ag_water
@@ -105,7 +105,7 @@ def write_files(sim, path):
 
         # Save raw agricultural management decision variables
         for am in AG_MANAGEMENTS_TO_LAND_USES:
-            snake_case_am = am.lower().replace(" ", "_")
+            snake_case_am = tools.am_name_snake_case(am)
             am_X_mrj_fname = 'ag_man_X_mrj_' + snake_case_am + "_" + str(yr_cal) + ".npy"
             np.save(os.path.join(path, am_X_mrj_fname), sim.non_ag_dvars[yr_cal])
         
@@ -135,12 +135,12 @@ def write_production(sim, yr_cal, path):
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
     
     # Calculate data for quantity comparison between base year and target year
-    prod_base = sim.data.PROD_2010_C                # get_production(sim.data, sim.data.YR_CAL_BASE, sim.data.L_MRJ)  # Get commodity quantities produced in 2010
-    prod_targ = get_production( sim.data
-                              , yr_cal
-                              , sim.ag_dvars[yr_cal]
-                              , sim.non_ag_dvars[yr_cal] 
-                              , sim.ag_man_dvars[yr_cal] )  # Get commodity quantities produced in target year
+    prod_base = sim.data.PROD_2010_C                # tools.get_production(sim.data, sim.data.YR_CAL_BASE, sim.data.L_MRJ)  # Get commodity quantities produced in 2010
+    prod_targ = tools.get_production( sim.data
+                                    , yr_cal
+                                    , sim.ag_dvars[yr_cal]
+                                    , sim.non_ag_dvars[yr_cal] 
+                                    , sim.ag_man_dvars[yr_cal] )  # Get commodity quantities produced in target year
     demands = sim.data.D_CY[yr_idx]                 # Get commodity demands for target year
     abs_diff = prod_targ - demands                  # Diff between target year production and demands in absolute terms (i.e. tonnes etc)
     prop_diff = ( prod_targ / demands ) * 100       # Target year production as a proportion of demands (%)
@@ -168,7 +168,12 @@ def write_production(sim, yr_cal, path):
                                  , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
                                  , sim.data.AGRICULTURAL_LANDUSES
                                  , sim.data.NON_AGRICULTURAL_LANDUSES )
-
+    
+    ctas, swas = crossmap_amstat( sim.lumaps[sim.data.YR_CAL_BASE], sim.ammaps[sim.data.YR_CAL_BASE]
+                                , sim.lumaps[yr_cal], sim.ammaps[yr_cal]
+                                , sim.data.AGRICULTURAL_LANDUSES
+                                , sim.data.NON_AGRICULTURAL_LANDUSES )
+        
     ctlu.to_csv(os.path.join(path, 'crosstab-lumap.csv'))
     ctlm.to_csv(os.path.join(path, 'crosstab-lmmap.csv'))
     ctam.to_csv(os.path.join(path, 'crosstab-ammap.csv'))
@@ -179,6 +184,9 @@ def write_production(sim, yr_cal, path):
 
     cthp.to_csv(os.path.join(path, 'crosstab-irrstat.csv'))
     swhp.to_csv(os.path.join(path, 'switches-irrstat.csv'))
+
+    ctas.to_csv(os.path.join(path, 'crosstab-amstat.csv'))
+    swas.to_csv(os.path.join(path, 'switches-amstat.csv'))
 
 
 def write_water(sim, yr_cal, path):
