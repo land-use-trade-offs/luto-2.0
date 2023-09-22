@@ -296,8 +296,10 @@ def get_precision_agriculture_effect_g_mrj(data, yr_idx):
                         / 1000            # convert to tonnes
                         * data.REAL_AREA  # adjust for resfactor
                     )
-                    reduction_amnt = np.nan_to_num(reduction_amnt, 0)
                     new_g_mrj[m, :, lu_idx] -= reduction_amnt
+
+    if np.isnan(new_g_mrj).any():
+        raise ValueError("Error in data: NaNs detected in agricultural management options' GHG effect matrix.")
 
     return new_g_mrj
 
