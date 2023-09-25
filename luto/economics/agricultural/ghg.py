@@ -304,13 +304,53 @@ def get_precision_agriculture_effect_g_mrj(data, yr_idx):
     return new_g_mrj
 
 
+def get_ecological_grazing_effect_g_mrj(data, yr_idx):
+    """
+    Applies the effects of using ecological grazing to the GHG data
+    for all relevant agr. land uses.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
+    year = 2010 + yr_idx
+
+    # Set up the effects matrix
+    new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    # Update values in the new matrix
+    for lu_idx, lu in enumerate(land_uses):
+        lu_data = data.PRECISION_AGRICULTURE_DATA[lu]
+
+        for lm in data.LANDMANS:
+            if lm == 'dry':
+                m = 0
+            else:
+                m = 1
+        
+            # Some crop land uses do not emit any GHG emissions, e.g. 'Rice'
+            if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
+                continue
+
+            reduction_perc = 1 - lu_data.loc[year, 'CO2E_KG_HEAD_IND_LEACH_RUNOFF']
+            if reduction_perc != 0:
+                reduction_amnt = (
+                    np.nan_to_num(data.AGGHG_CROPS['CO2E_KG_HEAD_IND_LEACH_RUNOFF', lm, lu].to_numpy(), 0)
+                    * reduction_perc
+                    / 1000            # convert to tonnes
+                    * data.REAL_AREA  # adjust for resfactor
+                )
+                new_g_mrj[m, :, lu_idx] = -reduction_amnt
+
+    return new_g_mrj
+
+
 def get_agricultural_management_ghg_matrices(data, g_mrj, yr_idx) -> Dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_g_mrj(data, yr_idx)
     precision_agriculture_data = get_precision_agriculture_effect_g_mrj(data, yr_idx)
+    eco_grazing_data = get_ecological_grazing_effect_g_mrj(data, yr_idx)
 
     ag_management_data = {
         'Asparagopsis taxiformis': asparagopsis_data,
         'Precision Agriculture': precision_agriculture_data,
+        'Ecological Grazing': eco_grazing_data,
     }
 
     return ag_management_data

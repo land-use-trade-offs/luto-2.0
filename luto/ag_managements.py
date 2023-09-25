@@ -41,7 +41,12 @@ AG_MANAGEMENTS_TO_LAND_USES = {
         'Plantation fruit',
         'Stone fruit',
         'Tropical stone fruit',
-    ]
+    ],
+    'Ecological Grazing': [
+        'Beef - modified land',
+        'Sheep - modified land',
+        'Dairy - modified land',
+    ],
 }
 
 # List of all agricultural managements, sorted by index value defined above

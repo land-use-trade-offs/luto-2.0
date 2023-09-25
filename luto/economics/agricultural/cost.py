@@ -228,6 +228,37 @@ def get_precision_agriculture_effect_c_mrj(data, yr_idx):
     return new_c_mrj
 
 
+def get_ecological_grazing_effect_c_mrj(data, yr_idx):
+    """
+    Applies the effects of using ecological grazing to the cost data
+    for all relevant agr. land uses.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
+    year = 2010 + yr_idx
+
+    # Set up the effects matrix
+    new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    for lu_idx, lu in enumerate(land_uses):
+        lvstype, _ = lvs_veg_types(lu)
+
+        # Get effects on operating costs
+        operating_mult = data.ECOLOGICAL_GRAZING_DATA[lu].loc[year, 'Operating_cost_multiplier']
+        operating_c_effect = data.AGEC_LVSTK['FOC', lvstype] * (1 - operating_mult) * data.REAL_AREA
+
+        # Get effects on labour costs
+        labour_mult = data.ECOLOGICAL_GRAZING_DATA[lu].loc[year, 'Labour_cost_mulitiplier']
+        labout_c_effect = data.AGEC_LVSTK['FLC', lvstype] * (1 - labour_mult) * data.REAL_AREA
+
+        # Combine for total cost effect
+        total_c_effect = operating_c_effect + labout_c_effect
+
+        for m in range(data.NLMS):
+            new_c_mrj[m, :, lu_idx] = total_c_effect
+
+    return new_c_mrj
+
+
 def get_agricultural_management_cost_matrices(data, c_mrj, yr_idx):
     asparagopsis_data = get_asparagopsis_effect_c_mrj(data, yr_idx)
     precision_agriculture_data = get_precision_agriculture_effect_c_mrj(data, yr_idx)
