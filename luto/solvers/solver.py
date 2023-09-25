@@ -474,6 +474,8 @@ def formulate_model(input_data: InputData, d_c):
         
     if 'nutrients' in limits:
         ...
+    
+    return model
 
 
 def solve(input_data: InputData, model):
