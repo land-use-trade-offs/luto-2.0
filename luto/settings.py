@@ -69,7 +69,6 @@ OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
 # OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
 
-
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
 # ---------------------------------------------------------------------------- #

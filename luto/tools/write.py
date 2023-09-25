@@ -269,10 +269,16 @@ def write_ghg(sim, yr_cal, path):
         
     # Convert calendar year to year index.
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
+    
+    # get the function domain, 
+    # if get_ghg_X was called in write function, 
+    #   calculate the GHG as seperated CO2 emmision
+    if __name__ == 'write_ghg':
+        aggregate = False
 
     # Get greenhouse gas emissions in mrj format
-    ag_g_mrj = ag_ghg.get_ghg_matrices(sim.data, yr_idx)
-    non_ag_g_rk = non_ag_ghg.get_ghg_matrix(sim.data)
+    ag_g_mrj = ag_ghg.get_ghg_matrices(sim.data, yr_idx,aggregate)
+    non_ag_g_rk = non_ag_ghg.get_ghg_matrix(sim.data,aggregate)
     ag_man_g_mrj = ag_ghg.get_agricultural_management_ghg_matrices(sim.data, ag_g_mrj, yr_idx)
 
     # Prepare a data frame.
