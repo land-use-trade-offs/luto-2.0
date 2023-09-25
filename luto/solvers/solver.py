@@ -125,7 +125,7 @@ class InputData:
         }
 
 
-def formulate_model(d_c, input_data: InputData):
+def formulate_model(input_data: InputData, d_c):
     # Ensure there is a dictionary to test against.
     limits = input_data.limits
     if limits is None: limits = {}
