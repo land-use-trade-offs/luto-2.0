@@ -28,6 +28,7 @@ from gurobipy import GRB
 from dataclasses import dataclass
 
 import luto.settings as settings
+from luto import tools
 from luto.ag_managements import SORTED_AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 
 # Set Gurobi environment.
@@ -167,8 +168,7 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
         }
 
         for am, am_j_list in am2j.items():
-            # Get snake_case version of the AM name for the variable name
-            am_name = am.lower().replace(' ', '_')
+            am_name = tools.am_name_snake_case(am)
 
             for j_idx, j in enumerate(am_j_list):                
                 # Create variable for all eligible cells
@@ -184,7 +184,6 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
 
         # Decision variables, one for each commodity, to minimise the deviations from demand.
         V = model.addMVar(ncms, name = 'V')
-        
         
         
         # ------------------- #
@@ -230,11 +229,9 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
 
             # Store calculations for each agricultural management option in a dict
             ag_man_objs = {
-                am: (
-                      input_data.ag_man_c_mrj[am]
-                    + input_data.ag_man_t_mrj[am]
-                    # TODO - add t costs for non ag to ag mans
-                ) / settings.PENALTY
+                am: ( input_data.ag_man_c_mrj[am]
+                    + input_data.ag_man_t_mrj[am] 
+                    ) / settings.PENALTY
                 for am in am2j
             }
             
@@ -245,26 +242,28 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
         non_ag_obj_rk = np.nan_to_num(non_ag_obj_rk)
 
         # Specify objective function
-        objective = ( 
-                     # Production costs + transition costs for all agricultural land uses.
-                     sum( ag_obj_mrj[0, ag_lu2cells[0, j], j] @ X_ag_dry_vars_jr[j, ag_lu2cells[0, j]]
-                        + ag_obj_mrj[1, ag_lu2cells[1, j], j] @ X_ag_irr_vars_jr[j, ag_lu2cells[1, j]]
-                          for j in range(n_ag_lus) )
-                    
-                     # Effects on production costs + transition costs for alternative agr. management options
-                   + sum( ag_man_objs[am][0, ag_lu2cells[0, j], j_idx] @ X_ag_man_dry_vars_jr[am][j_idx, ag_lu2cells[0, j]]
-                        + ag_man_objs[am][1, ag_lu2cells[1, j], j_idx] @ X_ag_man_irr_vars_jr[am][j_idx, ag_lu2cells[1, j]]
-                          for am, am_j_list in am2j.items()
-                          for j_idx, j in enumerate(am_j_list) )
+        # Production costs + transition costs for all agricultural land uses.
+        ag_obj_contr = gp.quicksum( 
+            ag_obj_mrj[0, ag_lu2cells[0, j], j] @ X_ag_dry_vars_jr[j, ag_lu2cells[0, j]]
+          + ag_obj_mrj[1, ag_lu2cells[1, j], j] @ X_ag_irr_vars_jr[j, ag_lu2cells[1, j]]
+            for j in range(n_ag_lus) 
+        )
+        
+        # Effects on production costs + transition costs for alternative agr. management options
+        ag_man_obj_contr = gp.quicksum( 
+            ag_man_objs[am][0, ag_lu2cells[0, j], j_idx] @ X_ag_man_dry_vars_jr[am][j_idx, ag_lu2cells[0, j]]
+          + ag_man_objs[am][1, ag_lu2cells[1, j], j_idx] @ X_ag_man_irr_vars_jr[am][j_idx, ag_lu2cells[1, j]]
+            for am, am_j_list in am2j.items()
+            for j_idx, j in enumerate(am_j_list) 
+        )
 
-                     # Production costs + transition costs for all non-agricultural land uses.
-                   + sum( non_ag_obj_rk[:, k][non_ag_lu2cells[k]] @ X_non_ag_vars_kr[k, non_ag_lu2cells[k]]
-                          for k in range(n_non_ag_lus) )
+        # Production costs + transition costs for all non-agricultural land uses.
+        non_ag_obj_contr = gp.quicksum( 
+            non_ag_obj_rk[:, k][non_ag_lu2cells[k]] @ X_non_ag_vars_kr[k, non_ag_lu2cells[k]]
+            for k in range(n_non_ag_lus) 
+        )
 
-                     # Add deviation-from-demand variables for ensuring demand of each commodity is met (approximately). 
-                   + sum( V[c] for c in range(ncms) )
-                    )
-
+        objective = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr + gp.quicksum( V[c] for c in range(ncms) )
         model.setObjective(objective, GRB.MINIMIZE)
         
 
@@ -272,7 +271,7 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
         # Constraints. #
         # ------------ #
         print('Setting up constraints...', time.ctime() + '\n')
-        
+
         # Constraint that all of every cell is used for some land use.
         # Create an array indexed by cell that contains the sums of each cell's variables.
         # Then, loop through the array and add the constraint that each expression must equal 1.
@@ -296,77 +295,96 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
 
                 # Sum of all usage of the AM option must be less than the limit
                 ag_man_vars_sum = (
-                    X_ag_man_dry_vars_jr[am][j_idx, :].sum()
-                  + X_ag_man_irr_vars_jr[am][j_idx, :].sum()
+                    gp.quicksum(X_ag_man_dry_vars_jr[am][j_idx, :])
+                  + gp.quicksum(X_ag_man_irr_vars_jr[am][j_idx, :])
                 )
                 all_vars_sum = (
-                    X_ag_dry_vars_jr[j, :].sum()
-                  + X_ag_irr_vars_jr[j, :].sum()
+                    gp.quicksum(X_ag_dry_vars_jr[j, :])
+                  + gp.quicksum(X_ag_irr_vars_jr[j, :])
                 )
                 model.addConstr(ag_man_vars_sum <= adoption_limit * all_vars_sum)
-        
-        # Constraints to penalise under and over production compared to demand.
 
+        # Constraints to penalise under and over production compared to demand.
         # Transform agricultural decision vars from LU/j to PR/p representation.
-        X_dry_pr = [ X_ag_dry_vars_jr[j, :] for p in range(nprs) for j in range(n_ag_lus)
-                     if input_data.lu2pr_pj[p, j] ]
-        X_irr_pr = [ X_ag_irr_vars_jr[j, :] for p in range(nprs) for j in range(n_ag_lus)
-                     if input_data.lu2pr_pj[p, j] ]
+        X_dry_pr = [
+            X_ag_dry_vars_jr[j, :]
+            for p in range(nprs)
+            for j in range(n_ag_lus)
+            if input_data.lu2pr_pj[p, j]
+        ]
+        X_irr_pr = [
+            X_ag_irr_vars_jr[j, :]
+            for p in range(nprs)
+            for j in range(n_ag_lus)
+            if input_data.lu2pr_pj[p, j]
+        ]
 
         # Quantities in PR/p representation by land-management (dry/irr).
-        ag_q_dry_p = [input_data.ag_q_mrp[0, :, p] @ X_dry_pr[p] for p in range(nprs)]
-        ag_q_irr_p = [input_data.ag_q_mrp[1, :, p] @ X_irr_pr[p] for p in range(nprs)]
+        ag_q_dry_p = [gp.quicksum(input_data.ag_q_mrp[0, :, p] * X_dry_pr[p]) for p in range(nprs)]
+        ag_q_irr_p = [gp.quicksum(input_data.ag_q_mrp[1, :, p] * X_irr_pr[p]) for p in range(nprs)]
 
         # Transform quantities to CM/c representation by land management (dry/irr).
-        ag_q_dry_c = [ sum(ag_q_dry_p[p] for p in range(nprs) if input_data.pr2cm_cp[c, p])
-                       for c in range(ncms) ]
-        ag_q_irr_c = [ sum(ag_q_irr_p[p] for p in range(nprs) if input_data.pr2cm_cp[c, p])
-                       for c in range(ncms) ]
-        
+        ag_q_dry_c = [
+            gp.quicksum(ag_q_dry_p[p] for p in range(nprs) if input_data.pr2cm_cp[c, p])
+            for c in range(ncms)
+        ]
+        ag_q_irr_c = [
+            gp.quicksum(ag_q_irr_p[p] for p in range(nprs) if input_data.pr2cm_cp[c, p])
+            for c in range(ncms)
+        ]
+
         # Repeat to get contributions of alternative agr. management options
         # Convert variables to PR/p representation
         for am, am_j_list in am2j.items():
             X_ag_man_dry_pr = []
-            for p in range(nprs):
-                for j_idx, j in enumerate(am_j_list):
-                    if input_data.lu2pr_pj[p, j]:
-                        X_ag_man_dry_pr.append(X_ag_man_dry_vars_jr[am][j_idx, :])
-                        break
-                else:
-                    X_ag_man_dry_pr.append(np.zeros(ncells))
-
             X_ag_man_irr_pr = []
             for p in range(nprs):
                 for j_idx, j in enumerate(am_j_list):
                     if input_data.lu2pr_pj[p, j]:
+                        X_ag_man_dry_pr.append(X_ag_man_dry_vars_jr[am][j_idx, :])
                         X_ag_man_irr_pr.append(X_ag_man_irr_vars_jr[am][j_idx, :])
                         break
                 else:
                     X_ag_man_irr_pr.append(np.zeros(ncells))
-            
-            ag_man_q_dry_p = [input_data.ag_man_q_mrp[am][0, :, p] @ X_ag_man_dry_pr[p] for p in range(nprs)]
-            ag_man_q_irr_p = [input_data.ag_man_q_mrp[am][1, :, p] @ X_ag_man_irr_pr[p] for p in range(nprs)]
+                    X_ag_man_dry_pr.append(np.zeros(ncells))
 
-            ag_man_q_dry_c = [ sum(ag_man_q_dry_p[p] for p in range(nprs) if input_data.pr2cm_cp[c, p])
-                           for c in range(ncms) ]
-            ag_man_q_irr_c = [ sum(ag_man_q_irr_p[p] for p in range(nprs) if input_data.pr2cm_cp[c, p])
-                           for c in range(ncms) ]
-            
+            ag_man_q_dry_p = [
+                gp.quicksum(input_data.ag_man_q_mrp[am][0, :, p] * X_ag_man_dry_pr[p])
+                for p in range(nprs)
+            ]
+            ag_man_q_irr_p = [
+                gp.quicksum(input_data.ag_man_q_mrp[am][1, :, p] * X_ag_man_irr_pr[p])
+                for p in range(nprs)
+            ]
+
+            ag_man_q_dry_c = [
+                gp.quicksum(ag_man_q_dry_p[p] for p in range(nprs) if input_data.pr2cm_cp[c, p])
+                for c in range(ncms)
+            ]
+            ag_man_q_irr_c = [
+                gp.quicksum(ag_man_q_irr_p[p] for p in range(nprs) if input_data.pr2cm_cp[c, p])
+                for c in range(ncms)
+            ]
+
             # Add to original agricultural variable commodity sums
             for c in range(ncms):
                 ag_q_dry_c[c] += ag_man_q_dry_c[c]
                 ag_q_irr_c[c] += ag_man_q_irr_c[c]
 
         # Calculate non-agricultural commodity contributions
-        non_ag_q_c = [ sum( input_data.non_ag_q_crk[c, :, k] @ X_non_ag_vars_kr[k, :] 
-                            for k in range(n_non_ag_lus) )
-                       for c in range(ncms) ]
-        
+        non_ag_q_c = [
+            gp.quicksum(
+                gp.quicksum(input_data.non_ag_q_crk[c, :, k] * X_non_ag_vars_kr[k, :])
+                for k in range(n_non_ag_lus)
+            )
+            for c in range(ncms)
+        ]
+
         # Total quantities in CM/c representation.
-        total_q_c = [ ag_q_dry_c[c] + ag_q_irr_c[c] + non_ag_q_c[c] for c in range(ncms) ]
+        total_q_c = [ag_q_dry_c[c] + ag_q_irr_c[c] + non_ag_q_c[c] for c in range(ncms)]
 
         # Finally, add the constraint in the CM/c representation.
-        print('Adding constraints...', time.ctime() + '\n')
+        print("Adding constraints...", time.ctime() + "\n")
 
         model.addConstrs((d_c[c] - total_q_c[c]) <= V[c]
                           for c in range(ncms) )
@@ -385,19 +403,25 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
 
             # Ensure water use remains below limit for each region
             for region, wreq_reg_limit, ind in w_limits:
-                wreq_region = (
-                    sum(input_data.ag_w_mrj[0, ind, j] @ X_ag_dry_vars_jr[j, ind]  # Dryland agriculture contribution
-                      + input_data.ag_w_mrj[1, ind, j] @ X_ag_irr_vars_jr[j, ind]  # Irrigated agriculture contribution
-                        for j in range(n_ag_lus))
-
-                  + sum(input_data.ag_man_w_mrj[am][0, ind, j_idx] @ X_ag_man_dry_vars_jr[am][j_idx, ind]  # Dryland alt. ag. management contributions 
-                      + input_data.ag_man_w_mrj[am][1, ind, j_idx] @ X_ag_man_irr_vars_jr[am][j_idx, ind]  # Irrigated alt. ag. management contributions 
-                        for am, am_j_list in am2j.items()
-                        for j_idx in range(len(am_j_list)))
-
-                  + sum( input_data.non_ag_w_rk[ind, k] @ X_non_ag_vars_kr[k, ind]  # Non-agricultural contribution
-                        for k in range(n_non_ag_lus))
+                ag_contr = gp.quicksum(
+                    input_data.ag_w_mrj[0, ind, j] @ X_ag_dry_vars_jr[j, ind]  # Dryland agriculture contribution
+                    + input_data.ag_w_mrj[1, ind, j] @ X_ag_irr_vars_jr[j, ind]  # Irrigated agriculture contribution
+                    for j in range(n_ag_lus)
                 )
+
+                ag_man_contr =gp.quicksum(
+                    input_data.ag_man_w_mrj[am][0, ind, j_idx] @ X_ag_man_dry_vars_jr[am][j_idx, ind]  # Dryland alt. ag. management contributions 
+                  + input_data.ag_man_w_mrj[am][1, ind, j_idx] @ X_ag_man_irr_vars_jr[am][j_idx, ind]  # Irrigated alt. ag. management contributions 
+                    for am, am_j_list in am2j.items()
+                    for j_idx in range(len(am_j_list))
+                )
+
+                non_ag_contr = gp.quicksum( 
+                    input_data.non_ag_w_rk[ind, k] @ X_non_ag_vars_kr[k, ind]  # Non-agricultural contribution
+                    for k in range(n_non_ag_lus)
+                )
+                    
+                wreq_region = ag_contr + ag_man_contr + non_ag_contr
 
                 if wreq_region is not 0:
                     model.addConstr(wreq_region <= wreq_reg_limit)
@@ -417,22 +441,27 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
             g_dry_coeff = input_data.ag_g_mrj[0, :, :] + input_data.ag_ghg_t_mrj[0, :, :]
             g_irr_coeff = input_data.ag_g_mrj[1, :, :] + input_data.ag_ghg_t_mrj[1, :, :]
 
-            ghg_emissions = (
-                sum(g_dry_coeff[:, j] @ X_ag_dry_vars_jr[j, :]  # Dryland agriculture contribution
-                  + g_irr_coeff[:, j] @ X_ag_irr_vars_jr[j, :]  # Irrigated agriculture contribution
-                    for j in range(n_ag_lus))
-
-              + sum(input_data.ag_man_g_mrj[am][0, :, j_idx] @ X_ag_man_dry_vars_jr[am][j_idx, :]  # Dryland alt. ag. management contributions 
-                  + input_data.ag_man_g_mrj[am][1, :, j_idx] @ X_ag_man_irr_vars_jr[am][j_idx, :]  # Irrigated alt. ag. management contributions 
-                    for am, am_j_list in am2j.items()
-                    for j_idx in range(len(am_j_list)))
-
-              + sum(input_data.non_ag_g_rk[:, k] @ X_non_ag_vars_kr[k, :]  # Non-agricultural contribution
-                    for k in range(n_non_ag_lus))
+            ag_contr = gp.quicksum( 
+                gp.quicksum(g_dry_coeff[:, j] * X_ag_dry_vars_jr[j, :])  # Dryland agriculture contribution
+                + gp.quicksum(g_irr_coeff[:, j] * X_ag_irr_vars_jr[j, :])  # Irrigated agriculture contribution
+                for j in range(n_ag_lus)
             )
+
+            ag_man_contr = gp.quicksum(
+                gp.quicksum(input_data.ag_man_g_mrj[am][0, :, j_idx] * X_ag_man_dry_vars_jr[am][j_idx, :])  # Dryland alt. ag. management contributions 
+                + gp.quicksum(input_data.ag_man_g_mrj[am][1, :, j_idx] * X_ag_man_irr_vars_jr[am][j_idx, :])  # Irrigated alt. ag. management contributions 
+                for am, am_j_list in am2j.items()
+                for j_idx in range(len(am_j_list))
+            )
+
+            non_ag_contr = gp.quicksum(
+                gp.quicksum(input_data.non_ag_g_rk[:, k] * X_non_ag_vars_kr[k, :])  # Non-agricultural contribution
+                for k in range(n_non_ag_lus)
+            )
+
+            ghg_emissions = ag_contr + ag_man_contr + non_ag_contr
             
-            print('    ...setting GHG emissions reduction target: {:,.0f} tCO2e\n'.format( ghg_limits )
-                 )
+            print('    ...setting GHG emissions reduction target: {:,.0f} tCO2e\n'.format( ghg_limits ))
             model.addConstr(ghg_emissions <= ghg_limits)
 
             
