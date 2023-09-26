@@ -37,6 +37,7 @@ gurenv.setParam('Method', settings.SOLVE_METHOD)
 gurenv.setParam('OutputFlag', settings.VERBOSE)
 gurenv.setParam('OptimalityTol', settings.OPTIMALITY_TOLERANCE)
 gurenv.setParam('Threads', settings.THREADS)
+gurenv.setParam('BarHomogeneous', settings.BARHOMOGENOUS)
 gurenv.start()
 
 

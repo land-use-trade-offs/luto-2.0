@@ -19,7 +19,7 @@ import os
 
 import pandas as pd
 import numpy as np
-from osgeo import gdal #can't import rasterio before importing gdal
+# from osgeo import gdal  # fixes error "can't import rasterio before importing gdal"
 import rasterio
 
 from luto.settings import INPUT_DIR, SSP, RCP, RESFACTOR

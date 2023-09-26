@@ -75,7 +75,7 @@ OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
 
 # Select Gurobi algorithm used to solve continuous models or the initial root relaxation of a MIP model.
 # Set solve method. Default is automatic. Dual simplex uses less memory.
-SOLVE_METHOD = 2
+SOLVE_METHOD = -1
 
 """ SOLVE METHODS
    'automatic':                       -1
@@ -101,6 +101,15 @@ OPTIMALITY_TOLERANCE = 1e-2
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
 THREADS = 32
+
+# Use homogenous barrier algorithm
+BARHOMOGENOUS = -1
+
+"""Determines whether to use the homogeneous barrier algorithm. At the default setting (-1), it is only used 
+   when barrier solves a node relaxation for a MIP model. Setting the parameter to 0 turns it off, and setting 
+   it to 1 forces it on. The homogeneous algorithm is useful for recognizing infeasibility or unboundedness. 
+   It is a bit slower than the default algorithm.
+"""
 
 
 # ---------------------------------------------------------------------------- #
