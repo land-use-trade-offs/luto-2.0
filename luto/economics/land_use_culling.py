@@ -50,7 +50,7 @@ def get_absolute_cost_mask(m, r, x_mrj_mask, costs_mrj):
     return cost_include_mask
 
 
-def apply_agricultural_land_use_culling(x_mrj, c_mrj, t_mrj, r_mrj, lumap):
+def apply_agricultural_land_use_culling(x_mrj, c_mrj, t_mrj, r_mrj, lumap, lmmap):
     """
     Refine the exclude matrix to cull unprofitable land uses based on the CULL_MODE setting.
     This function modifies the x_mrj matrix in-place.
@@ -62,6 +62,7 @@ def apply_agricultural_land_use_culling(x_mrj, c_mrj, t_mrj, r_mrj, lumap):
         t_mrj (np.ndarray): The 'transition' matrix.
         r_mrj (np.ndarray): The 'revenue' matrix.
         lumap (np.array): Land use map - the current land use of each cell.
+        lmmap (np.array): Land management map - the current land management of each cell.
     """
 
     if CULL_MODE == "none":
@@ -75,8 +76,9 @@ def apply_agricultural_land_use_culling(x_mrj, c_mrj, t_mrj, r_mrj, lumap):
 
     x_mrj_mask = x_mrj.astype(bool)
     costs_mrj = (c_mrj + t_mrj) - r_mrj
-    for m in range(costs_mrj.shape[0]):
-        for r in range(costs_mrj.shape[1]):
+    for r in range(costs_mrj.shape[1]):
+        # Apply cost masks for every land management option
+        for m in range(costs_mrj.shape[0]):
             if CULL_MODE == "absolute":
                 cost_include_mask = get_absolute_cost_mask(
                     m,
@@ -96,5 +98,5 @@ def apply_agricultural_land_use_culling(x_mrj, c_mrj, t_mrj, r_mrj, lumap):
 
             x_mrj[m, r, :] = x_mrj[m, r, :] & cost_include_mask
 
-            # the current land usage for this cell should always be valid
-            x_mrj[m, r, lumap[r]] = 1
+        # the current land usage for this cell should always be valid
+        x_mrj[lmmap[r], r, lumap[r]] = 1

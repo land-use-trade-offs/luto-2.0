@@ -165,13 +165,14 @@ def test_apply_agricultural_land_use_culling(
     cost_values = [random.random() for _ in range(MAX_J)]
     c_mrj = t_mrj = r_mrj = _generate_mock_mrj_matrix(cost_values, m=m, r=r)
     mock_lumap = np.array([random.randint(0, MAX_J - 1) for _ in range(MAX_R)])
+    mock_lmmap = np.array([random.randint(0, MAX_M - 1) for _ in range(MAX_R)])
 
     with (
         patch("luto.economics.land_use_culling.CULL_MODE", cull_mode),
         patch(f"luto.economics.land_use_culling.{cull_param}", cull_param_value),
     ):
         land_use_culling.apply_agricultural_land_use_culling(
-            x_mrj, c_mrj, t_mrj, r_mrj, mock_lumap
+            x_mrj, c_mrj, t_mrj, r_mrj, mock_lumap, mock_lmmap
         )
 
     if cull_mode == "none":
@@ -180,4 +181,4 @@ def test_apply_agricultural_land_use_culling(
     else:
         assert sum(x_mrj[m, r, :]) < MAX_J
         assert (x_mrj != old_x_mrj).any()
-        assert x_mrj[m, r, mock_lumap[r]] == 1
+        assert x_mrj[mock_lmmap[r], r, mock_lumap[r]] == 1

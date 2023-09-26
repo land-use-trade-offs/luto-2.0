@@ -314,7 +314,7 @@ def get_input_data():
     ag_x_mrj = get_ag_x_mrj()
 
     land_use_culling.apply_agricultural_land_use_culling(
-        ag_x_mrj, ag_c_mrj, ag_t_mrj, ag_r_mrj, lumaps[base_year]
+        ag_x_mrj, ag_c_mrj, ag_t_mrj, ag_r_mrj, lumaps[base_year], lmmaps[base_year]
     )
 
     return InputData(
