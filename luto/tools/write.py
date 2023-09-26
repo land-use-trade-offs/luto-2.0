@@ -23,6 +23,7 @@ import os, math
 from datetime import datetime
 import numpy as np
 import pandas as pd
+from itertools import product # to create multilevel columns for a pd.DataFrame
 
 import luto.settings as settings
 from luto import tools
@@ -64,6 +65,7 @@ def write_outputs(sim, yr_cal, path):
     write_production(sim, yr_cal, path)
     write_water(sim, yr_cal, path)
     write_ghg(sim, yr_cal, path)
+    write_ghg_seperate(sim, yr_cal, path)
 
 
 def write_settings(path):
@@ -277,16 +279,10 @@ def write_ghg(sim, yr_cal, path):
         
     # Convert calendar year to year index.
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
-    
-    # get the function domain, 
-    # if get_ghg_X was called in write function, 
-    #   calculate the GHG as seperated CO2 emmision
-    if __name__ == 'write_ghg':
-        aggregate = False
 
     # Get greenhouse gas emissions in mrj format
-    ag_g_mrj = ag_ghg.get_ghg_matrices(sim.data, yr_idx,aggregate)
-    non_ag_g_rk = non_ag_ghg.get_ghg_matrix(sim.data,aggregate)
+    ag_g_mrj = ag_ghg.get_ghg_matrices(sim.data, yr_idx)
+    non_ag_g_rk = non_ag_ghg.get_ghg_matrix(sim.data)
     ag_man_g_mrj = ag_ghg.get_agricultural_management_ghg_matrices(sim.data, ag_g_mrj, yr_idx)
 
     # Prepare a data frame.
@@ -313,3 +309,54 @@ def write_ghg(sim, yr_cal, path):
     
     # Save to file
     df.to_csv(os.path.join(path, 'GHG_emissions.csv'), index = False)
+    
+def write_ghg_seperate(sim, yr_cal, path):
+    # set the aggregate to False, so to calculate the GHG seperately 
+    # (i.e, get the GHG emissions according to sources [electricty, chemical fertilizer ...])
+    aggregate = False
+        
+    # Convert calendar year to year index.
+    yr_idx = yr_cal - sim.data.YR_CAL_BASE
+    
+    # -------------------------------------------------------#
+    # Get greenhouse gas emissions from agricultural landuse #
+    # -------------------------------------------------------#
+    
+    # get the ghg_df
+    ag_g_df = ag_ghg.get_ghg_matrices(sim.data, yr_idx,aggregate)
+    
+    # convert the mulilevel columns to a df, get the {unique value} and {count} of each level
+    ag_g_col = pd.DataFrame(ag_g_df.columns.tolist(),columns=['origin','lm','lu','source'])
+    ag_g_col_unique = {idx:ag_g_col[idx].unique().tolist() for idx in ag_g_col.columns}
+    ag_g_col_unique = {k:sorted(v) for k,v in ag_g_col_unique.items()} # IMPORTANT, to keep the columns in lexicall order
+    ag_g_col_count = dict(ag_g_col.nunique())
+    
+    # get the product from column of all levels
+    ag_g_col_product = list(product(*ag_g_col_unique.values()))
+    ag_g_col_product = sorted(ag_g_col_product,key=lambda x:(x[0],x[1],x[2],x[3])) # IMPORTANT, to order the columns
+    
+    # expande the original df with ag_g_col_product 
+    # so that we can finally convert it to a n-d rectangular np.array (of shape romjs) 
+    ag_g_df = ag_g_df.reindex(columns=ag_g_col_product,fill_value=np.nan)
+    
+    # reshape the df to the shape of [romjs]
+    ag_g_df_arr = ag_g_df.to_numpy(na_value=0).reshape(ag_g_df.shape[0],          # r: row, i.e, each valid pixel
+                                                       ag_g_col_count['origin'],  # o: origin, i.e, each origin [crop, lvstk, unallocated]
+                                                       ag_g_col_count['lm'],      # m: land management: [dry,irr]
+                                                       ag_g_col_count['lu'],      # j: land use [Apples, Beef, ...]
+                                                       ag_g_col_count['source'])  # s: GHG source [chemical fertilizer, electricity, ...]
+    
+    # use einsum to do the multiplication, 
+    # easy to understand, don't need to worry too much about the dimensionality
+    ag_dvar_mrj = sim.ag_dvars[yr_cal]                                               # mrj
+    GHG_emission_seperate = np.einsum('romjs,mrj -> roms', ag_g_df_arr, ag_dvar_mrj) # roms
+    
+    # warp the array back to a df
+    GHG_emission_seperate = pd.DataFrame(GHG_emission_seperate.reshape((GHG_emission_seperate.shape[0],-1)),
+                                         columns=pd.MultiIndex.from_product((ag_g_col_unique['origin'],
+                                                                             ag_g_col_unique['lm'],
+                                                                             ag_g_col_unique['source'])))
+    
+    # Save to pickle file, much faster than csv
+    GHG_emission_seperate.to_pickle(os.path.join(path, 'GHG_emissions_seperate.pkl'))
+    
