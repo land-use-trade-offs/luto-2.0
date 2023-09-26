@@ -575,9 +575,6 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
         lmmap[non_ag_bools_r] = 0  # Assume that all non-agricultural land uses are dryland
 
         # Process agricultural management usage info
-        # Get number of agr. man. options (add one for the option of no usage)
-        n_am_options = range(len(am2j.keys()) + 1)
-
         # Make ammap (agricultural management map) using the lumap and lmmap
         ammap = np.zeros(ncells, dtype=np.int8)
         for r in range(ncells):
