@@ -575,9 +575,6 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
         lmmap[non_ag_bools_r] = 0  # Assume that all non-agricultural land uses are dryland
 
         # Process agricultural management usage info
-        # Get number of agr. man. options (add one for the option of no usage)
-        n_am_options = range(len(am2j.keys()) + 1)
-
         # Make ammap (agricultural management map) using the lumap and lmmap
         ammap = np.zeros(ncells, dtype=np.int8)
         for r in range(ncells):
@@ -597,7 +594,7 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
                 # Get argmax and max of the am_values list
                 argmax, max_am_var_val = max(enumerate(am_values), key=lambda x: x[1])
 
-                if max_am_var_val < 0.5:
+                if max_am_var_val < settings.AGRICULTURAL_MANAGEMENT_USE_THRESHOLD:
                     # The cell doesn't use any alternative agricultural management options
                     cell_am = 0
                 else:

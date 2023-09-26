@@ -109,7 +109,7 @@ def write_files(sim, path):
         for am in AG_MANAGEMENTS_TO_LAND_USES:
             snake_case_am = tools.am_name_snake_case(am)
             am_X_mrj_fname = 'ag_man_X_mrj_' + snake_case_am + "_" + str(yr_cal) + ".npy"
-            np.save(os.path.join(path, am_X_mrj_fname), sim.non_ag_dvars[yr_cal])
+            np.save(os.path.join(path, am_X_mrj_fname), sim.ag_man_dvars[yr_cal])
         
         # Write out raw numpy arrays for land-use and land management
         lumap_fname = 'lumap_' + str(yr_cal) + '.npy'
