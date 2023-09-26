@@ -278,7 +278,7 @@ def get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx):
     year = 2010 + yr_idx
 
     # Set up the effects matrix
-    new_q_mrp = np.zeros((2, data.NCELLS, data.NPRS)).astype(np.float32)
+    new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu, j in zip(land_uses, lu_codes):
@@ -303,7 +303,7 @@ def get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx):
     year = 2010 + yr_idx
 
     # Set up the effects matrix
-    new_q_mrp = np.zeros((2, data.NCELLS, data.NPRS)).astype(np.float32)
+    new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
 
     # Update values in the new matrix    
     for lu, j in zip(land_uses, lu_codes):
@@ -316,7 +316,7 @@ def get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx):
     return new_q_mrp
 
 
-def get_ecological_graizng_effect_q_mrp(data, q_mrp, yr_idx):
+def get_ecological_grazing_effect_q_mrp(data, q_mrp, yr_idx):
     """
     Applies the effects of using ecological grazing to the quantity data
     for all relevant agr. land uses.
@@ -326,7 +326,7 @@ def get_ecological_graizng_effect_q_mrp(data, q_mrp, yr_idx):
     year = 2010 + yr_idx
 
     # Set up the effects matrix
-    new_q_mrp = np.zeros((2, data.NCELLS, data.NPRS)).astype(np.float32)
+    new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
 
     # Update values in the new matrix    
     for lu, j in zip(land_uses, lu_codes):
@@ -342,7 +342,7 @@ def get_ecological_graizng_effect_q_mrp(data, q_mrp, yr_idx):
 def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx)
     precision_agriculture_data = get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx)
-    eco_grazing_data = get_ecological_graizng_effect_q_mrp(data, q_mrp, yr_idx)
+    eco_grazing_data = get_ecological_grazing_effect_q_mrp(data, q_mrp, yr_idx)
 
     ag_management_data = {
         'Asparagopsis taxiformis': asparagopsis_data,

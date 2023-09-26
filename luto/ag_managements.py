@@ -6,6 +6,7 @@ from luto.settings import RAW_DATA
 AG_MANAGEMENTS_INDEXING = {
     1: 'Asparagopsis taxiformis',
     2: 'Precision Agriculture',
+    3: 'Ecological Grazing',
 }
 
 AG_MANAGEMENTS_TO_LAND_USES = {

@@ -194,7 +194,7 @@ def get_precision_agriculture_effect_t_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
-def get_precision_agriculture_effect_t_mrj(data):
+def get_ecological_grazing_effect_t_mrj(data):
     """
     Gets the transition costs of ecological grazing, which are none.
     Transition/establishment costs are handled in the costs matrix.
@@ -206,7 +206,7 @@ def get_precision_agriculture_effect_t_mrj(data):
 def get_agricultural_management_transition_matrices(data, t_mrj, yr_idx) -> Dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_t_mrj(data)
     precision_agriculture_data = get_precision_agriculture_effect_t_mrj(data)
-    eco_grazing_data = get_precision_agriculture_effect_t_mrj(data)
+    eco_grazing_data = get_ecological_grazing_effect_t_mrj(data)
 
     ag_management_data = {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -243,6 +243,19 @@ def get_precision_agriculture_adoption_limit(data, yr_idx):
     return prec_agr_limits
 
 
+def get_ecological_grazing_adoption_limit(data, yr_idx):
+    """
+    Gets the adoption limit of ecological grazing for each possible land use.
+    """
+    eco_grazing_limits = {}
+    year = 2010 + yr_idx
+    for lu in AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']:
+        j = data.DESC2AGLU[lu]
+        eco_grazing_limits[j] = data.ECOLOGICAL_GRAZING_DATA[lu].loc[year, 'Feasible Adoption (%)']
+
+    return eco_grazing_limits
+
+
 def get_agricultural_management_adoption_limits(data, yr_idx) -> Dict[str, dict]:
     """
     An adoption limit represents the maximum percentage of cells (for each land use) that can utilise
@@ -250,10 +263,12 @@ def get_agricultural_management_adoption_limits(data, yr_idx) -> Dict[str, dict]
     """
     asparagopsis_limits = get_asparagopsis_adoption_limits(data, yr_idx)
     precision_agriculture_limits = get_precision_agriculture_adoption_limit(data, yr_idx)
+    eco_grazing_limits = get_ecological_grazing_adoption_limit(data, yr_idx)
 
     adoption_limits = {
         'Asparagopsis taxiformis': asparagopsis_limits,
         'Precision Agriculture': precision_agriculture_limits,
+        'Ecological Grazing': eco_grazing_limits,
     }
 
     return adoption_limits

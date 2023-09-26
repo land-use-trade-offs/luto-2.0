@@ -309,7 +309,7 @@ def get_ecological_grazing_effect_g_mrj(data, yr_idx):
     Applies the effects of using ecological grazing to the GHG data
     for all relevant agr. land uses.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
     year = 2010 + yr_idx
 
     # Set up the effects matrix
@@ -317,7 +317,7 @@ def get_ecological_grazing_effect_g_mrj(data, yr_idx):
 
     # Update values in the new matrix
     for lu_idx, lu in enumerate(land_uses):
-        lu_data = data.PRECISION_AGRICULTURE_DATA[lu]
+        lu_data = data.ECOLOGICAL_GRAZING_DATA[lu]
 
         for lm in data.LANDMANS:
             if lm == 'dry':
@@ -328,16 +328,32 @@ def get_ecological_grazing_effect_g_mrj(data, yr_idx):
             # Some crop land uses do not emit any GHG emissions, e.g. 'Rice'
             if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
                 continue
+            
+            # Subtract leach runoff carbon benefit
+            leach_reduction_perc = 1 - lu_data.loc[year, 'CO2E_KG_HEAD_IND_LEACH_RUNOFF']
+            if leach_reduction_perc != 0:
+                lvstype, vegtype = lvs_veg_types(lu)
+                yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
 
-            reduction_perc = 1 - lu_data.loc[year, 'CO2E_KG_HEAD_IND_LEACH_RUNOFF']
-            if reduction_perc != 0:
-                reduction_amnt = (
-                    np.nan_to_num(data.AGGHG_CROPS['CO2E_KG_HEAD_IND_LEACH_RUNOFF', lm, lu].to_numpy(), 0)
-                    * reduction_perc
+                leach_reduction_amnt = (
+                      np.nan_to_num(data.AGGHG_CROPS['CO2E_KG_HEAD_IND_LEACH_RUNOFF', lm, lu].to_numpy(), 0)
+                    * yield_pot       # convert to HAs
+                    * leach_reduction_perc
                     / 1000            # convert to tonnes
                     * data.REAL_AREA  # adjust for resfactor
                 )
-                new_g_mrj[m, :, lu_idx] = -reduction_amnt
+                new_g_mrj[m, :, lu_idx] -= leach_reduction_amnt
+
+            # Subtract soil carbon benefit
+            soil_multiplier = lu_data.loc[year, 'IMPACTS_soil_carbon']
+            if soil_multiplier != 1:
+                soil_reduction_amnt = (
+                    data.SOIL_CARBON_T_HA
+                    * soil_multiplier
+                    * (44 / 12)       # convert carbon to CO2e
+                    * data.REAL_AREA  # adjust for resfactor
+                )
+                new_g_mrj[m, :, lu_idx] -= soil_reduction_amnt
 
     return new_g_mrj
 

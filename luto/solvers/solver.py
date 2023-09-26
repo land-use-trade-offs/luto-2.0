@@ -597,7 +597,7 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
                 # Get argmax and max of the am_values list
                 argmax, max_am_var_val = max(enumerate(am_values), key=lambda x: x[1])
 
-                if max_am_var_val < 0.5:
+                if max_am_var_val < settings.AGRICULTURAL_MANAGEMENT_USE_THRESHOLD:
                     # The cell doesn't use any alternative agricultural management options
                     cell_am = 0
                 else:

@@ -115,6 +115,14 @@ CARBON_PRICE_PER_TONNE = 50                 # Price of carbon per tonne - determ
 
 
 # ---------------------------------------------------------------------------- #
+# Agricultural management parameters
+# ---------------------------------------------------------------------------- #
+
+AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  # The minimum value an agricultural management variable must take for the
+                                             # write_output function to consider it being used on a cell
+
+
+# ---------------------------------------------------------------------------- #
 # Environmental parameters
 # ---------------------------------------------------------------------------- #
 
@@ -141,6 +149,8 @@ WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions  e.g., [1, 2].
 AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)
 0: (None)
 1: 'Asparagopsis taxiformis'
+2: 'Precision Agriculture'
+3: 'Ecological Grazing'
 
 
 DRAINAGE DIVISIONS
