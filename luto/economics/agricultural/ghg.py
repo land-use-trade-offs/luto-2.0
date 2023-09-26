@@ -20,6 +20,7 @@ Pure functions to calculate greenhouse gas emissions by lm, lu.
 
 from typing import Dict
 import numpy as np
+import pandas as pd
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
 import luto.settings as settings
 import luto.tools as tools
@@ -30,13 +31,16 @@ def get_ghg_crop( data     # Data object or module.
                 , lu       # Land use.
                 , lm       # Land management.
                 , yr_idx   # Number of years post base-year ('YR_CAL_BASE').
-                ):
-    """Return crop GHG emissions [tCO2e/cell] of `lu`+`lm` in `yr_idx` as np array.
+                , aggregate): # sums up all CO2 (True) or export GHG seperatly
+    """Return crop GHG emissions [tCO2e/cell] of `lu`+`lm` in `yr_idx` 
+            as (np array|pd.DataFrame) depending on aggregate (True|False).
 
     `data`: data object/module -- assumes fields like in `luto.data`.
     `lu`: land use (e.g. 'Winter cereals' or 'Beef - natural land').
     `lm`: land management (e.g. 'dry', 'irr').
     `yr_idx`: number of years from base year, counting from zero.
+    `aggregate`: True -> return GHG emission as np.array 
+                 False -> return GHG emission as pd.DataFrame.
     
     Crop GHG emissions include:
         'CO2E_KG_HA_CHEM_APPL', 
@@ -49,37 +53,72 @@ def get_ghg_crop( data     # Data object or module.
         'CO2E_KG_HA_SOIL_N_SURP', 
         'CO2E_KG_HA_SOWING'
     """
+    if aggregate == True:
     
-    # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not return zeros
-    if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
-        ghg_t = np.zeros((data.NCELLS))
-        
-    else:
+        # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not return zeros
+        if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
+            ghg_t = np.zeros((data.NCELLS))
+    
+        else:    
+            # Calculate total GHG emissions in kg of CO2eq/ha
+            ghg_t = data.AGGHG_CROPS.loc[:, (slice(None), lm, lu)].sum(axis = 1)
+            # Convert to tonnes of CO2e per ha. 
+            ghg_t = ghg_t.to_numpy() / 1000
+            # Convert to tonnes GHG per cell including resfactor
+            ghg_t *= data.REAL_AREA
+
+        # Return total greenhouse gas emissions as numpy array.
+        return ghg_t
+    
+    
+    elif aggregate == False:
+        # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not return zeros
+        if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
+            ghg_rs = pd.DataFrame(np.zeros((data.NCELLS,1))) # make sure the output is 2d
+            cols = pd.MultiIndex.from_tuples([('crop',lm,lu,'Total_CO2_t' )])
+            ghg_rs.columns = cols
+                    
+        else:
+            # ghg_rs {r->each pixel,  s->each GHG source }
+            ghg_rs = data.AGGHG_CROPS.loc[:, (slice(None), lm, lu)]
+            # Convert to tonnes of CO2e per ha. 
+            ghg_rs = ghg_rs / 1000
+            # Convert to tonnes GHG per cell including resfactor
+            ghg_rs *= data.REAL_AREA[:,np.newaxis]
             
-        # Calculate total GHG emissions in kg of CO2eq/ha
-        ghg_t = data.AGGHG_CROPS.loc[:, (slice(None), lm, lu)].sum(axis = 1)
-        
-        # Convert to tonnes of CO2e per ha. 
-        ghg_t = ghg_t.to_numpy() / 1000
-        
-        # Convert to tonnes GHG per cell including resfactor
-        ghg_t *= data.REAL_AREA
-        
-    # Return total greenhouse gas emissions as numpy array.
-    return ghg_t
+            # add the origin (Crop) to the df.columns
+            # make sure the columns in the level of [origin,lm,lu,source]
+            ghg_rs.columns = pd.MultiIndex.from_tuples( [['crop',lm,lu] + [col[0]] 
+                                                         for col in ghg_rs.columns])
+            
+            # add a columns that computes the total GHG
+            ghg_rs[('crop',lm,lu,'Total_CO2_t')] = ghg_rs.sum(axis=1)
+            
+            # resest_index
+            ghg_rs.reset_index(drop=True,inplace=True)
+
+        # Return each greenhouse gas emissions as numpy array.
+        return ghg_rs
+    
+    else:
+        raise KeyError(f"aggregate need to be in [True,False], '{aggregate}' is not support!")
+
 
 
 def get_ghg_lvstk( data     # Data object or module.
                  , lu       # Land use.
                  , lm       # Land management.
                  , yr_idx   # Number of years post base-year ('YR_CAL_BASE').
-                 ):
-    """Return livestock GHG emissions [tCO2e/cell] of `lu`+`lm` in `yr_idx` as np array.
+                 , aggregate = True):
+    """Return livestock GHG emissions [tCO2e/cell] of `lu`+`lm` in `yr_idx`
+            as (np array|pd.DataFrame) depending on aggregate (True|False).
 
     `data`: data object/module -- assumes fields like in `luto.data`.
     `lu`: land use (e.g. 'Winter cereals' or 'Beef - natural land').
     `lm`: land management (e.g. 'dry', 'irr').
     `yr_idx`: number of years from base year, counting from zero.
+    `aggregate`: True -> return GHG emission as np.array 
+                 False -> return GHG emission as pd.DataFrame.
     
     Livestock GHG emissions include:    
         'CO2E_KG_HEAD_ENTERIC', 
@@ -98,55 +137,151 @@ def get_ghg_lvstk( data     # Data object or module.
     # Get the yield potential, i.e. the total number of heads per hectare.
     yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
     
-    # Calculate total GHG emissions in kg CO2e per hectare
-    ghg_t = data.AGGHG_LVSTK.loc[:, (lvstype, slice(None))].sum(axis = 1) * yield_pot
     
-    # Add pasture irrigation emissions based on emissions associated with hay production.
-    if lm == 'irr': 
-        ghg_t += data.AGGHG_CROPS['CO2E_KG_HA_CHEM_APPL', 'irr', 'Hay'] + \
-                 data.AGGHG_CROPS['CO2E_KG_HA_FERT_PROD', 'irr', 'Hay'] + \
-                 data.AGGHG_CROPS['CO2E_KG_HA_IRRIG', 'irr', 'Hay'] + \
-                 data.AGGHG_CROPS['CO2E_KG_HA_PEST_PROD', 'irr', 'Hay'] + \
-                 data.AGGHG_CROPS['CO2E_KG_HA_SOIL_N_SURP', 'irr', 'Hay'] + \
-                 data.AGGHG_CROPS['CO2E_KG_HA_SOWING', 'irr', 'Hay'] 
+    if aggregate == True:
+    
+        # Calculate total GHG emissions in kg CO2e per hectare
+        ghg_t = data.AGGHG_LVSTK.loc[:, (lvstype, slice(None))].sum(axis = 1) * yield_pot
+        
+        # Add pasture irrigation emissions based on emissions associated with hay production.
+        if lm == 'irr': 
+            ghg_t += data.AGGHG_CROPS['CO2E_KG_HA_CHEM_APPL', 'irr', 'Hay'].to_numpy(na_value=0) + \
+                     data.AGGHG_CROPS['CO2E_KG_HA_FERT_PROD', 'irr', 'Hay'].to_numpy(na_value=0) + \
+                     data.AGGHG_CROPS['CO2E_KG_HA_IRRIG', 'irr', 'Hay'].to_numpy(na_value=0) + \
+                     data.AGGHG_CROPS['CO2E_KG_HA_PEST_PROD', 'irr', 'Hay'].to_numpy(na_value=0) + \
+                     data.AGGHG_CROPS['CO2E_KG_HA_SOIL_N_SURP', 'irr', 'Hay'].to_numpy(na_value=0) + \
+                     data.AGGHG_CROPS['CO2E_KG_HA_SOWING', 'irr', 'Hay'].to_numpy(na_value=0) 
+           
+        # Convert to tonnes of CO2e per ha. 
+        ghg_t = ghg_t.to_numpy() / 1000
+        
+        # Convert to tonnes CO2e per cell including resfactor
+        ghg_t *= data.REAL_AREA
+        
+        # Return total greenhouse gas emissions as numpy array.
+        return ghg_t
+    
+    
+    elif aggregate == False:    
+        # Calculate total GHG emissions in kg CO2e per hectare
+        # Note: ghg_rs {r->each pixel,  s->each GHG source }
+        ghg_raw = data.AGGHG_LVSTK.loc[:, (lvstype, slice(None))]
+        # get the names for each GHG
+        ghg_name_s =  [i[1] for i in ghg_raw.columns]
+        # calculate the GHG emission
+        ghg_rs = ghg_raw * yield_pot[:,np.newaxis]
+        
+        
+        # Add pasture irrigation emissions based on emissions associated with hay production.
+        if lm == 'irr':
+            ghg_name_irr_s = ['CO2E_KG_HA_CHEM_APPL','CO2E_KG_HA_FERT_PROD','CO2E_KG_HA_IRRIG',
+                              'CO2E_KG_HA_PEST_PROD','CO2E_KG_HA_SOIL_N_SURP','CO2E_KG_HA_SOWING']
+            # get the names for each GHG
+            ghg_name_s += ghg_name_irr_s
+            
+            # get the GHG emission
+            ghg_irr_rs = np.vstack([data.AGGHG_CROPS[f'{i}', 'irr', 'Hay'] 
+                            for i in ghg_name_irr_s]).swapaxes(1,0)
+            
+            # append it to lisvstock GHG
+            ghg_rs = np.concatenate([ghg_rs,ghg_irr_rs],1)
+            
+        # Convert to tonnes of CO2e per ha. 
+        ghg_rs = ghg_rs / 1000
+        
+        # Convert to tonnes CO2e per cell including resfactor
+        ghg_rs*= data.REAL_AREA[:,np.newaxis]
+        
+        # add the origin (lvstk) to the df.columns
+        ghg_rs = pd.DataFrame(ghg_rs)
+        ghg_rs.columns = pd.MultiIndex.from_tuples( [['lvstk',lm,lu] + [ghg] for ghg in ghg_name_s])
+        
+        # add a columns that computes the total GHG
+        ghg_rs[('lvstk',lm,lu,'Total_CO2_t')] = ghg_rs.sum(axis=1)
+        
+        # resest_index
+        ghg_rs.reset_index(drop=True,inplace=True)
+        
+        return ghg_rs
        
-    # Convert to tonnes of CO2e per ha. 
-    ghg_t = ghg_t.to_numpy() / 1000
+
     
-    # Convert to tonnes CO2e per cell including resfactor
-    ghg_t *= data.REAL_AREA
-    
-    # Return total greenhouse gas emissions as numpy array.
-    return ghg_t
+    else:
+        raise KeyError(f"aggregate need to be in [True,False], '{aggregate}' is not support!")
 
 
 def get_ghg( data    # Data object or module.
            , lu      # Land use.
            , lm      # Land management.
            , yr_idx  # Number of years post base-year ('YR_CAL_BASE').
-           ):
-    """Return GHG emissions [tCO2e/cell] of `lu`+`lm` in `yr_idx` as np array.
+           , aggregate):
+    """Return GHG emissions [tCO2e/cell] of `lu`+`lm` in `yr_idx` 
+            as (np array|pd.DataFrame) depending on aggregate (True|False).
 
     `data`: data object/module -- assumes fields like in `luto.data`.
     `lu`: land use (e.g. 'Winter cereals').
     `lm`: land management (e.g. 'dry', 'irr').
     `yr_idx`: number of years from base year, counting from zero.
+    `aggregate`: True -> return GHG emission as np.array 
+                 False -> return GHG emission as pd.DataFrame.
     """
+
+    
     # If it is a crop, it is known how to get GHG emissions.
     if lu in data.LU_CROPS:
-        return get_ghg_crop(data, lu, lm, yr_idx)
+        return get_ghg_crop(data, lu, lm, yr_idx, aggregate)
     
     # If it is livestock, it is known how to get GHG emissions.
     elif lu in data.LU_LVSTK:
-        return get_ghg_lvstk(data, lu, lm, yr_idx)
+        return get_ghg_lvstk(data, lu, lm, yr_idx, aggregate)
     
     # If neither crop nor livestock but in LANDUSES it is unallocated land.
     elif lu in data.AGRICULTURAL_LANDUSES:
-        return np.zeros(data.NCELLS)
+        if aggregate:
+            return np.zeros(data.NCELLS)
+        else:
+            return pd.DataFrame(np.zeros((data.NCELLS,1)),
+                                columns=pd.MultiIndex.from_tuples([('Unallocate',lm,lu,'Total_CO2_t')]))
     
     # If it is none of the above, it is not known how to get the GHG emissions.
     else:
         raise KeyError("Land use '%s' not found in data.LANDUSES" % lu)
+
+
+
+def get_ghg_matrix(data, lm, yr_idx, aggregate):
+    
+    if aggregate == True: 
+        """Return g_rj matrix of tCO2e/cell per lu under `lm` in `yr_idx`."""
+        
+        g_rj = np.zeros((data.NCELLS, len(data.AGRICULTURAL_LANDUSES)))
+        for j, lu in enumerate(data.AGRICULTURAL_LANDUSES):
+            g_rj[:, j] = get_ghg(data, lu, lm, yr_idx, aggregate)
+            
+        # Make sure all NaNs are replaced by zeroes.
+        g_rj = np.nan_to_num(g_rj)
+    
+        return g_rj
+    
+    elif aggregate == False:     
+        return pd.concat([get_ghg(data, lu, lm, yr_idx, aggregate) 
+                          for lu in data.AGRICULTURAL_LANDUSES],axis=1)
+        
+
+
+def get_ghg_matrices(data, yr_idx, aggregate=True):
+    if aggregate == True:  
+        
+        """Return g_mrj matrix of GHG emissions per cell as 3D Numpy array."""
+        g_mrj = np.stack(tuple( get_ghg_matrix(data, lm, yr_idx, aggregate)
+                               for lm in data.LANDMANS ))
+        return g_mrj
+    
+    
+    elif aggregate == False:   
+        return pd.concat([get_ghg_matrix(data, lu, yr_idx, aggregate) 
+                          for lu in data.LANDMANS],axis=1)
+
 
 
 def get_ghg_transition_penalties(data, lumap) -> np.ndarray:
@@ -171,27 +306,6 @@ def get_ghg_transition_penalties(data, lumap) -> np.ndarray:
     penalties_mrj = np.stack([penalties_rj] * 2)
 
     return penalties_mrj
-
-
-def get_ghg_matrix(data, lm, yr_idx):
-    """Return g_rj matrix of tCO2e/cell per lu under `lm` in `yr_idx`."""
-    
-    g_rj = np.zeros((data.NCELLS, len(data.AGRICULTURAL_LANDUSES)))
-    for j, lu in enumerate(data.AGRICULTURAL_LANDUSES):
-        g_rj[:, j] = get_ghg(data, lu, lm, yr_idx)
-        
-    # Make sure all NaNs are replaced by zeroes.
-    g_rj = np.nan_to_num(g_rj)
-
-    return g_rj
-
-
-def get_ghg_matrices(data, yr_idx):
-    """Return g_mrj matrix of GHG emissions per cell as 3D Numpy array."""
-
-    g_mrj = np.stack(tuple( get_ghg_matrix(data, lm, yr_idx)
-                           for lm in data.LANDMANS ))
-    return g_mrj
 
 
 
