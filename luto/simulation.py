@@ -44,7 +44,7 @@ import luto.economics.non_agricultural.revenue as non_ag_revenue
 
 from luto.economics import land_use_culling
 
-from luto.solvers.solver import InputData, formulate_model, solve
+from luto.solvers.solver import InputData, LutoSolver, solve
 from luto import tools
 
 
@@ -374,11 +374,12 @@ def solve_timeseries(steps: int, base: int, target: int):
 
         input_data = prepare_input_data(base + s, base + s + 1)
         d_c = d_cy[s]
-        if s == 0 or True:
-            model = formulate_model(input_data, d_c)
+        if s == 0:
+            luto_solver = LutoSolver(input_data, d_c)
+            luto_solver.formulate()
 
-        # if s > 0:
-        #     model = update_formulation(model, input_data, d_c)
+        if s > 0:
+            luto_solver.update_formulation(input_data, d_c)
 
         (
             lumaps[target],
@@ -387,7 +388,7 @@ def solve_timeseries(steps: int, base: int, target: int):
             ag_dvars[target],
             non_ag_dvars[target],
             ag_man_dvars[target],
-        ) = solve(input_data, model)
+        ) = solve(input_data, luto_solver.gurobi_model)
 
         print('Total processing time...', round(time.time() - start_time), 'seconds')
 
@@ -405,7 +406,8 @@ def solve_snapshot(base: int, target: int):
 
     start_time = time.time()
     input_data = prepare_input_data(base, target)
-    model = formulate_model(input_data, d_c)
+    luto_solver = LutoSolver(input_data, d_c)
+    luto_solver.formulate()
 
     (
         lumaps[target],
@@ -414,7 +416,7 @@ def solve_snapshot(base: int, target: int):
         ag_dvars[target],
         non_ag_dvars[target],
         ag_man_dvars[target],
-    ) = solve(input_data, model)
+    ) = solve(input_data, luto_solver.gurobi_model)
     
     print('Total processing time...', round(time.time() - start_time), 'seconds')
 
