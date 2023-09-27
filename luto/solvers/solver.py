@@ -27,6 +27,7 @@ import scipy.sparse as sp
 import gurobipy as gp
 from gurobipy import GRB
 from dataclasses import dataclass
+from functools import cached_property
 
 import luto.settings as settings
 from luto.ag_managements import SORTED_AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
@@ -119,25 +120,28 @@ class InputData:
         # Number of products
         return self.ag_q_mrp.shape[2]
 
-    @property
+    @cached_property
     def am2j(self):
         # Map of agricultural management options to land use codes
+        print("Setting up am2j for the first time...")
         return {
             am: [self.desc2aglu[lu] for lu in am_lus]
             for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items()
         }
 
-    @property
+    @cached_property
     def ag_lu2cells(self):
         # Make an index of each cell permitted to transform to each land use / land management combination
+        print("Setting up ag_lu2cells for the first time...")
         return {
             (m, j): np.where(self.ag_x_mrj[m, :, j])[0]
             for j in range(self.n_ag_lus)
             for m in range(self.n_ag_lms)
         }
 
-    @property
+    @cached_property
     def non_ag_lu2cells(self):
+        print("Setting up non_ag_lu2cells for the first time...")
         return {
             k: np.where(self.non_ag_x_rk[:, k])[0] for k in range(self.n_non_ag_lus)
         }
@@ -650,27 +654,22 @@ class LutoSolver:
         # Get agricultural results
         for j in range(self._input_data.n_ag_lus):
             for r in self._input_data.ag_lu2cells[0, j]:
-                X_dry_sol_rj[r, j] = self.gurobi_model.getVarByName(f"X_ag_dry_{j}_{r}").X
+                X_dry_sol_rj[r, j] = self.X_ag_dry_vars_jr[j, r].X
             for r in self._input_data.ag_lu2cells[1, j]:
-                X_irr_sol_rj[r, j] = self.gurobi_model.getVarByName(f"X_ag_irr_{j}_{r}").X
+                X_irr_sol_rj[r, j] = self.X_ag_irr_vars_jr[j, r].X
 
         # Get non-agricultural results
         for k in range(self._input_data.n_non_ag_lus):
             for r in self._input_data.non_ag_lu2cells[k]:
-                non_ag_X_sol_rk[r, k] = self.gurobi_model.getVarByName(f"X_non_ag_{k}_{r}").X
+                non_ag_X_sol_rk[r, k] = self.X_non_ag_vars_kr[k, r].X
 
         # Get agricultural management results
         for am, am_j_list in self._input_data.am2j.items():
-            am_name = am.lower().replace(" ", "_")
             for j_idx, j in enumerate(am_j_list):
                 for r in self._input_data.ag_lu2cells[0, j]:
-                    am_X_dry_sol_rj[am][r, j] = self.gurobi_model.getVarByName(
-                        f"X_ag_man_dry_{am_name}_{j}_{r}"
-                    ).X
+                    am_X_dry_sol_rj[am][r, j] = self.X_ag_man_dry_vars_jr[am][j_idx, r].X
                 for r in self._input_data.ag_lu2cells[1, j]:
-                    am_X_irr_sol_rj[am][r, j] = self.gurobi_model.getVarByName(
-                        f"X_ag_man_irr_{am_name}_{j}_{r}"
-                    ).X
+                    am_X_irr_sol_rj[am][r, j] = self.X_ag_man_irr_vars_jr[am][j_idx, r].X
 
         """Note that output decision variables are mostly 0 or 1 but in some cases they are somewhere in between which creates issues 
             when converting to maps etc. as individual cells can have non-zero values for multiple land-uses and land management type.
