@@ -42,7 +42,7 @@ def get_path():
     path = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
     
     # Add some shorthand details about the model run
-    post = '_' + settings.OBJECTIVE + '_RF' + str(settings.RESFACTOR) + '_P1e' + str(int(math.log10(settings.PENALTY))) + '_W' + settings.WATER_USE_LIMITS + '_G' + settings.GHG_EMISSIONS_LIMITS
+    post = '_' + settings.DEMAND_CONSTRAINT_TYPE + '_' + settings.OBJECTIVE + '_RF' + str(settings.RESFACTOR) + '_P1e' + str(int(math.log10(settings.PENALTY))) + '_W' + settings.WATER_USE_LIMITS + '_G' + settings.GHG_EMISSIONS_LIMITS
     
     # Create path name
     path = 'output/' + path + post
@@ -108,7 +108,7 @@ def write_files(sim, path):
         for am in AG_MANAGEMENTS_TO_LAND_USES:
             snake_case_am = tools.am_name_snake_case(am)
             am_X_mrj_fname = 'ag_man_X_mrj_' + snake_case_am + "_" + str(yr_cal) + ".npy"
-            np.save(os.path.join(path, am_X_mrj_fname), sim.non_ag_dvars[yr_cal])
+            np.save(os.path.join(path, am_X_mrj_fname), sim.ag_man_dvars[yr_cal])
         
         # Write out raw numpy arrays for land-use and land management
         lumap_fname = 'lumap_' + str(yr_cal) + '.npy'

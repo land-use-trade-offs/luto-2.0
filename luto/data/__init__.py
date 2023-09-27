@@ -19,7 +19,7 @@ import os
 
 import pandas as pd
 import numpy as np
-from osgeo import gdal #can't import rasterio before importing gdal
+# from osgeo import gdal  # fixes error "can't import rasterio before importing gdal"
 import rasterio
 
 from luto.settings import INPUT_DIR, SSP, RCP, RESFACTOR
@@ -212,6 +212,16 @@ for lu in ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears',
            'Plantation fruit', 'Stone fruit', 'Tropical stone fruit']:
     # Horticulture land uses
     PRECISION_AGRICULTURE_DATA[lu] = horticulture_data
+
+# Ecological grazing data
+eco_grazing_file = os.path.join(INPUT_DIR, '20230919_ECOGRAZE_Data.xlsx')
+ECOLOGICAL_GRAZING_DATA = {}
+ECOLOGICAL_GRAZING_DATA['Beef - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Cattle (extensive)', index_col='Year' )
+ECOLOGICAL_GRAZING_DATA['Sheep - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Sheep', index_col='Year' )
+ECOLOGICAL_GRAZING_DATA['Dairy - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Dairy', index_col='Year' )
+
+# Soil carbon data (for carbon benefits of ecological grazing)
+SOIL_CARBON_T_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'soil_carbon_t_ha.h5') ).to_numpy()
 
 
 ###############################################################

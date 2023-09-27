@@ -37,6 +37,7 @@ gurenv.setParam('Method', settings.SOLVE_METHOD)
 gurenv.setParam('OutputFlag', settings.VERBOSE)
 gurenv.setParam('OptimalityTol', settings.OPTIMALITY_TOLERANCE)
 gurenv.setParam('Threads', settings.THREADS)
+gurenv.setParam('BarHomogeneous', settings.BARHOMOGENOUS)
 gurenv.start()
 
 
@@ -181,9 +182,12 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
                 for r in irr_lu_cells:
                     irr_var_name = f"X_ag_man_irr_{am_name}_{j}_{r}"
                     X_ag_man_irr_vars_jr[am][j_idx, r] = model.addVar(ub=1, name=irr_var_name)
-
-        # Decision variables, one for each commodity, to minimise the deviations from demand.
-        V = model.addMVar(ncms, name = 'V')
+        
+        if settings.DEMAND_CONSTRAINT_TYPE == 'soft':
+            # Decision variables, one for each commodity, to minimise the deviations from demand.
+            V = model.addMVar(ncms, name = 'V')
+        # else do nothing
+        
         
         
         # ------------------- #
@@ -262,10 +266,19 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
             non_ag_obj_rk[:, k][non_ag_lu2cells[k]] @ X_non_ag_vars_kr[k, non_ag_lu2cells[k]]
             for k in range(n_non_ag_lus) 
         )
-
-        objective = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr + gp.quicksum( V[c] for c in range(ncms) )
-        model.setObjective(objective, GRB.MINIMIZE)
         
+        # Specify the objective function according to demand constraint type
+        if settings.DEMAND_CONSTRAINT_TYPE == 'soft':
+            objective = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr + gp.quicksum( V[c] for c in range(ncms) )
+        elif settings.DEMAND_CONSTRAINT_TYPE == 'hard':
+            objective = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr
+        else:
+            print('DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"')
+        
+        # Add objective function to the Gurobi model
+        model.setObjective(objective, GRB.MINIMIZE)
+
+
 
         # ------------ #
         # Constraints. #
@@ -383,14 +396,19 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
         # Total quantities in CM/c representation.
         total_q_c = [ag_q_dry_c[c] + ag_q_irr_c[c] + non_ag_q_c[c] for c in range(ncms)]
 
-        # Finally, add the constraint in the CM/c representation.
-        print("Adding constraints...", time.ctime() + "\n")
-
-        model.addConstrs((d_c[c] - total_q_c[c]) <= V[c]
-                          for c in range(ncms) )
-        model.addConstrs((total_q_c[c] - d_c[c]) <= V[c]
-                          for c in range(ncms) )
+        # Add demand constraints in CM/c representation.
+        print("Adding", settings.DEMAND_CONSTRAINT_TYPE, "demand constraints...", time.ctime() + "\n")
         
+        if settings.DEMAND_CONSTRAINT_TYPE == 'soft':
+            model.addConstrs((d_c[c] - total_q_c[c]) <= V[c]
+                              for c in range(ncms) )
+            model.addConstrs((total_q_c[c] - d_c[c]) <= V[c]
+                              for c in range(ncms) )
+        elif settings.DEMAND_CONSTRAINT_TYPE == 'hard':
+            model.addConstrs( (total_q_c[c] >= d_c[c]) 
+                               for c in range(ncms) )
+        else:
+            print('DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"')
         
 
         # Only add the following constraints if 'limits' are provided.
@@ -575,9 +593,6 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
         lmmap[non_ag_bools_r] = 0  # Assume that all non-agricultural land uses are dryland
 
         # Process agricultural management usage info
-        # Get number of agr. man. options (add one for the option of no usage)
-        n_am_options = range(len(am2j.keys()) + 1)
-
         # Make ammap (agricultural management map) using the lumap and lmmap
         ammap = np.zeros(ncells, dtype=np.int8)
         for r in range(ncells):
@@ -597,7 +612,7 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
                 # Get argmax and max of the am_values list
                 argmax, max_am_var_val = max(enumerate(am_values), key=lambda x: x[1])
 
-                if max_am_var_val < 0.5:
+                if max_am_var_val < settings.AGRICULTURAL_MANAGEMENT_USE_THRESHOLD:
                     # The cell doesn't use any alternative agricultural management options
                     cell_am = 0
                 else:

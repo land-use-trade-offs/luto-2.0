@@ -172,7 +172,7 @@ def get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx):
     year = 2010 + yr_idx
 
     # Set up the effects matrix
-    new_r_mrj = np.zeros((2, data.NCELLS, len(land_uses))).astype(np.float32)
+    new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
@@ -196,7 +196,7 @@ def get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx):
     year = 2010 + yr_idx
 
     # Set up the effects matrix
-    new_r_mrj = np.zeros((2, data.NCELLS, len(land_uses))).astype(np.float32)
+    new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
@@ -208,13 +208,37 @@ def get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx):
     return new_r_mrj
 
 
+def get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx):
+    """
+    Applies the effects of using ecologiacl grazing to the revenue data
+    for all relevant agr. land uses.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+    year = 2010 + yr_idx
+
+    # Set up the effects matrix
+    new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    # Update values in the new matrix using the correct multiplier for each LU
+    for lu_idx, lu in enumerate(land_uses):
+        j = lu_codes[lu_idx]
+        multiplier = data.ECOLOGICAL_GRAZING_DATA[lu].loc[year, 'Productivity']
+        if multiplier != 1:
+            new_r_mrj[:, :, lu_idx] = r_mrj[:, :, j] * (multiplier - 1)
+
+    return new_r_mrj
+
+
 def get_agricultural_management_revenue_matrices(data, r_mrj, yr_idx) -> Dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx)
     precision_agriculture_data = get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx)
+    eco_grazing_data = get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx)
 
     ag_management_data = {
         'Asparagopsis taxiformis': asparagopsis_data,
         'Precision Agriculture': precision_agriculture_data,
+        'Ecological Grazing': eco_grazing_data,
     }
 
     return ag_management_data

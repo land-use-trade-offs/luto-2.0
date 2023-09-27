@@ -192,7 +192,7 @@ def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
     return x_rk.astype(bool)
 
 
-def get_base_am_vars(ncells):
+def get_base_am_vars(ncells, ncms):
     """
     Get the 2010 agricultural management option vars.
     It is assumed that no agricultural management options were used in 2010, 
@@ -200,7 +200,7 @@ def get_base_am_vars(ncells):
     """
     am_vars = {}
     for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():
-        am_vars[am] = np.zeros((2, ncells, len(am_lus)))  # TODO - remove 2
+        am_vars[am] = np.zeros((ncms, ncells, len(am_lus)))
 
     return am_vars
 
