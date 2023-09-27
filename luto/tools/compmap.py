@@ -221,3 +221,42 @@ def crossmap_amstat( lumap_old
     df.loc['Total'] = cells_prior.sum(), cells_after.sum(), nswitches, pswitches
 
     return crosstab, df
+
+
+
+
+def df_spare2densi(df):
+    '''Function to fill a multilevel df to sensified format
+    Input:
+        pd.DataFrame
+
+    Output:
+        pd.DataFrame
+    
+    What does that mean?
+    For example, a df has multilevel columns of ([A,(1,3)],[B,(2,4)]),
+    after passing this function, it will become ([A,(1,2,3,4)], [B,(1,2,3,4)])
+    
+    Why this is necessary?
+    Because we want to perform matrics multiplication using the input df,
+    and this function fill nan values to "missing" colums, e.g., [A,(2,4)]
+    so that the output df has a nice rectangular shape to be multiplied with
+
+    
+    '''
+
+    # convert the mulilevel columns to a df, get the {unique value} and {count} of each level
+    df_col = pd.DataFrame(df.columns.tolist())
+    df_col_unique = {idx:df_col[idx].unique().tolist() for idx in df_col.columns}
+    df_col_unique = {k:sorted(v) for k,v in df_col_unique.items()} # IMPORTANT, to keep the columns in lexicall order
+    df_col_count = dict(df_col.nunique())
+    
+    # get the product from column of all levels
+    df_col_product = list(product(*df_col_unique.values()))
+    df_col_product = sorted(df_col_product,key=lambda x:[x[i] for i in range(df_col.shape[1])]) # IMPORTANT, to order the columns
+    
+    # expande the original df with df_col_product 
+    # so that we can finally convert it to a n-d rectangular np.array 
+    expand_df = df.reindex(columns=df_col_product,fill_value=np.nan)
+
+    return expand_df
