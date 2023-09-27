@@ -451,7 +451,7 @@ def am_name_snake_case(am_name):
 
 
 def df_sparse2dense(df):
-    '''Function to fill a multilevel df to densified format
+    """Function to fill a multilevel df to densified format
     
     What does that mean?
     For example, the input df has multilevel columns of ([A,(1,3)],[B,(2,4)]),
@@ -463,30 +463,34 @@ def df_sparse2dense(df):
     Output:
         pd.DataFrame,
         df_col_unique, # the unique values of each column level of the input df (e.g, [A,B],[1,2,3,4])
-        df_col_count   # the bumber of each column level (e.g, [2,4])
-    
-    
+        df_col_count   # the number of each column level (e.g, [2,4])
     
     Why this is necessary?
     Because we want to perform matrics multiplication using the input df,
     and this function fill nan values to "missing" colums, e.g., [A,(2,4)]
     so that the output df has a nice rectangular shape to be multiplied with
+    """
 
+    # Convert multilevel columns to a dataframe
+    df_col = pd.DataFrame( df.columns.tolist() )
     
-    '''
+    # Get the unique values and sort them 
+    df_col_unique = [ df_col[idx].unique().tolist() for idx in df_col.columns ]
+    df_col_unique = [ sorted(l) for l in df_col_unique ]
+    
+    # Get the count of each unique level
+    df_col_count = list( df_col.nunique() )
+    
+    # Get the product from columns of all levels
+    df_col_product = list( product(*df_col_unique) )
+    
+    # Sort the columns
+    df_col_product = sorted( df_col_product, 
+                             key = lambda x: [ x[i] for i in range( df_col.shape[1] ) ] 
+                           )     
 
-    # convert the mulilevel columns to a df, get the {unique value} and {count} of each level
-    df_col = pd.DataFrame(df.columns.tolist())
-    df_col_unique = [df_col[idx].unique().tolist() for idx in df_col.columns]
-    df_col_unique = [sorted(l) for l in df_col_unique] # IMPORTANT, to order the columns
-    df_col_count = list(df_col.nunique())
+    # Expand the original df with df_col_product to convert it to a n-d rectangular np.array 
+    expand_df = df.reindex( columns = df_col_product, fill_value = np.nan )
     
-    # get the product from column of all levels
-    df_col_product = list(product(*df_col_unique))
-    df_col_product = sorted(df_col_product,key=lambda x:[x[i] for i in range(df_col.shape[1])]) # IMPORTANT, to order the columns
-    
-    # expande the original df with df_col_product 
-    # so that we can finally convert it to a n-d rectangular np.array 
-    expand_df = df.reindex(columns=df_col_product,fill_value=np.nan)
-
-    return expand_df,df_col_unique,df_col_count
+    # Return expanded dataframe, list of unique column names, list of their count
+    return expand_df, df_col_unique, df_col_count

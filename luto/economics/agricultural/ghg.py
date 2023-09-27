@@ -85,11 +85,11 @@ def get_ghg_crop( data     # Data object or module.
 
 
 
-def get_ghg_lvstk( data     # Data object or module.
-                 , lu       # Land use.
-                 , lm       # Land management.
-                 , yr_idx   # Number of years post base-year ('YR_CAL_BASE').
-                 , aggregate = True): # indicate if the GHG is calculated as a total or seperately
+def get_ghg_lvstk( data               # Data object or module.
+                 , lu                 # Land use.
+                 , lm                 # Land management.
+                 , yr_idx             # Number of years post base-year ('YR_CAL_BASE').
+                 , aggregate = True): # GHG calculated as a total (for the solver) or by individual source (for writing outputs)
     """Return livestock GHG emissions [tCO2e/cell] of `lu`+`lm` in `yr_idx`
             as (np array|pd.DataFrame) depending on aggregate (True|False).
 
@@ -114,50 +114,59 @@ def get_ghg_lvstk( data     # Data object or module.
     # Get livestock and vegetation type.
     lvstype, vegtype = lvs_veg_types(lu)
 
-    # Get the yield potential, i.e. the total number of heads per hectare.
+    # Get the yield potential, i.e. the total number of livestock head per hectare.
     yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
     
-    # Calculate total GHG emissions in kg CO2e per hectare
-    # Note: ghg_rs {r->each pixel,  s->each GHG source }
-    ghg_raw = data.AGGHG_LVSTK.loc[:, (lvstype, slice(None))]
-    # get the names for each GHG
-    ghg_name_s =  [i[1] for i in ghg_raw.columns]
-    # calculate the GHG emission
+    # Get GHG emissions by source in kg CO2e per head of livestock. Note: ghg_rs (r -> each cell, s -> each GHG source)
+    ghg_raw = data.AGGHG_LVSTK.loc[:, (lvstype, slice(None)) ]
+    
+    # Get the names for each GHG source
+    ghg_name_s = [ i[1] for i in ghg_raw.columns ]
+    
+    # Calculate the GHG emission
     ghg_rs = ghg_raw * yield_pot[:,np.newaxis]
     
     
     # Add pasture irrigation emissions based on emissions associated with hay production.
     if lm == 'irr':
-        ghg_name_irr_s = ['CO2E_KG_HA_CHEM_APPL','CO2E_KG_HA_FERT_PROD','CO2E_KG_HA_IRRIG',
-                          'CO2E_KG_HA_PEST_PROD','CO2E_KG_HA_SOIL_N_SURP','CO2E_KG_HA_SOWING']
-        
-        # get the names for each GHG
+        ghg_name_irr_s = ['CO2E_KG_HA_CHEM_APPL', 
+                          'CO2E_KG_HA_CROP_MGT', 
+                          'CO2E_KG_HA_CULTIV', 
+                          'CO2E_KG_HA_FERT_PROD', 
+                          'CO2E_KG_HA_HARVEST', 
+                          'CO2E_KG_HA_IRRIG', 
+                          'CO2E_KG_HA_PEST_PROD', 
+                          'CO2E_KG_HA_SOIL_N_SURP', 
+                          'CO2E_KG_HA_SOWING']
+
+        # Add names for GHG sources from irrigated pasture
         ghg_name_s += ghg_name_irr_s
         
-        # get the GHG emission
-        ghg_irr_rs = np.vstack([data.AGGHG_CROPS[f'{i}', 'irr', 'Hay'] 
-                        for i in ghg_name_irr_s]).swapaxes(1,0)
+        # Get the GHG emissions from irrigated pasture
+        ghg_irr_rs = np.vstack( [ data.AGGHG_CROPS[f'{i}', 'irr', 'Hay'] 
+                                  for i in ghg_name_irr_s ]).swapaxes(1, 0)
         
-        # append it to lisvstock GHG
-        ghg_rs = np.concatenate([ghg_rs,ghg_irr_rs],1)
+        # Append it to livestock GHG dataframe
+        ghg_rs = np.concatenate( [ghg_rs, ghg_irr_rs], 1 )
         
     # Convert to tonnes of CO2e per ha. 
     ghg_rs = ghg_rs / 1000
     
     # Convert to tonnes CO2e per cell including resfactor
-    ghg_rs*= data.REAL_AREA[:,np.newaxis]
+    ghg_rs *= data.REAL_AREA[:, np.newaxis]
     
-    # add the origin (lvstk) to the df.columns
+    # Add the origin (lvstk) to df.columns
     ghg_rs = pd.DataFrame(ghg_rs)
-    ghg_rs.columns = pd.MultiIndex.from_tuples( [['lvstk',lm,lu] + [ghg] for ghg in ghg_name_s])
+    ghg_rs.columns = pd.MultiIndex.from_tuples([ ['lvstk', lm, lu] + [ghg] for ghg in ghg_name_s ])
     
-    # add a columns that computes the total GHG
-    ghg_rs[('lvstk',lm,lu,'Total_CO2_t')] = ghg_rs.sum(axis=1)
+    # Add a column that computes the total GHG in tonnes of CO2e per cell
+    ghg_rs[('lvstk', lm, lu, 'Total_tCO2e')] = ghg_rs.sum(axis = 1)
     
-    # resest_index
-    ghg_rs.reset_index(drop=True,inplace=True)
+    # Reset dataframe index
+    ghg_rs.reset_index(drop = True, inplace = True)
     
-    return ghg_rs if aggregate == False else ghg_rs[('lvstk',lm,lu,'Total_CO2_t')].values
+    # Return the full dataframe if Aggregate == False otherwise return the sum over all GHG sources
+    return ghg_rs if aggregate == False else ghg_rs[ ('lvstk', lm, lu, 'Total_tCO2e')].values
        
 
 
