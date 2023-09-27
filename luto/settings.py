@@ -57,7 +57,7 @@ DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 5           # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 1           # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 
 # How does the model run over time 
@@ -79,7 +79,7 @@ DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (li
 
 # Select Gurobi algorithm used to solve continuous models or the initial root relaxation of a MIP model.
 # Set solve method. Default is automatic. Dual simplex uses less memory.
-SOLVE_METHOD = -1
+SOLVE_METHOD = 2
 
 """ SOLVE METHODS
    'automatic':                       -1

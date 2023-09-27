@@ -64,7 +64,7 @@ def write_outputs(sim, yr_cal, path):
     write_production(sim, yr_cal, path)
     write_water(sim, yr_cal, path)
     write_ghg(sim, yr_cal, path)
-    write_ghg_seperate(sim, yr_cal, path)
+    write_ghg_separate(sim, yr_cal, path)
 
 
 def write_settings(path):
@@ -309,8 +309,8 @@ def write_ghg(sim, yr_cal, path):
     # Save to file
     df.to_csv(os.path.join(path, 'GHG_emissions.csv'), index = False)
     
-def write_ghg_seperate(sim, yr_cal, path):
-    # set the aggregate to False, so to calculate the GHG seperately 
+def write_ghg_separate(sim, yr_cal, path):
+    # set the aggregate to False, so to calculate the GHG separately 
     # (i.e, get the GHG emissions according to sources [electricty, chemical fertilizer ...])
     aggregate = False
         
@@ -338,20 +338,20 @@ def write_ghg_seperate(sim, yr_cal, path):
     # use einsum to do the multiplication, 
     # easy to understand, don't need to worry too much about the dimensionality
     ag_dvar_mrj = sim.ag_dvars[yr_cal]                                               # mrj
-    GHG_emission_seperate = np.einsum('romjs,mrj -> rms', ag_g_df_arr, ag_dvar_mrj)  # rms
+    GHG_emission_separate = np.einsum('romjs,mrj -> rms', ag_g_df_arr, ag_dvar_mrj)  # rms
     
     # warp the array back to a df
-    GHG_emission_seperate = pd.DataFrame(GHG_emission_seperate.reshape((GHG_emission_seperate.shape[0],-1)),
+    GHG_emission_separate = pd.DataFrame(GHG_emission_separate.reshape((GHG_emission_separate.shape[0],-1)),
                                          columns=pd.MultiIndex.from_product((ag_g_col_unique[1],    # m: land management
                                                                              ag_g_col_unique[3])))  # s: GHG source 
     
     # add landuse describtion
-    GHG_emission_seperate['lu'] = [sim.data.AGLU2DESC[x] for x in sim.data.LUMAP]
+    GHG_emission_separate['lu'] = [sim.data.AGLU2DESC[x] for x in sim.data.LUMAP]
     
     # sumarize the GHG as (lucc * [lu|source])
-    GHG_emission_seperate_summary = GHG_emission_seperate.groupby('lu').sum(0).reset_index()
-    GHG_emission_seperate_summary = GHG_emission_seperate_summary.set_index('lu')
+    GHG_emission_separate_summary = GHG_emission_separate.groupby('lu').sum(0).reset_index()
+    GHG_emission_separate_summary = GHG_emission_separate_summary.set_index('lu')
     
     # Save to pickle file, so to keep the multilvel columns
-    GHG_emission_seperate.to_csv(os.path.join(path, 'GHG_emissions_seperate.csv'))
+    GHG_emission_separate.to_csv(os.path.join(path, 'GHG_emissions_separate.csv'))
     
