@@ -55,6 +55,7 @@ class InputData:
     ag_q_mrp: np.ndarray            # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
     ag_ghg_t_mrj: np.ndarray        # GHG emissions released during transitions between agricultural land uses.
     """
+
     ag_t_mrj: np.ndarray  # Agricultural transition cost matrices.
     ag_c_mrj: np.ndarray  # Agricultural production cost matrices.
     ag_r_mrj: np.ndarray  # Agricultural production revenue matrices.
@@ -123,16 +124,22 @@ class InputData:
     @cached_property
     def am2j(self):
         # Map of agricultural management options to land use codes
-        print("Setting up am2j for the first time...")
         return {
             am: [self.desc2aglu[lu] for lu in am_lus]
             for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items()
         }
 
     @cached_property
+    def j2am(self):
+        _j2am = defaultdict(list)
+        for am, am_j_list in self.am2j.items():
+            for j in am_j_list:
+                _j2am[j].append(am)
+        return _j2am
+
+    @cached_property
     def ag_lu2cells(self):
         # Make an index of each cell permitted to transform to each land use / land management combination
-        print("Setting up ag_lu2cells for the first time...")
         return {
             (m, j): np.where(self.ag_x_mrj[m, :, j])[0]
             for j in range(self.n_ag_lus)
@@ -141,7 +148,6 @@ class InputData:
 
     @cached_property
     def non_ag_lu2cells(self):
-        print("Setting up non_ag_lu2cells for the first time...")
         return {
             k: np.where(self.non_ag_x_rk[:, k])[0] for k in range(self.n_non_ag_lus)
         }
@@ -154,9 +160,8 @@ class LutoSolver:
 
     def __init__(self, input_data: InputData, d_c: np.array):
         self._input_data = input_data
-        self.gurobi_model = gp.Model("LUTO " + settings.VERSION, env=gurenv)
         self.d_c = d_c
-        self.ncms = self.d_c.shape[0]  # Number of commodities.
+        self.gurobi_model = gp.Model("LUTO " + settings.VERSION, env=gurenv)
 
     def formulate(self):
         """
@@ -170,10 +175,6 @@ class LutoSolver:
         self._setup_ag_management_variables()
         self._setup_decision_variables()
 
-        print(
-            "Setting up objective function to %s..." % settings.OBJECTIVE,
-            time.ctime() + "\n",
-        )
         self._setup_objective()
 
         print("Setting up constraints...", time.ctime() + "\n")
@@ -258,6 +259,11 @@ class LutoSolver:
         """
         Formulate the objective based on settings.OBJECTIVE
         """
+        print(
+            "Setting up objective function to %s..." % settings.OBJECTIVE,
+            time.ctime() + "\n",
+        )
+
         if settings.OBJECTIVE == "maxrev":
             # Pre-calculate revenue minus (production and transition) costs
             ag_obj_mrj = (
@@ -609,6 +615,136 @@ class LutoSolver:
             )
             self.gurobi_model.addConstr(ghg_emissions <= ghg_limits)
 
+    def update_formulation(
+        self,
+        input_data: InputData,
+        d_c: np.array,
+        old_lumap: np.array,
+        current_lumap: np.array,
+        old_lmmap: np.array,
+        current_lmmap: np.array,
+    ):
+        """
+        Dynamically updates the existing formulation based on new input data and demands.
+        """
+        self._input_data = input_data
+        self.d_c = d_c
+
+        self._update_variables(old_lumap, current_lumap, old_lmmap, current_lmmap)
+
+        # TODO: update objective dynamically
+        self._setup_objective()
+
+        # TODO: update constraints dynamically
+        self.gurobi_model.remove(self.gurobi_model.getConstrs())
+        self._add_constraints()
+
+    def _update_variables(
+        self,
+        old_lumap: np.array,
+        current_lumap: np.array,
+        old_lmmap: np.array,
+        current_lmmap: np.array,
+    ):
+        """
+        Updates the variables only for cells that have changed land use or land management.
+        """
+        # update x vars
+        print("Updating variables...", end=" ", flush=True)
+
+        # metrics
+        cells_skipped = 0
+        cells_updated = 0
+
+        ag_lus_zeros = np.zeros(self._input_data.n_ag_lus)
+        non_ag_lus_zeros = np.zeros(self._input_data.n_non_ag_lus)
+
+        for r in range(self._input_data.ncells):
+            old_j = old_lumap[r]
+            new_j = current_lumap[r]
+            old_m = old_lmmap[r]
+            new_m = current_lmmap[r]
+            if old_j == new_j and old_m == new_m:
+                # cell has not changed between years. No need to update variables
+                cells_skipped += 1
+                continue
+
+            # agricultural land usage
+            self.gurobi_model.remove(
+                list(self.X_ag_dry_vars_jr[:, r][np.where(self.X_ag_dry_vars_jr[:, r])])
+            )
+            self.gurobi_model.remove(
+                list(self.X_ag_irr_vars_jr[:, r][np.where(self.X_ag_irr_vars_jr[:, r])])
+            )
+            self.X_ag_dry_vars_jr[:, r] = ag_lus_zeros
+            self.X_ag_irr_vars_jr[:, r] = ag_lus_zeros
+            for j in range(self._input_data.n_ag_lus):
+                if self._input_data.ag_x_mrj[0, r, j]:
+                    self.X_ag_dry_vars_jr[j, r] = self.gurobi_model.addVar(
+                        ub=1, name=f"X_ag_dry_{j}_{r}"
+                    )
+
+                if self._input_data.ag_x_mrj[1, r, j]:
+                    self.X_ag_irr_vars_jr[j, r] = self.gurobi_model.addVar(
+                        ub=1, name=f"X_ag_irr_{j}_{r}"
+                    )
+
+            # non-agricultural land usage
+            self.gurobi_model.remove(
+                list(self.X_non_ag_vars_kr[:, r][np.where(self.X_non_ag_vars_kr[:, r])])
+            )
+            self.X_non_ag_vars_kr[:, r] = non_ag_lus_zeros
+            for k in range(self._input_data.n_non_ag_lus):
+                if self._input_data.non_ag_x_rk[r, k]:
+                    self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
+                        ub=1, name=f"X_non_ag_{k}_{r}"
+                    )
+
+            # agricultural management
+            for am, am_j_list in self._input_data.am2j.items():
+                # Get snake_case version of the AM name for the variable name
+                am_name = am.lower().replace(" ", "_")
+                self.gurobi_model.remove(
+                    list(
+                        self.X_ag_man_dry_vars_jr[am][:, r][
+                            np.where(self.X_ag_man_dry_vars_jr[am][:, r])
+                        ]
+                    )
+                )
+                self.gurobi_model.remove(
+                    list(
+                        self.X_ag_man_irr_vars_jr[am][:, r][
+                            np.where(self.X_ag_man_irr_vars_jr[am][:, r])
+                        ]
+                    )
+                )
+                self.X_ag_man_dry_vars_jr[am][:, r] = np.zeros(len(am_j_list))
+                self.X_ag_man_irr_vars_jr[am][:, r] = np.zeros(len(am_j_list))
+
+                for j_idx, j in enumerate(am_j_list):
+                    if self._input_data.ag_x_mrj[0, r, j]:
+                        self.X_ag_man_dry_vars_jr[am][
+                            j_idx, r
+                        ] = self.gurobi_model.addVar(
+                            ub=1, name=f"X_ag_man_dry_{am_name}_{j}_{r}"
+                        )
+
+                    if self._input_data.ag_x_mrj[1, r, j]:
+                        self.X_ag_man_irr_vars_jr[am][
+                            j_idx, r
+                        ] = self.gurobi_model.addVar(
+                            ub=1, name=f"X_ag_man_irr_{am_name}_{j}_{r}"
+                        )
+
+            cells_updated += 1
+        print(f"Done. Skipped {cells_skipped} cells, updated {cells_updated} cells.")
+
+    def _update_objective(self):
+        raise NotImplementedError()
+
+    def _update_constraints(self):
+        raise NotImplementedError()
+
     def solve(self):
         st = time.time()
         print("Starting solve... ", time.ctime(), "\n")
@@ -667,9 +803,13 @@ class LutoSolver:
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx, j in enumerate(am_j_list):
                 for r in self._input_data.ag_lu2cells[0, j]:
-                    am_X_dry_sol_rj[am][r, j] = self.X_ag_man_dry_vars_jr[am][j_idx, r].X
+                    am_X_dry_sol_rj[am][r, j] = self.X_ag_man_dry_vars_jr[am][
+                        j_idx, r
+                    ].X
                 for r in self._input_data.ag_lu2cells[1, j]:
-                    am_X_irr_sol_rj[am][r, j] = self.X_ag_man_irr_vars_jr[am][j_idx, r].X
+                    am_X_irr_sol_rj[am][r, j] = self.X_ag_man_irr_vars_jr[am][
+                        j_idx, r
+                    ].X
 
         """Note that output decision variables are mostly 0 or 1 but in some cases they are somewhere in between which creates issues 
             when converting to maps etc. as individual cells can have non-zero values for multiple land-uses and land management type.
@@ -680,7 +820,7 @@ class LutoSolver:
         ag_X_mrj = np.stack((X_dry_sol_rj, X_irr_sol_rj))  # Float32
         ag_X_mrj_shape = ag_X_mrj.shape
 
-        # Reshape so that cells are along the first axis and land management and use are flattened along second axis i.e. (XXXXXXX, 56)
+        # Reshape so that cells are along the first axis and land management and use are flattened along second axis i.e. (XXXXXXX,  56)
         ag_X_mrj_processed = np.moveaxis(ag_X_mrj, 1, 0)
         ag_X_mrj_processed = ag_X_mrj_processed.reshape(ag_X_mrj_processed.shape[0], -1)
 
@@ -786,6 +926,10 @@ class LutoSolver:
             non_ag_X_rk_processed,
             ag_man_X_mrj_processed,
         )
+
+    @property
+    def ncms(self):
+        return self.d_c.shape[0]  # Number of commodities.
 
     @property
     def X_dry_pr(self):

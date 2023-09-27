@@ -379,15 +379,26 @@ def solve_timeseries(steps: int, base: int, target: int):
             luto_solver.formulate()
 
         if s > 0:
-            luto_solver.update_formulation(input_data, d_c)
+            # luto_solver._input_data = input_data
+            # luto_solver.d_c = d_c
+            # luto_solver.formulate()
+
+            luto_solver.update_formulation(
+                input_data=input_data,
+                d_c=d_c,
+                old_lumap=lumaps[base + s - 1],
+                current_lumap=lumaps[base + s],
+                old_lmmap=lmmaps[base + s - 1],
+                current_lmmap=lmmaps[base + s],
+            )
 
         (
-            lumaps[target],
-            lmmaps[target],
-            ammaps[target],
-            ag_dvars[target],
-            non_ag_dvars[target],
-            ag_man_dvars[target],
+            lumaps[base + s + 1],
+            lmmaps[base + s + 1],
+            ammaps[base + s + 1],
+            ag_dvars[base + s + 1],
+            non_ag_dvars[base + s + 1],
+            ag_man_dvars[base + s + 1],
         ) = luto_solver.solve()
 
         print('Total processing time...', round(time.time() - start_time), 'seconds')
