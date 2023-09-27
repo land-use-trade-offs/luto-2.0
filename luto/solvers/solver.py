@@ -32,11 +32,11 @@ import luto.settings as settings
 from luto.ag_managements import SORTED_AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 
 # Set Gurobi environment.
-gurenv = gp.Env(logfilename = 'gurobi.log', empty = True) # (empty = True)
-gurenv.setParam('Method', settings.SOLVE_METHOD)
-gurenv.setParam('OutputFlag', settings.VERBOSE)
-gurenv.setParam('OptimalityTol', settings.OPTIMALITY_TOLERANCE)
-gurenv.setParam('Threads', settings.THREADS)
+gurenv = gp.Env(logfilename="gurobi.log", empty=True)  # (empty = True)
+gurenv.setParam("Method", settings.SOLVE_METHOD)
+gurenv.setParam("OutputFlag", settings.VERBOSE)
+gurenv.setParam("OptimalityTol", settings.OPTIMALITY_TOLERANCE)
+gurenv.setParam("Threads", settings.THREADS)
 gurenv.start()
 
 
@@ -44,8 +44,7 @@ gurenv.start()
 class InputData:
     """
     An object that collects and stores all relevant data for solver.py.
-    """    
-    """    
+
     ag_t_mrj: np.ndarray            # Agricultural transition cost matrices.
     ag_c_mrj: np.ndarray            # Agricultural production cost matrices.
     ag_r_mrj: np.ndarray            # Agricultural production revenue matrices.
@@ -55,14 +54,14 @@ class InputData:
     ag_q_mrp: np.ndarray            # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
     ag_ghg_t_mrj: np.ndarray        # GHG emissions released during transitions between agricultural land uses.
     """
-    ag_t_mrj: np.ndarray            # Agricultural transition cost matrices.
-    ag_c_mrj: np.ndarray            # Agricultural production cost matrices.
-    ag_r_mrj: np.ndarray            # Agricultural production revenue matrices.
-    ag_g_mrj: np.ndarray            # Agricultural greenhouse gas emissions matrices.
-    ag_w_mrj: np.ndarray            # Agricultural water requirements matrices.
-    ag_x_mrj: np.ndarray            # Agricultural exclude matrices.
-    ag_q_mrp: np.ndarray            # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
-    ag_ghg_t_mrj: np.ndarray        # GHG emissions released during transitions between agricultural land uses.
+    ag_t_mrj: np.ndarray  # Agricultural transition cost matrices.
+    ag_c_mrj: np.ndarray  # Agricultural production cost matrices.
+    ag_r_mrj: np.ndarray  # Agricultural production revenue matrices.
+    ag_g_mrj: np.ndarray  # Agricultural greenhouse gas emissions matrices.
+    ag_w_mrj: np.ndarray  # Agricultural water requirements matrices.
+    ag_x_mrj: np.ndarray  # Agricultural exclude matrices.
+    ag_q_mrp: np.ndarray  # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
+    ag_ghg_t_mrj: np.ndarray  # GHG emissions released during transitions between agricultural land uses.
 
     ag_t_mrj: np.ndarray  # Agricultural transition cost matrices.
     ag_c_mrj: np.ndarray  # Agricultural production cost matrices.
@@ -156,6 +155,10 @@ class LutoSolver:
         self.ncms = self.d_c.shape[0]  # Number of commodities.
 
     def formulate(self):
+        """
+        Performs the initial formulation of the model - setting up variables, decision variables,
+        etc.
+        """
         print("\nSetting up the model...", time.ctime() + "\n")
 
         print("Adding decision variables...", time.ctime() + "\n")
@@ -173,6 +176,9 @@ class LutoSolver:
         self._add_constraints()
 
     def _setup_x_vars(self):
+        """
+        Sets up the 'x' variables, responsible for managing how cells are used.
+        """
         self.X_ag_dry_vars_jr = np.zeros(
             (self._input_data.n_ag_lus, self._input_data.ncells), dtype=object
         )
@@ -265,7 +271,10 @@ class LutoSolver:
             non_ag_obj_rk = (
                 -(
                     self._input_data.non_ag_r_rk
-                    - (self._input_data.non_ag_c_rk + self._input_data.ag_to_non_ag_t_rk)
+                    - (
+                        self._input_data.non_ag_c_rk
+                        + self._input_data.ag_to_non_ag_t_rk
+                    )
                 )
                 / settings.PENALTY
             )
@@ -596,6 +605,189 @@ class LutoSolver:
             )
             self.gurobi_model.addConstr(ghg_emissions <= ghg_limits)
 
+    def solve(self):
+        st = time.time()
+        print("Starting solve... ", time.ctime(), "\n")
+
+        # Magic.
+        self.gurobi_model.optimize()
+
+        ft = time.time()
+        print("Completed solve... ", time.ctime())
+        print(
+            "Found optimal objective value",
+            round(self.gurobi_model.objVal, 2),
+            "in",
+            round(ft - st),
+            "seconds\n",
+        )
+
+        print("Collecting results...", end=" ", flush=True)
+
+        # Collect optimised decision variables in one X_mrj Numpy array.
+        X_dry_sol_rj = np.zeros(
+            (self._input_data.ncells, self._input_data.n_ag_lus)
+        ).astype(np.float32)
+        X_irr_sol_rj = np.zeros(
+            (self._input_data.ncells, self._input_data.n_ag_lus)
+        ).astype(np.float32)
+        non_ag_X_sol_rk = np.zeros(
+            (self._input_data.ncells, self._input_data.n_non_ag_lus)
+        ).astype(np.float32)
+        am_X_dry_sol_rj = {
+            am: np.zeros((self._input_data.ncells, self._input_data.n_ag_lus)).astype(
+                np.float32
+            )
+            for am in self._input_data.am2j
+        }
+        am_X_irr_sol_rj = {
+            am: np.zeros((self._input_data.ncells, self._input_data.n_ag_lus)).astype(
+                np.float32
+            )
+            for am in self._input_data.am2j
+        }
+
+        # Get agricultural results
+        for j in range(self._input_data.n_ag_lus):
+            for r in self._input_data.ag_lu2cells[0, j]:
+                X_dry_sol_rj[r, j] = self.gurobi_model.getVarByName(f"X_ag_dry_{j}_{r}").X
+            for r in self._input_data.ag_lu2cells[1, j]:
+                X_irr_sol_rj[r, j] = self.gurobi_model.getVarByName(f"X_ag_irr_{j}_{r}").X
+
+        # Get non-agricultural results
+        for k in range(self._input_data.n_non_ag_lus):
+            for r in self._input_data.non_ag_lu2cells[k]:
+                non_ag_X_sol_rk[r, k] = self.gurobi_model.getVarByName(f"X_non_ag_{k}_{r}").X
+
+        # Get agricultural management results
+        for am, am_j_list in self._input_data.am2j.items():
+            am_name = am.lower().replace(" ", "_")
+            for j_idx, j in enumerate(am_j_list):
+                for r in self._input_data.ag_lu2cells[0, j]:
+                    am_X_dry_sol_rj[am][r, j] = self.gurobi_model.getVarByName(
+                        f"X_ag_man_dry_{am_name}_{j}_{r}"
+                    ).X
+                for r in self._input_data.ag_lu2cells[1, j]:
+                    am_X_irr_sol_rj[am][r, j] = self.gurobi_model.getVarByName(
+                        f"X_ag_man_irr_{am_name}_{j}_{r}"
+                    ).X
+
+        """Note that output decision variables are mostly 0 or 1 but in some cases they are somewhere in between which creates issues 
+            when converting to maps etc. as individual cells can have non-zero values for multiple land-uses and land management type.
+            This code creates a boolean X_mrj output matrix and ensure that each cell has one and only one land-use and land management"""
+
+        # Process agricultural land usage information
+        # Stack dryland and irrigated decision variables
+        ag_X_mrj = np.stack((X_dry_sol_rj, X_irr_sol_rj))  # Float32
+        ag_X_mrj_shape = ag_X_mrj.shape
+
+        # Reshape so that cells are along the first axis and land management and use are flattened along second axis i.e. (XXXXXXX, 56)
+        ag_X_mrj_processed = np.moveaxis(ag_X_mrj, 1, 0)
+        ag_X_mrj_processed = ag_X_mrj_processed.reshape(ag_X_mrj_processed.shape[0], -1)
+
+        # Boolean matrix where the maximum value for each cell across all land management types and land uses is True
+        ag_X_mrj_processed = ag_X_mrj_processed.argmax(axis=1)[:, np.newaxis] == range(
+            ag_X_mrj_processed.shape[1]
+        )
+
+        # Reshape to mrj structure
+        ag_X_mrj_processed = ag_X_mrj_processed.reshape(
+            (ag_X_mrj_shape[1], ag_X_mrj_shape[0], ag_X_mrj_shape[2])
+        )
+        ag_X_mrj_processed = np.moveaxis(ag_X_mrj_processed, 0, 1)
+
+        # Process non-agricultural land usage information
+        # Boolean matrix where the maximum value for each cell across all non-ag LUs is True
+        non_ag_X_rk_processed = non_ag_X_sol_rk.argmax(axis=1)[:, np.newaxis] == range(
+            self._input_data.n_non_ag_lus
+        )
+
+        # Make land use and land management maps
+        # Vector indexed by cell that denotes whether the cell is non-agricultural land (True) or agricultural land (False)
+        non_ag_bools_r = non_ag_X_sol_rk.max(axis=1) > ag_X_mrj.max(axis=(0, 2))
+
+        # Process agricultural management variables
+        # Repeat the steps for the regular agricultural management variables
+        ag_man_X_mrj_processed = {}
+        for am in self._input_data.am2j:
+            ag_man_processed = np.stack((am_X_dry_sol_rj[am], am_X_irr_sol_rj[am]))
+            ag_man_X_shape = ag_man_processed.shape
+
+            ag_man_processed = np.moveaxis(ag_man_processed, 1, 0)
+            ag_man_processed = ag_man_processed.reshape(ag_man_processed.shape[0], -1)
+
+            ag_man_processed = ag_man_processed.argmax(axis=1)[:, np.newaxis] == range(
+                ag_man_processed.shape[1]
+            )
+            ag_man_processed = ag_man_processed.reshape(
+                (ag_man_X_shape[1], ag_man_X_shape[0], ag_man_X_shape[2])
+            )
+            ag_man_processed = np.moveaxis(ag_man_processed, 0, 1)
+            ag_man_X_mrj_processed[am] = ag_man_processed
+
+        # Calculate 1D array (maps) of land-use and land management, considering only agricultural LUs
+        lumap = ag_X_mrj_processed.sum(axis=0).argmax(axis=1).astype("int8")
+        lmmap = ag_X_mrj_processed.sum(axis=2).argmax(axis=0).astype("int8")
+
+        # Update lxmaps and processed variable matrices to consider non-agricultural LUs
+        lumap[non_ag_bools_r] = (
+            non_ag_X_sol_rk[non_ag_bools_r, :].argmax(axis=1)
+            + settings.NON_AGRICULTURAL_LU_BASE_CODE
+        )
+        lmmap[
+            non_ag_bools_r
+        ] = 0  # Assume that all non-agricultural land uses are dryland
+
+        # Process agricultural management usage info
+        # Get number of agr. man. options (add one for the option of no usage)
+        n_am_options = range(len(self._input_data.am2j.keys()) + 1)
+
+        # Make ammap (agricultural management map) using the lumap and lmmap
+        ammap = np.zeros(self._input_data.ncells, dtype=np.int8)
+        for r in range(self._input_data.ncells):
+            cell_j = lumap[r]
+            cell_m = lmmap[r]
+
+            if cell_j >= settings.NON_AGRICULTURAL_LU_BASE_CODE:
+                # Non agricultural land use - no agricultural management option
+                cell_am = 0
+
+            else:
+                if cell_m == 0:
+                    am_values = [
+                        am_X_dry_sol_rj[am][r, cell_j] for am in SORTED_AG_MANAGEMENTS
+                    ]
+                else:
+                    am_values = [
+                        am_X_irr_sol_rj[am][r, cell_j] for am in SORTED_AG_MANAGEMENTS
+                    ]
+
+                # Get argmax and max of the am_values list
+                argmax, max_am_var_val = max(enumerate(am_values), key=lambda x: x[1])
+
+                if max_am_var_val < 0.5:
+                    # The cell doesn't use any alternative agricultural management options
+                    cell_am = 0
+                else:
+                    # Add one to the argmax to account for the default option of no ag management being 0
+                    cell_am = argmax + 1
+
+            ammap[r] = cell_am
+
+        ag_X_mrj_processed[:, non_ag_bools_r, :] = False
+        non_ag_X_rk_processed[~non_ag_bools_r, :] = False
+
+        print("Done\n")
+
+        return (
+            lumap,
+            lmmap,
+            ammap,
+            ag_X_mrj_processed,
+            non_ag_X_rk_processed,
+            ag_man_X_mrj_processed,
+        )
+
     @property
     def X_dry_pr(self):
         """
@@ -619,190 +811,3 @@ class LutoSolver:
             for j in range(self._input_data.n_ag_lus)
             if self._input_data.lu2pr_pj[p, j]
         ]
-
-
-def solve(input_data: InputData, model):
-    """Return land-use and land management maps under constraints and minimised costs.
-
-    All inputs are Numpy arrays of the appropriate shapes, except for `p` which
-    is a scalar and `limits` which is a dictionary.
-
-    To run with only a subset of the constraints, pass a custom `constraints`
-    dictionary. Format {key: value} where 'key' is a string, one of 'water',
-    'nutrients', 'carbon' or 'biodiversity' and 'value' is either True or False.
-    """
-    # -------------------------- #
-    # Solve and extract results. #
-    # -------------------------- #
-
-    st = time.time()
-    print("Starting solve... ", time.ctime(), "\n")
-
-    # Magic.
-    model.optimize()
-
-    ft = time.time()
-    print("Completed solve... ", time.ctime())
-    print(
-        "Found optimal objective value",
-        round(model.objVal, 2),
-        "in",
-        round(ft - st),
-        "seconds\n",
-    )
-
-    print("Collecting results...", end=" ", flush=True)
-
-    # Collect optimised decision variables in one X_mrj Numpy array.
-    X_dry_sol_rj = np.zeros((input_data.ncells, input_data.n_ag_lus)).astype(np.float32)
-    X_irr_sol_rj = np.zeros((input_data.ncells, input_data.n_ag_lus)).astype(np.float32)
-    non_ag_X_sol_rk = np.zeros((input_data.ncells, input_data.n_non_ag_lus)).astype(
-        np.float32
-    )
-    am_X_dry_sol_rj = {
-        am: np.zeros((input_data.ncells, input_data.n_ag_lus)).astype(np.float32)
-        for am in input_data.am2j
-    }
-    am_X_irr_sol_rj = {
-        am: np.zeros((input_data.ncells, input_data.n_ag_lus)).astype(np.float32)
-        for am in input_data.am2j
-    }
-
-    # Get agricultural results
-    for j in range(input_data.n_ag_lus):
-        for r in input_data.ag_lu2cells[0, j]:
-            X_dry_sol_rj[r, j] = model.getVarByName(f"X_ag_dry_{j}_{r}").X
-        for r in input_data.ag_lu2cells[1, j]:
-            X_irr_sol_rj[r, j] = model.getVarByName(f"X_ag_irr_{j}_{r}").X
-
-    # Get non-agricultural results
-    for k in range(input_data.n_non_ag_lus):
-        for r in input_data.non_ag_lu2cells[k]:
-            non_ag_X_sol_rk[r, k] = model.getVarByName(f"X_non_ag_{k}_{r}").X
-
-    # Get agricultural management results
-    for am, am_j_list in input_data.am2j.items():
-        am_name = am.lower().replace(" ", "_")
-        for j_idx, j in enumerate(am_j_list):
-            for r in input_data.ag_lu2cells[0, j]:
-                am_X_dry_sol_rj[am][r, j] = model.getVarByName(
-                    f"X_ag_man_dry_{am_name}_{j}_{r}"
-                ).X
-            for r in input_data.ag_lu2cells[1, j]:
-                am_X_irr_sol_rj[am][r, j] = model.getVarByName(
-                    f"X_ag_man_irr_{am_name}_{j}_{r}"
-                ).X
-
-    """Note that output decision variables are mostly 0 or 1 but in some cases they are somewhere in between which creates issues 
-        when converting to maps etc. as individual cells can have non-zero values for multiple land-uses and land management type.
-        This code creates a boolean X_mrj output matrix and ensure that each cell has one and only one land-use and land management"""
-
-    # Process agricultural land usage information
-    # Stack dryland and irrigated decision variables
-    ag_X_mrj = np.stack((X_dry_sol_rj, X_irr_sol_rj))  # Float32
-    ag_X_mrj_shape = ag_X_mrj.shape
-
-    # Reshape so that cells are along the first axis and land management and use are flattened along second axis i.e. (XXXXXXX, 56)
-    ag_X_mrj_processed = np.moveaxis(ag_X_mrj, 1, 0)
-    ag_X_mrj_processed = ag_X_mrj_processed.reshape(ag_X_mrj_processed.shape[0], -1)
-
-    # Boolean matrix where the maximum value for each cell across all land management types and land uses is True
-    ag_X_mrj_processed = ag_X_mrj_processed.argmax(axis=1)[:, np.newaxis] == range(
-        ag_X_mrj_processed.shape[1]
-    )
-
-    # Reshape to mrj structure
-    ag_X_mrj_processed = ag_X_mrj_processed.reshape(
-        (ag_X_mrj_shape[1], ag_X_mrj_shape[0], ag_X_mrj_shape[2])
-    )
-    ag_X_mrj_processed = np.moveaxis(ag_X_mrj_processed, 0, 1)
-
-    # Process non-agricultural land usage information
-    # Boolean matrix where the maximum value for each cell across all non-ag LUs is True
-    non_ag_X_rk_processed = non_ag_X_sol_rk.argmax(axis=1)[:, np.newaxis] == range(
-        input_data.n_non_ag_lus
-    )
-
-    # Make land use and land management maps
-    # Vector indexed by cell that denotes whether the cell is non-agricultural land (True) or agricultural land (False)
-    non_ag_bools_r = non_ag_X_sol_rk.max(axis=1) > ag_X_mrj.max(axis=(0, 2))
-
-    # Process agricultural management variables
-    # Repeat the steps for the regular agricultural management variables
-    ag_man_X_mrj_processed = {}
-    for am in input_data.am2j:
-        ag_man_processed = np.stack((am_X_dry_sol_rj[am], am_X_irr_sol_rj[am]))
-        ag_man_X_shape = ag_man_processed.shape
-
-        ag_man_processed = np.moveaxis(ag_man_processed, 1, 0)
-        ag_man_processed = ag_man_processed.reshape(ag_man_processed.shape[0], -1)
-
-        ag_man_processed = ag_man_processed.argmax(axis=1)[:, np.newaxis] == range(
-            ag_man_processed.shape[1]
-        )
-        ag_man_processed = ag_man_processed.reshape(
-            (ag_man_X_shape[1], ag_man_X_shape[0], ag_man_X_shape[2])
-        )
-        ag_man_processed = np.moveaxis(ag_man_processed, 0, 1)
-        ag_man_X_mrj_processed[am] = ag_man_processed
-
-    # Calculate 1D array (maps) of land-use and land management, considering only agricultural LUs
-    lumap = ag_X_mrj_processed.sum(axis=0).argmax(axis=1).astype("int8")
-    lmmap = ag_X_mrj_processed.sum(axis=2).argmax(axis=0).astype("int8")
-
-    # Update lxmaps and processed variable matrices to consider non-agricultural LUs
-    lumap[non_ag_bools_r] = (
-        non_ag_X_sol_rk[non_ag_bools_r, :].argmax(axis=1)
-        + settings.NON_AGRICULTURAL_LU_BASE_CODE
-    )
-    lmmap[non_ag_bools_r] = 0  # Assume that all non-agricultural land uses are dryland
-
-    # Process agricultural management usage info
-    # Get number of agr. man. options (add one for the option of no usage)
-    n_am_options = range(len(input_data.am2j.keys()) + 1)
-
-    # Make ammap (agricultural management map) using the lumap and lmmap
-    ammap = np.zeros(input_data.ncells, dtype=np.int8)
-    for r in range(input_data.ncells):
-        cell_j = lumap[r]
-        cell_m = lmmap[r]
-
-        if cell_j >= settings.NON_AGRICULTURAL_LU_BASE_CODE:
-            # Non agricultural land use - no agricultural management option
-            cell_am = 0
-
-        else:
-            if cell_m == 0:
-                am_values = [
-                    am_X_dry_sol_rj[am][r, cell_j] for am in SORTED_AG_MANAGEMENTS
-                ]
-            else:
-                am_values = [
-                    am_X_irr_sol_rj[am][r, cell_j] for am in SORTED_AG_MANAGEMENTS
-                ]
-
-            # Get argmax and max of the am_values list
-            argmax, max_am_var_val = max(enumerate(am_values), key=lambda x: x[1])
-
-            if max_am_var_val < 0.5:
-                # The cell doesn't use any alternative agricultural management options
-                cell_am = 0
-            else:
-                # Add one to the argmax to account for the default option of no ag management being 0
-                cell_am = argmax + 1
-
-        ammap[r] = cell_am
-
-    ag_X_mrj_processed[:, non_ag_bools_r, :] = False
-    non_ag_X_rk_processed[~non_ag_bools_r, :] = False
-
-    print("Done\n")
-
-    return (
-        lumap,
-        lmmap,
-        ammap,
-        ag_X_mrj_processed,
-        non_ag_X_rk_processed,
-        ag_man_X_mrj_processed,
-    )
