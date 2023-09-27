@@ -57,7 +57,7 @@ def get_ghg_crop( data     # Data object or module.
     # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not return zeros
     if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
         ghg_rs = pd.DataFrame(np.zeros((data.NCELLS,1))) # make sure the output is 2d
-        cols = pd.MultiIndex.from_tuples([('crop',lm,lu,'Total_CO2_t' )])
+        cols = pd.MultiIndex.from_tuples([('crop',lm,lu,'Total_tCO2e' )])
         ghg_rs.columns = cols
                 
     else:
@@ -74,13 +74,13 @@ def get_ghg_crop( data     # Data object or module.
                                                      for col in ghg_rs.columns])
         
         # add a columns that computes the total GHG
-        ghg_rs[('crop',lm,lu,'Total_CO2_t')] = ghg_rs.sum(axis=1)
+        ghg_rs[('crop',lm,lu,'Total_tCO2e')] = ghg_rs.sum(axis=1)
         
         # resest_index
         ghg_rs.reset_index(drop=True,inplace=True)
 
     # Return each greenhouse gas emissions 
-    return ghg_rs if aggregate == False else ghg_rs[('crop',lm,lu,'Total_CO2_t')].values
+    return ghg_rs if aggregate == False else ghg_rs[('crop',lm,lu,'Total_tCO2e')].values
 
 
 
@@ -201,7 +201,7 @@ def get_ghg( data    # Data object or module.
             return np.zeros(data.NCELLS)
         else:
             return pd.DataFrame(np.zeros((data.NCELLS,1)),
-                                columns=pd.MultiIndex.from_tuples([('Unallocate',lm,lu,'Total_CO2_t')]))
+                                columns=pd.MultiIndex.from_tuples([('Unallocate',lm,lu,'Total_tCO2e')]))
     
     # If it is none of the above, it is not known how to get the GHG emissions.
     else:
