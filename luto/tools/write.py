@@ -43,7 +43,7 @@ def get_path():
     path = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
     
     # Add some shorthand details about the model run
-    post = '_' + settings.OBJECTIVE + '_RF' + str(settings.RESFACTOR) + '_P1e' + str(int(math.log10(settings.PENALTY))) + '_W' + settings.WATER_USE_LIMITS + '_G' + settings.GHG_EMISSIONS_LIMITS
+    post = '_' + settings.DEMAND_CONSTRAINT_TYPE + '_' + settings.OBJECTIVE + '_RF' + str(settings.RESFACTOR) + '_P1e' + str(int(math.log10(settings.PENALTY))) + '_W' + settings.WATER_USE_LIMITS + '_G' + settings.GHG_EMISSIONS_LIMITS
     
     # Create path name
     path = 'output/' + path + post

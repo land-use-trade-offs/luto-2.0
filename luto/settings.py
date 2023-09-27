@@ -57,7 +57,7 @@ DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 3           # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 5           # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 
 # How does the model run over time 
@@ -65,8 +65,12 @@ MODE = 'snapshot'       # runs for target year only
 # MODE = 'timeseries'   # runs each year from base year to target year
 
 # Define the objective function
-OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
-# OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
+# OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
+OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
+
+# Specify how demand should be met in the solver
+DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
+# DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
 
 
 # ---------------------------------------------------------------------------- #
