@@ -20,7 +20,7 @@ Provides minimalist Solver class and pure helper functions.
 
 from collections import defaultdict
 import time
-from typing import Any
+from typing import Optional
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
@@ -162,6 +162,14 @@ class LutoSolver:
         self._input_data = input_data
         self.d_c = d_c
         self.gurobi_model = gp.Model("LUTO " + settings.VERSION, env=gurenv)
+
+        # initialise constraint lookups
+        self.cell_usage_constraint_r = {}
+        self.ag_management_constraints_r = defaultdict(list)
+        self.adoption_limit_constraints = []
+        self.demand_penalty_constraints = []
+        self.water_limit_constraints_r = defaultdict(list)
+        self.ghg_emissions_limit_constraint = None
 
     def formulate(self):
         """
@@ -364,37 +372,60 @@ class LutoSolver:
         )
         self.gurobi_model.setObjective(objective, GRB.MINIMIZE)
 
-    def _add_cell_usage_constraints(self):
+    def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
         """
         Constraint that all of every cell is used for some land use.
+        If `cells` is provided, only adds constraints for the given cells
         """
+        if cells is None:
+            cells = np.array(range(self._input_data.ncells))
+
+        x_ag_dry_vars = self.X_ag_dry_vars_jr[:, cells]
+        x_ag_irr_vars = self.X_ag_irr_vars_jr[:, cells]
+        x_non_ag_vars = self.X_non_ag_vars_kr[:, cells]
+
         # Create an array indexed by cell that contains the sums of each cell's variables.
         # Then, loop through the array and add the constraint that each expression must equal 1.
         X_sum_r = (
-            self.X_ag_dry_vars_jr.sum(axis=0)
-            + self.X_ag_irr_vars_jr.sum(axis=0)
-            + self.X_non_ag_vars_kr.sum(axis=0)
+            x_ag_dry_vars.sum(axis=0)
+            + x_ag_irr_vars.sum(axis=0)
+            + x_non_ag_vars.sum(axis=0)
         )
-        for expr in X_sum_r:
-            self.gurobi_model.addConstr(expr == 1)
+        for r, expr in zip(cells, X_sum_r):
+            self.cell_usage_constraint_r[r] = self.gurobi_model.addConstr(expr == 1)
 
-    def _add_agricultural_management_constraints(self):
+    def _add_agricultural_management_constraints(
+        self, cells: Optional[np.array] = None
+    ):
         """
         Constraint handling alternative agricultural management options:
         Ag. man. variables cannot exceed the value of the agricultural variable.
         """
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx, j in enumerate(am_j_list):
-                for r in self._input_data.ag_lu2cells[0, j]:
-                    self.gurobi_model.addConstr(
+                if cells is not None:
+                    lm0_r_vals = [
+                        r for r in cells if self._input_data.ag_x_mrj[0, r, j]
+                    ]
+                    lm1_r_vals = [
+                        r for r in cells if self._input_data.ag_x_mrj[1, r, j]
+                    ]
+                else:
+                    lm0_r_vals = self._input_data.ag_lu2cells[0, j]
+                    lm1_r_vals = self._input_data.ag_lu2cells[1, j]
+
+                for r in lm0_r_vals:
+                    constr = self.gurobi_model.addConstr(
                         self.X_ag_man_dry_vars_jr[am][j_idx, r]
                         <= self.X_ag_dry_vars_jr[j, r]
                     )
-                for r in self._input_data.ag_lu2cells[1, j]:
-                    self.gurobi_model.addConstr(
+                    self.ag_management_constraints_r[r].append(constr)
+                for r in lm1_r_vals:
+                    constr = self.gurobi_model.addConstr(
                         self.X_ag_man_irr_vars_jr[am][j_idx, r]
                         <= self.X_ag_irr_vars_jr[j, r]
                     )
+                    self.ag_management_constraints_r[r].append(constr)
 
     def _add_agricultural_management_adoption_limit_constraints(self):
         """
@@ -411,9 +442,11 @@ class LutoSolver:
                 all_vars_sum = gp.quicksum(self.X_ag_dry_vars_jr[j, :]) + gp.quicksum(
                     self.X_ag_irr_vars_jr[j, :]
                 )
-                self.gurobi_model.addConstr(
+                constr = self.gurobi_model.addConstr(
                     ag_man_vars_sum <= adoption_limit * all_vars_sum
                 )
+
+                self.adoption_limit_constraints.append(constr)
 
     def _add_demand_penalty_constraints(self):
         """
@@ -514,14 +547,21 @@ class LutoSolver:
             ag_q_dry_c[c] + ag_q_irr_c[c] + non_ag_q_c[c] for c in range(self.ncms)
         ]
 
-        self.gurobi_model.addConstrs(
+        constraints_left = self.gurobi_model.addConstrs(
             (self.d_c[c] - total_q_c[c]) <= self.V[c] for c in range(self.ncms)
         )
-        self.gurobi_model.addConstrs(
+        constraints_right = self.gurobi_model.addConstrs(
             (total_q_c[c] - self.d_c[c]) <= self.V[c] for c in range(self.ncms)
         )
-    
-    def _add_water_usage_limit_constraints(self):
+        self.demand_penalty_constraints.extend(constraints_left.values())
+        self.demand_penalty_constraints.extend(constraints_right.values())
+
+    def _add_water_usage_limit_constraints(self, cells: Optional[np.array] = None):
+        """
+        Adds constraints to handle water usage limits.
+        If `cells` is provided, only adds constraints for regions containing at least one of the
+        provided cells.
+        """
         if settings.WATER_USE_LIMITS != "on":
             return
 
@@ -536,12 +576,13 @@ class LutoSolver:
 
         # Ensure water use remains below limit for each region
         for region, wreq_reg_limit, ind in w_limits:
+            if cells is not None and np.intersect1d(cells, ind).size == 0:
+                continue
+
             wreq_region = (
                 gp.quicksum(
                     self._input_data.ag_w_mrj[0, ind, j]
-                    @ self.X_ag_dry_vars_jr[
-                        j, ind
-                    ]  # Dryland agriculture contribution
+                    @ self.X_ag_dry_vars_jr[j, ind]  # Dryland agriculture contribution
                     + self._input_data.ag_w_mrj[1, ind, j]
                     @ self.X_ag_irr_vars_jr[
                         j, ind
@@ -568,14 +609,16 @@ class LutoSolver:
             )
 
             if wreq_region is not 0:
-                self.gurobi_model.addConstr(wreq_region <= wreq_reg_limit)
+                constr = self.gurobi_model.addConstr(wreq_region <= wreq_reg_limit)
+                for r in ind:
+                    self.water_limit_constraints_r[r].append(constr)
 
             if settings.VERBOSE == 1:
                 print(
                     "    ...setting water limit for %s <= %.2f ML"
                     % (region, wreq_reg_limit)
                 )
-    
+
     def _add_ghg_emissions_limit_constraints(self):
         if settings.GHG_EMISSIONS_LIMITS != "on":
             return
@@ -588,12 +631,10 @@ class LutoSolver:
         # Pre-calculate the coefficients for each variable,
         # both for regular culture and alternative agr. management options
         g_dry_coeff = (
-            self._input_data.ag_g_mrj[0, :, :]
-            + self._input_data.ag_ghg_t_mrj[0, :, :]
+            self._input_data.ag_g_mrj[0, :, :] + self._input_data.ag_ghg_t_mrj[0, :, :]
         )
         g_irr_coeff = (
-            self._input_data.ag_g_mrj[1, :, :]
-            + self._input_data.ag_ghg_t_mrj[1, :, :]
+            self._input_data.ag_g_mrj[1, :, :] + self._input_data.ag_ghg_t_mrj[1, :, :]
         )
 
         ghg_emissions = (
@@ -628,7 +669,9 @@ class LutoSolver:
                 ghg_limits
             )
         )
-        self.gurobi_model.addConstr(ghg_emissions <= ghg_limits)
+        self.ghg_emissions_limit_constraint = self.gurobi_model.addConstr(
+            ghg_emissions <= ghg_limits
+        )
 
     def _setup_constraints(self):
         self._add_cell_usage_constraints()
@@ -771,10 +814,28 @@ class LutoSolver:
         self._setup_objective()
 
     def _update_constraints(self, updated_cells: np.array):
-        # For now, we setup all constraints from scratch.
-        # TODO: update constraints dynamically
-        self.gurobi_model.remove(self.gurobi_model.getConstrs())
-        self._setup_constraints()
+        print("Updating constraints...", end=" ", flush=True)
+        for r in updated_cells:
+            self.gurobi_model.remove(self.cell_usage_constraint_r.pop(r, []))
+            self.gurobi_model.remove(self.ag_management_constraints_r.pop(r, []))
+            self.gurobi_model.remove(self.water_limit_constraints_r.pop(r, []))
+
+            self.gurobi_model.remove(self.adoption_limit_constraints)
+            self.gurobi_model.remove(self.demand_penalty_constraints)
+            self.adoption_limit_constraints = []
+            self.demand_penalty_constraints = []
+
+            if self.ghg_emissions_limit_constraint is not None:
+                self.gurobi_model.remove(self.ghg_emissions_limit_constraint)
+                self.ghg_emissions_limit_constraint = None
+
+        self._add_cell_usage_constraints(updated_cells)
+        self._add_agricultural_management_constraints(updated_cells)
+        self._add_agricultural_management_adoption_limit_constraints()
+        self._add_demand_penalty_constraints()
+        self._add_water_usage_limit_constraints(updated_cells)
+        self._add_ghg_emissions_limit_constraints()
+        print("Done.")
 
     def solve(self):
         st = time.time()
