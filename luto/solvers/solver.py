@@ -177,16 +177,18 @@ class LutoSolver:
         etc.
         """
         print("\nSetting up the model...", time.ctime() + "\n")
+        self._setup_vars()
+        self._setup_objective()
+        self._setup_constraints()
 
-        print("Adding decision variables...", time.ctime() + "\n")
+    def _setup_vars(self):
+        print(f"Adding decision variables ({time.ctime()})...", end=" ", flush=True)
+        st = time.time()
         self._setup_x_vars()
         self._setup_ag_management_variables()
         self._setup_decision_variables()
-
-        self._setup_objective()
-
-        print("Setting up constraints...", time.ctime() + "\n")
-        self._setup_constraints()
+        ft = time.time()
+        print(f"Done in {round(ft - st, 1)}s")
 
     def _setup_x_vars(self):
         """
@@ -268,10 +270,12 @@ class LutoSolver:
         Formulate the objective based on settings.OBJECTIVE
         """
         print(
-            "Setting up objective function to %s..." % settings.OBJECTIVE,
-            time.ctime() + "\n",
+            f"Setting up objective function to {settings.OBJECTIVE} ({time.ctime()})...",
+            end=" ",
+            flush=True,
         )
 
+        st = time.time()
         if settings.OBJECTIVE == "maxrev":
             # Pre-calculate revenue minus (production and transition) costs
             ag_obj_mrj = (
@@ -371,6 +375,8 @@ class LutoSolver:
             + gp.quicksum(self.V[c] for c in range(self.ncms))
         )
         self.gurobi_model.setObjective(objective, GRB.MINIMIZE)
+        ft = time.time()
+        print(f"Done in {round(ft - st, 1)}s")
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
         """
@@ -547,14 +553,14 @@ class LutoSolver:
             ag_q_dry_c[c] + ag_q_irr_c[c] + non_ag_q_c[c] for c in range(self.ncms)
         ]
 
-        constraints_left = self.gurobi_model.addConstrs(
+        upper_bound_constraints = self.gurobi_model.addConstrs(
             (self.d_c[c] - total_q_c[c]) <= self.V[c] for c in range(self.ncms)
         )
-        constraints_right = self.gurobi_model.addConstrs(
+        lower_bound_constraints = self.gurobi_model.addConstrs(
             (total_q_c[c] - self.d_c[c]) <= self.V[c] for c in range(self.ncms)
         )
-        self.demand_penalty_constraints.extend(constraints_left.values())
-        self.demand_penalty_constraints.extend(constraints_right.values())
+        self.demand_penalty_constraints.extend(upper_bound_constraints.values())
+        self.demand_penalty_constraints.extend(lower_bound_constraints.values())
 
     def _add_water_usage_limit_constraints(self, cells: Optional[np.array] = None):
         """
@@ -581,29 +587,33 @@ class LutoSolver:
 
             wreq_region = (
                 gp.quicksum(
-                    self._input_data.ag_w_mrj[0, ind, j]
-                    @ self.X_ag_dry_vars_jr[j, ind]  # Dryland agriculture contribution
-                    + self._input_data.ag_w_mrj[1, ind, j]
-                    @ self.X_ag_irr_vars_jr[
-                        j, ind
-                    ]  # Irrigated agriculture contribution
+                    gp.quicksum(
+                        self._input_data.ag_w_mrj[0, ind, j]
+                        * self.X_ag_dry_vars_jr[j, ind]
+                    )  # Dryland agriculture contribution
+                    + gp.quicksum(
+                        self._input_data.ag_w_mrj[1, ind, j]
+                        * self.X_ag_irr_vars_jr[j, ind]
+                    )  # Irrigated agriculture contribution
                     for j in range(self._input_data.n_ag_lus)
                 )
                 + gp.quicksum(
-                    self._input_data.ag_man_w_mrj[am][0, ind, j_idx]
-                    @ self.X_ag_man_dry_vars_jr[am][
-                        j_idx, ind
-                    ]  # Dryland alt. ag. management contributions
-                    + self._input_data.ag_man_w_mrj[am][1, ind, j_idx]
-                    @ self.X_ag_man_irr_vars_jr[am][
-                        j_idx, ind
-                    ]  # Irrigated alt. ag. management contributions
+                    gp.quicksum(
+                        self._input_data.ag_man_w_mrj[am][0, ind, j_idx]
+                        * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
+                    )  # Dryland alt. ag. management contributions
+                    + gp.quicksum(
+                        self._input_data.ag_man_w_mrj[am][1, ind, j_idx]
+                        * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
+                    )  # Irrigated alt. ag. management contributions
                     for am, am_j_list in self._input_data.am2j.items()
                     for j_idx in range(len(am_j_list))
                 )
                 + gp.quicksum(
-                    self._input_data.non_ag_w_rk[ind, k]
-                    @ self.X_non_ag_vars_kr[k, ind]  # Non-agricultural contribution
+                    gp.quicksum(
+                        self._input_data.non_ag_w_rk[ind, k]
+                        * self.X_non_ag_vars_kr[k, ind]
+                    )  # Non-agricultural contribution
                     for k in range(self._input_data.n_non_ag_lus)
                 )
             )
@@ -639,27 +649,30 @@ class LutoSolver:
 
         ghg_emissions = (
             gp.quicksum(
-                g_dry_coeff[:, j]
-                @ self.X_ag_dry_vars_jr[j, :]  # Dryland agriculture contribution
-                + g_irr_coeff[:, j]
-                @ self.X_ag_irr_vars_jr[j, :]  # Irrigated agriculture contribution
+                gp.quicksum(
+                    g_dry_coeff[:, j] * self.X_ag_dry_vars_jr[j, :]
+                )  # Dryland agriculture contribution
+                + gp.quicksum(
+                    g_irr_coeff[:, j] * self.X_ag_irr_vars_jr[j, :]
+                )  # Irrigated agriculture contribution
                 for j in range(self._input_data.n_ag_lus)
             )
             + gp.quicksum(
-                self._input_data.ag_man_g_mrj[am][0, :, j_idx]
-                @ self.X_ag_man_dry_vars_jr[am][
-                    j_idx, :
-                ]  # Dryland alt. ag. management contributions
-                + self._input_data.ag_man_g_mrj[am][1, :, j_idx]
-                @ self.X_ag_man_irr_vars_jr[am][
-                    j_idx, :
-                ]  # Irrigated alt. ag. management contributions
+                gp.quicksum(
+                    self._input_data.ag_man_g_mrj[am][0, :, j_idx]
+                    * self.X_ag_man_dry_vars_jr[am][j_idx, :]
+                )  # Dryland alt. ag. management contributions
+                + gp.quicksum(
+                    self._input_data.ag_man_g_mrj[am][1, :, j_idx]
+                    * self.X_ag_man_irr_vars_jr[am][j_idx, :]
+                )  # Irrigated alt. ag. management contributions
                 for am, am_j_list in self._input_data.am2j.items()
                 for j_idx in range(len(am_j_list))
             )
             + gp.quicksum(
-                self._input_data.non_ag_g_rk[:, k]
-                @ self.X_non_ag_vars_kr[k, :]  # Non-agricultural contribution
+                gp.quicksum(
+                    self._input_data.non_ag_g_rk[:, k] * self.X_non_ag_vars_kr[k, :]
+                )  # Non-agricultural contribution
                 for k in range(self._input_data.n_non_ag_lus)
             )
         )
@@ -674,12 +687,16 @@ class LutoSolver:
         )
 
     def _setup_constraints(self):
+        print(f"Setting up constraints ({time.ctime()})...")
+        st = time.time()
         self._add_cell_usage_constraints()
         self._add_agricultural_management_constraints()
         self._add_agricultural_management_adoption_limit_constraints()
         self._add_demand_penalty_constraints()
         self._add_water_usage_limit_constraints()
         self._add_ghg_emissions_limit_constraints()
+        ft = time.time()
+        print(f"Constraint setup took {round(ft - st, 1)}s")
 
     def update_formulation(
         self,
@@ -715,6 +732,7 @@ class LutoSolver:
         """
         # update x vars
         print("Updating variables...", end=" ", flush=True)
+        st = time.time()
 
         # metrics
         num_cells_skipped = 0
@@ -803,8 +821,10 @@ class LutoSolver:
             updated_cells.append(r)
 
         updated_cells = np.array(updated_cells)
+        ft = time.time()
         print(
-            f"Done. Skipped {num_cells_skipped} cells, updated {len(updated_cells)} cells."
+            f"Done in {round(ft - st, 1)}s. "
+            f"Skipped {num_cells_skipped} cells, updated {len(updated_cells)} cells."
         )
         return updated_cells
 
@@ -814,7 +834,8 @@ class LutoSolver:
         self._setup_objective()
 
     def _update_constraints(self, updated_cells: np.array):
-        print("Updating constraints...", end=" ", flush=True)
+        print("Updating constraints...")
+        st = time.time()
         for r in updated_cells:
             self.gurobi_model.remove(self.cell_usage_constraint_r.pop(r, []))
             self.gurobi_model.remove(self.ag_management_constraints_r.pop(r, []))
@@ -835,7 +856,8 @@ class LutoSolver:
         self._add_demand_penalty_constraints()
         self._add_water_usage_limit_constraints(updated_cells)
         self._add_ghg_emissions_limit_constraints()
-        print("Done.")
+        ft = time.time()
+        print(f"Constraint update took {round(ft - st, 1)}s")
 
     def solve(self):
         st = time.time()
