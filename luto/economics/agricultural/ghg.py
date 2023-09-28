@@ -438,11 +438,7 @@ def get_ecological_grazing_effect_g_mrj(data, yr_idx):
                 m = 0
             else:
                 m = 1
-        
-            # Some crop land uses do not emit any GHG emissions, e.g. 'Rice'
-            if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
-                continue
-            
+                    
             # Subtract leach runoff carbon benefit
             leach_reduction_perc = 1 - lu_data.loc[year, 'CO2E_KG_HEAD_IND_LEACH_RUNOFF']
             if leach_reduction_perc != 0:
@@ -450,7 +446,7 @@ def get_ecological_grazing_effect_g_mrj(data, yr_idx):
                 yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
 
                 leach_reduction_amnt = (
-                      np.nan_to_num(data.AGGHG_CROPS['CO2E_KG_HEAD_IND_LEACH_RUNOFF', lm, lu].to_numpy(), 0)
+                    data.AGGHG_LVSTK[lvstype, 'CO2E_KG_HEAD_IND_LEACH_RUNOFF'].to_numpy()
                     * yield_pot       # convert to HAs
                     * leach_reduction_perc
                     / 1000            # convert to tonnes
@@ -464,7 +460,7 @@ def get_ecological_grazing_effect_g_mrj(data, yr_idx):
                 soil_reduction_amnt = (
                     data.SOIL_CARBON_T_HA
                     * soil_multiplier
-                    * (44 / 12)       # convert carbon to CO2e
+                    * (44 / 12)       # convert carbon tonnes to CO2e tonnes
                     * data.REAL_AREA  # adjust for resfactor
                 )
                 new_g_mrj[m, :, lu_idx] -= soil_reduction_amnt

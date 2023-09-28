@@ -24,6 +24,7 @@ import rasterio
 
 from luto.settings import INPUT_DIR, SSP, RCP, RESFACTOR
 from luto.economics.agricultural.quantity import lvs_veg_types
+from luto.ag_managements import SORTED_AG_MANAGEMENTS
 
 ###############################################################
 # Agricultural economic data.                                                 
@@ -257,8 +258,9 @@ LUMAP = pd.read_hdf(os.path.join(INPUT_DIR, 'lumap.h5')).to_numpy()
 # Initial (2010) land management map.
 LMMAP = pd.read_hdf(os.path.join(INPUT_DIR, 'lmmap.h5')).to_numpy()
 
-# Initial (2010) agricutural management map - no cells are used for alternative agricultural management options
-AMMAP = np.zeros(NCELLS).astype('int8')
+# Initial (2010) agricutural management maps - no cells are used for alternative agricultural management options.
+# Includes a separate AM map for each agricultural management option, because they can be stacked.
+AMMAP_DICT = {am: np.zeros(NCELLS).astype('int8') for am in SORTED_AG_MANAGEMENTS}
 
 
 

@@ -126,6 +126,8 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
         for j in am_j_list:
             j2am[j].append(am)
 
+    p2j = {p: [j for j in range(n_ag_lus) if input_data.lu2pr_pj[p, j]] for p in range(nprs)}
+
     try:
         print('\nSetting up the model...', time.ctime() + '\n')
 
@@ -338,15 +340,17 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
         for am, am_j_list in am2j.items():
             X_ag_man_dry_pr = []
             X_ag_man_irr_pr = []
+
             for p in range(nprs):
-                for j_idx, j in enumerate(am_j_list):
-                    if input_data.lu2pr_pj[p, j]:
-                        X_ag_man_dry_pr.append(X_ag_man_dry_vars_jr[am][j_idx, :])
-                        X_ag_man_irr_pr.append(X_ag_man_irr_vars_jr[am][j_idx, :])
-                        break
-                else:
+                p_am_j = set(p2j[p]) & set(am_j_list)
+                if not p_am_j:
                     X_ag_man_irr_pr.append(np.zeros(ncells))
                     X_ag_man_dry_pr.append(np.zeros(ncells))
+
+                else:
+                    for j in sorted(p_am_j):
+                        X_ag_man_dry_pr.append(X_ag_man_dry_vars_jr[am][j_idx, :])
+                        X_ag_man_irr_pr.append(X_ag_man_irr_vars_jr[am][j_idx, :])                        
 
             ag_man_q_dry_p = [
                 gp.quicksum(input_data.ag_man_q_mrp[am][0, :, p] * X_ag_man_dry_pr[p])
@@ -546,6 +550,10 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
         # Vector indexed by cell that denotes whether the cell is non-agricultural land (True) or agricultural land (False)
         non_ag_bools_r = non_ag_X_sol_rk.max(axis=1) > ag_X_mrj.max(axis=(0, 2))
 
+        # Update processed variables accordingly
+        ag_X_mrj_processed[:, non_ag_bools_r, :] = False
+        non_ag_X_rk_processed[~non_ag_bools_r, :] = False
+
         # Process agricultural management variables
         # Repeat the steps for the regular agricultural management variables
         ag_man_X_mrj_processed = {}
@@ -575,44 +583,30 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
         lmmap[non_ag_bools_r] = 0  # Assume that all non-agricultural land uses are dryland
 
         # Process agricultural management usage info
-        # Make ammap (agricultural management map) using the lumap and lmmap
-        ammap = np.zeros(ncells, dtype=np.int8)
+        # Make ammaps (agricultural management maps) using the lumap and lmmap. There is a
+        # separate ammap for each for each agricultural management option, because they can be stacked.
+        ammaps = {am: np.zeros(ncells, dtype=np.int8) for am in SORTED_AG_MANAGEMENTS}
         for r in range(ncells):
             cell_j = lumap[r]
             cell_m = lmmap[r]
 
             if cell_j >= settings.NON_AGRICULTURAL_LU_BASE_CODE:
                 # Non agricultural land use - no agricultural management option
-                cell_am = 0
-
-            else:
+                continue
+            
+            for am in j2am[cell_j]:
                 if cell_m == 0:
-                    am_values = [am_X_dry_sol_rj[am][r, cell_j] for am in SORTED_AG_MANAGEMENTS]
+                    am_var_val = am_X_dry_sol_rj[am][r, cell_j]
                 else:
-                    am_values = [am_X_irr_sol_rj[am][r, cell_j] for am in SORTED_AG_MANAGEMENTS]
-
-                # Get argmax and max of the am_values list
-                argmax, max_am_var_val = max(enumerate(am_values), key=lambda x: x[1])
-
-                if max_am_var_val < settings.AGRICULTURAL_MANAGEMENT_USE_THRESHOLD:
-                    # The cell doesn't use any alternative agricultural management options
-                    cell_am = 0
-                else:
-                    # Add one to the argmax to account for the default option of no ag management being 0
-                    cell_am = argmax + 1
-
-            ammap[r] = cell_am
-
-        ag_X_mrj_processed[:, non_ag_bools_r, :] = False
-        non_ag_X_rk_processed[~non_ag_bools_r, :] = False
+                    am_var_val = am_X_irr_sol_rj[am][r, cell_j]
+                
+                if am_var_val >= settings.AGRICULTURAL_MANAGEMENT_USE_THRESHOLD:
+                    ammaps[am][r] = 1
 
         print('Done\n')
         print('Total processing time...', round(time.time() - start_time), 'seconds')
 
-        return lumap, lmmap, ammap, ag_X_mrj_processed, non_ag_X_rk_processed, ag_man_X_mrj_processed
+        return lumap, lmmap, ammaps, ag_X_mrj_processed, non_ag_X_rk_processed, ag_man_X_mrj_processed
 
     except gp.GurobiError as e:
         print('Gurobi error code', str(e.errno), ':', str(e))
-
-    except AttributeError:
-        print('Encountered an attribute error')
