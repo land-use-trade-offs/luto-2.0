@@ -631,13 +631,8 @@ class LutoSolver:
         self.d_c = d_c
 
         self._update_variables(old_lumap, current_lumap, old_lmmap, current_lmmap)
-
-        # TODO: update objective dynamically
-        self._setup_objective()
-
-        # TODO: update constraints dynamically
-        self.gurobi_model.remove(self.gurobi_model.getConstrs())
-        self._add_constraints()
+        self._update_objective()
+        self._update_constraints()
 
     def _update_variables(
         self,
@@ -740,10 +735,15 @@ class LutoSolver:
         print(f"Done. Skipped {cells_skipped} cells, updated {cells_updated} cells.")
 
     def _update_objective(self):
-        raise NotImplementedError()
+        # For now, we can just setup the objective from scratch.
+        # TODO: update objective dynamically
+        self._setup_objective()
 
     def _update_constraints(self):
-        raise NotImplementedError()
+        # For now, we setup all constraints from scratch.
+        # TODO: update constraints dynamically
+        self.gurobi_model.remove(self.gurobi_model.getConstrs())
+        self._add_constraints()
 
     def solve(self):
         st = time.time()
