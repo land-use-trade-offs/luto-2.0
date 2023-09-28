@@ -349,7 +349,7 @@ def write_ghg_separate(sim, yr_cal, path):
     # add landuse describtion
     GHG_emission_separate['lu'] = [sim.data.AGLU2DESC[x] for x in sim.data.LUMAP]
     
-    # sumarize the GHG as (lucc * [lu|source])
+    # sumarize the GHG as (lucc * [lm|source])
     GHG_emission_separate_summary = GHG_emission_separate.groupby('lu').sum(0).reset_index()
     GHG_emission_separate_summary = GHG_emission_separate_summary.set_index('lu')
     
