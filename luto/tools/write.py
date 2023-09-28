@@ -78,6 +78,7 @@ def write_settings(path):
         f.write('RESFACTOR: %s\n' % settings.RESFACTOR)
         f.write('MODE: %s\n' % settings.MODE)
         f.write('OBJECTIVE: %s\n' % settings.OBJECTIVE)
+        f.write('DEMAND_CONSTRAINT_TYPE: %s\n' % settings.DEMAND_CONSTRAINT_TYPE)
         f.write('PENALTY: %s\n' % settings.PENALTY)
         f.write('OPTIMALITY_TOLERANCE: %s\n' % settings.OPTIMALITY_TOLERANCE)
         f.write('THREADS: %s\n' % settings.THREADS)
@@ -353,5 +354,5 @@ def write_ghg_separate(sim, yr_cal, path):
     GHG_emission_separate_summary = GHG_emission_separate_summary.set_index('lu')
     
     # Save to pickle file, so to keep the multilvel columns
-    GHG_emission_separate.to_csv(os.path.join(path, 'GHG_emissions_separate.csv'))
+    GHG_emission_separate_summary.to_csv(os.path.join(path, 'GHG_emissions_separate.csv'))
     
