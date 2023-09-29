@@ -65,8 +65,12 @@ MODE = 'snapshot'       # runs for target year only
 # MODE = 'timeseries'   # runs each year from base year to target year
 
 # Define the objective function
-OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
-# OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
+# OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
+OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
+
+# Specify how demand should be met in the solver
+DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
+# DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
 
 
 # ---------------------------------------------------------------------------- #
@@ -75,7 +79,7 @@ OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
 
 # Select Gurobi algorithm used to solve continuous models or the initial root relaxation of a MIP model.
 # Set solve method. Default is automatic. Dual simplex uses less memory.
-SOLVE_METHOD = 3
+SOLVE_METHOD = 2
 
 """ SOLVE METHODS
    'automatic':                       -1
@@ -100,7 +104,16 @@ OPTIMALITY_TOLERANCE = 1e-2
    Maximum value:	1e-2"""
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 8
+THREADS = 32
+
+# Use homogenous barrier algorithm
+BARHOMOGENOUS = -1
+
+"""Determines whether to use the homogeneous barrier algorithm. At the default setting (-1), it is only used 
+   when barrier solves a node relaxation for a MIP model. Setting the parameter to 0 turns it off, and setting 
+   it to 1 forces it on. The homogeneous algorithm is useful for recognizing infeasibility or unboundedness. 
+   It is a bit slower than the default algorithm.
+"""
 
 
 # ---------------------------------------------------------------------------- #

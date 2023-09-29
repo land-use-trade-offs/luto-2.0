@@ -19,8 +19,14 @@ import os
 
 import pandas as pd
 import numpy as np
-from osgeo import gdal #can't import rasterio before importing gdal
-import rasterio
+
+# Try-Except to make sure {rasterio} can be loaded under different environment
+try:
+    import rasterio
+except:
+    from osgeo import gdal
+    import rasterio
+    
 
 from luto.settings import INPUT_DIR, SSP, RCP, RESFACTOR
 from luto.economics.agricultural.quantity import lvs_veg_types
