@@ -383,9 +383,13 @@ def solve_timeseries(steps: int, base: int, target: int):
             # luto_solver.d_c = d_c
             # luto_solver.formulate()
 
+            old_ag_x_mrj = luto_solver._input_data.ag_x_mrj.copy()
+            old_non_ag_x_rk = luto_solver._input_data.non_ag_x_rk.copy()
             luto_solver.update_formulation(
                 input_data=input_data,
                 d_c=d_c,
+                old_ag_x_mrj=old_ag_x_mrj,
+                old_non_ag_x_rk=old_non_ag_x_rk,
                 old_lumap=lumaps[base + s - 1],
                 current_lumap=lumaps[base + s],
                 old_lmmap=lmmaps[base + s - 1],

@@ -702,6 +702,8 @@ class LutoSolver:
         self,
         input_data: InputData,
         d_c: np.array,
+        old_ag_x_mrj: np.ndarray,
+        old_non_ag_x_rk: np.ndarray,
         old_lumap: np.array,
         current_lumap: np.array,
         old_lmmap: np.array,
@@ -714,13 +716,20 @@ class LutoSolver:
         self.d_c = d_c
 
         updated_cells = self._update_variables(
-            old_lumap, current_lumap, old_lmmap, current_lmmap
+            old_ag_x_mrj,
+            old_non_ag_x_rk,
+            old_lumap,
+            current_lumap,
+            old_lmmap,
+            current_lmmap,
         )
         self._update_objective()
         self._update_constraints(updated_cells)
 
     def _update_variables(
         self,
+        old_ag_x_mrj: np.ndarray,
+        old_non_ag_x_rk: np.ndarray,
         old_lumap: np.array,
         current_lumap: np.array,
         old_lmmap: np.array,
@@ -746,7 +755,12 @@ class LutoSolver:
             new_j = current_lumap[r]
             old_m = old_lmmap[r]
             new_m = current_lmmap[r]
-            if old_j == new_j and old_m == new_m:
+            if (
+                old_j == new_j
+                and old_m == new_m
+                and (old_ag_x_mrj[:, r, :] == self._input_data.ag_x_mrj[:, r, :]).all()
+                and (old_non_ag_x_rk[r, :] == self._input_data.non_ag_x_rk[r, :]).all()
+            ):
                 # cell has not changed between years. No need to update variables
                 num_cells_skipped += 1
                 continue
@@ -834,6 +848,10 @@ class LutoSolver:
         self._setup_objective()
 
     def _update_constraints(self, updated_cells: np.array):
+        if len(updated_cells) == 0:
+            print("No constraints need updating.")
+            return
+
         print("Updating constraints...")
         st = time.time()
         for r in updated_cells:
