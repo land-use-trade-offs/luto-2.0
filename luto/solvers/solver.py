@@ -126,7 +126,7 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
         for j in am_j_list:
             j2am[j].append(am)
 
-    p2j = {p: [j for j in range(n_ag_lus) if input_data.lu2pr_pj[p, j]] for p in range(nprs)}
+    j2p = {j: [p for p in range(nprs) if input_data.lu2pr_pj[p, j]] for j in range(n_ag_lus)}
 
     try:
         print('\nSetting up the model...', time.ctime() + '\n')
@@ -282,7 +282,7 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
             model.addConstr(expr == 1)
 
         # Constraint handling alternative agricultural management options:
-        # Ag. man. variables cannot exceed the value of the agricultural variable.  TODO - uncomment
+        # Ag. man. variables cannot exceed the value of the agricultural variable.
         for am, am_j_list in am2j.items():
             for j_idx, j in enumerate(am_j_list):
                 for r in ag_lu2cells[0, j]:
@@ -341,23 +341,20 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
             X_ag_man_dry_pr = []
             X_ag_man_irr_pr = []
 
-            for p in range(nprs):
-                p_am_j = set(p2j[p]) & set(am_j_list)
-                if not p_am_j:
-                    X_ag_man_irr_pr.append(np.zeros(ncells))
-                    X_ag_man_dry_pr.append(np.zeros(ncells))
+            X_ag_man_dry_pr = np.zeros((nprs, ncells), dtype=object)
+            X_ag_man_irr_pr = np.zeros((nprs, ncells), dtype=object)
 
-                else:
-                    for j in sorted(p_am_j):
-                        X_ag_man_dry_pr.append(X_ag_man_dry_vars_jr[am][j_idx, :])
-                        X_ag_man_irr_pr.append(X_ag_man_irr_vars_jr[am][j_idx, :])                        
+            for j_idx, j in enumerate(am_j_list):
+                for p in j2p[j]:
+                    X_ag_man_dry_pr[p, :] = X_ag_man_dry_vars_jr[am][j_idx, :]
+                    X_ag_man_irr_pr[p, :] = X_ag_man_irr_vars_jr[am][j_idx, :]
 
             ag_man_q_dry_p = [
-                gp.quicksum(input_data.ag_man_q_mrp[am][0, :, p] * X_ag_man_dry_pr[p])
+                gp.quicksum(input_data.ag_man_q_mrp[am][0, :, p] * X_ag_man_dry_pr[p, :])
                 for p in range(nprs)
             ]
             ag_man_q_irr_p = [
-                gp.quicksum(input_data.ag_man_q_mrp[am][1, :, p] * X_ag_man_irr_pr[p])
+                gp.quicksum(input_data.ag_man_q_mrp[am][1, :, p] * X_ag_man_irr_pr[p, :])
                 for p in range(nprs)
             ]
 
@@ -559,19 +556,23 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
         ag_man_X_mrj_processed = {}
         for am in am2j:
             ag_man_processed = np.stack((am_X_dry_sol_rj[am], am_X_irr_sol_rj[am]))
-            ag_man_X_shape = ag_man_processed.shape
 
-            ag_man_processed = np.moveaxis(ag_man_processed, 1, 0)
-            ag_man_processed = ag_man_processed.reshape(ag_man_processed.shape[0], -1)
+            # Note - uncomment the following block of code to revert the processed AM variables to be binary.
+            # This will affect the quantity comparisons in the output greatly.
 
-            ag_man_processed = (
-                   ag_man_processed.argmax(axis = 1)[:, np.newaxis] 
-                == range(ag_man_processed.shape[1])
-            )
-            ag_man_processed = ag_man_processed.reshape(
-                (ag_man_X_shape[1], ag_man_X_shape[0], ag_man_X_shape[2])
-            )
-            ag_man_processed = np.moveaxis(ag_man_processed, 0, 1)
+            # ag_man_X_shape = ag_man_processed.shape
+
+            # ag_man_processed = np.moveaxis(ag_man_processed, 1, 0)
+            # ag_man_processed = ag_man_processed.reshape(ag_man_processed.shape[0], -1)
+
+            # ag_man_processed = (
+            #        ag_man_processed.argmax(axis = 1)[:, np.newaxis] 
+            #     == range(ag_man_processed.shape[1])
+            # )
+            # ag_man_processed = ag_man_processed.reshape(
+            #     (ag_man_X_shape[1], ag_man_X_shape[0], ag_man_X_shape[2])
+            # )
+            # ag_man_processed = np.moveaxis(ag_man_processed, 0, 1)
             ag_man_X_mrj_processed[am] = ag_man_processed
         
         # Calculate 1D array (maps) of land-use and land management, considering only agricultural LUs
