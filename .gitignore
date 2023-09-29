@@ -5,7 +5,15 @@
 /jinzhu_inspect_code
 luto/.ipynb_checkpoints/*
 
+# Virtual environments
+venv
+
+# Gurobi environment & logging
+gurobi.env
 gurobi.log
+
+# Testing
+.hypothesis
 
 # Except this very file:
 !.gitignore

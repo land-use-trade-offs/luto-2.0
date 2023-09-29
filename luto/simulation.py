@@ -42,6 +42,8 @@ import luto.economics.non_agricultural.quantity as non_ag_quantity
 import luto.economics.non_agricultural.transitions as non_ag_transition
 import luto.economics.non_agricultural.revenue as non_ag_revenue
 
+from luto.economics import land_use_culling
+
 from luto.solvers.solver import InputData, solve
 from luto import tools
 
@@ -311,6 +313,11 @@ def get_input_data():
     ag_r_mrj = get_ag_r_mrj()
     ag_t_mrj = get_ag_t_mrj()
     ag_w_mrj = get_ag_w_mrj()
+    ag_x_mrj = get_ag_x_mrj()
+
+    land_use_culling.apply_agricultural_land_use_culling(
+        ag_x_mrj, ag_c_mrj, ag_t_mrj, ag_r_mrj
+    )
 
     return InputData(
         ag_t_mrj=ag_t_mrj,
@@ -318,7 +325,7 @@ def get_input_data():
         ag_r_mrj=ag_r_mrj,
         ag_g_mrj=ag_g_mrj,
         ag_w_mrj=ag_w_mrj,
-        ag_x_mrj=get_ag_x_mrj(),
+        ag_x_mrj=ag_x_mrj,
         ag_q_mrp=ag_q_mrp,
         ag_ghg_t_mrj=get_ag_ghg_t_mrj(),
         ag_to_non_ag_t_rk=get_ag_to_non_ag_t_rk(),
