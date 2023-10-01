@@ -33,35 +33,35 @@ def recreate_2D_maps(sim, yr_cal):
     if settings.RESFACTOR > 1:
         lumap = uncoursify(sim, sim.lumaps[yr_cal])
         lmmap = uncoursify(sim, sim.lmmaps[yr_cal])
-        ammap = uncoursify(sim, sim.ammaps[yr_cal])
+        ammaps = {am: uncoursify(sim, ammap) for am, ammap in  sim.ammaps[yr_cal].items()}
     else:
         lumap = sim.lumaps[yr_cal]
         lmmap = sim.lmmaps[yr_cal]
-        ammap = sim.ammaps[yr_cal]
+        ammaps = sim.ammaps[yr_cal]
 
     # Then put the excluded land-use and land management types back in the array.
     lumap = reconstitute(lumap, sim.data.LUMASK, filler = sim.data.MASK_LU_CODE).astype(np.int8)
     lmmap = reconstitute(lmmap, sim.data.LUMASK, filler = 0).astype(np.int8)
-    ammap = reconstitute(ammap, sim.data.LUMASK, filler = 0).astype(np.int8)
+    ammaps = {am: reconstitute(ammap, sim.data.LUMASK, filler=0).astype(np.int8) for am, ammap in ammaps.items()}
     
-    return lumap, lmmap, ammap
+    return lumap, lmmap, ammaps
 
 
-def reconstitute(lxmap, mask, filler = -1):
-    """Return lxmap reconstituted to original 2D size and spatial domain.
+def reconstitute(map_, mask, filler = -1):
+    """Return lumap, lmmap or ammap reconstituted to original 2D size and spatial domain.
        Add Non-Agricultural, Non-Environmental Plantings Land as -1"""
     
     # Check that the number of cells in input map is full resolution. If so, then reconstitute 2D array
-    if lxmap.shape[0] == mask.sum():
+    if map_.shape[0] == mask.sum():
         indices = np.cumsum(mask) - 1
-        return np.where(mask, lxmap[indices], filler)
+        return np.where(mask, map_[indices], filler)
     
     # If the map is 2D but not the right shape then the map is filled out differently.
-    elif lxmap.shape != mask.shape: # Use Uncoursify to return full size map.
+    elif map_.shape != mask.shape: # Use Uncoursify to return full size map.
         raise ValueError("Map not of right shape.")
         
     else: # If the map is the same shape as the spatial mask
-        return np.where(mask, lxmap, filler)
+        return np.where(mask, map_, filler)
 
 
 def uncoursify(sim, lxmap):

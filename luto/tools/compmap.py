@@ -67,16 +67,17 @@ def lmmap_crossmap(oldmap, newmap):
     return crosstab, switches
 
 
-def ammap_crossmap(oldmap, newmap):
-    # Produce the cross-tabulation matrix with optional labels.
+def ammap_crossmap(oldmap, newmap, am):
+    # Produce the cross-tabulation matrix with optional labels for a single ammap.
     crosstab = pd.crosstab(oldmap, newmap, margins = True)
 
-    reindex =  list(range(len(SORTED_AG_MANAGEMENTS) + 1)) + ['All']
+    reindex =  [0, 1, 'All']
     crosstab = crosstab.reindex(reindex, axis = 0, fill_value = 0)
     crosstab = crosstab.reindex(reindex, axis = 1, fill_value = 0)
 
-    crosstab.columns = ['None'] + SORTED_AG_MANAGEMENTS + ['Total']
-    crosstab.index = ['None'] + SORTED_AG_MANAGEMENTS + ['Total']
+    ind_names = ['(None)', am, 'Total']
+    crosstab.columns = ind_names
+    crosstab.index = ind_names
 
     # Calculate net switches to land use (negative means switch away).
     switches = crosstab.iloc[-1, 0:-1] - crosstab.iloc[0:-1, -1]
@@ -141,73 +142,49 @@ def crossmap_irrstat( lumap_old
     return crosstab, df
 
 
-def crossmap_amstat( lumap_old
+def crossmap_amstat( am
+                   , lumap_old
                    , ammap_old
                    , lumap_new
                    , ammap_new
-                   , ag_landuses
-                   , non_ag_landuses ):
+                   , ag_landuses ):
+    """
+    For a given agricultural management option, make a crossmap showing cell changes at a land use level.
+    """
+    ludict = {}
+    ludict[-2] = 'Non-agricultural land (None)'
 
-    # Make new land maps where each land use / ag man combination is encoded as a separate number
-    # First, make a mapping from new codes to names, then a mapping from the old lummap and ammap codes to the new codes
-    n_am = len(SORTED_AG_MANAGEMENTS)
-    lu_names_map = {}
-    old_codes_to_new_codes = {}
-    lu_names_map[-1] = 'Non-agricultural land (None)'
-    
-    lu2am = defaultdict(list)
-    for am, lu_list in AG_MANAGEMENTS_TO_LAND_USES.items():
-        for lu in lu_list:
-            lu2am[lu].append(am)
-    am2mapcode = {am: code for code, am in AG_MANAGEMENTS_INDEXING.items()}
-
-    counter = 0
     for j, lu in enumerate(ag_landuses):
-        lu_names_map[counter] = lu + ' (None)'
-        old_codes_to_new_codes[j, 0] = counter
-        counter += 1
+        ludict[j*2] = lu + ' (None)'
+        ludict[j*2 + 1] = lu + f' ({am})'
 
-        for am in lu2am[lu]:
-            lu_names_map[counter] = f'{lu} ({am})'
-            old_codes_to_new_codes[j, am2mapcode[am]] = counter
-            counter += 1
+    # Collect all j values that apply to the given AM option
+    am_j = [j for j, lu_name in enumerate(ag_landuses) if lu_name in AG_MANAGEMENTS_TO_LAND_USES[am]]
+    am_j = np.array(am_j)
 
-    base = settings.NON_AGRICULTURAL_LU_BASE_CODE
-    for k, lu in enumerate(non_ag_landuses):
-        lu_names_map[counter] = lu
-        old_codes_to_new_codes[k + base, 0] = counter
-        counter += 1
+    # Encode information about the given AM usage by doubling up land uses
+    highpos_old = np.where(ammap_old == 0, lumap_old * 2, lumap_old * 2 + 1)
+    highpos_new = np.where(ammap_new == 0, lumap_new * 2, lumap_new * 2 + 1)
 
-    n_new_codes = counter
-    
-    # Make the new land maps with the new codes
-    old_map_highpos = np.zeros(len(lumap_old))
-    for idx, j in enumerate(lumap_old):
-        n = ammap_old[idx]
-        old_map_highpos[idx] = old_codes_to_new_codes[j, n]
-
-    new_map_highpos = np.zeros(len(lumap_new))
-    for idx, j in enumerate(lumap_new):
-        n = ammap_new[idx]
-        new_map_highpos[idx] = old_codes_to_new_codes[j, n]
-
-    # Make crosstab
-    crosstab = pd.crosstab(old_map_highpos, new_map_highpos, margins=True)
-
-    # Rename index and columns of crosstab to match the land use / ag management names for readability
-    reindex = list(range(n_new_codes)) + ['All']
+    # Produce the cross-tabulation matrix with labels.
+    crosstab = pd.crosstab(highpos_old, highpos_new, margins=True)
+    # Include all land uses and AM versions of land uses in the crosstab
+    non_am_idx = list(range(0, 2 * len(ag_landuses), 2))
+    am_idx = [2*i + 1 for i in am_j]
+    reindex = sorted(non_am_idx + am_idx) + ['All']
     crosstab = crosstab.reindex(reindex, axis=0, fill_value=0)
     crosstab = crosstab.reindex(reindex, axis=1, fill_value=0)
 
-    names = [lu_names_map[i] for i in crosstab.columns if i != 'All']
+    names = [ludict[i] for i in crosstab.columns if i != 'All']
     names.append('All')
     crosstab.columns = names
     crosstab.index = names
 
     # Calculate net switches to land use (negative means switch away).
     df = pd.DataFrame()
-    cells_prior = crosstab.iloc[:, -1]
-    cells_after = crosstab.iloc[-1, :]
+    am_lus = [ludict[i] for i in am_idx]
+    cells_prior = crosstab.iloc[:, -1].loc[am_lus]
+    cells_after = crosstab.iloc[-1, :].loc[am_lus]
     df['Cells prior [ # ]'] = cells_prior
     df['Cells after [ # ]'] = cells_after
     df.fillna(0, inplace=True)
