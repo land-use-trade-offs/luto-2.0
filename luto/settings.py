@@ -57,16 +57,20 @@ DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 1           # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 3           # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+
 
 # How does the model run over time 
 MODE = 'snapshot'       # runs for target year only
 # MODE = 'timeseries'   # runs each year from base year to target year
 
 # Define the objective function
-OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
-# OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
+# OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
+OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
+# Specify how demand should be met in the solver
+DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
+# DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
 
 
 # ---------------------------------------------------------------------------- #
@@ -100,7 +104,16 @@ OPTIMALITY_TOLERANCE = 1e-2
    Maximum value:	1e-2"""
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 200
+THREADS = 32
+
+# Use homogenous barrier algorithm
+BARHOMOGENOUS = -1
+
+"""Determines whether to use the homogeneous barrier algorithm. At the default setting (-1), it is only used 
+   when barrier solves a node relaxation for a MIP model. Setting the parameter to 0 turns it off, and setting 
+   it to 1 forces it on. The homogeneous algorithm is useful for recognizing infeasibility or unboundedness. 
+   It is a bit slower than the default algorithm.
+"""
 
 
 # ---------------------------------------------------------------------------- #
@@ -112,6 +125,14 @@ NON_AGRICULTURAL_LU_BASE_CODE = 100         # Non-agricultural land uses will ap
 # Environmental Plantings Parameters
 ENV_PLANTING_COST_PER_HA_PER_YEAR = 100     # Yearly cost of maintaining one hectare of environmental plantings
 CARBON_PRICE_PER_TONNE = 50                 # Price of carbon per tonne - determines EP revenue in the model
+
+
+# ---------------------------------------------------------------------------- #
+# Agricultural management parameters
+# ---------------------------------------------------------------------------- #
+
+AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  # The minimum value an agricultural management variable must take for the
+                                             # write_output function to consider it being used on a cell
 
 
 # ---------------------------------------------------------------------------- #
@@ -155,6 +176,8 @@ CULL_MODE = 'percentage'    # cull the LAND_USAGE_THRESHOLD_PERCENTAGE % most ex
 AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)
 0: (None)
 1: 'Asparagopsis taxiformis'
+2: 'Precision Agriculture'
+3: 'Ecological Grazing'
 
 
 DRAINAGE DIVISIONS

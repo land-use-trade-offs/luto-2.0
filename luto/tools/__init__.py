@@ -25,11 +25,13 @@ import pandas as pd
 import numpy as np
 import numpy_financial as npf
 from typing import Tuple
+from itertools import product
 
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 import luto.settings as settings
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto import tools
 
 
 def amortise(cost, rate = settings.DISCOUNT_RATE, horizon = settings.AMORTISATION_PERIOD):
@@ -83,18 +85,19 @@ def get_production(data, yr_cal, ag_X_mrj, non_ag_X_rk, ag_man_X_mrj):
     j2p = {j: [p for p in range(data.NPRS) if data.LU2PR[p, j]] for j in range(data.N_AG_LUS)}
     ag_man_q_mrp = ag_quantity.get_agricultural_management_quantity_matrices(data, ag_q_mrp, yr_idx)
     ag_man_q_c = np.zeros(data.NCMS)
+    
     for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():
         am_j_list = [data.DESC2AGLU[lu] for lu in am_lus]
-        ag_man_X_mrp = np.zeros(ag_q_mrp.shape, dtype=np.float32)
+        current_ag_man_X_mrp = np.zeros(ag_q_mrp.shape, dtype=np.float32)
 
-        for j_idx, j in enumerate(am_j_list):
+        for j in am_j_list:
             for p in j2p[j]:
-                ag_man_X_mrp[:, :, p] = ag_man_X_mrj[am][:, :, j_idx]
+                current_ag_man_X_mrp[:, :, p] = ag_man_X_mrj[am][:, :, j]
 
-        ag_man_q_p = np.sum( ag_man_q_mrp[am] * ag_man_X_mrp, axis = (0, 1), keepdims = False)
+        ag_man_q_p = np.sum( ag_man_q_mrp[am] * current_ag_man_X_mrp, axis = (0, 1), keepdims = False)
 
-        ag_man_q_c += [ sum( ag_man_q_p[p] for p in range(data.NPRS) if data.PR2CM[c, p] )
-                              for c in range(data.NCMS) ]
+        for c in range(data.NCMS):
+            ag_man_q_c[c] += sum( ag_man_q_p[p] for p in range(data.NPRS) if data.PR2CM[c, p] )
 
     # Return total commodity production as numpy array.
     total_q_c = [ ag_q_c[c] + non_ag_q_c[c] + ag_man_q_c[c] for c in range(data.NCMS) ]
@@ -190,15 +193,15 @@ def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
     return x_rk.astype(bool)
 
 
-def get_base_am_vars(ncells):
+def get_base_am_vars(ncells, ncms, n_ag_lus):
     """
     Get the 2010 agricultural management option vars.
     It is assumed that no agricultural management options were used in 2010, 
     so get zero arrays in the correct format.
     """
     am_vars = {}
-    for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():
-        am_vars[am] = np.zeros((2, ncells, len(am_lus)))  # TODO - remove 2
+    for am in AG_MANAGEMENTS_TO_LAND_USES:
+        am_vars[am] = np.zeros((ncms, ncells, n_ag_lus))
 
     return am_vars
 
@@ -441,3 +444,54 @@ def get_water_delta_matrix(w_mrj, l_mrj, data):
     # Amortise upfront costs to annualised costs
     w_delta_mrj = amortise(w_delta_mrj)
     return w_delta_mrj
+
+
+def am_name_snake_case(am_name):
+    """Get snake_case version of the AM name"""
+    return am_name.lower().replace(' ', '_')
+
+
+def df_sparse2dense(df):
+    """Function to fill a multilevel df to densified format
+    
+    What does that mean?
+    For example, the input df has multilevel columns of ([A,(1,3)],[B,(2,4)]),
+    after passing this function, it will become ([A,(1,2,3,4)], [B,(1,2,3,4)])
+    
+    Input:
+        pd.DataFrame
+
+    Output:
+        pd.DataFrame,
+        df_col_unique, # the unique values of each column level of the input df (e.g, [A,B],[1,2,3,4])
+        df_col_count   # the number of each column level (e.g, [2,4])
+    
+    Why this is necessary?
+    Because we want to perform matrics multiplication using the input df,
+    and this function fill nan values to "missing" colums, e.g., [A,(2,4)]
+    so that the output df has a nice rectangular shape to be multiplied with
+    """
+
+    # Convert multilevel columns to a dataframe
+    df_col = pd.DataFrame( df.columns.tolist() )
+    
+    # Get the unique values and sort them 
+    df_col_unique = [ df_col[idx].unique().tolist() for idx in df_col.columns ]
+    df_col_unique = [ sorted(l) for l in df_col_unique ]
+    
+    # Get the count of each unique level
+    df_col_count = list( df_col.nunique() )
+    
+    # Get the product from columns of all levels
+    df_col_product = list( product(*df_col_unique) )
+    
+    # Sort the columns
+    df_col_product = sorted( df_col_product, 
+                             key = lambda x: [ x[i] for i in range( df_col.shape[1] ) ] 
+                           )     
+
+    # Expand the original df with df_col_product to convert it to a n-d rectangular np.array 
+    expand_df = df.reindex( columns = df_col_product, fill_value = np.nan )
+    
+    # Return expanded dataframe, list of unique column names, list of their count
+    return expand_df, df_col_unique, df_col_count

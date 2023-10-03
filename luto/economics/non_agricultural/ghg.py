@@ -1,7 +1,8 @@
 import numpy as np
+import pandas as pd
 
 
-def get_ghg_reduction_env_plantings(data) -> np.ndarray:
+def get_ghg_reduction_env_plantings(data, aggregate) -> np.ndarray:
     """
     Parameters
     ----------
@@ -10,24 +11,45 @@ def get_ghg_reduction_env_plantings(data) -> np.ndarray:
 
     Returns
     -------
-    np.ndarray
+    if aggregate == True (default)  -> np.ndarray
+       aggregate == False           -> pd.DataFrame
+    
         Greenhouse gas emissions of environmental plantings for each cell.
         Since environmental plantings reduces carbon in the air, each value will be <= 0.
         1-D array Indexed by cell.
     """
+    
     # Tonnes of CO2e per ha, adjusted for resfactor
-    return -data.EP_BLOCK_AVG_T_C02_HA * data.REAL_AREA
+    if aggregate==True:
+        return -data.EP_BLOCK_AVG_T_C02_HA * data.REAL_AREA
+    elif aggregate==False:
+        return pd.DataFrame(-data.EP_BLOCK_AVG_T_C02_HA * data.REAL_AREA,columns=['env_plantings'])
+    else:
+    # If the aggregate arguments is not in [True,False]. That must be someting wrong
+        raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
 
-def get_ghg_matrix(data) -> np.ndarray:
+
+def get_ghg_matrix(data, aggregate=True) -> np.ndarray:
     """
     Get the g_rk matrix containing non-agricultural greenhouse gas emissions.
     """
-    env_plantings_ghg_matrix = get_ghg_reduction_env_plantings(data)
 
-    # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-    non_agr_ghg_matrices = [
-        env_plantings_ghg_matrix.reshape((data.NCELLS, 1)),
-    ]
+    env_plantings_ghg_matrix = get_ghg_reduction_env_plantings(data,aggregate)
 
-    return np.concatenate(non_agr_ghg_matrices, axis=1)
+      
+    if aggregate==True:
+        # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
+        non_agr_ghg_matrices = [
+            env_plantings_ghg_matrix.reshape((data.NCELLS, 1)),
+        ]
+        return np.concatenate(non_agr_ghg_matrices, axis=1)
+    
+    elif aggregate==False:
+        return pd.concat([env_plantings_ghg_matrix], axis=1)
+    
+    else:
+    # If the aggregate arguments is not in [True,False]. That must be someting wrong
+        raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
+
+        

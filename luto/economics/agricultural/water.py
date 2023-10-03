@@ -96,14 +96,40 @@ def get_precision_agriculture_effect_w_mrj(data, w_mrj, yr_idx):
     return new_w_mrj
 
 
+def get_ecological_grazing_effect_w_mrj(data, w_mrj, yr_idx):
+    """
+    Applies the effects of using ecological grazing to the water requirements data
+    for all relevant agr. land uses.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
+    lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
+    year = 2010 + yr_idx
+
+    # Set up the effects matrix
+    new_w_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    # Update values in the new matrix using the correct multiplier for each LU
+    for lu_idx, lu in enumerate(land_uses):
+        j = lu_codes[lu_idx]
+        multiplier = data.ECOLOGICAL_GRAZING_DATA[lu].loc[year, "INPUT-wrt_water-required"]
+        if multiplier != 1:
+            # The effect is: new value = old value * multiplier - old value
+            # E.g. a multiplier of .95 means a 5% reduction in quantity produced
+            new_w_mrj[:, :, lu_idx] = w_mrj[:, :, j] * (multiplier - 1)
+
+    return new_w_mrj
+
+
 
 def get_agricultural_management_water_matrices(data, w_mrj, yr_idx) -> Dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_w_mrj(data, w_mrj, yr_idx)
     precision_agriculture_data = get_precision_agriculture_effect_w_mrj(data, w_mrj, yr_idx)
+    eco_grazing_data = get_ecological_grazing_effect_w_mrj(data, w_mrj, yr_idx)
 
     ag_management_data = {
         'Asparagopsis taxiformis': asparagopsis_data,
         'Precision Agriculture': precision_agriculture_data,
+        'Ecological Grazing': eco_grazing_data,
     }
 
     return ag_management_data

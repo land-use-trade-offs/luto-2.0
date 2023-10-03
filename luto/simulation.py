@@ -72,11 +72,16 @@ class Data():
         self.REAL_AREA = bdata.REAL_AREA[self.MASK] * bdata.RESMULT             # Actual Float32
         self.LUMAP = bdata.LUMAP[self.MASK]                                     # Int8
         self.LMMAP = bdata.LMMAP[self.MASK]                                     # Int8
-        self.AMMAP = bdata.AMMAP[self.MASK]                                     # Int8
+        self.AMMAP_DICT = {
+            am: array[self.MASK] for am, array in bdata.AMMAP_DICT.items()
+        }                                                                       # Dictionary containing Int8 arrays
         self.AG_L_MRJ = tools.lumap2ag_l_mrj(self.LUMAP, self.LMMAP)            # Boolean [2, 4218733, 28]
         self.NON_AG_L_RK = tools.lumap2non_ag_l_mk(
             self.LUMAP, len(self.NON_AGRICULTURAL_LANDUSES)
         )                                                                       # Int8
+        self.AG_MAN_L_MRJ_DICT = tools.get_base_am_vars(
+            self.NCELLS, self.NLMS, self.N_AG_LUS
+        )                                                                       # Dictionary containing Int8 arrays
         self.PROD_2010_C = prod_2010_c                                          # Float, total agricultural production in 2010, shape n commodities
         self.D_CY = d_cy                                                        # Float, total demand for agricultural production, shape n commodities by 91 years
         self.WREQ_IRR_RJ = bdata.WREQ_IRR_RJ[self.MASK]                         # Water requirements for irrigated landuses
@@ -98,6 +103,7 @@ class Data():
         self.EP2AG_TRANSITION_COSTS_HA = bdata.EP2AG_TRANSITION_COSTS_HA        # Float32
         self.EP_BLOCK_AVG_T_C02_HA = bdata.EP_BLOCK_AVG_T_C02_HA[self.MASK]     # Float32
         self.NATURAL_LAND_T_CO2_HA = bdata.NATURAL_LAND_T_CO2_HA[self.MASK]     # Float32
+        self.SOIL_CARBON_T_HA = bdata.SOIL_CARBON_T_HA[self.MASK]
 
         # Slice this year off HDF5 bricks. TODO: This field is not in luto.data.
         # with h5py.File(bdata.fname_dr, 'r') as wy_dr_file:
@@ -116,77 +122,77 @@ def sync_years(base, target):
 # Local matrix-getters.
 
 def get_ag_c_mrj():
-    print('Getting agricultural production cost matrices...', end = ' ')
+    print('Getting agricultural production cost matrices...', end = ' ', flush = True)
     output = ag_cost.get_cost_matrices(data, target_index)
     print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_c_rk():
-    print('Getting non-agricultural production cost matrices...', end=' ')
+    print('Getting non-agricultural production cost matrices...', end=' ', flush = True)
     output = non_ag_cost.get_cost_matrix(data)
     print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_r_mrj():
-    print('Getting agricultural production revenue matrices...', end = ' ')
+    print('Getting agricultural production revenue matrices...', end = ' ', flush = True)
     output = ag_revenue.get_rev_matrices(data, target_index)
     print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_r_rk():
-    print('Getting non-agricultural production revenue matrices...', end = ' ')
+    print('Getting non-agricultural production revenue matrices...', end = ' ', flush = True)
     output = non_ag_revenue.get_rev_matrix(data)
     print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_g_mrj():
-    print('Getting agricultural GHG emissions matrices...', end = ' ')
+    print('Getting agricultural GHG emissions matrices...', end = ' ', flush = True)
     output = ag_ghg.get_ghg_matrices(data, target_index)
     print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_g_rk():
-    print('Getting non-agricultural GHG emissions matrices...', end = ' ')
+    print('Getting non-agricultural GHG emissions matrices...', end = ' ', flush = True)
     output = non_ag_ghg.get_ghg_matrix(data)
     print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_w_mrj():
-    print('Getting agricultural water requirement matrices...', end = ' ')
+    print('Getting agricultural water requirement matrices...', end = ' ', flush = True)
     output = ag_water.get_wreq_matrices(data, target_index)
     print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_w_rk():
-    print('Getting non-agricultural water requirement matrices...', end = ' ')
+    print('Getting non-agricultural water requirement matrices...', end = ' ', flush = True)
     output = non_ag_water.get_wreq_matrix(data)
     print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_q_mrp():
-    print('Getting agricultural production quantity matrices...', end = ' ')
+    print('Getting agricultural production quantity matrices...', end = ' ', flush = True)
     output = ag_quantity.get_quantity_matrices(data, target_index)
     print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_q_crk():
-    print('Getting non-agricultural production quantity matrices...', end = ' ')
+    print('Getting non-agricultural production quantity matrices...', end = ' ', flush = True)
     output = non_ag_quantity.get_quantity_matrix(data)
     print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_t_mrj():
-    print('Getting agricultural transition cost matrices...', end = ' ')
+    print('Getting agricultural transition cost matrices...', end = ' ', flush = True)
     output = ag_transition.get_transition_matrices( data
                                                   , target_index
                                                   , base_year
@@ -197,14 +203,14 @@ def get_ag_t_mrj():
 
 
 def get_ag_ghg_t_mrj():
-    print('Getting agricultural transitions GHG emissions...', end = ' ')
+    print('Getting agricultural transitions GHG emissions...', end = ' ', flush = True)
     output = ag_ghg.get_ghg_transition_penalties(data, lumaps[base_year])
     print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_to_non_ag_t_rk():
-    print('Getting agricultural to non-agricultural transition cost matrices...', end = ' ')
+    print('Getting agricultural to non-agricultural transition cost matrices...', end = ' ', flush = True)
     output = non_ag_transition.get_from_ag_transition_matrix(data
                                                            , base_year
                                                            , lumaps[base_year]
@@ -214,77 +220,77 @@ def get_ag_to_non_ag_t_rk():
 
 
 def get_non_ag_to_ag_t_mrj():
-    print('Getting non-agricultural to agricultural transition cost matrices...', end=' ')
+    print('Getting non-agricultural to agricultural transition cost matrices...', end = ' ', flush = True)
     output = non_ag_transition.get_to_ag_transition_matrix(data, base_year, lumaps[base_year], lmmaps[base_year])
     print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_x_mrj():
-    print('Getting agricultural exclude matrices...', end = ' ')
+    print('Getting agricultural exclude matrices...', end = ' ', flush = True)
     output = ag_transition.get_exclude_matrices(data, base_year, lumaps)
     print('Done.')
     return output
 
 
 def get_non_ag_x_rk():
-    print('Getting non-agricultural exclude matrices...', end=' ')
+    print('Getting non-agricultural exclude matrices...', end = ' ', flush = True)
     output = non_ag_transition.get_exclude_matrices(data, lumaps[base_year])
     print('Done.')
     return output
 
 
 def get_ag_man_costs(ag_c_mrj):
-    print('Getting agricultural management options\' cost effects...', end=' ')
+    print('Getting agricultural management options\' cost effects...', end = ' ', flush = True)
     output = ag_cost.get_agricultural_management_cost_matrices(data, ag_c_mrj, target_index)
     print('Done.')
     return output
 
 
 def get_ag_man_ghg(ag_g_mrj):
-    print('Getting agricultural management options\' GHG emission effects...', end=' ')
+    print('Getting agricultural management options\' GHG emission effects...', end = ' ', flush = True)
     output = ag_ghg.get_agricultural_management_ghg_matrices(data, ag_g_mrj, target_index)
     print('Done.')
     return output
 
 
 def get_ag_man_quantity(ag_q_mrp):
-    print('Getting agricultural management options\' quantity effects...', end=' ')
+    print('Getting agricultural management options\' quantity effects...', end = ' ', flush = True)
     output = ag_quantity.get_agricultural_management_quantity_matrices(data, ag_q_mrp, target_index)
     print('Done.')
     return output
 
 
 def get_ag_man_revenue(ag_r_mrj):
-    print('Getting agricultural management options\' revenue effects...', end=' ')
+    print('Getting agricultural management options\' revenue effects...', end = ' ', flush = True)
     output = ag_revenue.get_agricultural_management_revenue_matrices(data, ag_r_mrj, target_index)
     print('Done.')
     return output
 
 
 def get_ag_man_transitions(ag_t_mrj):
-    print('Getting agricultural management options\' transition cost effects...', end=' ')
+    print('Getting agricultural management options\' transition cost effects...', end = ' ', flush = True)
     output = ag_transition.get_agricultural_management_transition_matrices(data, ag_t_mrj, target_index)
     print('Done.')
     return output
 
 
 def get_ag_man_water(ag_w_mrj):
-    print('Getting agricultural management options\' water requirement effects...', end=' ')
+    print('Getting agricultural management options\' water requirement effects...', end = ' ', flush = True)
     output = ag_water.get_agricultural_management_water_matrices(data, ag_w_mrj, target_index)
     print('Done.')
     return output
 
 
 def get_ag_man_limits():
-    print('Getting agricultural management options\' adoption limits...', end=' ')
+    print('Getting agricultural management options\' adoption limits...', end = ' ', flush = True)
     output = ag_transition.get_agricultural_management_adoption_limits(data, target_index)
     print('Done.')
     return output
 
 
 def get_limits():
-    print('Getting environmental limits...', end = ' ')
+    print('Getting environmental limits...', end = ' ', flush = True)
     # Limits is a dictionary with heterogeneous value sets.
     limits = {}
     
@@ -356,9 +362,10 @@ def prepare_input_data(base: int, target: int) -> InputData:
     if base == data.YR_CAL_BASE: 
         lumaps[base] = data.LUMAP
         lmmaps[base] = data.LMMAP
-        ammaps[base] = data.AMMAP
+        ammaps[base] = data.AMMAP_DICT
         ag_dvars[base]  = data.AG_L_MRJ
         non_ag_dvars[base] = data.NON_AG_L_RK
+        ag_man_dvars[base] = data.AG_MAN_L_MRJ_DICT
 
     return get_input_data()
 
@@ -431,6 +438,7 @@ def solve_snapshot(base: int, target: int):
         ag_dvars[target],
         non_ag_dvars[target],
         ag_man_dvars[target],
+        prod_data[target],
     ) = luto_solver.solve()
     
     print('Total processing time...', round(time.time() - start_time), 'seconds')
@@ -472,14 +480,15 @@ ammaps = {}
 ag_dvars = {}
 non_ag_dvars = {}
 ag_man_dvars = {}
+prod_data = {}
 
 # Get the total demand quantities by commodity for 2010 to 2100 by combining the demand deltas with 2010 production
 prod_2010_c = tools.get_production( bdata
-                            , bdata.YR_CAL_BASE
-                            , tools.lumap2ag_l_mrj(bdata.LUMAP, bdata.LMMAP)
-                            , tools.lumap2non_ag_l_mk(bdata.LUMAP, len(bdata.NON_AGRICULTURAL_LANDUSES))
-                            , tools.get_base_am_vars(bdata.NCELLS)
-                            )
+                                  , bdata.YR_CAL_BASE
+                                  , tools.lumap2ag_l_mrj(bdata.LUMAP, bdata.LMMAP)
+                                  , tools.lumap2non_ag_l_mk(bdata.LUMAP, len(bdata.NON_AGRICULTURAL_LANDUSES))
+                                  , tools.get_base_am_vars(bdata.NCELLS, bdata.NLMS, bdata.N_AG_LUS)
+                                  )
 
 # Demand deltas can be a time series (shape year x commodity) or a single array (shape = n commodites).
 d_cy = bdata.DEMAND_DELTAS_C * prod_2010_c

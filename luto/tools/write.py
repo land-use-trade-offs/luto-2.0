@@ -25,7 +25,7 @@ import numpy as np
 import pandas as pd
 
 import luto.settings as settings
-from luto.tools import get_production
+from luto import tools
 from luto.tools.spatializers import *
 from luto.tools.compmap import *
 import luto.economics.agricultural.water as ag_water
@@ -42,7 +42,7 @@ def get_path():
     path = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
     
     # Add some shorthand details about the model run
-    post = '_' + settings.OBJECTIVE + '_RF' + str(settings.RESFACTOR) + '_P1e' + str(int(math.log10(settings.PENALTY))) + '_W' + settings.WATER_USE_LIMITS + '_G' + settings.GHG_EMISSIONS_LIMITS
+    post = '_' + settings.DEMAND_CONSTRAINT_TYPE + '_' + settings.OBJECTIVE + '_RF' + str(settings.RESFACTOR) + '_P1e' + str(int(math.log10(settings.PENALTY))) + '_W' + settings.WATER_USE_LIMITS + '_G' + settings.GHG_EMISSIONS_LIMITS
     
     # Create path name
     path = 'output/' + path + post
@@ -59,11 +59,12 @@ def get_path():
 def write_outputs(sim, yr_cal, path):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     
-    write_files(sim, path)
+    # write_files(sim, path)
     write_settings(path)
     write_production(sim, yr_cal, path)
     write_water(sim, yr_cal, path)
     write_ghg(sim, yr_cal, path)
+    write_ghg_separate(sim, yr_cal, path)
 
 
 def write_settings(path):
@@ -77,6 +78,7 @@ def write_settings(path):
         f.write('RESFACTOR: %s\n' % settings.RESFACTOR)
         f.write('MODE: %s\n' % settings.MODE)
         f.write('OBJECTIVE: %s\n' % settings.OBJECTIVE)
+        f.write('DEMAND_CONSTRAINT_TYPE: %s\n' % settings.DEMAND_CONSTRAINT_TYPE)
         f.write('PENALTY: %s\n' % settings.PENALTY)
         f.write('OPTIMALITY_TOLERANCE: %s\n' % settings.OPTIMALITY_TOLERANCE)
         f.write('THREADS: %s\n' % settings.THREADS)
@@ -105,9 +107,9 @@ def write_files(sim, path):
 
         # Save raw agricultural management decision variables
         for am in AG_MANAGEMENTS_TO_LAND_USES:
-            snake_case_am = am.lower().replace(" ", "_")
+            snake_case_am = tools.am_name_snake_case(am)
             am_X_mrj_fname = 'ag_man_X_mrj_' + snake_case_am + "_" + str(yr_cal) + ".npy"
-            np.save(os.path.join(path, am_X_mrj_fname), sim.non_ag_dvars[yr_cal])
+            np.save(os.path.join(path, am_X_mrj_fname), sim.ag_man_dvars[yr_cal][am])
         
         # Write out raw numpy arrays for land-use and land management
         lumap_fname = 'lumap_' + str(yr_cal) + '.npy'
@@ -116,14 +118,18 @@ def write_files(sim, path):
         np.save(os.path.join(path, lmmap_fname), sim.lmmaps[yr_cal])
 
         # Recreate full resolution 2D arrays and write out GeoTiffs for land-use and land management
-        lumap, lmmap, ammap = recreate_2D_maps(sim, yr_cal)
+        lumap, lmmap, ammaps = recreate_2D_maps(sim, yr_cal)
         
         lumap_fname = 'lumap_' + str(yr_cal) + '.tiff'
         lmmap_fname = 'lmmap_' + str(yr_cal) + '.tiff'
-        ammap_fname = 'ammap_' + str(yr_cal) + '.tiff'
+        
         write_gtiff(lumap, os.path.join(path, lumap_fname))
         write_gtiff(lmmap, os.path.join(path, lmmap_fname))
-        write_gtiff(ammap, os.path.join(path, ammap_fname))
+
+        for am in SORTED_AG_MANAGEMENTS:
+            am_snake_case = tools.am_name_snake_case(am)
+            ammap_fname = f'ammap_{am_snake_case}_{str(yr_cal)}.tiff'
+            write_gtiff(ammaps[am], os.path.join(path, ammap_fname))
 
 
 def write_production(sim, yr_cal, path): 
@@ -135,15 +141,11 @@ def write_production(sim, yr_cal, path):
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
     
     # Calculate data for quantity comparison between base year and target year
-    prod_base = sim.data.PROD_2010_C                # get_production(sim.data, sim.data.YR_CAL_BASE, sim.data.L_MRJ)  # Get commodity quantities produced in 2010
-    prod_targ = get_production( sim.data
-                              , yr_cal
-                              , sim.ag_dvars[yr_cal]
-                              , sim.non_ag_dvars[yr_cal] 
-                              , sim.ag_man_dvars[yr_cal] )  # Get commodity quantities produced in target year
-    demands = sim.data.D_CY[yr_idx]                 # Get commodity demands for target year
-    abs_diff = prod_targ - demands                  # Diff between target year production and demands in absolute terms (i.e. tonnes etc)
-    prop_diff = ( prod_targ / demands ) * 100       # Target year production as a proportion of demands (%)
+    prod_base = sim.data.PROD_2010_C                           # tools.get_production(sim.data, sim.data.YR_CAL_BASE, sim.data.L_MRJ)  # Get commodity quantities produced in 2010
+    prod_targ = np.array(sim.prod_data[yr_cal]['Production'])  # Get commodity quantities produced in target year
+    demands = sim.data.D_CY[yr_idx]                            # Get commodity demands for target year
+    abs_diff = prod_targ - demands                             # Diff between target year production and demands in absolute terms (i.e. tonnes etc)
+    prop_diff = ( prod_targ / demands ) * 100                  # Target year production as a proportion of demands (%)
     
     # Write to pandas dataframe
     df = pd.DataFrame()
@@ -162,23 +164,43 @@ def write_production(sim, yr_cal, path):
                                , sim.data.NON_AGRICULTURAL_LANDUSES )
     ctlm, swlm = lmmap_crossmap(sim.lmmaps[sim.data.YR_CAL_BASE], sim.lmmaps[yr_cal])
 
-    ctam, swam = ammap_crossmap(sim.ammaps[sim.data.YR_CAL_BASE], sim.ammaps[yr_cal])
-
     cthp, swhp = crossmap_irrstat( sim.lumaps[sim.data.YR_CAL_BASE], sim.lmmaps[sim.data.YR_CAL_BASE]
                                  , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
                                  , sim.data.AGRICULTURAL_LANDUSES
                                  , sim.data.NON_AGRICULTURAL_LANDUSES )
-
+    
+    # ctams = {}
+    # swams = {}
+    ctass = {}
+    swass = {}
+    for am in SORTED_AG_MANAGEMENTS:
+        # ctam, swam = ammap_crossmap(sim.ammaps[sim.data.YR_CAL_BASE][am], sim.ammaps[yr_cal][am], am)
+        # ctams[am] = ctam
+        # swams[am] = swam
+    
+        ctas, swas = crossmap_amstat( am
+                                    , sim.lumaps[sim.data.YR_CAL_BASE], sim.ammaps[sim.data.YR_CAL_BASE][am]
+                                    , sim.lumaps[yr_cal], sim.ammaps[yr_cal][am]
+                                    , sim.data.AGRICULTURAL_LANDUSES )
+        ctass[am] = ctas
+        swass[am] = swas
+        
     ctlu.to_csv(os.path.join(path, 'crosstab-lumap.csv'))
     ctlm.to_csv(os.path.join(path, 'crosstab-lmmap.csv'))
-    ctam.to_csv(os.path.join(path, 'crosstab-ammap.csv'))
 
     swlu.to_csv(os.path.join(path, 'switches-lumap.csv'))
     swlm.to_csv(os.path.join(path, 'switches-lmmap.csv'))
-    swam.to_csv(os.path.join(path, 'switches-ammap.csv'))
 
     cthp.to_csv(os.path.join(path, 'crosstab-irrstat.csv'))
     swhp.to_csv(os.path.join(path, 'switches-irrstat.csv'))
+    
+    for am in SORTED_AG_MANAGEMENTS:
+        am_snake_case = tools.am_name_snake_case(am).replace("_", "-")
+        # ctams[am].to_csv(os.path.join(path, f'crosstab-{am_snake_case}-ammap.csv'))
+        # swams[am].to_csv(os.path.join(path, f'switches-{am_snake_case}-ammap.csv'))
+
+        ctass[am].to_csv(os.path.join(path, f'crosstab-{am_snake_case}-amstat.csv'))
+        swass[am].to_csv(os.path.join(path, f'switches-{am_snake_case}-amstat.csv'))
 
 
 def write_water(sim, yr_cal, path):
@@ -267,14 +289,6 @@ def write_ghg(sim, yr_cal, path):
 
     print('\nWriting GHG outputs to', path)
         
-    # Convert calendar year to year index.
-    yr_idx = yr_cal - sim.data.YR_CAL_BASE
-
-    # Get greenhouse gas emissions in mrj format
-    ag_g_mrj = ag_ghg.get_ghg_matrices(sim.data, yr_idx)
-    non_ag_g_rk = non_ag_ghg.get_ghg_matrix(sim.data)
-    ag_man_g_mrj = ag_ghg.get_agricultural_management_ghg_matrices(sim.data, ag_g_mrj, yr_idx)
-
     # Prepare a data frame.
     df = pd.DataFrame( columns=[ 'GHG_EMISSIONS_LIMIT_TCO2e'
                                , 'GHG_EMISSIONS_TCO2e' ] )
@@ -282,20 +296,58 @@ def write_ghg(sim, yr_cal, path):
     # Get GHG emissions limits used as constraints in model
     ghg_limits = ag_ghg.get_ghg_limits(sim.data)
 
-    # Calculate the GHG emissions from agriculture for year.
-    ghg_t_2010 = ag_ghg.get_ghg_transition_penalties(sim.data, sim.lumaps[2010])
-    ghg_emissions = (
-          ( (ag_g_mrj + ghg_t_2010) * sim.ag_dvars[yr_cal] ).sum()  # Agricultural contribution
-        + ( non_ag_g_rk * sim.non_ag_dvars[yr_cal] ).sum()          # Non-agricultural contribution
-    )
-
-    for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():          # Agricultural managements contribution
-        am_j = np.array([sim.data.DESC2AGLU[lu] for lu in am_lus])
-        ghg_emissions += ( ag_man_g_mrj[am] 
-                         * sim.ag_man_dvars[yr_cal][am][:, :, am_j] ).sum() 
+    # Get GHG emissions from model
+    ghg_emissions = sim.prod_data[yr_cal]['GHG Emissions']
 
     # Add to dataframe
     df.loc[0] = ("{:,.0f}".format(ghg_limits), "{:,.0f}".format(ghg_emissions))
     
     # Save to file
     df.to_csv(os.path.join(path, 'GHG_emissions.csv'), index = False)
+    
+def write_ghg_separate(sim, yr_cal, path):
+    # set the aggregate to False, so to calculate the GHG separately 
+    # (i.e, get the GHG emissions according to sources [electricty, chemical fertilizer ...])
+    aggregate = False
+        
+    # Convert calendar year to year index.
+    yr_idx = yr_cal - sim.data.YR_CAL_BASE
+    
+    # -------------------------------------------------------#
+    # Get greenhouse gas emissions from agricultural landuse #
+    # -------------------------------------------------------#
+    
+    # get the ghg_df
+    ag_g_df = ag_ghg.get_ghg_matrices(sim.data, yr_idx, aggregate)
+    
+    # fill the ag_g_df so that it can be reshaped to a n-d array
+    ag_g_df, ag_g_col_unique, ag_g_col_count = tools.df_sparse2dense(ag_g_df)
+    
+    
+    # reshape the df to the shape of [romjs]
+    ag_g_df_arr = ag_g_df.to_numpy(na_value=0).reshape(ag_g_df.shape[0],   # r: row, i.e, each valid pixel
+                                                       ag_g_col_count[0],  # o: origin, i.e, each origin [crop, lvstk, unallocated]
+                                                       ag_g_col_count[1],  # m: land management: [dry,irr]
+                                                       ag_g_col_count[2],  # j: land use [Apples, Beef, ...]
+                                                       ag_g_col_count[3])  # s: GHG source [chemical fertilizer, electricity, ...]
+    
+    # use einsum to do the multiplication, 
+    # easy to understand, don't need to worry too much about the dimensionality
+    ag_dvar_mrj = sim.ag_dvars[yr_cal]                                               # mrj
+    GHG_emission_separate = np.einsum('romjs,mrj -> rms', ag_g_df_arr, ag_dvar_mrj)  # rms
+    
+    # warp the array back to a df
+    GHG_emission_separate = pd.DataFrame(GHG_emission_separate.reshape((GHG_emission_separate.shape[0],-1)),
+                                         columns=pd.MultiIndex.from_product((ag_g_col_unique[1],    # m: land management
+                                                                             ag_g_col_unique[3])))  # s: GHG source 
+    
+    # add landuse describtion
+    GHG_emission_separate['lu'] = [sim.data.AGLU2DESC[x] for x in sim.data.LUMAP]
+    
+    # sumarize the GHG as (lucc * [lu|source])
+    GHG_emission_separate_summary = GHG_emission_separate.groupby('lu').sum(0).reset_index()
+    GHG_emission_separate_summary = GHG_emission_separate_summary.set_index('lu')
+    
+    # Save to pickle file, so to keep the multilvel columns
+    GHG_emission_separate_summary.to_csv(os.path.join(path, 'GHG_emissions_separate.csv'))
+    
