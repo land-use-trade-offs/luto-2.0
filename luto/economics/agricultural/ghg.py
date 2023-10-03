@@ -358,7 +358,7 @@ def get_precision_agriculture_effect_g_mrj(data, yr_idx):
                 'CO2E_KG_HA_PEST_PROD',
                 'CO2E_KG_HA_SOIL_N_SURP',
             ]:
-                # Some crop land uses do not emit any GHG emissions, e.g. 'Rice'
+                # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not use zeros
                 if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
                     continue
 

@@ -244,11 +244,11 @@ def get_ecological_grazing_effect_c_mrj(data, yr_idx):
 
         # Get effects on operating costs
         operating_mult = data.ECOLOGICAL_GRAZING_DATA[lu].loc[year, 'Operating_cost_multiplier']
-        operating_c_effect = data.AGEC_LVSTK['FOC', lvstype] * (1 - operating_mult) * data.REAL_AREA
+        operating_c_effect = data.AGEC_LVSTK['FOC', lvstype] * (operating_mult - 1) * data.REAL_AREA
 
         # Get effects on labour costs
         labour_mult = data.ECOLOGICAL_GRAZING_DATA[lu].loc[year, 'Labour_cost_mulitiplier']
-        labout_c_effect = data.AGEC_LVSTK['FLC', lvstype] * (1 - labour_mult) * data.REAL_AREA
+        labout_c_effect = data.AGEC_LVSTK['FLC', lvstype] * (labour_mult - 1) * data.REAL_AREA
 
         # Combine for total cost effect
         total_c_effect = operating_c_effect + labout_c_effect
