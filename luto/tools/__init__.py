@@ -85,18 +85,19 @@ def get_production(data, yr_cal, ag_X_mrj, non_ag_X_rk, ag_man_X_mrj):
     j2p = {j: [p for p in range(data.NPRS) if data.LU2PR[p, j]] for j in range(data.N_AG_LUS)}
     ag_man_q_mrp = ag_quantity.get_agricultural_management_quantity_matrices(data, ag_q_mrp, yr_idx)
     ag_man_q_c = np.zeros(data.NCMS)
+    
     for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():
         am_j_list = [data.DESC2AGLU[lu] for lu in am_lus]
-        ag_man_X_mrp = np.zeros(ag_q_mrp.shape, dtype=np.float32)
+        current_ag_man_X_mrp = np.zeros(ag_q_mrp.shape, dtype=np.float32)
 
         for j_idx, j in enumerate(am_j_list):
             for p in j2p[j]:
-                ag_man_X_mrp[:, :, p] = ag_man_X_mrj[am][:, :, j_idx]
+                current_ag_man_X_mrp[:, :, p] = ag_man_X_mrj[am][:, :, j_idx]
 
-        ag_man_q_p = np.sum( ag_man_q_mrp[am] * ag_man_X_mrp, axis = (0, 1), keepdims = False)
+        ag_man_q_p = np.sum( ag_man_q_mrp[am] * current_ag_man_X_mrp, axis = (0, 1), keepdims = False)
 
-        ag_man_q_c += [ sum( ag_man_q_p[p] for p in range(data.NPRS) if data.PR2CM[c, p] )
-                              for c in range(data.NCMS) ]
+        for c in range(data.NCMS):
+            ag_man_q_c[c] += sum( ag_man_q_p[p] for p in range(data.NPRS) if data.PR2CM[c, p] )
 
     # Return total commodity production as numpy array.
     total_q_c = [ ag_q_c[c] + non_ag_q_c[c] + ag_man_q_c[c] for c in range(data.NCMS) ]

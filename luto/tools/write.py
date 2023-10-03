@@ -59,7 +59,7 @@ def get_path():
 def write_outputs(sim, yr_cal, path):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     
-    write_files(sim, path)
+    # write_files(sim, path)
     write_settings(path)
     write_production(sim, yr_cal, path)
     write_water(sim, yr_cal, path)
@@ -109,7 +109,7 @@ def write_files(sim, path):
         for am in AG_MANAGEMENTS_TO_LAND_USES:
             snake_case_am = tools.am_name_snake_case(am)
             am_X_mrj_fname = 'ag_man_X_mrj_' + snake_case_am + "_" + str(yr_cal) + ".npy"
-            np.save(os.path.join(path, am_X_mrj_fname), sim.ag_man_dvars[yr_cal])
+            np.save(os.path.join(path, am_X_mrj_fname), sim.ag_man_dvars[yr_cal][am])
         
         # Write out raw numpy arrays for land-use and land management
         lumap_fname = 'lumap_' + str(yr_cal) + '.npy'
@@ -118,14 +118,18 @@ def write_files(sim, path):
         np.save(os.path.join(path, lmmap_fname), sim.lmmaps[yr_cal])
 
         # Recreate full resolution 2D arrays and write out GeoTiffs for land-use and land management
-        lumap, lmmap, ammap = recreate_2D_maps(sim, yr_cal)
+        lumap, lmmap, ammaps = recreate_2D_maps(sim, yr_cal)
         
         lumap_fname = 'lumap_' + str(yr_cal) + '.tiff'
         lmmap_fname = 'lmmap_' + str(yr_cal) + '.tiff'
-        ammap_fname = 'ammap_' + str(yr_cal) + '.tiff'
+        
         write_gtiff(lumap, os.path.join(path, lumap_fname))
         write_gtiff(lmmap, os.path.join(path, lmmap_fname))
-        write_gtiff(ammap, os.path.join(path, ammap_fname))
+
+        for am in SORTED_AG_MANAGEMENTS:
+            am_snake_case = tools.am_name_snake_case(am)
+            ammap_fname = f'ammap_{am_snake_case}_{str(yr_cal)}.tiff'
+            write_gtiff(ammaps[am], os.path.join(path, ammap_fname))
 
 
 def write_production(sim, yr_cal, path): 
@@ -164,31 +168,43 @@ def write_production(sim, yr_cal, path):
                                , sim.data.NON_AGRICULTURAL_LANDUSES )
     ctlm, swlm = lmmap_crossmap(sim.lmmaps[sim.data.YR_CAL_BASE], sim.lmmaps[yr_cal])
 
-    ctam, swam = ammap_crossmap(sim.ammaps[sim.data.YR_CAL_BASE], sim.ammaps[yr_cal])
-
     cthp, swhp = crossmap_irrstat( sim.lumaps[sim.data.YR_CAL_BASE], sim.lmmaps[sim.data.YR_CAL_BASE]
                                  , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
                                  , sim.data.AGRICULTURAL_LANDUSES
                                  , sim.data.NON_AGRICULTURAL_LANDUSES )
     
-    ctas, swas = crossmap_amstat( sim.lumaps[sim.data.YR_CAL_BASE], sim.ammaps[sim.data.YR_CAL_BASE]
-                                , sim.lumaps[yr_cal], sim.ammaps[yr_cal]
-                                , sim.data.AGRICULTURAL_LANDUSES
-                                , sim.data.NON_AGRICULTURAL_LANDUSES )
+    # ctams = {}
+    # swams = {}
+    ctass = {}
+    swass = {}
+    for am in SORTED_AG_MANAGEMENTS:
+        # ctam, swam = ammap_crossmap(sim.ammaps[sim.data.YR_CAL_BASE][am], sim.ammaps[yr_cal][am], am)
+        # ctams[am] = ctam
+        # swams[am] = swam
+    
+        ctas, swas = crossmap_amstat( am
+                                    , sim.lumaps[sim.data.YR_CAL_BASE], sim.ammaps[sim.data.YR_CAL_BASE][am]
+                                    , sim.lumaps[yr_cal], sim.ammaps[yr_cal][am]
+                                    , sim.data.AGRICULTURAL_LANDUSES )
+        ctass[am] = ctas
+        swass[am] = swas
         
     ctlu.to_csv(os.path.join(path, 'crosstab-lumap.csv'))
     ctlm.to_csv(os.path.join(path, 'crosstab-lmmap.csv'))
-    ctam.to_csv(os.path.join(path, 'crosstab-ammap.csv'))
 
     swlu.to_csv(os.path.join(path, 'switches-lumap.csv'))
     swlm.to_csv(os.path.join(path, 'switches-lmmap.csv'))
-    swam.to_csv(os.path.join(path, 'switches-ammap.csv'))
 
     cthp.to_csv(os.path.join(path, 'crosstab-irrstat.csv'))
     swhp.to_csv(os.path.join(path, 'switches-irrstat.csv'))
+    
+    for am in SORTED_AG_MANAGEMENTS:
+        am_snake_case = tools.am_name_snake_case(am).replace("_", "-")
+        # ctams[am].to_csv(os.path.join(path, f'crosstab-{am_snake_case}-ammap.csv'))
+        # swams[am].to_csv(os.path.join(path, f'switches-{am_snake_case}-ammap.csv'))
 
-    ctas.to_csv(os.path.join(path, 'crosstab-amstat.csv'))
-    swas.to_csv(os.path.join(path, 'switches-amstat.csv'))
+        ctass[am].to_csv(os.path.join(path, f'crosstab-{am_snake_case}-amstat.csv'))
+        swass[am].to_csv(os.path.join(path, f'switches-{am_snake_case}-amstat.csv'))
 
 
 def write_water(sim, yr_cal, path):

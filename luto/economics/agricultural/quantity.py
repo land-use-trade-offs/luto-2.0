@@ -285,10 +285,11 @@ def get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx):
         multiplier = data.ASPARAGOPSIS_DATA[lu].loc[year, 'Productivity']
         if multiplier != 1:
             # Apply to all products associated with land use
-            for p in data.LU2PR[j]:
-                # The effect is: effect value = old value * multiplier - old value
-                # E.g. a multiplier of .95 means a 5% reduction in quantity produced
-                new_q_mrp[:, :, p] = q_mrp[:, :, p] * (multiplier - 1)
+            for p in range(data.NPRS):
+                if data.LU2PR[p, j]:
+                    # The effect is: effect value = old value * multiplier - old value
+                    # E.g. a multiplier of .95 means a 5% reduction in quantity produced
+                    new_q_mrp[:, :, p] = q_mrp[:, :, p] * (multiplier - 1)
 
     return new_q_mrp
 
@@ -310,8 +311,9 @@ def get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx):
         multiplier = data.PRECISION_AGRICULTURE_DATA[lu].loc[year, 'Productivity']
         if multiplier != 1:
             # Apply to all products associated with land use
-            for p in data.LU2PR[j]:
-                new_q_mrp[:, :, p] = q_mrp[:, :, p] * (multiplier - 1)
+            for p in range(data.NPRS):
+                if data.LU2PR[p, j]:
+                    new_q_mrp[:, :, p] = q_mrp[:, :, p] * (multiplier - 1)
 
     return new_q_mrp
 
@@ -333,8 +335,9 @@ def get_ecological_grazing_effect_q_mrp(data, q_mrp, yr_idx):
         multiplier = data.ECOLOGICAL_GRAZING_DATA[lu].loc[year, 'Productivity']
         if multiplier != 1:
             # Apply to all products associated with land use
-            for p in data.LU2PR[j]:
-                new_q_mrp[:, :, p] = q_mrp[:, :, p] * (multiplier - 1)
+            for p in range(data.NPRS):
+                if data.LU2PR[p, j]:
+                    new_q_mrp[:, :, p] = q_mrp[:, :, p] * (multiplier - 1)
 
     return new_q_mrp
 

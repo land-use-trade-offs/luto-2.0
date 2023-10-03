@@ -72,12 +72,16 @@ class Data():
         self.REAL_AREA = bdata.REAL_AREA[self.MASK] * bdata.RESMULT             # Actual Float32
         self.LUMAP = bdata.LUMAP[self.MASK]                                     # Int8
         self.LMMAP = bdata.LMMAP[self.MASK]                                     # Int8
-        self.AMMAP = bdata.AMMAP[self.MASK]                                     # Int8
+        self.AMMAP_DICT = {
+            am: array[self.MASK] for am, array in bdata.AMMAP_DICT.items()
+        }                                                                       # Dictionary containing Int8 arrays
         self.AG_L_MRJ = tools.lumap2ag_l_mrj(self.LUMAP, self.LMMAP)            # Boolean [2, 4218733, 28]
         self.NON_AG_L_RK = tools.lumap2non_ag_l_mk(
             self.LUMAP, len(self.NON_AGRICULTURAL_LANDUSES)
         )                                                                       # Int8
-        self.AG_MAN_L_MRJ = tools.get_base_am_vars(self.NCELLS, self.NLMS)      # Int8
+        self.AG_MAN_L_MRJ_DICT = tools.get_base_am_vars(
+            self.NCELLS, self.NLMS
+        )                                                                       # Dictionary containing Int8 arrays
         self.PROD_2010_C = prod_2010_c                                          # Float, total agricultural production in 2010, shape n commodities
         self.D_CY = d_cy                                                        # Float, total demand for agricultural production, shape n commodities by 91 years
         self.WREQ_IRR_RJ = bdata.WREQ_IRR_RJ[self.MASK]                         # Water requirements for irrigated landuses
@@ -363,10 +367,10 @@ def step( base    # Base year from which the data is taken.
     if base == data.YR_CAL_BASE: 
         lumaps[base] = data.LUMAP
         lmmaps[base] = data.LMMAP
-        ammaps[base] = data.AMMAP
+        ammaps[base] = data.AMMAP_DICT
         ag_dvars[base]  = data.AG_L_MRJ
         non_ag_dvars[base] = data.NON_AG_L_RK
-        ag_man_dvars[base] = data.AG_MAN_L_MRJ
+        ag_man_dvars[base] = data.AG_MAN_L_MRJ_DICT
 
         
     # Magic.
