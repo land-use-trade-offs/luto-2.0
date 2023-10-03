@@ -78,7 +78,7 @@ class Data():
             self.LUMAP, len(self.NON_AGRICULTURAL_LANDUSES)
         )                                                                       # Int8
         self.AG_MAN_L_MRJ_DICT = tools.get_base_am_vars(
-            self.NCELLS, self.NLMS
+            self.NCELLS, self.NLMS, self.N_AG_LUS
         )                                                                       # Dictionary containing Int8 arrays
         self.PROD_2010_C = prod_2010_c                                          # Float, total agricultural production in 2010, shape n commodities
         self.D_CY = d_cy                                                        # Float, total demand for agricultural production, shape n commodities by 91 years
@@ -374,6 +374,7 @@ def step( base    # Base year from which the data is taken.
         ag_dvars[target],
         non_ag_dvars[target],
         ag_man_dvars[target],
+        prod_data[target],
     ) = solve(d_c, get_input_data())
 
 def run( base
@@ -430,13 +431,14 @@ ammaps = {}
 ag_dvars = {}
 non_ag_dvars = {}
 ag_man_dvars = {}
+prod_data = {}
 
 # Get the total demand quantities by commodity for 2010 to 2100 by combining the demand deltas with 2010 production
 prod_2010_c = tools.get_production( bdata
                                   , bdata.YR_CAL_BASE
                                   , tools.lumap2ag_l_mrj(bdata.LUMAP, bdata.LMMAP)
                                   , tools.lumap2non_ag_l_mk(bdata.LUMAP, len(bdata.NON_AGRICULTURAL_LANDUSES))
-                                  , tools.get_base_am_vars(bdata.NCELLS, bdata.NLMS)
+                                  , tools.get_base_am_vars(bdata.NCELLS, bdata.NLMS, bdata.N_AG_LUS)
                                   )
 
 # Demand deltas can be a time series (shape year x commodity) or a single array (shape = n commodites).
