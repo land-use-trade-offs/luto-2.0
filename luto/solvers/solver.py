@@ -272,7 +272,8 @@ class LutoSolver:
         """
         Decision variables, one for each commodity, to minimise the deviations from demand.
         """
-        self.V = self.gurobi_model.addMVar(self.ncms, name="V")
+        if settings.DEMAND_CONSTRAINT_TYPE == "soft":
+            self.V = self.gurobi_model.addMVar(self.ncms, name="V")
 
     def _setup_objective(self):
         """
@@ -376,12 +377,19 @@ class LutoSolver:
             for k in range(self._input_data.n_non_ag_lus)
         )
 
-        objective = (
-            ag_obj_contr
-            + ag_man_obj_contr
-            + non_ag_obj_contr
-            + gp.quicksum(self.V[c] for c in range(self.ncms))
-        )
+        if settings.DEMAND_CONSTRAINT_TYPE == "soft":
+            objective = (
+                ag_obj_contr
+                + ag_man_obj_contr
+                + non_ag_obj_contr
+                + gp.quicksum(self.V[c] for c in range(self.ncms))
+            )
+        elif settings.DEMAND_CONSTRAINT_TYPE == "hard":
+            objective = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr
+        else:
+            raise ValueError(
+                'DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"'
+            )
 
         self.gurobi_model.setObjective(objective, GRB.MINIMIZE)
         ft = time.time()
@@ -924,7 +932,9 @@ class LutoSolver:
 
         print("Collecting results...", end=" ", flush=True)
 
-        prod_data = {}  # Dictionary that stores information about production and GHG emissions for the write module
+        prod_data = (
+            {}
+        )  # Dictionary that stores information about production and GHG emissions for the write module
 
         # Collect optimised decision variables in one X_mrj Numpy array.
         X_dry_sol_rj = np.zeros(
@@ -1078,7 +1088,9 @@ class LutoSolver:
 
         # # Process production amount for each commodity
         print("Processing commodity production amounts...")
-        prod_data["Production"] = [self.total_q_exprs_c[c].getValue() for c in range(self.ncms)]
+        prod_data["Production"] = [
+            self.total_q_exprs_c[c].getValue() for c in range(self.ncms)
+        ]
 
         print("Processing GHG emissions amount...")
         prod_data["GHG Emissions"] = self.ghg_emissions_expr.getValue()

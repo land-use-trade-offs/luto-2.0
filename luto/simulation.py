@@ -410,6 +410,7 @@ def solve_timeseries(steps: int, base: int, target: int):
             ag_dvars[base + s + 1],
             non_ag_dvars[base + s + 1],
             ag_man_dvars[base + s + 1],
+            prod_data[base + s + 1],
         ) = luto_solver.solve()
 
         print('Total processing time...', round(time.time() - start_time), 'seconds')
