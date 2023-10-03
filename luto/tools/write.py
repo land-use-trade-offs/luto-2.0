@@ -141,15 +141,11 @@ def write_production(sim, yr_cal, path):
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
     
     # Calculate data for quantity comparison between base year and target year
-    prod_base = sim.data.PROD_2010_C                # tools.get_production(sim.data, sim.data.YR_CAL_BASE, sim.data.L_MRJ)  # Get commodity quantities produced in 2010
-    prod_targ = tools.get_production( sim.data
-                                    , yr_cal
-                                    , sim.ag_dvars[yr_cal]
-                                    , sim.non_ag_dvars[yr_cal] 
-                                    , sim.ag_man_dvars[yr_cal] )  # Get commodity quantities produced in target year
-    demands = sim.data.D_CY[yr_idx]                 # Get commodity demands for target year
-    abs_diff = prod_targ - demands                  # Diff between target year production and demands in absolute terms (i.e. tonnes etc)
-    prop_diff = ( prod_targ / demands ) * 100       # Target year production as a proportion of demands (%)
+    prod_base = sim.data.PROD_2010_C                           # tools.get_production(sim.data, sim.data.YR_CAL_BASE, sim.data.L_MRJ)  # Get commodity quantities produced in 2010
+    prod_targ = np.array(sim.prod_data[yr_cal]['Production'])  # Get commodity quantities produced in target year
+    demands = sim.data.D_CY[yr_idx]                            # Get commodity demands for target year
+    abs_diff = prod_targ - demands                             # Diff between target year production and demands in absolute terms (i.e. tonnes etc)
+    prop_diff = ( prod_targ / demands ) * 100                  # Target year production as a proportion of demands (%)
     
     # Write to pandas dataframe
     df = pd.DataFrame()
@@ -293,14 +289,6 @@ def write_ghg(sim, yr_cal, path):
 
     print('\nWriting GHG outputs to', path)
         
-    # Convert calendar year to year index.
-    yr_idx = yr_cal - sim.data.YR_CAL_BASE
-
-    # Get greenhouse gas emissions in mrj format
-    ag_g_mrj = ag_ghg.get_ghg_matrices(sim.data, yr_idx)
-    non_ag_g_rk = non_ag_ghg.get_ghg_matrix(sim.data)
-    ag_man_g_mrj = ag_ghg.get_agricultural_management_ghg_matrices(sim.data, ag_g_mrj, yr_idx)
-
     # Prepare a data frame.
     df = pd.DataFrame( columns=[ 'GHG_EMISSIONS_LIMIT_TCO2e'
                                , 'GHG_EMISSIONS_TCO2e' ] )
@@ -308,17 +296,8 @@ def write_ghg(sim, yr_cal, path):
     # Get GHG emissions limits used as constraints in model
     ghg_limits = ag_ghg.get_ghg_limits(sim.data)
 
-    # Calculate the GHG emissions from agriculture for year.
-    ghg_t_2010 = ag_ghg.get_ghg_transition_penalties(sim.data, sim.lumaps[2010])
-    ghg_emissions = (
-          ( (ag_g_mrj + ghg_t_2010) * sim.ag_dvars[yr_cal] ).sum()  # Agricultural contribution
-        + ( non_ag_g_rk * sim.non_ag_dvars[yr_cal] ).sum()          # Non-agricultural contribution
-    )
-
-    for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():          # Agricultural managements contribution
-        am_j = np.array([sim.data.DESC2AGLU[lu] for lu in am_lus])
-        ghg_emissions += ( ag_man_g_mrj[am] 
-                         * sim.ag_man_dvars[yr_cal][am][:, :, am_j] ).sum() 
+    # Get GHG emissions from model
+    ghg_emissions = sim.prod_data[yr_cal]['GHG Emissions']
 
     # Add to dataframe
     df.loc[0] = ("{:,.0f}".format(ghg_limits), "{:,.0f}".format(ghg_emissions))
