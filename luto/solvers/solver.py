@@ -395,18 +395,18 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
         ]
 
         # Total quantities in CM/c representation.
-        total_q_c = [ag_q_dry_c[c] + ag_q_irr_c[c] + non_ag_q_c[c] for c in range(ncms)]
+        total_q_exprs_c = [ag_q_dry_c[c] + ag_q_irr_c[c] + non_ag_q_c[c] for c in range(ncms)]
 
         # Add demand constraints in CM/c representation.
         print("Adding", settings.DEMAND_CONSTRAINT_TYPE, "demand constraints...", time.ctime() + "\n")
         
         if settings.DEMAND_CONSTRAINT_TYPE == 'soft':
-            model.addConstrs((d_c[c] - total_q_c[c]) <= V[c]
+            model.addConstrs((d_c[c] - total_q_exprs_c[c]) <= V[c]
                               for c in range(ncms) )
-            model.addConstrs((total_q_c[c] - d_c[c]) <= V[c]
+            model.addConstrs((total_q_exprs_c[c] - d_c[c]) <= V[c]
                               for c in range(ncms) )
         elif settings.DEMAND_CONSTRAINT_TYPE == 'hard':
-            model.addConstrs( (total_q_c[c] >= d_c[c]) 
+            model.addConstrs( (total_q_exprs_c[c] >= d_c[c]) 
                                for c in range(ncms) )
         else:
             print('DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"')
@@ -478,10 +478,10 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
                 for k in range(n_non_ag_lus)
             )
 
-            ghg_emissions = ag_contr + ag_man_contr + non_ag_contr
+            ghg_emissions_expr = ag_contr + ag_man_contr + non_ag_contr
             
             print('    ...setting GHG emissions reduction target: {:,.0f} tCO2e\n'.format( ghg_limits ))
-            model.addConstr(ghg_emissions <= ghg_limits)
+            model.addConstr(ghg_emissions_expr <= ghg_limits)
 
             
 
@@ -500,13 +500,15 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
         print('Starting solve... ', time.ctime(), '\n')
 
         # Magic.
-        model.optimize() 
-        
+        model.optimize()
+
         ft = time.time()
         print('Completed solve... ', time.ctime())
         print('Found optimal objective value', round(model.objVal, 2), 'in', round(ft - st), 'seconds\n')
         
-        print('Collecting results...', end = ' ')
+        print('Collecting results...')
+
+        prod_data = {}  # Dictionary that stores information about production and GHG emissions for the write module
         
         # Collect optimised decision variables in one X_mrj Numpy array.
         X_dry_sol_rj = np.zeros((ncells, n_ag_lus)).astype(np.float32)
@@ -542,20 +544,24 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
         # Process agricultural land usage information
         # Stack dryland and irrigated decision variables
         ag_X_mrj = np.stack((X_dry_sol_rj, X_irr_sol_rj))  # Float32
-        ag_X_mrj_shape = ag_X_mrj.shape
+        ag_X_mrj_processed = ag_X_mrj
+
+        # Note - uncomment the following block of code to revert the processed agricultural variables to be binary.
+
+        # ag_X_mrj_shape = ag_X_mrj.shape
         
-        # Reshape so that cells are along the first axis and land management and use are flattened along second axis i.e. (XXXXXXX, 56)
-        ag_X_mrj_processed = np.moveaxis(ag_X_mrj, 1, 0)
-        ag_X_mrj_processed = ag_X_mrj_processed.reshape(ag_X_mrj_processed.shape[0], -1)
+        # # Reshape so that cells are along the first axis and land management and use are flattened along second axis i.e. (XXXXXXX, 56)
+        # ag_X_mrj_processed = np.moveaxis(ag_X_mrj, 1, 0)
+        # ag_X_mrj_processed = ag_X_mrj_processed.reshape(ag_X_mrj_processed.shape[0], -1)
         
-        # Boolean matrix where the maximum value for each cell across all land management types and land uses is True
-        ag_X_mrj_processed = ag_X_mrj_processed.argmax(axis = 1)[:, np.newaxis] == range(ag_X_mrj_processed.shape[1])
+        # # Boolean matrix where the maximum value for each cell across all land management types and land uses is True
+        # ag_X_mrj_processed = ag_X_mrj_processed.argmax(axis = 1)[:, np.newaxis] == range(ag_X_mrj_processed.shape[1])
         
-        # Reshape to mrj structure
-        ag_X_mrj_processed = ag_X_mrj_processed.reshape(
-            (ag_X_mrj_shape[1], ag_X_mrj_shape[0], ag_X_mrj_shape[2])
-        )
-        ag_X_mrj_processed = np.moveaxis(ag_X_mrj_processed, 0, 1)
+        # # Reshape to mrj structure
+        # ag_X_mrj_processed = ag_X_mrj_processed.reshape(
+        #     (ag_X_mrj_shape[1], ag_X_mrj_shape[0], ag_X_mrj_shape[2])
+        # )
+        # ag_X_mrj_processed = np.moveaxis(ag_X_mrj_processed, 0, 1)
 
         # Process non-agricultural land usage information
         # Boolean matrix where the maximum value for each cell across all non-ag LUs is True
@@ -576,7 +582,6 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
             ag_man_processed = np.stack((am_X_dry_sol_rj[am], am_X_irr_sol_rj[am]))
 
             # Note - uncomment the following block of code to revert the processed AM variables to be binary.
-            # This will affect the quantity comparisons in the output greatly.
 
             # ag_man_X_shape = ag_man_processed.shape
 
@@ -622,10 +627,16 @@ def solve( d_c                    # Demands -- note the `c` ('commodity') index 
                 if am_var_val >= settings.AGRICULTURAL_MANAGEMENT_USE_THRESHOLD:
                     ammaps[am][r] = 1
 
-        print('Done\n')
-        print('Total processing time...', round(time.time() - start_time), 'seconds')
+        # Process production amount for each commodity
+        print('Processing commodity production amounts...')
+        prod_data['Production'] = [total_q_exprs_c[c].getValue() for c in range(ncms)]
 
-        return lumap, lmmap, ammaps, ag_X_mrj_processed, non_ag_X_rk_processed, ag_man_X_mrj_processed
+        print('Processing GHG emissions amount...')
+        prod_data['GHG Emissions'] = ghg_emissions_expr.getValue()
+
+        print('Done. Total processing time:', round(time.time() - start_time), 'seconds')
+
+        return lumap, lmmap, ammaps, ag_X_mrj_processed, non_ag_X_sol_rk, ag_man_X_mrj_processed, prod_data
 
     except gp.GurobiError as e:
         print('Gurobi error code', str(e.errno), ':', str(e))
