@@ -90,9 +90,9 @@ def get_production(data, yr_cal, ag_X_mrj, non_ag_X_rk, ag_man_X_mrj):
         am_j_list = [data.DESC2AGLU[lu] for lu in am_lus]
         current_ag_man_X_mrp = np.zeros(ag_q_mrp.shape, dtype=np.float32)
 
-        for j_idx, j in enumerate(am_j_list):
+        for j in am_j_list:
             for p in j2p[j]:
-                current_ag_man_X_mrp[:, :, p] = ag_man_X_mrj[am][:, :, j_idx]
+                current_ag_man_X_mrp[:, :, p] = ag_man_X_mrj[am][:, :, j]
 
         ag_man_q_p = np.sum( ag_man_q_mrp[am] * current_ag_man_X_mrp, axis = (0, 1), keepdims = False)
 
@@ -193,15 +193,15 @@ def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
     return x_rk.astype(bool)
 
 
-def get_base_am_vars(ncells, ncms):
+def get_base_am_vars(ncells, ncms, n_ag_lus):
     """
     Get the 2010 agricultural management option vars.
     It is assumed that no agricultural management options were used in 2010, 
     so get zero arrays in the correct format.
     """
     am_vars = {}
-    for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():
-        am_vars[am] = np.zeros((ncms, ncells, len(am_lus)))
+    for am in AG_MANAGEMENTS_TO_LAND_USES:
+        am_vars[am] = np.zeros((ncms, ncells, n_ag_lus))
 
     return am_vars
 
@@ -495,3 +495,43 @@ def df_sparse2dense(df):
     
     # Return expanded dataframe, list of unique column names, list of their count
     return expand_df, df_col_unique, df_col_count
+
+def summarize_ghg_seperate_df(in_array,column_level,lu_desc):
+    '''Function to summarize the in_array to a df
+    Arguments:
+        in_array: a n-d np.array with the first dimension to be pixels/rows (dimension r)
+        
+        column_level: The levels of the in_array being reshaped to (r,-1). For example, if
+                      the in_array has a shape of (r,2,3), then the levels could be a tuple 
+                      of list as below. Note here add a ['Agricultural Landuse] as an extra
+                      level to indicate the origin of this array.
+                      
+                      (['Agricultural Landuse],
+                       ['dry','irri']),
+                       ['chemical_co2_emission','transportation_co2_emission']).
+                       
+        lu_desc: The description of each pixel. 
+
+    Return:
+        pd.DataFrame: A multilevel (column-wise) df.
+    '''
+    
+     # warp the array back to a df
+    df = pd.DataFrame(in_array.reshape((in_array.shape[0],-1)),columns=pd.MultiIndex.from_product(column_level)) 
+    
+    # add landuse describtion
+    df['lu'] = lu_desc
+    
+    # sumarize the column
+    df_summary = df.groupby('lu').sum(0).reset_index()
+    df_summary = df_summary.set_index('lu')
+      
+    # add SUM row/index
+    df_summary.loc['SUM'] = df_summary.sum(axis=0)
+    df_summary['SUM'] = df_summary.sum(axis=1)
+    
+    # remove column/index names
+    df_summary.columns = pd.MultiIndex.from_tuples(df_summary.columns.tolist())
+    df_summary.index = df_summary.index.tolist()
+
+    return df_summary
