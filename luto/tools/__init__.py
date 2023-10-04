@@ -496,7 +496,7 @@ def df_sparse2dense(df):
     # Return expanded dataframe, list of unique column names, list of their count
     return expand_df, df_col_unique, df_col_count
 
-def summarize_ghg_seperate_df(in_array,column_level,lu_desc):
+def summarize_ghg_separate_df(in_array,column_level,lu_desc):
     '''Function to summarize the in_array to a df
     Arguments:
         in_array: a n-d np.array with the first dimension to be pixels/rows (dimension r)
