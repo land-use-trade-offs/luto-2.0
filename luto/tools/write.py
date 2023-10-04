@@ -364,7 +364,7 @@ def write_ghg_separate(sim, yr_cal, path):
     GHG_emission_separate = np.einsum('mrjs,mrj -> rms', ag_g_mrjs, ag_dvar_mrj)   # rms
 
     # Summarize the array as a df
-    GHG_emission_separate_summary = tools.summarize_ghg_seperate_df(GHG_emission_separate,(['Agricultural Landuse'],
+    GHG_emission_separate_summary = tools.summarize_ghg_separate_df(GHG_emission_separate,(['Agricultural Landuse'],
                                                                                       ag_g_col_unique[1],   
                                                                                       ag_g_col_unique[3]),
                                                                      lu_desc)
@@ -386,7 +386,7 @@ def write_ghg_separate(sim, yr_cal, path):
     non_ag_g_rmk = np.swapaxes(non_ag_g_mrk,0,1)                       # rmk
     
     # Summarize the array as a df
-    non_ag_g_rk_summary = tools.summarize_ghg_seperate_df(non_ag_g_rmk,(['Non_Agricultural Landuse']
+    non_ag_g_rk_summary = tools.summarize_ghg_separate_df(non_ag_g_rmk,(['Non_Agricultural Landuse']
                                                                  , sim.data.LANDMANS
                                                                  , ['TCO2E_Environmental Planting']),
                                                           lu_desc)
@@ -403,10 +403,10 @@ def write_ghg_separate(sim, yr_cal, path):
     ghg_t_2010 = ag_ghg.get_ghg_transition_penalties(sim.data, sim.lumaps[2010])          # mrj
     
     # get the GHG emissions from lucc-convertion compared to the base year (2010)
-    ghg_t_seperate = np.einsum('mrj,mrj -> rmj',sim.ag_dvars[yr_cal], ghg_t_2010)         # rmj
+    ghg_t_separate = np.einsum('mrj,mrj -> rmj',sim.ag_dvars[yr_cal], ghg_t_2010)         # rmj
 
     # Summarize the array as a df
-    ghg_t_seperate_summary = tools.summarize_ghg_seperate_df(ghg_t_seperate,(['Transition Penalty'], 
+    ghg_t_separate_summary = tools.summarize_ghg_separate_df(ghg_t_separate,(['Transition Penalty'], 
                                                                        sim.data.LANDMANS,
                                                                        [f"TCO2E_{i}" for i in sim.data.AGRICULTURAL_LANDUSES]),
                                                              lu_desc)
@@ -414,7 +414,7 @@ def write_ghg_separate(sim, yr_cal, path):
     
     
     # Save table to disk
-    ghg_t_seperate_summary.to_csv(os.path.join(path, 'GHG_emissions_separate_transition_penalty.csv'))
+    ghg_t_separate_summary.to_csv(os.path.join(path, 'GHG_emissions_separate_transition_penalty.csv'))
     
     
     # -------------------------------------------------------------------#
@@ -443,7 +443,7 @@ def write_ghg_separate(sim, yr_cal, path):
     ag_ghg_summary = np.einsum('srm -> rms',ag_ghg_summary)                            # rms
     
     # Summarize the array as a df
-    ag_ghg_summary_df= tools.summarize_ghg_seperate_df(ag_ghg_summary,( ['Agricultural Management']
+    ag_ghg_summary_df= tools.summarize_ghg_separate_df(ag_ghg_summary,( ['Agricultural Management']
                                                                 , sim.data.LANDMANS
                                                                 , [f"TCO2E_{i}" for i in AG_MANAGEMENTS_TO_LAND_USES.keys()]),
                                                        lu_desc)
