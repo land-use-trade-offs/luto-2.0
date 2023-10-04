@@ -415,8 +415,8 @@ def get_ecological_grazing_effect_g_mrj(data, yr_idx):
                 new_g_mrj[m, :, lu_idx] -= leach_reduction_amnt
 
             # Subtract soil carbon benefit
-            soil_multiplier = lu_data.loc[year, 'IMPACTS_soil_carbon']
-            if soil_multiplier != 1:
+            soil_multiplier = lu_data.loc[year, 'IMPACTS_soil_carbon'] - 1
+            if soil_multiplier != 0:
                 soil_reduction_amnt = (
                     data.SOIL_CARBON_T_HA
                     * soil_multiplier
