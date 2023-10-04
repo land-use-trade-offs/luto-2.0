@@ -85,11 +85,11 @@ def get_ghg_crop( data     # Data object or module.
 
 
 
-def get_ghg_lvstk( data               # Data object or module.
-                 , lu                 # Land use.
-                 , lm                 # Land management.
-                 , yr_idx             # Number of years post base-year ('YR_CAL_BASE').
-                 , aggregate = True): # GHG calculated as a total (for the solver) or by individual source (for writing outputs)
+def get_ghg_lvstk( data        # Data object or module.
+                 , lu          # Land use.
+                 , lm          # Land management.
+                 , yr_idx      # Number of years post base-year ('YR_CAL_BASE').
+                 , aggregate): # GHG calculated as a total (for the solver) or by individual source (for writing outputs)
     """Return livestock GHG emissions [tCO2e/cell] of `lu`+`lm` in `yr_idx`
             as (np array|pd.DataFrame) depending on aggregate (True|False).
 
