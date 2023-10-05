@@ -101,7 +101,7 @@ class Data():
         self.EP2AG_TRANSITION_COSTS_HA = bdata.EP2AG_TRANSITION_COSTS_HA        # Float32
         self.EP_BLOCK_AVG_T_C02_HA = bdata.EP_BLOCK_AVG_T_C02_HA[self.MASK]     # Float32
         self.NATURAL_LAND_T_CO2_HA = bdata.NATURAL_LAND_T_CO2_HA[self.MASK]     # Float32
-        self.SOIL_CARBON_T_HA = bdata.SOIL_CARBON_T_HA[self.MASK]
+        self.SOIL_CARBON_AVG_T_C02_HA = bdata.SOIL_CARBON_AVG_T_C02_HA[self.MASK]
 
         # Slice this year off HDF5 bricks. TODO: This field is not in luto.data.
         # with h5py.File(bdata.fname_dr, 'r') as wy_dr_file:

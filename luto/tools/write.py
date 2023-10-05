@@ -451,7 +451,7 @@ def write_ghg_separate(sim, yr_cal, path):
     ag_ghg_summary = np.einsum('srm -> rms',ag_ghg_summary)                            # rms
     
     # Summarize the array as a df
-    ag_ghg_summary_df= tools.summarize_ghg_separate_df(ag_ghg_summary,( ['Agricultural Management']
+    ag_ghg_summary_df = tools.summarize_ghg_separate_df(ag_ghg_summary,( ['Agricultural Management']
                                                                 , sim.data.LANDMANS
                                                                 , [f"TCO2E_{i}" for i in AG_MANAGEMENTS_TO_LAND_USES.keys()]),
                                                        lu_desc)
