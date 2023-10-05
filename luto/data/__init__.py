@@ -227,10 +227,8 @@ ECOLOGICAL_GRAZING_DATA['Beef - modified land'] = pd.read_excel( eco_grazing_fil
 ECOLOGICAL_GRAZING_DATA['Sheep - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Sheep', index_col='Year' )
 ECOLOGICAL_GRAZING_DATA['Dairy - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Dairy', index_col='Year' )
 
-# Load soil carbon data and convert to CO2e
-SOIL_CARBON_AVG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'soil_carbon_t_ha.h5') ).to_numpy() \
-                           * (44 / 12) \         # Convert carbon -> CO2 requires a multiplier of (44/12)
-                           / SOC_AMORTISATION    # Spread soil carbon accumulation over X years
+# Load soil carbon data, convert C to CO2e (x 44/12), and average over years
+SOIL_CARBON_AVG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'soil_carbon_t_ha.h5') ).to_numpy() * (44 / 12) / SOC_AMORTISATION
 
 
 ###############################################################
