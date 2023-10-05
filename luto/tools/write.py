@@ -369,6 +369,11 @@ def write_ghg_separate(sim, yr_cal, path):
                                                                                       ag_g_col_unique[3]),
                                                                      lu_desc)
     
+    # Change "KG_HA/HEAN" to "TCO2E"
+    column_rename = [(i[0],i[1],i[2].replace('CO2E_KG_HA','TCO2E')) for i in GHG_emission_separate_summary.columns]
+    column_rename = [(i[0],i[1],i[2].replace('CO2E_KG_HEAD','TCO2E')) for i in column_rename]
+    GHG_emission_separate_summary.columns = pd.MultiIndex.from_tuples(column_rename)
+    
     # Save table to disk
     GHG_emission_separate_summary.to_csv(os.path.join(path, 'GHG_emissions_separate_agricultural_landuse.csv'))
 
@@ -376,8 +381,11 @@ def write_ghg_separate(sim, yr_cal, path):
     # Get greenhouse gas emissions from non-agricultural landuse #
     # -----------------------------------------------------------#
     
-    # get the non_ag GHG reduction df
+    # get the non_ag GHG reduction
     non_ag_g_rk = non_ag_ghg.get_ghg_matrix(sim.data)
+    
+    # multiply with decision variable to get the GHG in yr_cal
+    non_ag_g_rk = non_ag_g_rk * sim.non_ag_dvars[yr_cal]
     
     # get the non_ag GHG reduction on dry/irri land
     non_ag_g_rk_dry = np.einsum('rk,r -> rk', non_ag_g_rk, (sim.data.LMMAP != 1))
@@ -443,7 +451,7 @@ def write_ghg_separate(sim, yr_cal, path):
     ag_ghg_summary = np.einsum('srm -> rms',ag_ghg_summary)                            # rms
     
     # Summarize the array as a df
-    ag_ghg_summary_df= tools.summarize_ghg_separate_df(ag_ghg_summary,( ['Agricultural Management']
+    ag_ghg_summary_df = tools.summarize_ghg_separate_df(ag_ghg_summary,( ['Agricultural Management']
                                                                 , sim.data.LANDMANS
                                                                 , [f"TCO2E_{i}" for i in AG_MANAGEMENTS_TO_LAND_USES.keys()]),
                                                        lu_desc)
