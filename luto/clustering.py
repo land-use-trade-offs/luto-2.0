@@ -1,20 +1,21 @@
 from collections import defaultdict
 from dataclasses import dataclass, fields
+
+from tqdm import tqdm
 from luto.solvers.input_data import InputData
 from luto import settings
 
 import numpy as np
+import hashlib
 
 
 @dataclass
 class ClusterKey:
     ag_t_mrj: np.ndarray  # Agricultural transition cost matrices.
     ag_c_mrj: np.ndarray  # Agricultural production cost matrices.
-
-    # TODO: OTHER DIMENSIONS:
-    # ag_r_mrj: np.ndarray  # Agricultural production revenue matrices.
-    # ag_g_mrj: np.ndarray  # Agricultural greenhouse gas emissions matrices.
-    # ag_w_mrj: np.ndarray  # Agricultural water requirements matrices.
+    ag_r_mrj: np.ndarray  # Agricultural production revenue matrices.
+    ag_g_mrj: np.ndarray  # Agricultural greenhouse gas emissions matrices.
+    ag_w_mrj: np.ndarray  # Agricultural water requirements matrices.
     # ag_x_mrj: np.ndarray  # Agricultural exclude matrices.
     # ag_q_mrp: np.ndarray  # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
     # ag_ghg_t_mrj: np.ndarray  # GHG emissions released during transitions between agricultural land uses.
@@ -41,10 +42,11 @@ class ClusterKey:
     def __hash__(self) -> int:
         hashes = []
         for field in fields(self):
-            if field.type == np.ndarray:
-                field_hash = hash(getattr(self, field.name).data.tobytes())
+            value = getattr(self, field.name)
+            if isinstance(value, np.ndarray):
+                field_hash = hashlib.sha256(value.data).hexdigest()
             else:
-                field_hash = hash(getattr(self, field.name))
+                field_hash = hash(value)
 
             hashes.append(field_hash)
 
@@ -58,37 +60,49 @@ def _round_signif(x, p):
 
     See https://stackoverflow.com/questions/18915378/rounding-to-significant-figures-in-numpy
     """
-    x = np.asarray(x)
+    x = np.asarray(x, dtype=np.float32)
     x_positive = np.where(np.isfinite(x) & (x != 0), np.abs(x), 10 ** (p - 1))
     mags = 10 ** (p - 1 - np.floor(np.log10(x_positive)))
     return np.round(x * mags) / mags
 
 
 def _get_cluster_key_from_cell(input_data: InputData, cell_index: int):
+    exclude_matrix = input_data.ag_x_mrj[:, cell_index, :]
     return ClusterKey(
         ag_t_mrj=_round_signif(
-            input_data.ag_t_mrj[:, cell_index, :], settings.CLUSTERING_SIGFIGS
+            exclude_matrix * input_data.ag_t_mrj[:, cell_index, :],
+            settings.CLUSTERING_SIGFIGS,
         ),
         ag_c_mrj=_round_signif(
-            input_data.ag_c_mrj[:, cell_index, :], settings.CLUSTERING_SIGFIGS
+            exclude_matrix * input_data.ag_c_mrj[:, cell_index, :],
+            settings.CLUSTERING_SIGFIGS,
         ),
-        # ag_r_mrj=_round_signif(
-        #     input_data.ag_r_mrj[:, cell_index, :], settings.CLUSTERING_SIGFIGS
-        # ),
-        # ag_g_mrj=_round_signif(
-        #     input_data.ag_g_mrj[:, cell_index, :], settings.CLUSTERING_SIGFIGS
-        # ),
-        # ag_w_mrj=_round_signif(
-        #     input_data.ag_w_mrj[:, cell_index, :], settings.CLUSTERING_SIGFIGS
-        # ),
+        ag_r_mrj=_round_signif(
+            exclude_matrix * input_data.ag_r_mrj[:, cell_index, :],
+            settings.CLUSTERING_SIGFIGS,
+        ),
+        ag_g_mrj=_round_signif(
+            exclude_matrix * input_data.ag_g_mrj[:, cell_index, :],
+            settings.CLUSTERING_SIGFIGS,
+        ),
+        ag_w_mrj=_round_signif(
+            exclude_matrix * input_data.ag_w_mrj[:, cell_index, :],
+            settings.CLUSTERING_SIGFIGS,
+        ),
         # ag_x_mrj=_round_signif(
-        #     input_data.ag_x_mrj[:, cell_index, :], settings.CLUSTERING_SIGFIGS
+        #     input_data.ag_x_mrj[:, cell_index, :]
+        #     * input_data.ag_x_mrj[:, cell_index, :],
+        #     settings.CLUSTERING_SIGFIGS,
         # ),
         # ag_q_mrp=_round_signif(
-        #     input_data.ag_q_mrp[:, cell_index, :], settings.CLUSTERING_SIGFIGS
+        #     input_data.ag_x_mrj[:, cell_index, :]
+        #     * input_data.ag_q_mrp[:, cell_index, :],
+        #     settings.CLUSTERING_SIGFIGS,
         # ),
         # ag_ghg_t_mrj=_round_signif(
-        #     input_data.ag_ghg_t_mrj[:, cell_index, :], settings.CLUSTERING_SIGFIGS
+        #     input_data.ag_x_mrj[:, cell_index, :]
+        #     * input_data.ag_ghg_t_mrj[:, cell_index, :],
+        #     settings.CLUSTERING_SIGFIGS,
         # ),
         # ag_to_non_ag_t_rk=_round_signif(
         #     input_data.ag_to_non_ag_t_rk[cell_index, :], settings.CLUSTERING_SIGFIGS
@@ -145,11 +159,21 @@ def get_clusters(input_data: InputData) -> dict[int, list[int]]:
 
     Returns a dictionary mapping a representative cell index to a list of cells in that cluster.
     """
-    print("Clustering cells... ", end=" ", flush=True)
+    print(
+        f"Clustering cells to {settings.CLUSTERING_SIGFIGS} significant figures...",
+        end=" ",
+        flush=True,
+    )
     cells_by_cluster_key = defaultdict(list)
     for r in range(input_data.ncells):
         key = _get_cluster_key_from_cell(input_data, r)
         cells_by_cluster_key[key].append(r)
 
+    cluster_sizes = np.array([len(cells) for cells in cells_by_cluster_key.values()])
+    print(
+        f"Clustering completed: {input_data.ncells} cells to {len(cluster_sizes)} clusters.\n"
+        f"min={cluster_sizes.min()}, max={cluster_sizes.max()}, "
+        f"mean={cluster_sizes.mean()}, std={cluster_sizes.std()}"
+    )
     print("Done.")
     return {cells[0]: cells for _, cells in cells_by_cluster_key.items()}
