@@ -28,7 +28,7 @@ except:
     import rasterio
     
 
-from luto.settings import INPUT_DIR, SSP, RCP, RESFACTOR
+from luto.settings import INPUT_DIR, SSP, RCP, RESFACTOR, SOC_AMORTISATION
 from luto.economics.agricultural.quantity import lvs_veg_types
 from luto.ag_managements import SORTED_AG_MANAGEMENTS
 
@@ -227,11 +227,10 @@ ECOLOGICAL_GRAZING_DATA['Beef - modified land'] = pd.read_excel( eco_grazing_fil
 ECOLOGICAL_GRAZING_DATA['Sheep - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Sheep', index_col='Year' )
 ECOLOGICAL_GRAZING_DATA['Dairy - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Dairy', index_col='Year' )
 
-# Soil carbon data (for carbon benefits of ecological grazing)
-# Note. Carbon -> CO2 requires a multiplier of (44/12),
-#       and the soil carbon are assumed to be fully sequestrated in 20 yr.
-SOIL_CARBON_AVG_T_C02_HA = \
-    pd.read_hdf( os.path.join(INPUT_DIR, 'soil_carbon_t_ha.h5') ).to_numpy()*44/12/20
+# Load soil carbon data and convert to CO2e
+SOIL_CARBON_AVG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'soil_carbon_t_ha.h5') ).to_numpy() \
+                           * (44 / 12) \         # Convert carbon -> CO2 requires a multiplier of (44/12)
+                           / SOC_AMORTISATION    # Spread soil carbon accumulation over X years
 
 
 ###############################################################

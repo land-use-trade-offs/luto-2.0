@@ -140,6 +140,8 @@ AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  # The minimum value an agricultural
 # ---------------------------------------------------------------------------- #
 
 # Greenhouse gas emissions limits parameters
+SOC_AMORTISATION = 91           # Number of years over which to spread (average) soil carbon accumulation
+
 GHG_EMISSIONS_LIMITS = 'on'     # 'on' or 'off'
 GHG_LIMITS_TYPE = 'tonnes'      # 'tonnes' or 'percentage'
 GHG_REDUCTION_PERCENTAGE = 50   # reduction in GHG emissions as percentage of 2010 ag emissions

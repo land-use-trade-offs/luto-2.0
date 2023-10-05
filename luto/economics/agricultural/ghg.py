@@ -418,7 +418,7 @@ def get_ecological_grazing_effect_g_mrj(data, yr_idx):
             soil_multiplier = lu_data.loc[year, 'IMPACTS_soil_carbon'] - 1
             if soil_multiplier != 0:
                 soil_reduction_amnt = (
-                    data.SOIL_CARBON_AVG_T_C02_HA
+                    data.SOIL_CARBON_AVG_T_CO2_HA
                     * soil_multiplier
                     * data.REAL_AREA  # adjust for resfactor
                 )
