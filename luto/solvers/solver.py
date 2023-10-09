@@ -22,16 +22,13 @@ from collections import defaultdict
 import time
 from typing import Optional
 import numpy as np
-import pandas as pd
-import scipy.sparse as sp
 import gurobipy as gp
 from gurobipy import GRB
-from dataclasses import dataclass
-from functools import cached_property
 
 import luto.settings as settings
 from luto import tools
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.solvers.input_data import InputData
 
 # Set Gurobi environment.
 gurenv = gp.Env(logfilename="gurobi.log", empty=True)  # (empty = True)
@@ -530,7 +527,7 @@ class LutoSolver:
                     self.water_limit_constraints_r[r].append(constr)
 
             if settings.VERBOSE == 1:
-                print("    ...setting water limit for %s <= %.2f ML" % (region, wreq_reg_limit)ß)
+                print("    ...setting water limit for %s <= %.2f ML" % (region, wreq_reg_limit))
 
     def _add_ghg_emissions_limit_constraints(self):
         if settings.GHG_EMISSIONS_LIMITS != "on":

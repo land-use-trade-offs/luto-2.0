@@ -10,15 +10,6 @@ from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 class InputData:
     """
     An object that collects and stores all relevant data for solver.py.
-
-    ag_t_mrj: np.ndarray            # Agricultural transition cost matrices.
-    ag_c_mrj: np.ndarray            # Agricultural production cost matrices.
-    ag_r_mrj: np.ndarray            # Agricultural production revenue matrices.
-    ag_g_mrj: np.ndarray            # Agricultural greenhouse gas emissions matrices.
-    ag_w_mrj: np.ndarray            # Agricultural water requirements matrices.
-    ag_x_mrj: np.ndarray            # Agricultural exclude matrices.
-    ag_q_mrp: np.ndarray            # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
-    ag_ghg_t_mrj: np.ndarray        # GHG emissions released during transitions between agricultural land uses.
     """
 
     ag_t_mrj: np.ndarray  # Agricultural transition cost matrices.
