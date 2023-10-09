@@ -31,8 +31,7 @@ from functools import cached_property
 
 import luto.settings as settings
 from luto import tools
-from luto.ag_managements import SORTED_AG_MANAGEMENTS
-from luto.solvers.input_data import InputData
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 # Set Gurobi environment.
 gurenv = gp.Env(logfilename="gurobi.log", empty=True)  # (empty = True)
@@ -54,6 +53,14 @@ class LutoSolver:
         self.d_c = d_c
         self.gurobi_model = gp.Model("LUTO " + settings.VERSION, env=gurenv)
 
+        # Initialise variable stores
+        self.X_ag_dry_vars_jr = None
+        self.X_ag_irr_vars_jr = None
+        self.X_non_ag_vars_kr = None
+        self.X_ag_man_dry_vars_jr = None
+        self.X_ag_man_irr_vars_jr = None
+        self.V = None
+
         # initialise constraint lookups
         self.cell_usage_constraint_r = {}
         self.ag_management_constraints_r = defaultdict(list)
@@ -64,8 +71,8 @@ class LutoSolver:
 
     def formulate(self):
         """
-        Performs the initial formulation of the model - setting up variables, decision variables,
-        etc.
+        Performs the initial formulation of the model - setting up decision variables, 
+        constraints, and the objective.
         """
         print("\nSetting up the model...", time.ctime() + "\n")
         self._setup_vars()
@@ -161,11 +168,7 @@ class LutoSolver:
         """
         Formulate the objective based on settings.OBJECTIVE
         """
-        print(
-            f"Setting up objective function to {settings.OBJECTIVE} ({time.ctime()})...",
-            end=" ",
-            flush=True,
-        )
+        print(f"Setting up objective function to {settings.OBJECTIVE} ({time.ctime()})...", end=" ", flush=True)
 
         st = time.time()
         if settings.OBJECTIVE == "maxrev":
@@ -178,8 +181,7 @@ class LutoSolver:
                         + self._input_data.ag_t_mrj
                         + self._input_data.non_ag_to_ag_t_mrj
                     )
-                )
-                / settings.PENALTY
+                ) / settings.PENALTY
             )
 
             non_ag_obj_rk = (
@@ -189,8 +191,7 @@ class LutoSolver:
                         self._input_data.non_ag_c_rk
                         + self._input_data.ag_to_non_ag_t_rk
                     )
-                )
-                / settings.PENALTY
+                ) / settings.PENALTY
             )
 
             # Get effects of alternative agr. management options (stored in a dict)
@@ -201,8 +202,7 @@ class LutoSolver:
                         self._input_data.ag_man_c_mrj[am]
                         + self._input_data.ag_man_t_mrj[am]
                     )
-                )
-                / settings.PENALTY
+                ) / settings.PENALTY
                 for am in self._input_data.am2j
             }
 
@@ -213,6 +213,7 @@ class LutoSolver:
                 + self._input_data.ag_t_mrj
                 + self._input_data.non_ag_to_ag_t_mrj
             ) / settings.PENALTY
+
             non_ag_obj_rk = (
                 self._input_data.non_ag_c_rk + self._input_data.ag_to_non_ag_t_rk
             ) / settings.PENALTY
@@ -269,9 +270,7 @@ class LutoSolver:
         elif settings.DEMAND_CONSTRAINT_TYPE == "hard":
             objective = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr
         else:
-            raise ValueError(
-                'DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"'
-            )
+            raise ValueError('DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"')
 
         self.gurobi_model.setObjective(objective, GRB.MINIMIZE)
         ft = time.time()
@@ -309,26 +308,20 @@ class LutoSolver:
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx, j in enumerate(am_j_list):
                 if cells is not None:
-                    lm0_r_vals = [
-                        r for r in cells if self._input_data.ag_x_mrj[0, r, j]
-                    ]
-                    lm1_r_vals = [
-                        r for r in cells if self._input_data.ag_x_mrj[1, r, j]
-                    ]
+                    lm0_r_vals = [r for r in cells if self._input_data.ag_x_mrj[0, r, j]]
+                    lm1_r_vals = [r for r in cells if self._input_data.ag_x_mrj[1, r, j]]
                 else:
                     lm0_r_vals = self._input_data.ag_lu2cells[0, j]
                     lm1_r_vals = self._input_data.ag_lu2cells[1, j]
 
                 for r in lm0_r_vals:
                     constr = self.gurobi_model.addConstr(
-                        self.X_ag_man_dry_vars_jr[am][j_idx, r]
-                        <= self.X_ag_dry_vars_jr[j, r]
+                        self.X_ag_man_dry_vars_jr[am][j_idx, r] <= self.X_ag_dry_vars_jr[j, r]
                     )
                     self.ag_management_constraints_r[r].append(constr)
                 for r in lm1_r_vals:
                     constr = self.gurobi_model.addConstr(
-                        self.X_ag_man_irr_vars_jr[am][j_idx, r]
-                        <= self.X_ag_irr_vars_jr[j, r]
+                        self.X_ag_man_irr_vars_jr[am][j_idx, r] <= self.X_ag_irr_vars_jr[j, r]
                     )
                     self.ag_management_constraints_r[r].append(constr)
 
@@ -344,6 +337,7 @@ class LutoSolver:
                 ag_man_vars_sum = gp.quicksum(
                     self.X_ag_man_dry_vars_jr[am][j_idx, :]
                 ) + gp.quicksum(self.X_ag_man_irr_vars_jr[am][j_idx, :])
+
                 all_vars_sum = gp.quicksum(self.X_ag_dry_vars_jr[j, :]) + gp.quicksum(
                     self.X_ag_irr_vars_jr[j, :]
                 )
@@ -488,11 +482,7 @@ class LutoSolver:
         if settings.WATER_USE_LIMITS != "on":
             return
 
-        print(
-            "Adding water constraints by",
-            settings.WATER_REGION_DEF + "...",
-            time.ctime(),
-        )
+        print("Adding water constraints by", settings.WATER_REGION_DEF + "...", time.ctime())
 
         # Returns region-specific water use limits
         w_limits = self._input_data.limits["water"]
@@ -540,10 +530,7 @@ class LutoSolver:
                     self.water_limit_constraints_r[r].append(constr)
 
             if settings.VERBOSE == 1:
-                print(
-                    "    ...setting water limit for %s <= %.2f ML"
-                    % (region, wreq_reg_limit)
-                )
+                print("    ...setting water limit for %s <= %.2f ML" % (region, wreq_reg_limit)ß)
 
     def _add_ghg_emissions_limit_constraints(self):
         if settings.GHG_EMISSIONS_LIMITS != "on":
@@ -595,11 +582,7 @@ class LutoSolver:
 
         self.ghg_emissions_expr = ag_contr + ag_man_contr + non_ag_contr
 
-        print(
-            "    ...setting GHG emissions reduction target: {:,.0f} tCO2e\n".format(
-                ghg_limits
-            )
-        )
+        print("    ...setting GHG emissions reduction target: {:,.0f} tCO2e\n".format(ghg_limits))
         self.ghg_emissions_limit_constraint = self.gurobi_model.addConstr(
             self.ghg_emissions_expr <= ghg_limits
         )
@@ -641,8 +624,8 @@ class LutoSolver:
             old_lmmap,
             current_lmmap,
         )
-        self._update_objective()
         self._update_constraints(updated_cells)
+        self._setup_objective()
 
     def _update_variables(
         self,
@@ -760,11 +743,6 @@ class LutoSolver:
         )
         return updated_cells
 
-    def _update_objective(self):
-        # For now, we can just setup the objective from scratch.
-        # TODO: update objective dynamically
-        self._setup_objective()
-
     def _update_constraints(self, updated_cells: np.array):
         if len(updated_cells) == 0:
             print("No constraints need updating.")
@@ -804,14 +782,7 @@ class LutoSolver:
 
         ft = time.time()
         print("Completed solve... ", time.ctime())
-        print(
-            "Found optimal objective value",
-            round(self.gurobi_model.objVal, 2),
-            "in",
-            round(ft - st),
-            "seconds\n",
-        )
-
+        print("Found optimal objective value", round(self.gurobi_model.objVal, 2), "in", round(ft - st), "seconds\n")
         print("Collecting results...", end=" ", flush=True)
 
         # Dictionary that stores information about production and GHG emissions for the write module
@@ -828,15 +799,11 @@ class LutoSolver:
             (self._input_data.ncells, self._input_data.n_non_ag_lus)
         ).astype(np.float32)
         am_X_dry_sol_rj = {
-            am: np.zeros((self._input_data.ncells, self._input_data.n_ag_lus)).astype(
-                np.float32
-            )
+            am: np.zeros((self._input_data.ncells, self._input_data.n_ag_lus)).astype(np.float32)
             for am in self._input_data.am2j
         }
         am_X_irr_sol_rj = {
-            am: np.zeros((self._input_data.ncells, self._input_data.n_ag_lus)).astype(
-                np.float32
-            )
+            am: np.zeros((self._input_data.ncells, self._input_data.n_ag_lus)).astype(np.float32)
             for am in self._input_data.am2j
         }
 
@@ -886,7 +853,7 @@ class LutoSolver:
         ag_X_mrj = np.stack((X_dry_sol_rj, X_irr_sol_rj))  # Float32
         ag_X_mrj_processed = ag_X_mrj
 
-        # Note - uncomment the following block of code to revert the processed agricultural variables to be binary.
+        ## Note - uncomment the following block of code to revert the processed agricultural variables to be binary.
 
         # ag_X_mrj_shape = ag_X_mrj.shape
 
@@ -925,7 +892,7 @@ class LutoSolver:
         for am in self._input_data.am2j:
             ag_man_processed = np.stack((am_X_dry_sol_rj[am], am_X_irr_sol_rj[am]))
 
-            # Note - uncomment the following block of code to revert the processed AM variables to be binary.
+            ## Note - uncomment the following block of code to revert the processed AM variables to be binary.
 
             # ag_man_X_shape = ag_man_processed.shape
 
@@ -951,19 +918,14 @@ class LutoSolver:
             non_ag_X_sol_rk[non_ag_bools_r, :].argmax(axis=1)
             + settings.NON_AGRICULTURAL_LU_BASE_CODE
         )
-        lmmap[
-            non_ag_bools_r
-        ] = 0  # Assume that all non-agricultural land uses are dryland
+        lmmap[non_ag_bools_r] = 0  # Assume that all non-agricultural land uses are dryland
 
         # Process agricultural management usage info
 
         # Make ammaps (agricultural management maps) using the lumap and lmmap. There is a
         # separate ammap for each for each agricultural management option, because they can be stacked.
-        ammaps = {
-            am: np.zeros(self._input_data.ncells, dtype=np.int8)
-            for am in SORTED_AG_MANAGEMENTS
-        }
-        for r in self._input_data.cell_clusters.keys():
+        ammaps = {am: np.zeros(self._input_data.ncells, dtype=np.int8) for am in AG_MANAGEMENTS_TO_LAND_USES}
+        for r in range(self._input_data.ncells):
             cell_j = lumap[r]
             cell_m = lmmap[r]
 
@@ -982,9 +944,7 @@ class LutoSolver:
 
         # # Process production amount for each commodity
         print("Processing commodity production amounts...")
-        prod_data["Production"] = [
-            self.total_q_exprs_c[c].getValue() for c in range(self.ncms)
-        ]
+        prod_data["Production"] = [self.total_q_exprs_c[c].getValue() for c in range(self.ncms)]
 
         print("Processing GHG emissions amount...")
         prod_data["GHG Emissions"] = self.ghg_emissions_expr.getValue()
