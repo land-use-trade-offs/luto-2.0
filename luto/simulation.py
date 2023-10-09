@@ -44,7 +44,7 @@ import luto.economics.non_agricultural.revenue as non_ag_revenue
 
 from luto.economics import land_use_culling
 
-from luto.solvers.solver import InputData, solve
+from luto.solvers.solver import InputData, LutoSolver
 from luto import tools
 
 
@@ -354,12 +354,7 @@ def get_input_data():
     )
 
 
-def step( base    # Base year from which the data is taken.
-        , target  # Year to be solved for.
-        , d_c     # Demand in the form of total quantities of agricultural commodities by year (d_c) array.
-        ):
-    """Solve the linear programme using the `base` lumap for `target` year."""
-
+def prepare_input_data(base: int, target: int) -> InputData:
     # Synchronise base and target years across module so matrix-getters know.
     sync_years(base, target)
 
@@ -372,8 +367,69 @@ def step( base    # Base year from which the data is taken.
         non_ag_dvars[base] = data.NON_AG_L_RK
         ag_man_dvars[base] = data.AG_MAN_L_MRJ_DICT
 
+    return get_input_data()
+
+
+def solve_timeseries(steps: int, base: int, target: int):
+    print( "\nRunning LUTO %s timeseries from %s to %s at resfactor %s, starting at %s." % (settings.VERSION, base, target, settings.RESFACTOR, time.ctime()) )
+
+    for s in range(steps):
+        print( "\n-------------------------------------------------" )
+        print( "Running for year %s..." % (base + s + 1) )
+        print( "-------------------------------------------------\n" )
+        start_time = time.time()
+
+        input_data = prepare_input_data(base + s, base + s + 1)
+        d_c = d_cy[s]
         
-    # Magic.
+        if s == 0:
+            luto_solver = LutoSolver(input_data, d_c)
+            luto_solver.formulate()
+
+        if s > 0:
+            old_ag_x_mrj = luto_solver._input_data.ag_x_mrj.copy()
+            old_non_ag_x_rk = luto_solver._input_data.non_ag_x_rk.copy()
+
+            luto_solver.update_formulation(
+                input_data=input_data,
+                d_c=d_c,
+                old_ag_x_mrj=old_ag_x_mrj,
+                old_non_ag_x_rk=old_non_ag_x_rk,
+                old_lumap=lumaps[base + s - 1],
+                current_lumap=lumaps[base + s],
+                old_lmmap=lmmaps[base + s - 1],
+                current_lmmap=lmmaps[base + s],
+            )
+
+        (
+            lumaps[base + s + 1],
+            lmmaps[base + s + 1],
+            ammaps[base + s + 1],
+            ag_dvars[base + s + 1],
+            non_ag_dvars[base + s + 1],
+            ag_man_dvars[base + s + 1],
+            prod_data[base + s + 1],
+        ) = luto_solver.solve()
+
+        print('Total processing time...', round(time.time() - start_time), 'seconds')
+
+
+def solve_snapshot(base: int, target: int):
+    if len(d_cy.shape) == 2:
+        d_c = d_cy[ target - bdata.YR_CAL_BASE ]       # Demands needs to be a timeseries from 2010 to target year
+    else:
+        d_c = d_cy
+
+    print( "\nRunning LUTO %s snapshot for %s at resfactor %s, starting at %s" % (settings.VERSION, target, settings.RESFACTOR, time.ctime()) )
+    print( "\n-------------------------------------------------" )
+    print( "Running for year %s..." % target )
+    print( "-------------------------------------------------\n" )
+
+    start_time = time.time()
+    input_data = prepare_input_data(base, target)
+    luto_solver = LutoSolver(input_data, d_c)
+    luto_solver.formulate()
+
     (
         lumaps[target],
         lmmaps[target],
@@ -382,45 +438,30 @@ def step( base    # Base year from which the data is taken.
         non_ag_dvars[target],
         ag_man_dvars[target],
         prod_data[target],
-    ) = solve(d_c, get_input_data())
+    ) = luto_solver.solve()
+    
+    print('Total processing time...', round(time.time() - start_time), 'seconds')
+
 
 def run( base
        , target
        ):
     """Run the simulation."""
-    
-    # The number of times the solver is to be called.
-    steps = target - base
-    
+
     # Run the simulation up to `year` sequentially.         *** Not sure that timeseries mode is working ***
     if settings.MODE == 'timeseries':
         if len(d_cy.shape) != 2:
             raise ValueError( "Demands need to be a time series array of shape (years, commodities) and years > 0." )
-        elif target - base > d_cy.shape[0]:
+        if target - base > d_cy.shape[0]:
             raise ValueError( "Not enough years in demands time series.")
-        else:
-            print( "\nRunning LUTO %s timeseries from %s to %s at resfactor %s, starting at %s." % (settings.VERSION, base, target, settings.RESFACTOR, time.ctime()) )
-            for s in range(steps):
-                print( "\n-------------------------------------------------" )
-                print( "Running for year %s..." % (base + s + 1) )
-                print( "-------------------------------------------------\n" )
-                d_c = d_cy[s]
-                step(base + s, base + s + 1, d_c)
-                
-                # Need to fix how the 'base' land-use map is updated in timeseries runs
-                
+
+        steps = target - base
+        solve_timeseries(steps, base, target)
+
     # Run the simulation from YR_CAL_BASE to `target` year directly.
     elif settings.MODE == 'snapshot':
         # If demands is a time series, choose the appropriate entry.
-        if len(d_cy.shape) == 2:
-            d_c = d_cy[ target - bdata.YR_CAL_BASE ]       # Demands needs to be a timeseries from 2010 to target year
-        else:
-            d_c = d_cy
-        print( "\nRunning LUTO %s snapshot for %s at resfactor %s, starting at %s" % (settings.VERSION, target, settings.RESFACTOR, time.ctime()) )
-        print( "\n-------------------------------------------------" )
-        print( "Running for year %s..." % target )
-        print( "-------------------------------------------------\n" )
-        step(base, target, d_c)
+        solve_snapshot(base, target)
 
     else:
         raise ValueError("Unkown MODE: %s." % settings.MODE)
