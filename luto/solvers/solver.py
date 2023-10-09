@@ -31,7 +31,7 @@ from functools import cached_property
 
 import luto.settings as settings
 from luto import tools
-from luto.ag_managements import SORTED_AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 # Set Gurobi environment.
 gurenv = gp.Env(logfilename="gurobi.log", empty=True)  # (empty = True)
@@ -1065,10 +1065,7 @@ class LutoSolver:
 
         # Make ammaps (agricultural management maps) using the lumap and lmmap. There is a
         # separate ammap for each for each agricultural management option, because they can be stacked.
-        ammaps = {
-            am: np.zeros(self._input_data.ncells, dtype=np.int8)
-            for am in SORTED_AG_MANAGEMENTS
-        }
+        ammaps = {am: np.zeros(self._input_data.ncells, dtype=np.int8) for am in AG_MANAGEMENTS_TO_LAND_USES}
         for r in range(self._input_data.ncells):
             cell_j = lumap[r]
             cell_m = lmmap[r]
