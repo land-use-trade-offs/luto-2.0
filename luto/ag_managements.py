@@ -1,14 +1,3 @@
-from collections import defaultdict
-import pandas as pd
-from luto.settings import RAW_DATA
-
-
-AG_MANAGEMENTS_INDEXING = {
-    1: 'Asparagopsis taxiformis',
-    2: 'Precision Agriculture',
-    3: 'Ecological Grazing',
-}
-
 AG_MANAGEMENTS_TO_LAND_USES = {
     'Asparagopsis taxiformis': [
         'Beef - natural land',
@@ -49,6 +38,3 @@ AG_MANAGEMENTS_TO_LAND_USES = {
         'Dairy - modified land',
     ],
 }
-
-# List of all agricultural managements, sorted by index value defined above
-SORTED_AG_MANAGEMENTS = [item[1] for item in sorted(AG_MANAGEMENTS_INDEXING.items(), key=lambda item: item[0])]
