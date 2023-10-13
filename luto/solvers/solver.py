@@ -639,7 +639,7 @@ class LutoSolver:
                     self.water_limit_constraints_r[r].append(constr)
 
             if settings.VERBOSE == 1:
-                print("    ...setting water limit for %s <= %.2f ML" % (region, wreq_reg_limit)ß)
+                print("    ...setting water limit for %s <= %.2f ML" % (region, wreq_reg_limit))
 
     def _add_ghg_emissions_limit_constraints(self):
         if settings.GHG_EMISSIONS_LIMITS != "on":
