@@ -155,19 +155,26 @@ def write_production(sim, yr_cal, path):
     df['Demand (tonnes, KL)'] = demands
     df['Abs_diff (tonnes, KL)'] = abs_diff
     df['Prop_diff (%)'] = prop_diff
-    df.to_csv(os.path.join(path, 'quantity_comparison.csv'), index = False)
+    
 
     # LUS = ['Non-agricultural land'] + sim.data.AGRICULTURAL_LANDUSES + sim.data.NON_AGRICULTURAL_LANDUSES
     ctlu, swlu = lumap_crossmap( sim.lumaps[sim.data.YR_CAL_BASE]
                                , sim.lumaps[yr_cal]
                                , sim.data.AGRICULTURAL_LANDUSES
-                               , sim.data.NON_AGRICULTURAL_LANDUSES )
-    ctlm, swlm = lmmap_crossmap(sim.lmmaps[sim.data.YR_CAL_BASE], sim.lmmaps[yr_cal])
+                               , sim.data.NON_AGRICULTURAL_LANDUSES
+                               , sim.data.REAL_AREA)
+    
+
+    
+    ctlm, swlm = lmmap_crossmap(sim.lmmaps[sim.data.YR_CAL_BASE], sim.lmmaps[yr_cal], sim.data.REAL_AREA)
+
 
     cthp, swhp = crossmap_irrstat( sim.lumaps[sim.data.YR_CAL_BASE], sim.lmmaps[sim.data.YR_CAL_BASE]
-                                 , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
-                                 , sim.data.AGRICULTURAL_LANDUSES
-                                 , sim.data.NON_AGRICULTURAL_LANDUSES )
+                                  , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
+                                  , sim.data.AGRICULTURAL_LANDUSES
+                                  , sim.data.NON_AGRICULTURAL_LANDUSES
+                                  , sim.data.REAL_AREA)
+    
     
     # ctams = {}
     # swams = {}
@@ -179,12 +186,20 @@ def write_production(sim, yr_cal, path):
         # swams[am] = swam
     
         ctas, swas = crossmap_amstat( am
-                                    , sim.lumaps[sim.data.YR_CAL_BASE], sim.ammaps[sim.data.YR_CAL_BASE][am]
-                                    , sim.lumaps[yr_cal], sim.ammaps[yr_cal][am]
-                                    , sim.data.AGRICULTURAL_LANDUSES )
+                                    , sim.lumaps[sim.data.YR_CAL_BASE]
+                                    , sim.ammaps[sim.data.YR_CAL_BASE][am]
+                                    , sim.lumaps[yr_cal]
+                                    , sim.ammaps[yr_cal][am]
+                                    , sim.data.AGRICULTURAL_LANDUSES
+                                    , sim.data.REAL_AREA)
         ctass[am] = ctas
         swass[am] = swas
         
+
+    
+    # Save files to disk      
+    df.to_csv(os.path.join(path, 'quantity_comparison.csv'), index = False)
+    
     ctlu.to_csv(os.path.join(path, 'crosstab-lumap.csv'))
     ctlm.to_csv(os.path.join(path, 'crosstab-lmmap.csv'))
 
@@ -201,6 +216,7 @@ def write_production(sim, yr_cal, path):
 
         ctass[am].to_csv(os.path.join(path, f'crosstab-{am_snake_case}-amstat.csv'))
         swass[am].to_csv(os.path.join(path, f'switches-{am_snake_case}-amstat.csv'))
+
 
 
 def write_water(sim, yr_cal, path):
@@ -320,7 +336,7 @@ def write_ghg_separate(sim, yr_cal, path):
     # Convert calendar year to year index.
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
     
-    # get the landuse descriptions for each validate cell (i.e., 0 -> Apples)
+    # Get the landuse descriptions for each validate cell (i.e., 0 -> Apples)
     lu_desc = [sim.data.AGLU2DESC[x] for x in sim.data.LUMAP]
     
     # -------------------------------------------------------#
@@ -381,10 +397,10 @@ def write_ghg_separate(sim, yr_cal, path):
     # Get greenhouse gas emissions from non-agricultural landuse #
     # -----------------------------------------------------------#
     
-    # get the non_ag GHG reduction
+    # Get the non_ag GHG reduction
     non_ag_g_rk = non_ag_ghg.get_ghg_matrix(sim.data)
     
-    # multiply with decision variable to get the GHG in yr_cal
+    # Multiply with decision variable to get the GHG in yr_cal
     non_ag_g_rk = non_ag_g_rk * sim.non_ag_dvars[yr_cal]
     
     # get the non_ag GHG reduction on dry/irri land
@@ -407,10 +423,10 @@ def write_ghg_separate(sim, yr_cal, path):
     # Get greenhouse gas emissions from landuse transformation penalties #
     # -------------------------------------------------------------------# 
     
-    # get the lucc transition penalty data (mrj) between target and base (2010) year
+    # Get the lucc transition penalty data (mrj) between target and base (2010) year
     ghg_t_2010 = ag_ghg.get_ghg_transition_penalties(sim.data, sim.lumaps[2010])          # mrj
     
-    # get the GHG emissions from lucc-convertion compared to the base year (2010)
+    # Get the GHG emissions from lucc-convertion compared to the base year (2010)
     ghg_t_separate = np.einsum('mrj,mrj -> rmj',sim.ag_dvars[yr_cal], ghg_t_2010)         # rmj
 
     # Summarize the array as a df
@@ -435,18 +451,18 @@ def write_ghg_separate(sim, yr_cal, path):
     ag_ghg_arrays = []
     for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():
         
-        # get the lucc_code for this the agricultural management in this loop
+        # Get the lucc_code for this the agricultural management in this loop
         am_j = np.array([sim.data.DESC2AGLU[lu] for lu in am_lus]) 
     
-        # get the GHG emission from agricultural management, then reshape it to starte with row (r) dimension
+        # Get the GHG emission from agricultural management, then reshape it to starte with row (r) dimension
         am_ghg_mrj = ag_man_g_mrj[am] * sim.ag_man_dvars[yr_cal][am][:, :, am_j]              # mrj 
         am_ghg_rm = np.einsum('mrj -> rm',am_ghg_mrj)                                         # rm
     
-        # summarize the df by calculating the total value of each column
+        # Summarize the df by calculating the total value of each column
         ag_ghg_arrays.append(am_ghg_rm)
     
     
-    # concat all summary tables
+    # Concat all summary tables
     ag_ghg_summary = np.stack(ag_ghg_arrays)                                           # srm
     ag_ghg_summary = np.einsum('srm -> rms',ag_ghg_summary)                            # rms
     
