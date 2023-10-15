@@ -70,11 +70,16 @@ class Data():
         self.REAL_AREA = bdata.REAL_AREA[self.MASK] * bdata.RESMULT             # Actual Float32
         self.LUMAP = bdata.LUMAP[self.MASK]                                     # Int8
         self.LMMAP = bdata.LMMAP[self.MASK]                                     # Int8
-        self.AMMAP = bdata.AMMAP[self.MASK]                                     # Int8
+        self.AMMAP_DICT = {
+            am: array[self.MASK] for am, array in bdata.AMMAP_DICT.items()
+        }                                                                       # Dictionary containing Int8 arrays
         self.AG_L_MRJ = tools.lumap2ag_l_mrj(self.LUMAP, self.LMMAP)            # Boolean [2, 4218733, 28]
         self.NON_AG_L_RK = tools.lumap2non_ag_l_mk(
             self.LUMAP, len(self.NON_AGRICULTURAL_LANDUSES)
         )                                                                       # Int8
+        self.AG_MAN_L_MRJ_DICT = tools.get_base_am_vars(
+            self.NCELLS, self.NLMS, self.N_AG_LUS
+        )                                                                       # Dictionary containing Int8 arrays
         self.PROD_2010_C = prod_2010_c                                          # Float, total agricultural production in 2010, shape n commodities
         self.D_CY = d_cy                                                        # Float, total demand for agricultural production, shape n commodities by 91 years
         self.WREQ_IRR_RJ = bdata.WREQ_IRR_RJ[self.MASK]                         # Water requirements for irrigated landuses
@@ -96,6 +101,7 @@ class Data():
         self.EP2AG_TRANSITION_COSTS_HA = bdata.EP2AG_TRANSITION_COSTS_HA        # Float32
         self.EP_BLOCK_AVG_T_C02_HA = bdata.EP_BLOCK_AVG_T_C02_HA[self.MASK]     # Float32
         self.NATURAL_LAND_T_CO2_HA = bdata.NATURAL_LAND_T_CO2_HA[self.MASK]     # Float32
+        self.SOIL_CARBON_AVG_T_CO2_HA = bdata.SOIL_CARBON_AVG_T_CO2_HA[self.MASK]
 
         # Slice this year off HDF5 bricks. TODO: This field is not in luto.data.
         # with h5py.File(bdata.fname_dr, 'r') as wy_dr_file:
@@ -354,9 +360,10 @@ def step( base    # Base year from which the data is taken.
     if base == data.YR_CAL_BASE: 
         lumaps[base] = data.LUMAP
         lmmaps[base] = data.LMMAP
-        ammaps[base] = data.AMMAP
+        ammaps[base] = data.AMMAP_DICT
         ag_dvars[base]  = data.AG_L_MRJ
         non_ag_dvars[base] = data.NON_AG_L_RK
+        ag_man_dvars[base] = data.AG_MAN_L_MRJ_DICT
 
         
     # Magic.
@@ -367,6 +374,7 @@ def step( base    # Base year from which the data is taken.
         ag_dvars[target],
         non_ag_dvars[target],
         ag_man_dvars[target],
+        prod_data[target],
     ) = solve(d_c, get_input_data())
 
 def run( base
@@ -423,14 +431,15 @@ ammaps = {}
 ag_dvars = {}
 non_ag_dvars = {}
 ag_man_dvars = {}
+prod_data = {}
 
 # Get the total demand quantities by commodity for 2010 to 2100 by combining the demand deltas with 2010 production
 prod_2010_c = tools.get_production( bdata
-                            , bdata.YR_CAL_BASE
-                            , tools.lumap2ag_l_mrj(bdata.LUMAP, bdata.LMMAP)
-                            , tools.lumap2non_ag_l_mk(bdata.LUMAP, len(bdata.NON_AGRICULTURAL_LANDUSES))
-                            , tools.get_base_am_vars(bdata.NCELLS)
-                            )
+                                  , bdata.YR_CAL_BASE
+                                  , tools.lumap2ag_l_mrj(bdata.LUMAP, bdata.LMMAP)
+                                  , tools.lumap2non_ag_l_mk(bdata.LUMAP, len(bdata.NON_AGRICULTURAL_LANDUSES))
+                                  , tools.get_base_am_vars(bdata.NCELLS, bdata.NLMS, bdata.N_AG_LUS)
+                                  )
 
 # Demand deltas can be a time series (shape year x commodity) or a single array (shape = n commodites).
 d_cy = bdata.DEMAND_DELTAS_C * prod_2010_c

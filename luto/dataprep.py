@@ -541,7 +541,6 @@ def create_new_dataset():
     ############### Agricultural Greenhouse Gas Emissions - crops
         
     # Produce a multi-indexed version of the crops data.
-    # cropsGHG_ptable = cropsGHG.drop('LU_ID', axis = 1).pivot_table(index = 'SA2_ID', columns = ['IRRIGATION', 'LU_DESC'])
     cropsGHG_ptable = cropsGHG.drop('LU_DESC', axis = 1)
     
     # Merge to create a cell-based table.
@@ -555,10 +554,11 @@ def create_new_dataset():
     agGHG_crops['LU_ID'] = agGHG_crops['LU_ID'].astype('Int64')
             
     # Create the MultiIndex structure
+    GHG_sources_crops = ['CO2E_KG_HA_FERT_PROD', 'CO2E_KG_HA_PEST_PROD', 'CO2E_KG_HA_IRRIG', 'CO2E_KG_HA_CHEM_APPL', 'CO2E_KG_HA_CROP_MGT', 'CO2E_KG_HA_CULTIV', 'CO2E_KG_HA_HARVEST', 'CO2E_KG_HA_SOWING', 'CO2E_KG_HA_SOIL_N_SURP']
     agGHG_crops = agGHG_crops.pivot( index = 'CELL_ID', 
-                                   columns = ['IRRIGATION', 'LU_ID'], 
-                                   values = ['CO2E_KG_HA_FERT_PROD', 'CO2E_KG_HA_PEST_PROD', 'CO2E_KG_HA_IRRIG', 'CO2E_KG_HA_CHEM_APPL', 'CO2E_KG_HA_CROP_MGT', 'CO2E_KG_HA_CULTIV', 'CO2E_KG_HA_HARVEST', 'CO2E_KG_HA_SOWING', 'CO2E_KG_HA_SOIL_N_SURP']
-                                 ).dropna( axis = 'columns', how = 'all')
+                                     columns = ['IRRIGATION', 'LU_ID'], 
+                                     values = GHG_sources_crops
+                                   ).dropna( axis = 'columns', how = 'all' )
     
     # The merge flattens the multi-index to tuples, so unflatten back to multi-index
     ts = [(col[0], lms[col[1]], luid_desc[col[2]]) for col in agGHG_crops.columns]
@@ -566,16 +566,52 @@ def create_new_dataset():
                 
     # Sort land use in lexicographical order
     agGHG_crops.sort_index(axis = 1, inplace = True)
-    
-    # Check against previous data (note previous data had zeros instead of NaNs)
-    agGHG_orig = pd.read_hdf('N:/LUF-Modelling/LUTO2_BB/LUTO2/input/agGHG_crops.h5')
-    print('agGHG_crops matches previous data =', agGHG_crops.fillna(0).equals(agGHG_orig))
 
     # Save to HDF5
     agGHG_crops.to_hdf(outpath + 'agGHG_crops.h5', key = 'agGHG_crops', mode = 'w', format = 'fixed', index = False, complevel = 9)
         
+    
+    
+    # TEMPORARY CODE to Check total crop GHG emissions
+    agGHGmap = lmap[['CELL_ID', 'SA2_ID', 'LU_ID', 'IRRIGATION']].merge( cropsGHG_ptable, 
+                                                                         on = ['SA2_ID', 'LU_ID', 'IRRIGATION'], 
+                                                                         how = 'left' )
+    
+    agGHGmap['REAL_AREA'] = zones['CELL_HA']
+    
+    agGHGmap.eval('TCO2E_CELL_FERT_PROD = CO2E_KG_HA_FERT_PROD * REAL_AREA / 1000', inplace = True)
+    agGHGmap.eval('TCO2E_CELL_PEST_PROD = CO2E_KG_HA_PEST_PROD * REAL_AREA / 1000', inplace = True)
+    agGHGmap.eval('TCO2E_CELL_IRRIG = CO2E_KG_HA_IRRIG * REAL_AREA / 1000', inplace = True)
+    agGHGmap.eval('TCO2E_CELL_CHEM_APPL = CO2E_KG_HA_CHEM_APPL * REAL_AREA / 1000', inplace = True)
+    agGHGmap.eval('TCO2E_CELL_CROP_MGT = CO2E_KG_HA_CROP_MGT * REAL_AREA / 1000', inplace = True)
+    agGHGmap.eval('TCO2E_CELL_CULTIV = CO2E_KG_HA_CULTIV * REAL_AREA / 1000', inplace = True)
+    agGHGmap.eval('TCO2E_CELL_HARVEST = CO2E_KG_HA_HARVEST * REAL_AREA / 1000', inplace = True)
+    agGHGmap.eval('TCO2E_CELL_SOWING = CO2E_KG_HA_SOWING * REAL_AREA / 1000', inplace = True)
+    agGHGmap.eval('TCO2E_CELL_SOIL_N_SURP = CO2E_KG_HA_SOIL_N_SURP * REAL_AREA / 1000', inplace = True)
         
-        
+    agGHGmap.eval('Total_GHG = (TCO2E_CELL_FERT_PROD + \
+                                TCO2E_CELL_PEST_PROD + \
+                                TCO2E_CELL_IRRIG + \
+                                TCO2E_CELL_CHEM_APPL + \
+                                TCO2E_CELL_CROP_MGT + \
+                                TCO2E_CELL_CULTIV + \
+                                TCO2E_CELL_HARVEST + \
+                                TCO2E_CELL_SOWING + \
+                                TCO2E_CELL_SOIL_N_SURP)', inplace = True)
+    
+    print(agGHGmap[['TCO2E_CELL_FERT_PROD', 
+                    'TCO2E_CELL_PEST_PROD',
+                    'TCO2E_CELL_IRRIG', 
+                    'TCO2E_CELL_CHEM_APPL',
+                    'TCO2E_CELL_CROP_MGT', 
+                    'TCO2E_CELL_CULTIV', 
+                    'TCO2E_CELL_HARVEST', 
+                    'TCO2E_CELL_SOWING', 
+                    'TCO2E_CELL_SOIL_N_SURP']].sum())
+    
+    agGHGmap['Total_GHG'].sum()
+    
+    
     
     ############### Agricultural Greenhouse Gas Emissions - livestock
     
