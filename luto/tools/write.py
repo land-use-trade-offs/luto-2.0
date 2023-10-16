@@ -50,6 +50,12 @@ def get_path():
     # Create folder 
     if not os.path.exists(path):
         os.mkdir(path)
+
+    # Create a subfolder for each seperate lu
+    path_sub_lu = os.path.join(path, 'lucc_seperate')
+
+    if not os.path.exists(path_sub_lu):
+        os.mkdir(path_sub_lu)
     
     # Return path name
     return path
