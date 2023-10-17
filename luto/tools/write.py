@@ -144,10 +144,6 @@ def write_files(sim, path):
             write_gtiff(ammaps[am], os.path.join(path, ammap_fname))
 
 
-
-
-
-
 def write_files_seperate(sim, path):
 
     # Write raw decision variables to seperate GeoTiffs
@@ -167,7 +163,8 @@ def write_files_seperate(sim, path):
         ag_man_rj_dict = {am: np.einsum('mrj -> rj', ammap) for am, ammap in sim.ag_man_dvars[yr_cal].items()}
         non_ag_rk = np.einsum('rk -> rk', sim.non_ag_dvars[yr_cal]) # Do nothing, just for consistency
 
-        # 2) Get the desc2code table
+        # 2) Get the desc2dvar table. 
+        #       desc is the land-use description, dvar is the decision variable corresponding to desc
         ag_dvar_map = tools.map_desc_to_dvar_index('Agriculture Landuse',sim.data.DESC2AGLU,ag_dvar_rj)
 
         ag_man_map = pd.concat([tools.map_desc_to_dvar_index(am,

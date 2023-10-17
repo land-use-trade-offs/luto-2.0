@@ -543,9 +543,9 @@ def map_desc_to_dvar_index(category:str,
                            dvar_arr:np.ndarray):
     '''Input:
         category: str, the category of the dvar, e.g., 'Agriculture/Non-Agriculture',
-        desc2idx: dict, the mapping between lu_desc and dvar index, e.g., {'dry':0,'irri':1},
+        desc2idx: dict, the mapping between lu_desc and dvar index, e.g., {'Apples': 0 ...},
         dvar_arr: np.ndarray, the dvar array with shape (r,{j|k}), where r is the number of pixels,
-                  and {j|k} is the number of landuses or commodities.
+                  and {j|k} is the dimension of ag-landuses or non-ag-landuses.
                   
     Return:
         pd.DataFrame, with columns of ['Category','lu_desc','dvar_idx','dvar'].'''

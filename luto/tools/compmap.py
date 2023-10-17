@@ -53,10 +53,10 @@ def lumap_crossmap(oldmap, newmap, ag_landuses, non_ag_landuses, real_area):
     switches = crosstab.iloc[-1, 0:-1] - crosstab.iloc[0:-1, -1]
     nswitches = np.abs(switches).sum()
     switches['Total'] = nswitches
-    switches['Total [%]'] = int(np.around(100 * nswitches / oldmap.shape[0]))
+    switches['Total [%]'] = np.around(100 * nswitches / (real_area.sum()/100), decimals=2)
+    switches = pd.DataFrame(switches)
 
     return crosstab, switches
-
 
 def lmmap_crossmap(oldmap, newmap, real_area):
     # Produce the cross-tabulation matrix with optional labels.
@@ -67,35 +67,38 @@ def lmmap_crossmap(oldmap, newmap, real_area):
                            margins = True)
     
     crosstab = crosstab.reindex(crosstab.index, axis=1, fill_value=0)
+    crosstab.columns = crosstab.columns.tolist()
+    crosstab.index = crosstab.index.tolist()
 
     # Calculate net switches to land use (negative means switch away).
     switches = crosstab.iloc[-1, 0:-1] - crosstab.iloc[0:-1, -1]
     nswitches = np.abs(switches).sum()
     switches['Total'] = nswitches
-    switches['Total [%]'] = int(np.around(100 * nswitches / oldmap.shape[0]))
+    switches['Total [%]'] = np.around(100 * nswitches / (real_area.sum()/100),decimals=2)
+    switches = pd.DataFrame(switches)
 
     return crosstab, switches
 
 
-def ammap_crossmap(oldmap, newmap, am):
-    # Produce the cross-tabulation matrix with optional labels for a single ammap.
-    crosstab = pd.crosstab(oldmap, newmap, margins = True)
+# def ammap_crossmap(oldmap, newmap, am):
+#     # Produce the cross-tabulation matrix with optional labels for a single ammap.
+#     crosstab = pd.crosstab(oldmap, newmap, margins = True)
 
-    reindex =  [0, 1, 'All']
-    crosstab = crosstab.reindex(reindex, axis = 0, fill_value = 0)
-    crosstab = crosstab.reindex(reindex, axis = 1, fill_value = 0)
+#     reindex =  [0, 1, 'All']
+#     crosstab = crosstab.reindex(reindex, axis = 0, fill_value = 0)
+#     crosstab = crosstab.reindex(reindex, axis = 1, fill_value = 0)
 
-    ind_names = ['(None)', am, 'Total']
-    crosstab.columns = ind_names
-    crosstab.index = ind_names
+#     ind_names = ['(None)', am, 'Total']
+#     crosstab.columns = ind_names
+#     crosstab.index = ind_names
 
-    # Calculate net switches to land use (negative means switch away).
-    switches = crosstab.iloc[-1, 0:-1] - crosstab.iloc[0:-1, -1]
-    nswitches = np.abs(switches).sum()
-    switches['Total'] = nswitches
-    switches['Total [%]'] = int(np.around(100 * nswitches / oldmap.shape[0]))
+#     # Calculate net switches to land use (negative means switch away).
+#     switches = crosstab.iloc[-1, 0:-1] - crosstab.iloc[0:-1, -1]
+#     nswitches = np.abs(switches).sum()
+#     switches['Total'] = nswitches
+#     switches['Total [%]'] = int(np.around(100 * nswitches / oldmap.shape[0]))
 
-    return crosstab, switches
+#     return crosstab, switches
 
 
 
@@ -147,10 +150,9 @@ def crossmap_irrstat( lumap_old
     df['Area prior [ km2 ]'] = cells_prior
     df['Area after [ km2 ]'] = cells_after
     df.fillna(0, inplace=True)
-    df = df.astype(np.int64)
     switches = df['Area after [ km2 ]']-  df['Area prior [ km2 ]']
     nswitches = np.abs(switches).sum()
-    pswitches = int(np.around(100 * nswitches / lumap_old.shape[0]))
+    pswitches = np.around(100 * nswitches / (real_area.sum()/100), decimals=2)
 
     df['Switches [ km2 ]'] = switches
     df['Switches [ % ]'] = 100 * switches / cells_prior
@@ -212,10 +214,9 @@ def crossmap_amstat( am
     df['Area prior [ km2 ]'] = cells_prior
     df['Area after [ km2 ]'] = cells_after
     df.fillna(0, inplace=True)
-    df = df.astype(np.int64)
     switches = df['Area after [ km2 ]']-  df['Area prior [ km2 ]']
     nswitches = np.abs(switches).sum()
-    pswitches = int(np.around(100 * nswitches / lumap_old.shape[0]))
+    pswitches = np.around(100 * nswitches / (real_area.sum()/100),decimals=2)
 
     df['Switches [ km2 ]'] = switches
     df['Switches [ % ]'] = 100 * switches / cells_prior
