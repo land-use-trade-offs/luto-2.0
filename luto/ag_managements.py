@@ -1,6 +1,3 @@
-from collections import defaultdict
-import pandas as pd
-from luto.settings import RAW_DATA
 
 
 AG_MANAGEMENTS_INDEXING = {
