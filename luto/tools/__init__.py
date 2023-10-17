@@ -535,3 +535,25 @@ def summarize_ghg_separate_df(in_array,column_level,lu_desc):
     df_summary.index = df_summary.index.tolist()
 
     return df_summary
+
+
+# function to create mapping table between lu_desc and dvar index
+def map_desc_to_dvar_index(category:str,
+                           desc2idx:dict,
+                           dvar_arr:np.ndarray):
+    '''Input:
+        category: str, the category of the dvar, e.g., 'Agriculture/Non-Agriculture',
+        desc2idx: dict, the mapping between lu_desc and dvar index, e.g., {'dry':0,'irri':1},
+        dvar_arr: np.ndarray, the dvar array with shape (r,{j|k}), where r is the number of pixels,
+                  and {j|k} is the number of landuses or commodities.
+                  
+    Return:
+        pd.DataFrame, with columns of ['Category','lu_desc','dvar_idx','dvar'].'''
+    
+    df = pd.DataFrame({'Category':category,
+                       'lu_desc':desc2idx.keys(),
+                       'dvar_idx':desc2idx.values()})
+    
+    df['dvar'] = [dvar_arr[:,j] for j in df['dvar_idx']]
+
+    return df.reindex(columns=['Category','lu_desc','dvar_idx','dvar'])

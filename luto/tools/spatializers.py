@@ -25,26 +25,31 @@ import rasterio
 from scipy.interpolate import NearestNDInterpolator
 import luto.settings as settings
 
-
-def recreate_2D_maps(sim, yr_cal):
+def create_2d_map(sim, map_, filler) -> np.ndarray:
     """Recreates a full resolution 2D array from masked and resfactored 1D array"""
     
     # First convert back to full resolution 2D array if resfactor is > 1.
     if settings.RESFACTOR > 1:
-        lumap = uncoursify(sim, sim.lumaps[yr_cal])
-        lmmap = uncoursify(sim, sim.lmmaps[yr_cal])
-        ammaps = {am: uncoursify(sim, ammap) for am, ammap in  sim.ammaps[yr_cal].items()}
-    else:
-        lumap = sim.lumaps[yr_cal]
-        lmmap = sim.lmmaps[yr_cal]
-        ammaps = sim.ammaps[yr_cal]
-
+        map_ = uncoursify(sim, map_)
+        
     # Then put the excluded land-use and land management types back in the array.
-    lumap = reconstitute(lumap, sim.data.LUMASK, filler = sim.data.MASK_LU_CODE).astype(np.int8)
-    lmmap = reconstitute(lmmap, sim.data.LUMASK, filler = 0).astype(np.int8)
-    ammaps = {am: reconstitute(ammap, sim.data.LUMASK, filler=0).astype(np.int8) for am, ammap in ammaps.items()}
+    map_ = reconstitute(map_, sim.data.LUMASK, filler = filler).astype(np.int8)
+    
+    return map_
+
+
+
+def recreate_2D_maps(sim, yr_cal):
+    """Recreates a full resolution 2D array for lumap, lmmap and ammaps"""
+
+    # Put the excluded land-use and land management types back in the array.
+    lumap = create_2d_map(sim, sim.lumaps[yr_cal], filler = sim.data.MASK_LU_CODE)
+    lmmap = create_2d_map(sim, sim.lmmaps[yr_cal], filler = 0)
+    ammaps = {am: create_2d_map(sim, ammap, filler=0) for am, ammap in sim.ammaps[yr_cal].items()}
     
     return lumap, lmmap, ammaps
+
+
 
 
 def reconstitute(map_, mask, filler = -1):

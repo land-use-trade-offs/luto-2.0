@@ -42,7 +42,12 @@ def get_path():
     path = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
     
     # Add some shorthand details about the model run
-    post = '_' + settings.DEMAND_CONSTRAINT_TYPE + '_' + settings.OBJECTIVE + '_RF' + str(settings.RESFACTOR) + '_P1e' + str(int(math.log10(settings.PENALTY))) + '_W' + settings.WATER_USE_LIMITS + '_G' + settings.GHG_EMISSIONS_LIMITS
+    post = '_'    + settings.DEMAND_CONSTRAINT_TYPE + \
+           '_'    + settings.OBJECTIVE + \
+           '_RF'  + str(settings.RESFACTOR) + \
+           '_P1e' + str(int(math.log10(settings.PENALTY))) + \
+           '_W'   + settings.WATER_USE_LIMITS + \
+           '_G'   + settings.GHG_EMISSIONS_LIMITS
     
     # Create path name
     path = 'output/' + path + post
@@ -67,6 +72,7 @@ def write_outputs(sim, yr_cal, path):
     
     write_settings(path)
     write_files(sim, path)
+    write_files_seperate(sim, path)
     write_production(sim, yr_cal, path)
     write_water(sim, yr_cal, path)
     write_ghg(sim, yr_cal, path)
@@ -136,6 +142,64 @@ def write_files(sim, path):
             am_snake_case = tools.am_name_snake_case(am)
             ammap_fname = f'ammap_{am_snake_case}_{str(yr_cal)}.tiff'
             write_gtiff(ammaps[am], os.path.join(path, ammap_fname))
+
+
+
+
+
+
+def write_files_seperate(sim, path):
+
+    # Write raw decision variables to seperate GeoTiffs
+    # 
+    # Here we use decision variables to create TIFFs rather than directly creating them from 
+    #       {sim.lu/lmmaps, sim.ammaps}, because the decision variables is {np.float32} and 
+    #       the sim.lxmap is {np.int8}. 
+    # 
+    # In this way, if partial land-use is allowed (i.e, one pixel is determined to be 50% of apples and 50% citrus),
+    #       we can handle the fractional land-use successfully.
+
+    for yr_cal in sim.lumaps:
+    
+        # 1) Collapse the land management dimension (m -> [dry, irri])
+        #    i.e., mrj -> rj
+        ag_dvar_rj = np.einsum('mrj -> rj', sim.ag_dvars[yr_cal])
+        ag_man_rj_dict = {am: np.einsum('mrj -> rj', ammap) for am, ammap in sim.ag_man_dvars[yr_cal].items()}
+        non_ag_rk = np.einsum('rk -> rk', sim.non_ag_dvars[yr_cal]) # Do nothing, just for consistency
+
+        # 2) Get the desc2code table
+        ag_dvar_map = tools.map_desc_to_dvar_index('Agriculture Landuse',sim.data.DESC2AGLU,ag_dvar_rj)
+
+        ag_man_map = pd.concat([tools.map_desc_to_dvar_index(am,
+                                                    {desc:sim.data.DESC2AGLU[desc] for desc in  AG_MANAGEMENTS_TO_LAND_USES[am]},
+                                                    am_dvar)
+                                for am,am_dvar in ag_man_rj_dict.items()]).reset_index(drop=True)
+
+        non_ag_dvar_map = tools.map_desc_to_dvar_index('Non-Agriculture Landuse',
+                                                {v:k for k,v in dict(list(enumerate(sim.data.NON_AGRICULTURAL_LANDUSES))).items()},
+                                                non_ag_rk)
+        
+        desc2dvar_df = pd.concat([ag_dvar_map,ag_man_map,non_ag_dvar_map])
+        
+        # 3) Export to GeoTiff
+        for _,row in desc2dvar_df.iterrows():
+            # Get the Category, land-use desc, and dvar
+            category = row['Category']
+            dvar_idx = row['dvar_idx']
+            desc = row['lu_desc']
+
+            # reconsititude the dvar to 2d
+            dvar = row['dvar']
+            dvar = create_2d_map(sim, dvar, filler = sim.data.MASK_LU_CODE)
+
+            # Create output file name
+            fname = f'{category}_{dvar_idx:02}_{desc}_{yr_cal}.tiff'
+
+            # Write to GeoTiff
+            write_gtiff(dvar, os.path.join(path, 'lucc_seperate', fname))
+
+        
+
 
 
 def write_production(sim, yr_cal, path): 
