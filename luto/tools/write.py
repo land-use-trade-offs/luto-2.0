@@ -144,7 +144,7 @@ def write_files(sim, path):
             write_gtiff(ammaps[am], os.path.join(path, ammap_fname))
 
 
-def write_files_seperate(sim, path):
+def write_files_seperate(sim, path, ammap_seperate=False):
 
     # Write raw decision variables to seperate GeoTiffs
     # 
@@ -175,8 +175,10 @@ def write_files_seperate(sim, path):
         non_ag_dvar_map = tools.map_desc_to_dvar_index('Non-Agriculture Landuse',
                                                 {v:k for k,v in dict(list(enumerate(sim.data.NON_AGRICULTURAL_LANDUSES))).items()},
                                                 non_ag_rk)
-        
-        desc2dvar_df = pd.concat([ag_dvar_map,ag_man_map,non_ag_dvar_map])
+        if ammap_seperate:
+            desc2dvar_df = pd.concat([ag_dvar_map,ag_man_map,non_ag_dvar_map])
+        else:
+            desc2dvar_df = pd.concat([ag_dvar_map,non_ag_dvar_map])
         
         # 3) Export to GeoTiff
         for _,row in desc2dvar_df.iterrows():
