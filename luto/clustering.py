@@ -133,7 +133,7 @@ def _get_decimals_to_round_to(input_data: InputData, n: int):
             array = getattr(input_data, am_dict)[am]
             max_val = abs(np.nanmax(array))
             mag = magnitude(max_val)
-            decimals_to_round[am_dict][am] = n - mag
+            decimals_to_round[am_dict][am] = n - mag - 1
 
     return decimals_to_round
 
