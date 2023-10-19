@@ -27,9 +27,13 @@ import luto.settings as settings
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
-def lumap_crossmap(oldmap, newmap, ag_landuses, non_ag_landuses):
+def lumap_crossmap(oldmap, newmap, ag_landuses, non_ag_landuses, real_area):
     # Produce the cross-tabulation matrix with optional labels.
-    crosstab = pd.crosstab(oldmap, newmap, margins = True)
+    crosstab = pd.crosstab(oldmap, 
+                           newmap, 
+                           values = real_area, 
+                           aggfunc = lambda x:x.sum()/100 , # {sum/100} -> convert {ha} to {km2}
+                           margins = True)                 
 
     # Need to make sure each land use (both agricultural and non-agricultural) appears in the index/columns
     reindex = (
@@ -39,53 +43,62 @@ def lumap_crossmap(oldmap, newmap, ag_landuses, non_ag_landuses):
     )
     crosstab = crosstab.reindex(reindex, axis = 0, fill_value = 0)
     crosstab = crosstab.reindex(reindex, axis = 1, fill_value = 0)
-
+    
     lus = ag_landuses + non_ag_landuses + ['Total']
     crosstab.columns = lus
     crosstab.index = lus
-
+    crosstab = crosstab.fillna(0)
+    
     # Calculate net switches to land use (negative means switch away).
     switches = crosstab.iloc[-1, 0:-1] - crosstab.iloc[0:-1, -1]
     nswitches = np.abs(switches).sum()
     switches['Total'] = nswitches
-    switches['Total [%]'] = int(np.around(100 * nswitches / oldmap.shape[0]))
+    switches['Total [%]'] = np.around(100 * nswitches / (real_area.sum()/100), decimals=2)
+    switches = pd.DataFrame(switches)
 
     return crosstab, switches
 
-
-def lmmap_crossmap(oldmap, newmap):
+def lmmap_crossmap(oldmap, newmap, real_area):
     # Produce the cross-tabulation matrix with optional labels.
-    crosstab = pd.crosstab(oldmap, newmap, margins = True)
+    crosstab = pd.crosstab(oldmap, 
+                           newmap,
+                           values = real_area, 
+                           aggfunc = lambda x:x.sum()/100 , # {sum/100} -> convert {ha} to {km2}
+                           margins = True)
+    
     crosstab = crosstab.reindex(crosstab.index, axis=1, fill_value=0)
+    crosstab.columns = crosstab.columns.tolist()
+    crosstab.index = crosstab.index.tolist()
 
     # Calculate net switches to land use (negative means switch away).
     switches = crosstab.iloc[-1, 0:-1] - crosstab.iloc[0:-1, -1]
     nswitches = np.abs(switches).sum()
     switches['Total'] = nswitches
-    switches['Total [%]'] = int(np.around(100 * nswitches / oldmap.shape[0]))
+    switches['Total [%]'] = np.around(100 * nswitches / (real_area.sum()/100),decimals=2)
+    switches = pd.DataFrame(switches)
 
     return crosstab, switches
 
 
-def ammap_crossmap(oldmap, newmap, am):
-    # Produce the cross-tabulation matrix with optional labels for a single ammap.
-    crosstab = pd.crosstab(oldmap, newmap, margins = True)
+# def ammap_crossmap(oldmap, newmap, am):
+#     # Produce the cross-tabulation matrix with optional labels for a single ammap.
+#     crosstab = pd.crosstab(oldmap, newmap, margins = True)
 
-    reindex =  [0, 1, 'All']
-    crosstab = crosstab.reindex(reindex, axis = 0, fill_value = 0)
-    crosstab = crosstab.reindex(reindex, axis = 1, fill_value = 0)
+#     reindex =  [0, 1, 'All']
+#     crosstab = crosstab.reindex(reindex, axis = 0, fill_value = 0)
+#     crosstab = crosstab.reindex(reindex, axis = 1, fill_value = 0)
 
-    ind_names = ['(None)', am, 'Total']
-    crosstab.columns = ind_names
-    crosstab.index = ind_names
+#     ind_names = ['(None)', am, 'Total']
+#     crosstab.columns = ind_names
+#     crosstab.index = ind_names
 
-    # Calculate net switches to land use (negative means switch away).
-    switches = crosstab.iloc[-1, 0:-1] - crosstab.iloc[0:-1, -1]
-    nswitches = np.abs(switches).sum()
-    switches['Total'] = nswitches
-    switches['Total [%]'] = int(np.around(100 * nswitches / oldmap.shape[0]))
+#     # Calculate net switches to land use (negative means switch away).
+#     switches = crosstab.iloc[-1, 0:-1] - crosstab.iloc[0:-1, -1]
+#     nswitches = np.abs(switches).sum()
+#     switches['Total'] = nswitches
+#     switches['Total [%]'] = int(np.around(100 * nswitches / oldmap.shape[0]))
 
-    return crosstab, switches
+#     return crosstab, switches
 
 
 
@@ -97,7 +110,8 @@ def crossmap_irrstat( lumap_old
                     , lumap_new
                     , lmmap_new
                     , ag_landuses
-                    , non_ag_landuses ):
+                    , non_ag_landuses
+                    , real_area):
 
     ludict = {}
     ludict[-2] = 'Non-agricultural land (dry)'
@@ -115,27 +129,32 @@ def crossmap_irrstat( lumap_old
     highpos_new = np.where(lmmap_new == 0, lumap_new * 2, lumap_new * 2 + 1)
 
     # Produce the cross-tabulation matrix with labels.
-    crosstab = pd.crosstab(highpos_old, highpos_new, margins=True)
+    crosstab = pd.crosstab(highpos_old, 
+                           highpos_new,
+                           values = real_area, 
+                           aggfunc = lambda x:x.sum()/100 , # {sum/100} -> convert {ha} to {km2}
+                           margins=True)
+    
     # Make sure the cross-tabulation matrix is square.
     crosstab = crosstab.reindex(crosstab.index, axis=1, fill_value=0)
     names = [ludict[i] for i in crosstab.columns if i != 'All']
     names.append('All')
     crosstab.columns = names
     crosstab.index = names
+    crosstab = crosstab.fillna(0)
 
     # Calculate net switches to land use (negative means switch away).
     df = pd.DataFrame()
     cells_prior = crosstab.iloc[:, -1]
     cells_after = crosstab.iloc[-1, :]
-    df['Cells prior [ # ]'] = cells_prior
-    df['Cells after [ # ]'] = cells_after
+    df['Area prior [ km2 ]'] = cells_prior
+    df['Area after [ km2 ]'] = cells_after
     df.fillna(0, inplace=True)
-    df = df.astype(np.int64)
-    switches = df['Cells after [ # ]']-  df['Cells prior [ # ]']
+    switches = df['Area after [ km2 ]']-  df['Area prior [ km2 ]']
     nswitches = np.abs(switches).sum()
-    pswitches = int(np.around(100 * nswitches / lumap_old.shape[0]))
+    pswitches = np.around(100 * nswitches / (real_area.sum()/100), decimals=2)
 
-    df['Switches [ # ]'] = switches
+    df['Switches [ km2 ]'] = switches
     df['Switches [ % ]'] = 100 * switches / cells_prior
     df.loc['Total'] = cells_prior.sum(), cells_after.sum(), nswitches, pswitches
 
@@ -147,7 +166,8 @@ def crossmap_amstat( am
                    , ammap_old
                    , lumap_new
                    , ammap_new
-                   , ag_landuses ):
+                   , ag_landuses
+                   , real_area):
     """
     For a given agricultural management option, make a crossmap showing cell changes at a land use level.
     """
@@ -167,13 +187,19 @@ def crossmap_amstat( am
     highpos_new = np.where(ammap_new == 0, lumap_new * 2, lumap_new * 2 + 1)
 
     # Produce the cross-tabulation matrix with labels.
-    crosstab = pd.crosstab(highpos_old, highpos_new, margins=True)
+    crosstab = pd.crosstab(highpos_old, 
+                           highpos_new,
+                           values = real_area, 
+                           aggfunc = lambda x:x.sum()/100 , # {sum/100} -> convert {ha} to {km2}
+                           margins=True)
+    
     # Include all land uses and AM versions of land uses in the crosstab
     non_am_idx = list(range(0, 2 * len(ag_landuses), 2))
     am_idx = [2*i + 1 for i in am_j]
     reindex = sorted(non_am_idx + am_idx) + ['All']
     crosstab = crosstab.reindex(reindex, axis=0, fill_value=0)
     crosstab = crosstab.reindex(reindex, axis=1, fill_value=0)
+    crosstab = crosstab.fillna(0)
 
     names = [ludict[i] for i in crosstab.columns if i != 'All']
     names.append('All')
@@ -185,55 +211,15 @@ def crossmap_amstat( am
     am_lus = [ludict[i] for i in am_idx]
     cells_prior = crosstab.iloc[:, -1].loc[am_lus]
     cells_after = crosstab.iloc[-1, :].loc[am_lus]
-    df['Cells prior [ # ]'] = cells_prior
-    df['Cells after [ # ]'] = cells_after
+    df['Area prior [ km2 ]'] = cells_prior
+    df['Area after [ km2 ]'] = cells_after
     df.fillna(0, inplace=True)
-    df = df.astype(np.int64)
-    switches = df['Cells after [ # ]']-  df['Cells prior [ # ]']
+    switches = df['Area after [ km2 ]']-  df['Area prior [ km2 ]']
     nswitches = np.abs(switches).sum()
-    pswitches = int(np.around(100 * nswitches / lumap_old.shape[0]))
+    pswitches = np.around(100 * nswitches / (real_area.sum()/100),decimals=2)
 
-    df['Switches [ # ]'] = switches
+    df['Switches [ km2 ]'] = switches
     df['Switches [ % ]'] = 100 * switches / cells_prior
     df.loc['Total'] = cells_prior.sum(), cells_after.sum(), nswitches, pswitches
 
     return crosstab, df
-
-
-
-
-def df_spare2densi(df):
-    '''Function to fill a multilevel df to sensified format
-    Input:
-        pd.DataFrame
-
-    Output:
-        pd.DataFrame
-    
-    What does that mean?
-    For example, a df has multilevel columns of ([A,(1,3)],[B,(2,4)]),
-    after passing this function, it will become ([A,(1,2,3,4)], [B,(1,2,3,4)])
-    
-    Why this is necessary?
-    Because we want to perform matrics multiplication using the input df,
-    and this function fill nan values to "missing" colums, e.g., [A,(2,4)]
-    so that the output df has a nice rectangular shape to be multiplied with
-
-    
-    '''
-
-    # convert the mulilevel columns to a df, get the {unique value} and {count} of each level
-    df_col = pd.DataFrame(df.columns.tolist())
-    df_col_unique = {idx:df_col[idx].unique().tolist() for idx in df_col.columns}
-    df_col_unique = {k:sorted(v) for k,v in df_col_unique.items()} # IMPORTANT, to keep the columns in lexicall order
-    df_col_count = dict(df_col.nunique())
-    
-    # get the product from column of all levels
-    df_col_product = list(product(*df_col_unique.values()))
-    df_col_product = sorted(df_col_product,key=lambda x:[x[i] for i in range(df_col.shape[1])]) # IMPORTANT, to order the columns
-    
-    # expande the original df with df_col_product 
-    # so that we can finally convert it to a n-d rectangular np.array 
-    expand_df = df.reindex(columns=df_col_product,fill_value=np.nan)
-
-    return expand_df

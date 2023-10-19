@@ -495,3 +495,65 @@ def df_sparse2dense(df):
     
     # Return expanded dataframe, list of unique column names, list of their count
     return expand_df, df_col_unique, df_col_count
+
+def summarize_ghg_separate_df(in_array,column_level,lu_desc):
+    '''Function to summarize the in_array to a df
+    Arguments:
+        in_array: a n-d np.array with the first dimension to be pixels/rows (dimension r)
+        
+        column_level: The levels of the in_array being reshaped to (r,-1). For example, if
+                      the in_array has a shape of (r,2,3), then the levels could be a tuple 
+                      of list as below. Note here add a ['Agricultural Landuse] as an extra
+                      level to indicate the origin of this array.
+                      
+                      (['Agricultural Landuse],
+                       ['dry','irri']),
+                       ['chemical_co2_emission','transportation_co2_emission']).
+                       
+        lu_desc: The description of each pixel. 
+
+    Return:
+        pd.DataFrame: A multilevel (column-wise) df.
+    '''
+    
+     # warp the array back to a df
+    df = pd.DataFrame(in_array.reshape((in_array.shape[0],-1)),columns=pd.MultiIndex.from_product(column_level)) 
+    
+    # add landuse describtion
+    df['lu'] = lu_desc
+    
+    # sumarize the column
+    df_summary = df.groupby('lu').sum(0).reset_index()
+    df_summary = df_summary.set_index('lu')
+      
+    # add SUM row/index
+    df_summary.loc['SUM'] = df_summary.sum(axis=0)
+    df_summary['SUM'] = df_summary.sum(axis=1)
+    
+    # remove column/index names
+    df_summary.columns = pd.MultiIndex.from_tuples(df_summary.columns.tolist())
+    df_summary.index = df_summary.index.tolist()
+
+    return df_summary
+
+
+# function to create mapping table between lu_desc and dvar index
+def map_desc_to_dvar_index(category:str,
+                           desc2idx:dict,
+                           dvar_arr:np.ndarray):
+    '''Input:
+        category: str, the category of the dvar, e.g., 'Agriculture/Non-Agriculture',
+        desc2idx: dict, the mapping between lu_desc and dvar index, e.g., {'Apples': 0 ...},
+        dvar_arr: np.ndarray, the dvar array with shape (r,{j|k}), where r is the number of pixels,
+                  and {j|k} is the dimension of ag-landuses or non-ag-landuses.
+                  
+    Return:
+        pd.DataFrame, with columns of ['Category','lu_desc','dvar_idx','dvar'].'''
+    
+    df = pd.DataFrame({'Category':category,
+                       'lu_desc':desc2idx.keys(),
+                       'dvar_idx':desc2idx.values()})
+    
+    df['dvar'] = [dvar_arr[:,j] for j in df['dvar_idx']]
+
+    return df.reindex(columns=['Category','lu_desc','dvar_idx','dvar'])
