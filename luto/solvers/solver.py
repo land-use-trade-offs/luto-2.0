@@ -807,14 +807,8 @@ class LutoSolver:
         # Get agricultural results
         for j in range(self._input_data.n_ag_lus):
             for cluster in self._input_data.ag_lu2cells[0, j]:
-                cluster_size = len(self._input_data.cell_clusters[cluster])
                 for r in self._input_data.cell_clusters[cluster]:
                     X_dry_sol_rj[r, j] = self.X_ag_dry_vars_jr[j, cluster].X
-
-                    if cluster_size > 1:
-                        print(
-                            f"cluster={cluster}, r={r}, j={j}, var={self.X_ag_dry_vars_jr[j, r]} is being assigned cluster value {X_dry_sol_rj[r, j]}"
-                        )
 
             for cluster in self._input_data.ag_lu2cells[1, j]:
                 for r in self._input_data.cell_clusters[cluster]:
@@ -871,17 +865,17 @@ class LutoSolver:
 
         # Process non-agricultural land usage information
         # Boolean matrix where the maximum value for each cell across all non-ag LUs is True
-        non_ag_X_rk_processed = non_ag_X_sol_rk.argmax(axis=1)[:, np.newaxis] == range(
-            self._input_data.n_non_ag_lus
-        )
+        # non_ag_X_rk_processed = non_ag_X_sol_rk.argmax(axis=1)[:, np.newaxis] == range(
+        #     self._input_data.n_non_ag_lus
+        # )
 
         # Make land use and land management maps
         # Vector indexed by cell that denotes whether the cell is non-agricultural land (True) or agricultural land (False)
         non_ag_bools_r = non_ag_X_sol_rk.max(axis=1) > ag_X_mrj.max(axis=(0, 2))
 
         # Update processed variables accordingly
-        ag_X_mrj_processed[:, non_ag_bools_r, :] = False
-        non_ag_X_rk_processed[~non_ag_bools_r, :] = False
+        # ag_X_mrj_processed[:, non_ag_bools_r, :] = False
+        # non_ag_X_rk_processed[~non_ag_bools_r, :] = False
 
         # Process agricultural management variables
         # Repeat the steps for the regular agricultural management variables
@@ -941,14 +935,41 @@ class LutoSolver:
 
         # # Process production amount for each commodity
         print("Processing commodity production amounts...")
-        prod_data["Production"] = [self.total_q_exprs_c[c].getValue() for c in range(self.ncms)]
+        prod_data["Production"] = [0 for _ in range(self.ncms)]
+        ag_X_mrp = self.get_ag_X_mrp(ag_X_mrj_processed)
+        product_amounts = [0 for _ in range(self._input_data.nprs)]
+        
+        # Add agricultural contributions
+        for p in range(self._input_data.nprs):
+            
+            ag_contr = (ag_X_mrp[:, :, p] * self._input_data.ag_q_mrp[:, :, p]).sum()
+            product_amounts[p] += ag_contr
+        
+        # Add agricultural management contributions
+        for am in AG_MANAGEMENTS_TO_LAND_USES:
+            ag_man_X_mrp = self.get_ag_X_mrp(ag_man_X_mrj_processed[am])
+            for p in range(self._input_data.nprs):
+                ag_man_contr = (ag_man_X_mrp[:, :, p] * self._input_data.ag_man_q_mrp[am][:, :, p]).sum()
+                product_amounts[p] += ag_man_contr
+
+        # Add non-agricultural contributions and convert to commodities
+        for c in range(self.ncms):
+            # Convert product amounts to commodity amounts
+            commodity_amount = 0
+            for p in range(self._input_data.nprs):
+                if self._input_data.pr2cm_cp[c, p]:
+                    commodity_amount += product_amounts[p]
+
+            # Add non-agricultural contribution
+            for k in range(self._input_data.n_non_ag_lus):
+                non_ag_contr = (non_ag_X_sol_rk[:, k] * self._input_data.non_ag_q_crk[c, :, k]).sum()
+                commodity_amount += non_ag_contr
+
+            prod_data["Production"][c] = commodity_amount
+
 
         print("Processing GHG emissions amount...")
         prod_data["GHG Emissions"] = self.ghg_emissions_expr.getValue()
-
-        ag_X_mrj_processed[:, non_ag_bools_r, :] = False
-        non_ag_X_rk_processed[~non_ag_bools_r, :] = False
-
         print("Done\n")
 
         return (
@@ -988,3 +1009,17 @@ class LutoSolver:
             for j in range(self._input_data.n_ag_lus)
             if self._input_data.lu2pr_pj[p, j]
         ]
+    
+    def get_ag_X_mrp(self, ag_X_mrj: np.ndarray) -> np.ndarray:
+        """
+        Transform the agricultural solution matrix to mrp form for production processing
+        """
+        ag_X_mrp = np.zeros(
+            (self._input_data.n_ag_lms, self._input_data.ncells, self._input_data.nprs)
+        )
+        for m in range(self._input_data.n_ag_lms):
+            for j in range(self._input_data.n_ag_lus):
+                for p in self._input_data.j2p[j]:
+                    ag_X_mrp[m, :, p] = ag_X_mrj[m, :, j]
+
+        return ag_X_mrp

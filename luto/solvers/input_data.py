@@ -11,7 +11,6 @@ class InputData:
     """
     An object that collects and stores all relevant data for solver.py.
     """
-
     ag_t_mrj: np.ndarray  # Agricultural transition cost matrices.
     ag_c_mrj: np.ndarray  # Agricultural production cost matrices.
     ag_r_mrj: np.ndarray  # Agricultural production revenue matrices.
@@ -43,9 +42,8 @@ class InputData:
     limits: dict  # Targets to use.
     desc2aglu: dict  # Map of agricultural land use descriptions to codes.
 
-    cell_clusters: dict[
-        int, list[int]
-    ]  # Map of representative cell to list of cells in cluster
+    # Map of representative cell to list of cells in cluster
+    cell_clusters: dict[int, list[int]]  
 
     def apply_clusters(self, new_cell_clusters: dict[int, list[int]]):
         self.cell_clusters = new_cell_clusters
@@ -71,12 +69,14 @@ class InputData:
             self.non_ag_w_rk[repr_cell, :] = cluster_size * self.non_ag_w_rk[repr_cell, :]
             self.non_ag_x_rk[repr_cell, :] = cluster_size * self.non_ag_x_rk[repr_cell, :]
             self.non_ag_q_crk[:, repr_cell, :] = cluster_size * self.non_ag_q_crk[:, repr_cell, :]
-            # self.ag_man_c_mrj[:, repr_cell, :] = cluster_size * self.ag_man_c_mrj[:, repr_cell, :]
-            # self.ag_man_g_mrj[:, repr_cell, :] = cluster_size * self.ag_man_g_mrj[:, repr_cell, :]
-            # self.ag_man_q_mrp[:, repr_cell, :] = cluster_size * self.ag_man_q_mrp[:, repr_cell, :]
-            # self.ag_man_r_mrj[:, repr_cell, :] = cluster_size * self.ag_man_r_mrj[:, repr_cell, :]
-            # self.ag_man_t_mrj[:, repr_cell, :] = cluster_size * self.ag_man_t_mrj[:, repr_cell, :]
-            # self.ag_man_w_mrj[:, repr_cell, :] = cluster_size * self.ag_man_w_mrj[:, repr_cell, :]
+
+            for am in AG_MANAGEMENTS_TO_LAND_USES:
+                self.ag_man_c_mrj[am][:, repr_cell, :] = cluster_size * self.ag_man_c_mrj[am][:, repr_cell, :]
+                self.ag_man_g_mrj[am][:, repr_cell, :] = cluster_size * self.ag_man_g_mrj[am][:, repr_cell, :]
+                self.ag_man_q_mrp[am][:, repr_cell, :] = cluster_size * self.ag_man_q_mrp[am][:, repr_cell, :]
+                self.ag_man_r_mrj[am][:, repr_cell, :] = cluster_size * self.ag_man_r_mrj[am][:, repr_cell, :]
+                self.ag_man_t_mrj[am][:, repr_cell, :] = cluster_size * self.ag_man_t_mrj[am][:, repr_cell, :]
+                self.ag_man_w_mrj[am][:, repr_cell, :] = cluster_size * self.ag_man_w_mrj[am][:, repr_cell, :]
 
             # exlude non-representative cells from exclusion matrices
             for cell in cell_list:
@@ -116,6 +116,16 @@ class InputData:
     def nprs(self):
         # Number of products
         return self.ag_q_mrp.shape[2]
+    
+    @property
+    def ag_x_mrp(self):
+        ag_x_mrp = np.zeros((self.n_ag_lms, self.ncells, self.nprs))
+        for r in range(self.ncells):
+            for m in range(self.n_ag_lms):
+                for j in range(self.n_ag_lus):
+                    if self.ag_x_mrj[m, j]:
+                        for p in self.j2p[j]:
+                            ag_x_mrp[m, p] = 1
 
     @cached_property
     def am2j(self):
