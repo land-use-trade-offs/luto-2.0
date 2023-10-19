@@ -85,11 +85,11 @@ def get_ghg_crop( data     # Data object or module.
 
 
 
-def get_ghg_lvstk( data               # Data object or module.
-                 , lu                 # Land use.
-                 , lm                 # Land management.
-                 , yr_idx             # Number of years post base-year ('YR_CAL_BASE').
-                 , aggregate = True): # GHG calculated as a total (for the solver) or by individual source (for writing outputs)
+def get_ghg_lvstk( data        # Data object or module.
+                 , lu          # Land use.
+                 , lm          # Land management.
+                 , yr_idx      # Number of years post base-year ('YR_CAL_BASE').
+                 , aggregate): # GHG calculated as a total (for the solver) or by individual source (for writing outputs)
     """Return livestock GHG emissions [tCO2e/cell] of `lu`+`lm` in `yr_idx`
             as (np array|pd.DataFrame) depending on aggregate (True|False).
 
@@ -418,9 +418,8 @@ def get_ecological_grazing_effect_g_mrj(data, yr_idx):
             soil_multiplier = lu_data.loc[year, 'IMPACTS_soil_carbon'] - 1
             if soil_multiplier != 0:
                 soil_reduction_amnt = (
-                    data.SOIL_CARBON_T_HA
+                    data.SOIL_CARBON_AVG_T_CO2_HA
                     * soil_multiplier
-                    * (44 / 12)       # convert carbon tonnes to CO2e tonnes
                     * data.REAL_AREA  # adjust for resfactor
                 )
                 new_g_mrj[m, :, lu_idx] -= soil_reduction_amnt
