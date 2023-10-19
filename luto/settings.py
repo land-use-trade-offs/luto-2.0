@@ -57,7 +57,7 @@ DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 3           # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 1           # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 
 # How does the model run over time 
@@ -69,11 +69,11 @@ MODE = 'snapshot'       # runs for target year only
 OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
 # Specify how demand should be met in the solver
-DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
-# DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
+# DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
+DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a type of slack variable in the solver (goal programming approach)
 
 # Clustering behaviour - the number of significant figures used to determine whether cells can be clustered
-CLUSTERING_SIGFIGS = 1  # higher sigfigs = smaller clusters. Set to None to disable clustering altogether.
+CLUSTERING_SIGFIGS = None  # higher sigfigs = smaller clusters. Set to None to disable clustering altogether.
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
@@ -162,14 +162,14 @@ WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions  e.g., [1, 2].
 # ---------------------------------------------------------------------------- #
 
 # How many land uses should remain after culling the most expensive options
-MAX_LAND_USES_PER_CELL = 8
+MAX_LAND_USES_PER_CELL = 12
 
 # Cull this percentage of the most expensive land usage options
-LAND_USAGE_CULL_PERCENTAGE = 0.2
+LAND_USAGE_CULL_PERCENTAGE = 0.15
 
 # CULL_MODE = 'absolute'      # cull to include at most MAX_LAND_USES_PER_CELL
-CULL_MODE = 'percentage'    # cull the LAND_USAGE_THRESHOLD_PERCENTAGE % most expensive options
-# CULL_MODE = 'none'          # do no culling
+# CULL_MODE = 'percentage'    # cull the LAND_USAGE_THRESHOLD_PERCENTAGE % most expensive options
+CULL_MODE = 'none'          # do no culling
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)
 0: 'Environmental Plantings'
