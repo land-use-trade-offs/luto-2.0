@@ -24,7 +24,7 @@ import pandas as pd
 from collections import defaultdict
 
 import luto.settings as settings
-from luto.ag_managements import AG_MANAGEMENTS_INDEXING, SORTED_AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
 def lumap_crossmap(oldmap, newmap, ag_landuses, non_ag_landuses, real_area):

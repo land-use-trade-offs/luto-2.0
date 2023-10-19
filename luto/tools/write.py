@@ -138,7 +138,7 @@ def write_files(sim, path):
         write_gtiff(lumap, os.path.join(path, lumap_fname))
         write_gtiff(lmmap, os.path.join(path, lmmap_fname))
 
-        for am in SORTED_AG_MANAGEMENTS:
+        for am in AG_MANAGEMENTS_TO_LAND_USES:
             am_snake_case = tools.am_name_snake_case(am)
             ammap_fname = f'ammap_{am_snake_case}_{str(yr_cal)}.tiff'
             write_gtiff(ammaps[am], os.path.join(path, ammap_fname))
@@ -247,7 +247,7 @@ def write_production(sim, yr_cal, path):
     # swams = {}
     ctass = {}
     swass = {}
-    for am in SORTED_AG_MANAGEMENTS:
+    for am in AG_MANAGEMENTS_TO_LAND_USES:
         # ctam, swam = ammap_crossmap(sim.ammaps[sim.data.YR_CAL_BASE][am], sim.ammaps[yr_cal][am], am)
         # ctams[am] = ctam
         # swams[am] = swam
@@ -276,7 +276,7 @@ def write_production(sim, yr_cal, path):
     cthp.to_csv(os.path.join(path, 'crosstab-irrstat.csv'))
     swhp.to_csv(os.path.join(path, 'switches-irrstat.csv'))
     
-    for am in SORTED_AG_MANAGEMENTS:
+    for am in AG_MANAGEMENTS_TO_LAND_USES:
         am_snake_case = tools.am_name_snake_case(am).replace("_", "-")
         # ctams[am].to_csv(os.path.join(path, f'crosstab-{am_snake_case}-ammap.csv'))
         # swams[am].to_csv(os.path.join(path, f'switches-{am_snake_case}-ammap.csv'))
