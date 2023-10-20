@@ -28,7 +28,7 @@ except:
     import rasterio
     
 
-from luto.settings import INPUT_DIR, SSP, RCP, RESFACTOR, SOC_AMORTISATION
+from luto.settings import INPUT_DIR, SSP, RCP, RESFACTOR, SOC_AMORTISATION,NON_AGRICULTURAL_LU_BASE_CODE
 from luto.economics.agricultural.quantity import lvs_veg_types
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
@@ -71,6 +71,10 @@ YR_CAL_BASE = 2010
 # Read in lexicographically ordered list of land-uses.
 AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'ag_landuses.csv')), header = None)[0].to_list()
 NON_AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'non_ag_landuses.csv')), header = None)[0].to_list()
+
+NON_AG2DESC = dict(zip(range(NON_AGRICULTURAL_LU_BASE_CODE, 
+                             NON_AGRICULTURAL_LU_BASE_CODE + len(NON_AGRICULTURAL_LANDUSES)),
+                       NON_AGRICULTURAL_LANDUSES))
 
 # Get number of land-uses
 N_AG_LUS = len(AGRICULTURAL_LANDUSES)
