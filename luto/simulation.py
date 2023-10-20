@@ -24,6 +24,7 @@ model that has 'global' varying state.
 import numpy as np
 import h5py, time
 from dataclasses import dataclass
+from luto.clustering import get_clusters
 
 import luto.data as bdata
 import luto.settings as settings
@@ -44,7 +45,8 @@ import luto.economics.non_agricultural.revenue as non_ag_revenue
 
 from luto.economics import land_use_culling
 
-from luto.solvers.solver import InputData, LutoSolver
+from luto.solvers.input_data import InputData
+from luto.solvers.solver import LutoSolver
 from luto import tools
 
 
@@ -323,7 +325,7 @@ def get_input_data():
         ag_x_mrj, ag_c_mrj, ag_t_mrj, ag_r_mrj
     )
 
-    return InputData(
+    input_data = InputData(
         ag_t_mrj=ag_t_mrj,
         ag_c_mrj=ag_c_mrj,
         ag_r_mrj=ag_r_mrj,
@@ -351,7 +353,25 @@ def get_input_data():
         pr2cm_cp=data.PR2CM,
         limits=get_limits(),
         desc2aglu=data.DESC2AGLU,
+        cell_clusters={r: [r] for r in range(ag_t_mrj.shape[1])}
     )
+
+    if settings.CLUSTERING_SIGFIGS is not None:
+        # apply clustering
+        cluster_sizes = []
+        clusters = get_clusters(input_data)
+        for _, v in clusters.items():
+            cluster_sizes.append(len(v))
+
+        input_data.apply_clusters(clusters)
+
+        cluster_sizes = np.array(cluster_sizes)
+        print(
+            f"Clustering completed. min={cluster_sizes.min()}, max={cluster_sizes.max()}, "
+            f"mean={cluster_sizes.mean()}, std={cluster_sizes.std()}"
+        )
+
+    return input_data
 
 
 def prepare_input_data(base: int, target: int) -> InputData:

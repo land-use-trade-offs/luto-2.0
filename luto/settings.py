@@ -69,9 +69,11 @@ MODE = 'snapshot'       # runs for target year only
 OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
 # Specify how demand should be met in the solver
-DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
-# DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
+# DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
+DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a type of slack variable in the solver (goal programming approach)
 
+# Clustering behaviour - the number of significant figures used to determine whether cells can be clustered
+CLUSTERING_SIGFIGS = None  # higher sigfigs = smaller clusters. Set to None to disable clustering altogether.
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
