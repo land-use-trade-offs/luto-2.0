@@ -144,7 +144,7 @@ def write_files(sim, path):
             write_gtiff(ammaps[am], os.path.join(path, ammap_fname))
 
 
-def write_files_seperate(sim, path):
+def write_files_seperate(sim, path, ammap_seperate=False):
 
     # Write raw decision variables to seperate GeoTiffs
     # 
@@ -175,8 +175,10 @@ def write_files_seperate(sim, path):
         non_ag_dvar_map = tools.map_desc_to_dvar_index('Non-Agriculture Landuse',
                                                 {v:k for k,v in dict(list(enumerate(sim.data.NON_AGRICULTURAL_LANDUSES))).items()},
                                                 non_ag_rk)
-        
-        desc2dvar_df = pd.concat([ag_dvar_map,ag_man_map,non_ag_dvar_map])
+        if ammap_seperate:
+            desc2dvar_df = pd.concat([ag_dvar_map,ag_man_map,non_ag_dvar_map])
+        else:
+            desc2dvar_df = pd.concat([ag_dvar_map,non_ag_dvar_map])
         
         # 3) Export to GeoTiff
         for _,row in desc2dvar_df.iterrows():
@@ -404,7 +406,8 @@ def write_ghg_separate(sim, yr_cal, path):
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
     
     # Get the landuse descriptions for each validate cell (i.e., 0 -> Apples)
-    lu_desc = [sim.data.AGLU2DESC[x] for x in sim.data.LUMAP]
+    lu_desc = [{**sim.data.AGLU2DESC,**sim.data.NON_AG2DESC}[x] 
+                for x in sim.lumaps[yr_cal]]
     
     # -------------------------------------------------------#
     # Get greenhouse gas emissions from agricultural landuse #
@@ -422,8 +425,7 @@ def write_ghg_separate(sim, yr_cal, path):
     keep_column = [i for i in ag_g_df.columns if not 'Total' in '_'.join(i)]
     ag_g_df = ag_g_df[keep_column]
     
-    # Update the [ag_g_col_unique, ag_g_col_count] to reflect that 
-    # the removal of "Total CO2" 
+    # Update the [ag_g_col_unique, ag_g_col_count] to reflect the removal of "Total CO2" 
     ag_g_col_unique[3].remove('Total_tCO2e')
     ag_g_col_count[3] = ag_g_col_count[3] - 1
     
@@ -435,10 +437,10 @@ def write_ghg_separate(sim, yr_cal, path):
                                                        ag_g_col_count[3])  # s: GHG source [chemical fertilizer, electricity, ...]
                                                                                
     # 1-2) Get the ag_g_mrjs, which will be used to compute GHG_agricultural_landuse
-    ag_g_mrjs = np.einsum('romjs -> mrjs',ag_g_df_arr)                             # mrjs
+    ag_g_mrjs = np.einsum('romjs -> mrjs', ag_g_df_arr)                             # mrjs
     
     # 1-3) Get the ag_g_mrj, which will be used to compute GHG_agricultural_management
-    ag_g_mrj = np.einsum('mrjs -> mrj',ag_g_mrjs)                                  # mrj
+    ag_g_mrj = np.einsum('mrjs -> mrj', ag_g_mrjs)                                  # mrj
     
     
     # Use einsum to do the multiplication, 
