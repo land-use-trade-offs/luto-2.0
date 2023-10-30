@@ -101,14 +101,14 @@ def get_ghg_lvstk( data        # Data object or module.
                  False -> return GHG emission as pd.DataFrame.
     
     Livestock GHG emissions include:    
-        'CO2E_KG_HEAD_ENTERIC', 
-        'CO2E_KG_HEAD_MANURE_MGT', 
-        'CO2E_KG_HEAD_IND_LEACH_RUNOFF', 
-        'CO2E_KG_HEAD_DUNG_URINE', 
-        'CO2E_KG_HEAD_SEED', 
-        'CO2E_KG_HEAD_FODDER', 
-        'CO2E_KG_HEAD_FUEL', 
-        'CO2E_KG_HEAD_ELEC'
+                  'CO2E_KG_HEAD_DUNG_URINE',
+                  'CO2E_KG_HEAD_ELEC',
+                  'CO2E_KG_HEAD_ENTERIC',
+                  'CO2E_KG_HEAD_FODDER',
+                  'CO2E_KG_HEAD_FUEL',
+                  'CO2E_KG_HEAD_IND_LEACH_RUNOFF',
+                  'CO2E_KG_HEAD_MANURE_MGT',
+                  'CO2E_KG_HEAD_SEED',
     """
     
     # Get livestock and vegetation type.
@@ -127,7 +127,7 @@ def get_ghg_lvstk( data        # Data object or module.
     ghg_rs = ghg_raw * yield_pot[:,np.newaxis]
     
     
-    # Add pasture irrigation emissions based on emissions associated with hay production.
+    # Add pasture irrigation emissions.
     if lm == 'irr':
         ghg_name_irr_s = ['CO2E_KG_HA_CHEM_APPL', 
                           'CO2E_KG_HA_CROP_MGT', 
