@@ -50,7 +50,7 @@ def get_ghg_crop( data     # Data object or module.
         'CO2E_KG_HA_HARVEST', 
         'CO2E_KG_HA_IRRIG', 
         'CO2E_KG_HA_PEST_PROD', 
-        'CO2E_KG_HA_SOIL_N_SURP', 
+        'CO2E_KG_HA_SOIL', 
         'CO2E_KG_HA_SOWING'
     """
     
@@ -143,7 +143,7 @@ def get_ghg_lvstk( data        # Data object or module.
                           'CO2E_KG_HA_HARVEST', 
                           'CO2E_KG_HA_IRRIG', 
                           'CO2E_KG_HA_PEST_PROD', 
-                          'CO2E_KG_HA_SOIL_N_SURP', 
+                          'CO2E_KG_HA_SOIL', 
                           'CO2E_KG_HA_SOWING']
 
         # Add names for GHG sources from irrigated pasture
@@ -363,7 +363,7 @@ def get_precision_agriculture_effect_g_mrj(data, yr_idx):
                 'CO2E_KG_HA_CHEM_APPL',
                 'CO2E_KG_HA_CROP_MGT',
                 'CO2E_KG_HA_PEST_PROD',
-                'CO2E_KG_HA_SOIL_N_SURP',
+                'CO2E_KG_HA_SOIL',
             ]:
                 # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not use zeros
                 if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:

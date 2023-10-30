@@ -478,7 +478,7 @@ def create_new_dataset():
         
     # Produce a multi-indexed version of the crops data.
     # crops_ptable = crops.pivot_table(index = 'SA2_ID', columns = ['Irrigation', 'LU_DESC'])
-    crops_ptable = crops.drop(['LU_DESC', 'Irrigation', 'Area_ABS', 'Prod_ABS'], axis = 1)
+    crops_ptable = crops.drop(['LU_DESC', 'Irrigation', 'Area', 'Prod'], axis = 1)
     
     # Merge to create a cell-based table.
     agec_crops = concordance.merge( crops_ptable, on = 'SA2_ID', how = 'left' )
@@ -554,7 +554,7 @@ def create_new_dataset():
     agGHG_crops['LU_ID'] = agGHG_crops['LU_ID'].astype('Int64')
             
     # Create the MultiIndex structure
-    GHG_sources_crops = ['CO2E_KG_HA_FERT_PROD', 'CO2E_KG_HA_PEST_PROD', 'CO2E_KG_HA_IRRIG', 'CO2E_KG_HA_CHEM_APPL', 'CO2E_KG_HA_CROP_MGT', 'CO2E_KG_HA_CULTIV', 'CO2E_KG_HA_HARVEST', 'CO2E_KG_HA_SOWING', 'CO2E_KG_HA_SOIL_N_SURP']
+    GHG_sources_crops = ['CO2E_KG_HA_FERT_PROD', 'CO2E_KG_HA_PEST_PROD', 'CO2E_KG_HA_IRRIG', 'CO2E_KG_HA_CHEM_APPL', 'CO2E_KG_HA_CROP_MGT', 'CO2E_KG_HA_CULTIV', 'CO2E_KG_HA_HARVEST', 'CO2E_KG_HA_SOWING', 'CO2E_KG_HA_SOIL']
     agGHG_crops = agGHG_crops.pivot( index = 'CELL_ID', 
                                      columns = ['IRRIGATION', 'LU_ID'], 
                                      values = GHG_sources_crops
@@ -577,8 +577,12 @@ def create_new_dataset():
                                                                          on = ['SA2_ID', 'LU_ID', 'IRRIGATION'], 
                                                                          how = 'left' )
     
-    agGHGmap['REAL_AREA'] = zones['CELL_HA']
-    
+    agGHGmap['REAL_AREA'] = pd.read_hdf('input/real_area.h5')
+
+    agGHGmap = agGHGmap.query('5 <= LU_ID <= 25')
+    print('Number of NaNs =', agGHGmap[agGHGmap.isna().any(axis=1)].shape[0])
+
+
     agGHGmap.eval('TCO2E_CELL_FERT_PROD = CO2E_KG_HA_FERT_PROD * REAL_AREA / 1000', inplace = True)
     agGHGmap.eval('TCO2E_CELL_PEST_PROD = CO2E_KG_HA_PEST_PROD * REAL_AREA / 1000', inplace = True)
     agGHGmap.eval('TCO2E_CELL_IRRIG = CO2E_KG_HA_IRRIG * REAL_AREA / 1000', inplace = True)
@@ -587,7 +591,7 @@ def create_new_dataset():
     agGHGmap.eval('TCO2E_CELL_CULTIV = CO2E_KG_HA_CULTIV * REAL_AREA / 1000', inplace = True)
     agGHGmap.eval('TCO2E_CELL_HARVEST = CO2E_KG_HA_HARVEST * REAL_AREA / 1000', inplace = True)
     agGHGmap.eval('TCO2E_CELL_SOWING = CO2E_KG_HA_SOWING * REAL_AREA / 1000', inplace = True)
-    agGHGmap.eval('TCO2E_CELL_SOIL_N_SURP = CO2E_KG_HA_SOIL_N_SURP * REAL_AREA / 1000', inplace = True)
+    agGHGmap.eval('TCO2E_CELL_SOIL = CO2E_KG_HA_SOIL * REAL_AREA / 1000', inplace = True)
         
     agGHGmap.eval('Total_GHG = (TCO2E_CELL_FERT_PROD + \
                                 TCO2E_CELL_PEST_PROD + \
@@ -597,7 +601,7 @@ def create_new_dataset():
                                 TCO2E_CELL_CULTIV + \
                                 TCO2E_CELL_HARVEST + \
                                 TCO2E_CELL_SOWING + \
-                                TCO2E_CELL_SOIL_N_SURP)', inplace = True)
+                                TCO2E_CELL_SOIL)', inplace = True)
     
     print(agGHGmap[['TCO2E_CELL_FERT_PROD', 
                     'TCO2E_CELL_PEST_PROD',
@@ -607,7 +611,7 @@ def create_new_dataset():
                     'TCO2E_CELL_CULTIV', 
                     'TCO2E_CELL_HARVEST', 
                     'TCO2E_CELL_SOWING', 
-                    'TCO2E_CELL_SOIL_N_SURP']].sum())
+                    'TCO2E_CELL_SOIL']].sum())
     
     agGHGmap['Total_GHG'].sum()
     
