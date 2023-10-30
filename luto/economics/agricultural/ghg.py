@@ -55,7 +55,14 @@ def get_ghg_crop( data     # Data object or module.
     """
     
     # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not return zeros
-    if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
+
+    # get all the colum names in the AGGHG_CROPS dataframe
+    column_df = pd.DataFrame(data.AGGHG_CROPS.columns.tolist(), columns=['GHG','lm','lu'])
+
+    # check if the land use and land management combination exists
+    lu_lm = column_df.query(f'lm == "{lm}" and lu == "{lu}"' ) 
+
+    if len(lu_lm) == 0:
         ghg_rs = pd.DataFrame(np.zeros((data.NCELLS,1))) # make sure the output is 2d
         cols = pd.MultiIndex.from_tuples([('crop',lm,lu,'Total_tCO2e' )])
         ghg_rs.columns = cols

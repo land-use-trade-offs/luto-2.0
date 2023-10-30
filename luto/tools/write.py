@@ -32,6 +32,8 @@ import luto.economics.agricultural.water as ag_water
 import luto.economics.non_agricultural.water as non_ag_water
 import luto.economics.agricultural.ghg as ag_ghg
 import luto.economics.non_agricultural.ghg as non_ag_ghg
+
+
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
@@ -51,18 +53,18 @@ def get_path():
     
     # Create path name
     path = 'output/' + path + post
-    
-    # Create folder 
-    if not os.path.exists(path):
-        os.mkdir(path)
 
-    # Create a subfolder for each seperate lu
+    # Subfolder for each seperate lu
     path_sub_lu = os.path.join(path, 'lucc_seperate')
 
-    if not os.path.exists(path_sub_lu):
-        os.mkdir(path_sub_lu)
-    
-    # Return path name
+
+    # Create folder 
+    paths = [path, path_sub_lu]
+    for p in paths:
+        if not os.path.exists(p):
+            os.mkdir(p)
+
+    # Return parent path name
     return path
 
 
@@ -73,7 +75,8 @@ def write_outputs(sim, yr_cal, path):
     write_settings(path)
     write_files(sim, path)
     write_files_seperate(sim, path)
-    write_production(sim, yr_cal, path)
+    write_crosstab(sim, yr_cal, path)
+    write_quantity(sim, yr_cal, path)
     write_water(sim, yr_cal, path)
     write_ghg(sim, yr_cal, path)
     write_ghg_separate(sim, yr_cal, path)
@@ -199,13 +202,8 @@ def write_files_seperate(sim, path, ammap_seperate=False):
 
         
 
+def write_quantity(sim, yr_cal, path):
 
-
-def write_production(sim, yr_cal, path): 
-    """Write out land-use and production data"""
-
-    print('\nWriting production outputs to', path)
-    
     # Calculate year index
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
     
@@ -224,7 +222,22 @@ def write_production(sim, yr_cal, path):
     df['Demand (tonnes, KL)'] = demands
     df['Abs_diff (tonnes, KL)'] = abs_diff
     df['Prop_diff (%)'] = prop_diff
-    
+
+    # Save files to disk      
+    df.to_csv(os.path.join(path, f'quantity_comparison_{yr_cal}.csv'), index = False)
+
+
+    # Write the production of each year to disk
+    production_years = pd.DataFrame({yr:sim.prod_data[yr]['Production'] for yr in sim.prod_data.keys()})
+    production_years.insert(0,'Commodity',sim.bdata.COMMODITIES)
+    production_years.to_csv(os.path.join(path, 'quantity_production_killo_t.csv'), index = False)
+
+
+
+def write_crosstab(sim, yr_cal, path): 
+    """Write out land-use and production data"""
+
+    print('\nWriting production outputs to', path)
 
     # LUS = ['Non-agricultural land'] + sim.data.AGRICULTURAL_LANDUSES + sim.data.NON_AGRICULTURAL_LANDUSES
     ctlu, swlu = lumap_crossmap( sim.lumaps[sim.data.YR_CAL_BASE]
@@ -235,10 +248,13 @@ def write_production(sim, yr_cal, path):
     
 
     
-    ctlm, swlm = lmmap_crossmap(sim.lmmaps[sim.data.YR_CAL_BASE], sim.lmmaps[yr_cal], sim.data.REAL_AREA)
+    ctlm, swlm = lmmap_crossmap(sim.lmmaps[sim.data.YR_CAL_BASE], 
+                                sim.lmmaps[yr_cal], 
+                                sim.data.REAL_AREA)
 
 
-    cthp, swhp = crossmap_irrstat( sim.lumaps[sim.data.YR_CAL_BASE], sim.lmmaps[sim.data.YR_CAL_BASE]
+    cthp, swhp = crossmap_irrstat( sim.lumaps[sim.data.YR_CAL_BASE]
+                                  , sim.lmmaps[sim.data.YR_CAL_BASE]
                                   , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
                                   , sim.data.AGRICULTURAL_LANDUSES
                                   , sim.data.NON_AGRICULTURAL_LANDUSES
@@ -264,10 +280,6 @@ def write_production(sim, yr_cal, path):
         ctass[am] = ctas
         swass[am] = swas
         
-
-    
-    # Save files to disk      
-    df.to_csv(os.path.join(path, 'quantity_comparison.csv'), index = False)
     
     ctlu.to_csv(os.path.join(path, 'crosstab-lumap.csv'))
     ctlm.to_csv(os.path.join(path, 'crosstab-lmmap.csv'))
