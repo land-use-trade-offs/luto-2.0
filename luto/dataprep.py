@@ -607,7 +607,15 @@ def create_new_dataset():
                                 TCO2E_CELL_SOWING + \
                                 TCO2E_CELL_SOIL)', inplace = True)
     
-    print(agGHGmap[GHG_sources_crops].sum())
+    print(agGHGmap[['TCO2E_CELL_FERT_PROD',
+                   'TCO2E_CELL_PEST_PROD',
+                   'TCO2E_CELL_IRRIG',
+                   'TCO2E_CELL_CHEM_APPL',
+                   'TCO2E_CELL_CROP_MGT',
+                   'TCO2E_CELL_CULTIV',
+                   'TCO2E_CELL_HARVEST',
+                   'TCO2E_CELL_SOWING',
+                   'TCO2E_CELL_SOIL']].sum())
     
     agGHGmap['Total_GHG'].sum()
     
