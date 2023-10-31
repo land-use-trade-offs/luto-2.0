@@ -54,8 +54,8 @@ def get_path():
     # Create path name
     path = 'output/' + path + post
 
-    # Subfolder for each seperate lu
-    path_sub_lu = os.path.join(path, 'lucc_seperate')
+    # Subfolder for each separate lu
+    path_sub_lu = os.path.join(path, 'lucc_separate')
 
 
     # Create folder 
@@ -74,7 +74,7 @@ def write_outputs(sim, yr_cal, path):
     
     write_settings(path)
     write_files(sim, path)
-    write_files_seperate(sim, path)
+    write_files_separate(sim, path)
     write_crosstab(sim, yr_cal, path)
     write_quantity(sim, yr_cal, path)
     write_water(sim, yr_cal, path)
@@ -147,9 +147,9 @@ def write_files(sim, path):
             write_gtiff(ammaps[am], os.path.join(path, ammap_fname))
 
 
-def write_files_seperate(sim, path, ammap_seperate=False):
+def write_files_separate(sim, path, ammap_separate=False):
 
-    # Write raw decision variables to seperate GeoTiffs
+    # Write raw decision variables to separate GeoTiffs
     # 
     # Here we use decision variables to create TIFFs rather than directly creating them from 
     #       {sim.lu/lmmaps, sim.ammaps}, because the decision variables is {np.float32} and 
@@ -178,7 +178,7 @@ def write_files_seperate(sim, path, ammap_seperate=False):
         non_ag_dvar_map = tools.map_desc_to_dvar_index('Non-Agriculture Landuse',
                                                 {v:k for k,v in dict(list(enumerate(sim.data.NON_AGRICULTURAL_LANDUSES))).items()},
                                                 non_ag_rk)
-        if ammap_seperate:
+        if ammap_separate:
             desc2dvar_df = pd.concat([ag_dvar_map,ag_man_map,non_ag_dvar_map])
         else:
             desc2dvar_df = pd.concat([ag_dvar_map,non_ag_dvar_map])
@@ -198,7 +198,7 @@ def write_files_seperate(sim, path, ammap_seperate=False):
             fname = f'{category}_{dvar_idx:02}_{desc}_{yr_cal}.tiff'
 
             # Write to GeoTiff
-            write_gtiff(dvar, os.path.join(path, 'lucc_seperate', fname))
+            write_gtiff(dvar, os.path.join(path, 'lucc_separate', fname))
 
         
 
