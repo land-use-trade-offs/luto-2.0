@@ -21,7 +21,11 @@ By Fjalar de Haan and Brett Bryan (b.bryan@deakin.edu.au).
 
 import os.path
 import numpy as np
-import rasterio
+try:
+    import rasterio
+except:
+    from osgeo import gdal
+    import rasterio
 from scipy.interpolate import NearestNDInterpolator
 import luto.settings as settings
 
@@ -33,7 +37,7 @@ def create_2d_map(sim, map_, filler) -> np.ndarray:
         map_ = uncoursify(sim, map_)
         
     # Then put the excluded land-use and land management types back in the array.
-    map_ = reconstitute(map_, sim.data.LUMASK, filler = filler).astype(np.int8)
+    map_ = reconstitute(map_, sim.data.LUMASK, filler = filler)
     
     return map_
 
