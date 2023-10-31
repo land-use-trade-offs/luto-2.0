@@ -28,6 +28,7 @@ from typing import Tuple
 from itertools import product
 from glob import glob
 import re
+from itertools import product
 
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
@@ -35,58 +36,61 @@ import luto.settings as settings
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
-def amortise(cost, rate = settings.DISCOUNT_RATE, horizon = settings.AMORTISATION_PERIOD):
+def amortise(cost, rate=settings.DISCOUNT_RATE, horizon=settings.AMORTISATION_PERIOD):
     """Return NPV of future `cost` amortised to annual value at discount `rate` over `horizon` years."""
-    return -1 * npf.pmt(rate, horizon, pv = cost, fv = 0, when = 'begin')
+    return -1 * npf.pmt(rate, horizon, pv=cost, fv=0, when='begin')
 
 
 def show_map(yr_cal):
     """Show a plot of the lumap of `yr_cal`."""
-    plotmap(lumaps[yr_cal], labels = bdata.AGLU2DESC)
-    
+    plotmap(lumaps[yr_cal], labels=bdata.AGLU2DESC)
+
 
 def get_production(data, yr_cal, ag_X_mrj, non_ag_X_rk, ag_man_X_mrj):
     """Return total production of commodities for a specific year...
-    
+
     'data' is a sim.data or bdata like object, 'yr_cal' is calendar year, and X_mrj 
     is land-use and land management in mrj decision-variable format.
-       
+
     Can return base year production (e.g., year = 2010) or can return production for 
     a simulated year if one exists (i.e., year = 2030) check sim.info()).
-    
+
     Includes the impacts of land-use change, productivity increases, and 
     climate change on yield."""
-    
+
     # Calculate year index (i.e., number of years since 2010)
     yr_idx = yr_cal - data.YR_CAL_BASE
 
     # Get the quantity of each commodity produced by agricultural land uses
     # Get the quantity matrices. Quantity array of shape m, r, p
     ag_q_mrp = ag_quantity.get_quantity_matrices(data, yr_idx)
-    
+
     # Convert map of land-use in mrj format to mrp format
-    ag_X_mrp = np.stack( [ ag_X_mrj[:, :, j] for p in range(data.NPRS)
-                                             for j in range(data.N_AG_LUS)
-                                             if data.LU2PR[p, j]
-                         ], axis = 2 )
+    ag_X_mrp = np.stack([ag_X_mrj[:, :, j] for p in range(data.NPRS)
+                         for j in range(data.N_AG_LUS)
+                         if data.LU2PR[p, j]
+                         ], axis=2)
 
     # Sum quantities in product (PR/p) representation.
-    ag_q_p = np.sum( ag_q_mrp * ag_X_mrp, axis = (0, 1), keepdims = False)
-    
+    ag_q_p = np.sum(ag_q_mrp * ag_X_mrp, axis=(0, 1), keepdims=False)
+
     # Transform quantities to commodity (CM/c) representation.
-    ag_q_c = [ sum( ag_q_p[p] for p in range(data.NPRS) if data.PR2CM[c, p] )
-                              for c in range(data.NCMS) ]
+    ag_q_c = [sum(ag_q_p[p] for p in range(data.NPRS) if data.PR2CM[c, p])
+              for c in range(data.NCMS)]
 
     # Get the quantity of each commodity produced by non-agricultural land uses
     # Quantity matrix in the shape of c, r, k
     q_crk = non_ag_quantity.get_quantity_matrix(data)
-    non_ag_q_c = [ (q_crk[c, :, :] * non_ag_X_rk).sum() for c in range(data.NCMS) ]
+    non_ag_q_c = [(q_crk[c, :, :] * non_ag_X_rk).sum()
+                  for c in range(data.NCMS)]
 
     # Get quantities produced by agricultural management options
-    j2p = {j: [p for p in range(data.NPRS) if data.LU2PR[p, j]] for j in range(data.N_AG_LUS)}
-    ag_man_q_mrp = ag_quantity.get_agricultural_management_quantity_matrices(data, ag_q_mrp, yr_idx)
+    j2p = {j: [p for p in range(data.NPRS) if data.LU2PR[p, j]]
+           for j in range(data.N_AG_LUS)}
+    ag_man_q_mrp = ag_quantity.get_agricultural_management_quantity_matrices(
+        data, ag_q_mrp, yr_idx)
     ag_man_q_c = np.zeros(data.NCMS)
-    
+
     for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():
         am_j_list = [data.DESC2AGLU[lu] for lu in am_lus]
         current_ag_man_X_mrp = np.zeros(ag_q_mrp.shape, dtype=np.float32)
@@ -95,25 +99,28 @@ def get_production(data, yr_cal, ag_X_mrj, non_ag_X_rk, ag_man_X_mrj):
             for p in j2p[j]:
                 current_ag_man_X_mrp[:, :, p] = ag_man_X_mrj[am][:, :, j]
 
-        ag_man_q_p = np.sum( ag_man_q_mrp[am] * current_ag_man_X_mrp, axis = (0, 1), keepdims = False)
+        ag_man_q_p = np.sum(
+            ag_man_q_mrp[am] * current_ag_man_X_mrp, axis=(0, 1), keepdims=False)
 
         for c in range(data.NCMS):
-            ag_man_q_c[c] += sum( ag_man_q_p[p] for p in range(data.NPRS) if data.PR2CM[c, p] )
+            ag_man_q_c[c] += sum(ag_man_q_p[p]
+                                 for p in range(data.NPRS) if data.PR2CM[c, p])
 
     # Return total commodity production as numpy array.
-    total_q_c = [ ag_q_c[c] + non_ag_q_c[c] + ag_man_q_c[c] for c in range(data.NCMS) ]
+    total_q_c = [ag_q_c[c] + non_ag_q_c[c] + ag_man_q_c[c]
+                 for c in range(data.NCMS)]
     return np.array(total_q_c)
 
 
 def get_production_copy(sim, yr_cal):
     """Return total production of commodities for a specific year...
-       
+
     Can return base year production (e.g., year = 2010) or can return production for 
     a simulated year if one exists (i.e., year = 2030) check sim.info()).
-    
+
     Includes the impacts of land-use change, productivity increases, and 
     climate change on yield."""
-    
+
     # Calculate year index (i.e., number of years since 2010)
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
 
@@ -131,27 +138,26 @@ def get_production_copy(sim, yr_cal):
     # Get the quantity matrices. Quantity array of shape m, r, p
     q_mrp = get_quantity_matrices(sim.data, yr_idx)
 
-    X_dry_pr = [ X_dry[j] for p in range(nprs) for j in range(nlus)
-                    if lu2pr_pj[p, j] ]
-    X_irr_pr = [ X_irr[j] for p in range(nprs) for j in range(nlus)
-                    if lu2pr_pj[p, j] ]
+    X_dry_pr = [X_dry[j] for p in range(nprs) for j in range(nlus)
+                if lu2pr_pj[p, j]]
+    X_irr_pr = [X_irr[j] for p in range(nprs) for j in range(nlus)
+                if lu2pr_pj[p, j]]
 
     # Quantities in product (PR/p) representation by land management (dry/irr).
-    q_dry_p = [ q_mrp[0, :, p] @ X_dry_pr[p] for p in range(nprs) ]
-    q_irr_p = [ q_mrp[1, :, p] @ X_irr_pr[p] for p in range(nprs) ]
+    q_dry_p = [q_mrp[0, :, p] @ X_dry_pr[p] for p in range(nprs)]
+    q_irr_p = [q_mrp[1, :, p] @ X_irr_pr[p] for p in range(nprs)]
 
     # Transform quantities to commodity (CM/c) representation by land management (dry/irr).
-    q_dry_c = [ sum(q_dry_p[p] for p in range(nprs) if pr2cm_cp[c, p])
-                for c in range(ncms) ]
-    q_irr_c = [ sum(q_irr_p[p] for p in range(nprs) if pr2cm_cp[c, p])
-                for c in range(ncms) ]
+    q_dry_c = [sum(q_dry_p[p] for p in range(nprs) if pr2cm_cp[c, p])
+               for c in range(ncms)]
+    q_irr_c = [sum(q_irr_p[p] for p in range(nprs) if pr2cm_cp[c, p])
+               for c in range(ncms)]
 
     # Total quantities in commodity (CM/c) representation.
     q_c = [q_dry_c[c] + q_irr_c[c] for c in range(ncms)]
 
     # Return total commodity production.
     return np.array(q_c)
-
 
 
 def lumap2ag_l_mrj(lumap, lmmap):
@@ -162,15 +168,18 @@ def lumap2ag_l_mrj(lumap, lmmap):
     Cells used for non-agricultural land uses will have value 0 for all agricultural
     land uses, i.e. all r.
     """
-    # Set up a container array of shape m, r, j. 
-    x_mrj = np.zeros((2, lumap.shape[0], 28), dtype = bool)   # TODO - remove 2
-    
-    # Populate the 3D land-use, land mgt mask. 
+    # Set up a container array of shape m, r, j.
+    x_mrj = np.zeros((2, lumap.shape[0], 28), dtype=bool)   # TODO - remove 2
+
+    # Populate the 3D land-use, land mgt mask.
     for j in range(28):
-        jmap = np.where( lumap == j, True, False ).astype(bool)    # One boolean map for each land use.
-        x_mrj[0, :, j] = np.where( lmmap == False, jmap, False )   # Keep only dryland version.
-        x_mrj[1, :, j] = np.where( lmmap == True, jmap, False )    # Keep only irrigated version.
-    
+        # One boolean map for each land use.
+        jmap = np.where(lumap == j, True, False).astype(bool)
+        # Keep only dryland version.
+        x_mrj[0, :, j] = np.where(lmmap == False, jmap, False)
+        # Keep only irrigated version.
+        x_mrj[1, :, j] = np.where(lmmap == True, jmap, False)
+
     return x_mrj.astype(bool)
 
 
@@ -188,7 +197,7 @@ def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
     x_rk = np.zeros((lumap.shape[0], num_non_ag_land_uses), dtype=bool)
 
     for k in range(len(non_ag_lu_codes)):
-        kmap = np.where( lumap == k, True, False )
+        kmap = np.where(lumap == k, True, False)
         x_rk[:, k] = kmap
 
     return x_rk.astype(bool)
@@ -222,7 +231,8 @@ def get_ag_and_non_ag_cells(lumap) -> Tuple[np.ndarray, np.ndarray]:
 
     # get all agricultural and non agricultural cells
     non_agricultural_cells = np.nonzero(lumap >= non_ag_base)[0]
-    agricultural_cells = np.nonzero(~np.isin(all_cells, non_agricultural_cells))[0]
+    agricultural_cells = np.nonzero(
+        ~np.isin(all_cells, non_agricultural_cells))[0]
 
     return agricultural_cells, non_agricultural_cells
 
@@ -268,6 +278,7 @@ def timethis(function, *args, **kwargs):
 
     return return_value
 
+
 def mergeorderly(dict1, dict2):
     """Return merged dictionary with keys in alphabetic order."""
     list1 = list(dict1.keys())
@@ -280,6 +291,7 @@ def mergeorderly(dict1, dict2):
         else:
             merged[key] = dict2[key]
     return merged
+
 
 def crosstabulate(before, after, labels):
     """Return a cross-tabulation matrix as a Pandas DataFrame."""
@@ -324,21 +336,8 @@ def ctabnpystocsv(before, after, labels):
 def inspect(lumap, highpos, d_j, q_rj, c_rj, landuses):
 
     # Prepare the pandas.DataFrame.
-    columns = [ "Pre Cells [#]"
-              , "Pre Costs [AUD]"
-              , "Pre Deviation [units]"
-              , "Pre Deviation [%]"
-              , "Post Cells [#]"
-              , "Post Costs [AUD]"
-              , "Post Deviation [units]"
-              , "Post Deviation [%]"
-              , "Delta Total Cells [#]"
-              , "Delta Total Cells [%]"
-              , "Delta Costs [AUD]"
-              , "Delta Costs [%]"
-              , "Delta Moved Cells [#]"
-              , "Delta Deviation [units]"
-              , "Delta Deviation [%]" ]
+    columns = ["Pre Cells [#]", "Pre Costs [AUD]", "Pre Deviation [units]", "Pre Deviation [%]", "Post Cells [#]", "Post Costs [AUD]", "Post Deviation [units]", "Post Deviation [%]",
+               "Delta Total Cells [#]", "Delta Total Cells [%]", "Delta Costs [AUD]", "Delta Costs [%]", "Delta Moved Cells [#]", "Delta Deviation [units]", "Delta Deviation [%]"]
     index = landuses
     df = pd.DataFrame(index=index, columns=columns)
 
@@ -376,40 +375,12 @@ def inspect(lumap, highpos, d_j, q_rj, c_rj, landuses):
         postdeviation = postquantity_dry + postquantity_irr - d_j[j]
         postdevfrac = postdeviation / d_j[j]
 
-        df.loc[lu] = [ precount_dry
-                     , precost_dry
-                     , predeviation
-                     , 100 * predevfrac
-                     , postcount_dry
-                     , postcost_dry
-                     , postdeviation
-                     , 100 * postdevfrac
-                     , postcount_dry - precount_dry
-                     , 100 * (postcount_dry - precount_dry) / precount_dry
-                     , postcost_dry - precost_dry
-                     , 100 * (postcost_dry - precost_dry) / precost_dry
-                     , np.sum(postwhere_dry - (prewhere_dry*postwhere_dry))
-                     , np.abs(postdeviation) - np.abs(predeviation)
-                     , 100 * ( np.abs(postdeviation) - np.abs(predeviation)
-                             / predeviation ) ]
+        df.loc[lu] = [precount_dry, precost_dry, predeviation, 100 * predevfrac, postcount_dry, postcost_dry, postdeviation, 100 * postdevfrac, postcount_dry - precount_dry, 100 * (postcount_dry - precount_dry) / precount_dry, postcost_dry - precost_dry, 100 * (postcost_dry - precost_dry) / precost_dry, np.sum(postwhere_dry - (prewhere_dry*postwhere_dry)), np.abs(postdeviation) - np.abs(predeviation), 100 * (np.abs(postdeviation) - np.abs(predeviation)
+                                                                                                                                                                                                                                                                                                                                                                                                                            / predeviation)]
 
         lu_irr = lu.replace('_dry', '_irr')
-        df.loc[lu_irr] = [ precount_irr
-                         , precost_irr
-                         , predeviation
-                         , 100 * predevfrac
-                         , postcount_irr
-                         , postcost_irr
-                         , postdeviation
-                         , 100 * postdevfrac
-                         , postcount_irr - precount_irr
-                         , 100 * (postcount_irr - precount_irr) / precount_irr
-                         , postcost_irr - precost_irr
-                         , 100 * (postcost_irr - precost_irr) / precost_irr
-                         , np.sum(postwhere_irr - (prewhere_irr*postwhere_irr))
-                         , np.abs(postdeviation) - np.abs(predeviation)
-                         , 100 * ( np.abs(postdeviation) - np.abs(predeviation)
-                                 / predeviation ) ]
+        df.loc[lu_irr] = [precount_irr, precost_irr, predeviation, 100 * predevfrac, postcount_irr, postcost_irr, postdeviation, 100 * postdevfrac, postcount_irr - precount_irr, 100 * (postcount_irr - precount_irr) / precount_irr, postcost_irr - precost_irr, 100 * (postcost_irr - precost_irr) / precost_irr, np.sum(postwhere_irr - (prewhere_irr*postwhere_irr)), np.abs(postdeviation) - np.abs(predeviation), 100 * (np.abs(postdeviation) - np.abs(predeviation)
+                                                                                                                                                                                                                                                                                                                                                                                                                                / predeviation)]
 
         precost += prewhere_dry @ c_rj.T[k] + prewhere_irr @ c_rj.T[k+1]
         postcost += postwhere_dry @ c_rj.T[k] + postwhere_irr @ c_rj.T[k+1]
@@ -436,11 +407,13 @@ def get_water_delta_matrix(w_mrj, l_mrj, data):
 
     # When land-use changes from dryland to irrigated add $7.5k per hectare for establishing irrigation infrastructure
     new_irrig_cost = 7500 * data.REAL_AREA[:, np.newaxis]
-    w_delta_mrj[1] = np.where(l_mrj[0], w_delta_mrj[1] + new_irrig_cost, w_delta_mrj[1])
+    w_delta_mrj[1] = np.where(
+        l_mrj[0], w_delta_mrj[1] + new_irrig_cost, w_delta_mrj[1])
 
     # When land-use changes from irrigated to dryland add $3k per hectare for removing irrigation infrastructure
     remove_irrig_cost = 3000 * data.REAL_AREA[:, np.newaxis]
-    w_delta_mrj[0] = np.where(l_mrj[1], w_delta_mrj[0] + remove_irrig_cost, w_delta_mrj[0])
+    w_delta_mrj[0] = np.where(
+        l_mrj[1], w_delta_mrj[0] + remove_irrig_cost, w_delta_mrj[0])
 
     # Amortise upfront costs to annualised costs
     w_delta_mrj = amortise(w_delta_mrj)
@@ -452,85 +425,41 @@ def am_name_snake_case(am_name):
     return am_name.lower().replace(' ', '_')
 
 
-def df_sparse2dense(df):
-    """Function to fill a multilevel df to densified format
-    
-    What does that mean?
-    For example, the input df has multilevel columns of ([A,(1,3)],[B,(2,4)]),
-    after passing this function, it will become ([A,(1,2,3,4)], [B,(1,2,3,4)])
-    
-    Input:
-        pd.DataFrame
-
-    Output:
-        pd.DataFrame,
-        df_col_unique, # the unique values of each column level of the input df (e.g, [A,B],[1,2,3,4])
-        df_col_count   # the number of each column level (e.g, [2,4])
-    
-    Why this is necessary?
-    Because we want to perform matrics multiplication using the input df,
-    and this function fill nan values to "missing" colums, e.g., [A,(2,4)]
-    so that the output df has a nice rectangular shape to be multiplied with
-    """
-
-    # Convert multilevel columns to a dataframe
-    df_col = pd.DataFrame( df.columns.tolist() )
-    
-    # Get the unique values and sort them 
-    df_col_unique = [ df_col[idx].unique().tolist() for idx in df_col.columns ]
-    df_col_unique = [ sorted(l) for l in df_col_unique ]
-    
-    # Get the count of each unique level
-    df_col_count = list( df_col.nunique() )
-    
-    # Get the product from columns of all levels
-    df_col_product = list( product(*df_col_unique) )
-    
-    # Sort the columns
-    df_col_product = sorted( df_col_product, 
-                             key = lambda x: [ x[i] for i in range( df_col.shape[1] ) ] 
-                           )     
-
-    # Expand the original df with df_col_product to convert it to a n-d rectangular np.array 
-    expand_df = df.reindex( columns = df_col_product, fill_value = np.nan )
-    
-    # Return expanded dataframe, list of unique column names, list of their count
-    return expand_df, df_col_unique, df_col_count
-
-def summarize_ghg_separate_df(in_array,column_level,lu_desc):
+def summarize_ghg_separate_df(in_array, column_level, lu_desc):
     '''Function to summarize the in_array to a df
     Arguments:
         in_array: a n-d np.array with the first dimension to be pixels/rows (dimension r)
-        
+
         column_level: The levels of the in_array being reshaped to (r,-1). For example, if
                       the in_array has a shape of (r,2,3), then the levels could be a tuple 
                       of list as below. Note here add a ['Agricultural Landuse] as an extra
                       level to indicate the origin of this array.
-                      
+
                       (['Agricultural Landuse],
                        ['dry','irri']),
                        ['chemical_co2_emission','transportation_co2_emission']).
-                       
+
         lu_desc: The description of each pixel. 
 
     Return:
         pd.DataFrame: A multilevel (column-wise) df.
     '''
-    
-     # warp the array back to a df
-    df = pd.DataFrame(in_array.reshape((in_array.shape[0],-1)),columns=pd.MultiIndex.from_product(column_level)) 
-    
+
+    # warp the array back to a df
+    df = pd.DataFrame(in_array.reshape(
+        (in_array.shape[0], -1)), columns=pd.MultiIndex.from_product(column_level))
+
     # add landuse describtion
     df['lu'] = lu_desc
-    
+
     # sumarize the column
     df_summary = df.groupby('lu').sum(0).reset_index()
     df_summary = df_summary.set_index('lu')
-      
+
     # add SUM row/index
     df_summary.loc['SUM'] = df_summary.sum(axis=0)
     df_summary['SUM'] = df_summary.sum(axis=1)
-    
+
     # remove column/index names
     df_summary.columns = pd.MultiIndex.from_tuples(df_summary.columns.tolist())
     df_summary.index = df_summary.index.tolist()
@@ -539,22 +468,22 @@ def summarize_ghg_separate_df(in_array,column_level,lu_desc):
 
 
 # function to create mapping table between lu_desc and dvar index
-def map_desc_to_dvar_index(category:str,
-                           desc2idx:dict,
-                           dvar_arr:np.ndarray):
+def map_desc_to_dvar_index(category: str,
+                           desc2idx: dict,
+                           dvar_arr: np.ndarray):
     '''Input:
         category: str, the category of the dvar, e.g., 'Agriculture/Non-Agriculture',
         desc2idx: dict, the mapping between lu_desc and dvar index, e.g., {'Apples': 0 ...},
         dvar_arr: np.ndarray, the dvar array with shape (r,{j|k}), where r is the number of pixels,
                   and {j|k} is the dimension of ag-landuses or non-ag-landuses.
-                  
+
     Return:
         pd.DataFrame, with columns of ['Category','lu_desc','dvar_idx','dvar'].'''
-    
-    df = pd.DataFrame({'Category':category,
-                       'lu_desc':desc2idx.keys(),
-                       'dvar_idx':desc2idx.values()})
-    
-    df['dvar'] = [dvar_arr[:,j] for j in df['dvar_idx']]
 
-    return df.reindex(columns=['Category','lu_desc','dvar_idx','dvar'])
+    df = pd.DataFrame({'Category': category,
+                       'lu_desc': desc2idx.keys(),
+                       'dvar_idx': desc2idx.values()})
+
+    df['dvar'] = [dvar_arr[:, j] for j in df['dvar_idx']]
+
+    return df.reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])

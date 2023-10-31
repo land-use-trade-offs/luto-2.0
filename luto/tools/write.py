@@ -420,59 +420,61 @@ def write_ghg_separate(sim, yr_cal, path):
     # Get the landuse descriptions for each validate cell (i.e., 0 -> Apples)
     lu_desc = [{**sim.data.AGLU2DESC,**sim.data.NON_AG2DESC}[x] 
                 for x in sim.lumaps[yr_cal]]
-    
+
     # -------------------------------------------------------#
     # Get greenhouse gas emissions from agricultural landuse #
     # -------------------------------------------------------#
-    
+
     # 1-1) Get the ghg_df
     ag_g_df = ag_ghg.get_ghg_matrices(sim.data, yr_idx, aggregate=False)
-    
-    # Fill the ag_g_df so that it can be reshaped to a n-d array
-    ag_g_df, ag_g_col_unique, ag_g_col_count = tools.df_sparse2dense(ag_g_df)
-    
-    # Remove the "Total" columns to avoid double counting
-    # Note 'Total' exsit as a CO2 sources 
-    # (i.e., Total is the sum of CO2 emitted by Electircty, Fertilizer ...)
-    keep_column = [i for i in ag_g_df.columns if not 'Total' in '_'.join(i)]
-    ag_g_df = ag_g_df[keep_column]
-    
-    # Update the [ag_g_col_unique, ag_g_col_count] to reflect the removal of "Total CO2" 
-    ag_g_col_unique[3].remove('Total_tCO2e')
-    ag_g_col_count[3] = ag_g_col_count[3] - 1
-    
-    # Reshape the df to the shape of [romjs]
-    ag_g_df_arr = ag_g_df.to_numpy(na_value=0).reshape(ag_g_df.shape[0],   # r: row, i.e, each valid pixel
-                                                       ag_g_col_count[0],  # o: origin, i.e, each origin [crop, lvstk, unallocated]
-                                                       ag_g_col_count[1],  # m: land management: [dry,irr]
-                                                       ag_g_col_count[2],  # j: land use [Apples, Beef, ...]
-                                                       ag_g_col_count[3])  # s: GHG source [chemical fertilizer, electricity, ...]
-                                                                               
+
+    # Expand the original df with zero values to convert it to a a **mrj** array
+    lu_type = ag_g_df.columns.levels[0]
+    ghg_sources = ag_g_df.columns.levels[1]
+    lm_type = sim.data.LANDMANS
+    lu_type = sim.data.AGRICULTURAL_LANDUSES
+
+    df_col_product = list( product(*[lu_type, ghg_sources, lm_type, lu_type]) )
+
+    ag_g_df = ag_g_df.reindex(columns=df_col_product, fill_value=0)
+
+
+    # Reshape the df to the shape of [rosmj]
+    #       r: row, i.e, each valid pixel
+    #       o: origin, i.e, each origin [crop, lvstk, unallocated]
+    #       s: GHG source [chemical fertilizer, electricity, ...]
+    #       m: land management: [dry,irr]
+    #       j: land use [Apples, Beef, ...]
+    ag_g_df = ag_g_df.to_numpy(na_value=0).reshape(ag_g_df.shape[0], *ag_g_df.columns.levshape)  
+                                                                                
     # 1-2) Get the ag_g_mrjs, which will be used to compute GHG_agricultural_landuse
-    ag_g_mrjs = np.einsum('romjs -> mrjs', ag_g_df_arr)                             # mrjs
-    
+    ag_g_mrjs = np.einsum('rosmj -> mrjs', ag_g_df)                                     # mrjs
+
     # 1-3) Get the ag_g_mrj, which will be used to compute GHG_agricultural_management
-    ag_g_mrj = np.einsum('mrjs -> mrj', ag_g_mrjs)                                  # mrj
-    
-    
+    ag_g_mrj = np.einsum('mrjs -> mrj', ag_g_mrjs)                                      # mrj
+
+
     # Use einsum to do the multiplication, 
     # easy to understand, don't need to worry too much about the dimensionality
-    ag_dvar_mrj = sim.ag_dvars[yr_cal]                                             # mrj
-    GHG_emission_separate = np.einsum('mrjs,mrj -> rms', ag_g_mrjs, ag_dvar_mrj)   # rms
+    ag_dvar_mrj = sim.ag_dvars[yr_cal]                                                  # mrj
+    GHG_emission_separate = np.einsum('mrjs,mrj -> rms', ag_g_mrjs, ag_dvar_mrj)        # rms
+
 
     # Summarize the array as a df
     GHG_emission_separate_summary = tools.summarize_ghg_separate_df(GHG_emission_separate,(['Agricultural Landuse'],
-                                                                                      ag_g_col_unique[1],   
-                                                                                      ag_g_col_unique[3]),
-                                                                     lu_desc)
-    
+                                                                                            lm_type,   
+                                                                                            ghg_sources),
+                                                                        lu_desc)
+
     # Change "KG_HA/HEAN" to "TCO2E"
     column_rename = [(i[0],i[1],i[2].replace('CO2E_KG_HA','TCO2E')) for i in GHG_emission_separate_summary.columns]
     column_rename = [(i[0],i[1],i[2].replace('CO2E_KG_HEAD','TCO2E')) for i in column_rename]
     GHG_emission_separate_summary.columns = pd.MultiIndex.from_tuples(column_rename)
-    
+
     # Save table to disk
     GHG_emission_separate_summary.to_csv(os.path.join(path, 'GHG_emissions_separate_agricultural_landuse.csv'))
+
+
 
     # -----------------------------------------------------------#
     # Get greenhouse gas emissions from non-agricultural landuse #

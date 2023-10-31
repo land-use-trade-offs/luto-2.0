@@ -54,7 +54,8 @@ def get_ghg_crop( data     # Data object or module.
         'CO2E_KG_HA_SOWING'
     """
     
-    # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not return zeros
+    # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), 
+    # if not return None
 
     # get all the colum names in the AGGHG_CROPS dataframe
     column_df = pd.DataFrame(data.AGGHG_CROPS.columns.tolist(), columns=['GHG','lm','lu'])
@@ -73,14 +74,17 @@ def get_ghg_crop( data     # Data object or module.
         ghg_rs *= data.REAL_AREA[:,np.newaxis]
         
         # add the origin (Crop) to the df.columns
-        # make sure the columns in the level of [origin, lm, lu, source]
-        ghg_rs.columns = pd.MultiIndex.from_tuples( [['crop',lm,lu] + [col[0]] for col in ghg_rs.columns])
+        # make sure the columns in the level of [origin, source, lm, lu]
+        ghg_rs.columns = pd.MultiIndex.from_tuples( [['crop',col[0],lm,lu] for col in ghg_rs.columns])
         
         # resest_index
         ghg_rs.reset_index(drop=True,inplace=True)
 
-    # Return each greenhouse gas emissions 
-    return ghg_rs if aggregate == False else ghg_rs.sum(axis=1).values
+        # Return each greenhouse gas emissions 
+        return ghg_rs if aggregate == False else ghg_rs.sum(axis=1).values
+
+    else:
+        pass
 
 
 
@@ -101,14 +105,14 @@ def get_ghg_lvstk( data        # Data object or module.
                  False -> return GHG emission as pd.DataFrame.
     
     Livestock GHG emissions include:    
-        'CO2E_KG_HEAD_ENTERIC', 
-        'CO2E_KG_HEAD_MANURE_MGT', 
-        'CO2E_KG_HEAD_IND_LEACH_RUNOFF', 
-        'CO2E_KG_HEAD_DUNG_URINE', 
-        'CO2E_KG_HEAD_SEED', 
-        'CO2E_KG_HEAD_FODDER', 
-        'CO2E_KG_HEAD_FUEL', 
-        'CO2E_KG_HEAD_ELEC'
+                  'CO2E_KG_HEAD_DUNG_URINE',
+                  'CO2E_KG_HEAD_ELEC',
+                  'CO2E_KG_HEAD_ENTERIC',
+                  'CO2E_KG_HEAD_FODDER',
+                  'CO2E_KG_HEAD_FUEL',
+                  'CO2E_KG_HEAD_IND_LEACH_RUNOFF',
+                  'CO2E_KG_HEAD_MANURE_MGT',
+                  'CO2E_KG_HEAD_SEED',
     """
     
     lvstype, vegtype = lvs_veg_types(lu)
@@ -127,27 +131,15 @@ def get_ghg_lvstk( data        # Data object or module.
     ghg_rs = ghg_raw * yield_pot[:,np.newaxis]
 
 
-    # Add pasture irrigation emissions based on emissions associated with hay production.
+    # Add pasture irrigation emissions.
     if lm == 'irr':
-        ghg_name_irr_s = ['CO2E_KG_HA_CHEM_APPL', 
-                            'CO2E_KG_HA_CROP_MGT', 
-                            'CO2E_KG_HA_CULTIV', 
-                            'CO2E_KG_HA_FERT_PROD', 
-                            'CO2E_KG_HA_HARVEST', 
-                            'CO2E_KG_HA_IRRIG', 
-                            'CO2E_KG_HA_PEST_PROD', 
-                            'CO2E_KG_HA_SOIL', 
-                            'CO2E_KG_HA_SOWING']
+        ghg_lvstk_irr = data.AGGHG_IRRPAST
+        ghg_lvstk_irr_cols = [i for i in ghg_lvstk_irr.columns if 'CO2E' in i]
+        
+        ghg_rs = pd.concat([ghg_rs, ghg_lvstk_irr[ghg_lvstk_irr_cols]], axis=1)
+        ghg_name_s += ghg_lvstk_irr_cols
+        
 
-        # Add names for GHG sources from irrigated pasture
-        ghg_name_s += ghg_name_irr_s
-        
-        # Get the GHG emissions from irrigated pasture
-        ghg_irr_rs = pd.concat([data.AGGHG_CROPS[f'{i}', 'irr', 'Hay'] for i in ghg_name_irr_s], axis=1).values
-        
-        # Append it to livestock GHG dataframe
-        ghg_rs = np.concatenate( [ghg_rs, ghg_irr_rs], 1 )
-        
     # Convert to tonnes of CO2e per ha. 
     ghg_rs = ghg_rs / 1000
 
@@ -156,7 +148,7 @@ def get_ghg_lvstk( data        # Data object or module.
 
     # Add the origin (lvstk) to df.columns
     ghg_rs = pd.DataFrame(ghg_rs)
-    ghg_rs.columns = pd.MultiIndex.from_tuples([ ['lvstk', lm, lu] + [ghg] for ghg in ghg_name_s ])
+    ghg_rs.columns = pd.MultiIndex.from_tuples([ ['lvstk', ghg, lm, lu] + [] for ghg in ghg_name_s ])
 
     # Reset dataframe index
     ghg_rs.reset_index(drop = True, inplace = True)
@@ -192,12 +184,13 @@ def get_ghg( data    # Data object or module.
         return get_ghg_lvstk(data, lu, lm, yr_idx, aggregate)
     
     # If neither crop nor livestock but in LANDUSES it is unallocated land.
+    # Unallocated land has no GHG emissions. So here create a df with zeros.
+    # The 'CO2E_KG_HA_CHEM_APPL' is chosen arbitrarily.
     elif lu in data.AGRICULTURAL_LANDUSES:
         if aggregate:
             return np.zeros(data.NCELLS)
         else:
-            return pd.DataFrame(np.zeros((data.NCELLS,1)),
-                                columns=pd.MultiIndex.from_tuples([('Unallocate',lm,lu,'Total_tCO2e')]))
+            return pd.DataFrame({('lvstk', 'CO2E_KG_HA_CHEM_APPL', lm, lu):np.zeros(data.NCELLS)})
     
     # If it is none of the above, it is not known how to get the GHG emissions.
     else:
@@ -236,7 +229,7 @@ def get_ghg_matrices(data, yr_idx, aggregate=True):
     
     elif aggregate == False:   
         return pd.concat([get_ghg_matrix(data, lu, yr_idx, aggregate) 
-                          for lu in data.LANDMANS],axis=1)
+                          for lu in data.LANDMANS], axis=1)
 
 
 

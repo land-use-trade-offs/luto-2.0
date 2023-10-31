@@ -69,6 +69,7 @@ def create_new_dataset():
     shutil.copyfile(luto_2D_inpath + 'cell_zones_df.h5', raw_data + 'cell_zones_df.h5')
     shutil.copyfile(luto_2D_inpath + 'cell_livestock_data.h5', raw_data + 'cell_livestock_data.h5')
     shutil.copyfile(luto_2D_inpath + 'SA2_livestock_GHG_data.h5', raw_data + 'SA2_livestock_GHG_data.h5')
+    shutil.copyfile(luto_2D_inpath + 'SA2_irrigated_pasture_GHG_data.h5', raw_data + 'SA2_irrigated_pasture_GHG_data.h5')
     shutil.copyfile(luto_2D_inpath + 'SA2_crop_data.h5', raw_data + 'SA2_crop_data.h5')
     shutil.copyfile(luto_2D_inpath + 'SA2_crop_GHG_data.h5', raw_data + 'SA2_crop_GHG_data.h5')
     shutil.copyfile(luto_2D_inpath + 'cell_biophysical_df.h5', raw_data + 'cell_biophysical_df.h5')
@@ -128,6 +129,9 @@ def create_new_dataset():
     
     # Read livestock GHG emissions data
     lvstkGHG = pd.read_hdf(raw_data + 'SA2_livestock_GHG_data.h5')
+    
+    # Read irrigated pasture GHG emissions data
+    irrpastGHG = pd.read_hdf(raw_data + 'SA2_irrigated_pasture_GHG_data.h5')
     
     # Read crops data
     crops = pd.read_hdf(raw_data + 'SA2_crop_data.h5')
@@ -603,15 +607,7 @@ def create_new_dataset():
                                 TCO2E_CELL_SOWING + \
                                 TCO2E_CELL_SOIL)', inplace = True)
     
-    print(agGHGmap[['TCO2E_CELL_FERT_PROD', 
-                    'TCO2E_CELL_PEST_PROD',
-                    'TCO2E_CELL_IRRIG', 
-                    'TCO2E_CELL_CHEM_APPL',
-                    'TCO2E_CELL_CROP_MGT', 
-                    'TCO2E_CELL_CULTIV', 
-                    'TCO2E_CELL_HARVEST', 
-                    'TCO2E_CELL_SOWING', 
-                    'TCO2E_CELL_SOIL']].sum())
+    print(agGHGmap[GHG_sources_crops].sum())
     
     agGHGmap['Total_GHG'].sum()
     
@@ -630,7 +626,7 @@ def create_new_dataset():
     # Create the MultiIndex structure
     agGHG_lvstk = agGHG_lvstk.pivot( index = 'CELL_ID', 
                                      columns = ['Livestock type'], 
-                                     values = ['CO2E_KG_HEAD_DRN_WATER', 'CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ELEC', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG_HEAD_FODDER', 'CO2E_KG_HEAD_FUEL', 'CO2E_KG_HEAD_IND_LEACH_RUNOFF', 'CO2E_KG_HEAD_IRR_WATER', 'CO2E_KG_HEAD_MANURE_MGT', 'CO2E_KG_HEAD_SEED']
+                                     values = ['CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ELEC', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG_HEAD_FODDER', 'CO2E_KG_HEAD_FUEL', 'CO2E_KG_HEAD_IND_LEACH_RUNOFF', 'CO2E_KG_HEAD_MANURE_MGT', 'CO2E_KG_HEAD_SEED']
                                    ).dropna( axis = 'columns', how = 'all')
     
     # Change the level names
@@ -646,8 +642,14 @@ def create_new_dataset():
     agGHG_lvstk.to_hdf(outpath + 'agGHG_lvstk.h5', key = 'agGHG_lvstk', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
 
-
+    # Copy over irrigated pasture emissions
+    agGHG_irrpast = concordance.merge( irrpastGHG
+                                     , on = 'SA2_ID'
+                                     , how = 'left' )
     
+    # Save to HDF5
+    agGHG_irrpast.to_hdf(outpath + 'agGHG_irrpast.h5', key = 'agGHG_irrpast', mode = 'w', format = 'fixed', index = False, complevel = 9)
+
     
     # Complete processing and report back
     t = round(time.time() - start_time)

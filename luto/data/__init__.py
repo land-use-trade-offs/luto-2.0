@@ -43,6 +43,7 @@ AGEC_LVSTK = pd.read_hdf( os.path.join(INPUT_DIR, 'agec_lvstk.h5') )
 #Load greenhouse gas emissions from agriculture
 AGGHG_CROPS = pd.read_hdf( os.path.join(INPUT_DIR, 'agGHG_crops.h5') )
 AGGHG_LVSTK = pd.read_hdf( os.path.join(INPUT_DIR, 'agGHG_lvstk.h5') )
+AGGHG_IRRPAST = pd.read_hdf( os.path.join(INPUT_DIR, 'agGHG_irrpast.h5') )
 
 # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
 AG_TMATRIX = np.load(os.path.join(INPUT_DIR, 'ag_tmatrix.npy'))
