@@ -130,7 +130,7 @@ def get_ghg_lvstk( data        # Data object or module.
     # Get the names for each GHG source
     ghg_name_s = [ i[1] for i in ghg_raw.columns ]
 
-    # Calculate the GHG emissions (tCO2/head * head/ha = tCO/ha)
+    # Calculate the GHG emissions (kgCO2/head * head/ha = kgCO/ha)
     ghg_rs = ghg_raw * yield_pot[:,np.newaxis]
 
 
@@ -139,7 +139,7 @@ def get_ghg_lvstk( data        # Data object or module.
         ghg_lvstk_irr = data.AGGHG_IRRPAST
         ghg_lvstk_irr_cols = [i for i in ghg_lvstk_irr.columns if 'CO2E' in i]
         
-        ghg_rs = pd.concat([ghg_rs, ghg_lvstk_irr[ghg_lvstk_irr_cols]], axis=1)
+        ghg_rs = pd.concat([ghg_rs, ghg_lvstk_irr[ghg_lvstk_irr_cols]], axis = 1)
         ghg_name_s += ghg_lvstk_irr_cols
         
 
