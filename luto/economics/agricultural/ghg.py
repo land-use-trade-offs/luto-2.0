@@ -130,7 +130,7 @@ def get_ghg_lvstk( data        # Data object or module.
     # Get the names for each GHG source
     ghg_name_s = [ i[1] for i in ghg_raw.columns ]
 
-    # Calculate the GHG emissions
+    # Calculate the GHG emissions (tCO2/head * head/ha = tCO/ha)
     ghg_rs = ghg_raw * yield_pot[:,np.newaxis]
 
 
