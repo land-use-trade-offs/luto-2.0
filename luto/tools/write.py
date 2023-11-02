@@ -430,12 +430,12 @@ def write_ghg_separate(sim, yr_cal, path):
     ag_g_df = ag_ghg.get_ghg_matrices(sim.data, yr_idx, aggregate=False) 
 
     # Expand the original df with zero values to convert it to a a **mrj** array
-    lu_type = ag_g_df.columns.levels[0] 
+    origin_type = ag_g_df.columns.levels[0] 
     ghg_sources = ag_g_df.columns.levels[1]
     lm_type = sim.data.LANDMANS
     lu_type = sim.data.AGRICULTURAL_LANDUSES
 
-    df_col_product = list( product(*[lu_type, ghg_sources, lm_type, lu_type]) )
+    df_col_product = list( product(*[origin_type, ghg_sources, lm_type, lu_type]) )
 
     ag_g_df = ag_g_df.reindex(columns=df_col_product, fill_value=0)
 
@@ -467,7 +467,7 @@ def write_ghg_separate(sim, yr_cal, path):
                                                                                             ghg_sources),
                                                                         lu_desc)
 
-    # Change "KG_HA/HEAN" to "TCO2E"
+    # Change "KG_HA/HEAD" to "TCO2E"
     column_rename = [(i[0],i[1],i[2].replace('CO2E_KG_HA','TCO2E')) for i in GHG_emission_separate_summary.columns]
     column_rename = [(i[0],i[1],i[2].replace('CO2E_KG_HEAD','TCO2E')) for i in column_rename]
     GHG_emission_separate_summary.columns = pd.MultiIndex.from_tuples(column_rename)
