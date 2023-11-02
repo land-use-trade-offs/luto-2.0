@@ -57,35 +57,38 @@ def get_ghg_crop( data     # Data object or module.
     # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), 
     # if not return None
 
-    # get all the colum names in the AGGHG_CROPS dataframe
-    column_df = pd.DataFrame(data.AGGHG_CROPS.columns.tolist(), columns=['GHG','lm','lu'])
+    # # Get column names from the AGGHG_CROPS dataframe
+    # column_df = pd.DataFrame(data.AGGHG_CROPS.columns.tolist(), columns = ['GHG', 'lm', 'lu'])
 
-    # check if the land use and land management combination exists
-    lu_lm = column_df.query(f'lm == "{lm}" and lu == "{lu}"' ) 
+    # # Check if the land use and land management combination exists
+    # lu_lm = column_df.query(f'lm == "{lm}" and lu == "{lu}"' ) 
 
-    # process GHG_crop only if the lu-lm combination exist
-    if len(lu_lm) != 0:
+    # # Process GHG_crop only if the land-use (lu) and land management (lm) combination exists (e.g., dryland Pears/Rice do not occur)
+    # if len(lu_lm) != 0:
+    
+    # Process GHG_crop only if the land-use (lu) and land management (lm) combination exists (e.g., dryland Pears/Rice do not occur)
+    if lu in data.AGGHG_CROPS['CO2E_KG_HA_CHEM_APPL', lm].columns:
 
-        # ghg_rs {r->each pixel,  s->each GHG source }
+        # Get the data column {ghg_rs: r -> each pixel,  s -> each GHG source}
         ghg_rs = data.AGGHG_CROPS.loc[:, (slice(None), lm, lu)]
-        # Convert to tonnes of CO2e per ha. 
-        ghg_rs = ghg_rs / 1000
-        # Convert to tonnes GHG per cell including resfactor
-        ghg_rs *= data.REAL_AREA[:,np.newaxis]
         
-        # add the origin (Crop) to the df.columns
-        # make sure the columns in the level of [origin, source, lm, lu]
-        ghg_rs.columns = pd.MultiIndex.from_tuples( [['crop',col[0],lm,lu] for col in ghg_rs.columns])
+        # Convert kg CO2e per ha to tonnes. 
+        ghg_rs /= 1000
         
-        # resest_index
-        ghg_rs.reset_index(drop=True,inplace=True)
+        # Convert tonnes CO2 per ha to tonnes CO2 per cell including resfactor
+        ghg_rs *= data.REAL_AREA[:, np.newaxis]
+        
+        # Add the origin (Crop) to the df.columns. Convert to MultiIndex with levels [origin, source, lm, lu]
+        ghg_rs.columns = pd.MultiIndex.from_tuples([['crop', col[0], lm, lu] for col in ghg_rs.columns])
+        
+        # Reset the dataframe index
+        ghg_rs.reset_index(drop = True, inplace = True)
 
-        # Return each greenhouse gas emissions 
-        return ghg_rs if aggregate == False else ghg_rs.sum(axis=1).values
+        # Return greenhouse gas emissions by individual source or summed over all sources (default)
+        return ghg_rs if aggregate == False else ghg_rs.sum(axis = 1).values
 
-    else:
+    else: # if not return None
         pass
-
 
 
 
@@ -127,7 +130,7 @@ def get_ghg_lvstk( data        # Data object or module.
     # Get the names for each GHG source
     ghg_name_s = [ i[1] for i in ghg_raw.columns ]
 
-    # Calculate the GHG emission
+    # Calculate the GHG emissions (kgCO2/head * head/ha = kgCO/ha)
     ghg_rs = ghg_raw * yield_pot[:,np.newaxis]
 
 
@@ -136,7 +139,7 @@ def get_ghg_lvstk( data        # Data object or module.
         ghg_lvstk_irr = data.AGGHG_IRRPAST
         ghg_lvstk_irr_cols = [i for i in ghg_lvstk_irr.columns if 'CO2E' in i]
         
-        ghg_rs = pd.concat([ghg_rs, ghg_lvstk_irr[ghg_lvstk_irr_cols]], axis=1)
+        ghg_rs = pd.concat([ghg_rs, ghg_lvstk_irr[ghg_lvstk_irr_cols]], axis = 1)
         ghg_name_s += ghg_lvstk_irr_cols
         
 
