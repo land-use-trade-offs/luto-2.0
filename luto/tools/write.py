@@ -23,6 +23,7 @@ import os, math
 from datetime import datetime
 import numpy as np
 import pandas as pd
+from itertools import product
 
 import luto.settings as settings
 from luto import tools
@@ -426,10 +427,10 @@ def write_ghg_separate(sim, yr_cal, path):
     # -------------------------------------------------------#
 
     # 1-1) Get the ghg_df
-    ag_g_df = ag_ghg.get_ghg_matrices(sim.data, yr_idx, aggregate=False)
+    ag_g_df = ag_ghg.get_ghg_matrices(sim.data, yr_idx, aggregate=False) 
 
     # Expand the original df with zero values to convert it to a a **mrj** array
-    lu_type = ag_g_df.columns.levels[0]
+    lu_type = ag_g_df.columns.levels[0] 
     ghg_sources = ag_g_df.columns.levels[1]
     lm_type = sim.data.LANDMANS
     lu_type = sim.data.AGRICULTURAL_LANDUSES

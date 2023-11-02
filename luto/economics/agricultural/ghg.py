@@ -214,7 +214,7 @@ def get_ghg_matrix(data, lm, yr_idx, aggregate):
     
     elif aggregate == False:     
         return pd.concat([get_ghg(data, lu, lm, yr_idx, aggregate) 
-                          for lu in data.AGRICULTURAL_LANDUSES],axis=1)
+                          for lu in data.AGRICULTURAL_LANDUSES],axis=1) # type: ignore
         
 
 
@@ -223,13 +223,13 @@ def get_ghg_matrices(data, yr_idx, aggregate=True):
         
         """Return g_mrj matrix of GHG emissions per cell as 3D Numpy array."""
         g_mrj = np.stack(tuple( get_ghg_matrix(data, lm, yr_idx, aggregate)
-                               for lm in data.LANDMANS ))
+                               for lm in data.LANDMANS )) # type: ignore
         return g_mrj
     
     
     elif aggregate == False:   
         return pd.concat([get_ghg_matrix(data, lu, yr_idx, aggregate) 
-                          for lu in data.LANDMANS], axis=1)
+                          for lu in data.LANDMANS], axis=1) # type: ignore
 
 
 
@@ -354,7 +354,7 @@ def get_precision_agriculture_effect_g_mrj(data, yr_idx):
                 reduction_perc = 1 - lu_data.loc[year, co2e_type]
                 if reduction_perc != 0:
                     reduction_amnt = (
-                        np.nan_to_num(data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy(), 0)
+                        np.nan_to_num(data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy(), 0) # type: ignore
                         * reduction_perc
                         / 1000            # convert to tonnes
                         * data.REAL_AREA  # adjust for resfactor
