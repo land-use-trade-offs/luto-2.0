@@ -34,53 +34,70 @@ import luto.economics.non_agricultural.water as non_ag_water
 import luto.economics.agricultural.ghg as ag_ghg
 import luto.economics.non_agricultural.ghg as non_ag_ghg
 
-
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
-def get_path():
+def get_path(sim):
     """Create a folder for storing outputs and return folder name."""
-    
+
     # Get date and time
     path = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
-    
+
     # Add some shorthand details about the model run
     post = '_'    + settings.DEMAND_CONSTRAINT_TYPE + \
-           '_'    + settings.OBJECTIVE + \
-           '_RF'  + str(settings.RESFACTOR) + \
-           '_P1e' + str(int(math.log10(settings.PENALTY))) + \
-           '_W'   + settings.WATER_USE_LIMITS + \
-           '_G'   + settings.GHG_EMISSIONS_LIMITS
-    
+        '_'    + settings.OBJECTIVE + \
+        '_RF'  + str(settings.RESFACTOR) + \
+        '_P1e' + str(int(math.log10(settings.PENALTY))) + \
+        '_W'   + settings.WATER_USE_LIMITS + \
+        '_G'   + settings.GHG_EMISSIONS_LIMITS
+
     # Create path name
     path = 'output/' + path + post
 
-    # Subfolder for each separate lu
-    path_sub_lu = os.path.join(path, 'lucc_separate')
-
-
-    # Create folder 
-    paths = [path, path_sub_lu]
+    # Get all paths 
+    paths = [path]\
+            + [f"{path}/out_{yr}" for yr in sim.lumaps.keys()]\
+            + [f"{path}/out_{yr}/lucc_separate" for yr in sim.lumaps.keys()]
+    
+    # Create all paths
     for p in paths:
         if not os.path.exists(p):
             os.mkdir(p)
 
-    # Return parent path name
     return path
 
 
 
-def write_outputs(sim, yr_cal, path):
+
+def write_outputs(sim, path):
+
+    # Write model run settings
+    write_settings(path)
+
+    # Get the years to write
+    years = list(sim.lumaps.keys())
+    paths = [f"{path}/out_{yr}" for yr in years]
+
+    # Write outputs for each year
+    for idx,(yr, path_yr) in enumerate(zip(years, paths)):
+        write_output_single_year(sim, yr, path_yr)
+        if idx % 5 == 0:
+            print(f"Finished writing {yr} out of {years[0]}-{years[-1]} years")
+
+
+
+def write_output_single_year(sim, yr_cal, path_yr):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     
-    write_settings(path)
-    write_files(sim, path)
-    write_files_separate(sim, path)
-    write_crosstab(sim, yr_cal, path)
-    write_quantity(sim, yr_cal, path)
-    write_water(sim, yr_cal, path)
-    write_ghg(sim, yr_cal, path)
-    write_ghg_separate(sim, yr_cal, path)
+    write_files(sim,yr_cal,path_yr)
+    write_files_separate(sim, yr_cal,path_yr)
+    write_crosstab(sim, yr_cal, path_yr)
+    write_quantity(sim, yr_cal, path_yr)
+    write_water(sim, yr_cal, path_yr)
+    write_ghg(sim, yr_cal, path_yr)
+    write_ghg_separate(sim, yr_cal, path_yr)
+
+
 
 
 def write_settings(path):
@@ -106,49 +123,47 @@ def write_settings(path):
         f.write('WATER_REGION_DEF: %s\n' % settings.WATER_REGION_DEF)
 
 
-def write_files(sim, path):
+def write_files(sim, yr_cal, path):
     """Writes numpy arrays and geotiffs to file"""
     
     print('\nWriting numpy arrays and geotiff outputs to', path)
     
-    for yr_cal in sim.lumaps:
-        
-        # Save raw agricultural decision variables (boolean array).
-        ag_X_mrj_fname = 'ag_X_mrj_' + str(yr_cal) + '.npy'
-        np.save(os.path.join(path, ag_X_mrj_fname), sim.ag_dvars[yr_cal])
-        
-        # Save raw non-agricultural decision variables (boolean array).
-        non_ag_X_rk_fname = 'non_ag_X_rk_' + str(yr_cal) + '.npy'
-        np.save(os.path.join(path, non_ag_X_rk_fname), sim.non_ag_dvars[yr_cal])
+    # Save raw agricultural decision variables (boolean array).
+    ag_X_mrj_fname = 'ag_X_mrj_' + '.npy'
+    np.save(os.path.join(path, ag_X_mrj_fname), sim.ag_dvars[yr_cal])
+    
+    # Save raw non-agricultural decision variables (boolean array).
+    non_ag_X_rk_fname = 'non_ag_X_rk_' + '.npy'
+    np.save(os.path.join(path, non_ag_X_rk_fname), sim.non_ag_dvars[yr_cal])
 
-        # Save raw agricultural management decision variables
-        for am in AG_MANAGEMENTS_TO_LAND_USES:
-            snake_case_am = tools.am_name_snake_case(am)
-            am_X_mrj_fname = 'ag_man_X_mrj_' + snake_case_am + "_" + str(yr_cal) + ".npy"
-            np.save(os.path.join(path, am_X_mrj_fname), sim.ag_man_dvars[yr_cal][am].astype(np.float16))
-        
-        # Write out raw numpy arrays for land-use and land management
-        lumap_fname = 'lumap_' + str(yr_cal) + '.npy'
-        lmmap_fname = 'lmmap_' + str(yr_cal) + '.npy'
-        np.save(os.path.join(path, lumap_fname), sim.lumaps[yr_cal])
-        np.save(os.path.join(path, lmmap_fname), sim.lmmaps[yr_cal])
+    # Save raw agricultural management decision variables
+    for am in AG_MANAGEMENTS_TO_LAND_USES:
+        snake_case_am = tools.am_name_snake_case(am)
+        am_X_mrj_fname = 'ag_man_X_mrj_' + snake_case_am + "_" + ".npy"
+        np.save(os.path.join(path, am_X_mrj_fname), sim.ag_man_dvars[yr_cal][am].astype(np.float16))
+    
+    # Write out raw numpy arrays for land-use and land management
+    lumap_fname = 'lumap_' + '.npy'
+    lmmap_fname = 'lmmap_' + '.npy'
+    np.save(os.path.join(path, lumap_fname), sim.lumaps[yr_cal])
+    np.save(os.path.join(path, lmmap_fname), sim.lmmaps[yr_cal])
 
-        # Recreate full resolution 2D arrays and write out GeoTiffs for land-use and land management
-        lumap, lmmap, ammaps = recreate_2D_maps(sim, yr_cal)
-        
-        lumap_fname = 'lumap_' + str(yr_cal) + '.tiff'
-        lmmap_fname = 'lmmap_' + str(yr_cal) + '.tiff'
-        
-        write_gtiff(lumap, os.path.join(path, lumap_fname))
-        write_gtiff(lmmap, os.path.join(path, lmmap_fname))
+    # Recreate full resolution 2D arrays and write out GeoTiffs for land-use and land management
+    lumap, lmmap, ammaps = recreate_2D_maps(sim, yr_cal)
+    
+    lumap_fname = 'lumap_' + '.tiff'
+    lmmap_fname = 'lmmap_' + '.tiff'
+    
+    write_gtiff(lumap, os.path.join(path, lumap_fname))
+    write_gtiff(lmmap, os.path.join(path, lmmap_fname))
 
-        for am in AG_MANAGEMENTS_TO_LAND_USES:
-            am_snake_case = tools.am_name_snake_case(am)
-            ammap_fname = f'ammap_{am_snake_case}_{str(yr_cal)}.tiff'
-            write_gtiff(ammaps[am], os.path.join(path, ammap_fname))
+    for am in AG_MANAGEMENTS_TO_LAND_USES:
+        am_snake_case = tools.am_name_snake_case(am)
+        ammap_fname = f'ammap_{am_snake_case}.tiff'
+        write_gtiff(ammaps[am], os.path.join(path, ammap_fname))
 
 
-def write_files_separate(sim, path, ammap_separate=False):
+def write_files_separate(sim, yr_cal, path, ammap_separate=False):
 
     # Write raw decision variables to separate GeoTiffs
     # 
@@ -159,145 +174,168 @@ def write_files_separate(sim, path, ammap_separate=False):
     # In this way, if partial land-use is allowed (i.e, one pixel is determined to be 50% of apples and 50% citrus),
     #       we can handle the fractional land-use successfully.
 
-    for yr_cal in sim.lumaps:
+
     
-        # 1) Collapse the land management dimension (m -> [dry, irri])
-        #    i.e., mrj -> rj
-        ag_dvar_rj = np.einsum('mrj -> rj', sim.ag_dvars[yr_cal])
-        ag_man_rj_dict = {am: np.einsum('mrj -> rj', ammap) for am, ammap in sim.ag_man_dvars[yr_cal].items()}
-        non_ag_rk = np.einsum('rk -> rk', sim.non_ag_dvars[yr_cal]) # Do nothing, just for consistency
+    # 1) Collapse the land management dimension (m -> [dry, irri])
+    #    i.e., mrj -> rj
+    ag_dvar_rj = np.einsum('mrj -> rj', sim.ag_dvars[yr_cal])
+    ag_man_rj_dict = {am: np.einsum('mrj -> rj', ammap) for am, ammap in sim.ag_man_dvars[yr_cal].items()}
+    non_ag_rk = np.einsum('rk -> rk', sim.non_ag_dvars[yr_cal]) # Do nothing, just for consistency
 
-        # 2) Get the desc2dvar table. 
-        #       desc is the land-use description, dvar is the decision variable corresponding to desc
-        ag_dvar_map = tools.map_desc_to_dvar_index('Agriculture Landuse',sim.data.DESC2AGLU,ag_dvar_rj)
+    # 2) Get the desc2dvar table. 
+    #    desc is the land-use description, dvar is the decision variable corresponding to desc
+    ag_dvar_map = tools.map_desc_to_dvar_index('Agriculture Landuse', sim.data.DESC2AGLU, ag_dvar_rj)
 
-        ag_man_map = pd.concat([tools.map_desc_to_dvar_index(am,
-                                                    {desc:sim.data.DESC2AGLU[desc] for desc in  AG_MANAGEMENTS_TO_LAND_USES[am]},
-                                                    am_dvar)
-                                for am,am_dvar in ag_man_rj_dict.items()]).reset_index(drop=True)
+    non_ag_dvar_map = tools.map_desc_to_dvar_index('Non-Agriculture Landuse',
+                                                   {v:k for k,v in dict(list(enumerate(sim.data.NON_AGRICULTURAL_LANDUSES))).items()},
+                                                    non_ag_rk)
+    
+    if ammap_separate:
+        ag_man_maps = [tools.map_desc_to_dvar_index(am,
+                                                {desc:sim.data.DESC2AGLU[desc] for desc in  AG_MANAGEMENTS_TO_LAND_USES[am]}, 
+                                                am_dvar) for am,am_dvar in ag_man_rj_dict.items()]
+  
+        ag_man_map = pd.concat(ag_man_maps).reset_index(drop=True)
+        desc2dvar_df = pd.concat([ag_dvar_map,ag_man_map,non_ag_dvar_map])
+    else:
+        desc2dvar_df = pd.concat([ag_dvar_map,non_ag_dvar_map])
 
-        non_ag_dvar_map = tools.map_desc_to_dvar_index('Non-Agriculture Landuse',
-                                                {v:k for k,v in dict(list(enumerate(sim.data.NON_AGRICULTURAL_LANDUSES))).items()},
-                                                non_ag_rk)
-        if ammap_separate:
-            desc2dvar_df = pd.concat([ag_dvar_map,ag_man_map,non_ag_dvar_map])
-        else:
-            desc2dvar_df = pd.concat([ag_dvar_map,non_ag_dvar_map])
-        
-        # 3) Export to GeoTiff
-        for _,row in desc2dvar_df.iterrows():
-            # Get the Category, land-use desc, and dvar
-            category = row['Category']
-            dvar_idx = row['dvar_idx']
-            desc = row['lu_desc']
 
-            # reconsititude the dvar to 2d
-            dvar = row['dvar']
-            dvar = create_2d_map(sim, dvar, filler = sim.data.MASK_LU_CODE)
+    
+    # 3) Export to GeoTiff
+    for _,row in desc2dvar_df.iterrows():
+        # Get the Category, land-use desc, and dvar
+        category = row['Category']
+        dvar_idx = row['dvar_idx']
+        desc = row['lu_desc']
 
-            # Create output file name
-            fname = f'{category}_{dvar_idx:02}_{desc}_{yr_cal}.tiff'
+        # reconsititude the dvar to 2d
+        dvar = row['dvar']
+        dvar = create_2d_map(sim, dvar, filler = sim.data.MASK_LU_CODE)
 
-            # Write to GeoTiff
-            write_gtiff(dvar, os.path.join(path, 'lucc_separate', fname))
+        # Create output file name
+        fname = f'{category}_{dvar_idx:02}_{desc}.tiff'
+
+        # Write to GeoTiff
+        write_gtiff(dvar, os.path.join(path, 'lucc_separate', fname))
 
         
 
 def write_quantity(sim, yr_cal, path):
 
     # Calculate year index
-    yr_idx = yr_cal - sim.data.YR_CAL_BASE
+    yrs = list(sim.lumaps.keys())
+    yr_idx = yrs.index(yr_cal)
+
+    yr_idx_pre = yr_idx - 1
+    yr_pre = yrs[yr_idx_pre]
     
     # Calculate data for quantity comparison between base year and target year
-    prod_base = sim.data.PROD_2010_C                           # tools.get_production(sim.data, sim.data.YR_CAL_BASE, sim.data.L_MRJ)  # Get commodity quantities produced in 2010
-    prod_targ = np.array(sim.prod_data[yr_cal]['Production'])  # Get commodity quantities produced in target year
-    demands = sim.data.D_CY[yr_idx]                            # Get commodity demands for target year
-    abs_diff = prod_targ - demands                             # Diff between target year production and demands in absolute terms (i.e. tonnes etc)
-    prop_diff = ( prod_targ / demands ) * 100                  # Target year production as a proportion of demands (%)
+    if yr_idx > 0:
+        # Get commodity quantities produced in 2010
+        prod_base = sim.data.PROD_2010_C if   (yr_cal == 2011 or yr_pre==2010) \
+                                         else np.array(sim.prod_data[yr_pre]['Production'])   
     
-    # Write to pandas dataframe
-    df = pd.DataFrame()
-    df['Commodity'] = sim.data.COMMODITIES
-    df['Prod_base_year (tonnes, KL)'] = prod_base
-    df['Prod_targ_year (tonnes, KL)'] = prod_targ
-    df['Demand (tonnes, KL)'] = demands
-    df['Abs_diff (tonnes, KL)'] = abs_diff
-    df['Prop_diff (%)'] = prop_diff
+        prod_targ = np.array(sim.prod_data[yr_cal]['Production'])  # Get commodity quantities produced in target year
+        demands = sim.data.D_CY[yr_idx]                            # Get commodity demands for target year
+        abs_diff = prod_targ - demands                             # Diff between target year production and demands in absolute terms (i.e. tonnes etc)
+        prop_diff = ( prod_targ / demands ) * 100                  # Target year production as a proportion of demands (%)
+        
+        # Write to pandas dataframe
+        df = pd.DataFrame()
+        df['Commodity'] = sim.data.COMMODITIES
+        df['Prod_base_year (tonnes, KL)'] = prod_base
+        df['Prod_targ_year (tonnes, KL)'] = prod_targ
+        df['Demand (tonnes, KL)'] = demands
+        df['Abs_diff (tonnes, KL)'] = abs_diff
+        df['Prop_diff (%)'] = prop_diff
 
-    # Save files to disk      
-    df.to_csv(os.path.join(path, f'quantity_comparison_{yr_cal}.csv'), index = False)
+        # Save files to disk      
+        df.to_csv(os.path.join(path, f'quantity_comparison.csv'), index = False)
 
 
-    # Write the production of each year to disk
-    production_years = pd.DataFrame({yr:sim.prod_data[yr]['Production'] for yr in sim.prod_data.keys()})
-    production_years.insert(0,'Commodity',sim.bdata.COMMODITIES)
-    production_years.to_csv(os.path.join(path, 'quantity_production_killo_t.csv'), index = False)
+        # Write the production of each year to disk
+        production_years = pd.DataFrame({yr:sim.prod_data[yr]['Production'] for yr in sim.prod_data.keys()})
+        production_years.insert(0,'Commodity',sim.bdata.COMMODITIES)
+        production_years.to_csv(os.path.join(path, 'quantity_production_killo_t.csv'), index = False)
 
 
 
 def write_crosstab(sim, yr_cal, path): 
     """Write out land-use and production data"""
 
-    print('\nWriting production outputs to', path)
+    
+    # Calculate the croostab for land-use and land management,
+    #       and the switches between base year and target year
+    yrs = list(sim.lumaps.keys())
+    yr_idx = yrs.index(yr_cal)
 
-    # LUS = ['Non-agricultural land'] + sim.data.AGRICULTURAL_LANDUSES + sim.data.NON_AGRICULTURAL_LANDUSES
-    ctlu, swlu = lumap_crossmap( sim.lumaps[sim.data.YR_CAL_BASE]
-                               , sim.lumaps[yr_cal]
-                               , sim.data.AGRICULTURAL_LANDUSES
-                               , sim.data.NON_AGRICULTURAL_LANDUSES
-                               , sim.data.REAL_AREA)
-    
+    yr_idx_pre = yr_idx - 1
+    yr_pre = yrs[yr_idx_pre]
 
-    
-    ctlm, swlm = lmmap_crossmap(sim.lmmaps[sim.data.YR_CAL_BASE], 
-                                sim.lmmaps[yr_cal], 
-                                sim.data.REAL_AREA)
+    # Only perform the calculation if the yr_cal is not the base year
+    if yr_idx > 0:
 
+        print('\nWriting production outputs to', path)
 
-    cthp, swhp = crossmap_irrstat( sim.lumaps[sim.data.YR_CAL_BASE]
-                                  , sim.lmmaps[sim.data.YR_CAL_BASE]
-                                  , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
-                                  , sim.data.AGRICULTURAL_LANDUSES
-                                  , sim.data.NON_AGRICULTURAL_LANDUSES
-                                  , sim.data.REAL_AREA)
-    
-    
-    # ctams = {}
-    # swams = {}
-    ctass = {}
-    swass = {}
-    for am in AG_MANAGEMENTS_TO_LAND_USES:
-        # ctam, swam = ammap_crossmap(sim.ammaps[sim.data.YR_CAL_BASE][am], sim.ammaps[yr_cal][am], am)
-        # ctams[am] = ctam
-        # swams[am] = swam
-    
-        ctas, swas = crossmap_amstat( am
-                                    , sim.lumaps[sim.data.YR_CAL_BASE]
-                                    , sim.ammaps[sim.data.YR_CAL_BASE][am]
-                                    , sim.lumaps[yr_cal]
-                                    , sim.ammaps[yr_cal][am]
-                                    , sim.data.AGRICULTURAL_LANDUSES
-                                    , sim.data.REAL_AREA)
-        ctass[am] = ctas
-        swass[am] = swas
+        # LUS = ['Non-agricultural land'] + sim.data.AGRICULTURAL_LANDUSES + sim.data.NON_AGRICULTURAL_LANDUSES
+        ctlu, swlu = lumap_crossmap( sim.lumaps[yr_pre]
+                                , sim.lumaps[yr_cal]
+                                , sim.data.AGRICULTURAL_LANDUSES
+                                , sim.data.NON_AGRICULTURAL_LANDUSES
+                                , sim.data.REAL_AREA)
         
-    
-    ctlu.to_csv(os.path.join(path, 'crosstab-lumap.csv'))
-    ctlm.to_csv(os.path.join(path, 'crosstab-lmmap.csv'))
 
-    swlu.to_csv(os.path.join(path, 'switches-lumap.csv'))
-    swlm.to_csv(os.path.join(path, 'switches-lmmap.csv'))
+        
+        ctlm, swlm = lmmap_crossmap(sim.lmmaps[yr_pre], 
+                                    sim.lmmaps[yr_cal], 
+                                    sim.data.REAL_AREA)
 
-    cthp.to_csv(os.path.join(path, 'crosstab-irrstat.csv'))
-    swhp.to_csv(os.path.join(path, 'switches-irrstat.csv'))
-    
-    for am in AG_MANAGEMENTS_TO_LAND_USES:
-        am_snake_case = tools.am_name_snake_case(am).replace("_", "-")
-        # ctams[am].to_csv(os.path.join(path, f'crosstab-{am_snake_case}-ammap.csv'))
-        # swams[am].to_csv(os.path.join(path, f'switches-{am_snake_case}-ammap.csv'))
 
-        ctass[am].to_csv(os.path.join(path, f'crosstab-{am_snake_case}-amstat.csv'))
-        swass[am].to_csv(os.path.join(path, f'switches-{am_snake_case}-amstat.csv'))
+        cthp, swhp = crossmap_irrstat( sim.lumaps[yr_pre]
+                                    , sim.lmmaps[yr_pre]
+                                    , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
+                                    , sim.data.AGRICULTURAL_LANDUSES
+                                    , sim.data.NON_AGRICULTURAL_LANDUSES
+                                    , sim.data.REAL_AREA)
+        
+        
+        # ctams = {}
+        # swams = {}
+        ctass = {}
+        swass = {}
+        for am in AG_MANAGEMENTS_TO_LAND_USES:
+            # ctam, swam = ammap_crossmap(sim.ammaps[yr_pre][am], sim.ammaps[yr_cal][am], am)
+            # ctams[am] = ctam
+            # swams[am] = swam
+        
+            ctas, swas = crossmap_amstat( am
+                                        , sim.lumaps[yr_pre]
+                                        , sim.ammaps[yr_pre][am]
+                                        , sim.lumaps[yr_cal]
+                                        , sim.ammaps[yr_cal][am]
+                                        , sim.data.AGRICULTURAL_LANDUSES
+                                        , sim.data.REAL_AREA)
+            ctass[am] = ctas
+            swass[am] = swas
+            
+        
+        ctlu.to_csv(os.path.join(path, 'crosstab-lumap.csv'))
+        ctlm.to_csv(os.path.join(path, 'crosstab-lmmap.csv'))
+
+        swlu.to_csv(os.path.join(path, 'switches-lumap.csv'))
+        swlm.to_csv(os.path.join(path, 'switches-lmmap.csv'))
+
+        cthp.to_csv(os.path.join(path, 'crosstab-irrstat.csv'))
+        swhp.to_csv(os.path.join(path, 'switches-irrstat.csv'))
+        
+        for am in AG_MANAGEMENTS_TO_LAND_USES:
+            am_snake_case = tools.am_name_snake_case(am).replace("_", "-")
+            # ctams[am].to_csv(os.path.join(path, f'crosstab-{am_snake_case}-ammap.csv'))
+            # swams[am].to_csv(os.path.join(path, f'switches-{am_snake_case}-ammap.csv'))
+
+            ctass[am].to_csv(os.path.join(path, f'crosstab-{am_snake_case}-amstat.csv'))
+            swass[am].to_csv(os.path.join(path, f'switches-{am_snake_case}-amstat.csv'))
 
 
 
@@ -387,6 +425,8 @@ def write_ghg(sim, yr_cal, path):
        year (e.g., 2030), and an output path as input."""
 
     print('\nWriting GHG outputs to', path)
+
+    yr_idx = yr_cal - sim.data.YR_CAL_BASE
         
     # Prepare a data frame.
     df = pd.DataFrame( columns=[ 'GHG_EMISSIONS_LIMIT_TCO2e'
@@ -396,7 +436,11 @@ def write_ghg(sim, yr_cal, path):
     ghg_limits = ag_ghg.get_ghg_limits(sim.data)
 
     # Get GHG emissions from model
-    ghg_emissions = sim.prod_data[yr_cal]['GHG Emissions']
+    if yr_cal >= sim.data.YR_CAL_BASE + 1:
+        ghg_emissions = sim.prod_data[yr_cal]['GHG Emissions']
+    else:
+        ghg_emissions = (ag_ghg.get_ghg_matrices(sim.data, yr_idx, aggregate=True) * sim.ag_dvars[2010]).sum()
+        
 
     # Add to dataframe
     df.loc[0] = ("{:,.0f}".format(ghg_limits), "{:,.0f}".format(ghg_emissions))
