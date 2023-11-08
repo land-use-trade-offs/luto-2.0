@@ -44,7 +44,7 @@ def lumap_crossmap(oldmap, newmap, ag_landuses, non_ag_landuses, real_area):
     crosstab = crosstab.reindex(reindex, axis = 0, fill_value = 0)
     crosstab = crosstab.reindex(reindex, axis = 1, fill_value = 0)
     
-    lus = ag_landuses + non_ag_landuses + ['Total']
+    lus = ag_landuses + non_ag_landuses + ['Total [km2]']
     crosstab.columns = lus
     crosstab.index = lus
     crosstab = crosstab.fillna(0)
@@ -52,7 +52,7 @@ def lumap_crossmap(oldmap, newmap, ag_landuses, non_ag_landuses, real_area):
     # Calculate net switches to land use (negative means switch away).
     switches = crosstab.iloc[-1, 0:-1] - crosstab.iloc[0:-1, -1]
     nswitches = np.abs(switches).sum()
-    switches['Total'] = nswitches
+    switches['Total [km2]'] = nswitches
     switches['Total [%]'] = np.around(100 * nswitches / (real_area.sum()/100), decimals=2)
     switches = pd.DataFrame(switches)
 
@@ -73,7 +73,7 @@ def lmmap_crossmap(oldmap, newmap, real_area):
     # Calculate net switches to land use (negative means switch away).
     switches = crosstab.iloc[-1, 0:-1] - crosstab.iloc[0:-1, -1]
     nswitches = np.abs(switches).sum()
-    switches['Total'] = nswitches
+    switches['Total [km2]'] = nswitches
     switches['Total [%]'] = np.around(100 * nswitches / (real_area.sum()/100),decimals=2)
     switches = pd.DataFrame(switches)
 
@@ -88,14 +88,14 @@ def lmmap_crossmap(oldmap, newmap, real_area):
 #     crosstab = crosstab.reindex(reindex, axis = 0, fill_value = 0)
 #     crosstab = crosstab.reindex(reindex, axis = 1, fill_value = 0)
 
-#     ind_names = ['(None)', am, 'Total']
+#     ind_names = ['(None)', am, 'Total [km2]']
 #     crosstab.columns = ind_names
 #     crosstab.index = ind_names
 
 #     # Calculate net switches to land use (negative means switch away).
 #     switches = crosstab.iloc[-1, 0:-1] - crosstab.iloc[0:-1, -1]
 #     nswitches = np.abs(switches).sum()
-#     switches['Total'] = nswitches
+#     switches['Total [km2]'] = nswitches
 #     switches['Total [%]'] = int(np.around(100 * nswitches / oldmap.shape[0]))
 
 #     return crosstab, switches
@@ -123,18 +123,22 @@ def crossmap_irrstat( lumap_old
 
     base = settings.NON_AGRICULTURAL_LU_BASE_CODE
     for k, lu in enumerate(non_ag_landuses):
-        ludict[k + base] = lu
+        ludict[(k + base)*2] = lu + ' (dry)'
+        ludict[(k + base)*2 + 1] = lu + ' (irr)'
 
-    highpos_old = np.where(lmmap_old == 0, lumap_old * 2, lumap_old * 2 + 1)
-    highpos_new = np.where(lmmap_new == 0, lumap_new * 2, lumap_new * 2 + 1)
+    # incase the value spill out of range
+    lumap_old, lmmap_old , lumap_new , lmmap_new = (i.astype(np.int16) for i in  [lumap_old, lmmap_old , lumap_new , lmmap_new])
+
+    highpos_old = np.where(lmmap_old == 0, (lumap_old * 2).astype(np.int16), (lumap_old * 2 + 1))
+    highpos_new = np.where(lmmap_new == 0, (lumap_new * 2).astype(np.int16), lumap_new * 2 + 1)
 
     # Produce the cross-tabulation matrix with labels.
-    crosstab = pd.crosstab(highpos_old, 
-                           highpos_new,
-                           values = real_area, 
-                           aggfunc = lambda x:x.sum()/100 , # {sum/100} -> convert {ha} to {km2}
+    crosstab = pd.crosstab(highpos_old,         
+                           highpos_new,        
+                           values = real_area,        
+                           aggfunc = lambda x:x.sum()/100, # {sum/100} -> convert {ha} to {km2}        
                            margins=True)
-    
+
     # Make sure the cross-tabulation matrix is square.
     crosstab = crosstab.reindex(crosstab.index, axis=1, fill_value=0)
     names = [ludict[i] for i in crosstab.columns if i != 'All']
