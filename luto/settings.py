@@ -57,19 +57,19 @@ DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 1          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 5          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
 MODE = 'snapshot'       # runs for target year only
 # MODE = 'timeseries'   # runs each year from base year to target year
 
 # Define the objective function
-# OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
-OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
+OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
+# OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
 # Specify how demand should be met in the solver
-DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
-# DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
+# DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
+DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
 
 
 # ---------------------------------------------------------------------------- #
@@ -90,7 +90,7 @@ SOLVE_METHOD = 2
    'deterministic concurrent simplex': 5 """
 
 # Penalty in objective function  *** Needs to be balanced against OPTIMALITY_TOLERANCE to trade-off speed for optimality ***   1e5 works
-PENALTY = 1e4
+PENALTY = 1e8
 
 # Print detailed output to screen
 VERBOSE = 1
@@ -143,32 +143,37 @@ SOC_AMORTISATION = 91           # Number of years over which to spread (average)
 
 GHG_EMISSIONS_LIMITS = 'on'     # 'on' or 'off'
 GHG_LIMITS_TYPE = 'tonnes'      # 'tonnes' or 'percentage'
-GHG_REDUCTION_PERCENTAGE = 50   # reduction in GHG emissions as percentage of 2010 ag emissions
-GHG_LIMITS = -70 * 1e6          # total net GHG emissions in tonnes CO2e
+GHG_REDUCTION_PERCENTAGE = 50   # if GHG_LIMITS_TYPE = 'percentage' - reduction in GHG emissions as percentage of 2010 ag emissions
+GHG_LIMITS = -70 * 1e6          # if GHG_LIMITS_TYPE = 'tonnes' - total net GHG emissions in tonnes CO2e
 
 # Water use limits parameters
 WATER_USE_LIMITS = 'on'               # 'on' or 'off'
 WATER_LIMITS_TYPE = 'water_stress'    # 'water_stress' of 'pct_ag'
 WATER_USE_REDUCTION_PERCENTAGE = 0    # reduction in water use as percentage of 2010 irrigation water use
-WATER_STRESS_FRACTION = 0.6           # = 1 - Ratio of consumption to availability. High water stress if yields below this fraction (following Aqueduct classification).
+WATER_STRESS_FRACTION = 0.8           # = 1 - Ratio of consumption to availability. High water stress if yields below this fraction (following Aqueduct classification).
 
 WATER_REGION_DEF = 'DD'                 # 'RR' for River Region, 'DD' for Drainage Division
 WATER_DRAINDIVS = list(range(1, 14, 1)) # List of drainage divisions e.g., [1, 2].
 WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions  e.g., [1, 2].
 
+
+
 # ---------------------------------------------------------------------------- #
 # Cell Culling
 # ---------------------------------------------------------------------------- #
 
-# How many land uses should remain after culling the most expensive options
-MAX_LAND_USES_PER_CELL = 12
-
-# Cull this percentage of the most expensive land usage options
-LAND_USAGE_CULL_PERCENTAGE = 0.15
-
 CULL_MODE = 'absolute'      # cull to include at most MAX_LAND_USES_PER_CELL
 # CULL_MODE = 'percentage'    # cull the LAND_USAGE_THRESHOLD_PERCENTAGE % most expensive options
 # CULL_MODE = 'none'          # do no culling
+
+# if CULL_MODE = 'absolute'. How many land uses should remain after culling the most expensive options
+MAX_LAND_USES_PER_CELL = 12
+
+# if CULL_MODE = 'percentage'. Cull this percentage of the most expensive land usage options
+LAND_USAGE_CULL_PERCENTAGE = 0.15
+
+
+
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)
 0: 'Environmental Plantings'
