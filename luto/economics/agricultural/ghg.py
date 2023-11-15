@@ -297,7 +297,7 @@ def get_asparagopsis_effect_g_mrj(data, yr_idx):
 
     # Update values in the new matrix, taking into account the CH4 reduction of asparagopsis
     for lu_idx, lu in enumerate(land_uses):
-        ch4_reduction_perc = 1 - data.ASPARAGOPSIS_DATA[lu].loc[year, "MitEff_CH4"]
+        ch4_reduction_perc = 1 - data.ASPARAGOPSIS_DATA[lu].loc[year, "CO2E_KG_HEAD_ENTERIC"]
 
         if ch4_reduction_perc != 0:
             for lm in data.LANDMANS:
@@ -348,7 +348,7 @@ def get_precision_agriculture_effect_g_mrj(data, yr_idx):
                 'CO2E_KG_HA_CHEM_APPL',
                 'CO2E_KG_HA_CROP_MGT',
                 'CO2E_KG_HA_PEST_PROD',
-                'CO2E_KG_HA_SOIL',
+                'CO2E_KG_HA_SOIL'
             ]:
                 # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not use zeros
                 if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:

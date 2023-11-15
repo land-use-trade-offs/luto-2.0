@@ -28,9 +28,11 @@ except:
     import rasterio
     
 
-from luto.settings import INPUT_DIR, SSP, RCP, RESFACTOR, SOC_AMORTISATION,NON_AGRICULTURAL_LU_BASE_CODE
+from luto.settings import INPUT_DIR, SSP, RCP, RESFACTOR, CO2_FERT, SOC_AMORTISATION,NON_AGRICULTURAL_LU_BASE_CODE
 from luto.economics.agricultural.quantity import lvs_veg_types
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+
+
 
 ###############################################################
 # Agricultural economic data.                                                 
@@ -196,20 +198,21 @@ PR2CM = dict2matrix(CM2PR_DICT, COMMODITIES, PRODUCTS).T # Note the transpose.
 # Agricultural management options data.
 ###############################################################
 # Asparagopsis taxiformis data
-asparagopsis_file = os.path.join(INPUT_DIR, '20230907_Asparagopsis_Data.xlsx')
+asparagopsis_file = os.path.join(INPUT_DIR, '20231101_Bundle_MR.xlsx')
 ASPARAGOPSIS_DATA = {}
-ASPARAGOPSIS_DATA['Beef - natural land'] = pd.read_excel( asparagopsis_file, sheet_name='AT - Cattle (ext)', index_col='Year' )
-ASPARAGOPSIS_DATA['Beef - modified land'] = pd.read_excel( asparagopsis_file, sheet_name='AT - Cattle (int)', index_col='Year' )
-ASPARAGOPSIS_DATA['Sheep - natural land'] = pd.read_excel( asparagopsis_file, sheet_name='AT - Sheep', index_col='Year' )
+ASPARAGOPSIS_DATA['Beef - natural land'] = pd.read_excel( asparagopsis_file, sheet_name='MR bundle (ext cattle)', index_col='Year' )
+ASPARAGOPSIS_DATA['Beef - modified land'] = pd.read_excel( asparagopsis_file, sheet_name='MR bundle (int cattle)', index_col='Year' )
+ASPARAGOPSIS_DATA['Sheep - natural land'] = pd.read_excel( asparagopsis_file, sheet_name='MR bundle (sheep)', index_col='Year' )
 ASPARAGOPSIS_DATA['Sheep - modified land'] = ASPARAGOPSIS_DATA['Sheep - natural land']
-ASPARAGOPSIS_DATA['Dairy - natural land'] = pd.read_excel( asparagopsis_file, sheet_name='AT - Dairy', index_col='Year' )
+ASPARAGOPSIS_DATA['Dairy - natural land'] = pd.read_excel( asparagopsis_file, sheet_name='MR bundle (dairy)', index_col='Year' )
 ASPARAGOPSIS_DATA['Dairy - modified land'] = ASPARAGOPSIS_DATA["Dairy - natural land"]
 
 # Precision agriculture data
-prec_agr_file = os.path.join(INPUT_DIR, '20230913_PAG_Data.xlsx')
+prec_agr_file = os.path.join(INPUT_DIR, '20231101_Bundle_AgTech_NE.xlsx')
 PRECISION_AGRICULTURE_DATA = {}
-cropping_data = pd.read_excel( prec_agr_file, sheet_name='PAG bundle (Broadacre)', index_col='Year' )
-horticulture_data = pd.read_excel( prec_agr_file, sheet_name='PAG bundle (Horticulture)', index_col='Year' )
+int_cropping_data = pd.read_excel( prec_agr_file, sheet_name='AgTech NE bundle (int cropping)', index_col='Year' )
+cropping_data = pd.read_excel( prec_agr_file, sheet_name='AgTech NE bundle (cropping)', index_col='Year' )
+horticulture_data = pd.read_excel( prec_agr_file, sheet_name='AgTech NE bundle (horticulture)', index_col='Year' )
 
 for lu in ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds',
            'Winter cereals', 'Winter legumes', 'Winter oilseeds']:
@@ -218,7 +221,7 @@ for lu in ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds',
 
 for lu in ['Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']:
     # Intensive Cropping land uses
-    PRECISION_AGRICULTURE_DATA[lu] = cropping_data
+    PRECISION_AGRICULTURE_DATA[lu] = int_cropping_data
 
 for lu in ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 
            'Plantation fruit', 'Stone fruit', 'Tropical stone fruit']:
@@ -226,14 +229,15 @@ for lu in ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears',
     PRECISION_AGRICULTURE_DATA[lu] = horticulture_data
 
 # Ecological grazing data
-eco_grazing_file = os.path.join(INPUT_DIR, '20230919_ECOGRAZE_Data.xlsx')
+eco_grazing_file = os.path.join(INPUT_DIR, '20231107_ECOGRAZE_Bundle.xlsx')
 ECOLOGICAL_GRAZING_DATA = {}
-ECOLOGICAL_GRAZING_DATA['Beef - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Cattle (extensive)', index_col='Year' )
-ECOLOGICAL_GRAZING_DATA['Sheep - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Sheep', index_col='Year' )
-ECOLOGICAL_GRAZING_DATA['Dairy - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Dairy', index_col='Year' )
+ECOLOGICAL_GRAZING_DATA['Beef - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Ecograze bundle (ext cattle)', index_col='Year' )
+ECOLOGICAL_GRAZING_DATA['Sheep - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Ecograze bundle (sheep)', index_col='Year' )
+ECOLOGICAL_GRAZING_DATA['Dairy - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Ecograze bundle (dairy)', index_col='Year' )
 
 # Load soil carbon data, convert C to CO2e (x 44/12), and average over years
 SOIL_CARBON_AVG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'soil_carbon_t_ha.h5') ).to_numpy() * (44 / 12) / SOC_AMORTISATION
+
 
 
 ###############################################################
@@ -352,17 +356,22 @@ WATER_DELIVERY_PRICE = np.nan_to_num( pd.read_hdf(os.path.join(INPUT_DIR, 'water
 
 # River regions.
 RIVREG_ID = pd.read_hdf(os.path.join(INPUT_DIR, 'rivreg_id.h5')).to_numpy() # River region ID mapped.
-RIVREG_DICT = dict(pd.read_hdf(os.path.join(INPUT_DIR, 'rivreg_lut.h5')))   # River region ID to Name lookup table
+rr = pd.read_hdf(os.path.join(INPUT_DIR, 'rivreg_lut.h5'))
+RIVREG_DICT = dict(zip(rr.HR_RIVREG_ID, rr.HR_RIVREG_NAME))   # River region ID to Name lookup table
+RIVREG_LIMITS = dict(zip(rr.HR_RIVREG_ID, rr.WATER_YIELD_HIST_BASELINE_ML))   # River region ID and water use limits
 
 # Drainage divisions
 DRAINDIV_ID = pd.read_hdf(os.path.join(INPUT_DIR, 'draindiv_id.h5')).to_numpy() # Drainage div ID mapped.
-DRAINDIV_DICT = dict(pd.read_hdf(os.path.join(INPUT_DIR, 'draindiv_lut.h5')))   # Drainage div ID to Name lookup table
+dd = pd.read_hdf(os.path.join(INPUT_DIR, 'draindiv_lut.h5'))
+DRAINDIV_DICT = dict(zip(dd.HR_DRAINDIV_ID, dd.HR_DRAINDIV_NAME))   # Drainage div ID to Name lookup table
+DRAINDIV_LIMITS = dict(zip(dd.HR_DRAINDIV_ID, dd.WATER_YIELD_HIST_BASELINE_ML))   # Drainage div ID and water use limits
 
-# Water yields -- run off from a cell into catchment by deep-rooted and shallow-rooted vegetation type.
+# Water yields -- run off from a cell into catchment by deep-rooted, shallow-rooted, and natural vegetation types
 water_yield_base = pd.read_hdf(os.path.join( INPUT_DIR, 'water_yield_baselines.h5' ))
-WATER_YIELD_BASE_DR = water_yield_base['WATER_YIELD_HIST_DR_ML_HA'].to_numpy()
-WATER_YIELD_BASE_SR = water_yield_base['WATER_YIELD_HIST_SR_ML_HA'].to_numpy()
-WATER_YIELD_BASE_DIFF = WATER_YIELD_BASE_SR - WATER_YIELD_BASE_DR
+WATER_YIELD_BASE_DR = water_yield_base['WATER_YIELD_HIST_DR_ML_HA'].to_numpy(dtype = np.float32)
+WATER_YIELD_BASE_SR = water_yield_base['WATER_YIELD_HIST_SR_ML_HA'].to_numpy(dtype = np.float32)
+WATER_YIELD_BASE = water_yield_base['WATER_YIELD_HIST_BASELINE_ML_HA'].to_numpy(dtype = np.float32)
+# WATER_YIELD_BASE_DIFF = WATER_YIELD_BASE_SR - WATER_YIELD_BASE 
 
 fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + SSP + '_2010-2100_dr_ml_ha.h5')
 fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + SSP + '_2010-2100_sr_ml_ha.h5')
@@ -385,11 +394,12 @@ REMNANT_VEG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'natural_land_t_co2_
 NATURAL_LAND_T_CO2_HA = REMNANT_VEG_T_CO2_HA.to_numpy(dtype = np.float32)
 
 
+
 ###############################################################
 # Climate change impact data.
 ###############################################################
 
-CLIMATE_CHANGE_IMPACT = pd.read_hdf(os.path.join(INPUT_DIR, 'climate_change_impacts_' + RCP + '.h5'))
+CLIMATE_CHANGE_IMPACT = pd.read_hdf(os.path.join(INPUT_DIR, 'climate_change_impacts_' + RCP + '_CO2_FERT_' + CO2_FERT.upper() + '.h5'))
 
 
 

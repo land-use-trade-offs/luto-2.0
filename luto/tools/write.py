@@ -89,13 +89,13 @@ def write_outputs(sim, path):
 def write_output_single_year(sim, yr_cal, path_yr):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     
-    # write_files(sim,yr_cal,path_yr)
-    # write_files_separate(sim, yr_cal,path_yr)
+    write_files(sim,yr_cal,path_yr)
+    write_files_separate(sim, yr_cal,path_yr)
     write_crosstab(sim, yr_cal, path_yr)
     write_quantity(sim, yr_cal, path_yr)
     write_water(sim, yr_cal, path_yr)
     write_ghg(sim, yr_cal, path_yr)
-    # write_ghg_separate(sim, yr_cal, path_yr)
+    write_ghg_separate(sim, yr_cal, path_yr)
 
 
 
@@ -108,6 +108,7 @@ def write_settings(path):
         f.write('SSP %s, RCP %s\n' %(settings.SSP, settings.RCP))
         f.write('DISCOUNT_RATE: %s\n' % settings.DISCOUNT_RATE)
         f.write('AMORTISATION_PERIOD: %s\n' % settings.AMORTISATION_PERIOD)
+        f.write('CO2_FERT: %s\n' % settings.CO2_FERT)
         f.write('ENV_PLANTING_COST_PER_HA_PER_YEAR: %s\n' % settings.ENV_PLANTING_COST_PER_HA_PER_YEAR)
         f.write('CARBON_PRICE_PER_TONNE: %s\n' % settings.CARBON_PRICE_PER_TONNE)
         f.write('AGRICULTURAL_MANAGEMENT_USE_THRESHOLD: %s\n' % settings.AGRICULTURAL_MANAGEMENT_USE_THRESHOLD)
@@ -388,19 +389,21 @@ def write_water(sim, yr_cal, path):
 
     # Set up data for river regions or drainage divisions
     if settings.WATER_REGION_DEF == 'RR':
-        regions = settings.WATER_RIVREGS
+        region_limits = sim.data.RIVREG_LIMITS
         region_id = sim.data.RIVREG_ID
+        # regions = settings.WATER_RIVREGS
         region_dict = sim.data.RIVREG_DICT
         
     elif settings.WATER_REGION_DEF == 'DD':
-        regions = settings.WATER_DRAINDIVS
+        region_limits = sim.data.DRAINDIV_LIMITS
         region_id = sim.data.DRAINDIV_ID
+        # regions = settings.WATER_DRAINDIVS
         region_dict = sim.data.DRAINDIV_DICT
         
     else: print('Incorrect option for WATER_REGION_DEF in settings')
     
     # Loop through specified water regions
-    for i, region in enumerate(regions):
+    for i, region in enumerate(region_limits.keys()):
         
         # Get indices of cells in region
         ind = np.flatnonzero(region_id == region).astype(np.int32)

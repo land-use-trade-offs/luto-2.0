@@ -49,8 +49,8 @@ RAW_DATA = '../raw_data'
 SSP = '245' 
 RCP = 'rcp' + SSP[1] + 'p' + SSP[2]  # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
-# ***** TODO - ADD FACILITY TO TURN OFF CO2 FERTILIZATION in GAEZ climate impact on agricultural productivity *****
-# CO2_FERT_IMPACTS = 'ON'   # or 'OFF'
+# Add CO2 fertilisation effects on agricultural production from GAEZ v4 
+CO2_FERT = 'on'   # or 'off'
 
 # Economic parameters
 DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
@@ -68,8 +68,8 @@ OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
 # OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
 # Specify how demand should be met in the solver
-# DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
-DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
+DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
+# DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
 
 
 # ---------------------------------------------------------------------------- #
@@ -103,7 +103,7 @@ OPTIMALITY_TOLERANCE = 1e-2
    Maximum value:	1e-2"""
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 32
+THREADS = 64
 
 # Use homogenous barrier algorithm
 BARHOMOGENOUS = -1
@@ -148,13 +148,14 @@ GHG_LIMITS = -70 * 1e6          # if GHG_LIMITS_TYPE = 'tonnes' - total net GHG 
 
 # Water use limits parameters
 WATER_USE_LIMITS = 'on'               # 'on' or 'off'
-WATER_LIMITS_TYPE = 'water_stress'    # 'water_stress' of 'pct_ag'
-WATER_USE_REDUCTION_PERCENTAGE = 0    # reduction in water use as percentage of 2010 irrigation water use
-WATER_STRESS_FRACTION = 0.8           # = 1 - Ratio of consumption to availability. High water stress if yields below this fraction (following Aqueduct classification).
+WATER_LIMITS_TYPE = 'water_stress'    # 'water_stress' or 'pct_ag'
+WATER_USE_REDUCTION_PERCENTAGE = 0    # If WATER_LIMITS_TYPE = 'pct_ag'...       Set reduction in water use as percentage of 2010 irrigation water use
+WATER_STRESS_FRACTION = 0.25          # If WATER_LIMITS_TYPE = 'water_stress'... Set proportion of catchment water use above which is high water stress (following Aqueduct classification of 0.4 but leaving 0.15 for urban/industrial/indigenous use).
 
+# Regionalisation to enforce water use limits by
 WATER_REGION_DEF = 'DD'                 # 'RR' for River Region, 'DD' for Drainage Division
-WATER_DRAINDIVS = list(range(1, 14, 1)) # List of drainage divisions e.g., [1, 2].
-WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions  e.g., [1, 2].
+# WATER_DRAINDIVS = list(range(1, 14, 1)) # List of drainage divisions e.g., [1, 2].
+# WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions  e.g., [1, 2].
 
 
 

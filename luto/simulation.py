@@ -90,7 +90,8 @@ class Data():
         self.WATER_DELIVERY_PRICE = bdata.WATER_DELIVERY_PRICE[self.MASK]       # Float32
         self.WATER_YIELD_BASE_DR = bdata.WATER_YIELD_BASE_DR[self.MASK]         # Float32
         self.WATER_YIELD_BASE_SR = bdata.WATER_YIELD_BASE_SR[self.MASK]         # Float32
-        self.WATER_YIELD_BASE_DIFF = bdata.WATER_YIELD_BASE_DIFF[self.MASK]     # Float32
+        self.WATER_YIELD_BASE = bdata.WATER_YIELD_BASE[self.MASK]               # Float32
+        # self.WATER_YIELD_BASE_DIFF = bdata.WATER_YIELD_BASE_DIFF[self.MASK]   # Float32
         self.FEED_REQ = bdata.FEED_REQ[self.MASK]                               # Float32
         self.PASTURE_KG_DM_HA = bdata.PASTURE_KG_DM_HA[self.MASK]               # Int16  
         self.SAFE_PUR_MODL = bdata.SAFE_PUR_MODL[self.MASK]                     # Float32
@@ -297,15 +298,6 @@ def get_limits():
     
     if settings.WATER_USE_LIMITS == 'on': limits['water'] = ag_water.get_wuse_limits(data)
     if settings.GHG_EMISSIONS_LIMITS == 'on':  limits['ghg'] = ag_ghg.get_ghg_limits(data)
-
-    # # Water limits.
-    # wuse_limits = [] # A list of water use limits by drainage division.
-    # for region in np.unique(data.DRAINDIV_ID): # 7 == MDB
-    #     mask = np.where(data.DRAINDIV_ID == region, True, False)[data.mindices]
-    #     basefrac = get_water_stress_basefrac(data, mask)
-    #     stress = get_water_stress(data, target_index, mask)
-    #     stresses.append((basefrac, stress))
-    #     limits['water'] = stresses
     
     print('Done.')
     return limits
