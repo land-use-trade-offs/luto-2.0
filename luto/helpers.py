@@ -31,8 +31,8 @@ import luto.simulation as sim
 
 # 3. Write the ouputs to file
 from luto.tools.write import *
-path = get_path()
-write_outputs(sim, 2030, path)
+path = get_path(sim)
+write_outputs(sim, path)
 
 
 
@@ -44,8 +44,8 @@ import luto.simulation as sim
 sim.run( 2010, 2030 )
 
 from luto.tools.write import *
-path = get_path()
-write_outputs(sim, 2030, path)
+path = get_path(sim)
+write_outputs(sim, path)
 
 
 

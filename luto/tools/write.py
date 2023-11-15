@@ -57,7 +57,7 @@ def get_path(sim):
     # Get all paths 
     paths = [path]\
             + [f"{path}/out_{yr}" for yr in sim.lumaps.keys()]\
-            + [f"{path}/out_{yr}/lucc_separate" for yr in sim.lumaps.keys()]
+            + [f"{path}/out_{yr}/lucc_separate" for yr in list(sim.lumaps.keys())[1:]] # Skip creating lucc_separate for base year
     
     # Create all paths
     for p in paths:
@@ -129,30 +129,30 @@ def write_files(sim, yr_cal, path):
     print('\nWriting numpy arrays and geotiff outputs to', path)
     
     # Save raw agricultural decision variables (boolean array).
-    ag_X_mrj_fname = 'ag_X_mrj_' + '.npy'
+    ag_X_mrj_fname = 'ag_X_mrj' + '.npy'
     np.save(os.path.join(path, ag_X_mrj_fname), sim.ag_dvars[yr_cal])
     
     # Save raw non-agricultural decision variables (boolean array).
-    non_ag_X_rk_fname = 'non_ag_X_rk_' + '.npy'
+    non_ag_X_rk_fname = 'non_ag_X_rk' + '.npy'
     np.save(os.path.join(path, non_ag_X_rk_fname), sim.non_ag_dvars[yr_cal])
 
     # Save raw agricultural management decision variables
     for am in AG_MANAGEMENTS_TO_LAND_USES:
         snake_case_am = tools.am_name_snake_case(am)
-        am_X_mrj_fname = 'ag_man_X_mrj_' + snake_case_am + "_" + ".npy"
+        am_X_mrj_fname = 'ag_man_X_mrj_' + snake_case_am + ".npy"
         np.save(os.path.join(path, am_X_mrj_fname), sim.ag_man_dvars[yr_cal][am].astype(np.float16))
     
     # Write out raw numpy arrays for land-use and land management
-    lumap_fname = 'lumap_' + '.npy'
-    lmmap_fname = 'lmmap_' + '.npy'
+    lumap_fname = 'lumap' + '.npy'
+    lmmap_fname = 'lmmap' + '.npy'
     np.save(os.path.join(path, lumap_fname), sim.lumaps[yr_cal])
     np.save(os.path.join(path, lmmap_fname), sim.lmmaps[yr_cal])
 
     # Recreate full resolution 2D arrays and write out GeoTiffs for land-use and land management
     lumap, lmmap, ammaps = recreate_2D_maps(sim, yr_cal)
     
-    lumap_fname = 'lumap_' + '.tiff'
-    lmmap_fname = 'lmmap_' + '.tiff'
+    lumap_fname = 'lumap' + '.tiff'
+    lmmap_fname = 'lmmap' + '.tiff'
     
     write_gtiff(lumap, os.path.join(path, lumap_fname))
     write_gtiff(lmmap, os.path.join(path, lmmap_fname))
@@ -175,49 +175,51 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
     #       we can handle the fractional land-use successfully.
 
 
+    # Only processd if the yr_cal is not the base year
+    if yr_cal != sim.data.YR_CAL_BASE:
+
+        # 1) Collapse the land management dimension (m -> [dry, irri])
+        #    i.e., mrj -> rj
+        ag_dvar_rj = np.einsum('mrj -> rj', sim.ag_dvars[yr_cal])
+        ag_man_rj_dict = {am: np.einsum('mrj -> rj', ammap) for am, ammap in sim.ag_man_dvars[yr_cal].items()}
+        non_ag_rk = np.einsum('rk -> rk', sim.non_ag_dvars[yr_cal]) # Do nothing, just for consistency
+
+        # 2) Get the desc2dvar table. 
+        #    desc is the land-use description, dvar is the decision variable corresponding to desc
+        ag_dvar_map = tools.map_desc_to_dvar_index('Agriculture Landuse', sim.data.DESC2AGLU, ag_dvar_rj)
+
+        non_ag_dvar_map = tools.map_desc_to_dvar_index('Non-Agriculture Landuse',
+                                                    {v:k for k,v in dict(list(enumerate(sim.data.NON_AGRICULTURAL_LANDUSES))).items()},
+                                                        non_ag_rk)
+        
+        if ammap_separate:
+            ag_man_maps = [tools.map_desc_to_dvar_index(am,
+                                                    {desc:sim.data.DESC2AGLU[desc] for desc in  AG_MANAGEMENTS_TO_LAND_USES[am]}, 
+                                                    am_dvar) for am,am_dvar in ag_man_rj_dict.items()]
     
-    # 1) Collapse the land management dimension (m -> [dry, irri])
-    #    i.e., mrj -> rj
-    ag_dvar_rj = np.einsum('mrj -> rj', sim.ag_dvars[yr_cal])
-    ag_man_rj_dict = {am: np.einsum('mrj -> rj', ammap) for am, ammap in sim.ag_man_dvars[yr_cal].items()}
-    non_ag_rk = np.einsum('rk -> rk', sim.non_ag_dvars[yr_cal]) # Do nothing, just for consistency
-
-    # 2) Get the desc2dvar table. 
-    #    desc is the land-use description, dvar is the decision variable corresponding to desc
-    ag_dvar_map = tools.map_desc_to_dvar_index('Agriculture Landuse', sim.data.DESC2AGLU, ag_dvar_rj)
-
-    non_ag_dvar_map = tools.map_desc_to_dvar_index('Non-Agriculture Landuse',
-                                                   {v:k for k,v in dict(list(enumerate(sim.data.NON_AGRICULTURAL_LANDUSES))).items()},
-                                                    non_ag_rk)
-    
-    if ammap_separate:
-        ag_man_maps = [tools.map_desc_to_dvar_index(am,
-                                                {desc:sim.data.DESC2AGLU[desc] for desc in  AG_MANAGEMENTS_TO_LAND_USES[am]}, 
-                                                am_dvar) for am,am_dvar in ag_man_rj_dict.items()]
-  
-        ag_man_map = pd.concat(ag_man_maps).reset_index(drop=True)
-        desc2dvar_df = pd.concat([ag_dvar_map,ag_man_map,non_ag_dvar_map])
-    else:
-        desc2dvar_df = pd.concat([ag_dvar_map,non_ag_dvar_map])
+            ag_man_map = pd.concat(ag_man_maps).reset_index(drop=True)
+            desc2dvar_df = pd.concat([ag_dvar_map,ag_man_map,non_ag_dvar_map])
+        else:
+            desc2dvar_df = pd.concat([ag_dvar_map,non_ag_dvar_map])
 
 
-    
-    # 3) Export to GeoTiff
-    for _,row in desc2dvar_df.iterrows():
-        # Get the Category, land-use desc, and dvar
-        category = row['Category']
-        dvar_idx = row['dvar_idx']
-        desc = row['lu_desc']
+        
+        # 3) Export to GeoTiff
+        for _,row in desc2dvar_df.iterrows():
+            # Get the Category, land-use desc, and dvar
+            category = row['Category']
+            dvar_idx = row['dvar_idx']
+            desc = row['lu_desc']
 
-        # reconsititude the dvar to 2d
-        dvar = row['dvar']
-        dvar = create_2d_map(sim, dvar, filler = sim.data.MASK_LU_CODE)
+            # reconsititude the dvar to 2d
+            dvar = row['dvar']
+            dvar = create_2d_map(sim, dvar, filler = sim.data.MASK_LU_CODE)
 
-        # Create output file name
-        fname = f'{category}_{dvar_idx:02}_{desc}.tiff'
+            # Create output file name
+            fname = f'{category}_{dvar_idx:02}_{desc}.tiff'
 
-        # Write to GeoTiff
-        write_gtiff(dvar, os.path.join(path, 'lucc_separate', fname))
+            # Write to GeoTiff
+            write_gtiff(dvar, os.path.join(path, 'lucc_separate', fname))
 
         
 
@@ -233,8 +235,7 @@ def write_quantity(sim, yr_cal, path):
     # Calculate data for quantity comparison between base year and target year
     if yr_idx > 0:
         # Get commodity quantities produced in 2010
-        prod_base = sim.data.PROD_2010_C if   (yr_cal == 2011 or yr_pre==2010) \
-                                         else np.array(sim.prod_data[yr_pre]['Production'])   
+        prod_base = sim.data.PROD_2010_C if  yr_pre==2010 else np.array(sim.prod_data[yr_pre]['Production'])   
     
         prod_targ = np.array(sim.prod_data[yr_cal]['Production'])  # Get commodity quantities produced in target year
         demands = sim.data.D_CY[yr_idx]                            # Get commodity demands for target year
@@ -280,10 +281,10 @@ def write_crosstab(sim, yr_cal, path):
 
         # LUS = ['Non-agricultural land'] + sim.data.AGRICULTURAL_LANDUSES + sim.data.NON_AGRICULTURAL_LANDUSES
         ctlu, swlu = lumap_crossmap( sim.lumaps[yr_pre]
-                                , sim.lumaps[yr_cal]
-                                , sim.data.AGRICULTURAL_LANDUSES
-                                , sim.data.NON_AGRICULTURAL_LANDUSES
-                                , sim.data.REAL_AREA)
+                                   , sim.lumaps[yr_cal]
+                                   , sim.data.AGRICULTURAL_LANDUSES
+                                   , sim.data.NON_AGRICULTURAL_LANDUSES
+                                   , sim.data.REAL_AREA)
         
 
         
@@ -293,11 +294,12 @@ def write_crosstab(sim, yr_cal, path):
 
 
         cthp, swhp = crossmap_irrstat( sim.lumaps[yr_pre]
-                                    , sim.lmmaps[yr_pre]
-                                    , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
-                                    , sim.data.AGRICULTURAL_LANDUSES
-                                    , sim.data.NON_AGRICULTURAL_LANDUSES
-                                    , sim.data.REAL_AREA)
+                                     , sim.lmmaps[yr_pre]
+                                     , sim.lumaps[yr_cal]
+                                     , sim.lmmaps[yr_cal]
+                                     , sim.data.AGRICULTURAL_LANDUSES
+                                     , sim.data.NON_AGRICULTURAL_LANDUSES
+                                     , sim.data.REAL_AREA)
         
         
         # ctams = {}
@@ -315,6 +317,7 @@ def write_crosstab(sim, yr_cal, path):
                                         , sim.lumaps[yr_cal]
                                         , sim.ammaps[yr_cal][am]
                                         , sim.data.AGRICULTURAL_LANDUSES
+                                        , sim.data.NON_AGRICULTURAL_LANDUSES
                                         , sim.data.REAL_AREA)
             ctass[am] = ctas
             swass[am] = swas
@@ -334,8 +337,8 @@ def write_crosstab(sim, yr_cal, path):
             # ctams[am].to_csv(os.path.join(path, f'crosstab-{am_snake_case}-ammap.csv'))
             # swams[am].to_csv(os.path.join(path, f'switches-{am_snake_case}-ammap.csv'))
 
-            ctass[am].to_csv(os.path.join(path, f'crosstab-{am_snake_case}-amstat.csv'))
-            swass[am].to_csv(os.path.join(path, f'switches-{am_snake_case}-amstat.csv'))
+            ctass[am].to_csv(os.path.join(path, f'crosstab-amstat-{am_snake_case}.csv'))
+            swass[am].to_csv(os.path.join(path, f'switches-amstat-{am_snake_case}.csv'))
 
 
 
