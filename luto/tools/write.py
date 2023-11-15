@@ -89,13 +89,13 @@ def write_outputs(sim, path):
 def write_output_single_year(sim, yr_cal, path_yr):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     
-    write_files(sim,yr_cal,path_yr)
-    write_files_separate(sim, yr_cal,path_yr)
+    # write_files(sim,yr_cal,path_yr)
+    # write_files_separate(sim, yr_cal,path_yr)
     write_crosstab(sim, yr_cal, path_yr)
     write_quantity(sim, yr_cal, path_yr)
     write_water(sim, yr_cal, path_yr)
     write_ghg(sim, yr_cal, path_yr)
-    write_ghg_separate(sim, yr_cal, path_yr)
+    # write_ghg_separate(sim, yr_cal, path_yr)
 
 
 
@@ -108,19 +108,41 @@ def write_settings(path):
         f.write('SSP %s, RCP %s\n' %(settings.SSP, settings.RCP))
         f.write('DISCOUNT_RATE: %s\n' % settings.DISCOUNT_RATE)
         f.write('AMORTISATION_PERIOD: %s\n' % settings.AMORTISATION_PERIOD)
+        f.write('ENV_PLANTING_COST_PER_HA_PER_YEAR: %s\n' % settings.ENV_PLANTING_COST_PER_HA_PER_YEAR)
+        f.write('CARBON_PRICE_PER_TONNE: %s\n' % settings.CARBON_PRICE_PER_TONNE)
+        f.write('AGRICULTURAL_MANAGEMENT_USE_THRESHOLD: %s\n' % settings.AGRICULTURAL_MANAGEMENT_USE_THRESHOLD)
+        f.write('SOC_AMORTISATION: %s\n' % settings.SOC_AMORTISATION)
         f.write('RESFACTOR: %s\n' % settings.RESFACTOR)
         f.write('MODE: %s\n' % settings.MODE)
         f.write('OBJECTIVE: %s\n' % settings.OBJECTIVE)
         f.write('DEMAND_CONSTRAINT_TYPE: %s\n' % settings.DEMAND_CONSTRAINT_TYPE)
+        f.write('SOLVE_METHOD: %s\n' % settings.SOLVE_METHOD)
         f.write('PENALTY: %s\n' % settings.PENALTY)
         f.write('OPTIMALITY_TOLERANCE: %s\n' % settings.OPTIMALITY_TOLERANCE)
         f.write('THREADS: %s\n' % settings.THREADS)
-        f.write('ENV_PLANTING_COST_PER_HA_PER_YEAR: %s\n' % settings.ENV_PLANTING_COST_PER_HA_PER_YEAR)
-        f.write('CARBON_PRICE_PER_TONNE: %s\n' % settings.CARBON_PRICE_PER_TONNE)
+
+        f.write('CULL_MODE: %s\n' % settings.CULL_MODE)
+        if settings.CULL_MODE == 'absolute':
+            f.write('MAX_LAND_USES_PER_CELL: %s\n' % settings.MAX_LAND_USES_PER_CELL)
+        elif settings.CULL_MODE == 'percentage':
+            f.write('LAND_USAGE_CULL_PERCENTAGE: %s\n' % settings.LAND_USAGE_CULL_PERCENTAGE)
+
         f.write('WATER_USE_LIMITS: %s\n' % settings.WATER_USE_LIMITS)
+        if settings.WATER_USE_LIMITS == 'on':
+            f.write('WATER_LIMITS_TYPE: %s\n' % settings.WATER_LIMITS_TYPE)
+            if settings.WATER_LIMITS_TYPE == 'pct_ag':
+                f.write('WATER_USE_REDUCTION_PERCENTAGE: %s\n' % settings.WATER_USE_REDUCTION_PERCENTAGE)
+            elif settings.WATER_LIMITS_TYPE == 'water_stress':
+                f.write('WATER_STRESS_FRACTION: %s\n' % settings.WATER_STRESS_FRACTION)
+            f.write('WATER_REGION_DEF: %s\n' % settings.WATER_REGION_DEF)
+
         f.write('GHG_EMISSIONS_LIMITS: %s\n' % settings.GHG_EMISSIONS_LIMITS)
-        f.write('GHG_REDUCTION_PERCENTAGE: %s\n' % settings.GHG_REDUCTION_PERCENTAGE)
-        f.write('WATER_REGION_DEF: %s\n' % settings.WATER_REGION_DEF)
+        if settings.GHG_EMISSIONS_LIMITS == 'on':
+            f.write('GHG_LIMITS_TYPE: %s\n' % settings.GHG_LIMITS_TYPE)
+            if settings.GHG_LIMITS_TYPE == 'tonnes':
+                f.write('GHG_LIMITS: %s\n' % settings.GHG_LIMITS)
+            elif settings.GHG_LIMITS_TYPE == 'percentage':
+                f.write('GHG_REDUCTION_PERCENTAGE: %s\n' % settings.GHG_REDUCTION_PERCENTAGE)
 
 
 def write_files(sim, yr_cal, path):
@@ -184,23 +206,23 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
         ag_man_rj_dict = {am: np.einsum('mrj -> rj', ammap) for am, ammap in sim.ag_man_dvars[yr_cal].items()}
         non_ag_rk = np.einsum('rk -> rk', sim.non_ag_dvars[yr_cal]) # Do nothing, just for consistency
 
-        # 2) Get the desc2dvar table. 
-        #    desc is the land-use description, dvar is the decision variable corresponding to desc
-        ag_dvar_map = tools.map_desc_to_dvar_index('Agriculture Landuse', sim.data.DESC2AGLU, ag_dvar_rj)
+    # 2) Get the desc2dvar table. 
+    #    desc is the land-use description, dvar is the decision variable corresponding to desc
+    ag_dvar_map = tools.map_desc_to_dvar_index('Agricultural Land-use', sim.data.DESC2AGLU, ag_dvar_rj)
 
-        non_ag_dvar_map = tools.map_desc_to_dvar_index('Non-Agriculture Landuse',
-                                                    {v:k for k,v in dict(list(enumerate(sim.data.NON_AGRICULTURAL_LANDUSES))).items()},
-                                                        non_ag_rk)
-        
-        if ammap_separate:
-            ag_man_maps = [tools.map_desc_to_dvar_index(am,
-                                                    {desc:sim.data.DESC2AGLU[desc] for desc in  AG_MANAGEMENTS_TO_LAND_USES[am]}, 
-                                                    am_dvar) for am,am_dvar in ag_man_rj_dict.items()]
+    non_ag_dvar_map = tools.map_desc_to_dvar_index('Non-Agricultural Land-use',
+                                                   {v:k for k,v in dict(list(enumerate(sim.data.NON_AGRICULTURAL_LANDUSES))).items()},
+                                                    non_ag_rk)
     
-            ag_man_map = pd.concat(ag_man_maps).reset_index(drop=True)
-            desc2dvar_df = pd.concat([ag_dvar_map,ag_man_map,non_ag_dvar_map])
-        else:
-            desc2dvar_df = pd.concat([ag_dvar_map,non_ag_dvar_map])
+    if ammap_separate:
+        ag_man_maps = [tools.map_desc_to_dvar_index(am,
+                                                {desc:sim.data.DESC2AGLU[desc] for desc in  AG_MANAGEMENTS_TO_LAND_USES[am]}, 
+                                                am_dvar) for am,am_dvar in ag_man_rj_dict.items()]
+  
+        ag_man_map = pd.concat(ag_man_maps).reset_index(drop=True)
+        desc2dvar_df = pd.concat([ag_dvar_map,ag_man_map,non_ag_dvar_map])
+    else:
+        desc2dvar_df = pd.concat([ag_dvar_map,non_ag_dvar_map])
 
 
         
