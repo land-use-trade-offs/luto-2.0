@@ -89,13 +89,13 @@ def write_outputs(sim, path):
 def write_output_single_year(sim, yr_cal, path_yr):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     
-    # write_files(sim,yr_cal,path_yr)
+    write_files(sim,yr_cal,path_yr)
     # write_files_separate(sim, yr_cal,path_yr)
     write_crosstab(sim, yr_cal, path_yr)
     write_quantity(sim, yr_cal, path_yr)
     write_water(sim, yr_cal, path_yr)
     write_ghg(sim, yr_cal, path_yr)
-    # write_ghg_separate(sim, yr_cal, path_yr)
+    write_ghg_separate(sim, yr_cal, path_yr)
 
 
 
@@ -151,30 +151,30 @@ def write_files(sim, yr_cal, path):
     print('\nWriting numpy arrays and geotiff outputs to', path)
     
     # Save raw agricultural decision variables (boolean array).
-    ag_X_mrj_fname = 'ag_X_mrj_' + '.npy'
+    ag_X_mrj_fname = 'ag_X_mrj' + '.npy'
     np.save(os.path.join(path, ag_X_mrj_fname), sim.ag_dvars[yr_cal])
     
     # Save raw non-agricultural decision variables (boolean array).
-    non_ag_X_rk_fname = 'non_ag_X_rk_' + '.npy'
+    non_ag_X_rk_fname = 'non_ag_X_rk' + '.npy'
     np.save(os.path.join(path, non_ag_X_rk_fname), sim.non_ag_dvars[yr_cal])
 
     # Save raw agricultural management decision variables
     for am in AG_MANAGEMENTS_TO_LAND_USES:
         snake_case_am = tools.am_name_snake_case(am)
-        am_X_mrj_fname = 'ag_man_X_mrj_' + snake_case_am + "_" + ".npy"
+        am_X_mrj_fname = 'ag_man_X_mrj' + snake_case_am + "_" + ".npy"
         np.save(os.path.join(path, am_X_mrj_fname), sim.ag_man_dvars[yr_cal][am].astype(np.float16))
     
     # Write out raw numpy arrays for land-use and land management
-    lumap_fname = 'lumap_' + '.npy'
-    lmmap_fname = 'lmmap_' + '.npy'
+    lumap_fname = 'lumap' + '.npy'
+    lmmap_fname = 'lmmap' + '.npy'
     np.save(os.path.join(path, lumap_fname), sim.lumaps[yr_cal])
     np.save(os.path.join(path, lmmap_fname), sim.lmmaps[yr_cal])
 
     # Recreate full resolution 2D arrays and write out GeoTiffs for land-use and land management
     lumap, lmmap, ammaps = recreate_2D_maps(sim, yr_cal)
     
-    lumap_fname = 'lumap_' + '.tiff'
-    lmmap_fname = 'lmmap_' + '.tiff'
+    lumap_fname = 'lumap' + '.tiff'
+    lmmap_fname = 'lmmap' + '.tiff'
     
     write_gtiff(lumap, os.path.join(path, lumap_fname))
     write_gtiff(lmmap, os.path.join(path, lmmap_fname))
