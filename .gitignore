@@ -5,6 +5,7 @@
 /jinzhu_inspect_code/*
 /jinzhu_inspect_code
 luto/.ipynb_checkpoints/*
+pyproject.toml
 
 # Virtual environments
 venv
