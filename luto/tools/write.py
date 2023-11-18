@@ -458,7 +458,7 @@ def write_ghg(sim, yr_cal, path):
                                , 'GHG_EMISSIONS_TCO2e' ] )
 
     # Get GHG emissions limits used as constraints in model
-    ghg_limits = ag_ghg.get_ghg_limits(sim.data)
+    ghg_limits = ag_ghg.get_ghg_limits(sim.data, yr_cal)
 
     # Get GHG emissions from model
     if yr_cal >= sim.data.YR_CAL_BASE + 1:

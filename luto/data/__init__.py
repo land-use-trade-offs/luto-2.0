@@ -28,7 +28,7 @@ except:
     import rasterio
     
 
-from luto.settings import INPUT_DIR, SSP, RCP, RESFACTOR, CO2_FERT, SOC_AMORTISATION,NON_AGRICULTURAL_LU_BASE_CODE
+from luto.settings import INPUT_DIR, SSP, RCP, RESFACTOR, CO2_FERT, SOC_AMORTISATION, NON_AGRICULTURAL_LU_BASE_CODE, RISK_OF_REVERSAL, FIRE_RISK
 from luto.economics.agricultural.quantity import lvs_veg_types
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
@@ -197,6 +197,7 @@ PR2CM = dict2matrix(CM2PR_DICT, COMMODITIES, PRODUCTS).T # Note the transpose.
 ###############################################################
 # Agricultural management options data.
 ###############################################################
+
 # Asparagopsis taxiformis data
 asparagopsis_file = os.path.join(INPUT_DIR, '20231101_Bundle_MR.xlsx')
 ASPARAGOPSIS_DATA = {}
@@ -236,7 +237,7 @@ ECOLOGICAL_GRAZING_DATA['Sheep - modified land'] = pd.read_excel( eco_grazing_fi
 ECOLOGICAL_GRAZING_DATA['Dairy - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Ecograze bundle (dairy)', index_col='Year' )
 
 # Load soil carbon data, convert C to CO2e (x 44/12), and average over years
-SOIL_CARBON_AVG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'soil_carbon_t_ha.h5') ).to_numpy() * (44 / 12) / SOC_AMORTISATION
+SOIL_CARBON_AVG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'soil_carbon_t_ha.h5') ).to_numpy(dtype = np.float32) * (44 / 12) / SOC_AMORTISATION
 
 
 
@@ -244,9 +245,17 @@ SOIL_CARBON_AVG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'soil_carbon_t_h
 # Non-agricultural economic data.
 ###############################################################
 
-# Load environmental plantings economic data (incl. GHG emissions)
-EP_EST_COST_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_est_cost_ha.h5') ).to_numpy()
-EP_BLOCK_AVG_T_C02_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_block_avg_t_co2_ha_yr.h5') ).to_numpy()
+# Load environmental plantings economic data
+EP_EST_COST_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_est_cost_ha.h5') ).to_numpy(dtype = np.float32)
+
+# Load environmental plantings GHG emissions (aboveground carbon discounted by RISK_OF_REVERSAL and FIRE_RISK)
+ep_df = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_block_avg_t_co2_ha_yr.h5') )
+fr_df = pd.read_hdf( os.path.join(INPUT_DIR, 'fire_risk.h5') )
+fr_dict = {'low': 'FD_RISK_PERC_5TH', 'med': 'FD_RISK_MEDIAN', 'high': 'FD_RISK_PERC_95TH'}
+
+ep_df['FIRE_RISK'] = fr_df[fr_dict[FIRE_RISK]]
+EP_BLOCK_AVG_T_C02_HA = ep_df.eval('( EP_BLOCK_AG_AVG_T_CO2_HA_YR * (FIRE_RISK / 100) * (1 - @RISK_OF_REVERSAL) ) \
+                                    + EP_BLOCK_BG_AVG_T_CO2_HA_YR').to_numpy(dtype = np.float32)
 
 # Agricultural land use to environmental plantings raw transition costs:
 AG2EP_TRANSITION_COSTS_HA = np.load( os.path.join(INPUT_DIR, 'ag_to_ep_tmatrix.npy') )  # shape: (28,)
@@ -389,9 +398,12 @@ fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + SSP + '_2010-2100_sr_ml_h
 # Carbon sequestration by trees data.
 ###############################################################
 
-# Load the carbon data.
-REMNANT_VEG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'natural_land_t_co2_ha.h5') )
-NATURAL_LAND_T_CO2_HA = REMNANT_VEG_T_CO2_HA.to_numpy(dtype = np.float32)
+# Load the remnant vegetation carbon data.
+rem_veg = pd.read_hdf(os.path.join(INPUT_DIR, 'natural_land_t_co2_ha.h5')).to_numpy(dtype = np.float32)
+rem_veg = np.squeeze(rem_veg) # Remove extraneous extra dimension
+
+# Discount by fire risk.
+NATURAL_LAND_T_CO2_HA = rem_veg * (ep_df['FIRE_RISK'].to_numpy(dtype = np.float32) / 100)
 
 
 
@@ -430,3 +442,12 @@ BAU_PROD_INCR = pd.read_csv(fpath, header = [0,1]).astype(np.float32)
 
 # Load demand deltas (multipliers on 2010 production by commodity)
 DEMAND_DELTAS_C = np.load(os.path.join(INPUT_DIR, 'demand_deltas_c.npy') )
+
+
+    
+###############################################################
+# GHG targets data.
+###############################################################
+
+GHG_TARGETS = pd.read_excel(os.path.join(INPUT_DIR, 'GHG_targets.xlsx'), sheet_name = 'Data', index_col = 'YEAR')
+# GHG_TARGETS.loc[2100, 'TOTAL_GHG_TCO2E']

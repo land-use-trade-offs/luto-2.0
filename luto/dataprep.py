@@ -76,9 +76,12 @@ def create_new_dataset():
     shutil.copyfile(luto_2D_inpath + 'SA2_climate_damage_mult.h5', raw_data + 'SA2_climate_damage_mult.h5')
     
     # Copy data straight to LUTO input folder, no processing required
+    
     shutil.copyfile(fdh_inpath + 'yieldincreases-bau2022.csv', outpath + 'yieldincreases_bau2022.csv')
     shutil.copyfile(nlum_inpath + 'NLUM_2010-11_mask.tif', outpath + 'NLUM_2010-11_mask.tif')
-    
+        
+    shutil.copyfile(luto_1D_inpath + 'GHG_targets.xlsx', outpath + 'GHG_targets.xlsx')
+
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp126_2010-2100_DR_ML_HA_mean.h5', outpath + 'water_yield_ssp126_2010-2100_dr_ml_ha.h5')
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp126_2010-2100_SR_ML_HA_mean.h5', outpath + 'water_yield_ssp126_2010-2100_sr_ml_ha.h5')
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean.h5', outpath + 'water_yield_ssp245_2010-2100_dr_ml_ha.h5')
@@ -87,9 +90,10 @@ def create_new_dataset():
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp370_2010-2100_SR_ML_HA_mean.h5', outpath + 'water_yield_ssp370_2010-2100_sr_ml_ha.h5')
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp585_2010-2100_DR_ML_HA_mean.h5', outpath + 'water_yield_ssp585_2010-2100_dr_ml_ha.h5')
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp585_2010-2100_SR_ML_HA_mean.h5', outpath + 'water_yield_ssp585_2010-2100_sr_ml_ha.h5')
-
+    
     # Load delta demands file
     shutil.copyfile(luto_1D_inpath + 'demand_deltas_c.npy', outpath + 'demand_deltas_c.npy')
+    shutil.copyfile(luto_1D_inpath + 'BAU_demands_from_MH_20230810.csv', outpath + 'BAU_demands_from_MH_20230810.csv')
     
     # Load agricultural management datafiles
     shutil.copyfile(luto_1D_inpath + '20231101_Bundle_MR.xlsx', outpath + '20231101_Bundle_MR.xlsx')
@@ -396,35 +400,52 @@ def create_new_dataset():
     
     
     
-    ############### Forest and reforestation data - discount carbon sequestration by fire and drought risk
+    ############### Forest and reforestation data
     
     # Carbon stock in mature forest on natural land and save to file
-    s = bioph.eval('REMNANT_VEG_T_CO2_HA * FD_RISK_MEDIAN / 100')
-    s.to_hdf(outpath + 'natural_land_t_co2_ha.h5', key = 'natural_land_t_co2_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
-    
+    s = pd.DataFrame(columns=['REMNANT_VEG_T_CO2_HA'])
+    s['REMNANT_VEG_T_CO2_HA'] = bioph['REMNANT_VEG_T_CO2_HA']
+    s.to_hdf(outpath + 'natural_land_t_co2_ha.h5', key = 'natural_land_t_co2_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)    
     
     # Average annual carbon sequestration by Environmental Plantings (block plantings) and save to file
-    s = bioph.eval('((EP_BLOCK_TREES_AVG_T_CO2_HA_YR + EP_BLOCK_DEBRIS_AVG_T_CO2_HA_YR) * FD_RISK_MEDIAN / 100) + EP_BLOCK_SOIL_AVG_T_CO2_HA_YR')
+    s = pd.DataFrame(columns=['EP_BLOCK_AG_AVG_T_CO2_HA_YR', 'EP_BLOCK_BG_AVG_T_CO2_HA_YR'])
+    s['EP_BLOCK_AG_AVG_T_CO2_HA_YR'] = bioph.eval('EP_BLOCK_TREES_AVG_T_CO2_HA_YR + EP_BLOCK_DEBRIS_AVG_T_CO2_HA_YR') 
+    s['EP_BLOCK_BG_AVG_T_CO2_HA_YR'] = bioph['EP_BLOCK_SOIL_AVG_T_CO2_HA_YR']
     s.to_hdf(outpath + 'ep_block_avg_t_co2_ha_yr.h5', key = 'ep_block_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
     # Average annual carbon sequestration by Environmental Plantings (belt plantings) and save to file
-    s = bioph.eval('((EP_BELT_TREES_AVG_T_CO2_HA_YR + EP_BELT_DEBRIS_AVG_T_CO2_HA_YR) * FD_RISK_MEDIAN / 100) + EP_BELT_SOIL_AVG_T_CO2_HA_YR')
+    s = pd.DataFrame(columns=['EP_BELT_AG_AVG_T_CO2_HA_YR', 'EP_BELT_BG_AVG_T_CO2_HA_YR'])
+    s['EP_BELT_AG_AVG_T_CO2_HA_YR'] = bioph.eval('EP_BELT_TREES_AVG_T_CO2_HA_YR + EP_BELT_DEBRIS_AVG_T_CO2_HA_YR') 
+    s['EP_BELT_BG_AVG_T_CO2_HA_YR'] = bioph['EP_BELT_SOIL_AVG_T_CO2_HA_YR']
     s.to_hdf(outpath + 'ep_belt_avg_t_co2_ha_yr.h5', key = 'ep_belt_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
     # Average annual carbon sequestration by Environmental Plantings (riparian plantings) and save to file
-    s = bioph.eval('((EP_RIP_TREES_AVG_T_CO2_HA_YR + EP_RIP_DEBRIS_AVG_T_CO2_HA_YR) * FD_RISK_MEDIAN / 100) + EP_RIP_SOIL_AVG_T_CO2_HA_YR')
+    s = pd.DataFrame(columns=['EP_RIP_AG_AVG_T_CO2_HA_YR', 'EP_RIP_BG_AVG_T_CO2_HA_YR'])
+    s['EP_RIP_AG_AVG_T_CO2_HA_YR'] = bioph.eval('EP_RIP_TREES_AVG_T_CO2_HA_YR + EP_RIP_DEBRIS_AVG_T_CO2_HA_YR') 
+    s['EP_RIP_BG_AVG_T_CO2_HA_YR'] = bioph['EP_RIP_SOIL_AVG_T_CO2_HA_YR']
     s.to_hdf(outpath + 'ep_rip_avg_t_co2_ha_yr.h5', key = 'ep_rip_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
     
     # Average annual carbon sequestration by Hardwood Plantings (block plantings) and save to file
-    s = bioph.eval('((CP_BLOCK_TREES_AVG_T_CO2_HA_YR + CP_BLOCK_DEBRIS_AVG_T_CO2_HA_YR) * FD_RISK_MEDIAN / 100) + CP_BLOCK_SOIL_AVG_T_CO2_HA_YR')
-    s.to_hdf(outpath + 'hp_block_avg_t_co2_ha_yr.h5', key = 'hp_block_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    s = pd.DataFrame(columns=['CP_BLOCK_AG_AVG_T_CO2_HA_YR', 'CP_BLOCK_BG_AVG_T_CO2_HA_YR'])
+    s['CP_BLOCK_AG_AVG_T_CO2_HA_YR'] = bioph.eval('CP_BLOCK_TREES_AVG_T_CO2_HA_YR + CP_BLOCK_DEBRIS_AVG_T_CO2_HA_YR') 
+    s['CP_BLOCK_BG_AVG_T_CO2_HA_YR'] = bioph['CP_BLOCK_SOIL_AVG_T_CO2_HA_YR']
+    s.to_hdf(outpath + 'cp_block_avg_t_co2_ha_yr.h5', key = 'cp_block_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
     # Average annual carbon sequestration by Hardwood Plantings (belt plantings) and save to file
-    s = bioph.eval('((CP_BELT_TREES_AVG_T_CO2_HA_YR + CP_BELT_DEBRIS_AVG_T_CO2_HA_YR) * FD_RISK_MEDIAN / 100) + CP_BELT_SOIL_AVG_T_CO2_HA_YR')
-    s.to_hdf(outpath + 'hp_belt_avg_t_co2_ha_yr.h5', key = 'hp_belt_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    s = pd.DataFrame(columns=['CP_BELT_AG_AVG_T_CO2_HA_YR', 'CP_BELT_BG_AVG_T_CO2_HA_YR'])
+    s['CP_BELT_AG_AVG_T_CO2_HA_YR'] = bioph.eval('CP_BELT_TREES_AVG_T_CO2_HA_YR + CP_BELT_DEBRIS_AVG_T_CO2_HA_YR') 
+    s['CP_BELT_BG_AVG_T_CO2_HA_YR'] = bioph['CP_BELT_SOIL_AVG_T_CO2_HA_YR']
+    s.to_hdf(outpath + 'cp_belt_avg_t_co2_ha_yr.h5', key = 'cp_belt_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
     
+    # Fire risk low, medium, and high and save to file
+    s = bioph[['FD_RISK_PERC_5TH', 'FD_RISK_MEDIAN', 'FD_RISK_PERC_95TH']].copy()
+    s.to_hdf(outpath + 'fire_risk.h5', key = 'fire_risk', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    
+
+
+
     # Average establishment costs for Environmental Plantings ($/ha) and save to file
     bioph['EP_EST_COST_HA'].to_hdf(outpath + 'ep_est_cost_ha.h5', key = 'ep_est_cost_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
@@ -671,7 +692,13 @@ def create_new_dataset():
     
     # Save to HDF5
     agGHG_irrpast.to_hdf(outpath + 'agGHG_irrpast.h5', key = 'agGHG_irrpast', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    
+    
+    
+    ############### Greenhouse gas targets
 
+
+    
     
     # Complete processing and report back
     t = round(time.time() - start_time)

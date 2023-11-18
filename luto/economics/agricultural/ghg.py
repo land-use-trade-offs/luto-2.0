@@ -261,8 +261,8 @@ def get_ghg_transition_penalties(data, lumap) -> np.ndarray:
 
 
 
-def get_ghg_limits(data):
-    """Return greenhouse gas emissions limits as specified in settings.py."""
+def get_ghg_limits(data, target):
+    """Return greenhouse gas emissions limits from year target i.e. target = 2050"""
     
     # If using GHG emissions as a percentage of 2010 agricultural emissions
     if settings.GHG_LIMITS_TYPE == 'percentage':
@@ -275,8 +275,8 @@ def get_ghg_limits(data):
     
     # If using GHG emissions as a total tonnage of CO2e
     elif settings.GHG_LIMITS_TYPE == 'tonnes':
-        ghg_limits = settings.GHG_LIMITS
-        
+        # ghg_limits = settings.GHG_LIMITS
+        ghg_limits = data.GHG_TARGETS.loc[target, 'TOTAL_GHG_TCO2E']
     else: 
         print('Unknown GHG limit type...')
         exit()
