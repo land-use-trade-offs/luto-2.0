@@ -90,7 +90,7 @@ def write_output_single_year(sim, yr_cal, path_yr):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     
     write_files(sim,yr_cal,path_yr)
-    write_files_separate(sim, yr_cal,path_yr)
+    # write_files_separate(sim, yr_cal,path_yr)
     write_crosstab(sim, yr_cal, path_yr)
     write_quantity(sim, yr_cal, path_yr)
     write_water(sim, yr_cal, path_yr)

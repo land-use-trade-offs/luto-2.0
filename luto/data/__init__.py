@@ -28,7 +28,8 @@ except:
     import rasterio
     
 
-from luto.settings import INPUT_DIR, SSP, RCP, RESFACTOR, CO2_FERT, SOC_AMORTISATION, NON_AGRICULTURAL_LU_BASE_CODE, RISK_OF_REVERSAL, FIRE_RISK
+from luto.settings import INPUT_DIR, RESFACTOR, CO2_FERT, SOC_AMORTISATION, NON_AGRICULTURAL_LU_BASE_CODE, RISK_OF_REVERSAL, FIRE_RISK
+from luto.settings import SSP, RCP, SCENARIO, DIET, WASTE, FEED_EFFICIENCY
 from luto.economics.agricultural.quantity import lvs_veg_types
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
@@ -441,8 +442,11 @@ BAU_PROD_INCR = pd.read_csv(fpath, header = [0,1]).astype(np.float32)
 ###############################################################
 
 # Load demand deltas (multipliers on 2010 production by commodity)
-DEMAND_DELTAS_C = np.load(os.path.join(INPUT_DIR, 'demand_deltas_c.npy') )
+DEMAND_DELTAS_C = np.load(os.path.join(INPUT_DIR, 'demand_deltas_c.npy') ) # Placeholder data
 
+# *** STILL to do ***
+# DEMAND_DELTAS_C = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
+# x = DEMAND_DELTAS_C.loc[(SCENARIO, DIET, WASTE, FEED_EFFICIENCY]]
 
     
 ###############################################################

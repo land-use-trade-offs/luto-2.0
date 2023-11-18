@@ -53,6 +53,7 @@ RCP = 'rcp' + SSP[1] + 'p' + SSP[2]  # Representative Concentration Pathway stri
 SCENARIO = SSP_NUM = 'SSP' + SSP[0] # i.e., SSP1, SSP2 etc.
 DIET = 'BAU' # or '2050-FLX'
 WASTE = 1 # 1 for full waste, 0.5 for half waste
+FEED_EFFICIENCY = 'BAU' # 'BAU' or 'High'
 
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4 
 CO2_FERT = 'on'   # or 'off'

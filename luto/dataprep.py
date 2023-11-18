@@ -26,6 +26,7 @@ import csv
 import numpy as np
 import pandas as pd
 import shutil, os, time
+from scipy.interpolate import interp1d
 from luto.settings import INPUT_DIR, RAW_DATA
 
     
@@ -75,6 +76,8 @@ def create_new_dataset():
     shutil.copyfile(luto_2D_inpath + 'cell_biophysical_df.h5', raw_data + 'cell_biophysical_df.h5')
     shutil.copyfile(luto_2D_inpath + 'SA2_climate_damage_mult.h5', raw_data + 'SA2_climate_damage_mult.h5')
     
+    shutil.copyfile(luto_1D_inpath + 'BAU_demands_from_MH_20230810.csv', raw_data + 'BAU_demands_from_MH_20230810.csv')
+    
     # Copy data straight to LUTO input folder, no processing required
     
     shutil.copyfile(fdh_inpath + 'yieldincreases-bau2022.csv', outpath + 'yieldincreases_bau2022.csv')
@@ -93,7 +96,6 @@ def create_new_dataset():
     
     # Load delta demands file
     shutil.copyfile(luto_1D_inpath + 'demand_deltas_c.npy', outpath + 'demand_deltas_c.npy')
-    shutil.copyfile(luto_1D_inpath + 'BAU_demands_from_MH_20230810.csv', outpath + 'BAU_demands_from_MH_20230810.csv')
     
     # Load agricultural management datafiles
     shutil.copyfile(luto_1D_inpath + '20231101_Bundle_MR.xlsx', outpath + '20231101_Bundle_MR.xlsx')
@@ -152,6 +154,8 @@ def create_new_dataset():
     # Read raw climate impact data.
     cci_raw = pd.read_hdf(raw_data + 'SA2_climate_damage_mult.h5')
     
+    # Read raw demand data
+    demand = pd.read_csv( raw_data + 'BAU_demands_from_MH_20230810.csv')
     
     
     
@@ -695,10 +699,35 @@ def create_new_dataset():
     
     
     
-    ############### Greenhouse gas targets
-
-
+    ############### Agricultural demand
     
+    demand = pd.read_csv( raw_data + 'BAU_demands_from_MH_20230810.csv')
+
+    # Take out 2010 as they all = 1, drop unwanted columns
+    demand = demand.drop(columns = ['X', 'Production'])
+        
+    # Create the MultiIndex structure
+    demand = demand.pivot( index = ['Scenario', 'Diet', 'Waste', 'Feed', 'SPREAD_Commodity'], 
+                     columns = ['Year'], 
+                     values = 'Multiplier')
+    
+    d2 = demand.copy()
+    d2 = d2.drop(columns = d2.columns)
+    
+    for tup in demand.index:
+        s = demand.loc[(tup)]
+        xs = s.index.values   
+        ys = s.values
+        
+        # # Create linear function f and interpolate
+        f = interp1d(xs, ys, kind = 'linear', fill_value = 'extrapolate')
+        for yr in range(2010, 2101):
+            d2.loc[tup, yr] = f(yr)
+    
+    # Save to HDF5
+    d2.to_hdf(outpath + 'demand_projections.h5', key = 'demand_projections', mode = 'w', format = 'fixed', index = False, complevel = 9)
+
+
     
     # Complete processing and report back
     t = round(time.time() - start_time)
