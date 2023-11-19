@@ -301,11 +301,11 @@ def write_crosstab(sim, yr_cal, path):
         print('\nWriting production outputs to', path)
 
         # LUS = ['Non-agricultural land'] + sim.data.AGRICULTURAL_LANDUSES + sim.data.NON_AGRICULTURAL_LANDUSES
-        ctlu, swlu = lumap_crossmap( sim.lumaps[yr_pre]
-                                , sim.lumaps[yr_cal]
-                                , sim.data.AGRICULTURAL_LANDUSES
-                                , sim.data.NON_AGRICULTURAL_LANDUSES
-                                , sim.data.REAL_AREA)
+        ctlu, swlu = lumap_crossmap(  sim.lumaps[yr_pre]
+                                    , sim.lumaps[yr_cal]
+                                    , sim.data.AGRICULTURAL_LANDUSES
+                                    , sim.data.NON_AGRICULTURAL_LANDUSES
+                                    , sim.data.REAL_AREA)
         
 
         
@@ -315,11 +315,11 @@ def write_crosstab(sim, yr_cal, path):
 
 
         cthp, swhp = crossmap_irrstat( sim.lumaps[yr_pre]
-                                    , sim.lmmaps[yr_pre]
-                                    , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
-                                    , sim.data.AGRICULTURAL_LANDUSES
-                                    , sim.data.NON_AGRICULTURAL_LANDUSES
-                                    , sim.data.REAL_AREA)
+                                     , sim.lmmaps[yr_pre]
+                                     , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
+                                     , sim.data.AGRICULTURAL_LANDUSES
+                                     , sim.data.NON_AGRICULTURAL_LANDUSES
+                                     , sim.data.REAL_AREA)
         
         
         # ctams = {}
