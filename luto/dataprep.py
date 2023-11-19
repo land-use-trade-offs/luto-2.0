@@ -704,10 +704,12 @@ def create_new_dataset():
     demand = pd.read_csv( raw_data + 'BAU_demands_from_MH_20230810.csv')
 
     # Take out 2010 as they all = 1, drop unwanted columns
-    demand = demand.drop(columns = ['X', 'Production'])
+    demand['Commodity'] = demand['SPREAD_Commodity'].str.lower()
+    demand = demand.drop(columns = ['X', 'Production', 'SPREAD_Commodity'])
+    
         
     # Create the MultiIndex structure
-    demand = demand.pivot( index = ['Scenario', 'Diet', 'Waste', 'Feed', 'SPREAD_Commodity'], 
+    demand = demand.pivot( index = ['Scenario', 'Diet', 'Waste', 'Feed', 'Commodity'], 
                      columns = ['Year'], 
                      values = 'Multiplier')
     
@@ -722,8 +724,8 @@ def create_new_dataset():
         # # Create linear function f and interpolate
         f = interp1d(xs, ys, kind = 'linear', fill_value = 'extrapolate')
         for yr in range(2010, 2101):
-            d2.loc[tup, yr] = f(yr)
-    
+            d2.loc[tup, yr] = f(yr)    
+        
     # Save to HDF5
     d2.to_hdf(outpath + 'demand_projections.h5', key = 'demand_projections', mode = 'w', format = 'fixed', index = False, complevel = 9)
 

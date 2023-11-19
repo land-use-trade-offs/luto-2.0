@@ -441,12 +441,35 @@ BAU_PROD_INCR = pd.read_csv(fpath, header = [0,1]).astype(np.float32)
 # Demand data.
 ###############################################################
 
-# Load demand deltas (multipliers on 2010 production by commodity)
-DEMAND_DELTAS_C = np.load(os.path.join(INPUT_DIR, 'demand_deltas_c.npy') ) # Placeholder data
+# Load demand deltas (multipliers on 2010 production by commodity) - placeholder data
+# DEMAND_DELTAS_C = np.load(os.path.join(INPUT_DIR, 'demand_deltas_c.npy') ) 
 
-# *** STILL to do ***
-# DEMAND_DELTAS_C = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
-# x = DEMAND_DELTAS_C.loc[(SCENARIO, DIET, WASTE, FEED_EFFICIENCY]]
+# Load demand deltas (multipliers on 2010 production by commodity) - from demand model     
+dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
+
+# Select the demand scenario (returns commodity x year dataframe) - includes off-land commodities
+DEMAND_DELTAS = dd.loc[(SCENARIO, DIET, WASTE, FEED_EFFICIENCY)].copy()
+
+# Remove off-land commodities
+DEMAND_DELTAS_C = DEMAND_DELTAS.query("Commodity not in ['pork', 'chicken', 'eggs', 'aquaculture']").copy()
+
+# Ensure all commodities are represented
+missing_commodities = {'beef lexp': 'beef', 
+                       'beef meat': 'beef',
+                       'dairy': 'milk',
+                       'sheep lexp': 'sheep',
+                       'sheep meat': 'sheep',
+                       'sheep wool': 'sheep'}
+
+for com in missing_commodities.keys():
+    DEMAND_DELTAS_C.loc[com, :] = DEMAND_DELTAS_C.loc[missing_commodities[com], :].copy()
+
+# Drop unwanted rows and sort lexicographically based on commodity index
+DEMAND_DELTAS_C = DEMAND_DELTAS_C.drop(labels = ['beef', 'milk', 'sheep'], axis = 0).sort_index()
+
+# Convert to numpy array of shape (91, 26)
+DEMAND_DELTAS_C = DEMAND_DELTAS_C.to_numpy(dtype = np.float32).T
+
 
     
 ###############################################################
@@ -454,4 +477,3 @@ DEMAND_DELTAS_C = np.load(os.path.join(INPUT_DIR, 'demand_deltas_c.npy') ) # Pla
 ###############################################################
 
 GHG_TARGETS = pd.read_excel(os.path.join(INPUT_DIR, 'GHG_targets.xlsx'), sheet_name = 'Data', index_col = 'YEAR')
-# GHG_TARGETS.loc[2100, 'TOTAL_GHG_TCO2E']
