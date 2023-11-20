@@ -13,7 +13,7 @@ def get_wreq_matrix_env_planting(data) -> np.ndarray:
     -------
     1-D array, indexed by cell.
     """
-    return data.WATER_YIELD_BASE_DIFF * data.REAL_AREA
+    return (data.WATER_YIELD_BASE_SR - data.WATER_YIELD_BASE) * data.REAL_AREA
 
 
 def get_wreq_matrix(data) -> np.ndarray:

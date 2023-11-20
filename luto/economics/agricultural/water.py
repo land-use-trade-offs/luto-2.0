@@ -63,7 +63,7 @@ def get_asparagopsis_effect_w_mrj(data, w_mrj, yr_idx):
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
         j = lu_codes[lu_idx]
-        multiplier = data.ASPARAGOPSIS_DATA[lu].loc[year, "Water_use"]
+        multiplier = data.ASPARAGOPSIS_DATA[lu].loc[year, "Water Impacts"]
         if multiplier != 1:
             # The effect is: new value = old value * multiplier - old value
             # E.g. a multiplier of .95 means a 5% reduction in quantity produced
@@ -142,11 +142,11 @@ def get_wuse_limits(data):
 
     # Set up data for river regions or drainage divisions
     if settings.WATER_REGION_DEF == 'RR':
-        regions = settings.WATER_RIVREGS
+        region_limits = data.RIVREG_LIMITS # settings.WATER_RIVREGS
         region_id = data.RIVREG_ID
         
     elif settings.WATER_REGION_DEF == 'DD':
-        regions = settings.WATER_DRAINDIVS
+        region_limits = data.DRAINDIV_LIMITS # settings.WATER_DRAINDIVS
         region_id = data.DRAINDIV_ID
         
     else:
@@ -165,58 +165,44 @@ def get_wuse_limits(data):
         # Multiply by agricultural land use and management map in mrj format and sum for each grid cell
         w_lim_r = np.sum( w_mrj * data.AG_L_MRJ, axis = (0, 2) )
     
+        # Loop through specified water regions
+        for region in region_limits.keys():
+            
+            # Get indices of cells in region
+            ind = np.flatnonzero(region_id == region).astype(np.int32)
+    
+            # Calculate the 2010 water requirements by agriculture for region.
+            wuse_reg_limit = np.sum( w_lim_r[ind] )
+    
+            # Append to list
+            wuse_limits.append( (region, wuse_reg_limit, ind) )
+            
+    
     elif settings.WATER_LIMITS_TYPE == 'water_stress':
         
-        # Calculate water use limits as water yield under deep-rooted plants (i.e., native vegetation) x water stress percentage
-        w_lim_r = data.WATER_YIELD_BASE_DR * settings.WATER_STRESS_FRACTION
-        
-        w_lim_r *= data.REAL_AREA
+        # Loop through specified water regions
+        for region in region_limits.keys():
+            
+            # Get indices of cells in region
+            ind = np.flatnonzero(region_id == region).astype(np.int32)
     
+            # Retrieve the pre-calculated 2010 water use limit (ML) for each region.
+            wuse_reg_limit = region_limits[region] * settings.WATER_STRESS_FRACTION   # np.sum( w_lim_r[ind] )
     
-    # Loop through specified water regions
-    for region in regions:
-        
-        # Get indices of cells in region
-        ind = np.flatnonzero(region_id == region).astype(np.int32)
-
-        # Calculate the 2010 water requiremnents by agriculture for region.
-        wuse_reg_limit = np.sum( w_lim_r[ind] )
-
-        # Append to list
-        wuse_limits.append( (region, wuse_reg_limit, ind) )
+            # Append to list
+            wuse_limits.append( (region, wuse_reg_limit, ind) )
+            
 
     return wuse_limits
 
 
 
 
-
-# def get_wyld_matrix( data # Data object or module.
-#                     , yr_idx = None # Number of years post base-year ('YR_CAL_BASE').
-#                     ):
-#     """Return an rj matrix of the water yields, per cell, by land use."""
-
-#     # If no year is provided, use the base yields of 1985.
-#     if yr_idx is None:
-#         yld_dr = data.WATER_YIELD_BASE_DR
-#         yld_sr = data.WATER_YIELD_BASE_SR
-#     else:
-#         yld_dr = data.WATER_YIELD_NUNC_DR
-#         yld_sr = data.WATER_YIELD_NUNC_SR
-
-#     # Select the appropriate root depth for each land use.
-#     cols = tuple(      yld_dr if 'natural' in lu
-#                   else yld_sr
-#                   for lu in data.LANDUSES )
-
-#     # Stack the columns and convert from per ha to per cell.
-#     return np.stack(cols, axis=1) * data.REAL_AREA[:, np.newaxis]
-
  
 
 
 """
-Water logic
+Water logic *** a little outdated but maybe still useful ***
 
 The limits are related to the pre-European inflows into rivers. As a proxy
 for these inflows are used the flows that would result if all cells had

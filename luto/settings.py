@@ -46,11 +46,27 @@ RAW_DATA = '../raw_data'
 # ---------------------------------------------------------------------------- #
 
 # Climate change assumptions. Options include '126', '245', '370', '585'
-SSP = '245' 
+SSP = '245'
 RCP = 'rcp' + SSP[1] + 'p' + SSP[2]  # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
-# ***** TODO - ADD FACILITY TO TURN OFF CO2 FERTILIZATION in GAEZ climate impact on agricultural productivity *****
-# CO2_FERT_IMPACTS = 'ON'   # or 'OFF'
+# Set diet parameters
+SCENARIO = SSP_NUM = 'SSP' + SSP[0] # i.e., SSP1, SSP2 etc.
+DIET = 'BAU' # or '2050-FLX'
+WASTE = 1 # 1 for full waste, 0.5 for half waste
+FEED_EFFICIENCY = 'BAU' # 'BAU' or 'High'
+
+# Add CO2 fertilisation effects on agricultural production from GAEZ v4 
+CO2_FERT = 'on'   # or 'off'
+
+# Fire impacts on carbon sequestration
+RISK_OF_REVERSAL = 0.05  # Risk of reversal buffer under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
+FIRE_RISK = 'med'   # Options are 'low', 'med', 'high'. Determines whether to take the 5th, 50th, or 95th percentile of modelled fire impacts.
+""" 
+    Mean cell values ...
+    FD_RISK_PERC_5TH    80.3967
+    FD_RISK_MEDIAN      89.2485
+    FD_RISK_PERC_95TH   93.2735
+"""
 
 # Economic parameters
 DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
@@ -64,12 +80,12 @@ RESFACTOR = 5          # set to 1 to run at full spatial resolution, > 1 to run 
 MODE = 'timeseries'   # runs each year from base year to target year
 
 # Define the objective function
-OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
-# OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
+# OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
+OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
 # Specify how demand should be met in the solver
-# DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
-DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
+DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
+# DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
 
 
 # ---------------------------------------------------------------------------- #
@@ -103,7 +119,7 @@ OPTIMALITY_TOLERANCE = 1e-2
    Maximum value:	1e-2"""
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 32
+THREADS = 64
 
 # Use homogenous barrier algorithm
 BARHOMOGENOUS = -1
@@ -148,13 +164,14 @@ GHG_LIMITS = -70 * 1e6          # if GHG_LIMITS_TYPE = 'tonnes' - total net GHG 
 
 # Water use limits parameters
 WATER_USE_LIMITS = 'on'               # 'on' or 'off'
-WATER_LIMITS_TYPE = 'water_stress'    # 'water_stress' of 'pct_ag'
-WATER_USE_REDUCTION_PERCENTAGE = 0    # reduction in water use as percentage of 2010 irrigation water use
-WATER_STRESS_FRACTION = 0.8           # = 1 - Ratio of consumption to availability. High water stress if yields below this fraction (following Aqueduct classification).
+WATER_LIMITS_TYPE = 'water_stress'    # 'water_stress' or 'pct_ag'
+WATER_USE_REDUCTION_PERCENTAGE = 0    # If WATER_LIMITS_TYPE = 'pct_ag'...       Set reduction in water use as percentage of 2010 irrigation water use
+WATER_STRESS_FRACTION = 0.25          # If WATER_LIMITS_TYPE = 'water_stress'... Set proportion of catchment water use above which is high water stress (following Aqueduct classification of 0.4 but leaving 0.15 for urban/industrial/indigenous use).
 
+# Regionalisation to enforce water use limits by
 WATER_REGION_DEF = 'DD'                 # 'RR' for River Region, 'DD' for Drainage Division
-WATER_DRAINDIVS = list(range(1, 14, 1)) # List of drainage divisions e.g., [1, 2].
-WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions  e.g., [1, 2].
+# WATER_DRAINDIVS = list(range(1, 14, 1)) # List of drainage divisions e.g., [1, 2].
+# WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions  e.g., [1, 2].
 
 
 
