@@ -58,8 +58,8 @@ FEED_EFFICIENCY = 'BAU' # 'BAU' or 'High'
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4 
 CO2_FERT = 'on'   # or 'off'
 
-# Fire and drought impacts on carbon sequestration
-RISK_OF_REVERSAL = 0.05  # Risk of reversal under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
+# Fire impacts on carbon sequestration
+RISK_OF_REVERSAL = 0.05  # Risk of reversal buffer under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
 FIRE_RISK = 'med'   # Options are 'low', 'med', 'high'. Determines whether to take the 5th, 50th, or 95th percentile of modelled fire impacts.
 """ 
     Mean cell values ...
@@ -76,8 +76,8 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 5          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
-# MODE = 'snapshot'       # runs for target year only
-MODE = 'timeseries'   # runs each year from base year to target year
+MODE = 'snapshot'       # runs for target year only
+# MODE = 'timeseries'   # runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
