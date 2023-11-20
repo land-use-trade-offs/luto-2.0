@@ -89,7 +89,7 @@ def write_outputs(sim, path):
 def write_output_single_year(sim, yr_cal, path_yr):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     
-    write_files(sim,yr_cal,path_yr)
+    # write_files(sim,yr_cal,path_yr)
     # write_files_separate(sim, yr_cal,path_yr)
     write_crosstab(sim, yr_cal, path_yr)
     write_quantity(sim, yr_cal, path_yr)
@@ -167,8 +167,7 @@ def write_files(sim, yr_cal, path):
     # Write out raw numpy arrays for land-use and land management
     lumap_fname = 'lumap' + '.npy'
     lmmap_fname = 'lmmap' + '.npy'
-    lumap_fname = 'lumap' + '.npy'
-    lmmap_fname = 'lmmap' + '.npy'
+    
     np.save(os.path.join(path, lumap_fname), sim.lumaps[yr_cal])
     np.save(os.path.join(path, lmmap_fname), sim.lmmaps[yr_cal])
 
@@ -227,23 +226,22 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
         desc2dvar_df = pd.concat([ag_dvar_map,non_ag_dvar_map])
 
 
-        
-        # 3) Export to GeoTiff
-        for _,row in desc2dvar_df.iterrows():
-            # Get the Category, land-use desc, and dvar
-            category = row['Category']
-            dvar_idx = row['dvar_idx']
-            desc = row['lu_desc']
+    # 3) Export to GeoTiff
+    for _,row in desc2dvar_df.iterrows():
+        # Get the Category, land-use desc, and dvar
+        category = row['Category']
+        dvar_idx = row['dvar_idx']
+        desc = row['lu_desc']
 
-            # reconsititude the dvar to 2d
-            dvar = row['dvar']
-            dvar = create_2d_map(sim, dvar, filler = sim.data.MASK_LU_CODE)
+        # reconsititude the dvar to 2d
+        dvar = row['dvar']
+        dvar = create_2d_map(sim, dvar, filler = sim.data.MASK_LU_CODE)
 
-            # Create output file name
-            fname = f'{category}_{dvar_idx:02}_{desc}.tiff'
+        # Create output file name
+        fname = f'{category}_{dvar_idx:02}_{desc}.tiff'
 
-            # Write to GeoTiff
-            write_gtiff(dvar, os.path.join(path, 'lucc_separate', fname))
+        # Write to GeoTiff
+        write_gtiff(dvar, os.path.join(path, 'lucc_separate', fname))
 
         
 
@@ -292,7 +290,7 @@ def write_crosstab(sim, yr_cal, path):
     
     # Calculate the croostab for land-use and land management,
     #       and the switches between base year and target year
-    yrs = list(sim.lumaps.keys())
+    yrs = sorted(list(sim.lumaps.keys()))
     yr_idx = yrs.index(yr_cal)
 
     yr_idx_pre = yr_idx - 1
