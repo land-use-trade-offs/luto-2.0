@@ -73,15 +73,15 @@ DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 7          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 5          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
-MODE = 'snapshot'       # runs for target year only
-# MODE = 'timeseries'   # runs each year from base year to target year
+# MODE = 'snapshot'       # runs for target year only
+MODE = 'timeseries'   # runs each year from base year to target year
 
 # Define the objective function
-OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)
-# OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
+# OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****
+OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs) **** Use either DEMAND_CONSTRAINT_TYPE = 'soft' or 'hard' ****
 
 # Specify how demand should be met in the solver
 DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
@@ -106,7 +106,7 @@ SOLVE_METHOD = 2
    'deterministic concurrent simplex': 5 """
 
 # Penalty in objective function  *** Needs to be balanced against OPTIMALITY_TOLERANCE to trade-off speed for optimality ***   1e5 works
-PENALTY = 1e8
+PENALTY = 1e5
 
 # Print detailed output to screen
 VERBOSE = 1
@@ -119,7 +119,7 @@ OPTIMALITY_TOLERANCE = 1e-2
    Maximum value:	1e-2"""
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 64
+THREADS = 96
 
 # Use homogenous barrier algorithm
 BARHOMOGENOUS = -1
@@ -158,9 +158,13 @@ AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  # The minimum value an agricultural
 SOC_AMORTISATION = 91           # Number of years over which to spread (average) soil carbon accumulation
 
 GHG_EMISSIONS_LIMITS = 'on'     # 'on' or 'off'
-GHG_LIMITS_TYPE = 'tonnes'      # 'tonnes' or 'percentage'
-GHG_REDUCTION_PERCENTAGE = 50   # if GHG_LIMITS_TYPE = 'percentage' - reduction in GHG emissions as percentage of 2010 ag emissions
-GHG_LIMITS = -70 * 1e6          # if GHG_LIMITS_TYPE = 'tonnes' - total net GHG emissions in tonnes CO2e
+GHG_LIMITS_TYPE = 'tonnes'        # If GHG_EMISSIONS_LIMITS = 'on' then set GHG_LIMITS_TYPE = 'tonnes' or 'file'
+GHG_LIMITS = {
+                2010: 90 * 1e6,    # Agricultural emissions in 2010 in tonnes CO2e
+                2050: -337 * 1e6,  # GHG emissions target and year (can add more years/targets)
+                2100: -337 * 1e6   # GHG emissions target and year (can add more years/targets)
+              }
+
 
 # Water use limits parameters
 WATER_USE_LIMITS = 'on'               # 'on' or 'off'

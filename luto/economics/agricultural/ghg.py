@@ -263,25 +263,10 @@ def get_ghg_transition_penalties(data, lumap) -> np.ndarray:
 
 def get_ghg_limits(data, target):
     """Return greenhouse gas emissions limits from year target i.e. target = 2050"""
-    
-    # If using GHG emissions as a percentage of 2010 agricultural emissions
-    if settings.GHG_LIMITS_TYPE == 'percentage':
-        # Get GHG emissions from agriculture for 2010 in tCO2e per cell in mrj format.
-        yr_idx = 0
-        g_mrj = get_ghg_matrices(data, yr_idx)
         
-        # Calculate total greenhouse gas emissions of current land-use and land management.
-        ghg_limits = (g_mrj * data.AG_L_MRJ).sum() * (1 - settings.GHG_REDUCTION_PERCENTAGE / 100)
-    
-    # If using GHG emissions as a total tonnage of CO2e
-    elif settings.GHG_LIMITS_TYPE == 'tonnes':
-        # ghg_limits = settings.GHG_LIMITS
-        ghg_limits = data.GHG_TARGETS.loc[target, 'TOTAL_GHG_TCO2E']
-    else: 
-        print('Unknown GHG limit type...')
-        exit()
-        
-    return ghg_limits
+    # If using GHG emissions as a total tonnage of CO2e by a certain year (linear transition and extrapolation) or data from file
+    return data.GHG_TARGETS.loc[target, 'TOTAL_GHG_TCO2E']
+
 
 
 def get_asparagopsis_effect_g_mrj(data, yr_idx):
