@@ -244,21 +244,33 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
         # Write to GeoTiff
         write_gtiff(dvar, os.path.join(path, 'lucc_separate', fname))
 
+
         
 
 def write_quantity(sim, yr_cal, path):
 
-    # Calculate year index
-    yrs = list(sim.lumaps.keys())
-    yr_idx = yrs.index(yr_cal)
+    # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
+    simulated_year_list = list(sim.lumaps.keys())
+    
+    # Get index of yr_cal in timeseries (e.g., if yr_cal is 2050 then yr_idx = 40)
+    yr_idx = yr_cal - sim.data.YR_CAL_BASE
+    
+    # Get index of yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_idx_sim = 2 if snapshot)
+    yr_idx_sim = simulated_year_list.index(yr_cal)
+    
+    # Get index of year previous to yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_cal_sim_pre = 2010 if snapshot)
+    yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
 
-    yr_idx_pre = yr_idx - 1
-    yr_pre = yrs[yr_idx_pre]
+    
     
     # Calculate data for quantity comparison between base year and target year
-    if yr_idx > 0:
-        # Get commodity quantities produced in 2010
-        prod_base = sim.data.PROD_2010_C if  yr_pre==2010 else np.array(sim.prod_data[yr_pre]['Production'])   
+    if yr_cal > sim.data.YR_CAL_BASE:
+        
+        # Get commodity production quantities produced in base year
+        if yr_cal_sim_pre == sim.data.YR_CAL_BASE: # if base year is 2010
+            prod_base = sim.data.PROD_2010_C
+        else:                                      # if timeseries and base year is > 2010
+            prod_base = np.array(sim.prod_data[yr_cal_sim_pre]['Production'])   
     
         prod_targ = np.array(sim.prod_data[yr_cal]['Production'])  # Get commodity quantities produced in target year
         demands = sim.data.D_CY[yr_idx]                            # Get commodity demands for target year
@@ -291,38 +303,50 @@ def write_crosstab(sim, yr_cal, path):
     
     # Calculate the croostab for land-use and land management,
     #       and the switches between base year and target year
-    yrs = sorted(list(sim.lumaps.keys()))
-    yr_idx = yrs.index(yr_cal)
+    # yrs = list(sim.lumaps.keys())
+    # yr_idx = yrs.index(yr_cal)
 
-    yr_idx_pre = yr_idx - 1
-    yr_pre = yrs[yr_idx_pre]
+    # yr_idx_pre = yr_idx - 1
+    # yr_pre = yrs[yr_idx_pre]
+    
+    # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
+    simulated_year_list = list(sim.lumaps.keys())
+    
+    # Get index of yr_cal in timeseries (e.g., if yr_cal is 2050 then yr_idx = 40)
+    yr_idx = yr_cal - sim.data.YR_CAL_BASE
+    
+    # Get index of yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_idx_sim = 2 if snapshot)
+    yr_idx_sim = simulated_year_list.index(yr_cal)
+    
+    # Get index of year previous to yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_cal_sim_pre = 2010 if snapshot)
+    yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
+    
 
     # Only perform the calculation if the yr_cal is not the base year
-    if yr_idx > 0:
+    if yr_cal > sim.data.YR_CAL_BASE:
 
         print('\nWriting production outputs to', path)
 
         # LUS = ['Non-agricultural land'] + sim.data.AGRICULTURAL_LANDUSES + sim.data.NON_AGRICULTURAL_LANDUSES
-        ctlu, swlu = lumap_crossmap( sim.lumaps[yr_pre]
-                                   , sim.lumaps[yr_cal]
-                                   , sim.data.AGRICULTURAL_LANDUSES
-                                   , sim.data.NON_AGRICULTURAL_LANDUSES
-                                   , sim.data.REAL_AREA)
+        ctlu, swlu = lumap_crossmap( sim.lumaps[yr_cal_sim_pre]
+                                , sim.lumaps[yr_cal]
+                                , sim.data.AGRICULTURAL_LANDUSES
+                                , sim.data.NON_AGRICULTURAL_LANDUSES
+                                , sim.data.REAL_AREA)
         
 
         
-        ctlm, swlm = lmmap_crossmap(sim.lmmaps[yr_pre], 
+        ctlm, swlm = lmmap_crossmap(sim.lmmaps[yr_cal_sim_pre], 
                                     sim.lmmaps[yr_cal], 
                                     sim.data.REAL_AREA)
 
 
-        cthp, swhp = crossmap_irrstat( sim.lumaps[yr_pre]
-                                     , sim.lmmaps[yr_pre]
-                                     , sim.lumaps[yr_cal]
-                                     , sim.lmmaps[yr_cal]
-                                     , sim.data.AGRICULTURAL_LANDUSES
-                                     , sim.data.NON_AGRICULTURAL_LANDUSES
-                                     , sim.data.REAL_AREA)
+        cthp, swhp = crossmap_irrstat( sim.lumaps[yr_cal_sim_pre]
+                                    , sim.lmmaps[yr_cal_sim_pre]
+                                    , sim.lumaps[yr_cal], sim.lmmaps[yr_cal]
+                                    , sim.data.AGRICULTURAL_LANDUSES
+                                    , sim.data.NON_AGRICULTURAL_LANDUSES
+                                    , sim.data.REAL_AREA)
         
         
         # ctams = {}
@@ -335,8 +359,8 @@ def write_crosstab(sim, yr_cal, path):
             # swams[am] = swam
         
             ctas, swas = crossmap_amstat( am
-                                        , sim.lumaps[yr_pre]
-                                        , sim.ammaps[yr_pre][am]
+                                        , sim.lumaps[yr_cal_sim_pre]
+                                        , sim.ammaps[yr_cal_sim_pre][am]
                                         , sim.lumaps[yr_cal]
                                         , sim.ammaps[yr_cal][am]
                                         , sim.data.AGRICULTURAL_LANDUSES
