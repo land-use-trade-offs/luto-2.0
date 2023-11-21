@@ -73,11 +73,7 @@ DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-<<<<<<< HEAD
-RESFACTOR = 30         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
-=======
 RESFACTOR = 7          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
->>>>>>> 642def84c74456cd10a501d2014953db22bf79c9
 
 # How does the model run over time 
 # MODE = 'snapshot'       # runs for target year only
