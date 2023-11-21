@@ -29,7 +29,7 @@ except:
     import rasterio
     
 
-from luto.settings import INPUT_DIR, RESFACTOR, CO2_FERT, SOC_AMORTISATION, NON_AGRICULTURAL_LU_BASE_CODE, RISK_OF_REVERSAL, FIRE_RISK, GHG_LIMITS_TYPE, GHG_LIMITS
+from luto.settings import INPUT_DIR, RESFACTOR, CO2_FERT, SOC_AMORTISATION, NON_AGRICULTURAL_LU_BASE_CODE, RISK_OF_REVERSAL, FIRE_RISK, GHG_LIMITS_TYPE, GHG_LIMITS, GHG_LIMITS_FIELD
 from luto.settings import SSP, RCP, SCENARIO, DIET, WASTE, FEED_EFFICIENCY
 from luto.economics.agricultural.quantity import lvs_veg_types
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
@@ -477,16 +477,19 @@ DEMAND_DELTAS_C = DEMAND_DELTAS_C.to_numpy(dtype = np.float32).T
 # GHG targets data.
 ###############################################################
 
+# If GHG_LIMITS_TYPE == 'file' then import the Excel spreadsheet and import the results to a python dictionary {year: target (tCO2e), ...}
 if GHG_LIMITS_TYPE == 'file':
     GHG_TARGETS = pd.read_excel(os.path.join(INPUT_DIR, 'GHG_targets.xlsx'), sheet_name = 'Data', index_col = 'YEAR')
+    GHG_TARGETS = GHG_TARGETS[GHG_LIMITS_FIELD].to_dict()
 
-elif GHG_LIMITS_TYPE == 'tonnes':
+# If GHG_LIMITS_TYPE == 'dict' then import the Excel spreadsheet and import the results to a python dictionary {year: target (tCO2e), ...}
+elif GHG_LIMITS_TYPE == 'dict':
     
-    # Creat a dataframe to hold the GHG target data
-    GHG_TARGETS = pd.DataFrame(columns = ['TOTAL_GHG_TCO2E'])
+    # Create a dictionary to hold the GHG target data
+    GHG_TARGETS = {} # pd.DataFrame(columns = ['TOTAL_GHG_TCO2E'])
     
     # # Create linear function f and interpolate
     f = interp1d(list(GHG_LIMITS.keys()), list(GHG_LIMITS.values()), kind = 'linear', fill_value = 'extrapolate')
-    for yr in range(2010, 2101):
-        GHG_TARGETS.loc[yr, 'TOTAL_GHG_TCO2E'] = f(yr)
-    GHG_TARGETS.index.name = 'YEAR'
+    keys = range(2010, 2101)
+    values = f(yr)
+    GHG_TARGETS = dict(zip(keys, values))

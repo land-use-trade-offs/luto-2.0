@@ -262,10 +262,9 @@ def get_ghg_transition_penalties(data, lumap) -> np.ndarray:
 
 
 def get_ghg_limits(data, target):
-    """Return greenhouse gas emissions limits from year target i.e. target = 2050"""
+    """Return greenhouse gas emissions limits in tonnes CO2e from year target i.e. target = 2050"""
         
-    # If using GHG emissions as a total tonnage of CO2e by a certain year (linear transition and extrapolation) or data from file
-    return data.GHG_TARGETS.loc[target, 'TOTAL_GHG_TCO2E']
+    return data.GHG_TARGETS[target]
 
 
 
