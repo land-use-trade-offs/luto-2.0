@@ -45,11 +45,13 @@ def get_path(sim):
 
     # Add some shorthand details about the model run
     post = '_'    + settings.DEMAND_CONSTRAINT_TYPE + \
-        '_'    + settings.OBJECTIVE + \
-        '_RF'  + str(settings.RESFACTOR) + \
-        '_P1e' + str(int(math.log10(settings.PENALTY))) + \
-        '_W'   + settings.WATER_USE_LIMITS + \
-        '_G'   + settings.GHG_EMISSIONS_LIMITS
+           '_'    + settings.OBJECTIVE + \
+           '_RF'  + str(settings.RESFACTOR) + \
+           '_P1e' + str(int(math.log10(settings.PENALTY))) + \
+           '_'    + str(list(sim.lumaps.keys())[0]) + '-' + str(list(sim.lumaps.keys())[-1]) + \
+           '_'    + settings.MODE + \
+           '_'    + str(int(sim.data.GHG_TARGETS.loc[list(sim.lumaps.keys())[-1], 'TOTAL_GHG_TCO2E'] / 1e6)) + 'Mt'
+
 
     # Create path name
     path = 'output/' + path + post
@@ -65,8 +67,6 @@ def get_path(sim):
             os.mkdir(p)
 
     return path
-
-
 
 
 def write_outputs(sim, path):
@@ -85,19 +85,16 @@ def write_outputs(sim, path):
             print(f"Finished writing {yr} out of {years[0]}-{years[-1]} years")
 
 
-
 def write_output_single_year(sim, yr_cal, path_yr):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     
-    # write_files(sim,yr_cal,path_yr)
-    # write_files_separate(sim, yr_cal,path_yr)
+    write_files(sim, yr_cal, path_yr)
+    write_files_separate(sim, yr_cal,path_yr)
     write_crosstab(sim, yr_cal, path_yr)
     write_quantity(sim, yr_cal, path_yr)
     write_water(sim, yr_cal, path_yr)
     write_ghg(sim, yr_cal, path_yr)
     write_ghg_separate(sim, yr_cal, path_yr)
-
-
 
 
 def write_settings(path):
@@ -142,8 +139,8 @@ def write_settings(path):
             f.write('GHG_LIMITS_TYPE: %s\n' % settings.GHG_LIMITS_TYPE)
             if settings.GHG_LIMITS_TYPE == 'tonnes':
                 f.write('GHG_LIMITS: %s\n' % settings.GHG_LIMITS)
-            elif settings.GHG_LIMITS_TYPE == 'percentage':
-                f.write('GHG_REDUCTION_PERCENTAGE: %s\n' % settings.GHG_REDUCTION_PERCENTAGE)
+            elif settings.GHG_LIMITS_TYPE == 'file':
+                f.write('GHG_LIMITS: from file GHG_targets.xlsx in input folder')
 
 
 def write_files(sim, yr_cal, path):
@@ -199,14 +196,12 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
     #       we can handle the fractional land-use successfully.
 
 
-    # Only processd if the yr_cal is not the base year
-    if yr_cal != sim.data.YR_CAL_BASE:
-
-        # 1) Collapse the land management dimension (m -> [dry, irri])
-        #    i.e., mrj -> rj
-        ag_dvar_rj = np.einsum('mrj -> rj', sim.ag_dvars[yr_cal])
-        ag_man_rj_dict = {am: np.einsum('mrj -> rj', ammap) for am, ammap in sim.ag_man_dvars[yr_cal].items()}
-        non_ag_rk = np.einsum('rk -> rk', sim.non_ag_dvars[yr_cal]) # Do nothing, just for consistency
+    
+    # 1) Collapse the land management dimension (m -> [dry, irri])
+    #    i.e., mrj -> rj
+    ag_dvar_rj = np.einsum('mrj -> rj', sim.ag_dvars[yr_cal])
+    ag_man_rj_dict = {am: np.einsum('mrj -> rj', ammap) for am, ammap in sim.ag_man_dvars[yr_cal].items()}
+    non_ag_rk = np.einsum('rk -> rk', sim.non_ag_dvars[yr_cal]) # Do nothing, just for consistency
 
     # 2) Get the desc2dvar table. 
     #    desc is the land-use description, dvar is the decision variable corresponding to desc
@@ -227,6 +222,7 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
         desc2dvar_df = pd.concat([ag_dvar_map,non_ag_dvar_map])
 
 
+    
     # 3) Export to GeoTiff
     for _,row in desc2dvar_df.iterrows():
         # Get the Category, land-use desc, and dvar
@@ -245,8 +241,6 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
         write_gtiff(dvar, os.path.join(path, 'lucc_separate', fname))
 
 
-        
-
 def write_quantity(sim, yr_cal, path):
 
     # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
@@ -260,8 +254,6 @@ def write_quantity(sim, yr_cal, path):
     
     # Get index of year previous to yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_cal_sim_pre = 2010 if snapshot)
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
-
-    
     
     # Calculate data for quantity comparison between base year and target year
     if yr_cal > sim.data.YR_CAL_BASE:
@@ -289,7 +281,6 @@ def write_quantity(sim, yr_cal, path):
         # Save files to disk      
         df.to_csv(os.path.join(path, f'quantity_comparison.csv'), index = False)
 
-
         # Write the production of each year to disk
         production_years = pd.DataFrame({yr:sim.prod_data[yr]['Production'] for yr in sim.prod_data.keys()})
         production_years.insert(0,'Commodity',sim.bdata.COMMODITIES)
@@ -300,7 +291,6 @@ def write_quantity(sim, yr_cal, path):
 def write_crosstab(sim, yr_cal, path): 
     """Write out land-use and production data"""
 
-    
     # Calculate the croostab for land-use and land management,
     #       and the switches between base year and target year
     # yrs = list(sim.lumaps.keys())
@@ -320,7 +310,6 @@ def write_crosstab(sim, yr_cal, path):
     
     # Get index of year previous to yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_cal_sim_pre = 2010 if snapshot)
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
-    
 
     # Only perform the calculation if the yr_cal is not the base year
     if yr_cal > sim.data.YR_CAL_BASE:
@@ -334,12 +323,9 @@ def write_crosstab(sim, yr_cal, path):
                                 , sim.data.NON_AGRICULTURAL_LANDUSES
                                 , sim.data.REAL_AREA)
         
-
-        
         ctlm, swlm = lmmap_crossmap(sim.lmmaps[yr_cal_sim_pre], 
                                     sim.lmmaps[yr_cal], 
                                     sim.data.REAL_AREA)
-
 
         cthp, swhp = crossmap_irrstat( sim.lumaps[yr_cal_sim_pre]
                                     , sim.lmmaps[yr_cal_sim_pre]
@@ -347,7 +333,6 @@ def write_crosstab(sim, yr_cal, path):
                                     , sim.data.AGRICULTURAL_LANDUSES
                                     , sim.data.NON_AGRICULTURAL_LANDUSES
                                     , sim.data.REAL_AREA)
-        
         
         # ctams = {}
         # swams = {}
@@ -369,7 +354,6 @@ def write_crosstab(sim, yr_cal, path):
             ctass[am] = ctas
             swass[am] = swas
             
-        
         ctlu.to_csv(os.path.join(path, 'crosstab-lumap.csv'))
         ctlm.to_csv(os.path.join(path, 'crosstab-lmmap.csv'))
 
@@ -491,7 +475,7 @@ def write_ghg(sim, yr_cal, path):
     if yr_cal >= sim.data.YR_CAL_BASE + 1:
         ghg_emissions = sim.prod_data[yr_cal]['GHG Emissions']
     else:
-        ghg_emissions = (ag_ghg.get_ghg_matrices(sim.data, yr_idx, aggregate=True) * sim.ag_dvars[2010]).sum()
+        ghg_emissions = (ag_ghg.get_ghg_matrices(sim.data, yr_idx, aggregate=True) * sim.ag_dvars[sim.data.YR_CAL_BASE]).sum()
         
 
     # Add to dataframe
@@ -561,7 +545,7 @@ def write_ghg_separate(sim, yr_cal, path):
     GHG_emission_separate_summary = tools.summarize_ghg_separate_df(GHG_emission_separate,(['Agricultural Landuse'],
                                                                                             lm_type,   
                                                                                             ghg_sources),
-                                                                        lu_desc)
+                                                                                            lu_desc)
 
     # Change "KG_HA/HEAN" to "TCO2E"
     column_rename = [(i[0],i[1],i[2].replace('CO2E_KG_HA','TCO2E')) for i in GHG_emission_separate_summary.columns]

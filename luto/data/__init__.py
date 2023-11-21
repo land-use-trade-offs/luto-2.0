@@ -19,6 +19,7 @@ import os
 
 import pandas as pd
 import numpy as np
+from scipy.interpolate import interp1d
 
 # Try-Except to make sure {rasterio} can be loaded under different environment
 try:
@@ -28,7 +29,7 @@ except:
     import rasterio
     
 
-from luto.settings import INPUT_DIR, RESFACTOR, CO2_FERT, SOC_AMORTISATION, NON_AGRICULTURAL_LU_BASE_CODE, RISK_OF_REVERSAL, FIRE_RISK
+from luto.settings import INPUT_DIR, RESFACTOR, CO2_FERT, SOC_AMORTISATION, NON_AGRICULTURAL_LU_BASE_CODE, RISK_OF_REVERSAL, FIRE_RISK, GHG_LIMITS_TYPE, GHG_LIMITS
 from luto.settings import SSP, RCP, SCENARIO, DIET, WASTE, FEED_EFFICIENCY
 from luto.economics.agricultural.quantity import lvs_veg_types
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
@@ -476,4 +477,16 @@ DEMAND_DELTAS_C = DEMAND_DELTAS_C.to_numpy(dtype = np.float32).T
 # GHG targets data.
 ###############################################################
 
-GHG_TARGETS = pd.read_excel(os.path.join(INPUT_DIR, 'GHG_targets.xlsx'), sheet_name = 'Data', index_col = 'YEAR')
+if GHG_LIMITS_TYPE == 'file':
+    GHG_TARGETS = pd.read_excel(os.path.join(INPUT_DIR, 'GHG_targets.xlsx'), sheet_name = 'Data', index_col = 'YEAR')
+
+elif GHG_LIMITS_TYPE == 'tonnes':
+    
+    # Creat a dataframe to hold the GHG target data
+    GHG_TARGETS = pd.DataFrame(columns = ['TOTAL_GHG_TCO2E'])
+    
+    # # Create linear function f and interpolate
+    f = interp1d(list(GHG_LIMITS.keys()), list(GHG_LIMITS.values()), kind = 'linear', fill_value = 'extrapolate')
+    for yr in range(2010, 2101):
+        GHG_TARGETS.loc[yr, 'TOTAL_GHG_TCO2E'] = f(yr)
+    GHG_TARGETS.index.name = 'YEAR'
