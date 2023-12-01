@@ -723,8 +723,8 @@ def create_new_dataset():
         
         # # Create linear function f and interpolate
         f = interp1d(xs, ys, kind = 'linear', fill_value = 'extrapolate')
-        for yr in range(2010, 2101):
-            d2.loc[tup, yr] = f(yr)    
+        yr = range(2010, 2101)
+        d2.loc[tup, yr] = f(yr)    
         
     # Save to HDF5
     d2.to_hdf(outpath + 'demand_projections.h5', key = 'demand_projections', mode = 'w', format = 'fixed', index = False, complevel = 9)

@@ -76,16 +76,16 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 30          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
-# MODE = 'snapshot'       # runs for target year only
-MODE = 'timeseries'   # runs each year from base year to target year
+MODE = 'snapshot'       # runs for target year only
+# MODE = 'timeseries'   # runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****
 OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs) **** Use either DEMAND_CONSTRAINT_TYPE = 'soft' or 'hard' ****
 
 # Specify how demand should be met in the solver
-DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
-# DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
+# DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
+DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
 
 
 # ---------------------------------------------------------------------------- #
@@ -105,7 +105,8 @@ SOLVE_METHOD = 2
    'deterministic concurrent':         4
    'deterministic concurrent simplex': 5 """
 
-# Penalty in objective function  *** Needs to be balanced against OPTIMALITY_TOLERANCE to trade-off speed for optimality ***   1e5 works
+# Penalty in objective function  *** Needs to be balanced against OPTIMALITY_TOLERANCE to trade-off speed for optimality 
+# 1e5 works (i.e., demand are met), demands not met with anything less 
 PENALTY = 1e5
 
 # Print detailed output to screen
@@ -157,9 +158,10 @@ AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  # The minimum value an agricultural
 # Greenhouse gas emissions limits parameters
 SOC_AMORTISATION = 91           # Number of years over which to spread (average) soil carbon accumulation
 
-GHG_EMISSIONS_LIMITS = 'on'     # 'on' or 'off'
-GHG_LIMITS_TYPE = 'tonnes'        # If GHG_EMISSIONS_LIMITS = 'on' then set GHG_LIMITS_TYPE = 'tonnes' or 'file'
-GHG_LIMITS = {
+GHG_EMISSIONS_LIMITS = 'on'        # 'on' or 'off'
+GHG_LIMITS_TYPE = 'file'           # If GHG_EMISSIONS_LIMITS = 'on' then set GHG_LIMITS_TYPE = 'dict' or 'file'
+GHG_LIMITS_FIELD = 'CWC1.5_TCO2E'  # If GHG_LIMITS_TYPE = 'file' then need to add field name in 'GHG_targets.xlsx' ('CWC1.5_TCO2E', 'CWC2.0_TCO2E')
+GHG_LIMITS = {                     # If GHG_LIMITS_TYPE = 'dict' then need to set emissions limits in dictionary below (i.e., year: tonnes)
                 2010: 90 * 1e6,    # Agricultural emissions in 2010 in tonnes CO2e
                 2050: -337 * 1e6,  # GHG emissions target and year (can add more years/targets)
                 2100: -337 * 1e6   # GHG emissions target and year (can add more years/targets)
