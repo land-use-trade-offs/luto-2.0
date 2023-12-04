@@ -22,6 +22,7 @@ Writes model output and statistics to files.
 import os, math
 import shutil
 from datetime import datetime
+import time
 import numpy as np
 import pandas as pd
 from itertools import product
@@ -54,7 +55,8 @@ def get_path(sim):
            '_P1e' + str(int(math.log10(settings.PENALTY))) + \
            '_'    + str(yr_all[0]) + '-' + str(yr_all[-1]) + \
            '_'    + settings.MODE + \
-           '_'    + str(int(sim.data.GHG_TARGETS.loc[yr_all[-1], 'TOTAL_GHG_TCO2E'] / 1e6)) + 'Mt'
+           '_'    + str(int(sim.data.GHG_TARGETS[yr_all[-1]] / 1e6)) + 'Mt'
+          #'_'    + str(int(sim.data.GHG_TARGETS.loc[yr_all[-1], 'TOTAL_GHG_TCO2E'] / 1e6)) + 'Mt'
 
 
     # Create path name
@@ -99,8 +101,8 @@ def write_outputs(sim, path):
     # Write the area/quantity comparison between base-year and target-year for the timeseries mode
     if settings.MODE == 'timeseries':
         begin_end_path = f"{path}/begin_end_compare_{years[0]}_{years[-1]}"
-        # 1) Copy the base-year outputs to the path_begin_end_compare
-        shutil.copytree(f"{begin_end_path}/out_{years[0]}", f"{path}/{begin_end_path}/out_{years[0]}")
+        # 1) Simply copy the base-year outputs to the path_begin_end_compare
+        shutil.copytree(f"{path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True)
         # 2) Write the target-year outputs to the path_begin_end_compare
         write_output_single_year(sim, years[-1], f"{begin_end_path}/out_{years[-1]}", yr_cal_sim_pre=years[0])
 
@@ -109,8 +111,8 @@ def write_outputs(sim, path):
 def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     # Write the decision variables, land-use and land management maps
-    # write_files(sim, yr_cal, path_yr)
-    # write_files_separate(sim, yr_cal, path_yr)
+    write_files(sim, yr_cal, path_yr)
+    write_files_separate(sim, yr_cal, path_yr)
 
     # Write the crosstab and switches, and the quantity comparison
     write_crosstab(sim, yr_cal, path_yr, yr_cal_sim_pre=yr_cal_sim_pre)
@@ -268,6 +270,9 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
 
 def write_quantity(sim, yr_cal, path, yr_cal_sim_pre=None):
 
+    # Get the timestamp so each CSV in the timeseries mode has a unique name
+    timestamp = time.strftime('%H_%M_%S')
+
     # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
     simulated_year_list = list(sim.lumaps.keys())
     
@@ -309,25 +314,20 @@ def write_quantity(sim, yr_cal, path, yr_cal_sim_pre=None):
         df['Prop_diff (%)'] = prop_diff
 
         # Save files to disk      
-        df.to_csv(os.path.join(path, f'quantity_comparison.csv'), index = False)
+        df.to_csv(os.path.join(path, f'quantity_comparison_{timestamp}.csv'), index = False)
 
         # Write the production of each year to disk
         production_years = pd.DataFrame({yr:sim.prod_data[yr]['Production'] for yr in sim.prod_data.keys()})
         production_years.insert(0,'Commodity',sim.bdata.COMMODITIES)
-        production_years.to_csv(os.path.join(path, 'quantity_production_killo_t.csv'), index = False)
+        production_years.to_csv(os.path.join(path, f'quantity_production_killo_t_{timestamp}.csv'), index = False)
 
 
 
 def write_crosstab(sim, yr_cal, path, yr_cal_sim_pre=None): 
     """Write out land-use and production data"""
 
-    # Calculate the croostab for land-use and land management,
-    #       and the switches between base year and target year
-    # yrs = list(sim.lumaps.keys())
-    # yr_idx = yrs.index(yr_cal)
-
-    # yr_idx_pre = yr_idx - 1
-    # yr_pre = yrs[yr_idx_pre]
+    # Get the timestamp so each CSV in the timeseries mode has a unique name
+    timestamp = time.strftime('%H_%M_%S')
     
     # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
     simulated_year_list = list(sim.lumaps.keys())
@@ -389,28 +389,31 @@ def write_crosstab(sim, yr_cal, path, yr_cal_sim_pre=None):
             ctass[am] = ctas
             swass[am] = swas
             
-        ctlu.to_csv(os.path.join(path, 'crosstab-lumap.csv'))
-        ctlm.to_csv(os.path.join(path, 'crosstab-lmmap.csv'))
+        ctlu.to_csv(os.path.join(path, f'crosstab-lumap_{timestamp}.csv'))
+        ctlm.to_csv(os.path.join(path, f'crosstab-lmmap_{timestamp}.csv'))
 
-        swlu.to_csv(os.path.join(path, 'switches-lumap.csv'))
-        swlm.to_csv(os.path.join(path, 'switches-lmmap.csv'))
+        swlu.to_csv(os.path.join(path, f'switches-lumap_{timestamp}.csv'))
+        swlm.to_csv(os.path.join(path, f'switches-lmmap_{timestamp}.csv'))
 
-        cthp.to_csv(os.path.join(path, 'crosstab-irrstat.csv'))
-        swhp.to_csv(os.path.join(path, 'switches-irrstat.csv'))
+        cthp.to_csv(os.path.join(path, f'crosstab-irrstat_{timestamp}.csv'))
+        swhp.to_csv(os.path.join(path, f'switches-irrstat_{timestamp}.csv'))
         
         for am in AG_MANAGEMENTS_TO_LAND_USES:
             am_snake_case = tools.am_name_snake_case(am).replace("_", "-")
-            # ctams[am].to_csv(os.path.join(path, f'crosstab-{am_snake_case}-ammap.csv'))
-            # swams[am].to_csv(os.path.join(path, f'switches-{am_snake_case}-ammap.csv'))
+            # ctams[am].to_csv(os.path.join(path, f'crosstab-{am_snake_case}-ammap_{timestamp}.csv'))
+            # swams[am].to_csv(os.path.join(path, f'switches-{am_snake_case}-ammap_{timestamp}.csv'))
 
-            ctass[am].to_csv(os.path.join(path, f'crosstab-amstat-{am_snake_case}.csv'))
-            swass[am].to_csv(os.path.join(path, f'switches-amstat-{am_snake_case}.csv'))
+            ctass[am].to_csv(os.path.join(path, f'crosstab-amstat-{am_snake_case}_{timestamp}.csv'))
+            swass[am].to_csv(os.path.join(path, f'switches-amstat-{am_snake_case}_{timestamp}.csv'))
 
 
 
 def write_water(sim, yr_cal, path):
     """Calculate water use totals. Takes a simulation object, a numeric
        target calendar year (e.g., 2030), and an output path as input."""
+    
+    # Get the timestamp so each CSV in the timeseries mode has a unique name
+    timestamp = time.strftime('%H_%M_%S')
 
     print('\nWriting water outputs to', path)
     
@@ -485,7 +488,7 @@ def write_water(sim, yr_cal, path):
                     , prop_diff )
     
     # Write to CSV with 2 DP
-    df.to_csv( os.path.join(path, 'water_demand_vs_use.csv')
+    df.to_csv( os.path.join(path, f'water_demand_vs_use_{timestamp}.csv')
              , index = False
              , float_format = '{:0,.2f}'.format)
     
@@ -494,6 +497,9 @@ def write_water(sim, yr_cal, path):
 def write_ghg(sim, yr_cal, path):
     """Calculate total GHG emissions. Takes a simulation object, a target calendar 
        year (e.g., 2030), and an output path as input."""
+    
+    # Get the timestamp so each CSV in the timeseries mode has a unique name
+    timestamp = time.strftime('%H_%M_%S')
 
     print('\nWriting GHG outputs to', path)
 
@@ -517,7 +523,7 @@ def write_ghg(sim, yr_cal, path):
     df.loc[0] = ("{:,.0f}".format(ghg_limits), "{:,.0f}".format(ghg_emissions))
     
     # Save to file
-    df.to_csv(os.path.join(path, 'GHG_emissions.csv'), index = False)
+    df.to_csv(os.path.join(path, f'GHG_emissions_{timestamp}.csv'), index = False)
 
 
   
@@ -529,6 +535,9 @@ def write_ghg_separate(sim, yr_cal, path):
     #       k: The non-agricultural landuse
     #       m: Land management [dry, irri]
     #       s: The sources of origin. Such as [Chemical_CO2, Electric_CO2] for {Agricultural landuse},
+
+    # Get the timestamp so each CSV in the timeseries mode has a unique name
+    timestamp = time.strftime('%H_%M_%S')
         
     # Convert calendar year to year index.
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
@@ -588,7 +597,7 @@ def write_ghg_separate(sim, yr_cal, path):
     GHG_emission_separate_summary.columns = pd.MultiIndex.from_tuples(column_rename)
 
     # Save table to disk
-    GHG_emission_separate_summary.to_csv(os.path.join(path, 'GHG_emissions_separate_agricultural_landuse.csv'))
+    GHG_emission_separate_summary.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_landuse_{timestamp}.csv'))
 
 
 
@@ -615,7 +624,7 @@ def write_ghg_separate(sim, yr_cal, path):
                                                           lu_desc)
     
     # Save table to disk
-    non_ag_g_rk_summary.to_csv(os.path.join(path, 'GHG_emissions_separate_no_ag_reduction.csv'))
+    non_ag_g_rk_summary.to_csv(os.path.join(path, f'GHG_emissions_separate_no_ag_reduction_{timestamp}.csv'))
                         
 
     # -------------------------------------------------------------------#
@@ -637,7 +646,7 @@ def write_ghg_separate(sim, yr_cal, path):
     
     
     # Save table to disk
-    ghg_t_separate_summary.to_csv(os.path.join(path, 'GHG_emissions_separate_transition_penalty.csv'))
+    ghg_t_separate_summary.to_csv(os.path.join(path, f'GHG_emissions_separate_transition_penalty_{timestamp}.csv'))
     
     
     # -------------------------------------------------------------------#
@@ -672,4 +681,4 @@ def write_ghg_separate(sim, yr_cal, path):
                                                        lu_desc)
         
     # Save table to disk
-    ag_ghg_summary_df.to_csv(os.path.join(path, 'GHG_emissions_separate_agricultural_management.csv'))
+    ag_ghg_summary_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_management_{timestamp}.csv'))
