@@ -111,8 +111,8 @@ def write_outputs(sim, path):
 def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     # Write the decision variables, land-use and land management maps
-    write_files(sim, yr_cal, path_yr)
-    write_files_separate(sim, yr_cal, path_yr)
+    # write_files(sim, yr_cal, path_yr)
+    # write_files_separate(sim, yr_cal, path_yr)
 
     # Write the crosstab and switches, and the quantity comparison
     write_crosstab(sim, yr_cal, path_yr, yr_cal_sim_pre=yr_cal_sim_pre)
@@ -222,7 +222,8 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
     # In this way, if partial land-use is allowed (i.e, one pixel is determined to be 50% of apples and 50% citrus),
     #       we can handle the fractional land-use successfully.
 
-
+    # Skip writing if the yr_cal is the base year
+    if yr_cal == sim.bdata.YR_CAL_BASE: return
     
     # 1) Collapse the land management dimension (m -> [dry, irri])
     #    i.e., mrj -> rj
