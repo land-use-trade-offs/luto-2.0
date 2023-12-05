@@ -50,7 +50,7 @@ def get_path(sim):
            '_P1e' + str(int(math.log10(settings.PENALTY))) + \
            '_'    + str(list(sim.lumaps.keys())[0]) + '-' + str(list(sim.lumaps.keys())[-1]) + \
            '_'    + settings.MODE + \
-           '_'    + str(int(sim.data.GHG_TARGETS.loc[list(sim.lumaps.keys())[-1], 'TOTAL_GHG_TCO2E'] / 1e6)) + 'Mt'
+           '_'    + str( int( sim.data.GHG_TARGETS[list(sim.lumaps.keys())[-1]] / 1e6)) + 'Mt'
 
 
     # Create path name
@@ -89,7 +89,7 @@ def write_output_single_year(sim, yr_cal, path_yr):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     
     write_files(sim, yr_cal, path_yr)
-    write_files_separate(sim, yr_cal,path_yr)
+    # write_files_separate(sim, yr_cal,path_yr)
     write_crosstab(sim, yr_cal, path_yr)
     write_quantity(sim, yr_cal, path_yr)
     write_water(sim, yr_cal, path_yr)
