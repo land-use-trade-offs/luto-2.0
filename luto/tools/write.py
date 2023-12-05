@@ -55,12 +55,7 @@ def get_path(sim):
            '_P1e' + str(int(math.log10(settings.PENALTY))) + \
            '_'    + str(yr_all[0]) + '-' + str(yr_all[-1]) + \
            '_'    + settings.MODE + \
-<<<<<<< HEAD
-           '_'    + str(int(sim.data.GHG_TARGETS[yr_all[-1]] / 1e6)) + 'Mt'
-          #'_'    + str(int(sim.data.GHG_TARGETS.loc[yr_all[-1], 'TOTAL_GHG_TCO2E'] / 1e6)) + 'Mt'
-=======
            '_'    + str( int( sim.data.GHG_TARGETS[list(sim.lumaps.keys())[-1]] / 1e6)) + 'Mt'
->>>>>>> 2752f47321a296450068bc135138588258eabc5f
 
 
     # Create path name
@@ -114,7 +109,6 @@ def write_outputs(sim, path):
 
 def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
-<<<<<<< HEAD
     # Write the decision variables, land-use and land management maps
     # write_files(sim, yr_cal, path_yr)
     # write_files_separate(sim, yr_cal, path_yr)
@@ -124,13 +118,6 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_quantity(sim, yr_cal, path_yr, yr_cal_sim_pre=yr_cal_sim_pre)
 
     # Write the water and GHG outputs
-=======
-    
-    write_files(sim, yr_cal, path_yr)
-    # write_files_separate(sim, yr_cal,path_yr)
-    write_crosstab(sim, yr_cal, path_yr)
-    write_quantity(sim, yr_cal, path_yr)
->>>>>>> 2752f47321a296450068bc135138588258eabc5f
     write_water(sim, yr_cal, path_yr)
     write_ghg(sim, yr_cal, path_yr)
     write_ghg_separate(sim, yr_cal, path_yr)
