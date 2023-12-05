@@ -90,7 +90,8 @@ class Data():
         self.WATER_DELIVERY_PRICE = bdata.WATER_DELIVERY_PRICE[self.MASK]       # Float32
         self.WATER_YIELD_BASE_DR = bdata.WATER_YIELD_BASE_DR[self.MASK]         # Float32
         self.WATER_YIELD_BASE_SR = bdata.WATER_YIELD_BASE_SR[self.MASK]         # Float32
-        self.WATER_YIELD_BASE_DIFF = bdata.WATER_YIELD_BASE_DIFF[self.MASK]     # Float32
+        self.WATER_YIELD_BASE = bdata.WATER_YIELD_BASE[self.MASK]               # Float32
+        # self.WATER_YIELD_BASE_DIFF = bdata.WATER_YIELD_BASE_DIFF[self.MASK]   # Float32
         self.FEED_REQ = bdata.FEED_REQ[self.MASK]                               # Float32
         self.PASTURE_KG_DM_HA = bdata.PASTURE_KG_DM_HA[self.MASK]               # Int16  
         self.SAFE_PUR_MODL = bdata.SAFE_PUR_MODL[self.MASK]                     # Float32
@@ -290,28 +291,19 @@ def get_ag_man_limits():
     return output
 
 
-def get_limits():
+def get_limits(target: int):
     print('Getting environmental limits...', end = ' ', flush = True)
     # Limits is a dictionary with heterogeneous value sets.
     limits = {}
     
     if settings.WATER_USE_LIMITS == 'on': limits['water'] = ag_water.get_wuse_limits(data)
-    if settings.GHG_EMISSIONS_LIMITS == 'on':  limits['ghg'] = ag_ghg.get_ghg_limits(data)
-
-    # # Water limits.
-    # wuse_limits = [] # A list of water use limits by drainage division.
-    # for region in np.unique(data.DRAINDIV_ID): # 7 == MDB
-    #     mask = np.where(data.DRAINDIV_ID == region, True, False)[data.mindices]
-    #     basefrac = get_water_stress_basefrac(data, mask)
-    #     stress = get_water_stress(data, target_index, mask)
-    #     stresses.append((basefrac, stress))
-    #     limits['water'] = stresses
+    if settings.GHG_EMISSIONS_LIMITS == 'on':  limits['ghg'] = ag_ghg.get_ghg_limits(data, target)
     
     print('Done.')
     return limits
 
 
-def get_input_data():
+def get_input_data(target: int):
     ag_c_mrj = get_ag_c_mrj()
     ag_g_mrj = get_ag_g_mrj()
     ag_q_mrp = get_ag_q_mrp()
@@ -350,7 +342,7 @@ def get_input_data():
         ag_man_limits=get_ag_man_limits(),
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,
-        limits=get_limits(),
+        limits=get_limits(target),
         desc2aglu=data.DESC2AGLU,
     )
 
@@ -368,7 +360,7 @@ def prepare_input_data(base: int, target: int) -> InputData:
         non_ag_dvars[base] = data.NON_AG_L_RK
         ag_man_dvars[base] = data.AG_MAN_L_MRJ_DICT
 
-    return get_input_data()
+    return get_input_data(target)
 
 
 def solve_timeseries(steps: int, base: int, target: int):

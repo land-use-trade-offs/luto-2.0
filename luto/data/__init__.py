@@ -19,6 +19,7 @@ import os
 
 import pandas as pd
 import numpy as np
+from scipy.interpolate import interp1d
 
 # Try-Except to make sure {rasterio} can be loaded under different environment
 try:
@@ -28,9 +29,12 @@ except:
     import rasterio
     
 
-from luto.settings import INPUT_DIR, SSP, RCP, RESFACTOR, SOC_AMORTISATION,NON_AGRICULTURAL_LU_BASE_CODE
+from luto.settings import INPUT_DIR, RESFACTOR, CO2_FERT, SOC_AMORTISATION, NON_AGRICULTURAL_LU_BASE_CODE, RISK_OF_REVERSAL, FIRE_RISK, GHG_LIMITS_TYPE, GHG_LIMITS, GHG_LIMITS_FIELD
+from luto.settings import SSP, RCP, SCENARIO, DIET, WASTE, FEED_EFFICIENCY
 from luto.economics.agricultural.quantity import lvs_veg_types
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+
+
 
 ###############################################################
 # Agricultural economic data.                                                 
@@ -195,21 +199,23 @@ PR2CM = dict2matrix(CM2PR_DICT, COMMODITIES, PRODUCTS).T # Note the transpose.
 ###############################################################
 # Agricultural management options data.
 ###############################################################
+
 # Asparagopsis taxiformis data
-asparagopsis_file = os.path.join(INPUT_DIR, '20230907_Asparagopsis_Data.xlsx')
+asparagopsis_file = os.path.join(INPUT_DIR, '20231101_Bundle_MR.xlsx')
 ASPARAGOPSIS_DATA = {}
-ASPARAGOPSIS_DATA['Beef - natural land'] = pd.read_excel( asparagopsis_file, sheet_name='AT - Cattle (ext)', index_col='Year' )
-ASPARAGOPSIS_DATA['Beef - modified land'] = pd.read_excel( asparagopsis_file, sheet_name='AT - Cattle (int)', index_col='Year' )
-ASPARAGOPSIS_DATA['Sheep - natural land'] = pd.read_excel( asparagopsis_file, sheet_name='AT - Sheep', index_col='Year' )
+ASPARAGOPSIS_DATA['Beef - natural land'] = pd.read_excel( asparagopsis_file, sheet_name='MR bundle (ext cattle)', index_col='Year' )
+ASPARAGOPSIS_DATA['Beef - modified land'] = pd.read_excel( asparagopsis_file, sheet_name='MR bundle (int cattle)', index_col='Year' )
+ASPARAGOPSIS_DATA['Sheep - natural land'] = pd.read_excel( asparagopsis_file, sheet_name='MR bundle (sheep)', index_col='Year' )
 ASPARAGOPSIS_DATA['Sheep - modified land'] = ASPARAGOPSIS_DATA['Sheep - natural land']
-ASPARAGOPSIS_DATA['Dairy - natural land'] = pd.read_excel( asparagopsis_file, sheet_name='AT - Dairy', index_col='Year' )
+ASPARAGOPSIS_DATA['Dairy - natural land'] = pd.read_excel( asparagopsis_file, sheet_name='MR bundle (dairy)', index_col='Year' )
 ASPARAGOPSIS_DATA['Dairy - modified land'] = ASPARAGOPSIS_DATA["Dairy - natural land"]
 
 # Precision agriculture data
-prec_agr_file = os.path.join(INPUT_DIR, '20230913_PAG_Data.xlsx')
+prec_agr_file = os.path.join(INPUT_DIR, '20231101_Bundle_AgTech_NE.xlsx')
 PRECISION_AGRICULTURE_DATA = {}
-cropping_data = pd.read_excel( prec_agr_file, sheet_name='PAG bundle (Broadacre)', index_col='Year' )
-horticulture_data = pd.read_excel( prec_agr_file, sheet_name='PAG bundle (Horticulture)', index_col='Year' )
+int_cropping_data = pd.read_excel( prec_agr_file, sheet_name='AgTech NE bundle (int cropping)', index_col='Year' )
+cropping_data = pd.read_excel( prec_agr_file, sheet_name='AgTech NE bundle (cropping)', index_col='Year' )
+horticulture_data = pd.read_excel( prec_agr_file, sheet_name='AgTech NE bundle (horticulture)', index_col='Year' )
 
 for lu in ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds',
            'Winter cereals', 'Winter legumes', 'Winter oilseeds']:
@@ -218,7 +224,7 @@ for lu in ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds',
 
 for lu in ['Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']:
     # Intensive Cropping land uses
-    PRECISION_AGRICULTURE_DATA[lu] = cropping_data
+    PRECISION_AGRICULTURE_DATA[lu] = int_cropping_data
 
 for lu in ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 
            'Plantation fruit', 'Stone fruit', 'Tropical stone fruit']:
@@ -226,23 +232,32 @@ for lu in ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears',
     PRECISION_AGRICULTURE_DATA[lu] = horticulture_data
 
 # Ecological grazing data
-eco_grazing_file = os.path.join(INPUT_DIR, '20230919_ECOGRAZE_Data.xlsx')
+eco_grazing_file = os.path.join(INPUT_DIR, '20231107_ECOGRAZE_Bundle.xlsx')
 ECOLOGICAL_GRAZING_DATA = {}
-ECOLOGICAL_GRAZING_DATA['Beef - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Cattle (extensive)', index_col='Year' )
-ECOLOGICAL_GRAZING_DATA['Sheep - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Sheep', index_col='Year' )
-ECOLOGICAL_GRAZING_DATA['Dairy - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Dairy', index_col='Year' )
+ECOLOGICAL_GRAZING_DATA['Beef - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Ecograze bundle (ext cattle)', index_col='Year' )
+ECOLOGICAL_GRAZING_DATA['Sheep - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Ecograze bundle (sheep)', index_col='Year' )
+ECOLOGICAL_GRAZING_DATA['Dairy - modified land'] = pd.read_excel( eco_grazing_file, sheet_name='Ecograze bundle (dairy)', index_col='Year' )
 
 # Load soil carbon data, convert C to CO2e (x 44/12), and average over years
-SOIL_CARBON_AVG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'soil_carbon_t_ha.h5') ).to_numpy() * (44 / 12) / SOC_AMORTISATION
+SOIL_CARBON_AVG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'soil_carbon_t_ha.h5') ).to_numpy(dtype = np.float32) * (44 / 12) / SOC_AMORTISATION
+
 
 
 ###############################################################
 # Non-agricultural economic data.
 ###############################################################
 
-# Load environmental plantings economic data (incl. GHG emissions)
-EP_EST_COST_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_est_cost_ha.h5') ).to_numpy()
-EP_BLOCK_AVG_T_C02_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_block_avg_t_co2_ha_yr.h5') ).to_numpy()
+# Load environmental plantings economic data
+EP_EST_COST_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_est_cost_ha.h5') ).to_numpy(dtype = np.float32)
+
+# Load environmental plantings GHG emissions (aboveground carbon discounted by RISK_OF_REVERSAL and FIRE_RISK)
+ep_df = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_block_avg_t_co2_ha_yr.h5') )
+fr_df = pd.read_hdf( os.path.join(INPUT_DIR, 'fire_risk.h5') )
+fr_dict = {'low': 'FD_RISK_PERC_5TH', 'med': 'FD_RISK_MEDIAN', 'high': 'FD_RISK_PERC_95TH'}
+
+ep_df['FIRE_RISK'] = fr_df[fr_dict[FIRE_RISK]]
+EP_BLOCK_AVG_T_C02_HA = ep_df.eval('( EP_BLOCK_AG_AVG_T_CO2_HA_YR * (FIRE_RISK / 100) * (1 - @RISK_OF_REVERSAL) ) \
+                                    + EP_BLOCK_BG_AVG_T_CO2_HA_YR').to_numpy(dtype = np.float32)
 
 # Agricultural land use to environmental plantings raw transition costs:
 AG2EP_TRANSITION_COSTS_HA = np.load( os.path.join(INPUT_DIR, 'ag_to_ep_tmatrix.npy') )  # shape: (28,)
@@ -352,17 +367,22 @@ WATER_DELIVERY_PRICE = np.nan_to_num( pd.read_hdf(os.path.join(INPUT_DIR, 'water
 
 # River regions.
 RIVREG_ID = pd.read_hdf(os.path.join(INPUT_DIR, 'rivreg_id.h5')).to_numpy() # River region ID mapped.
-RIVREG_DICT = dict(pd.read_hdf(os.path.join(INPUT_DIR, 'rivreg_lut.h5')))   # River region ID to Name lookup table
+rr = pd.read_hdf(os.path.join(INPUT_DIR, 'rivreg_lut.h5'))
+RIVREG_DICT = dict(zip(rr.HR_RIVREG_ID, rr.HR_RIVREG_NAME))   # River region ID to Name lookup table
+RIVREG_LIMITS = dict(zip(rr.HR_RIVREG_ID, rr.WATER_YIELD_HIST_BASELINE_ML))   # River region ID and water use limits
 
 # Drainage divisions
 DRAINDIV_ID = pd.read_hdf(os.path.join(INPUT_DIR, 'draindiv_id.h5')).to_numpy() # Drainage div ID mapped.
-DRAINDIV_DICT = dict(pd.read_hdf(os.path.join(INPUT_DIR, 'draindiv_lut.h5')))   # Drainage div ID to Name lookup table
+dd = pd.read_hdf(os.path.join(INPUT_DIR, 'draindiv_lut.h5'))
+DRAINDIV_DICT = dict(zip(dd.HR_DRAINDIV_ID, dd.HR_DRAINDIV_NAME))   # Drainage div ID to Name lookup table
+DRAINDIV_LIMITS = dict(zip(dd.HR_DRAINDIV_ID, dd.WATER_YIELD_HIST_BASELINE_ML))   # Drainage div ID and water use limits
 
-# Water yields -- run off from a cell into catchment by deep-rooted and shallow-rooted vegetation type.
+# Water yields -- run off from a cell into catchment by deep-rooted, shallow-rooted, and natural vegetation types
 water_yield_base = pd.read_hdf(os.path.join( INPUT_DIR, 'water_yield_baselines.h5' ))
-WATER_YIELD_BASE_DR = water_yield_base['WATER_YIELD_HIST_DR_ML_HA'].to_numpy()
-WATER_YIELD_BASE_SR = water_yield_base['WATER_YIELD_HIST_SR_ML_HA'].to_numpy()
-WATER_YIELD_BASE_DIFF = WATER_YIELD_BASE_SR - WATER_YIELD_BASE_DR
+WATER_YIELD_BASE_DR = water_yield_base['WATER_YIELD_HIST_DR_ML_HA'].to_numpy(dtype = np.float32)
+WATER_YIELD_BASE_SR = water_yield_base['WATER_YIELD_HIST_SR_ML_HA'].to_numpy(dtype = np.float32)
+WATER_YIELD_BASE = water_yield_base['WATER_YIELD_HIST_BASELINE_ML_HA'].to_numpy(dtype = np.float32)
+# WATER_YIELD_BASE_DIFF = WATER_YIELD_BASE_SR - WATER_YIELD_BASE 
 
 fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + SSP + '_2010-2100_dr_ml_ha.h5')
 fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + SSP + '_2010-2100_sr_ml_ha.h5')
@@ -380,16 +400,20 @@ fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + SSP + '_2010-2100_sr_ml_h
 # Carbon sequestration by trees data.
 ###############################################################
 
-# Load the carbon data.
-REMNANT_VEG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'natural_land_t_co2_ha.h5') )
-NATURAL_LAND_T_CO2_HA = REMNANT_VEG_T_CO2_HA.to_numpy(dtype = np.float32)
+# Load the remnant vegetation carbon data.
+rem_veg = pd.read_hdf(os.path.join(INPUT_DIR, 'natural_land_t_co2_ha.h5')).to_numpy(dtype = np.float32)
+rem_veg = np.squeeze(rem_veg) # Remove extraneous extra dimension
+
+# Discount by fire risk.
+NATURAL_LAND_T_CO2_HA = rem_veg * (ep_df['FIRE_RISK'].to_numpy(dtype = np.float32) / 100)
+
 
 
 ###############################################################
 # Climate change impact data.
 ###############################################################
 
-CLIMATE_CHANGE_IMPACT = pd.read_hdf(os.path.join(INPUT_DIR, 'climate_change_impacts_' + RCP + '.h5'))
+CLIMATE_CHANGE_IMPACT = pd.read_hdf(os.path.join(INPUT_DIR, 'climate_change_impacts_' + RCP + '_CO2_FERT_' + CO2_FERT.upper() + '.h5'))
 
 
 
@@ -418,5 +442,54 @@ BAU_PROD_INCR = pd.read_csv(fpath, header = [0,1]).astype(np.float32)
 # Demand data.
 ###############################################################
 
-# Load demand deltas (multipliers on 2010 production by commodity)
-DEMAND_DELTAS_C = np.load(os.path.join(INPUT_DIR, 'demand_deltas_c.npy') )
+# Load demand deltas (multipliers on 2010 production by commodity) - placeholder data
+# DEMAND_DELTAS_C = np.load(os.path.join(INPUT_DIR, 'demand_deltas_c.npy') ) 
+
+# Load demand deltas (multipliers on 2010 production by commodity) - from demand model     
+dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
+
+# Select the demand scenario (returns commodity x year dataframe) - includes off-land commodities
+DEMAND_DELTAS = dd.loc[(SCENARIO, DIET, WASTE, FEED_EFFICIENCY)].copy()
+
+# Remove off-land commodities
+DEMAND_DELTAS_C = DEMAND_DELTAS.query("Commodity not in ['pork', 'chicken', 'eggs', 'aquaculture']").copy()
+
+# Ensure all commodities are represented
+missing_commodities = {'beef lexp': 'beef', 
+                       'beef meat': 'beef',
+                       'dairy': 'milk',
+                       'sheep lexp': 'sheep',
+                       'sheep meat': 'sheep',
+                       'sheep wool': 'sheep'}
+
+for com in missing_commodities.keys():
+    DEMAND_DELTAS_C.loc[com, :] = DEMAND_DELTAS_C.loc[missing_commodities[com], :].copy()
+
+# Drop unwanted rows and sort lexicographically based on commodity index
+DEMAND_DELTAS_C = DEMAND_DELTAS_C.drop(labels = ['beef', 'milk', 'sheep'], axis = 0).sort_index()
+
+# Convert to numpy array of shape (91, 26)
+DEMAND_DELTAS_C = DEMAND_DELTAS_C.to_numpy(dtype = np.float32).T
+
+
+    
+###############################################################
+# GHG targets data.
+###############################################################
+
+# If GHG_LIMITS_TYPE == 'file' then import the Excel spreadsheet and import the results to a python dictionary {year: target (tCO2e), ...}
+if GHG_LIMITS_TYPE == 'file':
+    GHG_TARGETS = pd.read_excel(os.path.join(INPUT_DIR, 'GHG_targets.xlsx'), sheet_name = 'Data', index_col = 'YEAR')
+    GHG_TARGETS = GHG_TARGETS[GHG_LIMITS_FIELD].to_dict()
+
+# If GHG_LIMITS_TYPE == 'dict' then import the Excel spreadsheet and import the results to a python dictionary {year: target (tCO2e), ...}
+elif GHG_LIMITS_TYPE == 'dict':
+    
+    # Create a dictionary to hold the GHG target data
+    GHG_TARGETS = {} # pd.DataFrame(columns = ['TOTAL_GHG_TCO2E'])
+    
+    # # Create linear function f and interpolate
+    f = interp1d(list(GHG_LIMITS.keys()), list(GHG_LIMITS.values()), kind = 'linear', fill_value = 'extrapolate')
+    keys = range(2010, 2101)
+    values = f(yr)
+    GHG_TARGETS = dict(zip(keys, values))

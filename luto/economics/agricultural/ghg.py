@@ -261,27 +261,11 @@ def get_ghg_transition_penalties(data, lumap) -> np.ndarray:
 
 
 
-def get_ghg_limits(data):
-    """Return greenhouse gas emissions limits as specified in settings.py."""
-    
-    # If using GHG emissions as a percentage of 2010 agricultural emissions
-    if settings.GHG_LIMITS_TYPE == 'percentage':
-        # Get GHG emissions from agriculture for 2010 in tCO2e per cell in mrj format.
-        yr_idx = 0
-        g_mrj = get_ghg_matrices(data, yr_idx)
+def get_ghg_limits(data, target):
+    """Return greenhouse gas emissions limits in tonnes CO2e from year target i.e. target = 2050"""
         
-        # Calculate total greenhouse gas emissions of current land-use and land management.
-        ghg_limits = (g_mrj * data.AG_L_MRJ).sum() * (1 - settings.GHG_REDUCTION_PERCENTAGE / 100)
-    
-    # If using GHG emissions as a total tonnage of CO2e
-    elif settings.GHG_LIMITS_TYPE == 'tonnes':
-        ghg_limits = settings.GHG_LIMITS
-        
-    else: 
-        print('Unknown GHG limit type...')
-        exit()
-        
-    return ghg_limits
+    return data.GHG_TARGETS[target]
+
 
 
 def get_asparagopsis_effect_g_mrj(data, yr_idx):
@@ -297,7 +281,7 @@ def get_asparagopsis_effect_g_mrj(data, yr_idx):
 
     # Update values in the new matrix, taking into account the CH4 reduction of asparagopsis
     for lu_idx, lu in enumerate(land_uses):
-        ch4_reduction_perc = 1 - data.ASPARAGOPSIS_DATA[lu].loc[year, "MitEff_CH4"]
+        ch4_reduction_perc = 1 - data.ASPARAGOPSIS_DATA[lu].loc[year, "CO2E_KG_HEAD_ENTERIC"]
 
         if ch4_reduction_perc != 0:
             for lm in data.LANDMANS:
@@ -348,7 +332,7 @@ def get_precision_agriculture_effect_g_mrj(data, yr_idx):
                 'CO2E_KG_HA_CHEM_APPL',
                 'CO2E_KG_HA_CROP_MGT',
                 'CO2E_KG_HA_PEST_PROD',
-                'CO2E_KG_HA_SOIL',
+                'CO2E_KG_HA_SOIL'
             ]:
                 # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not use zeros
                 if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:

@@ -201,7 +201,7 @@ def get_asparagopsis_effect_c_mrj(data, yr_idx):
         for lu_idx, lu in enumerate(land_uses):
             lvstype, vegtype = lvs_veg_types(lu)
             yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
-            cost_per_animal = data.ASPARAGOPSIS_DATA[lu].loc[year, 'AnnCost_per_animal']
+            cost_per_animal = data.ASPARAGOPSIS_DATA[lu].loc[year, 'Annual Cost Per Animal (A$2010/yr)']
             cost_per_cell = cost_per_animal * yield_pot * data.REAL_AREA
 
             new_c_mrj[m, :, lu_idx] = cost_per_cell
