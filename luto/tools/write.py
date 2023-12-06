@@ -71,8 +71,9 @@ def get_path(sim):
         path_begin_end_compare = f"{path}/begin_end_compare_{yr_all[0]}_{yr_all[-1]}"
         paths = paths\
                 + [path_begin_end_compare]\
-                + [f"{path_begin_end_compare}/out_{yr_all[0]}"]\
-                + [f"{path_begin_end_compare}/out_{yr_all[-1]}"]
+                + [f"{path_begin_end_compare}/out_{yr_all[0]}",
+                +  f"{path_begin_end_compare}/out_{yr_all[-1]}",
+                +  f"{path_begin_end_compare}/out_{yr_all[-1]}/lucc_separate"]
     
     # Create all paths
     for p in paths:
@@ -110,8 +111,8 @@ def write_outputs(sim, path):
 def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     # Write the decision variables, land-use and land management maps
-    # write_files(sim, yr_cal, path_yr)
-    # write_files_separate(sim, yr_cal, path_yr)
+    write_files(sim, yr_cal, path_yr)
+    write_files_separate(sim, yr_cal, path_yr)
 
     # Write the crosstab and switches, and the quantity comparison
     write_crosstab(sim, yr_cal, path_yr, yr_cal_sim_pre=yr_cal_sim_pre)
