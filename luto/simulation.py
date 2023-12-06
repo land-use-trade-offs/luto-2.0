@@ -22,8 +22,7 @@ model that has 'global' varying state.
 
 
 import numpy as np
-import h5py, time
-from dataclasses import dataclass
+import time
 
 import luto.data as bdata
 import luto.settings as settings
