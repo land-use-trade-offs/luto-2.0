@@ -111,8 +111,8 @@ def write_outputs(sim, path):
 def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     # Write the decision variables, land-use and land management maps
-    write_files(sim, yr_cal, path_yr)
-    write_files_separate(sim, yr_cal, path_yr)
+    # write_files(sim, yr_cal, path_yr)
+    # write_files_separate(sim, yr_cal, path_yr)
 
     # Write the crosstab and switches, and the quantity comparison
     write_crosstab(sim, yr_cal, path_yr, yr_cal_sim_pre=yr_cal_sim_pre)
@@ -272,7 +272,7 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
 def write_quantity(sim, yr_cal, path, yr_cal_sim_pre=None):
 
     # Get the timestamp so each CSV in the timeseries mode has a unique name
-    timestamp = time.strftime('%H_%M_%S')
+    timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
 
     # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
     simulated_year_list = list(sim.lumaps.keys())
@@ -328,7 +328,7 @@ def write_crosstab(sim, yr_cal, path, yr_cal_sim_pre=None):
     """Write out land-use and production data"""
 
     # Get the timestamp so each CSV in the timeseries mode has a unique name
-    timestamp = time.strftime('%H_%M_%S')
+    timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
     
     # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
     simulated_year_list = list(sim.lumaps.keys())
@@ -414,7 +414,7 @@ def write_water(sim, yr_cal, path):
        target calendar year (e.g., 2030), and an output path as input."""
     
     # Get the timestamp so each CSV in the timeseries mode has a unique name
-    timestamp = time.strftime('%H_%M_%S')
+    timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
 
     print('\nWriting water outputs to', path)
     
@@ -500,7 +500,7 @@ def write_ghg(sim, yr_cal, path):
        year (e.g., 2030), and an output path as input."""
     
     # Get the timestamp so each CSV in the timeseries mode has a unique name
-    timestamp = time.strftime('%H_%M_%S')
+    timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
 
     print('\nWriting GHG outputs to', path)
 
@@ -538,7 +538,7 @@ def write_ghg_separate(sim, yr_cal, path):
     #       s: The sources of origin. Such as [Chemical_CO2, Electric_CO2] for {Agricultural landuse},
 
     # Get the timestamp so each CSV in the timeseries mode has a unique name
-    timestamp = time.strftime('%H_%M_%S')
+    timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
         
     # Convert calendar year to year index.
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
@@ -598,7 +598,7 @@ def write_ghg_separate(sim, yr_cal, path):
     GHG_emission_separate_summary.columns = pd.MultiIndex.from_tuples(column_rename)
 
     # Save table to disk
-    GHG_emission_separate_summary.to_csv(os.path.join(path, 'GHG_emissions_separate_agricultural_landuse.csv'))
+    GHG_emission_separate_summary.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_landuse_{timestamp}.csv'))
 
 
 
