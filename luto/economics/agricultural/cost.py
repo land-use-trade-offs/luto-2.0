@@ -22,6 +22,8 @@ Pure functions to calculate costs of commodities and alt. land uses.
 import numpy as np
 
 from typing import Dict
+
+import pandas as pd
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
@@ -42,6 +44,9 @@ def get_cost_crop( data # Data object or module.
     # Check if land-use exists in AGEC_CROPS (e.g., dryland Pears/Rice do not occur), if not return zeros
     if lu not in data.AGEC_CROPS['AC', lm].columns:
         costs_t = np.zeros((data.NCELLS))
+        # The column name is irrelevant and only used to make the out df the same shape as the rest of crops.
+        return pd.DataFrame(costs_t,
+                            columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost']]))
         
     else: # Calculate the total costs 
             
@@ -65,18 +70,17 @@ def get_cost_crop( data # Data object or module.
             costs_w = 0
         else: # Passed lm is neither `dry` nor `irr`.
             raise KeyError("Unknown %s land management. Check `lm` key." % lm)
-            
-        # Total costs in $/ha. 
-        costs_t = costs_a + costs_f + costs_w
-        
+
         # Convert to $/cell including resfactor.
-        costs_t *= data.REAL_AREA
+        # Quantity costs which has already been adjusted for REAL_AREA/resfactor via get_quantity
+        costs_a, costs_f, costs_w = costs_a*data.REAL_AREA, costs_f*data.REAL_AREA, costs_w*data.REAL_AREA
+
+        costs_t = np.stack([(costs_a), (costs_f), (costs_w), (costs_q)]).T
+ 
         
-        # Add quantity costs which has already been adjusted for REAL_AREA/resfactor via get_quantity
-        costs_t += costs_q
-        
-    # Return costs as numpy array.
-    return costs_t
+        # Return costs as numpy array.
+        return pd.DataFrame(costs_t,
+                            columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost', 'Fixed cost', 'Water cost', 'Quantity cost']]))    
 
 
 def get_cost_lvstk( data # Data object or module.
@@ -120,14 +124,15 @@ def get_cost_lvstk( data # Data object or module.
     costs_w = (data.AGEC_LVSTK['WR_DRN', lvstype] + WR_IRR) * yield_pot
     costs_w *= data.WATER_DELIVERY_PRICE  # $/ha
 
-    # Total costs ($/ha) are variable (quantity + area) + fixed + water costs.
-    costs_t = costs_q + costs_a + costs_f + costs_w
-
     # Convert costs to $ per cell including resfactor.
-    costs_t *= data.REAL_AREA
+    cost_a, cost_f, cost_w, cost_q = costs_a*data.REAL_AREA, costs_f*data.REAL_AREA,\
+                                     costs_w*data.REAL_AREA, costs_q*data.REAL_AREA
     
+    costs = np.stack([(cost_a), (cost_f), (cost_w), (cost_q)]).T
+
     # Return costs as numpy array.
-    return costs_t.to_numpy()
+    return  pd.DataFrame(costs,
+                         columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost', 'Fixed cost', 'Water cost', 'Quantity cost']]))
 
 
 def get_cost( data # Data object or module.
@@ -151,8 +156,10 @@ def get_cost( data # Data object or module.
         return get_cost_lvstk(data, lu, lm, yr_idx)
     
     # If neither crop nor livestock but in LANDUSES it is unallocated land.
+    # The column name is irrelevant and only used to make the out df the same shape as of from crops/lvstk.
     elif lu in data.AGRICULTURAL_LANDUSES:
-        return np.zeros(data.NCELLS)
+        return pd.DataFrame(np.zeros(data.NCELLS),
+                            columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost']]))
     
     # If it is none of the above, it is not known how to get the costs.
     else:
@@ -162,22 +169,29 @@ def get_cost( data # Data object or module.
 def get_cost_matrix(data, lm, yr_idx):
     """Return agricultural c_rj matrix of costs/cell per lu under `lm` in `yr_idx`."""
     
-    c_rj = np.zeros((data.NCELLS, len(data.AGRICULTURAL_LANDUSES)))
-    for j, lu in enumerate(data.AGRICULTURAL_LANDUSES):
-        c_rj[:, j] = get_cost(data, lu, lm, yr_idx)
+    cost = pd.concat([get_cost(data, lu, lm, yr_idx) for lu in data.AGRICULTURAL_LANDUSES], axis=1)
         
     # Make sure all NaNs are replaced by zeroes.
-    return np.nan_to_num(c_rj)
+    return cost.fillna(0)
 
 
-def get_cost_matrices(data, yr_idx):
+def get_cost_matrices(data, yr_idx,aggregate=True):
     """Return agricultural c_mrj matrix of costs per cell as 3D Numpy array."""
     
-    c_mrj = np.stack(tuple( get_cost_matrix(data, lm, yr_idx)
-                            for lm in data.LANDMANS )
-                    ).astype(np.float32)
+    # Concatenate the revenue from each land management into a single Multiindex DataFrame.
+    cost_rjms = pd.concat([get_cost_matrix(data, lm, yr_idx) for lm in data.LANDMANS], axis=1)
+
+    if aggregate == True:
+        j,m,s = cost_rjms.columns.levshape
+        c_rjm = cost_rjms.groupby(level=[0,1],axis=1).sum().values.reshape(-1,*[j,m])
+        c_mrj = np.einsum('rjm->mrj',c_rjm)
+        return c_mrj
     
-    return c_mrj
+    elif aggregate == False:
+        return cost_rjms
+    
+    else:
+        raise ValueError("aggregate must be True or False")
 
 
 def get_asparagopsis_effect_c_mrj(data, yr_idx):

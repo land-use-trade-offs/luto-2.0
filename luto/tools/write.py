@@ -36,6 +36,7 @@ import luto.economics.non_agricultural.water as non_ag_water
 import luto.economics.agricultural.ghg as ag_ghg
 import luto.economics.non_agricultural.ghg as non_ag_ghg
 import luto.economics.agricultural.revenue as ag_revenue
+import luto.economics.agricultural.cost as ag_cost
 
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
@@ -120,6 +121,7 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_quantity(sim, yr_cal, path_yr, yr_cal_sim_pre=yr_cal_sim_pre)
 
     # Write the water and GHG outputs
+    write_ag_revenue_cost(sim, yr_cal, path_yr)
     write_water(sim, yr_cal, path_yr)
     write_ghg(sim, yr_cal, path_yr)
     write_ghg_separate(sim, yr_cal, path_yr)
@@ -324,7 +326,7 @@ def write_quantity(sim, yr_cal, path, yr_cal_sim_pre=None):
         production_years.to_csv(os.path.join(path, f'quantity_production_killo_t_{timestamp}.csv'), index = False)
 
 
-def write_ag_revenue(sim, yr_cal, path):
+def write_ag_revenue_cost(sim, yr_cal, path):
     """Calculate agricultural revenue. Takes a simulation object, a target calendar 
        year (e.g., 2030), and an output path as input."""
 
@@ -336,32 +338,47 @@ def write_ag_revenue(sim, yr_cal, path):
     # Convert calendar year to year index.
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
 
-    # Get agricultural revenue for year in mrjs format. Note the s stands for sources:
+    # Get agricultural revenue/cost for year in mrjs format. Note the s stands for sources:
     # E.g., Sources for crops only contains ['Revenue'], 
     #    but sources for livestock includes ['Meat', 'Wool', 'Live Exports', 'Milk']
     ag_rev_df_rjms = ag_revenue.get_rev_matrices(sim.data, yr_idx, aggregate=False)
+    ag_cost_df_rjms = ag_cost.get_cost_matrices(sim.data, yr_idx, aggregate=False)
 
     # Expand the original df with zero values to convert it to a a **mrjs** array
     ag_rev_df_rjms = ag_rev_df_rjms.reindex(columns=pd.MultiIndex.from_product(ag_rev_df_rjms.columns.levels), fill_value=0)
     ag_rev_rjms = ag_rev_df_rjms.values.reshape(-1, *ag_rev_df_rjms.columns.levshape)
 
+    ag_cost_df_rjms = ag_cost_df_rjms.reindex(columns=pd.MultiIndex.from_product(ag_cost_df_rjms.columns.levels), fill_value=0)
+    ag_cost_rjms = ag_cost_df_rjms.values.reshape(-1, *ag_cost_df_rjms.columns.levshape)
+    
+
     # Get the ag_dvar_mrj in the yr_cal
     ag_dvar_mrj = sim.ag_dvars[yr_cal]
 
+
     # Multiply the ag_dvar_mrj with the ag_rev_mrj to get the ag_rev_jm
     ag_rev_jms = np.einsum('mrj,rjms -> jms', ag_dvar_mrj, ag_rev_rjms)
+    ag_cost_jms = np.einsum('mrj,rjms -> jms', ag_dvar_mrj, ag_cost_rjms)
 
     # Put the ag_rev_jms into a dataframe
-    df = pd.DataFrame(ag_rev_jms.reshape(ag_rev_jms.shape[0],-1), 
+    df_rev = pd.DataFrame(ag_rev_jms.reshape(ag_rev_jms.shape[0],-1), 
                       columns=pd.MultiIndex.from_product(ag_rev_df_rjms.columns.levels[1:]),
                       index=ag_rev_df_rjms.columns.levels[0])
     
+    df_cost = pd.DataFrame(ag_cost_jms.reshape(ag_cost_jms.shape[0],-1),    
+                      columns=pd.MultiIndex.from_product(ag_cost_df_rjms.columns.levels[1:]),
+                      index=ag_cost_df_rjms.columns.levels[0])
+    
     # Add the SUM column to the last row and column
-    df.loc['SUM'] = df.sum(axis=0)
-    df['SUM'] = df.sum(axis=1)
+    df_rev.loc['SUM'] = df_rev.sum(axis=0)
+    df_rev['SUM'] = df_rev.sum(axis=1)
+
+    df_cost.loc['SUM'] = df_cost.sum(axis=0)
+    df_cost['SUM'] = df_cost.sum(axis=1)
 
     # Save to file
-    df.to_csv(os.path.join(path, f'agricultural_revenue_{timestamp}.csv'))
+    df_rev.to_csv(os.path.join(path, f'revenue_agricultural_commidity_{timestamp}.csv'))
+    df_cost.to_csv(os.path.join(path, f'cost_agricultural_commidity_{timestamp}.csv'))
 
 
 

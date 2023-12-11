@@ -188,7 +188,7 @@ def get_rev_matrices(data, yr_idx, aggregate:bool = True):
     if aggregate == True:
         j,m,s = rev_rjms.columns.levshape
         rev_rjm = rev_rjms.groupby(level=[0,1],axis=1).sum().values.reshape(-1,*[j,m])
-        rev_mrj = np.einsum('rjm->mjr',rev_rjm)
+        rev_mrj = np.einsum('rjm->mrj',rev_rjm)
         return rev_mrj
     
     elif aggregate == False:
@@ -205,7 +205,7 @@ def get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx):
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
-    year = 2010 + yr_idx
+    year = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
@@ -229,7 +229,7 @@ def get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx):
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
-    year = 2010 + yr_idx
+    year = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
@@ -251,7 +251,7 @@ def get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx):
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
-    year = 2010 + yr_idx
+    year = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
