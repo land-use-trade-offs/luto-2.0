@@ -20,6 +20,7 @@ Pure functions to calculate economic profit from land use.
 
 from typing import Dict
 import numpy as np
+import pandas as pd
 
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
@@ -41,16 +42,14 @@ def get_rev_crop( data   # Data object or module.
     if lu not in data.AGEC_CROPS['P1', lm].columns:
         rev_t = np.zeros((data.NCELLS))
         
-    else: # Calculate the total revenue 
-        
+    else:
         # Revenue in $ per cell (includes REAL_AREA via get_quantity)
         rev_t = ( data.AGEC_CROPS['P1', lm, lu]
                 * get_quantity( data, lu.upper(), lm, yr_idx )  # lu.upper() only for crops as needs to be in product format in get_quantity().
-                )
+                ).values
     
-    # Return revenue as numpy array.
-    return rev_t
-
+    # Return revenue as MultiIndexed DataFrame.
+    return pd.DataFrame(rev_t, columns=pd.MultiIndex.from_product([[lu],[lm],['Revenue']]))
 
 def get_rev_lvstk( data   # Data object or module.
                  , lu     # Land use.
@@ -72,52 +71,79 @@ def get_rev_lvstk( data   # Data object or module.
     
     # Revenue in $ per cell (includes RESMULT via get_quantity)
     if lvstype == 'BEEF':
-        rev = yield_pot * (  # Meat                           # Stocking density (head/ha)
-                           ( data.AGEC_LVSTK['F1', lvstype]   # Fraction of herd producing (0 - 1)
-                           * data.AGEC_LVSTK['Q1', lvstype]   # Quantity produced per head (meat tonnes/head)
-                           * data.AGEC_LVSTK['P1', lvstype] ) # Price per unit quantity ($/tonne of meat)
-                           + # Live exports
-                           ( data.AGEC_LVSTK['F3', lvstype]   # Fraction of herd producing (0 - 1) 
-                           * data.AGEC_LVSTK['Q3', lvstype]   # Quantity produced per head (animal weight tonnes/head)
-                           * data.AGEC_LVSTK['P3', lvstype] ) # Price per unit quantity ($/tonne of animal)
-                          )    
 
-    elif lvstype == 'SHEEP':
-        rev = yield_pot * (  # Meat                           # Stocking density (head/ha)
-                           ( data.AGEC_LVSTK['F1', lvstype]   # Fraction of herd producing (0 - 1) 
-                           * data.AGEC_LVSTK['Q1', lvstype]   # Quantity produced per head (meat tonnes/head)
-                           * data.AGEC_LVSTK['P1', lvstype] ) # Price per unit quantity ($/tonne of meat)
-                           + # Wool
-                           ( data.AGEC_LVSTK['F2', lvstype]   # Fraction of herd producing (0 - 1) 
-                           * data.AGEC_LVSTK['Q2', lvstype]   # Quantity produced per head (wool tonnes/head)
-                           * data.AGEC_LVSTK['P2', lvstype] ) # Price per unit quantity ($/tonne wool)
-                           + # Live exports
-                           ( data.AGEC_LVSTK['F3', lvstype]   # Fraction of herd producing (0 - 1) 
-                           * data.AGEC_LVSTK['Q3', lvstype]   # Quantity produced per head (animal weight tonnes/head)
-                           * data.AGEC_LVSTK['P3', lvstype] ) # Price per unit quantity ($/tonne of whole animal)
-                          )    
+        # Get the revenue from meat and live exports. Set to zero if not produced.
+        rev_meat = yield_pot * (                               # Stocking density (head/ha)
+                            ( data.AGEC_LVSTK['F1', lvstype]   # Fraction of herd producing (0 - 1)
+                            * data.AGEC_LVSTK['Q1', lvstype]   # Quantity produced per head (meat tonnes/head)
+                            * data.AGEC_LVSTK['P1', lvstype] ) # Price per unit quantity ($/tonne of meat)
+                            )
+        
+        rev_lexp = yield_pot * (  
+                            ( data.AGEC_LVSTK['F3', lvstype]   # Fraction of herd producing (0 - 1)
+                            * data.AGEC_LVSTK['Q3', lvstype]   # Quantity produced per head (animal weight tonnes/head)
+                            * data.AGEC_LVSTK['P3', lvstype] ) # Price per unit quantity ($/tonne of animal)
+                            )  
+        
+        # Set Wool and Milk to zero as they are not produced by beef cattle
+        rev_wool = rev_milk = np.zeros((data.NCELLS))
+
+    elif lvstype == 'SHEEP':    
+
+        # Get the revenue from meat, wool and live exports. Set to zero if not produced.
+        rev_meat = yield_pot * (  # Meat                           # Stocking density (head/ha)
+                                ( data.AGEC_LVSTK['F1', lvstype]   # Fraction of herd producing (0 - 1)
+                                * data.AGEC_LVSTK['Q1', lvstype]   # Quantity produced per head (meat tonnes/head)
+                                * data.AGEC_LVSTK['P1', lvstype] ) # Price per unit quantity ($/tonne of meat)
+                                )
+        rev_wool = yield_pot * (  # Wool                           # Stocking density (head/ha) 
+                                ( data.AGEC_LVSTK['F2', lvstype]   # Fraction of herd producing (0 - 1) 
+                                * data.AGEC_LVSTK['Q2', lvstype]   # Quantity produced per head (wool tonnes/head)
+                                * data.AGEC_LVSTK['P2', lvstype] ) # Price per unit quantity ($/tonne wool)
+                                )   
+        
+        rev_lexp = yield_pot * (  # Live exports                   # Stocking density (head/ha)
+                                ( data.AGEC_LVSTK['F3', lvstype]   # Fraction of herd producing (0 - 1) 
+                                * data.AGEC_LVSTK['Q3', lvstype]   # Quantity produced per head (animal weight tonnes/head)
+                                * data.AGEC_LVSTK['P3', lvstype] ) # Price per unit quantity ($/tonne of whole animal)
+                                )
+        
+        # Set Milk to zero as it is not produced by sheep
+        rev_milk = np.zeros((data.NCELLS)) # Set Milk to zero as it is not produced by sheep
+
+
+
 
     elif lvstype == 'DAIRY':
-        rev = yield_pot * (  # Milk                           # Stocking density (head/ha)
-                           ( data.AGEC_LVSTK['F1', lvstype]   # Fraction of herd producing (0 - 1) 
-                           * data.AGEC_LVSTK['Q1', lvstype]   # Quantity produced per head (milk litres/head)
-                           * data.AGEC_LVSTK['P1', lvstype] ) # Price per unit quantity
-                          )    
+
+        # Get the revenue from milk. Set to zero if not produced.
+        rev_milk = yield_pot * (  # Milk                           # Stocking density (head/ha)
+                                ( data.AGEC_LVSTK['F1', lvstype]   # Fraction of herd producing (0 - 1) 
+                                * data.AGEC_LVSTK['Q1', lvstype]   # Quantity produced per head (milk litres/head)
+                                * data.AGEC_LVSTK['P1', lvstype] ) # Price per unit quantity ($/litre milk)
+                                )
+        
+        # Set Meat, Wool and Live exports to zero
+        rev_meat = rev_wool = rev_lexp = np.zeros((data.NCELLS)) 
 
     else:  # Livestock type is unknown.
-        raise KeyError("Unknown %s livestock type. Check `lvstype`." % lvstype)
-        
+        raise KeyError("Unknown %s livestock type. Check `lvstype`." % lvstype)   
+
+    # Put the revenues into a MultiIndex DataFrame
+    rev_seperate = pd.DataFrame(np.stack((rev_meat, rev_wool, rev_lexp, rev_milk), axis=1), 
+                                columns=pd.MultiIndex.from_product([[lu], [lm], ['Meat', 'Wool', 'Live Exports', 'Milk']]))
+    
     # Revenue so far in AUD/ha. Now convert to AUD/cell including resfactor.
-    rev *= data.REAL_AREA
+    rev_seperate = rev_seperate * data.REAL_AREA.reshape(-1,1) # Convert to AUD/cell
     
     # Return revenue as numpy array.
-    return rev
+    return rev_seperate
 
 
 def get_rev( data    # Data object or module.
             , lu     # Land use.
             , lm     # Land management.
-            , yr_idx # Number of years post base-year ('YR_CAL_BASE').
+            , yr_idx # Number of years post base-year ('YR_CAL_BASE')
             ):
     """Return revenue from production [AUD/cell] of `lu`+`lm` in `yr_idx` as np array.
 
@@ -136,7 +162,8 @@ def get_rev( data    # Data object or module.
     
     # If neither crop nor livestock but in LANDUSES it is unallocated land.
     elif lu in data.AGRICULTURAL_LANDUSES:
-        return np.zeros(data.NCELLS)
+        return  pd.DataFrame(np.zeros((data.NCELLS, 1)),
+                             columns=pd.MultiIndex.from_product([[lu],[lm],['Revenue']]))
     
     # If it is none of the above, it is not known how to get the revenue.
     else:
@@ -146,20 +173,29 @@ def get_rev( data    # Data object or module.
 def get_rev_matrix(data, lm, yr_idx):
     """Return r_rj matrix of revenue/cell per lu under `lm` in `yr_idx`."""
     
-    r_rj = np.zeros((data.NCELLS, len(data.AGRICULTURAL_LANDUSES)))
-    for j, lu in enumerate(data.AGRICULTURAL_LANDUSES):
-        r_rj[:, j] = get_rev(data, lu, lm, yr_idx)
-        
-    # Make sure all NaNs are replaced by zeroes.
-    return np.nan_to_num(r_rj)
+    # Concatenate the revenue from each land use into a single Multiindex DataFrame.
+    r_rjs = pd.concat([get_rev(data, lu, lm, yr_idx) for lu in data.AGRICULTURAL_LANDUSES], axis=1)
+    r_rjs = r_rjs.fillna(0)
+    return r_rjs
 
 
-def get_rev_matrices(data, yr_idx):
+def get_rev_matrices(data, yr_idx, aggregate:bool = True):
     """Return r_mrj matrix of revenue per cell as 3D Numpy array."""
+
+    # Concatenate the revenue from each land management into a single Multiindex DataFrame.
+    rev_rjms = pd.concat([get_rev_matrix(data, lm, yr_idx) for lm in data.LANDMANS], axis=1)
+
+    if aggregate == True:
+        j,m,s = rev_rjms.columns.levshape
+        rev_rjm = rev_rjms.groupby(level=[0,1],axis=1).sum().values.reshape(-1,*[j,m])
+        rev_mrj = np.einsum('rjm->mrj',rev_rjm)
+        return rev_mrj
     
-    return np.stack(tuple( get_rev_matrix(data, lm, yr_idx)
-                           for lm in data.LANDMANS )
-                    ).astype(np.float32)
+    elif aggregate == False:
+        # Concatenate the revenue from each land management into a single Multiindex DataFrame.
+        return rev_rjms
+    else:
+        raise KeyError("aggregate must be either True or False")
 
 
 def get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx):
@@ -169,7 +205,7 @@ def get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx):
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
-    year = 2010 + yr_idx
+    year = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
@@ -193,7 +229,7 @@ def get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx):
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
-    year = 2010 + yr_idx
+    year = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
@@ -215,7 +251,7 @@ def get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx):
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
-    year = 2010 + yr_idx
+    year = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
