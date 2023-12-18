@@ -76,7 +76,8 @@ def create_new_dataset():
     shutil.copyfile(luto_2D_inpath + 'cell_biophysical_df.h5', raw_data + 'cell_biophysical_df.h5')
     shutil.copyfile(luto_2D_inpath + 'SA2_climate_damage_mult.h5', raw_data + 'SA2_climate_damage_mult.h5')
     
-    shutil.copyfile(luto_1D_inpath + 'BAU_demands_from_MH_20230810.csv', raw_data + 'BAU_demands_from_MH_20230810.csv')
+    # shutil.copyfile(luto_1D_inpath + 'BAU_demands_from_MH_20230810.csv', raw_data + 'BAU_demands_from_MH_20230810.csv')
+    shutil.copyfile('N:/LUF-Modelling/Food_demand_AU/au.food.demand/Outputs/Net_demand_BAU_waste_BAU_FE.csv',  raw_data + 'Net_demand_BAU_waste_BAU_FE.csv')
     
     # Copy data straight to LUTO input folder, no processing required
     
@@ -84,6 +85,8 @@ def create_new_dataset():
     shutil.copyfile(nlum_inpath + 'NLUM_2010-11_mask.tif', outpath + 'NLUM_2010-11_mask.tif')
         
     shutil.copyfile(luto_1D_inpath + 'GHG_targets.xlsx', outpath + 'GHG_targets.xlsx')
+    
+    shutil.copyfile(luto_2D_inpath + 'cell_savanna_burning.h5', outpath + 'cell_savanna_burning.h5')
 
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp126_2010-2100_DR_ML_HA_mean.h5', outpath + 'water_yield_ssp126_2010-2100_dr_ml_ha.h5')
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp126_2010-2100_SR_ML_HA_mean.h5', outpath + 'water_yield_ssp126_2010-2100_sr_ml_ha.h5')
@@ -95,7 +98,7 @@ def create_new_dataset():
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp585_2010-2100_SR_ML_HA_mean.h5', outpath + 'water_yield_ssp585_2010-2100_sr_ml_ha.h5')
     
     # Load delta demands file
-    shutil.copyfile(luto_1D_inpath + 'demand_deltas_c.npy', outpath + 'demand_deltas_c.npy')
+    # shutil.copyfile(luto_1D_inpath + 'demand_deltas_c.npy', outpath + 'demand_deltas_c.npy')
     
     # Load agricultural management datafiles
     shutil.copyfile(luto_1D_inpath + '20231101_Bundle_MR.xlsx', outpath + '20231101_Bundle_MR.xlsx')
@@ -701,35 +704,64 @@ def create_new_dataset():
     
     ############### Agricultural demand
     
-    demand = pd.read_csv( raw_data + 'BAU_demands_from_MH_20230810.csv')
+    # demand = pd.read_csv( raw_data + 'BAU_demands_from_MH_20230810.csv')
 
+    # # Take out 2010 as they all = 1, drop unwanted columns
+    # demand['Commodity'] = demand['SPREAD_Commodity'].str.lower()
+    # demand = demand.drop(columns = ['X', 'Production', 'SPREAD_Commodity'])
+    
+        
+    # # Create the MultiIndex structure
+    # demand = demand.pivot( index = ['Scenario', 'Diet', 'Waste', 'Feed', 'Commodity'], 
+    #                  columns = ['Year'], 
+    #                  values = 'Multiplier')
+    
+    # d2 = demand.copy()
+    # d2 = d2.drop(columns = d2.columns)
+    
+    # for tup in demand.index:
+    #     s = demand.loc[(tup)]
+    #     xs = s.index.values   
+    #     ys = s.values
+        
+    #     # # Create linear function f and interpolate
+    #     f = interp1d(xs, ys, kind = 'linear', fill_value = 'extrapolate')
+    #     yr = range(2010, 2101)
+    #     d2.loc[tup, yr] = f(yr)    
+        
+    # # Save to HDF5
+    # d2.to_hdf(outpath + 'demand_projections.h5', key = 'demand_projections', mode = 'w', format = 'fixed', index = False, complevel = 9)
+
+
+    # Demand using new data
+    
+    # Read in demand models data
+    demand = pd.read_csv(raw_data + 'Net_demand_BAU_waste_BAU_FE.csv')
+    
+    # Convert NaNs to zeros
+    demand.fillna(0, inplace = True)
+    
+    # Change commodity names to lower case
+    demand['SPREAD_Commodity'] = demand['SPREAD_Commodity'].str.lower()
+    
+    # Change SPREAD_Commodity names
+    changes = {'beef': 'beef meat', 'beef - live exports': 'beef lexp', 'milk': 'dairy', 'sheep - live exports': 'sheep lexp', 'wool': 'sheep wool'}
+    for item in changes:
+        demand.loc[demand.query('SPREAD_Commodity == @item').index, 'SPREAD_Commodity'] = changes[item]
+    
     # Take out 2010 as they all = 1, drop unwanted columns
-    demand['Commodity'] = demand['SPREAD_Commodity'].str.lower()
-    demand = demand.drop(columns = ['X', 'Production', 'SPREAD_Commodity'])
+    demand = demand.rename(columns = {'Scenario': 'SCENARIO', 'Domestic_diet': 'DIET_DOM', 'Global_diet': 'DIET_GLOB', 'Convergence': 'CONVERGENCE', 'Imports': 'IMPORT_TREND', 'Waste': 'WASTE', 'Feed': 'FEED_EFFICIENCY', 'SPREAD_Commodity': 'COMMODITY', 'Year': 'YEAR', 'domestic': 'DOMESTIC', 'exports': 'EXPORTS', 'imports': 'IMPORTS', 'feed': 'FEED', 'All_demand': 'PRODUCTION'})
     
-        
+    
     # Create the MultiIndex structure
-    demand = demand.pivot( index = ['Scenario', 'Diet', 'Waste', 'Feed', 'Commodity'], 
-                     columns = ['Year'], 
-                     values = 'Multiplier')
+    demand = demand.pivot( index = ['SCENARIO', 'DIET_DOM', 'DIET_GLOB', 'CONVERGENCE', 'IMPORT_TREND', 'WASTE', 'FEED_EFFICIENCY', 'COMMODITY'], 
+                         columns = ['YEAR'], 
+                          values = ['DOMESTIC', 'EXPORTS', 'IMPORTS', 'FEED', 'PRODUCTION'])
     
-    d2 = demand.copy()
-    d2 = d2.drop(columns = d2.columns)
-    
-    for tup in demand.index:
-        s = demand.loc[(tup)]
-        xs = s.index.values   
-        ys = s.values
-        
-        # # Create linear function f and interpolate
-        f = interp1d(xs, ys, kind = 'linear', fill_value = 'extrapolate')
-        yr = range(2010, 2101)
-        d2.loc[tup, yr] = f(yr)    
-        
     # Save to HDF5
-    d2.to_hdf(outpath + 'demand_projections.h5', key = 'demand_projections', mode = 'w', format = 'fixed', index = False, complevel = 9)
-
-
+    demand.to_hdf(outpath + 'demand_projections.h5', key = 'demand_projections', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    
+    
     
     ############### BECCS
     

@@ -40,7 +40,6 @@ DATA_DIR = 'input'
 RAW_DATA = '../raw_data'
 
 
-
 # ---------------------------------------------------------------------------- #
 # Model parameters.                                                                  #
 # ---------------------------------------------------------------------------- #
@@ -50,10 +49,14 @@ SSP = '245'
 RCP = 'rcp' + SSP[1] + 'p' + SSP[2]  # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
 # Set diet parameters
-SCENARIO = SSP_NUM = 'SSP' + SSP[0] # i.e., SSP1, SSP2 etc.
-DIET = 'BAU' # or '2050-FLX'
-WASTE = 1 # 1 for full waste, 0.5 for half waste
-FEED_EFFICIENCY = 'BAU' # 'BAU' or 'High'
+SCENARIO = SSP_NUM = 'SSP' + SSP[0] # SSP1, SSP2, SSP3, SSP4, SSP5
+DIET_DOM = 'BAU'                    # 'BAU', 'FLX', 'VEG', 'VGN' - domestic diets in Australia
+DIET_GLOB = 'BAU'                   # 'BAU', 'FLX', 'VEG', 'VGN' - global diets
+CONVERGENCE = 2050                  # 2050 or 2100 - date at which dietary transformation is completed (velocity of transformation)
+IMPORT_TREND = 'Static'             # 'Static' (assumes 2010 shares of imports for each commodity) or 'Trend' (follows historical rate of change in shares of imports for each commodity)
+WASTE = 1                           # 1 for full waste, 0.5 for half waste 
+FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
+
 
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4 
 CO2_FERT = 'on'   # or 'off'
@@ -73,11 +76,11 @@ DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 30          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 5          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
-# MODE = 'snapshot'       # runs for target year only
-MODE = 'timeseries'   # runs each year from base year to target year
+MODE = 'snapshot'       # runs for target year only
+# MODE = 'timeseries'   # runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****

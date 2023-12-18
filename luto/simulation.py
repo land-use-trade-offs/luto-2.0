@@ -482,4 +482,5 @@ prod_2010_c = tools.get_production( bdata
                                   )
 
 # Demand deltas can be a time series (shape year x commodity) or a single array (shape = n commodites).
-d_cy = bdata.DEMAND_DELTAS_C * prod_2010_c
+# d_cy = bdata.DEMAND_DELTAS_C * prod_2010_c
+d_cy = bdata.DEMAND_C # new demand is in tonnes rather than deltas
