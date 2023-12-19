@@ -29,7 +29,8 @@ except:
     import rasterio
     
 
-from luto.settings import INPUT_DIR, RESFACTOR, CO2_FERT, SOC_AMORTISATION, NON_AGRICULTURAL_LU_BASE_CODE, RISK_OF_REVERSAL, FIRE_RISK, GHG_LIMITS_TYPE, GHG_LIMITS, GHG_LIMITS_FIELD
+from luto.settings import INPUT_DIR, RESFACTOR, CO2_FERT, SOC_AMORTISATION, NON_AGRICULTURAL_LU_BASE_CODE, RISK_OF_REVERSAL
+from luto.settings import FIRE_RISK, GHG_LIMITS_TYPE, GHG_LIMITS, GHG_LIMITS_FIELD, CONNECTIVITY_WEIGHTING, BIODIV_TARGET
 from luto.settings import SSP, RCP, SCENARIO, DIET_DOM, DIET_GLOB, CONVERGENCE, IMPORT_TREND, WASTE, FEED_EFFICIENCY
 from luto.economics.agricultural.quantity import lvs_veg_types
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
@@ -244,20 +245,38 @@ SOIL_CARBON_AVG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'soil_carbon_t_h
 
 
 ###############################################################
-# Non-agricultural economic data.
+# Non-agricultural data.
 ###############################################################
 
 # Load environmental plantings economic data
 EP_EST_COST_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_est_cost_ha.h5') ).to_numpy(dtype = np.float32)
 
-# Load environmental plantings GHG emissions (aboveground carbon discounted by RISK_OF_REVERSAL and FIRE_RISK)
-ep_df = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_block_avg_t_co2_ha_yr.h5') )
+# Load fire risk data (reduced carbon sequestration by this amount)
 fr_df = pd.read_hdf( os.path.join(INPUT_DIR, 'fire_risk.h5') )
 fr_dict = {'low': 'FD_RISK_PERC_5TH', 'med': 'FD_RISK_MEDIAN', 'high': 'FD_RISK_PERC_95TH'}
+fire_risk = fr_df[fr_dict[FIRE_RISK]]
 
-ep_df['FIRE_RISK'] = fr_df[fr_dict[FIRE_RISK]]
-EP_BLOCK_AVG_T_C02_HA = ep_df.eval('( EP_BLOCK_AG_AVG_T_CO2_HA_YR * (FIRE_RISK / 100) * (1 - @RISK_OF_REVERSAL) ) \
-                                    + EP_BLOCK_BG_AVG_T_CO2_HA_YR').to_numpy(dtype = np.float32)
+# Load environmental plantings (block) GHG sequestration (aboveground carbon discounted by RISK_OF_REVERSAL and FIRE_RISK)
+ep_df = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_block_avg_t_co2_ha_yr.h5') )
+EP_BLOCK_AVG_T_CO2_HA = (
+                         ( ep_df.EP_BLOCK_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - RISK_OF_REVERSAL) )
+                         + ep_df.EP_BLOCK_BG_AVG_T_CO2_HA_YR
+                        ).to_numpy(dtype = np.float32)
+
+# Load environmental plantings (belt) GHG sequestration (aboveground carbon discounted by RISK_OF_REVERSAL and FIRE_RISK)
+ep_df = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_belt_avg_t_co2_ha_yr.h5') )
+EP_BELT_AVG_T_CO2_HA = (
+                         ( ep_df.EP_BELT_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - RISK_OF_REVERSAL) )
+                         + ep_df.EP_BELT_BG_AVG_T_CO2_HA_YR
+                        ).to_numpy(dtype = np.float32)
+
+# Load environmental plantings (riparian) GHG sequestration (aboveground carbon discounted by RISK_OF_REVERSAL and FIRE_RISK)
+ep_df = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_rip_avg_t_co2_ha_yr.h5') )
+EP_RIP_AVG_T_CO2_HA = (
+                         ( ep_df.EP_RIP_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - RISK_OF_REVERSAL) )
+                         + ep_df.EP_RIP_BG_AVG_T_CO2_HA_YR
+                        ).to_numpy(dtype = np.float32)
+
 
 # Agricultural land use to environmental plantings raw transition costs:
 AG2EP_TRANSITION_COSTS_HA = np.load( os.path.join(INPUT_DIR, 'ag_to_ep_tmatrix.npy') )  # shape: (28,)
@@ -287,6 +306,8 @@ LMMAP = pd.read_hdf(os.path.join(INPUT_DIR, 'lmmap.h5')).to_numpy()
 # Initial (2010) agricutural management maps - no cells are used for alternative agricultural management options.
 # Includes a separate AM map for each agricultural management option, because they can be stacked.
 AMMAP_DICT = {am: np.zeros(NCELLS).astype('int8') for am in AG_MANAGEMENTS_TO_LAND_USES}
+
+STREAM_LENGTH = pd.read_hdf(os.path.join(INPUT_DIR, 'stream_length_m_cell.h5')).to_numpy()
 
 
 
@@ -379,10 +400,10 @@ DRAINDIV_LIMITS = dict(zip(dd.HR_DRAINDIV_ID, dd.WATER_YIELD_HIST_BASELINE_ML)) 
 
 # Water yields -- run off from a cell into catchment by deep-rooted, shallow-rooted, and natural vegetation types
 water_yield_base = pd.read_hdf(os.path.join( INPUT_DIR, 'water_yield_baselines.h5' ))
-WATER_YIELD_BASE_DR = water_yield_base['WATER_YIELD_HIST_DR_ML_HA'].to_numpy(dtype = np.float32)
+# WATER_YIELD_BASE_DR = water_yield_base['WATER_YIELD_HIST_DR_ML_HA'].to_numpy(dtype = np.float32)
 WATER_YIELD_BASE_SR = water_yield_base['WATER_YIELD_HIST_SR_ML_HA'].to_numpy(dtype = np.float32)
 WATER_YIELD_BASE = water_yield_base['WATER_YIELD_HIST_BASELINE_ML_HA'].to_numpy(dtype = np.float32)
-# WATER_YIELD_BASE_DIFF = WATER_YIELD_BASE_SR - WATER_YIELD_BASE 
+
 
 fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + SSP + '_2010-2100_dr_ml_ha.h5')
 fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + SSP + '_2010-2100_sr_ml_ha.h5')
@@ -442,38 +463,6 @@ BAU_PROD_INCR = pd.read_csv(fpath, header = [0,1]).astype(np.float32)
 # Demand data.
 ###############################################################
 
-# Load demand deltas (multipliers on 2010 production by commodity) - placeholder data
-# DEMAND_DELTAS_C = np.load(os.path.join(INPUT_DIR, 'demand_deltas_c.npy') ) 
-
-# # Load demand deltas (multipliers on 2010 production by commodity) - from demand model     
-# dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
-
-# # Select the demand scenario (returns commodity x year dataframe) - includes off-land commodities
-# DEMAND_DELTAS = dd.loc[(SCENARIO, DIET, WASTE, FEED_EFFICIENCY)].copy()
-
-# # Remove off-land commodities
-# DEMAND_DELTAS_C = DEMAND_DELTAS.query("Commodity not in ['pork', 'chicken', 'eggs', 'aquaculture']").copy()
-
-# # Ensure all commodities are represented
-# missing_commodities = {'beef lexp': 'beef', 
-#                        'beef meat': 'beef',
-#                        'dairy': 'milk',
-#                        'sheep lexp': 'sheep',
-#                        'sheep meat': 'sheep',
-#                        'sheep wool': 'sheep'}
-
-# for com in missing_commodities.keys():
-#     DEMAND_DELTAS_C.loc[com, :] = DEMAND_DELTAS_C.loc[missing_commodities[com], :].copy()
-
-# # Drop unwanted rows and sort lexicographically based on commodity index
-# DEMAND_DELTAS_C = DEMAND_DELTAS_C.drop(labels = ['beef', 'milk', 'sheep'], axis = 0).sort_index()
-
-# # Convert to numpy array of shape (91, 26)
-# DEMAND_DELTAS_C = DEMAND_DELTAS_C.to_numpy(dtype = np.float32).T
-
-
-# New demand data
-
 # Load demand data (actual production (tonnes, ML) by commodity) - from demand model     
 dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
 
@@ -487,7 +476,7 @@ DEMAND_C = DEMAND_DATA.loc[DEMAND_DATA.query("COMMODITY not in ['pork', 'chicken
 DEMAND_C = DEMAND_C.to_numpy(dtype = np.float32).T
 
 
-    
+
 ###############################################################
 # GHG targets data.
 ###############################################################
@@ -516,7 +505,30 @@ elif GHG_LIMITS_TYPE == 'dict':
 ###############################################################
 
 SAVANNA_BURNING = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_savanna_burning.h5') )
+ 
+    
+ 
+###############################################################
+# Biodiversity data.
+###############################################################
+
+# Load biodiversity data
+biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5') )
+
+# Get the Zonation output score between 0 and 1
+BIODIV_SCORE_RAW = biodiv_priorities['BIODIV_PRIORITY_SSP' + SSP].to_numpy(dtype = np.float32)
+
+# Get the natural area connectivity score between 0 and 1 (1 is highly connected, 0 is not connected)
+conn_score = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.float32)
+
+# Calculate weighted biodiversity score
+BIODIV_SCORE_WEIGHTED = BIODIV_SCORE_RAW - (BIODIV_SCORE_RAW * (1 - conn_score) * CONNECTIVITY_WEIGHTING)
+
+# Calculate total biodiversity target score 
+TOTAL_BIODIV_TARGET_SCORE = ((LUMAP >= 0 ) * BIODIV_SCORE_RAW * BIODIV_TARGET).sum()
 
 
-
-
+"""
+Kunming-Montreal Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
+Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
+"""

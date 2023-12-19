@@ -77,7 +77,7 @@ def create_new_dataset():
     shutil.copyfile(luto_2D_inpath + 'SA2_climate_damage_mult.h5', raw_data + 'SA2_climate_damage_mult.h5')
     
     # shutil.copyfile(luto_1D_inpath + 'BAU_demands_from_MH_20230810.csv', raw_data + 'BAU_demands_from_MH_20230810.csv')
-    shutil.copyfile('N:/LUF-Modelling/Food_demand_AU/au.food.demand/Outputs/Net_demand_BAU_waste_BAU_FE.csv',  raw_data + 'Net_demand_BAU_waste_BAU_FE.csv')
+    shutil.copyfile('N:/LUF-Modelling/Food_demand_AU/au.food.demand/Outputs/All_LUTO_demand_scenarios_with_convergences.csv',  raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
     
     # Copy data straight to LUTO input folder, no processing required
     
@@ -399,12 +399,37 @@ def create_new_dataset():
     ############### Get water yield historical baseline data 
     
     # Select historical (1970 - 2000) water yield under deep rooted and shallow rooted vegetation
-    water_yield_baselines = bioph[['WATER_YIELD_HIST_DR_ML_HA', 'WATER_YIELD_HIST_SR_ML_HA', 'WATER_YIELD_HIST_BASELINE_ML_HA']]
+    water_yield_baselines = bioph[['WATER_YIELD_HIST_SR_ML_HA', 'WATER_YIELD_HIST_BASELINE_ML_HA']]
     
     # Save to file
     water_yield_baselines.to_hdf(outpath + 'water_yield_baselines.h5', key = 'water_yield_baselines', mode = 'w', format = 'fixed', index = False, complevel = 9)
-        
     
+    
+    
+    
+    
+    ############### Get biodiversity priority layers 
+    
+    # Biodiversity priorities under the four SSPs
+    biodiv_priorities = bioph[['BIODIV_PRIORITY_SSP126', 'BIODIV_PRIORITY_SSP245', 'BIODIV_PRIORITY_SSP370', 'BIODIV_PRIORITY_SSP585', 'NATURAL_AREA_CONNECTIVITY']].copy()
+    
+    # Save to file
+    biodiv_priorities.to_hdf(outpath + 'biodiv_priorities.h5', key = 'biodiv_priorities', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    
+    
+    
+    
+    
+    ############### Get stream length 
+    
+    # Get stream lenght per cell
+    stream_length_m_cell = bioph['RIP_LENGTH_M_CELL'].copy()
+    
+    # Save to file
+    stream_length_m_cell.to_hdf(outpath + 'stream_length_m_cell.h5', key = 'stream_length_m_cell', mode = 'w', format = 'fixed', index = False, complevel = 9)
+
+
+
     
     
     ############### Forest and reforestation data
@@ -691,11 +716,8 @@ def create_new_dataset():
     # Save to HDF5
     agGHG_lvstk.to_hdf(outpath + 'agGHG_lvstk.h5', key = 'agGHG_lvstk', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
-
     # Copy over irrigated pasture emissions
-    agGHG_irrpast = concordance.merge( irrpastGHG
-                                     , on = 'SA2_ID'
-                                     , how = 'left' )
+    agGHG_irrpast = concordance.merge( irrpastGHG, on = 'SA2_ID', how = 'left' )
     
     # Save to HDF5
     agGHG_irrpast.to_hdf(outpath + 'agGHG_irrpast.h5', key = 'agGHG_irrpast', mode = 'w', format = 'fixed', index = False, complevel = 9)
@@ -704,54 +726,14 @@ def create_new_dataset():
     
     ############### Agricultural demand
     
-    # demand = pd.read_csv( raw_data + 'BAU_demands_from_MH_20230810.csv')
-
-    # # Take out 2010 as they all = 1, drop unwanted columns
-    # demand['Commodity'] = demand['SPREAD_Commodity'].str.lower()
-    # demand = demand.drop(columns = ['X', 'Production', 'SPREAD_Commodity'])
-    
-        
-    # # Create the MultiIndex structure
-    # demand = demand.pivot( index = ['Scenario', 'Diet', 'Waste', 'Feed', 'Commodity'], 
-    #                  columns = ['Year'], 
-    #                  values = 'Multiplier')
-    
-    # d2 = demand.copy()
-    # d2 = d2.drop(columns = d2.columns)
-    
-    # for tup in demand.index:
-    #     s = demand.loc[(tup)]
-    #     xs = s.index.values   
-    #     ys = s.values
-        
-    #     # # Create linear function f and interpolate
-    #     f = interp1d(xs, ys, kind = 'linear', fill_value = 'extrapolate')
-    #     yr = range(2010, 2101)
-    #     d2.loc[tup, yr] = f(yr)    
-        
-    # # Save to HDF5
-    # d2.to_hdf(outpath + 'demand_projections.h5', key = 'demand_projections', mode = 'w', format = 'fixed', index = False, complevel = 9)
-
-
-    # Demand using new data
-    
-    # Read in demand models data
-    demand = pd.read_csv(raw_data + 'Net_demand_BAU_waste_BAU_FE.csv')
+    # Read in demand model data
+    demand = pd.read_csv(raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
     
     # Convert NaNs to zeros
     demand.fillna(0, inplace = True)
     
-    # Change commodity names to lower case
-    demand['SPREAD_Commodity'] = demand['SPREAD_Commodity'].str.lower()
-    
-    # Change SPREAD_Commodity names
-    changes = {'beef': 'beef meat', 'beef - live exports': 'beef lexp', 'milk': 'dairy', 'sheep - live exports': 'sheep lexp', 'wool': 'sheep wool'}
-    for item in changes:
-        demand.loc[demand.query('SPREAD_Commodity == @item').index, 'SPREAD_Commodity'] = changes[item]
-    
-    # Take out 2010 as they all = 1, drop unwanted columns
+    # Rename columns
     demand = demand.rename(columns = {'Scenario': 'SCENARIO', 'Domestic_diet': 'DIET_DOM', 'Global_diet': 'DIET_GLOB', 'Convergence': 'CONVERGENCE', 'Imports': 'IMPORT_TREND', 'Waste': 'WASTE', 'Feed': 'FEED_EFFICIENCY', 'SPREAD_Commodity': 'COMMODITY', 'Year': 'YEAR', 'domestic': 'DOMESTIC', 'exports': 'EXPORTS', 'imports': 'IMPORTS', 'feed': 'FEED', 'All_demand': 'PRODUCTION'})
-    
     
     # Create the MultiIndex structure
     demand = demand.pivot( index = ['SCENARIO', 'DIET_DOM', 'DIET_GLOB', 'CONVERGENCE', 'IMPORT_TREND', 'WASTE', 'FEED_EFFICIENCY', 'COMMODITY'], 
