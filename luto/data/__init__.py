@@ -426,7 +426,7 @@ rem_veg = pd.read_hdf(os.path.join(INPUT_DIR, 'natural_land_t_co2_ha.h5')).to_nu
 rem_veg = np.squeeze(rem_veg) # Remove extraneous extra dimension
 
 # Discount by fire risk.
-NATURAL_LAND_T_CO2_HA = rem_veg * (ep_df['FIRE_RISK'].to_numpy(dtype = np.float32) / 100)
+NATURAL_LAND_T_CO2_HA = rem_veg * (fire_risk.to_numpy() / 100) 
 
 
 
