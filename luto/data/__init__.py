@@ -511,7 +511,10 @@ SAVANNA_BURNING = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_savanna_burning.h5')
 ###############################################################
 # Biodiversity data.
 ###############################################################
-
+"""
+Kunming-Montreal Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
+Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
+"""
 # Load biodiversity data
 biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5') )
 
@@ -524,11 +527,6 @@ conn_score = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.
 # Calculate weighted biodiversity score
 BIODIV_SCORE_WEIGHTED = BIODIV_SCORE_RAW - (BIODIV_SCORE_RAW * (1 - conn_score) * CONNECTIVITY_WEIGHTING)
 
-# Calculate total biodiversity target score 
+# Calculate total biodiversity target score as the sum of biodiv raw score over the entire study area
 TOTAL_BIODIV_TARGET_SCORE = ((LUMAP >= 0 ) * BIODIV_SCORE_RAW * BIODIV_TARGET).sum()
 
-
-"""
-Kunming-Montreal Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
-"""
