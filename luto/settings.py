@@ -159,6 +159,11 @@ NON_AGRICULTURAL_LU_BASE_CODE = 100         # Non-agricultural land uses will ap
 ENV_PLANTING_COST_PER_HA_PER_YEAR = 100     # Yearly cost of maintaining one hectare of environmental plantings
 CARBON_PRICE_PER_TONNE = 50                 # Price of carbon per tonne - determines EP revenue in the model
 
+# Riparian Planting Parameters
+RIPARIAN_PLANTINGS_BUFFER_WIDTH = 10
+RIPARIAN_PLANTINGS_FENCING_COST = 10
+RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR = 0.5
+
 
 # ---------------------------------------------------------------------------- #
 # Agricultural management parameters
@@ -217,6 +222,7 @@ LAND_USAGE_CULL_PERCENTAGE = 0.15
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)
 0: 'Environmental Plantings'
+1: 'Riparian Plantings'
 
 
 AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)
