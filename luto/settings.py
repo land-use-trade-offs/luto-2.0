@@ -197,6 +197,7 @@ WATER_REGION_DEF = 'DD'                 # 'RR' for River Region, 'DD' for Draina
 # WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions  e.g., [1, 2].
 
 
+BIODIVERSITY_LIMITS = 'on'             # 'on' or 'off'
 
 # ---------------------------------------------------------------------------- #
 # Cell Culling
