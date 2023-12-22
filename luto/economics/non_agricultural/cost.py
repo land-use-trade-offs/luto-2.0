@@ -33,9 +33,10 @@ def get_cost_rip_plantings(data) -> np.ndarray:
         Cost of environmental plantings for each cell. 1-D array Indexed by cell.
     """
     rp_maintenance_cost = settings.ENV_PLANTING_COST_PER_HA_PER_YEAR
+    rp_fencing_cost = settings.RIPARIAN_PLANTINGS_FENCING_COST
 
-    # yearly maintenance cost of rp applied to each cell and adjusted for resfactor
-    return rp_maintenance_cost * data.REAL_AREA + data.RIPARIAN_PLANTINGS_FENCING_COST
+    # yearly maintenance cost of EP applied to each cell and adjusted for resfactor
+    return rp_maintenance_cost * data.REAL_AREA + data.RP_FENCING_LENGTH * rp_fencing_cost
 
 
 def get_cost_agroforestry(data) -> np.ndarray:
