@@ -164,6 +164,11 @@ RIPARIAN_PLANTINGS_BUFFER_WIDTH = 10
 RIPARIAN_PLANTINGS_FENCING_COST = 10
 RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR = 0.5
 
+# Agroforestry Paraameters
+AGROFORESTRY_ROW_WIDTH = 20
+AGROFORESTRY_ROW_SPACING = 40
+AGROFORESTRY_FENCING_COST = 10
+AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
 
 # ---------------------------------------------------------------------------- #
 # Agricultural management parameters
@@ -223,6 +228,7 @@ LAND_USAGE_CULL_PERCENTAGE = 0.15
 """ NON-AGRICULTURAL LAND USES (indexed by k)
 0: 'Environmental Plantings'
 1: 'Riparian Plantings'
+2: 'Agroforestry'
 
 
 AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)

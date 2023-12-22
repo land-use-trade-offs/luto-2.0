@@ -52,6 +52,11 @@ from luto.settings import (
     WASTE, 
     FEED_EFFICIENCY, 
     RIPARIAN_PLANTINGS_BUFFER_WIDTH,
+    RIPARIAN_PLANTINGS_FENCING_COST,
+    AGROFORESTRY_ROW_WIDTH,
+    AGROFORESTRY_ROW_SPACING,
+    AGROFORESTRY_FENCING_COST,
+    AF_PROPORTION,
 )
 from luto.economics.agricultural.quantity import lvs_veg_types
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
