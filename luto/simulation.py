@@ -106,6 +106,8 @@ class Data():
         self.NATURAL_LAND_T_CO2_HA = bdata.NATURAL_LAND_T_CO2_HA[self.MASK]     # Float32
         self.SOIL_CARBON_AVG_T_CO2_HA = bdata.SOIL_CARBON_AVG_T_CO2_HA[self.MASK]
         self.AGGHG_IRRPAST = bdata.AGGHG_IRRPAST[self.MASK]                     # Float32
+        self.BIODIV_SCORE_RAW = bdata.BIODIV_SCORE_RAW[self.MASK]               # Float32
+        self.BIODIV_SCORE_WEIGHTED = bdata.BIODIV_SCORE_WEIGHTED[self.MASK]     # Float32
 
         # Slice this year off HDF5 bricks. TODO: This field is not in luto.data.
         # with h5py.File(bdata.fname_dr, 'r') as wy_dr_file:
@@ -174,7 +176,7 @@ def get_ag_w_mrj():
 
 def get_ag_b_mrj():
     print('Getting agricultural biodiversity requirement matrices...', end = ' ', flush = True)
-    output = ag_biodiversity.get_breq_matrices(data, target_index)
+    output = ag_biodiversity.get_breq_matrices(data)
     print('Done.')
     return output.astype(np.float32)
 
@@ -188,7 +190,7 @@ def get_non_ag_w_rk():
 
 def get_non_ag_b_rk():
     print('Getting non-agricultural biodiversity requirement matrices...', end = ' ', flush = True)
-    output = non_ag_water.get_breq_matrix(data)
+    output = non_ag_biodiversity.get_breq_matrix(data)
     print('Done.')
     return output.astype(np.float32)
 
@@ -299,7 +301,10 @@ def get_ag_man_water(ag_w_mrj):
 
 
 def get_ag_man_biodiversity(ag_b_mrj):
-    return dict()
+    print('Getting agricultural management options\' biodiversity effects...', end = ' ', flush = True)
+    output = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data, ag_b_mrj, target_index)
+    print('Done.')
+    return output
 
 
 def get_ag_man_limits():
@@ -316,6 +321,7 @@ def get_limits(target: int):
     
     if settings.WATER_USE_LIMITS == 'on': limits['water'] = ag_water.get_wuse_limits(data)
     if settings.GHG_EMISSIONS_LIMITS == 'on':  limits['ghg'] = ag_ghg.get_ghg_limits(data, target)
+    if settings.BIODIVERSITY_LIMITS == 'on':  limits['biodiversity'] = ag_biodiversity.get_biodiversity_limits(data, target)
     
     print('Done.')
     return limits

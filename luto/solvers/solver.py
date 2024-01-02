@@ -59,15 +59,6 @@ class InputData:
     ag_q_mrp: np.ndarray  # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
     ag_ghg_t_mrj: np.ndarray  # GHG emissions released during transitions between agricultural land uses.
 
-    ag_t_mrj: np.ndarray  # Agricultural transition cost matrices.
-    ag_c_mrj: np.ndarray  # Agricultural production cost matrices.
-    ag_r_mrj: np.ndarray  # Agricultural production revenue matrices.
-    ag_g_mrj: np.ndarray  # Agricultural greenhouse gas emissions matrices.
-    ag_w_mrj: np.ndarray  # Agricultural water requirements matrices.
-    ag_x_mrj: np.ndarray  # Agricultural exclude matrices.
-    ag_q_mrp: np.ndarray  # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
-    ag_ghg_t_mrj: np.ndarray  # GHG emissions released during transitions between agricultural land uses.
-
     ag_to_non_ag_t_rk: np.ndarray  # Agricultural to non-agricultural transition cost matrix.
     non_ag_to_ag_t_mrj: np.ndarray  # Non-agricultural to agricultural transition cost matrices.
     non_ag_c_rk: np.ndarray  # Non-agricultural production cost matrix.
@@ -78,14 +69,14 @@ class InputData:
     non_ag_x_rk: np.ndarray  # Non-agricultural exclude matrices.
     non_ag_q_crk: np.ndarray  # Non-agricultural yield matrix.
 
-    ag_man_c_mrj: np.ndarray  # Agricultural management options' cost effects.
-    ag_man_g_mrj: np.ndarray  # Agricultural management options' GHG emission effects.
-    ag_man_q_mrp: np.ndarray  # Agricultural management options' quantity effects.
-    ag_man_r_mrj: np.ndarray  # Agricultural management options' revenue effects.
-    ag_man_t_mrj: np.ndarray  # Agricultural management options' transition cost effects.
-    ag_man_w_mrj: np.ndarray  # Agricultural management options' water requirement effects.
-    ag_man_b_mrj: np.ndarray  # Agricultural management options' biodiversity effects.
-    ag_man_limits: np.ndarray  # Agricultural management options' adoption limits.
+    ag_man_c_mrj: dict[str, np.ndarray]  # Agricultural management options' cost effects.
+    ag_man_g_mrj: dict[str, np.ndarray]  # Agricultural management options' GHG emission effects.
+    ag_man_q_mrp: dict[str, np.ndarray]  # Agricultural management options' quantity effects.
+    ag_man_r_mrj: dict[str, np.ndarray]  # Agricultural management options' revenue effects.
+    ag_man_t_mrj: dict[str, np.ndarray]  # Agricultural management options' transition cost effects.
+    ag_man_w_mrj: dict[str, np.ndarray]  # Agricultural management options' water requirement effects.
+    ag_man_b_mrj: dict[str, np.ndarray]  # Agricultural management options' biodiversity effects.
+    ag_man_limits: dict[str, np.ndarray]  # Agricultural management options' adoption limits.
 
     lu2pr_pj: np.ndarray  # Conversion matrix: land-use to product(s).
     pr2cm_cp: np.ndarray  # Conversion matrix: product(s) to commodity.
