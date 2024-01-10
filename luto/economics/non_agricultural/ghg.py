@@ -21,9 +21,9 @@ def get_ghg_reduction_env_plantings(data, aggregate) -> np.ndarray:
     
     # Tonnes of CO2e per ha, adjusted for resfactor
     if aggregate==True:
-        return -data.EP_BLOCK_AVG_T_C02_HA * data.REAL_AREA
+        return -data.EP_BLOCK_AVG_T_CO2_HA * data.REAL_AREA
     elif aggregate==False:
-        return pd.DataFrame(-data.EP_BLOCK_AVG_T_C02_HA * data.REAL_AREA,columns=['ENV_PLANTINGS'])
+        return pd.DataFrame(-data.EP_BLOCK_AVG_T_CO2_HA * data.REAL_AREA,columns=['ENV_PLANTINGS'])
     else:
     # If the aggregate arguments is not in [True,False]. That must be someting wrong
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )

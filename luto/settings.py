@@ -40,20 +40,32 @@ DATA_DIR = 'input'
 RAW_DATA = '../raw_data'
 
 
-
 # ---------------------------------------------------------------------------- #
-# Model parameters.                                                                  #
+# Scenario parameters.                                                                  #
 # ---------------------------------------------------------------------------- #
 
 # Climate change assumptions. Options include '126', '245', '370', '585'
 SSP = '245'
 RCP = 'rcp' + SSP[1] + 'p' + SSP[2]  # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
-# Set diet parameters
-SCENARIO = SSP_NUM = 'SSP' + SSP[0] # i.e., SSP1, SSP2 etc.
-DIET = 'BAU' # or '2050-FLX'
-WASTE = 1 # 1 for full waste, 0.5 for half waste
-FEED_EFFICIENCY = 'BAU' # 'BAU' or 'High'
+# Set demand parameters which define requirements for Australian production of agricultural commodities
+SCENARIO = SSP_NUM = 'SSP' + SSP[0] # SSP1, SSP2, SSP3, SSP4, SSP5
+DIET_DOM = 'BAU'                    # 'BAU', 'FLX', 'VEG', 'VGN' - domestic diets in Australia
+DIET_GLOB = 'BAU'                   # 'BAU', 'FLX', 'VEG', 'VGN' - global diets
+CONVERGENCE = 2050                  # 2050 or 2100 - date at which dietary transformation is completed (velocity of transformation)
+IMPORT_TREND = 'Static'             # 'Static' (assumes 2010 shares of imports for each commodity) or 'Trend' (follows historical rate of change in shares of imports for each commodity)
+WASTE = 1                           # 1 for full waste, 0.5 for half waste 
+FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
+
+# Set the weighting of landscape connectivity on biodiversity value (0 (no influence) - 1 (full influence))
+CONNECTIVITY_WEIGHTING = 1
+
+# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
+BIODIV_TARGET = 0.3
+BIODIV_TARGET_ACHIEVEMENT_YEAR = 2030
+
+# Set livestock impact on biodiversity (0 = no impact, 1 = total annihilation)
+BIODIV_LIVESTOCK_IMPACT = 0.5
 
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4 
 CO2_FERT = 'on'   # or 'off'
@@ -62,7 +74,7 @@ CO2_FERT = 'on'   # or 'off'
 RISK_OF_REVERSAL = 0.05  # Risk of reversal buffer under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
 FIRE_RISK = 'med'   # Options are 'low', 'med', 'high'. Determines whether to take the 5th, 50th, or 95th percentile of modelled fire impacts.
 """ 
-    Mean cell values ...
+    Mean FIRE_RISK cell values (%)...
     FD_RISK_PERC_5TH    80.3967
     FD_RISK_MEDIAN      89.2485
     FD_RISK_PERC_95TH   93.2735
@@ -72,12 +84,18 @@ FIRE_RISK = 'med'   # Options are 'low', 'med', 'high'. Determines whether to ta
 DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
+
+
+# ---------------------------------------------------------------------------- #
+# Model parameters
+# ---------------------------------------------------------------------------- #
+
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 30           # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 5          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
-# MODE = 'snapshot'       # runs for target year only
-MODE = 'timeseries'   # runs each year from base year to target year
+MODE = 'snapshot'       # runs for target year only
+# MODE = 'timeseries'   # runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****

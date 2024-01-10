@@ -87,10 +87,9 @@ class Data():
         self.WREQ_DRY_RJ = bdata.WREQ_DRY_RJ[self.MASK]                         # Water requirements for dryland landuses
         self.WATER_LICENCE_PRICE = bdata.WATER_LICENCE_PRICE[self.MASK]         # Int16
         self.WATER_DELIVERY_PRICE = bdata.WATER_DELIVERY_PRICE[self.MASK]       # Float32
-        self.WATER_YIELD_BASE_DR = bdata.WATER_YIELD_BASE_DR[self.MASK]         # Float32
+        # self.WATER_YIELD_BASE_DR = bdata.WATER_YIELD_BASE_DR[self.MASK]         # Float32
         self.WATER_YIELD_BASE_SR = bdata.WATER_YIELD_BASE_SR[self.MASK]         # Float32
         self.WATER_YIELD_BASE = bdata.WATER_YIELD_BASE[self.MASK]               # Float32
-        # self.WATER_YIELD_BASE_DIFF = bdata.WATER_YIELD_BASE_DIFF[self.MASK]   # Float32
         self.FEED_REQ = bdata.FEED_REQ[self.MASK]                               # Float32
         self.PASTURE_KG_DM_HA = bdata.PASTURE_KG_DM_HA[self.MASK]               # Int16  
         self.SAFE_PUR_MODL = bdata.SAFE_PUR_MODL[self.MASK]                     # Float32
@@ -101,7 +100,7 @@ class Data():
         self.EP_EST_COST_HA = bdata.EP_EST_COST_HA[self.MASK]                   # Float32
         self.AG2EP_TRANSITION_COSTS_HA = bdata.AG2EP_TRANSITION_COSTS_HA        # Float32
         self.EP2AG_TRANSITION_COSTS_HA = bdata.EP2AG_TRANSITION_COSTS_HA        # Float32
-        self.EP_BLOCK_AVG_T_C02_HA = bdata.EP_BLOCK_AVG_T_C02_HA[self.MASK]     # Float32
+        self.EP_BLOCK_AVG_T_CO2_HA = bdata.EP_BLOCK_AVG_T_CO2_HA[self.MASK]     # Float32
         self.NATURAL_LAND_T_CO2_HA = bdata.NATURAL_LAND_T_CO2_HA[self.MASK]     # Float32
         self.SOIL_CARBON_AVG_T_CO2_HA = bdata.SOIL_CARBON_AVG_T_CO2_HA[self.MASK]
         self.AGGHG_IRRPAST = bdata.AGGHG_IRRPAST[self.MASK]                     # Float32
@@ -482,4 +481,5 @@ prod_2010_c = tools.get_production( bdata
                                   )
 
 # Demand deltas can be a time series (shape year x commodity) or a single array (shape = n commodites).
-d_cy = bdata.DEMAND_DELTAS_C * prod_2010_c
+# d_cy = bdata.DEMAND_DELTAS_C * prod_2010_c
+d_cy = bdata.DEMAND_C # new demand is in tonnes rather than deltas
