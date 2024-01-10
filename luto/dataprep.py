@@ -157,8 +157,8 @@ def create_new_dataset():
     # Read raw climate impact data.
     cci_raw = pd.read_hdf(raw_data + 'SA2_climate_damage_mult.h5')
     
-    # Read raw demand data
-    demand = pd.read_csv( raw_data + 'BAU_demands_from_MH_20230810.csv')
+    # Read in demand data
+    demand = pd.read_csv(raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
     
     
     
@@ -575,10 +575,6 @@ def create_new_dataset():
     # Sort land use in lexicographical order
     agec_crops.sort_index(axis = 1, inplace = True)
     
-    # Check against previous data
-    aec_orig = pd.read_hdf('N:/LUF-Modelling/LUTO2_BB/LUTO2/input/agec_crops.h5')
-    print('agec_crops matches previous data =', agec_crops.equals(aec_orig))
-    
     # Save to HDF5
     agec_crops.to_hdf(outpath + 'agec_crops.h5', key = 'agec_crops', mode = 'w', format = 'fixed', index = False, complevel = 9)
         
@@ -598,10 +594,6 @@ def create_new_dataset():
     
     # Make and set the multi-index.
     agec_lvstk.columns = pd.MultiIndex.from_tuples(cols)
-    
-    # Check against previous data
-    lvstk_orig = pd.read_hdf('N:/LUF-Modelling/LUTO2_BB/LUTO2/input/agec_lvstk.h5')
-    print('agec_lvstk matches previous data =', agec_lvstk.equals(lvstk_orig))
 
     # Save to HDF5
     agec_lvstk.to_hdf(outpath + 'agec_lvstk.h5', key = 'agec_lvstk', mode = 'w', format = 'fixed', index = False, complevel = 9)
@@ -725,9 +717,6 @@ def create_new_dataset():
     
     
     ############### Agricultural demand
-    
-    # Read in demand model data
-    demand = pd.read_csv(raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
     
     # Convert NaNs to zeros
     demand.fillna(0, inplace = True)
