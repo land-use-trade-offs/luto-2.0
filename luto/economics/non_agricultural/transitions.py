@@ -37,7 +37,7 @@ def get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
     return ag2ep_transitions_r * data.REAL_AREA
 
 
-def get_rip_plant_transitions_from_ag(data, yr_idx, lumap, lmmap) -> nd.ndarray:
+def get_rip_plant_transitions_from_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
     """
     Get transition costs from agricultural land uses to riparian plantings for each cell.
 
@@ -123,7 +123,7 @@ def get_env_plantings_to_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
     return ep_to_ag_t_mrj * data.REAL_AREA[np.newaxis, :, np.newaxis]
 
 
-def get_rip_plantings_to_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
+def get_rip_plantings_to_ag(data, lumap) -> np.ndarray:
     """
     Get transition costs from riparian plantings to agricultural land uses for each cell.
     
@@ -138,15 +138,15 @@ def get_rip_plantings_to_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
     base_rp_to_ag_t = data.EP2AG_TRANSITION_COSTS_HA
 
     # Get water license price and costs of removing irrigation where appropriate
-    w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
-    l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
-    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data)
+    # w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
+    # l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
+    # w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data)
 
     # Reshape and amortise upfront costs to annualised costs
     base_rp_to_ag_t_mrj = np.broadcast_to(base_rp_to_ag_t, (2, data.NCELLS, base_rp_to_ag_t.shape[0]))
     base_rp_to_ag_t_mrj = tools.amortise(base_rp_to_ag_t_mrj)
 
-    ep_to_ag_t_mrj = base_rp_to_ag_t_mrj + w_delta_mrj
+    rp_to_ag_t_mrj = base_rp_to_ag_t_mrj  # + w_delta_mrj
 
     # Apply costs only to non-agricultural cells.
     ag_cells, _ = tools.get_ag_and_non_ag_cells(lumap)
@@ -164,7 +164,7 @@ def get_to_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
     3-D array, indexed by (m, r, j).
     """
     env_plant_transitions_to_ag_mrj = get_env_plantings_to_ag(data, yr_idx, lumap, lmmap)
-    rip_plant_transitions_to_ag_mrj = get_rip_plantings_to_ag(data, yr_idx, lumap, lmmap)
+    rip_plant_transitions_to_ag_mrj = get_rip_plantings_to_ag(data, lumap)
 
     # Reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     ag_to_non_agr_t_matrices = [
