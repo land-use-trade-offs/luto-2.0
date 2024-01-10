@@ -338,6 +338,9 @@ def write_ag_revenue_cost(sim, yr_cal, path):
     # Convert calendar year to year index.
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
 
+    # Get the ag_dvar_mrj in the yr_cal
+    ag_dvar_mrj = sim.ag_dvars[yr_cal]
+
     # Get agricultural revenue/cost for year in mrjs format. Note the s stands for sources:
     # E.g., Sources for crops only contains ['Revenue'], 
     #    but sources for livestock includes ['Meat', 'Wool', 'Live Exports', 'Milk']
@@ -350,10 +353,6 @@ def write_ag_revenue_cost(sim, yr_cal, path):
 
     ag_cost_df_rjms = ag_cost_df_rjms.reindex(columns=pd.MultiIndex.from_product(ag_cost_df_rjms.columns.levels), fill_value=0)
     ag_cost_rjms = ag_cost_df_rjms.values.reshape(-1, *ag_cost_df_rjms.columns.levshape)
-    
-
-    # Get the ag_dvar_mrj in the yr_cal
-    ag_dvar_mrj = sim.ag_dvars[yr_cal]
 
 
     # Multiply the ag_dvar_mrj with the ag_rev_mrj to get the ag_rev_jm
