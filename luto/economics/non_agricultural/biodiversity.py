@@ -3,7 +3,7 @@ import numpy as np
 
 def get_breq_matrix(data) -> np.ndarray:
     """
-    Get the water requirements matrix for all non-agricultural land uses.
+    Get the biodiversity requirements matrix for all non-agricultural land uses.
 
     Returns
     -------
