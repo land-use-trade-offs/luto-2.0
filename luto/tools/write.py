@@ -46,7 +46,7 @@ def get_path(sim):
 
     # Get date and time
     path = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
-
+    
     # Get the years to write
     yr_all = sorted(list(sim.lumaps.keys()))
 
@@ -62,6 +62,10 @@ def get_path(sim):
 
     # Create path name
     path = 'output/' + path + post
+    
+    # Write the path to output folder so that the report module knows where to look for the outputs
+    with open('output/working_dir.txt', 'w') as f:
+        f.write(path)
 
     # Get all paths 
     paths = [path]\

@@ -1,0 +1,14 @@
+#Map_all {
+    display: flex;
+    flex-direction: row;
+}
+
+.select_col{
+    flex:1;
+}
+
+#map {  flex:3;
+        width: 30%;
+        height: 500px; }
+
+
