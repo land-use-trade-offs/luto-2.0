@@ -91,7 +91,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 5          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 10          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
 MODE = 'snapshot'       # runs for target year only
