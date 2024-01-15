@@ -30,7 +30,7 @@ def get_quantity_rip_plantings(data) -> np.ndarray:
     np.ndarray
         Indexed by (c, r): represents the quantity commodity c produced by cell r
         if used for riparian plantings.
-        A matrix of zeros because riparian plantings doesn't produce anything.
+        A matrix of zeros because Riparian Plantings doesn't produce anything.
     """
 
     return np.zeros((data.NCMS, data.NCELLS))

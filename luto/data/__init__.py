@@ -52,6 +52,7 @@ from luto.settings import (
     WASTE, 
     FEED_EFFICIENCY, 
     RIPARIAN_PLANTINGS_BUFFER_WIDTH,
+    RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR,
 )
 from luto.economics.agricultural.quantity import lvs_veg_types
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
@@ -330,8 +331,8 @@ AMMAP_DICT = {am: np.zeros(NCELLS).astype('int8') for am in AG_MANAGEMENTS_TO_LA
 
 STREAM_LENGTH = pd.read_hdf(os.path.join(INPUT_DIR, 'stream_length_m_cell.h5')).to_numpy()
 
-RP_PROPORTION = (2 * RIPARIAN_PLANTINGS_BUFFER_WIDTH * STREAM_LENGTH) / REAL_AREA
-RP_FENCING_LENGTH = 2 * data.STREAM_LENGTH * settings.RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR
+RP_PROPORTION = np.divide(((2 * RIPARIAN_PLANTINGS_BUFFER_WIDTH) * STREAM_LENGTH), REAL_AREA)
+RP_FENCING_LENGTH = (2 * RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR) * STREAM_LENGTH
 
 
 

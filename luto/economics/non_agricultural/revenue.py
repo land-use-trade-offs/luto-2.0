@@ -33,8 +33,7 @@ def get_rev_rip_plantings(data) -> np.ndarray:
     np.ndarray
         The cost of riparian plantings for each cell. A 1-D array indexed by cell.
     """
-    # Multiply carbon reduction by carbon price for each cell and adjust for resfactor.
-    return data.EP_BLOCK_AVG_T_CO2_HA * data.REAL_AREA * settings.CARBON_PRICE_PER_TONNE
+    return get_rev_env_plantings(data)
 
 
 def get_rev_matrix(data) -> np.ndarray:
