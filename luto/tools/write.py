@@ -37,6 +37,7 @@ import luto.economics.agricultural.ghg as ag_ghg
 import luto.economics.non_agricultural.ghg as non_ag_ghg
 import luto.economics.agricultural.revenue as ag_revenue
 import luto.economics.agricultural.cost as ag_cost
+import luto.economics.agricultural.biodiversity as ag_biodiversity
 
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
@@ -112,6 +113,9 @@ def write_outputs(sim, path):
 
 def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
+    if not os.path.isdir(path_yr):
+        os.mkdir(path_yr)
+
     # Write the decision variables, land-use and land management maps
     # write_files(sim, yr_cal, path_yr)
     # write_files_separate(sim, yr_cal, path_yr)
@@ -124,7 +128,8 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_ag_revenue_cost(sim, yr_cal, path_yr)
     write_water(sim, yr_cal, path_yr)
     write_ghg(sim, yr_cal, path_yr)
-    write_ghg_separate(sim, yr_cal, path_yr)
+    # write_ghg_separate(sim, yr_cal, path_yr)
+    write_biodiversity(sim, yr_cal, path_yr)
 
 
 def write_settings(path):
@@ -579,13 +584,44 @@ def write_ghg(sim, yr_cal, path):
     else:
         ghg_emissions = (ag_ghg.get_ghg_matrices(sim.data, yr_idx, aggregate=True) * sim.ag_dvars[sim.data.YR_CAL_BASE]).sum()
         
-
     # Add to dataframe
     df.loc[0] = ("{:,.0f}".format(ghg_limits), "{:,.0f}".format(ghg_emissions))
     
     # Save to file
     df.to_csv(os.path.join(path, f'GHG_emissions_{timestamp}.csv'), index = False)
 
+
+def write_biodiversity(sim, yr_cal, path):
+    """
+    Write biodiversity info for a given year ('yr_cal'), simulation ('sim')
+    and output path ('path').
+    """
+    # Get the timestamp so each CSV in the timeseries mode has a unique name
+    timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
+
+    print('\nWriting biodiversity outputs to', path)
+
+    yr_idx = yr_cal - sim.data.YR_CAL_BASE
+
+    df = pd.DataFrame( columns=[ 'Biodiversity score limit'
+                               , f'Solve biodiversity score ({yr_cal})' ] )
+    
+    # Get limits used as constraints in model
+    biodiv_limit = ag_biodiversity.get_biodiversity_limits(sim.data, yr_cal)
+
+    # Get GHG emissions from model
+    if yr_cal >= sim.data.YR_CAL_BASE + 1:
+        biodiv_score = sim.prod_data[yr_cal]['Biodiversity']
+    else:
+        # Limits are based on the 2010 biodiversity scores, with the base year
+        # biodiversity score equal to the 
+        biodiv_score = ag_biodiversity.get_base_year_biodiversity_score(sim.data)
+
+    # Add to dataframe
+    df.loc[0] = ("{:,.0f}".format(biodiv_limit), "{:,.0f}".format(biodiv_score))
+    
+    # Save to file
+    df.to_csv(os.path.join(path, f'biodiversity_{timestamp}.csv'), index = False)
 
   
 def write_ghg_separate(sim, yr_cal, path):
@@ -604,8 +640,8 @@ def write_ghg_separate(sim, yr_cal, path):
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
     
     # Get the landuse descriptions for each validate cell (i.e., 0 -> Apples)
-    lu_desc = [{**sim.data.AGLU2DESC,**sim.data.NON_AG2DESC}[x] 
-                for x in sim.lumaps[yr_cal]]
+    lu_desc_map = {**sim.data.AGLU2DESC,**sim.data.NONAGLU2DESC}
+    lu_desc = [lu_desc_map[x] for x in sim.lumaps[yr_cal]]
 
     # -------------------------------------------------------#
     # Get greenhouse gas emissions from agricultural landuse #

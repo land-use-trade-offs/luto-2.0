@@ -302,7 +302,7 @@ def get_ag_man_water(ag_w_mrj):
 
 def get_ag_man_biodiversity(ag_b_mrj):
     print('Getting agricultural management options\' biodiversity effects...', end = ' ', flush = True)
-    output = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data, ag_b_mrj, target_index)
+    output = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data, ag_b_mrj)
     print('Done.')
     return output
 
@@ -347,6 +347,7 @@ def get_input_data(target: int):
         ag_r_mrj=ag_r_mrj,
         ag_g_mrj=ag_g_mrj,
         ag_w_mrj=ag_w_mrj,
+        ag_b_mrj=ag_b_mrj,
         ag_x_mrj=ag_x_mrj,
         ag_q_mrp=ag_q_mrp,
         ag_ghg_t_mrj=get_ag_ghg_t_mrj(),
@@ -365,7 +366,7 @@ def get_input_data(target: int):
         ag_man_r_mrj=get_ag_man_revenue(ag_r_mrj),
         ag_man_t_mrj=get_ag_man_transitions(ag_t_mrj),
         ag_man_w_mrj=get_ag_man_water(ag_w_mrj),
-        ag_b_mrj=get_ag_man_biodiversity(ag_b_mrj),
+        ag_man_b_mrj=get_ag_man_biodiversity(ag_b_mrj),
         ag_man_limits=get_ag_man_limits(),
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,

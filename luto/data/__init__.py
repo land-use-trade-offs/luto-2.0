@@ -86,6 +86,7 @@ DESC2NONAGLU = {value: key for key, value in NONAGLU2DESC.items()}
 
 # Get number of land-uses
 N_AG_LUS = len(AGRICULTURAL_LANDUSES)
+N_NON_AG_LUS = len(NON_AGRICULTURAL_LANDUSES)
 
 # Construct land-use index dictionary (distinct from LU_IDs!)
 AGLU2DESC = {i: lu for i, lu in enumerate(AGRICULTURAL_LANDUSES)}

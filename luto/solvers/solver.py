@@ -170,7 +170,9 @@ class LutoSolver:
         self.adoption_limit_constraints = []
         self.demand_penalty_constraints = []
         self.water_limit_constraints_r = defaultdict(list)
+        self.ghg_emissions_expr = None
         self.ghg_emissions_limit_constraint = None
+        self.biodiversity_expr = None
         self.biodiversity_limit_constraint = None
 
     def formulate(self):
@@ -734,7 +736,7 @@ class LutoSolver:
 
         print("    ...setting GHG emissions reduction target: {:,.0f} tCO2e\n".format(biodiversity_limits))
         self.biodiversity_limit_constraint = self.gurobi_model.addConstr(
-            self.biodiversity_expr <= biodiversity_limits
+            self.biodiversity_expr >= biodiversity_limits
         )
 
     def _setup_constraints(self):
@@ -1081,6 +1083,9 @@ class LutoSolver:
 
         print("Processing GHG emissions amount...")
         prod_data["GHG Emissions"] = self.ghg_emissions_expr.getValue()
+
+        print("Processing solution biodiversity score...")
+        prod_data["Biodiversity"] = self.biodiversity_expr.getValue()
 
         ag_X_mrj_processed[:, non_ag_bools_r, :] = False
         non_ag_X_rk_processed[~non_ag_bools_r, :] = False
