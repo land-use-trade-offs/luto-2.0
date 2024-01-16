@@ -121,8 +121,8 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     # write_files_separate(sim, yr_cal, path_yr)
 
     # Write the crosstab and switches, and the quantity comparison
-    write_crosstab(sim, yr_cal, path_yr, yr_cal_sim_pre=yr_cal_sim_pre)
-    write_quantity(sim, yr_cal, path_yr, yr_cal_sim_pre=yr_cal_sim_pre)
+    write_crosstab(sim, yr_cal, path_yr, yr_cal_sim_pre)
+    write_quantity(sim, yr_cal, path_yr, yr_cal_sim_pre)
 
     # Write the water and GHG outputs
     write_ag_revenue_cost(sim, yr_cal, path_yr)
@@ -282,7 +282,7 @@ def write_quantity(sim, yr_cal, path, yr_cal_sim_pre=None):
     timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
 
     # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
-    simulated_year_list = list(sim.lumaps.keys())
+    simulated_year_list = sorted(list(sim.lumaps.keys()))
     
     # Get index of yr_cal in timeseries (e.g., if yr_cal is 2050 then yr_idx = 40)
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
@@ -394,7 +394,7 @@ def write_crosstab(sim, yr_cal, path, yr_cal_sim_pre=None):
     timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
     
     # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
-    simulated_year_list = list(sim.lumaps.keys())
+    simulated_year_list = sorted(list(sim.lumaps.keys()))
     
     # Get index of yr_cal in timeseries (e.g., if yr_cal is 2050 then yr_idx = 40)
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
@@ -480,10 +480,10 @@ def write_water(sim, yr_cal, path):
     timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
 
     print('\nWriting water outputs to', path)
-    
+
     # Convert calendar year to year index.
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
-    
+
     # Get water use for year in mrj format
     ag_w_mrj = ag_water.get_wreq_matrices(sim.data, yr_idx)
     non_ag_w_rk = non_ag_water.get_wreq_matrix(sim.data)
@@ -491,11 +491,11 @@ def write_water(sim, yr_cal, path):
 
     # Prepare a data frame.
     df = pd.DataFrame( columns=[ 'REGION_ID'
-                               , 'REGION_NAME'
-                               , 'WATER_USE_LIMIT_ML'
-                               , 'TOT_WATER_REQ_ML'
-                               , 'ABS_DIFF_ML'
-                               , 'PROPORTION_%'  ] )
+                                , 'REGION_NAME'
+                                , 'WATER_USE_LIMIT_ML'
+                                , 'TOT_WATER_REQ_ML'
+                                , 'ABS_DIFF_ML'
+                                , 'PROPORTION_%'  ] )
 
     # Get 2010 water use limits used as constraints in model
     wuse_limits = ag_water.get_wuse_limits(sim.data)
@@ -522,19 +522,70 @@ def write_water(sim, yr_cal, path):
         ind = np.flatnonzero(region_id == region).astype(np.int32)
         
         # Calculate water requirements by agriculture for year and region.
-        wreq_reg = (
-              ( ag_w_mrj[:, ind, :] * sim.ag_dvars[yr_cal][:, ind, :] ).sum()   # Agricultural contribution
-            + ( non_ag_w_rk[ind, :] * sim.non_ag_dvars[yr_cal][ind, :] ).sum()  # Non-agricultural contribution
-        )
-
-        for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():                  # Agricultural managements contribution
-            am_j = np.array([sim.data.DESC2AGLU[lu] for lu in am_lus])
-            wreq_reg += ( ag_man_w_mrj[am][:, ind, :]
-                        * sim.ag_man_dvars[yr_cal][am][:, ind[:,np.newaxis], am_j] ).sum()
+        
+        index_levels = ['Landuse Type', 'Landuse', 'Irrigation',  'Water Use (ML)']
+        
+        # Agricultural water use
+        ag_mrj = ag_w_mrj[:, ind, :] * sim.ag_dvars[yr_cal][:, ind, :]   
+        ag_jm = np.einsum('mrj->jm', ag_mrj)                             
+        
+        ag_df = pd.DataFrame(ag_jm.reshape(-1).tolist(),
+                            index=pd.MultiIndex.from_product([['Agricultural Landuse'],
+                                                            sim.data.AGRICULTURAL_LANDUSES,
+                                                            sim.data.LANDMANS
+                                                            ])).reset_index()
+        
+        ag_df.columns = index_levels
 
         
-        # Calculate water use limits
+        # Non-agricultural water use
+        non_ag_rk = non_ag_w_rk[ind, :] * sim.non_ag_dvars[yr_cal][ind, :]  # Non-agricultural contribution
+        non_ag_k = np.einsum('rk->k', non_ag_rk)                            # Sum over cells
+        
+        non_ag_df = pd.DataFrame(non_ag_k, 
+                                index= pd.MultiIndex.from_product([['Non-agricultural Landuse'],
+                                                                    sim.data.NON_AGRICULTURAL_LANDUSES ,
+                                                                    ['dry']  # non-agricultural land is always dry
+                                                                    ])).reset_index()
+        
+        non_ag_df.columns = index_levels
+
+        
+        
+        # Agricultural management water use
+        AM_dfs = []
+        for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
+
+            am_j = np.array([sim.data.DESC2AGLU[lu] for lu in am_lus])
+            
+            # Water requirements for each agricultural management in array format
+            am_mrj = ag_man_w_mrj[am][:, ind, :]\
+                            * sim.ag_man_dvars[yr_cal][am][:, ind[:,np.newaxis], am_j] 
+                            
+            am_jm = np.einsum('mrj->jm', am_mrj)
+            
+            # Water requirements for each agricultural management in long dataframe format
+            df_am = pd.DataFrame(am_jm.reshape(-1).tolist(),
+                                index=pd.MultiIndex.from_product([['Agricultural Management'],
+                                                                am_lus,
+                                                                sim.data.LANDMANS
+                                                                ])).reset_index()
+            df_am.columns = index_levels
+            
+            # Add to list of dataframes
+            AM_dfs.append(df_am)
+            
+        # Combine all AM dataframes
+        AM_df = pd.concat(AM_dfs)
+        
+        # Combine all dataframes
+        df_region = pd.concat([ag_df, non_ag_df, AM_df])
+        df_region.insert(0, 'Year', yr_cal)
+        
+        
+        # Calculate water use limits and actual water use
         wul = wuse_limits[i][1]
+        wreq_reg = df_region['Water Use (ML)'].sum()
         
         # Calculate absolute and proportional difference between water use target and actual water use
         abs_diff = wreq_reg - wul
@@ -555,6 +606,11 @@ def write_water(sim, yr_cal, path):
     df.to_csv( os.path.join(path, f'water_demand_vs_use_{timestamp}.csv')
              , index = False
              , float_format = '{:0,.2f}'.format)
+    
+    df_region.to_csv( os.path.join(path, f'water_demand_vs_use_separate_{timestamp}.csv')
+             , index = False
+             , float_format = '{:0,.2f}'.format)
+    
     
     
 
