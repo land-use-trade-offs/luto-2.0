@@ -78,12 +78,15 @@ YR_CAL_BASE = 2010
 AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'ag_landuses.csv')), header = None)[0].to_list()
 NON_AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'non_ag_landuses.csv')), header = None)[0].to_list()
 
-NON_AG2DESC = dict(zip(range(NON_AGRICULTURAL_LU_BASE_CODE, 
+NONAGLU2DESC = dict(zip(range(NON_AGRICULTURAL_LU_BASE_CODE, 
                              NON_AGRICULTURAL_LU_BASE_CODE + len(NON_AGRICULTURAL_LANDUSES)),
                        NON_AGRICULTURAL_LANDUSES))
 
+DESC2NONAGLU = {value: key for key, value in NONAGLU2DESC.items()}
+
 # Get number of land-uses
 N_AG_LUS = len(AGRICULTURAL_LANDUSES)
+N_NON_AG_LUS = len(NON_AGRICULTURAL_LANDUSES)
 
 # Construct land-use index dictionary (distinct from LU_IDs!)
 AGLU2DESC = {i: lu for i, lu in enumerate(AGRICULTURAL_LANDUSES)}
@@ -111,6 +114,11 @@ LU_UNNATURAL = [DESC2AGLU[lu] for lu in AGRICULTURAL_LANDUSES if DESC2AGLU[lu] n
 LU_CROPS_INDICES = [AGRICULTURAL_LANDUSES.index(lu) for lu in AGRICULTURAL_LANDUSES if lu in LU_CROPS]
 LU_LVSTK_INDICES = [AGRICULTURAL_LANDUSES.index(lu) for lu in AGRICULTURAL_LANDUSES if lu in LU_LVSTK]
 LU_UNALL_INDICES = [AGRICULTURAL_LANDUSES.index(lu) for lu in AGRICULTURAL_LANDUSES if lu in LU_UNALL]
+
+NON_AG_LU_NATURAL = [ 
+    DESC2NONAGLU["Environmental Plantings"],
+    DESC2NONAGLU["Riparian Plantings"],
+]
 
 # Derive land management types from AGEC.
 LANDMANS = {t[1] for t in AGEC_CROPS.columns} # Set comp., unique entries.

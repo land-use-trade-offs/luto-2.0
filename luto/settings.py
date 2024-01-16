@@ -91,7 +91,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 5          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 10          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
 MODE = 'snapshot'       # runs for target year only
@@ -198,6 +198,8 @@ WATER_REGION_DEF = 'DD'                 # 'RR' for River Region, 'DD' for Draina
 # WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions  e.g., [1, 2].
 
 
+BIODIVERSITY_LIMITS = 'on'             # 'on' or 'off'
+BIODIV_TARGET_ACHIEVEMENT_YEAR = 2050
 
 # ---------------------------------------------------------------------------- #
 # Cell Culling
