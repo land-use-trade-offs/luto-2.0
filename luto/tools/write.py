@@ -57,7 +57,7 @@ def get_path(sim):
            '_P1e' + str(int(math.log10(settings.PENALTY))) + \
            '_'    + str(yr_all[0]) + '-' + str(yr_all[-1]) + \
            '_'    + settings.MODE + \
-           '_'    + str( int( sim.data.GHG_TARGETS[list(sim.lumaps.keys())[-1]] / 1e6)) + 'Mt'
+           '_'    + str( int( sim.data.GHG_TARGETS[yr_all[-1]] / 1e6)) + 'Mt'
 
 
     # Create path name
@@ -516,6 +516,7 @@ def write_water(sim, yr_cal, path):
     else: print('Incorrect option for WATER_REGION_DEF in settings')
     
     # Loop through specified water regions
+    df_water_seperate_dfs = []
     for i, region in enumerate(region_limits.keys()):
         
         # Get indices of cells in region
@@ -580,7 +581,11 @@ def write_water(sim, yr_cal, path):
         
         # Combine all dataframes
         df_region = pd.concat([ag_df, non_ag_df, AM_df])
-        df_region.insert(0, 'Year', yr_cal)
+        df_region.insert(0, 'region', region_dict[region])
+        df_region.insert(0, 'year', yr_cal)
+        
+        # Add to list of dataframes
+        df_water_seperate_dfs.append(df_region)
         
         
         # Calculate water use limits and actual water use
@@ -607,9 +612,10 @@ def write_water(sim, yr_cal, path):
              , index = False
              , float_format = '{:0,.2f}'.format)
     
-    df_region.to_csv( os.path.join(path, f'water_demand_vs_use_separate_{timestamp}.csv')
-             , index = False
-             , float_format = '{:0,.2f}'.format)
+    # Write the separate water use to CSV
+    df_water_seperate = pd.concat(df_water_seperate_dfs)
+    df_water_seperate.to_csv( os.path.join(path, f'water_demand_vs_use_separate_{timestamp}.csv')
+                            , index = False)
     
     
     

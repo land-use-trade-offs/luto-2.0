@@ -240,13 +240,35 @@ Ag_man_sequestration_dry_irr_wide.to_csv(f'{SAVE_DIR}/GHG_12_GHG_ag_man_dry_irr_
 ####################################################
 #                     4) Water                     #
 ####################################################
-water_paths = files.query('catetory == "water" and year_types == "single_year"').reset_index(drop=True)
-water_df = get_water_df(water_paths)
+water_paths_total = files.query('catetory == "water" and year_types == "single_year" and ~base_name.str.contains("separate")').reset_index(drop=True)
+water_paths_separate = files.query('catetory == "water" and year_types == "single_year" and base_name.str.contains("separate")').reset_index(drop=True)
+
+water_df_total = get_water_df(water_paths_total)
+water_df_separate = pd.concat([pd.read_csv(path) for path in water_paths_separate['path']], ignore_index=True)
+water_df_separate['Water Use (ML)'] = water_df_separate['Water Use (ML)'].astype(float)
 
 # Plot_4-1: Water use compared to limite (%)
-water_df_pct_wide = water_df.pivot(index='year', columns='REGION_NAME', values='PROPORTION_%')
-water_df_pct_wide.to_csv(f'{SAVE_DIR}/water_1_percent_to_limit.csv')
+water_df_total_pct_wide = water_df_total.pivot(index='year', columns='REGION_NAME', values='PROPORTION_%')
+water_df_total_pct_wide.to_csv(f'{SAVE_DIR}/water_1_percent_to_limit.csv')
 
 # Plot_4-2: Water use compared to limite (ML)
-water_df_vol_wide = water_df.pivot(index='year', columns='REGION_NAME', values='TOT_WATER_REQ_ML')
-water_df_vol_wide.to_csv(f'{SAVE_DIR}/water_2_volum_to_limit.csv')
+water_df_total_vol_wide = water_df_total.pivot(index='year', columns='REGION_NAME', values='TOT_WATER_REQ_ML')
+water_df_total_vol_wide.to_csv(f'{SAVE_DIR}/water_2_volum_to_limit.csv')
+
+# Plot_4-3: Water use by sector (ML)
+water_df_separate_lu_type = water_df_separate.groupby(['year','Landuse Type']).sum()[['Water Use (ML)']].reset_index()
+water_df_separate_lu_type_wide = water_df_separate_lu_type.pivot(index='year', columns='Landuse Type', values='Water Use (ML)').reset_index()
+water_df_separate_lu_type_wide.to_csv(f'{SAVE_DIR}/water_3_volum_by_sector.csv',index=False)
+
+# Plot_4-4: Water use by landuse (ML)
+water_df_seperate_lu = water_df_separate.groupby(['year','Landuse']).sum()[['Water Use (ML)']].reset_index()
+water_df_seperate_lu_wide = water_df_seperate_lu.pivot(index='year', columns='Landuse', values='Water Use (ML)').reset_index()
+water_df_seperate_lu_wide.to_csv(f'{SAVE_DIR}/water_4_volum_by_landuse.csv',index=False)
+
+# Plot_4-5: Water use by irrigation (ML)
+water_df_seperate_irr = water_df_separate.groupby(['year','Irrigation']).sum()[['Water Use (ML)']].reset_index()
+water_df_seperate_irr_wide = water_df_seperate_irr.pivot(index='year', columns='Irrigation', values='Water Use (ML)').reset_index()
+water_df_seperate_irr_wide.to_csv(f'{SAVE_DIR}/water_5_volum_by_irrigation.csv',index=False)
+
+
+
