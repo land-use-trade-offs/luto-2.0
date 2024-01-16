@@ -1,0 +1,113 @@
+body {
+    font-family: "Arial", sans-serif;
+  }
+
+
+/* The side navigation menu */
+.sidebar {
+    margin: 0;
+    padding: 0;
+    width: 250px;
+    background-color: #f1f1f1;
+    position: fixed;
+    height: 100%;
+    overflow: auto;
+  }
+  
+/* Sidebar links */
+.sidebar a {
+    display: block;
+    color: black;
+    padding: 16px;
+    text-decoration: none;
+  }
+
+/* Active/current link */
+.sidebar a.active {
+    background-color: #04AA6D;
+    color: white;
+  }
+
+/* Links on mouse-over */
+.sidebar a:hover:not(.active) {
+    background-color: #555;
+    color: white;
+  }
+  
+
+
+
+
+/* Page content. The value of the margin-left property should match the value of the sidebar's width property */
+.content {
+    margin-left: 250px;
+  }
+
+
+.content h1 {
+    text-align: center;
+    font-weight: bold;
+    font-size: 2.5rem;
+    margin-bottom: 20px;
+}
+
+
+.Introduction {
+  float: left;
+  margin-left: 70px;
+  max-width: 250px;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: left;
+
+  max-width: 480px;
+  height: 700px;
+  padding: 10px;
+
+  border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 20px;
+  background-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 10px 1px rgba(0, 0, 0, 0.25);
+
+  backdrop-filter: blur(15px);
+}
+
+.content p{
+    font-size: 30px;
+    margin-left: 10px;
+}
+
+.content li{
+    margin-bottom:10px;
+    margin-left: 5px;
+}
+
+.content h4{
+    float: left;
+    margin-left: 20px;
+    font-size: 0.65em;
+    color: #446;
+}
+
+
+
+
+
+/* Forms selector */
+select {
+    width: 200px;
+    height: 30px;
+    font-size: 15px;
+    font-family: Arial, sans-serif;
+    margin-left: 10px;
+    margin-bottom: 10px;
+    display: inline-block;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.sidebar p {
+    margin-left: 10px;
+}
