@@ -204,6 +204,8 @@ WATER_REGION_DEF = 'DD'                 # 'RR' for River Region, 'DD' for Draina
 # WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions  e.g., [1, 2].
 
 
+BIODIVERSITY_LIMITS = 'on'             # 'on' or 'off'
+BIODIV_TARGET_ACHIEVEMENT_YEAR = 2050
 
 # ---------------------------------------------------------------------------- #
 # Cell Culling

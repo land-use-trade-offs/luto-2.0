@@ -342,7 +342,7 @@ def get_precision_agriculture_effect_g_mrj(data, yr_idx):
 
                 if co2e_type == "CO2E_KG_HA_SOIL":
                     co2e_type += "_N_SURP"  # TODO: determine why names differ between files
-                
+
                 if reduction_perc != 0:
                     reduction_amnt = (
                         np.nan_to_num(data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy(), 0) # type: ignore
