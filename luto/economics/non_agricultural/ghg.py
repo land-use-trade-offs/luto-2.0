@@ -45,7 +45,15 @@ def get_ghg_reduction_rip_plantings(data, aggregate) -> np.ndarray:
         Since riparian plantings reduces carbon in the air, each value will be <= 0.
         1-D array Indexed by cell.
     """
-    return get_ghg_reduction_env_plantings(data, aggregate)
+
+    # Tonnes of CO2e per ha, adjusted for resfactor
+    if aggregate==True:
+        return -data.EP_RIP_AVG_T_CO2_HA * data.REAL_AREA
+    elif aggregate==False:
+        return pd.DataFrame(-data.EP_RIP_AVG_T_CO2_HA * data.REAL_AREA,columns=['RIP_PLANTINGS'])
+    else:
+    # If the aggregate arguments is not in [True,False]. That must be someting wrong
+        raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
 
 def get_ghg_matrix(data, aggregate=True) -> np.ndarray:
@@ -53,8 +61,8 @@ def get_ghg_matrix(data, aggregate=True) -> np.ndarray:
     Get the g_rk matrix containing non-agricultural greenhouse gas emissions.
     """
 
-    env_plantings_ghg_matrix = get_ghg_reduction_env_plantings(data,aggregate)
-    rip_plantings_ghg_matrix = get_ghg_reduction_rip_plantings(data,aggregate)
+    env_plantings_ghg_matrix = get_ghg_reduction_env_plantings(data, aggregate)
+    rip_plantings_ghg_matrix = get_ghg_reduction_rip_plantings(data, aggregate)
 
       
     if aggregate==True:

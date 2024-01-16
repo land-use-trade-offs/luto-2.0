@@ -1,4 +1,5 @@
 import numpy as np
+from luto import settings
 import luto.tools as tools
 import luto.economics.agricultural.water as ag_water
 
@@ -48,7 +49,9 @@ def get_rip_plant_transitions_from_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
     np.ndarray
         1-D array, indexed by cell.
     """
-    return get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap)
+    base_costs = get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap)
+    fencing_cost = data.RP_FENCING_LENGTH * data.REAL_AREA * settings.RIPARIAN_PLANTINGS_FENCING_COST_PER_HA
+    return base_costs + fencing_cost
 
 
 def get_from_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
@@ -134,6 +137,15 @@ def get_to_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
 
     # Element-wise sum each mrj-indexed matrix to get the final transition matrix
     return np.add.reduce(ag_to_non_agr_t_matrices)
+
+
+def get_non_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
+    """
+    Get the matrix that contains transition costs for non-agricultural land uses.
+    That is, the cost of transitioning between non-agricultural land uses.
+    """
+    return
+    # t_rk = np.zeros((data.NCELLS, data.))
 
 
 def get_exclusions_environmental_plantings(data, lumap) -> np.ndarray:

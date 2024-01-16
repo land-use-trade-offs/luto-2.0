@@ -69,6 +69,7 @@ class InputData:
 
     ag_to_non_ag_t_rk: np.ndarray  # Agricultural to non-agricultural transition cost matrix.
     non_ag_to_ag_t_mrj: np.ndarray  # Non-agricultural to agricultural transition cost matrices.
+    non_ag_t_rk: np.ndarray  # Non-agricultural transition costs matrix
     non_ag_c_rk: np.ndarray  # Non-agricultural production cost matrix.
     non_ag_r_rk: np.ndarray  # Non-agricultural revenue matrix.
     non_ag_g_rk: np.ndarray  # Non-agricultural greenhouse gas emissions matrix.
@@ -298,6 +299,7 @@ class LutoSolver:
                     self._input_data.non_ag_r_rk
                     - (
                         self._input_data.non_ag_c_rk
+                        + self._input_data.non_ag_t_rk
                         + self._input_data.ag_to_non_ag_t_rk
                     )
                 ) / settings.PENALTY
@@ -324,7 +326,9 @@ class LutoSolver:
             ) / settings.PENALTY
 
             non_ag_obj_rk = (
-                self._input_data.non_ag_c_rk + self._input_data.ag_to_non_ag_t_rk
+                self._input_data.non_ag_c_rk
+                + self._input_data.non_ag_t_rk
+                + self._input_data.ag_to_non_ag_t_rk
             ) / settings.PENALTY
 
             # Store calculations for each agricultural management option in a dict

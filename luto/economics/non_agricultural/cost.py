@@ -32,12 +32,7 @@ def get_cost_rip_plantings(data) -> np.ndarray:
     np.ndarray
         Cost of environmental plantings for each cell. 1-D array Indexed by cell.
     """
-    cost_unadjusted = (
-        settings.ENV_PLANTING_COST_PER_HA_PER_YEAR                           # Maintenance cost - same as environmental plantings
-        + data.RP_FENCING_LENGTH * settings.RIPARIAN_PLANTINGS_FENCING_COST  # Added fencing cost
-    )
-    # Adjust for resfactor
-    return cost_unadjusted * data.REAL_AREA
+    return settings.RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR * data.REAL_AREA
 
 
 def get_cost_matrix(data):

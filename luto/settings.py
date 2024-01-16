@@ -161,8 +161,9 @@ ENV_PLANTING_COST_PER_HA_PER_YEAR = 100     # Yearly cost of maintaining one hec
 CARBON_PRICE_PER_TONNE = 50                 # Price of carbon per tonne - determines EP revenue in the model
 
 # Riparian Planting Parameters
+RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR = 100
 RIPARIAN_PLANTINGS_BUFFER_WIDTH = 10
-RIPARIAN_PLANTINGS_FENCING_COST = 10
+RIPARIAN_PLANTINGS_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 
 RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR = 0.5
 
 
