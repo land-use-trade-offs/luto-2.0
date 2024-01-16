@@ -16,9 +16,9 @@ from tools.helper_func import get_GHG_category, get_GHG_file_df, get_rev_cost,ta
 #         setting up working variables             #
 ####################################################
 
-# setting up working directory to root dir
-if  __name__ == '__main__':
-    os.chdir('../../..')
+# # setting up working directory to root dir
+# if  __name__ == '__main__':
+#     os.chdir('../../..')
 
 # Get the output directory
 with open('output/working_dir.txt') as f:
@@ -272,3 +272,8 @@ water_df_seperate_irr_wide.to_csv(f'{SAVE_DIR}/water_5_volum_by_irrigation.csv',
 
 
 
+#########################################################
+#              Report success info                      #
+#########################################################
+
+print('\nReport data created successfully!\n')

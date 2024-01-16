@@ -111,6 +111,19 @@ def write_outputs(sim, path):
         shutil.copytree(f"{path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True)
         # 2) Write the target-year outputs to the path_begin_end_compare
         write_output_single_year(sim, years[-1], f"{begin_end_path}/out_{years[-1]}", yr_cal_sim_pre=years[0])
+        
+    ###############################################################
+    #               Fire up the report script                     #
+    ###############################################################
+
+    # Use sub process to run the report script
+    import subprocess
+
+    # 1) Clean up the output CSVs 
+    subprocess.run(['python', 'luto/tools/report/step_01_create_report_data.py'])
+
+    # 2) Create the report
+    subprocess.run(['python', 'luto/tools/report/step_02_create_html.py'])
 
 
 
@@ -808,3 +821,7 @@ def write_ghg_separate(sim, yr_cal, path):
         
     # Save table to disk
     ag_ghg_summary_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_management_{timestamp}.csv'))
+    
+
+
+    

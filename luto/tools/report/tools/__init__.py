@@ -310,7 +310,7 @@ def get_AREA_am(df):
 
 
 
-def get_begin_end_df(files):
+def get_begin_end_df(files,timeseries = False):
     
     """
     Given a DataFrame containing information about file paths, this function returns two DataFrames:
@@ -325,7 +325,11 @@ def get_begin_end_df(files):
     """
     
     # read the cross table between start and end year
-    begin_end_df = files.query('''year_types == "begin_end_year" and base_name.str.contains("crosstab-lumap")''').reset_index(drop=True)
+    if timeseries:
+        begin_end_df = files.query('''year_types == "begin_end_year" and base_name.str.contains("crosstab-lumap")''').reset_index(drop=True)
+    else:
+        begin_end_df = files.query(''' base_name.str.contains("crosstab-lumap")''').reset_index(drop=True)
+    
     begin_end_df = pd.read_csv(begin_end_df['path'][0], index_col=0)
 
     # get the total area in the begin year

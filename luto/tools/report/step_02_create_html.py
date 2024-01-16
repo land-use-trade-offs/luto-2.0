@@ -1,4 +1,4 @@
-
+import os
 import shutil
 import pandas as pd
 from glob import glob
@@ -11,9 +11,9 @@ from tools.helper_func import add_data_2_html
 #         setting up working variables             #
 ####################################################
 
-# setting up working directory to root dir
-if  __name__ == '__main__':
-    os.chdir('../../..')
+# # setting up working directory to root dir
+# if  __name__ == '__main__':
+#     os.chdir('../../..')
 
 # Get the output directory
 with open('output/working_dir.txt') as f:
@@ -65,3 +65,10 @@ for idx,row in html_df.iterrows():
 
     # Add data to html
     add_data_2_html(html_path,data_pathes)
+    
+    
+#########################################################
+#              Report success info                      #
+#########################################################
+
+print('\n Report html created successfully!! \n')
