@@ -1,4 +1,5 @@
 import numpy as np
+from luto import settings
 import luto.tools as tools
 import luto.economics.agricultural.water as ag_water
 
@@ -37,6 +38,22 @@ def get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
     return ag2ep_transitions_r * data.REAL_AREA
 
 
+def get_rip_plant_transitions_from_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
+    """
+    Get transition costs from agricultural land uses to riparian plantings for each cell.
+
+    Note: this is the same as for environmental plantings.
+
+    Returns
+    -------
+    np.ndarray
+        1-D array, indexed by cell.
+    """
+    base_costs = get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap)
+    fencing_cost = data.RP_FENCING_LENGTH * data.REAL_AREA * settings.RIPARIAN_PLANTINGS_FENCING_COST_PER_HA
+    return base_costs + fencing_cost
+
+
 def get_from_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
     """
     Get the matrix containing transition costs from agricultural land uses to non-agricultural land uses.
@@ -46,10 +63,12 @@ def get_from_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
     2-D array, indexed by (r, k) where r is cell and k is non-agricultural land usage.
     """
     env_plant_transitions_from_ag_r = get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap)
+    rip_plant_transitions_from_ag_r = get_rip_plant_transitions_from_ag(data, yr_idx, lumap, lmmap)
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     ag_to_non_agr_t_matrices = [
         env_plant_transitions_from_ag_r.reshape((data.NCELLS, 1)),
+        rip_plant_transitions_from_ag_r.reshape((data.NCELLS, 1)),
     ]
 
     return np.concatenate(ag_to_non_agr_t_matrices, axis=1)
@@ -85,6 +104,20 @@ def get_env_plantings_to_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
     return ep_to_ag_t_mrj * data.REAL_AREA[np.newaxis, :, np.newaxis]
 
 
+def get_rip_plantings_to_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
+    """
+    Get transition costs from riparian plantings to agricultural land uses for each cell.
+    
+    Note: this is the same as for environmental plantings.
+
+    Returns
+    -------
+    np.ndarray
+        3-D array, indexed by (m, r, j).
+    """
+    return get_env_plantings_to_ag(data, yr_idx, lumap, lmmap)
+
+
 def get_to_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
     """
     Get the matrix containing transition costs from non-agricultural land uses to agricultural land uses.
@@ -94,24 +127,59 @@ def get_to_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
     3-D array, indexed by (m, r, j).
     """
     env_plant_transitions_to_ag_mrj = get_env_plantings_to_ag(data, yr_idx, lumap, lmmap)
+    rip_plant_transitions_to_ag_mrj = get_rip_plantings_to_ag(data, yr_idx, lumap, lmmap)
 
     # Reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     ag_to_non_agr_t_matrices = [
         env_plant_transitions_to_ag_mrj,
+        rip_plant_transitions_to_ag_mrj,
     ]
 
     # Element-wise sum each mrj-indexed matrix to get the final transition matrix
     return np.add.reduce(ag_to_non_agr_t_matrices)
 
 
+def get_non_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
+    """
+    Get the matrix that contains transition costs for non-agricultural land uses.
+    That is, the cost of transitioning between non-agricultural land uses.
+    """
+    t_rk = np.zeros((data.NCELLS, data.N_NON_AG_LUS))
+
+    # Currently, non of the non-agricultural land uses may transition between each other.
+    # Thus, transition costs need not be considered.
+    return t_rk
+
+
 def get_exclusions_environmental_plantings(data, lumap) -> np.ndarray:
     """
-    Get an array of cells that cannot be transitioned to environmental plantings.
+    Get the exclusion array for the environmental plantings land use.
     """
     # Get (agricultural) land uses that cannot transition to environmental plantings
-    excluded_ag_lus = np.where(np.isnan(data.AG2EP_TRANSITION_COSTS_HA))[0]
-    # Return an array with 0 for every cell that has an excluded land use and 1 otherwise.
-    return (~np.isin(lumap, excluded_ag_lus)).astype(int)
+    excluded_ag_lus_cells = np.where(np.isnan(data.AG2EP_TRANSITION_COSTS_HA))[0]
+
+    # Create the exclude array as having 0 for every cell that has an excluded land use and 1 otherwise.
+    exclude = (~np.isin(lumap, excluded_ag_lus_cells)).astype(int)
+
+    # Ensure other non-agricultural land uses are excluded
+    rip_plantings_cells = tools.get_riparian_plantings_cells(lumap)
+    exclude[rip_plantings_cells] = 0
+
+    return exclude
+
+
+def get_exclusions_riparian_plantings(data, lumap) -> np.ndarray:
+    """
+    Get the exclusion array for the Riparian plantings land use.
+    Return a 1-D array indexed by r that represents how much RP can be utilised.
+    """
+    exclude = (data.RP_PROPORTION).astype(np.float32)
+
+    # Ensure other non-agricultural land uses are excluded
+    env_plantings_cells = tools.get_env_plantings_cells(lumap)
+    exclude[env_plantings_cells] = 0
+
+    return exclude
 
 
 def get_exclude_matrices(data, lumap) -> np.ndarray:
@@ -124,11 +192,13 @@ def get_exclude_matrices(data, lumap) -> np.ndarray:
     """
     # Environmental plantings exclusions
     env_plant_exclusions = get_exclusions_environmental_plantings(data, lumap)
+    rip_plant_exclusions = get_exclusions_riparian_plantings(data, lumap)
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     non_ag_x_matrices = [
         env_plant_exclusions.reshape((data.NCELLS, 1)),
+        rip_plant_exclusions.reshape((data.NCELLS, 1)),
     ]
 
     # Stack list and return to get x_rk
-    return np.concatenate(non_ag_x_matrices, axis=1).astype(bool)
+    return np.concatenate(non_ag_x_matrices, axis=1).astype(np.float32)

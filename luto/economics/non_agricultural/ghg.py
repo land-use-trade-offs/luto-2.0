@@ -29,24 +29,52 @@ def get_ghg_reduction_env_plantings(data, aggregate) -> np.ndarray:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
 
+def get_ghg_reduction_rip_plantings(data, aggregate) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    data: object/module
+        Data object or module with fields like in `luto.data`.
+
+    Returns
+    -------
+    if aggregate == True (default)  -> np.ndarray
+       aggregate == False           -> pd.DataFrame
+    
+        Greenhouse gas emissions of Riparian Plantings for each cell. Same as environmental plantings.
+        Since riparian plantings reduces carbon in the air, each value will be <= 0.
+        1-D array Indexed by cell.
+    """
+
+    # Tonnes of CO2e per ha, adjusted for resfactor
+    if aggregate==True:
+        return -data.EP_RIP_AVG_T_CO2_HA * data.REAL_AREA
+    elif aggregate==False:
+        return pd.DataFrame(-data.EP_RIP_AVG_T_CO2_HA * data.REAL_AREA,columns=['RIP_PLANTINGS'])
+    else:
+    # If the aggregate arguments is not in [True,False]. That must be someting wrong
+        raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
+
 
 def get_ghg_matrix(data, aggregate=True) -> np.ndarray:
     """
     Get the g_rk matrix containing non-agricultural greenhouse gas emissions.
     """
 
-    env_plantings_ghg_matrix = get_ghg_reduction_env_plantings(data,aggregate)
+    env_plantings_ghg_matrix = get_ghg_reduction_env_plantings(data, aggregate)
+    rip_plantings_ghg_matrix = get_ghg_reduction_rip_plantings(data, aggregate)
 
       
     if aggregate==True:
         # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
         non_agr_ghg_matrices = [
             env_plantings_ghg_matrix.reshape((data.NCELLS, 1)),
+            rip_plantings_ghg_matrix.reshape((data.NCELLS, 1)),
         ]
         return np.concatenate(non_agr_ghg_matrices, axis=1)
     
     elif aggregate==False:
-        return pd.concat([env_plantings_ghg_matrix], axis=1)
+        return pd.concat([env_plantings_ghg_matrix, rip_plantings_ghg_matrix], axis=1)
     
     else:
     # If the aggregate arguments is not in [True,False]. That must be someting wrong

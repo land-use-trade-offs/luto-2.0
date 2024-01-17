@@ -108,6 +108,9 @@ class Data():
         self.AGGHG_IRRPAST = bdata.AGGHG_IRRPAST[self.MASK]                     # Float32
         self.BIODIV_SCORE_RAW = bdata.BIODIV_SCORE_RAW[self.MASK]               # Float32
         self.BIODIV_SCORE_WEIGHTED = bdata.BIODIV_SCORE_WEIGHTED[self.MASK]     # Float32
+        self.RP_PROPORTION = bdata.RP_PROPORTION[self.MASK]                     # Float32
+        self.RP_FENCING_LENGTH = bdata.RP_FENCING_LENGTH[self.MASK]             # Float32
+        self.EP_RIP_AVG_T_CO2_HA = bdata.EP_RIP_AVG_T_CO2_HA[self.MASK]         # Float32
 
         # Slice this year off HDF5 bricks. TODO: This field is not in luto.data.
         # with h5py.File(bdata.fname_dr, 'r') as wy_dr_file:
@@ -244,6 +247,13 @@ def get_non_ag_to_ag_t_mrj():
     return output.astype(np.float32)
 
 
+def get_non_ag_t_rk():
+    print('Getting non-agricultural transition cost matrices...', end = ' ', flush = True)
+    output = non_ag_transition.get_non_ag_transition_matrix(data, base_year, lumaps[base_year], lmmaps[base_year])
+    print('Done.')
+    return output.astype(np.float32)
+
+
 def get_ag_x_mrj():
     print('Getting agricultural exclude matrices...', end = ' ', flush = True)
     output = ag_transition.get_exclude_matrices(data, base_year, lumaps)
@@ -353,6 +363,7 @@ def get_input_data(target: int):
         ag_ghg_t_mrj=get_ag_ghg_t_mrj(),
         ag_to_non_ag_t_rk=get_ag_to_non_ag_t_rk(),
         non_ag_to_ag_t_mrj=get_non_ag_to_ag_t_mrj(),
+        non_ag_t_rk=get_non_ag_t_rk(),
         non_ag_c_rk=get_non_ag_c_rk(),
         non_ag_r_rk=get_non_ag_r_rk(),
         non_ag_g_rk=get_non_ag_g_rk(),

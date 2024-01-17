@@ -29,9 +29,31 @@ except:
     import rasterio
     
 
-from luto.settings import INPUT_DIR, RESFACTOR, CO2_FERT, SOC_AMORTISATION, NON_AGRICULTURAL_LU_BASE_CODE, RISK_OF_REVERSAL
-from luto.settings import FIRE_RISK, GHG_LIMITS_TYPE, GHG_LIMITS, GHG_LIMITS_FIELD, CONNECTIVITY_WEIGHTING, BIODIV_TARGET
-from luto.settings import SSP, RCP, SCENARIO, DIET_DOM, DIET_GLOB, CONVERGENCE, IMPORT_TREND, WASTE, FEED_EFFICIENCY
+from luto.settings import (
+    INPUT_DIR, 
+    RESFACTOR, 
+    CO2_FERT, 
+    SOC_AMORTISATION, 
+    NON_AGRICULTURAL_LU_BASE_CODE, 
+    RISK_OF_REVERSAL, 
+    FIRE_RISK, 
+    GHG_LIMITS_TYPE, 
+    GHG_LIMITS, 
+    GHG_LIMITS_FIELD, 
+    CONNECTIVITY_WEIGHTING, 
+    BIODIV_TARGET, 
+    SSP, 
+    RCP, 
+    SCENARIO, 
+    DIET_DOM, 
+    DIET_GLOB, 
+    CONVERGENCE, 
+    IMPORT_TREND, 
+    WASTE, 
+    FEED_EFFICIENCY, 
+    RIPARIAN_PLANTINGS_BUFFER_WIDTH,
+    RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR,
+)
 from luto.economics.agricultural.quantity import lvs_veg_types
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
@@ -316,6 +338,9 @@ LMMAP = pd.read_hdf(os.path.join(INPUT_DIR, 'lmmap.h5')).to_numpy()
 AMMAP_DICT = {am: np.zeros(NCELLS).astype('int8') for am in AG_MANAGEMENTS_TO_LAND_USES}
 
 STREAM_LENGTH = pd.read_hdf(os.path.join(INPUT_DIR, 'stream_length_m_cell.h5')).to_numpy()
+
+RP_PROPORTION = np.divide(((2 * RIPARIAN_PLANTINGS_BUFFER_WIDTH) * STREAM_LENGTH), REAL_AREA).astype(np.float32)
+RP_FENCING_LENGTH = (2 * RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR) * STREAM_LENGTH.astype(np.float32)
 
 
 

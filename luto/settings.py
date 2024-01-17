@@ -91,7 +91,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 10          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 5          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
 MODE = 'snapshot'       # runs for target year only
@@ -138,7 +138,7 @@ OPTIMALITY_TOLERANCE = 1e-2
    Maximum value:	1e-2"""
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 96
+THREADS = 16
 
 # Use homogenous barrier algorithm
 BARHOMOGENOUS = -1
@@ -159,6 +159,12 @@ NON_AGRICULTURAL_LU_BASE_CODE = 100         # Non-agricultural land uses will ap
 # Environmental Plantings Parameters
 ENV_PLANTING_COST_PER_HA_PER_YEAR = 100     # Yearly cost of maintaining one hectare of environmental plantings
 CARBON_PRICE_PER_TONNE = 50                 # Price of carbon per tonne - determines EP revenue in the model
+
+# Riparian Planting Parameters
+RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR = 100
+RIPARIAN_PLANTINGS_BUFFER_WIDTH = 10
+RIPARIAN_PLANTINGS_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 
+RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR = 0.5
 
 
 # ---------------------------------------------------------------------------- #
@@ -220,6 +226,7 @@ LAND_USAGE_CULL_PERCENTAGE = 0.15
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)
 0: 'Environmental Plantings'
+1: 'Riparian Plantings'
 
 
 AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)
