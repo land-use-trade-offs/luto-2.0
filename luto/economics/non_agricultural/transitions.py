@@ -86,7 +86,7 @@ def get_env_plantings_to_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
     # Get base transition costs: add cost of installing irrigation
     base_ep_to_ag_t = data.EP2AG_TRANSITION_COSTS_HA
 
-    # Get water license price and costs of adding irrigation where appropriate
+    # Get water license price and costs of removing irrigation where appropriate
     w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
     l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
     w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data)
