@@ -61,7 +61,8 @@ FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 CONNECTIVITY_WEIGHTING = 1
 
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
-BIODIV_TARGET = 0.3 
+BIODIV_TARGET = 0.3
+BIODIV_TARGET_ACHIEVEMENT_YEAR = 2030
 
 # Set livestock impact on biodiversity (0 = no impact, 1 = total annihilation)
 BIODIV_LIVESTOCK_IMPACT = 0.5
@@ -137,7 +138,7 @@ OPTIMALITY_TOLERANCE = 1e-2
    Maximum value:	1e-2"""
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 96
+THREADS = 16
 
 # Use homogenous barrier algorithm
 BARHOMOGENOUS = -1
@@ -160,8 +161,9 @@ ENV_PLANTING_COST_PER_HA_PER_YEAR = 100     # Yearly cost of maintaining one hec
 CARBON_PRICE_PER_TONNE = 50                 # Price of carbon per tonne - determines EP revenue in the model
 
 # Riparian Planting Parameters
+RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR = 100
 RIPARIAN_PLANTINGS_BUFFER_WIDTH = 10
-RIPARIAN_PLANTINGS_FENCING_COST = 10
+RIPARIAN_PLANTINGS_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 
 RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR = 0.5
 
 # Agroforestry Paraameters
@@ -207,6 +209,8 @@ WATER_REGION_DEF = 'DD'                 # 'RR' for River Region, 'DD' for Draina
 # WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions  e.g., [1, 2].
 
 
+BIODIVERSITY_LIMITS = 'on'             # 'on' or 'off'
+BIODIV_TARGET_ACHIEVEMENT_YEAR = 2050
 
 # ---------------------------------------------------------------------------- #
 # Cell Culling

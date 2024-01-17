@@ -52,6 +52,7 @@ from luto.settings import (
     WASTE, 
     FEED_EFFICIENCY, 
     RIPARIAN_PLANTINGS_BUFFER_WIDTH,
+    RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR,
     RIPARIAN_PLANTINGS_FENCING_COST,
     AGROFORESTRY_ROW_WIDTH,
     AGROFORESTRY_ROW_SPACING,
@@ -104,12 +105,15 @@ YR_CAL_BASE = 2010
 AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'ag_landuses.csv')), header = None)[0].to_list()
 NON_AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'non_ag_landuses.csv')), header = None)[0].to_list()
 
-NON_AG2DESC = dict(zip(range(NON_AGRICULTURAL_LU_BASE_CODE, 
+NONAGLU2DESC = dict(zip(range(NON_AGRICULTURAL_LU_BASE_CODE, 
                              NON_AGRICULTURAL_LU_BASE_CODE + len(NON_AGRICULTURAL_LANDUSES)),
                        NON_AGRICULTURAL_LANDUSES))
 
+DESC2NONAGLU = {value: key for key, value in NONAGLU2DESC.items()}
+
 # Get number of land-uses
 N_AG_LUS = len(AGRICULTURAL_LANDUSES)
+N_NON_AG_LUS = len(NON_AGRICULTURAL_LANDUSES)
 
 # Construct land-use index dictionary (distinct from LU_IDs!)
 AGLU2DESC = {i: lu for i, lu in enumerate(AGRICULTURAL_LANDUSES)}
@@ -137,6 +141,11 @@ LU_UNNATURAL = [DESC2AGLU[lu] for lu in AGRICULTURAL_LANDUSES if DESC2AGLU[lu] n
 LU_CROPS_INDICES = [AGRICULTURAL_LANDUSES.index(lu) for lu in AGRICULTURAL_LANDUSES if lu in LU_CROPS]
 LU_LVSTK_INDICES = [AGRICULTURAL_LANDUSES.index(lu) for lu in AGRICULTURAL_LANDUSES if lu in LU_LVSTK]
 LU_UNALL_INDICES = [AGRICULTURAL_LANDUSES.index(lu) for lu in AGRICULTURAL_LANDUSES if lu in LU_UNALL]
+
+NON_AG_LU_NATURAL = [ 
+    DESC2NONAGLU["Environmental Plantings"],
+    DESC2NONAGLU["Riparian Plantings"],
+]
 
 # Derive land management types from AGEC.
 LANDMANS = {t[1] for t in AGEC_CROPS.columns} # Set comp., unique entries.
@@ -335,8 +344,8 @@ AMMAP_DICT = {am: np.zeros(NCELLS).astype('int8') for am in AG_MANAGEMENTS_TO_LA
 
 STREAM_LENGTH = pd.read_hdf(os.path.join(INPUT_DIR, 'stream_length_m_cell.h5')).to_numpy()
 
-RP_PROPORTION = (2 * RIPARIAN_PLANTINGS_BUFFER_WIDTH * STREAM_LENGTH) / REAL_AREA
-RP_FENCING_LENGTH = 2 * data.STREAM_LENGTH * settings.RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR
+RP_PROPORTION = np.divide(((2 * RIPARIAN_PLANTINGS_BUFFER_WIDTH) * STREAM_LENGTH), REAL_AREA).astype(np.float32)
+RP_FENCING_LENGTH = (2 * RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR) * STREAM_LENGTH.astype(np.float32)
 
 
 
@@ -455,7 +464,7 @@ rem_veg = pd.read_hdf(os.path.join(INPUT_DIR, 'natural_land_t_co2_ha.h5')).to_nu
 rem_veg = np.squeeze(rem_veg) # Remove extraneous extra dimension
 
 # Discount by fire risk.
-NATURAL_LAND_T_CO2_HA = rem_veg * (ep_df['FIRE_RISK'].to_numpy(dtype = np.float32) / 100)
+NATURAL_LAND_T_CO2_HA = rem_veg * (fire_risk.to_numpy() / 100) 
 
 
 
@@ -540,7 +549,10 @@ SAVANNA_BURNING = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_savanna_burning.h5')
 ###############################################################
 # Biodiversity data.
 ###############################################################
-
+"""
+Kunming-Montreal Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
+Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
+"""
 # Load biodiversity data
 biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5') )
 
@@ -553,11 +565,6 @@ conn_score = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.
 # Calculate weighted biodiversity score
 BIODIV_SCORE_WEIGHTED = BIODIV_SCORE_RAW - (BIODIV_SCORE_RAW * (1 - conn_score) * CONNECTIVITY_WEIGHTING)
 
-# Calculate total biodiversity target score 
+# Calculate total biodiversity target score as the sum of biodiv raw score over the entire study area
 TOTAL_BIODIV_TARGET_SCORE = ((LUMAP >= 0 ) * BIODIV_SCORE_RAW * BIODIV_TARGET).sum()
 
-
-"""
-Kunming-Montreal Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
-"""

@@ -232,9 +232,24 @@ def get_ag_and_non_ag_cells(lumap) -> Tuple[np.ndarray, np.ndarray]:
     # get all agricultural and non agricultural cells
     non_agricultural_cells = np.nonzero(lumap >= non_ag_base)[0]
     agricultural_cells = np.nonzero(
-        ~np.isin(all_cells, non_agricultural_cells))[0]
+        ~np.isin(all_cells, non_agricultural_cells)
+    )[0]
 
     return agricultural_cells, non_agricultural_cells
+
+
+def get_env_plantings_cells(lumap) -> np.ndarray:
+    """
+    Get an array with cells used for environmental plantings
+    """
+    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 0)[0]
+
+
+def get_riparian_plantings_cells(lumap) -> np.ndarray:
+    """
+    Get an array with cells used for riparian plantings
+    """
+    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 1)[0]
 
 
 def get_natural_and_unnatural_lu_cells(data, lumap) -> Tuple[np.ndarray, np.ndarray]:

@@ -41,11 +41,11 @@ def get_ghg_reduction_rip_plantings(data, aggregate) -> np.ndarray:
     if aggregate == True (default)  -> np.ndarray
        aggregate == False           -> pd.DataFrame
     
-        Greenhouse gas emissions of riparian plantings for each cell.
+        Greenhouse gas emissions of Riparian Plantings for each cell. Same as environmental plantings.
         Since riparian plantings reduces carbon in the air, each value will be <= 0.
         1-D array Indexed by cell.
     """
-    
+
     # Tonnes of CO2e per ha, adjusted for resfactor
     if aggregate==True:
         return -data.EP_RIP_AVG_T_CO2_HA * data.REAL_AREA
@@ -88,8 +88,8 @@ def get_ghg_matrix(data, aggregate=True) -> np.ndarray:
     Get the g_rk matrix containing non-agricultural greenhouse gas emissions.
     """
 
-    env_plantings_ghg_matrix = get_ghg_reduction_env_plantings(data,aggregate)
-    rip_plantings_ghg_matrix = get_ghg_reduction_rip_plantings(data,aggregate)
+    env_plantings_ghg_matrix = get_ghg_reduction_env_plantings(data, aggregate)
+    rip_plantings_ghg_matrix = get_ghg_reduction_rip_plantings(data, aggregate)
     agroforestry_ghg_matrix = get_ghg_reduction_agroforestry(data, aggregate)
 
       
