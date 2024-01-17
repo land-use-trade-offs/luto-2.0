@@ -363,6 +363,7 @@ def get_input_data(target: int):
         ag_ghg_t_mrj=get_ag_ghg_t_mrj(),
         ag_to_non_ag_t_rk=get_ag_to_non_ag_t_rk(),
         non_ag_to_ag_t_mrj=get_non_ag_to_ag_t_mrj(),
+        non_ag_t_rk=get_non_ag_t_rk(),
         non_ag_c_rk=get_non_ag_c_rk(),
         non_ag_r_rk=get_non_ag_r_rk(),
         non_ag_g_rk=get_non_ag_g_rk(),

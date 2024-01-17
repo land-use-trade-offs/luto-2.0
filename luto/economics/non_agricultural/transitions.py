@@ -144,26 +144,42 @@ def get_non_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
     Get the matrix that contains transition costs for non-agricultural land uses.
     That is, the cost of transitioning between non-agricultural land uses.
     """
-    return
-    # t_rk = np.zeros((data.NCELLS, data.))
+    t_rk = np.zeros((data.NCELLS, data.N_NON_AG_LUS))
+
+    # Currently, non of the non-agricultural land uses may transition between each other.
+    # Thus, transition costs need not be considered.
+    return t_rk
 
 
 def get_exclusions_environmental_plantings(data, lumap) -> np.ndarray:
     """
-    Get an array of cells that cannot be transitioned to environmental plantings.
+    Get the exclusion array for the environmental plantings land use.
     """
     # Get (agricultural) land uses that cannot transition to environmental plantings
-    excluded_ag_lus = np.where(np.isnan(data.AG2EP_TRANSITION_COSTS_HA))[0]
-    # Return an array with 0 for every cell that has an excluded land use and 1 otherwise.
-    return (~np.isin(lumap, excluded_ag_lus)).astype(int)
+    excluded_ag_lus_cells = np.where(np.isnan(data.AG2EP_TRANSITION_COSTS_HA))[0]
+
+    # Create the exclude array as having 0 for every cell that has an excluded land use and 1 otherwise.
+    exclude = (~np.isin(lumap, excluded_ag_lus_cells)).astype(int)
+
+    # Ensure other non-agricultural land uses are excluded
+    rip_plantings_cells = tools.get_riparian_plantings_cells(lumap)
+    exclude[rip_plantings_cells] = 0
+
+    return exclude
 
 
 def get_exclusions_riparian_plantings(data, lumap) -> np.ndarray:
     """
-    Return a 1-D array indexed by r that represents how much riparian plantings can 
-    be utilised.
+    Get the exclusion array for the Riparian plantings land use.
+    Return a 1-D array indexed by r that represents how much RP can be utilised.
     """
-    return (data.RP_PROPORTION).astype(np.float32)
+    exclude = (data.RP_PROPORTION).astype(np.float32)
+
+    # Ensure other non-agricultural land uses are excluded
+    env_plantings_cells = tools.get_env_plantings_cells(lumap)
+    exclude[env_plantings_cells] = 0
+
+    return exclude
 
 
 def get_exclude_matrices(data, lumap) -> np.ndarray:

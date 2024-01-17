@@ -15,9 +15,7 @@ def get_cost_env_plantings(data) -> np.ndarray:
     np.ndarray
         Cost of environmental plantings for each cell. 1-D array Indexed by cell.
     """
-    ep_maintenance_cost = settings.ENV_PLANTING_COST_PER_HA_PER_YEAR
-    # yearly maintenance cost of EP applied to each cell and adjusted for resfactor
-    return ep_maintenance_cost * data.REAL_AREA
+    return settings.ENV_PLANTING_COST_PER_HA_PER_YEAR * data.REAL_AREA
 
 
 def get_cost_rip_plantings(data) -> np.ndarray:

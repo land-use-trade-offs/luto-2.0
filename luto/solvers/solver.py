@@ -738,7 +738,7 @@ class LutoSolver:
 
         self.biodiversity_expr = ag_contr + ag_man_contr + non_ag_contr
 
-        print("    ...setting GHG emissions reduction target: {:,.0f} tCO2e\n".format(biodiversity_limits))
+        print("    ...setting biodiversity score target: {:,.0f}\n".format(biodiversity_limits))
         self.biodiversity_limit_constraint = self.gurobi_model.addConstr(
             self.biodiversity_expr >= biodiversity_limits
         )
