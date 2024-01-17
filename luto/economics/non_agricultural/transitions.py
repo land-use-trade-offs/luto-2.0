@@ -54,7 +54,7 @@ def get_rip_plant_transitions_from_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
     return base_costs + fencing_cost
 
 
-def get_agroforestry_transitions_from_ag(data, yr_idx, lumap, lmmap) -> nd.ndarray:
+def get_agroforestry_transitions_from_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
     """
     Get transition costs from agricultural land uses to agroforestry for each cell.
 
@@ -65,30 +65,9 @@ def get_agroforestry_transitions_from_ag(data, yr_idx, lumap, lmmap) -> nd.ndarr
     np.ndarray
         1-D array, indexed by cell.
     """
-
-    base_ag_to_af_t = data.AG2EP_TRANSITION_COSTS_HA
-    l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
-    base_ag_to_af_t_mrj = np.broadcast_to(base_ag_to_af_t, (2, data.NCELLS, base_ag_to_af_t.shape[0]))
-
-    # Amortise base costs to be annualised
-    base_ag_to_af_t_mrj = tools.amortise(base_ag_to_af_t_mrj)
-
-    # Add cost of water license and cost of removing irrigation where relevant (pre-amortised)
-    w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
-    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data)
-    ag_to_af_t_mrj = base_ag_to_af_t_mrj + w_delta_mrj
-
-    # Get raw transition costs for each cell to transition to environmental plantings
-    ag2af_transitions_r = np.nansum(l_mrj * ag_to_af_t_mrj, axis=(0, 2))
-
-    # Add establishment costs for each cell
-    est_costs_r = data.EP_EST_COST_HA
-
-    # Amortise establishment costs  to be annualised
-    est_costs_r = tools.amortise(est_costs_r)
-    ag2af_transitions_r += est_costs_r
-
-    return ag2af_transitions_r * data.REAL_AREA
+    base_costs = get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap)
+    fencing_cost = data.RP_FENCING_LENGTH * data.REAL_AREA * settings.AGROFORESTRY_FENCING_COST_PER_HA
+    return base_costs + fencing_cost
 
 
 def get_from_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
@@ -168,25 +147,7 @@ def get_agroforestry_to_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
     np.ndarray
         3-D array, indexed by (m, r, j).
     """
-    # Get base transition costs: add cost of installing irrigation
-    base_af_to_ag_t = data.EP2AG_TRANSITION_COSTS_HA
-
-    # Get water license price and costs of removing irrigation where appropriate
-    w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
-    l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
-    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data)
-
-    # Reshape and amortise upfront costs to annualised costs
-    base_af_to_ag_t_mrj = np.broadcast_to(base_af_to_ag_t, (2, data.NCELLS, base_af_to_ag_t.shape[0]))
-    base_af_to_ag_t_mrj = tools.amortise(base_af_to_ag_t_mrj)
-
-    af_to_ag_t_mrj = base_af_to_ag_t_mrj + w_delta_mrj
-
-    # Apply costs only to non-agricultural cells.
-    ag_cells, _ = tools.get_ag_and_non_ag_cells(lumap)
-    af_to_ag_t_mrj[:, ag_cells, :] = 0
-
-    return af_to_ag_t_mrj * data.REAL_AREA[np.newaxis, :, np.newaxis]
+    return get_env_plantings_to_ag(data, yr_idx, lumap, lmmap)
 
 
 def get_to_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
@@ -237,6 +198,8 @@ def get_exclusions_environmental_plantings(data, lumap) -> np.ndarray:
     # Ensure other non-agricultural land uses are excluded
     rip_plantings_cells = tools.get_riparian_plantings_cells(lumap)
     exclude[rip_plantings_cells] = 0
+    agroforestry_cells = tools.get_agroforestry_cells(lumap)
+    exclude[agroforestry_cells] = 0
 
     return exclude
 
@@ -248,9 +211,17 @@ def get_exclusions_riparian_plantings(data, lumap) -> np.ndarray:
     """
     exclude = (data.RP_PROPORTION).astype(np.float32)
 
+    # Exclude all cells used for natural land uses
+    # TODO - this means natural LU cells cannot transition to agriculture/RP splits, even though
+    # they may transition to agriculture without the RP portion. Think about this before merging.
+    natural_lu_cells = tools.get_natural_lu_cells(data, lumap)
+    exclude[natural_lu_cells] = 0
+
     # Ensure other non-agricultural land uses are excluded
     env_plantings_cells = tools.get_env_plantings_cells(lumap)
     exclude[env_plantings_cells] = 0
+    agroforestry_cells = tools.get_agroforestry_cells(lumap)
+    exclude[agroforestry_cells] = 0
 
     return exclude
 
@@ -260,8 +231,19 @@ def get_exclusions_agroforestry(data, lumap) -> np.ndarray:
     Return a 1-D array indexed by r that represents how much riparian plantings can possibly 
     be done at each cell.
     """
+    exclude = (np.ones(data.NCELLS) * settings.AF_PROPORTION).astype(np.float32)
 
-    return (data.AF_PROPORTION).astype(np.float32)
+    # Exclude all cells used for natural land uses
+    natural_lu_cells = tools.get_natural_lu_cells(data, lumap)
+    exclude[natural_lu_cells] = 0
+
+    # Ensure other non-agricultural land uses are excluded
+    env_plantings_cells = tools.get_env_plantings_cells(lumap)
+    exclude[env_plantings_cells] = 0
+    rip_plantings_cells = tools.get_riparian_plantings_cells(lumap)
+    exclude[rip_plantings_cells] = 0
+
+    return exclude
 
 
 def get_exclude_matrices(data, lumap) -> np.ndarray:
@@ -281,6 +263,7 @@ def get_exclude_matrices(data, lumap) -> np.ndarray:
     non_ag_x_matrices = [
         env_plant_exclusions.reshape((data.NCELLS, 1)),
         rip_plant_exclusions.reshape((data.NCELLS, 1)),
+        agroforestry_exclusions.reshape((data.NCELLS, 1)),
     ]
 
     # Stack list and return to get x_rk
