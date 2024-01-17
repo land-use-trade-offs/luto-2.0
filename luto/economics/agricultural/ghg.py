@@ -245,7 +245,7 @@ def get_ghg_transition_penalties(data, lumap) -> np.ndarray:
     _, ncells, n_ag_lus = data.AG_L_MRJ.shape
     # Set up empty array of penalties
     penalties_rj = np.zeros((ncells, n_ag_lus), dtype=np.float32)
-    natural_lu_cells, _ = tools.get_natural_and_unnatural_lu_cells(data, lumap)
+    natural_lu_cells = tools.get_natural_lu_cells(data, lumap)
 
     # Calculate penalties and add to g_rj matrix
     penalties_r = (

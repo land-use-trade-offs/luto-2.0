@@ -12,6 +12,7 @@ def get_breq_matrix(data) -> np.ndarray:
     """
     b_rk = np.zeros((data.NCELLS, data.N_NON_AG_LUS))
 
+    # The current assumption is that all non-agricultural land uses contribute fully to biodiversity
     for k in range(len(data.NON_AG_LU_NATURAL)):
         b_rk[:, k] = data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA
 

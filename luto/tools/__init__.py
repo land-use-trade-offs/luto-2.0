@@ -252,22 +252,18 @@ def get_riparian_plantings_cells(lumap) -> np.ndarray:
     return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 1)[0]
 
 
-def get_natural_and_unnatural_lu_cells(data, lumap) -> Tuple[np.ndarray, np.ndarray]:
+def get_agroforestry_cells(lumap) -> np.ndarray:
     """
-    Splits the index of cells based on whether that cell is used for natural
-    land, given the lumap.
-
-    Returns
-    -------
-    ( np.ndarray, np.ndarray )
-        Two numpy arrays containing the split cell index.
+    Get an array with cells used for riparian plantings
     """
-    all_cells = np.array(range(lumap.shape[0]))
+    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 2)[0]
 
-    # get all cells currently being used for natural and unnatural land uses
-    natural_cells = np.nonzero(np.isin(lumap, data.LU_NATURAL))[0]
-    unnatural_cells = np.nonzero(np.isin(all_cells, natural_cells))[0]
-    return natural_cells, unnatural_cells
+
+def get_natural_lu_cells(data, lumap) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Gets all cells being used for natural land uses.
+    """
+    return np.nonzero(np.isin(lumap, data.LU_NATURAL))[0]
 
 
 def timethis(function, *args, **kwargs):

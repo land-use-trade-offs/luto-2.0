@@ -163,9 +163,15 @@ CARBON_PRICE_PER_TONNE = 50                 # Price of carbon per tonne - determ
 # Riparian Planting Parameters
 RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR = 100
 RIPARIAN_PLANTINGS_BUFFER_WIDTH = 10
-RIPARIAN_PLANTINGS_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 
+RIPARIAN_PLANTINGS_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 100 metres per hectare
 RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR = 0.5
 
+# Agroforestry Parameters
+AGROFORESTRY_COST_PER_HA_PER_YEAR = 100
+AGROFORESTRY_ROW_WIDTH = 20
+AGROFORESTRY_ROW_SPACING = 40
+AGROFORESTRY_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 100 metres per hectare
+AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
 
 # ---------------------------------------------------------------------------- #
 # Agricultural management parameters
@@ -227,6 +233,7 @@ LAND_USAGE_CULL_PERCENTAGE = 0.15
 """ NON-AGRICULTURAL LAND USES (indexed by k)
 0: 'Environmental Plantings'
 1: 'Riparian Plantings'
+2: 'Agroforestry'
 
 
 AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)
