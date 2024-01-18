@@ -2,7 +2,7 @@ import os
 import re
 import pandas as pd
 
-from tools.PARAMETERS import LU_CROPS, LU_LVSTKS, YR_BASE
+from tools.parameters import LU_CROPS, LU_LVSTKS, YR_BASE
 from tools.helper_func import df_wide2long, get_GHG_category, merge_LVSTK_UAALLOW
 
 # Set up working directory to the root of the report folder

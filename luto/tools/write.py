@@ -120,10 +120,10 @@ def write_outputs(sim, path):
     import subprocess
 
     # 1) Clean up the output CSVs 
-    subprocess.run(['python', 'luto/tools/report/step_01_create_report_data.py'])
+    subprocess.run(['python', 'luto/tools/report/create_report_data.py'])
 
     # 2) Create the report
-    subprocess.run(['python', 'luto/tools/report/step_02_create_html.py'])
+    subprocess.run(['python', 'luto/tools/report/create_html.py'])
 
 
 
