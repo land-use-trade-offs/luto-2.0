@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
 
         title: {
-            text: 'Water Usage to Limit in Percentage'
+            text: 'Water Use as Percentage of Limit'
         },
 
         credits: {
@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
 
         title: {
-            text: 'Water Usage to Limit in Volume'
+            text: 'Water Use to Limit in Volume'
         },
 
         credits: {
@@ -129,7 +129,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
 
         title: {
-            text: 'Water Usage by Sector'
+            text: 'Water Use by Land Management'
         },
 
         credits: {
@@ -185,7 +185,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
 
         title: {
-            text: 'Water Usage by Land Use'
+            text: 'Water Use by Land Use'
         },
 
         credits: {
@@ -245,7 +245,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
 
         title: {
-            text: 'Water Usage by Irrigation'
+            text: 'Water Use by Irrigation'
         },
 
         credits: {

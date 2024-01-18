@@ -38,7 +38,7 @@
         
         yAxis: {
             title: {
-                text: 'Production Quantity (million tons)'
+                text: 'Production Quantity (million tonnes, kilolitres [milk])'
             },
         },
 
@@ -78,7 +78,7 @@
         },
 
         title: {
-            text: 'Revenue divided by irrigation'
+            text: 'Revenue by irrigation'
         },
 
         credits: {
@@ -131,7 +131,7 @@
         },
 
         title: {
-            text: 'Revenue divided by products'
+            text: 'Revenue by products'
         },
 
         credits: {
@@ -144,7 +144,7 @@
         
         yAxis: {
             title: {
-                text: 'Revenue divided by products(billion AU$)'
+                text: 'Revenue by product (billion AU$)'
             },
         },
 
@@ -185,7 +185,7 @@
         },
 
         title: {
-            text: 'Revenue divided by commodity type'
+            text: 'Revenue by commodity type'
         },
 
         credits: {
@@ -198,7 +198,7 @@
         
         yAxis: {
             title: {
-                text: 'Revenue divided by commodities (billion AU$)'
+                text: 'Revenue by commodities (billion AU$)'
             },
         },
 
@@ -238,7 +238,7 @@
         },
 
         title: {
-            text: 'Revenue divided by crop/livestock type'
+            text: 'Revenue by crop/livestock type'
         },
         
         credits: {
@@ -251,7 +251,7 @@
         
         yAxis: {
             title: {
-                text: 'Revenue divided by crop/livestock type (billion AU$)'
+                text: 'Revenue by crop/livestock type (billion AU$)'
             },
         },
 
@@ -292,7 +292,7 @@
         },
 
         title: {
-            text: 'Revenue divided by crop/livestock total'
+            text: 'Revenue by crop/livestock total'
         },
     
         data: {
@@ -305,7 +305,7 @@
 
         yAxis: {
             title: {
-                text: 'Revenue divided by crop/livestock total (billion AU$)'
+                text: 'Revenue by crop/livestock total (billion AU$)'
             },
         },
 
@@ -345,7 +345,7 @@
         },
 
         title: {
-            text: 'Cost divided by irrigation'
+            text: 'Cost by irrigation'
         },
 
         credits: {
@@ -399,7 +399,7 @@
         },
 
         title: {
-            text: 'Cost divided by products'
+            text: 'Cost by products'
         },
 
         credits: {
@@ -412,7 +412,7 @@
         
         yAxis: {
             title: {
-                text: 'Cost divided by products (billion AU$)'
+                text: 'Cost by products (billion AU$)'
             },
         },
 
@@ -453,7 +453,7 @@
         },
 
         title: {
-            text: 'Cost divided by commodity type'
+            text: 'Cost by commodity type'
         },
 
         credits: {
@@ -466,7 +466,7 @@
         
         yAxis: {
             title: {
-                text: 'Cost divided by commodities (billion AU$)'
+                text: 'Cost by commodities (billion AU$)'
             },
         },
 
@@ -506,7 +506,7 @@
         },
 
         title: {
-            text: 'Cost divided by crop/livestock type'
+            text: 'Cost by crop/livestock type'
         },
         
         credits: {
@@ -519,7 +519,7 @@
         
         yAxis: {
             title: {
-                text: 'Cost divided by crop/livestock type (billion AU$)'
+                text: 'Cost by crop/livestock type (billion AU$)'
             },
         },
 
@@ -560,7 +560,7 @@
         },
 
         title: {
-            text: 'Cost divided by crop/livestock total'
+            text: 'Cost by crop/livestock total'
         },
     
         data: {
@@ -573,7 +573,7 @@
 
         yAxis: {
             title: {
-                text: 'Cost divided by crop/livestock total (billion AU$)'
+                text: 'Cost by crop/livestock total (billion AU$)'
             },
         },
 

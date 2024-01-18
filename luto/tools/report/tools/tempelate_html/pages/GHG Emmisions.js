@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
 
         title: {
-            text: 'GHG Emissions Cumulative'
+            text: 'GHG Emissions'
         },
 
         credits: {
@@ -182,7 +182,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
 
         title: {
-            text: 'GHG Emission by Crop|Livestock'
+            text: 'GHG Emissions by Crop/Livestock'
         },
 
         credits: {
@@ -236,7 +236,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
 
         title: {
-            text: 'GHG Emission by Irrigation Type'
+            text: 'GHG Emissions by Irrigation Type'
         },
 
         credits: {
@@ -290,7 +290,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
 
         title: {
-            text: 'GHG Emission by CH4/N2O/CO2'
+            text: 'GHG Emissions by Gas'
         },
 
         credits: {
@@ -344,7 +344,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
 
         title: {
-            text: 'GHG Emission by Source'
+            text: 'GHG Emissions by Source'
         },
 
         credits: {
