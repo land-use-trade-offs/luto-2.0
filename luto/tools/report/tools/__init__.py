@@ -2,7 +2,7 @@ import os
 import re
 import pandas as pd
 
-from tools.parameters import LU_CROPS, LU_LVSTKS, YR_BASE
+from tools.PARAMETERS import LU_CROPS, LU_LVSTKS, YR_BASE
 from tools.helper_func import df_wide2long, get_GHG_category, merge_LVSTK_UAALLOW
 
 # Set up working directory to the root of the report folder
@@ -188,38 +188,6 @@ def get_rev_cost_df(files_df:pd.DataFrame,in_type:str):
 
 
 
-def process_row(df, idx, year, column_names, processing_function=None):
-    """
-    Process a single row of data from a DataFrame.
-
-    Args:
-        df (pandas.DataFrame): The DataFrame containing the data to process.
-        idx (int): The index of the row to process.
-        year (int): The year associated with the row.
-        column_names (list): A list of column names to use for the processed data.
-        processing_function (function, optional): A function to apply to the processed data.
-
-    Returns:
-        pandas.DataFrame: The processed data row.
-    """
-    # Function to process a single row
-    if idx == 0:
-        # Process the first year
-        data_row = df.iloc[:, -1].reset_index().query('(index != "Total") & (index != "All")')
-        data_row.columns = column_names
-        if processing_function:
-            data_row = processing_function(data_row)
-        data_row.insert(0, 'Year', YR_BASE)
-    else:
-        # Process the last row for the year
-        data_row = df.iloc[-1, :].reset_index().query('(index != "Total") & (index != "All")')
-        data_row.columns = column_names
-        if processing_function:
-            data_row = processing_function(data_row)
-        data_row.insert(0, 'Year', year)
-
-    return data_row
-
 def get_AREA_lu(df):
     """
     Returns a pandas DataFrame containing processed data on land use and area (in km2) for each year in the input DataFrame.
@@ -235,10 +203,30 @@ def get_AREA_lu(df):
         year = row['year']
         file_path = row['path']
         df = pd.read_csv(file_path, index_col=0)
-
-        # Process row and append
-        processed_row = process_row(df, idx, year, ['Land use', 'Area (km2)'], merge_LVSTK_UAALLOW)
-        area_df.append(processed_row)
+        column_names = ['Land use', 'Area (km2)']
+        
+        # Function to process a single row
+        if idx == 0:
+            # Process the first year
+            data_row = df.iloc[:, -1].reset_index().query('(index != "Total") & (index != "All")')
+            data_row.columns = column_names
+            data_row = merge_LVSTK_UAALLOW(data_row)
+            data_row.insert(0, 'Year', YR_BASE)
+            area_df.append(data_row)
+            
+            # Process the last row for the year
+            data_row = df.iloc[-1, :].reset_index().query('(index != "Total") & (index != "All")')
+            data_row.columns = column_names
+            data_row = merge_LVSTK_UAALLOW(data_row)
+            data_row.insert(0, 'Year', year)
+            area_df.append(data_row)
+        else:
+            # Process the last row for the year
+            data_row = df.iloc[-1, :].reset_index().query('(index != "Total") & (index != "All")')
+            data_row.columns = column_names
+            data_row = merge_LVSTK_UAALLOW(data_row)
+            data_row.insert(0, 'Year', year)    
+            area_df.append(data_row)
 
     return pd.concat(area_df).reset_index(drop=True)
 
@@ -259,14 +247,35 @@ def get_AREA_lm(df):
         year = row['year']
         file_path = row['path']
         df = pd.read_csv(file_path, index_col=0)
+        
+        column_names = ['Irrigation', 'Area (km2)']
 
         # Define a processing function for irrigation data
         def process_irrigation(row):
             return row.replace({'0': 'Dry', '1': 'Irrigated'})
-
-        # Process row and append
-        processed_row = process_row(df, idx, year, ['Irrigation', 'Area (km2)'], process_irrigation)
-        area_df.append(processed_row)
+        
+        # Function to process a single row
+        if idx == 0:
+            # Process the first year
+            data_row = df.iloc[:, -1].reset_index().query('(index != "Total") & (index != "All")')
+            data_row.columns = column_names
+            data_row = process_irrigation(data_row)
+            data_row.insert(0, 'Year', YR_BASE)
+            area_df.append(data_row)
+            
+            # Process the last row for the year
+            data_row = df.iloc[-1, :].reset_index().query('(index != "Total") & (index != "All")')
+            data_row.columns = column_names
+            data_row = process_irrigation(data_row)
+            data_row.insert(0, 'Year', year)
+            area_df.append(data_row)
+        else:
+            # Process the last row for the year
+            data_row = df.iloc[-1, :].reset_index().query('(index != "Total") & (index != "All")')
+            data_row.columns = column_names
+            data_row = process_irrigation(data_row)
+            data_row.insert(0, 'Year', year)    
+            area_df.append(data_row)
 
     return pd.concat(area_df).reset_index(drop=True)
 

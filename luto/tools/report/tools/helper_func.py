@@ -3,7 +3,7 @@ from lxml import etree
 import pandas as pd
 from  lxml.etree import Element
 
-from tools.parameters import GHG_CATEGORY, GHG_FNAME2TYPE, GHG_NAMES,\
+from tools.PARAMETERS import GHG_CATEGORY, GHG_FNAME2TYPE, GHG_NAMES,\
                              LU_CROPS, LU_LVSTKS, LU_UNALLOW, NON_AG_LANDUSE
 
 
