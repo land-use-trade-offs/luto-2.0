@@ -42,7 +42,7 @@ shutil.copytree('luto/tools/report/tools/template_html',
 
 # Get all html files needs data insertion
 html_df = pd.DataFrame([['production',f"{REPORT_DIR}/REPORT_HTML/pages/production_profit.html"],
-                        ["area",f"{REPORT_DIR}/REPORT_HTML/pages/area_change.html"],
+                        ["area",f"{REPORT_DIR}/REPORT_HTML/pages/land-use_area.html"],
                         ["GHG",f"{REPORT_DIR}/REPORT_HTML/pages/GHG_emissions.html"],
                         ["water",f"{REPORT_DIR}/REPORT_HTML/pages/water_usage.html"]])
 
