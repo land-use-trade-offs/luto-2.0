@@ -31,7 +31,7 @@ if not os.path.exists(REPORT_DIR):
 #        Copy report html to the REPORT_DIR        #
 ####################################################  
 
-shutil.copytree('luto/tools/report/tools/tempelate_html', 
+shutil.copytree('luto/tools/report/tools/template_html', 
                 f'{REPORT_DIR}/REPORT_HTML',
                 dirs_exist_ok=True)
 
