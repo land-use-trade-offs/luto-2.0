@@ -347,8 +347,8 @@ def get_begin_end_df(files,timeseries = False):
     return begin_end_df_area, begin_end_df_pct
 
 
-def get_GHG_emissions_by_crop_lvstk_df(GHG_emmisions_long):
-    GHG_crop_lvstk_total = GHG_emmisions_long.groupby(['Year','Land use category','Land category']).sum()['Quantity (Mt CO2e)'].reset_index()
+def get_GHG_emissions_by_crop_lvstk_df(GHG_emissions_long):
+    GHG_crop_lvstk_total = GHG_emissions_long.groupby(['Year','Land use category','Land category']).sum()['Quantity (Mt CO2e)'].reset_index()
     GHG_crop_lvstk_total['Landuse_land_cat'] = GHG_crop_lvstk_total.apply(lambda x: (x['Land use category'] + ' - ' + x['Land category']) 
                                     if (x['Land use category'] != x['Land category']) else x['Land use category'], axis=1)
     

@@ -25,7 +25,7 @@
         },
 
         title: {
-            text: 'Agricultural Production'
+            text: 'Agricultural Production by Commodity'
         },
 
         credits: {
@@ -38,7 +38,7 @@
         
         yAxis: {
             title: {
-                text: 'Production Quantity (million tonnes, kilolitres [milk])'
+                text: 'Quantity (million tonnes, kilolitres [milk])'
             },
         },
 
@@ -78,7 +78,7 @@
         },
 
         title: {
-            text: 'Revenue by irrigation'
+            text: 'Revenue by Irrigation Status'
         },
 
         credits: {
@@ -131,7 +131,7 @@
         },
 
         title: {
-            text: 'Revenue by products'
+            text: 'Revenue by Agricultural Product'
         },
 
         credits: {
@@ -144,7 +144,7 @@
         
         yAxis: {
             title: {
-                text: 'Revenue by product (billion AU$)'
+                text: 'Revenue (billion AU$)'
             },
         },
 
@@ -185,7 +185,7 @@
         },
 
         title: {
-            text: 'Revenue by commodity type'
+            text: 'Revenue by Agriultural Commodity'
         },
 
         credits: {
@@ -198,7 +198,7 @@
         
         yAxis: {
             title: {
-                text: 'Revenue by commodities (billion AU$)'
+                text: 'Revenue (billion AU$)'
             },
         },
 
@@ -238,7 +238,7 @@
         },
 
         title: {
-            text: 'Revenue by crop/livestock type'
+            text: 'Revenue by Commodity Type'
         },
         
         credits: {
@@ -251,7 +251,7 @@
         
         yAxis: {
             title: {
-                text: 'Revenue by crop/livestock type (billion AU$)'
+                text: 'Revenue (billion AU$)'
             },
         },
 
@@ -292,7 +292,7 @@
         },
 
         title: {
-            text: 'Revenue by crop/livestock total'
+            text: 'Revenue by Crop/Livestock'
         },
     
         data: {
@@ -305,7 +305,7 @@
 
         yAxis: {
             title: {
-                text: 'Revenue by crop/livestock total (billion AU$)'
+                text: 'Revenue (billion AU$)'
             },
         },
 
@@ -345,7 +345,7 @@
         },
 
         title: {
-            text: 'Cost by irrigation'
+            text: 'Cost of Production by Irrigation Status'
         },
 
         credits: {
@@ -399,7 +399,7 @@
         },
 
         title: {
-            text: 'Cost by products'
+            text: 'Cost of Production by Agricultural Product'
         },
 
         credits: {
@@ -412,7 +412,7 @@
         
         yAxis: {
             title: {
-                text: 'Cost by products (billion AU$)'
+                text: 'Cost (billion AU$)'
             },
         },
 
@@ -453,7 +453,7 @@
         },
 
         title: {
-            text: 'Cost by commodity type'
+            text: 'Cost of Production by Commodity'
         },
 
         credits: {
@@ -466,7 +466,7 @@
         
         yAxis: {
             title: {
-                text: 'Cost by commodities (billion AU$)'
+                text: 'Cost (billion AU$)'
             },
         },
 
@@ -506,7 +506,7 @@
         },
 
         title: {
-            text: 'Cost by crop/livestock type'
+            text: 'Cost of Production by Commodity Type'
         },
         
         credits: {
@@ -519,7 +519,7 @@
         
         yAxis: {
             title: {
-                text: 'Cost by crop/livestock type (billion AU$)'
+                text: 'Cost (billion AU$)'
             },
         },
 
@@ -560,7 +560,7 @@
         },
 
         title: {
-            text: 'Cost by crop/livestock total'
+            text: 'Cost of Production by Crop/Livestock'
         },
     
         data: {
@@ -573,7 +573,7 @@
 
         yAxis: {
             title: {
-                text: 'Cost by crop/livestock total (billion AU$)'
+                text: 'Cost (billion AU$)'
             },
         },
 
@@ -614,7 +614,7 @@
         },
     
         title: {
-            text: 'Agricultural Revenue V.S. Cost'
+            text: 'Agricultural Revenue and Cost of Production'
         },
 
         credits: {
@@ -645,7 +645,7 @@
             }
         },
         
-        series: [{name:'Revenur',data:[]},
+        series: [{name:'Revenue',data:[]},
                  {name:'Cost',data:[]}],
     
         legend: {

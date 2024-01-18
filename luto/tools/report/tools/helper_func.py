@@ -63,10 +63,10 @@ def df_wide2long(df:pd.DataFrame):
     return df
 
 
-# Get dataframe of Revenue V.S. Cost
+# Get dataframe of Revenue vs Cost
 def get_rev_cost(revenue_df,cost_df):
     """
-    This function is used to get the dataframe of Revenue V.S. Cost
+    This function is used to get the dataframe of Revenue vs Cost
 
     Parameters:
     revenue_df (pandas.DataFrame): The input dataframe containing revenue data.

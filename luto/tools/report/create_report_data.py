@@ -152,33 +152,33 @@ GHG_files_wide['Net emission'] = GHG_files_wide[GHG_files_wide.columns[1:]].sum(
 GHG_files_wide.to_csv(f'{SAVE_DIR}/GHG_2_individual_emission_Mt.csv',index=False)
 
 # Plot_3-3: GHG emission (Mt)
-GHG_emmisions_long = get_GHG_category(GHG_files,'Agricultural Landuse')
+GHG_emissions_long = get_GHG_category(GHG_files,'Agricultural Landuse')
 
 # Plot_3-3-1: Agricultural Emission by crop/lvstk sectors (Mt)
-GHG_Ag_emission_total_crop_lvstk = get_GHG_emissions_by_crop_lvstk_df(GHG_emmisions_long)
+GHG_Ag_emission_total_crop_lvstk = get_GHG_emissions_by_crop_lvstk_df(GHG_emissions_long)
 GHG_Ag_emission_total_crop_lvstk_wide = GHG_Ag_emission_total_crop_lvstk.pivot(index='Year', columns='Landuse_land_cat', values='Quantity (Mt CO2e)').reset_index()
 GHG_Ag_emission_total_crop_lvstk_wide.to_csv(f'{SAVE_DIR}/GHG_3_crop_lvstk_emission_Mt.csv',index=False)
 
 # Plot_3-3-2: Agricultural Emission by crop/lvstk sectors (Mt)
-GHG_Ag_emission_total_dry_irr = GHG_emmisions_long.groupby(['Year','Irrigation']).sum()['Quantity (Mt CO2e)'].reset_index()
+GHG_Ag_emission_total_dry_irr = GHG_emissions_long.groupby(['Year','Irrigation']).sum()['Quantity (Mt CO2e)'].reset_index()
 GHG_Ag_emission_total_dry_irr_wide = GHG_Ag_emission_total_dry_irr.pivot(index='Year', columns='Irrigation', values='Quantity (Mt CO2e)').reset_index()
 GHG_Ag_emission_total_dry_irr_wide.to_csv(f'{SAVE_DIR}/GHG_4_dry_irr_emission_Mt.csv',index=False)
 
 # Plot_3-3-3: Agricultural Emission by GHG type sectors (Mt)
-GHG_Ag_emission_total_GHG_type = GHG_emmisions_long.groupby(['Year','GHG Category']).sum()['Quantity (Mt CO2e)'].reset_index()
+GHG_Ag_emission_total_GHG_type = GHG_emissions_long.groupby(['Year','GHG Category']).sum()['Quantity (Mt CO2e)'].reset_index()
 GHG_Ag_emission_total_GHG_type_wide = GHG_Ag_emission_total_GHG_type.pivot(index='Year', columns='GHG Category', values='Quantity (Mt CO2e)').reset_index()
 GHG_Ag_emission_total_GHG_type_wide.to_csv(f'{SAVE_DIR}/GHG_5_category_emission_Mt.csv',index=False)
 
 # Plot_3-3-4: Agricultural Emission by Sources (Mt)
-GHG_Ag_emission_total_Source = GHG_emmisions_long.groupby(['Year','Sources']).sum()['Quantity (Mt CO2e)'].reset_index()
+GHG_Ag_emission_total_Source = GHG_emissions_long.groupby(['Year','Sources']).sum()['Quantity (Mt CO2e)'].reset_index()
 GHG_Ag_emission_total_Source_wide = GHG_Ag_emission_total_Source.pivot(index='Year', columns='Sources', values='Quantity (Mt CO2e)').reset_index()
 GHG_Ag_emission_total_Source_wide.to_csv(f'{SAVE_DIR}/GHG_6_sources_emission_Mt.csv',index=False)
 
 
 # Plot_3-3-5: GHG emission in start and end years (Mt)
-start_year,end_year = GHG_emmisions_long['Year'].min(),GHG_emmisions_long['Year'].max() 
+start_year,end_year = GHG_emissions_long['Year'].min(),GHG_emissions_long['Year'].max() 
 
-GHG_lu_lm = GHG_emmisions_long\
+GHG_lu_lm = GHG_emissions_long\
         .groupby(['Year','Land use category','Land use','Irrigation'])\
         .sum()['Quantity (Mt CO2e)']\
         .reset_index()
@@ -192,7 +192,7 @@ GHG_lu_lm_df_begin_end_wide['Irrigation'] = GHG_lu_lm_df_begin_end_wide.apply(la
 GHG_lu_lm_df_begin_end_wide.to_csv(f'{SAVE_DIR}/GHG_7_lu_lm_emission_Mt_wide.csv',index=False)
 
 # Plot_3-3-6: GHG emission in the target year (Mt)
-GHG_lu_source = GHG_emmisions_long\
+GHG_lu_source = GHG_emissions_long\
                 .groupby(['Year','Land use','Irrigation','Sources'])\
                 .sum()['Quantity (Mt CO2e)']\
                 .reset_index()
