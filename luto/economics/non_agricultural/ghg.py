@@ -108,5 +108,3 @@ def get_ghg_matrix(data, aggregate=True) -> np.ndarray:
     else:
     # If the aggregate arguments is not in [True,False]. That must be someting wrong
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
-
-        

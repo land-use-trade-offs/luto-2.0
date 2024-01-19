@@ -62,7 +62,6 @@ CONNECTIVITY_WEIGHTING = 1
 
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 BIODIV_TARGET = 0.3
-BIODIV_TARGET_ACHIEVEMENT_YEAR = 2030
 
 # Set livestock impact on biodiversity (0 = no impact, 1 = total annihilation)
 BIODIV_LIVESTOCK_IMPACT = 0.5

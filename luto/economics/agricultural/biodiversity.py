@@ -91,8 +91,7 @@ def get_base_year_biodiversity_score(data) -> float:
         livestock_cells_2010 * data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA
     ).sum()
 
-    biodiv_score_2010 = biodiv_2010_non_pen_score + biodiv_2010_pen_score
-    return biodiv_score_2010
+    return biodiv_2010_non_pen_score + biodiv_2010_pen_score
 
 
 def get_biodiversity_limits(data, yr_idx) -> float:
@@ -105,7 +104,15 @@ def get_biodiversity_limits(data, yr_idx) -> float:
     biodiv_score_2010 = get_base_year_biodiversity_score(data)
 
     no_years_to_reach_limit = settings.BIODIV_TARGET_ACHIEVEMENT_YEAR - 2010
+
+    biodiv_target_score = data.TOTAL_BIODIV_TARGET_SCORE
+    if biodiv_target_score < biodiv_score_2010:
+        # In the case that the 2010 biodiversity score exceeds the calculated
+        # target score, use the 2010 score as the target instead.
+        biodiv_target_score = biodiv_score_2010
+
     biodiv_targets_each_year = np.linspace(
-        biodiv_score_2010, data.TOTAL_BIODIV_TARGET_SCORE, no_years_to_reach_limit + 1
+        biodiv_score_2010, biodiv_target_score, no_years_to_reach_limit + 1
     )
+
     return biodiv_targets_each_year[yr_idx - 2010]
