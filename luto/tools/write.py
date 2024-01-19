@@ -62,10 +62,6 @@ def get_path(sim):
 
     # Create path name
     path = 'output/' + path + post
-    
-    # Write the path to output folder so that the report module knows where to look for the outputs
-    with open('output/working_dir.txt', 'w') as f:
-        f.write(path)
 
     # Get all paths 
     paths = [path]\
@@ -120,10 +116,13 @@ def write_outputs(sim, path):
     import subprocess
 
     # 1) Clean up the output CSVs 
-    subprocess.run(['python', 'luto/tools/report/create_report_data.py'])
+    result = subprocess.run(['python', 'luto/tools/report/create_report_data.py', '-p', path], capture_output=True, text=True)
+    print("\nError occurred:", result.stderr) if result.returncode != 0 else print("\nReport data:", result.stdout)
 
     # 2) Create the report
-    subprocess.run(['python', 'luto/tools/report/create_html.py'])
+    result = subprocess.run(['python', 'luto/tools/report/create_html.py', '-p', path], capture_output=True, text=True)
+    print("Error occurred:", result.stderr) if result.returncode != 0 else print("\nReport HTML:", result.stdout)
+
 
 
 
