@@ -16,9 +16,9 @@ from tools.helper_func import get_GHG_category, get_GHG_file_df, get_rev_cost,ta
 #         setting up working variables             #
 ####################################################
 
-# # setting up working directory to root dir
-# if  __name__ == '__main__':
-#     os.chdir('../../..')
+# setting up working directory to root dir
+if  __name__ == '__main__':
+    os.chdir('../../..')
 
 # Get the output directory
 with open('output/working_dir.txt') as f:

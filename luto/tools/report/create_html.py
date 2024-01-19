@@ -11,9 +11,9 @@ from tools.helper_func import add_data_2_html
 #         setting up working variables             #
 ####################################################
 
-# # setting up working directory to root dir
-# if  __name__ == '__main__':
-#     os.chdir('../../..')
+# setting up working directory to root dir
+if  __name__ == '__main__':
+    os.chdir('../../..')
 
 # Get the output directory
 with open('output/working_dir.txt') as f:
