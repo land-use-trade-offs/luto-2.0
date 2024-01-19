@@ -2,6 +2,7 @@ import os
 import json
 import re
 import pandas as pd
+import argparse
 
 # import functions
 from tools import   get_AREA_am, get_AREA_lm, get_AREA_lu, get_GHG_emissions_by_crop_lvstk_df,\
@@ -17,13 +18,17 @@ from tools.helper_func import get_GHG_category, get_GHG_file_df, get_rev_cost,ta
 ####################################################
 
 # setting up working directory to root dir
-if  __name__ == '__main__':
-    os.chdir('../../..')
+# if  __name__ == '__main__':
+#     os.chdir('../../..')
 
 # Get the output directory
-with open('output/working_dir.txt') as f:
-    RAW_DATA_ROOT = os.path.abspath(f.readline().strip())
-    RAW_DATA_ROOT = os.path.normpath(RAW_DATA_ROOT).replace("\\", "/")
+parser = argparse.ArgumentParser()
+parser.add_argument("-p", type=str, required=True, help="Output directory path")
+args = parser.parse_args()
+
+RAW_DATA_ROOT = args.p
+RAW_DATA_ROOT = os.path.abspath(RAW_DATA_ROOT)
+RAW_DATA_ROOT = os.path.normpath(RAW_DATA_ROOT).replace("\\", "/")
 
 # Set the save directory    
 SAVE_DIR = f'{RAW_DATA_ROOT}/DATA_REPORT/data'

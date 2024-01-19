@@ -2,6 +2,7 @@ import os
 import shutil
 import pandas as pd
 from glob import glob
+import argparse
 
 
 from tools.helper_func import add_data_2_html
@@ -11,14 +12,18 @@ from tools.helper_func import add_data_2_html
 #         setting up working variables             #
 ####################################################
 
-# setting up working directory to root dir
-if  __name__ == '__main__':
-    os.chdir('../../..')
+# # setting up working directory to root dir
+# if  __name__ == '__main__':
+#     os.chdir('../../..')
 
 # Get the output directory
-with open('output/working_dir.txt') as f:
-    RAW_DATA_ROOT = os.path.abspath(f.readline().strip())
-    RAW_DATA_ROOT = os.path.normpath(RAW_DATA_ROOT).replace("\\", "/")
+parser = argparse.ArgumentParser()
+parser.add_argument("-p", type=str, required=True, help="Output directory path")
+args = parser.parse_args()
+
+RAW_DATA_ROOT = args.p
+RAW_DATA_ROOT = os.path.abspath(RAW_DATA_ROOT)
+RAW_DATA_ROOT = os.path.normpath(RAW_DATA_ROOT).replace("\\", "/")
 
 # Set the save directory    
 REPORT_DIR = f'{RAW_DATA_ROOT}/DATA_REPORT'
