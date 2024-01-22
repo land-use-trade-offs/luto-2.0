@@ -245,7 +245,7 @@ def get_ghg_transition_penalties(data, lumap) -> np.ndarray:
     _, ncells, n_ag_lus = data.AG_L_MRJ.shape
     # Set up empty array of penalties
     penalties_rj = np.zeros((ncells, n_ag_lus), dtype=np.float32)
-    natural_lu_cells, _ = tools.get_natural_and_unnatural_lu_cells(data, lumap)
+    natural_lu_cells = tools.get_natural_lu_cells(data, lumap)
 
     # Calculate penalties and add to g_rj matrix
     penalties_r = (
@@ -339,6 +339,10 @@ def get_precision_agriculture_effect_g_mrj(data, yr_idx):
                     continue
 
                 reduction_perc = 1 - lu_data.loc[year, co2e_type]
+
+                if co2e_type == "CO2E_KG_HA_SOIL":
+                    co2e_type += "_N_SURP"  # TODO: determine why names differ between files
+
                 if reduction_perc != 0:
                     reduction_amnt = (
                         np.nan_to_num(data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy(), 0) # type: ignore

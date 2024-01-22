@@ -54,35 +54,30 @@ class InputData:
     ag_r_mrj: np.ndarray  # Agricultural production revenue matrices.
     ag_g_mrj: np.ndarray  # Agricultural greenhouse gas emissions matrices.
     ag_w_mrj: np.ndarray  # Agricultural water requirements matrices.
-    ag_x_mrj: np.ndarray  # Agricultural exclude matrices.
-    ag_q_mrp: np.ndarray  # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
-    ag_ghg_t_mrj: np.ndarray  # GHG emissions released during transitions between agricultural land uses.
-
-    ag_t_mrj: np.ndarray  # Agricultural transition cost matrices.
-    ag_c_mrj: np.ndarray  # Agricultural production cost matrices.
-    ag_r_mrj: np.ndarray  # Agricultural production revenue matrices.
-    ag_g_mrj: np.ndarray  # Agricultural greenhouse gas emissions matrices.
-    ag_w_mrj: np.ndarray  # Agricultural water requirements matrices.
+    ag_b_mrj: np.ndarray  # Agricultural biodiversity matrices.
     ag_x_mrj: np.ndarray  # Agricultural exclude matrices.
     ag_q_mrp: np.ndarray  # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
     ag_ghg_t_mrj: np.ndarray  # GHG emissions released during transitions between agricultural land uses.
 
     ag_to_non_ag_t_rk: np.ndarray  # Agricultural to non-agricultural transition cost matrix.
     non_ag_to_ag_t_mrj: np.ndarray  # Non-agricultural to agricultural transition cost matrices.
+    non_ag_t_rk: np.ndarray  # Non-agricultural transition costs matrix
     non_ag_c_rk: np.ndarray  # Non-agricultural production cost matrix.
     non_ag_r_rk: np.ndarray  # Non-agricultural revenue matrix.
     non_ag_g_rk: np.ndarray  # Non-agricultural greenhouse gas emissions matrix.
     non_ag_w_rk: np.ndarray  # Non-agricultural water requirements matrix.
+    non_ag_b_rk: np.ndarray  # Non-agricultural biodiversity matrix.
     non_ag_x_rk: np.ndarray  # Non-agricultural exclude matrices.
     non_ag_q_crk: np.ndarray  # Non-agricultural yield matrix.
 
-    ag_man_c_mrj: np.ndarray  # Agricultural management options' cost effects.
-    ag_man_g_mrj: np.ndarray  # Agricultural management options' GHG emission effects.
-    ag_man_q_mrp: np.ndarray  # Agricultural management options' quantity effects.
-    ag_man_r_mrj: np.ndarray  # Agricultural management options' revenue effects.
-    ag_man_t_mrj: np.ndarray  # Agricultural management options' transition cost effects.
-    ag_man_w_mrj: np.ndarray  # Agricultural management options' water requirement effects.
-    ag_man_limits: np.ndarray  # Agricultural management options' adoption limits.
+    ag_man_c_mrj: dict[str, np.ndarray]  # Agricultural management options' cost effects.
+    ag_man_g_mrj: dict[str, np.ndarray]  # Agricultural management options' GHG emission effects.
+    ag_man_q_mrp: dict[str, np.ndarray]  # Agricultural management options' quantity effects.
+    ag_man_r_mrj: dict[str, np.ndarray]  # Agricultural management options' revenue effects.
+    ag_man_t_mrj: dict[str, np.ndarray]  # Agricultural management options' transition cost effects.
+    ag_man_w_mrj: dict[str, np.ndarray]  # Agricultural management options' water requirement effects.
+    ag_man_b_mrj: dict[str, np.ndarray]  # Agricultural management options' biodiversity effects.
+    ag_man_limits: dict[str, np.ndarray]  # Agricultural management options' adoption limits.
 
     lu2pr_pj: np.ndarray  # Conversion matrix: land-use to product(s).
     pr2cm_cp: np.ndarray  # Conversion matrix: product(s) to commodity.
@@ -176,7 +171,10 @@ class LutoSolver:
         self.adoption_limit_constraints = []
         self.demand_penalty_constraints = []
         self.water_limit_constraints_r = defaultdict(list)
+        self.ghg_emissions_expr = None
         self.ghg_emissions_limit_constraint = None
+        self.biodiversity_expr = None
+        self.biodiversity_limit_constraint = None
 
     def formulate(self):
         """
@@ -298,6 +296,7 @@ class LutoSolver:
                     self._input_data.non_ag_r_rk
                     - (
                         self._input_data.non_ag_c_rk
+                        + self._input_data.non_ag_t_rk
                         + self._input_data.ag_to_non_ag_t_rk
                     )
                 ) / settings.PENALTY
@@ -324,7 +323,9 @@ class LutoSolver:
             ) / settings.PENALTY
 
             non_ag_obj_rk = (
-                self._input_data.non_ag_c_rk + self._input_data.ag_to_non_ag_t_rk
+                self._input_data.non_ag_c_rk
+                + self._input_data.non_ag_t_rk
+                + self._input_data.ag_to_non_ag_t_rk
             ) / settings.PENALTY
 
             # Store calculations for each agricultural management option in a dict
@@ -696,6 +697,52 @@ class LutoSolver:
             self.ghg_emissions_expr <= ghg_limits
         )
 
+    def _add_biodiversity_limit_constraints(self):
+        if settings.BIODIVERSITY_LIMITS != "on":
+            return
+
+        print("\nAdding biodiversity constraints...", time.ctime() + "\n")
+
+        # Returns GHG emissions limits
+        biodiversity_limits = self._input_data.limits["biodiversity"]
+
+        ag_contr = gp.quicksum(
+            gp.quicksum(
+                self._input_data.ag_b_mrj[0, :, :][:, j] * self.X_ag_dry_vars_jr[j, :]
+            )  # Dryland agriculture contribution
+            + gp.quicksum(
+                self._input_data.ag_b_mrj[1, :, :][:, j] * self.X_ag_irr_vars_jr[j, :]
+            )  # Irrigated agriculture contribution
+            for j in range(self._input_data.n_ag_lus)
+        )
+
+        ag_man_contr = gp.quicksum(
+            gp.quicksum(
+                self._input_data.ag_man_b_mrj[am][0, :, j_idx]
+                * self.X_ag_man_dry_vars_jr[am][j_idx, :]
+            )  # Dryland alt. ag. management contributions
+            + gp.quicksum(
+                self._input_data.ag_man_b_mrj[am][1, :, j_idx]
+                * self.X_ag_man_irr_vars_jr[am][j_idx, :]
+            )  # Irrigated alt. ag. management contributions
+            for am, am_j_list in self._input_data.am2j.items()
+            for j_idx in range(len(am_j_list))
+        )
+
+        non_ag_contr = gp.quicksum(
+            gp.quicksum(
+                self._input_data.non_ag_b_rk[:, k] * self.X_non_ag_vars_kr[k, :]
+            )  # Non-agricultural contribution
+            for k in range(self._input_data.n_non_ag_lus)
+        )
+
+        self.biodiversity_expr = ag_contr + ag_man_contr + non_ag_contr
+
+        print("    ...setting biodiversity score target: {:,.0f}\n".format(biodiversity_limits))
+        self.biodiversity_limit_constraint = self.gurobi_model.addConstr(
+            self.biodiversity_expr >= biodiversity_limits
+        )
+
     def _setup_constraints(self):
         print(f"Setting up constraints ({time.ctime()})...")
         st = time.time()
@@ -705,6 +752,7 @@ class LutoSolver:
         self._add_demand_penalty_constraints()
         self._add_water_usage_limit_constraints()
         self._add_ghg_emissions_limit_constraints()
+        self._add_biodiversity_limit_constraints()
         ft = time.time()
         print(f"Constraint setup took {round(ft - st, 1)}s")
 
@@ -1039,6 +1087,9 @@ class LutoSolver:
 
         print("Processing GHG emissions amount...")
         prod_data["GHG Emissions"] = self.ghg_emissions_expr.getValue()
+
+        print("Processing solution biodiversity score...")
+        prod_data["Biodiversity"] = self.biodiversity_expr.getValue()
 
         ag_X_mrj_processed[:, non_ag_bools_r, :] = False
         non_ag_X_rk_processed[~non_ag_bools_r, :] = False
