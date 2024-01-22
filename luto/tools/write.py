@@ -97,8 +97,7 @@ def write_outputs(sim, path):
     # Write outputs for each year
     for idx,(yr, path_yr) in enumerate(zip(years, paths)):
         write_output_single_year(sim, yr, path_yr, yr_cal_sim_pre=None)
-        if idx % 5 == 0:
-            print(f"Finished writing {yr} out of {years[0]}-{years[-1]} years")
+        print(f"Finished writing {yr} out of {years[0]}-{years[-1]} years\n")
     
     # Write the area/quantity comparison between base-year and target-year for the timeseries mode
     if settings.MODE == 'timeseries':
@@ -106,7 +105,8 @@ def write_outputs(sim, path):
         # 1) Simply copy the base-year outputs to the path_begin_end_compare
         shutil.copytree(f"{path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True)
         # 2) Write the target-year outputs to the path_begin_end_compare
-        write_output_single_year(sim, years[-1], f"{begin_end_path}/out_{years[-1]}", yr_cal_sim_pre=years[0])
+        write_output_single_year(sim, years[-1], f"{begin_end_path}/out_{years[-1]}", yr_cal_sim_pre=years[0])   
+        print(f"Finished writing {years[0]}-{years[-1]} comparison\n")
         
     ###############################################################
     #               Fire up the report script                     #
@@ -121,7 +121,7 @@ def write_outputs(sim, path):
 
     # 2) Create the report
     result = subprocess.run(['python', 'luto/tools/report/create_html.py', '-p', path], capture_output=True, text=True)
-    print("Error occurred:", result.stderr) if result.returncode != 0 else print("\nReport HTML:", result.stdout)
+    print("\nError occurred:", result.stderr) if result.returncode != 0 else print("\nReport HTML:\n", result.stdout)
 
 
 
@@ -192,7 +192,7 @@ def write_settings(path):
 def write_files(sim, yr_cal, path):
     """Writes numpy arrays and geotiffs to file"""
     
-    print('\nWriting numpy arrays and geotiff outputs to', path)
+    print('Writing numpy arrays and geotiff outputs to', path)
     
     # Save raw agricultural decision variables (boolean array).
     ag_X_mrj_fname = 'ag_X_mrj' + '.npy'
@@ -320,7 +320,7 @@ def write_quantity(sim, yr_cal, path, yr_cal_sim_pre=None):
             prod_base = np.array(sim.prod_data[yr_cal_sim_pre]['Production'])   
     
         prod_targ = np.array(sim.prod_data[yr_cal]['Production'])  # Get commodity quantities produced in target year
-        demands = sim.data.D_CY[yr_idx]                            # Get commodity demands for target year
+        demands = sim.data.D_CY[yr_idx - 1]                        # Get commodity demands for target year
         abs_diff = prod_targ - demands                             # Diff between target year production and demands in absolute terms (i.e. tonnes etc)
         prop_diff = ( prod_targ / demands ) * 100                  # Target year production as a proportion of demands (%)
         
@@ -349,7 +349,7 @@ def write_ag_revenue_cost(sim, yr_cal, path):
     # Get the timestamp so each CSV in the timeseries mode has a unique name
     timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
 
-    print('\nWriting agricultural revenue outputs to', path)
+    print('Writing agricultural revenue outputs to', path)
 
     # Convert calendar year to year index.
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
@@ -363,7 +363,7 @@ def write_ag_revenue_cost(sim, yr_cal, path):
     ag_rev_df_rjms = ag_revenue.get_rev_matrices(sim.data, yr_idx, aggregate=False)
     ag_cost_df_rjms = ag_cost.get_cost_matrices(sim.data, yr_idx, aggregate=False)
 
-    # Expand the original df with zero values to convert it to a a **mrjs** array
+    # Expand the original df with zero values to convert it to a **mrjs** array
     ag_rev_df_rjms = ag_rev_df_rjms.reindex(columns=pd.MultiIndex.from_product(ag_rev_df_rjms.columns.levels), fill_value=0)
     ag_rev_rjms = ag_rev_df_rjms.values.reshape(-1, *ag_rev_df_rjms.columns.levshape)
 
@@ -425,7 +425,7 @@ def write_crosstab(sim, yr_cal, path, yr_cal_sim_pre=None):
         assert yr_cal_sim_pre >= sim.data.YR_CAL_BASE and yr_cal_sim_pre < yr_cal,\
             f"yr_cal_sim_pre ({yr_cal_sim_pre}) must be >= {sim.data.YR_CAL_BASE} and < {yr_cal}"
 
-        print('\nWriting production outputs to', path)
+        print('Writing production outputs to', path)
 
         # LUS = ['Non-agricultural land'] + sim.data.AGRICULTURAL_LANDUSES + sim.data.NON_AGRICULTURAL_LANDUSES
         ctlu, swlu = lumap_crossmap( sim.lumaps[yr_cal_sim_pre]
@@ -491,7 +491,7 @@ def write_water(sim, yr_cal, path):
     # Get the timestamp so each CSV in the timeseries mode has a unique name
     timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
 
-    print('\nWriting water outputs to', path)
+    print('Writing water outputs to', path)
 
     # Convert calendar year to year index.
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
@@ -639,7 +639,7 @@ def write_ghg(sim, yr_cal, path):
     # Get the timestamp so each CSV in the timeseries mode has a unique name
     timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
 
-    print('\nWriting GHG outputs to', path)
+    print('Writing GHG outputs to', path)
 
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
         

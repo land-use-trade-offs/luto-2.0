@@ -1,5 +1,5 @@
 // create chart
- document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', function () {
 
     Highcharts.setOptions({
         colors: [
@@ -15,6 +15,119 @@
             '#91e8e1'
         ],
     });
+
+    // Chart:production_0_1_demand_borader_cat_wide
+    let production_0_1_demand_borader_cat_wide_option = {
+        chart: {
+            renderTo: 'production_0_1_demand_borader_cat_wide',
+            marginRight: 180,
+            type: 'column'
+        },
+        title: {
+            text: 'Agricultural Demand by Category'
+        },
+        xAxis: {
+            categories: [],
+        },
+        yAxis: {
+            title: {
+                text: 'Quantity (million tonnes, kilolitres [milk])'
+            },
+        },
+        legend: {
+            align: 'right',
+            verticalAlign: 'top',
+            layout: 'vertical',
+            x: 0,
+            y: -10
+        },
+
+        series: [],
+
+        credits: {
+            enabled: false
+        },
+
+        plotOptions: {
+            column: {
+                stacking: 'normal',
+                dataLabels: {
+                    enabled: false
+                }
+            }
+        },
+        exporting: {
+            sourceWidth: 1200,
+            sourceHeight: 600,
+        }
+    };
+
+    // Extract data to populate chart
+    $(document).ready(function() {
+        let data;
+
+        data = document.getElementById('production_0_1_demand_borader_cat_wide_csv').innerHTML;
+        var lines = data.split('\n');
+        
+        $.each(lines, function(lineNo, line) {
+            var items = line.split(',');
+    
+            if (lineNo == 0) { // The first line (headers)
+                production_0_1_demand_borader_cat_wide_option.xAxis.categories = items.slice(2).map(x => parseFloat(x)); 
+            }
+            else{
+                switch(items[0]) {
+                    case 'Domestic':
+                        production_0_1_demand_borader_cat_wide_option.series.push({
+                            name:items[1],
+                            data:items.slice(2).map(x => parseFloat(x)), 
+                            stack: items[0],
+                            type: 'column'
+                        });
+                        break;
+                    case 'Exports':
+                        production_0_1_demand_borader_cat_wide_option.series.push({
+                            name:items[1],
+                            data:items.slice(2).map(x => parseFloat(x)), 
+                            stack : items[0],
+                            showInLegend: false,
+                        });
+                        break;
+                    case 'Feed':
+                        production_0_1_demand_borader_cat_wide_option.series.push({
+                            name:items[1],
+                            data:items.slice(2).map(x => parseFloat(x)), 
+                            stack : items[0],
+                            showInLegend: false,
+                        });
+                        break;
+                    case 'Imports':
+                        production_0_1_demand_borader_cat_wide_option.series.push({
+                            name:items[1],
+                            data:items.slice(2).map(x => parseFloat(x)), 
+                            stack: items[0],
+                            showInLegend: false,
+                        });
+                        break;
+                    case 'Production':
+                        production_0_1_demand_borader_cat_wide_option.series.push({
+                            name:items[1],
+                            data:items.slice(2).map(x => parseFloat(x)), 
+                            stack : items[0],
+                            showInLegend: false,
+                        });
+                        break;
+                  }
+                
+            }
+        });
+    
+        // Create the chart with the correct options
+        let chart = new Highcharts.Chart(production_0_1_demand_borader_cat_wide_option);
+        
+
+        });
+
 
     // Chart:production_1_quantity_df_wide
     Highcharts.chart('production_1_quantity_df_wide', {
