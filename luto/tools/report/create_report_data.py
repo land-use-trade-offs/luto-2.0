@@ -81,12 +81,35 @@ DEMAND_DATA_wide = DEMAND_DATA_wide.reindex(
 DEMAND_DATA_wide.to_csv(f'{SAVE_DIR}/production_3_demand_commodity.csv', index=False)
 
 
-# Plot_1-4: Production (Million Tonnes)
-quantity_csv_paths = files.query('catetory == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)
-quantity_df = get_quantity_df(quantity_csv_paths)
+# Plot_1-4_(1-2): Domestic On/Off land commodities (Million Tonnes)
+for idx,on_off_land in enumerate(DEMAND_DATA_long['on_off_land'].unique()):
+    DEMAND_DATA_on_off_commodity = DEMAND_DATA_long.query('on_off_land == @on_off_land and Type == "Domestic" ')
+    DEMAND_DATA_on_off_commodity_wide = DEMAND_DATA_on_off_commodity.pivot(
+        index=['Year'], 
+        columns=['COMMODITY'], 
+        values='Quantity (tonnes, ML)').reset_index()
+    
+    # Remove the rows of all 0 values
+    DEMAND_DATA_on_off_commodity_wide = DEMAND_DATA_on_off_commodity_wide.loc[:, (DEMAND_DATA_on_off_commodity_wide != 0).any(axis=0)]
+    
+    on_off_land = '_'.join(on_off_land.split(' '))
+    DEMAND_DATA_on_off_commodity_wide.to_csv(f'{SAVE_DIR}/production_4_{idx+1}_demand_domestic_{on_off_land}_commodity.csv', index=False)
 
-quantity_df_wide = quantity_df.pivot_table(index=['year'], columns='Commodity', values='Prod_targ_year (tonnes, ML)').reset_index()
-quantity_df_wide.to_csv(f'{SAVE_DIR}/production_4_quantity_df_wide.csv', index=False)
+# Plot_1-5_(1-4): Commodities for 'Exports','Feed','Imports','Production' (Million Tonnes)
+for idx,Type in enumerate(DEMAND_DATA_long['Type'].unique()):
+    if Type == 'Domestic':
+        continue
+    DEMAND_DATA_commodity = DEMAND_DATA_long.query('Type == @Type')
+    DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity.pivot(
+        index=['Year'], 
+        columns=['COMMODITY'], 
+        values='Quantity (tonnes, ML)').reset_index()
+    
+    # Remove the rows of all 0 values
+    DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity_wide.loc[:, (DEMAND_DATA_commodity_wide != 0).any(axis=0)]
+    
+    DEMAND_DATA_commodity_wide.to_csv(f'{SAVE_DIR}/production_5_{idx+1}_demand_{Type}_commodity.csv', index=False)
+
 
 
 
