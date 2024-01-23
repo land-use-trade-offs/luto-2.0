@@ -48,28 +48,45 @@ files = get_all_files(RAW_DATA_ROOT)
 # Get the demand data
 DEMAND_DATA_long = get_demand_df(files)
 
+# Convert quanlity to million tonnes
+DEMAND_DATA_long['Quantity (tonnes, ML)'] = DEMAND_DATA_long['Quantity (tonnes, ML)'] / 1e6
 
-# Plot_1: {Total} for 'Domestic', 'Exports', 'Feed', 'Imports', 'Production'(Tonnes) 
+
+# Plot_1_1: {Total} for 'Domestic', 'Exports', 'Feed', 'Imports', 'Production'(Tonnes) 
 DEMAND_DATA_type = DEMAND_DATA_long.groupby(['Year','Type']).sum(numeric_only=True).reset_index()
 DEMAND_DATA_type_wide = DEMAND_DATA_type.pivot(index='Year', columns='Type', values='Quantity (tonnes, ML)').reset_index()
 DEMAND_DATA_type_wide.to_csv(f'{SAVE_DIR}/production_1_demand_type_wide.csv', index=False)
 
 
-# Plot_2: {ON/OFF land} for 'Domestic', 'Exports', 'Feed', 'Imports', 'Production'(Tonnes) 
+# Plot_1_2: {ON/OFF land} for 'Domestic', 'Exports', 'Feed', 'Imports', 'Production'(Tonnes) 
 DEMAND_DATA_on_off = DEMAND_DATA_long.groupby(['Year','Type','on_off_land']).sum(numeric_only=True).reset_index()
 DEMAND_DATA_on_off_wide = DEMAND_DATA_on_off.pivot(index='on_off_land', 
                                                    columns=['Year','Type'], 
-                                                   values='Quantity (tonnes, ML)').reset_index()
+                                                   values='Quantity (tonnes, ML)')
+
+DEMAND_DATA_on_off_wide = DEMAND_DATA_on_off_wide.reindex(
+    columns = pd.MultiIndex.from_product(DEMAND_DATA_on_off_wide.columns.levels)).reset_index()
+
 DEMAND_DATA_on_off_wide.to_csv(f'{SAVE_DIR}/production_2_demand_on_off_wide.csv', index=False)
 
-# Plot_3: {Commodity} 'Domestic', 'Exports', 'Feed', 'Imports', 'Production' (Tonnes)
+# Plot_1_3: {Commodity} 'Domestic', 'Exports', 'Feed', 'Imports', 'Production' (Tonnes)
 DEMAND_DATA_wide = DEMAND_DATA_long.pivot(
     index=['COMMODITY'], 
     columns=['Year','Type'], 
-    values='Quantity (tonnes, ML)').reset_index()
+    values='Quantity (tonnes, ML)')
+
+DEMAND_DATA_wide = DEMAND_DATA_wide.reindex(
+    columns = pd.MultiIndex.from_product(DEMAND_DATA_wide.columns.levels)).reset_index()
 
 DEMAND_DATA_wide.to_csv(f'{SAVE_DIR}/production_3_demand_commodity.csv', index=False)
 
+
+# Plot_1-4: Production (Million Tonnes)
+quantity_csv_paths = files.query('catetory == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)
+quantity_df = get_quantity_df(quantity_csv_paths)
+
+quantity_df_wide = quantity_df.pivot_table(index=['year'], columns='Commodity', values='Prod_targ_year (tonnes, ML)').reset_index()
+quantity_df_wide.to_csv(f'{SAVE_DIR}/production_4_quantity_df_wide.csv', index=False)
 
 
 
@@ -78,13 +95,6 @@ DEMAND_DATA_wide.to_csv(f'{SAVE_DIR}/production_3_demand_commodity.csv', index=F
 #         1) Produciton, Revenue, Cost             #
 ####################################################
 
-
-# Plot_1-1: Production (Million Tonnes)
-quantity_csv_paths = files.query('catetory == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)
-quantity_df = get_quantity_df(quantity_csv_paths)
-
-quantity_df_wide = quantity_df.pivot_table(index=['year'], columns='Commodity', values='Prod_targ_year (tonnes, ML)').reset_index()
-quantity_df_wide.to_csv(f'{SAVE_DIR}/production_1_quantity_df_wide.csv', index=False)
 
 
 # Plot_1-2: Revenue and Cost data (Billion Dollars)

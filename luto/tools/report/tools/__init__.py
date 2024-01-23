@@ -95,7 +95,19 @@ def get_all_files(data_root):
 
 
 def get_demand_df(files_df:pd.DataFrame):
-    
+    """
+    Get the demand data as a DataFrame.
+
+    Args:
+        files_df (pd.DataFrame): DataFrame containing file information.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the demand data.
+
+    Raises:
+        None
+    """
+
     # import luto settings
     sys.path.append('./') # path of current dir
     sys.path.append('../../..') # path of the project root dir
