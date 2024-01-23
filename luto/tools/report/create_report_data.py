@@ -13,13 +13,13 @@ from tools import   get_AREA_am, get_AREA_lm, get_AREA_lu, get_GHG_emissions_by_
 from tools.helper_func import get_GHG_category, get_GHG_file_df, get_rev_cost,target_GHG_2_Json
 
 # import settings
-sys.path.append('./')
-sys.path.append('../../..')
+sys.path.append('./') # path of current dir
+sys.path.append('../../..') # path of the project root dir
 from luto.settings import INPUT_DIR, SSP, RCP, SCENARIO, DIET_DOM, DIET_GLOB, CONVERGENCE, IMPORT_TREND, WASTE, FEED_EFFICIENCY
 
 
 ####################################################
-#         setting up working variables             #
+#         Setting up working variables             #
 ####################################################
 
 # setting up working directory to root dir
@@ -72,6 +72,10 @@ year_max = quantity_df_wide['year'].max()
 
 dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
 
+# Convert eggs from count to tones
+mask = dd.index.get_level_values(7) == 'eggs'
+dd.loc[:,:,:,:,:,:,:,mask] = dd.loc[:,:,:,:,:,:,:,mask] * 60 / 1000 / 1000 
+
 # Select the demand scenario
 DEMAND_DATA = dd.loc[(SCENARIO, DIET_DOM, DIET_GLOB, CONVERGENCE, 
                       IMPORT_TREND, WASTE, FEED_EFFICIENCY)].copy()
@@ -90,10 +94,10 @@ DEMAND_DATA_wide = DEMAND_DATA_wide.pivot(
 DEMAND_DATA_wide['Type'] = DEMAND_DATA_wide['Type'].str.title()
 DEMAND_DATA_wide['COMMODITY'] = DEMAND_DATA_wide['COMMODITY']\
     .apply(lambda x: x[0].upper() + x[1:].lower())
+    
+DEMAND_DATA_wide = DEMAND_DATA_wide.pivot(index='COMMODITY',columns='Type').reset_index()
 
 DEMAND_DATA_wide.to_csv(f'{SAVE_DIR}/production_0_1_demand_borader_cat_wide.csv', index=False)
-
-
 
 
 

@@ -466,6 +466,10 @@ BAU_PROD_INCR = pd.read_csv(fpath, header = [0,1]).astype(np.float32)
 # Load demand data (actual production (tonnes, ML) by commodity) - from demand model     
 dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
 
+# Convert eggs from count to tonnes, assuming each egg weighs 60g
+mask = dd.index.get_level_values(7) == 'eggs'
+dd.loc[:,:,:,:,:,:,:,mask] = dd.loc[:,:,:,:,:,:,:,mask] * 60 / 1000 / 1000 
+
 # Select the demand scenario (returns commodity x year dataframe) - includes off-land commodities
 DEMAND_DATA = dd.loc[(SCENARIO, DIET_DOM, DIET_GLOB, CONVERGENCE, IMPORT_TREND, WASTE, FEED_EFFICIENCY)].copy()
 
