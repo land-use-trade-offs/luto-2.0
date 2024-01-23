@@ -12,7 +12,7 @@ LU_LVSTKS = ['Beef - modified land','Beef - natural land','Dairy - modified land
 
 LU_UNALLOW = ['Unallocated - modified land','Unallocated - natural land']
 
-
+COMMODITIES_OFF_LAND = ['Pork', 'Chicken', 'Eggs', 'Aquaculture']
 
 # Define the file name patterns for each category
 GHG_FNAME2TYPE = {'GHG_emissions_separate_agricultural_landuse': 'Agricultural Landuse',

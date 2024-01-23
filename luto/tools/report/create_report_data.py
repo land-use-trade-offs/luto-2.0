@@ -1,5 +1,4 @@
 import os
-import sys
 import json
 import re
 import pandas as pd
@@ -8,14 +7,11 @@ import argparse
 # import functions
 from tools import   get_AREA_am, get_AREA_lm, get_AREA_lu, get_GHG_emissions_by_crop_lvstk_df,\
                     get_all_files, get_begin_end_df, get_non_ag_reduction, get_quantity_df, \
-                    get_rev_cost_df, get_water_df
+                    get_rev_cost_df, get_water_df, get_demand_df
+
               
 from tools.helper_func import get_GHG_category, get_GHG_file_df, get_rev_cost,target_GHG_2_Json
 
-# import settings
-sys.path.append('./') # path of current dir
-sys.path.append('../../..') # path of the project root dir
-from luto.settings import INPUT_DIR, SSP, RCP, SCENARIO, DIET_DOM, DIET_GLOB, CONVERGENCE, IMPORT_TREND, WASTE, FEED_EFFICIENCY
 
 
 ####################################################
@@ -45,15 +41,42 @@ if not os.path.exists(SAVE_DIR):
 files = get_all_files(RAW_DATA_ROOT)
 
 
+####################################################
+#                  1) Produciton                   #
+####################################################
+
+# Get the demand data
+DEMAND_DATA_long = get_demand_df(files)
+
+
+# Plot_1: {Total} for 'Domestic', 'Exports', 'Feed', 'Imports', 'Production'(Tonnes) 
+DEMAND_DATA_type = DEMAND_DATA_long.groupby(['Year','Type']).sum(numeric_only=True).reset_index()
+DEMAND_DATA_type_wide = DEMAND_DATA_type.pivot(index='Year', columns='Type', values='Quantity (tonnes, ML)').reset_index()
+DEMAND_DATA_type_wide.to_csv(f'{SAVE_DIR}/production_1_demand_type_wide.csv', index=False)
+
+
+# Plot_2: {ON/OFF land} for 'Domestic', 'Exports', 'Feed', 'Imports', 'Production'(Tonnes) 
+DEMAND_DATA_on_off = DEMAND_DATA_long.groupby(['Year','Type','on_off_land']).sum(numeric_only=True).reset_index()
+DEMAND_DATA_on_off_wide = DEMAND_DATA_on_off.pivot(index='on_off_land', 
+                                                   columns=['Year','Type'], 
+                                                   values='Quantity (tonnes, ML)').reset_index()
+DEMAND_DATA_on_off_wide.to_csv(f'{SAVE_DIR}/production_2_demand_on_off_wide.csv', index=False)
+
+# Plot_3: {Commodity} 'Domestic', 'Exports', 'Feed', 'Imports', 'Production' (Tonnes)
+DEMAND_DATA_wide = DEMAND_DATA_long.pivot(
+    index=['COMMODITY'], 
+    columns=['Year','Type'], 
+    values='Quantity (tonnes, ML)').reset_index()
+
+DEMAND_DATA_wide.to_csv(f'{SAVE_DIR}/production_3_demand_commodity.csv', index=False)
+
+
+
+
 
 ####################################################
 #         1) Produciton, Revenue, Cost             #
 ####################################################
-
-
-
-
-
 
 
 # Plot_1-1: Production (Million Tonnes)
@@ -62,43 +85,6 @@ quantity_df = get_quantity_df(quantity_csv_paths)
 
 quantity_df_wide = quantity_df.pivot_table(index=['year'], columns='Commodity', values='Prod_targ_year (tonnes, ML)').reset_index()
 quantity_df_wide.to_csv(f'{SAVE_DIR}/production_1_quantity_df_wide.csv', index=False)
-
-
-
-# Plot_0-1: 'Domestic', 'Exports', 'Feed', 'Imports', 'Production' (Million Tonnes)
-# Load demand data     
-year_max = quantity_df_wide['year'].max()
-
-
-dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
-
-# Convert eggs from count to tones
-mask = dd.index.get_level_values(7) == 'eggs'
-dd.loc[:,:,:,:,:,:,:,mask] = dd.loc[:,:,:,:,:,:,:,mask] * 60 / 1000 / 1000 
-
-# Select the demand scenario
-DEMAND_DATA = dd.loc[(SCENARIO, DIET_DOM, DIET_GLOB, CONVERGENCE, 
-                      IMPORT_TREND, WASTE, FEED_EFFICIENCY)].copy()
-
-# Filter the demand data to only include years up to the target year
-mask = DEMAND_DATA.columns.get_level_values(1) <=2015
-DEMAND_DATA = DEMAND_DATA.loc[:,mask]
-
-DEMAND_DATA_wide = DEMAND_DATA.stack([0,1]).reset_index()
-DEMAND_DATA_wide.columns = ['COMMODITY','Type','Year','Quantity (tonnes, ML)']
-DEMAND_DATA_wide = DEMAND_DATA_wide.pivot(
-    index=['Type','COMMODITY'], 
-    columns=['Year'], 
-    values='Quantity (tonnes, ML)').reset_index()
-
-DEMAND_DATA_wide['Type'] = DEMAND_DATA_wide['Type'].str.title()
-DEMAND_DATA_wide['COMMODITY'] = DEMAND_DATA_wide['COMMODITY']\
-    .apply(lambda x: x[0].upper() + x[1:].lower())
-    
-DEMAND_DATA_wide = DEMAND_DATA_wide.pivot(index='COMMODITY',columns='Type').reset_index()
-
-DEMAND_DATA_wide.to_csv(f'{SAVE_DIR}/production_0_1_demand_borader_cat_wide.csv', index=False)
-
 
 
 # Plot_1-2: Revenue and Cost data (Billion Dollars)
