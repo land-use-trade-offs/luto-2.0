@@ -120,7 +120,7 @@ def get_transition_matrices(data, yr_idx, base_year, lumaps, lmmaps):
     # Return l_mrj (Boolean) for current land-use and land management
     l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
 
-    ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)
+    ag_cells, _ = tools.get_ag_and_non_ag_cells(lumap)
 
     n_ag_lms, ncells, n_ag_lus = data.AG_L_MRJ.shape
 
