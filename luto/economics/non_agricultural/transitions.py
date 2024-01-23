@@ -50,7 +50,7 @@ def get_rip_plant_transitions_from_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
         1-D array, indexed by cell.
     """
     base_costs = get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap)
-    fencing_cost = data.RP_FENCING_LENGTH * data.REAL_AREA * settings.RIPARIAN_PLANTINGS_FENCING_COST_PER_HA
+    fencing_cost = data.RP_FENCING_LENGTH * data.REAL_AREA * settings.RIPARIAN_PLANTINGS_FENCING_COST_PER_M
     return base_costs + fencing_cost
 
 
@@ -66,7 +66,7 @@ def get_agroforestry_transitions_from_ag(data, yr_idx, lumap, lmmap) -> np.ndarr
         1-D array, indexed by cell.
     """
     base_costs = get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap)
-    fencing_cost = data.RP_FENCING_LENGTH * data.REAL_AREA * settings.AGROFORESTRY_FENCING_COST_PER_HA
+    fencing_cost = settings.AF_FENCING_LENGTH * data.REAL_AREA * settings.AGROFORESTRY_FENCING_COST_PER_M
     return base_costs + fencing_cost
 
 
