@@ -33,8 +33,10 @@ import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.agricultural.revenue as ag_revenue
 import luto.economics.agricultural.transitions as ag_transition
 import luto.economics.agricultural.water as ag_water
+import luto.economics.agricultural.biodiversity as ag_biodiversity
 
 import luto.economics.non_agricultural.water as non_ag_water
+import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 import luto.economics.non_agricultural.cost as non_ag_cost
 import luto.economics.non_agricultural.ghg as non_ag_ghg
 import luto.economics.non_agricultural.quantity as non_ag_quantity
@@ -104,6 +106,12 @@ class Data():
         self.NATURAL_LAND_T_CO2_HA = bdata.NATURAL_LAND_T_CO2_HA[self.MASK]     # Float32
         self.SOIL_CARBON_AVG_T_CO2_HA = bdata.SOIL_CARBON_AVG_T_CO2_HA[self.MASK]
         self.AGGHG_IRRPAST = bdata.AGGHG_IRRPAST[self.MASK]                     # Float32
+        self.BIODIV_SCORE_RAW = bdata.BIODIV_SCORE_RAW[self.MASK]               # Float32
+        self.BIODIV_SCORE_WEIGHTED = bdata.BIODIV_SCORE_WEIGHTED[self.MASK]     # Float32
+        self.RP_PROPORTION = bdata.RP_PROPORTION[self.MASK]                     # Float32
+        self.RP_FENCING_LENGTH = bdata.RP_FENCING_LENGTH[self.MASK]             # Float32
+        self.EP_RIP_AVG_T_CO2_HA = bdata.EP_RIP_AVG_T_CO2_HA[self.MASK]         # Float32
+        self.EP_BELT_AVG_T_CO2_HA = bdata.EP_BELT_AVG_T_CO2_HA[self.MASK]       # Float32
 
         # Slice this year off HDF5 bricks. TODO: This field is not in luto.data.
         # with h5py.File(bdata.fname_dr, 'r') as wy_dr_file:
@@ -170,9 +178,23 @@ def get_ag_w_mrj():
     return output.astype(np.float32)
 
 
+def get_ag_b_mrj():
+    print('Getting agricultural biodiversity requirement matrices...', end = ' ', flush = True)
+    output = ag_biodiversity.get_breq_matrices(data)
+    print('Done.')
+    return output.astype(np.float32)
+
+
 def get_non_ag_w_rk():
     print('Getting non-agricultural water requirement matrices...', end = ' ', flush = True)
     output = non_ag_water.get_wreq_matrix(data)
+    print('Done.')
+    return output.astype(np.float32)
+
+
+def get_non_ag_b_rk():
+    print('Getting non-agricultural biodiversity requirement matrices...', end = ' ', flush = True)
+    output = non_ag_biodiversity.get_breq_matrix(data)
     print('Done.')
     return output.astype(np.float32)
 
@@ -222,6 +244,13 @@ def get_ag_to_non_ag_t_rk():
 def get_non_ag_to_ag_t_mrj():
     print('Getting non-agricultural to agricultural transition cost matrices...', end = ' ', flush = True)
     output = non_ag_transition.get_to_ag_transition_matrix(data, base_year, lumaps[base_year], lmmaps[base_year])
+    print('Done.')
+    return output.astype(np.float32)
+
+
+def get_non_ag_t_rk():
+    print('Getting non-agricultural transition cost matrices...', end = ' ', flush = True)
+    output = non_ag_transition.get_non_ag_transition_matrix(data, base_year, lumaps[base_year], lmmaps[base_year])
     print('Done.')
     return output.astype(np.float32)
 
@@ -282,6 +311,13 @@ def get_ag_man_water(ag_w_mrj):
     return output
 
 
+def get_ag_man_biodiversity(ag_b_mrj):
+    print('Getting agricultural management options\' biodiversity effects...', end = ' ', flush = True)
+    output = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data, ag_b_mrj)
+    print('Done.')
+    return output
+
+
 def get_ag_man_limits():
     print('Getting agricultural management options\' adoption limits...', end = ' ', flush = True)
     output = ag_transition.get_agricultural_management_adoption_limits(data, target_index)
@@ -296,6 +332,7 @@ def get_limits(target: int):
     
     if settings.WATER_USE_LIMITS == 'on': limits['water'] = ag_water.get_wuse_limits(data)
     if settings.GHG_EMISSIONS_LIMITS == 'on':  limits['ghg'] = ag_ghg.get_ghg_limits(data, target)
+    if settings.BIODIVERSITY_LIMITS == 'on':  limits['biodiversity'] = ag_biodiversity.get_biodiversity_limits(data, target)
     
     print('Done.')
     return limits
@@ -308,6 +345,7 @@ def get_input_data(target: int):
     ag_r_mrj = get_ag_r_mrj()
     ag_t_mrj = get_ag_t_mrj()
     ag_w_mrj = get_ag_w_mrj()
+    ag_b_mrj = get_ag_b_mrj()
     ag_x_mrj = get_ag_x_mrj()
 
     land_use_culling.apply_agricultural_land_use_culling(
@@ -320,15 +358,18 @@ def get_input_data(target: int):
         ag_r_mrj=ag_r_mrj,
         ag_g_mrj=ag_g_mrj,
         ag_w_mrj=ag_w_mrj,
+        ag_b_mrj=ag_b_mrj,
         ag_x_mrj=ag_x_mrj,
         ag_q_mrp=ag_q_mrp,
         ag_ghg_t_mrj=get_ag_ghg_t_mrj(),
         ag_to_non_ag_t_rk=get_ag_to_non_ag_t_rk(),
         non_ag_to_ag_t_mrj=get_non_ag_to_ag_t_mrj(),
+        non_ag_t_rk=get_non_ag_t_rk(),
         non_ag_c_rk=get_non_ag_c_rk(),
         non_ag_r_rk=get_non_ag_r_rk(),
         non_ag_g_rk=get_non_ag_g_rk(),
         non_ag_w_rk=get_non_ag_w_rk(),
+        non_ag_b_rk=get_non_ag_b_rk(),
         non_ag_x_rk=get_non_ag_x_rk(),
         non_ag_q_crk=get_non_ag_q_crk(),
         ag_man_c_mrj=get_ag_man_costs(ag_c_mrj),
@@ -337,6 +378,7 @@ def get_input_data(target: int):
         ag_man_r_mrj=get_ag_man_revenue(ag_r_mrj),
         ag_man_t_mrj=get_ag_man_transitions(ag_t_mrj),
         ag_man_w_mrj=get_ag_man_water(ag_w_mrj),
+        ag_man_b_mrj=get_ag_man_biodiversity(ag_b_mrj),
         ag_man_limits=get_ag_man_limits(),
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,
