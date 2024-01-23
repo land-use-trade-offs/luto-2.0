@@ -57,15 +57,6 @@ IMPORT_TREND = 'Static'             # 'Static' (assumes 2010 shares of imports f
 WASTE = 1                           # 1 for full waste, 0.5 for half waste 
 FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 
-# Set the weighting of landscape connectivity on biodiversity value (0 (no influence) - 1 (full influence))
-CONNECTIVITY_WEIGHTING = 1
-
-# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
-BIODIV_TARGET = 0.3
-BIODIV_TARGET_ACHIEVEMENT_YEAR = 2030
-
-# Set livestock impact on biodiversity (0 = no impact, 1 = total annihilation)
-BIODIV_LIVESTOCK_IMPACT = 0.5
 
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4 
 CO2_FERT = 'on'   # or 'off'
@@ -94,8 +85,8 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 5          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
-# MODE = 'snapshot'       # runs for target year only
-MODE = 'timeseries'   # runs each year from base year to target year
+MODE = 'snapshot'       # runs for target year only
+# MODE = 'timeseries'   # runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****
@@ -138,7 +129,7 @@ OPTIMALITY_TOLERANCE = 1e-2
    Maximum value:	1e-2"""
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 16
+THREADS = 96
 
 # Use homogenous barrier algorithm
 BARHOMOGENOUS = -1
@@ -163,15 +154,20 @@ CARBON_PRICE_PER_TONNE = 50                 # Price of carbon per tonne - determ
 # Riparian Planting Parameters
 RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR = 100
 RIPARIAN_PLANTINGS_BUFFER_WIDTH = 10
-RIPARIAN_PLANTINGS_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 100 metres per hectare
+# RIPARIAN_PLANTINGS_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 100 metres per hectare
+RIPARIAN_PLANTINGS_FENCING_COST_PER_M = 10           # $10 per metre
 RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR = 0.5
 
 # Agroforestry Parameters
 AGROFORESTRY_COST_PER_HA_PER_YEAR = 100
 AGROFORESTRY_ROW_WIDTH = 20
 AGROFORESTRY_ROW_SPACING = 40
-AGROFORESTRY_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 100 metres per hectare
+# AGROFORESTRY_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 100 metres per hectare
+AGROFORESTRY_FENCING_COST_PER_M = 10           # $10 per metre
 AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
+no_alleys_per_ha = 100 / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
+AF_FENCING_LENGTH = 100 * no_alleys_per_ha # Length of fencing required per ha in metres
+                    
 
 # ---------------------------------------------------------------------------- #
 # Agricultural management parameters
@@ -185,7 +181,8 @@ AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  # The minimum value an agricultural
 # Environmental parameters
 # ---------------------------------------------------------------------------- #
 
-# Greenhouse gas emissions limits parameters
+# Greenhouse gas emissions limits and parameters *******************************
+
 SOC_AMORTISATION = 91           # Number of years over which to spread (average) soil carbon accumulation
 
 GHG_EMISSIONS_LIMITS = 'on'        # 'on' or 'off'
@@ -198,7 +195,8 @@ GHG_LIMITS = {                     # If GHG_LIMITS_TYPE = 'dict' then need to se
               }
 
 
-# Water use limits parameters
+# Water use limits and parameters *******************************
+
 WATER_USE_LIMITS = 'on'               # 'on' or 'off'
 WATER_LIMITS_TYPE = 'water_stress'    # 'water_stress' or 'pct_ag'
 WATER_USE_REDUCTION_PERCENTAGE = 0    # If WATER_LIMITS_TYPE = 'pct_ag'...       Set reduction in water use as percentage of 2010 irrigation water use
@@ -210,8 +208,20 @@ WATER_REGION_DEF = 'DD'                 # 'RR' for River Region, 'DD' for Draina
 # WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions  e.g., [1, 2].
 
 
+# Biodiversity limits and parameters *******************************
+
+# Set the weighting of landscape connectivity on biodiversity value (0 (no influence) - 1 (full influence))
+CONNECTIVITY_WEIGHTING = 1
+
+# Set livestock impact on biodiversity (0 = no impact, 1 = total annihilation)
+BIODIV_LIVESTOCK_IMPACT = 0.5
+
+# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 BIODIVERSITY_LIMITS = 'on'             # 'on' or 'off'
+BIODIV_TARGET = 0.3
 BIODIV_TARGET_ACHIEVEMENT_YEAR = 2050
+
+
 
 # ---------------------------------------------------------------------------- #
 # Cell Culling
