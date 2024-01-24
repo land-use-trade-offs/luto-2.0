@@ -582,6 +582,54 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    // Chart:production_5_6_demand_Production_commodity_from_LUTO
+    Highcharts.chart('production_5_6_demand_Production_commodity_from_LUTO', {
+        chart: {
+            type: 'column',
+            marginRight: 180
+        },
+        title: {
+            text: 'Production Commodity (outputs from LUTO)'
+        },
+        data: {
+            csv: document.getElementById('production_5_6_demand_Production_commodity_from_LUTO_csv').innerHTML,
+        },
+        credits: {
+            enabled: false
+        },
+        yAxis: {
+            title: {
+                text: "Quantity (million tonnes, kilolitres [milk])"
+            },
+        },
+
+        legend: {
+            align: 'right',
+            verticalAlign: 'top',
+            layout: 'vertical',
+            x: 0,
+            y: -10
+      
+        },
+
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name}:</b>${this.y.toFixed(2)}<br/>`;
+            }
+        },
+    
+        plotOptions: {
+            column: {
+                stacking: 'normal',
+            }
+        },
+        
+        exporting: {
+            sourceWidth: 1200,
+            sourceHeight: 600,
+        }
+    });
+
 
 
 

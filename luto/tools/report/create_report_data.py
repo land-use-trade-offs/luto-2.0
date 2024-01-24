@@ -110,12 +110,19 @@ for idx,Type in enumerate(DEMAND_DATA_long['Type'].unique()):
     
     DEMAND_DATA_commodity_wide.to_csv(f'{SAVE_DIR}/production_5_{idx+1}_demand_{Type}_commodity.csv', index=False)
 
+# Plot_1-5-6: Production (LUTO outputs, Million Tonnes)
+quantity_csv_paths = files.query('catetory == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)
+quantity_df = get_quantity_df(quantity_csv_paths)
 
+quantity_df_wide = quantity_df.pivot_table(index=['year'], 
+                                           columns='Commodity',
+                                           values='Prod_targ_year (tonnes, ML)').reset_index()
+quantity_df_wide.to_csv(f'{SAVE_DIR}/production_5_6_demand_Production_commodity_from_LUTO.csv', index=False)
 
 
 
 ####################################################
-#         1) Produciton, Revenue, Cost             #
+#                  2) Economics                    #
 ####################################################
 
 
@@ -131,7 +138,7 @@ for idx,col in enumerate(loop_cols):
     # convert to wide format
     df_wide = df.pivot_table(index=['year'], columns=col, values='value (billion)').reset_index()
     # save to csv
-    df_wide.to_csv(f'{SAVE_DIR}/production_2_revenue_{idx+1}_{col}_wide.csv', index=False)
+    df_wide.to_csv(f'{SAVE_DIR}/economics_1_revenue_{idx+1}_{col}_wide.csv', index=False)
 
 cost_df = get_rev_cost_df(files, 'cost')
 keep_cols = ['year', 'value (billion)']
@@ -144,12 +151,12 @@ for idx,col in enumerate(loop_cols):
     # convert to wide format
     df_wide = df.pivot_table(index=['year'], columns=col, values='value (billion)').reset_index()
     # save to csv
-    df_wide.to_csv(f'{SAVE_DIR}/production_3_cost_{idx+1}_{col}_wide.csv', index=False)
+    df_wide.to_csv(f'{SAVE_DIR}/economics_2_cost_{idx+1}_{col}_wide.csv', index=False)
 
 
 # Plot_1-4: Revenue and Cost data (Billion Dollars)
 rev_cost_compare = get_rev_cost(revenue_df,cost_df)
-rev_cost_compare.to_csv(f'{SAVE_DIR}/production_4_rev_cost_all.csv', index=False)
+rev_cost_compare.to_csv(f'{SAVE_DIR}/economics_3_rev_cost_all.csv', index=False)
 
 
 
