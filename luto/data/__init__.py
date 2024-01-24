@@ -28,7 +28,6 @@ except:
     from osgeo import gdal
     import rasterio
     
-
 from luto.settings import (
     INPUT_DIR, 
     RESFACTOR, 
@@ -54,6 +53,7 @@ from luto.settings import (
     RIPARIAN_PLANTINGS_BUFFER_WIDTH,
     RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR,
 )
+
 from luto.economics.agricultural.quantity import lvs_veg_types
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
@@ -338,10 +338,14 @@ LMMAP = pd.read_hdf(os.path.join(INPUT_DIR, 'lmmap.h5')).to_numpy()
 # Includes a separate AM map for each agricultural management option, because they can be stacked.
 AMMAP_DICT = {am: np.zeros(NCELLS).astype('int8') for am in AG_MANAGEMENTS_TO_LAND_USES}
 
+# Load stream length data in metres of stream per cell
 STREAM_LENGTH = pd.read_hdf(os.path.join(INPUT_DIR, 'stream_length_m_cell.h5')).to_numpy()
 
-RP_PROPORTION = np.divide(((2 * RIPARIAN_PLANTINGS_BUFFER_WIDTH) * STREAM_LENGTH), (REAL_AREA * 10000)).astype(np.float32)
-RP_FENCING_LENGTH = (2 * RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR) * STREAM_LENGTH.astype(np.float32)
+# Calculate the proportion of the area of each cell within stream buffer (convert REAL_AREA from ha to m2 and divide m2 by m2)
+RP_PROPORTION = ( (2 * RIPARIAN_PLANTINGS_BUFFER_WIDTH * STREAM_LENGTH) / (REAL_AREA * 10000) ).astype(np.float32)
+
+# Calculate the length of fencing required for each cell in per hectare terms for riparian plantings
+RP_FENCING_LENGTH = ( (2 * RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR * STREAM_LENGTH) / REAL_AREA ).astype(np.float32)
 
 
 
