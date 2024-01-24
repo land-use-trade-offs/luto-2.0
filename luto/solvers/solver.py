@@ -226,7 +226,7 @@ class LutoSolver:
             lu_cells = self._input_data.non_ag_lu2cells[k]
             for r in lu_cells:
                 self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
-                    ub=1, name=f"X_non_ag_{k}_{r}"
+                    ub=self._input_data.non_ag_x_rk[r, k], name=f"X_non_ag_{k}_{r}"
                 )
 
     def _setup_ag_management_variables(self):

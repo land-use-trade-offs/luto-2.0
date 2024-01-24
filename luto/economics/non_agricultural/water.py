@@ -29,7 +29,7 @@ def get_wreq_matrix_rip_planting(data) -> np.ndarray:
     -------
     1-D array, indexed by cell.
     """
-    return (data.WATER_YIELD_BASE_SR - data.WATER_YIELD_BASE) * data.REAL_AREA
+    return get_wreq_matrix_env_planting(data)
 
 
 def get_wreq_matrix_agroforestry(data) -> np.ndarray:
@@ -45,7 +45,7 @@ def get_wreq_matrix_agroforestry(data) -> np.ndarray:
     -------
     1-D array, indexed by cell.
     """
-    return (data.WATER_YIELD_BASE_SR - data.WATER_YIELD_BASE) * data.REAL_AREA
+    return get_wreq_matrix_env_planting(data)
 
 
 def get_wreq_matrix(data) -> np.ndarray:
