@@ -57,15 +57,6 @@ IMPORT_TREND = 'Static'             # 'Static' (assumes 2010 shares of imports f
 WASTE = 1                           # 1 for full waste, 0.5 for half waste 
 FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 
-# Set the weighting of landscape connectivity on biodiversity value (0 (no influence) - 1 (full influence))
-CONNECTIVITY_WEIGHTING = 1
-
-# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
-BIODIV_TARGET = 0.3
-
-# Set livestock impact on biodiversity (0 = no impact, 1 = total annihilation)
-BIODIV_LIVESTOCK_IMPACT = 0.5
-
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4 
 CO2_FERT = 'on'   # or 'off'
 
@@ -174,7 +165,7 @@ AGROFORESTRY_ROW_SPACING = 40
 AGROFORESTRY_FENCING_COST_PER_M = 10           # $10 per metre
 AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
 no_alleys_per_ha = 100 / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
-AF_FENCING_LENGTH = 100 * no_alleys_per_ha # Length of fencing required per ha in metres
+AF_FENCING_LENGTH = 100 * no_alleys_per_ha * 2 # Length of fencing required per ha in metres
                     
 
 # ---------------------------------------------------------------------------- #
@@ -226,8 +217,8 @@ BIODIV_LIVESTOCK_IMPACT = 0.5
 
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 BIODIVERSITY_LIMITS = 'on'             # 'on' or 'off'
-BIODIV_TARGET_ACHIEVEMENT_YEAR = 2030
 BIODIV_TARGET = 0.3
+BIODIV_TARGET_ACHIEVEMENT_YEAR = 2030
 
 
 
