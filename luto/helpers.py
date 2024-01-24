@@ -27,7 +27,7 @@ create_new_dataset()
 # 2. Run the simulation and profile memory use
 %load_ext memory_profiler
 import luto.simulation as sim
-%memit sim.run( 2010, 2030 )
+%memit sim.run( 2010, 2050 )
 
 # 3. Write the ouputs to file
 from luto.tools.write import *

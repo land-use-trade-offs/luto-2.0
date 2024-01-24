@@ -82,7 +82,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 5          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 2          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
 MODE = 'snapshot'       # runs for target year only
@@ -129,7 +129,7 @@ OPTIMALITY_TOLERANCE = 1e-2
    Maximum value:	1e-2"""
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 96
+THREADS = 32
 
 # Use homogenous barrier algorithm
 BARHOMOGENOUS = -1
