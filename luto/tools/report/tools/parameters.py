@@ -27,7 +27,7 @@ AG_LANDUSE = ['Apples', 'Beef - modified land', 'Beef - natural land', 'Citrus',
               'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit', 'Unallocated - modified land', 
               'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes', 'Winter oilseeds']
 
-NON_AG_LANDUSE = ['Environmental Plantings']
+NON_AG_LANDUSE = ['Environmental Plantings','Riparian Plantings','Agroforestry']
 
 
 # Define the GHG categories

@@ -31,7 +31,8 @@ def extract_dtype_from_path(path):
             'cross_table':['crosstab','switches'],
             'quantity':['quantity'],
             'revenue':['revenue'],
-            'cost':['cost']
+            'cost':['cost'],
+            'biodiversity':['biodiversity'],
             }
     
     if not 'lucc_separate' in path:
@@ -116,7 +117,7 @@ def get_demand_df(files_df:pd.DataFrame):
 
     # Load demand data     
     year_max = files_df['year'].max()
-    dd = pd.read_hdf(os.path.join(f'../../../{INPUT_DIR}', 'demand_projections.h5') )
+    dd = pd.read_hdf(f'{INPUT_DIR}/demand_projections.h5')
 
     # Convert eggs from count to tones
     mask = dd.index.get_level_values(7) == 'eggs'

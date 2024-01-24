@@ -144,7 +144,7 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_ag_revenue_cost(sim, yr_cal, path_yr)
     write_water(sim, yr_cal, path_yr)
     write_ghg(sim, yr_cal, path_yr)
-    # write_ghg_separate(sim, yr_cal, path_yr)
+    write_ghg_separate(sim, yr_cal, path_yr)
     write_biodiversity(sim, yr_cal, path_yr)
 
 
@@ -760,10 +760,11 @@ def write_ghg_separate(sim, yr_cal, path):
 
 
     # Summarize the array as a df
-    GHG_emission_separate_summary = tools.summarize_ghg_separate_df(GHG_emission_separate,(['Agricultural Landuse'],
-                                                                                            lm_type,   
-                                                                                            ghg_sources),
-                                                                                            lu_desc)
+    GHG_emission_separate_summary = tools.summarize_ghg_separate_df(
+        GHG_emission_separate,
+        (['Agricultural Landuse'], lm_type, ghg_sources),
+         lu_desc
+    )
 
     # Change "KG_HA/HEAD" to "TCO2E"
     column_rename = [(i[0],i[1],i[2].replace('CO2E_KG_HA','TCO2E')) for i in GHG_emission_separate_summary.columns]
@@ -792,10 +793,11 @@ def write_ghg_separate(sim, yr_cal, path):
     non_ag_g_rmk = np.swapaxes(non_ag_g_mrk,0,1)                       # rmk
     
     # Summarize the array as a df
-    non_ag_g_rk_summary = tools.summarize_ghg_separate_df(non_ag_g_rmk,(['Non_Agricultural Landuse']
-                                                                 , sim.data.LANDMANS
-                                                                 , ['TCO2E_Environmental Planting']),
-                                                          lu_desc)
+    non_ag_g_rk_summary = tools.summarize_ghg_separate_df(
+        non_ag_g_rmk,
+        (['Non_Agricultural Landuse'], sim.data.LANDMANS, [f'TCO2E_{non_ag}' for non_ag in sim.data.NON_AGRICULTURAL_LANDUSES]),
+        lu_desc
+    )
     
     # Save table to disk
     non_ag_g_rk_summary.to_csv(os.path.join(path, f'GHG_emissions_separate_no_ag_reduction_{timestamp}.csv'))

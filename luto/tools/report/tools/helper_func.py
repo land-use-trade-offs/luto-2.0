@@ -109,7 +109,7 @@ def merge_LVSTK_UAALLOW(df):
     """
     df_crop = df[[True if i in LU_CROPS else False for i in  df['Land use']]]
 
-    df_ep = df[[True if i in NON_AG_LANDUSE else False for i in  df['Land use']]]
+    df_non_ag = df[[True if i in NON_AG_LANDUSE else False for i in  df['Land use']]]
 
     df_unallow = df[[True if i in LU_UNALLOW else False for i in  df['Land use']]]
     # df_unallow.index = pd.MultiIndex.from_tuples(tuple(df_unallow['Land use'].str.split(' - ')))
@@ -119,7 +119,7 @@ def merge_LVSTK_UAALLOW(df):
     df_lvstk.index = pd.MultiIndex.from_tuples(tuple(df_lvstk['Land use'].str.split(' - ')))
     df_lvstk = df_lvstk.groupby(level=0).sum(numeric_only=True).reset_index(names='Land use')
 
-    return pd.concat([df_crop,df_ep,df_lvstk,df_unallow]).reset_index(drop=True)
+    return pd.concat([df_crop,df_non_ag,df_lvstk,df_unallow]).reset_index(drop=True)
 
 
 def get_xy_data(df):

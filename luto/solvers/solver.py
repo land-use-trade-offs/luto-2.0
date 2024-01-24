@@ -70,14 +70,14 @@ class InputData:
     non_ag_x_rk: np.ndarray  # Non-agricultural exclude matrices.
     non_ag_q_crk: np.ndarray  # Non-agricultural yield matrix.
 
-    ag_man_c_mrj: dict[str, np.ndarray]  # Agricultural management options' cost effects.
-    ag_man_g_mrj: dict[str, np.ndarray]  # Agricultural management options' GHG emission effects.
-    ag_man_q_mrp: dict[str, np.ndarray]  # Agricultural management options' quantity effects.
-    ag_man_r_mrj: dict[str, np.ndarray]  # Agricultural management options' revenue effects.
-    ag_man_t_mrj: dict[str, np.ndarray]  # Agricultural management options' transition cost effects.
-    ag_man_w_mrj: dict[str, np.ndarray]  # Agricultural management options' water requirement effects.
-    ag_man_b_mrj: dict[str, np.ndarray]  # Agricultural management options' biodiversity effects.
-    ag_man_limits: dict[str, np.ndarray]  # Agricultural management options' adoption limits.
+    ag_man_c_mrj: dict  # Agricultural management options' cost effects.
+    ag_man_g_mrj: dict  # Agricultural management options' GHG emission effects.
+    ag_man_q_mrp: dict  # Agricultural management options' quantity effects.
+    ag_man_r_mrj: dict  # Agricultural management options' revenue effects.
+    ag_man_t_mrj: dict  # Agricultural management options' transition cost effects.
+    ag_man_w_mrj: dict  # Agricultural management options' water requirement effects.
+    ag_man_b_mrj: dict  # Agricultural management options' biodiversity effects.
+    ag_man_limits: dict  # Agricultural management options' adoption limits.
 
     lu2pr_pj: np.ndarray  # Conversion matrix: land-use to product(s).
     pr2cm_cp: np.ndarray  # Conversion matrix: product(s) to commodity.
@@ -792,7 +792,7 @@ class LutoSolver:
         current_lumap: np.array,
         old_lmmap: np.array,
         current_lmmap: np.array,
-    ) -> np.array:
+    ):
         """
         Updates the variables only for cells that have changed land use or land management.
         Returns an array of cells that have been updated.
