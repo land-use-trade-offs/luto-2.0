@@ -210,7 +210,7 @@ WATER_REGION_DEF = 'DD'                 # 'RR' for River Region, 'DD' for Draina
 
 
 BIODIVERSITY_LIMITS = 'on'             # 'on' or 'off'
-BIODIV_TARGET_ACHIEVEMENT_YEAR = 2050
+BIODIV_TARGET_ACHIEVEMENT_YEAR = 2030
 
 # ---------------------------------------------------------------------------- #
 # Cell Culling

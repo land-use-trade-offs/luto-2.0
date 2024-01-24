@@ -94,7 +94,7 @@ def get_base_year_biodiversity_score(data) -> float:
     return biodiv_2010_non_pen_score + biodiv_2010_pen_score
 
 
-def get_biodiversity_limits(data, yr_idx) -> float:
+def get_biodiversity_limits(data, yr_cal) -> float:
     """
     Biodiversity score must hit settings.TOTAL_BIODIV_TARGET_SCORE by 
     settings.BIODIV_TARGET_ACHIEVEMENT_YEAR, beginning in 2010. 
@@ -111,8 +111,13 @@ def get_biodiversity_limits(data, yr_idx) -> float:
         # target score, use the 2010 score as the target instead.
         biodiv_target_score = biodiv_score_2010
 
+    if yr_cal >= settings.BIODIV_TARGET_ACHIEVEMENT_YEAR:
+        # For each year after the target achievement year, the limit is equal
+        # to that of the target achievement year.
+        return biodiv_target_score
+
     biodiv_targets_each_year = np.linspace(
         biodiv_score_2010, biodiv_target_score, no_years_to_reach_limit + 1
     )
 
-    return biodiv_targets_each_year[yr_idx - 2010]
+    return biodiv_targets_each_year[yr_cal - 2010]
