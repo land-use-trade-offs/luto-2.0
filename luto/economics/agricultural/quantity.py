@@ -275,14 +275,14 @@ def get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx):
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
-    year = 2010 + yr_idx
+    yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu, j in zip(land_uses, lu_codes):
-        multiplier = data.ASPARAGOPSIS_DATA[lu].loc[year, 'Productivity']
+        multiplier = data.ASPARAGOPSIS_DATA[lu].loc[yr_cal, 'Productivity']
         if multiplier != 1:
             # Apply to all products associated with land use
             for p in range(data.NPRS):
@@ -301,14 +301,14 @@ def get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx):
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
-    year = 2010 + yr_idx
+    yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
 
     # Update values in the new matrix    
     for lu, j in zip(land_uses, lu_codes):
-        multiplier = data.PRECISION_AGRICULTURE_DATA[lu].loc[year, 'Productivity']
+        multiplier = data.PRECISION_AGRICULTURE_DATA[lu].loc[yr_cal, 'Productivity']
         if multiplier != 1:
             # Apply to all products associated with land use
             for p in range(data.NPRS):
@@ -325,14 +325,14 @@ def get_ecological_grazing_effect_q_mrp(data, q_mrp, yr_idx):
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
-    year = 2010 + yr_idx
+    yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
 
     # Update values in the new matrix    
     for lu, j in zip(land_uses, lu_codes):
-        multiplier = data.ECOLOGICAL_GRAZING_DATA[lu].loc[year, 'Productivity']
+        multiplier = data.ECOLOGICAL_GRAZING_DATA[lu].loc[yr_cal, 'Productivity']
         if multiplier != 1:
             # Apply to all products associated with land use
             for p in range(data.NPRS):
