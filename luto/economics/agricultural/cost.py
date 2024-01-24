@@ -73,7 +73,7 @@ def get_cost_crop( data # Data object or module.
 
         # Convert to $/cell including resfactor.
         # Quantity costs which has already been adjusted for REAL_AREA/resfactor via get_quantity
-        costs_a, costs_f, costs_w = costs_a*data.REAL_AREA, costs_f*data.REAL_AREA, costs_w*data.REAL_AREA
+        costs_a, costs_f, costs_w = costs_a * data.REAL_AREA, costs_f * data.REAL_AREA, costs_w * data.REAL_AREA
 
         costs_t = np.stack([(costs_a), (costs_f), (costs_w), (costs_q)]).T
  
@@ -200,7 +200,7 @@ def get_asparagopsis_effect_c_mrj(data, yr_idx):
     for all relevant agr. land uses.
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
-    year = 2010 + yr_idx
+    yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
@@ -215,7 +215,7 @@ def get_asparagopsis_effect_c_mrj(data, yr_idx):
         for lu_idx, lu in enumerate(land_uses):
             lvstype, vegtype = lvs_veg_types(lu)
             yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
-            cost_per_animal = data.ASPARAGOPSIS_DATA[lu].loc[year, 'Annual Cost Per Animal (A$2010/yr)']
+            cost_per_animal = data.ASPARAGOPSIS_DATA[lu].loc[yr_cal, 'Annual Cost Per Animal (A$2010/yr)']
             cost_per_cell = cost_per_animal * yield_pot * data.REAL_AREA
 
             new_c_mrj[m, :, lu_idx] = cost_per_cell
@@ -229,14 +229,14 @@ def get_precision_agriculture_effect_c_mrj(data, yr_idx):
     for all relevant agr. land uses.
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
-    year = 2010 + yr_idx
+    yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
     for m in range(data.NLMS):
         for lu_idx, lu in enumerate(land_uses):
-            cost_per_ha = data.PRECISION_AGRICULTURE_DATA[lu].loc[year, 'AnnCost_per_Ha']
+            cost_per_ha = data.PRECISION_AGRICULTURE_DATA[lu].loc[yr_cal, 'AnnCost_per_Ha']
             new_c_mrj[m, :, lu_idx] = cost_per_ha * data.REAL_AREA
 
     return new_c_mrj
@@ -248,7 +248,7 @@ def get_ecological_grazing_effect_c_mrj(data, yr_idx):
     for all relevant agr. land uses.
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
-    year = 2010 + yr_idx
+    yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
@@ -257,11 +257,11 @@ def get_ecological_grazing_effect_c_mrj(data, yr_idx):
         lvstype, _ = lvs_veg_types(lu)
 
         # Get effects on operating costs
-        operating_mult = data.ECOLOGICAL_GRAZING_DATA[lu].loc[year, 'Operating_cost_multiplier']
+        operating_mult = data.ECOLOGICAL_GRAZING_DATA[lu].loc[yr_cal, 'Operating_cost_multiplier']
         operating_c_effect = data.AGEC_LVSTK['FOC', lvstype] * (operating_mult - 1) * data.REAL_AREA
 
         # Get effects on labour costs
-        labour_mult = data.ECOLOGICAL_GRAZING_DATA[lu].loc[year, 'Labour_cost_mulitiplier']
+        labour_mult = data.ECOLOGICAL_GRAZING_DATA[lu].loc[yr_cal, 'Labour_cost_mulitiplier']
         labout_c_effect = data.AGEC_LVSTK['FLC', lvstype] * (labour_mult - 1) * data.REAL_AREA
 
         # Combine for total cost effect

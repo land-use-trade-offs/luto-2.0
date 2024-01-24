@@ -274,14 +274,14 @@ def get_asparagopsis_effect_g_mrj(data, yr_idx):
     for all relevant agr. land uses.
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis']
-    year = 2010 + yr_idx
+    yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
     # Update values in the new matrix, taking into account the CH4 reduction of asparagopsis
     for lu_idx, lu in enumerate(land_uses):
-        ch4_reduction_perc = 1 - data.ASPARAGOPSIS_DATA[lu].loc[year, "CO2E_KG_HEAD_ENTERIC"]
+        ch4_reduction_perc = 1 - data.ASPARAGOPSIS_DATA[lu].loc[yr_cal, "CO2E_KG_HEAD_ENTERIC"]
 
         if ch4_reduction_perc != 0:
             for lm in data.LANDMANS:
@@ -313,7 +313,7 @@ def get_precision_agriculture_effect_g_mrj(data, yr_idx):
     for all relevant agr. land uses.
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
-    year = 2010 + yr_idx
+    yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
@@ -338,7 +338,7 @@ def get_precision_agriculture_effect_g_mrj(data, yr_idx):
                 if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
                     continue
 
-                reduction_perc = 1 - lu_data.loc[year, co2e_type]
+                reduction_perc = 1 - lu_data.loc[yr_cal, co2e_type]
 
                 # if co2e_type == "CO2E_KG_HA_SOIL":
                 #     co2e_type += "_N_SURP"  # TODO: determine why names differ between files
@@ -364,7 +364,7 @@ def get_ecological_grazing_effect_g_mrj(data, yr_idx):
     for all relevant agr. land uses.
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
-    year = 2010 + yr_idx
+    yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
@@ -380,7 +380,7 @@ def get_ecological_grazing_effect_g_mrj(data, yr_idx):
                 m = 1
                     
             # Subtract leach runoff carbon benefit
-            leach_reduction_perc = 1 - lu_data.loc[year, 'CO2E_KG_HEAD_IND_LEACH_RUNOFF']
+            leach_reduction_perc = 1 - lu_data.loc[yr_cal, 'CO2E_KG_HEAD_IND_LEACH_RUNOFF']
             if leach_reduction_perc != 0:
                 lvstype, vegtype = lvs_veg_types(lu)
                 yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
@@ -395,7 +395,7 @@ def get_ecological_grazing_effect_g_mrj(data, yr_idx):
                 new_g_mrj[m, :, lu_idx] -= leach_reduction_amnt
 
             # Subtract soil carbon benefit
-            soil_multiplier = lu_data.loc[year, 'IMPACTS_soil_carbon'] - 1
+            soil_multiplier = lu_data.loc[yr_cal, 'IMPACTS_soil_carbon'] - 1
             if soil_multiplier != 0:
                 soil_reduction_amnt = (
                     data.SOIL_CARBON_AVG_T_CO2_HA
