@@ -566,5 +566,5 @@ conn_score = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.
 BIODIV_SCORE_WEIGHTED = BIODIV_SCORE_RAW - (BIODIV_SCORE_RAW * (1 - conn_score) * CONNECTIVITY_WEIGHTING)
 
 # Calculate total biodiversity target score as the sum of biodiv raw score over the entire study area
-TOTAL_BIODIV_TARGET_SCORE = ((LUMAP >= 0 ) * BIODIV_SCORE_RAW * REAL_AREA).sum() * BIODIV_TARGET
+TOTAL_BIODIV_TARGET_SCORE = (LUMASK * BIODIV_SCORE_RAW * REAL_AREA).sum() * BIODIV_TARGET
 

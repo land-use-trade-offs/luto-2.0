@@ -86,9 +86,9 @@ def get_base_year_biodiversity_score(data) -> float:
     livestock_cells_2010 = np.isin(data.LUMAP, np.array(list(livestock_lus))).astype(int)
 
     # Apply penalties for livestock land uses
-    biodiv_2010_non_pen_score = (non_penalty_cells_2010 * data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA).sum()
+    biodiv_2010_non_pen_score = (non_penalty_cells_2010 * data.BIODIV_SCORE_RAW * data.REAL_AREA).sum()
     biodiv_2010_pen_score = (1 - settings.BIODIV_LIVESTOCK_IMPACT) * (
-        livestock_cells_2010 * data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA
+        livestock_cells_2010 * data.BIODIV_SCORE_RAW * data.REAL_AREA
     ).sum()
 
     return biodiv_2010_non_pen_score + biodiv_2010_pen_score
@@ -96,16 +96,17 @@ def get_base_year_biodiversity_score(data) -> float:
 
 def get_biodiversity_limits(data, yr_cal) -> float:
     """
-    Biodiversity score must hit settings.TOTAL_BIODIV_TARGET_SCORE by 
+    Biodiversity score must hit data.TOTAL_BIODIV_TARGET_SCORE by 
     settings.BIODIV_TARGET_ACHIEVEMENT_YEAR, beginning in 2010. 
 
     Assume that the biodiversity score may increase linearly over this time.
     """
     biodiv_score_2010 = get_base_year_biodiversity_score(data)
 
-    no_years_to_reach_limit = settings.BIODIV_TARGET_ACHIEVEMENT_YEAR - 2010
+    no_years_to_reach_limit = settings.BIODIV_TARGET_ACHIEVEMENT_YEAR - data.YR_CAL_BASE
 
     biodiv_target_score = data.TOTAL_BIODIV_TARGET_SCORE
+    
     if biodiv_target_score < biodiv_score_2010:
         # In the case that the 2010 biodiversity score exceeds the calculated
         # target score, use the 2010 score as the target instead.
@@ -120,4 +121,4 @@ def get_biodiversity_limits(data, yr_cal) -> float:
         biodiv_score_2010, biodiv_target_score, no_years_to_reach_limit + 1
     )
 
-    return biodiv_targets_each_year[yr_cal - 2010]
+    return biodiv_targets_each_year[yr_cal - data.YR_CAL_BASE]

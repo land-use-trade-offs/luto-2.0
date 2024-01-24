@@ -55,7 +55,7 @@ def get_asparagopsis_effect_w_mrj(data, w_mrj, yr_idx):
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
-    year = 2010 + yr_idx
+    yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_w_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
@@ -63,7 +63,7 @@ def get_asparagopsis_effect_w_mrj(data, w_mrj, yr_idx):
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
         j = lu_codes[lu_idx]
-        multiplier = data.ASPARAGOPSIS_DATA[lu].loc[year, "Water Impacts"]
+        multiplier = data.ASPARAGOPSIS_DATA[lu].loc[yr_cal, "Water Impacts"]
         if multiplier != 1:
             # The effect is: new value = old value * multiplier - old value
             # E.g. a multiplier of .95 means a 5% reduction in quantity produced
@@ -79,7 +79,7 @@ def get_precision_agriculture_effect_w_mrj(data, w_mrj, yr_idx):
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
-    year = 2010 + yr_idx
+    yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_w_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
@@ -87,7 +87,7 @@ def get_precision_agriculture_effect_w_mrj(data, w_mrj, yr_idx):
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
         j = lu_codes[lu_idx]
-        multiplier = data.PRECISION_AGRICULTURE_DATA[lu].loc[year, "Water_use"]
+        multiplier = data.PRECISION_AGRICULTURE_DATA[lu].loc[yr_cal, "Water_use"]
         if multiplier != 1:
             # The effect is: new value = old value * multiplier - old value
             # E.g. a multiplier of .95 means a 5% reduction in quantity produced
@@ -103,7 +103,7 @@ def get_ecological_grazing_effect_w_mrj(data, w_mrj, yr_idx):
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
-    year = 2010 + yr_idx
+    yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_w_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
@@ -111,7 +111,7 @@ def get_ecological_grazing_effect_w_mrj(data, w_mrj, yr_idx):
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
         j = lu_codes[lu_idx]
-        multiplier = data.ECOLOGICAL_GRAZING_DATA[lu].loc[year, "INPUT-wrt_water-required"]
+        multiplier = data.ECOLOGICAL_GRAZING_DATA[lu].loc[yr_cal, "INPUT-wrt_water-required"]
         if multiplier != 1:
             # The effect is: new value = old value * multiplier - old value
             # E.g. a multiplier of .95 means a 5% reduction in quantity produced
