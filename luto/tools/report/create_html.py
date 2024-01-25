@@ -4,17 +4,18 @@ import pandas as pd
 from glob import glob
 import argparse
 
-
 from tools.helper_func import add_data_2_html
 
+
+# # setting up working directory to root dir
+# if  __name__ == '__main__':
+#     os.chdir('../../..')
 
 ####################################################
 #         setting up working variables             #
 ####################################################
 
-# # setting up working directory to root dir
-# if  __name__ == '__main__':
-#     os.chdir('../../..')
+
 
 # Get the output directory
 parser = argparse.ArgumentParser()
