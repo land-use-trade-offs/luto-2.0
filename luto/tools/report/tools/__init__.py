@@ -114,9 +114,7 @@ def get_demand_df(files_df:pd.DataFrame):
     sys.path.append('../../..') # path of the project root dir
     from luto.settings import INPUT_DIR, SSP, RCP, SCENARIO, DIET_DOM, DIET_GLOB, \
         CONVERGENCE, IMPORT_TREND, WASTE, FEED_EFFICIENCY
-
-    # Load demand data     
-    year_max = files_df['year'].max()
+    
     dd = pd.read_hdf(f'{INPUT_DIR}/demand_projections.h5')
 
     # Convert eggs from count to tones
@@ -128,13 +126,11 @@ def get_demand_df(files_df:pd.DataFrame):
                         IMPORT_TREND, WASTE, FEED_EFFICIENCY)].copy()
 
     # Filter the demand data to only include years up to the target year
-    mask = DEMAND_DATA.columns.get_level_values(1) <= year_max
-    DEMAND_DATA = DEMAND_DATA.loc[:,mask]
     DEMAND_DATA_long = DEMAND_DATA.melt(ignore_index=False, 
                                         var_name=['Year','Commodity'], 
                                         value_name='Quantity (tonnes, ML)').reset_index()
     DEMAND_DATA_long.columns = ['COMMODITY','Type','Year','Quantity (tonnes, ML)']
-
+    
     # Rename the columns, so that they are the same with LUTO naming convention
     DEMAND_DATA_long['Type'] = DEMAND_DATA_long['Type'].str.title()
     DEMAND_DATA_long['COMMODITY'] = DEMAND_DATA_long['COMMODITY']\

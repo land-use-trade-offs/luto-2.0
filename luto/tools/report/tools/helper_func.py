@@ -414,3 +414,39 @@ def add_data_2_html(html_path:str, data_pathes:list)->None:
     tree.write(html_path, method="html")
 
     print(f"Data added to {html_path} successfully!")
+    
+    
+    
+def select_years(year_list):
+    """
+    Selects a subset of years from the given year_list. The selected years will 
+    1) include the first and last years in the year_list, and
+    2) be evenly distributed between the first and last years.
+
+    Args:
+        year_list (list): A list of years.
+
+    Returns:
+        list: A list containing the selected years.
+
+    """
+    # Check if the list has more than 6 elements
+    if len(year_list) <= 6:
+        return year_list  # Return the list as is if 6 or fewer elements
+
+    # Select the start and end years
+    selected_years = [year_list[0], year_list[-1]]
+
+    # Calculate the number of years to be selected in between (4 in this case)
+    slots = 4
+
+    # Calculate the interval for selection
+    interval = (len(year_list) - 2) / (slots + 1)
+
+    # Select years based on calculated interval, ensuring even distribution
+    for i in range(1, slots + 1):
+        # Calculate index for selection
+        index = int(round(i * interval))
+        selected_years.insert(-1, year_list[index])
+
+    return selected_years

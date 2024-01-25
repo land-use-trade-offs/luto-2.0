@@ -10,7 +10,8 @@ from tools import   get_AREA_am, get_AREA_lm, get_AREA_lu, get_GHG_emissions_by_
                     get_rev_cost_df, get_water_df, get_demand_df
 
               
-from tools.helper_func import get_GHG_category, get_GHG_file_df, get_rev_cost,target_GHG_2_Json
+from tools.helper_func import get_GHG_category, get_GHG_file_df,\
+                              get_rev_cost,target_GHG_2_Json, select_years
 
 
 # setting up working directory to root dir
@@ -53,14 +54,20 @@ DEMAND_DATA_long = get_demand_df(files)
 DEMAND_DATA_long['Quantity (tonnes, ML)'] = DEMAND_DATA_long['Quantity (tonnes, ML)'] / 1e6
 
 
+# Select the years to reduce the column number to 
+# avoid cluttering in the multi-level axis graphing
+years_select = files['year'].unique().tolist()
+years_select = select_years(years_select)
+DEMAND_DATA_long_filter_year = DEMAND_DATA_long.query('Year.isin(@years_select)')
+
 # Plot_1_1: {Total} for 'Domestic', 'Exports', 'Feed', 'Imports', 'Production'(Tonnes) 
-DEMAND_DATA_type = DEMAND_DATA_long.groupby(['Year','Type']).sum(numeric_only=True).reset_index()
+DEMAND_DATA_type = DEMAND_DATA_long_filter_year.groupby(['Year','Type']).sum(numeric_only=True).reset_index()
 DEMAND_DATA_type_wide = DEMAND_DATA_type.pivot(index='Year', columns='Type', values='Quantity (tonnes, ML)').reset_index()
 DEMAND_DATA_type_wide.to_csv(f'{SAVE_DIR}/production_1_demand_type_wide.csv', index=False)
 
 
 # Plot_1_2: {ON/OFF land} for 'Domestic', 'Exports', 'Feed', 'Imports', 'Production'(Tonnes) 
-DEMAND_DATA_on_off = DEMAND_DATA_long.groupby(['Year','Type','on_off_land']).sum(numeric_only=True).reset_index()
+DEMAND_DATA_on_off = DEMAND_DATA_long_filter_year.groupby(['Year','Type','on_off_land']).sum(numeric_only=True).reset_index()
 DEMAND_DATA_on_off_wide = DEMAND_DATA_on_off.pivot(index='on_off_land', 
                                                    columns=['Year','Type'], 
                                                    values='Quantity (tonnes, ML)')
@@ -71,7 +78,7 @@ DEMAND_DATA_on_off_wide = DEMAND_DATA_on_off_wide.reindex(
 DEMAND_DATA_on_off_wide.to_csv(f'{SAVE_DIR}/production_2_demand_on_off_wide.csv', index=False)
 
 # Plot_1_3: {Commodity} 'Domestic', 'Exports', 'Feed', 'Imports', 'Production' (Tonnes)
-DEMAND_DATA_wide = DEMAND_DATA_long.pivot(
+DEMAND_DATA_wide = DEMAND_DATA_long_filter_year.pivot(
     index=['COMMODITY'], 
     columns=['Year','Type'], 
     values='Quantity (tonnes, ML)')
