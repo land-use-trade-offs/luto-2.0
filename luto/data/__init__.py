@@ -52,6 +52,7 @@ from luto.settings import (
     FEED_EFFICIENCY, 
     RIPARIAN_PLANTINGS_BUFFER_WIDTH,
     RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR,
+    BIODIV_LIVESTOCK_IMPACT,
 )
 
 from luto.economics.agricultural.quantity import lvs_veg_types
@@ -131,7 +132,7 @@ LU_NATURAL = [
     DESC2AGLU["Sheep - natural land"],
     DESC2AGLU["Unallocated - natural land"],
 ]
-LU_UNNATURAL = [DESC2AGLU[lu] for lu in AGRICULTURAL_LANDUSES if DESC2AGLU[lu] not in LU_NATURAL]
+LU_MODIFIED_LAND = [DESC2AGLU[lu] for lu in AGRICULTURAL_LANDUSES if DESC2AGLU[lu] not in LU_NATURAL]
 
 LU_CROPS_INDICES = [AGRICULTURAL_LANDUSES.index(lu) for lu in AGRICULTURAL_LANDUSES if lu in LU_CROPS]
 LU_LVSTK_INDICES = [AGRICULTURAL_LANDUSES.index(lu) for lu in AGRICULTURAL_LANDUSES if lu in LU_LVSTK]
@@ -565,6 +566,11 @@ conn_score = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.
 # Calculate weighted biodiversity score
 BIODIV_SCORE_WEIGHTED = BIODIV_SCORE_RAW - (BIODIV_SCORE_RAW * (1 - conn_score) * CONNECTIVITY_WEIGHTING)
 
-# Calculate total biodiversity target score as the sum of biodiv raw score over the entire study area
-TOTAL_BIODIV_TARGET_SCORE = (LUMASK * BIODIV_SCORE_RAW * REAL_AREA).sum() * BIODIV_TARGET
+# Calculate total biodiversity target score as the sum of biodiv raw score over the study area
+TOTAL_BIODIV_TARGET_SCORE = ( 
+                              np.isin(LUMAP, 23) * BIODIV_SCORE_RAW * REAL_AREA +                                                   # Biodiversity value of Unallocated - natural land 
+                              np.isin(LUMAP, [2, 6, 15]) * BIODIV_SCORE_RAW * (1 - BIODIV_LIVESTOCK_IMPACT) * REAL_AREA +           # Biodiversity value of livestock on natural land 
+                              np.isin(LUMAP, [2, 6, 15]) * BIODIV_SCORE_RAW * BIODIV_LIVESTOCK_IMPACT * BIODIV_TARGET * REAL_AREA + # Add 30% improvement to the degraded part of livestock on natural land
+                              np.isin(LUMAP, LU_MODIFIED_LAND) * BIODIV_SCORE_RAW * BIODIV_TARGET * REAL_AREA                       # Add 30% improvement to modified land
+                            ).sum() 
 

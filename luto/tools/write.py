@@ -133,8 +133,8 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
         os.mkdir(path_yr)
 
     # Write the decision variables, land-use and land management maps
-    # write_files(sim, yr_cal, path_yr)
-    # write_files_separate(sim, yr_cal, path_yr)
+    write_files(sim, yr_cal, path_yr)
+    write_files_separate(sim, yr_cal, path_yr)
 
     # Write the crosstab and switches, and the quantity comparison
     write_crosstab(sim, yr_cal, path_yr, yr_cal_sim_pre)
@@ -344,7 +344,7 @@ def write_quantity(sim, yr_cal, path, yr_cal_sim_pre=None):
         # Write the production of each year to disk
         production_years = pd.DataFrame({yr:sim.prod_data[yr]['Production'] for yr in sim.prod_data.keys()})
         production_years.insert(0,'Commodity',sim.bdata.COMMODITIES)
-        production_years.to_csv(os.path.join(path, f'quantity_production_killo_t_{timestamp}.csv'), index = False)
+        production_years.to_csv(os.path.join(path, f'quantity_production_kt_{timestamp}.csv'), index = False)
 
 
 def write_ag_revenue_cost(sim, yr_cal, path):
@@ -397,8 +397,8 @@ def write_ag_revenue_cost(sim, yr_cal, path):
     df_cost['SUM'] = df_cost.sum(axis=1)
 
     # Save to file
-    df_rev.to_csv(os.path.join(path, f'revenue_agricultural_commidity_{timestamp}.csv'))
-    df_cost.to_csv(os.path.join(path, f'cost_agricultural_commidity_{timestamp}.csv'))
+    df_rev.to_csv(os.path.join(path, f'revenue_agricultural_commodity_{timestamp}.csv'))
+    df_cost.to_csv(os.path.join(path, f'cost_agricultural_commodity_{timestamp}.csv'))
 
 
 

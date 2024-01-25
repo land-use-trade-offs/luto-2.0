@@ -12,15 +12,15 @@ def get_non_penalty_land_uses(data) -> list[int]:
     """
     Return a list of land uses that contribute to biodiversity output without penalty.
     """
-    return list(set(data.LU_NATURAL) - set(data.LU_LVSTK))
+    return list(set(data.LU_NATURAL) - set(data.LU_LVSTK_INDICES))  # returns [23], the index of Unallocated - natural land index
 
 
-def get_livestock_land_uses(data) -> list[int]:
+def get_livestock_natural_land_land_uses(data) -> list[int]:
     """
     Return a list of land uses that contribute to biodiversity but are penalised as per the 
-    BIODIV_LIVESTOCK_IMPACT setting.
+    BIODIV_LIVESTOCK_IMPACT setting (i.e., livestock on natural land).
     """
-    return list(set(data.LU_NATURAL) & set(data.LU_LVSTK))
+    return list(set(data.LU_NATURAL) & set(data.LU_LVSTK_INDICES)) # returns [2, 6, 15], Beef, Dairy, Sheep on natural land 
 
 
 def get_breq_matrices(data):
@@ -28,14 +28,14 @@ def get_breq_matrices(data):
     b_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
 
     biodiv_non_penalty_lus = get_non_penalty_land_uses(data)
-    livestock_lus = get_livestock_land_uses(data)
+    livestock_nat_land_lus = get_livestock_natural_land_land_uses(data)
 
     for j in biodiv_non_penalty_lus:
-        b_mrj[:, :, j] = data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA
+        b_mrj[:, :, j] = data.BIODIV_SCORE_RAW * data.REAL_AREA
 
-    if settings.BIODIV_LIVESTOCK_IMPACT > 0:
-        for j in livestock_lus:
-            b_mrj[:, :, j] = data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * (1 - settings.BIODIV_LIVESTOCK_IMPACT)
+    # if settings.BIODIV_LIVESTOCK_IMPACT > 0:
+    for j in livestock_nat_land_lus:
+        b_mrj[:, :, j] = data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * (1 - settings.BIODIV_LIVESTOCK_IMPACT)
     
     return b_mrj
 
@@ -80,10 +80,10 @@ def get_base_year_biodiversity_score(data) -> float:
     Gets the biodiversity score of the base year (2010).
     """
     biodiv_non_penalty_lus = get_non_penalty_land_uses(data)
-    livestock_lus = get_livestock_land_uses(data)
+    livestock_nat_land_lus = get_livestock_natural_land_land_uses(data)
 
     non_penalty_cells_2010 = np.isin(data.LUMAP, np.array(list(biodiv_non_penalty_lus))).astype(int)
-    livestock_cells_2010 = np.isin(data.LUMAP, np.array(list(livestock_lus))).astype(int)
+    livestock_cells_2010 = np.isin(data.LUMAP, np.array(list(livestock_nat_land_lus))).astype(int)
 
     # Apply penalties for livestock land uses
     biodiv_2010_non_pen_score = (non_penalty_cells_2010 * data.BIODIV_SCORE_RAW * data.REAL_AREA).sum()
