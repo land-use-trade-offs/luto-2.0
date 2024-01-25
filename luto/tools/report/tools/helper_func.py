@@ -205,7 +205,7 @@ def add_crop_lvstk_to_df(all_files,GHG_type):
 
     # Read GHG emissions of ag lucc
     
-    GHG_files = get_GHG_subsector_files(all_files,GHG_type)
+    GHG_files = get_GHG_subsector_files(all_files, GHG_type)
     
     CSVs = []
     for _,row in GHG_files.iterrows():
@@ -216,7 +216,10 @@ def add_crop_lvstk_to_df(all_files,GHG_type):
 
             # Subset the crop landuse
             csv_crop = csv[[True if i in LU_CROPS else False for i in  csv.index]]
-            csv_crop.index = pd.MultiIndex.from_product(([row['year']], csv_crop.index, ['Crop'],['Crop']))
+            csv_crop.index = pd.MultiIndex.from_product(([row['year']], 
+                                                         csv_crop.index, 
+                                                         ['Crop'],
+                                                         ['Crop']))
 
             # Subset the livestock landuse
             csv_lvstk = csv[[True if i in LU_LVSTKS else False for i in  csv.index]]
@@ -280,9 +283,9 @@ def read_GHG_to_long(all_files,GHG_type):
     GHG_df_long.columns = idx_level_name + GHG_df_long.columns.tolist()[4:]
 
     # Melt the table to long format
-    GHG_df_long = GHG_df_long.melt(id_vars=idx_level_name,
-                                        value_vars=GHG_df_long.columns.tolist()[3:],
-                                        value_name='val_t')
+    GHG_df_long = GHG_df_long.melt( id_vars=idx_level_name,
+                                    value_vars=GHG_df_long.columns.tolist()[3:],
+                                    value_name='val_t')
 
     # Get the GHG emissions in Mt CO2e
     GHG_df_long['Quantity (Mt CO2e)'] = GHG_df_long['val_t'] / 1e6

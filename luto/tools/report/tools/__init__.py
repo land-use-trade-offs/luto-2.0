@@ -413,14 +413,6 @@ def get_GHG_emissions_by_crop_lvstk_df(GHG_emissions_long):
     return GHG_crop_lvstk_total
 
 
-def get_non_ag_reduction(Non_ag_reduction_long):
-
-    Non_ag_reduction_total = Non_ag_reduction_long.groupby(['Year','Land use category','Land category']).sum()['Quantity (Mt CO2e)'].reset_index()
-    Non_ag_reduction_total['Landuse_land_cat'] = Non_ag_reduction_total\
-                                                    .apply(lambda x: (x['Land use category'] + ' - ' + x['Land category'])
-                                                        if (x['Land use category'] != x['Land category'])
-                                                        else x['Land use category'], axis=1)
-    return Non_ag_reduction_total
 
 
 def get_water_df(water_dfs):

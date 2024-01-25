@@ -676,7 +676,7 @@ def write_biodiversity(sim, yr_cal, path):
     # Get the timestamp so each CSV in the timeseries mode has a unique name
     timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
 
-    print('\nWriting biodiversity outputs to', path)
+    print('Writing biodiversity outputs to', path)
 
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
 

@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', function () {
             verticalAlign: 'left',
             layout: 'vertical',
             x: 10,
-            y: 100
+            y: 50
       
         },
 
@@ -154,8 +154,8 @@ document.addEventListener('DOMContentLoaded', function () {
             align: 'right',
             verticalAlign: 'left',
             layout: 'vertical',
-            x: 30,
-            y: 80
+            x: 10,
+            y: 50
       
         },
 
@@ -369,60 +369,6 @@ document.addEventListener('DOMContentLoaded', function () {
             verticalAlign: 'left',
             layout: 'vertical',
             x: 10,
-            y: 100
-      
-        },
-
-        tooltip: {
-            formatter: function () {
-                return `<b>Year:</b> ${this.x}<br><b>${this.series.name}:</b>${this.y.toFixed(2)}<br/>`;
-            }
-        },
-    
-        plotOptions: {
-            column: {
-                stacking: 'normal',
-            }
-        }, 
-        
-        exporting: {
-            sourceWidth: 1200,
-            sourceHeight: 600,
-        }
-
-    });
-
-    // Chart:economics_2_cost_3_Source_type_wide
-    Highcharts.chart('economics_2_cost_3_Source_type_wide', {
-
-        chart: {
-            type: 'column',
-            marginRight: 180
-        },
-
-        title: {
-            text: 'Cost of Production by Commodity'
-        },
-
-        credits: {
-            enabled: false
-        },
-    
-        data: {
-            csv: document.getElementById('economics_2_cost_3_Source_type_wide_csv').innerHTML,
-        },
-        
-        yAxis: {
-            title: {
-                text: 'Cost (billion AU$)'
-            },
-        },
-
-        legend: {
-            align: 'right',
-            verticalAlign: 'left',
-            layout: 'vertical',
-            x: 30,
             y: 80
       
         },
@@ -432,7 +378,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return `<b>Year:</b> ${this.x}<br><b>${this.series.name}:</b>${this.y.toFixed(2)}<br/>`;
             }
         },
-
+    
         plotOptions: {
             column: {
                 stacking: 'normal',
@@ -443,7 +389,61 @@ document.addEventListener('DOMContentLoaded', function () {
             sourceWidth: 1200,
             sourceHeight: 600,
         }
+
     });
+
+    // // Chart:economics_2_cost_3_Source_type_wide
+    // Highcharts.chart('economics_2_cost_3_Source_type_wide', {
+
+    //     chart: {
+    //         type: 'column',
+    //         marginRight: 180
+    //     },
+
+    //     title: {
+    //         text: 'Cost of Production by Commodity'
+    //     },
+
+    //     credits: {
+    //         enabled: false
+    //     },
+    
+    //     data: {
+    //         csv: document.getElementById('economics_2_cost_3_Source_type_wide_csv').innerHTML,
+    //     },
+        
+    //     yAxis: {
+    //         title: {
+    //             text: 'Cost (billion AU$)'
+    //         },
+    //     },
+
+    //     legend: {
+    //         align: 'right',
+    //         verticalAlign: 'left',
+    //         layout: 'vertical',
+    //         x: 80,
+    //         y: 10
+      
+    //     },
+
+    //     tooltip: {
+    //         formatter: function () {
+    //             return `<b>Year:</b> ${this.x}<br><b>${this.series.name}:</b>${this.y.toFixed(2)}<br/>`;
+    //         }
+    //     },
+
+    //     plotOptions: {
+    //         column: {
+    //             stacking: 'normal',
+    //         }
+    //     }, 
+        
+    //     exporting: {
+    //         sourceWidth: 1200,
+    //         sourceHeight: 600,
+    //     }
+    // });
 
     // Chart:economics_2_cost_4_Type_wide
     Highcharts.chart('economics_2_cost_4_Type_wide', {
@@ -611,12 +611,17 @@ document.addEventListener('DOMContentLoaded', function () {
         data = document.getElementById('economics_3_rev_cost_all_csv').innerHTML;
 
         var lines = data.split('\n');
+
+        // if the last line is empty, remove it
+        if (lines[lines.length - 1] == '') {
+            lines.pop();
+        }
         
         $.each(lines, function(lineNo, line) {
             var items = line.split(',');
     
             if (lineNo != 0) { // Skip the first line (headers)
-                economics_3_rev_cost_all_option.xAxis.categories.push(items[0]);
+                economics_3_rev_cost_all_option.xAxis.categories.push(parseFloat(items[0]));
                 economics_3_rev_cost_all_option.series[0].data.push([0, parseFloat(items[1])]); // Revenue
                 economics_3_rev_cost_all_option.series[1].data.push([parseFloat(items[3]), parseFloat(items[1])]); // Cost
             }

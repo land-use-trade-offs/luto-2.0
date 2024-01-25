@@ -12,6 +12,9 @@ from tools import   get_AREA_am, get_AREA_lm, get_AREA_lu, get_GHG_emissions_by_
               
 from tools.helper_func import get_GHG_category, get_GHG_file_df,\
                               get_rev_cost,target_GHG_2_Json, select_years
+                              
+                              
+from tools.parameters import YR_BASE
 
 
 # setting up working directory to root dir
@@ -56,8 +59,10 @@ DEMAND_DATA_long['Quantity (tonnes, ML)'] = DEMAND_DATA_long['Quantity (tonnes, 
 
 # Select the years to reduce the column number to 
 # avoid cluttering in the multi-level axis graphing
-years_select = files['year'].unique().tolist()
-years_select = select_years(years_select)
+years = files['year'].unique().tolist()
+years_select = select_years(years)
+
+DEMAND_DATA_long = DEMAND_DATA_long.query('Year.isin(@years)')
 DEMAND_DATA_long_filter_year = DEMAND_DATA_long.query('Year.isin(@years_select)')
 
 # Plot_1_1: {Total} for 'Domestic', 'Exports', 'Feed', 'Imports', 'Production'(Tonnes) 
@@ -135,14 +140,17 @@ quantity_df_wide.to_csv(f'{SAVE_DIR}/production_5_6_demand_Production_commodity_
 
 # Plot_2-2: Revenue and Cost data (Billion Dollars)
 revenue_df = get_rev_cost_df(files, 'revenue')
+revenue_df['Source_type'] = revenue_df['Source_type'].str.replace(' Crop','')
+
 cost_df = get_rev_cost_df(files, 'cost')
+cost_df['Source_type'] = cost_df['Source_type'].str.replace(' Crop','')
 
 keep_cols = ['year', 'value (billion)']
 loop_cols = revenue_df.columns.difference(keep_cols)
 
 for idx,col in enumerate(loop_cols):
     take_cols = keep_cols + [col]
-    df = revenue_df[take_cols].groupby(['year', col]).sum().reset_index()
+    df = revenue_df[take_cols].groupby(['year', col]).sum(numeric_only=True).reset_index()
     # convert to wide format
     df_wide = df.pivot_table(index=['year'], columns=col, values='value (billion)').reset_index()
     # save to csv
@@ -294,9 +302,27 @@ with open(f'{SAVE_DIR}/GHG_8_lu_source_emission_Mt.json', 'w') as outfile:
 
 # Plot_4-4: GHG sequestrations by Non-Agrilcultural sector (Mt)
 Non_ag_reduction_long = get_GHG_category(GHG_files,'Non-Agricultural Landuse')
-Non_ag_reduction_total = get_non_ag_reduction(Non_ag_reduction_long)
-GHG_non_ag_crop_lvstk_wide = Non_ag_reduction_total.pivot(index='Year', columns='Land use category', values='Quantity (Mt CO2e)').reset_index()
-GHG_non_ag_crop_lvstk_wide.to_csv(f'{SAVE_DIR}/GHG_9_non_ag_crop_lvstk_emission_Mt.csv',index=False)
+
+# Create a fake data in year BASE_YEAR with all Quantity (Mt CO2e) as 0 values
+Non_ag_reduction_long_fake = Non_ag_reduction_long.copy()
+Non_ag_reduction_long_fake['Year'] = YR_BASE
+Non_ag_reduction_long_fake['Quantity (Mt CO2e)'] = 0
+
+# Concatenate the fake data with the real data
+Non_ag_reduction_long = pd.concat([Non_ag_reduction_long,Non_ag_reduction_long_fake],axis=0)
+
+Non_ag_reduction_total = Non_ag_reduction_long.groupby(['Year','Land use category'])\
+    .sum()['Quantity (Mt CO2e)'].reset_index()
+
+Non_ag_reduction_source = Non_ag_reduction_long.groupby(['Year','Land use category','Sources'])\
+    .sum()['Quantity (Mt CO2e)'].reset_index()    
+    
+Non_ag_reduction_total_wide = Non_ag_reduction_total.pivot(index='Year', columns='Land use category', values='Quantity (Mt CO2e)').reset_index()
+Non_ag_reduction_total_wide.to_csv(f'{SAVE_DIR}/GHG_9_1_ag_reduction_total_wide_Mt.csv',index=False)
+
+Non_ag_reduction_source_wide = Non_ag_reduction_source.pivot(index='Year', columns='Sources', values='Quantity (Mt CO2e)').reset_index()
+Non_ag_reduction_source_wide.to_csv(f'{SAVE_DIR}/GHG_9_2_ag_reduction_source_wide_Mt.csv',index=False)
+
 
 
 # Plot_4-5: GHG reductions by Agricultural managements (Mt)
