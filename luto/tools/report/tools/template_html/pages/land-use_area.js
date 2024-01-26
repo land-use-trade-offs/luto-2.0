@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', function() {
             verticalAlign: 'top',
             layout: 'vertical',
             x: 20,
-            y: 50
+            y: 10
       
         },
 

@@ -12,7 +12,7 @@ LU_LVSTKS = ['Beef - modified land','Beef - natural land','Dairy - modified land
 
 LU_UNALLOW = ['Unallocated - modified land','Unallocated - natural land']
 
-
+COMMODITIES_OFF_LAND = ['Pork', 'Chicken', 'Eggs', 'Aquaculture']
 
 # Define the file name patterns for each category
 GHG_FNAME2TYPE = {'GHG_emissions_separate_agricultural_landuse': 'Agricultural Landuse',
@@ -27,12 +27,13 @@ AG_LANDUSE = ['Apples', 'Beef - modified land', 'Beef - natural land', 'Citrus',
               'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit', 'Unallocated - modified land', 
               'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes', 'Winter oilseeds']
 
-NON_AG_LANDUSE = ['Environmental Plantings']
+NON_AG_LANDUSE = ['Environmental Plantings','Riparian Plantings','Agroforestry']
 
 
 # Define the GHG categories
 
 GHG_NAMES = {
+    # Agricultural Landuse
     'TCO2E_CHEM_APPL': 'Chemical Application',
     'TCO2E_CROP_MGT': 'Crop Management',
     'TCO2E_CULTIV': 'Cultivation',
@@ -50,10 +51,14 @@ GHG_NAMES = {
     'TCO2E_SOIL': 'Agricultural soils: Direct Soil Emissions (biogenic)',
     'TCO2E_DUNG_URINE': 'Agricultural soils: Animal production, dung and urine',
     'TCO2E_ENTERIC': 'Livestock Enteric Fermentation (biogenic)',
-
+    # Agricultural Management
     'TCO2E_Asparagopsis taxiformis': 'Asparagopsis taxiformis', 
     'TCO2E_Precision Agriculture': 'Precision Agriculture',
     'TCO2E_Ecological Grazing': 'Ecological Grazing',
+    # Non-Agricultural Landuse
+    'TCO2E_Agroforestry': 'Agroforestry', 
+    'TCO2E_Environmental Plantings': 'Environmental Plantings',
+    'TCO2E_Riparian Plantings': 'Riparian Plantings',
 }
 
 GHG_CATEGORY = {'Agricultural soils: Animal production, dung and urine': {"CH4":0.5,"CO2":0.5},

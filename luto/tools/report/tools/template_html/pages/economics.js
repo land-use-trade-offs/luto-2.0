@@ -1,5 +1,5 @@
 // create chart
- document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', function () {
 
     Highcharts.setOptions({
         colors: [
@@ -16,8 +16,9 @@
         ],
     });
 
-    // Chart:production_1_quantity_df_wide
-    Highcharts.chart('production_1_quantity_df_wide', {
+
+    // Chart:economics_1_revenue_1_Irrigation_wide
+    Highcharts.chart('economics_1_revenue_1_Irrigation_wide', {
 
         chart: {
             type: 'column',
@@ -25,26 +26,79 @@
         },
 
         title: {
-            text: 'Agricultural Production by Commodity'
+            text: 'Revenue by Irrigation Status'
         },
 
         credits: {
             enabled: false
         },
-
+    
         data: {
-            csv: document.getElementById('production_1_quantity_df_wide_csv').innerHTML,
+            csv: document.getElementById('economics_1_revenue_1_Irrigation_wide_csv').innerHTML,
         },
         
         yAxis: {
             title: {
-                text: 'Quantity (million tonnes, kilolitres [milk])'
+                text: 'Revenue (billion AU$)'
             },
         },
 
         legend: {
             align: 'right',
-            verticalAlign: 'top',
+            verticalAlign: 'left',
+            layout: 'vertical',
+            x: -100,
+            y: 300
+      
+        },
+
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name}:</b>${this.y.toFixed(2)}<br/>`;
+            }
+        },
+    
+        plotOptions: {
+            column: {
+                stacking: 'normal',
+            }
+        }, 
+        
+        exporting: {
+            sourceWidth: 1200,
+            sourceHeight: 600,
+        }
+    });
+
+    // Chart:economics_1_revenue_2_Source_wide
+    Highcharts.chart('economics_1_revenue_2_Source_wide', {
+
+        chart: {
+            type: 'column',
+            marginRight: 180
+        },
+
+        title: {
+            text: 'Revenue by Agricultural Product'
+        },
+
+        credits: {
+            enabled: false
+        },
+    
+        data: {
+            csv: document.getElementById('economics_1_revenue_2_Source_wide_csv').innerHTML,
+        },
+        
+        yAxis: {
+            title: {
+                text: 'Revenue (billion AU$)'
+            },
+        },
+
+        legend: {
+            align: 'right',
+            verticalAlign: 'left',
             layout: 'vertical',
             x: 10,
             y: 50
@@ -61,112 +115,6 @@
             column: {
                 stacking: 'normal',
             }
-        },
-        
-        exporting: {
-            sourceWidth: 1200,
-            sourceHeight: 600,
-        }
-    });
-
-    // Chart:production_2_revenue_1_Irrigation_wide
-    Highcharts.chart('production_2_revenue_1_Irrigation_wide', {
-
-        chart: {
-            type: 'column',
-            marginRight: 180
-        },
-
-        title: {
-            text: 'Revenue by Irrigation Status'
-        },
-
-        credits: {
-            enabled: false
-        },
-    
-        data: {
-            csv: document.getElementById('production_2_revenue_1_Irrigation_wide_csv').innerHTML,
-        },
-        
-        yAxis: {
-            title: {
-                text: 'Revenue (billion AU$)'
-            },
-        },
-
-        legend: {
-            align: 'right',
-            verticalAlign: 'left',
-            layout: 'vertical',
-            x: -100,
-            y: 300
-      
-        },
-
-        tooltip: {
-            formatter: function () {
-                return `<b>Year:</b> ${this.x}<br><b>${this.series.name}:</b>${this.y.toFixed(2)}<br/>`;
-            }
-        },
-    
-        plotOptions: {
-            column: {
-                stacking: 'normal',
-            }
-        }, 
-        
-        exporting: {
-            sourceWidth: 1200,
-            sourceHeight: 600,
-        }
-    });
-
-    // Chart:production_2_revenue_2_Source_wide
-    Highcharts.chart('production_2_revenue_2_Source_wide', {
-
-        chart: {
-            type: 'column',
-            marginRight: 180
-        },
-
-        title: {
-            text: 'Revenue by Agricultural Product'
-        },
-
-        credits: {
-            enabled: false
-        },
-    
-        data: {
-            csv: document.getElementById('production_2_revenue_2_Source_wide_csv').innerHTML,
-        },
-        
-        yAxis: {
-            title: {
-                text: 'Revenue (billion AU$)'
-            },
-        },
-
-        legend: {
-            align: 'right',
-            verticalAlign: 'left',
-            layout: 'vertical',
-            x: 10,
-            y: 100
-      
-        },
-
-        tooltip: {
-            formatter: function () {
-                return `<b>Year:</b> ${this.x}<br><b>${this.series.name}:</b>${this.y.toFixed(2)}<br/>`;
-            }
-        },
-    
-        plotOptions: {
-            column: {
-                stacking: 'normal',
-            }
         }, 
         
         exporting: {
@@ -176,8 +124,8 @@
 
     });
 
-    // Chart:production_2_revenue_3_Source_type_wide
-    Highcharts.chart('production_2_revenue_3_Source_type_wide', {
+    // Chart:economics_1_revenue_3_Source_type_wide
+    Highcharts.chart('economics_1_revenue_3_Source_type_wide', {
 
         chart: {
             type: 'column',
@@ -193,7 +141,7 @@
         },
     
         data: {
-            csv: document.getElementById('production_2_revenue_3_Source_type_wide_csv').innerHTML,
+            csv: document.getElementById('economics_1_revenue_3_Source_type_wide_csv').innerHTML,
         },
         
         yAxis: {
@@ -206,8 +154,8 @@
             align: 'right',
             verticalAlign: 'left',
             layout: 'vertical',
-            x: 30,
-            y: 80
+            x: 10,
+            y: 50
       
         },
 
@@ -229,8 +177,8 @@
         }
     });
 
-     // Chart:production_2_revenue_4_Type_wide
-     Highcharts.chart('production_2_revenue_4_Type_wide', {
+     // Chart:economics_1_revenue_4_Type_wide
+     Highcharts.chart('economics_1_revenue_4_Type_wide', {
 
         chart: {
             type: 'column',
@@ -246,7 +194,7 @@
         },
 
         data: {
-            csv: document.getElementById('production_2_revenue_4_Type_wide_csv').innerHTML,
+            csv: document.getElementById('economics_1_revenue_4_Type_wide_csv').innerHTML,
         },
         
         yAxis: {
@@ -283,8 +231,8 @@
 
     });
 
-     // Chart:production_2_revenue_5_crop_lvstk_wide
-     Highcharts.chart('production_2_revenue_5_crop_lvstk_wide', {
+     // Chart:economics_1_revenue_5_crop_lvstk_wide
+     Highcharts.chart('economics_1_revenue_5_crop_lvstk_wide', {
 
         chart: {
             type: 'column',
@@ -296,7 +244,7 @@
         },
     
         data: {
-            csv: document.getElementById('production_2_revenue_5_crop_lvstk_wide_csv').innerHTML,
+            csv: document.getElementById('economics_1_revenue_5_crop_lvstk_wide_csv').innerHTML,
         },
         
         credits: {
@@ -336,8 +284,8 @@
         }
     });
 
-    // Chart:production_3_cost_1_Irrigation_wide
-    Highcharts.chart('production_3_cost_1_Irrigation_wide', {
+    // Chart:economics_2_cost_1_Irrigation_wide
+    Highcharts.chart('economics_2_cost_1_Irrigation_wide', {
 
         chart: {
             type: 'column',
@@ -353,7 +301,7 @@
         },
     
         data: {
-            csv: document.getElementById('production_3_cost_1_Irrigation_wide_csv').innerHTML,
+            csv: document.getElementById('economics_2_cost_1_Irrigation_wide_csv').innerHTML,
         },
         
         yAxis: {
@@ -390,8 +338,8 @@
     });
 
 
-    // Chart:production_3_cost_2_Source_wide
-    Highcharts.chart('production_3_cost_2_Source_wide', {
+    // Chart:economics_2_cost_2_Source_wide
+    Highcharts.chart('economics_2_cost_2_Source_wide', {
 
         chart: {
             type: 'column',
@@ -407,7 +355,7 @@
         },
     
         data: {
-            csv: document.getElementById('production_3_cost_2_Source_wide_csv').innerHTML,
+            csv: document.getElementById('economics_2_cost_2_Source_wide_csv').innerHTML,
         },
         
         yAxis: {
@@ -421,60 +369,6 @@
             verticalAlign: 'left',
             layout: 'vertical',
             x: 10,
-            y: 100
-      
-        },
-
-        tooltip: {
-            formatter: function () {
-                return `<b>Year:</b> ${this.x}<br><b>${this.series.name}:</b>${this.y.toFixed(2)}<br/>`;
-            }
-        },
-    
-        plotOptions: {
-            column: {
-                stacking: 'normal',
-            }
-        }, 
-        
-        exporting: {
-            sourceWidth: 1200,
-            sourceHeight: 600,
-        }
-
-    });
-
-    // Chart:production_3_cost_3_Source_type_wide
-    Highcharts.chart('production_3_cost_3_Source_type_wide', {
-
-        chart: {
-            type: 'column',
-            marginRight: 180
-        },
-
-        title: {
-            text: 'Cost of Production by Commodity'
-        },
-
-        credits: {
-            enabled: false
-        },
-    
-        data: {
-            csv: document.getElementById('production_3_cost_3_Source_type_wide_csv').innerHTML,
-        },
-        
-        yAxis: {
-            title: {
-                text: 'Cost (billion AU$)'
-            },
-        },
-
-        legend: {
-            align: 'right',
-            verticalAlign: 'left',
-            layout: 'vertical',
-            x: 30,
             y: 80
       
         },
@@ -484,7 +378,7 @@
                 return `<b>Year:</b> ${this.x}<br><b>${this.series.name}:</b>${this.y.toFixed(2)}<br/>`;
             }
         },
-
+    
         plotOptions: {
             column: {
                 stacking: 'normal',
@@ -495,10 +389,64 @@
             sourceWidth: 1200,
             sourceHeight: 600,
         }
+
     });
 
-    // Chart:production_3_cost_4_Type_wide
-    Highcharts.chart('production_3_cost_4_Type_wide', {
+    // // Chart:economics_2_cost_3_Source_type_wide
+    // Highcharts.chart('economics_2_cost_3_Source_type_wide', {
+
+    //     chart: {
+    //         type: 'column',
+    //         marginRight: 180
+    //     },
+
+    //     title: {
+    //         text: 'Cost of Production by Commodity'
+    //     },
+
+    //     credits: {
+    //         enabled: false
+    //     },
+    
+    //     data: {
+    //         csv: document.getElementById('economics_2_cost_3_Source_type_wide_csv').innerHTML,
+    //     },
+        
+    //     yAxis: {
+    //         title: {
+    //             text: 'Cost (billion AU$)'
+    //         },
+    //     },
+
+    //     legend: {
+    //         align: 'right',
+    //         verticalAlign: 'left',
+    //         layout: 'vertical',
+    //         x: 80,
+    //         y: 10
+      
+    //     },
+
+    //     tooltip: {
+    //         formatter: function () {
+    //             return `<b>Year:</b> ${this.x}<br><b>${this.series.name}:</b>${this.y.toFixed(2)}<br/>`;
+    //         }
+    //     },
+
+    //     plotOptions: {
+    //         column: {
+    //             stacking: 'normal',
+    //         }
+    //     }, 
+        
+    //     exporting: {
+    //         sourceWidth: 1200,
+    //         sourceHeight: 600,
+    //     }
+    // });
+
+    // Chart:economics_2_cost_4_Type_wide
+    Highcharts.chart('economics_2_cost_4_Type_wide', {
 
         chart: {
             type: 'column',
@@ -514,7 +462,7 @@
         },
 
         data: {
-            csv: document.getElementById('production_3_cost_4_Type_wide_csv').innerHTML,
+            csv: document.getElementById('economics_2_cost_4_Type_wide_csv').innerHTML,
         },
         
         yAxis: {
@@ -551,8 +499,8 @@
 
     });
 
-    // Chart:production_3_cost_5_crop_lvstk_wide
-    Highcharts.chart('production_3_cost_5_crop_lvstk_wide', {
+    // Chart:economics_2_cost_5_crop_lvstk_wide
+    Highcharts.chart('economics_2_cost_5_crop_lvstk_wide', {
 
         chart: {
             type: 'column',
@@ -564,7 +512,7 @@
         },
     
         data: {
-            csv: document.getElementById('production_3_cost_5_crop_lvstk_wide_csv').innerHTML,
+            csv: document.getElementById('economics_2_cost_5_crop_lvstk_wide_csv').innerHTML,
         },
         
         credits: {
@@ -604,12 +552,12 @@
         }
     });
 
-    // Chart:production_4_rev_cost_all
+    // Chart:economics_3_rev_cost_all
 
-    let production_4_rev_cost_all_option = {
+    let economics_3_rev_cost_all_option = {
         chart: {
             type: 'columnrange',
-            renderTo: 'production_4_rev_cost_all',
+            renderTo: 'economics_3_rev_cost_all',
             marginRight: 180
         },
     
@@ -660,26 +608,29 @@
 
     $(document).ready(function() {
         let data;
-        data = document.getElementById('production_4_rev_cost_all_csv').innerHTML;
+        data = document.getElementById('economics_3_rev_cost_all_csv').innerHTML;
 
         var lines = data.split('\n');
+
+        // if the last line is empty, remove it
+        if (lines[lines.length - 1] == '') {
+            lines.pop();
+        }
         
         $.each(lines, function(lineNo, line) {
             var items = line.split(',');
     
             if (lineNo != 0) { // Skip the first line (headers)
-                production_4_rev_cost_all_option.xAxis.categories.push(items[0]);
-                production_4_rev_cost_all_option.series[0].data.push([0, parseFloat(items[1])]); // Revenue
-                production_4_rev_cost_all_option.series[1].data.push([parseFloat(items[3]), parseFloat(items[1])]); // Cost
+                economics_3_rev_cost_all_option.xAxis.categories.push(parseFloat(items[0]));
+                economics_3_rev_cost_all_option.series[0].data.push([0, parseFloat(items[1])]); // Revenue
+                economics_3_rev_cost_all_option.series[1].data.push([parseFloat(items[3]), parseFloat(items[1])]); // Cost
             }
         });
     
         // Create the chart with the correct options
-        let chart = new Highcharts.Chart(production_4_rev_cost_all_option);
+        let chart = new Highcharts.Chart(economics_3_rev_cost_all_option);
         });
 
     
 });
     
-
-

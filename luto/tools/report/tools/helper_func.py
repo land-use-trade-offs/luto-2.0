@@ -109,7 +109,7 @@ def merge_LVSTK_UAALLOW(df):
     """
     df_crop = df[[True if i in LU_CROPS else False for i in  df['Land use']]]
 
-    df_ep = df[[True if i in NON_AG_LANDUSE else False for i in  df['Land use']]]
+    df_non_ag = df[[True if i in NON_AG_LANDUSE else False for i in  df['Land use']]]
 
     df_unallow = df[[True if i in LU_UNALLOW else False for i in  df['Land use']]]
     # df_unallow.index = pd.MultiIndex.from_tuples(tuple(df_unallow['Land use'].str.split(' - ')))
@@ -119,7 +119,7 @@ def merge_LVSTK_UAALLOW(df):
     df_lvstk.index = pd.MultiIndex.from_tuples(tuple(df_lvstk['Land use'].str.split(' - ')))
     df_lvstk = df_lvstk.groupby(level=0).sum(numeric_only=True).reset_index(names='Land use')
 
-    return pd.concat([df_crop,df_ep,df_lvstk,df_unallow]).reset_index(drop=True)
+    return pd.concat([df_crop,df_non_ag,df_lvstk,df_unallow]).reset_index(drop=True)
 
 
 def get_xy_data(df):
@@ -205,7 +205,7 @@ def add_crop_lvstk_to_df(all_files,GHG_type):
 
     # Read GHG emissions of ag lucc
     
-    GHG_files = get_GHG_subsector_files(all_files,GHG_type)
+    GHG_files = get_GHG_subsector_files(all_files, GHG_type)
     
     CSVs = []
     for _,row in GHG_files.iterrows():
@@ -216,7 +216,10 @@ def add_crop_lvstk_to_df(all_files,GHG_type):
 
             # Subset the crop landuse
             csv_crop = csv[[True if i in LU_CROPS else False for i in  csv.index]]
-            csv_crop.index = pd.MultiIndex.from_product(([row['year']], csv_crop.index, ['Crop'],['Crop']))
+            csv_crop.index = pd.MultiIndex.from_product(([row['year']], 
+                                                         csv_crop.index, 
+                                                         ['Crop'],
+                                                         ['Crop']))
 
             # Subset the livestock landuse
             csv_lvstk = csv[[True if i in LU_LVSTKS else False for i in  csv.index]]
@@ -280,9 +283,9 @@ def read_GHG_to_long(all_files,GHG_type):
     GHG_df_long.columns = idx_level_name + GHG_df_long.columns.tolist()[4:]
 
     # Melt the table to long format
-    GHG_df_long = GHG_df_long.melt(id_vars=idx_level_name,
-                                        value_vars=GHG_df_long.columns.tolist()[3:],
-                                        value_name='val_t')
+    GHG_df_long = GHG_df_long.melt( id_vars=idx_level_name,
+                                    value_vars=GHG_df_long.columns.tolist()[3:],
+                                    value_name='val_t')
 
     # Get the GHG emissions in Mt CO2e
     GHG_df_long['Quantity (Mt CO2e)'] = GHG_df_long['val_t'] / 1e6
@@ -414,3 +417,39 @@ def add_data_2_html(html_path:str, data_pathes:list)->None:
     tree.write(html_path, method="html")
 
     print(f"Data added to {html_path} successfully!")
+    
+    
+    
+def select_years(year_list):
+    """
+    Selects a subset of years from the given year_list. The selected years will 
+    1) include the first and last years in the year_list, and
+    2) be evenly distributed between the first and last years.
+
+    Args:
+        year_list (list): A list of years.
+
+    Returns:
+        list: A list containing the selected years.
+
+    """
+    # Check if the list has more than 6 elements
+    if len(year_list) <= 6:
+        return year_list  # Return the list as is if 6 or fewer elements
+
+    # Select the start and end years
+    selected_years = [year_list[0], year_list[-1]]
+
+    # Calculate the number of years to be selected in between (4 in this case)
+    slots = 4
+
+    # Calculate the interval for selection
+    interval = (len(year_list) - 2) / (slots + 1)
+
+    # Select years based on calculated interval, ensuring even distribution
+    for i in range(1, slots + 1):
+        # Calculate index for selection
+        index = int(round(i * interval))
+        selected_years.insert(-1, year_list[index])
+
+    return selected_years

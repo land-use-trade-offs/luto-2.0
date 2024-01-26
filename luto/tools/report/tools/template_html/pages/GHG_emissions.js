@@ -127,8 +127,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         },
-
-
         exporting: {
             sourceWidth: 1200,
             sourceHeight: 600,
@@ -139,6 +137,10 @@ document.addEventListener('DOMContentLoaded', function () {
     let data = document.getElementById('GHG_2_individual_emission_Mt_csv').innerHTML;
     // Split the lines
     var lines = data.split('\n');
+    // If the last line is empty, remove it
+    if (lines[lines.length - 1] == "") {
+        lines.pop();
+    }
 
     // Push column data into data list
     for (let i = 0; i < lines.length; i++) {
@@ -160,7 +162,7 @@ document.addEventListener('DOMContentLoaded', function () {
             let col4 = lines[i].split(",")[4];
             let col5 = lines[i].split(",")[5];
 
-            options.xAxis.categories.push(year);
+            options.xAxis.categories.push(parseFloat(year));
             options.series[0].data.push(parseFloat(col1));
             options.series[1].data.push(parseFloat(col2));
             options.series[2].data.push(parseFloat(col3));
@@ -340,7 +342,8 @@ document.addEventListener('DOMContentLoaded', function () {
     Highcharts.chart('GHG_6_sources_emission_Mt', {
         chart: {
             type: 'column',
-            marginRight: 180
+            marginRight: 180,
+            marginBottom: 200
         },
 
         title: {
@@ -361,17 +364,17 @@ document.addEventListener('DOMContentLoaded', function () {
             },
         },
 
-        legend: {
-            itemStyle: {
-                "fontSize": "6px",
-                "textOverflow": "ellipsis",
-            },
-            align: 'right',
-            verticalAlign: 'top',
-            layout: 'vertical',
-            x: 0,
-            y: 170
-        },
+        // legend: {
+        //     // itemStyle: {
+        //     //     "fontSize": "6px",
+        //     //     "textOverflow": "ellipsis",
+        //     // },
+        //     align: 'bottom',
+        //     // verticalAlign: 'top',
+        //     // layout: 'vertical',
+        //     x: 80,
+        //     y: 0
+        // },
 
         tooltip: {
             formatter: function () {
@@ -433,8 +436,8 @@ document.addEventListener('DOMContentLoaded', function () {
             align: 'right',
             verticalAlign: 'top',
             layout: 'vertical',
-            x: 10,
-            y: 250
+            x: -50,
+            y: 200
         },
         series: [{
             name: 'Series 0',
@@ -542,18 +545,15 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 
-
-
-
-    // Chart:GHG_9_non_ag_crop_lvstk_emission_Mt
-    Highcharts.chart('GHG_9_non_ag_crop_lvstk_emission_Mt', {
+    // Chart:GHG_9_1_ag_reduction_total_wide_Mt
+    Highcharts.chart('GHG_9_1_ag_reduction_total_wide_Mt', {
         chart: {
             type: 'column',
             marginRight: 180
         },
 
         title: {
-            text: 'GHG Sequestration Total'
+            text: 'Non Agricultural Land-use Sequestration in total'
         },
 
         credits: {
@@ -561,7 +561,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
 
         data: {
-            csv: document.getElementById('GHG_9_non_ag_crop_lvstk_emission_Mt_csv').innerHTML,
+            csv: document.getElementById('GHG_9_1_ag_reduction_total_wide_Mt_csv').innerHTML,
         },
 
         yAxis: {
@@ -571,7 +571,11 @@ document.addEventListener('DOMContentLoaded', function () {
         },
 
         legend: {
-            disabled: true,
+            align: 'right',
+            verticalAlign: 'top',
+            layout: 'vertical',
+            x: 10,
+            y: 250
         },
 
         tooltip: {
@@ -582,6 +586,60 @@ document.addEventListener('DOMContentLoaded', function () {
 
         plotOptions: {
             column: {
+                dataLabels: {
+                    enabled: false
+                }
+            }
+        },
+
+        exporting: {
+            sourceWidth: 1200,
+            sourceHeight: 600,
+        }
+    });
+
+    // Chart:GHG_9_2_ag_reduction_source_wide_Mt
+    Highcharts.chart('GHG_9_2_ag_reduction_source_wide_Mt', {
+        chart: {
+            type: 'column',
+            marginRight: 180
+        },
+
+        title: {
+            text: 'Non Agricultural Land-use Sequestration by Sources'
+        },
+
+        credits: {
+            enabled: false
+        },
+
+        data: {
+            csv: document.getElementById('GHG_9_2_ag_reduction_source_wide_Mt_csv').innerHTML,
+        },
+
+        yAxis: {
+            title: {
+                text: 'Sequestration (million t CO2e)'
+            },
+        },
+
+        legend: {
+            align: 'right',
+            verticalAlign: 'top',
+            layout: 'vertical',
+            x: 10,
+            y: 250
+        },
+
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name}:</b>${this.y.toFixed(2)}<br/>`;
+            }
+        },
+
+        plotOptions: {
+            column: {
+                stacking: 'normal',
                 dataLabels: {
                     enabled: false
                 }

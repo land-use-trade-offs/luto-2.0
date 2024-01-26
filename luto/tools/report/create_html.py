@@ -4,17 +4,18 @@ import pandas as pd
 from glob import glob
 import argparse
 
-
 from tools.helper_func import add_data_2_html
 
+
+# # setting up working directory to root dir
+# if  __name__ == '__main__':
+#     os.chdir('../../..')
 
 ####################################################
 #         setting up working variables             #
 ####################################################
 
-# # setting up working directory to root dir
-# if  __name__ == '__main__':
-#     os.chdir('../../..')
+
 
 # Get the output directory
 parser = argparse.ArgumentParser()
@@ -46,7 +47,8 @@ shutil.copytree('luto/tools/report/tools/template_html',
 ####################################################  
 
 # Get all html files needs data insertion
-html_df = pd.DataFrame([['production',f"{REPORT_DIR}/REPORT_HTML/pages/production_profit.html"],
+html_df = pd.DataFrame([['production',f"{REPORT_DIR}/REPORT_HTML/pages/production.html"],
+                        ['economics',f"{REPORT_DIR}/REPORT_HTML/pages/economics.html"],
                         ["area",f"{REPORT_DIR}/REPORT_HTML/pages/land-use_area.html"],
                         ["GHG",f"{REPORT_DIR}/REPORT_HTML/pages/GHG_emissions.html"],
                         ["water",f"{REPORT_DIR}/REPORT_HTML/pages/water_usage.html"]])
@@ -55,8 +57,6 @@ html_df.columns = ['name','path']
 
 # Get all data files
 all_data_files = glob(f"{REPORT_DIR}/data/*")
-# # Exclude html files
-# all_data_files = [i for i in all_data_files if 'html' not in i]
 
 # Add data path to html_df
 html_df['data_path'] = html_df.apply(lambda x: [i for i in all_data_files if x['name'] in i ],axis=1)

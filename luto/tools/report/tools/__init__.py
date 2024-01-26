@@ -1,8 +1,9 @@
+import sys
 import os
 import re
 import pandas as pd
 
-from tools.parameters import LU_CROPS, LU_LVSTKS, YR_BASE
+from tools.parameters import LU_CROPS, LU_LVSTKS, YR_BASE, COMMODITIES_OFF_LAND
 from tools.helper_func import df_wide2long, get_GHG_category, merge_LVSTK_UAALLOW
 
 # Set up working directory to the root of the report folder
@@ -30,7 +31,8 @@ def extract_dtype_from_path(path):
             'cross_table':['crosstab','switches'],
             'quantity':['quantity'],
             'revenue':['revenue'],
-            'cost':['cost']
+            'cost':['cost'],
+            'biodiversity':['biodiversity'],
             }
     
     if not 'lucc_separate' in path:
@@ -91,6 +93,53 @@ def get_all_files(data_root):
     file_paths['base_name'] = file_paths['base_name'].apply(lambda x: re.sub(r'_\d{4}.*\d{2}','',x))
 
     return file_paths
+
+
+def get_demand_df(files_df:pd.DataFrame):
+    """
+    Get the demand data as a DataFrame.
+
+    Args:
+        files_df (pd.DataFrame): DataFrame containing file information.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the demand data.
+
+    Raises:
+        None
+    """
+
+    # import luto settings
+    sys.path.append('./') # path of current dir
+    sys.path.append('../../..') # path of the project root dir
+    from luto.settings import INPUT_DIR, SSP, RCP, SCENARIO, DIET_DOM, DIET_GLOB, \
+        CONVERGENCE, IMPORT_TREND, WASTE, FEED_EFFICIENCY
+    
+    dd = pd.read_hdf(f'{INPUT_DIR}/demand_projections.h5')
+
+    # Convert eggs from count to tones
+    mask = dd.index.get_level_values(7) == 'eggs'
+    dd.loc[:,:,:,:,:,:,:,mask] = dd.loc[:,:,:,:,:,:,:,mask] * 60 / 1000 / 1000 
+
+    # Select the demand scenario
+    DEMAND_DATA = dd.loc[(SCENARIO, DIET_DOM, DIET_GLOB, CONVERGENCE, 
+                        IMPORT_TREND, WASTE, FEED_EFFICIENCY)].copy()
+
+    # Filter the demand data to only include years up to the target year
+    DEMAND_DATA_long = DEMAND_DATA.melt(ignore_index=False,
+                                        value_name='Quantity (tonnes, ML)').reset_index()
+    
+    DEMAND_DATA_long.columns = ['COMMODITY','Type','Year','Quantity (tonnes, ML)']
+    
+    # Rename the columns, so that they are the same with LUTO naming convention
+    DEMAND_DATA_long['Type'] = DEMAND_DATA_long['Type'].str.title()
+    DEMAND_DATA_long['COMMODITY'] = DEMAND_DATA_long['COMMODITY']\
+        .apply(lambda x: x[0].upper() + x[1:].lower())
+        
+    # Add columns for on_land and off_land commodities
+    DEMAND_DATA_long['on_off_land'] = DEMAND_DATA_long['COMMODITY'].apply(lambda x: 'On land' if x not in COMMODITIES_OFF_LAND else 'Off land')
+        
+    return DEMAND_DATA_long
 
 
 def get_quantity_df(in_dfs):
@@ -364,14 +413,6 @@ def get_GHG_emissions_by_crop_lvstk_df(GHG_emissions_long):
     return GHG_crop_lvstk_total
 
 
-def get_non_ag_reduction(Non_ag_reduction_long):
-
-    Non_ag_reduction_total = Non_ag_reduction_long.groupby(['Year','Land use category','Land category']).sum()['Quantity (Mt CO2e)'].reset_index()
-    Non_ag_reduction_total['Landuse_land_cat'] = Non_ag_reduction_total\
-                                                    .apply(lambda x: (x['Land use category'] + ' - ' + x['Land category'])
-                                                        if (x['Land use category'] != x['Land category'])
-                                                        else x['Land use category'], axis=1)
-    return Non_ag_reduction_total
 
 
 def get_water_df(water_dfs):
