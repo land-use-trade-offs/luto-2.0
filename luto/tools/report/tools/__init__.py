@@ -126,9 +126,9 @@ def get_demand_df(files_df:pd.DataFrame):
                         IMPORT_TREND, WASTE, FEED_EFFICIENCY)].copy()
 
     # Filter the demand data to only include years up to the target year
-    DEMAND_DATA_long = DEMAND_DATA.melt(ignore_index=False, 
-                                        var_name=['Year','Commodity'], 
+    DEMAND_DATA_long = DEMAND_DATA.melt(ignore_index=False,
                                         value_name='Quantity (tonnes, ML)').reset_index()
+    
     DEMAND_DATA_long.columns = ['COMMODITY','Type','Year','Quantity (tonnes, ML)']
     
     # Rename the columns, so that they are the same with LUTO naming convention
