@@ -84,8 +84,8 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 3          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
-MODE = 'snapshot'       # runs for target year only
-# MODE = 'timeseries'   # runs each year from base year to target year
+# MODE = 'snapshot'       # runs for target year only
+MODE = 'timeseries'   # runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****
@@ -154,7 +154,7 @@ CARBON_PRICE_PER_TONNE = 50                 # Price of carbon per tonne - determ
 RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR = 100
 RIPARIAN_PLANTINGS_BUFFER_WIDTH = 10
 # RIPARIAN_PLANTINGS_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 100 metres per hectare
-RIPARIAN_PLANTINGS_FENCING_COST_PER_M = -10           # $ per linear metre
+RIPARIAN_PLANTINGS_FENCING_COST_PER_M = 0           # $ per linear metre
 RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR = 0.5
 
 # Agroforestry Parameters
@@ -162,7 +162,7 @@ AGROFORESTRY_COST_PER_HA_PER_YEAR = 100
 AGROFORESTRY_ROW_WIDTH = 20
 AGROFORESTRY_ROW_SPACING = 40
 # AGROFORESTRY_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 100 metres per hectare
-AGROFORESTRY_FENCING_COST_PER_M = -10           # $ per linear metre
+AGROFORESTRY_FENCING_COST_PER_M = 0           # $ per linear metre
 AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
 no_alleys_per_ha = 100 / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
 AF_FENCING_LENGTH = 100 * no_alleys_per_ha * 2 # Length of fencing required per ha in metres
