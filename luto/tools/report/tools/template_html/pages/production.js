@@ -573,19 +573,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
     // Chart:production_5_4_demand_Feed_commodity
-    Highcharts.chart('production_5_4_demand_Feed_commodity', {
+    production_5_4_demand_Feed_commodity_option = {
         chart: {
+            renderTo: "production_5_4_demand_Feed_commodity",
             type: 'column',
             marginRight: 180
         },
         title: {
             text: 'Feed Commodity'
         },
-        data: {
-            csv: document.getElementById('production_5_4_demand_Feed_commodity_csv').innerHTML,
-        },
+        series: [],
         credits: {
             enabled: false
+        },
+        xAxis: {
+            categories: [],
         },
         yAxis: {
             title: {
@@ -618,7 +620,89 @@ document.addEventListener('DOMContentLoaded', function () {
             sourceWidth: 1200,
             sourceHeight: 600,
         }
+    };
+
+    // Extract data to populate chart
+    $(document).ready(function () {
+
+        let data, lines;
+
+        data = document.getElementById(
+            "production_5_4_demand_Feed_commodity_csv"
+        ).innerHTML;
+        
+        // If the last line is empty, remove it
+        lines = data.split("\n");
+        if (lines[lines.length - 1] == "") {
+            lines.pop();
+        }
+
+        // Iterate through the lines and add categories or series
+        $.each(lines, function (lineNo, line) {
+            var items = line.split(",");
+            if (lineNo == 0) {
+                // Loop throught items of this line and add names to series
+                $.each(items, function (itemNo, item) {
+                    if (itemNo > 0) {
+                        production_5_4_demand_Feed_commodity_option.series.push({
+                            name: item,
+                            data: [],
+                        });
+                    }
+                });
+            } 
+            else {
+                // Add year to categories
+                production_5_4_demand_Feed_commodity_option.xAxis.categories.push(
+                    parseFloat(items[0])
+                );
+
+                // Add data to series
+                $.each(items, function (itemNo, item) {
+                    if (itemNo > 0) {
+
+                        // If the item is empty, add null
+                        if (item == "") {
+                            production_5_4_demand_Feed_commodity_option.series[itemNo - 1].data.push(
+                                null
+                            );
+                        } else {
+                            // Add the item
+                            production_5_4_demand_Feed_commodity_option.series[itemNo - 1].data.push(
+                                parseFloat(item));
+
+                            }
+                        }
+                    });
+                };
+
+            });
+
+            // Loop through series, if all null, add the showInLegend to be false
+            production_5_4_demand_Feed_commodity_option.series.forEach(
+                (series) => {
+                    let allNull = true;
+                    series.data.forEach((data) => {
+                        if (data != null) {
+                            allNull = false;
+                        }
+                    });
+                    if (allNull) {
+                        series.showInLegend = false;
+                    }
+                }
+            );
+
+            // Create the chart
+            let chart = new Highcharts.Chart(
+                production_5_4_demand_Feed_commodity_option
+            );
+            console.log(production_5_4_demand_Feed_commodity_option);
+
     });
+
+
+
 
     // Chart:production_5_5_demand_Production_commodity
     Highcharts.chart('production_5_5_demand_Production_commodity', {
