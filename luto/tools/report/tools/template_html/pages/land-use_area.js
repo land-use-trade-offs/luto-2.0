@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         yAxis: {
             title: {
-                text: 'Area (km2)'
+                text: 'Area (million km2)'
             },
         },
 
@@ -96,7 +96,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         yAxis: {
             title: {
-                text: 'Area (km2)'
+                text: 'Area (million km2)'
             },
         },
 
@@ -144,7 +144,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         yAxis: {
             title: {
-                text: 'Area (km2)'
+                text: 'Area (million km2)'
             },
         },
 
@@ -192,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         yAxis: {
             title: {
-                text: 'Area (km2)'
+                text: 'Area (million km2)'
             },
         },
 
@@ -243,8 +243,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }); 
 
     // area_5_begin_end_area
-    document.getElementById('area_5_begin_end_area').innerHTML = '<object type="text/html" data="../../data/area_5_begin_end_area.html" ></object>'
+    document.getElementById('area_5_begin_end_area').innerHTML = '<object type="text/html"  data="../../data/area_5_begin_end_area.html" ></object>'
 
     // area_6_begin_end_pct
-    document.getElementById('area_6_begin_end_pct').innerHTML = '<object type="text/html" data="../../data/area_6_begin_end_pct.html" ></object>'
+    document.getElementById('area_6_begin_end_pct').innerHTML = '<object type="text/html" style={font-size: 10px} data="../../data/area_6_begin_end_pct.html" ></object>'
+    
 });

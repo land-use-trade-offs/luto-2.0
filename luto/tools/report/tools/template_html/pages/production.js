@@ -32,8 +32,10 @@ document.addEventListener('DOMContentLoaded', function () {
             enabled: false
         },
         yAxis: {
+            endOnTick: false,
+            maxPadding: 0.1,
             title: {
-                text: "Quantity (million tonnes, kilolitres [milk])"
+                text: "Quantity (million tonnes, million kilolitres [milk])"
             },
         },
 
@@ -92,8 +94,10 @@ document.addEventListener('DOMContentLoaded', function () {
         },
 
         yAxis: {
+            endOnTick: false,
+            maxPadding: 0.1,
             title: {
-                text: "Quantity (million tonnes, kilolitres [milk])",
+                text: "Quantity (million tonnes, million kilolitres [milk])",
             }
         },
 
@@ -208,8 +212,10 @@ document.addEventListener('DOMContentLoaded', function () {
         },
 
         yAxis: {
+            endOnTick: false,
+            maxPadding: 0.1,
             title: {
-                text: "Quantity (million tonnes, kilolitres [milk])",
+                text: "Quantity (million tonnes, million kilolitres [milk])",
             }
         },
 
@@ -310,7 +316,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         yAxis: {
             title: {
-                text: "Quantity (million tonnes, kilolitres [milk])"
+                text: "Quantity (million tonnes, million kilolitres [milk])"
             },
         },
 
@@ -358,7 +364,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         yAxis: {
             title: {
-                text: "Quantity (million tonnes, kilolitres [milk])"
+                text: "Quantity (million tonnes, million kilolitres [milk])"
             },
         },
 
@@ -406,7 +412,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         yAxis: {
             title: {
-                text: "Quantity (million tonnes, kilolitres [milk])"
+                text: "Quantity (million tonnes, million kilolitres [milk])"
             },
         },
 
@@ -457,7 +463,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         yAxis: {
             title: {
-                text: "Quantity (million tonnes, kilolitres [milk])"
+                text: "Quantity (million tonnes, million kilolitres [milk])"
             },
         },
 
@@ -590,7 +596,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         yAxis: {
             title: {
-                text: "Quantity (million tonnes, kilolitres [milk])"
+                text: "Quantity (million tonnes, million kilolitres [milk])"
             },
         },
 
@@ -719,7 +725,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         yAxis: {
             title: {
-                text: "Quantity (million tonnes, kilolitres [milk])"
+                text: "Quantity (million tonnes, million kilolitres [milk])"
             },
         },
 
@@ -767,7 +773,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         yAxis: {
             title: {
-                text: "Quantity (million tonnes, kilolitres [milk])"
+                text: "Quantity (million tonnes, million kilolitres [milk])"
             },
         },
 

@@ -195,28 +195,32 @@ area_paths = files.query('catetory == "cross_table" and year_types == "single_ye
 
 crosstab_lu = area_paths.query('base_name == "crosstab-lumap"').reset_index(drop=True)
 lu_area = get_AREA_lu(crosstab_lu)
-lu_area_wide = lu_area.pivot(index='Year', columns='Land use', values='Area (km2)').reset_index()
+lu_area['Area (million km2)'] = lu_area['Area (km2)'] / 1e6
+lu_area_wide = lu_area.pivot(index='Year', columns='Land use', values='Area (million km2)').reset_index()
 lu_area_wide.to_csv(f'{SAVE_DIR}/area_1_total_area_wide.csv', index=False)
 
-# Plot_3-2_(1-5): Area (km2) by Irrigation
+# Plot_3-2: Area (km2) by Irrigation
 crosstab_lm = area_paths.query('base_name == "crosstab-lmmap"').reset_index(drop=True)
 lm_area = get_AREA_lm(crosstab_lm)
-lm_area_wide = lm_area.pivot(index='Year', columns='Irrigation', values='Area (km2)').reset_index()
+lm_area['Area (million km2)'] = lm_area['Area (km2)'] / 1e6
+lm_area_wide = lm_area.pivot(index='Year', columns='Irrigation', values='Area (million km2)').reset_index()
 lm_area_wide.to_csv(f'{SAVE_DIR}/area_2_irrigation_area_wide.csv', index=False)
 
-# Plot_3-3_(1-5): Area (km2) by Agricultural management
+# Plot_3-3: Area (km2) by Agricultural management
 switches_am = area_paths.query('base_name.str.contains(r"switches.*amstat.*", regex=True)').reset_index(drop=True)
 am_area_km2 = get_AREA_am(switches_am)
+am_area_km2['Area (million km2)'] = am_area_km2['Area (km2)'] / 1e6
+
 am_area_km2[['Land use','Agricultural management']] = am_area_km2['Land use'].apply(lambda x: re.findall(r'(.*) \((.*)\)',x)[0]).tolist()
 am_area_km2_total = am_area_km2.groupby(['Year','Agricultural management']).sum(numeric_only=True).reset_index()
 
-am_area_km2_total_wide = am_area_km2_total.pivot(index='Year', columns='Agricultural management', values='Area (km2)').reset_index()
+am_area_km2_total_wide = am_area_km2_total.pivot(index='Year', columns='Agricultural management', values='Area (million km2)').reset_index()
 am_area_km2_total_wide.to_csv(f'{SAVE_DIR}/area_3_am_total_area_wide.csv', index=False)
 
 
 # Plot_3-4: Area (km2) by Land use
 am_area_km2_wide = am_area_km2.drop(columns='Agricultural management').groupby(['Year','Land use']).sum().reset_index()
-am_area_km2_wide = am_area_km2_wide.pivot(index='Year', columns='Land use', values='Area (km2)').reset_index()
+am_area_km2_wide = am_area_km2_wide.pivot(index='Year', columns='Land use', values='Area (million km2)').reset_index()
 am_area_km2_wide.to_csv(f'{SAVE_DIR}/area_4_am_lu_area_wide.csv', index=False)
 
 
@@ -228,9 +232,19 @@ begin_end_df_area, begin_end_df_pct = get_begin_end_df(files)
 heat_area = begin_end_df_area.style.background_gradient(cmap='Oranges', axis=1).format('{:,.0f}')
 heat_pct = begin_end_df_pct.style.background_gradient(cmap='Oranges', axis=1).format('{:,.0f}%')
 
-heat_area.to_html(f'{SAVE_DIR}/area_5_begin_end_area.html', index=False)
-heat_pct.to_html(f'{SAVE_DIR}/area_6_begin_end_pct.html', index=False)
+# Define the style
+style = "<style>table, th, td {font-size: 9px;}</style>\n"
 
+# Add the style to the HTML
+heat_area_html = style + heat_area.to_html()
+heat_pct_html = style + heat_pct.to_html()
+
+# Save the html
+with open(f'{SAVE_DIR}/area_5_begin_end_area.html', 'w') as f:
+    f.write(heat_area_html)
+    
+with open(f'{SAVE_DIR}/area_6_begin_end_pct.html', 'w') as f:
+    f.write(heat_pct_html)
 
 
 
