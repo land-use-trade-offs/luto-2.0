@@ -184,7 +184,7 @@ def create_new_dataset():
 
     # Create a non-agricultural landuses file
     # Do not sort the whole list alphabetically when adding new landuses to the model.
-    non_ag_landuses = ["Environmental Plantings"]
+    non_ag_landuses = ["Environmental Plantings", "Riparian Plantings", "Agroforestry"]
     with open(outpath + 'non_ag_landuses.csv', 'w') as non_ag_lu_csv:
         writer = csv.writer(non_ag_lu_csv)
         for lu in non_ag_landuses:
