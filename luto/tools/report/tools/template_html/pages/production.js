@@ -565,7 +565,6 @@ document.addEventListener('DOMContentLoaded', function () {
         let chart = new Highcharts.Chart(
             production_5_3_demand_Imports_commodity_option
         );
-        console.log(production_5_3_demand_Imports_commodity_option);
 
 
     });
@@ -697,7 +696,6 @@ document.addEventListener('DOMContentLoaded', function () {
             let chart = new Highcharts.Chart(
                 production_5_4_demand_Feed_commodity_option
             );
-            console.log(production_5_4_demand_Feed_commodity_option);
 
     });
 
@@ -778,7 +776,7 @@ document.addEventListener('DOMContentLoaded', function () {
             verticalAlign: 'top',
             layout: 'vertical',
             x: 0,
-            y: -10
+            y: 30
       
         },
 

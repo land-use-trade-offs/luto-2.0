@@ -186,7 +186,7 @@ def get_quantity_df(in_dfs):
 
     # concatenate all the dfs, and made a column with the unit of Million tonnes
     all_df = pd.concat(all_dfs).reset_index(drop=True)
-    all_df['Prod_targ_year (tonnes, ML)'] = all_df['Prod_targ_year (tonnes, KL)']/1000
+    all_df['Prod_targ_year (tonnes, ML)'] = all_df['Prod_targ_year (tonnes, KL)']/1e6
 
     # rename the commodity column so that the first letter is capitalised
     all_df['Commodity'] = all_df['Commodity'].str.capitalize()
