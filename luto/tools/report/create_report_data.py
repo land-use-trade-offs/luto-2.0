@@ -14,7 +14,7 @@ from tools.helper_func import get_GHG_category, get_GHG_file_df,\
                               get_rev_cost,target_GHG_2_Json, select_years
                               
                               
-from tools.parameters import YR_BASE
+from tools.parameters import YR_BASE, COMMODITIES_ALL
 
 
 # setting up working directory to root dir
@@ -47,7 +47,7 @@ files = get_all_files(RAW_DATA_ROOT)
 
 
 ####################################################
-#                  1) Produciton                   #
+#                   1) Demand                      #
 ####################################################
 
 # Get the demand data
@@ -91,6 +91,8 @@ DEMAND_DATA_wide = DEMAND_DATA_long_filter_year.pivot(
 DEMAND_DATA_wide = DEMAND_DATA_wide.reindex(
     columns = pd.MultiIndex.from_product(DEMAND_DATA_wide.columns.levels)).reset_index()
 
+DEMAND_DATA_wide = DEMAND_DATA_wide.set_index('COMMODITY').reindex(COMMODITIES_ALL).reset_index()
+
 DEMAND_DATA_wide.to_csv(f'{SAVE_DIR}/production_3_demand_commodity.csv', index=False)
 
 
@@ -120,6 +122,13 @@ for idx,Type in enumerate(DEMAND_DATA_long['Type'].unique()):
     
     # Remove the rows of all 0 values
     DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity_wide.loc[:, (DEMAND_DATA_commodity_wide != 0).any(axis=0)]
+    
+    # Reorder the columns to match the order in COMMODITIES_ALL
+    DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity_wide.reindex(
+        columns = [DEMAND_DATA_commodity_wide.columns[0]] + COMMODITIES_ALL).reset_index(drop=True)
+    
+    # Remove the columns of all 0 values
+    DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity_wide.loc[:, (DEMAND_DATA_commodity_wide != 0).any(axis=0)] 
     
     DEMAND_DATA_commodity_wide.to_csv(f'{SAVE_DIR}/production_5_{idx+1}_demand_{Type}_commodity.csv', index=False)
 
