@@ -226,8 +226,6 @@ am_area_km2_wide.to_csv(f'{SAVE_DIR}/area_4_am_lu_area_wide.csv', index=False)
 
 # Plot_3-5/6: Area (km2) by Land use
 begin_end_df_area, begin_end_df_pct = get_begin_end_df(files)
-# get_xy_data(begin_end_df_area).to_csv(f'{SAVE_DIR}/area_5_begin_end_area.csv', index=False)
-# get_xy_data(begin_end_df_pct).to_csv(f'{SAVE_DIR}/area_6_begin_end_pct.csv', index=False)
 
 heat_area = begin_end_df_area.style.background_gradient(cmap='Oranges', axis=1).format('{:,.0f}')
 heat_pct = begin_end_df_pct.style.background_gradient(cmap='Oranges', axis=1).format('{:,.0f}%')
@@ -307,6 +305,7 @@ GHG_lu_lm_df_begin_end = pd.concat([GHG_lu_lm_df_start,GHG_lu_lm_df_end],axis=0)
 GHG_lu_lm_df_begin_end_wide = GHG_lu_lm_df_begin_end.pivot(index=['Year','Irrigation'], columns='Land use', values='Quantity (Mt CO2e)').reset_index()
 GHG_lu_lm_df_begin_end_wide['Irrigation'] = GHG_lu_lm_df_begin_end_wide.apply(lambda x: f"{x['Irrigation']} ({x['Year']})", axis=1)
 GHG_lu_lm_df_begin_end_wide.to_csv(f'{SAVE_DIR}/GHG_7_lu_lm_emission_Mt_wide.csv',index=False)
+
 
 # Plot_4-3-6: GHG emission in the target year (Mt)
 GHG_lu_source = GHG_emissions_long\
