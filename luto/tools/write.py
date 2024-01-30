@@ -219,15 +219,62 @@ def write_files(sim, yr_cal, path):
     
     np.save(os.path.join(path, lumap_fname), sim.lumaps[yr_cal])
     np.save(os.path.join(path, lmmap_fname), sim.lmmaps[yr_cal])
+    
+    
+    
+    
+    # Get the Agricultural Management applied to each pixel
+    # Collapse to pixel dimension, and then stack the decision variables
+    # The value represents the ratio of Agricultural Managment applied to the pixel
+    ag_man_dvars = np.stack([np.einsum('mrj -> r', v) for _,v in sim.ag_man_dvars[yr_cal].items()]) # (am, r)
 
-    # Recreate full resolution 2D arrays and write out GeoTiffs for land-use and land management
-    lumap, lmmap = recreate_2D_maps(sim, yr_cal)
+    # Get the index of pixels > 0, meaning that they have some agricultural management applied
+    valid_index = [slice(None), ag_man_dvars.sum(0) > 0]
+    valid_pixels = ag_man_dvars[*valid_index]
+
+    # Get the maximum index of the agricultural management applied to the valid pixel
+    valid_pixels_argmax = np.argmax(valid_pixels, axis=0) + 1 # +1 to start from 1
+
+    # Get the agricultural management applied to the valid pixel
+    # 0 means no agricultural management applied
+    # and the >=1 value corespondes to the 1 + index(AG_MANAGEMENTS_TO_LAND_USES)
+    ag_man_max = np.zeros(ag_man_dvars.shape[1], dtype=np.int8)
+    ag_man_max[valid_index[1]] = valid_pixels_argmax 
+    
+    
+    
+    
+    # Get the index of pixels > 0 from non_ag_rk, meaning that non-agricultural land use occurs
+    valid_index = [sim.non_ag_dvars[yr_cal].sum(1) > 0, slice(None)]
+    valid_pixels = sim.non_ag_dvars[yr_cal][*valid_index]
+
+    # Get the maximum index of the non-agricultural landuse 
+    valid_pixels_argmax = np.argmax(valid_pixels, axis=1) + 1 # +1 to start from 1
+
+    # Get the non-agricultural landuse for each pixel
+    # 0 means this pixel has no non-agricultural landuse
+    # and the value corespondes sim.data.NONAGLU2DESC
+    non_ag_max = np.zeros(sim.non_ag_dvars[yr_cal].shape[0], dtype=np.int8)
+    non_ag_max[valid_index[0]] = valid_pixels_argmax + sim.data.NON_AGRICULTURAL_LU_BASE_CODE
+        
+     
+    
+    
+    # Put the excluded land-use and land management types back in the array.
+    lumap = create_2d_map(sim, sim.lumaps[yr_cal], filler = sim.data.MASK_LU_CODE)
+    lmmap = create_2d_map(sim, sim.lmmaps[yr_cal], filler = sim.data.MASK_LU_CODE)
+    ammap = create_2d_map(sim, ag_man_max, filler = 0)
+    non_ag = create_2d_map(sim, non_ag_max, filler = 0)
     
     lumap_fname = 'lumap' + '.tiff'
     lmmap_fname = 'lmmap' + '.tiff'
+    ammap_fname = 'ammap' + '.tiff'
+    non_ag_fname = 'non_ag' + '.tiff'
     
     write_gtiff(lumap, os.path.join(path, lumap_fname))
-    write_gtiff(lmmap, os.path.join(path, lmmap_fname))
+    write_gtiff(lmmap, os.path.join(path, lmmap_fname)) 
+    write_gtiff(ammap, os.path.join(path, ammap_fname))  
+    write_gtiff(non_ag, os.path.join(path, non_ag_fname))        
 
 
 
