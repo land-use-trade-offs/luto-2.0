@@ -546,57 +546,57 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
     // Chart:GHG_9_1_ag_reduction_total_wide_Mt
-    Highcharts.chart('GHG_9_1_ag_reduction_total_wide_Mt', {
-        chart: {
-            type: 'column',
-            marginRight: 180
-        },
+    // Highcharts.chart('GHG_9_1_ag_reduction_total_wide_Mt', {
+    //     chart: {
+    //         type: 'column',
+    //         marginRight: 180
+    //     },
 
-        title: {
-            text: 'Non Agricultural Land-use Sequestration in total'
-        },
+    //     title: {
+    //         text: 'Non Agricultural Land-use Sequestration in total'
+    //     },
 
-        credits: {
-            enabled: false
-        },
+    //     credits: {
+    //         enabled: false
+    //     },
 
-        data: {
-            csv: document.getElementById('GHG_9_1_ag_reduction_total_wide_Mt_csv').innerHTML,
-        },
+    //     data: {
+    //         csv: document.getElementById('GHG_9_1_ag_reduction_total_wide_Mt_csv').innerHTML,
+    //     },
 
-        yAxis: {
-            title: {
-                text: 'Sequestration (million t CO2e)'
-            },
-        },
+    //     yAxis: {
+    //         title: {
+    //             text: 'Sequestration (million t CO2e)'
+    //         },
+    //     },
 
-        legend: {
-            align: 'right',
-            verticalAlign: 'top',
-            layout: 'vertical',
-            x: 10,
-            y: 250
-        },
+    //     legend: {
+    //         align: 'right',
+    //         verticalAlign: 'top',
+    //         layout: 'vertical',
+    //         x: 10,
+    //         y: 250
+    //     },
 
-        tooltip: {
-            formatter: function () {
-                return `<b>Year:</b> ${this.x}<br><b>${this.series.name}:</b>${this.y.toFixed(2)}<br/>`;
-            }
-        },
+    //     tooltip: {
+    //         formatter: function () {
+    //             return `<b>Year:</b> ${this.x}<br><b>${this.series.name}:</b>${this.y.toFixed(2)}<br/>`;
+    //         }
+    //     },
 
-        plotOptions: {
-            column: {
-                dataLabels: {
-                    enabled: false
-                }
-            }
-        },
+    //     plotOptions: {
+    //         column: {
+    //             dataLabels: {
+    //                 enabled: false
+    //             }
+    //         }
+    //     },
 
-        exporting: {
-            sourceWidth: 1200,
-            sourceHeight: 600,
-        }
-    });
+    //     exporting: {
+    //         sourceWidth: 1200,
+    //         sourceHeight: 600,
+    //     }
+    // });
 
     // Chart:GHG_9_2_ag_reduction_source_wide_Mt
     Highcharts.chart('GHG_9_2_ag_reduction_source_wide_Mt', {

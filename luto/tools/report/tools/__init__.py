@@ -3,7 +3,7 @@ import os
 import re
 import pandas as pd
 
-from tools.parameters import LU_CROPS, LU_LVSTKS, YR_BASE, COMMODITIES_OFF_LAND
+from tools.parameters import LU_CROPS, LU_LVSTKS, YR_BASE, COMMODITIES_OFF_LAND, COMMODITIES_ALL
 from tools.helper_func import df_wide2long, get_GHG_category, merge_LVSTK_UAALLOW
 
 # Set up working directory to the root of the report folder
@@ -136,6 +136,11 @@ def get_demand_df(files_df:pd.DataFrame):
     DEMAND_DATA_long['COMMODITY'] = DEMAND_DATA_long['COMMODITY']\
         .apply(lambda x: x[0].upper() + x[1:].lower())
         
+    # Sort the dataframe by year, commodity, and type, 
+    # where the commodity is sorted by the order in COMMODITIES_ALL
+    DEMAND_DATA_long = DEMAND_DATA_long.set_index(['Year','COMMODITY','Type'])
+    DEMAND_DATA_long = DEMAND_DATA_long.reindex(COMMODITIES_ALL, level=1).reset_index()
+
     # Add columns for on_land and off_land commodities
     DEMAND_DATA_long['on_off_land'] = DEMAND_DATA_long['COMMODITY'].apply(lambda x: 'On land' if x not in COMMODITIES_OFF_LAND else 'Off land')
         
@@ -181,7 +186,7 @@ def get_quantity_df(in_dfs):
 
     # concatenate all the dfs, and made a column with the unit of Million tonnes
     all_df = pd.concat(all_dfs).reset_index(drop=True)
-    all_df['Prod_targ_year (tonnes, ML)'] = all_df['Prod_targ_year (tonnes, KL)']/1000
+    all_df['Prod_targ_year (tonnes, ML)'] = all_df['Prod_targ_year (tonnes, KL)']/1e6
 
     # rename the commodity column so that the first letter is capitalised
     all_df['Commodity'] = all_df['Commodity'].str.capitalize()

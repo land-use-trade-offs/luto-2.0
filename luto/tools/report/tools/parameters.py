@@ -12,7 +12,17 @@ LU_LVSTKS = ['Beef - modified land','Beef - natural land','Dairy - modified land
 
 LU_UNALLOW = ['Unallocated - modified land','Unallocated - natural land']
 
-COMMODITIES_OFF_LAND = ['Pork', 'Chicken', 'Eggs', 'Aquaculture']
+
+# Define the commodity categories
+COMMODITIES_ON_LAND = ['Apples','Beef lexp','Beef meat','Citrus','Cotton','Dairy','Grapes',
+                       'Hay','Nuts','Other non-cereal crops', 'Pears', 'Plantation fruit',
+                       'Rice', 'Sheep lexp', 'Sheep meat', 'Sheep wool', 'Stone fruit', 'Sugar',
+                       'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
+                       'Vegetables','Winter cereals','Winter legumes','Winter oilseeds']
+
+COMMODITIES_OFF_LAND = ['Aquaculture', 'Chicken', 'Eggs', 'Pork' ]
+
+COMMODITIES_ALL = COMMODITIES_ON_LAND + COMMODITIES_OFF_LAND
 
 # Define the file name patterns for each category
 GHG_FNAME2TYPE = {'GHG_emissions_separate_agricultural_landuse': 'Agricultural Landuse',

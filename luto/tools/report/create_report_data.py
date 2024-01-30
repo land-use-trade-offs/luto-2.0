@@ -5,7 +5,7 @@ import pandas as pd
 import argparse
 
 # import functions
-from tools import   get_AREA_am, get_AREA_lm, get_AREA_lu, get_GHG_emissions_by_crop_lvstk_df,\
+from tools.__init__ import   get_AREA_am, get_AREA_lm, get_AREA_lu, get_GHG_emissions_by_crop_lvstk_df,\
                     get_all_files, get_begin_end_df, get_quantity_df, \
                     get_rev_cost_df, get_water_df, get_demand_df
 
@@ -14,7 +14,7 @@ from tools.helper_func import get_GHG_category, get_GHG_file_df,\
                               get_rev_cost,target_GHG_2_Json, select_years
                               
                               
-from tools.parameters import YR_BASE
+from tools.parameters import YR_BASE, COMMODITIES_ALL
 
 
 # setting up working directory to root dir
@@ -47,7 +47,7 @@ files = get_all_files(RAW_DATA_ROOT)
 
 
 ####################################################
-#                  1) Produciton                   #
+#                   1) Demand                      #
 ####################################################
 
 # Get the demand data
@@ -91,6 +91,8 @@ DEMAND_DATA_wide = DEMAND_DATA_long_filter_year.pivot(
 DEMAND_DATA_wide = DEMAND_DATA_wide.reindex(
     columns = pd.MultiIndex.from_product(DEMAND_DATA_wide.columns.levels)).reset_index()
 
+DEMAND_DATA_wide = DEMAND_DATA_wide.set_index('COMMODITY').reindex(COMMODITIES_ALL).reset_index()
+
 DEMAND_DATA_wide.to_csv(f'{SAVE_DIR}/production_3_demand_commodity.csv', index=False)
 
 
@@ -120,6 +122,13 @@ for idx,Type in enumerate(DEMAND_DATA_long['Type'].unique()):
     
     # Remove the rows of all 0 values
     DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity_wide.loc[:, (DEMAND_DATA_commodity_wide != 0).any(axis=0)]
+    
+    # Reorder the columns to match the order in COMMODITIES_ALL
+    DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity_wide.reindex(
+        columns = [DEMAND_DATA_commodity_wide.columns[0]] + COMMODITIES_ALL).reset_index(drop=True)
+    
+    # Remove the columns of all 0 values
+    DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity_wide.loc[:, (DEMAND_DATA_commodity_wide != 0).any(axis=0)] 
     
     DEMAND_DATA_commodity_wide.to_csv(f'{SAVE_DIR}/production_5_{idx+1}_demand_{Type}_commodity.csv', index=False)
 
@@ -186,42 +195,54 @@ area_paths = files.query('catetory == "cross_table" and year_types == "single_ye
 
 crosstab_lu = area_paths.query('base_name == "crosstab-lumap"').reset_index(drop=True)
 lu_area = get_AREA_lu(crosstab_lu)
-lu_area_wide = lu_area.pivot(index='Year', columns='Land use', values='Area (km2)').reset_index()
+lu_area['Area (million km2)'] = lu_area['Area (km2)'] / 1e6
+lu_area_wide = lu_area.pivot(index='Year', columns='Land use', values='Area (million km2)').reset_index()
 lu_area_wide.to_csv(f'{SAVE_DIR}/area_1_total_area_wide.csv', index=False)
 
-# Plot_3-2_(1-5): Area (km2) by Irrigation
+# Plot_3-2: Area (km2) by Irrigation
 crosstab_lm = area_paths.query('base_name == "crosstab-lmmap"').reset_index(drop=True)
 lm_area = get_AREA_lm(crosstab_lm)
-lm_area_wide = lm_area.pivot(index='Year', columns='Irrigation', values='Area (km2)').reset_index()
+lm_area['Area (million km2)'] = lm_area['Area (km2)'] / 1e6
+lm_area_wide = lm_area.pivot(index='Year', columns='Irrigation', values='Area (million km2)').reset_index()
 lm_area_wide.to_csv(f'{SAVE_DIR}/area_2_irrigation_area_wide.csv', index=False)
 
-# Plot_3-3_(1-5): Area (km2) by Agricultural management
+# Plot_3-3: Area (km2) by Agricultural management
 switches_am = area_paths.query('base_name.str.contains(r"switches.*amstat.*", regex=True)').reset_index(drop=True)
 am_area_km2 = get_AREA_am(switches_am)
+am_area_km2['Area (million km2)'] = am_area_km2['Area (km2)'] / 1e6
+
 am_area_km2[['Land use','Agricultural management']] = am_area_km2['Land use'].apply(lambda x: re.findall(r'(.*) \((.*)\)',x)[0]).tolist()
 am_area_km2_total = am_area_km2.groupby(['Year','Agricultural management']).sum(numeric_only=True).reset_index()
 
-am_area_km2_total_wide = am_area_km2_total.pivot(index='Year', columns='Agricultural management', values='Area (km2)').reset_index()
+am_area_km2_total_wide = am_area_km2_total.pivot(index='Year', columns='Agricultural management', values='Area (million km2)').reset_index()
 am_area_km2_total_wide.to_csv(f'{SAVE_DIR}/area_3_am_total_area_wide.csv', index=False)
 
 
 # Plot_3-4: Area (km2) by Land use
 am_area_km2_wide = am_area_km2.drop(columns='Agricultural management').groupby(['Year','Land use']).sum().reset_index()
-am_area_km2_wide = am_area_km2_wide.pivot(index='Year', columns='Land use', values='Area (km2)').reset_index()
+am_area_km2_wide = am_area_km2_wide.pivot(index='Year', columns='Land use', values='Area (million km2)').reset_index()
 am_area_km2_wide.to_csv(f'{SAVE_DIR}/area_4_am_lu_area_wide.csv', index=False)
 
 
 # Plot_3-5/6: Area (km2) by Land use
 begin_end_df_area, begin_end_df_pct = get_begin_end_df(files)
-# get_xy_data(begin_end_df_area).to_csv(f'{SAVE_DIR}/area_5_begin_end_area.csv', index=False)
-# get_xy_data(begin_end_df_pct).to_csv(f'{SAVE_DIR}/area_6_begin_end_pct.csv', index=False)
 
 heat_area = begin_end_df_area.style.background_gradient(cmap='Oranges', axis=1).format('{:,.0f}')
 heat_pct = begin_end_df_pct.style.background_gradient(cmap='Oranges', axis=1).format('{:,.0f}%')
 
-heat_area.to_html(f'{SAVE_DIR}/area_5_begin_end_area.html', index=False)
-heat_pct.to_html(f'{SAVE_DIR}/area_6_begin_end_pct.html', index=False)
+# Define the style
+style = "<style>table, th, td {font-size: 9px;}</style>\n"
 
+# Add the style to the HTML
+heat_area_html = style + heat_area.to_html()
+heat_pct_html = style + heat_pct.to_html()
+
+# Save the html
+with open(f'{SAVE_DIR}/area_5_begin_end_area.html', 'w') as f:
+    f.write(heat_area_html)
+    
+with open(f'{SAVE_DIR}/area_6_begin_end_pct.html', 'w') as f:
+    f.write(heat_pct_html)
 
 
 
@@ -284,6 +305,7 @@ GHG_lu_lm_df_begin_end = pd.concat([GHG_lu_lm_df_start,GHG_lu_lm_df_end],axis=0)
 GHG_lu_lm_df_begin_end_wide = GHG_lu_lm_df_begin_end.pivot(index=['Year','Irrigation'], columns='Land use', values='Quantity (Mt CO2e)').reset_index()
 GHG_lu_lm_df_begin_end_wide['Irrigation'] = GHG_lu_lm_df_begin_end_wide.apply(lambda x: f"{x['Irrigation']} ({x['Year']})", axis=1)
 GHG_lu_lm_df_begin_end_wide.to_csv(f'{SAVE_DIR}/GHG_7_lu_lm_emission_Mt_wide.csv',index=False)
+
 
 # Plot_4-3-6: GHG emission in the target year (Mt)
 GHG_lu_source = GHG_emissions_long\
