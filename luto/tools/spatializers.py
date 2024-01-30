@@ -30,7 +30,18 @@ from scipy.interpolate import NearestNDInterpolator
 import luto.settings as settings
 
 def create_2d_map(sim, map_, filler) -> np.ndarray:
-    """Recreates a full resolution 2D array from masked and resfactored 1D array"""
+    """
+    Create a 2D map by converting it back to full resolution if necessary and
+    putting the excluded land-use and land management types back in the array.
+
+    Args:
+        sim: The simulation object.
+        map_: The input map.
+        filler: The filler value for excluded land-use and land management types.
+
+    Returns:
+        np.ndarray: The created 2D map.
+    """
     
     # First convert back to full resolution 2D array if resfactor is > 1.
     if settings.RESFACTOR > 1:
@@ -43,38 +54,43 @@ def create_2d_map(sim, map_, filler) -> np.ndarray:
 
 
 
-def recreate_2D_maps(sim, yr_cal):
-    """Recreates a full resolution 2D array for lumap, lmmap and ammaps"""
+def reconstitute(map_, mask, filler=-1):
+    """
+    Reconstitutes a map based on a spatial mask.
 
-    # Put the excluded land-use and land management types back in the array.
-    lumap = create_2d_map(sim, sim.lumaps[yr_cal], filler = sim.data.MASK_LU_CODE)
-    lmmap = create_2d_map(sim, sim.lmmaps[yr_cal], filler = 0)
-    
-    return lumap, lmmap
+    Args:
+        map_ (numpy.ndarray): The input map.
+        mask (numpy.ndarray): The spatial mask.
+        filler (int, optional): The value to fill in the non-masked cells. Defaults to -1.
 
+    Returns:
+        numpy.ndarray: The reconstituted map.
 
+    Raises:
+        ValueError: If the map is not of the right shape.
 
-
-def reconstitute(map_, mask, filler = -1):
-    """Return lumap, lmmap or ammap reconstituted to original 2D size and spatial domain.
-       Add Non-Agricultural, Non-Environmental Plantings Land as -1"""
-    
-    # Check that the number of cells in input map is full resolution. If so, then reconstitute 2D array
+    """
     if map_.shape[0] == mask.sum():
         indices = np.cumsum(mask) - 1
         return np.where(mask, map_[indices], filler)
-    
-    # If the map is 2D but not the right shape then the map is filled out differently.
-    elif map_.shape != mask.shape: # Use Uncoursify to return full size map.
+    elif map_.shape != mask.shape:
         raise ValueError("Map not of right shape.")
-        
-    else: # If the map is the same shape as the spatial mask
+    else:
         return np.where(mask, map_, filler)
 
 
 def uncoursify(sim, lxmap):
-    """Recreates a full resolution 2D array from resfactored low resolution 1D array"""
-    
+    """
+    Uncoursify the map by interpolating missing values based on known indices.
+
+    Parameters:
+    sim (object): The simulation object.
+    lxmap (ndarray): The map containing the values to be uncoursified.
+
+    Returns:
+    ndarray: The uncoursified map.
+
+    """
     # Arrays with all x, y -coordinates on the larger map.
     allindices = np.nonzero(sim.data.NLUM_MASK)
     
@@ -89,8 +105,18 @@ def uncoursify(sim, lxmap):
 
 
 
-def write_gtiff(array_1D, fname, nodata = -9999):
-    """Write a 2D GeoTiff based on an input 1D numpy array and the study area mask."""
+def write_gtiff(array_1D, fname, nodata=-9999):
+    """
+    Write a GeoTIFF file from a 1D numpy array.
+
+    Parameters:
+        array_1D (numpy.ndarray): The 1D numpy array containing the data to be written.
+        fname (str): The output file name.
+        nodata (int or float, optional): The nodata value to be used in the GeoTIFF file. Default is -9999.
+
+    Returns:
+        None
+    """
 
     # Open the file, distill the NLUM study area mask and get the meta data.
     fpath_src = os.path.join(settings.INPUT_DIR, 'NLUM_2010-11_mask.tif')
@@ -101,7 +127,7 @@ def write_gtiff(array_1D, fname, nodata = -9999):
     # These keys set afresh when exporting the GeoTiff.
     for key in ('dtype', 'nodata'):
         meta.pop(key)
-    meta.update(compress = 'lzw', driver = 'GTiff')
+    meta.update(compress='lzw', driver='GTiff')
 
     # Reconstitute the 2D map using the NLUM mask and the numpy array.
     array_2D = np.zeros(NLUM_mask.shape, dtype=np.float32) + nodata
@@ -109,10 +135,5 @@ def write_gtiff(array_1D, fname, nodata = -9999):
     array_2D[nonzeroes] = array_1D
 
     # Write the GeoTiff.
-    with rasterio.open( fname
-                      , 'w+'
-                      , dtype = 'float32'
-                      , nodata = nodata
-                      , **meta
-                      ) as dst:
+    with rasterio.open(fname, 'w+', dtype='float32', nodata=nodata, **meta) as dst:
         dst.write_band(1, array_2D)

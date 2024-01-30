@@ -122,7 +122,7 @@ def write_outputs(sim, path):
 
     # 2) Create the report
     result = subprocess.run(['python', 'luto/tools/report/create_html.py', '-p', path], capture_output=True, text=True)
-    print("\nError occurred:", result.stderr) if result.returncode != 0 else print("\nReport HTML:\n", result.stdout)
+    print("\nError occurred:", result.stderr) if result.returncode != 0 else print("\nReport HTML:", result.stdout)
 
 
 
@@ -230,7 +230,7 @@ def write_files(sim, yr_cal, path):
 
     # Get the index of pixels > 0, meaning that they have some agricultural management applied
     valid_index = [slice(None), ag_man_dvars.sum(0) > 0]
-    valid_pixels = ag_man_dvars[*valid_index]
+    valid_pixels = ag_man_dvars.__getitem__(*valid_index) # ag_man_dvars[*valid_index] is a better way but may not work on older version
 
     # Get the maximum index of the agricultural management applied to the valid pixel
     valid_pixels_argmax = np.argmax(valid_pixels, axis=0) + 1 # +1 to start from 1
@@ -246,7 +246,7 @@ def write_files(sim, yr_cal, path):
     
     # Get the index of pixels > 0 from non_ag_rk, meaning that non-agricultural land use occurs
     valid_index = [sim.non_ag_dvars[yr_cal].sum(1) > 0, slice(None)]
-    valid_pixels = sim.non_ag_dvars[yr_cal][*valid_index]
+    valid_pixels = sim.non_ag_dvars[yr_cal].__getitem__(*valid_index) # ag_man_dvars[*valid_index] is a better way but may not work on older version
 
     # Get the maximum index of the non-agricultural landuse 
     valid_pixels_argmax = np.argmax(valid_pixels, axis=1) + 1 # +1 to start from 1
@@ -263,8 +263,8 @@ def write_files(sim, yr_cal, path):
     # Put the excluded land-use and land management types back in the array.
     lumap = create_2d_map(sim, sim.lumaps[yr_cal], filler = sim.data.MASK_LU_CODE)
     lmmap = create_2d_map(sim, sim.lmmaps[yr_cal], filler = sim.data.MASK_LU_CODE)
-    ammap = create_2d_map(sim, ag_man_max, filler = 0)
-    non_ag = create_2d_map(sim, non_ag_max, filler = 0)
+    ammap = create_2d_map(sim, ag_man_max, filler = sim.data.MASK_LU_CODE)
+    non_ag = create_2d_map(sim, non_ag_max, filler = sim.data.MASK_LU_CODE)
     
     lumap_fname = 'lumap' + '.tiff'
     lmmap_fname = 'lmmap' + '.tiff'
@@ -334,7 +334,7 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
 
         # reconsititude the dvar to 2d
         dvar = row['dvar']
-        dvar = create_2d_map(sim, dvar, filler = 0) # fill the missing values with 0   
+        dvar = create_2d_map(sim, dvar, filler = sim.data.MASK_LU_CODE) # fill the missing values with sim.data.MASK_LU_CODE  
 
         # Create output file name
         fname = f'{category}_{dvar_idx:02}_{desc}.tiff'
