@@ -49,9 +49,8 @@ def recreate_2D_maps(sim, yr_cal):
     # Put the excluded land-use and land management types back in the array.
     lumap = create_2d_map(sim, sim.lumaps[yr_cal], filler = sim.data.MASK_LU_CODE)
     lmmap = create_2d_map(sim, sim.lmmaps[yr_cal], filler = 0)
-    ammaps = {am: create_2d_map(sim, ammap, filler=0) for am, ammap in sim.ammaps[yr_cal].items()}
     
-    return lumap, lmmap, ammaps
+    return lumap, lmmap
 
 
 
@@ -86,7 +85,7 @@ def uncoursify(sim, lxmap):
     f = NearestNDInterpolator(knownindices, lxmap)
     
     # The uncoursified map is obtained by interpolating the missing values.
-    return f(allindices).astype(np.int8)
+    return f(allindices).astype(np.float16)
 
 
 

@@ -133,8 +133,8 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
         os.mkdir(path_yr)
 
     # Write the decision variables, land-use and land management maps
-    # write_files(sim, yr_cal, path_yr)
-    # write_files_separate(sim, yr_cal, path_yr)
+    write_files(sim, yr_cal, path_yr)
+    write_files_separate(sim, yr_cal, path_yr)
 
     # Write the crosstab and switches, and the quantity comparison
     write_crosstab(sim, yr_cal, path_yr, yr_cal_sim_pre)
@@ -199,15 +199,15 @@ def write_files(sim, yr_cal, path):
     
     print('Writing numpy arrays and geotiff outputs to', path)
     
-    # Save raw agricultural decision variables (boolean array).
+    # Save raw agricultural decision variables (float array).
     ag_X_mrj_fname = 'ag_X_mrj' + '.npy'
-    np.save(os.path.join(path, ag_X_mrj_fname), sim.ag_dvars[yr_cal])
+    np.save(os.path.join(path, ag_X_mrj_fname), sim.ag_dvars[yr_cal].astype(np.float16))
     
-    # Save raw non-agricultural decision variables (boolean array).
+    # Save raw non-agricultural decision variables (float array).
     non_ag_X_rk_fname = 'non_ag_X_rk' + '.npy'
-    np.save(os.path.join(path, non_ag_X_rk_fname), sim.non_ag_dvars[yr_cal])
+    np.save(os.path.join(path, non_ag_X_rk_fname), sim.non_ag_dvars[yr_cal].astype(np.float16))
 
-    # Save raw agricultural management decision variables
+    # Save raw agricultural management decision variables (float array).
     for am in AG_MANAGEMENTS_TO_LAND_USES:
         snake_case_am = tools.am_name_snake_case(am)
         am_X_mrj_fname = 'ag_man_X_mrj' + snake_case_am + ".npy"
@@ -221,7 +221,7 @@ def write_files(sim, yr_cal, path):
     np.save(os.path.join(path, lmmap_fname), sim.lmmaps[yr_cal])
 
     # Recreate full resolution 2D arrays and write out GeoTiffs for land-use and land management
-    lumap, lmmap, ammaps = recreate_2D_maps(sim, yr_cal)
+    lumap, lmmap = recreate_2D_maps(sim, yr_cal)
     
     lumap_fname = 'lumap' + '.tiff'
     lmmap_fname = 'lmmap' + '.tiff'
@@ -229,10 +229,6 @@ def write_files(sim, yr_cal, path):
     write_gtiff(lumap, os.path.join(path, lumap_fname))
     write_gtiff(lmmap, os.path.join(path, lmmap_fname))
 
-    for am in AG_MANAGEMENTS_TO_LAND_USES:
-        am_snake_case = tools.am_name_snake_case(am)
-        ammap_fname = f'ammap_{am_snake_case}.tiff'
-        write_gtiff(ammaps[am], os.path.join(path, ammap_fname))
 
 
 def write_files_separate(sim, yr_cal, path, ammap_separate=False):
@@ -249,7 +245,7 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
     # Skip writing if the yr_cal is the base year
     if yr_cal == sim.bdata.YR_CAL_BASE: return
     
-    # 1) Collapse the land management dimension (m -> [dry, irri])
+    # 1) Collapse the land management dimension (m -> [dry, irr])
     #    i.e., mrj -> rj
     ag_dvar_rj = np.einsum('mrj -> rj', sim.ag_dvars[yr_cal])
     ag_man_rj_dict = {am: np.einsum('mrj -> rj', ammap) for am, ammap in sim.ag_man_dvars[yr_cal].items()}
@@ -257,23 +253,30 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
 
     # 2) Get the desc2dvar table. 
     #    desc is the land-use description, dvar is the decision variable corresponding to desc
-    ag_dvar_map = tools.map_desc_to_dvar_index('Agricultural Land-use', sim.data.DESC2AGLU, ag_dvar_rj)
+    ag_dvar_map = tools.map_desc_to_dvar_index('Agricultural Land-use', 
+                                               sim.data.DESC2AGLU, 
+                                               ag_dvar_rj)
 
     non_ag_dvar_map = tools.map_desc_to_dvar_index('Non-Agricultural Land-use',
                                                    {v:k for k,v in dict(list(enumerate(sim.data.NON_AGRICULTURAL_LANDUSES))).items()},
                                                     non_ag_rk)
     
-    if ammap_separate:
-        ag_man_maps = [tools.map_desc_to_dvar_index(am,
-                                                {desc:sim.data.DESC2AGLU[desc] for desc in  AG_MANAGEMENTS_TO_LAND_USES[am]}, 
-                                                am_dvar) for am,am_dvar in ag_man_rj_dict.items()]
-  
-        ag_man_map = pd.concat(ag_man_maps).reset_index(drop=True)
-        desc2dvar_df = pd.concat([ag_dvar_map,ag_man_map,non_ag_dvar_map])
-    else:
-        desc2dvar_df = pd.concat([ag_dvar_map,non_ag_dvar_map])
-
-
+    # Get the desc2dvar table for agricultural management
+    ag_man_maps = []
+    for am,am_dvar in ag_man_rj_dict.items():
+        desc2idx = {desc:sim.data.DESC2AGLU[desc] for desc in  AG_MANAGEMENTS_TO_LAND_USES[am]}
+        # Check if need to separate the agricultural management into different land uses
+        if ammap_separate == True:
+            am_map = tools.map_desc_to_dvar_index(am, desc2idx, am_dvar)
+        else:
+            am_dvar = am_dvar.sum(1)[:,np.newaxis]
+            am_map = tools.map_desc_to_dvar_index('Agricultural Management', {am:0}, am_dvar)
+        ag_man_maps.append(am_map)
+        
+    ag_man_map = pd.concat(ag_man_maps)
+    
+    # Combine the desc2dvar table for agricultural land-use, agricultural management, and non-agricultural land-use
+    desc2dvar_df = pd.concat([ag_dvar_map,ag_man_map,non_ag_dvar_map])
     
     # 3) Export to GeoTiff
     for _,row in desc2dvar_df.iterrows():
@@ -284,7 +287,7 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
 
         # reconsititude the dvar to 2d
         dvar = row['dvar']
-        dvar = create_2d_map(sim, dvar, filler = sim.data.MASK_LU_CODE)
+        dvar = create_2d_map(sim, dvar, filler = 0) # fill the missing values with 0   
 
         # Create output file name
         fname = f'{category}_{dvar_idx:02}_{desc}.tiff'
