@@ -200,76 +200,56 @@ def write_files(sim, yr_cal, path):
     print('Writing numpy arrays and geotiff outputs to', path)
     
     # Save raw agricultural decision variables (float array).
-    ag_X_mrj_fname = 'ag_X_mrj' + '.npy'
+    ag_X_mrj_fname = 'ag_X_mrj' + '_' + str(yr_cal) + '.npy'
     np.save(os.path.join(path, ag_X_mrj_fname), sim.ag_dvars[yr_cal].astype(np.float16))
     
     # Save raw non-agricultural decision variables (float array).
-    non_ag_X_rk_fname = 'non_ag_X_rk' + '.npy'
+    non_ag_X_rk_fname = 'non_ag_X_rk' + '_' + str(yr_cal) + '.npy'
     np.save(os.path.join(path, non_ag_X_rk_fname), sim.non_ag_dvars[yr_cal].astype(np.float16))
 
     # Save raw agricultural management decision variables (float array).
     for am in AG_MANAGEMENTS_TO_LAND_USES:
         snake_case_am = tools.am_name_snake_case(am)
-        am_X_mrj_fname = 'ag_man_X_mrj' + snake_case_am + ".npy"
+        am_X_mrj_fname = 'ag_man_X_mrj' + snake_case_am + '_' + str(yr_cal) + ".npy"
         np.save(os.path.join(path, am_X_mrj_fname), sim.ag_man_dvars[yr_cal][am].astype(np.float16))
     
     # Write out raw numpy arrays for land-use and land management
-    lumap_fname = 'lumap' + '.npy'
-    lmmap_fname = 'lmmap' + '.npy'
+    lumap_fname = 'lumap' + '_' + str(yr_cal) + '.npy'
+    lmmap_fname = 'lmmap' + '_' + str(yr_cal) + '.npy'
     
     np.save(os.path.join(path, lumap_fname), sim.lumaps[yr_cal])
     np.save(os.path.join(path, lmmap_fname), sim.lmmaps[yr_cal])
     
     
     
-    
     # Get the Agricultural Management applied to each pixel
-    # Collapse to pixel dimension, and then stack the decision variables
-    # The value represents the ratio of Agricultural Managment applied to the pixel
-    ag_man_dvars = np.stack([np.einsum('mrj -> r', v) for _,v in sim.ag_man_dvars[yr_cal].items()]) # (am, r)
-
-    # Get the index of pixels > 0, meaning that they have some agricultural management applied
-    valid_index = [slice(None), ag_man_dvars.sum(0) > 0]
-    valid_pixels = ag_man_dvars.__getitem__(*valid_index) # ag_man_dvars[*valid_index] is a better way but may not work on older version
-
+    ag_man_dvar = np.stack([np.einsum('mrj -> r', v) for _,v in sim.ag_man_dvars[yr_cal].items()]).T   # (r, am)
+    ag_man_dvar_mask = ag_man_dvar.sum(1) > 0          # Meaning that they have some agricultural management applied
     # Get the maximum index of the agricultural management applied to the valid pixel
-    valid_pixels_argmax = np.argmax(valid_pixels, axis=0) + 1 # +1 to start from 1
-
-    # Get the agricultural management applied to the valid pixel
-    # 0 means no agricultural management applied
-    # and the >=1 value corespondes to the 1 + index(AG_MANAGEMENTS_TO_LAND_USES)
-    ag_man_max = np.zeros(ag_man_dvars.shape[1], dtype=np.int8)
-    ag_man_max[valid_index[1]] = valid_pixels_argmax 
+    ag_man_dvar = np.argmax(ag_man_dvar, axis=1) + 1   # Start from 1
+    # Let the pixels that were all zeros in the original array to be 0
+    ag_man_dvar_argmax = np.where(ag_man_dvar_mask, ag_man_dvar, 0)
     
-    
-    
-    
-    # Get the index of pixels > 0 from non_ag_rk, meaning that non-agricultural land use occurs
-    valid_index = [sim.non_ag_dvars[yr_cal].sum(1) > 0, slice(None)]
-    valid_pixels = sim.non_ag_dvars[yr_cal].__getitem__(*valid_index) # ag_man_dvars[*valid_index] is a better way but may not work on older version
-
-    # Get the maximum index of the non-agricultural landuse 
-    valid_pixels_argmax = np.argmax(valid_pixels, axis=1) + 1 # +1 to start from 1
 
     # Get the non-agricultural landuse for each pixel
-    # 0 means this pixel has no non-agricultural landuse
-    # and the value corespondes sim.data.NONAGLU2DESC
-    non_ag_max = np.zeros(sim.non_ag_dvars[yr_cal].shape[0], dtype=np.int8)
-    non_ag_max[valid_index[0]] = valid_pixels_argmax + sim.data.NON_AGRICULTURAL_LU_BASE_CODE
-        
-     
-    
+    non_ag_dvar = sim.non_ag_dvars[yr_cal]              # (r, k)
+    non_ag_dvar_mask = non_ag_dvar.sum(1) > 0           # Meaning that they have some non-agricultural landuse applied
+    # Get the maximum index of the non-agricultural landuse applied to the valid pixel
+    non_ag_dvar = np.argmax(non_ag_dvar, axis=1) + sim.data.NON_AGRICULTURAL_LU_BASE_CODE    # Start from 100
+    # Let the pixels that were all zeros in the original array to be 0
+    non_ag_dvar_argmax = np.where(non_ag_dvar_mask, non_ag_dvar, 0)
+ 
     
     # Put the excluded land-use and land management types back in the array.
     lumap = create_2d_map(sim, sim.lumaps[yr_cal], filler = sim.data.MASK_LU_CODE)
     lmmap = create_2d_map(sim, sim.lmmaps[yr_cal], filler = sim.data.MASK_LU_CODE)
-    ammap = create_2d_map(sim, ag_man_max, filler = sim.data.MASK_LU_CODE)
-    non_ag = create_2d_map(sim, non_ag_max, filler = sim.data.MASK_LU_CODE)
+    ammap = create_2d_map(sim, ag_man_dvar_argmax, filler = sim.data.MASK_LU_CODE)
+    non_ag = create_2d_map(sim, non_ag_dvar_argmax, filler = sim.data.MASK_LU_CODE)
     
-    lumap_fname = 'lumap' + '.tiff'
-    lmmap_fname = 'lmmap' + '.tiff'
-    ammap_fname = 'ammap' + '.tiff'
-    non_ag_fname = 'non_ag' + '.tiff'
+    lumap_fname = 'lumap' + '_' + str(yr_cal) + '.tiff'
+    lmmap_fname = 'lmmap' + '_' + str(yr_cal) + '.tiff'
+    ammap_fname = 'ammap' + '_' + str(yr_cal) + '.tiff'
+    non_ag_fname = 'non_ag' + '_' + str(yr_cal) + '.tiff'
     
     write_gtiff(lumap, os.path.join(path, lumap_fname))
     write_gtiff(lmmap, os.path.join(path, lmmap_fname)) 
@@ -337,7 +317,7 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
         dvar = create_2d_map(sim, dvar, filler = sim.data.MASK_LU_CODE) # fill the missing values with sim.data.MASK_LU_CODE  
 
         # Create output file name
-        fname = f'{category}_{dvar_idx:02}_{desc}.tiff'
+        fname = f'{category}_{dvar_idx:02}_{desc}_{yr_cal}.tiff'
 
         # Write to GeoTiff
         write_gtiff(dvar, os.path.join(path, 'lucc_separate', fname))
@@ -347,6 +327,9 @@ def write_quantity(sim, yr_cal, path, yr_cal_sim_pre=None):
 
     # Get the timestamp so each CSV in the timeseries mode has a unique name
     timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
+    
+    # Append the yr_cal to timestamp as prefix
+    timestamp = str(yr_cal) + '_' + timestamp
 
     # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
     simulated_year_list = sorted(list(sim.lumaps.keys()))
@@ -403,6 +386,9 @@ def write_ag_revenue_cost(sim, yr_cal, path):
 
     # Get the timestamp so each CSV in the timeseries mode has a unique name
     timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
+    
+    # Append the yr_cal to timestamp as prefix
+    timestamp = str(yr_cal) + '_' + timestamp
 
     print('Writing agricultural revenue outputs to', path)
 
@@ -459,6 +445,9 @@ def write_crosstab(sim, yr_cal, path, yr_cal_sim_pre=None):
 
     # Get the timestamp so each CSV in the timeseries mode has a unique name
     timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
+    
+    # Append the yr_cal to timestamp as prefix
+    timestamp = str(yr_cal) + '_' + timestamp
     
     # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
     simulated_year_list = sorted(list(sim.lumaps.keys()))
@@ -545,6 +534,9 @@ def write_water(sim, yr_cal, path):
     
     # Get the timestamp so each CSV in the timeseries mode has a unique name
     timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
+    
+    # Append the yr_cal to timestamp as prefix
+    timestamp = str(yr_cal) + '_' + timestamp
 
     print('Writing water outputs to', path)
 
@@ -693,6 +685,9 @@ def write_ghg(sim, yr_cal, path):
     
     # Get the timestamp so each CSV in the timeseries mode has a unique name
     timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
+    
+    # Append the yr_cal to timestamp as prefix
+    timestamp = str(yr_cal) + '_' + timestamp
 
     print('Writing GHG outputs to', path)
 
@@ -725,6 +720,9 @@ def write_biodiversity(sim, yr_cal, path):
     """
     # Get the timestamp so each CSV in the timeseries mode has a unique name
     timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
+    
+    # Append the yr_cal to timestamp as prefix
+    timestamp = str(yr_cal) + '_' + timestamp
 
     print('Writing biodiversity outputs to', path)
 
@@ -762,6 +760,9 @@ def write_ghg_separate(sim, yr_cal, path):
 
     # Get the timestamp so each CSV in the timeseries mode has a unique name
     timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
+    
+    # Append the yr_cal to timestamp as prefix
+    timestamp = str(yr_cal) + '_' + timestamp
         
     # Convert calendar year to year index.
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
