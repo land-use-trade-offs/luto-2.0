@@ -274,19 +274,25 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
     
     # 1) Collapse the land management dimension (m -> [dry, irr])
     #    i.e., mrj -> rj
-    ag_dvar_rj = np.einsum('mrj -> rj', sim.ag_dvars[yr_cal])
+    ag_dvar_rj = np.einsum('mrj -> rj', sim.ag_dvars[yr_cal])   # To compute the landuse map
+    ag_dvar_rm = np.einsum('mrj -> rm', sim.ag_dvars[yr_cal])   # To compute the land management (dry/irr) map
+    non_ag_rk = np.einsum('rk -> rk', sim.non_ag_dvars[yr_cal]) # Do nothing, just for code consistency
     ag_man_rj_dict = {am: np.einsum('mrj -> rj', ammap) for am, ammap in sim.ag_man_dvars[yr_cal].items()}
-    non_ag_rk = np.einsum('rk -> rk', sim.non_ag_dvars[yr_cal]) # Do nothing, just for consistency
+    
 
     # 2) Get the desc2dvar table. 
     #    desc is the land-use description, dvar is the decision variable corresponding to desc
-    ag_dvar_map = tools.map_desc_to_dvar_index('Agricultural Land-use', 
+    ag_dvar_map = tools.map_desc_to_dvar_index('Ag_LU', 
                                                sim.data.DESC2AGLU, 
                                                ag_dvar_rj)
 
-    non_ag_dvar_map = tools.map_desc_to_dvar_index('Non-Agricultural Land-use',
+    non_ag_dvar_map = tools.map_desc_to_dvar_index('Non-Ag_LU',
                                                    {v:k for k,v in dict(list(enumerate(sim.data.NON_AGRICULTURAL_LANDUSES))).items()},
                                                     non_ag_rk)
+    
+    lm_dvar_map = tools.map_desc_to_dvar_index('Land_Mgt',
+                                                {i[1]:i[0] for i in enumerate(sim.data.LANDMANS)},
+                                                ag_dvar_rm)
     
     # Get the desc2dvar table for agricultural management
     ag_man_maps = []
@@ -297,13 +303,14 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
             am_map = tools.map_desc_to_dvar_index(am, desc2idx, am_dvar)
         else:
             am_dvar = am_dvar.sum(1)[:,np.newaxis]
-            am_map = tools.map_desc_to_dvar_index('Agricultural Management', {am:0}, am_dvar)
+            am_map = tools.map_desc_to_dvar_index('Ag_Mgt', {am:0}, am_dvar)
         ag_man_maps.append(am_map)
         
     ag_man_map = pd.concat(ag_man_maps)
     
+    
     # Combine the desc2dvar table for agricultural land-use, agricultural management, and non-agricultural land-use
-    desc2dvar_df = pd.concat([ag_dvar_map,ag_man_map,non_ag_dvar_map])
+    desc2dvar_df = pd.concat([ag_dvar_map, ag_man_map, non_ag_dvar_map, lm_dvar_map])
     
     # 3) Export to GeoTiff
     for _,row in desc2dvar_df.iterrows():
