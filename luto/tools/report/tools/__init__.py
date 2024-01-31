@@ -21,33 +21,38 @@ def extract_dtype_from_path(path):
         tuple: A tuple containing the year type and data type extracted from the file path.
     """
     # Define the output categories and its corresponding file patterns
-    f_cat = {'dvar':['ag','non_ag'],
-            'ammap':['ammap'],
+    f_cat = {
+            # CSVs
+            'dvar':['ag','non_ag'],
             'GHG':['GHG'],
-            'lumap':['lumap'],
-            'lmmap':['lmmap'],
             'water':['water'],
-            'lumap_separate':[r'(Non-)?Agriculture Landuse_\d{2}'],
             'cross_table':['crosstab','switches'],
             'quantity':['quantity'],
             'revenue':['revenue'],
             'cost':['cost'],
             'biodiversity':['biodiversity'],
+            # Full maps
+            'ammap':['ammap'],
+            'lumap':['lumap'],
+            'lmmap':['lmmap'],
+            # Individual maps
+            'lumap_separate':['Ag_LU', 'Ag_Mgt', 'Land_Mgt', 'Non-Ag_LU'],
             }
     
     if not 'lucc_separate' in path:
         # Get the key if the file path contains the file pattern
-        f_cat = [k for k,v in f_cat.items() if any(re.compile(fr'^{i}').search(os.path.basename(path)) for i in v)][0]
+        for ftype, fpat in f_cat.items():
+            if any(re.compile(fr'^{i}').search(os.path.basename(path)) for i in fpat): break
     else:
         luseperate_suffix = re.compile(r'lucc_separate(/|\\)(.*)_\d').findall(path)[0][1]
-        f_cat = f'lumap_separate_{luseperate_suffix}'
+        ftype = f'lumap_separate'
 
     # Check if this comes from the begin_end_compare folder
     if 'begin_end_compare' in path:
         yr_type = 'begin_end_year'
     else:
         yr_type = 'single_year'
-    return yr_type,f_cat
+    return yr_type, ftype
 
 
 
