@@ -703,7 +703,7 @@ class LutoSolver:
 
         print("\nAdding biodiversity constraints...", time.ctime() + "\n")
 
-        # Returns GHG emissions limits
+        # Returns biodiversity limits
         biodiversity_limits = self._input_data.limits["biodiversity"]
 
         ag_contr = gp.quicksum(
@@ -927,6 +927,7 @@ class LutoSolver:
         self._add_demand_penalty_constraints()
         self._add_water_usage_limit_constraints(updated_cells)
         self._add_ghg_emissions_limit_constraints()
+        self._add_biodiversity_limit_constraints()
         ft = time.time()
         print(f"Constraint update took {round(ft - st, 1)}s")
 

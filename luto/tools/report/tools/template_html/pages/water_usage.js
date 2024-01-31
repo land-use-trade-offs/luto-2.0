@@ -55,7 +55,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "Water Use as Percentage of Limit",
+        text: "Water Use as Percentage of Sustainable Limit",
       },
 
       credits: {
@@ -108,7 +108,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "Water Use to Limit in Volume",
+        text: "Water Use",
       },
 
       credits: {
@@ -176,7 +176,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
       yAxis: {
         title: {
-          text: "Water Requirment/Yield (ML)",
+          text: "Water Use (ML)",
         },
       },
 
@@ -234,7 +234,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
       yAxis: {
         title: {
-          text: "Water Requirment/Yield (ML)",
+          text: "Water Use (ML)",
         },
       },
 
@@ -297,7 +297,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
       yAxis: {
         title: {
-          text: "Water Requirment/Yield (ML)",
+          text: "Water Use (ML)",
         },
       },
 

@@ -93,7 +93,7 @@ CAT2NAME = {'lumap': 'Agricultural Land-use all category',
             'lumap_separate_AgriculturalLand-use': 'Agricultural Land-use single category',
             'ammap': 'Agricultural Management',
             'lumap_separate_Non-AgriculturalLand-use': 'Non-Agricultural Land-use ',
-            'lmmap': 'Dry and Irrigated Land-use'}
+            'lmmap': 'Dryland and Irrigated Land-use'}
 
 BASE2NAME = {'AgriculturalLand-use_00_Apples_color4band': 'Apples',
             'AgriculturalLand-use_01_Beef-modifiedland_color4band': 'Beef - modified land',
@@ -131,4 +131,4 @@ BASE2NAME = {'AgriculturalLand-use_00_Apples_color4band': 'Apples',
             'ammap_precision_agriculture_color4band': 'Precision Agriculture',
             
             'lumap_color4band': 'Land-use Map',
-            'lmmap_color4band': 'Dry Irriagted Land-use Map'}
+            'lmmap_color4band': 'Dryland and Irrigated Land-use Map'}
