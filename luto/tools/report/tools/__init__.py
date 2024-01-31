@@ -147,7 +147,7 @@ def get_demand_df(files_df:pd.DataFrame):
     DEMAND_DATA_long = DEMAND_DATA_long.reindex(COMMODITIES_ALL, level=1).reset_index()
 
     # Add columns for on_land and off_land commodities
-    DEMAND_DATA_long['on_off_land'] = DEMAND_DATA_long['COMMODITY'].apply(lambda x: 'On land' if x not in COMMODITIES_OFF_LAND else 'Off land')
+    DEMAND_DATA_long['on_off_land'] = DEMAND_DATA_long['COMMODITY'].apply(lambda x: 'On-land' if x not in COMMODITIES_OFF_LAND else 'Off-land')
         
     return DEMAND_DATA_long
 
@@ -311,7 +311,7 @@ def get_AREA_lm(df):
 
         # Define a processing function for irrigation data
         def process_irrigation(row):
-            return row.replace({'0': 'Dry', '1': 'Irrigated'})
+            return row.replace({'0': 'Dryland', '1': 'Irrigated'})
         
         # Function to process a single row
         if idx == 0:

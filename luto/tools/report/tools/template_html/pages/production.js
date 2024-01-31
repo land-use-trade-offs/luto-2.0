@@ -54,7 +54,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 180,
       },
       title: {
-        text: "Demand in Total",
+        text: "Demand, Trade, and Production of Agricultural Commodities",
       },
       data: {
         csv: document.getElementById("production_1_demand_type_wide_csv")
@@ -111,7 +111,7 @@ document.addEventListener("DOMContentLoaded", function () {
         type: "column",
       },
       title: {
-        text: "Agricultural Demand by On/Off Land",
+        text: "Agricultural Demand by Commodity Type",
       },
 
       xAxis: {
@@ -228,7 +228,7 @@ document.addEventListener("DOMContentLoaded", function () {
         type: "column",
       },
       title: {
-        text: "Agricultural Demand by Category",
+        text: "Agricultural Demand by Commodity",
       },
 
       xAxis: {
@@ -336,7 +336,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 180,
       },
       title: {
-        text: "Domestic Demand - On Land Commodity",
+        text: "Domestic Demand - On-land Commodities",
       },
       data: {
         csv: document.getElementById(
@@ -390,7 +390,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 180,
       },
       title: {
-        text: "Domestic Demand - Off Land Commodity",
+        text: "Domestic Demand - Off-land Commodities",
       },
       data: {
         csv: document.getElementById(

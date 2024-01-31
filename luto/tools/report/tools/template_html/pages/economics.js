@@ -172,7 +172,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "Revenue by Agriultural Commodity",
+        text: "Revenue by Agricultural Commodity",
       },
 
       credits: {
