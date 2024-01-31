@@ -18,17 +18,18 @@
 Pure helper functions and other tools.
 """
 
-
+import sys
 import time
 import os.path
 import pandas as pd
 import numpy as np
 import numpy_financial as npf
-from typing import Tuple
+from typing import Any, Tuple
 from itertools import product
 from glob import glob
 import re
 from itertools import product
+import functools
 
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
@@ -498,3 +499,53 @@ def map_desc_to_dvar_index(category: str,
     df['dvar'] = [dvar_arr[:, j] for j in df['dvar_idx']]
 
     return df.reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+
+
+# The class below is used to redirect the standard output to a file.
+
+class Tee_log(object):
+    def __init__(self, fname):
+        """
+        Initializes a Tee_log object, which will be used to write the output to both a file and stdout.
+        """
+        self.file = open(fname, 'w')
+        self.stdout = sys.stdout
+
+    def write(self, message):
+        """
+        Writes the given message to both the file and stdout.
+        """
+        self.file.write(message)
+        self.stdout.write(message)
+
+    def flush(self):
+        """
+        Flushes the buffers of both the file and stdout.
+        """
+        self.file.flush()
+        self.stdout.flush()
+
+    def close(self):
+        """
+        Closes the file and restores the original stdout.
+        """
+        if self.file:
+            self.file.close()
+        self.file = None
+
+    def __call__(self, func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            original_stdout = sys.stdout
+            
+            sys.stdout = self
+            result = func(*args, **kwargs)
+            sys.stdout = original_stdout
+            
+            self.close()
+     
+            return result
+        
+        return wrapper
+
+    

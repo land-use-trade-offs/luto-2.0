@@ -85,7 +85,7 @@ def get_path(sim):
 
     return path
 
-
+@tools.Tee_log(f'{settings.OUTPUT_DIR}/writing_log.txt')
 def write_outputs(sim, path):
 
     # Write model run settings
@@ -95,6 +95,10 @@ def write_outputs(sim, path):
     years = sorted(list(sim.lumaps.keys()))
     paths = [f"{path}/out_{yr}" for yr in years]
 
+    ###############################################################
+    #                     Create raw outputs                      #
+    ###############################################################
+    
     # Write outputs for each year
     for idx,(yr, path_yr) in enumerate(zip(years, paths)):
         write_output_single_year(sim, yr, path_yr, yr_cal_sim_pre=None)
@@ -108,6 +112,7 @@ def write_outputs(sim, path):
         # 2) Write the target-year outputs to the path_begin_end_compare
         write_output_single_year(sim, years[-1], f"{begin_end_path}/out_{years[-1]}", yr_cal_sim_pre=years[0])   
         print(f"Finished writing {years[0]}-{years[-1]} comparison\n")
+        
         
     ###############################################################
     #               Fire up the report script                     #
@@ -123,6 +128,19 @@ def write_outputs(sim, path):
     # 2) Create the report
     result = subprocess.run(['python', 'luto/tools/report/create_html.py', '-p', path], capture_output=True, text=True)
     print("\nError occurred:", result.stderr) if result.returncode != 0 else print("\nReport HTML:", result.stdout)
+    
+    ###############################################################
+    #                    Create log infomatoin                    #
+    ###############################################################
+    logs = [f'{settings.OUTPUT_DIR}/writing_log.txt', 
+        f'{settings.OUTPUT_DIR}/running_log.txt']
+
+    for log in logs:
+        if os.path.exists(log):
+            # Copy the running/writing log to the output folder
+            shutil.copy(log, path)
+            # Remove the running/writing log from the output folder
+            os.remove(log)
 
 
 
