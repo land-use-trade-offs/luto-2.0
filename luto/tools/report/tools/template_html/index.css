@@ -1,0 +1,28 @@
+.row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+    margin-left:30px;
+    padding: 5px; /* Optional: Adds padding to each row for better readability */
+    transition: background-color 0.3s; /* Smooth transition for hover effect */
+  }
+  
+  .label, .value {
+    flex: 1;
+  }
+  
+  /* Odd rows */
+  .row:nth-child(odd) {
+    background-color: #f9f9f9; /* Light grey background for odd rows */
+  }
+  
+  /* Even rows */
+  .row:nth-child(even) {
+    background-color: #ffffff; /* White background for even rows */
+  }
+  
+  /* Hover effect */
+  .row:hover {
+    background-color: #e0e0e0; /* Slightly darker background on hover */
+  }
+  

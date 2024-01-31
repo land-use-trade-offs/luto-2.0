@@ -5,13 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LUTO output visualization</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="index.css">
+    
 </head>
 <body>
-
+    <!-- Link to the page script -->
+    <script src="index.js"></script>
 
     <!-- The sidebar -->
     <div class="sidebar">
-        <a class="active" href="index.html">Home</a>
+        <a class="active" href="index.html">Scenario Details</a>
         <a href="./pages/land-use_area.html">Land-use Area</a>
         <a href="./pages/production.html">Commodity Demand</a>
         <a href="./pages/economics.html">Economics</a>
@@ -21,70 +24,15 @@
 
 
     <div class="content">
-        <h1>Land Use Trade-Offs (LUTO) Model Insights</h1>
+        <h1>Model Running Settings</h1> 
+        
+        <div id="settingsTable"></div>
 
-        <!-- Introduction left -->
-        <div class="Introduction">
-
-            <p>About LUTO...</p>
-            <ul>
-                <li>LUTO estimates Australian land use futures (2010-2100).</li>
-                <li>Integrating environmental and economic drivers.</li>
-                <li>Considering global change and policy scenarios.</li>
-            </ul><br>
-
-            <p>How it works...</p>
-            <ul>
-                <li>The LUTO model takes the 2010 National Land-Use Map as the baseline.</li>
-                <li>Combining environmental and economic data to identify potential land use change: 
-                    <ul style="margin-top:10px;">
-                        <li>agriculture, carbon plantings, environmental plantings.</li>
-                        <li>biodiversity services , biofuel production (in LUTO v.1).</li>
-                    </ul>
-                </li>
-                <li>Corresponding supply of ecosystem services.
-                    <ul style="margin-top:10px;">
-                        <li>agriculture, emissions abatement, water resources.</li>
-                        <li>biodiversity services , biofuel production (in LUTO v.1).</li>
-                    </ul>
-                </li>
-            </ul>
-        </div>
-
-        <!-- Introduction right -->
-        <div class="Introduction">
-            <p>Running details...</p>
-            <ul>
-                <li>The model works at a grid cell resolution of 0.01 degrees (~1.1 km).</li>
-                <li>At an annual time-step from 2010-2100.</li>
-                <li>A bottom-up model that identifies:
-                    <ul style="margin-top:10px;">
-                        <li>land use change based on economic and environmental drivers.</li>
-                        <li>supply of ecosystem services based on land use change.</li>
-                    </ul>
-                </li>
-            </ul>
-  
-            <p>Model inputs</p>
-            <ul>
-                <li>Land use map (2010).</li>
-                <li>Land use change drivers:
-                    <ul style="margin-top:10px;">
-                        <li>Population growth.</li>
-                        <li>Climate change.</li>
-                        <li>Land use change policy.</li>
-                        <li>Carbon price.</li>
-                        <li>Water price.</li>
-                        <li>Land use change cost.</li>
-            </ul>
-        </div>  
-          
-        <!-- Introduction bottom -->
-        <h4 style="margin-top:50px;">The 1.0 version of the model is provided here as used to run the 648 scenarios in <a  href="https://www.sciencedirect.com/science/article/pii/S0959378016300231">Bryan et. al. 2015</a>.</h4>
-        <h4>Input data is available in the CSIRO DAP collection Land Use Trade-Offs (LUTO) Model Input Data from <a href="https://data.csiro.au/collection/csiro:52373">https://data.csiro.au/collection/csiro:52373</a></h4>
-
+            
 
     </div>
+
+    <pre id="settingsTxt"></pre>
 
     
    

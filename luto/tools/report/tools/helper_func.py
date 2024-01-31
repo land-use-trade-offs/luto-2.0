@@ -383,7 +383,7 @@ def add_data_2_html(html_path:str, data_pathes:list)->None:
     parser = etree.HTMLParser()
     tree = etree.parse(html_path, parser)
 
-    # Step 2: Remove the div if it exists
+    # Step 2: Remove the data_csv if it exists
     data_csv_div = tree.find('.//div[@id="data_csv"]')
 
     if data_csv_div is not None:
