@@ -151,8 +151,8 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
         os.mkdir(path_yr)
 
     # Write the decision variables, land-use and land management maps
-    write_files(sim, yr_cal, path_yr)
-    write_files_separate(sim, yr_cal, path_yr)
+    # write_files(sim, yr_cal, path_yr)
+    # write_files_separate(sim, yr_cal, path_yr)
 
     # Write the crosstab and switches, and the quantity comparison
     write_crosstab(sim, yr_cal, path_yr, yr_cal_sim_pre)
@@ -462,7 +462,19 @@ def write_ag_revenue_cost(sim, yr_cal, path):
     df_cost.to_csv(os.path.join(path, f'cost_agricultural_commodity_{timestamp}.csv'))
 
 
-
+def write_lu_area(sim, yr_cal, path):
+    
+    # Get the timestamp so each CSV in the timeseries mode has a unique name
+    timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
+    
+    # Append the yr_cal to timestamp as prefix
+    timestamp = str(yr_cal) + '_' + timestamp
+    
+    # Get the decision variables for the year
+    ag_dvar_mrj = sim.ag_dvars[yr_cal]
+    non_ag_dvar_rk = sim.non_ag_dvars[yr_cal]
+    ag_mam_dict = sim.a
+    
 
 
 def write_crosstab(sim, yr_cal, path, yr_cal_sim_pre=None): 

@@ -107,62 +107,62 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // Chart:economics_1_revenue_2_Source_wide
-    Highcharts.chart("economics_1_revenue_2_Source_wide", {
-      chart: {
-        type: "column",
-        marginRight: 180,
-      },
+    // Highcharts.chart("economics_1_revenue_2_Source_wide", {
+    //   chart: {
+    //     type: "column",
+    //     marginRight: 180,
+    //   },
 
-      title: {
-        text: "Revenue by Agricultural Product",
-      },
+    //   title: {
+    //     text: "Revenue by Agricultural Product",
+    //   },
 
-      credits: {
-        enabled: false,
-      },
+    //   credits: {
+    //     enabled: false,
+    //   },
 
-      data: {
-        csv: document.getElementById("economics_1_revenue_2_Source_wide_csv")
-          .innerHTML,
-      },
+    //   data: {
+    //     csv: document.getElementById("economics_1_revenue_2_Source_wide_csv")
+    //       .innerHTML,
+    //   },
 
-      yAxis: {
-        title: {
-          text: "Revenue (billion AU$)",
-        },
-      },
+    //   yAxis: {
+    //     title: {
+    //       text: "Revenue (billion AU$)",
+    //     },
+    //   },
 
-      xAxis: {
-        tickPositions: tickposition,
-      },
+    //   xAxis: {
+    //     tickPositions: tickposition,
+    //   },
 
-      legend: {
-        align: "right",
-        verticalAlign: "left",
-        layout: "vertical",
-        x: 10,
-        y: 50,
-      },
+    //   legend: {
+    //     align: "right",
+    //     verticalAlign: "left",
+    //     layout: "vertical",
+    //     x: 10,
+    //     y: 50,
+    //   },
 
-      tooltip: {
-        formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-        },
-      },
+    //   tooltip: {
+    //     formatter: function () {
+    //       return `<b>Year:</b> ${this.x}<br><b>${
+    //         this.series.name
+    //       }:</b>${this.y.toFixed(2)}<br/>`;
+    //     },
+    //   },
 
-      plotOptions: {
-        column: {
-          stacking: "normal",
-        },
-      },
+    //   plotOptions: {
+    //     column: {
+    //       stacking: "normal",
+    //     },
+    //   },
 
-      exporting: {
-        sourceWidth: 1200,
-        sourceHeight: 600,
-      },
-    });
+    //   exporting: {
+    //     sourceWidth: 1200,
+    //     sourceHeight: 600,
+    //   },
+    // });
 
     // Chart:economics_1_revenue_3_Source_type_wide
     Highcharts.chart("economics_1_revenue_3_Source_type_wide", {
@@ -641,7 +641,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
       xAxis: {
         categories: [],
-        tickPositions: tickposition,
       },
 
       yAxis: {

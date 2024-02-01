@@ -119,7 +119,6 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       xAxis: {
-        tickPositions: tickposition,
         categories: [],
       },
 
@@ -134,6 +133,13 @@ document.addEventListener("DOMContentLoaded", function () {
         layout: "vertical",
         x: 10,
         y: 250,
+      },
+      tooltip: {
+        formatter: function () {
+          return `<b>Year:</b> ${this.x}<br><b>${
+            this.series.name
+          }:</b>${this.y.toFixed(2)}<br/>`;
+        },
       },
       series: [
         {
@@ -490,7 +496,6 @@ document.addEventListener("DOMContentLoaded", function () {
         text: "GHG Emission between start and end year",
       },
       xAxis: {
-        tickPositions: tickposition,
         categories: [],
       },
 
@@ -505,6 +510,13 @@ document.addEventListener("DOMContentLoaded", function () {
         layout: "vertical",
         x: -50,
         y: 200,
+      },
+      tooltip: {
+        formatter: function () {
+          return `<b>Year:</b> ${this.x}<br><b>${
+            this.series.name
+          }:</b>${this.y.toFixed(2)}<br/>`;
+        },
       },
       series: [
         {

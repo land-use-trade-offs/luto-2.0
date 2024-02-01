@@ -174,7 +174,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 180,
       },
       title: {
-        text: "Total Area by Agricultural Management Type",
+        text: "Agricultural Management Area by Type",
       },
       data: {
         csv: document.getElementById("area_3_am_total_area_wide_csv").innerHTML,
@@ -226,7 +226,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 180,
       },
       title: {
-        text: "Total Area by Land-use Type",
+        text: "Agricultural Management Area by Land-use Type",
       },
       data: {
         csv: document.getElementById("area_4_am_lu_area_wide_csv").innerHTML,
