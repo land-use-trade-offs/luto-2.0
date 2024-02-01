@@ -911,9 +911,10 @@ class LutoSolver:
             self.gurobi_model.remove(self.cell_usage_constraint_r.pop(r, []))
             self.gurobi_model.remove(self.ag_management_constraints_r.pop(r, []))
             self.gurobi_model.remove(self.water_limit_constraints_r.pop(r, []))
-
             self.gurobi_model.remove(self.adoption_limit_constraints)
             self.gurobi_model.remove(self.demand_penalty_constraints)
+            self.gurobi_model.remove(self.biodiversity_limit_constraint)
+            
             self.adoption_limit_constraints = []
             self.demand_penalty_constraints = []
 
