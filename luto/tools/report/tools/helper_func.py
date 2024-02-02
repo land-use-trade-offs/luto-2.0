@@ -116,8 +116,12 @@ def merge_LVSTK_UAALLOW(df):
     # df_unallow = df_unallow.groupby(level=0).sum(numeric_only=True).reset_index(names='Land use')
 
     df_lvstk = df[[True if i in LU_LVSTKS else False for i in  df['Land use']]]
-    df_lvstk.index = pd.MultiIndex.from_tuples(tuple(df_lvstk['Land use'].str.split(' - ')))
-    df_lvstk = df_lvstk.groupby(level=0).sum(numeric_only=True).reset_index(names='Land use')
+    df_lvstk.index = pd.MultiIndex.from_tuples(tuple(df_lvstk['Land use'].str.split(' - ')),
+                                               names =  ['Lvstk','Land category'])
+
+    df_lvstk = df_lvstk.reset_index()
+    df_lvstk = df_lvstk.groupby(['Year','Water','Lvstk']).sum(numeric_only=True).reset_index()
+    df_lvstk.rename(columns={'Lvstk':'Land use'}, inplace=True)
 
     return pd.concat([df_crop,df_non_ag,df_lvstk,df_unallow]).reset_index(drop=True)
 
@@ -155,7 +159,7 @@ def get_GHG_file_df(all_files_df):
     """
     
     # Get only GHG_seperate files
-    GHG_files = all_files_df.query('catetory == "GHG" and base_name != "GHG_emissions" and year_types == "single_year"').reset_index(drop=True)
+    GHG_files = all_files_df.query('category == "GHG" and base_name != "GHG_emissions" and year_types == "single_year"').reset_index(drop=True)
     GHG_files['GHG_sum_t'] = GHG_files['path'].apply(lambda x: pd.read_csv(x,index_col=0).loc['SUM','SUM'])
     GHG_files = GHG_files.replace({'base_name': GHG_FNAME2TYPE})
 
@@ -367,6 +371,29 @@ def list_all_files(directory):
     return file_list
 
 
+def add_settings_2_html(REPORT_DIR:str, RAW_DATA_ROOT:str)->None:
+    # Get the tree of the index page
+    index_tree = etree.parse(f"{REPORT_DIR}/REPORT_HTML/index.html", 
+                            etree.HTMLParser())
+
+    # Get the txt of the running settings
+    with open(f"{RAW_DATA_ROOT}/model_run_settings.txt",'r') as f:
+        settings_txt = f.read()
+        
+    # Replace the inner text of the <pre id="settingsTxt"></pre> with 
+    # the settings txt and make it to be invisible
+    settings_pre = index_tree.xpath('//pre[@id="settingsTxt"]')[0]
+    settings_pre.text = settings_txt
+    settings_pre.attrib['style'] = 'display:none'
+    
+    
+    # Write the index page
+    index_tree.write(f"{REPORT_DIR}/REPORT_HTML/index.html", 
+                    pretty_print=True,
+                    encoding='utf-8',
+                    method='html')
+    
+
 def add_data_2_html(html_path:str, data_pathes:list)->None:
     """
     Adds data from multiple files to an HTML file.
@@ -383,7 +410,7 @@ def add_data_2_html(html_path:str, data_pathes:list)->None:
     parser = etree.HTMLParser()
     tree = etree.parse(html_path, parser)
 
-    # Step 2: Remove the div if it exists
+    # Step 2: Remove the data_csv if it exists
     data_csv_div = tree.find('.//div[@id="data_csv"]')
 
     if data_csv_div is not None:

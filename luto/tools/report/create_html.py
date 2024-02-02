@@ -4,7 +4,7 @@ import pandas as pd
 from glob import glob
 import argparse
 
-from tools.helper_func import add_data_2_html
+from tools.helper_func import add_data_2_html, add_settings_2_html
 
 
 # # setting up working directory to root dir
@@ -44,7 +44,10 @@ shutil.copytree('luto/tools/report/tools/template_html',
 
 ####################################################
 #                Write data to HTML                #
-####################################################  
+#################################################### 
+
+# Add settings to the home page
+add_settings_2_html(REPORT_DIR, RAW_DATA_ROOT)
 
 # Get all html files needs data insertion
 html_df = pd.DataFrame([['production',f"{REPORT_DIR}/REPORT_HTML/pages/production.html"],

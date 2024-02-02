@@ -65,9 +65,6 @@ document.addEventListener("DOMContentLoaded", function () {
       data: {
         csv: document.getElementById("water_1_percent_to_limit_csv").innerHTML,
       },
-      xAxis: {
-        tickPositions: tickposition,
-      },
       yAxis: {
         title: {
           text: "Percentage to Limit (%)",
@@ -117,9 +114,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
       data: {
         csv: document.getElementById("water_2_volum_to_limit_csv").innerHTML,
-      },
-      xAxis: {
-        tickPositions: tickposition,
       },
       yAxis: {
         title: {

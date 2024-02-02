@@ -197,9 +197,9 @@ def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
     # Set up a container array of shape r, k.
     x_rk = np.zeros((lumap.shape[0], num_non_ag_land_uses), dtype=bool)
 
-    for k in range(len(non_ag_lu_codes)):
+    for i,k in enumerate(non_ag_lu_codes):
         kmap = np.where(lumap == k, True, False)
-        x_rk[:, k] = kmap
+        x_rk[:, i] = kmap
 
     return x_rk.astype(bool)
 
@@ -505,33 +505,28 @@ def map_desc_to_dvar_index(category: str,
 
 class Tee_log(object):
     def __init__(self, fname):
-        """
-        Initializes a Tee_log object, which will be used to write the output to both a file and stdout.
-        """
-        self.file = open(fname, 'w')
+        self.fname = fname
         self.stdout = sys.stdout
 
+    def __enter__(self):
+        self.file = open(self.fname, 'w')
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
     def write(self, message):
-        """
-        Writes the given message to both the file and stdout.
-        """
         self.file.write(message)
         self.stdout.write(message)
 
     def flush(self):
-        """
-        Flushes the buffers of both the file and stdout.
-        """
         self.file.flush()
         self.stdout.flush()
 
     def close(self):
-        """
-        Closes the file and restores the original stdout.
-        """
         if self.file:
             self.file.close()
-        self.file = None
+            self.file = None
 
     def __call__(self, func):
         @functools.wraps(func)

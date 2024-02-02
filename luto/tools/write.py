@@ -85,7 +85,7 @@ def get_path(sim):
 
     return path
 
-@tools.Tee_log(f'{settings.OUTPUT_DIR}/writing_log.txt')
+# @tools.Tee_log(f'{settings.OUTPUT_DIR}/writing_log.txt')
 def write_outputs(sim, path):
 
     # Write model run settings
@@ -132,15 +132,15 @@ def write_outputs(sim, path):
     ###############################################################
     #                    Create log infomatoin                    #
     ###############################################################
-    logs = [f'{settings.OUTPUT_DIR}/writing_log.txt', 
-        f'{settings.OUTPUT_DIR}/running_log.txt']
+    # logs = [f'{settings.OUTPUT_DIR}/writing_log.txt', 
+    #     f'{settings.OUTPUT_DIR}/running_log.txt']
 
-    for log in logs:
-        if os.path.exists(log):
-            # Copy the running/writing log to the output folder
-            shutil.copy(log, path)
-            # Remove the running/writing log from the output folder
-            os.remove(log)
+    # for log in logs:
+    #     if os.path.exists(log):
+    #         # Copy the running/writing log to the output folder
+    #         shutil.copy(log, path)
+    #         # Remove the running/writing log from the output folder
+    #         os.remove(log)
 
 
 
@@ -151,10 +151,11 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
         os.mkdir(path_yr)
 
     # Write the decision variables, land-use and land management maps
-    write_files(sim, yr_cal, path_yr)
-    write_files_separate(sim, yr_cal, path_yr)
+    # write_files(sim, yr_cal, path_yr)
+    # write_files_separate(sim, yr_cal, path_yr)
 
     # Write the crosstab and switches, and the quantity comparison
+    write_dvar_area(sim, yr_cal, path_yr)
     write_crosstab(sim, yr_cal, path_yr, yr_cal_sim_pre)
     write_quantity(sim, yr_cal, path_yr, yr_cal_sim_pre)
 
@@ -462,7 +463,57 @@ def write_ag_revenue_cost(sim, yr_cal, path):
     df_cost.to_csv(os.path.join(path, f'cost_agricultural_commodity_{timestamp}.csv'))
 
 
+def write_dvar_area(sim, yr_cal, path):
+    
+    # Get the timestamp so each CSV in the timeseries mode has a unique name
+    timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
+    
+    # Append the yr_cal to timestamp as prefix
+    timestamp = str(yr_cal) + '_' + timestamp
+    
+    # Reprot the process
+    print('Writting area calculated from dvars to', path)
+    
+    # Get the decision variables for the year, multiply them by the area of each pixel, 
+    # and sum over the landuse dimension (j/k)
+    ag_area = np.einsum('mrj,r -> mj', sim.ag_dvars[yr_cal], sim.data.REAL_AREA)  
+    non_ag_area = np.einsum('rk,r -> k', sim.non_ag_dvars[yr_cal], sim.data.REAL_AREA) 
+    ag_man_area_dict = {am: np.einsum('mrj,r -> mj', ammap, sim.data.REAL_AREA) 
+                        for am, ammap in sim.ag_man_dvars[yr_cal].items()}
 
+    # Agricultural landuse
+    df_ag_area = pd.DataFrame(ag_area.reshape(-1), 
+                                index=pd.MultiIndex.from_product([[yr_cal],
+                                                                sim.data.LANDMANS,
+                                                                sim.data.AGRICULTURAL_LANDUSES],
+                                                                names=['Year', 'Water','Land use']),
+                                columns=['Area (ha)']).reset_index()
+    # Non-agricultural landuse
+    df_non_ag_area = pd.DataFrame(non_ag_area.reshape(-1),
+                                index=pd.MultiIndex.from_product([[yr_cal],
+                                                                ['dry'],
+                                                                sim.data.NON_AGRICULTURAL_LANDUSES],
+                                                                names=['Year', 'Water', 'Land use']),
+                                columns=['Area (ha)']).reset_index()
+
+    # Agricultural management
+    am_areas = []
+    for am, am_arr in ag_man_area_dict.items():
+        df_am_area = pd.DataFrame(am_arr.reshape(-1),
+                                index=pd.MultiIndex.from_product([[yr_cal],
+                                                                [am],
+                                                                sim.data.LANDMANS,
+                                                                sim.data.AGRICULTURAL_LANDUSES],
+                                                                names=['Year', 'Type', 'Water','Land use']),
+                                columns=['Area (ha)']).reset_index()
+        am_areas.append(df_am_area)
+    df_am_area = pd.concat(am_areas)
+
+
+    # Save to file
+    df_ag_area.to_csv(os.path.join(path, f'area_agricultural_landuse_{timestamp}.csv'), index = False)
+    df_non_ag_area.to_csv(os.path.join(path, f'area_non_agricultural_landuse_{timestamp}.csv'), index = False)
+    df_am_area.to_csv(os.path.join(path, f'area_agricultural_management_{timestamp}.csv'), index = False)
 
 
 def write_crosstab(sim, yr_cal, path, yr_cal_sim_pre=None): 

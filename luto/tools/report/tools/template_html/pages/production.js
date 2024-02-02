@@ -329,8 +329,8 @@ document.addEventListener("DOMContentLoaded", function () {
       let chart = new Highcharts.Chart(production_3_demand_commodity_option);
     });
 
-    // Chart:production_4_1_demand_domestic_On_land_commodity
-    Highcharts.chart("production_4_1_demand_domestic_On_land_commodity", {
+    // Chart:production_4_1_demand_domestic_On-land_commodity
+    Highcharts.chart("production_4_1_demand_domestic_On-land_commodity", {
       chart: {
         type: "column",
         marginRight: 180,
@@ -340,7 +340,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
       data: {
         csv: document.getElementById(
-          "production_4_1_demand_domestic_On_land_commodity_csv"
+          "production_4_1_demand_domestic_On-land_commodity_csv"
         ).innerHTML,
       },
       credits: {
@@ -383,8 +383,8 @@ document.addEventListener("DOMContentLoaded", function () {
       },
     });
 
-    // Chart:production_4_2_demand_domestic_Off_land_commodity
-    Highcharts.chart("production_4_2_demand_domestic_Off_land_commodity", {
+    // Chart:production_4_2_demand_domestic_Off-land_commodity
+    Highcharts.chart("production_4_2_demand_domestic_Off-land_commodity", {
       chart: {
         type: "column",
         marginRight: 180,
@@ -394,7 +394,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
       data: {
         csv: document.getElementById(
-          "production_4_2_demand_domestic_Off_land_commodity_csv"
+          "production_4_2_demand_domestic_Off-land_commodity_csv"
         ).innerHTML,
       },
       credits: {
