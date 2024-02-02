@@ -27,6 +27,7 @@ def extract_dtype_from_path(path):
             'GHG':['GHG'],
             'water':['water'],
             'cross_table':['crosstab','switches'],
+            'area':['area'],
             'quantity':['quantity'],
             'revenue':['revenue'],
             'cost':['cost'],
@@ -87,10 +88,10 @@ def get_all_files(data_root):
 
     yr_types, f_cats = zip(*[extract_dtype_from_path(i) for i in file_paths['path']])
     file_paths.insert(1, 'year_types', yr_types)
-    file_paths.insert(2, 'catetory', f_cats)
+    file_paths.insert(2, 'category', f_cats)
 
     file_paths[['base_name','base_ext']] = [os.path.splitext(os.path.basename(i)) for i in file_paths['path']]
-    file_paths = file_paths.reindex(columns=['year','year_types','catetory','base_name','base_ext','path'])
+    file_paths = file_paths.reindex(columns=['year','year_types','category','base_name','base_ext','path'])
 
     file_paths['year'] = file_paths['year'].astype(int)
     
@@ -216,7 +217,7 @@ def get_rev_cost_df(files_df:pd.DataFrame,in_type:str):
     if in_type not in ['revenue','cost']:
         raise ValueError('in_type must be either "Revenue" or "Cost"')
     
-    path_df = files_df.query('catetory == @in_type and year_types == "single_year"').reset_index(drop=True) 
+    path_df = files_df.query('category == @in_type and year_types == "single_year"').reset_index(drop=True) 
         
     dfs =[]  
     for _,row in path_df.iterrows():
@@ -269,27 +270,43 @@ def get_AREA_lu(df):
             # Process the first year
             data_row = df.iloc[:, -1].reset_index().query('(index != "Total") & (index != "All")')
             data_row.columns = column_names
-            data_row = merge_LVSTK_UAALLOW(data_row)
             data_row.insert(0, 'Year', YR_BASE)
+            data_row = merge_LVSTK_UAALLOW(data_row)
             area_df.append(data_row)
             
             # Process the last row for the year
             data_row = df.iloc[-1, :].reset_index().query('(index != "Total") & (index != "All")')
             data_row.columns = column_names
-            data_row = merge_LVSTK_UAALLOW(data_row)
             data_row.insert(0, 'Year', year)
+            data_row = merge_LVSTK_UAALLOW(data_row)  
             area_df.append(data_row)
+            
         else:
             # Process the last row for the year
             data_row = df.iloc[-1, :].reset_index().query('(index != "Total") & (index != "All")')
             data_row.columns = column_names
+            data_row.insert(0, 'Year', year)
             data_row = merge_LVSTK_UAALLOW(data_row)
-            data_row.insert(0, 'Year', year)    
             area_df.append(data_row)
 
     return pd.concat(area_df).reset_index(drop=True)
 
+def get_ag_dvar_area(area_dvar_paths):
 
+    ag_dvar_dfs = area_dvar_paths.query('base_name.str.contains("area_agricultural_landuse")').reset_index(drop=True)
+    ag_dvar_area = pd.concat([pd.read_csv(path) for path in ag_dvar_dfs['path']], ignore_index=True)
+    ag_dvar_area = merge_LVSTK_UAALLOW(ag_dvar_area)
+    ag_dvar_area['Area (million km2)'] = ag_dvar_area['Area (ha)'] / 100 / 1e6
+    ag_dvar_area['Type'] = 'Agricultural landuse'
+
+    non_ag_dvar_dfs = area_dvar_paths.query('base_name.str.contains("area_non_agricultural_landuse")').reset_index(drop=True)
+    non_ag_dvar_area = pd.concat([pd.read_csv(path) for path in non_ag_dvar_dfs['path']], ignore_index=True)
+    non_ag_dvar_area['Area (million km2)'] = non_ag_dvar_area['Area (ha)'] / 100 / 1e6
+    non_ag_dvar_area['Type'] = 'Non-agricultural landuse'
+
+    area_dvar = pd.concat([ag_dvar_area, non_ag_dvar_area], ignore_index=True) 
+    
+    return area_dvar
 
 def get_AREA_lm(df):
     """

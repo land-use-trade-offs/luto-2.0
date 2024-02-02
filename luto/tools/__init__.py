@@ -197,9 +197,9 @@ def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
     # Set up a container array of shape r, k.
     x_rk = np.zeros((lumap.shape[0], num_non_ag_land_uses), dtype=bool)
 
-    for k in range(len(non_ag_lu_codes)):
+    for i,k in enumerate(non_ag_lu_codes):
         kmap = np.where(lumap == k, True, False)
-        x_rk[:, k] = kmap
+        x_rk[:, i] = kmap
 
     return x_rk.astype(bool)
 

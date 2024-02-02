@@ -4,17 +4,19 @@ import re
 import pandas as pd
 import argparse
 
+
 # import functions
 from tools.__init__ import   get_AREA_am, get_AREA_lm, get_AREA_lu, get_GHG_emissions_by_crop_lvstk_df,\
-                    get_all_files, get_begin_end_df, get_quantity_df, \
-                    get_rev_cost_df, get_water_df, get_demand_df
+                    get_all_files, get_begin_end_df, get_quantity_df, merge_LVSTK_UAALLOW,\
+                    get_rev_cost_df, get_water_df, get_demand_df, get_ag_dvar_area
 
               
 from tools.helper_func import get_GHG_category, get_GHG_file_df,\
-                              get_rev_cost,target_GHG_2_Json, select_years
+                              get_rev_cost, target_GHG_2_Json, select_years
                               
-                              
-from tools.parameters import YR_BASE, COMMODITIES_ALL
+
+                                                     
+from tools.parameters import LU_LVSTKS, YR_BASE, COMMODITIES_ALL
 
 
 # setting up working directory to root dir
@@ -133,7 +135,7 @@ for idx,Type in enumerate(DEMAND_DATA_long['Type'].unique()):
     DEMAND_DATA_commodity_wide.to_csv(f'{SAVE_DIR}/production_5_{idx+1}_demand_{Type}_commodity.csv', index=False)
 
 # Plot_1-5-6: Production (LUTO outputs, Million Tonnes)
-quantity_csv_paths = files.query('catetory == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)
+quantity_csv_paths = files.query('category == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)
 quantity_df = get_quantity_df(quantity_csv_paths)
 
 quantity_df_wide = quantity_df.pivot_table(index=['year'], 
@@ -189,42 +191,60 @@ rev_cost_compare.to_csv(f'{SAVE_DIR}/economics_3_rev_cost_all.csv', index=False)
 #                    3) Area Change                #
 ####################################################
 
-# Plot_3-1: Area (km2)
-area_paths = files.query('catetory == "cross_table" and year_types == "single_year"').reset_index(drop=True)
+area_dvar_paths = files.query('category == "area" and year_types == "single_year"').reset_index(drop=True)
+area_dvar = get_ag_dvar_area(area_dvar_paths)
 
 
-crosstab_lu = area_paths.query('base_name == "crosstab-lumap"').reset_index(drop=True)
-lu_area = get_AREA_lu(crosstab_lu)
-lu_area['Area (million km2)'] = lu_area['Area (km2)'] / 1e6
-lu_area_wide = lu_area.pivot(index='Year', columns='Land use', values='Area (million km2)').reset_index()
-lu_area_wide.to_csv(f'{SAVE_DIR}/area_1_total_area_wide.csv', index=False)
+# Plot_3-1: Total Area (km2)
 
-# Plot_3-2: Area (km2) by Irrigation
-crosstab_lm = area_paths.query('base_name == "crosstab-lmmap"').reset_index(drop=True)
-lm_area = get_AREA_lm(crosstab_lm)
-lm_area['Area (million km2)'] = lm_area['Area (km2)'] / 1e6
-lm_area_wide = lm_area.pivot(index='Year', columns='Irrigation', values='Area (million km2)').reset_index()
-lm_area_wide.to_csv(f'{SAVE_DIR}/area_2_irrigation_area_wide.csv', index=False)
-
-# Plot_3-3: Area (km2) by Agricultural management
-switches_am = area_paths.query('base_name.str.contains(r"switches.*amstat.*", regex=True)').reset_index(drop=True)
-am_area_km2 = get_AREA_am(switches_am)
-am_area_km2['Area (million km2)'] = am_area_km2['Area (km2)'] / 1e6
-
-am_area_km2[['Land use','Agricultural management']] = am_area_km2['Land use'].apply(lambda x: re.findall(r'(.*) \((.*)\)',x)[0]).tolist()
-am_area_km2_total = am_area_km2.groupby(['Year','Agricultural management']).sum(numeric_only=True).reset_index()
-
-am_area_km2_total_wide = am_area_km2_total.pivot(index='Year', columns='Agricultural management', values='Area (million km2)').reset_index()
-am_area_km2_total_wide.to_csv(f'{SAVE_DIR}/area_3_am_total_area_wide.csv', index=False)
+lu_area_dvar = area_dvar.groupby(['Year','Land use']).sum(numeric_only=True).reset_index()
+lu_area_dvar_wide = lu_area_dvar.pivot(index='Year', 
+                                                     columns='Land use', 
+                                                     values='Area (million km2)').reset_index()
+lu_area_dvar_wide.to_csv(f'{SAVE_DIR}/area_1_total_area_wide.csv', index=False)
 
 
-# Plot_3-4: Area (km2) by Land use
-am_area_km2_wide = am_area_km2.drop(columns='Agricultural management').groupby(['Year','Land use']).sum().reset_index()
-am_area_km2_wide = am_area_km2_wide.pivot(index='Year', columns='Land use', values='Area (million km2)').reset_index()
-am_area_km2_wide.to_csv(f'{SAVE_DIR}/area_4_am_lu_area_wide.csv', index=False)
+# Plot_3-2: Total Area (km2) by Irrigation
+lm_dvar_area = area_dvar.groupby(['Year','Water']).sum(numeric_only=True).reset_index()
+lm_dvar_area_wide = lm_dvar_area.pivot(index='Year', 
+                                       columns='Water', 
+                                       values='Area (million km2)').reset_index()
+lm_dvar_area_wide.to_csv(f'{SAVE_DIR}/area_2_irrigation_area_wide.csv', index=False)
 
 
-# Plot_3-5/6: Area (km2) by Land use
+# Plot_3-3: Area (km2) by Non-Agricultural land use
+non_ag_dvar_area = area_dvar.query('Type == "Non-agricultural landuse"').reset_index(drop=True)
+non_ag_dvar_area_wide = non_ag_dvar_area.groupby(['Year','Land use']).sum(numeric_only=True).reset_index()
+non_ag_dvar_area_wide = non_ag_dvar_area_wide.pivot(index='Year',
+                                                    columns='Land use',
+                                                    values='Area (million km2)').reset_index()
+non_ag_dvar_area_wide.to_csv(f'{SAVE_DIR}/area_3_non_ag_lu_area_wide.csv', index=False)
+
+
+# Plot_3-4: Area (km2) by Agricultural management
+am_dvar_dfs = area_dvar_paths.query('base_name.str.contains("area_agricultural_management")').reset_index(drop=True)
+am_dvar_area = pd.concat([pd.read_csv(path) for path in am_dvar_dfs['path']], ignore_index=True)
+am_dvar_area['Area (million km2)'] = am_dvar_area['Area (ha)'] / 100 / 1e6
+
+am_dvar_area_type_wide = am_dvar_area.groupby(['Year','Type']).sum(numeric_only=True).reset_index()
+am_dvar_area_type_wide = am_dvar_area_type_wide.pivot(index='Year', 
+                                       columns='Type', 
+                                       values='Area (million km2)').reset_index()
+am_dvar_area_type_wide.to_csv(f'{SAVE_DIR}/area_4_am_total_area_wide.csv', index=False)
+
+
+
+# Plot_3-5: Agricultural management Area (km2) by Land use
+am_dvar_area_lu_wide = am_dvar_area.groupby(['Year','Land use']).sum(numeric_only=True).reset_index()
+
+am_dvar_area_lu_wide = am_dvar_area_lu_wide.pivot(index='Year',
+                                                  columns='Land use',
+                                                  values='Area (million km2)').reset_index()
+am_dvar_area_lu_wide.to_csv(f'{SAVE_DIR}/area_5_am_lu_area_wide.csv', index=False)
+
+
+
+# Plot_3-6/7: Area (km2) by Land use
 begin_end_df_area, begin_end_df_pct = get_begin_end_df(files)
 
 heat_area = begin_end_df_area.style.background_gradient(cmap='Oranges', axis=1).format('{:,.0f}')
@@ -238,10 +258,10 @@ heat_area_html = style + heat_area.to_html()
 heat_pct_html = style + heat_pct.to_html()
 
 # Save the html
-with open(f'{SAVE_DIR}/area_5_begin_end_area.html', 'w') as f:
+with open(f'{SAVE_DIR}/area_6_begin_end_area.html', 'w') as f:
     f.write(heat_area_html)
     
-with open(f'{SAVE_DIR}/area_6_begin_end_pct.html', 'w') as f:
+with open(f'{SAVE_DIR}/area_7_begin_end_pct.html', 'w') as f:
     f.write(heat_pct_html)
 
 
@@ -374,8 +394,8 @@ Ag_man_sequestration_dry_irr_wide.to_csv(f'{SAVE_DIR}/GHG_12_GHG_ag_man_dry_irr_
 ####################################################
 #                     5) Water                     #
 ####################################################
-water_paths_total = files.query('catetory == "water" and year_types == "single_year" and ~base_name.str.contains("separate")').reset_index(drop=True)
-water_paths_separate = files.query('catetory == "water" and year_types == "single_year" and base_name.str.contains("separate")').reset_index(drop=True)
+water_paths_total = files.query('category == "water" and year_types == "single_year" and ~base_name.str.contains("separate")').reset_index(drop=True)
+water_paths_separate = files.query('category == "water" and year_types == "single_year" and base_name.str.contains("separate")').reset_index(drop=True)
 
 water_df_total = get_water_df(water_paths_total)
 water_df_separate = pd.concat([pd.read_csv(path) for path in water_paths_separate['path']], ignore_index=True)

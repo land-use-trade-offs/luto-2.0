@@ -167,17 +167,17 @@ document.addEventListener("DOMContentLoaded", function () {
       },
     });
 
-    // area_3_am_total_area_wide
-    Highcharts.chart("area_3_am_total_area_wide", {
+    // area_3_non_ag_lu_area_wide
+    Highcharts.chart("area_3_non_ag_lu_area_wide", {
       chart: {
         type: "column",
         marginRight: 180,
       },
       title: {
-        text: "Agricultural Management Area by Type",
+        text: "Non-Agricultural Land Use Area",
       },
       data: {
-        csv: document.getElementById("area_3_am_total_area_wide_csv").innerHTML,
+        csv: document.getElementById("area_3_non_ag_lu_area_wide_csv").innerHTML,
       },
       credits: {
         enabled: false,
@@ -219,8 +219,60 @@ document.addEventListener("DOMContentLoaded", function () {
       },
     });
 
-    // area_4_am_lu_area_wide
-    Highcharts.chart("area_4_am_lu_area_wide", {
+    // area_4_am_total_area_wide
+    Highcharts.chart("area_4_am_total_area_wide", {
+      chart: {
+        type: "column",
+        marginRight: 180,
+      },
+      title: {
+        text: "Agricultural Management Area by Type",
+      },
+      data: {
+        csv: document.getElementById("area_4_am_total_area_wide_csv").innerHTML,
+      },
+      credits: {
+        enabled: false,
+      },
+      yAxis: {
+        title: {
+          text: "Area (million km2)",
+        },
+      },
+      xAxis: {
+        tickPositions: tickposition,
+      },
+
+      legend: {
+        align: "right",
+        verticalAlign: "top",
+        layout: "vertical",
+        x: 10,
+        y: 100,
+      },
+
+      tooltip: {
+        formatter: function () {
+          return `<b>Year:</b> ${this.x}<br><b>${
+            this.series.name
+          }:</b>${this.y.toFixed(2)}<br/>`;
+        },
+      },
+
+      plotOptions: {
+        column: {
+          stacking: "normal",
+        },
+      },
+
+      exporting: {
+        sourceWidth: 1200,
+        sourceHeight: 600,
+      },
+    });
+
+    // area_5_am_lu_area_wide
+    Highcharts.chart("area_5_am_lu_area_wide", {
       chart: {
         type: "column",
         marginRight: 180,
@@ -229,7 +281,7 @@ document.addEventListener("DOMContentLoaded", function () {
         text: "Agricultural Management Area by Land-use Type",
       },
       data: {
-        csv: document.getElementById("area_4_am_lu_area_wide_csv").innerHTML,
+        csv: document.getElementById("area_5_am_lu_area_wide_csv").innerHTML,
       },
       credits: {
         enabled: false,
@@ -288,12 +340,12 @@ document.addEventListener("DOMContentLoaded", function () {
       },
     });
 
-    // area_5_begin_end_area
-    document.getElementById("area_5_begin_end_area").innerHTML =
-      '<object type="text/html"  data="../../data/area_5_begin_end_area.html" ></object>';
+    // area_6_begin_end_area
+    document.getElementById("area_6_begin_end_area").innerHTML =
+      '<object type="text/html"  data="../../data/area_6_begin_end_area.html" ></object>';
 
-    // area_6_begin_end_pct
-    document.getElementById("area_6_begin_end_pct").innerHTML =
-      '<object type="text/html" style={font-size: 10px} data="../../data/area_6_begin_end_pct.html" ></object>';
+    // area_7_begin_end_pct
+    document.getElementById("area_7_begin_end_pct").innerHTML =
+      '<object type="text/html" style={font-size: 10px} data="../../data/area_7_begin_end_pct.html" ></object>';
   });
 });

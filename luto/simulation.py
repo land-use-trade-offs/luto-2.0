@@ -477,7 +477,7 @@ def solve_snapshot(base: int, target: int):
     print('Total processing time...', round(time.time() - start_time), 'seconds')
 
 
-@Tee_log(f'{settings.OUTPUT_DIR}/running_log.txt')
+# @Tee_log(f'{settings.OUTPUT_DIR}/running_log.txt')
 def run( base
        , target
        ):
