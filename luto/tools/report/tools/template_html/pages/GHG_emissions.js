@@ -493,7 +493,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 180,
       },
       title: {
-        text: "GHG Emission between start and end year",
+        text: "GHG Emissions - Start and End Year",
       },
       xAxis: {
         categories: [],

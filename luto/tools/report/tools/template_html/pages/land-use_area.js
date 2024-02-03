@@ -52,7 +52,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 180,
       },
       title: {
-        text: "Land-use Total Area",
+        text: "Total Area by Land-use and Agricultural Commodity",
       },
       data: {
         csv: document.getElementById("area_1_total_area_wide_csv").innerHTML,
