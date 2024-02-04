@@ -127,7 +127,7 @@ def write_outputs(sim, path):
 
     # 2) Create the report
     result = subprocess.run(['python', 'luto/tools/report/create_html.py', '-p', path], capture_output=True, text=True)
-    print("\nError occurred:", result.stderr) if result.returncode != 0 else print("\nReport HTML:", result.stdout)
+    print("\nError occurred:", result.stderr) if result.returncode != 0 else print("\nReport HTML:\n", result.stdout)
     
     ###############################################################
     #                    Create log infomatoin                    #
