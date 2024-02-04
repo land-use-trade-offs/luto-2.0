@@ -448,7 +448,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "Exports Commodity",
+        text: "Exports by Agricultural Commodity",
       },
 
       data: {
@@ -507,7 +507,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 180,
       },
       title: {
-        text: "Imports Commodity",
+        text: "Imports by Agricultural Commodity",
       },
       series: [],
       credits: {
@@ -632,7 +632,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 180,
       },
       title: {
-        text: "Feed Commodity",
+        text: "Feed by Agricultural Commodity",
       },
       series: [],
       credits: {
@@ -753,7 +753,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 180,
       },
       title: {
-        text: "Production Commodity (demands for LUTO)",
+        text: "Production by Agricultural Commodity (demands input into LUTO)",
       },
       data: {
         csv: document.getElementById(
@@ -807,7 +807,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 180,
       },
       title: {
-        text: "Production Commodity (outputs from LUTO)",
+        text: "Production by Agricultural Commodity (outputs from LUTO)",
       },
       data: {
         csv: document.getElementById(

@@ -105,7 +105,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "Water Use",
+        text: "Water Use by Drainage Division/River Region",
       },
 
       credits: {
@@ -117,7 +117,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
       yAxis: {
         title: {
-          text: "Usage to Limit (ML)",
+          text: "Water Use (ML)",
         },
       },
 
@@ -155,7 +155,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "Water Use by Land Management",
+        text: "Water Use by Broad Land-use and Management Type",
       },
 
       credits: {
@@ -213,7 +213,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "Water Use by Land Use",
+        text: "Water Use by Agricultural Commodity and Land-use",
       },
 
       credits: {
@@ -275,7 +275,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "Water Use by Irrigation",
+        text: "Water Use by Irrigation Type",
       },
 
       credits: {
