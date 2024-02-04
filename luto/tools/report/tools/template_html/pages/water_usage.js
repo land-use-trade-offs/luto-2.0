@@ -117,7 +117,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
       yAxis: {
         title: {
-          text: "Usage to Limit (ML)",
+          text: "Water Use (ML)",
         },
       },
 
