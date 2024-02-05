@@ -163,6 +163,7 @@ def write_output_single_year(sim, yr_cal, path_yr, timestamp, yr_cal_sim_pre=Non
     # write_files(sim, yr_cal, path_yr, timestamp)
     # write_files_separate(sim, yr_cal, path_yr, timestamp)
 
+
     # Write the crosstab and switches, and the quantity comparison
     write_dvar_area(sim, yr_cal, path_yr, timestamp)
     write_crosstab(sim, yr_cal, path_yr, timestamp, yr_cal_sim_pre)
