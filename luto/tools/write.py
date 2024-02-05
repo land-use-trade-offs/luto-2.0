@@ -21,11 +21,13 @@ Writes model output and statistics to files.
 
 import os, math
 import shutil
-from datetime import datetime
-import time
 import numpy as np
 import pandas as pd
+
+from datetime import datetime
 from itertools import product
+
+import luto.data as bdata
 
 import luto.settings as settings
 from luto import tools
@@ -94,6 +96,13 @@ def write_outputs(sim, path, timestamp):
     # Get the years to write
     years = sorted(list(sim.lumaps.keys()))
     paths = [f"{path}/out_{yr}" for yr in years]
+    
+    # Change the decision variables for 2010 {sim.data.YR_CAL_BASE} 
+    # with results computed from raw lu/lm maps (RESFACTOR = 1)
+    sim.ag_dvars[sim.data.YR_CAL_BASE] = tools.lumap2ag_l_mrj(bdata.LUMAP, bdata.LMMAP)
+    sim.non_ag_dvars[sim.data.YR_CAL_BASE] = tools.lumap2non_ag_l_mk(bdata.LUMAP, len(bdata.NON_AGRICULTURAL_LANDUSES))
+    sim.ag_man_dvars[sim.data.YR_CAL_BASE] = tools.get_base_am_vars(bdata.NCELLS, bdata.NLMS, bdata.N_AG_LUS)
+
 
     ###############################################################
     #                     Create raw outputs                      #
@@ -151,8 +160,8 @@ def write_output_single_year(sim, yr_cal, path_yr, timestamp, yr_cal_sim_pre=Non
         os.mkdir(path_yr)
 
     # Write the decision variables, land-use and land management maps
-    write_files(sim, yr_cal, path_yr, timestamp)
-    write_files_separate(sim, yr_cal, path_yr, timestamp)
+    # write_files(sim, yr_cal, path_yr, timestamp)
+    # write_files_separate(sim, yr_cal, path_yr, timestamp)
 
     # Write the crosstab and switches, and the quantity comparison
     write_dvar_area(sim, yr_cal, path_yr, timestamp)
@@ -379,7 +388,7 @@ def write_quantity(sim, yr_cal, path,timestamp, yr_cal_sim_pre=None):
         
         # Get commodity production quantities produced in base year
         if yr_cal_sim_pre == sim.data.YR_CAL_BASE: # if base year is 2010
-            prod_base = sim.data.PROD_2010_C
+            prod_base = sim.data.PROD_2010_C       # the production in 2010 is calculated with raw lu/lm maps (RESFACTOR = 1)
         else:                                      # if timeseries and base year is > 2010
             prod_base = np.array(sim.prod_data[yr_cal_sim_pre]['Production'])   
     
@@ -424,11 +433,16 @@ def write_ag_revenue_cost(sim, yr_cal, path, timestamp):
     # Get the ag_dvar_mrj in the yr_cal
     ag_dvar_mrj = sim.ag_dvars[yr_cal]
 
+    # Change the input data to bdata if yr_cal is the base year
+    # This is to ensure the calculation for base year is under RESCACTRO=1
+    # nomatter what the RESFACTOR is set in the settings.py
+    data_input = bdata if yr_cal == sim.data.YR_CAL_BASE else sim.data
+    
     # Get agricultural revenue/cost for year in mrjs format. Note the s stands for sources:
     # E.g., Sources for crops only contains ['Revenue'], 
     #    but sources for livestock includes ['Meat', 'Wool', 'Live Exports', 'Milk']
-    ag_rev_df_rjms = ag_revenue.get_rev_matrices(sim.data, yr_idx, aggregate=False)
-    ag_cost_df_rjms = ag_cost.get_cost_matrices(sim.data, yr_idx, aggregate=False)
+    ag_rev_df_rjms = ag_revenue.get_rev_matrices(data_input, yr_idx, aggregate=False)
+    ag_cost_df_rjms = ag_cost.get_cost_matrices(data_input, yr_idx, aggregate=False)
 
     # Expand the original df with zero values to convert it to a **mrjs** array
     ag_rev_df_rjms = ag_rev_df_rjms.reindex(columns=pd.MultiIndex.from_product(ag_rev_df_rjms.columns.levels), fill_value=0)
@@ -471,11 +485,16 @@ def write_dvar_area(sim, yr_cal, path, timestamp):
     # Reprot the process
     print('Writting area calculated from dvars to', path)
     
+    # Change the input data to bdata if yr_cal is the base year
+    # This is to ensure the calculation for base year is under RESCACTRO=1
+    # nomatter what the RESFACTOR is set in the settings.py
+    real_area = bdata.REAL_AREA if yr_cal == sim.data.YR_CAL_BASE else sim.data.REAL_AREA
+    
     # Get the decision variables for the year, multiply them by the area of each pixel, 
     # and sum over the landuse dimension (j/k)
-    ag_area = np.einsum('mrj,r -> mj', sim.ag_dvars[yr_cal], sim.data.REAL_AREA)  
-    non_ag_area = np.einsum('rk,r -> k', sim.non_ag_dvars[yr_cal], sim.data.REAL_AREA) 
-    ag_man_area_dict = {am: np.einsum('mrj,r -> mj', ammap, sim.data.REAL_AREA) 
+    ag_area = np.einsum('mrj,r -> mj', sim.ag_dvars[yr_cal], real_area)  
+    non_ag_area = np.einsum('rk,r -> k', sim.non_ag_dvars[yr_cal], real_area) 
+    ag_man_area_dict = {am: np.einsum('mrj,r -> mj', ammap, real_area) 
                         for am, ammap in sim.ag_man_dvars[yr_cal].items()}
 
     # Agricultural landuse
@@ -601,22 +620,24 @@ def write_crosstab(sim, yr_cal, path, timestamp, yr_cal_sim_pre=None):
 def write_water(sim, yr_cal, path, timestamp):
     """Calculate water use totals. Takes a simulation object, a numeric
        target calendar year (e.g., 2030), and an output path as input."""
-    
-    # Get the timestamp so each CSV in the timeseries mode has a unique name
-    timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
-    
+
     # Append the yr_cal to timestamp as prefix
     timestamp = str(yr_cal) + '_' + timestamp
 
     print('Writing water outputs to', path)
 
     # Convert calendar year to year index.
-    yr_idx = yr_cal - sim.data.YR_CAL_BASE
+    yr_idx = yr_cal - bdata.YR_CAL_BASE
+
+    # Change the input data to bdata if yr_cal is the base year
+    # This is to ensure the calculation for base year is under RESCACTRO=1
+    # nomatter what the RESFACTOR is set in the settings.py
+    data_input = bdata if yr_cal == bdata.YR_CAL_BASE else bdata
 
     # Get water use for year in mrj format
-    ag_w_mrj = ag_water.get_wreq_matrices(sim.data, yr_idx)
-    non_ag_w_rk = non_ag_water.get_wreq_matrix(sim.data)
-    ag_man_w_mrj = ag_water.get_agricultural_management_water_matrices(sim.data, ag_w_mrj, yr_idx)
+    ag_w_mrj = ag_water.get_wreq_matrices(data_input, yr_idx)
+    non_ag_w_rk = non_ag_water.get_wreq_matrix(data_input)
+    ag_man_w_mrj = ag_water.get_agricultural_management_water_matrices(data_input, ag_w_mrj, yr_idx)
 
     # Prepare a data frame.
     df = pd.DataFrame( columns=[ 'REGION_ID'
@@ -627,23 +648,23 @@ def write_water(sim, yr_cal, path, timestamp):
                                 , 'PROPORTION_%'  ] )
 
     # Get 2010 water use limits used as constraints in model
-    wuse_limits = ag_water.get_wuse_limits(sim.data)
+    wuse_limits = ag_water.get_wuse_limits(data_input)
 
     # Set up data for river regions or drainage divisions
     if settings.WATER_REGION_DEF == 'RR':
-        region_limits = sim.data.RIVREG_LIMITS
-        region_id = sim.data.RIVREG_ID
+        region_limits = bdata.RIVREG_LIMITS
+        region_id = bdata.RIVREG_ID
         # regions = settings.WATER_RIVREGS
-        region_dict = sim.data.RIVREG_DICT
+        region_dict = bdata.RIVREG_DICT
         
     elif settings.WATER_REGION_DEF == 'DD':
-        region_limits = sim.data.DRAINDIV_LIMITS
-        region_id = sim.data.DRAINDIV_ID
+        region_limits = bdata.DRAINDIV_LIMITS
+        region_id = bdata.DRAINDIV_ID
         # regions = settings.WATER_DRAINDIVS
-        region_dict = sim.data.DRAINDIV_DICT
+        region_dict = bdata.DRAINDIV_DICT
         
     else: print('Incorrect option for WATER_REGION_DEF in settings')
-    
+
     # Loop through specified water regions
     df_water_seperate_dfs = []
     for i, region in enumerate(region_limits.keys()):
@@ -661,8 +682,8 @@ def write_water(sim, yr_cal, path, timestamp):
         
         ag_df = pd.DataFrame(ag_jm.reshape(-1).tolist(),
                             index=pd.MultiIndex.from_product([['Agricultural Landuse'],
-                                                            sim.data.AGRICULTURAL_LANDUSES,
-                                                            sim.data.LANDMANS
+                                                            data_input.AGRICULTURAL_LANDUSES,
+                                                            data_input.LANDMANS
                                                             ])).reset_index()
         
         ag_df.columns = index_levels
@@ -674,7 +695,7 @@ def write_water(sim, yr_cal, path, timestamp):
         
         non_ag_df = pd.DataFrame(non_ag_k, 
                                 index= pd.MultiIndex.from_product([['Non-agricultural Landuse'],
-                                                                    sim.data.NON_AGRICULTURAL_LANDUSES ,
+                                                                    data_input.NON_AGRICULTURAL_LANDUSES ,
                                                                     ['dry']  # non-agricultural land is always dry
                                                                     ])).reset_index()
         
@@ -686,7 +707,7 @@ def write_water(sim, yr_cal, path, timestamp):
         AM_dfs = []
         for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
 
-            am_j = np.array([sim.data.DESC2AGLU[lu] for lu in am_lus])
+            am_j = np.array([data_input.DESC2AGLU[lu] for lu in am_lus])
             
             # Water requirements for each agricultural management in array format
             am_mrj = ag_man_w_mrj[am][:, ind, :]\
@@ -698,7 +719,7 @@ def write_water(sim, yr_cal, path, timestamp):
             df_am = pd.DataFrame(am_jm.reshape(-1).tolist(),
                                 index=pd.MultiIndex.from_product([['Agricultural Management'],
                                                                 am_lus,
-                                                                sim.data.LANDMANS
+                                                                data_input.LANDMANS
                                                                 ])).reset_index()
             df_am.columns = index_levels
             
@@ -757,21 +778,26 @@ def write_ghg(sim, yr_cal, path, timestamp):
     timestamp = str(yr_cal) + '_' + timestamp
 
     print('Writing GHG outputs to', path)
+    
+    # Change the input data to bdata if yr_cal is the base year
+    # This is to ensure the calculation for base year is under RESCACTRO=1
+    # nomatter what the RESFACTOR is set in the settings.py
+    data_input = bdata if yr_cal == bdata.YR_CAL_BASE else bdata
 
-    yr_idx = yr_cal - sim.data.YR_CAL_BASE
+    yr_idx = yr_cal - data_input.YR_CAL_BASE
         
     # Prepare a data frame.
     df = pd.DataFrame( columns=[ 'GHG_EMISSIONS_LIMIT_TCO2e'
                                , 'GHG_EMISSIONS_TCO2e' ] )
 
     # Get GHG emissions limits used as constraints in model
-    ghg_limits = ag_ghg.get_ghg_limits(sim.data, yr_cal)
+    ghg_limits = ag_ghg.get_ghg_limits(data_input, yr_cal)
 
     # Get GHG emissions from model
-    if yr_cal >= sim.data.YR_CAL_BASE + 1:
+    if yr_cal >= data_input.YR_CAL_BASE + 1:
         ghg_emissions = sim.prod_data[yr_cal]['GHG Emissions']
     else:
-        ghg_emissions = (ag_ghg.get_ghg_matrices(sim.data, yr_idx, aggregate=True) * sim.ag_dvars[sim.data.YR_CAL_BASE]).sum()
+        ghg_emissions = (ag_ghg.get_ghg_matrices(data_input, yr_idx, aggregate=True) * sim.ag_dvars[data_input.YR_CAL_BASE]).sum()
         
     # Add to dataframe
     df.loc[0] = ("{:,.0f}".format(ghg_limits), "{:,.0f}".format(ghg_emissions))
@@ -790,22 +816,27 @@ def write_biodiversity(sim, yr_cal, path, timestamp):
     timestamp = str(yr_cal) + '_' + timestamp
 
     print('Writing biodiversity outputs to', path)
+    
+    # Change the input data to bdata if yr_cal is the base year
+    # This is to ensure the calculation for base year is under RESCACTRO=1
+    # nomatter what the RESFACTOR is set in the settings.py
+    data_input = bdata if yr_cal == bdata.YR_CAL_BASE else bdata
 
-    yr_idx = yr_cal - sim.data.YR_CAL_BASE
+    yr_idx = yr_cal - data_input.YR_CAL_BASE
 
     df = pd.DataFrame( columns=[ 'Biodiversity score limit'
                                , f'Solve biodiversity score ({yr_cal})' ] )
     
     # Get limits used as constraints in model
-    biodiv_limit = ag_biodiversity.get_biodiversity_limits(sim.data, yr_cal)
+    biodiv_limit = ag_biodiversity.get_biodiversity_limits(data_input, yr_cal)
 
     # Get GHG emissions from model
-    if yr_cal >= sim.data.YR_CAL_BASE + 1:
+    if yr_cal >= data_input.YR_CAL_BASE + 1:
         biodiv_score = sim.prod_data[yr_cal]['Biodiversity']
     else:
         # Limits are based on the 2010 biodiversity scores, with the base year
         # biodiversity score equal to the 
-        biodiv_score = ag_biodiversity.get_base_year_biodiversity_score(sim.data)
+        biodiv_score = ag_biodiversity.get_base_year_biodiversity_score(data_input)
 
     # Add to dataframe
     df.loc[0] = ("{:,.0f}".format(biodiv_limit), "{:,.0f}".format(biodiv_score))
@@ -825,12 +856,19 @@ def write_ghg_separate(sim, yr_cal, path, timestamp):
 
     # Append the yr_cal to timestamp as prefix
     timestamp = str(yr_cal) + '_' + timestamp
+    
+    print(f'Writing GHG emissions_Separate from agricultural and non-agricultural landuse to {path}')
+    
+    # Change the input data to bdata if yr_cal is the base year
+    # This is to ensure the calculation for base year is under RESCACTRO=1
+    # nomatter what the RESFACTOR is set in the settings.py
+    data_input = bdata if yr_cal == bdata.YR_CAL_BASE else bdata
         
     # Convert calendar year to year index.
-    yr_idx = yr_cal - sim.data.YR_CAL_BASE
+    yr_idx = yr_cal - data_input.YR_CAL_BASE
     
     # Get the landuse descriptions for each validate cell (i.e., 0 -> Apples)
-    lu_desc_map = {**sim.data.AGLU2DESC,**sim.data.NONAGLU2DESC}
+    lu_desc_map = {**data_input.AGLU2DESC,**data_input.NONAGLU2DESC}
     lu_desc = [lu_desc_map[x] for x in sim.lumaps[yr_cal]]
 
     # -------------------------------------------------------#
@@ -838,13 +876,13 @@ def write_ghg_separate(sim, yr_cal, path, timestamp):
     # -------------------------------------------------------#
 
     # 1-1) Get the ghg_df
-    ag_g_df = ag_ghg.get_ghg_matrices(sim.data, yr_idx, aggregate=False) 
+    ag_g_df = ag_ghg.get_ghg_matrices(data_input, yr_idx, aggregate=False) 
 
     # Expand the original df with zero values to convert it to a a **mrj** array
     origin_type = ag_g_df.columns.levels[0] 
     ghg_sources = ag_g_df.columns.levels[1]
-    lm_type = sim.data.LANDMANS
-    lu_type = sim.data.AGRICULTURAL_LANDUSES
+    lm_type = data_input.LANDMANS
+    lu_type = data_input.AGRICULTURAL_LANDUSES
 
     df_col_product = list( product(*[origin_type, ghg_sources, lm_type, lu_type]) )
 
@@ -894,21 +932,21 @@ def write_ghg_separate(sim, yr_cal, path, timestamp):
     # -----------------------------------------------------------#
     
     # Get the non_ag GHG reduction
-    non_ag_g_rk = non_ag_ghg.get_ghg_matrix(sim.data)
+    non_ag_g_rk = non_ag_ghg.get_ghg_matrix(data_input)
     
     # Multiply with decision variable to get the GHG in yr_cal
     non_ag_g_rk = non_ag_g_rk * sim.non_ag_dvars[yr_cal]
     
     # get the non_ag GHG reduction on dry/irri land
-    non_ag_g_rk_dry = np.einsum('rk,r -> rk', non_ag_g_rk, (sim.data.LMMAP != 1))
-    non_ag_g_rk_irri = np.einsum('rk,r -> rk', non_ag_g_rk, (sim.data.LMMAP == 1))
+    non_ag_g_rk_dry = np.einsum('rk,r -> rk', non_ag_g_rk, (data_input.LMMAP != 1))
+    non_ag_g_rk_irri = np.einsum('rk,r -> rk', non_ag_g_rk, (data_input.LMMAP == 1))
     non_ag_g_mrk = np.array([non_ag_g_rk_dry,non_ag_g_rk_irri])        # mrk
     non_ag_g_rmk = np.swapaxes(non_ag_g_mrk,0,1)                       # rmk
     
     # Summarize the array as a df
     non_ag_g_rk_summary = tools.summarize_ghg_separate_df(
         non_ag_g_rmk,
-        (['Non_Agricultural Landuse'], sim.data.LANDMANS, [f'TCO2E_{non_ag}' for non_ag in sim.data.NON_AGRICULTURAL_LANDUSES]),
+        (['Non_Agricultural Landuse'], data_input.LANDMANS, [f'TCO2E_{non_ag}' for non_ag in data_input.NON_AGRICULTURAL_LANDUSES]),
         lu_desc
     )
     
@@ -921,15 +959,15 @@ def write_ghg_separate(sim, yr_cal, path, timestamp):
     # -------------------------------------------------------------------# 
     
     # Get the lucc transition penalty data (mrj) between target and base (2010) year
-    ghg_t_2010 = ag_ghg.get_ghg_transition_penalties(sim.data, sim.lumaps[2010])          # mrj
+    ghg_t_2010 = ag_ghg.get_ghg_transition_penalties(data_input, sim.lumaps[2010])          # mrj
     
     # Get the GHG emissions from lucc-convertion compared to the base year (2010)
     ghg_t_separate = np.einsum('mrj,mrj -> rmj',sim.ag_dvars[yr_cal], ghg_t_2010)         # rmj
 
     # Summarize the array as a df
     ghg_t_separate_summary = tools.summarize_ghg_separate_df(ghg_t_separate,(['Transition Penalty'], 
-                                                                       sim.data.LANDMANS,
-                                                                       [f"TCO2E_{i}" for i in sim.data.AGRICULTURAL_LANDUSES]),
+                                                                       data_input.LANDMANS,
+                                                                       [f"TCO2E_{i}" for i in data_input.AGRICULTURAL_LANDUSES]),
                                                              lu_desc)
 
     
@@ -943,13 +981,13 @@ def write_ghg_separate(sim, yr_cal, path, timestamp):
     # -------------------------------------------------------------------# 
     
     # 3) Get the ag_man_g_mrj
-    ag_man_g_mrj = ag_ghg.get_agricultural_management_ghg_matrices(sim.data, ag_g_mrj, yr_idx)
+    ag_man_g_mrj = ag_ghg.get_agricultural_management_ghg_matrices(data_input, ag_g_mrj, yr_idx)
     
     ag_ghg_arrays = []
     for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():
         
         # Get the lucc_code for this the agricultural management in this loop
-        am_j = np.array([sim.data.DESC2AGLU[lu] for lu in am_lus]) 
+        am_j = np.array([data_input.DESC2AGLU[lu] for lu in am_lus]) 
     
         # Get the GHG emission from agricultural management, then reshape it to starte with row (r) dimension
         am_ghg_mrj = ag_man_g_mrj[am] * sim.ag_man_dvars[yr_cal][am][:, :, am_j]              # mrj 
@@ -965,7 +1003,7 @@ def write_ghg_separate(sim, yr_cal, path, timestamp):
     
     # Summarize the array as a df
     ag_ghg_summary_df = tools.summarize_ghg_separate_df(ag_ghg_summary,( ['Agricultural Management']
-                                                                , sim.data.LANDMANS
+                                                                , data_input.LANDMANS
                                                                 , [f"TCO2E_{i}" for i in AG_MANAGEMENTS_TO_LAND_USES.keys()]),
                                                        lu_desc)
         
