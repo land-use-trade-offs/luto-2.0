@@ -393,7 +393,7 @@ def write_quantity(sim, yr_cal, path,timestamp, yr_cal_sim_pre=None):
             prod_base = np.array(sim.prod_data[yr_cal_sim_pre]['Production'])   
     
         prod_targ = np.array(sim.prod_data[yr_cal]['Production'])  # Get commodity quantities produced in target year
-        demands = sim.data.D_CY[yr_idx - 1]                        # Get commodity demands for target year
+        demands = sim.data.D_CY[yr_idx]                        # Get commodity demands for target year
         abs_diff = prod_targ - demands                             # Diff between target year production and demands in absolute terms (i.e. tonnes etc)
         prop_diff = ( prod_targ / demands ) * 100                  # Target year production as a proportion of demands (%)
         
@@ -632,7 +632,7 @@ def write_water(sim, yr_cal, path, timestamp):
     # Change the input data to bdata if yr_cal is the base year
     # This is to ensure the calculation for base year is under RESCACTRO=1
     # nomatter what the RESFACTOR is set in the settings.py
-    data_input = bdata if yr_cal == bdata.YR_CAL_BASE else bdata
+    data_input = bdata if yr_cal == bdata.YR_CAL_BASE else sim.data
 
     # Get water use for year in mrj format
     ag_w_mrj = ag_water.get_wreq_matrices(data_input, yr_idx)
@@ -782,7 +782,7 @@ def write_ghg(sim, yr_cal, path, timestamp):
     # Change the input data to bdata if yr_cal is the base year
     # This is to ensure the calculation for base year is under RESCACTRO=1
     # nomatter what the RESFACTOR is set in the settings.py
-    data_input = bdata if yr_cal == bdata.YR_CAL_BASE else bdata
+    data_input = bdata if yr_cal == bdata.YR_CAL_BASE else sim.data
 
     yr_idx = yr_cal - data_input.YR_CAL_BASE
         
@@ -820,7 +820,7 @@ def write_biodiversity(sim, yr_cal, path, timestamp):
     # Change the input data to bdata if yr_cal is the base year
     # This is to ensure the calculation for base year is under RESCACTRO=1
     # nomatter what the RESFACTOR is set in the settings.py
-    data_input = bdata if yr_cal == bdata.YR_CAL_BASE else bdata
+    data_input = bdata if yr_cal == bdata.YR_CAL_BASE else sim.data
 
     yr_idx = yr_cal - data_input.YR_CAL_BASE
 
@@ -862,7 +862,7 @@ def write_ghg_separate(sim, yr_cal, path, timestamp):
     # Change the input data to bdata if yr_cal is the base year
     # This is to ensure the calculation for base year is under RESCACTRO=1
     # nomatter what the RESFACTOR is set in the settings.py
-    data_input = bdata if yr_cal == bdata.YR_CAL_BASE else bdata
+    data_input = bdata if yr_cal == bdata.YR_CAL_BASE else sim.data
         
     # Convert calendar year to year index.
     yr_idx = yr_cal - data_input.YR_CAL_BASE
