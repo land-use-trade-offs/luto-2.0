@@ -858,7 +858,7 @@ def write_ghg_separate(sim, yr_cal, path, timestamp):
     # Append the yr_cal to timestamp as prefix
     timestamp = str(yr_cal) + '_' + timestamp
     
-    print(f'Writing GHG emissions_Separate from agricultural and non-agricultural landuse to {path}')
+    print(f'Writing GHG emissions_Separate to {path}')
     
     # Change the input data to bdata if yr_cal is the base year
     # This is to ensure the calculation for base year is under RESCACTRO=1
