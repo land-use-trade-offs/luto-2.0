@@ -78,8 +78,8 @@ def get_ghg_crop( data     # Data object or module.
         # Convert tonnes CO2 per ha to tonnes CO2 per cell including resfactor
         ghg_rs *= data.REAL_AREA[:, np.newaxis]
         
-        # Add the origin (Crop) to the df.columns. Convert to MultiIndex with levels [origin, source, lm, lu]
-        ghg_rs.columns = pd.MultiIndex.from_tuples([['crop', col[0], lm, lu] for col in ghg_rs.columns])
+        # Convert to MultiIndex with levels [source, lm, lu]
+        ghg_rs.columns = pd.MultiIndex.from_tuples([[col[0], lm, lu] for col in ghg_rs.columns])
         
         # Reset the dataframe index
         ghg_rs.reset_index(drop = True, inplace = True)
@@ -149,9 +149,9 @@ def get_ghg_lvstk( data        # Data object or module.
     # Convert to tonnes CO2e per cell including resfactor
     ghg_rs *= data.REAL_AREA[:, np.newaxis]
 
-    # Add the origin (lvstk) to df.columns
+    # Convert to MultiIndex with levels [source, lm, lu]
     ghg_rs = pd.DataFrame(ghg_rs)
-    ghg_rs.columns = pd.MultiIndex.from_tuples([ ['lvstk', ghg, lm, lu] + [] for ghg in ghg_name_s ])
+    ghg_rs.columns = pd.MultiIndex.from_tuples( [(ghg, lm, lu) for ghg in ghg_name_s ])
 
     # Reset dataframe index
     ghg_rs.reset_index(drop = True, inplace = True)
@@ -188,12 +188,12 @@ def get_ghg( data    # Data object or module.
     
     # If neither crop nor livestock but in LANDUSES it is unallocated land.
     # Unallocated land has no GHG emissions. So here create a df with zeros.
-    # The 'CO2E_KG_HA_CHEM_APPL' is chosen arbitrarily.
+    # The '('CO2E_KG_HA_CHEM_APPL', lm, lu)' is just used as a place holder.
     elif lu in data.AGRICULTURAL_LANDUSES:
         if aggregate:
             return np.zeros(data.NCELLS)
         else:
-            return pd.DataFrame({('lvstk', 'CO2E_KG_HA_CHEM_APPL', lm, lu):np.zeros(data.NCELLS)})
+            return pd.DataFrame({('CO2E_KG_HA_CHEM_APPL', lm, lu):np.zeros(data.NCELLS)})
     
     # If it is none of the above, it is not known how to get the GHG emissions.
     else:
@@ -242,7 +242,7 @@ def get_ghg_transition_penalties(data, lumap) -> np.ndarray:
     unnatural land. The penalty represents the carbon that is emitted when
     clearing natural land.
     """
-    _, ncells, n_ag_lus = data.AG_L_MRJ.shape
+    ncells, n_ag_lus = data.REAL_AREA.shape[0], len(data.AGRICULTURAL_LANDUSES)
     # Set up empty array of penalties
     penalties_rj = np.zeros((ncells, n_ag_lus), dtype=np.float32)
     natural_lu_cells = tools.get_natural_lu_cells(data, lumap)
