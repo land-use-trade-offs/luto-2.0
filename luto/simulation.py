@@ -314,7 +314,7 @@ def get_ag_man_water(ag_w_mrj):
 
 def get_ag_man_biodiversity(ag_b_mrj):
     print('Getting agricultural management options\' biodiversity effects...', end = ' ', flush = True)
-    output = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data, ag_b_mrj)
+    output = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data)
     print('Done.')
     return output
 
