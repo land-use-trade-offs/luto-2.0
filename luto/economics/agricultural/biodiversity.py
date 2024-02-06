@@ -8,7 +8,7 @@ import numpy as np
 from luto import settings
 
 
-def get_non_penalty_land_uses(data):
+def get_non_penalty_land_uses(data) -> list[int]:
     """
     Return a list of land uses that contribute to biodiversity output without penalty.
     """
@@ -61,7 +61,7 @@ def get_ecological_grazing_effect_b_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
 
 
-def get_agricultural_management_biodiversity_matrices(data, b_mrj: np.ndarray):
+def get_agricultural_management_biodiversity_matrices(data):
     asparagopsis_data = get_asparagopsis_effect_b_mrj(data)
     precision_agriculture_data = get_precision_agriculture_effect_b_mrj(data)
     eco_grazing_data = get_ecological_grazing_effect_b_mrj(data)

@@ -40,6 +40,7 @@ import luto.economics.non_agricultural.ghg as non_ag_ghg
 import luto.economics.agricultural.revenue as ag_revenue
 import luto.economics.agricultural.cost as ag_cost
 import luto.economics.agricultural.biodiversity as ag_biodiversity
+import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
@@ -653,16 +654,16 @@ def write_water(sim, yr_cal, path, timestamp):
 
     # Set up data for river regions or drainage divisions
     if settings.WATER_REGION_DEF == 'RR':
-        region_limits = bdata.RIVREG_LIMITS
-        region_id = bdata.RIVREG_ID
+        region_limits = data_input.RIVREG_LIMITS
+        region_id = data_input.RIVREG_ID
         # regions = settings.WATER_RIVREGS
-        region_dict = bdata.RIVREG_DICT
+        region_dict = data_input.RIVREG_DICT
         
     elif settings.WATER_REGION_DEF == 'DD':
-        region_limits = bdata.DRAINDIV_LIMITS
-        region_id = bdata.DRAINDIV_ID
+        region_limits = data_input.DRAINDIV_LIMITS
+        region_id = data_input.DRAINDIV_ID
         # regions = settings.WATER_DRAINDIVS
-        region_dict = bdata.DRAINDIV_DICT
+        region_dict = data_input.DRAINDIV_DICT
         
     else: print('Incorrect option for WATER_REGION_DEF in settings')
 
@@ -844,84 +845,127 @@ def write_biodiversity(sim, yr_cal, path, timestamp):
     
     # Save to file
     df.to_csv(os.path.join(path, f'biodiversity_{timestamp}.csv'), index = False)
+    
+    
+# def write_biodiversity_separate(sim, yr_cal, path, timestamp):
+    
+#     # Append the yr_cal to timestamp as prefix
+#     timestamp = str(yr_cal) + '_' + timestamp
+    
+#     print('Writing biodiversity_separate outputs to', path)
+    
+#     # Change the input data to bdata if yr_cal is the base year
+#     # This is to ensure the calculation for base year is under RESCACTRO=1
+#     # nomatter what the RESFACTOR is set in the settings.py
+#     data_input = bdata if yr_cal == bdata.YR_CAL_BASE else sim.data
+    
+#     # Get the biodiversity scores b_mrj
+#     ag_biodiv_mrj = ag_biodiversity.get_breq_matrices(data_input)
+#     am_biodiv_mrj = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data_input)
+#     non_ag_biodiv_rk = non_ag_biodiversity.get_breq_matrix(data_input)
+    
+#     # Get the decision variables for the year
+#     ag_dvar_mrj = sim.ag_dvars[yr_cal]
+#     ag_mam_dvar_mrj =  sim.ag_man_dvars[yr_cal]
+#     non_ag_dvar_rk = sim.non_ag_dvars[yr_cal]
+    
+#     # Multiply the decision variables with the biodiversity scores
+#     ag_biodiv_mj = np.einsum('mrj,mrj -> mj', ag_biodiv_mrj, ag_dvar_mrj)
+#     non_ag_biodiv_k = np.einsum('mrj,rk -> k', non_ag_biodiv_rk, non_ag_dvar_rk)
+    
+#     # Agricultural management water use
+#     AM_dfs = []
+#     for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
 
+#         am_j = np.array([data_input.DESC2AGLU[lu] for lu in am_lus])
+        
+#         # Water requirements for each agricultural management in array format
+#         am_mrj = ag_man_w_mrj[am][:, ind, :]\
+#                         * sim.ag_man_dvars[yr_cal][am][:, ind[:,np.newaxis], am_j] 
+                        
+#         am_jm = np.einsum('mrj->jm', am_mrj)
+        
+#         # Water requirements for each agricultural management in long dataframe format
+#         df_am = pd.DataFrame(am_jm.reshape(-1).tolist(),
+#                             index=pd.MultiIndex.from_product([['Agricultural Management'],
+#                                                             am_lus,
+#                                                             data_input.LANDMANS
+#                                                             ])).reset_index()
+#         df_am.columns = index_levels
+        
+#         # Add to list of dataframes
+#         AM_dfs.append(df_am)
+        
+#     # Combine all AM dataframes
+#     AM_df = pd.concat(AM_dfs)
+    
+    
+    
+    
+    
   
 def write_ghg_separate(sim, yr_cal, path, timestamp):
 
-    # Notation explain
-    #       r: The pixel/row dimens. 
-    #       j: The landuse 
-    #       k: The non-agricultural landuse
-    #       m: Land management [dry, irri]
-    #       s: The sources of origin. Such as [Chemical_CO2, Electric_CO2] for {Agricultural landuse},
 
     # Append the yr_cal to timestamp as prefix
     timestamp = str(yr_cal) + '_' + timestamp
-    
+
     print(f'Writing GHG emissions_Separate to {path}')
-    
+
     # Change the input data to bdata if yr_cal is the base year
     # This is to ensure the calculation for base year is under RESCACTRO=1
     # nomatter what the RESFACTOR is set in the settings.py
     data_input = bdata if yr_cal == bdata.YR_CAL_BASE else sim.data
+    lumap = bdata.LUMAP if yr_cal == bdata.YR_CAL_BASE else sim.lumaps[yr_cal]
         
     # Convert calendar year to year index.
     yr_idx = yr_cal - data_input.YR_CAL_BASE
-    
+
     # Get the landuse descriptions for each validate cell (i.e., 0 -> Apples)
     lu_desc_map = {**data_input.AGLU2DESC,**data_input.NONAGLU2DESC}
-    lu_desc = [lu_desc_map[x] for x in sim.lumaps[yr_cal]]
+    lu_desc = [lu_desc_map[x] for x in lumap]
 
     # -------------------------------------------------------#
     # Get greenhouse gas emissions from agricultural landuse #
     # -------------------------------------------------------#
 
-    # 1-1) Get the ghg_df
-    ag_g_df = ag_ghg.get_ghg_matrices(data_input, yr_idx, aggregate=False) 
+    # Get the ghg_df
+    ag_g_df = ag_ghg.get_ghg_matrices(data_input, yr_idx, aggregate=False)
 
-    # Expand the original df with zero values to convert it to a a **mrj** array
-    origin_type = ag_g_df.columns.levels[0] 
-    ghg_sources = ag_g_df.columns.levels[1]
-    lm_type = data_input.LANDMANS
-    lu_type = data_input.AGRICULTURAL_LANDUSES
-
-    df_col_product = list( product(*[origin_type, ghg_sources, lm_type, lu_type]) )
-
-    ag_g_df = ag_g_df.reindex(columns=df_col_product, fill_value=0)
-
-
-    # Reshape the df to the shape of [rosmj]
+    # Expand the original df with zero values to convert it to a **rosmj** array
     #       r: row, i.e, each valid pixel
-    #       o: origin, i.e, each origin [crop, lvstk, unallocated]
     #       s: GHG source [chemical fertilizer, electricity, ...]
     #       m: land management: [dry,irr]
     #       j: land use [Apples, Beef, ...]
-    ag_g_df = ag_g_df.to_numpy(na_value=0).reshape(ag_g_df.shape[0], *ag_g_df.columns.levshape)  
-                                                                                
-    # 1-2) Get the ag_g_mrjs, which will be used to compute GHG_agricultural_landuse
-    ag_g_mrjs = np.einsum('rosmj -> mrjs', ag_g_df)                                     # mrjs
+    ag_g_df_rsmj = np.zeros([ag_g_df.shape[0]] + list(ag_g_df.columns.levshape), dtype=np.float32)
 
-    # 1-3) Get the ag_g_mrj, which will be used to compute GHG_agricultural_management
-    ag_g_mrj = np.einsum('mrjs -> mrj', ag_g_mrjs)                                      # mrj
-
+    for col in ag_g_df.columns:
+        s,m,j = [ag_g_df.columns.levels[i].get_loc(col[i]) for i in range(len(col))]
+        ag_g_df_rsmj[:,s,m,j] = ag_g_df.loc[slice(None), col]
+        
+    # Replace NAN with 0
+    ag_g_df_rsmj = np.nan_to_num(ag_g_df_rsmj)
+                                
+    # Get the ag_g_mrj, which will be used to compute GHG_agricultural_management
+    ag_g_mrj = np.einsum('rsmj -> mrj', ag_g_df_rsmj)                                       # mrj
 
     # Use einsum to do the multiplication, 
     # easy to understand, don't need to worry too much about the dimensionality
-    ag_dvar_mrj = sim.ag_dvars[yr_cal]                                                  # mrj
-    GHG_emission_separate = np.einsum('mrjs,mrj -> rms', ag_g_mrjs, ag_dvar_mrj)        # rms
-
+    ag_dvar_mrj = sim.ag_dvars[yr_cal]                                                      # mrj
+    GHG_emission_separate = np.einsum('rsmj,mrj -> rms', ag_g_df_rsmj, ag_dvar_mrj)         # rms
 
     # Summarize the array as a df
     GHG_emission_separate_summary = tools.summarize_ghg_separate_df(
         GHG_emission_separate,
-        (['Agricultural Landuse'], lm_type, ghg_sources),
-         lu_desc
+        (['Agricultural Landuse'], data_input.LANDMANS, ag_g_df.columns.levels[0]),
+            lu_desc
     )
 
     # Change "KG_HA/HEAD" to "TCO2E"
     column_rename = [(i[0],i[1],i[2].replace('CO2E_KG_HA','TCO2E')) for i in GHG_emission_separate_summary.columns]
     column_rename = [(i[0],i[1],i[2].replace('CO2E_KG_HEAD','TCO2E')) for i in column_rename]
     GHG_emission_separate_summary.columns = pd.MultiIndex.from_tuples(column_rename)
+                                              
 
     # Save table to disk
     GHG_emission_separate_summary.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_landuse_{timestamp}.csv'))
