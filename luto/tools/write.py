@@ -109,6 +109,11 @@ def write_outputs(sim, path, timestamp):
     #                     Create raw outputs                      #
     ###############################################################
     
+    # Write the area transition between base-year and target-year 
+    write_area_trainsition_start_end(sim, 
+                                     timestamp, 
+                                     f'{path}/begin_end_compare_{years[0]}_{years[-1]}/out_{years[-1]}')
+    
     # Write outputs for each year
     for idx,(yr, path_yr) in enumerate(zip(years, paths)):
         write_output_single_year(sim, yr, path_yr, timestamp, yr_cal_sim_pre=None)
@@ -534,6 +539,47 @@ def write_dvar_area(sim, yr_cal, path, timestamp):
     df_am_area.to_csv(os.path.join(path, f'area_agricultural_management_{timestamp}.csv'), index = False)
 
 
+def write_area_trainsition_start_end(sim, timestamp, path):
+    
+    print(f'Save transition matrix for start year to end year to {path}\n')
+    
+    # Get all years from sim
+    years = sorted(sim.ag_dvars.keys())
+
+    # Get the end year
+    yr_cal_end = years[-1]
+
+    # Get the decision variables for the start year
+    dvar_base = sim.ag_dvars[sim.data.YR_CAL_BASE]
+
+    # Apply MASK to the decision variables for the start year
+    # to keep it the same size as the rest years
+    dvar_base = dvar_base[:,sim.data.MASK,]
+
+    # Calculate the transition matrix for agricultural land uses (start) to agricultural land uses (end)
+    transitions_ag2ag = []
+    for lu_idx, lu in enumerate(sim.data.AGRICULTURAL_LANDUSES):
+        dvar_target = sim.ag_dvars[yr_cal_end][:,:,lu_idx]
+        trans = np.einsum('mrj, mr, r -> j', dvar_base, dvar_target, sim.data.REAL_AREA)
+        trans_df = pd.DataFrame({lu:trans.flatten()}, index=sim.data.AGRICULTURAL_LANDUSES)
+        transitions_ag2ag.append(trans_df)
+    transition_ag2ag = pd.concat(transitions_ag2ag, axis=1)
+
+    # Calculate the transition matrix for agricultural land uses (start) to non-agricultural land uses (end)
+    trainsitions_ag2non_ag = []
+    for lu_idx, lu in enumerate(sim.data.NON_AGRICULTURAL_LANDUSES):
+        dvar_target = sim.non_ag_dvars[yr_cal_end][:,lu_idx]
+        trans = np.einsum('mrj, r, r -> j', dvar_base, dvar_target, sim.data.REAL_AREA)
+        trans_df = pd.DataFrame({lu:trans.flatten()}, index=sim.data.AGRICULTURAL_LANDUSES)
+        trainsitions_ag2non_ag.append(trans_df)
+    transition_ag2non_ag = pd.concat(trainsitions_ag2non_ag, axis=1)
+
+    # Concatenate the two transition matrices
+    transition = pd.concat([transition_ag2ag, transition_ag2non_ag], axis=1)
+    
+    # Write the transition matrix to a csv file
+    transition.to_csv(os.path.join(path, f'transition_matrix_{sim.data.YR_CAL_BASE}_{yr_cal_end}_{timestamp}.csv'))
+
 def write_crosstab(sim, yr_cal, path, timestamp, yr_cal_sim_pre=None): 
     """Write out land-use and production data"""
     
@@ -847,59 +893,83 @@ def write_biodiversity(sim, yr_cal, path, timestamp):
     df.to_csv(os.path.join(path, f'biodiversity_{timestamp}.csv'), index = False)
     
     
-# def write_biodiversity_separate(sim, yr_cal, path, timestamp):
+def write_biodiversity_separate(sim, yr_cal, path, timestamp):
     
-#     # Append the yr_cal to timestamp as prefix
-#     timestamp = str(yr_cal) + '_' + timestamp
-    
-#     print('Writing biodiversity_separate outputs to', path)
-    
-#     # Change the input data to bdata if yr_cal is the base year
-#     # This is to ensure the calculation for base year is under RESCACTRO=1
-#     # nomatter what the RESFACTOR is set in the settings.py
-#     data_input = bdata if yr_cal == bdata.YR_CAL_BASE else sim.data
-    
-#     # Get the biodiversity scores b_mrj
-#     ag_biodiv_mrj = ag_biodiversity.get_breq_matrices(data_input)
-#     am_biodiv_mrj = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data_input)
-#     non_ag_biodiv_rk = non_ag_biodiversity.get_breq_matrix(data_input)
-    
-#     # Get the decision variables for the year
-#     ag_dvar_mrj = sim.ag_dvars[yr_cal]
-#     ag_mam_dvar_mrj =  sim.ag_man_dvars[yr_cal]
-#     non_ag_dvar_rk = sim.non_ag_dvars[yr_cal]
-    
-#     # Multiply the decision variables with the biodiversity scores
-#     ag_biodiv_mj = np.einsum('mrj,mrj -> mj', ag_biodiv_mrj, ag_dvar_mrj)
-#     non_ag_biodiv_k = np.einsum('mrj,rk -> k', non_ag_biodiv_rk, non_ag_dvar_rk)
-    
-#     # Agricultural management water use
-#     AM_dfs = []
-#     for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
+    # Append the yr_cal to timestamp as prefix
+    timestamp = str(yr_cal) + '_' + timestamp
 
-#         am_j = np.array([data_input.DESC2AGLU[lu] for lu in am_lus])
+    print('Writing biodiversity_separate outputs to', path)
+
+    # Change the input data to bdata if yr_cal is the base year
+    # This is to ensure the calculation for base year is under RESCACTRO=1
+    # nomatter what the RESFACTOR is set in the settings.py
+    data_input = bdata if yr_cal == bdata.YR_CAL_BASE else sim.data
+
+    # Get the biodiversity scores b_mrj
+    ag_biodiv_mrj = ag_biodiversity.get_breq_matrices(data_input)
+    am_biodiv_mrj = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data_input)
+    non_ag_biodiv_rk = non_ag_biodiversity.get_breq_matrix(data_input)
+
+    # Get the decision variables for the year
+    ag_dvar_mrj = sim.ag_dvars[yr_cal]
+    ag_mam_dvar_mrj =  sim.ag_man_dvars[yr_cal]
+    non_ag_dvar_rk = sim.non_ag_dvars[yr_cal]
+
+    # Multiply the decision variables with the biodiversity scores
+    ag_biodiv_mj = np.einsum('mrj,mrj -> mj', ag_biodiv_mrj, ag_dvar_mrj)
+    non_ag_biodiv_k = np.einsum('rk,rk -> k', non_ag_biodiv_rk, non_ag_dvar_rk)
+
+    # Get the biodiversity scores for agricultural landuse
+    AG_df = pd.DataFrame(ag_biodiv_mj.reshape(-1),
+                        index=pd.MultiIndex.from_product([['Agricultural Landuse'],
+                                                        ['Agricultural Landuse'],
+                                                        data_input.AGRICULTURAL_LANDUSES,
+                                                        data_input.LANDMANS,
+                                                        ])).reset_index()
+
+    # Get the biodiversity scores for non-agricultural landuse
+    NON_AG_df = pd.DataFrame(non_ag_biodiv_k.reshape(-1),
+                            index=pd.MultiIndex.from_product([['Non-Agricultural Landuse'],
+                                                            ['Non-Agricultural Landuse'],
+                                                            data_input.NON_AGRICULTURAL_LANDUSES,
+                                                            ['dry'],
+                                                            ])).reset_index()
+
+    # Get the biodiversity scores for agricultural management
+    AM_dfs = []
+    for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
         
-#         # Water requirements for each agricultural management in array format
-#         am_mrj = ag_man_w_mrj[am][:, ind, :]\
-#                         * sim.ag_man_dvars[yr_cal][am][:, ind[:,np.newaxis], am_j] 
-                        
-#         am_jm = np.einsum('mrj->jm', am_mrj)
+        # Slice the arrays with the agricultural management land uses
+        am_j = np.array([data_input.DESC2AGLU[lu] for lu in am_lus])
+        am_dvar = ag_mam_dvar_mrj[am][:,:,am_j]
+        am_biodiv = am_biodiv_mrj[am][:,:,am_j]
         
-#         # Water requirements for each agricultural management in long dataframe format
-#         df_am = pd.DataFrame(am_jm.reshape(-1).tolist(),
-#                             index=pd.MultiIndex.from_product([['Agricultural Management'],
-#                                                             am_lus,
-#                                                             data_input.LANDMANS
-#                                                             ])).reset_index()
-#         df_am.columns = index_levels
+        # Biodiversity score for each agricultural management in array format                    
+        am_jm = np.einsum('mrj,mrj -> jm', am_dvar, am_biodiv)
         
-#         # Add to list of dataframes
-#         AM_dfs.append(df_am)
+        # Water requirements for each agricultural management in long dataframe format
+        df_am = pd.DataFrame(am_jm.reshape(-1),
+                            index=pd.MultiIndex.from_product([['Agricultural Management'],
+                                                            [am],
+                                                            am_lus,
+                                                            data_input.LANDMANS
+                                                            ])).reset_index()
+
         
-#     # Combine all AM dataframes
-#     AM_df = pd.concat(AM_dfs)
-    
-    
+        # Add to list of dataframes
+        AM_dfs.append(df_am)
+        
+    # Combine all AM dataframes
+    AM_df = pd.concat(AM_dfs)
+
+
+    # Combine all dataframes
+    biodiv_df = pd.concat([AG_df, NON_AG_df, AM_df])
+    biodiv_df.columns = ['Landuse type','Landuse subtype', 'Landuse', 'Land management', 'Biodiversity score']
+    biodiv_df.insert(0, 'Year', yr_cal)
+
+    # Write to file
+    biodiv_df.to_csv(os.path.join(path, 'biodiversity_separate_' + timestamp + '.csv'), index=False)    
     
     
     

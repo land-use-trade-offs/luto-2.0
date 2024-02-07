@@ -28,6 +28,7 @@ def extract_dtype_from_path(path):
             'water':['water'],
             'cross_table':['crosstab','switches'],
             'area':['area'],
+            'transition_matrix':['transition_matrix'],
             'quantity':['quantity'],
             'revenue':['revenue'],
             'cost':['cost'],
@@ -37,16 +38,24 @@ def extract_dtype_from_path(path):
             'lumap':['lumap'],
             'lmmap':['lmmap'],
             # Individual maps
-            'lumap_separate':['Ag_LU', 'Ag_Mgt', 'Land_Mgt', 'Non-Ag_LU'],
+            'lucc_separate':['Ag_LU', 'Ag_Mgt', 'Land_Mgt', 'Non-Ag_LU'],
             }
     
-    if not 'lucc_separate' in path:
-        # Get the key if the file path contains the file pattern
-        for ftype, fpat in f_cat.items():
-            if any(re.compile(fr'^{i}').search(os.path.basename(path)) for i in fpat): break
-    else:
-        luseperate_suffix = re.compile(r'lucc_separate(/|\\)(.*)_\d').findall(path)[0][1]
-        ftype = f'lumap_separate'
+    # Get the base name of the file path
+    base_name = os.path.basename(path)
+    
+    # Check the file type
+    for ftype, fpat in f_cat.items():
+        
+        search_result = []
+        for pat in fpat:
+            # Registry of chekcing the start of the base name
+            reg = re.compile(fr'^{pat}')
+            search_result.append(bool(reg.search(base_name)))
+        
+        # If any of the patterns are found, break the loop
+        if any(search_result): break
+
 
     # Check if this comes from the begin_end_compare folder
     if 'begin_end_compare' in path:

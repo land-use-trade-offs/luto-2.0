@@ -79,4 +79,4 @@ for idx,row in html_df.iterrows():
 #              Report success info                      #
 #########################################################
 
-print('\n Report html created successfully!! \n')
+print('\n Report html created successfully!!\n')
