@@ -245,13 +245,27 @@ am_dvar_area_lu_wide.to_csv(f'{SAVE_DIR}/area_5_am_lu_area_wide.csv', index=Fals
 
 
 # Plot_3-6/7: Area (km2) by Land use
-begin_end_df_area, begin_end_df_pct = get_begin_end_df(files)
+transition_path = files.query('category =="transition_matrix"')
 
-heat_area = begin_end_df_area.style.background_gradient(cmap='Oranges', axis=1).format('{:,.0f}')
-heat_pct = begin_end_df_pct.style.background_gradient(cmap='Oranges', axis=1).format('{:,.0f}%')
+# Read the transition matrix (Area (ha))
+transition_df = pd.read_csv(transition_path['path'].values[0], index_col=0)
+
+# Convert the transition matrix to km2
+transition_df_area = transition_df / 100 
+
+# Get the total area of each land use
+total_area = transition_df_area.sum(axis=0).values
+
+# Calculate the percentage of each land use
+transition_df_pct = transition_df_area / total_area * 100
+transition_df_pct = transition_df_pct.fillna(0)
+
+
+heat_area = transition_df_area.style.background_gradient(cmap='Oranges', axis=1).format('{:,.0f}')
+heat_pct = transition_df_pct.style.background_gradient(cmap='Oranges', axis=1).format('{:,.0f}')
 
 # Define the style
-style = "<style>table, th, td {font-size: 9px;}</style>\n"
+style = "<style>table, th, td {font-size: 8.5px;}</style>\n"
 
 # Add the style to the HTML
 heat_area_html = style + heat_area.to_html()

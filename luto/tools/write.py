@@ -109,6 +109,11 @@ def write_outputs(sim, path, timestamp):
     #                     Create raw outputs                      #
     ###############################################################
     
+    # Write the area transition between base-year and target-year 
+    write_area_trainsition_start_end(sim, 
+                                     timestamp, 
+                                     f'{path}/begin_end_compare_{years[0]}_{years[-1]}/out_{years[-1]}')
+    
     # Write outputs for each year
     for idx,(yr, path_yr) in enumerate(zip(years, paths)):
         write_output_single_year(sim, yr, path_yr, timestamp, yr_cal_sim_pre=None)
@@ -534,6 +539,47 @@ def write_dvar_area(sim, yr_cal, path, timestamp):
     df_am_area.to_csv(os.path.join(path, f'area_agricultural_management_{timestamp}.csv'), index = False)
 
 
+def write_area_trainsition_start_end(sim, timestamp, path):
+    
+    print(f'Save transition matrix for start year to end year to {path}\n')
+    
+    # Get all years from sim
+    years = sorted(sim.ag_dvars.keys())
+
+    # Get the end year
+    yr_cal_end = years[-1]
+
+    # Get the decision variables for the start year
+    dvar_base = sim.ag_dvars[sim.data.YR_CAL_BASE]
+
+    # Apply MASK to the decision variables for the start year
+    # to keep it the same size as the rest years
+    dvar_base = dvar_base[:,sim.data.MASK,]
+
+    # Calculate the transition matrix for agricultural land uses (start) to agricultural land uses (end)
+    transitions_ag2ag = []
+    for lu_idx, lu in enumerate(sim.data.AGRICULTURAL_LANDUSES):
+        dvar_target = sim.ag_dvars[yr_cal_end][:,:,lu_idx]
+        trans = np.einsum('mrj, mr, r -> j', dvar_base, dvar_target, sim.data.REAL_AREA)
+        trans_df = pd.DataFrame({lu:trans.flatten()}, index=sim.data.AGRICULTURAL_LANDUSES)
+        transitions_ag2ag.append(trans_df)
+    transition_ag2ag = pd.concat(transitions_ag2ag, axis=1)
+
+    # Calculate the transition matrix for agricultural land uses (start) to non-agricultural land uses (end)
+    trainsitions_ag2non_ag = []
+    for lu_idx, lu in enumerate(sim.data.NON_AGRICULTURAL_LANDUSES):
+        dvar_target = sim.non_ag_dvars[yr_cal_end][:,lu_idx]
+        trans = np.einsum('mrj, r, r -> j', dvar_base, dvar_target, sim.data.REAL_AREA)
+        trans_df = pd.DataFrame({lu:trans.flatten()}, index=sim.data.AGRICULTURAL_LANDUSES)
+        trainsitions_ag2non_ag.append(trans_df)
+    transition_ag2non_ag = pd.concat(trainsitions_ag2non_ag, axis=1)
+
+    # Concatenate the two transition matrices
+    transition = pd.concat([transition_ag2ag, transition_ag2non_ag], axis=1)
+    
+    # Write the transition matrix to a csv file
+    transition.to_csv(os.path.join(path, f'transition_matrix_{sim.data.YR_CAL_BASE}_{yr_cal_end}_{timestamp}.csv'))
+
 def write_crosstab(sim, yr_cal, path, timestamp, yr_cal_sim_pre=None): 
     """Write out land-use and production data"""
     
@@ -923,9 +969,7 @@ def write_biodiversity_separate(sim, yr_cal, path, timestamp):
     biodiv_df.insert(0, 'Year', yr_cal)
 
     # Write to file
-    biodiv_df.to_csv(os.path.join(path, 'biodiversity_separate_' + timestamp + '.csv'), index=False)
-    
-    
+    biodiv_df.to_csv(os.path.join(path, 'biodiversity_separate_' + timestamp + '.csv'), index=False)    
     
     
     
