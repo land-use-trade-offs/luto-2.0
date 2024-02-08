@@ -1027,12 +1027,12 @@ def write_ghg_separate(sim, yr_cal, path, timestamp):
     ghg_df.columns = ['Source','Water','Landuse','GHG Emissions (t)']
 
     # Pivot the dataframe
-    ghg_df = ghg_df.pivot(index='Landuse', columns=['Source','Water'], values='GHG Emissions (t)')
+    ghg_df = ghg_df.pivot(index='Landuse', columns=['Water','Source'], values='GHG Emissions (t)')
 
     # Rename the columns
     ghg_df.columns = pd.MultiIndex.from_tuples([['Agricultural Landuse'] + list(col) for col in ghg_df.columns])
-    column_rename = [(i[0],i[1].replace('CO2E_KG_HA','TCO2E'),i[2]) for i in ghg_df.columns]
-    column_rename = [(i[0],i[1].replace('CO2E_KG_HEAD','TCO2E'),i[2]) for i in column_rename]
+    column_rename = [(i[0],i[1],i[2].replace('CO2E_KG_HA','TCO2E')) for i in ghg_df.columns]
+    column_rename = [(i[0],i[1],i[2].replace('CO2E_KG_HEAD','TCO2E')) for i in column_rename]
     ghg_df.columns = pd.MultiIndex.from_tuples(column_rename)
     
     

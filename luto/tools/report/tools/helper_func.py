@@ -126,25 +126,6 @@ def merge_LVSTK_UAALLOW(df):
     return pd.concat([df_crop,df_non_ag,df_lvstk,df_unallow]).reset_index(drop=True)
 
 
-def get_xy_data(df):
-    
-    """
-    This function is used to convert the wide dataframe into long dataframe
-
-    Parameters:
-    df (pandas.DataFrame): The input dataframe.
-
-    Returns:
-    pandas.DataFrame: The output dataframe containing the data for different types of land use.
-    """
-    
-    val_xy = []
-    for col in range(len(df.columns)):
-        for row in range(len(df)):
-            val_xy.append([col, len(df) - row, df.iloc[row,col]])
-
-    return pd.DataFrame(val_xy)
-
 
 def get_GHG_file_df(all_files_df):
         
@@ -207,8 +188,7 @@ def add_crop_lvstk_to_df(all_files,GHG_type):
     pandas.DataFrame: The dataframe containing the GHG data for the given GHG type.
     """
 
-    # Read GHG emissions of ag lucc
-    
+    # Read GHG emissions of ag lucc 
     GHG_files = get_GHG_subsector_files(all_files, GHG_type)
     
     CSVs = []
@@ -259,7 +239,7 @@ def add_crop_lvstk_to_df(all_files,GHG_type):
     return GHG_df
 
 
-def read_GHG_to_long(all_files,GHG_type):
+def read_GHG_to_long(all_files, GHG_type):
     
     """
     This function is used to convert the GHG data into long format.
@@ -277,9 +257,9 @@ def read_GHG_to_long(all_files,GHG_type):
     # Define the index levels
     idx_level_name = ['Year','Land use','Land category','Land use category']
 
-    # remove the first level in the multiindex columns
+    # Remove the first level in the multiindex columns
     GHG_df_long = GHG_df.copy()
-    GHG_df_long = GHG_df_long.droplevel(0,axis=1)
+    GHG_df_long = GHG_df_long.droplevel(0, axis=1)
 
     # Squeeze the multiindex columns into a single concatenated by "+"
     GHG_df_long.columns = ["+".join(i) for i in GHG_df_long.columns.tolist()]
@@ -307,7 +287,7 @@ def read_GHG_to_long(all_files,GHG_type):
     return GHG_df_long
 
 
-def get_GHG_category(all_files,GHG_type):
+def get_GHG_category(all_files, GHG_type):
     
     """
     This function is used to get the GHG data for the given GHG type.
@@ -320,7 +300,7 @@ def get_GHG_category(all_files,GHG_type):
     pandas.DataFrame: The dataframe containing the GHG data for the given GHG type.
     """
     
-    GHG_df_long = read_GHG_to_long(all_files,GHG_type)
+    GHG_df_long = read_GHG_to_long(all_files, GHG_type)
 
     # 1) get CO2 GHG
     GHG_CO2 = GHG_df_long.query('~Sources.isin(@GHG_CATEGORY.keys())').copy()
