@@ -921,11 +921,11 @@ def write_biodiversity_separate(sim, yr_cal, path, timestamp):
     non_ag_dvar_rk = sim.non_ag_dvars[yr_cal]
 
     # Multiply the decision variables with the biodiversity scores
-    ag_biodiv_mj = np.einsum('mrj,mrj -> mj', ag_biodiv_mrj, ag_dvar_mrj)
+    ag_biodiv_jm = np.einsum('mrj,mrj -> jm', ag_biodiv_mrj, ag_dvar_mrj)
     non_ag_biodiv_k = np.einsum('rk,rk -> k', non_ag_biodiv_rk, non_ag_dvar_rk)
 
     # Get the biodiversity scores for agricultural landuse
-    AG_df = pd.DataFrame(ag_biodiv_mj.reshape(-1),
+    AG_df = pd.DataFrame(ag_biodiv_jm.reshape(-1),
                         index=pd.MultiIndex.from_product([['Agricultural Landuse'],
                                                         ['Agricultural Landuse'],
                                                         data_input.AGRICULTURAL_LANDUSES,

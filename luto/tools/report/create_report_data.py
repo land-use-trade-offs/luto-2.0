@@ -16,7 +16,7 @@ from tools.helper_func import get_GHG_category, get_GHG_file_df,\
                               
 
                                                      
-from tools.parameters import LU_LVSTKS, YR_BASE, COMMODITIES_ALL
+from tools.parameters import LU_LVSTKS, YR_BASE, COMMODITIES_ALL, LANDUSE_ALL
 
 
 # setting up working directory to root dir
@@ -254,7 +254,7 @@ transition_df = pd.read_csv(transition_path['path'].values[0], index_col=0)
 transition_df_area = transition_df / 100 
 
 # Get the total area of each land use
-total_area = transition_df_area.sum(axis=0).values
+total_area = transition_df_area.sum(axis=1).values.reshape(-1,1)
 
 # Calculate the percentage of each land use
 transition_df_pct = transition_df_area / total_area * 100
@@ -262,10 +262,11 @@ transition_df_pct = transition_df_pct.fillna(0)
 
 
 heat_area = transition_df_area.style.background_gradient(cmap='Oranges', axis=1).format('{:,.0f}')
-heat_pct = transition_df_pct.style.background_gradient(cmap='Oranges', axis=1).format('{:,.0f}')
+heat_pct = transition_df_pct.style.background_gradient(cmap='Oranges', axis=1).format('{:,.2f}')
 
 # Define the style
-style = "<style>table, th, td {font-size: 8.5px;}</style>\n"
+style = "<style>table, th, td {font-size: 8.5px;} </style>\n"
+style = style + "<style>td {text-align: right;;} </style>\n"
 
 # Add the style to the HTML
 heat_area_html = style + heat_area.to_html()
@@ -437,6 +438,35 @@ water_df_seperate_lu_wide.to_csv(f'{SAVE_DIR}/water_4_volum_by_landuse.csv',inde
 water_df_seperate_irr = water_df_separate.groupby(['year','Irrigation']).sum()[['Water Use (ML)']].reset_index()
 water_df_seperate_irr_wide = water_df_seperate_irr.pivot(index='year', columns='Irrigation', values='Water Use (ML)').reset_index()
 water_df_seperate_irr_wide.to_csv(f'{SAVE_DIR}/water_5_volum_by_irrigation.csv',index=False)
+
+
+
+#########################################################
+#                   6) Biodiversity                     #
+#########################################################
+bio_paths = files.query('category == "biodiversity" and year_types == "single_year" and base_name == "biodiversity_separate"').reset_index(drop=True)
+bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
+bio_df['Biodiversity score (million)'] = bio_df['Biodiversity score'] / 1e6
+
+# Plot_6-1: Biodiversity total by category
+bio_df_category = bio_df.groupby(['Year','Landuse type']).sum(numeric_only=True).reset_index()
+bio_df_category_wide = bio_df_category.pivot(index='Year', columns='Landuse type', values='Biodiversity score (million)').reset_index()
+bio_df_category_wide.to_csv(f'{SAVE_DIR}/biodiversity_1_total_score_by_category.csv',index=False)
+
+# Plot_6-2: Biodiversity total by irrigation
+bio_df_irrigation = bio_df.groupby(['Year','Land management']).sum(numeric_only=True).reset_index()
+bio_df_irrigation_wide = bio_df_irrigation.pivot(index='Year', columns='Land management', values='Biodiversity score (million)').reset_index()
+bio_df_irrigation_wide.to_csv(f'{SAVE_DIR}/biodiversity_2_total_score_by_irrigation.csv',index=False)
+
+# Plot_6-3: Biodiversity total by landuse
+bio_df_landuse = bio_df.groupby(['Year','Landuse']).sum(numeric_only=True).reset_index()
+bio_df_landuse_wide = bio_df_landuse.pivot(index='Year', columns='Landuse', values='Biodiversity score (million)').reset_index()
+
+# Reorder the columns to match the order in LANDUSE_ALL
+bio_df_landuse_wide = bio_df_landuse_wide.reindex(
+    columns = [bio_df_landuse_wide.columns[0]] + LANDUSE_ALL).reset_index(drop=True)
+
+bio_df_landuse_wide.to_csv(f'{SAVE_DIR}/biodiversity_3_total_score_by_landuse.csv',index=False)
 
 
 

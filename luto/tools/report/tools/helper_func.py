@@ -409,6 +409,7 @@ def add_data_2_html(html_path:str, data_pathes:list)->None:
     # Step 1: Parse the HTML file
     parser = etree.HTMLParser()
     tree = etree.parse(html_path, parser)
+    name = os.path.basename(html_path)
 
     # Step 2: Remove the data_csv if it exists
     data_csv_div = tree.find('.//div[@id="data_csv"]')
@@ -443,7 +444,7 @@ def add_data_2_html(html_path:str, data_pathes:list)->None:
     # Step 6: Save the changes
     tree.write(html_path, method="html")
 
-    print(f"Data added to {html_path} successfully!")
+    print(f"Data of {name} has successfully added to HTML!")
     
     
     
