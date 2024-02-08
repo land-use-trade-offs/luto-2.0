@@ -63,7 +63,7 @@ document.addEventListener("DOMContentLoaded", function () {
             },
             yAxis: {
                 title: {
-                    text: "Score (million)",
+                    text: "Quality-weighted Area (million ha)",
                 },
             },
             xAxis: {
@@ -108,7 +108,7 @@ document.addEventListener("DOMContentLoaded", function () {
             },
             yAxis: {
                 title: {
-                    text: "Score (million)",
+                    text: "Quality-weighted Area (million ha)",
                 },
             },
             xAxis: {
@@ -153,7 +153,7 @@ document.addEventListener("DOMContentLoaded", function () {
             },
             yAxis: {
                 title: {
-                    text: "Score (million)",
+                    text: "Quality-weighted Area (million ha)",
                 },
             },
             xAxis: {

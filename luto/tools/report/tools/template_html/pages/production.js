@@ -336,7 +336,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 180,
       },
       title: {
-        text: "Domestic Demand - On-land Commodities",
+        text: "Domestic Consumption (Food) - On-land Commodities",
       },
       data: {
         csv: document.getElementById(
@@ -390,7 +390,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 180,
       },
       title: {
-        text: "Domestic Demand - Off-land Commodities",
+        text: "Domestic Consumption (Food) - Off-land Commodities",
       },
       data: {
         csv: document.getElementById(
@@ -632,7 +632,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 180,
       },
       title: {
-        text: "Feed by Agricultural Commodity",
+        text: "Domestic Consumption (Feed) by Agricultural Commodity",
       },
       series: [],
       credits: {
@@ -753,7 +753,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 180,
       },
       title: {
-        text: "Production by Agricultural Commodity (demands input into LUTO)",
+        text: "Total Production Requirement by Agricultural Commodity (demand input into LUTO)",
       },
       data: {
         csv: document.getElementById(
@@ -807,7 +807,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 180,
       },
       title: {
-        text: "Production by Agricultural Commodity (outputs from LUTO)",
+        text: "Total Production by Agricultural Commodity (outputs from LUTO)",
       },
       data: {
         csv: document.getElementById(
