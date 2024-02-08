@@ -74,7 +74,7 @@ def get_path(sim):
     
     # Add the path for the comparison between base-year and target-year if in the timeseries mode
     if settings.MODE == 'timeseries':
-        path_begin_end_compare = f"{path}/out_{yr_all[-1]}"
+        path_begin_end_compare = f"{path}/begin_end_compare_{yr_all[0]}_{yr_all[-1]}"
         paths = paths\
                 + [path_begin_end_compare]\
                 + [f"{path_begin_end_compare}/out_{yr_all[0]}",
