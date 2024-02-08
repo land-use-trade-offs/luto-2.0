@@ -39,6 +39,8 @@ AG_LANDUSE = ['Apples', 'Beef - modified land', 'Beef - natural land', 'Citrus',
 
 NON_AG_LANDUSE = ['Environmental Plantings','Riparian Plantings','Agroforestry']
 
+LANDUSE_ALL = AG_LANDUSE + NON_AG_LANDUSE
+
 
 # Define the GHG categories
 

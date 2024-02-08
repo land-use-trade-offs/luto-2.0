@@ -54,7 +54,8 @@ html_df = pd.DataFrame([['production',f"{REPORT_DIR}/REPORT_HTML/pages/productio
                         ['economics',f"{REPORT_DIR}/REPORT_HTML/pages/economics.html"],
                         ["area",f"{REPORT_DIR}/REPORT_HTML/pages/land-use_area.html"],
                         ["GHG",f"{REPORT_DIR}/REPORT_HTML/pages/GHG_emissions.html"],
-                        ["water",f"{REPORT_DIR}/REPORT_HTML/pages/water_usage.html"]])
+                        ["water",f"{REPORT_DIR}/REPORT_HTML/pages/water_usage.html"],
+                        ['biodiversity',f"{REPORT_DIR}/REPORT_HTML/pages/biodiversity.html"],])
 
 html_df.columns = ['name','path']
 
