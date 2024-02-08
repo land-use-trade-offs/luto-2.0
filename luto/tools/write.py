@@ -74,7 +74,7 @@ def get_path(sim):
     
     # Add the path for the comparison between base-year and target-year if in the timeseries mode
     if settings.MODE == 'timeseries':
-        path_begin_end_compare = f"{path}/begin_end_compare_{yr_all[0]}_{yr_all[-1]}"
+        path_begin_end_compare = f"{path}/out_{yr_all[-1]}"
         paths = paths\
                 + [path_begin_end_compare]\
                 + [f"{path_begin_end_compare}/out_{yr_all[0]}",
@@ -112,7 +112,7 @@ def write_outputs(sim, path, timestamp):
     # Write the area transition between base-year and target-year 
     write_area_trainsition_start_end(sim, 
                                      timestamp, 
-                                     f'{path}/begin_end_compare_{years[0]}_{years[-1]}/out_{years[-1]}')
+                                     f'{path}/out_{years[-1]}')
     
     # Write outputs for each year
     for idx,(yr, path_yr) in enumerate(zip(years, paths)):
@@ -170,17 +170,22 @@ def write_output_single_year(sim, yr_cal, path_yr, timestamp, yr_cal_sim_pre=Non
     # write_files_separate(sim, yr_cal, path_yr, timestamp)
 
 
-    # Write the crosstab and switches, and the quantity comparison
-    write_dvar_area(sim, yr_cal, path_yr, timestamp)
-    write_crosstab(sim, yr_cal, path_yr, timestamp, yr_cal_sim_pre)
-    write_quantity(sim, yr_cal, path_yr, timestamp, yr_cal_sim_pre)
 
-    # Write the water and GHG outputs
+    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CAUTION !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    # The area here was calculated from lumap/lmmap, which is not {maby inaccurate !!!} 
+    # compared to the area calculated from dvars
+    write_crosstab(sim, yr_cal, path_yr, timestamp, yr_cal_sim_pre)
+    
+
+    # Write the reset outputs
+    write_dvar_area(sim, yr_cal, path_yr, timestamp)
+    write_quantity(sim, yr_cal, path_yr, timestamp, yr_cal_sim_pre)
     write_ag_revenue_cost(sim, yr_cal, path_yr, timestamp)
     write_water(sim, yr_cal, path_yr, timestamp)
     write_ghg(sim, yr_cal, path_yr, timestamp)
     write_ghg_separate(sim, yr_cal, path_yr, timestamp)
     write_biodiversity(sim, yr_cal, path_yr, timestamp)
+    write_biodiversity_separate(sim, yr_cal, path_yr, timestamp)
 
 
 def write_settings(path):
@@ -1002,43 +1007,42 @@ def write_ghg_separate(sim, yr_cal, path, timestamp):
     # Get the ghg_df
     ag_g_df = ag_ghg.get_ghg_matrices(data_input, yr_idx, aggregate=False)
 
-    # Expand the original df with zero values to convert it to a **rosmj** array
-    #       r: row, i.e, each valid pixel
-    #       s: GHG source [chemical fertilizer, electricity, ...]
-    #       m: land management: [dry,irr]
-    #       j: land use [Apples, Beef, ...]
-    ag_g_df_rsmj = np.zeros([ag_g_df.shape[0]] + list(ag_g_df.columns.levshape), dtype=np.float32)
-
+    GHG_cols = []
     for col in ag_g_df.columns:
+        # Get the index of each column
         s,m,j = [ag_g_df.columns.levels[i].get_loc(col[i]) for i in range(len(col))]
-        ag_g_df_rsmj[:,s,m,j] = ag_g_df.loc[slice(None), col]
+        # Get the GHG emissions
+        ghg_col = np.nan_to_num(ag_g_df.loc[slice(None), col])
+        # Get the dvar coresponding to the (m,j) dimension
+        dvar = sim.ag_dvars[yr_cal][m,:,j]
+        # Multiply the GHG emissions by the dvar
+        ghg_e = (ghg_col * dvar).sum()
+        # Create a dataframe with the GHG emissions
+        ghg_col = pd.DataFrame([ghg_e], index=pd.MultiIndex.from_tuples([col]))
+
+        GHG_cols.append(ghg_col)
         
-    # Replace NAN with 0
-    ag_g_df_rsmj = np.nan_to_num(ag_g_df_rsmj)
-                                
-    # Get the ag_g_mrj, which will be used to compute GHG_agricultural_management
-    ag_g_mrj = np.einsum('rsmj -> mrj', ag_g_df_rsmj)                                       # mrj
+    # Concatenate the GHG emissions
+    ghg_df = pd.concat(GHG_cols).reset_index()
+    ghg_df.columns = ['Source','Water','Landuse','GHG Emissions (t)']
 
-    # Use einsum to do the multiplication, 
-    # easy to understand, don't need to worry too much about the dimensionality
-    ag_dvar_mrj = sim.ag_dvars[yr_cal]                                                      # mrj
-    GHG_emission_separate = np.einsum('rsmj,mrj -> rms', ag_g_df_rsmj, ag_dvar_mrj)         # rms
+    # Pivot the dataframe
+    ghg_df = ghg_df.pivot(index='Landuse', columns=['Source','Water'], values='GHG Emissions (t)')
 
-    # Summarize the array as a df
-    GHG_emission_separate_summary = tools.summarize_ghg_separate_df(
-        GHG_emission_separate,
-        (['Agricultural Landuse'], data_input.LANDMANS, ag_g_df.columns.levels[0]),
-            lu_desc
-    )
-
-    # Change "KG_HA/HEAD" to "TCO2E"
-    column_rename = [(i[0],i[1],i[2].replace('CO2E_KG_HA','TCO2E')) for i in GHG_emission_separate_summary.columns]
-    column_rename = [(i[0],i[1],i[2].replace('CO2E_KG_HEAD','TCO2E')) for i in column_rename]
-    GHG_emission_separate_summary.columns = pd.MultiIndex.from_tuples(column_rename)
-                                              
+    # Rename the columns
+    ghg_df.columns = pd.MultiIndex.from_tuples([['Agricultural Landuse'] + list(col) for col in ghg_df.columns])
+    column_rename = [(i[0],i[1].replace('CO2E_KG_HA','TCO2E'),i[2]) for i in ghg_df.columns]
+    column_rename = [(i[0],i[1].replace('CO2E_KG_HEAD','TCO2E'),i[2]) for i in column_rename]
+    ghg_df.columns = pd.MultiIndex.from_tuples(column_rename)
+    
+    
+    # Add the sum of each column
+    ghg_df.loc['SUM'] = ghg_df.sum(axis=0)
+    ghg_df['SUM'] = ghg_df.sum(axis=1)
+    ghg_df = ghg_df.fillna(0)                                       
 
     # Save table to disk
-    GHG_emission_separate_summary.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_landuse_{timestamp}.csv'))
+    ghg_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_landuse_{timestamp}.csv'))
 
 
 
@@ -1071,16 +1075,27 @@ def write_ghg_separate(sim, yr_cal, path, timestamp):
 
     # -------------------------------------------------------------------#
     # Get greenhouse gas emissions from landuse transformation penalties #
-    # -------------------------------------------------------------------# 
+    # -------------------------------------------------------------------#
     
-    # Get the lucc transition penalty data (mrj) between target and base (2010) year
-    ghg_t_2010 = ag_ghg.get_ghg_transition_penalties(data_input, sim.lumaps[2010])          # mrj
+    # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
+    simulated_year_list = sorted(list(sim.lumaps.keys()))
     
-    # Get the GHG emissions from lucc-convertion compared to the base year (2010)
-    ghg_t_separate = np.einsum('mrj,mrj -> rmj',sim.ag_dvars[yr_cal], ghg_t_2010)         # rmj
+    # Get index of yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_idx_sim = 2 if snapshot)
+    yr_idx_sim = simulated_year_list.index(yr_cal)
+    
+    # Get index of year previous to yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_cal_sim_pre = 2010 if snapshot)
+    if yr_cal == data_input.YR_CAL_BASE:
+        ghg_t = np.zeros(sim.ag_dvars[yr_cal].shape, dtype=np.bool_)
+    else:
+        yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
+        ghg_t = ag_ghg.get_ghg_transition_penalties(data_input, sim.lumaps[yr_cal_sim_pre])
+    
+    
+    # Get the GHG emissions from lucc-convertion compared to the previous year
+    ghg_t_separate = np.einsum('mrj,mrj -> rmj',sim.ag_dvars[yr_cal], ghg_t)         
 
     # Summarize the array as a df
-    ghg_t_separate_summary = tools.summarize_ghg_separate_df(ghg_t_separate,(['Transition Penalty'], 
+    ghg_t_separate_summary = tools.summarize_ghg_separate_df(ghg_t_separate,(['Deforestation'], 
                                                                        data_input.LANDMANS,
                                                                        [f"TCO2E_{i}" for i in data_input.AGRICULTURAL_LANDUSES]),
                                                              lu_desc)
@@ -1091,11 +1106,15 @@ def write_ghg_separate(sim, yr_cal, path, timestamp):
     ghg_t_separate_summary.to_csv(os.path.join(path, f'GHG_emissions_separate_transition_penalty_{timestamp}.csv'))
     
     
+    
+    
     # -------------------------------------------------------------------#
     # Get greenhouse gas emissions from agricultural management          #
-    # -------------------------------------------------------------------# 
+    # -------------------------------------------------------------------#
+     
+    ag_g_mrj = ag_ghg.get_ghg_matrices(data_input, yr_idx, aggregate=True)
     
-    # 3) Get the ag_man_g_mrj
+    # Get the ag_man_g_mrj
     ag_man_g_mrj = ag_ghg.get_agricultural_management_ghg_matrices(data_input, ag_g_mrj, yr_idx)
     
     ag_ghg_arrays = []
