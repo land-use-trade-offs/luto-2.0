@@ -265,7 +265,7 @@ transition_df_pct = transition_df_pct.fillna(0)
 
 
 heat_area = transition_df_area.style.background_gradient(cmap='Oranges', axis=1).format('{:,.0f}')
-heat_pct = transition_df_pct.style.background_gradient(cmap='Oranges', axis=1).format('{:,.3f}')
+heat_pct = transition_df_pct.style.background_gradient(cmap='Oranges', axis=1,vmin=0, vmax=100).format('{:,.3f}')
 
 # Define the style
 style = "<style>table, th, td {font-size: 8.5px;} </style>\n"
