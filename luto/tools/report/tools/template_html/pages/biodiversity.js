@@ -92,50 +92,50 @@ document.addEventListener("DOMContentLoaded", function () {
             },
         });
 
-        // biodiversity_2_total_score_by_irrigation
-        Highcharts.chart("biodiversity_2_total_score_by_irrigation", {
-            chart: {
-                type: "column",
-                marginRight: 180,
-            },
-            title: {
-                text: "Total Biodiversity Score by Irrigation",
-            },
-            data: {
-                csv: document.getElementById(
-                    "biodiversity_2_total_score_by_irrigation_csv"
-                ).innerHTML,
-            },
-            yAxis: {
-                title: {
-                    text: "Quality-weighted Area (million ha)",
-                },
-            },
-            xAxis: {
-                tickPositions: tickposition,
-            },
-            plotOptions: {
-                column: {
-                    stacking: "normal",
-                },
-            },
-            tooltip: {
-                formatter: function () {
-                    return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-                        }:</b>${this.y.toFixed(2)}<br/>`;
-                },
-            },
-            legend: {
-                align: "right",
-                verticalAlign: "left",
-                layout: "vertical",
-                x: 0,
-                y: 300,
-            },
-            credits: {
-                enabled: false,
-            },
-        });
+        // // biodiversity_2_total_score_by_irrigation
+        // Highcharts.chart("biodiversity_2_total_score_by_irrigation", {
+        //     chart: {
+        //         type: "column",
+        //         marginRight: 180,
+        //     },
+        //     title: {
+        //         text: "Total Biodiversity Score by Irrigation",
+        //     },
+        //     data: {
+        //         csv: document.getElementById(
+        //             "biodiversity_2_total_score_by_irrigation_csv"
+        //         ).innerHTML,
+        //     },
+        //     yAxis: {
+        //         title: {
+        //             text: "Quality-weighted Area (million ha)",
+        //         },
+        //     },
+        //     xAxis: {
+        //         tickPositions: tickposition,
+        //     },
+        //     plotOptions: {
+        //         column: {
+        //             stacking: "normal",
+        //         },
+        //     },
+        //     tooltip: {
+        //         formatter: function () {
+        //             return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+        //                 }:</b>${this.y.toFixed(2)}<br/>`;
+        //         },
+        //     },
+        //     legend: {
+        //         align: "right",
+        //         verticalAlign: "left",
+        //         layout: "vertical",
+        //         x: 0,
+        //         y: 300,
+        //     },
+        //     credits: {
+        //         enabled: false,
+        //     },
+        // });
 
         // biodiversity_3_total_score_by_landuse
         Highcharts.chart("biodiversity_3_total_score_by_landuse", {
@@ -175,9 +175,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 verticalAlign: "left",
                 layout: "vertical",
                 x: 10,
-                y: 0,
+                y: 250,
                 itemStyle: {
-                    "fontSize": "11.5px",
+                    // "fontSize": "11.5px",
                   },
             },
             credits: {

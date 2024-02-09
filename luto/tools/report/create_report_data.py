@@ -16,7 +16,8 @@ from tools.helper_func import get_GHG_category, get_GHG_file_df,\
                               
 
                                                      
-from tools.parameters import LU_LVSTKS, YR_BASE, COMMODITIES_ALL, LANDUSE_ALL
+from tools.parameters import LU_LVSTKS, YR_BASE, COMMODITIES_ALL, LANDUSE_ALL,LU_NATURAL,\
+                             NON_AG_LANDUSE, LANDUSE_ALL_MERGE_LANDTYPE
 
 
 # setting up working directory to root dir
@@ -196,11 +197,13 @@ area_dvar = get_ag_dvar_area(area_dvar_paths)
 
 
 # Plot_3-1: Total Area (km2)
-
 lu_area_dvar = area_dvar.groupby(['Year','Land use']).sum(numeric_only=True).reset_index()
 lu_area_dvar_wide = lu_area_dvar.pivot(index='Year', 
-                                                     columns='Land use', 
-                                                     values='Area (million km2)').reset_index()
+                                       columns='Land use', 
+                                       values='Area (million km2)').reset_index()
+# Reorder the columns to match the order in LANDUSE_ALL
+lu_area_dvar_wide = lu_area_dvar_wide.reindex(
+    columns = [lu_area_dvar_wide.columns[0]] + LANDUSE_ALL_MERGE_LANDTYPE).reset_index(drop=True)
 lu_area_dvar_wide.to_csv(f'{SAVE_DIR}/area_1_total_area_wide.csv', index=False)
 
 
@@ -262,7 +265,7 @@ transition_df_pct = transition_df_pct.fillna(0)
 
 
 heat_area = transition_df_area.style.background_gradient(cmap='Oranges', axis=1).format('{:,.0f}')
-heat_pct = transition_df_pct.style.background_gradient(cmap='Oranges', axis=1).format('{:,.2f}')
+heat_pct = transition_df_pct.style.background_gradient(cmap='Oranges', axis=1,vmin=0, vmax=100).format('{:,.3f}')
 
 # Define the style
 style = "<style>table, th, td {font-size: 8.5px;} </style>\n"
@@ -309,7 +312,7 @@ GHG_Ag_emission_total_crop_lvstk = get_GHG_emissions_by_crop_lvstk_df(GHG_emissi
 GHG_Ag_emission_total_crop_lvstk_wide = GHG_Ag_emission_total_crop_lvstk.pivot(index='Year', columns='Landuse_land_cat', values='Quantity (Mt CO2e)').reset_index()
 GHG_Ag_emission_total_crop_lvstk_wide.to_csv(f'{SAVE_DIR}/GHG_3_crop_lvstk_emission_Mt.csv',index=False)
 
-# Plot_4-3-2: Agricultural Emission by crop/lvstk sectors (Mt)
+# Plot_4-3-2: Agricultural Emission by dry/irrigation  (Mt)
 GHG_Ag_emission_total_dry_irr = GHG_emissions_long.groupby(['Year','Irrigation']).sum()['Quantity (Mt CO2e)'].reset_index()
 GHG_Ag_emission_total_dry_irr_wide = GHG_Ag_emission_total_dry_irr.pivot(index='Year', columns='Irrigation', values='Quantity (Mt CO2e)').reset_index()
 GHG_Ag_emission_total_dry_irr_wide.to_csv(f'{SAVE_DIR}/GHG_4_dry_irr_emission_Mt.csv',index=False)
@@ -444,9 +447,15 @@ water_df_seperate_irr_wide.to_csv(f'{SAVE_DIR}/water_5_volum_by_irrigation.csv',
 #########################################################
 #                   6) Biodiversity                     #
 #########################################################
+
+# get biodiversity dataframe
 bio_paths = files.query('category == "biodiversity" and year_types == "single_year" and base_name == "biodiversity_separate"').reset_index(drop=True)
 bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
 bio_df['Biodiversity score (million)'] = bio_df['Biodiversity score'] / 1e6
+
+# Filter out landuse that are reated to biodiversity
+bio_lucc = LU_NATURAL + NON_AG_LANDUSE
+
 
 # Plot_6-1: Biodiversity total by category
 bio_df_category = bio_df.groupby(['Year','Landuse type']).sum(numeric_only=True).reset_index()
@@ -464,7 +473,7 @@ bio_df_landuse_wide = bio_df_landuse.pivot(index='Year', columns='Landuse', valu
 
 # Reorder the columns to match the order in LANDUSE_ALL
 bio_df_landuse_wide = bio_df_landuse_wide.reindex(
-    columns = [bio_df_landuse_wide.columns[0]] + LANDUSE_ALL).reset_index(drop=True)
+    columns = [bio_df_landuse_wide.columns[0]] + bio_lucc).reset_index(drop=True)
 
 bio_df_landuse_wide.to_csv(f'{SAVE_DIR}/biodiversity_3_total_score_by_landuse.csv',index=False)
 
