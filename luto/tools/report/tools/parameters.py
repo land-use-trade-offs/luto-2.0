@@ -43,9 +43,15 @@ AG_LANDUSE = ['Apples', 'Beef - modified land', 'Beef - natural land', 'Citrus',
               'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit', 'Unallocated - modified land', 
               'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes', 'Winter oilseeds']
 
+AG_LANDUSE_MERGE_LANDTYPE = ['Apples', 'Beef', 'Citrus', 'Cotton', 'Dairy', 'Grapes', 'Hay', 'Nuts', 'Other non-cereal crops',
+                             'Pears', 'Plantation fruit', 'Rice', 'Sheep', 'Stone fruit', 'Sugar', 'Summer cereals',
+                             'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit', 'Unallocated - modified land', 
+                             'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes', 'Winter oilseeds']
+
 NON_AG_LANDUSE = ['Environmental Plantings','Riparian Plantings','Agroforestry']
 
 LANDUSE_ALL = AG_LANDUSE + NON_AG_LANDUSE
+LANDUSE_ALL_MERGE_LANDTYPE = AG_LANDUSE_MERGE_LANDTYPE + NON_AG_LANDUSE
 
 
 # Define the GHG categories

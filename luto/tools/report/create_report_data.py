@@ -16,7 +16,8 @@ from tools.helper_func import get_GHG_category, get_GHG_file_df,\
                               
 
                                                      
-from tools.parameters import LU_LVSTKS, YR_BASE, COMMODITIES_ALL, LANDUSE_ALL,LU_NATURAL, NON_AG_LANDUSE
+from tools.parameters import LU_LVSTKS, YR_BASE, COMMODITIES_ALL, LANDUSE_ALL,LU_NATURAL,\
+                             NON_AG_LANDUSE, LANDUSE_ALL_MERGE_LANDTYPE
 
 
 # setting up working directory to root dir
@@ -196,11 +197,13 @@ area_dvar = get_ag_dvar_area(area_dvar_paths)
 
 
 # Plot_3-1: Total Area (km2)
-
 lu_area_dvar = area_dvar.groupby(['Year','Land use']).sum(numeric_only=True).reset_index()
 lu_area_dvar_wide = lu_area_dvar.pivot(index='Year', 
-                                                     columns='Land use', 
-                                                     values='Area (million km2)').reset_index()
+                                       columns='Land use', 
+                                       values='Area (million km2)').reset_index()
+# Reorder the columns to match the order in LANDUSE_ALL
+lu_area_dvar_wide = lu_area_dvar_wide.reindex(
+    columns = [lu_area_dvar_wide.columns[0]] + LANDUSE_ALL_MERGE_LANDTYPE).reset_index(drop=True)
 lu_area_dvar_wide.to_csv(f'{SAVE_DIR}/area_1_total_area_wide.csv', index=False)
 
 
@@ -262,7 +265,7 @@ transition_df_pct = transition_df_pct.fillna(0)
 
 
 heat_area = transition_df_area.style.background_gradient(cmap='Oranges', axis=1).format('{:,.0f}')
-heat_pct = transition_df_pct.style.background_gradient(cmap='Oranges', axis=1).format('{:,.2f}')
+heat_pct = transition_df_pct.style.background_gradient(cmap='Oranges', axis=1).format('{:,.3f}')
 
 # Define the style
 style = "<style>table, th, td {font-size: 8.5px;} </style>\n"
