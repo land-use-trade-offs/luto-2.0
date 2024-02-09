@@ -175,9 +175,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 verticalAlign: "left",
                 layout: "vertical",
                 x: 10,
-                y: 0,
+                y: 250,
                 itemStyle: {
-                    "fontSize": "11.5px",
+                    // "fontSize": "11.5px",
                   },
             },
             credits: {

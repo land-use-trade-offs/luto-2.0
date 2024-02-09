@@ -13,6 +13,12 @@ LU_LVSTKS = ['Beef - modified land','Beef - natural land','Dairy - modified land
 LU_UNALLOW = ['Unallocated - modified land','Unallocated - natural land']
 
 
+LU_NATURAL = ['Beef - natural land',
+              'Dairy - natural land',
+              'Sheep - natural land',
+              'Unallocated - natural land']
+
+
 # Define the commodity categories
 COMMODITIES_ON_LAND = ['Apples','Beef lexp','Beef meat','Citrus','Cotton','Dairy','Grapes',
                        'Hay','Nuts','Other non-cereal crops', 'Pears', 'Plantation fruit',

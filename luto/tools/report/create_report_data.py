@@ -16,7 +16,7 @@ from tools.helper_func import get_GHG_category, get_GHG_file_df,\
                               
 
                                                      
-from tools.parameters import LU_LVSTKS, YR_BASE, COMMODITIES_ALL, LANDUSE_ALL
+from tools.parameters import LU_LVSTKS, YR_BASE, COMMODITIES_ALL, LANDUSE_ALL,LU_NATURAL, NON_AG_LANDUSE
 
 
 # setting up working directory to root dir
@@ -444,9 +444,15 @@ water_df_seperate_irr_wide.to_csv(f'{SAVE_DIR}/water_5_volum_by_irrigation.csv',
 #########################################################
 #                   6) Biodiversity                     #
 #########################################################
+
+# get biodiversity dataframe
 bio_paths = files.query('category == "biodiversity" and year_types == "single_year" and base_name == "biodiversity_separate"').reset_index(drop=True)
 bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
 bio_df['Biodiversity score (million)'] = bio_df['Biodiversity score'] / 1e6
+
+# Filter out landuse that are reated to biodiversity
+bio_lucc = LU_NATURAL + NON_AG_LANDUSE
+
 
 # Plot_6-1: Biodiversity total by category
 bio_df_category = bio_df.groupby(['Year','Landuse type']).sum(numeric_only=True).reset_index()
@@ -464,7 +470,7 @@ bio_df_landuse_wide = bio_df_landuse.pivot(index='Year', columns='Landuse', valu
 
 # Reorder the columns to match the order in LANDUSE_ALL
 bio_df_landuse_wide = bio_df_landuse_wide.reindex(
-    columns = [bio_df_landuse_wide.columns[0]] + LANDUSE_ALL).reset_index(drop=True)
+    columns = [bio_df_landuse_wide.columns[0]] + bio_lucc).reset_index(drop=True)
 
 bio_df_landuse_wide.to_csv(f'{SAVE_DIR}/biodiversity_3_total_score_by_landuse.csv',index=False)
 
