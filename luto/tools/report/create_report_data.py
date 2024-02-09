@@ -275,6 +275,9 @@ style = style + "<style>td {text-align: right;;} </style>\n"
 heat_area_html = style + heat_area.to_html()
 heat_pct_html = style + heat_pct.to_html()
 
+# Replace 0.00 with 0 in the html
+heat_pct_html = re.sub(r'(?<!\d)0.000(?!\d)', '0', heat_pct_html)
+
 # Save the html
 with open(f'{SAVE_DIR}/area_6_begin_end_area.html', 'w') as f:
     f.write(heat_area_html)
@@ -435,6 +438,9 @@ water_df_separate_lu_type_wide.to_csv(f'{SAVE_DIR}/water_3_volum_by_sector.csv',
 # Plot_5-4: Water use by landuse (ML)
 water_df_seperate_lu = water_df_separate.groupby(['year','Landuse']).sum()[['Water Use (ML)']].reset_index()
 water_df_seperate_lu_wide = water_df_seperate_lu.pivot(index='year', columns='Landuse', values='Water Use (ML)').reset_index()
+# reorder the columns to match the order in LANDUSE_ALL
+water_df_seperate_lu_wide = water_df_seperate_lu_wide.reindex(
+    columns = [water_df_seperate_lu_wide.columns[0]] + LANDUSE_ALL).reset_index(drop=True)
 water_df_seperate_lu_wide.to_csv(f'{SAVE_DIR}/water_4_volum_by_landuse.csv',index=False)
 
 # Plot_5-5: Water use by irrigation (ML)

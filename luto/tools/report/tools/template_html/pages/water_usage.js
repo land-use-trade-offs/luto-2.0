@@ -73,13 +73,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
       legend: {
         itemStyle: {
-          fontSize: "10px",
+          fontSize: "11px",
           textOverflow: "ellipsis",
         },
         align: "right",
         verticalAlign: "top",
         layout: "vertical",
-        x: 10,
+        x: 5,
         y: 180,
       },
 
@@ -234,14 +234,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
       legend: {
         itemStyle: {
-          fontSize: "10px",
+          fontSize: "11px",
           textOverflow: "ellipsis",
         },
         align: "right",
         verticalAlign: "top",
         layout: "vertical",
-        x: 10,
-        y: 10,
+        x: 5,
+        y: -10,
       },
 
       tooltip: {
