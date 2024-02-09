@@ -84,9 +84,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       tooltip: {
         formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
         },
       },
 
@@ -365,9 +364,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       tooltip: {
         formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
         },
       },
 
@@ -422,9 +420,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       tooltip: {
         formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
         },
       },
 
@@ -481,9 +478,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       tooltip: {
         formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
         },
       },
 
@@ -533,9 +529,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       tooltip: {
         formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
         },
       },
 
@@ -657,9 +652,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       tooltip: {
         formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
         },
       },
 
@@ -782,9 +776,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       tooltip: {
         formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
         },
       },
 
@@ -836,9 +829,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       tooltip: {
         formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
         },
       },
 
