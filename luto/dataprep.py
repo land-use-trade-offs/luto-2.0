@@ -636,6 +636,7 @@ def create_new_dataset():
     
     
     # TEMPORARY CODE to Check total crop GHG emissions
+    
     agGHGmap = lmap[['CELL_ID', 'SA2_ID', 'LU_ID', 'IRRIGATION']].merge( cropsGHG_ptable, 
                                                                          on = ['SA2_ID', 'LU_ID', 'IRRIGATION'], 
                                                                          how = 'left' )
@@ -715,6 +716,9 @@ def create_new_dataset():
     agGHG_irrpast.to_hdf(outpath + 'agGHG_irrpast.h5', key = 'agGHG_irrpast', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
     
+    # CODE to Check total livestock GHG emissions - see N:\Data-Master\LUTO_2.0_input_data\Scripts\2_assemble_agricultural_data.py
+
+
     
     ############### Agricultural demand
     
