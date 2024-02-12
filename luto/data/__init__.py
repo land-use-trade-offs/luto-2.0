@@ -538,6 +538,7 @@ elif GHG_LIMITS_TYPE == 'dict':
     # # Create linear function f and interpolate
     f = interp1d(list(GHG_LIMITS.keys()), list(GHG_LIMITS.values()), kind = 'linear', fill_value = 'extrapolate')
     keys = range(2010, 2101)
+    yr = range(2010, 2101)
     values = f(yr)
     GHG_TARGETS = dict(zip(keys, values))
  
