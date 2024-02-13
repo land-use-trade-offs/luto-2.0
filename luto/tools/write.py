@@ -205,7 +205,7 @@ def write_settings(path):
         f.write('DEMAND_CONSTRAINT_TYPE: %s\n' % settings.DEMAND_CONSTRAINT_TYPE)
         f.write('SOLVE_METHOD: %s\n' % settings.SOLVE_METHOD)
         f.write('PENALTY: %s\n' % settings.PENALTY)
-        f.write('OPTIMALITY_TOLERANCE: %s\n' % settings.OPTIMALITY_TOLERANCE)
+        f.write('DUAL_FEASIBILITY_TOLERANCE: %s\n' % settings.DUAL_FEASIBILITY_TOLERANCE)
         f.write('THREADS: %s\n' % settings.THREADS)
 
         f.write('CULL_MODE: %s\n' % settings.CULL_MODE)
