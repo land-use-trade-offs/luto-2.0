@@ -37,9 +37,11 @@ from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 gurenv = gp.Env(logfilename="gurobi.log", empty=True)  # (empty = True)
 gurenv.setParam("Method", settings.SOLVE_METHOD)
 gurenv.setParam("OutputFlag", settings.VERBOSE)
-gurenv.setParam("OptimalityTol", settings.OPTIMALITY_TOLERANCE)
+gurenv.setParam("OptimalityTol", settings.DUAL_FEASIBILITY_TOLERANCE)
+gurenv.setParam("BarConvTol", settings.BARRIER_CONVERGENCE_TOLERANCE)
 gurenv.setParam("Threads", settings.THREADS)
 gurenv.setParam("BarHomogeneous", settings.BARHOMOGENOUS)
+gurenv.setParam("Crossover", settings.CROSSOVER)
 gurenv.start()
 
 

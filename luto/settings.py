@@ -113,15 +113,16 @@ SOLVE_METHOD = 2
    'deterministic concurrent':         4
    'deterministic concurrent simplex': 5 """
 
-# Penalty in objective function  *** Needs to be balanced against OPTIMALITY_TOLERANCE to trade-off speed for optimality 
-# 1e5 works (i.e., demand are met), demands not met with anything less 
+# Penalty in objective function to balance influence of demand versus cost when DEMAND_CONSTRAINT_TYPE = 'soft'
+# 1e5 works well (i.e., demand are met), demands not met with anything less 
 PENALTY = 1e5
 
 # Print detailed output to screen
 VERBOSE = 1
 
 # Relax the tolerance for proving optimality
-OPTIMALITY_TOLERANCE = 1e-2
+DUAL_FEASIBILITY_TOLERANCE = 1e-2
+BARRIER_CONVERGENCE_TOLERANCE = 1e-2
 
 """Default value:	1e-6
    Minimum value:	1e-9
@@ -129,6 +130,9 @@ OPTIMALITY_TOLERANCE = 1e-2
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
 THREADS = 32
+
+# Whether to use crossover in barrier solve. -1 for automatic crossover.
+CROSSOVER = 0
 
 # Use homogenous barrier algorithm
 BARHOMOGENOUS = -1
