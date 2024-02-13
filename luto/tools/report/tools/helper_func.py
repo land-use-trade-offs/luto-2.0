@@ -458,6 +458,6 @@ def select_years(year_list):
     for i in range(1, slots + 1):
         # Calculate index for selection
         index = int(round(i * interval))
-        selected_years.insert(-1, year_list[index])
+        selected_years.append(year_list[index])
 
-    return selected_years
+    return sorted(selected_years)

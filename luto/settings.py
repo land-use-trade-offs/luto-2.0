@@ -81,7 +81,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 5          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 30          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
 # MODE = 'snapshot'       # runs for target year only
@@ -186,7 +186,7 @@ SOC_AMORTISATION = 30           # Number of years over which to spread (average)
 
 GHG_EMISSIONS_LIMITS = 'on'        # 'on' or 'off'
 GHG_LIMITS_TYPE = 'file'           # If GHG_EMISSIONS_LIMITS = 'on' then set GHG_LIMITS_TYPE = 'dict' or 'file'
-GHG_LIMITS_FIELD = '1.5C (67%)'    # If GHG_LIMITS_TYPE = 'file' then need to add field name in 'GHG_targets.xlsx' options include: '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
+GHG_LIMITS_FIELD = '1.5C (50%)'    # If GHG_LIMITS_TYPE = 'file' then need to add field name in 'GHG_targets.xlsx' options include: '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
 GHG_LIMITS = {                     # If GHG_LIMITS_TYPE = 'dict' then need to set emissions limits in dictionary below (i.e., year: tonnes)
                 2010: 90 * 1e6,    # Agricultural emissions in 2010 in tonnes CO2e
                 2050: -337 * 1e6,  # GHG emissions target and year (can add more years/targets)

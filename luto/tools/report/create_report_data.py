@@ -62,7 +62,7 @@ DEMAND_DATA_long['Quantity (tonnes, ML)'] = DEMAND_DATA_long['Quantity (tonnes, 
 
 # Select the years to reduce the column number to 
 # avoid cluttering in the multi-level axis graphing
-years = files['year'].unique().tolist()
+years = sorted(files['year'].unique().tolist())
 years_select = select_years(years)
 
 DEMAND_DATA_long = DEMAND_DATA_long.query('Year.isin(@years)')
