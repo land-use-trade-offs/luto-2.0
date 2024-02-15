@@ -66,6 +66,7 @@ years = sorted(files['year'].unique().tolist())
 years_select = select_years(years)
 
 DEMAND_DATA_long = DEMAND_DATA_long.query('Year.isin(@years)')
+DEMAND_DATA_long['COMMODITY'] = DEMAND_DATA_long['COMMODITY'].str.replace('Beef lexp','Beef live export')
 DEMAND_DATA_long_filter_year = DEMAND_DATA_long.query('Year.isin(@years_select)')
 
 # Plot_1_1: {Total} for 'Domestic', 'Exports', 'Feed', 'Imports', 'Production'(Tonnes) 
@@ -138,6 +139,7 @@ for idx,Type in enumerate(DEMAND_DATA_long['Type'].unique()):
 # Plot_1-5-6: Production (LUTO outputs, Million Tonnes)
 quantity_csv_paths = files.query('category == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)
 quantity_df = get_quantity_df(quantity_csv_paths)
+quantity_df['Commodity'] = quantity_df['Commodity'].str.replace('Beef lexp','Beef live export')
 
 quantity_df_wide = quantity_df.pivot_table(index=['year'], 
                                            columns='Commodity',
@@ -280,7 +282,7 @@ heat_area_html = style + heat_area.to_html()
 heat_pct_html = style + heat_pct.to_html()
 
 # Replace 0.00 with 0 in the html
-heat_area_html = re.sub(r'(?<!\d)0.000(?!\d)', '-', heat_area_html)
+heat_area_html = re.sub(r'(?<!\d)0(?!\d)', '-', heat_area_html)
 heat_pct_html = re.sub(r'(?<!\d)0.000(?!\d)', '-', heat_pct_html)
 
 # Save the html

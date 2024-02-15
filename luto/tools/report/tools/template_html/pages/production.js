@@ -110,7 +110,7 @@ document.addEventListener("DOMContentLoaded", function () {
         type: "column",
       },
       title: {
-        text: "Agricultural Demand by Commodity Type",
+        text: "Agricultural Demand by On-Off Land",
       },
 
       xAxis: {
