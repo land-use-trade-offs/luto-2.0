@@ -110,7 +110,7 @@ def write_outputs(sim, path):
     ###############################################################
     
     # Write the area transition between base-year and target-year 
-    write_area_trainsition_start_end(sim,f'{path}/out_{years[-1]}')
+    write_area_transition_start_end(sim,f'{path}/out_{years[-1]}')
     
     # Write outputs for each year
     for idx,(yr, path_yr) in enumerate(zip(years, paths)):
@@ -528,7 +528,7 @@ def write_dvar_area(sim, yr_cal, path):
     df_am_area.to_csv(os.path.join(path, f'area_agricultural_management_{timestamp}.csv'), index = False)
 
 
-def write_area_trainsition_start_end(sim, path):
+def write_area_transition_start_end(sim, path):
     
     # Append the yr_cal to timestamp as prefix
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]

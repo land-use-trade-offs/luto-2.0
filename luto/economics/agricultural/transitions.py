@@ -152,7 +152,7 @@ def get_transition_matrices(data, yr_idx, base_year, lumaps, lmmaps):
     # Cardbon costs of transitioning cells.                          #
     # -------------------------------------------------------------- #
 
-    # apply the cost of carbon released by transitioning unnatural land to natural land
+    # apply the cost of carbon released by transitioning modified land to natural land
     ghg_t_mrj = ag_ghg.get_ghg_transition_penalties(data, lumap)
     ghg_t_mrj_cost = tools.amortise(ghg_t_mrj * settings.CARBON_PRICE_PER_TONNE)
 

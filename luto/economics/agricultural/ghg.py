@@ -239,7 +239,7 @@ def get_ghg_matrices(data, yr_idx, aggregate=True):
 def get_ghg_transition_penalties(data, lumap) -> np.ndarray:
     """
     Gets the one-off greenhouse gas penalties for transitioning natural land to
-    unnatural land. The penalty represents the carbon that is emitted when
+    modified land. The penalty represents the carbon that is emitted when
     clearing natural land.
     """
     ncells, n_ag_lus = data.REAL_AREA.shape[0], len(data.AGRICULTURAL_LANDUSES)
