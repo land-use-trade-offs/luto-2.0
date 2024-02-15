@@ -747,7 +747,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 200,
       },
       title: {
-        text: "Total Production Requirement by Agricultural Commodity (demand input into LUTO)",
+        text: "Total Production Requirement by Agricultural Commodity (inputs into LUTO)",
       },
       data: {
         csv: document.getElementById(

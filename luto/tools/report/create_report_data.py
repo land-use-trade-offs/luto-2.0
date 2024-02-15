@@ -317,6 +317,9 @@ GHG_files_wide.to_csv(f'{SAVE_DIR}/GHG_2_individual_emission_Mt.csv',index=False
 # Plot_4-3: GHG emission (Mt)
 GHG_emissions_long = get_GHG_category(GHG_files,'Agricultural Landuse')
 GHG_emissions_long['Irrigation'] = GHG_emissions_long['Irrigation'].replace({'dry': 'Dry-land', 'irr': 'Irrigated-land'})
+GHG_emissions_long['GHG Category'] = GHG_emissions_long['GHG Category'].replace({'CH4': 'Methane (CH4)', 
+                                                                                 'N2O': 'Nitrous Oxide (N2O)', 
+                                                                                 'CO2': 'Carbon Dioxide (CO2)'})
 
 # Plot_4-3-1: Agricultural Emission by crop/lvstk sectors (Mt)
 GHG_Ag_emission_total_crop_lvstk = get_GHG_emissions_by_crop_lvstk_df(GHG_emissions_long)

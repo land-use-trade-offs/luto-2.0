@@ -378,7 +378,7 @@ document.addEventListener("DOMContentLoaded", function () {
         align: "right",
         verticalAlign: "top",
         layout: "vertical",
-        x: -100,
+        x: 0,
         y: 250,
       },
 
@@ -674,7 +674,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "Non Agricultural Land-use Sequestration by Sources",
+        text: "Non Agricultural Land-use Sequestration",
       },
 
       credits: {
@@ -734,7 +734,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "GHG Emission Reductions",
+        text: "GHG Emission Abatements",
       },
 
       credits: {
@@ -748,7 +748,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       yAxis: {
         title: {
-          text: "GHG Emission Reductions (million t CO2e)",
+          text: "GHG Emission Abatements (million t CO2e)",
         },
       },
       xAxis: {
@@ -794,7 +794,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "GHG Emission Reductions by Crop|Livestock",
+        text: "GHG Emission Abatements by Crop|Livestock",
       },
 
       credits: {
@@ -809,7 +809,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       yAxis: {
         title: {
-          text: "GHG Emission Reductions (million t CO2e)",
+          text: "GHG Emission Abatements (million t CO2e)",
         },
       },
       xAxis: {
@@ -855,7 +855,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "GHG Emission Reductions by Irrigation Type",
+        text: "GHG Emission Abatements by Irrigation Type",
       },
 
       credits: {
@@ -869,7 +869,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       yAxis: {
         title: {
-          text: "GHG Emission Reductions (million t CO2e)",
+          text: "GHG Emission Abatements (million t CO2e)",
         },
       },
       xAxis: {
