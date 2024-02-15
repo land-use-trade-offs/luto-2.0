@@ -403,7 +403,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "Cost of Production by Agricultural Product",
+        text: "Cost of Production by Agricultural Land-use",
       },
 
       credits: {
