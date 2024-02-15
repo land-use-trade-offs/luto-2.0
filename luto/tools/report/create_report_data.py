@@ -6,9 +6,9 @@ import argparse
 
 
 # import functions
-from tools.__init__ import   get_AREA_am, get_AREA_lm, get_AREA_lu, get_GHG_emissions_by_crop_lvstk_df,\
-                    get_all_files, get_begin_end_df, get_quantity_df, merge_LVSTK_UAALLOW,\
-                    get_rev_cost_df, get_water_df, get_demand_df, get_ag_dvar_area
+from tools.__init__ import   get_GHG_emissions_by_crop_lvstk_df,\
+                             get_all_files, get_quantity_df, get_rev_cost_df,\
+                             get_water_df, get_demand_df, get_ag_dvar_area
 
               
 from tools.helper_func import get_GHG_category, get_GHG_file_df,\
@@ -16,7 +16,7 @@ from tools.helper_func import get_GHG_category, get_GHG_file_df,\
                               
 
                                                      
-from tools.parameters import LU_LVSTKS, YR_BASE, COMMODITIES_ALL, LANDUSE_ALL,LU_NATURAL,\
+from tools.parameters import YR_BASE, COMMODITIES_ALL, LANDUSE_ALL,LU_NATURAL,\
                              NON_AG_LANDUSE, LANDUSE_ALL_MERGE_LANDTYPE
 
 
@@ -62,10 +62,11 @@ DEMAND_DATA_long['Quantity (tonnes, ML)'] = DEMAND_DATA_long['Quantity (tonnes, 
 
 # Select the years to reduce the column number to 
 # avoid cluttering in the multi-level axis graphing
-years = files['year'].unique().tolist()
+years = sorted(files['year'].unique().tolist())
 years_select = select_years(years)
 
 DEMAND_DATA_long = DEMAND_DATA_long.query('Year.isin(@years)')
+DEMAND_DATA_long['COMMODITY'] = DEMAND_DATA_long['COMMODITY'].str.replace('Beef lexp','Beef live export')
 DEMAND_DATA_long_filter_year = DEMAND_DATA_long.query('Year.isin(@years_select)')
 
 # Plot_1_1: {Total} for 'Domestic', 'Exports', 'Feed', 'Imports', 'Production'(Tonnes) 
@@ -138,6 +139,7 @@ for idx,Type in enumerate(DEMAND_DATA_long['Type'].unique()):
 # Plot_1-5-6: Production (LUTO outputs, Million Tonnes)
 quantity_csv_paths = files.query('category == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)
 quantity_df = get_quantity_df(quantity_csv_paths)
+quantity_df['Commodity'] = quantity_df['Commodity'].str.replace('Beef lexp','Beef live export')
 
 quantity_df_wide = quantity_df.pivot_table(index=['year'], 
                                            columns='Commodity',
@@ -153,9 +155,7 @@ quantity_df_wide.to_csv(f'{SAVE_DIR}/production_5_6_demand_Production_commodity_
 # Plot_2-2: Revenue and Cost data (Billion Dollars)
 revenue_df = get_rev_cost_df(files, 'revenue')
 revenue_df['Source_type'] = revenue_df['Source_type'].str.replace(' Crop','')
-
-cost_df = get_rev_cost_df(files, 'cost')
-cost_df['Source_type'] = cost_df['Source_type'].str.replace(' Crop','')
+revenue_df['Irrigation'] = revenue_df['Irrigation'].replace({'dry': 'Dry-land', 'irr': 'Irrigated-land'})
 
 keep_cols = ['year', 'value (billion)']
 loop_cols = revenue_df.columns.difference(keep_cols)
@@ -168,7 +168,12 @@ for idx,col in enumerate(loop_cols):
     # save to csv
     df_wide.to_csv(f'{SAVE_DIR}/economics_1_revenue_{idx+1}_{col}_wide.csv', index=False)
 
+
+
 cost_df = get_rev_cost_df(files, 'cost')
+cost_df['Source_type'] = cost_df['Source_type'].str.replace(' Crop','')
+cost_df['Irrigation'] = cost_df['Irrigation'].replace({'dry': 'Dry-land', 'irr': 'Irrigated-land'})
+
 keep_cols = ['year', 'value (billion)']
 loop_cols = cost_df.columns.difference(keep_cols)
 
@@ -209,6 +214,7 @@ lu_area_dvar_wide.to_csv(f'{SAVE_DIR}/area_1_total_area_wide.csv', index=False)
 
 # Plot_3-2: Total Area (km2) by Irrigation
 lm_dvar_area = area_dvar.groupby(['Year','Water']).sum(numeric_only=True).reset_index()
+lm_dvar_area['Water'] = lm_dvar_area['Water'].replace({'dry': 'Dry-land', 'irr': 'Irrigated-land'})
 lm_dvar_area_wide = lm_dvar_area.pivot(index='Year', 
                                        columns='Water', 
                                        values='Area (million km2)').reset_index()
@@ -268,15 +274,16 @@ heat_area = transition_df_area.style.background_gradient(cmap='Oranges', axis=1)
 heat_pct = transition_df_pct.style.background_gradient(cmap='Oranges', axis=1,vmin=0, vmax=100).format('{:,.3f}')
 
 # Define the style
-style = "<style>table, th, td {font-size: 8.5px;} </style>\n"
-style = style + "<style>td {text-align: right;;} </style>\n"
+style = "<style>table, th, td {font-size: 8.2px;font-family: Helvetica, Arial, sans-serif;} </style>\n"
+style = style + "<style>td {text-align: right; } </style>\n"
 
 # Add the style to the HTML
 heat_area_html = style + heat_area.to_html()
 heat_pct_html = style + heat_pct.to_html()
 
 # Replace 0.00 with 0 in the html
-heat_pct_html = re.sub(r'(?<!\d)0.000(?!\d)', '0', heat_pct_html)
+heat_area_html = re.sub(r'(?<!\d)0(?!\d)', '-', heat_area_html)
+heat_pct_html = re.sub(r'(?<!\d)0.000(?!\d)', '-', heat_pct_html)
 
 # Save the html
 with open(f'{SAVE_DIR}/area_6_begin_end_area.html', 'w') as f:
@@ -309,6 +316,10 @@ GHG_files_wide.to_csv(f'{SAVE_DIR}/GHG_2_individual_emission_Mt.csv',index=False
 
 # Plot_4-3: GHG emission (Mt)
 GHG_emissions_long = get_GHG_category(GHG_files,'Agricultural Landuse')
+GHG_emissions_long['Irrigation'] = GHG_emissions_long['Irrigation'].replace({'dry': 'Dry-land', 'irr': 'Irrigated-land'})
+GHG_emissions_long['GHG Category'] = GHG_emissions_long['GHG Category'].replace({'CH4': 'Methane (CH4)', 
+                                                                                 'N2O': 'Nitrous Oxide (N2O)', 
+                                                                                 'CO2': 'Carbon Dioxide (CO2)'})
 
 # Plot_4-3-1: Agricultural Emission by crop/lvstk sectors (Mt)
 GHG_Ag_emission_total_crop_lvstk = get_GHG_emissions_by_crop_lvstk_df(GHG_emissions_long)
@@ -390,6 +401,7 @@ Non_ag_reduction_source_wide.to_csv(f'{SAVE_DIR}/GHG_9_2_ag_reduction_source_wid
 
 # Plot_4-5: GHG reductions by Agricultural managements (Mt)
 Ag_man_sequestration_long = get_GHG_category(GHG_files,'Agricultural Management')
+Ag_man_sequestration_long['Irrigation'] = Ag_man_sequestration_long['Irrigation'].replace({'dry': 'Dry-land', 'irr': 'Irrigated-land'}) 
 
 # Plot_4-5-1: GHG reductions by Agricultural managements in total (Mt)
 Ag_man_sequestration_total = Ag_man_sequestration_long.groupby(['Year','GHG Category']).sum()['Quantity (Mt CO2e)'].reset_index()
@@ -421,6 +433,7 @@ water_paths_separate = files.query('category == "water" and year_types == "singl
 water_df_total = get_water_df(water_paths_total)
 water_df_separate = pd.concat([pd.read_csv(path) for path in water_paths_separate['path']], ignore_index=True)
 water_df_separate['Water Use (ML)'] = water_df_separate['Water Use (ML)'].astype(float)
+water_df_separate['Irrigation'] = water_df_separate['Irrigation'].replace({'dry': 'Dry-land', 'irr': 'Irrigated-land'}) 
 
 # Plot_5-1: Water use compared to limite (%)
 water_df_total_pct_wide = water_df_total.pivot(index='year', columns='REGION_NAME', values='PROPORTION_%')

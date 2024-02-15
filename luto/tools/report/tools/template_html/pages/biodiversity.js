@@ -51,10 +51,10 @@ document.addEventListener("DOMContentLoaded", function () {
         Highcharts.chart("biodiversity_1_total_score_by_category", {
             chart: {
                 type: "column",
-                marginRight: 180,
+                marginRight: 200,
             },
             title: {
-                text: "Total Biodiversity Score by Category",
+                text: "Total Biodiversity Score by Land-use/Management",
             },
             data: {
                 csv: document.getElementById(
@@ -96,7 +96,7 @@ document.addEventListener("DOMContentLoaded", function () {
         // Highcharts.chart("biodiversity_2_total_score_by_irrigation", {
         //     chart: {
         //         type: "column",
-        //         marginRight: 180,
+        //         marginRight: 200,
         //     },
         //     title: {
         //         text: "Total Biodiversity Score by Irrigation",
@@ -141,7 +141,7 @@ document.addEventListener("DOMContentLoaded", function () {
         Highcharts.chart("biodiversity_3_total_score_by_landuse", {
             chart: {
                 type: "column",
-                marginRight: 180,
+                marginRight: 200,
             },
             title: {
                 text: "Total Biodiversity Score by Land Use",

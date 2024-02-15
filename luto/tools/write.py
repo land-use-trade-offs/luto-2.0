@@ -164,8 +164,9 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
         os.mkdir(path_yr)
 
     # Write the decision variables, land-use and land management maps
-    # write_files(sim, yr_cal, path_yr)
-    # write_files_separate(sim, yr_cal, path_yr)
+    if yr_cal == 2050:
+        write_files(sim, yr_cal, path_yr)
+        write_files_separate(sim, yr_cal, path_yr)
 
 
 
@@ -188,48 +189,29 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
 
 def write_settings(path):
     """Write model run settings"""
-    
+
+    # Open the settings.py file
+    with open('luto/settings.py', 'r') as file:
+        lines = file.readlines()
+        
+        # Adjusted regex patterns to match the multiline section header and variable assignments
+        parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=")
+
+        settings_order = []
+        for line in lines:
+            match = parameter_reg.match(line)
+            if match:
+                settings_order.append(match.group(1).strip())
+
+                
+        # Reorder the settings dictionary to match the order in the settings.py file
+        settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
+        settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
+
+    # Write the settings to a file
     with open(os.path.join(path, 'model_run_settings.txt'), 'w') as f:
-        f.write('LUTO version %s\n' % settings.VERSION)
-        f.write('SSP %s, RCP %s\n' %(settings.SSP, settings.RCP))
-        f.write('DISCOUNT_RATE: %s\n' % settings.DISCOUNT_RATE)
-        f.write('AMORTISATION_PERIOD: %s\n' % settings.AMORTISATION_PERIOD)
-        f.write('CO2_FERT: %s\n' % settings.CO2_FERT)
-        f.write('ENV_PLANTING_COST_PER_HA_PER_YEAR: %s\n' % settings.ENV_PLANTING_COST_PER_HA_PER_YEAR)
-        f.write('CARBON_PRICE_PER_TONNE: %s\n' % settings.CARBON_PRICE_PER_TONNE)
-        f.write('AGRICULTURAL_MANAGEMENT_USE_THRESHOLD: %s\n' % settings.AGRICULTURAL_MANAGEMENT_USE_THRESHOLD)
-        f.write('SOC_AMORTISATION: %s\n' % settings.SOC_AMORTISATION)
-        f.write('RESFACTOR: %s\n' % settings.RESFACTOR)
-        f.write('MODE: %s\n' % settings.MODE)
-        f.write('OBJECTIVE: %s\n' % settings.OBJECTIVE)
-        f.write('DEMAND_CONSTRAINT_TYPE: %s\n' % settings.DEMAND_CONSTRAINT_TYPE)
-        f.write('SOLVE_METHOD: %s\n' % settings.SOLVE_METHOD)
-        f.write('PENALTY: %s\n' % settings.PENALTY)
-        f.write('DUAL_FEASIBILITY_TOLERANCE: %s\n' % settings.DUAL_FEASIBILITY_TOLERANCE)
-        f.write('THREADS: %s\n' % settings.THREADS)
-
-        f.write('CULL_MODE: %s\n' % settings.CULL_MODE)
-        if settings.CULL_MODE == 'absolute':
-            f.write('MAX_LAND_USES_PER_CELL: %s\n' % settings.MAX_LAND_USES_PER_CELL)
-        elif settings.CULL_MODE == 'percentage':
-            f.write('LAND_USAGE_CULL_PERCENTAGE: %s\n' % settings.LAND_USAGE_CULL_PERCENTAGE)
-
-        f.write('WATER_USE_LIMITS: %s\n' % settings.WATER_USE_LIMITS)
-        if settings.WATER_USE_LIMITS == 'on':
-            f.write('WATER_LIMITS_TYPE: %s\n' % settings.WATER_LIMITS_TYPE)
-            if settings.WATER_LIMITS_TYPE == 'pct_ag':
-                f.write('WATER_USE_REDUCTION_PERCENTAGE: %s\n' % settings.WATER_USE_REDUCTION_PERCENTAGE)
-            elif settings.WATER_LIMITS_TYPE == 'water_stress':
-                f.write('WATER_STRESS_FRACTION: %s\n' % settings.WATER_STRESS_FRACTION)
-            f.write('WATER_REGION_DEF: %s\n' % settings.WATER_REGION_DEF)
-
-        f.write('GHG_EMISSIONS_LIMITS: %s\n' % settings.GHG_EMISSIONS_LIMITS)
-        if settings.GHG_EMISSIONS_LIMITS == 'on':
-            f.write('GHG_LIMITS_TYPE: %s\n' % settings.GHG_LIMITS_TYPE)
-            if settings.GHG_LIMITS_TYPE == 'tonnes':
-                f.write('GHG_LIMITS: %s\n' % settings.GHG_LIMITS)
-            elif settings.GHG_LIMITS_TYPE == 'file':
-                f.write('GHG_LIMITS: from file GHG_targets.xlsx in input folder')
+        for k, v in settings_dict.items():
+            f.write(f'{k}:{v}\n')
 
 
 def write_files(sim, yr_cal, path):

@@ -49,7 +49,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("area_1_total_area_wide", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
       title: {
         text: "Total Area by Land-use and Agricultural Commodity",
@@ -89,23 +89,6 @@ document.addEventListener("DOMContentLoaded", function () {
         column: {
           stacking: "normal",
         },
-        series: {
-          events: {
-            legendItemClick: function (event) {
-              var series = this.chart.series;
-
-              series.forEach(function (item) {
-                if (this.name == "Show all" || this == item) {
-                  item.setVisible(true);
-                } else {
-                  item.setVisible(false);
-                }
-              }, this);
-
-              return false;
-            },
-          },
-        },
       },
 
       exporting: {
@@ -118,7 +101,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("area_2_irrigation_area_wide", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
       title: {
         text: "Total Area by Irrigation Type",
@@ -171,7 +154,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("area_3_non_ag_lu_area_wide", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
       title: {
         text: "Non-Agricultural Land Use Area",
@@ -223,7 +206,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("area_4_am_total_area_wide", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
       title: {
         text: "Agricultural Management Area by Type",
@@ -275,7 +258,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("area_5_am_lu_area_wide", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
       title: {
         text: "Agricultural Management Area by Land-use Type",
@@ -314,23 +297,6 @@ document.addEventListener("DOMContentLoaded", function () {
       plotOptions: {
         column: {
           stacking: "normal",
-        },
-        series: {
-          events: {
-            legendItemClick: function (event) {
-              var series = this.chart.series;
-
-              series.forEach(function (item) {
-                if (this.name == "Show all" || this == item) {
-                  item.setVisible(true);
-                } else {
-                  item.setVisible(false);
-                }
-              }, this);
-
-              return false;
-            },
-          },
         },
       },
 

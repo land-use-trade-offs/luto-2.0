@@ -51,7 +51,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("water_1_percent_to_limit", {
       chart: {
         type: "spline",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -101,7 +101,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("water_2_volum_to_limit", {
       chart: {
         type: "spline",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -129,7 +129,7 @@ document.addEventListener("DOMContentLoaded", function () {
         align: "right",
         verticalAlign: "top",
         layout: "vertical",
-        x: 10,
+        x: -10,
         y: 180,
       },
 
@@ -151,7 +151,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("water_3_volum_by_sector", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -209,7 +209,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("water_4_volum_by_landuse", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -271,7 +271,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("water_5_volum_by_irrigation", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -299,7 +299,7 @@ document.addEventListener("DOMContentLoaded", function () {
         align: "right",
         verticalAlign: "top",
         layout: "vertical",
-        x: -100,
+        x: -50,
         y: 280,
       },
 

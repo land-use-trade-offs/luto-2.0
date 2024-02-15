@@ -313,8 +313,11 @@ def get_GHG_category(all_files, GHG_type):
     GHG_nonCO2 = GHG_nonCO2.explode(['GHG Category','Multiplier']).reset_index(drop=True)
     GHG_nonCO2['Quantity (Mt CO2e)'] = GHG_nonCO2['Quantity (Mt CO2e)'] * GHG_nonCO2['Multiplier']
     GHG_nonCO2 = GHG_nonCO2.drop(columns=['Multiplier'])
+    
+    dfs = [GHG_CO2.dropna(axis=1, how='all'),
+           GHG_nonCO2.dropna(axis=1, how='all')]
 
-    return pd.concat([GHG_CO2,GHG_nonCO2],axis=0).reset_index(drop=True)
+    return pd.concat(dfs,axis=0).reset_index(drop=True)
 
 
 def target_GHG_2_Json(GHG_lu_source_target_yr):
@@ -458,6 +461,6 @@ def select_years(year_list):
     for i in range(1, slots + 1):
         # Calculate index for selection
         index = int(round(i * interval))
-        selected_years.insert(-1, year_list[index])
+        selected_years.append(year_list[index])
 
-    return selected_years
+    return sorted(selected_years)
