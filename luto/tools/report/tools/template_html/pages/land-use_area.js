@@ -49,7 +49,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("area_1_total_area_wide", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
       title: {
         text: "Total Area by Land-use and Agricultural Commodity",
@@ -118,7 +118,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("area_2_irrigation_area_wide", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
       title: {
         text: "Total Area by Irrigation Type",
@@ -171,7 +171,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("area_3_non_ag_lu_area_wide", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
       title: {
         text: "Non-Agricultural Land Use Area",
@@ -223,7 +223,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("area_4_am_total_area_wide", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
       title: {
         text: "Agricultural Management Area by Type",
@@ -275,7 +275,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("area_5_am_lu_area_wide", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
       title: {
         text: "Agricultural Management Area by Land-use Type",

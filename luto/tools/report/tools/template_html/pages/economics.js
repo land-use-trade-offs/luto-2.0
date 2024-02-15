@@ -51,7 +51,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("economics_1_revenue_1_Irrigation_wide", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -82,7 +82,7 @@ document.addEventListener("DOMContentLoaded", function () {
         align: "right",
         verticalAlign: "left",
         layout: "vertical",
-        x: -100,
+        x: -50,
         y: 300,
       },
 
@@ -110,7 +110,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Highcharts.chart("economics_1_revenue_2_Source_wide", {
     //   chart: {
     //     type: "column",
-    //     marginRight: 180,
+    //     marginRight: 200,
     //   },
 
     //   title: {
@@ -168,7 +168,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("economics_1_revenue_3_Source_type_wide", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -227,7 +227,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("economics_1_revenue_4_Type_wide", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -284,7 +284,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("economics_1_revenue_5_crop_lvstk_wide", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -342,7 +342,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("economics_2_cost_1_Irrigation_wide", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -371,7 +371,7 @@ document.addEventListener("DOMContentLoaded", function () {
         align: "right",
         verticalAlign: "left",
         layout: "vertical",
-        x: -100,
+        x: -50,
         y: 300,
       },
 
@@ -399,7 +399,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("economics_2_cost_2_Source_wide", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -457,7 +457,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     //     chart: {
     //         type: 'column',
-    //         marginRight: 180
+    //         marginRight: 200
     //     },
 
     //     title: {
@@ -511,7 +511,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("economics_2_cost_4_Type_wide", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -568,7 +568,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("economics_2_cost_5_crop_lvstk_wide", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -628,7 +628,7 @@ document.addEventListener("DOMContentLoaded", function () {
       chart: {
         type: "columnrange",
         renderTo: "economics_3_rev_cost_all",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {

@@ -52,7 +52,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("GHG_1_cunsum_emission_Mt", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -112,7 +112,7 @@ document.addEventListener("DOMContentLoaded", function () {
     let options = {
       chart: {
         renderTo: "GHG_2_individual_emission_Mt",
-        marginRight: 180,
+        marginRight: 200,
       },
       title: {
         text: "GHG Emissions by Sector",
@@ -230,7 +230,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("GHG_3_crop_lvstk_emission_Mt", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -290,7 +290,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("GHG_4_dry_irr_emission_Mt", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -318,7 +318,7 @@ document.addEventListener("DOMContentLoaded", function () {
         align: "right",
         verticalAlign: "top",
         layout: "vertical",
-        x: -100,
+        x: -50,
         y: 250,
       },
 
@@ -349,7 +349,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("GHG_5_category_emission_Mt", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -409,7 +409,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("GHG_6_sources_emission_Mt", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
         marginBottom: 200,
       },
 
@@ -490,7 +490,7 @@ document.addEventListener("DOMContentLoaded", function () {
     let GHG_7_lu_lm_emission_Mt_wide_option = {
       chart: {
         renderTo: "GHG_7_lu_lm_emission_Mt_wide",
-        marginRight: 180,
+        marginRight: 200,
       },
       title: {
         text: "GHG Emissions - Start and End Year",
@@ -508,7 +508,7 @@ document.addEventListener("DOMContentLoaded", function () {
         align: "right",
         verticalAlign: "top",
         layout: "vertical",
-        x: -50,
+        x: -10,
         y: 200,
       },
       tooltip: {
@@ -632,7 +632,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Highcharts.chart('GHG_9_1_ag_reduction_total_wide_Mt', {
     //     chart: {
     //         type: 'column',
-    //         marginRight: 180
+    //         marginRight: 200
     //     },
 
     //     title: {
@@ -687,7 +687,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("GHG_9_2_ag_reduction_source_wide_Mt", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -747,7 +747,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("GHG_10_GHG_ag_man_df_wide_Mt", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -807,7 +807,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("GHG_11_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -868,7 +868,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("GHG_12_GHG_ag_man_dry_irr_df_wide_Mt", {
       chart: {
         type: "column",
-        marginRight: 180,
+        marginRight: 200,
       },
 
       title: {
@@ -897,7 +897,7 @@ document.addEventListener("DOMContentLoaded", function () {
         align: "right",
         verticalAlign: "top",
         layout: "vertical",
-        x: -100,
+        x: -50,
         y: 250,
       },
 
