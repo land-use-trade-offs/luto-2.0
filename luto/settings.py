@@ -187,23 +187,38 @@ AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  # The minimum value an agricultural
 # Greenhouse gas emissions limits and parameters *******************************
 
 SOC_AMORTISATION = 30           # Number of years over which to spread (average) soil carbon accumulation
-
 GHG_EMISSIONS_LIMITS = 'on'        # 'on' or 'off'
-GHG_LIMITS_TYPE = 'file'           # If GHG_EMISSIONS_LIMITS = 'on' then set GHG_LIMITS_TYPE = 'dict' or 'file'
-GHG_LIMITS_FIELD = '1.5C (50%)'    # If GHG_LIMITS_TYPE = 'file' then need to add field name in 'GHG_targets.xlsx' options include: '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-GHG_LIMITS = {                     # If GHG_LIMITS_TYPE = 'dict' then need to set emissions limits in dictionary below (i.e., year: tonnes)
-                2010: 90 * 1e6,    # Agricultural emissions in 2010 in tonnes CO2e
-                2050: -337 * 1e6,  # GHG emissions target and year (can add more years/targets)
-                2100: -337 * 1e6   # GHG emissions target and year (can add more years/targets)
-              }
+
+
+if GHG_EMISSIONS_LIMITS == 'on':
+   GHG_LIMITS_TYPE = 'file' # 'dict' or 'file'
+   if GHG_LIMITS_TYPE == 'dict':
+      # Set emissions limits in dictionary below (i.e., year: tonnes)
+      GHG_LIMITS = {                     
+                  2010: 90 * 1e6,    # Agricultural emissions in 2010 in tonnes CO2e
+                  2050: -337 * 1e6,  # GHG emissions target and year (can add more years/targets)
+                  2100: -337 * 1e6   # GHG emissions target and year (can add more years/targets)
+               }
+   elif GHG_LIMITS_TYPE == 'file':
+      # Take data from 'GHG_targets.xlsx', options include: '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
+      GHG_LIMITS_FIELD = '1.5C (50%)'    
+
 
 
 # Water use limits and parameters *******************************
 
 WATER_USE_LIMITS = 'on'               # 'on' or 'off'
 WATER_LIMITS_TYPE = 'water_stress'    # 'water_stress' or 'pct_ag'
-WATER_USE_REDUCTION_PERCENTAGE = 0    # If WATER_LIMITS_TYPE = 'pct_ag'...       Set reduction in water use as percentage of 2010 irrigation water use
-WATER_STRESS_FRACTION = 0.25          # If WATER_LIMITS_TYPE = 'water_stress'... Set proportion of catchment water use above which is high water stress (following Aqueduct classification of 0.4 but leaving 0.15 for urban/industrial/indigenous use).
+
+if WATER_USE_LIMITS == 'on':
+   if WATER_LIMITS_TYPE == 'pct_ag':
+      # Set reduction in water use as percentage of 2010 irrigation water use
+      WATER_USE_REDUCTION_PERCENTAGE = 0
+   elif WATER_LIMITS_TYPE == 'water_stress':
+      # Set proportion of catchment water use above which is high water stress 
+      # (following Aqueduct classification of 0.4 but leaving 0.15 for urban/industrial/indigenous use).
+      WATER_STRESS_FRACTION = 0.25          
+      
 
 # Regionalisation to enforce water use limits by
 WATER_REGION_DEF = 'DD'                 # 'RR' for River Region, 'DD' for Drainage Division
@@ -232,11 +247,13 @@ CULL_MODE = 'absolute'      # cull to include at most MAX_LAND_USES_PER_CELL
 # CULL_MODE = 'percentage'    # cull the LAND_USAGE_THRESHOLD_PERCENTAGE % most expensive options
 # CULL_MODE = 'none'          # do no culling
 
-# if CULL_MODE = 'absolute'. How many land uses should remain after culling the most expensive options
-MAX_LAND_USES_PER_CELL = 12
 
-# if CULL_MODE = 'percentage'. Cull this percentage of the most expensive land usage options
-LAND_USAGE_CULL_PERCENTAGE = 0.15
+if CULL_MODE == 'absolute':
+   # if CULL_MODE = 'absolute'. How many land uses should remain after culling the most expensive options
+   MAX_LAND_USES_PER_CELL = 12 
+   # if CULL_MODE = 'percentage'. Cull this percentage of the most expensive land usage options
+elif CULL_MODE == 'percentage':
+   LAND_USAGE_CULL_PERCENTAGE = 0.15
 
 
 
