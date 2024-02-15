@@ -89,23 +89,6 @@ document.addEventListener("DOMContentLoaded", function () {
         column: {
           stacking: "normal",
         },
-        series: {
-          events: {
-            legendItemClick: function (event) {
-              var series = this.chart.series;
-
-              series.forEach(function (item) {
-                if (this.name == "Show all" || this == item) {
-                  item.setVisible(true);
-                } else {
-                  item.setVisible(false);
-                }
-              }, this);
-
-              return false;
-            },
-          },
-        },
       },
 
       exporting: {
@@ -314,23 +297,6 @@ document.addEventListener("DOMContentLoaded", function () {
       plotOptions: {
         column: {
           stacking: "normal",
-        },
-        series: {
-          events: {
-            legendItemClick: function (event) {
-              var series = this.chart.series;
-
-              series.forEach(function (item) {
-                if (this.name == "Show all" || this == item) {
-                  item.setVisible(true);
-                } else {
-                  item.setVisible(false);
-                }
-              }, this);
-
-              return false;
-            },
-          },
         },
       },
 

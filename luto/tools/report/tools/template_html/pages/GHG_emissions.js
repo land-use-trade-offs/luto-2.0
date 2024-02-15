@@ -461,23 +461,6 @@ document.addEventListener("DOMContentLoaded", function () {
             enabled: false,
           },
         },
-        series: {
-          events: {
-            legendItemClick: function (event) {
-              var series = this.chart.series;
-
-              series.forEach(function (item) {
-                if (this.name == "Show all" || this == item) {
-                  item.setVisible(true);
-                } else {
-                  item.setVisible(false);
-                }
-              }, this);
-
-              return false;
-            },
-          },
-        },
       },
 
       exporting: {
