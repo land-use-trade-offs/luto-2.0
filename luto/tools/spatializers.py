@@ -29,7 +29,7 @@ except:
 from scipy.interpolate import NearestNDInterpolator
 import luto.settings as settings
 
-def create_2d_map(sim, map_, filler) -> np.ndarray:
+def create_2d_map(sim, map_, yr_cal, filler) -> np.ndarray:
     """
     Create a 2D map by converting it back to full resolution if necessary and
     putting the excluded land-use and land management types back in the array.
@@ -44,7 +44,10 @@ def create_2d_map(sim, map_, filler) -> np.ndarray:
     """
     
     # First convert back to full resolution 2D array if resfactor is > 1.
-    if settings.RESFACTOR > 1:
+    # 1) REFACTOR > 1: requires uncoursification.
+    # 2) yr_cal == sim.data.YR_CAL_BASE: the map_ for YR_CAL_BASE is always at RESFACTOT=1, which
+    #    does not requires uncoursification.
+    if settings.RESFACTOR > 1 and yr_cal != sim.data.YR_CAL_BASE:
         map_ = uncoursify(sim, map_)
         
     # Then put the excluded land-use and land management types back in the array.
@@ -101,7 +104,7 @@ def uncoursify(sim, lxmap):
     f = NearestNDInterpolator(knownindices, lxmap)
     
     # The uncoursified map is obtained by interpolating the missing values.
-    return f(allindices).astype(np.float16)
+    return f(allindices).astype(np.float16) 
 
 
 

@@ -164,9 +164,8 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
         os.mkdir(path_yr)
 
     # Write the decision variables, land-use and land management maps
-    if yr_cal == 2050:
-        write_files(sim, yr_cal, path_yr)
-        write_files_separate(sim, yr_cal, path_yr)
+    write_files(sim, yr_cal, path_yr)
+    write_files_separate(sim, yr_cal, path_yr)
 
 
 
@@ -223,26 +222,26 @@ def write_files(sim, yr_cal, path):
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
     timestamp = str(yr_cal) + '_' + timestamp
     
-    # Save raw agricultural decision variables (float array).
-    ag_X_mrj_fname = 'ag_X_mrj' + '_' + timestamp + '.npy'
-    np.save(os.path.join(path, ag_X_mrj_fname), sim.ag_dvars[yr_cal].astype(np.float16))
+    # # Save raw agricultural decision variables (float array).
+    # ag_X_mrj_fname = 'ag_X_mrj' + '_' + timestamp + '.npy'
+    # np.save(os.path.join(path, ag_X_mrj_fname), sim.ag_dvars[yr_cal].astype(np.float16))
     
-    # Save raw non-agricultural decision variables (float array).
-    non_ag_X_rk_fname = 'non_ag_X_rk' + '_' + timestamp + '.npy'
-    np.save(os.path.join(path, non_ag_X_rk_fname), sim.non_ag_dvars[yr_cal].astype(np.float16))
+    # # Save raw non-agricultural decision variables (float array).
+    # non_ag_X_rk_fname = 'non_ag_X_rk' + '_' + timestamp + '.npy'
+    # np.save(os.path.join(path, non_ag_X_rk_fname), sim.non_ag_dvars[yr_cal].astype(np.float16))
 
-    # Save raw agricultural management decision variables (float array).
-    for am in AG_MANAGEMENTS_TO_LAND_USES:
-        snake_case_am = tools.am_name_snake_case(am)
-        am_X_mrj_fname = 'ag_man_X_mrj' + snake_case_am + '_' + timestamp + ".npy"
-        np.save(os.path.join(path, am_X_mrj_fname), sim.ag_man_dvars[yr_cal][am].astype(np.float16))
+    # # Save raw agricultural management decision variables (float array).
+    # for am in AG_MANAGEMENTS_TO_LAND_USES:
+    #     snake_case_am = tools.am_name_snake_case(am)
+    #     am_X_mrj_fname = 'ag_man_X_mrj' + snake_case_am + '_' + timestamp + ".npy"
+    #     np.save(os.path.join(path, am_X_mrj_fname), sim.ag_man_dvars[yr_cal][am].astype(np.float16))
     
-    # Write out raw numpy arrays for land-use and land management
-    lumap_fname = 'lumap' + '_' + timestamp + '.npy'
-    lmmap_fname = 'lmmap' + '_' + timestamp + '.npy'
+    # # Write out raw numpy arrays for land-use and land management
+    # lumap_fname = 'lumap' + '_' + timestamp + '.npy'
+    # lmmap_fname = 'lmmap' + '_' + timestamp + '.npy'
     
-    np.save(os.path.join(path, lumap_fname), sim.lumaps[yr_cal])
-    np.save(os.path.join(path, lmmap_fname), sim.lmmaps[yr_cal])
+    # np.save(os.path.join(path, lumap_fname), sim.lumaps[yr_cal])
+    # np.save(os.path.join(path, lmmap_fname), sim.lmmaps[yr_cal])
     
     
     
@@ -265,10 +264,10 @@ def write_files(sim, yr_cal, path):
  
     
     # Put the excluded land-use and land management types back in the array.
-    lumap = create_2d_map(sim, sim.lumaps[yr_cal], filler = sim.data.MASK_LU_CODE)
-    lmmap = create_2d_map(sim, sim.lmmaps[yr_cal], filler = sim.data.MASK_LU_CODE)
-    ammap = create_2d_map(sim, ag_man_dvar_argmax, filler = sim.data.MASK_LU_CODE)
-    non_ag = create_2d_map(sim, non_ag_dvar_argmax, filler = sim.data.MASK_LU_CODE)
+    lumap = create_2d_map(sim, sim.lumaps[yr_cal], yr_cal, filler = sim.data.MASK_LU_CODE)
+    lmmap = create_2d_map(sim, sim.lmmaps[yr_cal], yr_cal, filler = sim.data.MASK_LU_CODE)
+    ammap = create_2d_map(sim, ag_man_dvar_argmax, yr_cal, filler = sim.data.MASK_LU_CODE)
+    non_ag = create_2d_map(sim, non_ag_dvar_argmax, yr_cal, filler = sim.data.MASK_LU_CODE)
     
     lumap_fname = 'lumap' + '_' + timestamp + '.tiff'
     lmmap_fname = 'lmmap' + '_' + timestamp + '.tiff'
@@ -345,7 +344,7 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
 
         # reconsititude the dvar to 2d
         dvar = row['dvar']
-        dvar = create_2d_map(sim, dvar, filler = sim.data.MASK_LU_CODE) # fill the missing values with sim.data.MASK_LU_CODE  
+        dvar = create_2d_map(sim, dvar, yr_cal, filler = sim.data.MASK_LU_CODE) # fill the missing values with sim.data.MASK_LU_CODE  
 
         # Create output file name
         fname = f'{category}_{dvar_idx:02}_{desc}_{yr_cal}.tiff'
