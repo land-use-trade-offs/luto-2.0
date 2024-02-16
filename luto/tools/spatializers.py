@@ -46,7 +46,7 @@ def create_2d_map(sim, map_, filler) -> np.ndarray:
     # First convert back to full resolution 2D array if resfactor is > 1.
     if settings.RESFACTOR > 1:
         map_ = uncoursify(sim, map_)
-        
+
     # Then put the excluded land-use and land management types back in the array.
     map_ = reconstitute(map_, sim.data.LUMASK, filler = filler)
     
@@ -101,7 +101,7 @@ def uncoursify(sim, lxmap):
     f = NearestNDInterpolator(knownindices, lxmap)
     
     # The uncoursified map is obtained by interpolating the missing values.
-    return f(allindices).astype(np.float16)
+    return f(allindices).astype(np.float16) 
 
 
 
