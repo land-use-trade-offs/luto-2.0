@@ -56,7 +56,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "GHG Emissions",
+        text: "Net Land Sector GHG Emissions",
       },
 
       credits: {
@@ -69,7 +69,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       yAxis: {
         title: {
-          text: "Emissions (Mt CO2e)",
+          text: "Greenhouse Gas (Mt CO2e)",
         },
       },
       xAxis: {
@@ -115,7 +115,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 200,
       },
       title: {
-        text: "GHG Emissions by Sector",
+        text: "GHG Emissions by Land-use/Management Type",
       },
 
       xAxis: {
@@ -124,7 +124,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       yAxis: {
         title: {
-          text: "Emissions (Mt CO2e)",
+          text: "Greenhouse Gas (Mt CO2e)",
         },
       },
       legend: {
@@ -248,7 +248,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       yAxis: {
         title: {
-          text: "Emissions (million t CO2e)",
+          text: "Greenhouse Gas (Mt CO2e)",
         },
       },
       xAxis: {
@@ -307,7 +307,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       yAxis: {
         title: {
-          text: "Emissions (million t CO2e)",
+          text: "Greenhouse Gas (Mt CO2e)",
         },
       },
       xAxis: {
@@ -367,7 +367,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       yAxis: {
         title: {
-          text: "Emissions (million t CO2e)",
+          text: "Greenhouse Gas (Mt CO2e)",
         },
       },
       xAxis: {
@@ -427,7 +427,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       yAxis: {
         title: {
-          text: "Emissions (million t CO2e)",
+          text: "Emissions (Mt CO2e)",
         },
       },
       xAxis: {
@@ -484,7 +484,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       yAxis: {
         title: {
-          text: "Emissions (t CO2e/ha)",
+          text: "Greenhouse Gas (t CO2e/ha)",
         },
       },
       legend: {
@@ -575,7 +575,7 @@ document.addEventListener("DOMContentLoaded", function () {
         type: "packedbubble",
       },
       title: {
-        text: "GHG Emission in the target year",
+        text: "GHG Emissions in the target year",
       },
       tooltip: {
         useHTML: true,
@@ -632,7 +632,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     //     yAxis: {
     //         title: {
-    //             text: 'Sequestration (million t CO2e)'
+    //             text: 'Emissions (Mt CO2e)'
     //         },
     //     },xAxis: {
     //     tickPositions: tickposition,
@@ -674,7 +674,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "Non Agricultural Land-use Sequestration",
+        text: "GHG Emissions Abatement by Non-agricultural Land-use Type",
       },
 
       credits: {
@@ -688,7 +688,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       yAxis: {
         title: {
-          text: "Sequestration (million t CO2e)",
+          text: "Greenhouse Gas (Mt CO2e)",
         },
       },
       xAxis: {
@@ -734,7 +734,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "GHG Emission Abatements",
+        text: "GHG Emissions Abatement by Agricultural Management Type",
       },
 
       credits: {
@@ -748,7 +748,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       yAxis: {
         title: {
-          text: "GHG Emission Abatements (million t CO2e)",
+          text: "Greenhouse Gas (Mt CO2e)",
         },
       },
       xAxis: {
@@ -794,7 +794,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "GHG Emission Abatements by Crop|Livestock",
+        text: "GHG Emissions Abatement by Crop/Livestock",
       },
 
       credits: {
@@ -809,7 +809,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       yAxis: {
         title: {
-          text: "GHG Emission Abatements (million t CO2e)",
+          text: "Greenhouse Gas (Mt CO2e)",
         },
       },
       xAxis: {
@@ -855,7 +855,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "GHG Emission Abatements by Irrigation Type",
+        text: "GHG Emissions Abatement by Irrigation Type",
       },
 
       credits: {
@@ -869,7 +869,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       yAxis: {
         title: {
-          text: "GHG Emission Abatements (million t CO2e)",
+          text: "Greenhouse Gas (Mt CO2e)",
         },
       },
       xAxis: {
