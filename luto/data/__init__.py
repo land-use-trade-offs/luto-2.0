@@ -38,7 +38,6 @@ from luto.settings import (
     FIRE_RISK, 
     GHG_LIMITS_TYPE, 
     GHG_LIMITS, 
-    GHG_LIMITS_FIELD, 
     CONNECTIVITY_WEIGHTING, 
     BIODIV_TARGET, 
     SSP, 
@@ -527,7 +526,7 @@ DEMAND_C = DEMAND_C.to_numpy(dtype = np.float32).T
 # If GHG_LIMITS_TYPE == 'file' then import the Excel spreadsheet and import the results to a python dictionary {year: target (tCO2e), ...}
 if GHG_LIMITS_TYPE == 'file':
     GHG_TARGETS = pd.read_excel(os.path.join(INPUT_DIR, 'GHG_targets.xlsx'), sheet_name = 'Data', index_col = 'YEAR')
-    GHG_TARGETS = GHG_TARGETS[GHG_LIMITS_FIELD].to_dict()
+    GHG_TARGETS = GHG_TARGETS[GHG_LIMITS].to_dict()
 
 # If GHG_LIMITS_TYPE == 'dict' then import the Excel spreadsheet and import the results to a python dictionary {year: target (tCO2e), ...}
 elif GHG_LIMITS_TYPE == 'dict':

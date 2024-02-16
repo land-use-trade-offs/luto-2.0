@@ -81,7 +81,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 30          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 5          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
 # MODE = 'snapshot'       # runs for target year only
@@ -201,7 +201,7 @@ if GHG_EMISSIONS_LIMITS == 'on':
                }
    elif GHG_LIMITS_TYPE == 'file':
       # Take data from 'GHG_targets.xlsx', options include: '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-      GHG_LIMITS_FIELD = '1.5C (50%)'    
+      GHG_LIMITS = '1.5C (50%)'    
 
 
 
@@ -247,13 +247,8 @@ CULL_MODE = 'absolute'      # cull to include at most MAX_LAND_USES_PER_CELL
 # CULL_MODE = 'percentage'    # cull the LAND_USAGE_THRESHOLD_PERCENTAGE % most expensive options
 # CULL_MODE = 'none'          # do no culling
 
-
-if CULL_MODE == 'absolute':
-   # if CULL_MODE = 'absolute'. How many land uses should remain after culling the most expensive options
-   MAX_LAND_USES_PER_CELL = 12 
-   # if CULL_MODE = 'percentage'. Cull this percentage of the most expensive land usage options
-elif CULL_MODE == 'percentage':
-   LAND_USAGE_CULL_PERCENTAGE = 0.15
+MAX_LAND_USES_PER_CELL = 12 
+LAND_USAGE_CULL_PERCENTAGE = 0.15
 
 
 
