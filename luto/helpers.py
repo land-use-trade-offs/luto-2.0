@@ -41,7 +41,7 @@ from luto.dataprep import create_new_dataset
 create_new_dataset()
 
 import luto.simulation as sim
-sim.run( 2010, 2050 )
+sim.run( 2010, 2015 )
 
 from luto.tools.write import *
 path = get_path(sim)

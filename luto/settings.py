@@ -81,7 +81,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 5          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 10          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # How does the model run over time 
 # MODE = 'snapshot'       # runs for target year only
@@ -152,7 +152,7 @@ NON_AGRICULTURAL_LU_BASE_CODE = 100         # Non-agricultural land uses will ap
 
 # Environmental Plantings Parameters
 ENV_PLANTING_COST_PER_HA_PER_YEAR = 100     # Yearly cost of maintaining one hectare of environmental plantings
-CARBON_PRICE_PER_TONNE = 50                 # Price of carbon per tonne - determines EP revenue in the model
+CARBON_PRICE_PER_TONNE = 50                # Price of carbon per tonne - determines EP revenue in the model
 
 # Riparian Planting Parameters
 RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR = 100
@@ -190,18 +190,16 @@ SOC_AMORTISATION = 30           # Number of years over which to spread (average)
 GHG_EMISSIONS_LIMITS = 'on'        # 'on' or 'off'
 
 
-if GHG_EMISSIONS_LIMITS == 'on':
-   GHG_LIMITS_TYPE = 'file' # 'dict' or 'file'
-   if GHG_LIMITS_TYPE == 'dict':
-      # Set emissions limits in dictionary below (i.e., year: tonnes)
-      GHG_LIMITS = {                     
-                  2010: 90 * 1e6,    # Agricultural emissions in 2010 in tonnes CO2e
-                  2050: -337 * 1e6,  # GHG emissions target and year (can add more years/targets)
-                  2100: -337 * 1e6   # GHG emissions target and year (can add more years/targets)
-               }
-   elif GHG_LIMITS_TYPE == 'file':
-      # Take data from 'GHG_targets.xlsx', options include: '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-      GHG_LIMITS = '1.5C (50%)'    
+GHG_LIMITS_TYPE = 'file' # 'dict' or 'file'
+
+# Set emissions limits in dictionary below (i.e., year: tonnes)
+# GHG_LIMITS = {                     
+#             2010: 90 * 1e6,    # Agricultural emissions in 2010 in tonnes CO2e
+#             2050: -337 * 1e6,  # GHG emissions target and year (can add more years/targets)
+#             2100: -337 * 1e6   # GHG emissions target and year (can add more years/targets)
+#              }
+# Take data from 'GHG_targets.xlsx', options include: '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
+GHG_LIMITS = 'None'    
 
 
 

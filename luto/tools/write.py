@@ -157,8 +157,8 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
         os.mkdir(path_yr)
 
     # Write the decision variables, land-use and land management maps
-    write_files(sim, yr_cal, path_yr)
-    write_files_separate(sim, yr_cal, path_yr)
+    # write_files(sim, yr_cal, path_yr)
+    # write_files_separate(sim, yr_cal, path_yr)
 
 
 
@@ -467,7 +467,7 @@ def write_dvar_area(sim, yr_cal, path):
     timestamp = str(yr_cal) + '_' + timestamp
     
     # Reprot the process
-    print('Writting area calculated from dvars to', path)
+    print('Writing area calculated from dvars to', path)
     
 
     # Get the decision variables for the year, multiply them by the area of each pixel, 
