@@ -81,10 +81,10 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 10          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 5          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # Determine if write GeoTiffs to output directory: True or False
-WRITE_OUTPUT_GEOTIFFS = True
+WRITE_OUTPUT_GEOTIFFS = False
 
 # How does the model run over time 
 # MODE = 'snapshot'       # runs for target year only
@@ -123,13 +123,9 @@ PENALTY = 1e5
 # Print detailed output to screen
 VERBOSE = 1
 
-# Relax the tolerance for proving optimality
-DUAL_FEASIBILITY_TOLERANCE = 1e-2
-BARRIER_CONVERGENCE_TOLERANCE = 1e-2
-
-"""Default value:	1e-6
-   Minimum value:	1e-9
-   Maximum value:	1e-2"""
+# Relax the tolerances for feasibility and optimality
+DUAL_FEASIBILITY_TOLERANCE = 1e-2         # Default:	 1e-6, Min: 1e-9, Max: 1e-2
+BARRIER_CONVERGENCE_TOLERANCE = 1e-4      # Range from 1e-2 to 1e-8, that larger the number the faster but the less exact the solve 
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
 THREADS = 32
@@ -188,21 +184,21 @@ AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  # The minimum value an agricultural
 # ---------------------------------------------------------------------------- #
 
 # Greenhouse gas emissions limits and parameters *******************************
-
-SOC_AMORTISATION = 30           # Number of years over which to spread (average) soil carbon accumulation
 GHG_EMISSIONS_LIMITS = 'on'        # 'on' or 'off'
-
 
 GHG_LIMITS_TYPE = 'file' # 'dict' or 'file'
 
 # Set emissions limits in dictionary below (i.e., year: tonnes)
-# GHG_LIMITS = {                     
-#             2010: 90 * 1e6,    # Agricultural emissions in 2010 in tonnes CO2e
-#             2050: -337 * 1e6,  # GHG emissions target and year (can add more years/targets)
-#             2100: -337 * 1e6   # GHG emissions target and year (can add more years/targets)
-#              }
+GHG_LIMITS = {                     
+              2010: 90 * 1e6,    # Agricultural emissions in 2010 in tonnes CO2e
+              2050: -337 * 1e6,  # GHG emissions target and year (can add more years/targets)
+              2100: -337 * 1e6   # GHG emissions target and year (can add more years/targets)
+             }
+
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
 GHG_LIMITS = '1.5C (67%)'    
+
+SOC_AMORTISATION = 30           # Number of years over which to spread (average) soil carbon accumulation
 
 
 
@@ -219,7 +215,7 @@ if WATER_USE_LIMITS == 'on':
       # Set proportion of catchment water use above which is high water stress 
       # (0.25 follows Aqueduct classification of 0.4 but leaving 0.15 for urban/industrial/indigenous use).
       # Safe and just Earth system boundaries says 0.2 https://www.nature.com/articles/s41586-023-06083-8
-      WATER_STRESS_FRACTION = 0.20          
+      WATER_STRESS_FRACTION = 0.20
       
 
 # Regionalisation to enforce water use limits by
