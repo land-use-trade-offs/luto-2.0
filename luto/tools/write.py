@@ -156,9 +156,9 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     if not os.path.isdir(path_yr):
         os.mkdir(path_yr)
 
-    # Write the decision variables, land-use and land management maps
-    write_files(sim, yr_cal, path_yr)
-    write_files_separate(sim, yr_cal, path_yr)
+    # # Write the decision variables, land-use and land management maps
+    # write_files(sim, yr_cal, path_yr)
+    # write_files_separate(sim, yr_cal, path_yr)
 
 
 
