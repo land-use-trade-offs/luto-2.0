@@ -270,7 +270,7 @@ transition_df_pct = transition_df_area / total_area * 100
 transition_df_pct = transition_df_pct.fillna(0)
 
 
-heat_area = transition_df_area.style.background_gradient(cmap='Oranges', axis=1).format('{:,.0f}')
+heat_area = transition_df_area.style.background_gradient(cmap='Oranges', axis=1).format('{:,.1f}')
 heat_pct = transition_df_pct.style.background_gradient(cmap='Oranges', axis=1,vmin=0, vmax=100).format('{:,.3f}')
 
 # Define the style
@@ -282,7 +282,7 @@ heat_area_html = style + heat_area.to_html()
 heat_pct_html = style + heat_pct.to_html()
 
 # Replace 0.00 with 0 in the html
-heat_area_html = re.sub(r'(?<!\d)0(?!\d)', '-', heat_area_html)
+heat_area_html = re.sub(r'(?<!\d)0.0(?!\d)', '-', heat_area_html)
 heat_pct_html = re.sub(r'(?<!\d)0.000(?!\d)', '-', heat_pct_html)
 
 # Save the html

@@ -84,7 +84,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 10          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # Determine if write GeoTiffs to output directory: True or False
-WRITE_OUTPUT_GEOTIFFS = False
+WRITE_OUTPUT_GEOTIFFS = True
 
 # How does the model run over time 
 # MODE = 'snapshot'       # runs for target year only
