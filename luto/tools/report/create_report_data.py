@@ -155,7 +155,7 @@ quantity_df_wide.to_csv(f'{SAVE_DIR}/production_5_6_demand_Production_commodity_
 # Plot_2-2: Revenue and Cost data (Billion Dollars)
 revenue_df = get_rev_cost_df(files, 'revenue')
 revenue_df['Source_type'] = revenue_df['Source_type'].str.replace(' Crop','')
-revenue_df['Irrigation'] = revenue_df['Irrigation'].replace({'dry': 'Dry-land', 'irr': 'Irrigated-land'})
+revenue_df['Irrigation'] = revenue_df['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
 
 keep_cols = ['year', 'value (billion)']
 loop_cols = revenue_df.columns.difference(keep_cols)
@@ -172,7 +172,7 @@ for idx,col in enumerate(loop_cols):
 
 cost_df = get_rev_cost_df(files, 'cost')
 cost_df['Source_type'] = cost_df['Source_type'].str.replace(' Crop','')
-cost_df['Irrigation'] = cost_df['Irrigation'].replace({'dry': 'Dry-land', 'irr': 'Irrigated-land'})
+cost_df['Irrigation'] = cost_df['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
 
 keep_cols = ['year', 'value (billion)']
 loop_cols = cost_df.columns.difference(keep_cols)
@@ -214,7 +214,7 @@ lu_area_dvar_wide.to_csv(f'{SAVE_DIR}/area_1_total_area_wide.csv', index=False)
 
 # Plot_3-2: Total Area (km2) by Irrigation
 lm_dvar_area = area_dvar.groupby(['Year','Water']).sum(numeric_only=True).reset_index()
-lm_dvar_area['Water'] = lm_dvar_area['Water'].replace({'dry': 'Dry-land', 'irr': 'Irrigated-land'})
+lm_dvar_area['Water'] = lm_dvar_area['Water'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
 lm_dvar_area_wide = lm_dvar_area.pivot(index='Year', 
                                        columns='Water', 
                                        values='Area (million km2)').reset_index()
@@ -316,7 +316,7 @@ GHG_files_wide.to_csv(f'{SAVE_DIR}/GHG_2_individual_emission_Mt.csv',index=False
 
 # Plot_4-3: GHG emission (Mt)
 GHG_emissions_long = get_GHG_category(GHG_files,'Agricultural Landuse')
-GHG_emissions_long['Irrigation'] = GHG_emissions_long['Irrigation'].replace({'dry': 'Dry-land', 'irr': 'Irrigated-land'})
+GHG_emissions_long['Irrigation'] = GHG_emissions_long['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
 GHG_emissions_long['GHG Category'] = GHG_emissions_long['GHG Category'].replace({'CH4': 'Methane (CH4)', 
                                                                                  'N2O': 'Nitrous Oxide (N2O)', 
                                                                                  'CO2': 'Carbon Dioxide (CO2)'})
@@ -401,7 +401,7 @@ Non_ag_reduction_source_wide.to_csv(f'{SAVE_DIR}/GHG_9_2_ag_reduction_source_wid
 
 # Plot_4-5: GHG reductions by Agricultural managements (Mt)
 Ag_man_sequestration_long = get_GHG_category(GHG_files,'Agricultural Management')
-Ag_man_sequestration_long['Irrigation'] = Ag_man_sequestration_long['Irrigation'].replace({'dry': 'Dry-land', 'irr': 'Irrigated-land'}) 
+Ag_man_sequestration_long['Irrigation'] = Ag_man_sequestration_long['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'}) 
 
 # Plot_4-5-1: GHG reductions by Agricultural managements in total (Mt)
 Ag_man_sequestration_total = Ag_man_sequestration_long.groupby(['Year','GHG Category']).sum()['Quantity (Mt CO2e)'].reset_index()
@@ -433,7 +433,7 @@ water_paths_separate = files.query('category == "water" and year_types == "singl
 water_df_total = get_water_df(water_paths_total)
 water_df_separate = pd.concat([pd.read_csv(path) for path in water_paths_separate['path']], ignore_index=True)
 water_df_separate['Water Use (ML)'] = water_df_separate['Water Use (ML)'].astype(float)
-water_df_separate['Irrigation'] = water_df_separate['Irrigation'].replace({'dry': 'Dry-land', 'irr': 'Irrigated-land'}) 
+water_df_separate['Irrigation'] = water_df_separate['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'}) 
 
 # Plot_5-1: Water use compared to limite (%)
 water_df_total_pct_wide = water_df_total.pivot(index='year', columns='REGION_NAME', values='PROPORTION_%')

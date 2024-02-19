@@ -144,7 +144,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 marginRight: 200,
             },
             title: {
-                text: "Total Biodiversity Score by Land Use",
+                text: "Total Biodiversity Score by Land-use",
             },
             data: {
                 csv: document.getElementById(

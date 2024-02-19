@@ -213,7 +213,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "Water Use by Agricultural Commodity and Land-use",
+        text: "Water Use by Land-use and Agricultural Commodity",
       },
 
       credits: {

@@ -52,7 +52,7 @@ def get_exclude_matrices(data, base_year: int, lumaps: Dict[int, np.ndarray]):
     numpy.ndarray
         x_mrj exclude matrix. The m-slices correspond to the
         different land-management versions of the land-use `j` to switch _to_.
-        With m==0 conventional dry-land, m==1 conventional irrigated.
+        With m==0 conventional dryland, m==1 conventional irrigated.
     """    
     # Boolean exclusion matrix based on SA2/NLUM agricultural land-use data (in mrj structure).
     # Effectively, this ensures that in any SA2 region the only combinations of land-use and land management
@@ -152,7 +152,7 @@ def get_transition_matrices(data, yr_idx, base_year, lumaps, lmmaps):
     # Cardbon costs of transitioning cells.                          #
     # -------------------------------------------------------------- #
 
-    # apply the cost of carbon released by transitioning unnatural land to natural land
+    # apply the cost of carbon released by transitioning modified land to natural land
     ghg_t_mrj = ag_ghg.get_ghg_transition_penalties(data, lumap)
     ghg_t_mrj_cost = tools.amortise(ghg_t_mrj * settings.CARBON_PRICE_PER_TONNE)
 
