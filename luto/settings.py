@@ -152,7 +152,7 @@ NON_AGRICULTURAL_LU_BASE_CODE = 100         # Non-agricultural land uses will ap
 
 # Environmental Plantings Parameters
 ENV_PLANTING_COST_PER_HA_PER_YEAR = 100     # Yearly cost of maintaining one hectare of environmental plantings
-CARBON_PRICE_PER_TONNE = 50                # Price of carbon per tonne - determines EP revenue in the model
+CARBON_PRICE_PER_TONNE = 100                # Price of carbon per tonne - determines EP revenue in the model
 
 # Riparian Planting Parameters
 RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR = 100
@@ -198,8 +198,8 @@ GHG_LIMITS_TYPE = 'file' # 'dict' or 'file'
 #             2050: -337 * 1e6,  # GHG emissions target and year (can add more years/targets)
 #             2100: -337 * 1e6   # GHG emissions target and year (can add more years/targets)
 #              }
-# Take data from 'GHG_targets.xlsx', options include: '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-GHG_LIMITS = 'None'    
+# Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
+GHG_LIMITS = '1.5C (67%)'    
 
 
 
@@ -214,8 +214,9 @@ if WATER_USE_LIMITS == 'on':
       WATER_USE_REDUCTION_PERCENTAGE = 0
    elif WATER_LIMITS_TYPE == 'water_stress':
       # Set proportion of catchment water use above which is high water stress 
-      # (following Aqueduct classification of 0.4 but leaving 0.15 for urban/industrial/indigenous use).
-      WATER_STRESS_FRACTION = 0.25          
+      # (0.25 follows Aqueduct classification of 0.4 but leaving 0.15 for urban/industrial/indigenous use).
+      # Safe and just Earth system boundaries says 0.2 https://www.nature.com/articles/s41586-023-06083-8
+      WATER_STRESS_FRACTION = 0.20          
       
 
 # Regionalisation to enforce water use limits by
