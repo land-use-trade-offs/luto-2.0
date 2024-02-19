@@ -1,5 +1,5 @@
 import numpy as np
-import settings.REFORESTATION_BIODIVERSITY_BENEFIT
+from luto.settings import REFORESTATION_BIODIVERSITY_BENEFIT
 
 
 def get_breq_matrix(data) -> np.ndarray:
