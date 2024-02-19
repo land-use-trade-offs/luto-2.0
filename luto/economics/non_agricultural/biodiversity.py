@@ -1,4 +1,5 @@
 import numpy as np
+import settings.REFORESTATION_BIODIVERSITY_BENEFIT
 
 
 def get_breq_matrix(data) -> np.ndarray:
@@ -14,6 +15,6 @@ def get_breq_matrix(data) -> np.ndarray:
 
     # The current assumption is that all non-agricultural land uses contribute fully to biodiversity
     for k in range(len(data.NON_AG_LU_NATURAL)):
-        b_rk[:, k] = data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA
+        b_rk[:, k] = data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * REFORESTATION_BIODIVERSITY_BENEFIT
 
     return b_rk

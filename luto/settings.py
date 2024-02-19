@@ -231,6 +231,9 @@ CONNECTIVITY_WEIGHTING = 1
 # Set livestock impact on biodiversity (0 = no impact, 1 = total annihilation)
 BIODIV_LIVESTOCK_IMPACT = 0.5
 
+# Set benefit level of EP, AF, and RP (0 = none, 1 = full)
+REFORESTATION_BIODIVERSITY_BENEFIT = 0.5
+
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 BIODIVERSITY_LIMITS = 'on'             # 'on' or 'off'
 BIODIV_TARGET = 0.3
