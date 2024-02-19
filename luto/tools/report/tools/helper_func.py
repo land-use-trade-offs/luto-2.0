@@ -444,23 +444,28 @@ def select_years(year_list):
         list: A list containing the selected years.
 
     """
-    # Check if the list has more than 6 elements
-    if len(year_list) <= 6:
-        return year_list  # Return the list as is if 6 or fewer elements
+    year_list = sorted(year_list)
+    
+    if year_list[-1] == 2050:
+        # Return [2010, 2020, ..., 2050] if the last year is 2050 
+        return list(range(2010, 2051, 10)) 
+    elif len(year_list) <= 6:
+        # Return the list as is if 5 or fewer elements
+        return year_list 
+    else:
+        # Select the start and end years
+        selected_years = [year_list[0], year_list[-1]]
 
-    # Select the start and end years
-    selected_years = [year_list[0], year_list[-1]]
+        # Calculate the number of years to be selected in between (4 in this case)
+        slots = 4
 
-    # Calculate the number of years to be selected in between (4 in this case)
-    slots = 4
+        # Calculate the interval for selection
+        interval = (len(year_list) - 2) / (slots + 1)
 
-    # Calculate the interval for selection
-    interval = (len(year_list) - 2) / (slots + 1)
+        # Select years based on calculated interval, ensuring even distribution
+        for i in range(1, slots + 1):
+            # Calculate index for selection
+            index = int(round(i * interval))
+            selected_years.append(year_list[index])
 
-    # Select years based on calculated interval, ensuring even distribution
-    for i in range(1, slots + 1):
-        # Calculate index for selection
-        index = int(round(i * interval))
-        selected_years.append(year_list[index])
-
-    return sorted(selected_years)
+        return selected_years

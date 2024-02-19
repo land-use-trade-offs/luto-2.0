@@ -63,7 +63,7 @@ html_df.columns = ['name','path']
 all_data_files = glob(f"{REPORT_DIR}/data/*")
 
 # Add data path to html_df
-html_df['data_path'] = html_df.apply(lambda x: [i for i in all_data_files if x['name'] in i ],axis=1)
+html_df['data_path'] = html_df.apply(lambda x: [i for i in all_data_files if x['name'] in i ], axis=1)
 
 
 # Parse html files

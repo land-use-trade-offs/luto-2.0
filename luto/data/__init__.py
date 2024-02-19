@@ -20,14 +20,9 @@ import os
 import pandas as pd
 import numpy as np
 from scipy.interpolate import interp1d
+from luto.economics.agricultural.quantity import lvs_veg_types
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
-# Try-Except to make sure {rasterio} can be loaded under different environment
-try:
-    import rasterio
-except:
-    from osgeo import gdal
-    import rasterio
-    
 from luto.settings import (
     INPUT_DIR, 
     RESFACTOR, 
@@ -36,8 +31,6 @@ from luto.settings import (
     NON_AGRICULTURAL_LU_BASE_CODE, 
     RISK_OF_REVERSAL, 
     FIRE_RISK, 
-    GHG_LIMITS_TYPE, 
-    GHG_LIMITS, 
     CONNECTIVITY_WEIGHTING, 
     BIODIV_TARGET, 
     SSP, 
@@ -49,13 +42,34 @@ from luto.settings import (
     IMPORT_TREND, 
     WASTE, 
     FEED_EFFICIENCY, 
+    GHG_LIMITS_TYPE,
     RIPARIAN_PLANTINGS_BUFFER_WIDTH,
     RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR,
     BIODIV_LIVESTOCK_IMPACT,
 )
 
-from luto.economics.agricultural.quantity import lvs_veg_types
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+
+
+# The {GHG_LIMITS}, and {GHG_LIMITS_FIELD} settings are mutually exclusive. 
+# Here we use a try-except block to set the value of the
+# settings if they are not set in the settings.py file.
+try:
+    from luto.settings import GHG_LIMITS
+except ImportError:
+    GHG_LIMITS = None
+    
+try: 
+    from luto.settings import GHG_LIMITS_FIELD
+except ImportError: 
+    GHG_LIMITS_FIELD = None
+
+
+# Try-Except to make sure {rasterio} can be loaded under different environment
+try:
+    import rasterio
+except:
+    from osgeo import gdal
+    import rasterio
 
 
 
@@ -537,8 +551,8 @@ elif GHG_LIMITS_TYPE == 'dict':
     # # Create linear function f and interpolate
     f = interp1d(list(GHG_LIMITS.keys()), list(GHG_LIMITS.values()), kind = 'linear', fill_value = 'extrapolate')
     keys = range(2010, 2101)
-    values = f(yr)
-    GHG_TARGETS = dict(zip(keys, values))
+    for yr in range(2010, 2101):
+        GHG_TARGETS[yr] = f(yr)
  
     
  

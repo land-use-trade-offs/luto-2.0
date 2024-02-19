@@ -1,10 +1,19 @@
 import numpy as np
 
-from luto.settings import (
-    CULL_MODE,
-    MAX_LAND_USES_PER_CELL,
-    LAND_USAGE_CULL_PERCENTAGE,
-)
+from luto.settings import CULL_MODE
+
+# The {MAX_LAND_USES_PER_CELL}, and {LAND_USAGE_CULL_PERCENTAGE} settings are 
+# mutually exclusive. Here we use a try-except block to set the value of the
+# settings if they are not set in the settings.py file.
+try:
+    from luto.settings import MAX_LAND_USES_PER_CELL 
+except ImportError: 
+    MAX_LAND_USES_PER_CELL = None
+    
+try:
+    from luto.settings import LAND_USAGE_CULL_PERCENTAGE
+except ImportError:
+    LAND_USAGE_CULL_PERCENTAGE = None
 
 
 def get_percentage_cost_mask(m, r, x_mrj_mask, costs_mrj):

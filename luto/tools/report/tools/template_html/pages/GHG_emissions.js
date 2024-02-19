@@ -24,7 +24,7 @@ document.addEventListener("DOMContentLoaded", function () {
     csv = document.getElementById(
       "GHG_1_cunsum_emission_Mt_csv"
     ).innerHTML;
-    
+
     csv_lines = csv.split("\n");
 
     // if the last line is empty, remove it
@@ -87,9 +87,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       tooltip: {
         formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
         },
       },
 
@@ -109,19 +108,13 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // Chart:GHG_2_individual_emission_Mt
-    let options = {
+    Highcharts.chart("GHG_2_individual_emission_Mt", {
       chart: {
-        renderTo: "GHG_2_individual_emission_Mt",
         marginRight: 200,
       },
       title: {
         text: "GHG Emissions by Land-use/Management Type",
       },
-
-      xAxis: {
-        categories: [],
-      },
-
       yAxis: {
         title: {
           text: "Greenhouse Gas (Mt CO2e)",
@@ -136,38 +129,13 @@ document.addEventListener("DOMContentLoaded", function () {
       },
       tooltip: {
         formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
         },
       },
-      series: [
-        {
-          name: "Series 0",
-          data: [],
-          type: "column",
-        },
-        {
-          name: "Series 1",
-          data: [],
-          type: "column",
-        },
-        {
-          name: "Series 2",
-          data: [],
-          type: "column",
-        },
-        {
-          name: "Series 3",
-          data: [],
-          type: "column",
-        },
-        {
-          name: "Series 4",
-          data: [],
-          type: "spline",
-        },
-      ],
+      series: JSON.parse(
+        document.getElementById("GHG_2_individual_emission_Mt_csv").innerHTML
+        ),
       credits: {
         enabled: false,
       },
@@ -183,48 +151,9 @@ document.addEventListener("DOMContentLoaded", function () {
         sourceWidth: 1200,
         sourceHeight: 600,
       },
-    };
+    });
 
-    // push data into options
-    let data = document.getElementById(
-      "GHG_2_individual_emission_Mt_csv"
-    ).innerHTML;
-    // Split the lines
-    var lines = data.split("\n");
-    // If the last line is empty, remove it
-    if (lines[lines.length - 1] == "") {
-      lines.pop();
-    }
 
-    // Push column data into data list
-    for (let i = 0; i < lines.length; i++) {
-      if (i == 0) {
-        // push column names into series names
-        options.series[0].name = lines[i].split(",")[1];
-        options.series[1].name = lines[i].split(",")[2];
-        options.series[2].name = lines[i].split(",")[3];
-        options.series[3].name = lines[i].split(",")[4];
-        options.series[4].name = lines[i].split(",")[5];
-      } else {
-        // push row data into series data
-        let year = lines[i].split(",")[0];
-        let col1 = lines[i].split(",")[1];
-        let col2 = lines[i].split(",")[2];
-        let col3 = lines[i].split(",")[3];
-        let col4 = lines[i].split(",")[4];
-        let col5 = lines[i].split(",")[5];
-
-        options.xAxis.categories.push(parseFloat(year));
-        options.series[0].data.push(parseFloat(col1));
-        options.series[1].data.push(parseFloat(col2));
-        options.series[2].data.push(parseFloat(col3));
-        options.series[3].data.push(parseFloat(col4));
-        options.series[4].data.push(parseFloat(col5));
-      }
-    }
-
-    // Create the chart
-    var chart = new Highcharts.Chart(options);
 
     // Chart:GHG_3_crop_lvstk_emission_Mt
     Highcharts.chart("GHG_3_crop_lvstk_emission_Mt", {
@@ -265,9 +194,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       tooltip: {
         formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
         },
       },
 
@@ -324,9 +252,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       tooltip: {
         formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
         },
       },
 
@@ -384,9 +311,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       tooltip: {
         formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
         },
       },
 
@@ -448,9 +374,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       tooltip: {
         formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
         },
       },
 
@@ -496,9 +421,8 @@ document.addEventListener("DOMContentLoaded", function () {
       },
       tooltip: {
         formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
         },
       },
       series: [
@@ -705,9 +629,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       tooltip: {
         formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
         },
       },
 
@@ -765,9 +688,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       tooltip: {
         formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
         },
       },
 
@@ -826,9 +748,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       tooltip: {
         formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
         },
       },
 
@@ -886,9 +807,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       tooltip: {
         formatter: function () {
-          return `<b>Year:</b> ${this.x}<br><b>${
-            this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
         },
       },
 
