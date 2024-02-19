@@ -25,8 +25,6 @@ import numpy as np
 import pandas as pd
 
 from datetime import datetime
-from itertools import product
-
 import luto.data as bdata
 
 import luto.settings as settings
@@ -157,8 +155,9 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
         os.mkdir(path_yr)
 
     # # Write the decision variables, land-use and land management maps
-    # write_files(sim, yr_cal, path_yr)
-    # write_files_separate(sim, yr_cal, path_yr)
+    if settings.WRITE_OUTPUT_GEOTIFFS:
+        write_files(sim, yr_cal, path_yr)
+        write_files_separate(sim, yr_cal, path_yr)
 
 
 
