@@ -55,13 +55,13 @@ from luto.settings import (
 # settings if they are not set in the settings.py file.
 try:
     from luto.settings import GHG_LIMITS
-except ImportError:  
+except ImportError:
     GHG_LIMITS = None
     
 try: 
     from luto.settings import GHG_LIMITS_FIELD
 except ImportError: 
-    GHG_LIMITS_FIELD == None
+    GHG_LIMITS_FIELD = None
 
 
 # Try-Except to make sure {rasterio} can be loaded under different environment

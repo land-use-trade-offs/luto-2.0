@@ -157,7 +157,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 200,
       },
       title: {
-        text: "Non-Agricultural Land Use Area",
+        text: "Non-Agricultural Land-Use Area",
       },
       data: {
         csv: document.getElementById("area_3_non_ag_lu_area_wide_csv").innerHTML,

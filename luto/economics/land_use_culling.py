@@ -8,12 +8,12 @@ from luto.settings import CULL_MODE
 try:
     from luto.settings import MAX_LAND_USES_PER_CELL 
 except ImportError: 
-    MAX_LAND_USES_PER_CELL == None
+    MAX_LAND_USES_PER_CELL = None
     
-try: 
+try:
     from luto.settings import LAND_USAGE_CULL_PERCENTAGE
-except ImportError: 
-    LAND_USAGE_CULL_PERCENTAGE == None
+except ImportError:
+    LAND_USAGE_CULL_PERCENTAGE = None
 
 
 def get_percentage_cost_mask(m, r, x_mrj_mask, costs_mrj):

@@ -300,6 +300,7 @@ with open(f'{SAVE_DIR}/area_7_begin_end_pct.html', 'w') as f:
 GHG_files = get_GHG_file_df(files)
 GHG_files = GHG_files.reset_index(drop=True).sort_values(['year','GHG_sum_t'])
 GHG_files['GHG_sum_Mt'] = GHG_files['GHG_sum_t'] / 1e6
+GHG_files['base_name'] = GHG_files['base_name'].replace({'Transition Penalty': 'Deforestation'})
 
 # Plot_4-1: GHG of cumulative emissions (Mt)
 Net_emission = GHG_files.groupby('year')['GHG_sum_Mt'].sum(numeric_only = True).reset_index()
@@ -310,9 +311,22 @@ Net_emission_wide = Net_emission[['year','Net_emission']]
 Net_emission_wide.to_csv(f'{SAVE_DIR}/GHG_1_cunsum_emission_Mt.csv',index=False)
 
 # Plot_4-2: GHG from individual emission sectors (Mt)
-GHG_files_wide = GHG_files.pivot(index='year', columns='base_name', values='GHG_sum_Mt').reset_index()
-GHG_files_wide['Net emission'] = GHG_files_wide[GHG_files_wide.columns[1:]].sum(axis=1)
-GHG_files_wide.to_csv(f'{SAVE_DIR}/GHG_2_individual_emission_Mt.csv',index=False)
+# GHG_files_wide = GHG_files.pivot(index='year', columns='base_name', values='GHG_sum_Mt').reset_index()
+# GHG_files_wide['Net emissions'] = GHG_files_wide[GHG_files_wide.columns[1:]].sum(axis=1)
+# GHG_files_wide.to_csv(f'{SAVE_DIR}/GHG_2_individual_emission_Mt.csv',index=False)
+
+GHG_files_wide = GHG_files[['year','base_name','GHG_sum_Mt']]
+GHG_files_wide = GHG_files_wide\
+    .groupby('base_name')\
+    .apply(lambda x:list(map(list,zip(x['year'],x['GHG_sum_Mt']))), include_groups=False)\
+    .reset_index()
+    
+GHG_files_wide.columns = ['name','data'] 
+GHG_files_wide['type'] = 'column'
+GHG_files_wide.loc[-1] = ['Net emissions', list(map(list,zip(Net_emission['year'],Net_emission['Net_emission']))), 'line']
+GHG_files_wide.to_json(f'{SAVE_DIR}/GHG_2_individual_emission_Mt.json',orient='records')
+
+
 
 # Plot_4-3: GHG emission (Mt)
 GHG_emissions_long = get_GHG_category(GHG_files,'Agricultural Landuse')
