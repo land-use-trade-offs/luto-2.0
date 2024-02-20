@@ -274,12 +274,20 @@ total_area = transition_df_area.sum(axis=1).values.reshape(-1,1)
 transition_df_pct = transition_df_area / total_area * 100
 transition_df_pct = transition_df_pct.fillna(0)
 
+# Add the total area to the transition matrix
+transition_df_area['SUM'] = transition_df_area.sum(axis=1)
+transition_df_area.loc['SUM'] = transition_df_area.sum(axis=0)
 
-heat_area = transition_df_area.style.background_gradient(cmap='Oranges', axis=1).format('{:,.1f}')
-heat_pct = transition_df_pct.style.background_gradient(cmap='Oranges', axis=1,vmin=0, vmax=100).format('{:,.3f}')
+heat_area = transition_df_area.style.background_gradient(cmap='Oranges', 
+                                                         axis=1, 
+                                                         subset=pd.IndexSlice[:transition_df_area.index[-2], :transition_df_area.columns[-2]]).format('{:,.1f}')
+heat_pct = transition_df_pct.style.background_gradient(cmap='Oranges', 
+                                                       axis=1,
+                                                       vmin=0, 
+                                                       vmax=100).format('{:,.3f}')
 
 # Define the style
-style = "<style>table, th, td {font-size: 8.2px;font-family: Helvetica, Arial, sans-serif;} </style>\n"
+style = "<style>table, th, td {font-size: 7px;font-family: Helvetica, Arial, sans-serif;} </style>\n"
 style = style + "<style>td {text-align: right; } </style>\n"
 
 # Add the style to the HTML
