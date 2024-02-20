@@ -304,7 +304,7 @@ def get_ag_dvar_area(area_dvar_paths):
 
     ag_dvar_dfs = area_dvar_paths.query('base_name.str.contains("area_agricultural_landuse")').reset_index(drop=True)
     ag_dvar_area = pd.concat([pd.read_csv(path) for path in ag_dvar_dfs['path']], ignore_index=True)
-    ag_dvar_area = merge_LVSTK_UAALLOW(ag_dvar_area)
+    # ag_dvar_area = merge_LVSTK_UAALLOW(ag_dvar_area)
     ag_dvar_area['Area (million km2)'] = ag_dvar_area['Area (ha)'] / 100 / 1e6
     ag_dvar_area['Type'] = 'Agricultural landuse'
 

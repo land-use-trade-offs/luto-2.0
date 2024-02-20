@@ -54,9 +54,9 @@ document.addEventListener("DOMContentLoaded", function () {
       title: {
         text: "Total Area by Land-use and Agricultural Commodity",
       },
-      data: {
-        csv: document.getElementById("area_1_total_area_wide_csv").innerHTML,
-      },
+      series:JSON.parse(
+        document.getElementById("area_1_total_area_wide_csv").innerHTML
+      ),
       credits: {
         enabled: false,
       },
@@ -65,16 +65,16 @@ document.addEventListener("DOMContentLoaded", function () {
           text: "Area (million km2)",
         },
       },
-      xAxis: {
-        tickPositions: tickposition,
-      },
 
       legend: {
         align: "right",
         verticalAlign: "top",
         layout: "vertical",
-        x: 20,
-        y: 10,
+        x: 5,
+        y: -15,
+        itemStyle: {
+          fontSize: '11px'
+      }
       },
 
       tooltip: {
