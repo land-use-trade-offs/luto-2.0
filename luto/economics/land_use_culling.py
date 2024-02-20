@@ -75,12 +75,6 @@ def apply_agricultural_land_use_culling(x_mrj, c_mrj, t_mrj, r_mrj):
     if CULL_MODE == "none":
         return
 
-    print(f"Culling using {CULL_MODE=}...")
-    if CULL_MODE == "percentage":
-        print(f"    {LAND_USAGE_CULL_PERCENTAGE=}")
-    elif CULL_MODE == "absolute":
-        print(f"    {MAX_LAND_USES_PER_CELL=}")
-
     x_mrj_mask = x_mrj.astype(bool)
     costs_mrj = (c_mrj + t_mrj) - r_mrj
     for r in range(costs_mrj.shape[1]):

@@ -126,6 +126,9 @@ SOLVE_METHOD = 2
    'deterministic concurrent':         4
    'deterministic concurrent simplex': 5 """
 
+# Level of presolve: automatic (-1), off (0), conservative (1), or aggressive (2)
+PRESOLVE = 2
+
 # Penalty in objective function to balance influence of demand versus cost when DEMAND_CONSTRAINT_TYPE = 'soft'
 # 1e5 works well (i.e., demand are met), demands not met with anything less 
 PENALTY = 1e5
@@ -134,8 +137,9 @@ PENALTY = 1e5
 VERBOSE = 1
 
 # Relax the tolerances for feasibility and optimality
-DUAL_FEASIBILITY_TOLERANCE = 1e-2         # Default:	 1e-6, Min: 1e-9, Max: 1e-2
-BARRIER_CONVERGENCE_TOLERANCE = 1e-3      # Range from 1e-2 to 1e-8, that larger the number the faster but the less exact the solve 
+FEASIBILITY_TOLERANCE = 1e-2              # Primal feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2
+OPTIMALITY_TOLERANCE = 1e-2               # Dual feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2
+BARRIER_CONVERGENCE_TOLERANCE = 1e-5      # Range from 1e-2 to 1e-8, that larger the number the faster but the less exact the solve. 1e-5 is a good compromise between optimality and speed.
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
 THREADS = 32
@@ -241,7 +245,7 @@ CONNECTIVITY_WEIGHTING = 1
 BIODIV_LIVESTOCK_IMPACT = 0.5
 
 # Set benefit level of EP, AF, and RP (0 = none, 1 = full)
-REFORESTATION_BIODIVERSITY_BENEFIT = 0.5
+REFORESTATION_BIODIVERSITY_BENEFIT = 0.7
 
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 BIODIVERSITY_LIMITS = 'on'             # 'on' or 'off'

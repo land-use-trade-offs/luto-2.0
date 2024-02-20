@@ -37,7 +37,9 @@ from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 gurenv = gp.Env(logfilename="gurobi.log", empty=True)  # (empty = True)
 gurenv.setParam("Method", settings.SOLVE_METHOD)
 gurenv.setParam("OutputFlag", settings.VERBOSE)
-gurenv.setParam("OptimalityTol", settings.DUAL_FEASIBILITY_TOLERANCE)
+gurenv.setParam("Presolve", settings.PRESOLVE)
+gurenv.setParam("OptimalityTol", settings.OPTIMALITY_TOLERANCE)
+gurenv.setParam("FeasibilityTol", settings.FEASIBILITY_TOLERANCE)
 gurenv.setParam("BarConvTol", settings.BARRIER_CONVERGENCE_TOLERANCE)
 gurenv.setParam("Threads", settings.THREADS)
 gurenv.setParam("BarHomogeneous", settings.BARHOMOGENOUS)
@@ -636,7 +638,7 @@ class LutoSolver:
 
             wreq_region = ag_contr + ag_man_contr + non_ag_contr
 
-            if wreq_region is not 0:
+            if wreq_region != 0:                                                   # changed from if wreq_region is not 0: 
                 constr = self.gurobi_model.addConstr(wreq_region <= wreq_reg_limit)
                 for r in ind:
                     self.water_limit_constraints_r[r].append(constr)
