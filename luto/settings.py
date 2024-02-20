@@ -91,7 +91,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 5          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 3          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # Determine if write GeoTiffs to output directory: True or False
 WRITE_OUTPUT_GEOTIFFS = False

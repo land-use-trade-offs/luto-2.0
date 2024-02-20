@@ -638,7 +638,7 @@ class LutoSolver:
 
             wreq_region = ag_contr + ag_man_contr + non_ag_contr
 
-            if wreq_region != 0:                                                   # changed from if wreq_region is not 0: 
+            if wreq_region is not 0:
                 constr = self.gurobi_model.addConstr(wreq_region <= wreq_reg_limit)
                 for r in ind:
                     self.water_limit_constraints_r[r].append(constr)
