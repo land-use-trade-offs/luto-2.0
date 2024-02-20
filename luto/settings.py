@@ -70,8 +70,18 @@ FIRE_RISK = 'med'   # Options are 'low', 'med', 'high'. Determines whether to ta
     FD_RISK_PERC_95TH   93.2735
 """
 
+
+# ---------------------------------------------------------------------------- #
 # Economic parameters
+# ---------------------------------------------------------------------------- #
+
+# Amortise upfront (i.e., establishment and transitions) costs 
+AMORTISE_UPFRONT_COSTS = False
+
+# Discount rate for amortisation
 DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
+
+# Set amortisation period
 AMORTISATION_PERIOD = 30 # years
 
 
@@ -81,7 +91,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 3          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 5          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
 
 # Determine if write GeoTiffs to output directory: True or False
 WRITE_OUTPUT_GEOTIFFS = False
@@ -125,7 +135,7 @@ VERBOSE = 1
 
 # Relax the tolerances for feasibility and optimality
 DUAL_FEASIBILITY_TOLERANCE = 1e-2         # Default:	 1e-6, Min: 1e-9, Max: 1e-2
-BARRIER_CONVERGENCE_TOLERANCE = 1e-4      # Range from 1e-2 to 1e-8, that larger the number the faster but the less exact the solve 
+BARRIER_CONVERGENCE_TOLERANCE = 1e-3      # Range from 1e-2 to 1e-8, that larger the number the faster but the less exact the solve 
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
 THREADS = 32
