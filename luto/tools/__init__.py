@@ -39,8 +39,8 @@ from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 def amortise(cost, rate=settings.DISCOUNT_RATE, horizon=settings.AMORTISATION_PERIOD):
     """Return NPV of future `cost` amortised to annual value at discount `rate` over `horizon` years."""
-    # return -1 * npf.pmt(rate, horizon, pv=cost, fv=0, when='begin')
-    return cost
+    if settings.AMORTISE_UPFRONT_COSTS: return -1 * npf.pmt(rate, horizon, pv=cost, fv=0, when='begin')
+    else: return cost
 
 
 def show_map(yr_cal):
