@@ -15,176 +15,136 @@ document.addEventListener("DOMContentLoaded", function () {
         ],
     });
 
-    // Get the years from the csv
-    var tickposition;
-    $(document).ready(function () {
-        let data, lines;
-        let years = [];
 
-        data = document.getElementById(
-            "biodiversity_1_total_score_by_category"
-        ).innerHTML;
-        lines = data.split("\n");
 
-        // if the last line is empty, remove it
-        if (lines[lines.length - 1] == "") {
-            lines.pop();
-        }
-
-        $.each(lines, function (lineNo, line) {
-            var items = line.split(",");
-
-            if (lineNo != 0) {
-                // Skip the first line (headers)
-                years.push(parseFloat(items[0]));
-            }
-        });
-
-        // if the length of the years is greater than 5, then set the tickposition = bull
-        if (years.length < 5) {
-            tickposition = years;
-        } else {
-            tickposition = null;
-        }
-
-        // biodiversity_1_total_score_by_category
-        Highcharts.chart("biodiversity_1_total_score_by_category", {
-            chart: {
-                type: "column",
-                marginRight: 200,
-            },
+    // biodiversity_1_total_score_by_category
+    Highcharts.chart("biodiversity_1_total_score_by_category", {
+        chart: {
+            type: "column",
+            marginRight: 200,
+        },
+        title: {
+            text: "Total Biodiversity Score by Land-use/Management",
+        },
+        series: JSON.parse(
+            document.getElementById(
+                "biodiversity_1_total_score_by_category_csv"
+            ).innerHTML
+        ),
+        yAxis: {
             title: {
-                text: "Total Biodiversity Score by Land-use/Management",
+                text: "Quality-weighted Area (million ha)",
             },
-            data: {
-                csv: document.getElementById(
-                    "biodiversity_1_total_score_by_category_csv"
-                ).innerHTML,
+        },
+        plotOptions: {
+            column: {
+                stacking: "normal",
             },
-            yAxis: {
-                title: {
-                    text: "Quality-weighted Area (million ha)",
-                },
+        },
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                    }:</b>${this.y.toFixed(2)}<br/>`;
             },
-            xAxis: {
-                tickPositions: tickposition,
-            },
-            plotOptions: {
-                column: {
-                    stacking: "normal",
-                },
-            },
-            tooltip: {
-                formatter: function () {
-                    return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-                        }:</b>${this.y.toFixed(2)}<br/>`;
-                },
-            },
-            legend: {
-                align: "right",
-                verticalAlign: "left",
-                layout: "vertical",
-                x: 0,
-                y: 250,
-            },
-            credits: {
-                enabled: false,
-            },
-        });
-
-        // // biodiversity_2_total_score_by_irrigation
-        // Highcharts.chart("biodiversity_2_total_score_by_irrigation", {
-        //     chart: {
-        //         type: "column",
-        //         marginRight: 200,
-        //     },
-        //     title: {
-        //         text: "Total Biodiversity Score by Irrigation",
-        //     },
-        //     data: {
-        //         csv: document.getElementById(
-        //             "biodiversity_2_total_score_by_irrigation_csv"
-        //         ).innerHTML,
-        //     },
-        //     yAxis: {
-        //         title: {
-        //             text: "Quality-weighted Area (million ha)",
-        //         },
-        //     },
-        //     xAxis: {
-        //         tickPositions: tickposition,
-        //     },
-        //     plotOptions: {
-        //         column: {
-        //             stacking: "normal",
-        //         },
-        //     },
-        //     tooltip: {
-        //         formatter: function () {
-        //             return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-        //                 }:</b>${this.y.toFixed(2)}<br/>`;
-        //         },
-        //     },
-        //     legend: {
-        //         align: "right",
-        //         verticalAlign: "left",
-        //         layout: "vertical",
-        //         x: 0,
-        //         y: 300,
-        //     },
-        //     credits: {
-        //         enabled: false,
-        //     },
-        // });
-
-        // biodiversity_3_total_score_by_landuse
-        Highcharts.chart("biodiversity_3_total_score_by_landuse", {
-            chart: {
-                type: "column",
-                marginRight: 200,
-            },
-            title: {
-                text: "Total Biodiversity Score by Land-use",
-            },
-            data: {
-                csv: document.getElementById(
-                    "biodiversity_3_total_score_by_landuse_csv"
-                ).innerHTML,
-            },
-            yAxis: {
-                title: {
-                    text: "Quality-weighted Area (million ha)",
-                },
-            },
-            xAxis: {
-                tickPositions: tickposition,
-            },
-            plotOptions: {
-                column: {
-                    stacking: "normal",
-                },
-            },
-            tooltip: {
-                formatter: function () {
-                    return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-                        }:</b>${this.y.toFixed(2)}<br/>`;
-                },
-            },
-            legend: {
-                align: "right",
-                verticalAlign: "left",
-                layout: "vertical",
-                x: 10,
-                y: 250,
-                itemStyle: {
-                    // "fontSize": "11.5px",
-                  },
-            },
-            credits: {
-                enabled: false,
-            },
-        });
-
-
+        },
+        legend: {
+            align: "right",
+            verticalAlign: "left",
+            layout: "vertical",
+            x: 0,
+            y: 250,
+        },
+        credits: {
+            enabled: false,
+        },
     });
+
+    // biodiversity_3_total_score_by_landuse
+    Highcharts.chart("biodiversity_3_total_score_by_landuse", {
+        chart: {
+            type: "column",
+            marginRight: 200,
+        },
+        title: {
+            text: "Total Biodiversity Score by Land-use",
+        },
+        series: JSON.parse(
+            document.getElementById(
+                "biodiversity_3_total_score_by_landuse_csv"
+            ).innerHTML
+        ),
+
+        yAxis: {
+            title: {
+                text: "Quality-weighted Area (million ha)",
+            },
+        },
+        plotOptions: {
+            column: {
+                stacking: "normal",
+            },
+        },
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                    }:</b>${this.y.toFixed(2)}<br/>`;
+            },
+        },
+        legend: {
+            align: "right",
+            verticalAlign: "left",
+            layout: "vertical",
+            x: 10,
+            y: 250,
+            itemStyle: {
+                // "fontSize": "11.5px",
+            },
+        },
+        credits: {
+            enabled: false,
+        },
+    });
+
+    // biodiversity_4_natural_land_area
+    Highcharts.chart("biodiversity_4_natural_land_area", {
+        chart: {
+            type: "column",
+            marginRight: 200,
+        },
+        title: {
+            text: "Land-Use Area (Natural land & Non-Agricultural land)",
+        },
+        series: JSON.parse(
+            document.getElementById("biodiversity_4_natural_land_area_csv").innerHTML
+        ),
+        yAxis: {
+            title: {
+                text: "Area (million ha)",
+            },
+        },
+        plotOptions: {
+            column: {
+                stacking: "normal",
+            },
+        },
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                    }:</b>${this.y.toFixed(2)}<br/>`;
+            },
+        },
+        legend: {
+            align: "right",
+            verticalAlign: "left",
+            layout: "vertical",
+            x: 0,
+            y: 250,
+        },
+        credits: {
+            enabled: false,
+        },
+    });
+
+
 });
+

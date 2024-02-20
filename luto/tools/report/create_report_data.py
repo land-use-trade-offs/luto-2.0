@@ -17,7 +17,7 @@ from tools.helper_func import get_GHG_category, get_GHG_file_df,\
 
                                                      
 from tools.parameters import YR_BASE, COMMODITIES_ALL, LANDUSE_ALL,LU_NATURAL,\
-                             NON_AG_LANDUSE, LANDUSE_ALL_MERGE_LANDTYPE
+                             NON_AG_LANDUSE
 
 
 # setting up working directory to root dir
@@ -199,17 +199,22 @@ rev_cost_compare.to_csv(f'{SAVE_DIR}/economics_3_rev_cost_all.csv', index=False)
 
 area_dvar_paths = files.query('category == "area" and year_types == "single_year"').reset_index(drop=True)
 area_dvar = get_ag_dvar_area(area_dvar_paths)
-
+area_dvar['Water'] = area_dvar['Water'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
 
 # Plot_3-1: Total Area (km2)
 lu_area_dvar = area_dvar.groupby(['Year','Land use']).sum(numeric_only=True).reset_index()
-lu_area_dvar_wide = lu_area_dvar.pivot(index='Year', 
-                                       columns='Land use', 
-                                       values='Area (million km2)').reset_index()
-# Reorder the columns to match the order in LANDUSE_ALL
-lu_area_dvar_wide = lu_area_dvar_wide.reindex(
-    columns = [lu_area_dvar_wide.columns[0]] + LANDUSE_ALL_MERGE_LANDTYPE).reset_index(drop=True)
-lu_area_dvar_wide.to_csv(f'{SAVE_DIR}/area_1_total_area_wide.csv', index=False)
+lu_area_dvar = lu_area_dvar\
+    .groupby('Land use')\
+    .apply(lambda x:list(map(list,zip(x['Year'],x['Area (million km2)']))))\
+    .reset_index()
+    
+lu_area_dvar.columns = ['name','data']
+lu_area_dvar['type'] = 'column'
+lu_area_dvar['sort_index'] = lu_area_dvar['name'].apply(lambda x: LANDUSE_ALL.index(x))
+lu_area_dvar = lu_area_dvar.sort_values('sort_index').drop('sort_index',axis=1)
+lu_area_dvar.to_json(f'{SAVE_DIR}/area_1_total_area_wide.json',orient='records')
+
+
 
 
 # Plot_3-2: Total Area (km2) by Irrigation
@@ -311,10 +316,6 @@ Net_emission_wide = Net_emission[['year','Net_emission']]
 Net_emission_wide.to_csv(f'{SAVE_DIR}/GHG_1_cunsum_emission_Mt.csv',index=False)
 
 # Plot_4-2: GHG from individual emission sectors (Mt)
-# GHG_files_wide = GHG_files.pivot(index='year', columns='base_name', values='GHG_sum_Mt').reset_index()
-# GHG_files_wide['Net emissions'] = GHG_files_wide[GHG_files_wide.columns[1:]].sum(axis=1)
-# GHG_files_wide.to_csv(f'{SAVE_DIR}/GHG_2_individual_emission_Mt.csv',index=False)
-
 GHG_files_wide = GHG_files[['year','base_name','GHG_sum_Mt']]
 GHG_files_wide = GHG_files_wide\
     .groupby('base_name')\
@@ -485,6 +486,7 @@ water_df_seperate_irr_wide.to_csv(f'{SAVE_DIR}/water_5_volum_by_irrigation.csv',
 bio_paths = files.query('category == "biodiversity" and year_types == "single_year" and base_name == "biodiversity_separate"').reset_index(drop=True)
 bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
 bio_df['Biodiversity score (million)'] = bio_df['Biodiversity score'] / 1e6
+bio_df['Land management'] = bio_df['Land management'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
 
 # Filter out landuse that are reated to biodiversity
 bio_lucc = LU_NATURAL + NON_AG_LANDUSE
@@ -492,24 +494,63 @@ bio_lucc = LU_NATURAL + NON_AG_LANDUSE
 
 # Plot_6-1: Biodiversity total by category
 bio_df_category = bio_df.groupby(['Year','Landuse type']).sum(numeric_only=True).reset_index()
-bio_df_category_wide = bio_df_category.pivot(index='Year', columns='Landuse type', values='Biodiversity score (million)').reset_index()
-bio_df_category_wide.to_csv(f'{SAVE_DIR}/biodiversity_1_total_score_by_category.csv',index=False)
+# bio_df_category_wide = bio_df_category.pivot(index='Year', columns='Landuse type', values='Biodiversity score (million)').reset_index()
+# bio_df_category_wide.to_csv(f'{SAVE_DIR}/biodiversity_1_total_score_by_category.csv',index=False)
+bio_df_category = bio_df_category\
+    .groupby('Landuse type')\
+    .apply(lambda x:list(map(list,zip(x['Year'],x['Biodiversity score (million)']))))\
+    .reset_index()
+    
+bio_df_category.columns = ['name','data']
+bio_df_category['type'] = 'column'
+bio_df_category.to_json(f'{SAVE_DIR}/biodiversity_1_total_score_by_category.json',orient='records')
+
 
 # Plot_6-2: Biodiversity total by irrigation
 bio_df_irrigation = bio_df.groupby(['Year','Land management']).sum(numeric_only=True).reset_index()
-bio_df_irrigation_wide = bio_df_irrigation.pivot(index='Year', columns='Land management', values='Biodiversity score (million)').reset_index()
-bio_df_irrigation_wide.to_csv(f'{SAVE_DIR}/biodiversity_2_total_score_by_irrigation.csv',index=False)
+bio_df_irrigation = bio_df_irrigation\
+    .groupby('Land management')\
+    .apply(lambda x:list(map(list,zip(x['Year'],x['Biodiversity score (million)']))))\
+    .reset_index()
+    
+bio_df_irrigation.columns = ['name','data']
+bio_df_irrigation['type'] = 'column'
+bio_df_irrigation.to_json(f'{SAVE_DIR}/biodiversity_2_total_score_by_irrigation.json',orient='records')
+
 
 # Plot_6-3: Biodiversity total by landuse
 bio_df_landuse = bio_df.groupby(['Year','Landuse']).sum(numeric_only=True).reset_index()
-bio_df_landuse_wide = bio_df_landuse.pivot(index='Year', columns='Landuse', values='Biodiversity score (million)').reset_index()
+bio_df_landuse = bio_df_landuse.query('Landuse in @bio_lucc')
 
-# Reorder the columns to match the order in LANDUSE_ALL
-bio_df_landuse_wide = bio_df_landuse_wide.reindex(
-    columns = [bio_df_landuse_wide.columns[0]] + bio_lucc).reset_index(drop=True)
+bio_df_landuse = bio_df_landuse\
+    .groupby('Landuse')\
+    .apply(lambda x:list(map(list,zip(x['Year'],x['Biodiversity score (million)']))))\
+    .reset_index()
+    
+bio_df_landuse['sort_index'] = bio_df_landuse['Landuse'].apply(lambda x: bio_lucc.index(x))
+bio_df_landuse = bio_df_landuse.sort_values('sort_index').drop('sort_index',axis=1)
 
-bio_df_landuse_wide.to_csv(f'{SAVE_DIR}/biodiversity_3_total_score_by_landuse.csv',index=False)
+bio_df_landuse.columns = ['name','data']
+bio_df_landuse['type'] = 'column'
+bio_df_landuse.to_json(f'{SAVE_DIR}/biodiversity_3_total_score_by_landuse.json',orient='records')
 
+# Plot_6-4: Natural landuse area (million)
+natural_land_area = area_dvar.groupby(['Year','Land use']).sum(numeric_only=True).reset_index()
+natural_land_area = natural_land_area.query('`Land use` in @bio_lucc')
+
+# million km2 to million ha
+natural_land_area['Area (million ha)'] = natural_land_area['Area (ha)'] / 1e6
+natural_land_area = natural_land_area\
+    .groupby('Land use')\
+    .apply(lambda x:list(map(list,zip(x['Year'],x['Area (million ha)']))))\
+    .reset_index()
+    
+natural_land_area['sort_index'] = natural_land_area['Land use'].apply(lambda x: bio_lucc.index(x))
+natural_land_area = natural_land_area.sort_values(['sort_index']).drop('sort_index',axis=1)
+
+natural_land_area.columns = ['name','data']
+natural_land_area['type'] = 'column'
+natural_land_area.to_json(f'{SAVE_DIR}/biodiversity_4_natural_land_area.json',orient='records')
 
 
 #########################################################

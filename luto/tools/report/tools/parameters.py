@@ -51,7 +51,6 @@ AG_LANDUSE_MERGE_LANDTYPE = ['Apples', 'Beef', 'Citrus', 'Cotton', 'Dairy', 'Gra
 NON_AG_LANDUSE = ['Environmental Plantings','Riparian Plantings','Agroforestry']
 
 LANDUSE_ALL = AG_LANDUSE + NON_AG_LANDUSE
-LANDUSE_ALL_MERGE_LANDTYPE = AG_LANDUSE_MERGE_LANDTYPE + NON_AG_LANDUSE
 
 
 # Define the GHG categories
