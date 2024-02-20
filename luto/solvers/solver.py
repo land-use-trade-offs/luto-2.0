@@ -37,7 +37,9 @@ from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 gurenv = gp.Env(logfilename="gurobi.log", empty=True)  # (empty = True)
 gurenv.setParam("Method", settings.SOLVE_METHOD)
 gurenv.setParam("OutputFlag", settings.VERBOSE)
-gurenv.setParam("OptimalityTol", settings.DUAL_FEASIBILITY_TOLERANCE)
+gurenv.setParam("Presolve", settings.PRESOLVE)
+gurenv.setParam("OptimalityTol", settings.OPTIMALITY_TOLERANCE)
+gurenv.setParam("FeasibilityTol", settings.FEASIBILITY_TOLERANCE)
 gurenv.setParam("BarConvTol", settings.BARRIER_CONVERGENCE_TOLERANCE)
 gurenv.setParam("Threads", settings.THREADS)
 gurenv.setParam("BarHomogeneous", settings.BARHOMOGENOUS)
@@ -277,7 +279,7 @@ class LutoSolver:
         """
         Formulate the objective based on settings.OBJECTIVE
         """
-        print(f"Setting up objective function to {settings.OBJECTIVE} ({time.ctime()})...", end=" ", flush=True)
+        print(f"\nSetting objective function to {settings.OBJECTIVE} ({time.ctime()})...", flush=True)
 
         st = time.time()
         if settings.OBJECTIVE == "maxrev":
@@ -648,7 +650,7 @@ class LutoSolver:
         if settings.GHG_EMISSIONS_LIMITS != "on":
             return
 
-        print("\nAdding GHG emissions constraints...", time.ctime() + "\n")
+        print("\nAdding GHG emissions constraints...", time.ctime())
 
         # Returns GHG emissions limits
         ghg_limits = self._input_data.limits["ghg"]
@@ -703,7 +705,7 @@ class LutoSolver:
         if settings.BIODIVERSITY_LIMITS != "on":
             return
 
-        print("\nAdding biodiversity constraints...", time.ctime() + "\n")
+        print("Adding biodiversity constraints...", time.ctime())
 
         # Returns biodiversity limits
         biodiversity_limits = self._input_data.limits["biodiversity"]
@@ -800,7 +802,7 @@ class LutoSolver:
         Returns an array of cells that have been updated.
         """
         # update x vars
-        print("Updating variables...", end=" ", flush=True)
+        print("\nUpdating variables...", end=" ", flush=True)
         st = time.time()
 
         # metrics
@@ -907,7 +909,7 @@ class LutoSolver:
             print("No constraints need updating.")
             return
 
-        print("Updating constraints...")
+        print("\nUpdating constraints...\n")
         st = time.time()
         for r in updated_cells:
             self.gurobi_model.remove(self.cell_usage_constraint_r.pop(r, []))
@@ -932,7 +934,7 @@ class LutoSolver:
         self._add_ghg_emissions_limit_constraints()
         self._add_biodiversity_limit_constraints()
         ft = time.time()
-        print(f"Constraint update took {round(ft - st, 1)}s")
+        print(f"Constraint update took {round(ft - st, 1)}s\n")
 
     def solve(self):
         st = time.time()
@@ -1086,13 +1088,8 @@ class LutoSolver:
                     ammaps[am][r] = 1
 
         # # Process production amount for each commodity
-        print("Processing commodity production amounts...")
         prod_data["Production"] = [self.total_q_exprs_c[c].getValue() for c in range(self.ncms)]
-
-        print("Processing GHG emissions amount...")
         prod_data["GHG Emissions"] = self.ghg_emissions_expr.getValue()
-
-        print("Processing solution biodiversity score...")
         prod_data["Biodiversity"] = self.biodiversity_expr.getValue()
 
         ag_X_mrj_processed[:, non_ag_bools_r, :] = False
