@@ -287,12 +287,16 @@ heat_pct = transition_df_pct.style.background_gradient(cmap='Oranges',
                                                        vmax=100).format('{:,.3f}')
 
 # Define the style
-style = "<style>table, th, td {font-size: 7px;font-family: Helvetica, Arial, sans-serif;} </style>\n"
-style = style + "<style>td {text-align: right; } </style>\n"
+# style = "<style>table, th, td {font-size: 7px;font-family: Helvetica, Arial, sans-serif;} </style>\n"
+# style = style + "<style>td {text-align: right; } </style>\n"
+# style = style + "<style>html { height: 100%; } </style>\n"
 
-# Add the style to the HTML
-heat_area_html = style + heat_area.to_html()
-heat_pct_html = style + heat_pct.to_html()
+# # Add the style to the HTML
+# heat_area_html = style + heat_area.to_html()
+# heat_pct_html = style + heat_pct.to_html()
+
+heat_area_html = heat_area.to_html()
+heat_pct_html = heat_pct.to_html()
 
 # Replace 0.00 with 0 in the html
 heat_area_html = re.sub(r'(?<!\d)0.0(?!\d)', '-', heat_area_html)

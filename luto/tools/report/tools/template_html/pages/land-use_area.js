@@ -307,11 +307,13 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // area_6_begin_end_area
-    document.getElementById("area_6_begin_end_area").innerHTML =
-      '<object type="text/html"  data="../../data/area_6_begin_end_area.html" ></object>';
+    document.getElementById("area_6_begin_end_area").innerHTML = document.getElementById(
+      "area_6_begin_end_area_csv"
+    ).innerText;
 
     // area_7_begin_end_pct
-    document.getElementById("area_7_begin_end_pct").innerHTML =
-      '<object type="text/html" style={font-size: 10px} data="../../data/area_7_begin_end_pct.html" ></object>';
+    document.getElementById("area_7_begin_end_pct").innerHTML = document.getElementById(
+      "area_7_begin_end_pct_csv"
+    ).innerText;
   });
 });
