@@ -318,7 +318,7 @@ Net_emission_wide.to_csv(f'{SAVE_DIR}/GHG_1_cunsum_emission_Mt.csv',index=False)
 GHG_files_wide = GHG_files[['year','base_name','GHG_sum_Mt']]
 GHG_files_wide = GHG_files_wide\
     .groupby('base_name')\
-    .apply(lambda x:list(map(list,zip(x['year'],x['GHG_sum_Mt']))), include_groups=False)\
+    .apply(lambda x:list(map(list,zip(x['year'],x['GHG_sum_Mt']))))\
     .reset_index()
     
 GHG_files_wide.columns = ['name','data'] 
