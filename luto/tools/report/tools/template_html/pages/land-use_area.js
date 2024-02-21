@@ -106,10 +106,9 @@ document.addEventListener("DOMContentLoaded", function () {
       title: {
         text: "Total Area by Irrigation Type",
       },
-      data: {
-        csv: document.getElementById("area_2_irrigation_area_wide_csv")
-          .innerHTML,
-      },
+      series:JSON.parse(
+        document.getElementById("area_2_irrigation_area_wide_csv").innerHTML
+      ),
       credits: {
         enabled: false,
       },
@@ -117,9 +116,6 @@ document.addEventListener("DOMContentLoaded", function () {
         title: {
           text: "Area (million km2)",
         },
-      },
-      xAxis: {
-        tickPositions: tickposition,
       },
 
       legend: {
@@ -159,9 +155,9 @@ document.addEventListener("DOMContentLoaded", function () {
       title: {
         text: "Non-Agricultural Land-Use Area",
       },
-      data: {
-        csv: document.getElementById("area_3_non_ag_lu_area_wide_csv").innerHTML,
-      },
+      series:JSON.parse(
+        document.getElementById("area_3_non_ag_lu_area_wide_csv").innerHTML,
+      ),
       credits: {
         enabled: false,
       },
@@ -169,9 +165,6 @@ document.addEventListener("DOMContentLoaded", function () {
         title: {
           text: "Area (million km2)",
         },
-      },
-      xAxis: {
-        tickPositions: tickposition,
       },
 
       legend: {
@@ -211,9 +204,9 @@ document.addEventListener("DOMContentLoaded", function () {
       title: {
         text: "Agricultural Management Area by Type",
       },
-      data: {
-        csv: document.getElementById("area_4_am_total_area_wide_csv").innerHTML,
-      },
+      series:JSON.parse(
+        document.getElementById("area_4_am_total_area_wide_csv").innerHTML
+      ),
       credits: {
         enabled: false,
       },
@@ -221,9 +214,6 @@ document.addEventListener("DOMContentLoaded", function () {
         title: {
           text: "Area (million km2)",
         },
-      },
-      xAxis: {
-        tickPositions: tickposition,
       },
 
       legend: {
@@ -263,9 +253,9 @@ document.addEventListener("DOMContentLoaded", function () {
       title: {
         text: "Agricultural Management Area by Land-use Type",
       },
-      data: {
-        csv: document.getElementById("area_5_am_lu_area_wide_csv").innerHTML,
-      },
+      series: 
+        JSON.parse(document.getElementById("area_5_am_lu_area_wide_csv").innerHTML)
+      ,
       credits: {
         enabled: false,
       },
@@ -273,9 +263,6 @@ document.addEventListener("DOMContentLoaded", function () {
         title: {
           text: "Area (million km2)",
         },
-      },
-      xAxis: {
-        tickPositions: tickposition,
       },
 
       legend: {
@@ -307,11 +294,13 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // area_6_begin_end_area
-    document.getElementById("area_6_begin_end_area").innerHTML =
-      '<object type="text/html"  data="../../data/area_6_begin_end_area.html" ></object>';
+    document.getElementById("area_6_begin_end_area").innerHTML = document.getElementById(
+      "area_6_begin_end_area_csv"
+    ).innerText;
 
     // area_7_begin_end_pct
-    document.getElementById("area_7_begin_end_pct").innerHTML =
-      '<object type="text/html" style={font-size: 10px} data="../../data/area_7_begin_end_pct.html" ></object>';
+    document.getElementById("area_7_begin_end_pct").innerHTML = document.getElementById(
+      "area_7_begin_end_pct_csv"
+    ).innerText;
   });
 });

@@ -162,12 +162,10 @@ document.addEventListener("DOMContentLoaded", function () {
         enabled: false,
       },
 
-      data: {
-        csv: document.getElementById("water_3_volum_by_sector_csv").innerHTML,
-      },
-      xAxis: {
-        tickPositions: tickposition,
-      },
+      series: JSON.parse(
+        document.getElementById("water_3_volum_by_sector_csv").innerHTML
+      ),
+
       yAxis: {
         title: {
           text: "Water Use (ML)",

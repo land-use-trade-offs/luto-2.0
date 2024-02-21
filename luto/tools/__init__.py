@@ -18,18 +18,14 @@
 Pure helper functions and other tools.
 """
 
-import sys
 import time
 import os.path
+from typing import Tuple
+from contextlib import redirect_stderr, redirect_stdout
+
 import pandas as pd
 import numpy as np
 import numpy_financial as npf
-from typing import Any, Tuple
-from itertools import product
-from glob import glob
-import re
-from itertools import product
-import functools
 
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
@@ -515,46 +511,17 @@ def map_desc_to_dvar_index(category: str,
     return df.reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
 
 
-# The class below is used to redirect the standard output to a file.
+# # The class below is used to redirect the standard output to a file.
+# class RedirectStdStreams:
+#     def __init__(self, filepath):
+#         self.filepath = filepath
+#         if os.path.exists(self.filepath):
+#             os.remove(self.filepath)
 
-class Tee_log(object):
-    def __init__(self, fname):
-        self.fname = fname
-        self.stdout = sys.stdout
-
-    def __enter__(self):
-        self.file = open(self.fname, 'w')
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
-
-    def write(self, message):
-        self.file.write(message)
-        self.stdout.write(message)
-
-    def flush(self):
-        self.file.flush()
-        self.stdout.flush()
-
-    def close(self):
-        if self.file:
-            self.file.close()
-            self.file = None
-
-    def __call__(self, func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            original_stdout = sys.stdout
-            
-            sys.stdout = self
-            result = func(*args, **kwargs)
-            sys.stdout = original_stdout
-            
-            self.close()
-     
-            return result
-        
-        return wrapper
+#     def __call__(self, func):
+#         def wrapped(*args, **kwargs):
+#             with open(self.filepath, 'a') as f, redirect_stdout(f), redirect_stderr(f):
+#                 return func(*args, **kwargs)
+#         return wrapped
 
     
