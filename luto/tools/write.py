@@ -43,14 +43,17 @@ import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
-def get_path(sim):
+def get_path(bdata,start,end):
     """Create a folder for storing outputs and return folder name."""
 
     # Get date and time
     timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
     
     # Get the years to write
-    yr_all = sorted(list(sim.lumaps.keys()))
+    if settings.MODE == 'snapshot':
+        yr_all = [start,end]
+    elif settings.MODE == 'timeseries':
+        yr_all = list(range(start,end+1))
 
     # Add some shorthand details about the model run
     post = '_'    + settings.DEMAND_CONSTRAINT_TYPE + \
@@ -59,7 +62,7 @@ def get_path(sim):
            '_P1e' + str(int(math.log10(settings.PENALTY))) + \
            '_'    + str(yr_all[0]) + '-' + str(yr_all[-1]) + \
            '_'    + settings.MODE + \
-           '_'    + str( int( sim.data.GHG_TARGETS[yr_all[-1]] / 1e6)) + 'Mt'
+           '_'    + str( int( bdata.GHG_TARGETS[yr_all[-1]] / 1e6)) + 'Mt'
 
 
     # Create path name
@@ -133,22 +136,8 @@ def write_outputs(sim, path):
     result = subprocess.run(['python', 'luto/tools/report/create_html.py', '-p', path], capture_output=True, text=True)
     print("\nError occurred:", result.stderr) if result.returncode != 0 else print("\nReport HTML:\n", result.stdout)
     
-    ###############################################################
-    #                    Create log infomatoin                    #
-    ###############################################################
-    logs = [f'{settings.OUTPUT_DIR}/writing_log.txt', 
-        f'{settings.OUTPUT_DIR}/running_log.txt']
-
-    for log in logs:
-        if os.path.exists(log):
-            # Copy the log to the OUTPUT_DIR
-            shutil.copy(log, path)
-            # Remove the log from OUTPUT_DIR
-            os.remove(log)
 
 
-
-@tools.RedirectStdStreams(f'{settings.OUTPUT_DIR}/writing_log.txt')
 def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     if not os.path.isdir(path_yr):
@@ -177,9 +166,6 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_biodiversity(sim, yr_cal, path_yr)
     write_biodiversity_separate(sim, yr_cal, path_yr)
     
-    # Add a black line to separate the outputs by years in the log
-    print("\n")
-
 
 def write_settings(path):
     """Write model run settings"""

@@ -511,17 +511,17 @@ def map_desc_to_dvar_index(category: str,
     return df.reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
 
 
-# The class below is used to redirect the standard output to a file.
-class RedirectStdStreams:
-    def __init__(self, filepath):
-        self.filepath = filepath
-        if os.path.exists(self.filepath):
-            os.remove(self.filepath)
+# # The class below is used to redirect the standard output to a file.
+# class RedirectStdStreams:
+#     def __init__(self, filepath):
+#         self.filepath = filepath
+#         if os.path.exists(self.filepath):
+#             os.remove(self.filepath)
 
-    def __call__(self, func):
-        def wrapped(*args, **kwargs):
-            with open(self.filepath, 'a') as f, redirect_stdout(f), redirect_stderr(f):
-                return func(*args, **kwargs)
-        return wrapped
+#     def __call__(self, func):
+#         def wrapped(*args, **kwargs):
+#             with open(self.filepath, 'a') as f, redirect_stdout(f), redirect_stderr(f):
+#                 return func(*args, **kwargs)
+#         return wrapped
 
     
