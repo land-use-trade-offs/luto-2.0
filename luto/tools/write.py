@@ -86,7 +86,7 @@ def get_path(sim):
 
     return path
 
-# @tools.Tee_log(f'{settings.OUTPUT_DIR}/writing_log.txt')
+
 def write_outputs(sim, path):
 
     # Write model run settings
@@ -136,19 +136,19 @@ def write_outputs(sim, path):
     ###############################################################
     #                    Create log infomatoin                    #
     ###############################################################
-    # logs = [f'{settings.OUTPUT_DIR}/writing_log.txt', 
-    #     f'{settings.OUTPUT_DIR}/running_log.txt']
+    logs = [f'{settings.OUTPUT_DIR}/writing_log.txt', 
+        f'{settings.OUTPUT_DIR}/running_log.txt']
 
-    # for log in logs:
-    #     if os.path.exists(log):
-    #         # Copy the running/writing log to the output folder
-    #         shutil.copy(log, path)
-    #         # Remove the running/writing log from the output folder
-    #         os.remove(log)
-
-
+    for log in logs:
+        if os.path.exists(log):
+            # Copy the log to the OUTPUT_DIR
+            shutil.copy(log, path)
+            # Remove the log from OUTPUT_DIR
+            os.remove(log)
 
 
+
+@tools.RedirectStdStreams(f'{settings.OUTPUT_DIR}/writing_log.txt')
 def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     if not os.path.isdir(path_yr):
@@ -176,6 +176,9 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_ghg_separate(sim, yr_cal, path_yr)
     write_biodiversity(sim, yr_cal, path_yr)
     write_biodiversity_separate(sim, yr_cal, path_yr)
+    
+    # Add a black line to separate the outputs by years in the log
+    print("\n")
 
 
 def write_settings(path):
@@ -214,26 +217,26 @@ def write_files(sim, yr_cal, path):
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
     timestamp = str(yr_cal) + '_' + timestamp
     
-    # # Save raw agricultural decision variables (float array).
-    # ag_X_mrj_fname = 'ag_X_mrj' + '_' + timestamp + '.npy'
-    # np.save(os.path.join(path, ag_X_mrj_fname), sim.ag_dvars[yr_cal].astype(np.float16))
+    # Save raw agricultural decision variables (float array).
+    ag_X_mrj_fname = 'ag_X_mrj' + '_' + timestamp + '.npy'
+    np.save(os.path.join(path, ag_X_mrj_fname), sim.ag_dvars[yr_cal].astype(np.float16))
     
-    # # Save raw non-agricultural decision variables (float array).
-    # non_ag_X_rk_fname = 'non_ag_X_rk' + '_' + timestamp + '.npy'
-    # np.save(os.path.join(path, non_ag_X_rk_fname), sim.non_ag_dvars[yr_cal].astype(np.float16))
+    # Save raw non-agricultural decision variables (float array).
+    non_ag_X_rk_fname = 'non_ag_X_rk' + '_' + timestamp + '.npy'
+    np.save(os.path.join(path, non_ag_X_rk_fname), sim.non_ag_dvars[yr_cal].astype(np.float16))
 
-    # # Save raw agricultural management decision variables (float array).
-    # for am in AG_MANAGEMENTS_TO_LAND_USES:
-    #     snake_case_am = tools.am_name_snake_case(am)
-    #     am_X_mrj_fname = 'ag_man_X_mrj' + snake_case_am + '_' + timestamp + ".npy"
-    #     np.save(os.path.join(path, am_X_mrj_fname), sim.ag_man_dvars[yr_cal][am].astype(np.float16))
+    # Save raw agricultural management decision variables (float array).
+    for am in AG_MANAGEMENTS_TO_LAND_USES:
+        snake_case_am = tools.am_name_snake_case(am)
+        am_X_mrj_fname = 'ag_man_X_mrj' + snake_case_am + '_' + timestamp + ".npy"
+        np.save(os.path.join(path, am_X_mrj_fname), sim.ag_man_dvars[yr_cal][am].astype(np.float16))
     
-    # # Write out raw numpy arrays for land-use and land management
-    # lumap_fname = 'lumap' + '_' + timestamp + '.npy'
-    # lmmap_fname = 'lmmap' + '_' + timestamp + '.npy'
+    # Write out raw numpy arrays for land-use and land management
+    lumap_fname = 'lumap' + '_' + timestamp + '.npy'
+    lmmap_fname = 'lmmap' + '_' + timestamp + '.npy'
     
-    # np.save(os.path.join(path, lumap_fname), sim.lumaps[yr_cal])
-    # np.save(os.path.join(path, lmmap_fname), sim.lmmaps[yr_cal])
+    np.save(os.path.join(path, lumap_fname), sim.lumaps[yr_cal])
+    np.save(os.path.join(path, lmmap_fname), sim.lmmaps[yr_cal])
     
     
     

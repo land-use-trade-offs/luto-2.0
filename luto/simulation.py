@@ -47,7 +47,7 @@ from luto.economics import land_use_culling
 
 from luto.solvers.solver import InputData, LutoSolver
 from luto import tools
-from luto.tools import Tee_log
+from luto.tools import RedirectStdStreams
 
 
 class Data():
@@ -477,7 +477,7 @@ def solve_snapshot(base: int, target: int):
     print('Total processing time...', round(time.time() - start_time), 'seconds')
 
 
-# @Tee_log(f'{settings.OUTPUT_DIR}/running_log.txt')
+@RedirectStdStreams(f'{settings.OUTPUT_DIR}/running_log.txt')
 def run( base
        , target
        ):
