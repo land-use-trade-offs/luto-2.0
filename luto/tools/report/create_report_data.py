@@ -220,19 +220,28 @@ lu_area_dvar.to_json(f'{SAVE_DIR}/area_1_total_area_wide.json',orient='records')
 # Plot_3-2: Total Area (km2) by Irrigation
 lm_dvar_area = area_dvar.groupby(['Year','Water']).sum(numeric_only=True).reset_index()
 lm_dvar_area['Water'] = lm_dvar_area['Water'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
-lm_dvar_area_wide = lm_dvar_area.pivot(index='Year', 
-                                       columns='Water', 
-                                       values='Area (million km2)').reset_index()
-lm_dvar_area_wide.to_csv(f'{SAVE_DIR}/area_2_irrigation_area_wide.csv', index=False)
+
+lm_dvar_area = lm_dvar_area.groupby(['Water'])\
+    .apply(lambda x:list(map(list,zip(x['Year'],x['Area (million km2)']))))\
+    .reset_index()
+    
+lm_dvar_area.columns = ['name','data']
+lm_dvar_area['type'] = 'column'
+lm_dvar_area.to_json(f'{SAVE_DIR}/area_2_irrigation_area_wide.json',orient='records')
+
+
 
 
 # Plot_3-3: Area (km2) by Non-Agricultural land use
 non_ag_dvar_area = area_dvar.query('Type == "Non-agricultural landuse"').reset_index(drop=True)
-non_ag_dvar_area_wide = non_ag_dvar_area.groupby(['Year','Land use']).sum(numeric_only=True).reset_index()
-non_ag_dvar_area_wide = non_ag_dvar_area_wide.pivot(index='Year',
-                                                    columns='Land use',
-                                                    values='Area (million km2)').reset_index()
-non_ag_dvar_area_wide.to_csv(f'{SAVE_DIR}/area_3_non_ag_lu_area_wide.csv', index=False)
+non_ag_dvar_area = non_ag_dvar_area.groupby(['Land use'])\
+    .apply(lambda x:list(map(list,zip(x['Year'],x['Area (million km2)']))))\
+    .reset_index()
+    
+non_ag_dvar_area.columns = ['name','data']
+non_ag_dvar_area['type'] = 'column'
+non_ag_dvar_area.to_json(f'{SAVE_DIR}/area_3_non_ag_lu_area_wide.json',orient='records')
+
 
 
 # Plot_3-4: Area (km2) by Agricultural management
@@ -240,21 +249,29 @@ am_dvar_dfs = area_dvar_paths.query('base_name.str.contains("area_agricultural_m
 am_dvar_area = pd.concat([pd.read_csv(path) for path in am_dvar_dfs['path']], ignore_index=True)
 am_dvar_area['Area (million km2)'] = am_dvar_area['Area (ha)'] / 100 / 1e6
 
-am_dvar_area_type_wide = am_dvar_area.groupby(['Year','Type']).sum(numeric_only=True).reset_index()
-am_dvar_area_type_wide = am_dvar_area_type_wide.pivot(index='Year', 
-                                       columns='Type', 
-                                       values='Area (million km2)').reset_index()
-am_dvar_area_type_wide.to_csv(f'{SAVE_DIR}/area_4_am_total_area_wide.csv', index=False)
+am_dvar_area_type = am_dvar_area.groupby(['Year','Type']).sum(numeric_only=True).reset_index()
+
+am_dvar_area_type = am_dvar_area_type.groupby(['Type'])\
+    .apply(lambda x:list(map(list,zip(x['Year'],x['Area (million km2)']))))\
+    .reset_index()
+    
+am_dvar_area_type.columns = ['name','data']
+am_dvar_area_type['type'] = 'column'
+am_dvar_area_type.to_json(f'{SAVE_DIR}/area_4_am_total_area_wide.json',orient='records')
 
 
 
 # Plot_3-5: Agricultural management Area (km2) by Land use
-am_dvar_area_lu_wide = am_dvar_area.groupby(['Year','Land use']).sum(numeric_only=True).reset_index()
+am_dvar_area_lu = am_dvar_area.groupby(['Year','Land use']).sum(numeric_only=True).reset_index()
 
-am_dvar_area_lu_wide = am_dvar_area_lu_wide.pivot(index='Year',
-                                                  columns='Land use',
-                                                  values='Area (million km2)').reset_index()
-am_dvar_area_lu_wide.to_csv(f'{SAVE_DIR}/area_5_am_lu_area_wide.csv', index=False)
+am_dvar_area_lu = am_dvar_area_lu.groupby(['Land use'])\
+    .apply(lambda x:list(map(list,zip(x['Year'],x['Area (million km2)']))))\
+    .reset_index()
+    
+am_dvar_area_lu.columns = ['name','data']
+am_dvar_area_lu['type'] = 'column'
+am_dvar_area_lu.to_json(f'{SAVE_DIR}/area_5_am_lu_area_wide.json',orient='records')
+
 
 
 
@@ -472,8 +489,20 @@ water_df_total_vol_wide.to_csv(f'{SAVE_DIR}/water_2_volum_to_limit.csv')
 
 # Plot_5-3: Water use by sector (ML)
 water_df_separate_lu_type = water_df_separate.groupby(['year','Landuse Type']).sum()[['Water Use (ML)']].reset_index()
-water_df_separate_lu_type_wide = water_df_separate_lu_type.pivot(index='year', columns='Landuse Type', values='Water Use (ML)').reset_index()
-water_df_separate_lu_type_wide.to_csv(f'{SAVE_DIR}/water_3_volum_by_sector.csv',index=False)
+water_df_net = water_df_separate.groupby('year').sum(numeric_only=True).reset_index()
+
+water_df_separate_lu_type = water_df_separate_lu_type.groupby(['Landuse Type'])\
+    .apply(lambda x:list(map(list,zip(x['year'],x['Water Use (ML)']))))\
+    .reset_index()
+    
+water_df_separate_lu_type.columns = ['name','data']
+water_df_separate_lu_type['type'] = 'column'
+
+water_df_separate_lu_type.loc[len(water_df_separate_lu_type)] = ['Net Volume', list(map(list,zip(water_df_net['year'],water_df_net['Water Use (ML)']))), 'line']
+
+water_df_separate_lu_type.to_json(f'{SAVE_DIR}/water_3_volum_by_sector.json',orient='records')
+
+
 
 # Plot_5-4: Water use by landuse (ML)
 water_df_seperate_lu = water_df_separate.groupby(['year','Landuse']).sum()[['Water Use (ML)']].reset_index()

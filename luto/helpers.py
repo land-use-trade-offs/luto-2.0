@@ -49,10 +49,13 @@ yr_start = bdata.YR_CAL_BASE
 yr_end = 2020
 path = get_path(bdata,yr_start,yr_end)
 
+# Run the simulation
 with open(f"{path}/running_log.txt",'w') as f, redirect_stdout(f), redirect_stderr(f):
     sim.run( yr_start, yr_end )
-    write_outputs(sim, path)
 
+# Write the outputs
+with open(f"{path}/writing_log.txt",'w') as f, redirect_stdout(f), redirect_stderr(f):
+    write_outputs(sim, path)
 
 
 
