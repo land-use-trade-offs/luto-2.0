@@ -34,9 +34,9 @@ from luto.tools.compmap import *
 import luto.economics.agricultural.water as ag_water
 import luto.economics.non_agricultural.water as non_ag_water
 import luto.economics.agricultural.ghg as ag_ghg
-import luto.economics.non_agricultural.ghg as non_ag_ghg
 import luto.economics.agricultural.revenue as ag_revenue
 import luto.economics.agricultural.cost as ag_cost
+import luto.economics.non_agricultural.ghg as non_ag_ghg
 import luto.economics.agricultural.biodiversity as ag_biodiversity
 import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
@@ -171,6 +171,8 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_dvar_area(sim, yr_cal, path_yr)
     write_quantity(sim, yr_cal, path_yr, yr_cal_sim_pre)
     write_ag_revenue_cost(sim, yr_cal, path_yr)
+    write_ag_management_cost(sim, yr_cal, path_yr)
+    write_non_ag_cost(sim, yr_cal, path_yr)
     write_water(sim, yr_cal, path_yr)
     write_ghg(sim, yr_cal, path_yr)
     write_ghg_separate(sim, yr_cal, path_yr)
@@ -457,6 +459,65 @@ def write_ag_revenue_cost(sim, yr_cal, path):
     # Save to file
     df_rev.to_csv(os.path.join(path, f'revenue_agricultural_commodity_{timestamp}.csv'))
     df_cost.to_csv(os.path.join(path, f'cost_agricultural_commodity_{timestamp}.csv'))
+
+def write_ag_management_cost(sim, yr_cal, path):
+    """Calculate agricultural management cost."""
+    # Get the timestamp so each CSV in the timeseries mode has a unique name
+    # Append the yr_cal to timestamp as prefix
+    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
+    timestamp = str(yr_cal) + '_' + timestamp
+
+    print('Writing agricultural management cost outputs to', path)
+
+    # Convert calendar year to year index.
+    yr_idx = yr_cal - sim.bdata.YR_CAL_BASE
+
+    cost_asparagopsis_lm = ag_cost.get_asparagopsis_effect_c_mrj(sim.data, yr_idx) # Cost of ag_management
+    ag_man_col = [sim.data.DESC2AGLU[name] for name in AG_MANAGEMENTS_TO_LAND_USES.get('Asparagopsis taxiformis', []) if
+                  name in sim.data.DESC2AGLU] # Get the col of the agricultural management
+    ag_man_dvar = sim.ag_man_dvars[yr_cal]['Asparagopsis taxiformis'][:,:,ag_man_col]
+    cost_asparagopsis = np.sum(ag_man_dvar * cost_asparagopsis_lm)
+
+    cost_precision_agriculture_lm = ag_cost.get_precision_agriculture_effect_c_mrj(sim.data, yr_idx)  # Cost of ag_management
+    ag_man_col = [sim.data.DESC2AGLU[name] for name in AG_MANAGEMENTS_TO_LAND_USES.get('Precision Agriculture', []) if
+                  name in sim.data.DESC2AGLU]
+    ag_man_dvar = sim.ag_man_dvars[yr_cal]['Precision Agriculture'][:, :, ag_man_col]
+    cost_precision_agriculture = np.sum(ag_man_dvar * cost_precision_agriculture_lm)
+
+    cost_ecological_grazing_lm = ag_cost.get_ecological_grazing_effect_c_mrj(sim.data, yr_idx) # Cost of ag_management
+    ag_man_col = [sim.data.DESC2AGLU[name] for name in AG_MANAGEMENTS_TO_LAND_USES.get('Ecological Grazing', []) if
+                  name in sim.data.DESC2AGLU]
+    ag_man_dvar = sim.ag_man_dvars[yr_cal]['Ecological Grazing'][:, :, ag_man_col]
+    cost_ecological_grazing = np.sum(ag_man_dvar * np.nan_to_num(cost_ecological_grazing_lm))
+
+    df_cost = pd.DataFrame({
+        "Asparagopsis": [cost_asparagopsis],
+        "Precision agriculture": [cost_precision_agriculture],
+        "Ecological grazing": [cost_ecological_grazing]
+    })
+    df_cost.to_csv(os.path.join(path, f'cost_agricultural_management_{timestamp}.csv'), index = False)
+
+
+def write_non_ag_cost(sim, yr_cal, path):
+    """Calculate non_agricultural cost. """
+
+    # Get the timestamp so each CSV in the timeseries mode has a unique name
+    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
+    timestamp = str(yr_cal) + '_' + timestamp
+
+    print('Writing non agricultural management cost outputs to', path)
+    non_ag_dvar = sim.non_ag_dvars[yr_cal]
+
+    cost_env_plantings = np.sum(non_ag_dvar[:, 0] * non_ag_cost.get_cost_env_plantings(sim.data))
+    cost_rip_plantings = np.sum(non_ag_dvar[:, 1] * non_ag_cost.get_cost_rip_plantings(sim.data))
+    cost_agroforestry = np.sum(non_ag_dvar[:, 2] * non_ag_cost.get_cost_agroforestry(sim.data))
+    df_cost = pd.DataFrame({
+        "Environmental Plantings": [cost_env_plantings],
+        "Riparian Plantings": [cost_rip_plantings],
+        "Agroforestry": [cost_agroforestry]
+    })
+    # Save to file.
+    df_cost.to_csv(os.path.join(path, f'cost_non_ag_{timestamp}.csv'), index = False)
 
 
 def write_dvar_area(sim, yr_cal, path):
