@@ -509,7 +509,7 @@ document.addEventListener("DOMContentLoaded", function () {
         packedbubble: {
           useSimulation: true,
           splitSeries: false,
-          minSize: "10%",
+          minSize: "1%",
           maxSize: "1000%",
           dataLabels: {
             enabled: true,
@@ -527,6 +527,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
       credits: {
         enabled: false,
+      },
+      tooltip: {
+        formatter: function () {
+          return `<b>${this.series.name
+            }:</b>${this.y.toFixed(3)}<br/>`;
+        },
       },
 
       exporting: {
