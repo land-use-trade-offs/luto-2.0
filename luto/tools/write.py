@@ -174,7 +174,7 @@ def write_settings(path):
     with open('luto/settings.py', 'r') as file:
         lines = file.readlines()
         
-        # Adjusted regex patterns to match the multiline section header and variable assignments
+        # Regex patterns that matches variable assignments from settings
         parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=")
 
         settings_order = []
@@ -187,6 +187,27 @@ def write_settings(path):
         # Reorder the settings dictionary to match the order in the settings.py file
         settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
         settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
+        
+        # Some variables are mutually exclusive, 
+        # so we set the unsed variable to None here.
+        if settings.GHG_LIMITS_TYPE == 'dict': 
+            settings_dict['GHG_LIMITS_FIELD'] == 'None'
+        elif settings.GHG_LIMITS_TYPE == 'file':
+            settings_dict['GHG_LIMITS'] == 'None'
+            
+        if settings.CULL_MODE == 'absolute':
+            settings_dict['LAND_USAGE_CULL_PERCENTAGE'] == 'None'
+        elif settings.CULL_MODE == 'percentage':
+            settings_dict['MAX_LAND_USES_PER_CELL'] == 'None'
+        elif settings.CULL_MODE == 'none':
+            settings_dict['LAND_USAGE_CULL_PERCENTAGE'] == 'None'
+            settings_dict['MAX_LAND_USES_PER_CELL'] == 'None'
+
+        if settings.WATER_USE_LIMITS == 'on':
+            if settings.WATER_LIMITS_TYPE == 'pct_ag':
+                settings_dict['WATER_STRESS_FRACTION'] == 'None'
+            elif settings.WATER_LIMITS_TYPE == 'water_stress':
+                settings_dict['WATER_USE_REDUCTION_PERCENTAGE'] == 'None'
 
     # Write the settings to a file
     with open(os.path.join(path, 'model_run_settings.txt'), 'w') as f:

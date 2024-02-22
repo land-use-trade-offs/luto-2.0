@@ -43,25 +43,12 @@ from luto.settings import (
     WASTE, 
     FEED_EFFICIENCY, 
     GHG_LIMITS_TYPE,
+    GHG_LIMITS,
+    GHG_LIMITS_FIELD,
     RIPARIAN_PLANTINGS_BUFFER_WIDTH,
     RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR,
     BIODIV_LIVESTOCK_IMPACT,
 )
-
-
-
-# The {GHG_LIMITS}, and {GHG_LIMITS_FIELD} settings are mutually exclusive. 
-# Here we use a try-except block to set the value of the
-# settings if they are not set in the settings.py file.
-try:
-    from luto.settings import GHG_LIMITS
-except ImportError:
-    GHG_LIMITS = None
-    
-try: 
-    from luto.settings import GHG_LIMITS_FIELD
-except ImportError: 
-    GHG_LIMITS_FIELD = None
 
 
 # Try-Except to make sure {rasterio} can be loaded under different environment
@@ -540,7 +527,7 @@ DEMAND_C = DEMAND_C.to_numpy(dtype = np.float32).T
 # If GHG_LIMITS_TYPE == 'file' then import the Excel spreadsheet and import the results to a python dictionary {year: target (tCO2e), ...}
 if GHG_LIMITS_TYPE == 'file':
     GHG_TARGETS = pd.read_excel(os.path.join(INPUT_DIR, 'GHG_targets.xlsx'), sheet_name = 'Data', index_col = 'YEAR')
-    GHG_TARGETS = GHG_TARGETS[GHG_LIMITS].to_dict()
+    GHG_TARGETS = GHG_TARGETS[GHG_LIMITS_FIELD].to_dict()
 
 # If GHG_LIMITS_TYPE == 'dict' then import the Excel spreadsheet and import the results to a python dictionary {year: target (tCO2e), ...}
 elif GHG_LIMITS_TYPE == 'dict':
