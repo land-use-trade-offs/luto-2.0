@@ -37,6 +37,7 @@ import luto.economics.agricultural.ghg as ag_ghg
 import luto.economics.agricultural.revenue as ag_revenue
 import luto.economics.agricultural.cost as ag_cost
 import luto.economics.non_agricultural.ghg as non_ag_ghg
+import luto.economics.non_agricultural.cost as non_ag_cost
 import luto.economics.agricultural.biodiversity as ag_biodiversity
 import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
