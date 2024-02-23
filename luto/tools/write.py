@@ -43,7 +43,6 @@ import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
-
 def write_outputs(sim):
 
     # Write model run settings
@@ -91,7 +90,7 @@ def write_outputs(sim):
     print("\nError occurred:", result.stderr) if result.returncode != 0 else print("\nReport HTML:\n", result.stdout)
     
 
-
+@tools.LogToFile(f"{settings.OUTPUT_DIR}/write")
 def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     if not os.path.isdir(path_yr):

@@ -125,14 +125,12 @@ class Data():
 
 
 def sync_years(base, target):
-    global data, base_year, target_index, path
+    global data, base_year, target_index
     base_year = base
     target_index = target - bdata.YR_CAL_BASE
     data = Data(bdata, target_index)
-    path = get_path(bdata, base, target)
-
-
-   
+    
+    
 def get_path(bdata, start, end):
     """Create a folder for storing outputs and return folder name."""
 
@@ -178,6 +176,7 @@ def get_path(bdata, start, end):
             os.mkdir(p)
 
     return path
+
 
 
 # Local matrix-getters.
@@ -529,10 +528,15 @@ def solve_snapshot(base: int, target: int):
     print('Total processing time...', round(time.time() - start_time), 'seconds')
 
 
+@tools.LogToFile(f"{settings.OUTPUT_DIR}/run")
 def run( base
        , target
        ):
     """Run the simulation."""
+    
+    # Create output directories
+    global path
+    path = get_path(bdata, base, target)
 
     # Run the simulation up to `year` sequentially.         *** Not sure that timeseries mode is working ***
     if settings.MODE == 'timeseries':
