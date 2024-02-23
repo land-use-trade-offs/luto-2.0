@@ -21,8 +21,12 @@ model that has 'global' varying state.
 """
 
 
-import numpy as np
+import os
+import math
 import time
+from datetime import datetime
+
+import numpy as np
 
 import luto.data as bdata
 import luto.settings as settings
@@ -43,10 +47,10 @@ import luto.economics.non_agricultural.quantity as non_ag_quantity
 import luto.economics.non_agricultural.transitions as non_ag_transition
 import luto.economics.non_agricultural.revenue as non_ag_revenue
 
-from luto.economics import land_use_culling
-
-from luto.solvers.solver import InputData, LutoSolver
 from luto import tools
+from luto.economics import land_use_culling
+from luto.solvers.solver import InputData, LutoSolver
+
 
 
 class Data():
@@ -121,10 +125,59 @@ class Data():
 
 
 def sync_years(base, target):
-    global data, base_year, target_index
+    global data, base_year, target_index, path
     base_year = base
     target_index = target - bdata.YR_CAL_BASE
     data = Data(bdata, target_index)
+    path = get_path(bdata, base, target)
+
+
+   
+def get_path(bdata, start, end):
+    """Create a folder for storing outputs and return folder name."""
+
+    # Get date and time
+    timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
+    
+    # Get the years to write
+    if settings.MODE == 'snapshot':
+        yr_all = [start,end]
+    elif settings.MODE == 'timeseries':
+        yr_all = list(range(start,end+1))
+
+    # Add some shorthand details about the model run
+    post = '_'    + settings.DEMAND_CONSTRAINT_TYPE + \
+           '_'    + settings.OBJECTIVE + \
+           '_RF'  + str(settings.RESFACTOR) + \
+           '_P1e' + str(int(math.log10(settings.PENALTY))) + \
+           '_'    + str(yr_all[0]) + '-' + str(yr_all[-1]) + \
+           '_'    + settings.MODE + \
+           '_'    + str( int( bdata.GHG_TARGETS[yr_all[-1]] / 1e6)) + 'Mt'
+
+
+    # Create path name
+    path = 'output/' + timestamp + post
+
+    # Get all paths 
+    paths = [path]\
+            + [f"{path}/out_{yr}" for yr in yr_all]\
+            + [f"{path}/out_{yr}/lucc_separate" for yr in yr_all[1:]] # Skip creating lucc_separate for base year
+    
+    # Add the path for the comparison between base-year and target-year if in the timeseries mode
+    if settings.MODE == 'timeseries':
+        path_begin_end_compare = f"{path}/begin_end_compare_{yr_all[0]}_{yr_all[-1]}"
+        paths = paths\
+                + [path_begin_end_compare]\
+                + [f"{path_begin_end_compare}/out_{yr_all[0]}",
+                   f"{path_begin_end_compare}/out_{yr_all[-1]}",
+                   f"{path_begin_end_compare}/out_{yr_all[-1]}/lucc_separate"]
+    
+    # Create all paths
+    for p in paths:
+        if not os.path.exists(p):
+            os.mkdir(p)
+
+    return path
 
 
 # Local matrix-getters.
