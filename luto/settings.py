@@ -200,7 +200,7 @@ AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  # The minimum value an agricultural
 # Greenhouse gas emissions limits and parameters *******************************
 GHG_EMISSIONS_LIMITS = 'on'        # 'on' or 'off'
 
-GHG_LIMITS_TYPE = 'dict' # 'dict' or 'file'
+GHG_LIMITS_TYPE = 'file' # 'dict' or 'file'
 
 # Set emissions limits in dictionary below (i.e., year: tonnes)
 GHG_LIMITS = {                     

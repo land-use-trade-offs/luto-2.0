@@ -424,6 +424,9 @@ def write_ag_revenue_cost(sim, yr_cal, path):
     # Save to file
     df_rev.to_csv(os.path.join(path, f'revenue_agricultural_commodity_{timestamp}.csv'))
     df_cost.to_csv(os.path.join(path, f'cost_agricultural_commodity_{timestamp}.csv'))
+    
+    
+    
 
 def write_ag_management_cost(sim, yr_cal, path):
     """Calculate agricultural management cost."""
