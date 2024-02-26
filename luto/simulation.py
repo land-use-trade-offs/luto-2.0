@@ -459,9 +459,9 @@ def solve_timeseries(steps: int, base: int, target: int):
     print( "\nRunning LUTO %s timeseries from %s to %s at resfactor %s, starting at %s." % (settings.VERSION, base, target, settings.RESFACTOR, time.ctime()) )
 
     for s in range(steps):
-        print( "\n-------------------------------------------------" )
-        print( "Running for year %s..." % (base + s + 1) )
-        print( "-------------------------------------------------\n" )
+        print( "\n-------------------------------------------------", end=' ')
+        print( f"Running for year %s... {base + s + 1}"   )
+        print( "-------------------------------------------------\n", end=' ' )
         start_time = time.time()
 
         input_data = prepare_input_data(base + s, base + s + 1)
@@ -496,7 +496,7 @@ def solve_timeseries(steps: int, base: int, target: int):
             prod_data[base + s + 1],
         ) = luto_solver.solve()
 
-        print('Total processing time...', round(time.time() - start_time), 'seconds')
+        print(f'Total processing time... {round(time.time() - start_time)} seconds', end=' ' )
 
 
 def solve_snapshot(base: int, target: int):
@@ -525,7 +525,7 @@ def solve_snapshot(base: int, target: int):
         prod_data[target],
     ) = luto_solver.solve()
     
-    print('Total processing time...', round(time.time() - start_time), 'seconds')
+    print(f'Total processing time... {round(time.time() - start_time)} seconds', end=' ')
 
 
 @tools.LogToFile(f"{settings.OUTPUT_DIR}/run")

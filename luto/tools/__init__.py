@@ -554,7 +554,12 @@ class LogToFile:
             finally:
                 sys.stdout = original_stdout
                 sys.stderr = original_stderr
+                self.close()
         return wrapper
+    
+    def close(self):
+        self.stdout_logger.handlers[0].close()
+        self.stderr_logger.handlers[0].close()
 
     class StreamToLogger(object):
         def __init__(self, logger, log_level=logging.INFO, original_stream=None):
@@ -563,10 +568,11 @@ class LogToFile:
             self.original_stream = original_stream
 
         def write(self, buf):
-            for line in buf.rstrip().splitlines():
-                self.logger.log(self.log_level, line.rstrip())
-                if self.original_stream:
-                    self.original_stream.write(line + '\n')
+            # for line in buf.rstrip().splitlines()
+            line =  ' '.join(buf.rstrip().splitlines())
+            self.logger.log(self.log_level, line.rstrip())
+            if self.original_stream:
+                self.original_stream.write(line + '\n')
 
         def flush(self):
             if self.original_stream:

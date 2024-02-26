@@ -90,6 +90,17 @@ def write_outputs(sim):
     result = subprocess.run(['python', 'luto/tools/report/create_html.py', '-p', sim.path], capture_output=True, text=True)
     print("\nError occurred:", result.stderr) if result.returncode != 0 else print("\nReport HTML:\n", result.stdout)
     
+    
+    ###############################################################
+    #           Move logs to current output dir                   #
+    ###############################################################
+    logs = ['run_stderr', 'run_stdout', 'write_stderr', 'write_stdout']
+    logs = [f"{settings.OUTPUT_DIR}/{log}.log" for log in logs]
+    
+    for log in logs:
+        if os.path.exists(log):
+            shutil.move(log, f"{sim.path}/{os.path.basename(log)}")
+
 
 @tools.LogToFile(f"{settings.OUTPUT_DIR}/write")
 def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
@@ -121,6 +132,8 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_ghg_separate(sim, yr_cal, path_yr)
     write_biodiversity(sim, yr_cal, path_yr)
     write_biodiversity_separate(sim, yr_cal, path_yr)
+    
+    
     
 
 def write_settings(path):
@@ -175,7 +188,7 @@ def write_settings(path):
 def write_files(sim, yr_cal, path):
     """Writes numpy arrays and geotiffs to file"""
     
-    print('Writing numpy arrays and geotiff outputs to', path)
+    print(f'Writing numpy arrays and geotiff outputs to {path}')
 
     # Append the yr_cal to timestamp as prefix
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
@@ -378,7 +391,7 @@ def write_ag_revenue_cost(sim, yr_cal, path):
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
     timestamp = str(yr_cal) + '_' + timestamp
 
-    print('Writing agricultural revenue outputs to', path)
+    print(f'Writing agricultural revenue outputs to {path}' )
 
     # Convert calendar year to year index.
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
@@ -435,7 +448,7 @@ def write_ag_management_cost(sim, yr_cal, path):
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
     timestamp = str(yr_cal) + '_' + timestamp
 
-    print('Writing agricultural management cost outputs to', path)
+    print(f'Writing agricultural management cost outputs to {path}')
 
     # Convert calendar year to year index.
     yr_idx = yr_cal - sim.bdata.YR_CAL_BASE
@@ -463,7 +476,8 @@ def write_ag_management_cost(sim, yr_cal, path):
         "Precision agriculture": [cost_precision_agriculture],
         "Ecological grazing": [cost_ecological_grazing]
     })
-    df_cost.to_csv(os.path.join(path, f'cost_agricultural_management_{timestamp}.csv'), index = False)
+    
+    # df_cost.to_csv(os.path.join(path, f'cost_agricultural_management_{timestamp}.csv'), index = False)
 
 
 def write_non_ag_cost(sim, yr_cal, path):
@@ -473,19 +487,21 @@ def write_non_ag_cost(sim, yr_cal, path):
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
     timestamp = str(yr_cal) + '_' + timestamp
 
-    print('Writing non agricultural management cost outputs to', path)
+    print(f'Writing non agricultural management cost outputs to {path}')
     non_ag_dvar = sim.non_ag_dvars[yr_cal]
 
     cost_env_plantings = np.sum(non_ag_dvar[:, 0] * non_ag_cost.get_cost_env_plantings(sim.data))
     cost_rip_plantings = np.sum(non_ag_dvar[:, 1] * non_ag_cost.get_cost_rip_plantings(sim.data))
     cost_agroforestry = np.sum(non_ag_dvar[:, 2] * non_ag_cost.get_cost_agroforestry(sim.data))
+    
     df_cost = pd.DataFrame({
         "Environmental Plantings": [cost_env_plantings],
         "Riparian Plantings": [cost_rip_plantings],
         "Agroforestry": [cost_agroforestry]
     })
+    
     # Save to file.
-    df_cost.to_csv(os.path.join(path, f'cost_non_ag_{timestamp}.csv'), index = False)
+    # df_cost.to_csv(os.path.join(path, f'cost_non_ag_{timestamp}.csv'), index = False)
 
 
 def write_dvar_area(sim, yr_cal, path):
@@ -495,7 +511,7 @@ def write_dvar_area(sim, yr_cal, path):
     timestamp = str(yr_cal) + '_' + timestamp
     
     # Reprot the process
-    print('Writing area calculated from dvars to', path)
+    print(f'Writing area calculated from dvars to {path}')
     
 
     # Get the decision variables for the year, multiply them by the area of each pixel, 
@@ -609,7 +625,7 @@ def write_crosstab(sim, yr_cal, path, yr_cal_sim_pre=None):
         assert yr_cal_sim_pre >= sim.data.YR_CAL_BASE and yr_cal_sim_pre < yr_cal,\
             f"yr_cal_sim_pre ({yr_cal_sim_pre}) must be >= {sim.data.YR_CAL_BASE} and < {yr_cal}"
 
-        print('Writing production outputs to', path)
+        print(f'Writing production outputs to {path}')
 
         # LUS = ['Non-agricultural land'] + sim.data.AGRICULTURAL_LANDUSES + sim.data.NON_AGRICULTURAL_LANDUSES
         ctlu, swlu = lumap_crossmap( sim.lumaps[yr_cal_sim_pre]
@@ -676,7 +692,7 @@ def write_water(sim, yr_cal, path):
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
     timestamp = str(yr_cal) + '_' + timestamp
 
-    print('Writing water outputs to', path)
+    print(f'Writing water outputs to {path}')
 
     # Convert calendar year to year index.
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
@@ -825,7 +841,7 @@ def write_ghg(sim, yr_cal, path):
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
     timestamp = str(yr_cal) + '_' + timestamp
 
-    print('Writing GHG outputs to', path)
+    print(f'Writing GHG outputs to {path}' )
     
 
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
@@ -860,7 +876,7 @@ def write_biodiversity(sim, yr_cal, path):
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
     timestamp = str(yr_cal) + '_' + timestamp
 
-    print('Writing biodiversity outputs to', path)
+    print(f'Writing biodiversity outputs to {path}')
 
 
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
@@ -892,7 +908,7 @@ def write_biodiversity_separate(sim, yr_cal, path):
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
     timestamp = str(yr_cal) + '_' + timestamp
 
-    print('Writing biodiversity_separate outputs to', path)
+    print(f'Writing biodiversity_separate outputs to {path}')
 
 
     # Get the biodiversity scores b_mrj
