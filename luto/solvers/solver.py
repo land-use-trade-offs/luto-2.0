@@ -187,7 +187,7 @@ class LutoSolver:
         Performs the initial formulation of the model - setting up decision variables, 
         constraints, and the objective.
         """
-        print("\nSetting up the model...", time.ctime() + "\n")
+        print(f"\nSetting up the model... {time.ctime()}", end=" ")
         self._setup_vars()
         self._setup_objective()
         self._setup_constraints()
@@ -598,7 +598,7 @@ class LutoSolver:
         if settings.WATER_USE_LIMITS != "on":
             return
 
-        print("Adding water constraints by", settings.WATER_REGION_DEF + "...", time.ctime())
+        print(f"Adding water constraints by {settings.WATER_REGION_DEF} {time.ctime()}...", end=" ")
 
         # Returns region-specific water use limits
         w_limits = self._input_data.limits["water"]
@@ -646,13 +646,13 @@ class LutoSolver:
                     self.water_limit_constraints_r[r].append(constr)
 
             if settings.VERBOSE == 1:
-                print("    ...setting water limit for %s <= %.2f ML" % (region, wreq_reg_limit))
+                print(f"    ...setting water limit for {region} <= {wreq_reg_limit:.2f} ML", end=" ")
 
     def _add_ghg_emissions_limit_constraints(self):
         if settings.GHG_EMISSIONS_LIMITS != "on":
             return
 
-        print("\nAdding GHG emissions constraints...", time.ctime())
+        print(f"\nAdding GHG emissions constraints...", end=" ")
 
         # Returns GHG emissions limits
         ghg_limits = self._input_data.limits["ghg"]
@@ -698,7 +698,7 @@ class LutoSolver:
 
         self.ghg_emissions_expr = ag_contr + ag_man_contr + non_ag_contr
 
-        print("    ...setting GHG emissions reduction target: {:,.0f} tCO2e\n".format(ghg_limits))
+        print(f"    ...setting GHG emissions reduction target: {ghg_limits:,.0f} tCO2e\n", end=" ")
         self.ghg_emissions_limit_constraint = self.gurobi_model.addConstr(
             self.ghg_emissions_expr <= ghg_limits
         )
@@ -707,7 +707,7 @@ class LutoSolver:
         if settings.BIODIVERSITY_LIMITS != "on":
             return
 
-        print("Adding biodiversity constraints...", time.ctime())
+        print("Adding biodiversity constraints...", end=" ")
 
         # Returns biodiversity limits
         biodiversity_limits = self._input_data.limits["biodiversity"]
@@ -744,13 +744,13 @@ class LutoSolver:
 
         self.biodiversity_expr = ag_contr + ag_man_contr + non_ag_contr
 
-        print("    ...setting biodiversity score target: {:,.0f}\n".format(biodiversity_limits))
+        print(f"    ...setting biodiversity score target: {biodiversity_limits:,.0f}\n")
         self.biodiversity_limit_constraint = self.gurobi_model.addConstr(
             self.biodiversity_expr >= biodiversity_limits
         )
 
     def _setup_constraints(self):
-        print(f"Setting up constraints ({time.ctime()})...")
+        print(f"Setting up constraints...")
         st = time.time()
         self._add_cell_usage_constraints()
         self._add_agricultural_management_constraints()
@@ -940,14 +940,14 @@ class LutoSolver:
 
     def solve(self):
         st = time.time()
-        print("Starting solve... ", time.ctime(), "\n")
+        print(f"Starting solve... ", end=" ")
 
         # Magic.
         self.gurobi_model.optimize()
 
         ft = time.time()
-        print("Completed solve... ", time.ctime())
-        print("Found optimal objective value", round(self.gurobi_model.objVal, 2), "in", round(ft - st), "seconds\n")
+        print("Completed solve...", end=" ")
+        print(f"Found optimal objective value {round(self.gurobi_model.objVal, 2)} in {round(ft - st)}seconds", end=" ")
         print("Collecting results...", end=" ", flush=True)
 
         prod_data = {}  # Dictionary that stores information about production and GHG emissions for the write module

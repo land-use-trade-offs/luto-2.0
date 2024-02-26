@@ -11,10 +11,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (line.includes(':')) {
             // Split the line into label and value if a colon is present
-            [label, value] = line.split(':').map(s => s.trim());
+            [label, value] = line.split(':').map(s => String(s).trim());
         } else {
             // Use the entire line as the label if no colon is present
-            label = line.trim();
+            label = String(line).trim();
             value = '';
         }
 

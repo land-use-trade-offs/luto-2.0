@@ -18,6 +18,9 @@
 Pure helper functions and other tools.
 """
 
+import functools
+import logging
+import sys
 import time
 import os.path
 from typing import Tuple
@@ -511,17 +514,66 @@ def map_desc_to_dvar_index(category: str,
     return df.reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
 
 
-# # The class below is used to redirect the standard output to a file.
-# class RedirectStdStreams:
-#     def __init__(self, filepath):
-#         self.filepath = filepath
-#         if os.path.exists(self.filepath):
-#             os.remove(self.filepath)
+class LogToFile:
+    def __init__(self, 
+                 log_path, 
+                 stdout_level=logging.INFO, 
+                 stderr_level=logging.ERROR, 
+                 log_format='%(asctime)s - %(message)s'):
+        
+        self.log_path_stdout = f"{log_path}_stdout.log"
+        self.log_path_stderr = f"{log_path}_stderr.log"
+        self.stdout_level = stdout_level
+        self.stderr_level = stderr_level
+        self.log_format = log_format
 
-#     def __call__(self, func):
-#         def wrapped(*args, **kwargs):
-#             with open(self.filepath, 'a') as f, redirect_stdout(f), redirect_stderr(f):
-#                 return func(*args, **kwargs)
-#         return wrapped
+        # Setup logging handlers for stdout and stderr with specified levels and format
+        self.stdout_logger = logging.getLogger(f'{log_path}_STDOUT')
+        self.stderr_logger = logging.getLogger(f'{log_path}_STDERR')
+        self.setup_logger(self.stdout_logger, self.log_path_stdout, stdout_level)
+        self.setup_logger(self.stderr_logger, self.log_path_stderr, stderr_level)
 
+    def setup_logger(self, logger, log_path, level):
+        logger.setLevel(level)
+        handler = logging.FileHandler(log_path, mode='w')
+        formatter = logging.Formatter(self.log_format)
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        # Prevent logging from propagating to the root logger
+        logger.propagate = False
+
+    def __call__(self, func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            original_stdout = sys.stdout
+            original_stderr = sys.stderr
+            try:
+                sys.stdout = self.StreamToLogger(self.stdout_logger, self.stdout_level, sys.stdout)
+                sys.stderr = self.StreamToLogger(self.stderr_logger, self.stderr_level, sys.stderr)
+                return func(*args, **kwargs)
+            finally:
+                sys.stdout = original_stdout
+                sys.stderr = original_stderr
+                self.close()
+        return wrapper
     
+    def close(self):
+        self.stdout_logger.handlers[0].close()
+        self.stderr_logger.handlers[0].close()
+
+    class StreamToLogger(object):
+        def __init__(self, logger, log_level=logging.INFO, original_stream=None):
+            self.logger = logger
+            self.log_level = log_level
+            self.original_stream = original_stream
+
+        def write(self, buf):
+            # for line in buf.rstrip().splitlines()
+            line =  ' '.join(buf.rstrip().splitlines())
+            self.logger.log(self.log_level, line.rstrip())
+            if self.original_stream:
+                self.original_stream.write(line + '\n')
+
+        def flush(self):
+            if self.original_stream:
+                self.original_stream.flush()

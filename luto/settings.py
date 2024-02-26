@@ -195,7 +195,7 @@ AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  # The minimum value an agricultural
 # Greenhouse gas emissions limits and parameters *******************************
 GHG_EMISSIONS_LIMITS = 'on'        # 'on' or 'off'
 
-GHG_LIMITS_TYPE = 'dict' # 'dict' or 'file'
+GHG_LIMITS_TYPE = 'file' # 'dict' or 'file'
 
 # Set emissions limits in dictionary below (i.e., year: tonnes)
 GHG_LIMITS = {                     
@@ -205,7 +205,7 @@ GHG_LIMITS = {
              }
 
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-GHG_LIMITS = '1.5C (67%)'    
+GHG_LIMITS_FIELD = '1.5C (67%)'    
 
 SOC_AMORTISATION = 30           # Number of years over which to spread (average) soil carbon accumulation
 
@@ -213,19 +213,19 @@ SOC_AMORTISATION = 30           # Number of years over which to spread (average)
 
 # Water use limits and parameters *******************************
 
+
+
 WATER_USE_LIMITS = 'on'               # 'on' or 'off'
 WATER_LIMITS_TYPE = 'water_stress'    # 'water_stress' or 'pct_ag'
 
-if WATER_USE_LIMITS == 'on':
-   if WATER_LIMITS_TYPE == 'pct_ag':
-      # Set reduction in water use as percentage of 2010 irrigation water use
-      WATER_USE_REDUCTION_PERCENTAGE = 0
-   elif WATER_LIMITS_TYPE == 'water_stress':
-      # Set proportion of catchment water use above which is high water stress 
-      # (0.25 follows Aqueduct classification of 0.4 but leaving 0.15 for urban/industrial/indigenous use).
-      # Safe and just Earth system boundaries says 0.2 https://www.nature.com/articles/s41586-023-06083-8
-      WATER_STRESS_FRACTION = 0.20
-      
+# If WATER_LIMITS_TYPE = 'pct_ag'...       
+# Set reduction in water use as percentage of 2010 irrigation water use
+WATER_USE_REDUCTION_PERCENTAGE = 0  
+
+# If WATER_LIMITS_TYPE = 'water_stress'...                                           
+# (0.25 follows Aqueduct classification of 0.4 but leaving 0.15 for urban/industrial/indigenous use).
+# Safe and just Earth system boundaries says 0.2 https://www.nature.com/articles/s41586-023-06083-8  
+WATER_STRESS_FRACTION = 0.25          
 
 # Regionalisation to enforce water use limits by
 WATER_REGION_DEF = 'DD'                 # 'RR' for River Region, 'DD' for Drainage Division

@@ -44,79 +44,32 @@ import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
-def get_path(bdata,start,end):
-    """Create a folder for storing outputs and return folder name."""
-
-    # Get date and time
-    timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
-    
-    # Get the years to write
-    if settings.MODE == 'snapshot':
-        yr_all = [start,end]
-    elif settings.MODE == 'timeseries':
-        yr_all = list(range(start,end+1))
-
-    # Add some shorthand details about the model run
-    post = '_'    + settings.DEMAND_CONSTRAINT_TYPE + \
-           '_'    + settings.OBJECTIVE + \
-           '_RF'  + str(settings.RESFACTOR) + \
-           '_P1e' + str(int(math.log10(settings.PENALTY))) + \
-           '_'    + str(yr_all[0]) + '-' + str(yr_all[-1]) + \
-           '_'    + settings.MODE + \
-           '_'    + str( int( bdata.GHG_TARGETS[yr_all[-1]] / 1e6)) + 'Mt'
-
-
-    # Create path name
-    path = 'output/' + timestamp + post
-
-    # Get all paths 
-    paths = [path]\
-            + [f"{path}/out_{yr}" for yr in yr_all]\
-            + [f"{path}/out_{yr}/lucc_separate" for yr in yr_all[1:]] # Skip creating lucc_separate for base year
-    
-    # Add the path for the comparison between base-year and target-year if in the timeseries mode
-    if settings.MODE == 'timeseries':
-        path_begin_end_compare = f"{path}/begin_end_compare_{yr_all[0]}_{yr_all[-1]}"
-        paths = paths\
-                + [path_begin_end_compare]\
-                + [f"{path_begin_end_compare}/out_{yr_all[0]}",
-                   f"{path_begin_end_compare}/out_{yr_all[-1]}",
-                   f"{path_begin_end_compare}/out_{yr_all[-1]}/lucc_separate"]
-    
-    # Create all paths
-    for p in paths:
-        if not os.path.exists(p):
-            os.mkdir(p)
-
-    return path
-
-
-def write_outputs(sim, path):
+def write_outputs(sim):
 
     # Write model run settings
-    write_settings(path)
+    write_settings(sim.path)
 
     # Get the years to write
     years = sorted(list(sim.lumaps.keys()))
-    paths = [f"{path}/out_{yr}" for yr in years]
+    paths = [f"{sim.path}/out_{yr}" for yr in years]
 
     ###############################################################
     #                     Create raw outputs                      #
     ###############################################################
     
     # Write the area transition between base-year and target-year 
-    write_area_transition_start_end(sim,f'{path}/out_{years[-1]}')
+    write_area_transition_start_end(sim,f'{sim.path}/out_{years[-1]}')
     
     # Write outputs for each year
-    for idx,(yr, path_yr) in enumerate(zip(years, paths)):
+    for yr, path_yr in zip(years, paths):
         write_output_single_year(sim, yr, path_yr,yr_cal_sim_pre=None)
         print(f"Finished writing {yr} out of {years[0]}-{years[-1]} years\n")
     
     # Write the area/quantity comparison between base-year and target-year for the timeseries mode
     if settings.MODE == 'timeseries':
-        begin_end_path = f"{path}/begin_end_compare_{years[0]}_{years[-1]}"
+        begin_end_path = f"{sim.path}/begin_end_compare_{years[0]}_{years[-1]}"
         # 1) Simply copy the base-year outputs to the path_begin_end_compare
-        shutil.copytree(f"{path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True)
+        shutil.copytree(f"{sim.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True)
         # 2) Write the target-year outputs to the path_begin_end_compare
         write_output_single_year(sim, years[-1], f"{begin_end_path}/out_{years[-1]}", yr_cal_sim_pre=years[0])   
         print(f"Finished writing {years[0]}-{years[-1]} comparison\n")
@@ -130,15 +83,26 @@ def write_outputs(sim, path):
     import subprocess
 
     # 1) Clean up the output CSVs 
-    result = subprocess.run(['python', 'luto/tools/report/create_report_data.py', '-p', path], capture_output=True, text=True)
+    result = subprocess.run(['python', 'luto/tools/report/create_report_data.py', '-p', sim.path], capture_output=True, text=True)
     print("\nError occurred:", result.stderr) if result.returncode != 0 else print("\nReport data:", result.stdout)
 
     # 2) Create the report
-    result = subprocess.run(['python', 'luto/tools/report/create_html.py', '-p', path], capture_output=True, text=True)
+    result = subprocess.run(['python', 'luto/tools/report/create_html.py', '-p', sim.path], capture_output=True, text=True)
     print("\nError occurred:", result.stderr) if result.returncode != 0 else print("\nReport HTML:\n", result.stdout)
     
+    
+    ###############################################################
+    #           Move logs to current output dir                   #
+    ###############################################################
+    logs = ['run_stderr', 'run_stdout', 'write_stderr', 'write_stdout']
+    logs = [f"{settings.OUTPUT_DIR}/{log}.log" for log in logs]
+    
+    for log in logs:
+        if os.path.exists(log):
+            shutil.move(log, f"{sim.path}/{os.path.basename(log)}")
 
 
+@tools.LogToFile(f"{settings.OUTPUT_DIR}/write")
 def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     if not os.path.isdir(path_yr):
@@ -169,15 +133,18 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_biodiversity(sim, yr_cal, path_yr)
     write_biodiversity_separate(sim, yr_cal, path_yr)
     
+    
+    
 
 def write_settings(path):
     """Write model run settings"""
 
     # Open the settings.py file
+    # Open the settings.py file
     with open('luto/settings.py', 'r') as file:
         lines = file.readlines()
         
-        # Adjusted regex patterns to match the multiline section header and variable assignments
+        # Regex patterns that matches variable assignments from settings
         parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=")
 
         settings_order = []
@@ -190,6 +157,27 @@ def write_settings(path):
         # Reorder the settings dictionary to match the order in the settings.py file
         settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
         settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
+        
+        # Some variables are mutually exclusive, 
+        # so we set the unsed variable to None here.
+        if settings.GHG_LIMITS_TYPE == 'dict': 
+            settings_dict['GHG_LIMITS_FIELD'] = 'None'
+        elif settings.GHG_LIMITS_TYPE == 'file':
+            settings_dict['GHG_LIMITS'] = 'None'
+            
+        if settings.CULL_MODE == 'absolute':
+            settings_dict['LAND_USAGE_CULL_PERCENTAGE'] = 'None'
+        elif settings.CULL_MODE == 'percentage':
+            settings_dict['MAX_LAND_USES_PER_CELL'] = 'None'
+        elif settings.CULL_MODE == 'none':
+            settings_dict['LAND_USAGE_CULL_PERCENTAGE'] = 'None'
+            settings_dict['MAX_LAND_USES_PER_CELL'] = 'None'
+
+        if settings.WATER_USE_LIMITS == 'on':
+            if settings.WATER_LIMITS_TYPE == 'pct_ag':
+                settings_dict['WATER_STRESS_FRACTION'] = 'None'
+            elif settings.WATER_LIMITS_TYPE == 'water_stress':
+                settings_dict['WATER_USE_REDUCTION_PERCENTAGE'] = 'None'
 
     # Write the settings to a file
     with open(os.path.join(path, 'model_run_settings.txt'), 'w') as f:
@@ -200,7 +188,7 @@ def write_settings(path):
 def write_files(sim, yr_cal, path):
     """Writes numpy arrays and geotiffs to file"""
     
-    print('Writing numpy arrays and geotiff outputs to', path)
+    print(f'Writing numpy arrays and geotiff outputs to {path}')
 
     # Append the yr_cal to timestamp as prefix
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
@@ -277,7 +265,7 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
     #       we can handle the fractional land-use successfully.
 
     # Skip writing if the yr_cal is the base year
-    if yr_cal == sim.bdata.YR_CAL_BASE: return
+    if yr_cal == sim.data.YR_CAL_BASE: return
     
     # 1) Collapse the land management dimension (m -> [dry, irr])
     #    i.e., mrj -> rj
@@ -388,7 +376,7 @@ def write_quantity(sim, yr_cal, path, yr_cal_sim_pre=None):
 
         # Write the production of each year to disk
         production_years = pd.DataFrame({yr:sim.prod_data[yr]['Production'] for yr in sim.prod_data.keys()})
-        production_years.insert(0,'Commodity',sim.bdata.COMMODITIES)
+        production_years.insert(0,'Commodity',sim.data.COMMODITIES)
         production_years.to_csv(os.path.join(path, f'quantity_production_kt_{timestamp}.csv'), index = False)
         
 
@@ -403,7 +391,7 @@ def write_ag_revenue_cost(sim, yr_cal, path):
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
     timestamp = str(yr_cal) + '_' + timestamp
 
-    print('Writing agricultural revenue outputs to', path)
+    print(f'Writing agricultural revenue outputs to {path}' )
 
     # Convert calendar year to year index.
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
@@ -449,6 +437,9 @@ def write_ag_revenue_cost(sim, yr_cal, path):
     # Save to file
     df_rev.to_csv(os.path.join(path, f'revenue_agricultural_commodity_{timestamp}.csv'))
     df_cost.to_csv(os.path.join(path, f'cost_agricultural_commodity_{timestamp}.csv'))
+    
+    
+    
 
 def write_ag_management_cost(sim, yr_cal, path):
     """Calculate agricultural management cost."""
@@ -457,7 +448,7 @@ def write_ag_management_cost(sim, yr_cal, path):
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
     timestamp = str(yr_cal) + '_' + timestamp
 
-    print('Writing agricultural management cost outputs to', path)
+    print(f'Writing agricultural management cost outputs to {path}')
 
     # Convert calendar year to year index.
     yr_idx = yr_cal - sim.bdata.YR_CAL_BASE
@@ -485,7 +476,8 @@ def write_ag_management_cost(sim, yr_cal, path):
         "Precision agriculture": [cost_precision_agriculture],
         "Ecological grazing": [cost_ecological_grazing]
     })
-    df_cost.to_csv(os.path.join(path, f'cost_agricultural_management_{timestamp}.csv'), index = False)
+    
+    # df_cost.to_csv(os.path.join(path, f'cost_agricultural_management_{timestamp}.csv'), index = False)
 
 
 def write_non_ag_cost(sim, yr_cal, path):
@@ -495,19 +487,21 @@ def write_non_ag_cost(sim, yr_cal, path):
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
     timestamp = str(yr_cal) + '_' + timestamp
 
-    print('Writing non agricultural management cost outputs to', path)
+    print(f'Writing non agricultural management cost outputs to {path}')
     non_ag_dvar = sim.non_ag_dvars[yr_cal]
 
     cost_env_plantings = np.sum(non_ag_dvar[:, 0] * non_ag_cost.get_cost_env_plantings(sim.data))
     cost_rip_plantings = np.sum(non_ag_dvar[:, 1] * non_ag_cost.get_cost_rip_plantings(sim.data))
     cost_agroforestry = np.sum(non_ag_dvar[:, 2] * non_ag_cost.get_cost_agroforestry(sim.data))
+    
     df_cost = pd.DataFrame({
         "Environmental Plantings": [cost_env_plantings],
         "Riparian Plantings": [cost_rip_plantings],
         "Agroforestry": [cost_agroforestry]
     })
+    
     # Save to file.
-    df_cost.to_csv(os.path.join(path, f'cost_non_ag_{timestamp}.csv'), index = False)
+    # df_cost.to_csv(os.path.join(path, f'cost_non_ag_{timestamp}.csv'), index = False)
 
 
 def write_dvar_area(sim, yr_cal, path):
@@ -517,7 +511,7 @@ def write_dvar_area(sim, yr_cal, path):
     timestamp = str(yr_cal) + '_' + timestamp
     
     # Reprot the process
-    print('Writing area calculated from dvars to', path)
+    print(f'Writing area calculated from dvars to {path}')
     
 
     # Get the decision variables for the year, multiply them by the area of each pixel, 
@@ -631,7 +625,7 @@ def write_crosstab(sim, yr_cal, path, yr_cal_sim_pre=None):
         assert yr_cal_sim_pre >= sim.data.YR_CAL_BASE and yr_cal_sim_pre < yr_cal,\
             f"yr_cal_sim_pre ({yr_cal_sim_pre}) must be >= {sim.data.YR_CAL_BASE} and < {yr_cal}"
 
-        print('Writing production outputs to', path)
+        print(f'Writing production outputs to {path}')
 
         # LUS = ['Non-agricultural land'] + sim.data.AGRICULTURAL_LANDUSES + sim.data.NON_AGRICULTURAL_LANDUSES
         ctlu, swlu = lumap_crossmap( sim.lumaps[yr_cal_sim_pre]
@@ -698,10 +692,10 @@ def write_water(sim, yr_cal, path):
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
     timestamp = str(yr_cal) + '_' + timestamp
 
-    print('Writing water outputs to', path)
+    print(f'Writing water outputs to {path}')
 
     # Convert calendar year to year index.
-    yr_idx = yr_cal - bdata.YR_CAL_BASE
+    yr_idx = yr_cal - sim.data.YR_CAL_BASE
 
     # Get water use for year in mrj format
     ag_w_mrj = ag_water.get_wreq_matrices(sim.data, yr_idx)
@@ -847,7 +841,7 @@ def write_ghg(sim, yr_cal, path):
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
     timestamp = str(yr_cal) + '_' + timestamp
 
-    print('Writing GHG outputs to', path)
+    print(f'Writing GHG outputs to {path}' )
     
 
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
@@ -882,7 +876,7 @@ def write_biodiversity(sim, yr_cal, path):
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
     timestamp = str(yr_cal) + '_' + timestamp
 
-    print('Writing biodiversity outputs to', path)
+    print(f'Writing biodiversity outputs to {path}')
 
 
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
@@ -914,7 +908,7 @@ def write_biodiversity_separate(sim, yr_cal, path):
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
     timestamp = str(yr_cal) + '_' + timestamp
 
-    print('Writing biodiversity_separate outputs to', path)
+    print(f'Writing biodiversity_separate outputs to {path}')
 
 
     # Get the biodiversity scores b_mrj
