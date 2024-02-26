@@ -520,7 +520,7 @@ dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
 
 # Convert eggs from count to tonnes, assuming each egg weighs 60g
 mask = dd.index.get_level_values(7) == 'eggs'
-dd.loc[:,:,:,:,:,:,:,mask] = dd.loc[:,:,:,:,:,:,:,mask] * 60 / 1000 / 1000 
+dd.loc[:,:,:,:,:,:,:,mask] = dd.loc[:,:,:,:,:,:,:,mask] * 60 / 1e6 
 
 # Select the demand scenario (returns commodity x year dataframe) - includes off-land commodities
 DEMAND_DATA = dd.loc[(SCENARIO, DIET_DOM, DIET_GLOB, CONVERGENCE, IMPORT_TREND, WASTE, FEED_EFFICIENCY)].copy()

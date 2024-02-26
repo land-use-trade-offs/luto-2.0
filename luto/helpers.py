@@ -37,16 +37,17 @@ LUTO 2.0 temporary helper code.
 
 
 # Minimalist run code
-from contextlib import redirect_stderr, redirect_stdout
 from luto.dataprep import create_new_dataset
 create_new_dataset()
+
+from contextlib import redirect_stderr, redirect_stdout
 
 from luto.tools.write import *
 import luto.simulation as sim
 import luto.data as bdata
 
 yr_start = bdata.YR_CAL_BASE
-yr_end = 2020
+yr_end = 2050
 path = get_path(bdata,yr_start,yr_end)
 
 # Run the simulation
