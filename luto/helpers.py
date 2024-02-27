@@ -20,19 +20,18 @@ LUTO 2.0 temporary helper code.
 
 # # To run LUTO, execute steps 1-4 below...
 
-# # 1. Refresh input data (if required)
-# from luto.dataprep import create_new_dataset
-# create_new_dataset()
+# 1. Refresh input data (if required)
+from luto.dataprep import create_new_dataset
+create_new_dataset()
 
-# # 2. Run the simulation and profile memory use
-# %load_ext memory_profiler
-# import luto.simulation as sim
-# %memit sim.run( 2010, 2050 )
+# 2. Run the simulation and profile memory use
+%load_ext memory_profiler
+import luto.simulation as sim
+%memit sim.run( 2010, 2050 )
 
-# # 3. Write the ouputs to file
-# from luto.tools.write import *
-# path = get_path(sim)
-# write_outputs(sim, path)
+# 3. Write the ouputs to file
+from luto.tools.write import *
+write_outputs(sim)
 
 
 
@@ -42,11 +41,8 @@ create_new_dataset()
 
 from luto.tools.write import *
 import luto.simulation as sim
-sim.run( 2010, 2050)
+sim.run( 2010, 2050 )
 write_outputs(sim)
-
-
-
 
 #################################################### Pixel-level data testing code
 

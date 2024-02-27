@@ -7,7 +7,7 @@ import argparse
 
 # import functions
 from tools.__init__ import   get_GHG_emissions_by_crop_lvstk_df,\
-                             get_all_files, get_quantity_df, get_rev_cost_df,\
+                             get_all_files, get_quantity_df, get_ag_rev_cost_df,\
                              get_water_df, get_demand_df, get_ag_dvar_area
 
               
@@ -47,7 +47,6 @@ if not os.path.exists(SAVE_DIR):
 
 # Get all LUTO output files and store them in a dataframe
 files = get_all_files(RAW_DATA_ROOT)
-
 
 ####################################################
 #                   1) Demand                      #
@@ -152,8 +151,14 @@ quantity_df_wide.to_csv(f'{SAVE_DIR}/production_5_6_demand_Production_commodity_
 #                  2) Economics                    #
 ####################################################
 
+files.query('year_types == "single_year" and category == "cost" and base_name == "cost_non_ag"')
+files.query('year_types == "single_year" and category == "cost" and base_name == "cost_agricultural_management"')
+
+files = files.query('base_name != "cost_non_ag" or base_name != "cost_agricultural_management"')
+
+
 # Plot_2-2: Revenue and Cost data (Billion Dollars)
-revenue_df = get_rev_cost_df(files, 'revenue')
+revenue_df = get_ag_rev_cost_df(files, 'revenue')
 revenue_df['Source_type'] = revenue_df['Source_type'].str.replace(' Crop','')
 revenue_df['Irrigation'] = revenue_df['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
 
@@ -170,7 +175,7 @@ for idx,col in enumerate(loop_cols):
 
 
 
-cost_df = get_rev_cost_df(files, 'cost')
+cost_df = get_ag_rev_cost_df(files, 'cost')
 cost_df['Source_type'] = cost_df['Source_type'].str.replace(' Crop','')
 cost_df['Irrigation'] = cost_df['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
 
