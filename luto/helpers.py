@@ -39,11 +39,8 @@ write_outputs(sim)
 from luto.dataprep import create_new_dataset
 create_new_dataset()
 
-from contextlib import redirect_stderr, redirect_stdout
-
 from luto.tools.write import *
 import luto.simulation as sim
-
 sim.run( 2010, 2050 )
 write_outputs(sim)
 
