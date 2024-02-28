@@ -22,7 +22,7 @@ import pandas as pd
 # ---------------------------------------------------------------------------- #
 # LUTO model version.                                                                 #
 # ---------------------------------------------------------------------------- #
-VERSION = '2.1'
+VERSION = '2.3'
 
 ############### Set some Spyder options
 pd.set_option('display.width', 470)
@@ -91,7 +91,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 10          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
+RESFACTOR = 3          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
 
 # Determine if write GeoTiffs to output directory: True or False
 WRITE_OUTPUT_GEOTIFFS = False
@@ -106,6 +106,10 @@ OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production co
 # Specify how demand should be met in the solver
 DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
 # DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
+
+# Penalty in objective function to balance influence of demand versus cost when DEMAND_CONSTRAINT_TYPE = 'soft'
+# 1e5 works well (i.e., demand are met), demands not met with anything less 
+PENALTY = 1e5
 
 
 # ---------------------------------------------------------------------------- #
@@ -125,12 +129,9 @@ SOLVE_METHOD = 2
    'deterministic concurrent':         4
    'deterministic concurrent simplex': 5 """
 
-# Level of presolve: automatic (-1), off (0), conservative (1), or aggressive (2)
-PRESOLVE = 2
-
-# Penalty in objective function to balance influence of demand versus cost when DEMAND_CONSTRAINT_TYPE = 'soft'
-# 1e5 works well (i.e., demand are met), demands not met with anything less 
-PENALTY = 1e5
+# Presolve parameters (switching both to 0 solves numerical problems)
+PRESOLVE = 0     # automatic (-1), off (0), conservative (1), or aggressive (2)
+AGGREGATE = 0    # Controls the aggregation level in presolve. The options are off (0), moderate (1), or aggressive (2). In rare instances, aggregation can lead to an accumulation of numerical errors. Turning it off can sometimes improve solution accuracy (it did not fix sub-optimal termination issue)
 
 # Print detailed output to screen
 VERBOSE = 1
@@ -140,16 +141,16 @@ FEASIBILITY_TOLERANCE = 1e-2              # Primal feasility tolerance - Default
 OPTIMALITY_TOLERANCE = 1e-2               # Dual feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2
 BARRIER_CONVERGENCE_TOLERANCE = 1e-5      # Range from 1e-2 to 1e-8 (default), that larger the number the faster but the less exact the solve. 1e-5 is a good compromise between optimality and speed.
 
-# Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 32
-
-# Whether to use crossover in barrier solve. 0 = off, -1 = automatic. Auto cleans up sub-optimal termination errors without much additional compute time.
+# Whether to use crossover in barrier solve. 0 = off, -1 = automatic. Auto cleans up sub-optimal termination errors without much additional compute time (apart from 2050 when it sometimes never finishes).
 CROSSOVER = -1
 
 # Parameters for dealing with numerical issues. NUMERIC_FOCUS = 2 fixes most things but roughly doubles solve time.
 SCALE_FLAG = -1     # Scales the rows and columns of the model to improve the numerical properties of the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each row to make its largest nonzero entry to be magnitude one, then scale each column to max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing revealed that 1 tripled solve time, 3 led to numerical problems.
 NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect and manage numerical issues. Default (0) makes an automatic choice, with a slight preference for speed. Settings 1-3 increasingly shift the focus towards being more careful in numerical computations. NUMERIC_FOCUS = 1 is ok, but 2 increases solve time by ~4x
 BARHOMOGENOUS = -1  # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
+
+# Number of threads to use in parallel algorithms (e.g., barrier)
+THREADS = 32
 
 
 # ---------------------------------------------------------------------------- #
