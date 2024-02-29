@@ -793,7 +793,7 @@ class Data:
         self.apply_resfactor()
         self.add_base_year_data_to_containers()
 
-    def apply_resfactor(self) -> None:
+    def apply_resfactor(self):
         """
         Sub-set spatial data is based on the masks.
         """
