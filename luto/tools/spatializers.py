@@ -37,7 +37,7 @@ def create_2d_map(data: Data, map_, filler) -> np.ndarray:
     putting the excluded land-use and land management types back in the array.
 
     Args:
-        sim: The simulation object.
+        data (object): Data object.
         map_: The input map.
         filler: The filler value for excluded land-use and land management types.
 
@@ -86,7 +86,7 @@ def uncoursify(data: Data, lxmap):
     Uncoursify the map by interpolating missing values based on known indices.
 
     Parameters:
-    sim (object): The simulation object.
+    data (object): Data object.
     lxmap (ndarray): The map containing the values to be uncoursified.
 
     Returns:

@@ -44,34 +44,39 @@ import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
-def write_outputs(sim):
+def write_outputs(data: Data):
 
     # Write model run settings
-    write_settings(sim.path)
+    if not data.path:
+        raise ValueError(
+            "Cannot write outputs: 'path' attribute of Data object has not been set "
+            "(has the simulation been run?)"
+        )
+    write_settings(data.path)
 
     # Get the years to write
-    years = sorted(list(sim.lumaps.keys()))
-    paths = [f"{sim.path}/out_{yr}" for yr in years]
+    years = sorted(list(data.lumaps.keys()))
+    paths = [f"{data.path}/out_{yr}" for yr in years]
 
     ###############################################################
     #                     Create raw outputs                      #
     ###############################################################
     
     # Write the area transition between base-year and target-year 
-    write_area_transition_start_end(sim,f'{sim.path}/out_{years[-1]}')
+    write_area_transition_start_end(data,f'{data.path}/out_{years[-1]}')
     
     # Write outputs for each year
     for yr, path_yr in zip(years, paths):
-        write_output_single_year(sim, yr, path_yr,yr_cal_sim_pre=None)
+        write_output_single_year(data, yr, path_yr,yr_cal_sim_pre=None)
         print(f"Finished writing {yr} out of {years[0]}-{years[-1]} years\n")
     
     # Write the area/quantity comparison between base-year and target-year for the timeseries mode
     if settings.MODE == 'timeseries':
-        begin_end_path = f"{sim.path}/begin_end_compare_{years[0]}_{years[-1]}"
+        begin_end_path = f"{data.path}/begin_end_compare_{years[0]}_{years[-1]}"
         # 1) Simply copy the base-year outputs to the path_begin_end_compare
-        shutil.copytree(f"{sim.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True)
+        shutil.copytree(f"{data.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True)
         # 2) Write the target-year outputs to the path_begin_end_compare
-        write_output_single_year(sim, years[-1], f"{begin_end_path}/out_{years[-1]}", yr_cal_sim_pre=years[0])   
+        write_output_single_year(data, years[-1], f"{begin_end_path}/out_{years[-1]}", yr_cal_sim_pre=years[0])   
         print(f"Finished writing {years[0]}-{years[-1]} comparison\n")
         
         
@@ -83,11 +88,11 @@ def write_outputs(sim):
     import subprocess
 
     # 1) Clean up the output CSVs 
-    result = subprocess.run(['python', 'luto/tools/report/create_report_data.py', '-p', sim.path], capture_output=True, text=True)
+    result = subprocess.run(['python', 'luto/tools/report/create_report_data.py', '-p', data.path], capture_output=True, text=True)
     print("\nError occurred:", result.stderr) if result.returncode != 0 else print("\nReport data:", result.stdout)
 
     # 2) Create the report
-    result = subprocess.run(['python', 'luto/tools/report/create_html.py', '-p', sim.path], capture_output=True, text=True)
+    result = subprocess.run(['python', 'luto/tools/report/create_html.py', '-p', data.path], capture_output=True, text=True)
     print("\nError occurred:", result.stderr) if result.returncode != 0 else print("\nReport HTML:\n", result.stdout)
     
     
@@ -99,7 +104,7 @@ def write_outputs(sim):
     
     for log in logs:
         if os.path.exists(log):
-            shutil.move(log, f"{sim.path}/{os.path.basename(log)}")
+            shutil.move(log, f"{data.path}/{os.path.basename(log)}")
 
 
 @tools.LogToFile(f"{settings.OUTPUT_DIR}/write")
@@ -258,8 +263,8 @@ def write_files_separate(data: Data, yr_cal, path, ammap_separate=False):
     # Write raw decision variables to separate GeoTiffs
     # 
     # Here we use decision variables to create TIFFs rather than directly creating them from 
-    #       {sim.lu/lmmaps, sim.ammaps}, because the decision variables is {np.float32} and 
-    #       the sim.lxmap is {np.int8}. 
+    #       {data.lu/lmmaps, data.ammaps}, because the decision variables is {np.float32} and 
+    #       the data.lxmap is {np.int8}. 
     # 
     # In this way, if partial land-use is allowed (i.e, one pixel is determined to be 50% of apples and 50% citrus),
     #       we can handle the fractional land-use successfully.
@@ -316,7 +321,7 @@ def write_files_separate(data: Data, yr_cal, path, ammap_separate=False):
 
         # reconsititude the dvar to 2d
         dvar = row['dvar']
-        dvar = create_2d_map(data, dvar, filler = data.MASK_LU_CODE) # fill the missing values with sim.data.MASK_LU_CODE  
+        dvar = create_2d_map(data, dvar, filler = data.MASK_LU_CODE) # fill the missing values with data.MASK_LU_CODE  
 
         # Create output file name
         fname = f'{category}_{dvar_idx:02}_{desc}_{yr_cal}.tiff'
@@ -553,7 +558,7 @@ def write_dvar_area(data: Data, yr_cal, path):
     df_am_area.to_csv(os.path.join(path, f'area_agricultural_management_{timestamp}.csv'), index = False)
 
 
-def write_area_transition_start_end(sim, path):
+def write_area_transition_start_end(data, path):
     
     # Append the yr_cal to timestamp as prefix
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
@@ -561,29 +566,29 @@ def write_area_transition_start_end(sim, path):
     print(f'Save transition matrix for start year to end year to {path}\n')
     
     # Get all years from sim
-    years = sorted(sim.ag_dvars.keys())
+    years = sorted(data.ag_dvars.keys())
 
     # Get the end year
     yr_cal_end = years[-1]
 
     # Get the decision variables for the start year
-    dvar_base = sim.ag_dvars[sim.data.YR_CAL_BASE]
+    dvar_base = data.ag_dvars[data.data.YR_CAL_BASE]
 
     # Calculate the transition matrix for agricultural land uses (start) to agricultural land uses (end)
     transitions_ag2ag = []
-    for lu_idx, lu in enumerate(sim.data.AGRICULTURAL_LANDUSES):
-        dvar_target = sim.ag_dvars[yr_cal_end][:,:,lu_idx]
-        trans = np.einsum('mrj, mr, r -> j', dvar_base, dvar_target, sim.data.REAL_AREA)
-        trans_df = pd.DataFrame({lu:trans.flatten()}, index=sim.data.AGRICULTURAL_LANDUSES)
+    for lu_idx, lu in enumerate(data.AGRICULTURAL_LANDUSES):
+        dvar_target = data.ag_dvars[yr_cal_end][:,:,lu_idx]
+        trans = np.einsum('mrj, mr, r -> j', dvar_base, dvar_target, data.REAL_AREA)
+        trans_df = pd.DataFrame({lu:trans.flatten()}, index=data.AGRICULTURAL_LANDUSES)
         transitions_ag2ag.append(trans_df)
     transition_ag2ag = pd.concat(transitions_ag2ag, axis=1)
 
     # Calculate the transition matrix for agricultural land uses (start) to non-agricultural land uses (end)
     trainsitions_ag2non_ag = []
-    for lu_idx, lu in enumerate(sim.data.NON_AGRICULTURAL_LANDUSES):
-        dvar_target = sim.non_ag_dvars[yr_cal_end][:,lu_idx]
-        trans = np.einsum('mrj, r, r -> j', dvar_base, dvar_target, sim.data.REAL_AREA)
-        trans_df = pd.DataFrame({lu:trans.flatten()}, index=sim.data.AGRICULTURAL_LANDUSES)
+    for lu_idx, lu in enumerate(data.NON_AGRICULTURAL_LANDUSES):
+        dvar_target = data.non_ag_dvars[yr_cal_end][:,lu_idx]
+        trans = np.einsum('mrj, r, r -> j', dvar_base, dvar_target, data.REAL_AREA)
+        trans_df = pd.DataFrame({lu:trans.flatten()}, index=data.AGRICULTURAL_LANDUSES)
         trainsitions_ag2non_ag.append(trans_df)
     transition_ag2non_ag = pd.concat(trainsitions_ag2non_ag, axis=1)
 
@@ -591,7 +596,7 @@ def write_area_transition_start_end(sim, path):
     transition = pd.concat([transition_ag2ag, transition_ag2non_ag], axis=1)
     
     # Write the transition matrix to a csv file
-    transition.to_csv(os.path.join(path, f'transition_matrix_{sim.data.YR_CAL_BASE}_{yr_cal_end}_{timestamp}.csv'))
+    transition.to_csv(os.path.join(path, f'transition_matrix_{data.YR_CAL_BASE}_{yr_cal_end}_{timestamp}.csv'))
 
 
 
@@ -624,7 +629,7 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
         print(f'Writing production outputs to {path}')
 
-        # LUS = ['Non-agricultural land'] + sim.data.AGRICULTURAL_LANDUSES + sim.data.NON_AGRICULTURAL_LANDUSES
+        # LUS = ['Non-agricultural land'] + data.AGRICULTURAL_LANDUSES + data.NON_AGRICULTURAL_LANDUSES
         ctlu, swlu = lumap_crossmap( data.lumaps[yr_cal_sim_pre]
                                    , data.lumaps[yr_cal]
                                    , data.AGRICULTURAL_LANDUSES
@@ -647,7 +652,7 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ctass = {}
         swass = {}
         for am in AG_MANAGEMENTS_TO_LAND_USES:
-            # ctam, swam = ammap_crossmap(sim.ammaps[yr_pre][am], sim.ammaps[yr_cal][am], am)
+            # ctam, swam = ammap_crossmap(data.ammaps[yr_pre][am], data.ammaps[yr_cal][am], am)
             # ctams[am] = ctam
             # swams[am] = swam
         

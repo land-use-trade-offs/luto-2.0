@@ -150,12 +150,12 @@ def get_natural_lu_cells(data, lumap) -> Tuple[np.ndarray, np.ndarray]:
     """
     return np.nonzero(np.isin(lumap, data.LU_NATURAL))[0]
 
-# def get_natural_lu_cells(sim, yr_cal) -> Tuple[np.ndarray, np.ndarray]:
+# def get_natural_lu_cells(data, yr_cal) -> Tuple[np.ndarray, np.ndarray]:
 #     """
 #     Gets all cells being used for natural land uses.
 #     """
-#     dvar = sim.ag_dvars[yr_cal]
-#     dvar_nat = dvar[:,:,sim.data.LU_NATURAL]
+#     dvar = data.ag_dvars[yr_cal]
+#     dvar_nat = dvar[:,:,data.data.LU_NATURAL]
 
 #     dvar_nat_val = np.einsum('mrj -> r', dvar_nat)
 #     dvar_nat_idx = np.nonzero(dvar_nat_val)[0]
