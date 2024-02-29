@@ -797,6 +797,7 @@ class Data:
         """
         Sub-set spatial data is based on the masks.
         """
+        print("\tAdjusting data for resfactor...", end=" ", flush=True)
         self.NCELLS = self.MASK.sum()
         self.EXCLUDE = self.EXCLUDE[:, self.MASK, :]
         self.AGEC_CROPS = self.AGEC_CROPS.iloc[
@@ -857,6 +858,8 @@ class Data:
         #     self.WATER_YIELD_DR = wy_dr_file[list(wy_dr_file.keys())[0]][yr_idx][self.MASK]
         # with h5py.File(bdata.fname_sr, 'r') as wy_sr_file:
         #     self.WATER_YIELD_SR = wy_sr_file[list(wy_sr_file.keys())[0]][yr_idx][self.MASK]
+
+        print("Done.")
 
     def add_lumap(self, yr: int, lumap: np.ndarray):
         """
