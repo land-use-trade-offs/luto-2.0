@@ -16,7 +16,7 @@
 
 
 import os
-import datetime
+from datetime import datetime
 import math
 from dataclasses import dataclass
 import pandas as pd
@@ -133,7 +133,7 @@ class Data:
 
         # Load greenhouse gas emissions from agriculture
         self.AGGHG_CROPS = pd.read_hdf(os.path.join(INPUT_DIR, "agGHG_crops.h5"))
-        self.AGGHG_CROPS = pd.read_hdf(os.path.join(INPUT_DIR, "agGHG_lvstk.h5"))
+        self.AGGHG_LVSTK = pd.read_hdf(os.path.join(INPUT_DIR, "agGHG_lvstk.h5"))
         self.AGGHG_IRRPAST = pd.read_hdf(os.path.join(INPUT_DIR, "agGHG_irrpast.h5"))
 
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
