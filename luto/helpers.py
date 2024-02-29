@@ -45,6 +45,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from luto.tools.write import *
 import luto.simulation as sim
 import luto.data as bdata
+from luto.economics.production import get_production
 
 yr_start = bdata.YR_CAL_BASE
 yr_end = 2050
@@ -173,7 +174,7 @@ for row in ind:
     print(old[row], new[row])
 
 # Get commodity production totals when no resfactor used and check against raw data
-x = sim.get_production()
+x = get_production()
 for i, j in enumerate(sim.data.COMMODITIES):
     print(j, x[i])
 

@@ -21,10 +21,12 @@ Pure functions for calculating the production quantities of agricutlural commodi
 from typing import Dict
 import numpy as np
 from scipy.interpolate import interp1d
+
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.data import Data, lvs_veg_types
 
 
-def get_ccimpact(data, lu, lm, yr_idx):
+def get_ccimpact(data: Data, lu, lm, yr_idx):
     """Return climate change impact multiplier at (zero-based) year index."""
     
     # Check if land-use exists in CLIMATE_CHANGE_IMPACT (e.g., dryland Pears/Rice do not occur), if not return ones
@@ -51,35 +53,11 @@ def get_ccimpact(data, lu, lm, yr_idx):
     return cci
 
 
-def lvs_veg_types(lu):
-    """Return livestock and vegetation types of the livestock land-use `lu`."""
-
-    # Determine type of livestock.
-    if 'beef' in lu.lower():
-        lvstype = 'BEEF'
-    elif 'sheep' in lu.lower():
-        lvstype = 'SHEEP'
-    elif 'dairy' in lu.lower():
-        lvstype = 'DAIRY'
-    else:
-        raise KeyError("Livestock type '%s' not identified." % lu)
-
-    # Determine type of vegetation.
-    if 'natural' in lu.lower():
-        vegtype = 'natural land'
-    elif 'modified' in lu.lower():
-        vegtype = 'modified land'
-    else:
-        raise KeyError("Vegetation type '%s' not identified." % lu)
-
-    return lvstype, vegtype
-
-
-def get_yield_pot( data    # Data object or module.
-                 , lvstype # Livestock type (one of 'BEEF', 'SHEEP' or 'DAIRY')
-                 , vegtype # Vegetation type (one of 'natural land' or 'modified land')
-                 , lm      # Land-management type.
-                 , yr_idx    # Number of years post 2010
+def get_yield_pot( data: Data    # Data object.
+                 , lvstype       # Livestock type (one of 'BEEF', 'SHEEP' or 'DAIRY')
+                 , vegtype       # Vegetation type (one of 'natural land' or 'modified land')
+                 , lm            # Land-management type.
+                 , yr_idx        # Number of years post 2010
                  ):
     """Return the yield potential (head/ha) for livestock by land cover type."""
 
@@ -119,10 +97,10 @@ def get_yield_pot( data    # Data object or module.
     return yield_pot
 
 
-def get_quantity_lvstk( data   # Data object or module.
-                      , pr     # Livestock + product like 'SHEEP - MODIFIED LAND WOOL').
-                      , lm     # Land management.
-                      , yr_idx # Number of years post base-year ('YR_CAL_BASE').
+def get_quantity_lvstk( data: Data   # Data object.
+                      , pr           # Livestock + product like 'SHEEP - MODIFIED LAND WOOL').
+                      , lm           # Land management.
+                      , yr_idx       # Number of years post base-year ('YR_CAL_BASE').
                       ):
     """Return livestock yield of `pr`+`lm` in `yr_idx` as 1D Numpy array...
     
@@ -192,10 +170,10 @@ def get_quantity_lvstk( data   # Data object or module.
     return quantity
 
 
-def get_quantity_crop( data   # Data object or module.
-                     , pr     # Product -- equivalent to land use for crops.
-                     , lm     # Land management.
-                     , yr_idx # Number of years post base-year ('YR_CAL_BASE').
+def get_quantity_crop( data: Data   # Data object.
+                     , pr           # Product -- equivalent to land use for crops.
+                     , lm           # Land management.
+                     , yr_idx       # Number of years post base-year ('YR_CAL_BASE').
                      ):
     """Return crop yield (tonne/cell) of `pr`+`lm` in `yr_idx` as 1D Numpy array.
 
@@ -223,10 +201,10 @@ def get_quantity_crop( data   # Data object or module.
     return quantity
 
 
-def get_quantity( data   # Data object or module.
-                , pr     # Product produced.
-                , lm     # Land management.
-                , yr_idx # Number of years post base-year ('YR_CAL_BASE').
+def get_quantity( data: Data   # Data object.
+                , pr           # Product produced.
+                , lm           # Land management.
+                , yr_idx       # Number of years post base-year ('YR_CAL_BASE').
                 ):
     """Return yield in tonne/cell of `pr`+`lm` in `yr_idx` as 1D Numpy array.
 
@@ -253,7 +231,7 @@ def get_quantity( data   # Data object or module.
     return q
 
 
-def get_quantity_matrix(data, lm, yr_idx):
+def get_quantity_matrix(data: Data, lm, yr_idx):
     """Return q_rp matrix of quantities per cell per pr as 2D Numpy array."""
     q_rp = np.zeros((data.NCELLS, len(data.PRODUCTS)))
     for j, pr in enumerate(data.PRODUCTS):
@@ -268,7 +246,7 @@ def get_quantity_matrices(data, yr_idx):
                            for lm in data.LANDMANS ))
 
 
-def get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx):
+def get_asparagopsis_effect_q_mrp(data: Data, q_mrp, yr_idx):
     """
     Applies the effects of using asparagopsis to the quantity data
     for all relevant agr. land uses.
@@ -294,7 +272,7 @@ def get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx):
     return new_q_mrp
 
 
-def get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx):
+def get_precision_agriculture_effect_q_mrp(data: Data, q_mrp, yr_idx):
     """
     Applies the effects of using precision agriculture to the quantity data
     for all relevant agr. land uses.
@@ -318,7 +296,7 @@ def get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx):
     return new_q_mrp
 
 
-def get_ecological_grazing_effect_q_mrp(data, q_mrp, yr_idx):
+def get_ecological_grazing_effect_q_mrp(data: Data, q_mrp, yr_idx):
     """
     Applies the effects of using ecological grazing to the quantity data
     for all relevant agr. land uses.
@@ -342,7 +320,7 @@ def get_ecological_grazing_effect_q_mrp(data, q_mrp, yr_idx):
     return new_q_mrp
 
 
-def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[str, np.ndarray]:
+def get_agricultural_management_quantity_matrices(data: Data, q_mrp, yr_idx) -> Dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx)
     precision_agriculture_data = get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx)
     eco_grazing_data = get_ecological_grazing_effect_q_mrp(data, q_mrp, yr_idx)

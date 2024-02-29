@@ -28,8 +28,10 @@ except:
     import rasterio
 from scipy.interpolate import NearestNDInterpolator
 import luto.settings as settings
+from luto.data import Data
 
-def create_2d_map(sim, map_, filler) -> np.ndarray:
+
+def create_2d_map(data: Data, map_, filler) -> np.ndarray:
     """
     Create a 2D map by converting it back to full resolution if necessary and
     putting the excluded land-use and land management types back in the array.
@@ -45,10 +47,10 @@ def create_2d_map(sim, map_, filler) -> np.ndarray:
     
     # First convert back to full resolution 2D array if resfactor is > 1.
     if settings.RESFACTOR > 1:
-        map_ = uncoursify(sim, map_)
+        map_ = uncoursify(data, map_)
 
     # Then put the excluded land-use and land management types back in the array.
-    map_ = reconstitute(map_, sim.data.LUMASK, filler = filler)
+    map_ = reconstitute(map_, data.LUMASK, filler = filler)
     
     return map_
 
@@ -79,7 +81,7 @@ def reconstitute(map_, mask, filler=-1):
         return np.where(mask, map_, filler)
 
 
-def uncoursify(sim, lxmap):
+def uncoursify(data: Data, lxmap):
     """
     Uncoursify the map by interpolating missing values based on known indices.
 
@@ -92,10 +94,10 @@ def uncoursify(sim, lxmap):
 
     """
     # Arrays with all x, y -coordinates on the larger map.
-    allindices = np.nonzero(sim.data.NLUM_MASK)
+    allindices = np.nonzero(data.NLUM_MASK)
     
     # Arrays with x, y -coordinates on the larger map of entries in lxmap.
-    knownindices = tuple(np.stack(allindices)[:, sim.data.MASK])
+    knownindices = tuple(np.stack(allindices)[:, data.MASK])
     
     # Instantiate an interpolation function.
     f = NearestNDInterpolator(knownindices, lxmap)

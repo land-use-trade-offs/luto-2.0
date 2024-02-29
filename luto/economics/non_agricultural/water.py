@@ -1,7 +1,9 @@
 import numpy as np
 
+from luto.data import Data
 
-def get_wreq_matrix_env_planting(data) -> np.ndarray:
+
+def get_wreq_matrix_env_planting(data: Data) -> np.ndarray:
     """
     Get water requirements vector of environmental plantings.
 
@@ -16,7 +18,7 @@ def get_wreq_matrix_env_planting(data) -> np.ndarray:
     return (data.WATER_YIELD_BASE_SR - data.WATER_YIELD_BASE) * data.REAL_AREA
 
 
-def get_wreq_matrix_rip_planting(data) -> np.ndarray:
+def get_wreq_matrix_rip_planting(data: Data) -> np.ndarray:
     """
     Get water requirements vector of riparian plantings.
 
@@ -32,7 +34,7 @@ def get_wreq_matrix_rip_planting(data) -> np.ndarray:
     return get_wreq_matrix_env_planting(data)
 
 
-def get_wreq_matrix_agroforestry(data) -> np.ndarray:
+def get_wreq_matrix_agroforestry(data: Data) -> np.ndarray:
     """
     Get water requirements vector of agroforestry.
 
@@ -48,7 +50,7 @@ def get_wreq_matrix_agroforestry(data) -> np.ndarray:
     return get_wreq_matrix_env_planting(data)
 
 
-def get_wreq_matrix(data) -> np.ndarray:
+def get_wreq_matrix(data: Data) -> np.ndarray:
     """
     Get the water requirements matrix for all non-agricultural land uses.
 

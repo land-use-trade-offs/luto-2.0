@@ -23,11 +23,12 @@ from typing import Dict
 import numpy as np
 
 import luto.settings as settings
-from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.data import Data, lvs_veg_types
+from luto.economics.agricultural.quantity import get_yield_pot
 
 
-def get_wreq_matrices(data, yr_idx):
+def get_wreq_matrices(data: Data, yr_idx):
     """Return w_mrj water requirement matrices by land management, cell, and land-use type."""
     
     # Stack water requirements data
@@ -46,7 +47,7 @@ def get_wreq_matrices(data, yr_idx):
     return w_mrj
 
 
-def get_asparagopsis_effect_w_mrj(data, w_mrj, yr_idx):
+def get_asparagopsis_effect_w_mrj(data: Data, w_mrj, yr_idx):
     """
     Applies the effects of using asparagopsis to the water requirements data
     for all relevant agr. land uses.
@@ -72,7 +73,7 @@ def get_asparagopsis_effect_w_mrj(data, w_mrj, yr_idx):
     return new_w_mrj
 
 
-def get_precision_agriculture_effect_w_mrj(data, w_mrj, yr_idx):
+def get_precision_agriculture_effect_w_mrj(data: Data, w_mrj, yr_idx):
     """
     Applies the effects of using precision agriculture to the water requirements data
     for all relevant agr. land uses.
@@ -96,7 +97,7 @@ def get_precision_agriculture_effect_w_mrj(data, w_mrj, yr_idx):
     return new_w_mrj
 
 
-def get_ecological_grazing_effect_w_mrj(data, w_mrj, yr_idx):
+def get_ecological_grazing_effect_w_mrj(data: Data, w_mrj, yr_idx):
     """
     Applies the effects of using ecological grazing to the water requirements data
     for all relevant agr. land uses.
@@ -121,7 +122,7 @@ def get_ecological_grazing_effect_w_mrj(data, w_mrj, yr_idx):
 
 
 
-def get_agricultural_management_water_matrices(data, w_mrj, yr_idx) -> Dict[str, np.ndarray]:
+def get_agricultural_management_water_matrices(data: Data, w_mrj, yr_idx) -> Dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_w_mrj(data, w_mrj, yr_idx)
     precision_agriculture_data = get_precision_agriculture_effect_w_mrj(data, w_mrj, yr_idx)
     eco_grazing_data = get_ecological_grazing_effect_w_mrj(data, w_mrj, yr_idx)

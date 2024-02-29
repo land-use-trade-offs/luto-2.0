@@ -1,14 +1,14 @@
 import numpy as np
 
 import luto.settings as settings
+from luto.data import Data
 
 
-def get_rev_env_plantings(data) -> np.ndarray:
+def get_rev_env_plantings(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Returns
     -------
@@ -19,12 +19,11 @@ def get_rev_env_plantings(data) -> np.ndarray:
     return data.EP_BLOCK_AVG_T_CO2_HA * data.REAL_AREA * settings.CARBON_PRICE_PER_TONNE
 
 
-def get_rev_rip_plantings(data) -> np.ndarray:
+def get_rev_rip_plantings(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Note: this is the same as for environmental plantings.
 
@@ -36,12 +35,11 @@ def get_rev_rip_plantings(data) -> np.ndarray:
     return get_rev_env_plantings(data)
 
 
-def get_rev_agroforestry(data) -> np.ndarray:
+def get_rev_agroforestry(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Note: this is the same as for environmental plantings.
 
@@ -53,9 +51,11 @@ def get_rev_agroforestry(data) -> np.ndarray:
     return get_rev_env_plantings(data)
 
 
-def get_rev_matrix(data) -> np.ndarray:
+def get_rev_matrix(data: Data) -> np.ndarray:
     """
-
+    Get the non-agricultural revenue matrix r_rk.
+    Values represent the revenue gained by the cell r when using the
+        non-agricultural land use k.
     """
     env_plantings_rev_matrix = get_rev_env_plantings(data)
     rip_plantings_rev_matrix = get_rev_rip_plantings(data)

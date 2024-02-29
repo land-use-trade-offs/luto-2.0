@@ -21,17 +21,16 @@ Pure functions to calculate costs of commodities and alt. land uses.
 
 import numpy as np
 
-from typing import Dict
-
 import pandas as pd
-from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.data import Data, lvs_veg_types
+from luto.economics.agricultural.quantity import get_yield_pot, get_quantity
 
 
-def get_cost_crop( data # Data object or module.
-                 , lu   # Land use.
-                 , lm   # Land management.
-                 , yr_idx # Number of years post base-year ('YR_CAL_BASE').
+def get_cost_crop( data: Data # Data object.
+                 , lu         # Land use.
+                 , lm         # Land management.
+                 , yr_idx     # Number of years post base-year ('YR_CAL_BASE').
                  ):
     """Return crop prod. cost [AUD/cell] of `lu`+`lm` in `yr_idx` as np array.
 
@@ -83,10 +82,10 @@ def get_cost_crop( data # Data object or module.
                             columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost', 'Fixed cost', 'Water cost', 'Quantity cost']]))    
 
 
-def get_cost_lvstk( data # Data object or module.
-                  , lu   # Land use.
-                  , lm   # Land management.
-                  , yr_idx # Number of years post base-year ('YR_CAL_BASE').
+def get_cost_lvstk( data: Data # Data object.
+                  , lu         # Land use.
+                  , lm         # Land management.
+                  , yr_idx     # Number of years post base-year ('YR_CAL_BASE').
                   ):
     """Return lvstk prod. cost [AUD/cell] of `lu`+`lm` in `yr_idx` as np array.
 
@@ -135,10 +134,10 @@ def get_cost_lvstk( data # Data object or module.
                          columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost', 'Fixed cost', 'Water cost', 'Quantity cost']]))
 
 
-def get_cost( data # Data object or module.
-            , lu   # Land use.
-            , lm   # Land management.
-            , yr_idx # Number of years post base-year ('YR_CAL_BASE').
+def get_cost( data: Data # Data object.
+            , lu         # Land use.
+            , lm         # Land management.
+            , yr_idx     # Number of years post base-year ('YR_CAL_BASE').
             ):
     """Return production cost [AUD/cell] of `lu`+`lm` in `yr_idx` as np array.
 
@@ -166,7 +165,7 @@ def get_cost( data # Data object or module.
         raise KeyError("Land use '%s' not found in data.LANDUSES" % lu)
 
 
-def get_cost_matrix(data, lm, yr_idx):
+def get_cost_matrix(data: Data, lm, yr_idx):
     """Return agricultural c_rj matrix of costs/cell per lu under `lm` in `yr_idx`."""
     
     cost = pd.concat([get_cost(data, lu, lm, yr_idx) for lu in data.AGRICULTURAL_LANDUSES], axis=1)
@@ -175,7 +174,7 @@ def get_cost_matrix(data, lm, yr_idx):
     return cost.fillna(0)
 
 
-def get_cost_matrices(data, yr_idx,aggregate=True):
+def get_cost_matrices(data: Data, yr_idx,aggregate=True):
     """Return agricultural c_mrj matrix of costs per cell as 3D Numpy array."""
     
     # Concatenate the revenue from each land management into a single Multiindex DataFrame.
@@ -194,7 +193,7 @@ def get_cost_matrices(data, yr_idx,aggregate=True):
         raise ValueError("aggregate must be True or False")
 
 
-def get_asparagopsis_effect_c_mrj(data, yr_idx):
+def get_asparagopsis_effect_c_mrj(data: Data, yr_idx):
     """
     Applies the effects of using asparagopsis to the cost data
     for all relevant agr. land uses.
@@ -223,7 +222,7 @@ def get_asparagopsis_effect_c_mrj(data, yr_idx):
     return new_c_mrj
 
 
-def get_precision_agriculture_effect_c_mrj(data, yr_idx):
+def get_precision_agriculture_effect_c_mrj(data: Data, yr_idx):
     """
     Applies the effects of using precision agriculture to the cost data
     for all relevant agr. land uses.
@@ -242,7 +241,7 @@ def get_precision_agriculture_effect_c_mrj(data, yr_idx):
     return new_c_mrj
 
 
-def get_ecological_grazing_effect_c_mrj(data, yr_idx):
+def get_ecological_grazing_effect_c_mrj(data: Data, yr_idx):
     """
     Applies the effects of using ecological grazing to the cost data
     for all relevant agr. land uses.
@@ -273,7 +272,7 @@ def get_ecological_grazing_effect_c_mrj(data, yr_idx):
     return new_c_mrj
 
 
-def get_agricultural_management_cost_matrices(data, c_mrj, yr_idx):
+def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
     asparagopsis_data = get_asparagopsis_effect_c_mrj(data, yr_idx)
     precision_agriculture_data = get_precision_agriculture_effect_c_mrj(data, yr_idx)
     eco_grazing_data = get_ecological_grazing_effect_c_mrj(data, yr_idx)

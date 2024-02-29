@@ -1,12 +1,13 @@
 import numpy as np
 
+from luto.data import Data
 
-def get_quantity_env_plantings(data) -> np.ndarray:
+
+def get_quantity_env_plantings(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Returns
     -------
@@ -18,12 +19,11 @@ def get_quantity_env_plantings(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_rip_plantings(data) -> np.ndarray:
+def get_quantity_rip_plantings(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Returns
     -------
@@ -36,12 +36,11 @@ def get_quantity_rip_plantings(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_agroforestry(data) -> np.ndarray:
+def get_quantity_agroforestry(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Returns
     -------
@@ -54,7 +53,7 @@ def get_quantity_agroforestry(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_matrix(data) -> np.ndarray:
+def get_quantity_matrix(data: Data) -> np.ndarray:
     """
     Get the non-agricultural quantity matrix q_crk.
     Values represent the yield of each commodity c from the cell r when using

@@ -6,16 +6,17 @@ from typing import Dict
 import numpy as np
 
 from luto import settings
+from luto.data import Data
 
 
-def get_non_penalty_land_uses(data) -> list[int]:
+def get_non_penalty_land_uses(data: Data) -> list[int]:
     """
     Return a list of land uses that contribute to biodiversity output without penalty.
     """
     return list(set(data.LU_NATURAL) - set(data.LU_LVSTK_INDICES))  # returns [23], the index of Unallocated - natural land index
 
 
-def get_livestock_natural_land_land_uses(data) -> list[int]:
+def get_livestock_natural_land_land_uses(data: Data) -> list[int]:
     """
     Return a list of land uses that contribute to biodiversity but are penalised as per the 
     BIODIV_LIVESTOCK_IMPACT setting (i.e., livestock on natural land).
@@ -40,28 +41,28 @@ def get_breq_matrices(data):
     return b_mrj
 
 
-def get_asparagopsis_effect_b_mrj(data):
+def get_asparagopsis_effect_b_mrj(data: Data):
     """
     Gets biodiversity impacts of using Asparagopsis taxiformis (no effect)
     """
     return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
 
 
-def get_precision_agriculture_effect_b_mrj(data):
+def get_precision_agriculture_effect_b_mrj(data: Data):
     """
     Gets biodiversity impacts of using Precision Agriculture (no effect)
     """
     return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
 
 
-def get_ecological_grazing_effect_b_mrj(data):
+def get_ecological_grazing_effect_b_mrj(data: Data):
     """
     Gets biodiversity impacts of using Ecological Grazing (no effect)
     """
     return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
 
 
-def get_agricultural_management_biodiversity_matrices(data):
+def get_agricultural_management_biodiversity_matrices(data: Data, ag_b_mrj):
     asparagopsis_data = get_asparagopsis_effect_b_mrj(data)
     precision_agriculture_data = get_precision_agriculture_effect_b_mrj(data)
     eco_grazing_data = get_ecological_grazing_effect_b_mrj(data)
@@ -75,7 +76,7 @@ def get_agricultural_management_biodiversity_matrices(data):
     return ag_management_data
 
 
-def get_base_year_biodiversity_score(data):
+def get_base_year_biodiversity_score(data: Data):
     """
     Gets the biodiversity score of the base year (2010).
     """
@@ -94,7 +95,7 @@ def get_base_year_biodiversity_score(data):
     return biodiv_2010_non_pen_score + biodiv_2010_pen_score
 
 
-def get_biodiversity_limits(data, yr_cal):
+def get_biodiversity_limits(data: Data, yr_cal: int):
     """
     Biodiversity score must hit data.TOTAL_BIODIV_TARGET_SCORE by 
     settings.BIODIV_TARGET_ACHIEVEMENT_YEAR, beginning in 2010. 

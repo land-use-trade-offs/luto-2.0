@@ -21,17 +21,18 @@ Pure functions to calculate greenhouse gas emissions by lm, lu.
 from typing import Dict
 import numpy as np
 import pandas as pd
-from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
-import luto.settings as settings
+
+from luto.data import Data, lvs_veg_types
+from luto.economics.agricultural.quantity import get_yield_pot
 import luto.tools as tools
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
-def get_ghg_crop( data     # Data object or module.
-                , lu       # Land use.
-                , lm       # Land management.
-                , yr_idx   # Number of years post base-year ('YR_CAL_BASE').
-                , aggregate): # sums up all CO2 (True) or export GHG seperatly
+def get_ghg_crop( data: Data     # Data object.
+                , lu             # Land use.
+                , lm             # Land management.
+                , yr_idx         # Number of years post base-year ('YR_CAL_BASE').
+                , aggregate):    # sums up all CO2 (True) or export GHG seperatly
     """Return crop GHG emissions [tCO2e/cell] of `lu`+`lm` in `yr_idx` 
             as (np array|pd.DataFrame) depending on aggregate (True|False).
 
@@ -92,7 +93,7 @@ def get_ghg_crop( data     # Data object or module.
 
 
 
-def get_ghg_lvstk( data        # Data object or module.
+def get_ghg_lvstk( data: Data  # Data object.
                  , lu          # Land use.
                  , lm          # Land management.
                  , yr_idx      # Number of years post base-year ('YR_CAL_BASE').
@@ -161,11 +162,11 @@ def get_ghg_lvstk( data        # Data object or module.
        
 
 
-def get_ghg( data    # Data object or module.
-           , lu      # Land use.
-           , lm      # Land management.
-           , yr_idx  # Number of years post base-year ('YR_CAL_BASE').
-           , aggregate):
+def get_ghg( data: Data  # Data object.
+           , lu          # Land use.
+           , lm          # Land management.
+           , yr_idx      # Number of years post base-year ('YR_CAL_BASE').
+           , aggregate ):
     """Return GHG emissions [tCO2e/cell] of `lu`+`lm` in `yr_idx` 
             as (np array|pd.DataFrame) depending on aggregate (True|False).
 
@@ -201,7 +202,7 @@ def get_ghg( data    # Data object or module.
 
 
 
-def get_ghg_matrix(data, lm, yr_idx, aggregate):
+def get_ghg_matrix(data: Data, lm, yr_idx, aggregate):
     
     if aggregate == True: 
         """Return g_rj matrix of tCO2e/cell per lu under `lm` in `yr_idx`."""
@@ -221,7 +222,7 @@ def get_ghg_matrix(data, lm, yr_idx, aggregate):
         
 
 
-def get_ghg_matrices(data, yr_idx, aggregate=True):
+def get_ghg_matrices(data: Data, yr_idx, aggregate=True):
     if aggregate == True:  
         
         """Return g_mrj matrix of GHG emissions per cell as 3D Numpy array."""
@@ -236,7 +237,7 @@ def get_ghg_matrices(data, yr_idx, aggregate=True):
 
 
 
-def get_ghg_transition_penalties(data, lumap) -> np.ndarray:
+def get_ghg_transition_penalties(data: Data, lumap) -> np.ndarray:
     """
     Gets the one-off greenhouse gas penalties for transitioning natural land to
     modified land. The penalty represents the carbon that is emitted when
@@ -261,7 +262,7 @@ def get_ghg_transition_penalties(data, lumap) -> np.ndarray:
 
 
 
-def get_ghg_limits(data, target):
+def get_ghg_limits(data: Data, target):
     """Return greenhouse gas emissions limits in tonnes CO2e from year target i.e. target = 2050"""
         
     return data.GHG_TARGETS[target]
@@ -307,7 +308,7 @@ def get_asparagopsis_effect_g_mrj(data, yr_idx):
     return new_g_mrj
 
 
-def get_precision_agriculture_effect_g_mrj(data, yr_idx):
+def get_precision_agriculture_effect_g_mrj(data: Data, yr_idx):
     """
     Applies the effects of using precision agriculture to the GHG data
     for all relevant agr. land uses.
@@ -358,7 +359,7 @@ def get_precision_agriculture_effect_g_mrj(data, yr_idx):
     return new_g_mrj
 
 
-def get_ecological_grazing_effect_g_mrj(data, yr_idx):
+def get_ecological_grazing_effect_g_mrj(data: Data, yr_idx):
     """
     Applies the effects of using ecological grazing to the GHG data
     for all relevant agr. land uses.
@@ -407,7 +408,7 @@ def get_ecological_grazing_effect_g_mrj(data, yr_idx):
     return new_g_mrj
 
 
-def get_agricultural_management_ghg_matrices(data, g_mrj, yr_idx) -> Dict[str, np.ndarray]:
+def get_agricultural_management_ghg_matrices(data: Data, g_mrj, yr_idx) -> Dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_g_mrj(data, yr_idx)
     precision_agriculture_data = get_precision_agriculture_effect_g_mrj(data, yr_idx)
     eco_grazing_data = get_ecological_grazing_effect_g_mrj(data, yr_idx)

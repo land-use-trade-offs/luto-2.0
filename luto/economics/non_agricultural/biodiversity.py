@@ -1,8 +1,10 @@
 import numpy as np
+
+from luto.data import Data
 from luto.settings import REFORESTATION_BIODIVERSITY_BENEFIT
 
 
-def get_breq_matrix(data) -> np.ndarray:
+def get_breq_matrix(data: Data) -> np.ndarray:
     """
     Get the biodiversity requirements matrix for all non-agricultural land uses.
 
