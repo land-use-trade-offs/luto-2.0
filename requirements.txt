@@ -16,3 +16,4 @@ folium==0.16.0
 contextily==1.5.1
 imageio==2.34.0
 matplotlib_scalebar==0.8.1
+geopandas==0.14.3

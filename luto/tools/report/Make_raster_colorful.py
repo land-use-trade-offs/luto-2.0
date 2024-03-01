@@ -90,7 +90,8 @@ for _, row in tif_files_with_meta.iterrows():
     create_png_map(tif_path = tif_path,
                     color_desc_dict = color_desc_dict,
                     anno_text = inmap_text,
-                    mercator_bbox = mercator_bbox)
+                    mercator_bbox = mercator_bbox,
+                    map_num = map_num)
 
 
 

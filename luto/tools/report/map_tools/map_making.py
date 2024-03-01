@@ -47,7 +47,8 @@ def create_png_map(tif_path: str,
                   basemap_path: str = 'Assests/basemap.tif', 
                   shapefile_path: str ='Assests/AUS_adm/STE11aAust_mercator_simplified.shp',
                   anno_text: str = None,
-                  mercator_bbox: BoundingBox = None):
+                  mercator_bbox: BoundingBox = None,
+                  map_num: int = None):
 
     
     # Download basemap if it does not exist
@@ -62,9 +63,8 @@ def create_png_map(tif_path: str,
     
     # Get the mercator input image
     out_base = os.path.splitext(tif_path)[0]
-    
-    in_mercator_path = f"{out_base}_mercator.tif"
-    png_out_path = f"{out_base}_mosaic.png"
+    in_mercator_path = f"{out_base}_mercator_{map_num}.tif"
+    png_out_path = f"{out_base}_mosaic_{map_num}.png"
     
     
     # Create the figure and axis
