@@ -54,7 +54,7 @@ def get_cost_matrix(data):
     Returns non-agricultural c_rk matrix of costs per cell and land use.
     """
 
-    non_agr_c_matrices = {use: np.zeros(data.NCELLS, 1) for use in NON_AG_LAND_USES}
+    non_agr_c_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     if NON_AG_LAND_USES['Environmental Plantings']:

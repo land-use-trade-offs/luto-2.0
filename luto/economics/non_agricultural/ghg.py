@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from luto.non_ag_landuses import NON_AG_LAND_USES
 
 
 def get_ghg_reduction_env_plantings(data, aggregate) -> np.ndarray:
@@ -88,7 +89,7 @@ def get_ghg_matrix(data, aggregate=True) -> np.ndarray:
     Get the g_rk matrix containing non-agricultural greenhouse gas emissions.
     """
 
-    non_agr_ghg_matrices = {use: np.zeros(data.NCELLS, 1) for use in NON_AG_LAND_USES}
+    non_agr_ghg_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     if NON_AG_LAND_USES['Environmental Plantings']:

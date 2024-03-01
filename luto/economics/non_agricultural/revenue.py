@@ -1,5 +1,5 @@
 import numpy as np
-
+from luto.non_ag_landuses import NON_AG_LAND_USES
 import luto.settings as settings
 
 
@@ -57,7 +57,7 @@ def get_rev_matrix(data) -> np.ndarray:
     """
 
     """
-    non_agr_rev_matrices = {use: np.zeros(data.NCELLS, 1) for use in NON_AG_LAND_USES}
+    non_agr_rev_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     if NON_AG_LAND_USES['Environmental Plantings']:

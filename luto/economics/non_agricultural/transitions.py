@@ -2,6 +2,7 @@ import numpy as np
 from luto import settings
 import luto.tools as tools
 import luto.economics.agricultural.water as ag_water
+from luto.non_ag_landuses import NON_AG_LAND_USES
 
 
 def get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
@@ -159,7 +160,7 @@ def get_to_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
     3-D array, indexed by (m, r, j).
     """
 
-    ag_to_non_agr_t_matrices = {use: np.zeros(data.NCELLS, 1) for use in NON_AG_LAND_USES}
+    ag_to_non_agr_t_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     if NON_AG_LAND_USES['Environmental Plantings']:
@@ -259,7 +260,7 @@ def get_exclude_matrices(data, lumap) -> np.ndarray:
     2-D array, indexed by (r, k) where r is cell and k is non-agricultural land usage.
     """
 
-    non_ag_x_matrices = {use: np.zeros(data.NCELLS, 1) for use in NON_AG_LAND_USES}
+    non_ag_x_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     if NON_AG_LAND_USES['Environmental Plantings']:
