@@ -53,7 +53,7 @@ def get_asparagopsis_effect_w_mrj(data, w_mrj, yr_idx):
 
     Asparagopsis taxiformis has no effect on the water required.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES.get("Asparagopsis taxiformis", [])
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
 
@@ -77,7 +77,7 @@ def get_precision_agriculture_effect_w_mrj(data, w_mrj, yr_idx):
     Applies the effects of using precision agriculture to the water requirements data
     for all relevant agr. land uses.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES.get('Precision Agriculture', [])
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
 
@@ -101,7 +101,7 @@ def get_ecological_grazing_effect_w_mrj(data, w_mrj, yr_idx):
     Applies the effects of using ecological grazing to the water requirements data
     for all relevant agr. land uses.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES.get('Ecological Grazing', [])
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
 
@@ -122,15 +122,14 @@ def get_ecological_grazing_effect_w_mrj(data, w_mrj, yr_idx):
 
 
 def get_agricultural_management_water_matrices(data, w_mrj, yr_idx) -> Dict[str, np.ndarray]:
-    asparagopsis_data = get_asparagopsis_effect_w_mrj(data, w_mrj, yr_idx)
-    precision_agriculture_data = get_precision_agriculture_effect_w_mrj(data, w_mrj, yr_idx)
-    eco_grazing_data = get_ecological_grazing_effect_w_mrj(data, w_mrj, yr_idx)
+    ag_management_data = {}
 
-    ag_management_data = {
-        'Asparagopsis taxiformis': asparagopsis_data,
-        'Precision Agriculture': precision_agriculture_data,
-        'Ecological Grazing': eco_grazing_data,
-    }
+    if 'Asparagopsis taxiformis' in AG_MANAGEMENTS_TO_LAND_USES:
+        ag_management_data['Asparagopsis taxiformis'] = get_asparagopsis_effect_w_mrj(data, w_mrj, yr_idx)
+    if 'Precision Agriculture' in AG_MANAGEMENTS_TO_LAND_USES:
+        ag_management_data['Precision Agriculture'] = get_precision_agriculture_effect_w_mrj(data, w_mrj, yr_idx)
+    if 'Ecological Grazing' in AG_MANAGEMENTS_TO_LAND_USES:
+        ag_management_data['Ecological Grazing'] = get_ecological_grazing_effect_w_mrj(data, w_mrj, yr_idx)
 
     return ag_management_data
 

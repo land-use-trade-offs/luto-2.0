@@ -181,7 +181,7 @@ def get_asparagopsis_effect_t_mrj(data):
     Gets the transition costs of asparagopsis taxiformis, which are none.
     Transition/establishment costs are handled in the costs matrix.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis']
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES.get('Asparagopsis taxiformis', [])
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
@@ -190,7 +190,7 @@ def get_precision_agriculture_effect_t_mrj(data):
     Gets the transition costs of asparagopsis taxiformis, which are none.
     Transition/establishment costs are handled in the costs matrix.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES.get('Precision Agriculture', [])
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
@@ -199,7 +199,7 @@ def get_ecological_grazing_effect_t_mrj(data):
     Gets the transition costs of ecological grazing, which are none.
     Transition/establishment costs are handled in the costs matrix.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES.get('Ecological Grazing', [])
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
@@ -223,7 +223,7 @@ def get_asparagopsis_adoption_limits(data, yr_idx):
     """
     asparagopsis_limits = {}
     yr_cal = data.YR_CAL_BASE + yr_idx
-    for lu in AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis']:
+    for lu in AG_MANAGEMENTS_TO_LAND_USES.get('Asparagopsis taxiformis', []):
         j = data.DESC2AGLU[lu]
         asparagopsis_limits[j] = data.ASPARAGOPSIS_DATA[lu].loc[yr_cal, 'Technical_Adoption']
 
@@ -236,7 +236,7 @@ def get_precision_agriculture_adoption_limit(data, yr_idx):
     """
     prec_agr_limits = {}
     yr_cal = data.YR_CAL_BASE + yr_idx
-    for lu in AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']:
+    for lu in AG_MANAGEMENTS_TO_LAND_USES.get('Precision Agriculture', []):
         j = data.DESC2AGLU[lu]
         prec_agr_limits[j] = data.PRECISION_AGRICULTURE_DATA[lu].loc[yr_cal, 'Technical_Adoption']
 
@@ -249,7 +249,7 @@ def get_ecological_grazing_adoption_limit(data, yr_idx):
     """
     eco_grazing_limits = {}
     yr_cal = data.YR_CAL_BASE + yr_idx
-    for lu in AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']:
+    for lu in AG_MANAGEMENTS_TO_LAND_USES.get('Ecological Grazing', []):
         j = data.DESC2AGLU[lu]
         eco_grazing_limits[j] = data.ECOLOGICAL_GRAZING_DATA[lu].loc[yr_cal, 'Feasible Adoption (%)']
 
@@ -261,15 +261,14 @@ def get_agricultural_management_adoption_limits(data, yr_idx) -> Dict[str, dict]
     An adoption limit represents the maximum percentage of cells (for each land use) that can utilise
     each agricultural management option.
     """
-    asparagopsis_limits = get_asparagopsis_adoption_limits(data, yr_idx)
-    precision_agriculture_limits = get_precision_agriculture_adoption_limit(data, yr_idx)
-    eco_grazing_limits = get_ecological_grazing_adoption_limit(data, yr_idx)
+    ag_management_data = {}
 
-    adoption_limits = {
-        'Asparagopsis taxiformis': asparagopsis_limits,
-        'Precision Agriculture': precision_agriculture_limits,
-        'Ecological Grazing': eco_grazing_limits,
-    }
+    if 'Asparagopsis taxiformis' in AG_MANAGEMENTS_TO_LAND_USES:
+        ag_management_data['Asparagopsis taxiformis'] = get_asparagopsis_adoption_limits(data, yr_idx)
+    if 'Precision Agriculture' in AG_MANAGEMENTS_TO_LAND_USES:
+        ag_management_data['Precision Agriculture'] = get_precision_agriculture_adoption_limit(data, yr_idx)
+    if 'Ecological Grazing' in AG_MANAGEMENTS_TO_LAND_USES:
+        ag_management_data['Ecological Grazing'] = get_ecological_grazing_adoption_limit(data, yr_idx)
 
-    return adoption_limits
+    return ag_management_data
 

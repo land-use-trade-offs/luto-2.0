@@ -473,10 +473,9 @@ def write_ag_management_revenue_cost(sim, yr_cal, path):
     revenue_am_dfs = []
     cost_am_dfs = []
     # Loop through the agricultural managements
-    for am in AG_MANAGEMENTS_TO_LAND_USES:
+    for (am, am_desc) in AG_MANAGEMENTS_TO_LAND_USES.items():
         
         # Get the land use codes for the agricultural management
-        am_desc = AG_MANAGEMENTS_TO_LAND_USES[am]
         am_code = [sim.data.DESC2AGLU[desc] for desc in am_desc]
         
         # Get the revenue/cost matrix for the agricultural management
