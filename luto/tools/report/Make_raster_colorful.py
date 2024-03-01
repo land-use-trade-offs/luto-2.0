@@ -15,6 +15,8 @@ from map_tools.helper import (get_map_meta,
 from tools.__init__ import  get_all_files
 
 
+
+
 ####################################################
 #         Setting up working variables             #
 ####################################################
