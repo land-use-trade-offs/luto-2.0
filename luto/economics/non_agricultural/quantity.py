@@ -60,15 +60,19 @@ def get_quantity_matrix(data) -> np.ndarray:
     Values represent the yield of each commodity c from the cell r when using
         the non-agricultural land use k.
     """
-    env_plantings_quantity_matrix = get_quantity_env_plantings(data)
-    rip_plantings_quantity_matrix = get_quantity_rip_plantings(data)
-    agroforestry_quantity_matrix = get_quantity_agroforestry(data)
 
-    # reshape each matrix to be indexed (c, r, k) and concatenate on the k indexing
-    non_agr_quantity_matrices = [
-        env_plantings_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
-        rip_plantings_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
-        agroforestry_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
-    ]
+    non_agr_quantity_matrices = {use: np.zeros(data.NCELLS, 1) for use in NON_AG_LAND_USES}
+
+    # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
+    if NON_AG_LAND_USES['Environmental Plantings']:
+        non_agr_quantity_matrices['Environmental Plantings'] = get_quantity_env_plantings(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Riparian Plantings']:
+        non_agr_quantity_matrices['Riparian Plantings'] = get_quantity_rip_plantings(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Agroforestry']:
+        non_agr_quantity_matrices['Agroforestry'] = get_quantity_agroforestry(data).reshape((data.NCELLS, 1))
+
+    non_agr_quantity_matrices = list(non_agr_quantity_matrices.values())
 
     return np.concatenate(non_agr_quantity_matrices, axis=2)

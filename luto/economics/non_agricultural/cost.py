@@ -1,6 +1,7 @@
 import numpy as np
 
 import luto.settings as settings
+from luto.non_ag_landuses import NON_AG_LAND_USES
 
 
 def get_cost_env_plantings(data) -> np.ndarray:
@@ -52,15 +53,18 @@ def get_cost_matrix(data):
     """
     Returns non-agricultural c_rk matrix of costs per cell and land use.
     """
-    env_plantings_costs = get_cost_env_plantings(data)
-    rip_plantings_costs = get_cost_rip_plantings(data)
-    agroforestry_costs = get_cost_agroforestry(data)
+
+    non_agr_c_matrices = {use: np.zeros(data.NCELLS, 1) for use in NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-    non_agr_c_matrices = [
-        env_plantings_costs.reshape((data.NCELLS, 1)),
-        rip_plantings_costs.reshape((data.NCELLS, 1)),
-        agroforestry_costs.reshape((data.NCELLS, 1)),
-    ]
+    if NON_AG_LAND_USES['Environmental Plantings']:
+        non_agr_c_matrices['Environmental Plantings'] = get_cost_env_plantings(data).reshape((data.NCELLS, 1))
 
+    if NON_AG_LAND_USES['Riparian Plantings']:
+        non_agr_c_matrices['Riparian Plantings'] = get_cost_rip_plantings(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Agroforestry']:
+        non_agr_c_matrices['Agroforestry'] = get_cost_agroforestry(data).reshape((data.NCELLS, 1))
+
+    non_agr_c_matrices = list(non_agr_c_matrices.values())
     return np.concatenate(non_agr_c_matrices, axis=1)

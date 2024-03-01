@@ -57,15 +57,18 @@ def get_rev_matrix(data) -> np.ndarray:
     """
 
     """
-    env_plantings_rev_matrix = get_rev_env_plantings(data)
-    rip_plantings_rev_matrix = get_rev_rip_plantings(data)
-    agroforestry_rev_matrix = get_rev_agroforestry(data)
+    non_agr_rev_matrices = {use: np.zeros(data.NCELLS, 1) for use in NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-    non_agr_rev_matrices = [
-        env_plantings_rev_matrix.reshape((data.NCELLS, 1)),
-        rip_plantings_rev_matrix.reshape((data.NCELLS, 1)),
-        agroforestry_rev_matrix.reshape((data.NCELLS, 1)),
-    ]
+    if NON_AG_LAND_USES['Environmental Plantings']:
+        non_agr_rev_matrices['Environmental Plantings'] = get_rev_env_plantings(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Riparian Plantings']:
+        non_agr_rev_matrices['Riparian Plantings'] = get_rev_rip_plantings(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Agroforestry']:
+        non_agr_rev_matrices['Agroforestry'] = get_rev_agroforestry(data).reshape((data.NCELLS, 1))
+
+    non_agr_rev_matrices = list(non_agr_rev_matrices.values())
 
     return np.concatenate(non_agr_rev_matrices, axis=1)

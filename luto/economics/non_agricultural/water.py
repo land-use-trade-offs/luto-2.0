@@ -57,15 +57,19 @@ def get_wreq_matrix(data) -> np.ndarray:
     np.ndarray
         Indexed by (r, k) where r is cell and k is non-agricultural land usage.
     """
-    env_plant_wreq_matrix = get_wreq_matrix_env_planting(data)
-    rip_plant_wreq_matrix = get_wreq_matrix_rip_planting(data)
-    agroforestry_wreq_matrix = get_wreq_matrix_agroforestry(data)
+
+    non_agr_wreq_matrices = {use: np.zeros(data.NCELLS, 1) for use in NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-    non_ag_wreq_matrices = [
-        env_plant_wreq_matrix.reshape((data.NCELLS, 1)),
-        rip_plant_wreq_matrix.reshape((data.NCELLS, 1)),
-        agroforestry_wreq_matrix.reshape((data.NCELLS, 1)),
-    ]
+    if NON_AG_LAND_USES['Environmental Plantings']:
+        non_agr_wreq_matrices['Environmental Plantings'] = get_wreq_matrix_env_planting(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Riparian Plantings']:
+        non_agr_wreq_matrices['Riparian Plantings'] = get_wreq_matrix_rip_planting(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Agroforestry']:
+        non_agr_wreq_matrices['Agroforestry'] = get_wreq_matrix_agroforestry(data).reshape((data.NCELLS, 1))
+
+    non_agr_wreq_matrices = list(non_agr_wreq_matrices.values())
 
     return np.concatenate(non_ag_wreq_matrices, axis=1)

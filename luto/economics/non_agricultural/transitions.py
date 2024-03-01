@@ -158,16 +158,20 @@ def get_to_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
     -------
     3-D array, indexed by (m, r, j).
     """
-    env_plant_transitions_to_ag_mrj = get_env_plantings_to_ag(data, yr_idx, lumap, lmmap)
-    rip_plant_transitions_to_ag_mrj = get_rip_plantings_to_ag(data, yr_idx, lumap, lmmap)
-    agroforestry_transitions_to_ag_mrj = get_agroforestry_to_ag(data, yr_idx, lumap, lmmap)
 
-    # Reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-    ag_to_non_agr_t_matrices = [
-        env_plant_transitions_to_ag_mrj,
-        rip_plant_transitions_to_ag_mrj,
-        agroforestry_transitions_to_ag_mrj,
-    ]
+    ag_to_non_agr_t_matrices = {use: np.zeros(data.NCELLS, 1) for use in NON_AG_LAND_USES}
+
+    # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
+    if NON_AG_LAND_USES['Environmental Plantings']:
+        ag_to_non_agr_t_matrices['Environmental Plantings'] = get_env_plantings_to_ag(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Riparian Plantings']:
+        ag_to_non_agr_t_matrices['Riparian Plantings'] = get_rip_plantings_to_ag(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Agroforestry']:
+        ag_to_non_agr_t_matrices['Agroforestry'] = get_agroforestry_to_ag(data).reshape((data.NCELLS, 1))
+
+    ag_to_non_agr_t_matrices = list(ag_to_non_agr_t_matrices.values())
 
     # Element-wise sum each mrj-indexed matrix to get the final transition matrix
     return np.add.reduce(ag_to_non_agr_t_matrices)
@@ -254,17 +258,20 @@ def get_exclude_matrices(data, lumap) -> np.ndarray:
     -------
     2-D array, indexed by (r, k) where r is cell and k is non-agricultural land usage.
     """
-    # Environmental plantings exclusions
-    env_plant_exclusions = get_exclusions_environmental_plantings(data, lumap)
-    rip_plant_exclusions = get_exclusions_riparian_plantings(data, lumap)
-    agroforestry_exclusions = get_exclusions_agroforestry(data, lumap)
+
+    non_ag_x_matrices = {use: np.zeros(data.NCELLS, 1) for use in NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-    non_ag_x_matrices = [
-        env_plant_exclusions.reshape((data.NCELLS, 1)),
-        rip_plant_exclusions.reshape((data.NCELLS, 1)),
-        agroforestry_exclusions.reshape((data.NCELLS, 1)),
-    ]
+    if NON_AG_LAND_USES['Environmental Plantings']:
+        non_ag_x_matrices['Environmental Plantings'] = get_exclusions_environmental_plantings(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Riparian Plantings']:
+        non_ag_x_matrices['Riparian Plantings'] = get_exclusions_riparian_plantings(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Agroforestry']:
+        non_ag_x_matrices['Agroforestry'] = get_exclusions_agroforestry(data).reshape((data.NCELLS, 1))
+
+    non_ag_x_matrices = list(non_ag_x_matrices.values())
 
     # Stack list and return to get x_rk
     return np.concatenate(non_ag_x_matrices, axis=1).astype(np.float32)
