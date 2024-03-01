@@ -1,0 +1,34 @@
+group_code,lu_code,lu_desc,lu_color_HEX
+-1,-1,Non-Agricultural Land,#e1e1e1
+-1,-2,Non-Agricultural Land,#e1e1e1
+1,0,Crop,#7a8ef5
+1,3,Crop,#7a8ef5
+1,4,Crop,#7a8ef5
+1,7,Crop,#7a8ef5
+1,8,Crop,#7a8ef5
+1,9,Crop,#7a8ef5
+1,10,Crop,#7a8ef5
+1,11,Crop,#7a8ef5
+1,12,Crop,#7a8ef5
+1,13,Crop,#7a8ef5
+1,16,Crop,#7a8ef5
+1,17,Crop,#7a8ef5
+1,18,Crop,#7a8ef5
+1,19,Crop,#7a8ef5
+1,20,Crop,#7a8ef5
+1,21,Crop,#7a8ef5
+1,24,Crop,#7a8ef5
+1,25,Crop,#7a8ef5
+1,26,Crop,#7a8ef5
+1,27,Crop,#7a8ef5
+2,1,Livestock,#ffa77f
+2,2,Livestock,#ffa77f
+2,5,Livestock,#ffa77f
+2,6,Livestock,#ffa77f
+2,14,Livestock,#ffa77f
+2,15,Livestock,#ffa77f
+3,22,Unallocated - modified land,#00e6a9
+4,23,Unallocated - natural land,#ffebbe
+5,100,Environmental Planting,#267300
+5,101,Environmental Planting,#267300
+5,102,Environmental Planting,#267300

@@ -151,12 +151,6 @@ quantity_df_wide.to_csv(f'{SAVE_DIR}/production_5_6_demand_Production_commodity_
 #                  2) Economics                    #
 ####################################################
 
-files.query('year_types == "single_year" and category == "cost" and base_name == "cost_non_ag"')
-files.query('year_types == "single_year" and category == "cost" and base_name == "cost_agricultural_management"')
-
-files = files.query('base_name != "cost_non_ag" or base_name != "cost_agricultural_management"')
-
-
 # Plot_2-2: Revenue and Cost data (Billion Dollars)
 revenue_df = get_ag_rev_cost_df(files, 'revenue')
 revenue_df['Source_type'] = revenue_df['Source_type'].str.replace(' Crop','')
