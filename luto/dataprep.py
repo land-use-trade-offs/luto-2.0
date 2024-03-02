@@ -104,6 +104,7 @@ def create_new_dataset():
     shutil.copyfile(luto_1D_inpath + '20231101_Bundle_MR.xlsx', outpath + '20231101_Bundle_MR.xlsx')
     shutil.copyfile(luto_1D_inpath + '20231101_Bundle_AgTech_NE.xlsx', outpath + '20231101_Bundle_AgTech_NE.xlsx')
     shutil.copyfile(luto_1D_inpath + '20231107_ECOGRAZE_Bundle.xlsx', outpath + '20231107_ECOGRAZE_Bundle.xlsx')
+    shutil.copyfile(luto_1D_inpath + '20231107_Bundle_AgTech_EI.xlsx', outpath + '20231107_Bundle_AgTech_EI.xlsx')
     
     
     
@@ -176,7 +177,7 @@ def create_new_dataset():
     ############### Create landuses -- lexicographically ordered list of land-uses (strings)
     
     # Lexicographically ordered list of land-uses
-    ag_landuses = sorted(lmap['LU_DESC'].unique().to_list())
+    ag_landuses = sorted(lmap['LU_DESC'].unique().tolist())
     ag_landuses.remove('Non-agricultural land')
     
     # Save to file
@@ -310,9 +311,9 @@ def create_new_dataset():
     ############### Calculate exclusion matrix -- x_mrj
     
     # Turn it into a pivot table. Non-NaN entries are permitted land-uses in the SA2.
-    ut_ptable = ut.pivot_table(index = 'SA2_ID', columns = ['IRRIGATION', 'LU_DESC'])['LU_ID']
-    x_dry = concordance.merge(ut_ptable[0], on = 'SA2_ID', how = 'left')
-    x_irr = concordance.merge(ut_ptable[1], on = 'SA2_ID', how = 'left')
+    ut_ptable = ut.pivot_table(index = 'SA2_ID', columns = ['IRRIGATION', 'LU_DESC'], observed = False)['LU_ID']
+    x_dry = concordance.merge(ut_ptable[0].reset_index(), on = 'SA2_ID', how = 'left')
+    x_irr = concordance.merge(ut_ptable[1].reset_index(), on = 'SA2_ID', how = 'left')
     x_dry = x_dry.drop(columns = ['CELL_ID', 'SA2_ID'])
     x_irr = x_irr.drop(columns = ['CELL_ID', 'SA2_ID'])
     
@@ -481,8 +482,8 @@ def create_new_dataset():
     # Average establishment costs for Environmental Plantings ($/ha) and save to file
     bioph['EP_EST_COST_HA'].to_hdf(outpath + 'ep_est_cost_ha.h5', key = 'ep_est_cost_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
-    # Average establishment costs for Hardwood Plantings ($/ha) and save to file
-    bioph['CP_EST_COST_HA'].to_hdf(outpath + 'hp_est_cost_ha.h5', key = 'hp_est_cost_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    # Average establishment costs for Carbon Plantings ($/ha) and save to file
+    bioph['CP_EST_COST_HA'].to_hdf(outpath + 'cp_est_cost_ha.h5', key = 'cp_est_cost_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
     
     
@@ -683,11 +684,13 @@ def create_new_dataset():
     
     ############### Agricultural Greenhouse Gas Emissions - livestock
     
-    # Merge to create a cell-based table.
-    agGHG_lvstk = concordance.merge( lvstkGHG.stack(level = 0).reset_index()
+    # Merge to create a cell-based table. Added future_stack = True to silence warning: The previous implementation of stack is deprecated and will be removed in a future version of pandas. See the What's New notes for pandas 2.1.0 for details. Specify future_stack=True to adopt the new implementation and silence this warning.
+    # agGHG_lvstk = concordance.merge( lvstkGHG.stack(level = 0).reset_index()
+    #                                , on = 'SA2_ID'
+    #                                , how = 'left' )
+    agGHG_lvstk2 = concordance.merge( lvstkGHG.stack(level = 0, future_stack = True).reset_index()
                                    , on = 'SA2_ID'
                                    , how = 'left' )
-    
     # Drop unnecessary columns.
     agGHG_lvstk = agGHG_lvstk.drop(['SA2_ID'], axis = 1)
     
