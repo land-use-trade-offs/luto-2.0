@@ -91,13 +91,10 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 3          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
-
-# Determine if write GeoTiffs to output directory: True or False
-WRITE_OUTPUT_GEOTIFFS = True
+RESFACTOR = 1          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
 
 # How does the model run over time 
-MODE = 'timeseries'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
+MODE = 'snapshot'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****
@@ -111,23 +108,16 @@ DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (li
 # 1e5 works well (i.e., demand are met), demands not met with anything less 
 PENALTY = 1e5
 
+# Write GeoTiffs to output directory: True or False
+WRITE_OUTPUT_GEOTIFFS = False
+
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
 # ---------------------------------------------------------------------------- #
 
-# Select Gurobi algorithm used to solve continuous models or the initial root relaxation of a MIP model.
-# Set solve method. Default is automatic. Dual simplex uses less memory.
-SOLVE_METHOD = 2
-
-""" SOLVE METHODS
-   'automatic':                       -1
-   'primal simplex':                   0
-   'dual simplex':                     1
-   'barrier':                          2
-   'concurrent':                       3
-   'deterministic concurrent':         4
-   'deterministic concurrent simplex': 5 """
+# Select Gurobi algorithm used to solve continuous models or the initial root relaxation of a MIP model. Default is automatic. 
+SOLVE_METHOD = 2  # 'automatic: -1, primal simplex: 0, dual simplex: 1, barrier: 2, concurrent: 3, deterministic concurrent: 4, deterministic concurrent simplex: 5
 
 # Presolve parameters (switching both to 0 solves numerical problems)
 PRESOLVE = 0     # automatic (-1), off (0), conservative (1), or aggressive (2)
@@ -142,7 +132,7 @@ OPTIMALITY_TOLERANCE = 1e-2               # Dual feasility tolerance - Default: 
 BARRIER_CONVERGENCE_TOLERANCE = 1e-5      # Range from 1e-2 to 1e-8 (default), that larger the number the faster but the less exact the solve. 1e-5 is a good compromise between optimality and speed.
 
 # Whether to use crossover in barrier solve. 0 = off, -1 = automatic. Auto cleans up sub-optimal termination errors without much additional compute time (apart from 2050 when it sometimes never finishes).
-CROSSOVER = -1
+CROSSOVER = 0
 
 # Parameters for dealing with numerical issues. NUMERIC_FOCUS = 2 fixes most things but roughly doubles solve time.
 SCALE_FLAG = -1     # Scales the rows and columns of the model to improve the numerical properties of the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each row to make its largest nonzero entry to be magnitude one, then scale each column to max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing revealed that 1 tripled solve time, 3 led to numerical problems.
@@ -214,8 +204,6 @@ SOC_AMORTISATION = 30           # Number of years over which to spread (average)
 
 # Water use limits and parameters *******************************
 
-
-
 WATER_USE_LIMITS = 'on'               # 'on' or 'off'
 WATER_LIMITS_TYPE = 'water_stress'    # 'water_stress' or 'pct_ag'
 
@@ -225,11 +213,12 @@ WATER_USE_REDUCTION_PERCENTAGE = 0
 
 # If WATER_LIMITS_TYPE = 'water_stress'...                                           
 # (0.25 follows Aqueduct classification of 0.4 but leaving 0.15 for urban/industrial/indigenous use).
-# Safe and just Earth system boundaries says 0.2 https://www.nature.com/articles/s41586-023-06083-8  
-WATER_STRESS_FRACTION = 0.25          
+# Safe and just Earth system boundaries says 0.2 inclusive of domestic/industrial https://www.nature.com/articles/s41586-023-06083-8  
+WATER_STRESS_FRACTION = 0.2          
 
 # Regionalisation to enforce water use limits by
 WATER_REGION_DEF = 'DD'                 # 'RR' for River Region, 'DD' for Drainage Division
+
 
 
 # Biodiversity limits and parameters *******************************

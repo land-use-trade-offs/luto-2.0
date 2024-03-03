@@ -280,8 +280,9 @@ SOIL_CARBON_AVG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'soil_carbon_t_h
 # Non-agricultural data.
 ###############################################################
 
-# Load environmental plantings economic data
+# Load plantings economic data
 EP_EST_COST_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_est_cost_ha.h5') ).to_numpy(dtype = np.float32)
+CP_EST_COST_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'cp_est_cost_ha.h5') ).to_numpy(dtype = np.float32)
 
 # Load fire risk data (reduced carbon sequestration by this amount)
 fr_df = pd.read_hdf( os.path.join(INPUT_DIR, 'fire_risk.h5') )
@@ -309,6 +310,19 @@ EP_RIP_AVG_T_CO2_HA = (
                          + ep_df.EP_RIP_BG_AVG_T_CO2_HA_YR
                         ).to_numpy(dtype = np.float32)
 
+# Load carbon plantings (block) GHG sequestration (aboveground carbon discounted by RISK_OF_REVERSAL and FIRE_RISK)
+cp_df = pd.read_hdf( os.path.join(INPUT_DIR, 'cp_block_avg_t_co2_ha_yr.h5') )
+CP_BLOCK_AVG_T_CO2_HA = (
+                         ( cp_df.CP_BLOCK_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - RISK_OF_REVERSAL) )
+                         + cp_df.CP_BLOCK_BG_AVG_T_CO2_HA_YR
+                        ).to_numpy(dtype = np.float32)
+
+# Load farm forestry [i.e. carbon plantings (belt)] GHG sequestration (aboveground carbon discounted by RISK_OF_REVERSAL and FIRE_RISK)
+cp_df = pd.read_hdf( os.path.join(INPUT_DIR, 'cp_belt_avg_t_co2_ha_yr.h5') )
+CP_BELT_AVG_T_CO2_HA = (
+                         ( cp_df.CP_BELT_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - RISK_OF_REVERSAL) )
+                         + cp_df.CP_BELT_BG_AVG_T_CO2_HA_YR
+                        ).to_numpy(dtype = np.float32)
 
 # Agricultural land use to environmental plantings raw transition costs:
 AG2EP_TRANSITION_COSTS_HA = np.load( os.path.join(INPUT_DIR, 'ag_to_ep_tmatrix.npy') )  # shape: (28,)
