@@ -688,7 +688,7 @@ def create_new_dataset():
     # agGHG_lvstk = concordance.merge( lvstkGHG.stack(level = 0).reset_index()
     #                                , on = 'SA2_ID'
     #                                , how = 'left' )
-    agGHG_lvstk2 = concordance.merge( lvstkGHG.stack(level = 0, future_stack = True).reset_index()
+    agGHG_lvstk = concordance.merge( lvstkGHG.stack(level = 0, future_stack = True).reset_index()
                                    , on = 'SA2_ID'
                                    , how = 'left' )
     # Drop unnecessary columns.
