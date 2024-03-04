@@ -34,11 +34,21 @@ from luto.data import Data
 import luto.economics.agricultural.water as ag_water
 import luto.economics.non_agricultural.water as non_ag_water
 import luto.economics.agricultural.ghg as ag_ghg
+
+import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.agricultural.revenue as ag_revenue
 import luto.economics.agricultural.cost as ag_cost
-import luto.economics.non_agricultural.ghg as non_ag_ghg
-import luto.economics.non_agricultural.cost as non_ag_cost
+import luto.economics.agricultural.transitions as ag_transitions
+import luto.economics.agricultural.ghg as ag_ghg
+import luto.economics.agricultural.water as ag_water
 import luto.economics.agricultural.biodiversity as ag_biodiversity
+
+import luto.economics.non_agricultural.quantity as non_ag_quantity
+import luto.economics.non_agricultural.revenue as non_ag_revenue
+import luto.economics.non_agricultural.cost as non_ag_cost
+import luto.economics.non_agricultural.transitions as non_ag_transitions
+import luto.economics.non_agricultural.ghg as non_ag_ghg
+import luto.economics.non_agricultural.water as non_ag_water
 import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
@@ -130,21 +140,19 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_dvar_area(data, yr_cal, path_yr)
     write_quantity(data, yr_cal, path_yr, yr_cal_sim_pre)
     write_ag_revenue_cost(data, yr_cal, path_yr)
-    write_ag_management_cost(data, yr_cal, path_yr)
-    write_non_ag_cost(data, yr_cal, path_yr)
+    write_ag_management_revenue_cost(data, yr_cal, path_yr)
+    write_non_ag_revenue_cost(data, yr_cal, path_yr)
     write_water(data, yr_cal, path_yr)
     write_ghg(data, yr_cal, path_yr)
     write_ghg_separate(data, yr_cal, path_yr)
     write_biodiversity(data, yr_cal, path_yr)
     write_biodiversity_separate(data, yr_cal, path_yr)
     
-    
-    
+       
 
 def write_settings(path):
     """Write model run settings"""
 
-    # Open the settings.py file
     # Open the settings.py file
     with open('luto/settings.py', 'r') as file:
         lines = file.readlines()
@@ -188,6 +196,7 @@ def write_settings(path):
     with open(os.path.join(path, 'model_run_settings.txt'), 'w') as f:
         for k, v in settings_dict.items():
             f.write(f'{k}:{v}\n')
+
 
 
 def write_files(data: Data, yr_cal, path):
@@ -330,6 +339,7 @@ def write_files_separate(data: Data, yr_cal, path, ammap_separate=False):
         write_gtiff(dvar, os.path.join(path, 'lucc_separate', fname))
 
 
+
 def write_quantity(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     
     # Append the yr_cal to timestamp as prefix
@@ -380,8 +390,10 @@ def write_quantity(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         production_years = pd.DataFrame({yr:data.prod_data[yr]['Production'] for yr in data.prod_data.keys()})
         production_years.insert(0,'Commodity',data.COMMODITIES)
         production_years.to_csv(os.path.join(path, f'quantity_production_kt_{timestamp}.csv'), index = False)
-        
 
+    # --------------------------------------------------------------------------------------------
+    # NOTE:Non-agricultural production are all zeros, therefore skip the calculation
+    # --------------------------------------------------------------------------------------------
         
 
 
@@ -440,49 +452,75 @@ def write_ag_revenue_cost(data: Data, yr_cal, path):
     df_rev.to_csv(os.path.join(path, f'revenue_agricultural_commodity_{timestamp}.csv'))
     df_cost.to_csv(os.path.join(path, f'cost_agricultural_commodity_{timestamp}.csv'))
     
-    
-    
 
-def write_ag_management_cost(data: Data, yr_cal, path):
-    """Calculate agricultural management cost."""
+def write_ag_management_revenue_cost(data: Data, yr_cal, path):
+    """Calculate agricultural management revenue and cost."""
+    
     # Get the timestamp so each CSV in the timeseries mode has a unique name
     # Append the yr_cal to timestamp as prefix
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
     timestamp = str(yr_cal) + '_' + timestamp
 
-    print(f'Writing agricultural management cost outputs to {path}')
+    print(f'Writing agricultural management revenue and cost outputs to {path}')
 
     # Convert calendar year to year index.
     yr_idx = yr_cal - data.YR_CAL_BASE
-
-    cost_asparagopsis_lm = ag_cost.get_asparagopsis_effect_c_mrj(data, yr_idx) # Cost of ag_management
-    ag_man_col = [data.DESC2AGLU[name] for name in AG_MANAGEMENTS_TO_LAND_USES.get('Asparagopsis taxiformis', []) if
-                  name in data.DESC2AGLU] # Get the col of the agricultural management
-    ag_man_dvar = data.ag_man_dvars[yr_cal]['Asparagopsis taxiformis'][:,:,ag_man_col]
-    cost_asparagopsis = np.sum(ag_man_dvar * cost_asparagopsis_lm)
-
-    cost_precision_agriculture_lm = ag_cost.get_precision_agriculture_effect_c_mrj(data, yr_idx)  # Cost of ag_management
-    ag_man_col = [data.DESC2AGLU[name] for name in AG_MANAGEMENTS_TO_LAND_USES.get('Precision Agriculture', []) if
-                  name in data.DESC2AGLU]
-    ag_man_dvar = data.ag_man_dvars[yr_cal]['Precision Agriculture'][:, :, ag_man_col]
-    cost_precision_agriculture = np.sum(ag_man_dvar * cost_precision_agriculture_lm)
-
-    cost_ecological_grazing_lm = ag_cost.get_ecological_grazing_effect_c_mrj(data, yr_idx) # Cost of ag_management
-    ag_man_col = [data.DESC2AGLU[name] for name in AG_MANAGEMENTS_TO_LAND_USES.get('Ecological Grazing', []) if
-                  name in data.DESC2AGLU]
-    ag_man_dvar = data.ag_man_dvars[yr_cal]['Ecological Grazing'][:, :, ag_man_col]
-    cost_ecological_grazing = np.sum(ag_man_dvar * np.nan_to_num(cost_ecological_grazing_lm))
-
-    df_cost = pd.DataFrame({
-        "Asparagopsis": [cost_asparagopsis],
-        "Precision agriculture": [cost_precision_agriculture],
-        "Ecological grazing": [cost_ecological_grazing]
-    })
     
-    # df_cost.to_csv(os.path.join(path, f'cost_agricultural_management_{timestamp}.csv'), index = False)
+    # Get the revenue/cost matirces for each agricultural land-use
+    ag_rev_mrj = ag_revenue.get_rev_matrices(data, yr_idx)
+    ag_cost_mrj = ag_cost.get_cost_matrices(data, yr_idx)
+
+    # Get the revenuecost matrices for each agricultural management
+    am_revenue_mat = ag_revenue.get_agricultural_management_revenue_matrices(data, ag_rev_mrj, yr_idx)
+    am_cost_mat = ag_cost.get_agricultural_management_cost_matrices(data, ag_cost_mrj, yr_idx)
+
+    revenue_am_dfs = []
+    cost_am_dfs = []
+    # Loop through the agricultural managements
+    for am in AG_MANAGEMENTS_TO_LAND_USES:
+        
+        # Get the land use codes for the agricultural management
+        am_desc = AG_MANAGEMENTS_TO_LAND_USES[am]
+        am_code = [data.DESC2AGLU[desc] for desc in am_desc]
+        
+        # Get the revenue/cost matrix for the agricultural management
+        am_rev = np.nan_to_num(am_revenue_mat[am]) # Replace NaNs with 0
+        am_cost = np.nan_to_num(am_cost_mat[am])   # Replace NaNs with 0
+        
+        # Get the decision variable for each agricultural management
+        am_dvar = data.ag_man_dvars[yr_cal][am][:,:,am_code]
+        
+        # Multiply the decision variable by revenue matrix
+        am_rev_yr = np.einsum('mrj,mrj->jm', am_dvar, am_rev)
+        am_cost_yr = np.einsum('mrj,mrj->jm', am_dvar, am_cost)
+        
+        # Reformat the revenue/cost matrix into a dataframe
+        am_rev_yr_df = pd.DataFrame(am_rev_yr, columns=data.LANDMANS)
+        am_rev_yr_df['Land-use'] = am_desc
+        am_rev_yr_df = am_rev_yr_df.melt(id_vars='Land-use',value_vars=data.LANDMANS,var_name='Water',value_name='Value (AU$)')
+        am_rev_yr_df['year'] = yr_cal
+        am_rev_yr_df['Management Type'] = am
+        
+        am_cost_yr_df = pd.DataFrame(am_cost_yr, columns=data.LANDMANS)
+        am_cost_yr_df['Land-use'] = am_desc
+        am_cost_yr_df = am_cost_yr_df.melt(id_vars='Land-use',value_vars=data.LANDMANS,var_name='Water',value_name='Value (AU$)')
+        am_cost_yr_df['year'] = yr_cal
+        am_cost_yr_df['Management Type'] = am
+        
+        # Store the revenue/cost dataframes
+        revenue_am_dfs.append(am_rev_yr_df)
+        cost_am_dfs.append(am_cost_yr_df)   
+
+    # Concatenate the revenue/cost dataframes    
+    revenue_am_df = pd.concat(revenue_am_dfs)
+    cost_am_df = pd.concat(cost_am_dfs)
+    
+    revenue_am_df.to_csv(os.path.join(path, f'revenue_agricultural_management_{timestamp}.csv'), index = False)
+    cost_am_df.to_csv(os.path.join(path, f'cost_agricultural_management_{timestamp}.csv'), index = False)
 
 
-def write_non_ag_cost(data: Data, yr_cal, path):
+
+def write_non_ag_revenue_cost(data: Data, yr_cal, path):
     """Calculate non_agricultural cost. """
 
     # Get the timestamp so each CSV in the timeseries mode has a unique name
@@ -492,19 +530,30 @@ def write_non_ag_cost(data: Data, yr_cal, path):
     print(f'Writing non agricultural management cost outputs to {path}')
     non_ag_dvar = data.non_ag_dvars[yr_cal]
 
-    cost_env_plantings = np.sum(non_ag_dvar[:, 0] * non_ag_cost.get_cost_env_plantings(data))
-    cost_rip_plantings = np.sum(non_ag_dvar[:, 1] * non_ag_cost.get_cost_rip_plantings(data))
-    cost_agroforestry = np.sum(non_ag_dvar[:, 2] * non_ag_cost.get_cost_agroforestry(data))
-    
-    df_cost = pd.DataFrame({
-        "Environmental Plantings": [cost_env_plantings],
-        "Riparian Plantings": [cost_rip_plantings],
-        "Agroforestry": [cost_agroforestry]
-    })
-    
-    # Save to file.
-    # df_cost.to_csv(os.path.join(path, f'cost_non_ag_{timestamp}.csv'), index = False)
+    # Get the non-agricultural revenue/cost matrices
+    non_ag_rev_mat = non_ag_revenue.get_rev_matrix(data)    # rk
+    non_ag_cost_mat = non_ag_cost.get_cost_matrix(data)     # rk
 
+    # Replace nan with 0
+    non_ag_rev_mat = np.nan_to_num(non_ag_rev_mat)
+    non_ag_cost_mat = np.nan_to_num(non_ag_cost_mat)
+
+    # Calculate the non-agricultural revenue and cost
+    rev_non_ag = np.einsum('rk,rk->k', non_ag_dvar, non_ag_rev_mat)
+    cost_non_ag = np.einsum('rk,rk->k', non_ag_dvar, non_ag_cost_mat)
+
+    # Reformat the revenue/cost matrix into a dataframe
+    rev_non_ag_df = pd.DataFrame(rev_non_ag.reshape(-1,1), columns=['Value AU$'])
+    rev_non_ag_df['year'] = yr_cal
+    rev_non_ag_df['Land-use'] = data.NON_AGRICULTURAL_LANDUSES
+
+    cost_non_ag_df = pd.DataFrame(cost_non_ag.reshape(-1,1), columns=['Value AU$'])
+    cost_non_ag_df['year'] = yr_cal
+    cost_non_ag_df['Land-use'] = data.NON_AGRICULTURAL_LANDUSES
+
+    # Save to disk
+    rev_non_ag_df.to_csv(os.path.join(path, f'revenue_non_ag_{timestamp}.csv'), index = False)
+    cost_non_ag_df.to_csv(os.path.join(path, f'cost_non_ag_{timestamp}.csv'), index = False)
 
 def write_dvar_area(data: Data, yr_cal, path):
     
@@ -549,8 +598,9 @@ def write_dvar_area(data: Data, yr_cal, path):
                                                                 names=['Year', 'Type', 'Water','Land use']),
                                 columns=['Area (ha)']).reset_index()
         am_areas.append(df_am_area)
+    
+    # Concatenate the dataframes
     df_am_area = pd.concat(am_areas)
-
 
     # Save to file
     df_ag_area.to_csv(os.path.join(path, f'area_agricultural_landuse_{timestamp}.csv'), index = False)

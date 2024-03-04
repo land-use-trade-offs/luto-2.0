@@ -209,7 +209,7 @@ def get_quantity_df(in_dfs):
     return all_df
 
 
-def get_rev_cost_df(files_df:pd.DataFrame,in_type:str):
+def get_ag_rev_cost_df(files_df:pd.DataFrame,in_type:str):
     
     """
     Given a DataFrame containing information about files, this function returns a DataFrame of revenue or cost (in billion dollars) for each year in the input DataFrame.
@@ -224,10 +224,17 @@ def get_rev_cost_df(files_df:pd.DataFrame,in_type:str):
     
     # in_type = 'Revenue' or 'Cost', otherwise raise error
     if in_type not in ['revenue','cost']:
-        raise ValueError('in_type must be either "Revenue" or "Cost"')
+        raise ValueError('in_type must be either "revenue" or "cost"')
     
     path_df = files_df.query('category == @in_type and year_types == "single_year"').reset_index(drop=True) 
-        
+    
+    # Remove the non-ag and ag-mam from the path_df
+    remove_list = ['cost_non_ag', 
+                   'cost_agricultural_management',
+                   'revenue_non_ag', 
+                   'revenue_agricultural_management']
+    path_df = path_df[~path_df['base_name'].str.contains('|'.join(remove_list))]
+       
     dfs =[]  
     for _,row in path_df.iterrows():
         df = df_wide2long(row['path'])

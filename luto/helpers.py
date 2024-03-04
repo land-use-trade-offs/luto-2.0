@@ -20,19 +20,18 @@ LUTO 2.0 temporary helper code.
 
 # # To run LUTO, execute steps 1-4 below...
 
-# # 1. Refresh input data (if required)
-# from luto.dataprep import create_new_dataset
-# create_new_dataset()
+# 1. Refresh input data (if required)
+from luto.dataprep import create_new_dataset
+create_new_dataset()
 
-# # 2. Run the simulation and profile memory use
-# %load_ext memory_profiler
-# import luto.simulation as sim
-# %memit sim.run( 2010, 2050 )
+# 2. Run the simulation and profile memory use
+%load_ext memory_profiler
+import luto.simulation as sim
+%memit sim.run( 2010, 2050 )
 
-# # 3. Write the ouputs to file
-# from luto.tools.write import *
-# path = get_path(sim)
-# write_outputs(sim, path)
+# 3. Write the ouputs to file
+from luto.tools.write import *
+write_outputs(sim)
 
 
 
@@ -40,24 +39,15 @@ LUTO 2.0 temporary helper code.
 from luto.dataprep import create_new_dataset
 create_new_dataset()
 
-from contextlib import redirect_stderr, redirect_stdout
-
 from luto.tools.write import *
 import luto.simulation as sim
-import luto.data as bdata
+from luto.data import Data
 from luto.economics.production import get_production
 
-yr_start = bdata.YR_CAL_BASE
-yr_end = 2050
-path = get_path(bdata,yr_start,yr_end)
 
-# Run the simulation
-with open(f"{path}/running_log.txt",'w') as f, redirect_stdout(f), redirect_stderr(f):
-    sim.run( yr_start, yr_end )
+sim.run( 2010, 2050 )
+write_outputs(sim)
 
-# Write the outputs
-with open(f"{path}/writing_log.txt",'w') as f, redirect_stdout(f), redirect_stderr(f):
-    write_outputs(sim, path)
 
 
 

@@ -414,8 +414,11 @@ class Data:
         ###############################################################
         print("\tLoading non-agricultural data...", end=" ", flush=True)
 
-        # Load environmental plantings economic data
+        # Load plantings economic data
         self.EP_EST_COST_HA = pd.read_hdf(os.path.join(INPUT_DIR, "ep_est_cost_ha.h5")).to_numpy(
+            dtype=np.float32
+        )
+        self.CP_EST_COST_HA = pd.read_hdf(os.path.join(INPUT_DIR, "cp_est_cost_ha.h5")).to_numpy(
             dtype=np.float32
         )
 
@@ -443,6 +446,20 @@ class Data:
         self.EP_RIP_AVG_T_CO2_HA = (
             (ep_df.EP_RIP_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - RISK_OF_REVERSAL))
             + ep_df.EP_RIP_BG_AVG_T_CO2_HA_YR
+        ).to_numpy(dtype=np.float32)
+
+        # Load carbon plantings (block) GHG sequestration (aboveground carbon discounted by RISK_OF_REVERSAL and FIRE_RISK)
+        cp_df = pd.read_hdf(os.path.join(INPUT_DIR, "cp_block_avg_t_co2_ha_yr.h5"))
+        self.CP_BLOCK_AVG_T_CO2_HA = (
+            (cp_df.CP_BLOCK_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - RISK_OF_REVERSAL))
+            + cp_df.CP_BLOCK_BG_AVG_T_CO2_HA_YR
+        ).to_numpy(dtype=np.float32)
+
+        # Load farm forestry [i.e. carbon plantings (belt)] GHG sequestration (aboveground carbon discounted by RISK_OF_REVERSAL and FIRE_RISK)
+        cp_df = pd.read_hdf(os.path.join(INPUT_DIR, "cp_belt_avg_t_co2_ha_yr.h5"))
+        self.CP_BELT_AVG_T_CO2_HA = (
+            (cp_df.CP_BELT_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - RISK_OF_REVERSAL))
+            + cp_df.CP_BELT_BG_AVG_T_CO2_HA_YR
         ).to_numpy(dtype=np.float32)
 
         # Agricultural land use to environmental plantings raw transition costs:
@@ -749,7 +766,9 @@ class Data:
         ###############################################################
         """
         Kunming-Montreal Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-        Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
+        Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, 
+        and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity 
+        and ecosystem functions and services, ecological integrity and connectivity.
         """
         print("\tLoading biodiversity data...", end=" ", flush=True)
 
