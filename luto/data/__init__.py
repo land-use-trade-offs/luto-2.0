@@ -99,7 +99,7 @@ YR_CAL_BASE = 2010
 
 # Read in lexicographically ordered list of land-uses.
 AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'ag_landuses.csv')), header = None)[0].to_list()
-NON_AGRICULTURAL_LANDUSES = [non_ag_land_use for non_ag_land_use in NON_AG_LAND_USES if NON_AG_LAND_USES[non_ag_land_use]]
+NON_AGRICULTURAL_LANDUSES = [non_ag_land_use for non_ag_land_use in NON_AG_LAND_USES]
 
 NONAGLU2DESC = dict(zip(range(NON_AGRICULTURAL_LU_BASE_CODE, 
                              NON_AGRICULTURAL_LU_BASE_CODE + len(NON_AGRICULTURAL_LANDUSES)),
