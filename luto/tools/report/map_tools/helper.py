@@ -27,11 +27,11 @@ def download_basemap(bounds_mercator: list[str]):
     """
 
     base_map, extent = ctx.bounds2raster(*bounds_mercator, 
-                                    path='Assests/basemap.tif',
-                                    source=ctx.providers.OpenStreetMap.Mapnik,
-                                    zoom=7,
-                                    n_connections=16,
-                                    max_retries=4)
+                                        path='Assests/basemap.tif',
+                                        source=ctx.providers.OpenStreetMap.Mapnik,
+                                        zoom=7,
+                                        n_connections=16,
+                                        max_retries=4)
     return base_map, extent
 
    

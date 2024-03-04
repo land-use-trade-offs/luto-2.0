@@ -19,13 +19,12 @@ Writes model output and statistics to files.
 """
 
 
-import os, math, re
+
+import os, re
 import shutil
 import numpy as np
 import pandas as pd
-
 from datetime import datetime
-import luto.data as bdata
 
 import luto.settings as settings
 from luto import tools
@@ -51,6 +50,13 @@ import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
+
+# Set the timestamp for the outputs
+timestamp_write = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
+
+
+
+@tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{timestamp_write}")
 def write_outputs(sim):
 
     # Write model run settings
@@ -91,25 +97,29 @@ def write_outputs(sim):
 
     # 1) Clean up the output CSVs 
     result = subprocess.run(['python', 'luto/tools/report/create_report_data.py', '-p', sim.path], capture_output=True, text=True)
-    print("\nError occurred:", result.stderr) if result.returncode != 0 else print("\nReport data:", result.stdout)
+    print("\nError occurred:", result.stderr) if result.returncode != 0 else print("Report data:", result.stdout)
 
     # 2) Create the report
     result = subprocess.run(['python', 'luto/tools/report/create_html.py', '-p', sim.path], capture_output=True, text=True)
-    print("\nError occurred:", result.stderr) if result.returncode != 0 else print("\nReport HTML:\n", result.stdout)
+    print("\nError occurred:", result.stderr) if result.returncode != 0 else print("Report HTML:\n", result.stdout)
     
     
     ###############################################################
     #           Move logs to current output dir                   #
     ###############################################################
-    logs = ['run_stderr', 'run_stdout', 'write_stderr', 'write_stdout']
-    logs = [f"{settings.OUTPUT_DIR}/{log}.log" for log in logs]
+    logs = [f'run_stderr_{sim.timestamp}.log', 
+            f'run_stdout_{sim.timestamp}.log', 
+            f'write_stderr_{timestamp_write}.log', 
+            f'write_stdout_{timestamp_write}.log']
+    
+    logs = [f"{settings.OUTPUT_DIR}/{log}" for log in logs]
     
     for log in logs:
         if os.path.exists(log):
             shutil.move(log, f"{sim.path}/{os.path.basename(log)}")
 
 
-@tools.LogToFile(f"{settings.OUTPUT_DIR}/write")
+
 def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
     if not os.path.isdir(path_yr):
