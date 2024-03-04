@@ -61,17 +61,17 @@ def get_quantity_matrix(data) -> np.ndarray:
         the non-agricultural land use k.
     """
 
-    non_agr_quantity_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}
+    non_agr_quantity_matrices = {use: np.zeros((data.NCMS, data.NCELLS, 1)) for use in NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     if NON_AG_LAND_USES['Environmental Plantings']:
-        non_agr_quantity_matrices['Environmental Plantings'] = get_quantity_env_plantings(data).reshape((data.NCELLS, 1))
+        non_agr_quantity_matrices['Environmental Plantings'] = get_quantity_env_plantings(data).reshape((data.NCMS, data.NCELLS, 1))
 
     if NON_AG_LAND_USES['Riparian Plantings']:
-        non_agr_quantity_matrices['Riparian Plantings'] = get_quantity_rip_plantings(data).reshape((data.NCELLS, 1))
+        non_agr_quantity_matrices['Riparian Plantings'] = get_quantity_rip_plantings(data).reshape((data.NCMS, data.NCELLS, 1))
 
     if NON_AG_LAND_USES['Agroforestry']:
-        non_agr_quantity_matrices['Agroforestry'] = get_quantity_agroforestry(data).reshape((data.NCELLS, 1))
+        non_agr_quantity_matrices['Agroforestry'] = get_quantity_agroforestry(data).reshape((data.NCMS, data.NCELLS, 1))
 
     non_agr_quantity_matrices = list(non_agr_quantity_matrices.values())
 
