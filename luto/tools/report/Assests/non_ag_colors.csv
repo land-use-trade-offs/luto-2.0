@@ -1,0 +1,6 @@
+lu_code,lu_desc,lu_color_HEX
+-1,Non-Agricultural Land,#e1e1e1
+0,No management applied,#cccccc
+100,Environmental Plantings,#73b2ff
+101,Riparian Plantings,#ff5500
+102,Agroforestry,#38a800

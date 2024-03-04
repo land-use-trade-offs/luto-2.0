@@ -22,8 +22,9 @@ def extract_dtype_from_path(path):
     """
     # Define the output categories and its corresponding file patterns
     f_cat = {
+            # decision variables (npy files)
+            'dvar':['npy'],
             # CSVs
-            'dvar':['ag','non_ag'],
             'GHG':['GHG'],
             'water':['water'],
             'cross_table':['crosstab','switches'],
@@ -33,12 +34,15 @@ def extract_dtype_from_path(path):
             'revenue':['revenue'],
             'cost':['cost'],
             'biodiversity':['biodiversity'],
-            # Full maps
+            # Maps
             'ammap':['ammap'],
             'lumap':['lumap'],
             'lmmap':['lmmap'],
-            # Individual maps
-            'lucc_separate':['Ag_LU', 'Ag_Mgt', 'Land_Mgt', 'Non-Ag_LU'],
+            'non_ag':['non_ag'],
+            'Ag_LU':['Ag_LU'], 
+            'Ag_Mgt':['Ag_Mgt'],
+            'Land_Mgt':['Land_Mgt'],
+            'Non-Ag':['Non-Ag'],
             }
     
     # Get the base name of the file path

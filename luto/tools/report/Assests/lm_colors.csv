@@ -1,0 +1,4 @@
+lu_code,lu_desc,lu_color_HEX
+-1,Non-Agricultural Land,#cccccc
+0,Dry Land,#ffebbe
+1,Irrigated Land,#ff73df
