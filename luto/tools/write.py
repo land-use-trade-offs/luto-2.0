@@ -24,6 +24,7 @@ import os, re
 import shutil
 import numpy as np
 import pandas as pd
+import subprocess
 from datetime import datetime
 
 import luto.settings as settings
@@ -51,12 +52,6 @@ from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
 
-# Set the timestamp for the outputs
-timestamp_write = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
-
-
-
-@tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{timestamp_write}")
 def write_outputs(sim):
 
     # Write model run settings
@@ -92,9 +87,6 @@ def write_outputs(sim):
     #               Fire up the report script                     #
     ###############################################################
 
-    # Use sub process to run the report script
-    import subprocess
-
     # 1) Clean up the output CSVs 
     result = subprocess.run(['python', 'luto/tools/report/create_report_data.py', '-p', sim.path], capture_output=True, text=True)
     print("\nError occurred:", result.stderr) if result.returncode != 0 else print("Report data:", result.stdout)
@@ -107,17 +99,14 @@ def write_outputs(sim):
     ###############################################################
     #           Move logs to current output dir                   #
     ###############################################################
-    logs = [f'run_stderr_{sim.timestamp}.log', 
-            f'run_stdout_{sim.timestamp}.log', 
-            f'write_stderr_{timestamp_write}.log', 
-            f'write_stdout_{timestamp_write}.log']
+    logs = [f'run_{sim.timestamp}_stderr.log', 
+            f'run_{sim.timestamp}_stdout.log']
     
     logs = [f"{settings.OUTPUT_DIR}/{log}" for log in logs]
     
     for log in logs:
         if os.path.exists(log):
             shutil.move(log, f"{sim.path}/{os.path.basename(log)}")
-
 
 
 def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):

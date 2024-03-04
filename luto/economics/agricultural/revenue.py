@@ -187,7 +187,7 @@ def get_rev_matrices(data, yr_idx, aggregate:bool = True):
 
     if aggregate == True:
         j,m,s = rev_rjms.columns.levshape
-        rev_rjm = rev_rjms.groupby(level=[0,1],axis=1).sum().values.reshape(-1,*[j,m])
+        rev_rjm = rev_rjms.T.groupby(level=[0,1]).sum().values.reshape(-1,*[j,m])
         rev_mrj = np.einsum('rjm->mrj',rev_rjm)
         return rev_mrj
     

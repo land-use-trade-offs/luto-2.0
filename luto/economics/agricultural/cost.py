@@ -183,7 +183,7 @@ def get_cost_matrices(data, yr_idx,aggregate=True):
 
     if aggregate == True:
         j,m,s = cost_rjms.columns.levshape
-        c_rjm = cost_rjms.groupby(level=[0,1],axis=1).sum().values.reshape(-1,*[j,m])
+        c_rjm = cost_rjms.T.groupby(level=[0,1]).sum().values.reshape(-1,*[j,m])
         c_mrj = np.einsum('rjm->mrj',c_rjm)
         return c_mrj
     
