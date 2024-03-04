@@ -160,17 +160,17 @@ def get_to_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
     3-D array, indexed by (m, r, j).
     """
 
-    ag_to_non_agr_t_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}
+    ag_to_non_agr_t_matrices = {use: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)) for use in NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     if NON_AG_LAND_USES['Environmental Plantings']:
-        ag_to_non_agr_t_matrices['Environmental Plantings'] = get_env_plantings_to_ag(data).reshape((data.NCELLS, 1))
+        ag_to_non_agr_t_matrices['Environmental Plantings'] = get_env_plantings_to_ag(data, yr_idx, lumap, lmmap)
 
     if NON_AG_LAND_USES['Riparian Plantings']:
-        ag_to_non_agr_t_matrices['Riparian Plantings'] = get_rip_plantings_to_ag(data).reshape((data.NCELLS, 1))
+        ag_to_non_agr_t_matrices['Riparian Plantings'] = get_rip_plantings_to_ag(data, yr_idx, lumap, lmmap)
 
     if NON_AG_LAND_USES['Agroforestry']:
-        ag_to_non_agr_t_matrices['Agroforestry'] = get_agroforestry_to_ag(data).reshape((data.NCELLS, 1))
+        ag_to_non_agr_t_matrices['Agroforestry'] = get_agroforestry_to_ag(data, yr_idx, lumap, lmmap)
 
     ag_to_non_agr_t_matrices = list(ag_to_non_agr_t_matrices.values())
 
@@ -264,13 +264,13 @@ def get_exclude_matrices(data, lumap) -> np.ndarray:
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     if NON_AG_LAND_USES['Environmental Plantings']:
-        non_ag_x_matrices['Environmental Plantings'] = get_exclusions_environmental_plantings(data).reshape((data.NCELLS, 1))
+        non_ag_x_matrices['Environmental Plantings'] = get_exclusions_environmental_plantings(data, lumap).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['Riparian Plantings']:
-        non_ag_x_matrices['Riparian Plantings'] = get_exclusions_riparian_plantings(data).reshape((data.NCELLS, 1))
+        non_ag_x_matrices['Riparian Plantings'] = get_exclusions_riparian_plantings(data, lumap).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['Agroforestry']:
-        non_ag_x_matrices['Agroforestry'] = get_exclusions_agroforestry(data).reshape((data.NCELLS, 1))
+        non_ag_x_matrices['Agroforestry'] = get_exclusions_agroforestry(data, lumap).reshape((data.NCELLS, 1))
 
     non_ag_x_matrices = list(non_ag_x_matrices.values())
 

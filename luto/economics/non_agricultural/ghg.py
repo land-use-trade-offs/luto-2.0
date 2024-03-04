@@ -93,13 +93,13 @@ def get_ghg_matrix(data, aggregate=True) -> np.ndarray:
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     if NON_AG_LAND_USES['Environmental Plantings']:
-        non_agr_ghg_matrices['Environmental Plantings'] = get_ghg_reduction_env_plantings(data)
+        non_agr_ghg_matrices['Environmental Plantings'] = get_ghg_reduction_env_plantings(data, aggregate)
 
     if NON_AG_LAND_USES['Riparian Plantings']:
-        non_agr_ghg_matrices['Riparian Plantings'] = get_ghg_reduction_rip_plantings(data)
+        non_agr_ghg_matrices['Riparian Plantings'] = get_ghg_reduction_rip_plantings(data, aggregate)
 
     if NON_AG_LAND_USES['Agroforestry']:
-        non_agr_ghg_matrices['Agroforestry'] = get_ghg_reduction_agroforestry(data)
+        non_agr_ghg_matrices['Agroforestry'] = get_ghg_reduction_agroforestry(data, aggregate)
       
     if aggregate==True:
         # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing

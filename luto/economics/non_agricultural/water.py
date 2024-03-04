@@ -73,4 +73,4 @@ def get_wreq_matrix(data) -> np.ndarray:
 
     non_agr_wreq_matrices = list(non_agr_wreq_matrices.values())
 
-    return np.concatenate(non_ag_wreq_matrices, axis=1)
+    return np.concatenate(non_agr_wreq_matrices, axis=1)
