@@ -20,11 +20,7 @@ functions as a singleton class. It is intended to be the _only_ part of the
 model that has 'global' varying state.
 """
 
-
-import os
-import math
 import time
-from datetime import datetime
 
 import luto.settings as settings
 from luto.data import Data
@@ -39,14 +35,11 @@ def load_data() -> Data:
     """
     Load the Data object containing all required data to run a LUTO simulation.
     """
-    print("\nLoading LUTO data...\n")
-    data = Data()
-    print("\nData loading complete.")
-    return data
+    return Data()
 
 
 def solve_timeseries(data: Data, steps: int, base: int, target: int):
-    print( "\nRunning LUTO %s timeseries from %s to %s at resfactor %s, starting at %s." % (settings.VERSION, base, target, settings.RESFACTOR, time.ctime()) )
+    print( "\nRunning LUTO %s timeseries from %s to %s at resfactor %s, starting at %s." % (settings.VERSION, base, target, settings.RESFACTOR, time.ctime()), flush=True )
 
     for s in range(steps):
         print( "\n-------------------------------------------------", end=' ')
@@ -95,10 +88,10 @@ def solve_snapshot(data: Data, base: int, target: int):
     else:
         d_c = data.D_CY
 
-    print( "\nRunning LUTO %s snapshot for %s at resfactor %s, starting at %s" % (settings.VERSION, target, settings.RESFACTOR, time.ctime()) )
-    print( "\n-------------------------------------------------" )
-    print( "Running for year %s..." % target )
-    print( "-------------------------------------------------\n" )
+    print( "\nRunning LUTO %s snapshot for %s at resfactor %s, starting at %s" % (settings.VERSION, target, settings.RESFACTOR, time.ctime()), flush=True )
+    print( "\n-------------------------------------------------", end=' ')
+    print( f"Running for year... {target}"   )
+    print( "-------------------------------------------------\n", end=' ' )
 
     start_time = time.time()
     input_data = get_input_data(data, base, target)
@@ -130,13 +123,16 @@ def run( data: Data, base: int, target: int) -> None:
 
     # Calculate base year production figures if they don't already exist
     if data.YR_CAL_BASE not in data.prod_data:
-        data.prod_data[data.YR_CAL_BASE] = get_production(
+        print(f"Calculating base year ({data.YR_CAL_BASE}) production data...", end = " ", flush = True)
+        data.prod_data[data.YR_CAL_BASE] = dict()
+        data.prod_data[data.YR_CAL_BASE]["Production"] = get_production(
             data,
             data.YR_CAL_BASE,
             tools.lumap2ag_l_mrj(data.LUMAP, data.LMMAP),
             tools.lumap2non_ag_l_mk(data.LUMAP, len(data.NON_AGRICULTURAL_LANDUSES)),
             tools.get_base_am_vars(data.NCELLS, data.NLMS, data.N_AG_LUS),
         )
+        print("Done.")
 
     # Run the simulation up to `year` sequentially.         *** Not sure that timeseries mode is working ***
     if settings.MODE == 'timeseries':
@@ -146,12 +142,12 @@ def run( data: Data, base: int, target: int) -> None:
             raise ValueError( "Not enough years in demands time series.")
 
         steps = target - base
-        solve_timeseries(steps, base, target)
+        solve_timeseries(data, steps, base, target)
 
     # Run the simulation from YR_CAL_BASE to `target` year directly.
     elif settings.MODE == 'snapshot':
         # If demands is a time series, choose the appropriate entry.
-        solve_snapshot(base, target)
+        solve_snapshot(data, base, target)
 
     else:
         raise ValueError("Unkown MODE: %s." % settings.MODE)

@@ -622,7 +622,7 @@ def write_area_transition_start_end(data, path):
     yr_cal_end = years[-1]
 
     # Get the decision variables for the start year
-    dvar_base = data.ag_dvars[data.data.YR_CAL_BASE]
+    dvar_base = data.ag_dvars[data.YR_CAL_BASE]
 
     # Calculate the transition matrix for agricultural land uses (start) to agricultural land uses (end)
     transitions_ag2ag = []
@@ -822,7 +822,7 @@ def write_water(data: Data, yr_cal, path):
         AM_dfs = []
         for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
 
-            am_j = np.array([data.data.DESC2AGLU[lu] for lu in am_lus])
+            am_j = np.array([data.DESC2AGLU[lu] for lu in am_lus])
             
             # Water requirements for each agricultural management in array format
             am_mrj = ag_man_w_mrj[am][:, ind, :]\
@@ -965,7 +965,7 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
 
     # Get the biodiversity scores b_mrj
     ag_biodiv_mrj = ag_biodiversity.get_breq_matrices(data)
-    am_biodiv_mrj = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data)
+    am_biodiv_mrj = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data, ag_biodiv_mrj)
     non_ag_biodiv_rk = non_ag_biodiversity.get_breq_matrix(data)
 
     # Get the decision variables for the year

@@ -122,6 +122,8 @@ class Data:
         self.ag_man_dvars = {}
         self.prod_data = {}
 
+        print("\nLoading LUTO data...\n")
+
         ###############################################################
         # Agricultural economic data.
         ###############################################################
@@ -811,6 +813,7 @@ class Data:
 
         self.apply_resfactor()
         self.add_base_year_data_to_containers()
+        print("\nData loading complete.")
 
     def apply_resfactor(self):
         """
@@ -981,18 +984,18 @@ class Data:
         )
 
         # Create path name
-        path = "output/" + timestamp + post
+        self.path = "output/" + timestamp + post
 
         # Get all paths
         paths = (
-            [path]
-            + [f"{path}/out_{yr}" for yr in yr_all]
-            + [f"{path}/out_{yr}/lucc_separate" for yr in yr_all[1:]]
+            [self.path]
+            + [f"{self.path}/out_{yr}" for yr in yr_all]
+            + [f"{self.path}/out_{yr}/lucc_separate" for yr in yr_all[1:]]
         )  # Skip creating lucc_separate for base year
 
         # Add the path for the comparison between base-year and target-year if in the timeseries mode
         if MODE == "timeseries":
-            path_begin_end_compare = f"{path}/begin_end_compare_{yr_all[0]}_{yr_all[-1]}"
+            path_begin_end_compare = f"{self.path}/begin_end_compare_{yr_all[0]}_{yr_all[-1]}"
             paths = (
                 paths
                 + [path_begin_end_compare]
@@ -1008,4 +1011,4 @@ class Data:
             if not os.path.exists(p):
                 os.mkdir(p)
 
-        return path
+        return self.path
