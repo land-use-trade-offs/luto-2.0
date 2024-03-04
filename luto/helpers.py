@@ -41,7 +41,7 @@ create_new_dataset()
 
 from luto.tools.write import *
 import luto.simulation as sim
-sim.run( 2010, 2050 )
+sim.run( 2010, 2020 )
 write_outputs(sim)
 
 
