@@ -48,6 +48,7 @@ def create_new_dataset():
     fdh_inpath = 'N:/LUF-Modelling/fdh-archive/data/neoluto-data/new-data-and-domain/'
     profit_map_inpath = 'N:/Data-Master/Profit_map/'
     nlum_inpath = 'N:/Data-Master/National_Landuse_Map/'
+    GHG_off_land_inpath = 'N:/LUF-Modelling/Food_demand_AU/au.food.demand/Inputs/Off_land_GHG_emissions'
     
     # Set data output paths
     raw_data = RAW_DATA + '/' # '../raw_data/'
@@ -721,6 +722,44 @@ def create_new_dataset():
     
     # CODE to Check total livestock GHG emissions - see N:\Data-Master\LUTO_2.0_input_data\Scripts\2_assemble_agricultural_data.py
 
+    
+    ############### Agricultural Greenhouse Gas Emissions - livestock - off-land
+    
+    # Read in raw data
+    agGHG_lvstk_off_land_dairy = pd.read_csv(f"{GHG_off_land_inpath}/GLEAM3Results2024-02-16_Dairy_ANZ_AR6.csv")
+    agGHG_lvstk_off_land_eggs = pd.read_csv(f"{GHG_off_land_inpath}/GLEAM3Results2024-02-16_Eggs_ANZ_AR6.csv")
+    agGHG_lvstk_off_land_meat = pd.read_csv(f"{GHG_off_land_inpath}/GLEAM3Results2024-02-16_Meat_ANZ_AR6.csv")
+    
+    # Create df for aquaculture, fill 0 for the GHG values
+    agGHG_lvstk_off_land_aquaculture = agGHG_lvstk_off_land_eggs.copy()
+    agGHG_lvstk_off_land_aquaculture['Emission Source'] = agGHG_lvstk_off_land_eggs['Emission Source']
+    agGHG_lvstk_off_land_aquaculture['Animal'] = 'Aquaculture'
+    agGHG_lvstk_off_land_aquaculture['HerdType'] = 'Aquaculture'
+    agGHG_lvstk_off_land_aquaculture['Emissions [ t CO2eq ]'] = 0
+    agGHG_lvstk_off_land_aquaculture['Emission Intensity [ kg CO2eq / kg ]'] = 0
+    agGHG_lvstk_off_land_aquaculture['Production [ t ]'] = None
+
+    
+    
+    agGHG_lvstk_off_land = pd.concat([agGHG_lvstk_off_land_dairy, 
+                                      agGHG_lvstk_off_land_eggs, 
+                                      agGHG_lvstk_off_land_meat,
+                                      agGHG_lvstk_off_land_aquaculture], axis = 0)
+
+    # Define the GHG emissions that need to be considered by LUTO
+    #       Off livestock GHG emissions of {Feed}, {Land Use Change}, and 
+    #       {Post Farm} have already being included in LUTO. So there is 
+    #       no need to include them here.
+    include_GHG = ['Direct on-farm energy (CO2)','Embedded on-farm energy (CO2)','Manure (CH4)', 'Manure (N2O)']
+
+    # Query the GHG emissions that need to be included in LUTO
+    agGHG_lvstk_off_land = agGHG_lvstk_off_land.query("`Emission Source` in @include_GHG")
+    
+    # Add Aquaculture to the Livestock type column, and fill 0 for the missing values
+    
+    # Save to the input data folder
+    agGHG_lvstk_off_land.to_csv(outpath + 'agGHG_lvstk_off_land.csv', index = False)
+    
 
     
     ############### Agricultural demand

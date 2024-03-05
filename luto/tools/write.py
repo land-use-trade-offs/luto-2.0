@@ -118,7 +118,12 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     if settings.WRITE_OUTPUT_GEOTIFFS:
         write_files(sim, yr_cal, path_yr)
         write_files_separate(sim, yr_cal, path_yr)
+        
+        # Making maps
+        result = subprocess.run(['python', 'luto/tools/report/Make_raster_colorful.py', '-p', sim.path], capture_output=True, text=True)
+        print("\nError occurred:", result.stderr) if result.returncode != 0 else print("Report data:", result.stdout)
 
+    
 
 
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CAUTION !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
