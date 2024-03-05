@@ -147,7 +147,6 @@ def get_path(bdata, start, end):
     post = '_'    + settings.DEMAND_CONSTRAINT_TYPE + \
            '_'    + settings.OBJECTIVE + \
            '_RF'  + str(settings.RESFACTOR) + \
-           '_P1e' + str(int(math.log10(settings.PENALTY))) + \
            '_'    + str(yr_all[0]) + '-' + str(yr_all[-1]) + \
            '_'    + settings.MODE + \
            '_'    + str( int( bdata.GHG_TARGETS[yr_all[-1]] / 1e6)) + 'Mt'
@@ -184,84 +183,72 @@ def get_path(bdata, start, end):
 def get_ag_c_mrj():
     print('Getting agricultural production cost matrices...')
     output = ag_cost.get_cost_matrices(data, target_index)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_c_rk():
     print('Getting non-agricultural production cost matrices...')
     output = non_ag_cost.get_cost_matrix(data)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_r_mrj():
     print('Getting agricultural production revenue matrices...')
     output = ag_revenue.get_rev_matrices(data, target_index)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_r_rk():
     print('Getting non-agricultural production revenue matrices...')
     output = non_ag_revenue.get_rev_matrix(data)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_g_mrj():
     print('Getting agricultural GHG emissions matrices...')
     output = ag_ghg.get_ghg_matrices(data, target_index)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_g_rk():
     print('Getting non-agricultural GHG emissions matrices...')
     output = non_ag_ghg.get_ghg_matrix(data)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_w_mrj():
     print('Getting agricultural water requirement matrices...')
     output = ag_water.get_wreq_matrices(data, target_index)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_b_mrj():
     print('Getting agricultural biodiversity requirement matrices...')
     output = ag_biodiversity.get_breq_matrices(data)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_w_rk():
     print('Getting non-agricultural water requirement matrices...')
     output = non_ag_water.get_wreq_matrix(data)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_b_rk():
     print('Getting non-agricultural biodiversity requirement matrices...')
     output = non_ag_biodiversity.get_breq_matrix(data)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_q_mrp():
     print('Getting agricultural production quantity matrices...')
     output = ag_quantity.get_quantity_matrices(data, target_index)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_q_crk():
-    print('Getting non-agricultural production quantity matrices...')
+    print('Getting non-agricultural production quantity matrices...\n')
     output = non_ag_quantity.get_quantity_matrix(data)
-    print('Done.')
     return output.astype(np.float32)
 
 
@@ -272,113 +259,98 @@ def get_ag_t_mrj():
                                                   , base_year
                                                   , lumaps
                                                   , lmmaps)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_ghg_t_mrj():
     print('Getting agricultural transitions GHG emissions...')
     output = ag_ghg.get_ghg_transition_penalties(data, lumaps[base_year])
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_to_non_ag_t_rk():
-    print('Getting agricultural to non-agricultural transition cost matrices...')
+    print('Getting agricultural to non-agricultural transition cost matrices...\n')
     output = non_ag_transition.get_from_ag_transition_matrix(data
                                                            , base_year
                                                            , lumaps[base_year]
                                                            , lmmaps[base_year])
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_to_ag_t_mrj():
     print('Getting non-agricultural to agricultural transition cost matrices...')
     output = non_ag_transition.get_to_ag_transition_matrix(data, base_year, lumaps[base_year], lmmaps[base_year])
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_t_rk():
     print('Getting non-agricultural transition cost matrices...')
     output = non_ag_transition.get_non_ag_transition_matrix(data, base_year, lumaps[base_year], lmmaps[base_year])
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_x_mrj():
     print('Getting agricultural exclude matrices...')
     output = ag_transition.get_exclude_matrices(data, base_year, lumaps)
-    print('Done.')
     return output
 
 
 def get_non_ag_x_rk():
     print('Getting non-agricultural exclude matrices...')
     output = non_ag_transition.get_exclude_matrices(data, lumaps[base_year])
-    print('Done.')
     return output
 
 
 def get_ag_man_costs(ag_c_mrj):
     print('Getting agricultural management options\' cost effects...')
     output = ag_cost.get_agricultural_management_cost_matrices(data, ag_c_mrj, target_index)
-    print('Done.')
     return output
 
 
 def get_ag_man_ghg(ag_g_mrj):
     print('Getting agricultural management options\' GHG emission effects...')
     output = ag_ghg.get_agricultural_management_ghg_matrices(data, ag_g_mrj, target_index)
-    print('Done.')
     return output
 
 
 def get_ag_man_quantity(ag_q_mrp):
     print('Getting agricultural management options\' quantity effects...')
     output = ag_quantity.get_agricultural_management_quantity_matrices(data, ag_q_mrp, target_index)
-    print('Done.')
     return output
 
 
 def get_ag_man_revenue(ag_r_mrj):
     print('Getting agricultural management options\' revenue effects...')
     output = ag_revenue.get_agricultural_management_revenue_matrices(data, ag_r_mrj, target_index)
-    print('Done.')
     return output
 
 
 def get_ag_man_transitions(ag_t_mrj):
     print('Getting agricultural management options\' transition cost effects...')
     output = ag_transition.get_agricultural_management_transition_matrices(data, ag_t_mrj, target_index)
-    print('Done.')
     return output
 
 
 def get_ag_man_water(ag_w_mrj):
     print('Getting agricultural management options\' water requirement effects...')
     output = ag_water.get_agricultural_management_water_matrices(data, ag_w_mrj, target_index)
-    print('Done.')
     return output
 
 
 def get_ag_man_biodiversity(ag_b_mrj):
     print('Getting agricultural management options\' biodiversity effects...')
     output = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data)
-    print('Done.')
     return output
 
 
 def get_ag_man_limits():
-    print('Getting agricultural management options\' adoption limits...')
+    print('Getting agricultural management options\' adoption limits...\n')
     output = ag_transition.get_agricultural_management_adoption_limits(data, target_index)
-    print('Done.')
     return output
 
 
 def get_limits(target: int):
-    print('Getting environmental limits...')
+    print('Getting environmental limits...\n')
     # Limits is a dictionary with heterogeneous value sets.
     limits = {}
     
@@ -386,7 +358,6 @@ def get_limits(target: int):
     if settings.GHG_EMISSIONS_LIMITS == 'on':  limits['ghg'] = ag_ghg.get_ghg_limits(data, target)
     if settings.BIODIVERSITY_LIMITS == 'on':  limits['biodiversity'] = ag_biodiversity.get_biodiversity_limits(data, target)
     
-    print('Done.')
     return limits
 
 
@@ -456,11 +427,12 @@ def prepare_input_data(base: int, target: int) -> InputData:
 
 
 def solve_timeseries(steps: int, base: int, target: int):
+    print('\n')
     print( f"Running LUTO {settings.VERSION} timeseries from {base} to {target} at resfactor {settings.RESFACTOR}\n" )
 
     for s in range(steps):
         print( "-------------------------------------------------")
-        print( f"Running for year %s... {base + s + 1}"   )
+        print( f"Running for year {base + s + 1}"   )
         print( "-------------------------------------------------\n" )
         start_time = time.time()
 
@@ -496,7 +468,7 @@ def solve_timeseries(steps: int, base: int, target: int):
             prod_data[base + s + 1],
         ) = luto_solver.solve()
 
-        print(f'Total processing time... {round(time.time() - start_time)} seconds' )
+        print(f'Processing for {base + s + 1} completed in {round(time.time() - start_time)} seconds\n\n' )
 
 
 def solve_snapshot(base: int, target: int):
@@ -505,9 +477,10 @@ def solve_snapshot(base: int, target: int):
     else:
         d_c = d_cy
 
+    print('\n')
     print( f"Running LUTO {settings.VERSION} snapshot for {target} at resfactor {settings.RESFACTOR}" )
     print( "-------------------------------------------------" )
-    print( "Running for year %s..." % target )
+    print( "Running for year ..." % target )
     print( "-------------------------------------------------" )
 
     start_time = time.time()
@@ -525,7 +498,7 @@ def solve_snapshot(base: int, target: int):
         prod_data[target],
     ) = luto_solver.solve()
     
-    print(f'Total processing time... {round(time.time() - start_time)} seconds')
+    print(f'Processing for {target} completed in {round(time.time() - start_time)} seconds\n\n')
 
 @tools.LogToFile(f"{settings.OUTPUT_DIR}/run_{timestamp}")
 def run( base
