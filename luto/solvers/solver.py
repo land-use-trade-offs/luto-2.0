@@ -188,19 +188,18 @@ class LutoSolver:
         Performs the initial formulation of the model - setting up decision variables, 
         constraints, and the objective.
         """
-        print(f"\nSetting up the model... {time.ctime()}")
+        print(f"Setting up the model...\n")
         self._setup_vars()
         self._setup_objective()
         self._setup_constraints()
 
     def _setup_vars(self):
-        print(f"Adding decision variables ({time.ctime()})...", flush=True)
+        print(f"Adding decision variables...\n", flush=True)
         st = time.time()
         self._setup_x_vars()
         self._setup_ag_management_variables()
         self._setup_decision_variables()
         ft = time.time()
-        print(f"Done in {round(ft - st, 1)}s")
 
     def _setup_x_vars(self):
         """
@@ -282,7 +281,7 @@ class LutoSolver:
         """
         Formulate the objective based on settings.OBJECTIVE
         """
-        print(f"\nSetting objective function to {settings.OBJECTIVE} ({time.ctime()})...", flush=True)
+        print(f"Setting objective function to {settings.OBJECTIVE}...\n", flush=True)
 
         st = time.time()
         if settings.OBJECTIVE == "maxrev":
@@ -390,8 +389,6 @@ class LutoSolver:
             raise ValueError('DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"')
 
         self.gurobi_model.setObjective(objective, GRB.MINIMIZE)
-        ft = time.time()
-        print(f"Done in {round(ft - st, 1)}s")
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
         """
@@ -599,7 +596,7 @@ class LutoSolver:
         if settings.WATER_USE_LIMITS != "on":
             return
 
-        print(f"Adding water constraints by {settings.WATER_REGION_DEF} {time.ctime()}...")
+        print(f"Adding water constraints by {settings.WATER_REGION_DEF}...")
 
         # Returns region-specific water use limits
         w_limits = self._input_data.limits["water"]
@@ -652,8 +649,8 @@ class LutoSolver:
     def _add_ghg_emissions_limit_constraints(self):
         if settings.GHG_EMISSIONS_LIMITS != "on":
             return
-
-        print(f"\nAdding GHG emissions constraints...")
+        print('')
+        print(f"Adding GHG emissions constraints...")
 
         # Returns GHG emissions limits
         ghg_limits = self._input_data.limits["ghg"]
@@ -751,7 +748,7 @@ class LutoSolver:
         )
 
     def _setup_constraints(self):
-        print(f"Setting up constraints...")
+        print(f"Setting up constraints...\n")
         st = time.time()
         self._add_cell_usage_constraints()
         self._add_agricultural_management_constraints()
@@ -760,8 +757,6 @@ class LutoSolver:
         self._add_water_usage_limit_constraints()
         self._add_ghg_emissions_limit_constraints()
         self._add_biodiversity_limit_constraints()
-        ft = time.time()
-        print(f"Constraint setup took {round(ft - st, 1)}s")
 
     def update_formulation(
         self,
@@ -805,7 +800,7 @@ class LutoSolver:
         Returns an array of cells that have been updated.
         """
         # update x vars
-        print("\nUpdating variables...", flush=True)
+        print("Updating variables...", flush=True)
         st = time.time()
 
         # metrics
@@ -900,11 +895,7 @@ class LutoSolver:
             updated_cells.append(r)
 
         updated_cells = np.array(updated_cells)
-        ft = time.time()
-        print(
-            f"Done in {round(ft - st, 1)}s. "
-            f"Skipped {num_cells_skipped} cells, updated {len(updated_cells)} cells."
-        )
+        print(f"    ...skipped {num_cells_skipped} cells, updated {len(updated_cells)} cells.\n")
         return updated_cells
 
     def _update_constraints(self, updated_cells: np.array):
@@ -912,7 +903,7 @@ class LutoSolver:
             print("No constraints need updating.")
             return
 
-        print("\nUpdating constraints...\n")
+        print("Updating constraints...\n")
         st = time.time()
         for r in updated_cells:
             self.gurobi_model.remove(self.cell_usage_constraint_r.pop(r, []))
@@ -936,20 +927,17 @@ class LutoSolver:
         self._add_water_usage_limit_constraints(updated_cells)
         self._add_ghg_emissions_limit_constraints()
         self._add_biodiversity_limit_constraints()
-        ft = time.time()
-        print(f"Constraint update took {round(ft - st, 1)}s\n")
 
     def solve(self):
         st = time.time()
-        print(f"Starting solve... ")
+        print(f"Starting solve...\n")
 
         # Magic.
         self.gurobi_model.optimize()
 
         ft = time.time()
-        print("Completed solve...")
-        print(f"Found optimal objective value {round(self.gurobi_model.objVal, 2)} in {round(ft - st)}seconds")
-        print("Collecting results...", flush=True)
+        print("Completed solve...\n")
+        print("Collecting results...\n", flush=True)
 
         prod_data = {}  # Dictionary that stores information about production and GHG emissions for the write module
 
@@ -1097,8 +1085,6 @@ class LutoSolver:
 
         ag_X_mrj_processed[:, non_ag_bools_r, :] = False
         non_ag_X_rk_processed[~non_ag_bools_r, :] = False
-
-        print("Done\n")
 
         return (
             lumap,
