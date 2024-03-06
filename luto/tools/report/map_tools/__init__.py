@@ -1,4 +1,5 @@
 import os
+import folium
 import pandas as pd
 import numpy as np
 import imageio
@@ -196,12 +197,12 @@ def save_colored_raster_as_png(src_memfile: MemoryFile,
     return center, bounds_for_folium, mercator_bbox
 
 # Function to reclassify -> colorfy -> reproject -> toPNG
-def process_int_raster(initial_tif:str=None, 
-                   band=1,
-                   map_type_idx:int=None, 
-                   color_dict:dict=None,
-                   src_crs='EPSG:3857', 
-                   dst_crs='EPSG:4326'):
+def process_int_raster( initial_tif:str=None, 
+                        band=1,
+                        map_note:str=None, 
+                        color_dict:dict=None,
+                        src_crs='EPSG:3857', 
+                        dst_crs='EPSG:4326'):
     """
     Process a raster file by reclassifying, coloring, and reprojecting it entirely in memory.
     
@@ -210,8 +211,8 @@ def process_int_raster(initial_tif:str=None,
             Path to the initial raster file.
         band (int): 
             Band number to process (default is 1).
-        map_type_idx (int):
-            Index of the map type (default is None).
+        map_note (str):
+            Extra note for the map, can be used in the output path.
         color_dict (dict): 
             Dictionary mapping pixel values to colors (default is None).
         src_crs (str):
@@ -228,18 +229,23 @@ def process_int_raster(initial_tif:str=None,
     
     # Infer the save path (no extension) from the initial path
     save_base = os.path.splitext(initial_tif)[0]
+    
+    if map_note is not None:
+        output_base = f"{save_base}_mercator_{map_note}"
+    else:
+        output_base = f"{save_base}_mercator"
         
     # Save the reprojected raster as a GeoTIFF file
     with f.open() as src:
         kwargs = src.meta.copy()
         kwargs.update(compress='lzw', dtype='uint8', nodata=None)
-        with rasterio.open(f"{save_base}_mercator_{map_type_idx}.tif", 'w', **kwargs) as dst:
+        with rasterio.open(f"{output_base}.tif", 'w', **kwargs) as dst:
             for i in range(1, src.count + 1):
                 dst.write(src.read(i), i)
     
     # Save the reprojected raster as a PNG file
     center, bounds_for_folium, mercator_bbox = save_colored_raster_as_png(f, 
-                                                    f"{save_base}_mercator_{map_type_idx}.png", 
+                                                    f"{output_base}.png", 
                                                     src_crs, 
                                                     dst_crs)
     
@@ -323,6 +329,7 @@ def mask_invalid_data(memfile: MemoryFile,
 # Function to intify -> colorfy -> reproject -> toPNG
 def process_float_raster(initial_tif:str=None, 
                    band:int=1,
+                   map_note:str=None,
                    color_dict:dict=None,
                    mask_path:str='luto/tools/report/Assests/NLUM_2010-11_mask.tif', 
                    src_crs='EPSG:3857', 
@@ -338,6 +345,8 @@ def process_float_raster(initial_tif:str=None,
         Path to the initial float raster image.
     band (int, default=1): 
         Band number of the float raster image.
+    map_note (str): 
+        The extra note for the map, can be used in the output path.    
     color_dict (dict): 
         Dictionary mapping values to colors for the 4-band image.
     mask_path (str): 
@@ -357,19 +366,22 @@ def process_float_raster(initial_tif:str=None,
     f = reproject_raster_in_memory(f)
     
     # Infer the save path (no extension) from the initial path
-    save_base = os.path.splitext(initial_tif)[0]
+    if map_note is not None:
+        save_base = f"{os.path.splitext(initial_tif)[0]}_mercator_{map_note}"
+    else:
+        save_base = f"{os.path.splitext(initial_tif)[0]}_mercator"
 
     # Save the reprojected raster as a GeoTIFF file
     with f.open() as src:
         kwargs = src.meta.copy()
         kwargs.update(compress='lzw', dtype='uint8', nodata=None)
-        with rasterio.open(f"{save_base}_mercator.tif", 'w', **kwargs) as dst:
+        with rasterio.open(f"{save_base}.tif", 'w', **kwargs) as dst:
             for i in range(1, src.count + 1):
                 dst.write(src.read(i), i)
 
     # Save the reprojected raster as a PNG file
     center, bounds_for_folium, mercator_bbox = save_colored_raster_as_png(f, 
-                                                    f"{save_base}_mercator.png", 
+                                                    f"{save_base}.png", 
                                                     src_crs, 
                                                     dst_crs)
 
@@ -381,7 +393,7 @@ def process_float_raster(initial_tif:str=None,
 def process_raster(tif_path: str, 
                    color_csv: str, 
                    data_type: str, 
-                   map_num: int) -> tuple:
+                   map_note: str) -> tuple:
     """
     Process a raster image and return the center, bounds, and mercator bbox.
 
@@ -389,7 +401,7 @@ def process_raster(tif_path: str,
         tif_path (str): The path to the raster image file.
         color_csv (str): The path to the CSV file containing color information.
         data_type (str): The type of data in the raster image ('integer' or 'float').
-        map_num (int): The map number.
+        map_note (str): The extra note for the map.
 
     Returns:
         tuple: A tuple containing the center, bounds for folium map, and mercator bbox.
@@ -409,11 +421,12 @@ def process_raster(tif_path: str,
         center, bounds_for_folium, mercator_bbox = process_int_raster(
                                                         initial_tif=tif_path, 
                                                         color_dict=val_color_dict,
-                                                        map_type_idx=map_num)
+                                                        map_note=map_note)
     elif data_type == 'float':
-        color_desc_dict = None
+        color_desc_dict = color_df.set_index('lu_color_numeric')['lu_code'].to_dict()
         center, bounds_for_folium, mercator_bbox = process_float_raster(initial_tif=tif_path,
-                                                                        color_dict=val_color_dict)
+                                                                        color_dict=val_color_dict,
+                                                                        map_note=map_note)
 
     
     # center -> the center of the raster, will be used for folium map to center the map
@@ -423,3 +436,43 @@ def process_raster(tif_path: str,
     return center, bounds_for_folium, mercator_bbox, color_desc_dict
 
 
+
+def save_map_to_html(tif_path:str, 
+                     map_note:object,
+                     center:list,
+                     bounds_for_folium:list):
+            
+    # Get the input image path
+    out_base = os.path.splitext(tif_path)[0]
+    if map_note is not None:
+        in_mercator_png = f"{out_base}_mercator_{map_note}.png"
+        html_save_path = f"{out_base}_mercator_{map_note}"
+    else:
+        in_mercator_png = f"{out_base}_mercator.png"
+        html_save_path = f"{out_base}_mercator"
+        
+    
+    
+    # Initialize the map
+    m = folium.Map(center, 
+                   zoom_start=4,
+                   zoom_control=False)
+
+    # Overlay the image on folium base map
+    img = folium.raster_layers.ImageOverlay(
+            name="Mercator projection SW",
+            image=in_mercator_png,
+            bounds=bounds_for_folium,
+            opacity=0.6,
+            interactive=True,
+            cross_origin=False,
+            zindex=1,
+        )
+
+    img.add_to(m)
+    
+    # Save the map to interactive html
+    m.save(f"{html_save_path}.html")
+    
+    # Delete the in_mercator_png
+    os.remove(in_mercator_png)

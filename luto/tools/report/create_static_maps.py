@@ -4,7 +4,7 @@ import folium
 import rasterio
 from rasterio.merge import merge
 
-from luto.tools.report.map_tools import process_raster
+from luto.tools.report.map_tools import process_raster, save_map_to_html
 from luto.tools.report.map_tools.map_making import create_png_map
 from luto.tools.report.map_tools.helper import (get_map_meta, 
                                                 get_map_fullname,
@@ -53,55 +53,32 @@ def TIF2PNG(sim):
         tif_path = row['path']
         color_csv = row['color_csv']
         data_type = row['data_type']
-        map_num = row['map_num']
-        
+        map_note = row['map_note']
         year = row['year']
-        map_fullname = get_map_fullname(tif_path)
-        
         
         # Process the raster, and get the necessary variables
-        (center, # center of the map
-        bounds_for_folium, # bounds for folium
-        mercator_bbox, # bounds for download base map
-        color_desc_dict # color description dictionary
-        ) = process_raster(tif_path, color_csv, data_type, map_num)
-
+        (center,                # center of the map (lat, lon)
+        bounds_for_folium,      # bounds for folium (lat, lon)
+        mercator_bbox,          # bounds for download base map (west, south, east, north <meters>)
+        color_desc_dict         # color description dictionary ((R,G,B,A) <0-255>: description <str>)
+        ) = process_raster(tif_path, color_csv, data_type, map_note)
 
 
         # Create the annotation text for the map
+        map_fullname = get_map_fullname(tif_path)
         inmap_text = f'''{map_fullname}\nScenario: {model_run_scenario}\nYear: {year}'''
 
 
-        create_png_map(tif_path = tif_path,
+        # Mosaic the projected_tif with base map, and overlay the shapefile
+        create_png_map( tif_path = tif_path,
+                        map_note = map_note,
                         color_desc_dict = color_desc_dict,
                         anno_text = inmap_text,
-                        mercator_bbox = mercator_bbox,
-                        map_num = map_num)
+                        mercator_bbox = mercator_bbox)
 
-
-
-
-        # Save the map to interactive html
-        m = folium.Map(center, zoom_start=3,zoom_control=False)
-        out_base = os.path.splitext(tif_path)[0]
-        in_mercator_path = f"{out_base}_mercator_{map_num}.png"
-
-        # Overlay the image on folium base map
-        img = folium.raster_layers.ImageOverlay(
-                name="Mercator projection SW",
-                image=in_mercator_path,
-                bounds=bounds_for_folium,
-                opacity=0.6,
-                interactive=True,
-                cross_origin=False,
-                zindex=1,
-            )
-
-        img.add_to(m)
         
-        # Save the map to interactive html
-        m.save(f"{out_base}_mercator_{map_num}.html")
-
+        # Save the map to HTML
+        save_map_to_html(tif_path, map_note, center, bounds_for_folium)
 
 
 

@@ -22,8 +22,8 @@ color_types ={
             'Non-Ag':   ['luto/tools/report/Assests/float_img_colors.csv']
             }
 
-# Define the map names
-map_basename_to_change = {
+
+map_multiple_lucc = {
              'lumap': 'Land-use all category',
              'lmmap': 'Dryland/Irrigated Land-use',
              'ammap': 'Agricultural Management',
@@ -32,15 +32,25 @@ map_basename_to_change = {
              'irr': 'Irrigated Land',
              }
 
+map_single_lucc = AG_LANDUSE + ag_management + NON_AG_LANDUSE
+map_single_lucc = {k:k for k in map_single_lucc}
 
-map_basename_to_keep = AG_LANDUSE + ag_management + NON_AG_LANDUSE
-map_basename_to_keep = {k:k for k in map_basename_to_keep}
+# Dictionary {k:v} for renaming the map names
+# if <k> exists in the map name, the map full name will be <v>
+map_basename_rename = {**map_multiple_lucc, **map_single_lucc}
 
-map_basename_rename = {**map_basename_to_change, **map_basename_to_keep}
 
-
-# How many maps will be made for each map-type
-map_num = {k:list(range(len(v))) for k,v in color_types.items()}
+# If more than one color_csv were used to create the map, 
+# the map_note will be used to identify the color_csv
+map_note = {'lumap': [None, 'grouped'],
+            'lmmap': [None],
+            'ammap': [None],
+            'non_ag': [None],
+            'Ag_LU': [None],
+            'Ag_Mgt': [None],
+            'Land_Mgt': [None],
+            'Non-Ag': [None]
+            }
 
 
 # The data types for each map type

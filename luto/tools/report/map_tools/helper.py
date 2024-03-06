@@ -8,7 +8,7 @@ import matplotlib as mpl
 from rasterio.coords import BoundingBox
 
 from luto.tools.report.map_tools.parameters import (color_types,
-                                                    map_num,
+                                                    map_note,
                                                     data_types,
                                                     legend_positions,
                                                     map_basename_rename)
@@ -84,12 +84,12 @@ def get_map_meta():
                             columns=['map_type', 'color_csv'])
  
     # Add other metadata columns to the DataFrame
-    map_meta['map_num'] = map_meta['map_type'].map(map_num)
+    map_meta['map_note'] = map_meta['map_type'].map(map_note)
     map_meta['data_type'] = map_meta['map_type'].map(data_types)
     map_meta['legend_position'] = map_meta['map_type'].map(legend_positions)
     
-    # Explode the csv_path and map_num columns
-    map_meta = map_meta.explode(['color_csv','map_num'])
+    # Explode the csv_path and map_note columns
+    map_meta = map_meta.explode(['color_csv','map_note'])
     
     return map_meta.reset_index(drop=True)
 

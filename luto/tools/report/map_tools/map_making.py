@@ -13,18 +13,23 @@ from rasterio.coords import BoundingBox
 
 
 
+
 def create_png_map(tif_path: str, 
-                  color_desc_dict: dict,
-                  basemap_path: str = 'Assests/basemap.tif', 
-                  shapefile_path: str ='Assests\AUS_adm\STE11aAust_mercator_simplified.shp',
-                  anno_text: str = None,
-                  mercator_bbox: BoundingBox = None):
+                   map_note:str,
+                   color_desc_dict: dict,
+                   basemap_path: str = 'luto/tools/report/Assests/basemap.tif', 
+                   shapefile_path: str ='luto/tools/report/Assests/AUS_adm/STE11aAust_mercator_simplified.shp',
+                   anno_text: str = None,
+                   mercator_bbox: BoundingBox = None):
+    
     """
     Creates a PNG map by overlaying a raster image with a basemap, shapefile, annotation, scale bar, north arrow, and legend.
 
     Parameters:
     - tif_path (str): 
         The path to the input raster image.
+    - map_note (str):
+        The note for the map. Can be used to identify the color scheme used for the map.
     - color_desc_dict (dict): 
         A dictionary mapping color values to their descriptions for the legend.
     - basemap_path (str): 
@@ -39,16 +44,6 @@ def create_png_map(tif_path: str,
     Returns:
     - None
     """
-    
-    # Function code goes here
-    ...
-def create_png_map(tif_path: str, 
-                  color_desc_dict: dict,
-                  basemap_path: str = 'luto/tools/report/Assests/basemap.tif', 
-                  shapefile_path: str ='luto/tools/report/Assests/AUS_adm/STE11aAust_mercator_simplified.shp',
-                  anno_text: str = None,
-                  mercator_bbox: BoundingBox = None,
-                  map_num: int = None):
 
     
     # Download basemap if it does not exist
@@ -63,8 +58,12 @@ def create_png_map(tif_path: str,
     
     # Get the mercator input image
     out_base = os.path.splitext(tif_path)[0]
-    in_mercator_path = f"{out_base}_mercator_{map_num}.tif"
-    png_out_path = f"{out_base}_mosaic_{map_num}.png"
+    if map_note is not None:
+        in_mercator_path = f"{out_base}_mercator_{map_note}.tif"
+        png_out_path = f"{out_base}_mosaic_{map_note}.png"
+    else:
+        in_mercator_path = f"{out_base}_mercator.tif"
+        png_out_path = f"{out_base}_mosaic.png"
     
     
     # Create the figure and axis
