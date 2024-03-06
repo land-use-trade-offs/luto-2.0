@@ -25,10 +25,8 @@ import os
 import math
 import time
 from datetime import datetime
-
 import numpy as np
 
-import luto.data as bdata
 import luto.settings as settings
 
 import luto.economics.agricultural.cost as ag_cost
@@ -51,6 +49,8 @@ from luto import tools
 from luto.economics import land_use_culling
 from luto.solvers.solver import InputData, LutoSolver
 
+print('Loading data...')
+import luto.data as bdata
 
 
 class Data():

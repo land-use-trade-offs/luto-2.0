@@ -48,6 +48,7 @@ from luto.settings import (
     RIPARIAN_PLANTINGS_BUFFER_WIDTH,
     RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR,
     BIODIV_LIVESTOCK_IMPACT,
+    LDS_BIODIVERSITY_VALUE,
 )
 
 
@@ -58,6 +59,8 @@ except:
     from osgeo import gdal
     import rasterio
 
+
+print('Initialising data...')
 
 
 ###############################################################
@@ -561,9 +564,20 @@ elif GHG_LIMITS_TYPE == 'dict':
 # Savanna burning data.
 ###############################################################
 
-SAVANNA_BURNING = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_savanna_burning.h5') )
- 
-    
+# Read in the dataframe
+savburn_df = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_savanna_burning.h5') )
+
+# Load the columns as numpy arrays
+SAVBURN_ELIGIBLE = savburn_df.ELIGIBLE_AREA.to_numpy()               # 1 = areas eligible for early dry season savanna burning under the ERF, 0 = ineligible
+SAVBURN_AVEM_CH4_TCO2E_HA = savburn_df.SAV_AVEM_CH4_TCO2E_HA.to_numpy()  # Avoided emissions - methane
+SAVBURN_AVEM_N2O_TCO2E_HA = savburn_df.SAV_AVEM_N2O_TCO2E_HA.to_numpy()  # Avoided emissions - nitrous oxide
+SAVBURN_SEQ_CO2_TCO2E_HA = savburn_df.SAV_SEQ_CO2_TCO2E_HA.to_numpy()    # Additional carbon sequestration - carbon dioxide
+SAVBURN_TOTAL_TCO2E_HA = savburn_df.AEA_TOTAL_TCO2E_HA.to_numpy()        # Total emissions abatement from EDS savanna burning
+
+# Cost per hectare in dollars
+SAVBURN_COST_HA = 2 
+
+
  
 ###############################################################
 # Biodiversity data.
@@ -573,6 +587,7 @@ Kunming-Montreal Biodiversity Framework Target 2: Restore 30% of all Degraded Ec
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
 """
 # Load biodiversity data
+
 biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5') )
 
 # Get the Zonation output score between 0 and 1
@@ -584,11 +599,23 @@ conn_score = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.
 # Calculate weighted biodiversity score
 BIODIV_SCORE_WEIGHTED = BIODIV_SCORE_RAW - (BIODIV_SCORE_RAW * (1 - conn_score) * CONNECTIVITY_WEIGHTING)
 
-# Calculate total biodiversity target score as the sum of biodiv raw score over the study area
+# Calculate total biodiversity target score as the quality-weighted sum of biodiv raw score over the study area 
+biodiv_value_current = ( np.isin(LUMAP, 23) * BIODIV_SCORE_RAW +                                         # Biodiversity value of Unallocated - natural land 
+                         np.isin(LUMAP, [2, 6, 15]) * BIODIV_SCORE_RAW * (1 - BIODIV_LIVESTOCK_IMPACT)   # Biodiversity value of livestock on natural land 
+                       ) * np.where(SAVBURN_ELIGIBLE, LDS_BIODIVERSITY_VALUE, 1) * REAL_AREA           # Reduce biodiversity value of area eligible for savanna burning 
+
+biodiv_value_target = ( ( np.isin(LUMAP, [2, 6, 15, 23]) * BIODIV_SCORE_RAW * REAL_AREA - biodiv_value_current ) +  # On natural land calculate the difference between the raw biodiversity score and the current score
+                          np.isin(LUMAP, LU_MODIFIED_LAND) * BIODIV_SCORE_RAW * REAL_AREA                           # Calculate raw biodiversity score of modified land
+                      ) * BIODIV_TARGET                                                                             # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
+                        
+# Sum the current biodiversity value and the addition biodiversity score required to meet the target
+TOTAL_BIODIV_TARGET_SCORE = biodiv_value_current.sum() + biodiv_value_target.sum()                         
+
+"""
 TOTAL_BIODIV_TARGET_SCORE = ( 
                               np.isin(LUMAP, 23) * BIODIV_SCORE_RAW * REAL_AREA +                                                   # Biodiversity value of Unallocated - natural land 
                               np.isin(LUMAP, [2, 6, 15]) * BIODIV_SCORE_RAW * (1 - BIODIV_LIVESTOCK_IMPACT) * REAL_AREA +           # Biodiversity value of livestock on natural land 
                               np.isin(LUMAP, [2, 6, 15]) * BIODIV_SCORE_RAW * BIODIV_LIVESTOCK_IMPACT * BIODIV_TARGET * REAL_AREA + # Add 30% improvement to the degraded part of livestock on natural land
                               np.isin(LUMAP, LU_MODIFIED_LAND) * BIODIV_SCORE_RAW * BIODIV_TARGET * REAL_AREA                       # Add 30% improvement to modified land
                             ).sum() 
-
+"""

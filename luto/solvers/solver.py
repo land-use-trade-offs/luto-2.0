@@ -22,8 +22,6 @@ from collections import defaultdict
 import time
 from typing import Optional
 import numpy as np
-import pandas as pd
-import scipy.sparse as sp
 import gurobipy as gp
 from gurobipy import GRB
 from dataclasses import dataclass
@@ -188,18 +186,16 @@ class LutoSolver:
         Performs the initial formulation of the model - setting up decision variables, 
         constraints, and the objective.
         """
-        print(f"Setting up the model...\n")
+        print("Setting up the model...\n")
         self._setup_vars()
         self._setup_objective()
         self._setup_constraints()
 
     def _setup_vars(self):
-        print(f"Adding decision variables...\n", flush=True)
-        st = time.time()
+        print("Adding decision variables...\n", flush=True)
         self._setup_x_vars()
         self._setup_ag_management_variables()
         self._setup_decision_variables()
-        ft = time.time()
 
     def _setup_x_vars(self):
         """
@@ -283,7 +279,6 @@ class LutoSolver:
         """
         print(f"Setting objective function to {settings.OBJECTIVE}...\n", flush=True)
 
-        st = time.time()
         if settings.OBJECTIVE == "maxrev":
             # Pre-calculate revenue minus (production and transition) costs
             ag_obj_mrj = (
@@ -650,7 +645,7 @@ class LutoSolver:
         if settings.GHG_EMISSIONS_LIMITS != "on":
             return
         print('')
-        print(f"Adding GHG emissions constraints...")
+        print("Adding GHG emissions constraints...")
 
         # Returns GHG emissions limits
         ghg_limits = self._input_data.limits["ghg"]
@@ -748,8 +743,7 @@ class LutoSolver:
         )
 
     def _setup_constraints(self):
-        print(f"Setting up constraints...\n")
-        st = time.time()
+        print("Setting up constraints...\n")
         self._add_cell_usage_constraints()
         self._add_agricultural_management_constraints()
         self._add_agricultural_management_adoption_limit_constraints()
@@ -801,7 +795,6 @@ class LutoSolver:
         """
         # update x vars
         print("Updating variables...", flush=True)
-        st = time.time()
 
         # metrics
         num_cells_skipped = 0
@@ -904,7 +897,6 @@ class LutoSolver:
             return
 
         print("Updating constraints...\n")
-        st = time.time()
         for r in updated_cells:
             self.gurobi_model.remove(self.cell_usage_constraint_r.pop(r, []))
             self.gurobi_model.remove(self.ag_management_constraints_r.pop(r, []))
@@ -929,8 +921,7 @@ class LutoSolver:
         self._add_biodiversity_limit_constraints()
 
     def solve(self):
-        st = time.time()
-        print(f"Starting solve...\n")
+        print("Starting solve...\n")
 
         # Magic.
         self.gurobi_model.optimize()

@@ -231,6 +231,9 @@ BIODIV_LIVESTOCK_IMPACT = 0.5
 # Set benefit level of EP, AF, and RP (0 = none, 1 = full)
 REFORESTATION_BIODIVERSITY_BENEFIT = 0.7
 
+# Biodiversity value under default late dry season savanna fire regime
+LDS_BIODIVERSITY_VALUE = 0.8  # For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value.
+
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 BIODIVERSITY_LIMITS = 'on'             # 'on' or 'off'
 BIODIV_TARGET = 0.3
