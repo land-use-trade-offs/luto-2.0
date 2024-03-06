@@ -4,13 +4,15 @@ import re
 import pandas as pd
 
 
+from luto.economics.off_land_commodity import get_demand_df
+
+
 # import functions
 from luto.tools.report.data_tools import   (get_GHG_emissions_by_crop_lvstk_df,
                                             get_all_files, 
                                             get_quantity_df, 
                                             get_ag_rev_cost_df,
-                                            get_water_df, 
-                                            get_demand_df, 
+                                            get_water_df,  
                                             get_ag_dvar_area)
 
               
@@ -31,16 +33,19 @@ from luto.tools.report.data_tools.parameters import(COMMODITIES_OFF_LAND,
 
 # Get the output directory
 def save_report_data(sim):
+    
+    # Get the output directory
+    raw_data_dir = sim.path
 
     # Set the save directory    
-    SAVE_DIR = f'{sim.path}/DATA_REPORT/data'
+    SAVE_DIR = f'{raw_data_dir}/DATA_REPORT/data'
     
     # Create the directory if it does not exist
     if not os.path.exists(SAVE_DIR):
         os.makedirs(SAVE_DIR)
 
     # Get all LUTO output files and store them in a dataframe
-    files = get_all_files(sim.path)
+    files = get_all_files(raw_data_dir)
 
 
 
@@ -51,7 +56,7 @@ def save_report_data(sim):
     # Get the demand data
     DEMAND_DATA_long = get_demand_df(files)
 
-    # Reorder the commodities to match the order in COMMODITIES_ALL
+    # Reorder the columns to match the order in COMMODITIES_ALL
     DEMAND_DATA_long = DEMAND_DATA_long.reindex(COMMODITIES_ALL, level=1).reset_index()
 
     # Add columns for on-land and off-land commodities
@@ -207,7 +212,7 @@ def save_report_data(sim):
     # Plot_3-1: Total Area (km2)
     lu_area_dvar = area_dvar.groupby(['Year','Land use']).sum(numeric_only=True).reset_index()
     lu_area_dvar = lu_area_dvar\
-        .groupby('Land use')\
+        .groupby('Land use')[['Year','Area (million km2)']]\
         .apply(lambda x:list(map(list,zip(x['Year'],x['Area (million km2)']))))\
         .reset_index()
         
@@ -224,7 +229,8 @@ def save_report_data(sim):
     lm_dvar_area = area_dvar.groupby(['Year','Water']).sum(numeric_only=True).reset_index()
     lm_dvar_area['Water'] = lm_dvar_area['Water'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
 
-    lm_dvar_area = lm_dvar_area.groupby(['Water'])\
+    lm_dvar_area = lm_dvar_area\
+        .groupby(['Water'])[['Year','Area (million km2)']]\
         .apply(lambda x:list(map(list,zip(x['Year'],x['Area (million km2)']))))\
         .reset_index()
         
@@ -237,7 +243,8 @@ def save_report_data(sim):
 
     # Plot_3-3: Area (km2) by Non-Agricultural land use
     non_ag_dvar_area = area_dvar.query('Type == "Non-agricultural landuse"').reset_index(drop=True)
-    non_ag_dvar_area = non_ag_dvar_area.groupby(['Land use'])\
+    non_ag_dvar_area = non_ag_dvar_area\
+        .groupby(['Land use'])[['Year','Area (million km2)']]\
         .apply(lambda x:list(map(list,zip(x['Year'],x['Area (million km2)']))))\
         .reset_index()
         
@@ -254,7 +261,8 @@ def save_report_data(sim):
 
     am_dvar_area_type = am_dvar_area.groupby(['Year','Type']).sum(numeric_only=True).reset_index()
 
-    am_dvar_area_type = am_dvar_area_type.groupby(['Type'])\
+    am_dvar_area_type = am_dvar_area_type\
+        .groupby(['Type'])[['Year','Area (million km2)']]\
         .apply(lambda x:list(map(list,zip(x['Year'],x['Area (million km2)']))))\
         .reset_index()
         
@@ -267,7 +275,8 @@ def save_report_data(sim):
     # Plot_3-5: Agricultural management Area (km2) by Land use
     am_dvar_area_lu = am_dvar_area.groupby(['Year','Land use']).sum(numeric_only=True).reset_index()
 
-    am_dvar_area_lu = am_dvar_area_lu.groupby(['Land use'])\
+    am_dvar_area_lu = am_dvar_area_lu\
+        .groupby(['Land use'])[['Year','Area (million km2)']]\
         .apply(lambda x:list(map(list,zip(x['Year'],x['Area (million km2)']))))\
         .reset_index()
         
@@ -350,7 +359,7 @@ def save_report_data(sim):
     # Plot_4-2: GHG from individual emission sectors (Mt)
     GHG_files_wide = GHG_files[['year','base_name','GHG_sum_Mt']]
     GHG_files_wide = GHG_files_wide\
-        .groupby('base_name')\
+        .groupby('base_name')[['year','GHG_sum_Mt']]\
         .apply(lambda x:list(map(list,zip(x['year'],x['GHG_sum_Mt']))))\
         .reset_index()
         
@@ -494,7 +503,8 @@ def save_report_data(sim):
     water_df_separate_lu_type = water_df_separate.groupby(['year','Landuse Type']).sum()[['Water Use (ML)']].reset_index()
     water_df_net = water_df_separate.groupby('year').sum(numeric_only=True).reset_index()
 
-    water_df_separate_lu_type = water_df_separate_lu_type.groupby(['Landuse Type'])\
+    water_df_separate_lu_type = water_df_separate_lu_type\
+        .groupby(['Landuse Type'])[['Landuse Type','year','Water Use (ML)']]\
         .apply(lambda x:list(map(list,zip(x['year'],x['Water Use (ML)']))))\
         .reset_index()
         
@@ -541,7 +551,7 @@ def save_report_data(sim):
     # bio_df_category_wide = bio_df_category.pivot(index='Year', columns='Landuse type', values='Biodiversity score (million)').reset_index()
     # bio_df_category_wide.to_csv(f'{SAVE_DIR}/biodiversity_1_total_score_by_category.csv',index=False)
     bio_df_category = bio_df_category\
-        .groupby('Landuse type')\
+        .groupby('Landuse type')[['Year','Biodiversity score (million)']]\
         .apply(lambda x:list(map(list,zip(x['Year'],x['Biodiversity score (million)']))))\
         .reset_index()
         
@@ -553,7 +563,7 @@ def save_report_data(sim):
     # Plot_6-2: Biodiversity total by irrigation
     bio_df_irrigation = bio_df.groupby(['Year','Land management']).sum(numeric_only=True).reset_index()
     bio_df_irrigation = bio_df_irrigation\
-        .groupby('Land management')\
+        .groupby('Land management')[['Year','Biodiversity score (million)']]\
         .apply(lambda x:list(map(list,zip(x['Year'],x['Biodiversity score (million)']))))\
         .reset_index()
         
@@ -567,7 +577,7 @@ def save_report_data(sim):
     bio_df_landuse = bio_df_landuse.query('Landuse in @bio_lucc')
 
     bio_df_landuse = bio_df_landuse\
-        .groupby('Landuse')\
+        .groupby('Landuse')[['Year','Biodiversity score (million)']]\
         .apply(lambda x:list(map(list,zip(x['Year'],x['Biodiversity score (million)']))))\
         .reset_index()
         
@@ -585,7 +595,7 @@ def save_report_data(sim):
     # million km2 to million ha
     natural_land_area['Area (million ha)'] = natural_land_area['Area (ha)'] / 1e6
     natural_land_area = natural_land_area\
-        .groupby('Land use')\
+        .groupby('Land use')[['Year','Area (million ha)']]\
         .apply(lambda x:list(map(list,zip(x['Year'],x['Area (million ha)']))))\
         .reset_index()
         

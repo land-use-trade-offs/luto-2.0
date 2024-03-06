@@ -114,57 +114,6 @@ def get_all_files(data_root):
     return file_paths
 
 
-def get_demand_df(files_df:pd.DataFrame):
-    """
-    Get the demand data as a DataFrame.
-
-    Args:
-        files_df (pd.DataFrame): DataFrame containing file information.
-
-    Returns:
-        pd.DataFrame: DataFrame containing the demand data.
-
-    Raises:
-        None
-    """
-
-    # import luto settings
-    sys.path.append('./') # path of current dir
-    sys.path.append('../../..') # path of the project root dir
-    from luto.settings import INPUT_DIR, SSP, RCP, SCENARIO, DIET_DOM, DIET_GLOB, \
-        CONVERGENCE, IMPORT_TREND, WASTE, FEED_EFFICIENCY
-    
-    dd = pd.read_hdf(f'{INPUT_DIR}/demand_projections.h5')
-
-    # Convert eggs from count to tones
-    mask = dd.index.get_level_values(7) == 'eggs'
-    dd.loc[:,:,:,:,:,:,:,mask] = dd.loc[:,:,:,:,:,:,:,mask] * 60 / 1000 / 1000 
-
-    # Select the demand scenario
-    DEMAND_DATA = dd.loc[(SCENARIO, DIET_DOM, DIET_GLOB, CONVERGENCE, 
-                        IMPORT_TREND, WASTE, FEED_EFFICIENCY)].copy()
-
-    # Filter the demand data to only include years up to the target year
-    DEMAND_DATA_long = DEMAND_DATA.melt(ignore_index=False,
-                                        value_name='Quantity (tonnes, ML)').reset_index()
-    
-    DEMAND_DATA_long.columns = ['COMMODITY','Type','Year','Quantity (tonnes, ML)']
-    
-    # Rename the columns, so that they are the same with LUTO naming convention
-    DEMAND_DATA_long['Type'] = DEMAND_DATA_long['Type'].str.title()
-    DEMAND_DATA_long['COMMODITY'] = DEMAND_DATA_long['COMMODITY']\
-        .apply(lambda x: x[0].upper() + x[1:].lower())
-        
-    # Sort the dataframe by year, commodity, and type, 
-    # where the commodity is sorted by the order in COMMODITIES_ALL
-    DEMAND_DATA_long = DEMAND_DATA_long.set_index(['Year','COMMODITY','Type'])
-    DEMAND_DATA_long = DEMAND_DATA_long.reindex(COMMODITIES_ALL, level=1).reset_index()
-
-    # Add columns for on_land and off_land commodities
-    DEMAND_DATA_long['on_off_land'] = DEMAND_DATA_long['COMMODITY'].apply(lambda x: 'On-land' if x not in COMMODITIES_OFF_LAND else 'Off-land')
-        
-    return DEMAND_DATA_long
-
 
 def get_quantity_df(in_dfs):
     """
