@@ -1,6 +1,3 @@
-import os
-os.chdir('N:/LUF-Modelling/LUTO2_JZ/luto-2.0')
-
 import pandas as pd
 
 # import luto settings
