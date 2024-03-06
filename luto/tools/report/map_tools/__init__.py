@@ -324,7 +324,7 @@ def mask_invalid_data(memfile: MemoryFile,
 def process_float_raster(initial_tif:str=None, 
                    band:int=1,
                    color_dict:dict=None,
-                   mask_path:str='Assests/NLUM_2010-11_mask.tif', 
+                   mask_path:str='luto/tools/report/Assests/NLUM_2010-11_mask.tif', 
                    src_crs='EPSG:3857', 
                    dst_crs='EPSG:4326'):
     """

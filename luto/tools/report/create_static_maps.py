@@ -1,4 +1,3 @@
-import argparse
 import os
 import pandas as pd
 import folium
@@ -82,29 +81,27 @@ def TIF2PNG(sim):
 
 
 
-    ###################################################################
-    #       Merge processed map with basemap, create png map          #
-    ###################################################################
+        # Save the map to interactive html
+        m = folium.Map(center, zoom_start=3,zoom_control=False)
+        out_base = os.path.splitext(tif_path)[0]
+        in_mercator_path = f"{out_base}_mercator_{map_num}.png"
 
+        # Overlay the image on folium base map
+        img = folium.raster_layers.ImageOverlay(
+                name="Mercator projection SW",
+                image=in_mercator_path,
+                bounds=bounds_for_folium,
+                opacity=0.6,
+                interactive=True,
+                cross_origin=False,
+                zindex=1,
+            )
+
+        img.add_to(m)
         
+        # Save the map to interactive html
+        m.save(f"{out_base}_mercator_{map_num}.html")
 
-
-
-
-    # m = folium.Map(center, zoom_start=3,zoom_control=False)
-
-    # img = folium.raster_layers.ImageOverlay(
-    #         name="Mercator projection SW",
-    #         image=out_png,
-    #         bounds=bounds,
-    #         opacity=0.6,
-    #         interactive=True,
-    #         cross_origin=False,
-    #         zindex=1,
-    #     )
-
-    # img.add_to(m)
-    # m
 
 
 
