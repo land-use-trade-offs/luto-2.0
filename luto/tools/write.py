@@ -76,6 +76,7 @@ def write_outputs(sim):
     # Write the area/quantity comparison between base-year and target-year for the timeseries mode
     if settings.MODE == 'timeseries':
         begin_end_path = f"{sim.path}/begin_end_compare_{years[0]}_{years[-1]}"
+        
         # 1) Simply copy the base-year outputs to the path_begin_end_compare
         shutil.copytree(f"{sim.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True)
         # 2) Write the target-year outputs to the path_begin_end_compare

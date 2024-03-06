@@ -3,8 +3,8 @@ import os
 import re
 import pandas as pd
 
-from tools.parameters import LU_CROPS, LU_LVSTKS, YR_BASE, COMMODITIES_OFF_LAND, COMMODITIES_ALL
-from tools.helper_func import df_wide2long, get_GHG_category, merge_LVSTK_UAALLOW
+from luto.tools.report.data_tools.parameters import LU_CROPS, LU_LVSTKS, YR_BASE, COMMODITIES_OFF_LAND, COMMODITIES_ALL
+from luto.tools.report.data_tools.helper_func import df_wide2long, get_GHG_category, merge_LVSTK_UAALLOW
 
 # Set up working directory to the root of the report folder
 if __name__ == '__main__':

@@ -12,7 +12,7 @@ from map_tools.helper import (get_map_meta,
                               get_scenario)
 
 
-from tools.__init__ import  get_all_files
+from luto.tools.report.data_tools import  get_all_files
 
 
 

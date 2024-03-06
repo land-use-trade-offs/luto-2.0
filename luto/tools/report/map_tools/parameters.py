@@ -1,4 +1,4 @@
-from tools.parameters import AG_LANDUSE, NON_AG_LANDUSE
+from luto.tools.report.data_tools.parameters import AG_LANDUSE, NON_AG_LANDUSE
 
 
 # The ag management names

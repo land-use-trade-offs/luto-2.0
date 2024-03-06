@@ -750,7 +750,10 @@ def create_new_dataset():
     #       Off livestock GHG emissions of {Feed}, {Land Use Change}, and 
     #       {Post Farm} have already being included in LUTO. So there is 
     #       no need to include them here.
-    include_GHG = ['Direct on-farm energy (CO2)','Embedded on-farm energy (CO2)','Manure (CH4)', 'Manure (N2O)']
+    include_GHG = ['Direct on-farm energy (CO2)',
+                   'Embedded on-farm energy (CO2)',
+                   'Manure (CH4)', 
+                   'Manure (N2O)']
 
     # Query the GHG emissions that need to be included in LUTO
     agGHG_lvstk_off_land = agGHG_lvstk_off_land.query("`Emission Source` in @include_GHG")

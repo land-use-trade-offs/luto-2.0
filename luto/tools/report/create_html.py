@@ -4,7 +4,7 @@ import pandas as pd
 from glob import glob
 import argparse
 
-from tools.helper_func import add_data_2_html, add_settings_2_html
+from luto.tools.report.data_tools.helper_func import add_data_2_html, add_settings_2_html
 
 
 # # setting up working directory to root dir
