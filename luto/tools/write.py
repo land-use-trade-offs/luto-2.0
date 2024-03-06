@@ -20,6 +20,7 @@ Writes model output and statistics to files.
 
 
 
+from glob import glob
 import os, re
 import shutil
 import numpy as np
@@ -29,8 +30,12 @@ from datetime import datetime
 
 import luto.settings as settings
 from luto import tools
+from luto.tools.report.create_static_maps import TIF2PNG
 from luto.tools.spatializers import *
 from luto.tools.compmap import *
+
+from luto.tools.report.create_html import data2html
+from luto.tools.report.create_report_data import save_report_data
 
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.agricultural.revenue as ag_revenue
@@ -84,28 +89,14 @@ def write_outputs(sim):
         print(f"Finished writing {years[0]}-{years[-1]} comparison\n")
         
         
-    ###############################################################
-    #               Fire up the report script                     #
-    ###############################################################
-
-    # 1) Clean up the output CSVs 
-    result = subprocess.run(['python', 'luto/tools/report/create_report_data.py', '-p', sim.path], capture_output=True, text=True)
-    print("\nError occurred:", result.stderr) if result.returncode != 0 else print("Report data:", result.stdout)
-
-    # 2) Create the report
-    result = subprocess.run(['python', 'luto/tools/report/create_html.py', '-p', sim.path], capture_output=True, text=True)
-    print("\nError occurred:", result.stderr) if result.returncode != 0 else print("Report HTML:\n", result.stdout)
+    # Create the report HTML and png maps
+    save_report_data(sim)
+    data2html(sim)
+    TIF2PNG(sim) if settings.WRITE_OUTPUT_GEOTIFFS else None
     
     
-    ###############################################################
-    #           Move logs to current output dir                   #
-    ###############################################################
-    logs = [f'run_{sim.timestamp}_stderr.log', 
-            f'run_{sim.timestamp}_stdout.log']
-    
-    logs = [f"{settings.OUTPUT_DIR}/{log}" for log in logs]
-    
-    for log in logs:
+    # Move the log files to the output directory
+    for log in glob(f"{settings.OUTPUT_DIR}/*.log"):
         if os.path.exists(log):
             shutil.move(log, f"{sim.path}/{os.path.basename(log)}")
 
@@ -119,12 +110,6 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     if settings.WRITE_OUTPUT_GEOTIFFS:
         write_files(sim, yr_cal, path_yr)
         write_files_separate(sim, yr_cal, path_yr)
-        
-        # Making maps
-        result = subprocess.run(['python', 'luto/tools/report/Make_raster_colorful.py', '-p', sim.path], capture_output=True, text=True)
-        print("\nError occurred:", result.stderr) if result.returncode != 0 else print("Report data:", result.stdout)
-
-    
 
 
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CAUTION !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

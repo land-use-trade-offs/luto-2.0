@@ -7,7 +7,7 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib_scalebar.scalebar import ScaleBar
-from map_tools.helper import download_basemap
+from luto.tools.report.map_tools.helper import download_basemap
 from rasterio.coords import BoundingBox
 
 
@@ -44,8 +44,8 @@ def create_png_map(tif_path: str,
     ...
 def create_png_map(tif_path: str, 
                   color_desc_dict: dict,
-                  basemap_path: str = 'Assests/basemap.tif', 
-                  shapefile_path: str ='Assests/AUS_adm/STE11aAust_mercator_simplified.shp',
+                  basemap_path: str = 'luto/tools/report/Assests/basemap.tif', 
+                  shapefile_path: str ='luto/tools/report/Assests/AUS_adm/STE11aAust_mercator_simplified.shp',
                   anno_text: str = None,
                   mercator_bbox: BoundingBox = None,
                   map_num: int = None):

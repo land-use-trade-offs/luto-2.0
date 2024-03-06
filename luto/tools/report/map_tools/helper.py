@@ -7,11 +7,11 @@ import contextily as ctx
 import matplotlib as mpl
 from rasterio.coords import BoundingBox
 
-from map_tools.parameters import (color_types,
-                                  map_num,
-                                  data_types,
-                                  legend_positions,
-                                  map_basename_rename)
+from luto.tools.report.map_tools.parameters import (color_types,
+                                                    map_num,
+                                                    data_types,
+                                                    legend_positions,
+                                                    map_basename_rename)
 
 
 # Function to download a basemap image
@@ -27,7 +27,7 @@ def download_basemap(bounds_mercator: list[str]):
     """
 
     base_map, extent = ctx.bounds2raster(*bounds_mercator, 
-                                        path='Assests/basemap.tif',
+                                        path='luto/ools/report/Assests/basemap.tif',
                                         source=ctx.providers.OpenStreetMap.Mapnik,
                                         zoom=7,
                                         n_connections=16,

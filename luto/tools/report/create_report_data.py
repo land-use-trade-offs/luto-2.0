@@ -73,7 +73,7 @@ def save_report_data(sim):
     years_select = select_years(years)
 
     DEMAND_DATA_long = DEMAND_DATA_long.query('Year.isin(@years)')
-    DEMAND_DATA_long['COMMODITY'] = DEMAND_DATA_long['COMMODITY'].str.replace('Beef lexp','Beef live export')
+    DEMAND_DATA_long.loc[:,'COMMODITY'] = DEMAND_DATA_long['COMMODITY'].str.replace('Beef lexp','Beef live export')
     DEMAND_DATA_long_filter_year = DEMAND_DATA_long.query('Year.isin(@years_select)')
 
     # Plot_1_1: {Total} for 'Domestic', 'Exports', 'Feed', 'Imports', 'Production'(Tonnes) 
@@ -593,7 +593,7 @@ def save_report_data(sim):
     natural_land_area = natural_land_area.query('`Land use` in @bio_lucc')
 
     # million km2 to million ha
-    natural_land_area['Area (million ha)'] = natural_land_area['Area (ha)'] / 1e6
+    natural_land_area.loc[:,'Area (million ha)'] = natural_land_area['Area (ha)'] / 1e6
     natural_land_area = natural_land_area\
         .groupby('Land use')[['Year','Area (million ha)']]\
         .apply(lambda x:list(map(list,zip(x['Year'],x['Area (million ha)']))))\
