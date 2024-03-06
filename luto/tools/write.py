@@ -20,22 +20,17 @@ Writes model output and statistics to files.
 
 
 
-from glob import glob
+
 import os, re
 import shutil
 import numpy as np
 import pandas as pd
-import subprocess
-from datetime import datetime
+from glob import glob
 
-import luto.settings as settings
 from luto import tools
-from luto.tools.report.create_static_maps import TIF2PNG
 from luto.tools.spatializers import *
 from luto.tools.compmap import *
-
-from luto.tools.report.create_html import data2html
-from luto.tools.report.create_report_data import save_report_data
+import luto.settings as settings
 
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.agricultural.revenue as ag_revenue
@@ -52,6 +47,10 @@ import luto.economics.non_agricultural.transitions as non_ag_transitions
 import luto.economics.non_agricultural.ghg as non_ag_ghg
 import luto.economics.non_agricultural.water as non_ag_water
 import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
+
+from luto.tools.report.create_report_data import save_report_data
+from luto.tools.report.create_html import data2html
+from luto.tools.report.create_static_maps import TIF2PNG
 
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
