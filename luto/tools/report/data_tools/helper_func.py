@@ -3,8 +3,13 @@ from lxml import etree
 import pandas as pd
 from  lxml.etree import Element
 
-from tools.parameters import GHG_CATEGORY, GHG_FNAME2TYPE, GHG_NAMES,\
-                             LU_CROPS, LU_LVSTKS, LU_UNALLOW, NON_AG_LANDUSE
+from luto.tools.report.data_tools.parameters import (GHG_CATEGORY, 
+                                                     GHG_FNAME2TYPE, 
+                                                     GHG_NAMES,
+                                                     LU_CROPS, 
+                                                     LU_LVSTKS, 
+                                                     LU_UNALLOW, 
+                                                     NON_AG_LANDUSE)
 
 
 def sum_lvstk(path:str):
