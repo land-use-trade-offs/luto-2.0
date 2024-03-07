@@ -95,7 +95,7 @@ def write_outputs(sim):
     
     
     # Move the log files to the output directory
-    for log in glob(f"{settings.OUTPUT_DIR}/*.log"):
+    for log in glob(f"{settings.OUTPUT_DIR}/run_{sim.timestamp}*.log"):
         if os.path.exists(log):
             shutil.move(log, f"{sim.path}/{os.path.basename(log)}")
 
