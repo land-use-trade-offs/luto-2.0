@@ -21,11 +21,13 @@ Writes model output and statistics to files.
 
 
 
+
 import os, re
 import shutil
 import numpy as np
 import pandas as pd
 from glob import glob
+from datetime import datetime
 
 from luto import tools
 from luto.tools.spatializers import *
@@ -48,14 +50,16 @@ import luto.economics.non_agricultural.ghg as non_ag_ghg
 import luto.economics.non_agricultural.water as non_ag_water
 import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+
 from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_html import data2html
 from luto.tools.report.create_static_maps import TIF2PNG
 
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
+timestamp_write = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
 
-
+@tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{timestamp_write}")
 def write_outputs(sim):
 
     # Write model run settings
@@ -95,7 +99,12 @@ def write_outputs(sim):
     
     
     # Move the log files to the output directory
-    for log in glob(f"{settings.OUTPUT_DIR}/run_{sim.timestamp}*.log"):
+    logs = [f"{settings.OUTPUT_DIR}/run_{sim.timestamp}_stdout.log",
+            f"{settings.OUTPUT_DIR}/run_{sim.timestamp}_stderr.log",
+            f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stdout.log",
+            f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stderr.log"]
+    
+    for log in logs:
         if os.path.exists(log):
             shutil.move(log, f"{sim.path}/{os.path.basename(log)}")
 
@@ -1015,8 +1024,7 @@ def write_biodiversity_separate(sim, yr_cal, path):
 
     # Write to file
     biodiv_df.to_csv(os.path.join(path, 'biodiversity_separate_' + timestamp + '.csv'), index=False)    
-    
-    
+      
     
   
 def write_ghg_separate(sim, yr_cal, path):

@@ -18,14 +18,16 @@
 Provides minimalist Solver class and pure helper functions.
 """
 
-from collections import defaultdict
+
 import time
 from typing import Optional
+from collections import defaultdict
+from dataclasses import dataclass
+from functools import cached_property
+
 import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
-from dataclasses import dataclass
-from functools import cached_property
 
 import luto.settings as settings
 from luto import tools
@@ -63,8 +65,8 @@ class InputData:
     ag_x_mrj: np.ndarray  # Agricultural exclude matrices.
     ag_q_mrp: np.ndarray  # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
     ag_ghg_t_mrj: np.ndarray  # GHG emissions released during transitions between agricultural land uses.
-
     ag_to_non_ag_t_rk: np.ndarray  # Agricultural to non-agricultural transition cost matrix.
+    
     non_ag_to_ag_t_mrj: np.ndarray  # Non-agricultural to agricultural transition cost matrices.
     non_ag_t_rk: np.ndarray  # Non-agricultural transition costs matrix
     non_ag_c_rk: np.ndarray  # Non-agricultural production cost matrix.

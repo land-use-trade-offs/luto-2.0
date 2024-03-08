@@ -54,7 +54,7 @@ def save_report_data(sim):
     ####################################################
     
     # Get the demand data
-    DEMAND_DATA_long = get_demand_df(files)
+    DEMAND_DATA_long = get_demand_df()
 
     # Reorder the columns to match the order in COMMODITIES_ALL
     DEMAND_DATA_long = DEMAND_DATA_long.reindex(COMMODITIES_ALL, level=1).reset_index()

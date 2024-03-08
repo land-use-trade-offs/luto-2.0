@@ -726,39 +726,45 @@ def create_new_dataset():
     ############### Agricultural Greenhouse Gas Emissions - livestock - off-land
     
     # Read in raw data
-    agGHG_lvstk_off_land_dairy = pd.read_csv(f"{GHG_off_land_inpath}/GLEAM3Results2024-02-16_Dairy_ANZ_AR6.csv")
     agGHG_lvstk_off_land_eggs = pd.read_csv(f"{GHG_off_land_inpath}/GLEAM3Results2024-02-16_Eggs_ANZ_AR6.csv")
     agGHG_lvstk_off_land_meat = pd.read_csv(f"{GHG_off_land_inpath}/GLEAM3Results2024-02-16_Meat_ANZ_AR6.csv")
+    
+    # Rename the HerdType column to math the LUTO convention
+    agGHG_lvstk_off_land_eggs['COMMODITY'] = agGHG_lvstk_off_land_eggs['HerdType'].replace({'Chickens': 'eggs'})
+    agGHG_lvstk_off_land_meat['COMMODITY'] = agGHG_lvstk_off_land_meat['HerdType'].replace({'Pigs': 'pork', 
+                                                                                           'Chickens': 'chicken'})
     
     # Create df for aquaculture, fill 0 for the GHG values
     agGHG_lvstk_off_land_aquaculture = agGHG_lvstk_off_land_eggs.copy()
     agGHG_lvstk_off_land_aquaculture['Emission Source'] = agGHG_lvstk_off_land_eggs['Emission Source']
     agGHG_lvstk_off_land_aquaculture['Animal'] = 'Aquaculture'
     agGHG_lvstk_off_land_aquaculture['HerdType'] = 'Aquaculture'
+    agGHG_lvstk_off_land_aquaculture['COMMODITY'] = 'aquaculture'
     agGHG_lvstk_off_land_aquaculture['Emissions [ t CO2eq ]'] = 0
     agGHG_lvstk_off_land_aquaculture['Emission Intensity [ kg CO2eq / kg ]'] = 0
     agGHG_lvstk_off_land_aquaculture['Production [ t ]'] = None
 
     
     
-    agGHG_lvstk_off_land = pd.concat([agGHG_lvstk_off_land_dairy, 
-                                      agGHG_lvstk_off_land_eggs, 
+    agGHG_lvstk_off_land = pd.concat([agGHG_lvstk_off_land_eggs, 
                                       agGHG_lvstk_off_land_meat,
                                       agGHG_lvstk_off_land_aquaculture], axis = 0)
 
     # Define the GHG emissions that need to be considered by LUTO
-    #       Off livestock GHG emissions of {Feed}, {Land Use Change}, and 
-    #       {Post Farm} have already being included in LUTO. So there is 
-    #       no need to include them here.
-    include_GHG = ['Direct on-farm energy (CO2)',
-                   'Embedded on-farm energy (CO2)',
-                   'Manure (CH4)', 
-                   'Manure (N2O)']
+    #       {Feed}, {Land Use Change}, and {Post Farm} have already 
+    #       being included in LUTO. So there is no need to include them here.
+    exclude_GHG = ['Feed (CO2)',
+                   'Feed (N2O)',
+                   'Feed (CH4)',
+                   'LUC: soy and palm (CO2)',
+                   'LUC: pasture expansion (CO2)',
+                   'Post-farm (CO2)',]
 
     # Query the GHG emissions that need to be included in LUTO
-    agGHG_lvstk_off_land = agGHG_lvstk_off_land.query("`Emission Source` in @include_GHG")
+    agGHG_lvstk_off_land = agGHG_lvstk_off_land.query("`Emission Source` not in @exclude_GHG")
     
-    # Add Aquaculture to the Livestock type column, and fill 0 for the missing values
+    # Filter only the off-land commodities
+    agGHG_lvstk_off_land = agGHG_lvstk_off_land.query("COMMODITY in ['pork', 'chicken', 'eggs', 'aquaculture']")
     
     # Save to the input data folder
     agGHG_lvstk_off_land.to_csv(outpath + 'agGHG_lvstk_off_land.csv', index = False)
@@ -771,7 +777,20 @@ def create_new_dataset():
     demand.fillna(0, inplace = True)
     
     # Rename columns
-    demand = demand.rename(columns = {'Scenario': 'SCENARIO', 'Domestic_diet': 'DIET_DOM', 'Global_diet': 'DIET_GLOB', 'Convergence': 'CONVERGENCE', 'Imports': 'IMPORT_TREND', 'Waste': 'WASTE', 'Feed': 'FEED_EFFICIENCY', 'SPREAD_Commodity': 'COMMODITY', 'Year': 'YEAR', 'domestic': 'DOMESTIC', 'exports': 'EXPORTS', 'imports': 'IMPORTS', 'feed': 'FEED', 'All_demand': 'PRODUCTION'})
+    demand = demand.rename(columns = {'Scenario': 'SCENARIO', 
+                                      'Domestic_diet': 'DIET_DOM', 
+                                      'Global_diet': 'DIET_GLOB', 
+                                      'Convergence': 'CONVERGENCE', 
+                                      'Imports': 'IMPORT_TREND', 
+                                      'Waste': 'WASTE', 
+                                      'Feed': 'FEED_EFFICIENCY', 
+                                      'SPREAD_Commodity': 'COMMODITY', 
+                                      'Year': 'YEAR', 
+                                      'domestic': 'DOMESTIC', 
+                                      'exports': 'EXPORTS', 
+                                      'imports': 'IMPORTS', 
+                                      'feed': 'FEED', 
+                                      'All_demand': 'PRODUCTION'})
     
     # Create the MultiIndex structure
     demand = demand.pivot( index = ['SCENARIO', 'DIET_DOM', 'DIET_GLOB', 'CONVERGENCE', 'IMPORT_TREND', 'WASTE', 'FEED_EFFICIENCY', 'COMMODITY'], 

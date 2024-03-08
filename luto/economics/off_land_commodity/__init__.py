@@ -11,12 +11,11 @@ from luto.settings import (INPUT_DIR,
                            FEED_EFFICIENCY)
 
 
-def get_demand_df(files_df: pd.DataFrame, egg_weight=60) -> pd.DataFrame:
+def get_demand_df(egg_weight=60) -> pd.DataFrame:
     """
     Get the demand dataframe for off-land commodities.
 
     Args:
-        files_df (pd.DataFrame): The input files dataframe.
         egg_weight (int, optional): The weight of each egg in grams. Defaults to 60.
 
     Returns:
