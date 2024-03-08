@@ -656,3 +656,18 @@ TOTAL_BIODIV_TARGET_SCORE = (
                               np.isin(LUMAP, LU_MODIFIED_LAND) * BIODIV_SCORE_RAW * BIODIV_TARGET * REAL_AREA                       # Add 30% improvement to modified land
                             ).sum() 
 """
+
+ 
+###############################################################
+# BECCS data.
+###############################################################
+
+# Load dataframe
+beccs_df = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_BECCS_df.h5') )
+
+# Capture as numpy arrays
+BECCS_COSTS_AUD_HA_YR = beccs_df['BECCS_COSTS_AUD_HA_YR']
+BECCS_REV_AUD_HA_YR = beccs_df['BECCS_REV_AUD_HA_YR']
+BECCS_TCO2E_HA_YR = beccs_df['BECCS_TCO2E_HA_YR']
+BECCS_MWH_HA_YR = beccs_df['BECCS_MWH_HA_YR']
+
