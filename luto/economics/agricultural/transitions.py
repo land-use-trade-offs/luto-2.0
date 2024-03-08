@@ -26,6 +26,7 @@ from luto.economics.agricultural.water import get_wreq_matrices
 import luto.economics.agricultural.ghg as ag_ghg
 from luto import settings
 import luto.tools as tools
+import luto.data as bdata
 
 
 def get_exclude_matrices(data, base_year: int, lumaps: Dict[int, np.ndarray]):
@@ -272,3 +273,14 @@ def get_agricultural_management_adoption_limits(data, yr_idx) -> Dict[str, dict]
 
     return ag_management_data
 
+
+def get_lower_bound_matrices(data, ag_dvars, index) -> Dict[str, dict]:
+    """
+    Gets the lower bound for the agricultural land use of the current years optimisation.
+    """
+
+    ag_man_lb_mrj = ag_dvars.get(index)
+
+    if not ag_man_lb_mrj:
+        return np.zeros((2, bdata.LUMAP.shape[0], 28), dtype=bool)
+    return ag_dvars.get(index).astype(np.float32)

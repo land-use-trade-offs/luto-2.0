@@ -233,7 +233,7 @@ def get_exclusions_riparian_plantings(data, lumap) -> np.ndarray:
     
 def get_exclusions_agroforestry(data, lumap) -> np.ndarray:
     """
-    Return a 1-D array indexed by r that represents how much riparian plantings can possibly 
+    Return a 1-D array indexed by r that represents how much agroforestry can possibly 
     be done at each cell.
     """
     exclude = (np.ones(data.NCELLS) * settings.AF_PROPORTION).astype(np.float32)
@@ -276,3 +276,19 @@ def get_exclude_matrices(data, lumap) -> np.ndarray:
 
     # Stack list and return to get x_rk
     return np.concatenate(non_ag_x_matrices, axis=1).astype(np.float32)
+
+
+def get_lower_bound_matrices(data, non_ag_dvars, index) -> np.ndarray:
+    """
+    Get the non-agricultural lower bound matrix.
+
+    Returns
+    -------
+    2-D array, indexed by (r,k) where r is the cell and k is the non-agricultural land usage.
+    """
+
+    non_ag_lb_rk = non_ag_dvars.get(index)
+
+    if not non_ag_lb_rk:
+        return np.zeros((data.NCELLS, len([lu for lu in NON_AG_LAND_USES if NON_AG_LAND_USES[lu]])))
+    return non_ag_lb_rk.astype(np.float32)

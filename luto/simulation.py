@@ -314,9 +314,23 @@ def get_ag_x_mrj():
     return output
 
 
+def get_ag_man_lb_mrj():
+    print('Getting agricultural lower bound matrices...', end = ' ', flush = True)
+    output = ag_transition.get_lower_bound_matrices(data, ag_dvars, base_year - 1)
+    print("Done.")
+    return output
+
+
 def get_non_ag_x_rk():
     print('Getting non-agricultural exclude matrices...', end = ' ', flush = True)
     output = non_ag_transition.get_exclude_matrices(data, lumaps[base_year])
+    print('Done.')
+    return output
+
+
+def get_non_ag_lb_rk():
+    print('Getting non-agricultural lower bound matrices...', end = ' ', flush = True)
+    output = non_ag_transition.get_lower_bound_matrices(data, non_ag_dvars, base_year - 1)
     print('Done.')
     return output
 
@@ -424,6 +438,7 @@ def get_input_data(target: int):
         non_ag_b_rk=get_non_ag_b_rk(),
         non_ag_x_rk=get_non_ag_x_rk(),
         non_ag_q_crk=get_non_ag_q_crk(),
+        non_ag_lb_rk=get_non_ag_lb_rk(),
         ag_man_c_mrj=get_ag_man_costs(ag_c_mrj),
         ag_man_g_mrj=get_ag_man_ghg(ag_g_mrj),
         ag_man_q_mrp=get_ag_man_quantity(ag_q_mrp),
@@ -431,6 +446,7 @@ def get_input_data(target: int):
         ag_man_t_mrj=get_ag_man_transitions(ag_t_mrj),
         ag_man_w_mrj=get_ag_man_water(ag_w_mrj),
         ag_man_b_mrj=get_ag_man_biodiversity(ag_b_mrj),
+        ag_man_lb_mrj=get_ag_man_lb_mrj(),
         ag_man_limits=get_ag_man_limits(),
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,
