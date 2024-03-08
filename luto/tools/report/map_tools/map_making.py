@@ -80,7 +80,7 @@ def create_png_map(tif_path: str,
     
     # Add annotation
     plt.annotate(anno_text, 
-         xy=(0.07, 0.9), 
+         xy=(0.05, 0.92), 
          xycoords='axes fraction',
          fontsize=25,
         #  fontweight = 'bold',
