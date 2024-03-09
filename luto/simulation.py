@@ -49,7 +49,6 @@ from luto import tools
 from luto.economics import land_use_culling
 from luto.solvers.solver import InputData, LutoSolver
 
-print('Loading data...')
 import luto.data as bdata
 
 
