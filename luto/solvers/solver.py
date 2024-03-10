@@ -235,7 +235,9 @@ class LutoSolver:
             lu_cells = self._input_data.non_ag_lu2cells[k]
             for r in lu_cells:
                 self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
-                    lb=self._input_data.non_ag_lb_rk[r, k],
+                    lb=(
+                        lambda x: self._input_data.non_ag_lb_rk[r, k] if x else 0
+                    )(NON_AG_REVERSIBLE),
                     ub=self._input_data.non_ag_x_rk[r, k], 
                     name=f"X_non_ag_{k}_{r}",
                 )
@@ -265,7 +267,9 @@ class LutoSolver:
                 for r in dry_lu_cells:
                     dry_var_name = f"X_ag_man_dry_{am_name}_{j}_{r}"
                     self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
-                        lb=self._input_data.ag_man_lb_mrj[am][0, r, j_idx],
+                        lb=(
+                            lambda x: self._input_data.ag_man_lb_mrj[am][0, r, j_idx] if x else 0
+                        )(AG_MANAGEMENT_REVERSIBLE),
                         ub=1, 
                         name=dry_var_name,
                     )
