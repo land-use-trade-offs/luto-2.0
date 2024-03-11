@@ -279,8 +279,8 @@ def get_lower_bound_matrices(data, ag_dvars, index) -> Dict[str, dict]:
     Gets the lower bound for the agricultural land use of the current years optimisation.
     """
 
-    ag_man_lb_mrj = ag_dvars.get(index)
+    ag_man_lb_mrj = ag_dvars.get(index, np.empty(0))
 
-    if not ag_man_lb_mrj:
+    if not ag_man_lb_mrj.size:
         return np.zeros((2, bdata.LUMAP.shape[0], 28), dtype=bool)
     return ag_dvars.get(index).astype(np.float32)

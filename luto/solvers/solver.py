@@ -278,7 +278,9 @@ class LutoSolver:
                 for r in irr_lu_cells:
                     irr_var_name = f"X_ag_man_irr_{am_name}_{j}_{r}"
                     self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
-                        lb=self._input_data.ag_man_lb_mrj[am][1, r, j_idx],
+                        lb=(
+                            lambda x: 0 if x else self._input_data.ag_man_lb_mrj[am][1, r, j_idx]
+                        )(settings.AG_MANAGEMENT_REVERSIBLE),
                         ub=1, 
                         name=irr_var_name,
                     )
