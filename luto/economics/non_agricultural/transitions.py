@@ -278,7 +278,7 @@ def get_exclude_matrices(data, lumap) -> np.ndarray:
     return np.concatenate(non_ag_x_matrices, axis=1).astype(np.float32)
 
 
-def get_lower_bound_matrices(data, non_ag_dvars, index) -> np.ndarray:
+def get_lower_bound_non_agricultural_matrices(data, non_ag_dvars, index) -> np.ndarray:
     """
     Get the non-agricultural lower bound matrix.
 

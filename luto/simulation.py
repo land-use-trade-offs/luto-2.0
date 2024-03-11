@@ -316,7 +316,7 @@ def get_ag_x_mrj():
 
 def get_ag_man_lb_mrj():
     print('Getting agricultural lower bound matrices...', end = ' ', flush = True)
-    output = ag_transition.get_lower_bound_matrices(data, ag_dvars, base_year - 1)
+    output = ag_transition.get_lower_bound_agricultural_management_matrices(data, ag_man_dvars, base_year - 1)
     print("Done.")
     return output
 
@@ -330,7 +330,7 @@ def get_non_ag_x_rk():
 
 def get_non_ag_lb_rk():
     print('Getting non-agricultural lower bound matrices...', end = ' ', flush = True)
-    output = non_ag_transition.get_lower_bound_matrices(data, non_ag_dvars, base_year - 1)
+    output = non_ag_transition.get_lower_bound_non_agricultural_matrices(data, non_ag_dvars, base_year - 1)
     print('Done.')
     return output
 
