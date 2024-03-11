@@ -479,7 +479,7 @@ def solve_snapshot(base: int, target: int):
     print('\n')
     print( f"Running LUTO {settings.VERSION} snapshot for {target} at resfactor {settings.RESFACTOR}" )
     print( "-------------------------------------------------" )
-    print( "Running for year ..." % target )
+    print( f"Running for year {target}" )
     print( "-------------------------------------------------" )
 
     start_time = time.time()
