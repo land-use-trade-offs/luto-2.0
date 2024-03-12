@@ -49,7 +49,6 @@ from luto import tools
 from luto.economics import land_use_culling
 from luto.solvers.solver import InputData, LutoSolver
 
-print('Loading data...')
 import luto.data as bdata
 
 
@@ -497,7 +496,7 @@ def solve_snapshot(base: int, target: int):
     print('\n')
     print( f"Running LUTO {settings.VERSION} snapshot for {target} at resfactor {settings.RESFACTOR}" )
     print( "-------------------------------------------------" )
-    print( "Running for {target} ..." )
+    print( f"Running for year {target}" )
     print( "-------------------------------------------------" )
 
     start_time = time.time()

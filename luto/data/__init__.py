@@ -15,7 +15,7 @@
 # LUTO 2.0. If not, see <https://www.gnu.org/licenses/>. 
 
 
-import os
+import os, time
 
 import pandas as pd
 import numpy as np
@@ -62,7 +62,7 @@ except:
     import rasterio
 
 
-print('Initialising data...')
+print('\nBeginning data initialisation at', time.strftime("%H:%M:%S", time.localtime()) + '...')
 
 
 ###############################################################
