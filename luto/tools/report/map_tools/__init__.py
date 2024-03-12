@@ -424,9 +424,10 @@ def process_raster(tif_path: str,
                                                         map_note=map_note)
     elif data_type == 'float':
         color_desc_dict = color_df.set_index('lu_color_numeric')['lu_code'].to_dict()
-        center, bounds_for_folium, mercator_bbox = process_float_raster(initial_tif=tif_path,
-                                                                        color_dict=val_color_dict,
-                                                                        map_note=map_note)
+        center, bounds_for_folium, mercator_bbox = process_float_raster(
+                                                        initial_tif=tif_path,
+                                                        color_dict=val_color_dict,
+                                                        map_note=map_note)
 
     
     # center -> the center of the raster, will be used for folium map to center the map

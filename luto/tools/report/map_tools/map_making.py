@@ -80,7 +80,7 @@ def create_png_map(tif_path: str,
     
     # Add annotation
     plt.annotate(anno_text, 
-         xy=(0.07, 0.9), 
+         xy=(0.05, 0.92), 
          xycoords='axes fraction',
          fontsize=25,
         #  fontweight = 'bold',
@@ -97,30 +97,30 @@ def create_png_map(tif_path: str,
               edgecolor='grey', 
               facecolor='none')
 
-    # Create scale bar
-    ax.add_artist(ScaleBar(1, 
-               "m", 
-               location="lower right",
-               border_pad=1,
-               fixed_units="km",
-               fixed_value=500,
-               box_color="skyblue", 
-               box_alpha=0))
+    # # Create scale bar
+    # ax.add_artist(ScaleBar(1, 
+    #            "m", 
+    #            location="lower right",
+    #            border_pad=1,
+    #            fixed_units="km",
+    #            fixed_value=500,
+    #            box_color="skyblue", 
+    #            box_alpha=0))
 
-    # Create north arrow
-    x, y, arrow_length = 0.9, 0.9, 0.07
-    ax.annotate('N', 
-        xy=(x, y), 
-        xytext=(x, y-arrow_length),
-        arrowprops=dict(facecolor='#5f5f5e', 
-                        edgecolor='#5f5f5e', 
-                        width=30, 
-                        headwidth=45),
-        ha='center', 
-        va='center', 
-        fontsize=25,
-        color='#2f2f2f',
-        xycoords=ax.transAxes)
+    # # Create north arrow
+    # x, y, arrow_length = 0.9, 0.9, 0.07
+    # ax.annotate('N', 
+    #     xy=(x, y), 
+    #     xytext=(x, y-arrow_length),
+    #     arrowprops=dict(facecolor='#5f5f5e', 
+    #                     edgecolor='#5f5f5e', 
+    #                     width=30, 
+    #                     headwidth=45),
+    #     ha='center', 
+    #     va='center', 
+    #     fontsize=25,
+    #     color='#2f2f2f',
+    #     xycoords=ax.transAxes)
 
     # Create legend
     patches = [mpatches.Patch(color=tuple(value / 255 for value in k), label=v) 

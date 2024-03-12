@@ -74,4 +74,4 @@ def data2html(sim):
     #              Report success info                      #
     #########################################################
 
-    print('\nReport html created successfully!\n')
+    print('Report html created successfully!\n')

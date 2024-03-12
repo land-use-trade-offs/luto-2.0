@@ -62,7 +62,10 @@ def TIF2PNG(sim):
                         mercator_bbox = mercator_bbox)
         
         # Save the map to HTML
-        save_map_to_html(tif_path, map_note, center, bounds_for_folium)
+        save_map_to_html(tif_path, 
+                         map_note, 
+                         center, 
+                         bounds_for_folium)
 
 
 

@@ -54,7 +54,7 @@ def save_report_data(sim):
     ####################################################
     
     # Get the demand data
-    DEMAND_DATA_long = get_demand_df(files)
+    DEMAND_DATA_long = get_demand_df()
 
     # Reorder the columns to match the order in COMMODITIES_ALL
     DEMAND_DATA_long = DEMAND_DATA_long.reindex(COMMODITIES_ALL, level=1).reset_index()
@@ -590,7 +590,7 @@ def save_report_data(sim):
 
     # Plot_6-4: Natural landuse area (million)
     natural_land_area = area_dvar.groupby(['Year','Land use']).sum(numeric_only=True).reset_index()
-    natural_land_area = natural_land_area.query('`Land use` in @bio_lucc')
+    natural_land_area = natural_land_area.query('`Land use` in @bio_lucc').copy()
 
     # million km2 to million ha
     natural_land_area.loc[:,'Area (million ha)'] = natural_land_area['Area (ha)'] / 1e6
@@ -611,4 +611,4 @@ def save_report_data(sim):
     #              Report success info                      #
     #########################################################
 
-    print('\nReport data created successfully!\n')
+    print('Report data created successfully!\n')

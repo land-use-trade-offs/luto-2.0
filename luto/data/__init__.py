@@ -49,6 +49,8 @@ from luto.settings import (
     RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR,
     BIODIV_LIVESTOCK_IMPACT,
     LDS_BIODIVERSITY_VALUE,
+    OFF_LAND_COMMODITIES,
+    EGGS_AVG_WEIGHT
 )
 
 
@@ -522,18 +524,55 @@ BAU_PROD_INCR = pd.read_csv(fpath, header = [0,1]).astype(np.float32)
 # Load demand data (actual production (tonnes, ML) by commodity) - from demand model     
 dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
 
-# Convert eggs from count to tonnes, assuming each egg weighs 60g
-mask = dd.index.get_level_values(7) == 'eggs'
-dd.loc[:,:,:,:,:,:,:,mask] = dd.loc[:,:,:,:,:,:,:,mask] * 60 / 1e6 
+# Select the demand data under the running scenario
+DEMAND_DATA = dd.loc[(SCENARIO, 
+                      DIET_DOM, 
+                      DIET_GLOB, 
+                      CONVERGENCE,
+                      IMPORT_TREND, 
+                      WASTE, 
+                      FEED_EFFICIENCY)].copy()
 
-# Select the demand scenario (returns commodity x year dataframe) - includes off-land commodities
-DEMAND_DATA = dd.loc[(SCENARIO, DIET_DOM, DIET_GLOB, CONVERGENCE, IMPORT_TREND, WASTE, FEED_EFFICIENCY)].copy()
+# Convert eggs from count to tonnes
+DEMAND_DATA.loc['eggs'] = DEMAND_DATA.loc['eggs'] * EGGS_AVG_WEIGHT / 1000 / 1000
+
+# Get the off-land commodities
+DEMAND_OFFLAND = DEMAND_DATA.loc[DEMAND_DATA.query("COMMODITY in @OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
 
 # Remove off-land commodities
-DEMAND_C = DEMAND_DATA.loc[DEMAND_DATA.query("COMMODITY not in ['pork', 'chicken', 'eggs', 'aquaculture']").index, 'PRODUCTION'].copy()
+DEMAND_C = DEMAND_DATA.loc[DEMAND_DATA.query("COMMODITY not in @OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
 
 # Convert to numpy array of shape (91, 26)
 DEMAND_C = DEMAND_C.to_numpy(dtype = np.float32).T
+
+
+###############################################################
+# Carbon emissions from off-land commodities.
+###############################################################
+
+# Read the greenhouse gas intensity data
+off_land_ghg_intensity = pd.read_csv(f'{INPUT_DIR}/agGHG_lvstk_off_land.csv')
+# Split the Emission Source column into two columns
+off_land_ghg_intensity[['Emission Type', 'Emission Source']] = off_land_ghg_intensity['Emission Source'].str.extract(r'^(.*?)\s*\((.*?)\)')
+
+# Get the emissions from the off-land commodities
+demand_offland_long = DEMAND_OFFLAND.stack().reset_index()
+demand_offland_long = demand_offland_long.rename(columns={ 0: 'DEMAND (t/kL)'})
+
+# Merge the demand and GHG intensity, and calculate the total GHG emissions
+off_land_ghg_emissions = demand_offland_long.merge(off_land_ghg_intensity, on='COMMODITY')
+off_land_ghg_emissions['CO2e Total (t)'] = off_land_ghg_emissions.eval('`DEMAND (t/kL)` * `Emission Intensity [ kg CO2eq / kg ]`')
+
+# Keep only the relevant columns
+OFF_LAND_GHG_EMISSION = off_land_ghg_emissions[['YEAR',
+                                                'COMMODITY',
+                                                'Emission Type', 
+                                                'Emission Source',
+                                                'CO2e Total (t)']]
+
+# Get the GHG constraints for luto, shape is (91, 1)
+OFF_LAND_GHG_EMISSION_C = OFF_LAND_GHG_EMISSION.groupby(['YEAR']).sum(numeric_only=True).values
+
 
 
 
