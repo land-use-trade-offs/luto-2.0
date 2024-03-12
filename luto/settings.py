@@ -108,7 +108,7 @@ DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (li
 PENALTY = 1e5
 
 # Write GeoTiffs to output directory: True or False
-WRITE_OUTPUT_GEOTIFFS = True
+WRITE_OUTPUT_GEOTIFFS = False
 
 
 # ---------------------------------------------------------------------------- #
@@ -176,6 +176,13 @@ AF_FENCING_LENGTH = 100 * no_alleys_per_ha * 2 # Length of fencing required per 
 
 AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  # The minimum value an agricultural management variable must take for the
                                              # write_output function to consider it being used on a cell
+                                             
+
+# ---------------------------------------------------------------------------- #
+# Off-land commodity parameters
+# ---------------------------------------------------------------------------- #
+OFF_LAND_COMMODITIES = ['pork', 'chicken', 'eggs', 'aquaculture']
+EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 
 
 # ---------------------------------------------------------------------------- #

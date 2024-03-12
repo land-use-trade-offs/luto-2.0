@@ -85,6 +85,8 @@ class InputData:
     ag_man_w_mrj: dict  # Agricultural management options' water requirement effects.
     ag_man_b_mrj: dict  # Agricultural management options' biodiversity effects.
     ag_man_limits: dict  # Agricultural management options' adoption limits.
+    
+    offland_ghg: np.ndarray  # GHG emissions from off-land commodity.
 
     lu2pr_pj: np.ndarray  # Conversion matrix: land-use to product(s).
     pr2cm_cp: np.ndarray  # Conversion matrix: product(s) to commodity.
@@ -691,7 +693,7 @@ class LutoSolver:
             for k in range(self._input_data.n_non_ag_lus)
         )
 
-        self.ghg_emissions_expr = ag_contr + ag_man_contr + non_ag_contr
+        self.ghg_emissions_expr = ag_contr + ag_man_contr + non_ag_contr + self._input_data.offland_ghg
 
         print(f"    ...setting GHG emissions reduction target: {ghg_limits:,.0f} tCO2e\n")
         self.ghg_emissions_limit_constraint = self.gurobi_model.addConstr(

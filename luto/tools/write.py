@@ -24,9 +24,9 @@ Writes model output and statistics to files.
 
 import os, re
 import shutil
+import time
 import numpy as np
 import pandas as pd
-from glob import glob
 from datetime import datetime
 
 from luto import tools
@@ -59,8 +59,15 @@ from luto.tools.report.create_static_maps import TIF2PNG
 
 timestamp_write = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
 
-@tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{timestamp_write}")
 def write_outputs(sim):
+    # Write the model outputs to file
+    write_data(sim)
+    # Move the log files to the output directory
+    write_logs(sim)
+    
+
+@tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{timestamp_write}")
+def write_data(sim):
 
     # Write model run settings
     write_settings(sim.path)
@@ -97,7 +104,10 @@ def write_outputs(sim):
     data2html(sim)
     TIF2PNG(sim) if settings.WRITE_OUTPUT_GEOTIFFS else None
     
-    
+
+
+
+def write_logs(sim):
     # Move the log files to the output directory
     logs = [f"{settings.OUTPUT_DIR}/run_{sim.timestamp}_stdout.log",
             f"{settings.OUTPUT_DIR}/run_{sim.timestamp}_stderr.log",
@@ -106,7 +116,9 @@ def write_outputs(sim):
     
     for log in logs:
         if os.path.exists(log):
+            # Move the file to the output directory
             shutil.move(log, f"{sim.path}/{os.path.basename(log)}")
+
 
 
 def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):

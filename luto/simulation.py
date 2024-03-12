@@ -53,6 +53,22 @@ print('Loading data...')
 import luto.data as bdata
 
 
+# Get the total demand quantities by commodity for 2010 to 2100 by combining the demand deltas with 2010 production
+prod_2010_c = tools.get_production( bdata
+                                  , bdata.YR_CAL_BASE
+                                  , tools.lumap2ag_l_mrj(bdata.LUMAP, bdata.LMMAP)
+                                  , tools.lumap2non_ag_l_mk(bdata.LUMAP, len(bdata.NON_AGRICULTURAL_LANDUSES))
+                                  , tools.get_base_am_vars(bdata.NCELLS, bdata.NLMS, bdata.N_AG_LUS)
+                                  )
+
+# Demand deltas can be a time series (shape year x commodity) or a single array (shape = n commodites).
+# d_cy = bdata.DEMAND_DELTAS_C * prod_2010_c
+d_cy = bdata.DEMAND_C # new demand is in tonnes rather than deltas
+
+# The GHG from off-land commodities 
+ghg_offland_cy = bdata.OFF_LAND_GHG_EMISSION_C
+
+
 class Data():
     """Provide simple object to mimic 'data' namespace from `luto.data`."""
 
@@ -403,6 +419,7 @@ def get_input_data(target: int):
         ag_man_w_mrj=get_ag_man_water(ag_w_mrj),
         ag_man_b_mrj=get_ag_man_biodiversity(ag_b_mrj),
         ag_man_limits=get_ag_man_limits(),
+        offland_ghg=ghg_offland_cy[target - bdata.YR_CAL_BASE],
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,
         limits=get_limits(target),
@@ -543,14 +560,4 @@ non_ag_dvars = {}
 ag_man_dvars = {}
 prod_data = {}
 
-# Get the total demand quantities by commodity for 2010 to 2100 by combining the demand deltas with 2010 production
-prod_2010_c = tools.get_production( bdata
-                                  , bdata.YR_CAL_BASE
-                                  , tools.lumap2ag_l_mrj(bdata.LUMAP, bdata.LMMAP)
-                                  , tools.lumap2non_ag_l_mk(bdata.LUMAP, len(bdata.NON_AGRICULTURAL_LANDUSES))
-                                  , tools.get_base_am_vars(bdata.NCELLS, bdata.NLMS, bdata.N_AG_LUS)
-                                  )
 
-# Demand deltas can be a time series (shape year x commodity) or a single array (shape = n commodites).
-# d_cy = bdata.DEMAND_DELTAS_C * prod_2010_c
-d_cy = bdata.DEMAND_C # new demand is in tonnes rather than deltas

@@ -518,41 +518,31 @@ def map_desc_to_dvar_index(category: str,
 
 class LogToFile:
     def __init__(self, log_path):
-                
         self.log_path_stdout = f"{log_path}_stdout.log"
         self.log_path_stderr = f"{log_path}_stderr.log"
-
-        # Open files for writing. Use 'w' mode to overwrite existing files, or 'a' to append.
-        self.file_stdout = open(self.log_path_stdout, 'w')
-        self.file_stderr = open(self.log_path_stderr, 'w')
 
     def __call__(self, func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            original_stdout = sys.stdout
-            original_stderr = sys.stderr
-            try:
-                sys.stdout = self.StreamToLogger(self.file_stdout, original_stdout)
-                sys.stderr = self.StreamToLogger(self.file_stderr, original_stderr)
-                return func(*args, **kwargs)
-            except Exception:
-                # Capture the full traceback
-                exc_info = traceback.format_exc()
-                # Log the traceback to stderr log before re-raising the exception
-                sys.stderr.write(exc_info + '\n')  # Log the full traceback
-                raise  # Re-raise the caught exception to propagate it
-            finally:
-                sys.stdout = original_stdout
-                sys.stderr = original_stderr
-                self.close()
+            # Open files for writing here, ensuring they're only created upon function call
+            with open(self.log_path_stdout, 'w') as file_stdout, open(self.log_path_stderr, 'w') as file_stderr:
+                original_stdout = sys.stdout
+                original_stderr = sys.stderr
+                try:
+                    sys.stdout = self.StreamToLogger(file_stdout, original_stdout)
+                    sys.stderr = self.StreamToLogger(file_stderr, original_stderr)
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    # Capture the full traceback
+                    exc_info = traceback.format_exc()
+                    # Log the traceback to stderr log before re-raising the exception
+                    sys.stderr.write(exc_info + '\n')
+                    raise  # Re-raise the caught exception to propagate it
+                finally:
+                    # Reset stdout and stderr
+                    sys.stdout = original_stdout
+                    sys.stderr = original_stderr
         return wrapper
-    
-    def close(self):
-        # Flush and close the files
-        self.file_stdout.flush()
-        self.file_stderr.flush()
-        self.file_stdout.close()
-        self.file_stderr.close()
 
     class StreamToLogger(object):
         def __init__(self, file, orig_stream=None):
@@ -560,17 +550,34 @@ class LogToFile:
             self.orig_stream = orig_stream
 
         def write(self, buf):
-            # Only prepend timestamp to non-newline content
-            if buf.strip():  # This checks if buf is not just whitespace/newline
+            if buf.strip():  # Only prepend timestamp to non-newline content
                 timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 formatted_buf = f"{timestamp} - {buf}"
             else:
                 formatted_buf = buf  # If buf is just a newline/whitespace, don't prepend timestamp
             
+            if self.orig_stream:
+                self.orig_stream.write(formatted_buf)  # Write to the original stream if it exists
+            self.file.write(formatted_buf)  # Write to the log file
+
+        def flush(self):
+            self.file.flush()  # Ensure content is written to disk
+
+        def __init__(self, file, orig_stream=None):
+            self.file = file
+            self.orig_stream = orig_stream
+
+        def write(self, buf):
+            if buf.strip():  # Check if buf is not just whitespace/newline
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                formatted_buf = f"{timestamp} - {buf}"
+            else:
+                formatted_buf = buf  # If buf is just a newline/whitespace, don't prepend timestamp
+
             # Write to the original stream if it exists
             if self.orig_stream:
                 self.orig_stream.write(formatted_buf)
-                
+            
             # Write to the log file
             self.file.write(formatted_buf)
 

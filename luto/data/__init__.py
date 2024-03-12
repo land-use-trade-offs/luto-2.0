@@ -49,6 +49,8 @@ from luto.settings import (
     RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR,
     BIODIV_LIVESTOCK_IMPACT,
     LDS_BIODIVERSITY_VALUE,
+    OFF_LAND_COMMODITIES,
+    EGGS_AVG_WEIGHT
 )
 
 
@@ -532,13 +534,13 @@ DEMAND_DATA = dd.loc[(SCENARIO,
                       FEED_EFFICIENCY)].copy()
 
 # Convert eggs from count to tonnes
-DEMAND_DATA.loc['eggs'] = DEMAND_DATA.loc['eggs'] * 60 / 1000 / 1000
+DEMAND_DATA.loc['eggs'] = DEMAND_DATA.loc['eggs'] * EGGS_AVG_WEIGHT / 1000 / 1000
 
 # Get the off-land commodities
-DEMAND_OFFLAND = DEMAND_DATA.loc[DEMAND_DATA.query("COMMODITY in ['pork', 'chicken', 'eggs', 'aquaculture']").index, 'PRODUCTION'].copy()
+DEMAND_OFFLAND = DEMAND_DATA.loc[DEMAND_DATA.query("COMMODITY in @OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
 
 # Remove off-land commodities
-DEMAND_C = DEMAND_DATA.loc[DEMAND_DATA.query("COMMODITY not in ['pork', 'chicken', 'eggs', 'aquaculture']").index, 'PRODUCTION'].copy()
+DEMAND_C = DEMAND_DATA.loc[DEMAND_DATA.query("COMMODITY not in @OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
 
 # Convert to numpy array of shape (91, 26)
 DEMAND_C = DEMAND_C.to_numpy(dtype = np.float32).T
