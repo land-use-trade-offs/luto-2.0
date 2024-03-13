@@ -289,6 +289,7 @@ SOIL_CARBON_AVG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'soil_carbon_t_h
 EP_EST_COST_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_est_cost_ha.h5') ).to_numpy(dtype = np.float32)
 CP_EST_COST_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'cp_est_cost_ha.h5') ).to_numpy(dtype = np.float32)
 
+
 # Load fire risk data (reduced carbon sequestration by this amount)
 fr_df = pd.read_hdf( os.path.join(INPUT_DIR, 'fire_risk.h5') )
 fr_dict = {'low': 'FD_RISK_PERC_5TH', 'med': 'FD_RISK_MEDIAN', 'high': 'FD_RISK_PERC_95TH'}

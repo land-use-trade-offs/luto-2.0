@@ -108,7 +108,7 @@ DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (li
 PENALTY = 1e5
 
 # Write GeoTiffs to output directory: True or False
-WRITE_OUTPUT_GEOTIFFS = False
+WRITE_OUTPUT_GEOTIFFS = True
 
 
 # ---------------------------------------------------------------------------- #
