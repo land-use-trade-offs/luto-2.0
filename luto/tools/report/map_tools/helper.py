@@ -2,7 +2,6 @@
 import pandas as pd
 import contextily as ctx
 import matplotlib as mpl
-from rasterio.coords import BoundingBox
 
 from luto.tools.report.map_tools.parameters import (color_types,
                                                     map_note,
@@ -35,7 +34,7 @@ def download_basemap(bounds_mercator: list[str]):
 # Function to create value-color dictionary for intergirized raster (1-100) 
 def create_color_csv_0_100(color_scheme:str='YlOrRd',
                            save_path:str='luto/tools/report/Assets/float_img_colors.csv',
-                           extra_color:dict={   0:(130, 130, 130, 255),
+                           extra_color:dict={   0:(200, 200, 200, 255),
                                              -100:(225, 225, 225, 255)}):
     """
     Create a CSV file contains the value(1-100)-color(HEX) records.

@@ -207,9 +207,7 @@ def write_files(sim, yr_cal, path):
     
     print(f'Writing numpy arrays and geotiff outputs to {path}')
 
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
     
     # Save raw agricultural decision variables (float array).
     ag_X_mrj_fname = 'ag_X_mrj' + '_' + timestamp + '.npy'
@@ -345,9 +343,7 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
 
 def write_quantity(sim, yr_cal, path, yr_cal_sim_pre=None):
     
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
 
     # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
     simulated_year_list = sorted(list(sim.lumaps.keys()))
@@ -407,9 +403,7 @@ def write_ag_revenue_cost(sim, yr_cal, path):
     """Calculate agricultural revenue. Takes a simulation object, a target calendar 
        year (e.g., 2030), and an output path as input."""
 
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
 
     print(f'Writing agricultural revenue outputs to {path}' )
 
@@ -464,9 +458,7 @@ def write_ag_management_revenue_cost(sim, yr_cal, path):
     """Calculate agricultural management revenue and cost."""
     
     # Get the timestamp so each CSV in the timeseries mode has a unique name
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
 
     print(f'Writing agricultural management revenue and cost outputs to {path}')
 
@@ -566,9 +558,7 @@ def write_non_ag_revenue_cost(sim, yr_cal, path):
 
 def write_dvar_area(sim, yr_cal, path):
     
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
     
     # Reprot the process
     print(f'Writing area calculated from dvars to {path}')
@@ -662,9 +652,7 @@ def write_area_transition_start_end(sim, path):
 def write_crosstab(sim, yr_cal, path, yr_cal_sim_pre=None): 
     """Write out land-use and production data"""
     
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
     
     # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
     simulated_year_list = sorted(list(sim.lumaps.keys()))
@@ -749,9 +737,7 @@ def write_water(sim, yr_cal, path):
     """Calculate water use totals. Takes a simulation object, a numeric
        target calendar year (e.g., 2030), and an output path as input."""
 
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
 
     print(f'Writing water outputs to {path}')
 
@@ -899,9 +885,7 @@ def write_ghg(sim, yr_cal, path):
         Takes a simulation object, a target calendar year (e.g., 2030), 
         and an output path as input."""
 
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
 
     print(f'Writing GHG outputs to {path}' )
     
@@ -934,9 +918,7 @@ def write_biodiversity(sim, yr_cal, path):
     and output path ('path').
     """
 
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
 
     print(f'Writing biodiversity outputs to {path}')
 
@@ -966,9 +948,7 @@ def write_biodiversity(sim, yr_cal, path):
     
 def write_biodiversity_separate(sim, yr_cal, path):
     
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
 
     print(f'Writing biodiversity_separate outputs to {path}')
 
@@ -1044,9 +1024,7 @@ def write_biodiversity_separate(sim, yr_cal, path):
 def write_ghg_separate(sim, yr_cal, path):
 
 
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
 
     print(f'Writing GHG emissions_Separate to {path}')
 

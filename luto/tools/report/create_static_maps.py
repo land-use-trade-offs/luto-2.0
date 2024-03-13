@@ -6,6 +6,7 @@ from rasterio.merge import merge
 
 from luto.tools.report.map_tools import process_raster, save_map_to_html
 from luto.tools.report.map_tools.map_making import create_png_map
+from luto.tools.report.map_tools.parameters import lucc_rename
 from luto.tools.report.map_tools.helper import (get_map_meta, 
                                                 get_map_fullname,
                                                 get_scenario)
@@ -49,6 +50,9 @@ def TIF2PNG(sim):
         mercator_bbox,          # bounds for download base map (west, south, east, north <meters>)
         color_desc_dict         # color description dictionary ((R,G,B,A) <0-255>: description <str>)
         ) = process_raster(tif_path, color_csv, data_type, map_note)
+        
+        # Update the lucc description in the color_desc_dict with the lucc_rename
+        color_desc_dict = {k:lucc_rename.get(v,v) for k, v in color_desc_dict.items()}
 
         # Create the annotation text for the map
         map_fullname = get_map_fullname(tif_path)

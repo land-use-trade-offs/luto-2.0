@@ -446,17 +446,17 @@ def save_map_to_html(tif_path:str,
     # Get the input image path
     out_base = os.path.splitext(tif_path)[0]
     if map_note is not None:
-        in_mercator_png = f"{out_base}_mercator_{map_note}.png"
-        html_save_path = f"{out_base}_mercator_{map_note}"
+        in_mercator_png = f"{out_base}_{map_note}.png"
+        html_save_path = f"{out_base}_{map_note}"
     else:
-        in_mercator_png = f"{out_base}_mercator.png"
-        html_save_path = f"{out_base}_mercator"
+        in_mercator_png = f"{out_base}.png"
+        html_save_path = f"{out_base}"
         
     
     
     # Initialize the map
     m = folium.Map(center, 
-                   zoom_start=4,
+                   zoom_start=5,
                    zoom_control=False)
 
     # Overlay the image on folium base map

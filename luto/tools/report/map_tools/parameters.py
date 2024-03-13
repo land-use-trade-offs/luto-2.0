@@ -6,6 +6,10 @@ ag_management = ['Asparagopsis taxiformis',
                  'Precision Agriculture', 
                  'Ecological Grazing']
 
+# lucc reanaming
+lucc_rename = {'Asparagopsis taxiformis' : 'Methane Inhibitors',
+               'Precision Agriculture' : 'AgTech Non-Energy'}
+
 
 # The val-color(HEX) records for each map type
 color_types ={

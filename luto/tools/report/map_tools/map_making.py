@@ -35,7 +35,7 @@ def create_png_map(tif_path: str,
     - basemap_path (str): 
         The path to the basemap image. Default is 'Assets/basemap.tif'.
     - shapefile_path (str): 
-        The path to the shapefile for overlaying. Default is 'Assets\AUS_adm\STE11aAust_mercator_simplified.shp'.
+        The path to the shapefile for overlaying. Default is 'Assets/AUS_adm/STE11aAust_mercator_simplified.shp'.
     - anno_text (str): 
         The annotation text to be displayed on the map. Default is None.
     - mercator_bbox (BoundingBox): 
@@ -60,10 +60,10 @@ def create_png_map(tif_path: str,
     out_base = os.path.splitext(tif_path)[0]
     if map_note is not None:
         in_mercator_path = f"{out_base}_mercator_{map_note}.tif"
-        png_out_path = f"{out_base}_mosaic_{map_note}.png"
+        png_out_path = f"{out_base}_{map_note}.png"
     else:
         in_mercator_path = f"{out_base}_mercator.tif"
-        png_out_path = f"{out_base}_mosaic.png"
+        png_out_path = f"{out_base}.png"
     
     
     # Create the figure and axis
