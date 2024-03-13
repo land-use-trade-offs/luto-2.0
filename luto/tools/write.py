@@ -28,6 +28,7 @@ import time
 import numpy as np
 import pandas as pd
 from datetime import datetime
+from joblib import Parallel, delayed
 
 from luto import tools
 from luto.tools.spatializers import *
@@ -85,9 +86,10 @@ def write_data(sim):
     write_ghg_offland_commodity(sim, f'{sim.path}/out_{years[-1]}')
     
     # Write outputs for each year
-    for yr, path_yr in zip(years, paths):
-        write_output_single_year(sim, yr, path_yr,yr_cal_sim_pre=None)
-        print(f"Finished writing {yr} out of {years[0]}-{years[-1]} years\n")
+    # for yr, path_yr in zip(years, paths):
+        # write_output_single_year(sim, yr, path_yr,yr_cal_sim_pre=None)
+    Parallel(n_jobs=settings.THREADS, prefer='threads')(delayed(write_output_single_year)(sim, yr, path_yr, yr_cal_sim_pre=None) for yr, path_yr in zip(years, paths))
+        
     
     # Write the area/quantity comparison between base-year and target-year for the timeseries mode
     if settings.MODE == 'timeseries':
@@ -96,7 +98,8 @@ def write_data(sim):
         # 1) Simply copy the base-year outputs to the path_begin_end_compare
         shutil.copytree(f"{sim.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True)
         # 2) Write the target-year outputs to the path_begin_end_compare
-        write_output_single_year(sim, years[-1], f"{begin_end_path}/out_{years[-1]}", yr_cal_sim_pre=years[0])   
+        # write_output_single_year(sim, years[-1], f"{begin_end_path}/out_{years[-1]}", yr_cal_sim_pre=years[0])   
+        Parallel(n_jobs=settings.THREADS, prefer='threads')(delayed(write_output_single_year)(sim, years[-1], f"{begin_end_path}/out_{years[-1]}", yr_cal_sim_pre=years[0]) )
         print(f"Finished writing {years[0]}-{years[-1]} comparison\n")
         
         
@@ -124,6 +127,9 @@ def write_logs(sim):
 
 def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
+    
+    years = sorted(list(sim.lumaps.keys()))
+    
     if not os.path.isdir(path_yr):
         os.mkdir(path_yr)
 
@@ -150,6 +156,8 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_ghg_separate(sim, yr_cal, path_yr)
     write_biodiversity(sim, yr_cal, path_yr)
     write_biodiversity_separate(sim, yr_cal, path_yr)
+    
+    print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
     
        
 
