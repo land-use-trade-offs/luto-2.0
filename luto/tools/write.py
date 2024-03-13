@@ -86,8 +86,6 @@ def write_data(sim):
     write_ghg_offland_commodity(sim, f'{sim.path}/out_{years[-1]}')
     
     # Write outputs for each year
-    # for yr, path_yr in zip(years, paths):
-        # write_output_single_year(sim, yr, path_yr,yr_cal_sim_pre=None)
     Parallel(n_jobs=settings.THREADS, prefer='threads')(delayed(write_output_single_year)(sim, yr, path_yr, yr_cal_sim_pre=None) for yr, path_yr in zip(years, paths))
         
     
@@ -98,7 +96,6 @@ def write_data(sim):
         # 1) Simply copy the base-year outputs to the path_begin_end_compare
         shutil.copytree(f"{sim.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True)
         # 2) Write the target-year outputs to the path_begin_end_compare
-        # write_output_single_year(sim, years[-1], f"{begin_end_path}/out_{years[-1]}", yr_cal_sim_pre=years[0])   
         Parallel(n_jobs=settings.THREADS, prefer='threads')(delayed(write_output_single_year)(sim, years[-1], f"{begin_end_path}/out_{years[-1]}", yr_cal_sim_pre=years[0]) )
         print(f"Finished writing {years[0]}-{years[-1]} comparison\n")
         
