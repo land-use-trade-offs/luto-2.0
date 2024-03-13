@@ -17,8 +17,8 @@ from rasterio.coords import BoundingBox
 def create_png_map(tif_path: str, 
                    map_note:str,
                    color_desc_dict: dict,
-                   basemap_path: str = 'luto/tools/report/Assests/basemap.tif', 
-                   shapefile_path: str ='luto/tools/report/Assests/AUS_adm/STE11aAust_mercator_simplified.shp',
+                   basemap_path: str = 'luto/tools/report/Assets/basemap.tif', 
+                   shapefile_path: str ='luto/tools/report/Assets/AUS_adm/STE11aAust_mercator_simplified.shp',
                    anno_text: str = None,
                    mercator_bbox: BoundingBox = None):
     
@@ -33,9 +33,9 @@ def create_png_map(tif_path: str,
     - color_desc_dict (dict): 
         A dictionary mapping color values to their descriptions for the legend.
     - basemap_path (str): 
-        The path to the basemap image. Default is 'Assests/basemap.tif'.
+        The path to the basemap image. Default is 'Assets/basemap.tif'.
     - shapefile_path (str): 
-        The path to the shapefile for overlaying. Default is 'Assests\AUS_adm\STE11aAust_mercator_simplified.shp'.
+        The path to the shapefile for overlaying. Default is 'Assets\AUS_adm\STE11aAust_mercator_simplified.shp'.
     - anno_text (str): 
         The annotation text to be displayed on the map. Default is None.
     - mercator_bbox (BoundingBox): 

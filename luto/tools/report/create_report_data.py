@@ -1,8 +1,9 @@
+
 import os
 import json
 import re
 import pandas as pd
-
+from glob import glob
 
 from luto.economics.off_land_commodity import get_demand_df
 
@@ -46,7 +47,11 @@ def save_report_data(sim):
 
     # Get all LUTO output files and store them in a dataframe
     files = get_all_files(raw_data_dir)
-
+    
+    # Select the years to reduce the column number to 
+    # avoid cluttering in the multi-level axis graphing
+    years = sorted(files['year'].unique().tolist())
+    years_select = select_years(years)
 
 
     ####################################################
@@ -65,13 +70,6 @@ def save_report_data(sim):
 
     # Convert quanlity to million tonnes
     DEMAND_DATA_long['Quantity (tonnes, ML)'] = DEMAND_DATA_long['Quantity (tonnes, ML)'] / 1e6
-
-
-    # Select the years to reduce the column number to 
-    # avoid cluttering in the multi-level axis graphing
-    years = sorted(files['year'].unique().tolist())
-    years_select = select_years(years)
-
     DEMAND_DATA_long = DEMAND_DATA_long.query('Year.isin(@years)')
     DEMAND_DATA_long.loc[:,'COMMODITY'] = DEMAND_DATA_long['COMMODITY'].str.replace('Beef lexp','Beef live export')
     DEMAND_DATA_long_filter_year = DEMAND_DATA_long.query('Year.isin(@years_select)')
@@ -285,8 +283,6 @@ def save_report_data(sim):
     am_dvar_area_lu.to_json(f'{SAVE_DIR}/area_5_am_lu_area_wide.json',orient='records')
 
 
-
-
     # Plot_3-6/7: Area (km2) by Land use
     transition_path = files.query('category =="transition_matrix"')
 
@@ -343,62 +339,83 @@ def save_report_data(sim):
     ####################################################
     #                       4) GHGs                    #
     ####################################################
-    GHG_files = get_GHG_file_df(files)
-    GHG_files = GHG_files.reset_index(drop=True).sort_values(['year','GHG_sum_t'])
-    GHG_files['GHG_sum_Mt'] = GHG_files['GHG_sum_t'] / 1e6
-    GHG_files['base_name'] = GHG_files['base_name'].replace({'Transition Penalty': 'Deforestation'})
-
+    GHG_files_onland = get_GHG_file_df(files)
+    GHG_files_onland = GHG_files_onland.reset_index(drop=True).sort_values(['year','GHG_sum_t'])
+    GHG_files_onland['GHG_sum_Mt'] = GHG_files_onland['GHG_sum_t'] / 1e6
+    GHG_files_onland['base_name'] = GHG_files_onland['base_name'].replace({'Transition Penalty': 'Deforestation'})
+    
+    # Read the off-land GHG emissions
+    last_year = GHG_files_onland['year'].max()
+    GHG_file_off_land = glob(f'{raw_data_dir}/out_{last_year}/GHG_emissions_offland_commodity*.csv')[0]
+    GHG_off_land = pd.read_csv(GHG_file_off_land).query('YEAR in @years')
+    GHG_off_land['GHG_sum_Mt'] = GHG_off_land['Total GHG Emissions (tCO2e)'] / 1e6
+    GHG_off_land = GHG_off_land.rename(columns={'YEAR':'year'})
+    GHG_off_land['COMMODITY'] = GHG_off_land['COMMODITY'].apply(lambda x: x[0].capitalize() + x[1:])
+    GHG_off_land['Emission Source'] = GHG_off_land['Emission Source'].replace({'CO2': 'Carbon Dioxide (CO2)',
+                                                                               'CH4': 'Methane (CH4)',
+                                                                               'N2O': 'Nitrous Oxide (N2O)'})
+    
     # Plot_4-1: GHG of cumulative emissions (Mt)
-    Net_emission = GHG_files.groupby('year')['GHG_sum_Mt'].sum(numeric_only = True).reset_index()
-    Net_emission = Net_emission.rename(columns={'GHG_sum_Mt':'Net_emission'})
-
-    Net_emission['Net_emission_cum'] = Net_emission['Net_emission'].cumsum()
-    Net_emission_wide = Net_emission[['year','Net_emission']]
-    Net_emission_wide.to_csv(f'{SAVE_DIR}/GHG_1_cunsum_emission_Mt.csv',index=False)
+    Emission_onland = GHG_files_onland.groupby('year')['GHG_sum_Mt'].sum(numeric_only = True).reset_index()
+    Emission_offland = GHG_off_land.groupby('year').sum(numeric_only=True).reset_index()
+    Emission_offland = Emission_offland[['year','GHG_sum_Mt']]
+    Emission_offland['base_name'] = 'Off-land Commodity'
+    
+    Net_emission = pd.concat([Emission_onland,Emission_offland],axis=0)
+    Net_emission = Net_emission.groupby(['year']).sum(numeric_only = True).reset_index()
+    
+    Cumsum_emissions = Net_emission.copy()
+    Cumsum_emissions['Cumulative GHG emissions (Mt)'] = Cumsum_emissions.cumsum()['GHG_sum_Mt']
+    Cumsum_emissions = Cumsum_emissions[['year','Cumulative GHG emissions (Mt)']]
+    Cumsum_emissions.to_csv(f'{SAVE_DIR}/GHG_1_cunsum_emission_Mt.csv',index=False)
 
     # Plot_4-2: GHG from individual emission sectors (Mt)
-    GHG_files_wide = GHG_files[['year','base_name','GHG_sum_Mt']]
+    GHG_files_wide_onland = GHG_files_onland[['year','base_name','GHG_sum_Mt']]
+    GHG_files_wide_offland = Emission_offland[['year','base_name','GHG_sum_Mt']]
+    GHG_files_wide = pd.concat([GHG_files_wide_onland,GHG_files_wide_offland],axis=0)
+    
     GHG_files_wide = GHG_files_wide\
-        .groupby('base_name')[['year','GHG_sum_Mt']]\
+        .groupby(['base_name'])[['year','GHG_sum_Mt']]\
         .apply(lambda x:list(map(list,zip(x['year'],x['GHG_sum_Mt']))))\
         .reset_index()
         
     GHG_files_wide.columns = ['name','data'] 
     GHG_files_wide['type'] = 'column'
-    GHG_files_wide.loc[-1] = ['Net emissions', list(map(list,zip(Net_emission['year'],Net_emission['Net_emission']))), 'line']
+    
+    GHG_files_wide.loc[-1] = ['Net emissions', list(map(list,zip(Net_emission['year'],Net_emission['GHG_sum_Mt']))), 'line']
     GHG_files_wide.to_json(f'{SAVE_DIR}/GHG_2_individual_emission_Mt.json',orient='records')
 
 
 
     # Plot_4-3: GHG emission (Mt)
-    GHG_emissions_long = get_GHG_category(GHG_files,'Agricultural Landuse')
+    GHG_emissions_long = get_GHG_category(GHG_files_onland,'Agricultural Landuse')
     GHG_emissions_long['Irrigation'] = GHG_emissions_long['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
     GHG_emissions_long['GHG Category'] = GHG_emissions_long['GHG Category'].replace({'CH4': 'Methane (CH4)', 
-                                                                                    'N2O': 'Nitrous Oxide (N2O)', 
-                                                                                    'CO2': 'Carbon Dioxide (CO2)'})
+                                                                                     'N2O': 'Nitrous Oxide (N2O)', 
+                                                                                     'CO2': 'Carbon Dioxide (CO2)'})
 
-    # Plot_4-3-1: Agricultural Emission by crop/lvstk sectors (Mt)
+    # Plot_4-3-1: Agricultural Emission (on-land) by crop/lvstk sectors (Mt)
     GHG_Ag_emission_total_crop_lvstk = get_GHG_emissions_by_crop_lvstk_df(GHG_emissions_long)
     GHG_Ag_emission_total_crop_lvstk_wide = GHG_Ag_emission_total_crop_lvstk.pivot(index='Year', columns='Landuse_land_cat', values='Quantity (Mt CO2e)').reset_index()
     GHG_Ag_emission_total_crop_lvstk_wide.to_csv(f'{SAVE_DIR}/GHG_3_crop_lvstk_emission_Mt.csv',index=False)
 
-    # Plot_4-3-2: Agricultural Emission by dry/irrigation  (Mt)
+    # Plot_4-3-2: Agricultural Emission (on-land) by dry/irrigation  (Mt)
     GHG_Ag_emission_total_dry_irr = GHG_emissions_long.groupby(['Year','Irrigation']).sum()['Quantity (Mt CO2e)'].reset_index()
     GHG_Ag_emission_total_dry_irr_wide = GHG_Ag_emission_total_dry_irr.pivot(index='Year', columns='Irrigation', values='Quantity (Mt CO2e)').reset_index()
     GHG_Ag_emission_total_dry_irr_wide.to_csv(f'{SAVE_DIR}/GHG_4_dry_irr_emission_Mt.csv',index=False)
 
-    # Plot_4-3-3: Agricultural Emission by GHG type sectors (Mt)
+    # Plot_4-3-3: Agricultural Emission (on-land) by GHG type sectors (Mt)
     GHG_Ag_emission_total_GHG_type = GHG_emissions_long.groupby(['Year','GHG Category']).sum()['Quantity (Mt CO2e)'].reset_index()
     GHG_Ag_emission_total_GHG_type_wide = GHG_Ag_emission_total_GHG_type.pivot(index='Year', columns='GHG Category', values='Quantity (Mt CO2e)').reset_index()
     GHG_Ag_emission_total_GHG_type_wide.to_csv(f'{SAVE_DIR}/GHG_5_category_emission_Mt.csv',index=False)
 
-    # Plot_4-3-4: Agricultural Emission by Sources (Mt)
+    # Plot_4-3-4: Agricultural Emission (on-land) by Sources (Mt)
     GHG_Ag_emission_total_Source = GHG_emissions_long.groupby(['Year','Sources']).sum()['Quantity (Mt CO2e)'].reset_index()
     GHG_Ag_emission_total_Source_wide = GHG_Ag_emission_total_Source.pivot(index='Year', columns='Sources', values='Quantity (Mt CO2e)').reset_index()
     GHG_Ag_emission_total_Source_wide.to_csv(f'{SAVE_DIR}/GHG_6_sources_emission_Mt.csv',index=False)
 
 
-    # Plot_4-3-5: GHG emission in start and end years (Mt)
+    # Plot_4-3-5: GHG emission (on-land) in start and end years (Mt)
     start_year,end_year = GHG_emissions_long['Year'].min(),GHG_emissions_long['Year'].max() 
 
     GHG_lu_lm = GHG_emissions_long\
@@ -415,7 +432,7 @@ def save_report_data(sim):
     GHG_lu_lm_df_begin_end_wide.to_csv(f'{SAVE_DIR}/GHG_7_lu_lm_emission_Mt_wide.csv',index=False)
 
 
-    # Plot_4-3-6: GHG emission in the target year (Mt)
+    # Plot_4-3-6: GHG emission (on-land) in the target year (Mt)
     GHG_lu_source = GHG_emissions_long\
                     .groupby(['Year','Land use','Irrigation','Sources'])\
                     .sum()['Quantity (Mt CO2e)']\
@@ -427,11 +444,62 @@ def save_report_data(sim):
     # save as json
     with open(f'{SAVE_DIR}/GHG_8_lu_source_emission_Mt.json', 'w') as outfile:
         json.dump(GHG_lu_source_nest_dict, outfile)
+      
+        
+        
+        
+    # Plot_4-3-7: GHG emission (off-land) by commodity (Mt)
+    GHG_off_land_commodity = GHG_off_land\
+        .groupby(['year','COMMODITY'])\
+        .sum(numeric_only=True)['GHG_sum_Mt'].reset_index()
+        
+    GHG_off_land_commodity_json = GHG_off_land_commodity\
+        .groupby('COMMODITY')[['year','GHG_sum_Mt']]\
+        .apply(lambda x:list(map(list,zip(x['year'],x['GHG_sum_Mt']))))\
+        .reset_index()
+        
+    GHG_off_land_commodity_json.columns = ['name','data']
+    GHG_off_land_commodity_json['type'] = 'column'
+    GHG_off_land_commodity_json.to_json(f'{SAVE_DIR}/GHG_4_3_7_off_land_commodity_emission_Mt.json',orient='records')
+    
+    
+    
+    # Plot_4-3-8: GHG emission (off-land) by sources (Mt)
+    GHG_off_land_sources = GHG_off_land\
+        .groupby(['year','Emission Source'])\
+        .sum(numeric_only=True)['GHG_sum_Mt'].reset_index()
+        
+    GHG_off_land_sources_json = GHG_off_land_sources\
+        .groupby('Emission Source')[['year','GHG_sum_Mt']]\
+        .apply(lambda x:list(map(list,zip(x['year'],x['GHG_sum_Mt']))))\
+        .reset_index()
+        
+    GHG_off_land_sources_json.columns = ['name','data']
+    GHG_off_land_sources_json['type'] = 'column'
+    GHG_off_land_sources_json.to_json(f'{SAVE_DIR}/GHG_4_3_8_off_land_sources_emission_Mt.json',orient='records')
+    
+    
+    
+    
+    # Plot_4-3-9: GHG emission (off-land) by Emission Type
+    GHG_off_land_type = GHG_off_land\
+        .groupby(['year','Emission Type'])\
+        .sum(numeric_only=True)['GHG_sum_Mt'].reset_index()
+        
+    GHG_off_land_type_json = GHG_off_land_type\
+        .groupby('Emission Type')[['year','GHG_sum_Mt']]\
+        .apply(lambda x:list(map(list,zip(x['year'],x['GHG_sum_Mt']))))\
+        .reset_index()
+        
+    GHG_off_land_type_json.columns = ['name','data']
+    GHG_off_land_type_json['type'] = 'column'
+    
+    GHG_off_land_type_json.to_json(f'{SAVE_DIR}/GHG_4_3_9_off_land_type_emission_Mt.json',orient='records')
 
 
 
     # Plot_4-4: GHG sequestrations by Non-Agrilcultural sector (Mt)
-    Non_ag_reduction_long = get_GHG_category(GHG_files,'Non-Agricultural Landuse')
+    Non_ag_reduction_long = get_GHG_category(GHG_files_onland,'Non-Agricultural Landuse')
 
     # Create a fake data in year BASE_YEAR with all Quantity (Mt CO2e) as 0 values
     Non_ag_reduction_long_fake = Non_ag_reduction_long.copy()
@@ -456,7 +524,7 @@ def save_report_data(sim):
 
 
     # Plot_4-5: GHG reductions by Agricultural managements (Mt)
-    Ag_man_sequestration_long = get_GHG_category(GHG_files,'Agricultural Management')
+    Ag_man_sequestration_long = get_GHG_category(GHG_files_onland,'Agricultural Management')
     Ag_man_sequestration_long['Irrigation'] = Ag_man_sequestration_long['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'}) 
 
     # Plot_4-5-1: GHG reductions by Agricultural managements in total (Mt)

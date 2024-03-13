@@ -82,6 +82,7 @@ def write_data(sim):
     
     # Write the area transition between base-year and target-year 
     write_area_transition_start_end(sim,f'{sim.path}/out_{years[-1]}')
+    write_ghg_offland_commodity(sim, f'{sim.path}/out_{years[-1]}')
     
     # Write outputs for each year
     for yr, path_yr in zip(years, paths):
@@ -894,8 +895,9 @@ def write_water(sim, yr_cal, path):
     
 
 def write_ghg(sim, yr_cal, path):
-    """Calculate total GHG emissions. Takes a simulation object, a target calendar 
-       year (e.g., 2030), and an output path as input."""
+    """Calculate total GHG emissions from on-land agricultural sector. 
+        Takes a simulation object, a target calendar year (e.g., 2030), 
+        and an output path as input."""
 
     # Append the yr_cal to timestamp as prefix
     timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
@@ -1201,5 +1203,18 @@ def write_ghg_separate(sim, yr_cal, path):
     ag_ghg_summary_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_management_{timestamp}.csv'))
     
 
+def write_ghg_offland_commodity(sim, path):
+    """Write out offland commodity GHG emissions"""
+    
+    print(f'Writing offland commodity GHG to {path}\n')
 
+    # Append the yr_cal to timestamp as prefix
+    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
+
+    # Get the offland commodity data
+    offland_ghg = sim.data.OFF_LAND_GHG_EMISSION
+    
+    # Save to disk
+    offland_ghg.to_csv(os.path.join(path, f'GHG_emissions_offland_commodity_{timestamp}.csv'), index = False)
+    
     

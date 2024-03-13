@@ -10,16 +10,16 @@ ag_management = ['Asparagopsis taxiformis',
 # The val-color(HEX) records for each map type
 color_types ={
             # Integer rasters
-            'lumap':   ['luto/tools/report/Assests/lumap_colors.csv',
-                        'luto/tools/report/Assests/lumap_colors_grouped.csv'],
-            'lmmap':    ['luto/tools/report/Assests/lm_colors.csv'],
-            'ammap':    ['luto/tools/report/Assests/ammap_colors.csv'],
-            'non_ag':   ['luto/tools/report/Assests/non_ag_colors.csv'],
+            'lumap':   ['luto/tools/report/Assets/lumap_colors.csv',
+                        'luto/tools/report/Assets/lumap_colors_grouped.csv'],
+            'lmmap':    ['luto/tools/report/Assets/lm_colors.csv'],
+            'ammap':    ['luto/tools/report/Assets/ammap_colors.csv'],
+            'non_ag':   ['luto/tools/report/Assets/non_ag_colors.csv'],
             # Float rasters
-            'Ag_LU':    ['luto/tools/report/Assests/float_img_colors.csv'],
-            'Ag_Mgt':   ['luto/tools/report/Assests/float_img_colors.csv'],
-            'Land_Mgt': ['luto/tools/report/Assests/float_img_colors.csv'],
-            'Non-Ag':   ['luto/tools/report/Assests/float_img_colors.csv']
+            'Ag_LU':    ['luto/tools/report/Assets/float_img_colors.csv'],
+            'Ag_Mgt':   ['luto/tools/report/Assets/float_img_colors.csv'],
+            'Land_Mgt': ['luto/tools/report/Assets/float_img_colors.csv'],
+            'Non-Ag':   ['luto/tools/report/Assets/float_img_colors.csv']
             }
 
 

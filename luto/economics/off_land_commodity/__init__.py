@@ -8,10 +8,11 @@ from luto.settings import (INPUT_DIR,
                            CONVERGENCE, 
                            IMPORT_TREND, 
                            WASTE, 
-                           FEED_EFFICIENCY)
+                           FEED_EFFICIENCY,
+                           EGGS_AVG_WEIGHT)
 
 
-def get_demand_df(egg_weight=60) -> pd.DataFrame:
+def get_demand_df(egg_weight=EGGS_AVG_WEIGHT) -> pd.DataFrame:
     """
     Get the demand dataframe for off-land commodities.
 

@@ -331,7 +331,7 @@ def process_float_raster(initial_tif:str=None,
                    band:int=1,
                    map_note:str=None,
                    color_dict:dict=None,
-                   mask_path:str='luto/tools/report/Assests/NLUM_2010-11_mask.tif', 
+                   mask_path:str='luto/tools/report/Assets/NLUM_2010-11_mask.tif', 
                    src_crs='EPSG:3857', 
                    dst_crs='EPSG:4326'):
     """

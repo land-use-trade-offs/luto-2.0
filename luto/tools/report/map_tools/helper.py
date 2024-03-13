@@ -24,7 +24,7 @@ def download_basemap(bounds_mercator: list[str]):
     """
 
     base_map, extent = ctx.bounds2raster(*bounds_mercator, 
-                                        path='luto/ools/report/Assests/basemap.tif',
+                                        path='luto/ools/report/Assets/basemap.tif',
                                         source=ctx.providers.OpenStreetMap.Mapnik,
                                         zoom=7,
                                         n_connections=16,
@@ -34,7 +34,7 @@ def download_basemap(bounds_mercator: list[str]):
    
 # Function to create value-color dictionary for intergirized raster (1-100) 
 def create_color_csv_0_100(color_scheme:str='YlOrRd',
-                           save_path:str='luto/tools/report/Assests/float_img_colors.csv',
+                           save_path:str='luto/tools/report/Assets/float_img_colors.csv',
                            extra_color:dict={   0:(130, 130, 130, 255),
                                              -100:(225, 225, 225, 255)}):
     """
@@ -44,7 +44,7 @@ def create_color_csv_0_100(color_scheme:str='YlOrRd',
     - color_scheme (str): 
         The name of the color scheme to use. Default is 'YlOrRd'.
     - save_path (str): 
-        The file path to save the color dictionary as a CSV file. Default is 'Assests/float_img_colors.csv'.
+        The file path to save the color dictionary as a CSV file. Default is 'Assets/float_img_colors.csv'.
     - extra_color (dict): 
         Additional colors to include in the dictionary. Default is {-100:(225, 225, 225, 255)}.
 
