@@ -86,8 +86,7 @@ def write_data(sim):
     write_ghg_offland_commodity(sim, f'{sim.path}/out_{years[-1]}')
     
     # Write outputs for each year
-    Parallel(n_jobs=settings.THREADS, prefer='threads')(delayed(write_output_single_year)(sim, yr, path_yr, yr_cal_sim_pre=None) for yr, path_yr in zip(years, paths))
-        
+    jobs = [delayed(write_output_single_year)(sim, yr, path_yr, None) for (yr, path_yr) in zip(years, paths)]
     
     # Write the area/quantity comparison between base-year and target-year for the timeseries mode
     if settings.MODE == 'timeseries':
@@ -96,9 +95,10 @@ def write_data(sim):
         # 1) Simply copy the base-year outputs to the path_begin_end_compare
         shutil.copytree(f"{sim.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True)
         # 2) Write the target-year outputs to the path_begin_end_compare
-        Parallel(n_jobs=settings.THREADS, prefer='threads')(delayed(write_output_single_year)(sim, years[-1], f"{begin_end_path}/out_{years[-1]}", yr_cal_sim_pre=years[0]) )
-        print(f"Finished writing {years[0]}-{years[-1]} comparison\n")
-        
+        jobs = jobs + [delayed(write_output_single_year)(sim, years[-1], f"{begin_end_path}/out_{years[-1]}", years[0])]
+    
+    # Parallel write the outputs for each year    
+    Parallel(n_jobs=settings.THREADS, prefer='threads')(jobs)
         
     # Create the report HTML and png maps
     save_report_data(sim)
