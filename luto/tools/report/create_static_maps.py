@@ -30,16 +30,17 @@ def TIF2PNG(sim):
     # Get the metadata for map making
     map_meta = get_map_meta()
     model_run_scenario = get_scenario(raw_data_dir)
+    
     # Merge the metadata with the tif files
     tif_files_with_meta = tif_files.merge(map_meta, 
                                         left_on='category', 
                                         right_on='map_type')
     
     # Loop through the tif files and create the maps (PNG and HTML)
-    Parallel(n_jobs=settings.THREADS)(delayed(create_maps)(row) for _, row in tif_files_with_meta.iterrows())
+    Parallel(n_jobs=settings.THREADS)(delayed(create_maps)(row,model_run_scenario) for _, row in tif_files_with_meta.iterrows())
         
         
-def create_maps(row):
+def create_maps(row, model_run_scenario):
  
     tif_path = row['path']
     color_csv = row['color_csv']
