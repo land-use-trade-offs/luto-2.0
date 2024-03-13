@@ -558,18 +558,18 @@ off_land_ghg_intensity[['Emission Type', 'Emission Source']] = off_land_ghg_inte
 
 # Get the emissions from the off-land commodities
 demand_offland_long = DEMAND_OFFLAND.stack().reset_index()
-demand_offland_long = demand_offland_long.rename(columns={ 0: 'DEMAND (t/kL)'})
+demand_offland_long = demand_offland_long.rename(columns={ 0: 'DEMAND (tonnes)'})
 
 # Merge the demand and GHG intensity, and calculate the total GHG emissions
 off_land_ghg_emissions = demand_offland_long.merge(off_land_ghg_intensity, on='COMMODITY')
-off_land_ghg_emissions['CO2e Total (t)'] = off_land_ghg_emissions.eval('`DEMAND (t/kL)` * `Emission Intensity [ kg CO2eq / kg ]`')
+off_land_ghg_emissions['Total GHG Emissions (tCO2e)'] = off_land_ghg_emissions.eval('`DEMAND (tonnes)` * `Emission Intensity [ kg CO2eq / kg ]`')
 
 # Keep only the relevant columns
 OFF_LAND_GHG_EMISSION = off_land_ghg_emissions[['YEAR',
                                                 'COMMODITY',
                                                 'Emission Type', 
                                                 'Emission Source',
-                                                'CO2e Total (t)']]
+                                                'Total GHG Emissions (tCO2e)']]
 
 # Get the GHG constraints for luto, shape is (91, 1)
 OFF_LAND_GHG_EMISSION_C = OFF_LAND_GHG_EMISSION.groupby(['YEAR']).sum(numeric_only=True).values
