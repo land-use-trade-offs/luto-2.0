@@ -6,6 +6,7 @@ import imageio
 import pyproj
 
 import rasterio
+from shutil import move
 from rasterio.io import MemoryFile
 from rasterio.coords import BoundingBox
 from rasterio.warp import (calculate_default_transform, 
@@ -405,10 +406,7 @@ def process_raster(tif_path: str,
 
     Returns:
         tuple: A tuple containing the center, bounds for folium map, and mercator bbox.
-    """
-    # Report the process
-    print(f"Processing {os.path.basename(tif_path)}")
-    
+    """    
     
     # Get the metadata for making map with the tif    
     color_df = pd.read_csv(color_csv)
@@ -446,11 +444,16 @@ def save_map_to_html(tif_path:str,
     # Get the input image path
     out_base = os.path.splitext(tif_path)[0]
     if map_note is not None:
-        in_mercator_png = f"{out_base}_{map_note}.png"
+        in_mercator_png = f"{out_base}_mercator_{map_note}.png"
+        in_base_png = f"{out_base}_basemap_{map_note}.png"
+        out_base_png = f"{out_base}_{map_note}.png"
         html_save_path = f"{out_base}_{map_note}"
     else:
-        in_mercator_png = f"{out_base}.png"
+        in_mercator_png = f"{out_base}_mercator.png"
+        in_base_png = f"{out_base}_basemap.png"
+        out_base_png = f"{out_base}.png"
         html_save_path = f"{out_base}"
+        
         
     
     
@@ -475,5 +478,6 @@ def save_map_to_html(tif_path:str,
     # Save the map to interactive html
     m.save(f"{html_save_path}.html")
     
-    # Delete the in_mercator_png
+    # Delete the in_mercator_png, reanme the input_mercator_png to input.png
     os.remove(in_mercator_png)
+    move(in_base_png, out_base_png)

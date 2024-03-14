@@ -97,8 +97,9 @@ def write_data(sim):
         # 2) Write the target-year outputs to the path_begin_end_compare
         jobs = jobs + [delayed(write_output_single_year)(sim, years[-1], f"{begin_end_path}/out_{years[-1]}", years[0])]
     
-    # Parallel write the outputs for each year    
-    Parallel(n_jobs=settings.THREADS, prefer='threads')(jobs)
+    # Parallel write the outputs for each year
+    num_jobs = min(len(years), settings.WRITE_THREADS) if settings.PARALLEL_WRITE else 1   # Use the minimum between years and threads for parallel writing
+    Parallel(n_jobs=num_jobs, prefer='threads')(jobs)
         
     # Create the report HTML and png maps
     save_report_data(sim)
@@ -239,7 +240,7 @@ def write_files(sim, yr_cal, path):
     
     # Get the Agricultural Management applied to each pixel
     ag_man_dvar = np.stack([np.einsum('mrj -> r', v) for _,v in sim.ag_man_dvars[yr_cal].items()]).T   # (r, am)
-    ag_man_dvar_mask = ag_man_dvar.sum(1) > 0          # Meaning that they have some agricultural management applied
+    ag_man_dvar_mask = ag_man_dvar.sum(1) > 0.01           # Meaning that they have at least 1% of agricultural management applied
     # Get the maximum index of the agricultural management applied to the valid pixel
     ag_man_dvar = np.argmax(ag_man_dvar, axis=1) + 1   # Start from 1
     # Let the pixels that were all zeros in the original array to be 0
@@ -248,7 +249,7 @@ def write_files(sim, yr_cal, path):
 
     # Get the non-agricultural landuse for each pixel
     non_ag_dvar = sim.non_ag_dvars[yr_cal]              # (r, k)
-    non_ag_dvar_mask = non_ag_dvar.sum(1) > 0           # Meaning that they have some non-agricultural landuse applied
+    non_ag_dvar_mask = non_ag_dvar.sum(1) > 0.01          # Meaning that they have at least 1% of non-agricultural landuse applied
     # Get the maximum index of the non-agricultural landuse applied to the valid pixel
     non_ag_dvar = np.argmax(non_ag_dvar, axis=1) + sim.data.NON_AGRICULTURAL_LU_BASE_CODE    # Start from 100
     # Let the pixels that were all zeros in the original array to be 0

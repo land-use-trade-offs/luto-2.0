@@ -35,7 +35,7 @@ def create_png_map(tif_path: str,
     - basemap_path (str): 
         The path to the basemap image. Default is 'Assets/basemap.tif'.
     - shapefile_path (str): 
-        The path to the shapefile for overlaying. Default is 'Assets\AUS_adm\STE11aAust_mercator_simplified.shp'.
+        The path to the shapefile for overlaying. Default is 'Assets/AUS_adm/STE11aAust_mercator_simplified.shp'.
     - anno_text (str): 
         The annotation text to be displayed on the map. Default is None.
     - mercator_bbox (BoundingBox): 
@@ -49,7 +49,7 @@ def create_png_map(tif_path: str,
     # Download basemap if it does not exist
     if not os.path.exists(basemap_path):
         if mercator_bbox is None:
-            raise ValueError("The bounding box in Mercator projection is required to download the basemap.")
+            raise ValueError("The bounding box in Mercator projection (w,s,e,n) is required to download the basemap.")
         print("Downloading basemap...")
         print('This Could take a while ...')
         print('Only download once ...')
@@ -60,10 +60,10 @@ def create_png_map(tif_path: str,
     out_base = os.path.splitext(tif_path)[0]
     if map_note is not None:
         in_mercator_path = f"{out_base}_mercator_{map_note}.tif"
-        png_out_path = f"{out_base}_{map_note}.png"
+        png_out_path = f"{out_base}_basemap_{map_note}.png"
     else:
         in_mercator_path = f"{out_base}_mercator.tif"
-        png_out_path = f"{out_base}.png"
+        png_out_path = f"{out_base}_basemap.png"
     
     
     # Create the figure and axis

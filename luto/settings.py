@@ -107,8 +107,19 @@ DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (li
 # 1e5 works well (i.e., demand are met), demands not met with anything less 
 PENALTY = 1e5
 
+
+# ---------------------------------------------------------------------------- #
+# GEO Raster writing parameters
+# ---------------------------------------------------------------------------- #
+
 # Write GeoTiffs to output directory: True or False
 WRITE_OUTPUT_GEOTIFFS = True
+
+# If use parallel processing to write GeoTiffs: True or False
+PARALLEL_WRITE = True
+
+# The Threads to use for writing GeoTiffs, and map making
+WRITE_THREADS:int = 32      # Works only if PARALLEL_WRITE = True
 
 
 # ---------------------------------------------------------------------------- #

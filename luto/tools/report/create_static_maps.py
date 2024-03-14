@@ -41,12 +41,15 @@ def TIF2PNG(sim):
         
         
 def create_maps(row, model_run_scenario):
- 
+    
+    # Get the necessary variables
     tif_path = row['path']
     color_csv = row['color_csv']
     data_type = row['data_type']
     map_note = row['map_note']
     year = row['year']
+    
+    print(f'Making maps for {row["base_name"]} for {year}...')
     
     # Process the raster, and get the necessary variables
     (center,                # center of the map (lat, lon)
@@ -69,11 +72,14 @@ def create_maps(row, model_run_scenario):
                     anno_text = inmap_text,
                     mercator_bbox = mercator_bbox)
     
+    
     # Save the map to HTML
     save_map_to_html(tif_path, 
-                        map_note, 
-                        center, 
-                        bounds_for_folium)
+                     map_note, 
+                     center, 
+                     bounds_for_folium)
+    
+    
 
 
 
