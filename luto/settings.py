@@ -149,9 +149,19 @@ THREADS = 32
 NON_AGRICULTURAL_LU_BASE_CODE = 100         # Non-agricultural land uses will appear on the land use map
                                             # offset by this amount (e.g. land use 0 will appear as 100)
 
-# Environmental Plantings Parameters
-ENV_PLANTING_COST_PER_HA_PER_YEAR = 100     # Yearly cost of maintaining one hectare of environmental plantings
-CARBON_PRICE_PER_TONNE = 100                # Price of carbon per tonne - determines EP revenue in the model
+# Plantings Parameters
+ENV_PLANTING_COST_PER_HA_PER_YEAR = 100           # Yearly cost of maintaining one hectare of environmental plantings
+CARBON_PLANTING_BLOCK_COST_PER_HA_PER_YEAR = 100  # Yearly cost of maintaining one hectare of carbon plantings (block)
+CARBON_PLANTING_BELT_COST_PER_HA_PER_YEAR = 100   # Yearly cost of maintaining one hectare of carbon plantings (belt)
+CARBON_PRICE_PER_TONNE = 100                      # Price of carbon per tonne - determines EP revenue in the model
+
+CP_BELT_ROW_WIDTH = 20
+CP_BELT_ROW_SPACING = 40
+# CARBON_PLANTINGS_BELT_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 100 metres per hectare
+CARBON_PLANTINGS_BELT_FENCING_COST_PER_M = 2           # $ per linear metre
+CP_BELT_PROPORTION = CP_BELT_ROW_WIDTH / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
+cp_no_alleys_per_ha = 100 / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
+CP_BELT_FENCING_LENGTH = 100 * cp_no_alleys_per_ha * 2 # Length of fencing required per ha in metres
 
 # Riparian Planting Parameters
 RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR = 100
@@ -167,8 +177,8 @@ AGROFORESTRY_ROW_SPACING = 40
 # AGROFORESTRY_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 100 metres per hectare
 AGROFORESTRY_FENCING_COST_PER_M = 2           # $ per linear metre
 AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
-no_alleys_per_ha = 100 / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
-AF_FENCING_LENGTH = 100 * no_alleys_per_ha * 2 # Length of fencing required per ha in metres
+af_no_alleys_per_ha = 100 / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
+AF_FENCING_LENGTH = 100 * af_no_alleys_per_ha * 2 # Length of fencing required per ha in metres
                     
 
 # ---------------------------------------------------------------------------- #
@@ -257,6 +267,8 @@ LAND_USAGE_CULL_PERCENTAGE = 0.15
 0: 'Environmental Plantings'
 1: 'Riparian Plantings'
 2: 'Agroforestry'
+3: 'Carbon Plantings (Block Arrangement)'
+4: 'Carbon Plantings (Belt Arrangement)'
 
 
 AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)

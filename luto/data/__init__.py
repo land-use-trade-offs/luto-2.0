@@ -48,6 +48,7 @@ from luto.settings import (
     RIPARIAN_PLANTINGS_BUFFER_WIDTH,
     RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR,
     BIODIV_LIVESTOCK_IMPACT,
+    CARBON_PLANTINGS_BUFFER_WIDTH,
 )
 
 
@@ -142,6 +143,8 @@ NON_AG_LU_NATURAL = [
     DESC2NONAGLU["Environmental Plantings"],
     DESC2NONAGLU["Riparian Plantings"],
     DESC2NONAGLU["Agroforestry"],
+    DESC2NONAGLU["Carbon Plantings (Block)"],
+    DESC2NONAGLU["Carbon Plantings (Belt)"],
 ]
 
 # Derive land management types from AGEC.
@@ -324,7 +327,7 @@ CP_BELT_AVG_T_CO2_HA = (
                          + cp_df.CP_BELT_BG_AVG_T_CO2_HA_YR
                         ).to_numpy(dtype = np.float32)
 
-# Agricultural land use to environmental plantings raw transition costs:
+# Agricultural land use to plantings raw transition costs:
 AG2EP_TRANSITION_COSTS_HA = np.load( os.path.join(INPUT_DIR, 'ag_to_ep_tmatrix.npy') )  # shape: (28,)
 
 # EP to agricultural land use transition costs:
