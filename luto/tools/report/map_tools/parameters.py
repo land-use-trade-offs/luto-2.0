@@ -14,16 +14,15 @@ lucc_rename = {'Asparagopsis taxiformis' : 'Methane Inhibitors',
 # The val-color(HEX) records for each map type
 color_types ={
             # Integer rasters
-            'lumap':   ['luto/tools/report/Assets/lumap_colors.csv',
-                        'luto/tools/report/Assets/lumap_colors_grouped.csv'],
-            'lmmap':    ['luto/tools/report/Assets/lm_colors.csv'],
-            'ammap':    ['luto/tools/report/Assets/ammap_colors.csv'],
-            'non_ag':   ['luto/tools/report/Assets/non_ag_colors.csv'],
+            'lumap':  'luto/tools/report/Assets/lumap_colors_grouped.csv',
+            'lmmap': 'luto/tools/report/Assets/lm_colors.csv',
+            'ammap': 'luto/tools/report/Assets/ammap_colors.csv',
+            'non_ag':'luto/tools/report/Assets/non_ag_colors.csv',
             # Float rasters
-            'Ag_LU':    ['luto/tools/report/Assets/float_img_colors.csv'],
-            'Ag_Mgt':   ['luto/tools/report/Assets/float_img_colors.csv'],
-            'Land_Mgt': ['luto/tools/report/Assets/float_img_colors.csv'],
-            'Non-Ag':   ['luto/tools/report/Assets/float_img_colors.csv']
+            'Ag_LU': 'luto/tools/report/Assets/float_img_colors.csv',
+            'Ag_Mgt': 'luto/tools/report/Assets/float_img_colors.csv',
+            'Land_Mgt':'luto/tools/report/Assets/float_img_colors.csv',
+            'Non-Ag':'luto/tools/report/Assets/float_img_colors.csv'
             }
 
 
@@ -44,38 +43,70 @@ map_single_lucc = {k:k for k in map_single_lucc}
 map_basename_rename = {**map_multiple_lucc, **map_single_lucc}
 
 
-# If more than one color_csv were used to create the map, 
-# the map_note will be used to identify the color_csv
-map_note = {'lumap': [None, 'grouped'],
-            'lmmap': [None],
-            'ammap': [None],
-            'non_ag': [None],
-            'Ag_LU': [None],
-            'Ag_Mgt': [None],
-            'Land_Mgt': [None],
-            'Non-Ag': [None]
-            }
 
 
 # The data types for each map type
 data_types = {'lumap': 'integer',
-                'lmmap': 'integer',
-                'ammap': 'integer',
-                'non_ag': 'integer',
-                'Ag_LU': 'float',
-                'Ag_Mgt': 'float',
-                'Land_Mgt': 'float',
-                'Non-Ag': 'float'
+              'lmmap': 'integer',
+              'ammap': 'integer',
+              'non_ag': 'integer',
+              'Ag_LU': 'float',
+              'Ag_Mgt': 'float',
+              'Land_Mgt': 'float',
+              'Non-Ag': 'float'
+            }
+
+
+# The parameters for legend
+legend_params = {'lumap': {'bbox_to_anchor': (0.02, 0.19),
+                            'loc': 'upper left',
+                            'ncol': 2,
+                            'fontsize': 23,
+                            'framealpha': 0,
+                            'columnspacing': 1},
+                 
+                 'lmmap': {'bbox_to_anchor': (0.1, 0.25),
+                            'loc': 'upper left',
+                            'ncol': 1,
+                            'fontsize': 23,
+                            'framealpha': 0,
+                            'columnspacing': 1},
+                 
+                 'ammap': {'bbox_to_anchor': (0.02, 0.19),
+                            'loc': 'upper left',
+                            'ncol': 2,
+                            'fontsize': 23,
+                            'framealpha': 0,
+                            'columnspacing': 1},
+                 
+                 'non_ag': {'bbox_to_anchor': (0.02, 0.19),
+                            'loc': 'upper left',
+                            'ncol': 2,
+                            'fontsize': 23,
+                            'framealpha': 0,
+                            'columnspacing': 1},
+                 
+                 'Ag_LU': {'bbox_to_anchor': (0.09, 0.2), 
+                            'loc': 'upper left',
+                            'ncol': 2,
+                            'fontsize': 22,
+                            'framealpha': 0},
+                 
+                 'Ag_Mgt': {'bbox_to_anchor': (0.09, 0.2), 
+                            'loc': 'upper left',
+                            'ncol': 2,
+                            'fontsize': 22,
+                            'framealpha': 0},
+                 
+                 'Land_Mgt': {'bbox_to_anchor': (0.09, 0.2), 
+                            'loc': 'upper left',
+                            'ncol': 2,
+                            'fontsize': 22,
+                            'framealpha': 0},
+                 
+                 'Non-Ag': {'bbox_to_anchor': (0.09, 0.2), 
+                            'loc': 'upper left',
+                            'ncol': 2,
+                            'fontsize': 22,
+                            'framealpha': 0},
                 }
-
-
-# The legend positions for each map type
-legend_positions = {'lumap': 'bottomright',
-                    'lmmap': 'bottomright',
-                    'ammap': 'bottomright',
-                    'non_ag': 'bottomright',
-                    'Ag_LU': 'bottomright',
-                    'Ag_Mgt': 'bottomright',
-                    'Land_Mgt': 'bottomright',
-                    'Non-Ag': 'bottomright'
-                    }

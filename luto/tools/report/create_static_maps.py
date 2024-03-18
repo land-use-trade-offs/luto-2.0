@@ -37,7 +37,8 @@ def TIF2PNG(sim):
                                         right_on='map_type')
     
     # Loop through the tif files and create the maps (PNG and HTML)
-    Parallel(n_jobs=settings.THREADS)(delayed(create_maps)(row,model_run_scenario) for _, row in tif_files_with_meta.iterrows())
+    Parallel(n_jobs=settings.THREADS)(delayed(create_maps)(row, model_run_scenario) 
+                                      for _, row in tif_files_with_meta.iterrows())
         
         
 def create_maps(row, model_run_scenario):
@@ -46,17 +47,17 @@ def create_maps(row, model_run_scenario):
     tif_path = row['path']
     color_csv = row['color_csv']
     data_type = row['data_type']
-    map_note = row['map_note']
     year = row['year']
+    legend_params = row['legend_params']
     
-    print(f'Making maps for {row["base_name"]} for {year}...')
+    print(f'Making map for {row["base_name"]} in {year}...')
     
     # Process the raster, and get the necessary variables
     (center,                # center of the map (lat, lon)
     bounds_for_folium,      # bounds for folium (lat, lon)
     mercator_bbox,          # bounds for download base map (west, south, east, north <meters>)
     color_desc_dict         # color description dictionary ((R,G,B,A) <0-255>: description <str>)
-    ) = process_raster(tif_path, color_csv, data_type, map_note)
+    ) = process_raster(tif_path, color_csv, data_type)
     
     # Update the lucc description in the color_desc_dict with the lucc_rename
     color_desc_dict = {k:lucc_rename.get(v,v) for k, v in color_desc_dict.items()}
@@ -67,15 +68,14 @@ def create_maps(row, model_run_scenario):
 
     # Mosaic the projected_tif with base map, and overlay the shapefile
     create_png_map( tif_path = tif_path,
-                    map_note = map_note,
                     color_desc_dict = color_desc_dict,
                     anno_text = inmap_text,
-                    mercator_bbox = mercator_bbox)
+                    mercator_bbox = mercator_bbox,
+                    legend_params = legend_params)
     
     
     # Save the map to HTML
     save_map_to_html(tif_path, 
-                     map_note, 
                      center, 
                      bounds_for_folium)
     

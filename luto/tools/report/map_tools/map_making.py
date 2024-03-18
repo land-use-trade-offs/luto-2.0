@@ -15,12 +15,12 @@ from rasterio.coords import BoundingBox
 
 
 def create_png_map(tif_path: str, 
-                   map_note:str,
                    color_desc_dict: dict,
                    basemap_path: str = 'luto/tools/report/Assets/basemap.tif', 
                    shapefile_path: str ='luto/tools/report/Assets/AUS_adm/STE11aAust_mercator_simplified.shp',
                    anno_text: str = None,
-                   mercator_bbox: BoundingBox = None):
+                   mercator_bbox: tuple[int] = None,
+                   legend_params: dict = None):
     
     """
     Creates a PNG map by overlaying a raster image with a basemap, shapefile, annotation, scale bar, north arrow, and legend.
@@ -28,8 +28,6 @@ def create_png_map(tif_path: str,
     Parameters:
     - tif_path (str): 
         The path to the input raster image.
-    - map_note (str):
-        The note for the map. Can be used to identify the color scheme used for the map.
     - color_desc_dict (dict): 
         A dictionary mapping color values to their descriptions for the legend.
     - basemap_path (str): 
@@ -38,8 +36,10 @@ def create_png_map(tif_path: str,
         The path to the shapefile for overlaying. Default is 'Assets/AUS_adm/STE11aAust_mercator_simplified.shp'.
     - anno_text (str): 
         The annotation text to be displayed on the map. Default is None.
-    - mercator_bbox (BoundingBox): 
-        The bounding box of the mercator projection. Default is None.
+    - mercator_bbox (tuple[int]):
+        The bounding box in Mercator projection (west, south, east, north). Default is None.
+    - legend_params (dict):
+        The parameters for the legend. Default is None.
 
     Returns:
     - None
@@ -58,12 +58,8 @@ def create_png_map(tif_path: str,
     
     # Get the mercator input image
     out_base = os.path.splitext(tif_path)[0]
-    if map_note is not None:
-        in_mercator_path = f"{out_base}_mercator_{map_note}.tif"
-        png_out_path = f"{out_base}_basemap_{map_note}.png"
-    else:
-        in_mercator_path = f"{out_base}_mercator.tif"
-        png_out_path = f"{out_base}_basemap.png"
+    in_mercator_path = f"{out_base}_mercator.tif"
+    png_out_path = f"{out_base}_basemap.png"
     
     
     # Create the figure and axis
@@ -126,13 +122,7 @@ def create_png_map(tif_path: str,
     patches = [mpatches.Patch(color=tuple(value / 255 for value in k), label=v) 
            for k, v in color_desc_dict.items()]
 
-    plt.legend(handles=patches, 
-           bbox_to_anchor=(0.09, 0.2), 
-           loc=2, 
-           borderaxespad=0.,
-           ncol=2, 
-           fontsize=20,
-           framealpha=0)
+    plt.legend(handles=patches, **legend_params)
 
     # Optionally remove axis
     ax.set_axis_off()
