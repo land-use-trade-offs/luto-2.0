@@ -113,7 +113,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 200,
       },
       title: {
-        text: "GHG Emissions (on-land) by Land-use/Management Type",
+        text: "GHG Emissions by Land-use/Management Type",
       },
       yAxis: {
         title: {
@@ -135,7 +135,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
       series: JSON.parse(
         document.getElementById("GHG_2_individual_emission_Mt_csv").innerHTML
-        ),
+      ),
       credits: {
         enabled: false,
       },
@@ -568,7 +568,7 @@ document.addEventListener("DOMContentLoaded", function () {
       xAxis: {
         tickPositions: tickposition,
       },
-      
+
       legend: {
         align: "right",
         verticalAlign: "top",
@@ -576,7 +576,7 @@ document.addEventListener("DOMContentLoaded", function () {
         x: -10,
         y: 250,
       },
-      
+
       tooltip: {
         formatter: function () {
           return `<b>Year:</b> ${this.x}<br><b>${this.series.name
@@ -679,7 +679,7 @@ document.addEventListener("DOMContentLoaded", function () {
           text: "Greenhouse Gas (Mt CO2e)",
         },
       },
-      
+
 
       legend: {
         align: "right",

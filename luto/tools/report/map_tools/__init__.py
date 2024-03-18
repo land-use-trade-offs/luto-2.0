@@ -6,6 +6,7 @@ import imageio
 import pyproj
 
 import rasterio
+from shutil import move
 from rasterio.io import MemoryFile
 from rasterio.coords import BoundingBox
 from rasterio.warp import (calculate_default_transform, 
@@ -199,7 +200,6 @@ def save_colored_raster_as_png(src_memfile: MemoryFile,
 # Function to reclassify -> colorfy -> reproject -> toPNG
 def process_int_raster( initial_tif:str=None, 
                         band=1,
-                        map_note:str=None, 
                         color_dict:dict=None,
                         src_crs='EPSG:3857', 
                         dst_crs='EPSG:4326'):
@@ -211,8 +211,6 @@ def process_int_raster( initial_tif:str=None,
             Path to the initial raster file.
         band (int): 
             Band number to process (default is 1).
-        map_note (str):
-            Extra note for the map, can be used in the output path.
         color_dict (dict): 
             Dictionary mapping pixel values to colors (default is None).
         src_crs (str):
@@ -229,11 +227,7 @@ def process_int_raster( initial_tif:str=None,
     
     # Infer the save path (no extension) from the initial path
     save_base = os.path.splitext(initial_tif)[0]
-    
-    if map_note is not None:
-        output_base = f"{save_base}_mercator_{map_note}"
-    else:
-        output_base = f"{save_base}_mercator"
+    output_base = f"{save_base}_mercator"
         
     # Save the reprojected raster as a GeoTIFF file
     with f.open() as src:
@@ -329,7 +323,6 @@ def mask_invalid_data(memfile: MemoryFile,
 # Function to intify -> colorfy -> reproject -> toPNG
 def process_float_raster(initial_tif:str=None, 
                    band:int=1,
-                   map_note:str=None,
                    color_dict:dict=None,
                    mask_path:str='luto/tools/report/Assets/NLUM_2010-11_mask.tif', 
                    src_crs='EPSG:3857', 
@@ -344,9 +337,7 @@ def process_float_raster(initial_tif:str=None,
     initial_tif (str): 
         Path to the initial float raster image.
     band (int, default=1): 
-        Band number of the float raster image.
-    map_note (str): 
-        The extra note for the map, can be used in the output path.    
+        Band number of the float raster image. 
     color_dict (dict): 
         Dictionary mapping values to colors for the 4-band image.
     mask_path (str): 
@@ -365,11 +356,8 @@ def process_float_raster(initial_tif:str=None,
     f = mask_invalid_data(f, mask_path)
     f = reproject_raster_in_memory(f)
     
-    # Infer the save path (no extension) from the initial path
-    if map_note is not None:
-        save_base = f"{os.path.splitext(initial_tif)[0]}_mercator_{map_note}"
-    else:
-        save_base = f"{os.path.splitext(initial_tif)[0]}_mercator"
+
+    save_base = f"{os.path.splitext(initial_tif)[0]}_mercator"
 
     # Save the reprojected raster as a GeoTIFF file
     with f.open() as src:
@@ -392,8 +380,7 @@ def process_float_raster(initial_tif:str=None,
 # Get the tif path
 def process_raster(tif_path: str, 
                    color_csv: str, 
-                   data_type: str, 
-                   map_note: str) -> tuple:
+                   data_type: str) -> tuple:
     """
     Process a raster image and return the center, bounds, and mercator bbox.
 
@@ -401,14 +388,10 @@ def process_raster(tif_path: str,
         tif_path (str): The path to the raster image file.
         color_csv (str): The path to the CSV file containing color information.
         data_type (str): The type of data in the raster image ('integer' or 'float').
-        map_note (str): The extra note for the map.
 
     Returns:
         tuple: A tuple containing the center, bounds for folium map, and mercator bbox.
-    """
-    # Report the process
-    print(f"Processing {os.path.basename(tif_path)}")
-    
+    """    
     
     # Get the metadata for making map with the tif    
     color_df = pd.read_csv(color_csv)
@@ -420,14 +403,12 @@ def process_raster(tif_path: str,
         color_desc_dict = color_df.set_index('lu_color_numeric')['lu_desc'].to_dict()
         center, bounds_for_folium, mercator_bbox = process_int_raster(
                                                         initial_tif=tif_path, 
-                                                        color_dict=val_color_dict,
-                                                        map_note=map_note)
+                                                        color_dict=val_color_dict)
     elif data_type == 'float':
         color_desc_dict = color_df.set_index('lu_color_numeric')['lu_code'].to_dict()
         center, bounds_for_folium, mercator_bbox = process_float_raster(
                                                         initial_tif=tif_path,
-                                                        color_dict=val_color_dict,
-                                                        map_note=map_note)
+                                                        color_dict=val_color_dict)
 
     
     # center -> the center of the raster, will be used for folium map to center the map
@@ -439,18 +420,16 @@ def process_raster(tif_path: str,
 
 
 def save_map_to_html(tif_path:str, 
-                     map_note:object,
                      center:list,
                      bounds_for_folium:list):
             
     # Get the input image path
     out_base = os.path.splitext(tif_path)[0]
-    if map_note is not None:
-        in_mercator_png = f"{out_base}_{map_note}.png"
-        html_save_path = f"{out_base}_{map_note}"
-    else:
-        in_mercator_png = f"{out_base}.png"
-        html_save_path = f"{out_base}"
+    in_mercator_png = f"{out_base}_mercator.png"
+    in_base_png = f"{out_base}_basemap.png"
+    out_base_png = f"{out_base}.png"
+    html_save_path = f"{out_base}"
+        
         
     
     
@@ -475,5 +454,6 @@ def save_map_to_html(tif_path:str,
     # Save the map to interactive html
     m.save(f"{html_save_path}.html")
     
-    # Delete the in_mercator_png
+    # Delete the in_mercator_png, reanme the input_mercator_png to input.png
     os.remove(in_mercator_png)
+    move(in_base_png, out_base_png)
