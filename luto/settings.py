@@ -119,7 +119,7 @@ WRITE_OUTPUT_GEOTIFFS = True
 PARALLEL_WRITE = True
 
 # The Threads to use for writing GeoTiffs, and map making
-WRITE_THREADS:int = 32      # Works only if PARALLEL_WRITE = True
+WRITE_THREADS:int = 42      # Works only if PARALLEL_WRITE = True
 
 
 # ---------------------------------------------------------------------------- #
