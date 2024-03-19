@@ -184,12 +184,15 @@ def get_rev_matrices(data, yr_idx, aggregate:bool = True):
 
     # Concatenate the revenue from each land management into a single Multiindex DataFrame.
     rev_rjms = pd.concat([get_rev_matrix(data, lm, yr_idx) for lm in data.LANDMANS], axis=1)
+    
+    # Reorder the columns to match the multi-level dimension of r*jms.
+    rev_rjms = rev_rjms.reindex(columns=pd.MultiIndex.from_product(rev_rjms.columns.levels), fill_value=0)
 
     if aggregate == True:
         j,m,s = rev_rjms.columns.levshape
-        rev_rjm = rev_rjms.T.groupby(level=[0,1]).sum().values.reshape(-1,*[j,m])
-        rev_mrj = np.einsum('rjm->mrj',rev_rjm)
-        return rev_mrj
+        r_rjms = rev_rjms.values.reshape(-1,j,m,s)
+        r_mrj = np.einsum('rjms->mrj',r_rjms)
+        return r_mrj
     
     elif aggregate == False:
         # Concatenate the revenue from each land management into a single Multiindex DataFrame.

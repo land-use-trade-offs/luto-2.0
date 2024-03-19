@@ -175,16 +175,19 @@ def get_cost_matrix(data, lm, yr_idx):
     return cost.fillna(0)
 
 
-def get_cost_matrices(data, yr_idx,aggregate=True):
+def get_cost_matrices(data, yr_idx, aggregate=True):
     """Return agricultural c_mrj matrix of costs per cell as 3D Numpy array."""
     
     # Concatenate the revenue from each land management into a single Multiindex DataFrame.
     cost_rjms = pd.concat([get_cost_matrix(data, lm, yr_idx) for lm in data.LANDMANS], axis=1)
+    
+    # Reorder the columns to match the multi-level dimension of r*jms.
+    cost_rjms = cost_rjms.reindex(columns=pd.MultiIndex.from_product(cost_rjms.columns.levels), fill_value=0)
 
     if aggregate == True:
         j,m,s = cost_rjms.columns.levshape
-        c_rjm = cost_rjms.T.groupby(level=[0,1]).sum().values.reshape(-1,*[j,m])
-        c_mrj = np.einsum('rjm->mrj',c_rjm)
+        c_rjms = cost_rjms.values.reshape(-1,j,m,s)
+        c_mrj = np.einsum('rjms->mrj',c_rjms)
         return c_mrj
     
     elif aggregate == False:
