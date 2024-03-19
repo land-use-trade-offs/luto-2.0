@@ -240,16 +240,16 @@ def write_files(sim, yr_cal, path):
     
     # Get the Agricultural Management applied to each pixel
     ag_man_dvar = np.stack([np.einsum('mrj -> r', v) for _,v in sim.ag_man_dvars[yr_cal].items()]).T   # (r, am)
-    ag_man_dvar_mask = ag_man_dvar.sum(1) > 0.01           # Meaning that they have at least 1% of agricultural management applied
+    ag_man_dvar_mask = ag_man_dvar.sum(1) > 0.01            # Meaning that they have at least 1% of agricultural management applied
     # Get the maximum index of the agricultural management applied to the valid pixel
-    ag_man_dvar = np.argmax(ag_man_dvar, axis=1) + 1   # Start from 1
+    ag_man_dvar = np.argmax(ag_man_dvar, axis=1) + 1        # Start from 1
     # Let the pixels that were all zeros in the original array to be 0
     ag_man_dvar_argmax = np.where(ag_man_dvar_mask, ag_man_dvar, 0)
     
 
     # Get the non-agricultural landuse for each pixel
-    non_ag_dvar = sim.non_ag_dvars[yr_cal]              # (r, k)
-    non_ag_dvar_mask = non_ag_dvar.sum(1) > 0.01          # Meaning that they have at least 1% of non-agricultural landuse applied
+    non_ag_dvar = sim.non_ag_dvars[yr_cal]                  # (r, k)
+    non_ag_dvar_mask = non_ag_dvar.sum(1) > 0.01            # Meaning that they have at least 1% of non-agricultural landuse applied
     # Get the maximum index of the non-agricultural landuse applied to the valid pixel
     non_ag_dvar = np.argmax(non_ag_dvar, axis=1) + sim.data.NON_AGRICULTURAL_LU_BASE_CODE    # Start from 100
     # Let the pixels that were all zeros in the original array to be 0

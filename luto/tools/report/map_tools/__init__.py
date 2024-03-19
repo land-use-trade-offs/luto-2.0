@@ -411,8 +411,8 @@ def process_raster(tif_path: str,
                                                         color_dict=val_color_dict)
 
     
-    # center -> the center of the raster, will be used for folium map to center the map
-    # bounds_wgs -> the bounds of the raster in WGS84, will be used for folium map to set the bounds
+    # center          -> the center of the raster, will be used for folium map to center the map
+    # bounds_wgs      -> the bounds of the raster in WGS84, will be used for folium map to set the bounds
     # bounds_mercator -> the bounds of the raster in Mercator, will be used to download the basemap
     # color_desc_dict -> the color-description dictionary, can be used to create legend 
     return center, bounds_for_folium, mercator_bbox, color_desc_dict

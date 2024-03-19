@@ -4,6 +4,7 @@ from rasterio.plot import show
 from rasterio.merge import merge
 
 import geopandas as gpd
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib_scalebar.scalebar import ScaleBar

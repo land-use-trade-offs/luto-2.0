@@ -55,11 +55,7 @@ from luto.settings import (
 
 
 # Try-Except to make sure {rasterio} can be loaded under different environment
-try:
-    import rasterio
-except:
-    from osgeo import gdal
-    import rasterio
+import rasterio
 
 
 print('\nBeginning data initialisation at', time.strftime("%H:%M:%S", time.localtime()) + '...')
