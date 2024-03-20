@@ -86,7 +86,7 @@ class InputData:
     ag_man_b_mrj: dict  # Agricultural management options' biodiversity effects.
     ag_man_limits: dict  # Agricultural management options' adoption limits.
     
-    offland_ghg: np.ndarray  # GHG emissions from off-land commodity.
+    offland_ghg: np.ndarray  # GHG emissions from off-land commodities.
 
     lu2pr_pj: np.ndarray  # Conversion matrix: land-use to product(s).
     pr2cm_cp: np.ndarray  # Conversion matrix: product(s) to commodity.
@@ -191,12 +191,17 @@ class LutoSolver:
         constraints, and the objective.
         """
         print("Setting up the model...\n")
+
+        print("Adding the decision variables...\n")
         self._setup_vars()
+        
+        print(f"Adding the objective function - {settings.OBJECTIVE}...\n", flush=True)
         self._setup_objective()
+        
+        print("Adding the constraints...\n")
         self._setup_constraints()
 
     def _setup_vars(self):
-        print("Adding decision variables...\n", flush=True)
         self._setup_x_vars()
         self._setup_ag_management_variables()
         self._setup_decision_variables()
@@ -281,7 +286,7 @@ class LutoSolver:
         """
         Formulate the objective based on settings.OBJECTIVE
         """
-        print(f"Setting objective function to {settings.OBJECTIVE}...\n", flush=True)
+        # print(f"Setting objective function to {settings.OBJECTIVE}...\n", flush=True)
 
         if settings.OBJECTIVE == "maxrev":
             # Pre-calculate revenue minus (production and transition) costs
@@ -394,6 +399,8 @@ class LutoSolver:
         Constraint that all of every cell is used for some land use.
         If `cells` is provided, only adds constraints for the given cells
         """
+        print('  ...cell usage constraints...\n')
+
         if cells is None:
             cells = np.array(range(self._input_data.ncells))
 
@@ -418,6 +425,8 @@ class LutoSolver:
         Constraint handling alternative agricultural management options:
         Ag. man. variables cannot exceed the value of the agricultural variable.
         """
+        print('  ...agricultural management constraints...\n')
+
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx, j in enumerate(am_j_list):
                 if cells is not None:
@@ -442,6 +451,8 @@ class LutoSolver:
         """
         Add adoption limits constraints for agricultural management options.
         """
+        print('  ...agricultural management adoption constraints...\n')
+
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx, j in enumerate(am_j_list):
                 adoption_limit = self._input_data.ag_man_limits[am][j]
@@ -464,6 +475,7 @@ class LutoSolver:
         """
         Constraints to penalise under and over production compared to demand.
         """
+        print('  ...demand constraints...\n')
 
         # Quantities in PR/p representation by land-management (dry/irr).
         ag_q_dry_p = [
@@ -592,16 +604,18 @@ class LutoSolver:
         If `cells` is provided, only adds constraints for regions containing at least one of the
         provided cells.
         """
+        print(f'  ...water constraints by {settings.WATER_REGION_DEF}...')
+
         if settings.WATER_USE_LIMITS != "on":
             return
 
-        print(f"Adding water constraints by {settings.WATER_REGION_DEF}...")
+        # print(f"Adding water constraints by {settings.WATER_REGION_DEF}...")
 
         # Returns region-specific water use limits
         w_limits = self._input_data.limits["water"]
 
         # Ensure water use remains below limit for each region
-        for region, wreq_reg_limit, ind in w_limits:
+        for region, name, wreq_reg_limit, ind in w_limits:
             if cells is not None and np.intersect1d(cells, ind).size == 0:
                 continue
 
@@ -643,14 +657,16 @@ class LutoSolver:
                     self.water_limit_constraints_r[r].append(constr)
 
             if settings.VERBOSE == 1:
-                print(f"    ...setting water limit for {region} <= {wreq_reg_limit:.2f} ML")
+                print(f"    ...water use in {name} <= {wreq_reg_limit:.2f} ML")
+        print('')
 
     def _add_ghg_emissions_limit_constraints(self):
+        
         if settings.GHG_EMISSIONS_LIMITS != "on":
             return
-        print('')
-        print("Adding GHG emissions constraints...")
-
+        
+        print('  ...GHG emissions constraints...')
+        
         # Returns GHG emissions limits
         ghg_limits = self._input_data.limits["ghg"]
 
@@ -695,7 +711,7 @@ class LutoSolver:
 
         self.ghg_emissions_expr = ag_contr + ag_man_contr + non_ag_contr + self._input_data.offland_ghg
 
-        print(f"    ...setting GHG emissions reduction target: {ghg_limits:,.0f} tCO2e\n")
+        print(f"    ...GHG emissions reduction target: {ghg_limits:,.0f} tCO2e\n")
         self.ghg_emissions_limit_constraint = self.gurobi_model.addConstr(
             self.ghg_emissions_expr <= ghg_limits
         )
@@ -703,8 +719,8 @@ class LutoSolver:
     def _add_biodiversity_limit_constraints(self):
         if settings.BIODIVERSITY_LIMITS != "on":
             return
-
-        print("Adding biodiversity constraints...")
+        
+        print('  ...biodiversity constraints...')
 
         # Returns biodiversity limits
         biodiversity_limits = self._input_data.limits["biodiversity"]
@@ -741,13 +757,12 @@ class LutoSolver:
 
         self.biodiversity_expr = ag_contr + ag_man_contr + non_ag_contr
 
-        print(f"    ...setting biodiversity score target: {biodiversity_limits:,.0f}\n")
+        print(f"    ...biodiversity target score: {biodiversity_limits:,.0f}\n")
         self.biodiversity_limit_constraint = self.gurobi_model.addConstr(
             self.biodiversity_expr >= biodiversity_limits
         )
 
     def _setup_constraints(self):
-        print("Setting up constraints...\n")
         self._add_cell_usage_constraints()
         self._add_agricultural_management_constraints()
         self._add_agricultural_management_adoption_limit_constraints()
@@ -773,6 +788,7 @@ class LutoSolver:
         self._input_data = input_data
         self.d_c = d_c
 
+        print('Updating variables...', flush=True)
         updated_cells = self._update_variables(
             old_ag_x_mrj,
             old_non_ag_x_rk,
@@ -781,7 +797,10 @@ class LutoSolver:
             old_lmmap,
             current_lmmap,
         )
+        print('Updating constraints...\n', flush=True)
         self._update_constraints(updated_cells)
+        
+        print('Updating objective function...\n', flush=True)
         self._setup_objective()
 
     def _update_variables(
@@ -797,9 +816,6 @@ class LutoSolver:
         Updates the variables only for cells that have changed land use or land management.
         Returns an array of cells that have been updated.
         """
-        # update x vars
-        print("Updating variables...", flush=True)
-
         # metrics
         num_cells_skipped = 0
         updated_cells = []
@@ -900,22 +916,38 @@ class LutoSolver:
             print("No constraints need updating.")
             return
 
-        print("Updating constraints...\n")
+        # for r in updated_cells:
+        #     self.gurobi_model.remove(self.cell_usage_constraint_r.pop(r, []))
+        #     self.gurobi_model.remove(self.ag_management_constraints_r.pop(r, []))
+        #     self.gurobi_model.remove(self.water_limit_constraints_r.pop(r, []))
+        #     self.gurobi_model.remove(self.adoption_limit_constraints)
+        #     self.gurobi_model.remove(self.demand_penalty_constraints)
+        #     self.gurobi_model.remove(self.biodiversity_limit_constraint)
+            
+        #     self.adoption_limit_constraints = []
+        #     self.demand_penalty_constraints = []
+
+        #     if self.ghg_emissions_limit_constraint is not None:
+        #         self.gurobi_model.remove(self.ghg_emissions_limit_constraint)
+        #         self.ghg_emissions_limit_constraint = None
+        
+        print('  ...removing existing constraints...\n')
         for r in updated_cells:
             self.gurobi_model.remove(self.cell_usage_constraint_r.pop(r, []))
             self.gurobi_model.remove(self.ag_management_constraints_r.pop(r, []))
             self.gurobi_model.remove(self.water_limit_constraints_r.pop(r, []))
-            self.gurobi_model.remove(self.adoption_limit_constraints)
-            self.gurobi_model.remove(self.demand_penalty_constraints)
-            self.gurobi_model.remove(self.biodiversity_limit_constraint)
-            
-            self.adoption_limit_constraints = []
-            self.demand_penalty_constraints = []
+        
+        self.gurobi_model.remove(self.adoption_limit_constraints)
+        self.gurobi_model.remove(self.demand_penalty_constraints)
+        self.gurobi_model.remove(self.biodiversity_limit_constraint)
+        
+        self.adoption_limit_constraints = []
+        self.demand_penalty_constraints = []
 
-            if self.ghg_emissions_limit_constraint is not None:
-                self.gurobi_model.remove(self.ghg_emissions_limit_constraint)
-                self.ghg_emissions_limit_constraint = None
-
+        if self.ghg_emissions_limit_constraint is not None:
+            self.gurobi_model.remove(self.ghg_emissions_limit_constraint)
+            self.ghg_emissions_limit_constraint = None
+                
         self._add_cell_usage_constraints(updated_cells)
         self._add_agricultural_management_constraints(updated_cells)
         self._add_agricultural_management_adoption_limit_constraints()
@@ -924,15 +956,14 @@ class LutoSolver:
         self._add_ghg_emissions_limit_constraints()
         self._add_biodiversity_limit_constraints()
 
+
     def solve(self):
         print("Starting solve...\n")
 
         # Magic.
         self.gurobi_model.optimize()
 
-        ft = time.time()
-        print("Completed solve...\n")
-        print("Collecting results...\n", flush=True)
+        print("Completed solve, collecting results...\n", flush=True)
 
         prod_data = {}  # Dictionary that stores information about production and GHG emissions for the write module
 

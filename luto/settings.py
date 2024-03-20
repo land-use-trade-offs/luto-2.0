@@ -18,16 +18,23 @@
 
 import pandas as pd
 
+
 # ---------------------------------------------------------------------------- #
 # LUTO model version.                                                                 #
 # ---------------------------------------------------------------------------- #
+
 VERSION = '2.3'
 
-############### Set some Spyder options
+
+# ---------------------------------------------------------------------------- #
+# Spyder options                                                            #
+# ---------------------------------------------------------------------------- #
+
 pd.set_option('display.width', 470)
 pd.set_option('display.max_columns', 200)
 pd.set_option('display.max_rows', 5000)
 pd.set_option('display.float_format', '{:,.4f}'.format)
+
 
 # ---------------------------------------------------------------------------- #
 # Directories.                                                                 #
@@ -62,12 +69,11 @@ CO2_FERT = 'on'   # or 'off'
 # Fire impacts on carbon sequestration
 RISK_OF_REVERSAL = 0.05  # Risk of reversal buffer under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
 FIRE_RISK = 'med'   # Options are 'low', 'med', 'high'. Determines whether to take the 5th, 50th, or 95th percentile of modelled fire impacts.
-""" 
-    Mean FIRE_RISK cell values (%)...
+
+""" Mean FIRE_RISK cell values (%)
     FD_RISK_PERC_5TH    80.3967
     FD_RISK_MEDIAN      89.2485
-    FD_RISK_PERC_95TH   93.2735
-"""
+    FD_RISK_PERC_95TH   93.2735 """
 
 
 # ---------------------------------------------------------------------------- #
@@ -84,7 +90,6 @@ DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 
-
 # ---------------------------------------------------------------------------- #
 # Model parameters
 # ---------------------------------------------------------------------------- #
@@ -93,7 +98,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 10          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
 
 # How does the model run over time 
-MODE = 'snapshot'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
+MODE = 'timeseries'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****
@@ -109,7 +114,7 @@ PENALTY = 1e5
 
 
 # ---------------------------------------------------------------------------- #
-# Geographical Raster writing parameters
+# Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
 
 # Write GeoTiffs to output directory: True or False
@@ -120,8 +125,6 @@ PARALLEL_WRITE = True
 
 # The Threads to use for writing GeoTiffs, and map making
 WRITE_THREADS = 50      # Works only if PARALLEL_WRITE = True
-
-
 
 
 # ---------------------------------------------------------------------------- #
@@ -158,42 +161,46 @@ THREADS = 42
 # ---------------------------------------------------------------------------- #
 # Non-agricultural land usage parameters
 # ---------------------------------------------------------------------------- #
-NON_AGRICULTURAL_LU_BASE_CODE = 100         # Non-agricultural land uses will appear on the land use map
-                                            # offset by this amount (e.g. land use 0 will appear as 100)
+
+# Price of carbon per tonne - determines revenue from carbon sequestration
+CARBON_PRICE_PER_TONNE = 100                
 
 # Environmental Plantings Parameters
 ENV_PLANTING_COST_PER_HA_PER_YEAR = 100     # Yearly cost of maintaining one hectare of environmental plantings
-CARBON_PRICE_PER_TONNE = 100                # Price of carbon per tonne - determines EP revenue in the model
 
 # Riparian Planting Parameters
-RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR = 100
+rp_annual_maintennance_cost_per_ha_per_year = 100
+rp_annual_ecosystem_services_benefit_per_ha_per_year = 100
+RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR = rp_annual_maintennance_cost_per_ha_per_year - rp_annual_ecosystem_services_benefit_per_ha_per_year
 RIPARIAN_PLANTINGS_BUFFER_WIDTH = 20
-# RIPARIAN_PLANTINGS_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 100 metres per hectare
-RIPARIAN_PLANTINGS_FENCING_COST_PER_M = 2           # $ per linear metre
+RIPARIAN_PLANTINGS_FENCING_COST_PER_M = 5           # $ per linear metre
 RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR = 0.5
 
 # Agroforestry Parameters
 AGROFORESTRY_COST_PER_HA_PER_YEAR = 100
 AGROFORESTRY_ROW_WIDTH = 20
 AGROFORESTRY_ROW_SPACING = 40
-# AGROFORESTRY_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 100 metres per hectare
-AGROFORESTRY_FENCING_COST_PER_M = 2           # $ per linear metre
+AGROFORESTRY_FENCING_COST_PER_M = 5           # $ per linear metre
 AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
-no_alleys_per_ha = 100 / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
-AF_FENCING_LENGTH = 100 * no_alleys_per_ha * 2 # Length of fencing required per ha in metres
+no_belts_per_ha = 100 / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
+AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per ha in metres
                     
+NON_AGRICULTURAL_LU_BASE_CODE = 100         # Non-agricultural land uses will appear on the land use map
+                                            # offset by this amount (e.g. land use 0 will appear as 100)
+
 
 # ---------------------------------------------------------------------------- #
 # Agricultural management parameters
 # ---------------------------------------------------------------------------- #
 
-AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  # The minimum value an agricultural management variable must take for the
-                                             # write_output function to consider it being used on a cell
+# The minimum value an agricultural management variable must take for the write_output function to consider it being used on a cell
+AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  
                                              
 
 # ---------------------------------------------------------------------------- #
 # Off-land commodity parameters
 # ---------------------------------------------------------------------------- #
+
 OFF_LAND_COMMODITIES = ['pork', 'chicken', 'eggs', 'aquaculture']
 EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 
@@ -220,7 +227,6 @@ GHG_LIMITS_FIELD = '1.5C (67%)'
 SOC_AMORTISATION = 30           # Number of years over which to spread (average) soil carbon accumulation
 
 
-
 # Water use limits and parameters *******************************
 
 WATER_USE_LIMITS = 'on'               # 'on' or 'off'
@@ -236,8 +242,7 @@ WATER_USE_REDUCTION_PERCENTAGE = 0
 WATER_STRESS_FRACTION = 0.2          
 
 # Regionalisation to enforce water use limits by
-WATER_REGION_DEF = 'DD'                 # 'RR' for River Region, 'DD' for Drainage Division
-
+WATER_REGION_DEF = 'Drainage Division'                 # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
 
 
 # Biodiversity limits and parameters *******************************
@@ -260,7 +265,6 @@ BIODIV_TARGET = 0.3
 BIODIV_TARGET_ACHIEVEMENT_YEAR = 2030
 
 
-
 # ---------------------------------------------------------------------------- #
 # Cell Culling
 # ---------------------------------------------------------------------------- #
@@ -271,7 +275,6 @@ CULL_MODE = 'absolute'      # cull to include at most MAX_LAND_USES_PER_CELL
 
 MAX_LAND_USES_PER_CELL = 12 
 LAND_USAGE_CULL_PERCENTAGE = 0.15
-
 
 
 

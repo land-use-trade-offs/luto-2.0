@@ -58,7 +58,7 @@ from luto.settings import (
 import rasterio
 
 
-print('\nBeginning data initialisation at', time.strftime("%H:%M:%S", time.localtime()) + '...')
+print('\n' + time.strftime("%Y-%m-%d %H:%M:%S"), 'Beginning data initialisation...')
 
 
 ###############################################################
