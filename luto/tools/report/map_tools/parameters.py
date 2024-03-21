@@ -43,6 +43,14 @@ map_single_lucc = {k:k for k in map_single_lucc}
 map_basename_rename = {**map_multiple_lucc, **map_single_lucc}
 
 
+# The extra colors for the float rasters
+extra_color_float_tif = {   0:(200, 200, 200, 255), # 0 is the non-Agriculture land in the raw tif file
+                          -100:(225, 225, 225, 255)  # -100 refers to the nodata pixels in the raw tif file
+                        } 
+
+extra_desc_float_tif = {0: 'Agricultural land',
+                        -100: 'Non-Agriculture land'
+                        }  
 
 
 # The data types for each map type
@@ -61,52 +69,56 @@ data_types = {'lumap': 'integer',
 legend_params = {'lumap': {'bbox_to_anchor': (0.02, 0.19),
                             'loc': 'upper left',
                             'ncol': 2,
-                            'fontsize': 23,
+                            'fontsize': 15,
                             'framealpha': 0,
                             'columnspacing': 1},
                  
                  'lmmap': {'bbox_to_anchor': (0.1, 0.25),
                             'loc': 'upper left',
                             'ncol': 1,
-                            'fontsize': 23,
+                            'fontsize': 15,
                             'framealpha': 0,
                             'columnspacing': 1},
                  
                  'ammap': {'bbox_to_anchor': (0.02, 0.19),
                             'loc': 'upper left',
                             'ncol': 2,
-                            'fontsize': 23,
+                            'fontsize': 15,
                             'framealpha': 0,
                             'columnspacing': 1},
                  
                  'non_ag': {'bbox_to_anchor': (0.02, 0.19),
                             'loc': 'upper left',
                             'ncol': 2,
-                            'fontsize': 23,
+                            'fontsize': 15,
                             'framealpha': 0,
                             'columnspacing': 1},
                  
-                 'Ag_LU': {'bbox_to_anchor': (0.09, 0.2), 
+                 'Ag_LU': {'bbox_to_anchor': (0.05, 0.23),
                             'loc': 'upper left',
-                            'ncol': 2,
-                            'fontsize': 22,
+                            'ncol': 1,
+                            'labelspacing': 2.0,
+                            'fontsize': 15,
                             'framealpha': 0},
                  
-                 'Ag_Mgt': {'bbox_to_anchor': (0.09, 0.2), 
+                 'Ag_Mgt': {'bbox_to_anchor': (0.05, 0.23),
                             'loc': 'upper left',
-                            'ncol': 2,
-                            'fontsize': 22,
+                            'ncol': 1,
+                            'labelspacing': 2.0,
+                            'fontsize': 15,
                             'framealpha': 0},
                  
-                 'Land_Mgt': {'bbox_to_anchor': (0.09, 0.2), 
+                 'Land_Mgt': {'bbox_to_anchor': (0.05, 0.23),
                             'loc': 'upper left',
-                            'ncol': 2,
-                            'fontsize': 22,
+                            'ncol': 1,
+                            'labelspacing': 2.0,
+                            'fontsize': 15,
                             'framealpha': 0},
                  
-                 'Non-Ag': {'bbox_to_anchor': (0.09, 0.2), 
+                 'Non-Ag': {'bbox_to_anchor': (0.05, 0.23),
                             'loc': 'upper left',
-                            'ncol': 2,
-                            'fontsize': 22,
+                            'ncol': 1,
+                            'labelspacing': 2.0,
+                            'fontsize': 15,
                             'framealpha': 0},
                 }
