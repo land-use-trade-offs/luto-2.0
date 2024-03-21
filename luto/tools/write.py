@@ -767,13 +767,13 @@ def write_water(sim, yr_cal, path):
     wuse_limits = ag_water.get_wuse_limits(sim.data)
 
     # Set up data for river regions or drainage divisions
-    if settings.WATER_REGION_DEF == 'RR':
+    if settings.WATER_REGION_DEF == 'River Region':
         region_limits = sim.data.RIVREG_LIMITS
         region_id = sim.data.RIVREG_ID
         # regions = settings.WATER_RIVREGS
         region_dict = sim.data.RIVREG_DICT
         
-    elif settings.WATER_REGION_DEF == 'DD':
+    elif settings.WATER_REGION_DEF == 'Drainage Division':
         region_limits = sim.data.DRAINDIV_LIMITS
         region_id = sim.data.DRAINDIV_ID
         # regions = settings.WATER_DRAINDIVS
@@ -855,7 +855,7 @@ def write_water(sim, yr_cal, path):
         
         
         # Calculate water use limits and actual water use
-        wul = wuse_limits[i][1]
+        wul = wuse_limits[i][2]
         wreq_reg = df_region['Water Use (ML)'].sum()
         
         # Calculate absolute and proportional difference between water use target and actual water use
