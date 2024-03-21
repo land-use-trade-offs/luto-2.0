@@ -1,4 +1,5 @@
 import os
+import base64
 import folium
 import pandas as pd
 import numpy as np
@@ -430,10 +431,19 @@ def save_map_to_html(tif_path:str,
     in_mercator_png = f"{out_base}_mercator.png"
     in_base_png = f"{out_base}_basemap.png"
     out_base_png = f"{out_base}.png"
-    html_save_path = f"{out_base}"
-        
-        
+    html_save_path = f"{out_base}.html"
+    txt_save_path = f"{out_base}.txt"
     
+    
+    # Open the file in binary mode
+    with open(in_mercator_png, 'rb') as image_file, open(f"{txt_save_path}", "w") as f:
+        # Convert the image to base64
+        encoded_string = base64.b64encode(image_file.read()).decode()
+        # Add the tag to the base64 string
+        img_tag = f'data:image/png;base64,{encoded_string}'
+        # Write the tagged string to the text file
+        f.write(img_tag)
+
     
     # Initialize the map
     m = folium.Map(center, 
@@ -454,7 +464,7 @@ def save_map_to_html(tif_path:str,
     img.add_to(m)
     
     # Save the map to interactive html
-    m.save(f"{html_save_path}.html")
+    m.save(html_save_path)
     
     # Delete the in_mercator_png, reanme the input_mercator_png to input.png
     os.remove(in_mercator_png)
