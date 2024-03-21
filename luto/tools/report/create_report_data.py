@@ -305,11 +305,12 @@ def save_report_data(sim):
 
     heat_area = transition_df_area.style.background_gradient(cmap='Oranges', 
                                                             axis=1, 
-                                                            subset=pd.IndexSlice[:transition_df_area.index[-2], :transition_df_area.columns[-2]]).format('{:,.1f}')
+                                                            subset=pd.IndexSlice[:transition_df_area.index[-2], :transition_df_area.columns[-2]]).format('{:,.0f}')
+    
     heat_pct = transition_df_pct.style.background_gradient(cmap='Oranges', 
                                                         axis=1,
                                                         vmin=0, 
-                                                        vmax=100).format('{:,.3f}')
+                                                        vmax=100).format('{:,.2f}')
 
     # Define the style
     # style = "<style>table, th, td {font-size: 7px;font-family: Helvetica, Arial, sans-serif;} </style>\n"
@@ -323,9 +324,9 @@ def save_report_data(sim):
     heat_area_html = heat_area.to_html()
     heat_pct_html = heat_pct.to_html()
 
-    # Replace 0.00 with 0 in the html
-    heat_area_html = re.sub(r'(?<!\d)0.0(?!\d)', '-', heat_area_html)
-    heat_pct_html = re.sub(r'(?<!\d)0.000(?!\d)', '-', heat_pct_html)
+    # Replace 0.00 with - in the html
+    heat_area_html = re.sub(r'(?<!\d)0(?!\d)', '-', heat_area_html)
+    heat_pct_html = re.sub(r'(?<!\d)0.00(?!\d)', '-', heat_pct_html)
 
     # Save the html
     with open(f'{SAVE_DIR}/area_6_begin_end_area.html', 'w') as f:
