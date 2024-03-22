@@ -5,6 +5,8 @@ import re
 import shutil
 import pandas as pd
 from glob import glob
+from joblib import Parallel, delayed
+import luto.settings as settings
 
 from luto.economics.off_land_commodity import get_demand_df
 
@@ -683,8 +685,12 @@ def save_report_data(sim):
     map_files = files.query('base_ext == ".map" and year_types != "begin_end_year"')
     
     # Copy the map files to the save directory
-    for _,row in map_files.iterrows():
-        shutil.copy(row['path'], f"{SAVE_DIR}/map_{row['base_name']}.map")
+    tasks = [delayed(shutil.copy)(row['path'], f"{SAVE_DIR}/map_{row['base_name']}.map")
+                for _,row in map_files.iterrows()]
+    
+    worker = min(settings.WRITE_THREADS, len(tasks))
+    
+    Parallel(n_jobs=worker)(tasks)
     
     
 
