@@ -2,6 +2,7 @@
 import os
 import json
 import re
+import shutil
 import pandas as pd
 from glob import glob
 
@@ -674,6 +675,18 @@ def save_report_data(sim):
     natural_land_area.columns = ['name','data']
     natural_land_area['type'] = 'column'
     natural_land_area.to_json(f'{SAVE_DIR}/biodiversity_4_natural_land_area.json',orient='records')
+    
+    
+    #########################################################
+    #                         7) Maps                       #
+    #########################################################
+    map_files = files.query('base_ext == ".map" and year_types != "begin_end_year"')
+    
+    # Copy the map files to the save directory
+    for _,row in map_files.iterrows():
+        shutil.copy(row['path'], f"{SAVE_DIR}/map_{row['base_name']}.map")
+    
+    
 
 
     #########################################################

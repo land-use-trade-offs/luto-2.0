@@ -102,9 +102,10 @@ def write_data(sim):
     Parallel(n_jobs=num_jobs, prefer='threads')(jobs)
         
     # Create the report HTML and png maps
+    TIF2PNG(sim) if settings.WRITE_OUTPUT_GEOTIFFS else None
     save_report_data(sim)
     data2html(sim)
-    TIF2PNG(sim) if settings.WRITE_OUTPUT_GEOTIFFS else None
+    
     
 
 
@@ -212,26 +213,24 @@ def write_files(sim, yr_cal, path):
     """Writes numpy arrays and geotiffs to file"""
     
     print(f'Writing numpy arrays and geotiff outputs to {path}')
-
-    timestamp = sim.timestamp
     
     # Save raw agricultural decision variables (float array).
-    ag_X_mrj_fname = 'ag_X_mrj' + '_' + timestamp + '.npy'
+    ag_X_mrj_fname = 'ag_X_mrj' + '_' + str(yr_cal) + '.npy'
     np.save(os.path.join(path, ag_X_mrj_fname), sim.ag_dvars[yr_cal].astype(np.float16))
     
     # Save raw non-agricultural decision variables (float array).
-    non_ag_X_rk_fname = 'non_ag_X_rk' + '_' + timestamp + '.npy'
+    non_ag_X_rk_fname = 'non_ag_X_rk' + '_' + str(yr_cal) + '.npy'
     np.save(os.path.join(path, non_ag_X_rk_fname), sim.non_ag_dvars[yr_cal].astype(np.float16))
 
     # Save raw agricultural management decision variables (float array).
     for am in AG_MANAGEMENTS_TO_LAND_USES:
         snake_case_am = tools.am_name_snake_case(am)
-        am_X_mrj_fname = 'ag_man_X_mrj' + snake_case_am + '_' + timestamp + ".npy"
+        am_X_mrj_fname = 'ag_man_X_mrj' + snake_case_am + '_' + str(yr_cal) + ".npy"
         np.save(os.path.join(path, am_X_mrj_fname), sim.ag_man_dvars[yr_cal][am].astype(np.float16))
     
     # Write out raw numpy arrays for land-use and land management
-    lumap_fname = 'lumap' + '_' + timestamp + '.npy'
-    lmmap_fname = 'lmmap' + '_' + timestamp + '.npy'
+    lumap_fname = 'lumap' + '_' + str(yr_cal) + '.npy'
+    lmmap_fname = 'lmmap' + '_' + str(yr_cal) + '.npy'
     
     np.save(os.path.join(path, lumap_fname), sim.lumaps[yr_cal])
     np.save(os.path.join(path, lmmap_fname), sim.lmmaps[yr_cal])
@@ -262,10 +261,10 @@ def write_files(sim, yr_cal, path):
     ammap = create_2d_map(sim, ag_man_dvar_argmax, filler = sim.data.MASK_LU_CODE)
     non_ag = create_2d_map(sim, non_ag_dvar_argmax, filler = sim.data.MASK_LU_CODE)
     
-    lumap_fname = 'lumap' + '_' + timestamp + '.tiff'
-    lmmap_fname = 'lmmap' + '_' + timestamp + '.tiff'
-    ammap_fname = 'ammap' + '_' + timestamp + '.tiff'
-    non_ag_fname = 'non_ag' + '_' + timestamp + '.tiff'
+    lumap_fname = 'lumap' + '_' + str(yr_cal) + '.tiff'
+    lmmap_fname = 'lmmap' + '_' + str(yr_cal) + '.tiff'
+    ammap_fname = 'ammap' + '_' + str(yr_cal) + '.tiff'
+    non_ag_fname = 'non_ag' + '_' + str(yr_cal) + '.tiff'
     
     write_gtiff(lumap, os.path.join(path, lumap_fname))
     write_gtiff(lmmap, os.path.join(path, lmmap_fname)) 

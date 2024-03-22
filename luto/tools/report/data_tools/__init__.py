@@ -92,7 +92,7 @@ def get_all_files(data_root):
             # Append the file path to the list
             file_paths.append(file_path)
 
-    # remove log files and sort the files
+    # Only filepath containing "out_" are valid paths
     file_paths = sorted([i for i in file_paths if 'out_' in i])
 
     # Get the year and the run number from the file name

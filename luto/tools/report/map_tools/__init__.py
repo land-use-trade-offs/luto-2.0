@@ -432,7 +432,7 @@ def save_map_to_html(tif_path:str,
     in_base_png = f"{out_base}_basemap.png"
     out_base_png = f"{out_base}.png"
     html_save_path = f"{out_base}.html"
-    txt_save_path = f"{out_base}.txt"
+    txt_save_path = f"{out_base}.map"
     
     
     # Open the file in binary mode
