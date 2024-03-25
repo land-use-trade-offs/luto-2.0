@@ -1,13 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-     <!-- Make sure you put this AFTER Leaflet's CSS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <!-- Make sure you put this AFTER Leaflet's CSS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <title>Document</title>
 </head>
+
 <body>
 
     <script src="spatial_maps.js"></script>
@@ -20,46 +24,63 @@
         <a href="../index.html">Home</a>
         <a href="./production.html">Demand and Production</a>
         <a href="./economics.html">Economics</a>
-        <a href="./land-use_area.html">Land-use Area</a>        
+        <a href="./land-use_area.html">Land-use Area</a>
         <a href="./GHG_emissions.html">GHG Emissions</a>
         <a href="./water_usage.html">Water Use</a>
         <a href="./biodiversity.html">Biodiversity</a>
-        <a class="active" href="./spatial_maps.html">Maps</a> 
-        
-        <a id="dropdown">
-            <label for="select">Select a category:</label>
-            <select id="select">
-                <option value="production">Production</option>
-                <option value="demand">Demand</option>
-                <option value="economics">Economics</option>
-                <option value="land-use">Land-use Area</option>
-                <option value="GHG-emissions">GHG Emissions</option>
-                <option value="water-usage">Water Use</option>
-                <option value="biodiversity">Biodiversity</option>
+        <a class="active" href="./spatial_maps.html">Maps</a>
+
+        <!-- Add a line to separate the sidebar from the rest of the content -->
+        <div id="sidebarLine" class="NoHover"></div>
+
+        <!-- The dropdown to select the category of the map: -->
+        <div >
+            <label for="select_1" class="label">Select a category:</label>
+            <select id="select_1">
+                <option value="lumap" selected>All Land-use</option>
+                <option value="Ag_LU">Agricultural Land-use</option>
+                <option value="Ag_Mgt">Agricultural Management</option>
+                <option value="Land_Mgt">Water supply</option>
+                <option value="Non-Ag_LU">Non-agricultural Land-use</option>
             </select>
-        </a>
+        </div>
 
-        <a id="scroll">
-            <label for="year">Select a year:</label>
-            <input type="range" id="year" name="year" min="2010" max="2050" step="1" oninput="yearOutput.value = year.value">
+
+        <!-- The dropdown to select the specific map: -->
+        <div >
+            <label for="select_2" class="label">Select a map:</label>
+            <select id="select_2">
+                <option value="lumap" selected>All Land-use</option>
+            </select>
+        </div>
+
+
+        <!-- The dropdown to select the year of the map: -->
+        <div > 
+            <label for="year" class="label">Select a year:</label><br>
+            <input type="range" id="year" name="year" min="2010" max="2050" step="1"
+                oninput="yearOutput.value = year.value">
             <output id="yearOutput">2010</output>
-        </a>
+        </div>
 
-        
+
+
+
 
 
     </div>
 
     <!-- The main content -->
-    <div class="content"> 
+    <div class="content">
 
         <div id="map"></div>
 
     </div>
-    
 
 
-  
-    
+
+
+
 </body>
+
 </html>

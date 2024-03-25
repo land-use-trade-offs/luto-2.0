@@ -515,8 +515,8 @@ document.addEventListener("DOMContentLoaded", function () {
         align: "right",
         verticalAlign: "top",
         layout: "vertical",
-        x: 0,
-        y: -10,
+        x: 10,
+        y: 30,
       },
 
       tooltip: {
