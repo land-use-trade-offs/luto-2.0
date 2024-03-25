@@ -127,23 +127,15 @@ def save_report_data(sim):
         if Type == 'Domestic':
             continue
         DEMAND_DATA_commodity = DEMAND_DATA_long.query('Type == @Type')
-        DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity.pivot(
-            index=['Year'], 
-            columns=['COMMODITY'], 
-            values='Quantity (tonnes, ML)').reset_index()
+        DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity\
+            .groupby(['COMMODITY'])[['Year','Quantity (tonnes, ML)']]\
+            .apply(lambda x: list(zip(x['Year'],x['Quantity (tonnes, ML)'])))\
+            .reset_index()
+            
+        DEMAND_DATA_commodity_wide.columns = ['name','data']
+        DEMAND_DATA_commodity_wide['type'] = 'column'
+        DEMAND_DATA_commodity_wide.to_json(f'{SAVE_DIR}/production_5_{idx+1}_demand_{Type}_commodity.json', orient='records')
         
-        # Remove the rows of all 0 values
-        DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity_wide.loc[:, (DEMAND_DATA_commodity_wide != 0).any(axis=0)]
-        
-        # Reorder the columns to match the order in COMMODITIES_ALL
-        DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity_wide.reindex(
-            columns = [DEMAND_DATA_commodity_wide.columns[0]] + COMMODITIES_ALL).reset_index(drop=True)
-        
-        # Remove the columns of all 0 values
-        DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity_wide.loc[:, (DEMAND_DATA_commodity_wide != 0).any(axis=0)] 
-        
-        DEMAND_DATA_commodity_wide.to_csv(f'{SAVE_DIR}/production_5_{idx+1}_demand_{Type}_commodity.csv', index=False)
-
     # Plot_1-5-6: Production (LUTO outputs, Million Tonnes)
     quantity_csv_paths = files.query('category == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)
     quantity_df = get_quantity_df(quantity_csv_paths)
@@ -682,10 +674,14 @@ def save_report_data(sim):
     #########################################################
     #                         7) Maps                       #
     #########################################################
-    map_files = files.query('base_ext == ".map" and year_types != "begin_end_year"')
+    map_files = files.query('base_ext == ".html" and year_types != "begin_end_year"')
+    map_save_dir = f"{SAVE_DIR}/Map_data/"
+    
+    if not os.path.exists(map_save_dir):
+        os.makedirs(map_save_dir)
     
     # Copy the map files to the save directory
-    tasks = [delayed(shutil.copy)(row['path'], f"{SAVE_DIR}/map_{row['base_name']}.map")
+    tasks = [delayed(shutil.copy)(row['path'], map_save_dir)
                 for _,row in map_files.iterrows()]
     
     worker = min(settings.WRITE_THREADS, len(tasks))
