@@ -6,7 +6,8 @@ import matplotlib as mpl
 from luto.tools.report.map_tools.parameters import (color_types,
                                                     data_types,
                                                     legend_params,
-                                                    map_basename_rename)
+                                                    map_basename_rename,
+                                                    extra_color_float_tif)
 
 
 # Function to download a basemap image
@@ -28,13 +29,11 @@ def download_basemap(bounds_mercator: list[str]):
                                         n_connections=16,
                                         max_retries=4)
     return base_map, extent
+                          
 
-   
-# Function to create value-color dictionary for intergirized raster (1-100) 
-def create_color_csv_0_100(color_scheme:str='YlOrRd',
+def create_color_csv_1_100(color_scheme:str='YlOrRd',
                            save_path:str='luto/tools/report/Assets/float_img_colors.csv',
-                           extra_color:dict={   0:(200, 200, 200, 255),
-                                             -100:(225, 225, 225, 255)}):
+                           extra_color:dict=extra_color_float_tif):
     """
     Create a CSV file contains the value(1-100)-color(HEX) records.
 

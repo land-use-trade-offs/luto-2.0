@@ -158,9 +158,8 @@ def input2tiff(sim, input_data, out_dir):
 
         
         # Execute the futures as they are completed, report the process
-        names = []
         for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)):
             try:
-                names.append(future.result())
+                future.result()
             except Exception as exc:
                 print(f'Generated an exception: {exc}')

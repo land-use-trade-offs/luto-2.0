@@ -63,6 +63,7 @@ def create_maps(row, model_run_scenario):
 
     # Mosaic the projected_tif with base map, and overlay the shapefile
     create_png_map( tif_path = tif_path,
+                    data_type = data_type,
                     color_desc_dict = color_desc_dict,
                     anno_text = inmap_text,
                     mercator_bbox = mercator_bbox,

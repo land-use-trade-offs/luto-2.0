@@ -2,8 +2,11 @@
 import os
 import json
 import re
+import shutil
 import pandas as pd
 from glob import glob
+from joblib import Parallel, delayed
+import luto.settings as settings
 
 from luto.economics.off_land_commodity import get_demand_df
 
@@ -305,11 +308,12 @@ def save_report_data(sim):
 
     heat_area = transition_df_area.style.background_gradient(cmap='Oranges', 
                                                             axis=1, 
-                                                            subset=pd.IndexSlice[:transition_df_area.index[-2], :transition_df_area.columns[-2]]).format('{:,.1f}')
+                                                            subset=pd.IndexSlice[:transition_df_area.index[-2], :transition_df_area.columns[-2]]).format('{:,.0f}')
+    
     heat_pct = transition_df_pct.style.background_gradient(cmap='Oranges', 
                                                         axis=1,
                                                         vmin=0, 
-                                                        vmax=100).format('{:,.3f}')
+                                                        vmax=100).format('{:,.2f}')
 
     # Define the style
     # style = "<style>table, th, td {font-size: 7px;font-family: Helvetica, Arial, sans-serif;} </style>\n"
@@ -323,9 +327,9 @@ def save_report_data(sim):
     heat_area_html = heat_area.to_html()
     heat_pct_html = heat_pct.to_html()
 
-    # Replace 0.00 with 0 in the html
-    heat_area_html = re.sub(r'(?<!\d)0.0(?!\d)', '-', heat_area_html)
-    heat_pct_html = re.sub(r'(?<!\d)0.000(?!\d)', '-', heat_pct_html)
+    # Replace 0.00 with - in the html
+    heat_area_html = re.sub(r'(?<!\d)0(?!\d)', '-', heat_area_html)
+    heat_pct_html = re.sub(r'(?<!\d)0.00(?!\d)', '-', heat_pct_html)
 
     # Save the html
     with open(f'{SAVE_DIR}/area_6_begin_end_area.html', 'w') as f:
@@ -673,6 +677,22 @@ def save_report_data(sim):
     natural_land_area.columns = ['name','data']
     natural_land_area['type'] = 'column'
     natural_land_area.to_json(f'{SAVE_DIR}/biodiversity_4_natural_land_area.json',orient='records')
+    
+    
+    #########################################################
+    #                         7) Maps                       #
+    #########################################################
+    map_files = files.query('base_ext == ".map" and year_types != "begin_end_year"')
+    
+    # Copy the map files to the save directory
+    tasks = [delayed(shutil.copy)(row['path'], f"{SAVE_DIR}/map_{row['base_name']}.map")
+                for _,row in map_files.iterrows()]
+    
+    worker = min(settings.WRITE_THREADS, len(tasks))
+    
+    Parallel(n_jobs=worker)(tasks)
+    
+    
 
 
     #########################################################

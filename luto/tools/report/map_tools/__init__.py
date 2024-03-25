@@ -1,4 +1,5 @@
 import os
+import base64
 import folium
 import pandas as pd
 import numpy as np
@@ -70,6 +71,8 @@ def convert_1band_to_4band_in_memory(initial_tif:str,
     Args:
         initial_tif (str): 
                 The path for input tif.
+        band (int, optional):
+                The band number of the input tif to process (default is 1).
         color_dict (dict): 
                 A dictionary of color values for each class.
 
@@ -288,7 +291,7 @@ def mask_invalid_data(memfile: MemoryFile,
 
     Args:
         memfile (MemoryFile): The input memory file containing the data to be masked.
-        mask_path (str): The path to the mask file.
+        mask_path (str): The path to the mask file (1-band file, -9999 as the nodata value).
 
     Returns:
         MemoryFile: The memory file with the invalid data masked.
@@ -337,7 +340,7 @@ def process_float_raster(initial_tif:str=None,
     initial_tif (str): 
         Path to the initial float raster image.
     band (int, default=1): 
-        Band number of the float raster image. 
+        Band number of the input float raster image. 
     color_dict (dict): 
         Dictionary mapping values to colors for the 4-band image.
     mask_path (str): 
@@ -351,7 +354,7 @@ def process_float_raster(initial_tif:str=None,
     tuple: A tuple containing the center coordinates, bounds for folium, and the mercator bounding box.
     """
     
-    f = float_img_to_int(initial_tif,band)
+    f = float_img_to_int(initial_tif, band)
     f = convert_1band_to_4band_in_memory(f, band, color_dict)
     f = mask_invalid_data(f, mask_path)
     f = reproject_raster_in_memory(f)
@@ -428,10 +431,19 @@ def save_map_to_html(tif_path:str,
     in_mercator_png = f"{out_base}_mercator.png"
     in_base_png = f"{out_base}_basemap.png"
     out_base_png = f"{out_base}.png"
-    html_save_path = f"{out_base}"
-        
-        
+    html_save_path = f"{out_base}.html"
+    txt_save_path = f"{out_base}.map"
     
+    
+    # Open the file in binary mode
+    with open(in_mercator_png, 'rb') as image_file, open(f"{txt_save_path}", "w") as f:
+        # Convert the image to base64
+        encoded_string = base64.b64encode(image_file.read()).decode()
+        # Add the tag to the base64 string
+        img_tag = f'data:image/png;base64,{encoded_string}'
+        # Write the tagged string to the text file
+        f.write(img_tag)
+
     
     # Initialize the map
     m = folium.Map(center, 
@@ -452,7 +464,7 @@ def save_map_to_html(tif_path:str,
     img.add_to(m)
     
     # Save the map to interactive html
-    m.save(f"{html_save_path}.html")
+    m.save(html_save_path)
     
     # Delete the in_mercator_png, reanme the input_mercator_png to input.png
     os.remove(in_mercator_png)
