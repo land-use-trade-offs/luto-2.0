@@ -1,14 +1,28 @@
-#Map_all {
-    display: flex;
-    flex-direction: row;
+
+.content{
+    margin-left:250px; 
 }
 
-.select_col{
-    flex:1;
+#map object{  
+    width:calc(100vw - 265px); 
+    height:calc(98vh - 1px)
 }
 
-#map {  flex:3;
-        width: 30%;
-        height: 500px; }
+#dropdown {
+    border-top: 1px dashed #8d8787; 
+    margin-top: 30px; /* Add some space above the dropdown */
+}
 
+.sidebar label {
+    padding-top: 20px;
+}
 
+.sidebar #dropdown:hover,  .sidebar #scroll:hover {
+    background-color: #f1f1f1;
+    color: rgb(0, 0, 0);
+  }
+  
+
+#select {
+    margin-top: 10px;
+}

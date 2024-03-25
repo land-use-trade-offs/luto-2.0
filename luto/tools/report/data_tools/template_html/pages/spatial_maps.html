@@ -9,11 +9,6 @@
     <title>Document</title>
 </head>
 <body>
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/georaster"></script>
-    <script src="https://unpkg.com/proj4"></script>
-    <script src="https://unpkg.com/georaster-layer-for-leaflet"></script>
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 
     <script src="spatial_maps.js"></script>
     <link rel="stylesheet" href="spatial_maps.css">
@@ -29,29 +24,40 @@
         <a href="./GHG_emissions.html">GHG Emissions</a>
         <a href="./water_usage.html">Water Use</a>
         <a href="./biodiversity.html">Biodiversity</a>
-        <a class="active" href="./spatial_maps.html">Maps</a>  
+        <a class="active" href="./spatial_maps.html">Maps</a> 
+        
+        <a id="dropdown">
+            <label for="select">Select a category:</label>
+            <select id="select">
+                <option value="production">Production</option>
+                <option value="demand">Demand</option>
+                <option value="economics">Economics</option>
+                <option value="land-use">Land-use Area</option>
+                <option value="GHG-emissions">GHG Emissions</option>
+                <option value="water-usage">Water Use</option>
+                <option value="biodiversity">Biodiversity</option>
+            </select>
+        </a>
+
+        <a id="scroll">
+            <label for="year">Select a year:</label>
+            <input type="range" id="year" name="year" min="2010" max="2050" step="1" oninput="yearOutput.value = year.value">
+            <output id="yearOutput">2010</output>
+        </a>
+
+        
 
 
     </div>
 
     <!-- The main content -->
-    <div class="content">
-        <h1>Maps</h1>
-        <div id="Map_all">
-            
-            <!-- the select panel for the left -->
-            <div class="select_col" id="select_left">
-                <p>left</p>
-            </div>
-            <!-- the map -->
-            <div id="map"></div>
-            <!-- the select panel for the right -->
-            <div class="select_col" id="select_right">
-                <p>right</p>
-        </div>
-        </div>
-        
+    <div class="content"> 
+
+        <div id="map"></div>
+
     </div>
+    
+
 
   
     

@@ -682,15 +682,15 @@ def save_report_data(sim):
     #########################################################
     #                         7) Maps                       #
     #########################################################
-    map_files = files.query('base_ext == ".map" and year_types != "begin_end_year"')
+    # map_files = files.query('base_ext == ".map" and year_types != "begin_end_year"')
     
-    # Copy the map files to the save directory
-    tasks = [delayed(shutil.copy)(row['path'], f"{SAVE_DIR}/map_{row['base_name']}.map")
-                for _,row in map_files.iterrows()]
+    # # Copy the map files to the save directory
+    # tasks = [delayed(shutil.copy)(row['path'], f"{SAVE_DIR}/map_{row['base_name']}.map")
+    #             for _,row in map_files.iterrows()]
     
-    worker = min(settings.WRITE_THREADS, len(tasks))
+    # worker = min(settings.WRITE_THREADS, len(tasks))
     
-    Parallel(n_jobs=worker)(tasks)
+    # Parallel(n_jobs=worker)(tasks)
     
     
 
