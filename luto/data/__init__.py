@@ -16,6 +16,7 @@
 
 
 import os, time
+import rasterio
 
 import pandas as pd
 import numpy as np
@@ -52,11 +53,6 @@ from luto.settings import (
     OFF_LAND_COMMODITIES,
     EGGS_AVG_WEIGHT
 )
-
-
-# Try-Except to make sure {rasterio} can be loaded under different environment
-import rasterio
-
 
 print('\n' + time.strftime("%Y-%m-%d %H:%M:%S"), 'Beginning data initialisation...')
 
