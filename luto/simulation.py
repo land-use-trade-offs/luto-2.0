@@ -37,13 +37,13 @@ import luto.economics.agricultural.transitions as ag_transition
 import luto.economics.agricultural.water as ag_water
 import luto.economics.agricultural.biodiversity as ag_biodiversity
 
-import luto.economics.non_agricultural.water as non_ag_water
-import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 import luto.economics.non_agricultural.cost as non_ag_cost
 import luto.economics.non_agricultural.ghg as non_ag_ghg
 import luto.economics.non_agricultural.quantity as non_ag_quantity
-import luto.economics.non_agricultural.transitions as non_ag_transition
 import luto.economics.non_agricultural.revenue as non_ag_revenue
+import luto.economics.non_agricultural.transitions as non_ag_transition
+import luto.economics.non_agricultural.water as non_ag_water
+import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
 from luto import tools
 from luto.economics import land_use_culling
@@ -305,7 +305,7 @@ def get_non_ag_t_rk():
 
 
 def get_ag_x_mrj():
-    print('Getting agricultural exclude matrices...')
+    print('Getting agricultural exclusion matrices...')
     output = ag_transition.get_exclude_matrices(data, base_year, lumaps)
     return output
 
