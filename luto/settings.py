@@ -181,6 +181,8 @@ CP_BELT_PROPORTION = CP_BELT_ROW_WIDTH / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACIN
 cp_no_alleys_per_ha = 100 / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
 CP_BELT_FENCING_LENGTH = 100 * cp_no_alleys_per_ha * 2 # Length of fencing required per ha in metres
 
+CARBON_PLANTINGS_BIODIV_BENEFIT = 0.1
+
 # Riparian Planting Parameters
 rp_annual_maintennance_cost_per_ha_per_year = 100
 rp_annual_ecosystem_services_benefit_per_ha_per_year = 100

@@ -962,7 +962,7 @@ def write_biodiversity_separate(sim, yr_cal, path):
     yr_idx = yr_cal - sim.data.YR_CAL_BASE
     ag_biodiv_mrj = ag_biodiversity.get_breq_matrices(sim.data)
     am_biodiv_mrj = ag_biodiversity.get_agricultural_management_biodiversity_matrices(sim.data)
-    non_ag_biodiv_rk = non_ag_biodiversity.get_breq_matrix(sim.data, yr_idx)
+    non_ag_biodiv_rk = non_ag_biodiversity.get_breq_matrix(sim.data)
 
     # Get the decision variables for the year
     ag_dvar_mrj = sim.ag_dvars[yr_cal]
