@@ -79,7 +79,6 @@ def get_carbon_plantings_block_from_ag(data, yr_idx, lumap, lmmap) -> np.ndarray
     np.ndarray
         1-D array, indexed by cell.
     """
-    # TODO - check that these base costs should be the same as EP
     base_ag_to_cp_t = data.AG2EP_TRANSITION_COSTS_HA
     l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
     base_ag_to_cp_t_mrj = np.broadcast_to(base_ag_to_cp_t, (2, data.NCELLS, base_ag_to_cp_t.shape[0]))

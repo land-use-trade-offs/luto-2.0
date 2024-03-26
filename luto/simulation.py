@@ -106,7 +106,6 @@ class Data():
         self.EP_EST_COST_HA = bdata.EP_EST_COST_HA[self.MASK]                   # Float32
         self.AG2EP_TRANSITION_COSTS_HA = bdata.AG2EP_TRANSITION_COSTS_HA        # Float32
         self.EP2AG_TRANSITION_COSTS_HA = bdata.EP2AG_TRANSITION_COSTS_HA        # Float32
-        self.AG2CP_TRANSITION_COSTS_HA = bdata.CP2AG_TRANSITION_COSTS_HA        #
         self.EP_BLOCK_AVG_T_CO2_HA = bdata.EP_BLOCK_AVG_T_CO2_HA[self.MASK]     # Float32
         self.NATURAL_LAND_T_CO2_HA = bdata.NATURAL_LAND_T_CO2_HA[self.MASK]     # Float32
         self.SOIL_CARBON_AVG_T_CO2_HA = bdata.SOIL_CARBON_AVG_T_CO2_HA[self.MASK]
@@ -119,6 +118,7 @@ class Data():
         self.EP_BELT_AVG_T_CO2_HA = bdata.EP_BELT_AVG_T_CO2_HA[self.MASK]       # Float32
         self.CP_BLOCK_AVG_T_CO2_HA = bdata.CP_BLOCK_AVG_T_CO2_HA[self.MASK]     # Float32
         self.CP_BELT_AVG_T_CO2_HA = bdata.CP_BELT_AVG_T_CO2_HA[self.MASK]       # Float32
+        self.CP_EST_COST_HA = bdata.CP_EST_COST_HA[self.MASK]
 
         # Slice this year off HDF5 bricks. TODO: This field is not in luto.data.
         # with h5py.File(bdata.fname_dr, 'r') as wy_dr_file:
@@ -249,7 +249,7 @@ def get_non_ag_w_rk():
 
 def get_non_ag_b_rk():
     print('Getting non-agricultural biodiversity requirement matrices...', end = ' ', flush = True)
-    output = non_ag_biodiversity.get_breq_matrix(data)
+    output = non_ag_biodiversity.get_breq_matrix(data, target_index)
     print('Done.')
     return output.astype(np.float32)
 

@@ -105,8 +105,8 @@ def get_quantity_matrix(data) -> np.ndarray:
         env_plantings_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
         rip_plantings_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
         agroforestry_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
-        carbon_plantings_block_quantity_matrix.reshape((data.NCMS, data.NCELLS)),
-        carbon_plantings_belt_quantity_matrix.reshape((data.NCMS, data.NCELLS)),
+        carbon_plantings_block_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
+        carbon_plantings_belt_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
     ]
 
     return np.concatenate(non_agr_quantity_matrices, axis=2)

@@ -264,21 +264,21 @@ def get_ag_natural_lu_cells(data, lumap) -> np.ndarray:
     """
     Gets all cells being used for agricultural natural land uses.
     """
-    return np.nonzero(np.isin(lumap, data.LU_NATURAL))[0]
+    return np.isin(lumap, data.LU_NATURAL)
 
 
 def get_non_ag_natural_lu_cells(data, lumap) -> np.ndarray:
     """
     Gets all cells being used for non-agricultural natural land uses.
     """
-    return np.nonzero(np.isin(lumap, data.NON_AG_LU_NATURAL))[0]
+    return np.isin(lumap, data.NON_AG_LU_NATURAL)
 
 
 def get_ag_and_non_ag_natural_lu_cells(data, lumap) -> np.ndarray:
     """
     Gets all cells being used for natural land uses, both agricultural and non-agricultural.
     """
-    return np.nonzero(np.isin(lumap, data.LU_NATURAL + data.NON_AG_LU_NATURAL))[0]
+    return np.isin(lumap, data.LU_NATURAL + data.NON_AG_LU_NATURAL)
 
 
 # def get_ag_natural_lu_cells(sim, yr_cal) -> np.ndarray::

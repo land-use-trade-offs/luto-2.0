@@ -75,7 +75,6 @@ class InputData:
     non_ag_w_rk: np.ndarray  # Non-agricultural water requirements matrix.
     non_ag_b_rk: np.ndarray  # Non-agricultural biodiversity matrix.
     non_ag_x_rk: np.ndarray  # Non-agricultural exclude matrices.
-    non_ag_lb_rk: np.ndarray
     non_ag_q_crk: np.ndarray  # Non-agricultural yield matrix.
 
     ag_man_c_mrj: dict  # Agricultural management options' cost effects.
@@ -85,7 +84,6 @@ class InputData:
     ag_man_t_mrj: dict  # Agricultural management options' transition cost effects.
     ag_man_w_mrj: dict  # Agricultural management options' water requirement effects.
     ag_man_b_mrj: dict  # Agricultural management options' biodiversity effects.
-    ag_man_lb_mrj: dict
     ag_man_limits: dict  # Agricultural management options' adoption limits.
 
     lu2pr_pj: np.ndarray  # Conversion matrix: land-use to product(s).
@@ -235,7 +233,6 @@ class LutoSolver:
             lu_cells = self._input_data.non_ag_lu2cells[k]
             for r in lu_cells:
                 self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
-                    lb=self._input_data.non_ag_lb_rk[r, k],
                     ub=self._input_data.non_ag_x_rk[r, k], name=f"X_non_ag_{k}_{r}"
                 )
 
@@ -264,7 +261,6 @@ class LutoSolver:
                 for r in dry_lu_cells:
                     dry_var_name = f"X_ag_man_dry_{am_name}_{j}_{r}"
                     self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
-                        lb=self._input_data.ag_man_lb_mrj[am][0, r, j_idx]
                         ub=1, name=dry_var_name
                     )
 
@@ -272,7 +268,6 @@ class LutoSolver:
                 for r in irr_lu_cells:
                     irr_var_name = f"X_ag_man_irr_{am_name}_{j}_{r}"
                     self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
-                        lb=self._input_data.ag_man_lb_mrj[am][1, r, j_idx]
                         ub=1, name=irr_var_name
                     )
 
