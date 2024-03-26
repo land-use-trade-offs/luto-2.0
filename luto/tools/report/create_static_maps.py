@@ -71,9 +71,11 @@ def create_maps(row, model_run_scenario):
     
     
     # Save the map to HTML
-    save_map_to_html(tif_path, 
+    save_map_to_html(tif_path,
+                     'luto/tools/report/Assets/AUS_adm', 
                      center, 
-                     bounds_for_folium)
+                     bounds_for_folium,
+                     color_desc_dict)
     
     
 

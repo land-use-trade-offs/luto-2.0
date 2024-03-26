@@ -284,8 +284,6 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
     # In this way, if partial land-use is allowed (i.e, one pixel is determined to be 50% of apples and 50% citrus),
     #       we can handle the fractional land-use successfully.
 
-    # Skip writing if the yr_cal is the base year
-    if yr_cal == sim.data.YR_CAL_BASE: return
     
     # 1) Collapse the land management dimension (m -> [dry, irr])
     #    i.e., mrj -> rj

@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var year = '';
     var names = [];
     var file_name = '';
+    var map_idx = '0';
 
     // Load the selected data to report HTML
     load_data( get_dataDir() + '/data/Map_data/lumap_2010.html');
@@ -16,8 +17,7 @@ document.addEventListener('DOMContentLoaded', function () {
         "Ag_LU": ['Apples', 'Beef - modified land', 'Beef - natural land', 'Citrus', 'Cotton', 'Dairy - modified land', 'Dairy - natural land',
             'Grapes', 'Hay', 'Nuts', 'Other non-cereal crops', 'Pears', 'Plantation fruit', 'Rice', 'Sheep - modified land',
             'Sheep - natural land', 'Stone fruit', 'Sugar', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
-            'Unallocated - modified land', 'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes',
-            'Winter oilseeds', 'Environmental Plantings', 'Riparian Plantings', 'Agroforestry'],
+            'Unallocated - modified land', 'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes','Winter oilseeds'],
         "Ag_Mgt": ['Asparagopsis taxiformis', 'Ecological Grazing', 'Precision Agriculture'],
         "Land_Mgt": ['dry', 'irr'],
         'Non-Ag_LU': ['Environmental Plantings', 'Riparian Plantings', 'Agroforestry'],
@@ -75,21 +75,26 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 
+
+
     function update_fname() {
         lucc = document.getElementById("select_1").value;
         map_name = document.getElementById("select_2").value;
         year = document.getElementById("year").value;
         names = lucc_names[lucc];
-
-        file_name = lucc == 'lumap' ? 'lumap_' + year + '.html' : lucc + '_' + String(names.indexOf(map_name)).padStart(2, '0') + '_' + map_name + '_' + year + '.html';
+        map_idx = lucc == 'Ag_Mgt' ? '00' : String(names.indexOf(map_name)).padStart(2, '0');
+        
+        file_name = lucc == 'lumap' ? 'lumap_' + year + '.html' : lucc + '_' +  map_idx + '_' + map_name + '_' + year + '.html';
         file_name = get_dataDir() + '/data/Map_data/' + file_name;
+        
         // Replace spaces with %20
         file_name = file_name.replace(/ /g, '%20');
-
         console.log(file_name);
 
         return file_name;
     }
+
+
 
     function get_dataDir() {
         // Get the data path
