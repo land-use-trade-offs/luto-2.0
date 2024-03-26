@@ -619,7 +619,6 @@ Kunming-Montreal Biodiversity Framework Target 2: Restore 30% of all Degraded Ec
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
 """
 # Load biodiversity data
-
 biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5') )
 
 # Get the Zonation output score between 0 and 1
@@ -634,7 +633,7 @@ BIODIV_SCORE_WEIGHTED = BIODIV_SCORE_RAW - (BIODIV_SCORE_RAW * (1 - conn_score) 
 # Calculate total biodiversity target score as the quality-weighted sum of biodiv raw score over the study area 
 biodiv_value_current = ( np.isin(LUMAP, 23) * BIODIV_SCORE_RAW +                                         # Biodiversity value of Unallocated - natural land 
                          np.isin(LUMAP, [2, 6, 15]) * BIODIV_SCORE_RAW * (1 - BIODIV_LIVESTOCK_IMPACT)   # Biodiversity value of livestock on natural land 
-                       ) * np.where(SAVBURN_ELIGIBLE, LDS_BIODIVERSITY_VALUE, 1) * REAL_AREA           # Reduce biodiversity value of area eligible for savanna burning 
+                       ) * np.where(SAVBURN_ELIGIBLE, LDS_BIODIVERSITY_VALUE, 1) * REAL_AREA             # Reduce biodiversity value of area eligible for savanna burning 
 
 biodiv_value_target = ( ( np.isin(LUMAP, [2, 6, 15, 23]) * BIODIV_SCORE_RAW * REAL_AREA - biodiv_value_current ) +  # On natural land calculate the difference between the raw biodiversity score and the current score
                           np.isin(LUMAP, LU_MODIFIED_LAND) * BIODIV_SCORE_RAW * REAL_AREA                           # Calculate raw biodiversity score of modified land
