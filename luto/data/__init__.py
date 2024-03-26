@@ -15,7 +15,8 @@
 # LUTO 2.0. If not, see <https://www.gnu.org/licenses/>. 
 
 
-import os
+import os, time
+import rasterio
 
 import pandas as pd
 import numpy as np
@@ -48,16 +49,12 @@ from luto.settings import (
     RIPARIAN_PLANTINGS_BUFFER_WIDTH,
     RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR,
     BIODIV_LIVESTOCK_IMPACT,
+    LDS_BIODIVERSITY_VALUE,
+    OFF_LAND_COMMODITIES,
+    EGGS_AVG_WEIGHT
 )
 
-
-# Try-Except to make sure {rasterio} can be loaded under different environment
-try:
-    import rasterio
-except:
-    from osgeo import gdal
-    import rasterio
-
+print('\n' + time.strftime("%Y-%m-%d %H:%M:%S"), 'Beginning data initialisation...')
 
 
 ###############################################################
@@ -285,6 +282,7 @@ SOIL_CARBON_AVG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'soil_carbon_t_h
 # Load plantings economic data
 EP_EST_COST_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'ep_est_cost_ha.h5') ).to_numpy(dtype = np.float32)
 CP_EST_COST_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'cp_est_cost_ha.h5') ).to_numpy(dtype = np.float32)
+
 
 # Load fire risk data (reduced carbon sequestration by this amount)
 fr_df = pd.read_hdf( os.path.join(INPUT_DIR, 'fire_risk.h5') )
@@ -521,18 +519,55 @@ BAU_PROD_INCR = pd.read_csv(fpath, header = [0,1]).astype(np.float32)
 # Load demand data (actual production (tonnes, ML) by commodity) - from demand model     
 dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
 
-# Convert eggs from count to tonnes, assuming each egg weighs 60g
-mask = dd.index.get_level_values(7) == 'eggs'
-dd.loc[:,:,:,:,:,:,:,mask] = dd.loc[:,:,:,:,:,:,:,mask] * 60 / 1e6 
+# Select the demand data under the running scenario
+DEMAND_DATA = dd.loc[(SCENARIO, 
+                      DIET_DOM, 
+                      DIET_GLOB, 
+                      CONVERGENCE,
+                      IMPORT_TREND, 
+                      WASTE, 
+                      FEED_EFFICIENCY)].copy()
 
-# Select the demand scenario (returns commodity x year dataframe) - includes off-land commodities
-DEMAND_DATA = dd.loc[(SCENARIO, DIET_DOM, DIET_GLOB, CONVERGENCE, IMPORT_TREND, WASTE, FEED_EFFICIENCY)].copy()
+# Convert eggs from count to tonnes
+DEMAND_DATA.loc['eggs'] = DEMAND_DATA.loc['eggs'] * EGGS_AVG_WEIGHT / 1000 / 1000
+
+# Get the off-land commodities
+DEMAND_OFFLAND = DEMAND_DATA.loc[DEMAND_DATA.query("COMMODITY in @OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
 
 # Remove off-land commodities
-DEMAND_C = DEMAND_DATA.loc[DEMAND_DATA.query("COMMODITY not in ['pork', 'chicken', 'eggs', 'aquaculture']").index, 'PRODUCTION'].copy()
+DEMAND_C = DEMAND_DATA.loc[DEMAND_DATA.query("COMMODITY not in @OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
 
 # Convert to numpy array of shape (91, 26)
 DEMAND_C = DEMAND_C.to_numpy(dtype = np.float32).T
+
+
+###############################################################
+# Carbon emissions from off-land commodities.
+###############################################################
+
+# Read the greenhouse gas intensity data
+off_land_ghg_intensity = pd.read_csv(f'{INPUT_DIR}/agGHG_lvstk_off_land.csv')
+# Split the Emission Source column into two columns
+off_land_ghg_intensity[['Emission Type', 'Emission Source']] = off_land_ghg_intensity['Emission Source'].str.extract(r'^(.*?)\s*\((.*?)\)')
+
+# Get the emissions from the off-land commodities
+demand_offland_long = DEMAND_OFFLAND.stack().reset_index()
+demand_offland_long = demand_offland_long.rename(columns={ 0: 'DEMAND (tonnes)'})
+
+# Merge the demand and GHG intensity, and calculate the total GHG emissions
+off_land_ghg_emissions = demand_offland_long.merge(off_land_ghg_intensity, on='COMMODITY')
+off_land_ghg_emissions['Total GHG Emissions (tCO2e)'] = off_land_ghg_emissions.eval('`DEMAND (tonnes)` * `Emission Intensity [ kg CO2eq / kg ]`')
+
+# Keep only the relevant columns
+OFF_LAND_GHG_EMISSION = off_land_ghg_emissions[['YEAR',
+                                                'COMMODITY',
+                                                'Emission Type', 
+                                                'Emission Source',
+                                                'Total GHG Emissions (tCO2e)']]
+
+# Get the GHG constraints for luto, shape is (91, 1)
+OFF_LAND_GHG_EMISSION_C = OFF_LAND_GHG_EMISSION.groupby(['YEAR']).sum(numeric_only=True).values
+
 
 
 
@@ -563,9 +598,20 @@ elif GHG_LIMITS_TYPE == 'dict':
 # Savanna burning data.
 ###############################################################
 
-SAVANNA_BURNING = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_savanna_burning.h5') )
- 
-    
+# Read in the dataframe
+savburn_df = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_savanna_burning.h5') )
+
+# Load the columns as numpy arrays
+SAVBURN_ELIGIBLE = savburn_df.ELIGIBLE_AREA.to_numpy()               # 1 = areas eligible for early dry season savanna burning under the ERF, 0 = ineligible
+SAVBURN_AVEM_CH4_TCO2E_HA = savburn_df.SAV_AVEM_CH4_TCO2E_HA.to_numpy()  # Avoided emissions - methane
+SAVBURN_AVEM_N2O_TCO2E_HA = savburn_df.SAV_AVEM_N2O_TCO2E_HA.to_numpy()  # Avoided emissions - nitrous oxide
+SAVBURN_SEQ_CO2_TCO2E_HA = savburn_df.SAV_SEQ_CO2_TCO2E_HA.to_numpy()    # Additional carbon sequestration - carbon dioxide
+SAVBURN_TOTAL_TCO2E_HA = savburn_df.AEA_TOTAL_TCO2E_HA.to_numpy()        # Total emissions abatement from EDS savanna burning
+
+# Cost per hectare in dollars
+SAVBURN_COST_HA = 2 
+
+
  
 ###############################################################
 # Biodiversity data.
@@ -575,6 +621,7 @@ Kunming-Montreal Biodiversity Framework Target 2: Restore 30% of all Degraded Ec
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
 """
 # Load biodiversity data
+
 biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5') )
 
 # Get the Zonation output score between 0 and 1
@@ -586,11 +633,38 @@ conn_score = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.
 # Calculate weighted biodiversity score
 BIODIV_SCORE_WEIGHTED = BIODIV_SCORE_RAW - (BIODIV_SCORE_RAW * (1 - conn_score) * CONNECTIVITY_WEIGHTING)
 
-# Calculate total biodiversity target score as the sum of biodiv raw score over the study area
+# Calculate total biodiversity target score as the quality-weighted sum of biodiv raw score over the study area 
+biodiv_value_current = ( np.isin(LUMAP, 23) * BIODIV_SCORE_RAW +                                         # Biodiversity value of Unallocated - natural land 
+                         np.isin(LUMAP, [2, 6, 15]) * BIODIV_SCORE_RAW * (1 - BIODIV_LIVESTOCK_IMPACT)   # Biodiversity value of livestock on natural land 
+                       ) * np.where(SAVBURN_ELIGIBLE, LDS_BIODIVERSITY_VALUE, 1) * REAL_AREA           # Reduce biodiversity value of area eligible for savanna burning 
+
+biodiv_value_target = ( ( np.isin(LUMAP, [2, 6, 15, 23]) * BIODIV_SCORE_RAW * REAL_AREA - biodiv_value_current ) +  # On natural land calculate the difference between the raw biodiversity score and the current score
+                          np.isin(LUMAP, LU_MODIFIED_LAND) * BIODIV_SCORE_RAW * REAL_AREA                           # Calculate raw biodiversity score of modified land
+                      ) * BIODIV_TARGET                                                                             # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
+                        
+# Sum the current biodiversity value and the addition biodiversity score required to meet the target
+TOTAL_BIODIV_TARGET_SCORE = biodiv_value_current.sum() + biodiv_value_target.sum()                         
+
+"""
 TOTAL_BIODIV_TARGET_SCORE = ( 
                               np.isin(LUMAP, 23) * BIODIV_SCORE_RAW * REAL_AREA +                                                   # Biodiversity value of Unallocated - natural land 
                               np.isin(LUMAP, [2, 6, 15]) * BIODIV_SCORE_RAW * (1 - BIODIV_LIVESTOCK_IMPACT) * REAL_AREA +           # Biodiversity value of livestock on natural land 
                               np.isin(LUMAP, [2, 6, 15]) * BIODIV_SCORE_RAW * BIODIV_LIVESTOCK_IMPACT * BIODIV_TARGET * REAL_AREA + # Add 30% improvement to the degraded part of livestock on natural land
                               np.isin(LUMAP, LU_MODIFIED_LAND) * BIODIV_SCORE_RAW * BIODIV_TARGET * REAL_AREA                       # Add 30% improvement to modified land
                             ).sum() 
+"""
+
+ 
+###############################################################
+# BECCS data.
+###############################################################
+
+# Load dataframe
+beccs_df = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_BECCS_df.h5') )
+
+# Capture as numpy arrays
+BECCS_COSTS_AUD_HA_YR = beccs_df['BECCS_COSTS_AUD_HA_YR']
+BECCS_REV_AUD_HA_YR = beccs_df['BECCS_REV_AUD_HA_YR']
+BECCS_TCO2E_HA_YR = beccs_df['BECCS_TCO2E_HA_YR']
+BECCS_MWH_HA_YR = beccs_df['BECCS_MWH_HA_YR']
 

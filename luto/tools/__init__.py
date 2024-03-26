@@ -18,11 +18,12 @@
 Pure helper functions and other tools.
 """
 
+from datetime import datetime
 import functools
-import logging
 import sys
 import time
 import os.path
+import traceback
 from typing import Tuple
 from contextlib import redirect_stderr, redirect_stdout
 
@@ -42,9 +43,9 @@ def amortise(cost, rate=settings.DISCOUNT_RATE, horizon=settings.AMORTISATION_PE
     else: return cost
 
 
-def show_map(yr_cal):
-    """Show a plot of the lumap of `yr_cal`."""
-    plotmap(lumaps[yr_cal], labels=bdata.AGLU2DESC)
+# def show_map(yr_cal):
+#     """Show a plot of the lumap of `yr_cal`."""
+#     plotmap(lumaps[yr_cal], labels=bdata.AGLU2DESC)
 
 
 def get_production(data, yr_cal, ag_X_mrj, non_ag_X_rk, ag_man_X_mrj):
@@ -113,52 +114,52 @@ def get_production(data, yr_cal, ag_X_mrj, non_ag_X_rk, ag_man_X_mrj):
     return np.array(total_q_c)
 
 
-def get_production_copy(sim, yr_cal):
-    """Return total production of commodities for a specific year...
+# def get_production_copy(sim, yr_cal):
+#     """Return total production of commodities for a specific year...
 
-    Can return base year production (e.g., year = 2010) or can return production for 
-    a simulated year if one exists (i.e., year = 2030) check sim.info()).
+#     Can return base year production (e.g., year = 2010) or can return production for 
+#     a simulated year if one exists (i.e., year = 2030) check sim.info()).
 
-    Includes the impacts of land-use change, productivity increases, and 
-    climate change on yield."""
+#     Includes the impacts of land-use change, productivity increases, and 
+#     climate change on yield."""
 
-    # Calculate year index (i.e., number of years since 2010)
-    yr_idx = yr_cal - sim.data.YR_CAL_BASE
+#     # Calculate year index (i.e., number of years since 2010)
+#     yr_idx = yr_cal - sim.data.YR_CAL_BASE
 
-    # Acquire local names for matrices and shapes.
-    lu2pr_pj = sim.data.LU2PR
-    pr2cm_cp = sim.data.PR2CM
-    nlus = sim.data.N_AG_LUS
-    nprs = sim.data.NPRS
-    ncms = sim.data.NCMS
+#     # Acquire local names for matrices and shapes.
+#     lu2pr_pj = sim.data.LU2PR
+#     pr2cm_cp = sim.data.PR2CM
+#     nlus = sim.data.N_AG_LUS
+#     nprs = sim.data.NPRS
+#     ncms = sim.data.NCMS
 
-    # Get the maps in decision-variable format. 0/1 array of shape j, r
-    X_dry = sim.dvars[yr_cal][0].T
-    X_irr = sim.dvars[yr_cal][1].T
+#     # Get the maps in decision-variable format. 0/1 array of shape j, r
+#     X_dry = sim.dvars[yr_cal][0].T
+#     X_irr = sim.dvars[yr_cal][1].T
 
-    # Get the quantity matrices. Quantity array of shape m, r, p
-    q_mrp = get_quantity_matrices(sim.data, yr_idx)
+#     # Get the quantity matrices. Quantity array of shape m, r, p
+#     q_mrp = get_quantity_matrices(sim.data, yr_idx)
 
-    X_dry_pr = [X_dry[j] for p in range(nprs) for j in range(nlus)
-                if lu2pr_pj[p, j]]
-    X_irr_pr = [X_irr[j] for p in range(nprs) for j in range(nlus)
-                if lu2pr_pj[p, j]]
+#     X_dry_pr = [X_dry[j] for p in range(nprs) for j in range(nlus)
+#                 if lu2pr_pj[p, j]]
+#     X_irr_pr = [X_irr[j] for p in range(nprs) for j in range(nlus)
+#                 if lu2pr_pj[p, j]]
 
-    # Quantities in product (PR/p) representation by land management (dry/irr).
-    q_dry_p = [q_mrp[0, :, p] @ X_dry_pr[p] for p in range(nprs)]
-    q_irr_p = [q_mrp[1, :, p] @ X_irr_pr[p] for p in range(nprs)]
+#     # Quantities in product (PR/p) representation by land management (dry/irr).
+#     q_dry_p = [q_mrp[0, :, p] @ X_dry_pr[p] for p in range(nprs)]
+#     q_irr_p = [q_mrp[1, :, p] @ X_irr_pr[p] for p in range(nprs)]
 
-    # Transform quantities to commodity (CM/c) representation by land management (dry/irr).
-    q_dry_c = [sum(q_dry_p[p] for p in range(nprs) if pr2cm_cp[c, p])
-               for c in range(ncms)]
-    q_irr_c = [sum(q_irr_p[p] for p in range(nprs) if pr2cm_cp[c, p])
-               for c in range(ncms)]
+#     # Transform quantities to commodity (CM/c) representation by land management (dry/irr).
+#     q_dry_c = [sum(q_dry_p[p] for p in range(nprs) if pr2cm_cp[c, p])
+#                for c in range(ncms)]
+#     q_irr_c = [sum(q_irr_p[p] for p in range(nprs) if pr2cm_cp[c, p])
+#                for c in range(ncms)]
 
-    # Total quantities in commodity (CM/c) representation.
-    q_c = [q_dry_c[c] + q_irr_c[c] for c in range(ncms)]
+#     # Total quantities in commodity (CM/c) representation.
+#     q_c = [q_dry_c[c] + q_irr_c[c] for c in range(ncms)]
 
-    # Return total commodity production.
-    return np.array(q_c)
+#     # Return total commodity production.
+#     return np.array(q_c)
 
 
 def lumap2ag_l_mrj(lumap, lmmap):
@@ -529,66 +530,72 @@ def map_desc_to_dvar_index(category: str,
     return df.reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
 
 
+
 class LogToFile:
-    def __init__(self, 
-                 log_path, 
-                 stdout_level=logging.INFO, 
-                 stderr_level=logging.ERROR, 
-                 log_format='%(asctime)s - %(message)s'):
-        
+    def __init__(self, log_path):
         self.log_path_stdout = f"{log_path}_stdout.log"
         self.log_path_stderr = f"{log_path}_stderr.log"
-        self.stdout_level = stdout_level
-        self.stderr_level = stderr_level
-        self.log_format = log_format
-
-        # Setup logging handlers for stdout and stderr with specified levels and format
-        self.stdout_logger = logging.getLogger(f'{log_path}_STDOUT')
-        self.stderr_logger = logging.getLogger(f'{log_path}_STDERR')
-        self.setup_logger(self.stdout_logger, self.log_path_stdout, stdout_level)
-        self.setup_logger(self.stderr_logger, self.log_path_stderr, stderr_level)
-
-    def setup_logger(self, logger, log_path, level):
-        logger.setLevel(level)
-        handler = logging.FileHandler(log_path, mode='w')
-        formatter = logging.Formatter(self.log_format)
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        # Prevent logging from propagating to the root logger
-        logger.propagate = False
 
     def __call__(self, func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            original_stdout = sys.stdout
-            original_stderr = sys.stderr
-            try:
-                sys.stdout = self.StreamToLogger(self.stdout_logger, self.stdout_level, sys.stdout)
-                sys.stderr = self.StreamToLogger(self.stderr_logger, self.stderr_level, sys.stderr)
-                return func(*args, **kwargs)
-            finally:
-                sys.stdout = original_stdout
-                sys.stderr = original_stderr
-                self.close()
+            # Open files for writing here, ensuring they're only created upon function call
+            with open(self.log_path_stdout, 'w') as file_stdout, open(self.log_path_stderr, 'w') as file_stderr:
+                original_stdout = sys.stdout
+                original_stderr = sys.stderr
+                try:
+                    sys.stdout = self.StreamToLogger(file_stdout, original_stdout)
+                    sys.stderr = self.StreamToLogger(file_stderr, original_stderr)
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    # Capture the full traceback
+                    exc_info = traceback.format_exc()
+                    # Log the traceback to stderr log before re-raising the exception
+                    sys.stderr.write(exc_info + '\n')
+                    raise  # Re-raise the caught exception to propagate it
+                finally:
+                    # Reset stdout and stderr
+                    sys.stdout = original_stdout
+                    sys.stderr = original_stderr
         return wrapper
-    
-    def close(self):
-        self.stdout_logger.handlers[0].close()
-        self.stderr_logger.handlers[0].close()
 
     class StreamToLogger(object):
-        def __init__(self, logger, log_level=logging.INFO, original_stream=None):
-            self.logger = logger
-            self.log_level = log_level
-            self.original_stream = original_stream
+        def __init__(self, file, orig_stream=None):
+            self.file = file
+            self.orig_stream = orig_stream
 
         def write(self, buf):
-            # for line in buf.rstrip().splitlines()
-            line =  ' '.join(buf.rstrip().splitlines())
-            self.logger.log(self.log_level, line.rstrip())
-            if self.original_stream:
-                self.original_stream.write(line + '\n')
+            if buf.strip():  # Only prepend timestamp to non-newline content
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                formatted_buf = f"{timestamp} - {buf}"
+            else:
+                formatted_buf = buf  # If buf is just a newline/whitespace, don't prepend timestamp
+            
+            if self.orig_stream:
+                self.orig_stream.write(formatted_buf)  # Write to the original stream if it exists
+            self.file.write(formatted_buf)  # Write to the log file
 
         def flush(self):
-            if self.original_stream:
-                self.original_stream.flush()
+            self.file.flush()  # Ensure content is written to disk
+
+        def __init__(self, file, orig_stream=None):
+            self.file = file
+            self.orig_stream = orig_stream
+
+        def write(self, buf):
+            if buf.strip():  # Check if buf is not just whitespace/newline
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                formatted_buf = f"{timestamp} - {buf}"
+            else:
+                formatted_buf = buf  # If buf is just a newline/whitespace, don't prepend timestamp
+
+            # Write to the original stream if it exists
+            if self.orig_stream:
+                self.orig_stream.write(formatted_buf)
+            
+            # Write to the log file
+            self.file.write(formatted_buf)
+
+        def flush(self):
+            # Ensure content is written to disk
+            self.file.flush()

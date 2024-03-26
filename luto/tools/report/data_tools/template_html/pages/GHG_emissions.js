@@ -56,7 +56,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "Net Land Sector GHG Emissions",
+        text: "Cumulative GHG Emissions",
       },
 
       credits: {
@@ -135,7 +135,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
       series: JSON.parse(
         document.getElementById("GHG_2_individual_emission_Mt_csv").innerHTML
-        ),
+      ),
       credits: {
         enabled: false,
       },
@@ -163,7 +163,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "GHG Emissions by Crop/Livestock",
+        text: "GHG Emissions (on-land) by Crop/Livestock",
       },
 
       credits: {
@@ -222,7 +222,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "GHG Emissions by Irrigation Type",
+        text: "GHG Emissions (on-land) by Irrigation Type",
       },
 
       credits: {
@@ -280,7 +280,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "GHG Emissions by Gas",
+        text: "GHG Emissions (on-land) by Gas",
       },
 
       credits: {
@@ -340,7 +340,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: "GHG Emissions by Source",
+        text: "GHG Emissions (on-land) by Source",
       },
 
       credits: {
@@ -401,7 +401,7 @@ document.addEventListener("DOMContentLoaded", function () {
         marginRight: 200,
       },
       title: {
-        text: "GHG Emissions - Start and End Year",
+        text: "GHG Emissions (on-land) - Start and End Year",
       },
       xAxis: {
         categories: [],
@@ -499,7 +499,7 @@ document.addEventListener("DOMContentLoaded", function () {
         type: "packedbubble",
       },
       title: {
-        text: "GHG Emissions in the target year",
+        text: "GHG Emissions (on-land) in the target year",
       },
       tooltip: {
         useHTML: true,
@@ -540,6 +540,178 @@ document.addEventListener("DOMContentLoaded", function () {
         sourceHeight: 600,
       },
     });
+
+    Highcharts.chart("GHG_4_3_7_off_land_commodity_emission_Mt", {
+      chart: {
+        type: "column",
+        marginRight: 200,
+      },
+
+      title: {
+        text: "GHG Emissions (off-land) by Commodity",
+      },
+
+      credits: {
+        enabled: false,
+      },
+
+      series: JSON.parse(
+        document.getElementById("GHG_4_3_7_off_land_commodity_emission_Mt_csv")
+          .innerHTML
+      ),
+
+      yAxis: {
+        title: {
+          text: "Greenhouse Gas (Mt CO2e)",
+        },
+      },
+      xAxis: {
+        tickPositions: tickposition,
+      },
+
+      legend: {
+        align: "right",
+        verticalAlign: "top",
+        layout: "vertical",
+        x: -10,
+        y: 250,
+      },
+
+      tooltip: {
+        formatter: function () {
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
+        },
+      },
+
+      plotOptions: {
+        column: {
+          stacking: "normal",
+          dataLabels: {
+            enabled: false,
+          },
+        },
+      },
+
+      exporting: {
+        sourceWidth: 1200,
+        sourceHeight: 600,
+      },
+    });
+
+    Highcharts.chart("GHG_4_3_8_off_land_sources_emission_Mt", {
+      chart: {
+        type: "column",
+        marginRight: 200,
+      },
+
+      title: {
+        text: "GHG Emissions (off-land) by Source",
+      },
+
+      credits: {
+        enabled: false,
+      },
+
+      series: JSON.parse(
+        document.getElementById("GHG_4_3_8_off_land_sources_emission_Mt_csv")
+          .innerHTML
+      ),
+
+      yAxis: {
+        title: {
+          text: "Greenhouse Gas (Mt CO2e)",
+        },
+      },
+
+      legend: {
+        align: "right",
+        verticalAlign: "top",
+        layout: "vertical",
+        x: -10,
+        y: 250,
+      },
+
+      tooltip: {
+        formatter: function () {
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
+        },
+      },
+
+      plotOptions: {
+        column: {
+          stacking: "normal",
+          dataLabels: {
+            enabled: false,
+          },
+        },
+
+        exporting: {
+          sourceWidth: 1200,
+          sourceHeight: 600,
+        },
+      },
+    });
+
+
+    Highcharts.chart("GHG_4_3_9_off_land_type_emission_Mt", {
+      chart: {
+        type: "column",
+        marginRight: 200,
+      },
+
+      title: {
+        text: "GHG Emissions (off-land) by Type",
+      },
+
+      credits: {
+        enabled: false,
+      },
+
+      series: JSON.parse(
+        document.getElementById("GHG_4_3_9_off_land_type_emission_Mt_csv")
+          .innerHTML
+      ),
+
+      yAxis: {
+        title: {
+          text: "Greenhouse Gas (Mt CO2e)",
+        },
+      },
+
+
+      legend: {
+        align: "right",
+        verticalAlign: "top",
+        layout: "vertical",
+        x: -10,
+        y: 250,
+      },
+
+      tooltip: {
+        formatter: function () {
+          return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+            }:</b>${this.y.toFixed(2)}<br/>`;
+        },
+      },
+
+      plotOptions: {
+        column: {
+          stacking: "normal",
+          dataLabels: {
+            enabled: false,
+          },
+        },
+
+        exporting: {
+          sourceWidth: 1200,
+          sourceHeight: 600,
+        },
+      },
+    });
+
+
 
     // Chart:GHG_9_1_ag_reduction_total_wide_Mt
     // Highcharts.chart('GHG_9_1_ag_reduction_total_wide_Mt', {

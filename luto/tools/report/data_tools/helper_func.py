@@ -3,8 +3,13 @@ from lxml import etree
 import pandas as pd
 from  lxml.etree import Element
 
-from tools.parameters import GHG_CATEGORY, GHG_FNAME2TYPE, GHG_NAMES,\
-                             LU_CROPS, LU_LVSTKS, LU_UNALLOW, NON_AG_LANDUSE
+from luto.tools.report.data_tools.parameters import (GHG_CATEGORY, 
+                                                     GHG_FNAME2TYPE, 
+                                                     GHG_NAMES,
+                                                     LU_CROPS, 
+                                                     LU_LVSTKS, 
+                                                     LU_UNALLOW, 
+                                                     NON_AG_LANDUSE)
 
 
 def sum_lvstk(path:str):
@@ -140,7 +145,7 @@ def get_GHG_file_df(all_files_df):
     """
     
     # Get only GHG_seperate files
-    GHG_files = all_files_df.query('category == "GHG" and base_name != "GHG_emissions" and year_types == "single_year"').reset_index(drop=True)
+    GHG_files = all_files_df.query('category == "GHG" and base_name != "GHG_emissions"  and base_name != "GHG_emissions_offland_commodity" and year_types == "single_year"').reset_index(drop=True)
     GHG_files['GHG_sum_t'] = GHG_files['path'].apply(lambda x: pd.read_csv(x,index_col=0).loc['SUM','SUM'])
     GHG_files = GHG_files.replace({'base_name': GHG_FNAME2TYPE})
 

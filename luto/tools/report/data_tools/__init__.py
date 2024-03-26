@@ -3,8 +3,8 @@ import os
 import re
 import pandas as pd
 
-from tools.parameters import LU_CROPS, LU_LVSTKS, YR_BASE, COMMODITIES_OFF_LAND, COMMODITIES_ALL
-from tools.helper_func import df_wide2long, get_GHG_category, merge_LVSTK_UAALLOW
+from luto.tools.report.data_tools.parameters import LU_CROPS, LU_LVSTKS, YR_BASE, COMMODITIES_OFF_LAND, COMMODITIES_ALL
+from luto.tools.report.data_tools.helper_func import df_wide2long, get_GHG_category, merge_LVSTK_UAALLOW
 
 # Set up working directory to the root of the report folder
 if __name__ == '__main__':
@@ -22,8 +22,9 @@ def extract_dtype_from_path(path):
     """
     # Define the output categories and its corresponding file patterns
     f_cat = {
+            # decision variables (npy files)
+            'dvar':['npy'],
             # CSVs
-            'dvar':['ag','non_ag'],
             'GHG':['GHG'],
             'water':['water'],
             'cross_table':['crosstab','switches'],
@@ -33,12 +34,15 @@ def extract_dtype_from_path(path):
             'revenue':['revenue'],
             'cost':['cost'],
             'biodiversity':['biodiversity'],
-            # Full maps
+            # Maps
             'ammap':['ammap'],
             'lumap':['lumap'],
             'lmmap':['lmmap'],
-            # Individual maps
-            'lucc_separate':['Ag_LU', 'Ag_Mgt', 'Land_Mgt', 'Non-Ag_LU'],
+            'non_ag':['non_ag'],
+            'Ag_LU':['Ag_LU'], 
+            'Ag_Mgt':['Ag_Mgt'],
+            'Land_Mgt':['Land_Mgt'],
+            'Non-Ag':['Non-Ag'],
             }
     
     # Get the base name of the file path
@@ -88,7 +92,7 @@ def get_all_files(data_root):
             # Append the file path to the list
             file_paths.append(file_path)
 
-    # remove log files and sort the files
+    # Only filepath containing "out_" are valid paths
     file_paths = sorted([i for i in file_paths if 'out_' in i])
 
     # Get the year and the run number from the file name
@@ -109,57 +113,6 @@ def get_all_files(data_root):
 
     return file_paths
 
-
-def get_demand_df(files_df:pd.DataFrame):
-    """
-    Get the demand data as a DataFrame.
-
-    Args:
-        files_df (pd.DataFrame): DataFrame containing file information.
-
-    Returns:
-        pd.DataFrame: DataFrame containing the demand data.
-
-    Raises:
-        None
-    """
-
-    # import luto settings
-    sys.path.append('./') # path of current dir
-    sys.path.append('../../..') # path of the project root dir
-    from luto.settings import INPUT_DIR, SSP, RCP, SCENARIO, DIET_DOM, DIET_GLOB, \
-        CONVERGENCE, IMPORT_TREND, WASTE, FEED_EFFICIENCY
-    
-    dd = pd.read_hdf(f'{INPUT_DIR}/demand_projections.h5')
-
-    # Convert eggs from count to tones
-    mask = dd.index.get_level_values(7) == 'eggs'
-    dd.loc[:,:,:,:,:,:,:,mask] = dd.loc[:,:,:,:,:,:,:,mask] * 60 / 1000 / 1000 
-
-    # Select the demand scenario
-    DEMAND_DATA = dd.loc[(SCENARIO, DIET_DOM, DIET_GLOB, CONVERGENCE, 
-                        IMPORT_TREND, WASTE, FEED_EFFICIENCY)].copy()
-
-    # Filter the demand data to only include years up to the target year
-    DEMAND_DATA_long = DEMAND_DATA.melt(ignore_index=False,
-                                        value_name='Quantity (tonnes, ML)').reset_index()
-    
-    DEMAND_DATA_long.columns = ['COMMODITY','Type','Year','Quantity (tonnes, ML)']
-    
-    # Rename the columns, so that they are the same with LUTO naming convention
-    DEMAND_DATA_long['Type'] = DEMAND_DATA_long['Type'].str.title()
-    DEMAND_DATA_long['COMMODITY'] = DEMAND_DATA_long['COMMODITY']\
-        .apply(lambda x: x[0].upper() + x[1:].lower())
-        
-    # Sort the dataframe by year, commodity, and type, 
-    # where the commodity is sorted by the order in COMMODITIES_ALL
-    DEMAND_DATA_long = DEMAND_DATA_long.set_index(['Year','COMMODITY','Type'])
-    DEMAND_DATA_long = DEMAND_DATA_long.reindex(COMMODITIES_ALL, level=1).reset_index()
-
-    # Add columns for on_land and off_land commodities
-    DEMAND_DATA_long['on_off_land'] = DEMAND_DATA_long['COMMODITY'].apply(lambda x: 'On-land' if x not in COMMODITIES_OFF_LAND else 'Off-land')
-        
-    return DEMAND_DATA_long
 
 
 def get_quantity_df(in_dfs):
