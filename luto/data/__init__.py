@@ -630,6 +630,7 @@ conn_score = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.
 
 # Calculate weighted biodiversity score
 BIODIV_SCORE_WEIGHTED = BIODIV_SCORE_RAW - (BIODIV_SCORE_RAW * (1 - conn_score) * CONNECTIVITY_WEIGHTING)
+BIODIV_SCORE_WEIGHTED_LDS_BURNING = BIODIV_SCORE_WEIGHTED * np.where(SAVBURN_ELIGIBLE, LDS_BIODIVERSITY_VALUE, 1)
 
 # Calculate total biodiversity target score as the quality-weighted sum of biodiv raw score over the study area 
 biodiv_value_current = ( np.isin(LUMAP, 23) * BIODIV_SCORE_RAW +                                         # Biodiversity value of Unallocated - natural land 

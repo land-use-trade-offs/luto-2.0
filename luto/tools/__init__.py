@@ -261,24 +261,25 @@ def get_agroforestry_cells(lumap) -> np.ndarray:
     return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 2)[0]
 
 
-def get_natural_lu_cells(data, lumap) -> Tuple[np.ndarray, np.ndarray]:
+def get_ag_natural_lu_cells(data, lumap) -> np.ndarray:
     """
-    Gets all cells being used for natural land uses.
+    Gets all cells being used for agricultural natural land uses.
     """
-    return np.nonzero(np.isin(lumap, data.LU_NATURAL))[0]
+    return np.isin(lumap, data.LU_NATURAL)
 
-# def get_natural_lu_cells(sim, yr_cal) -> Tuple[np.ndarray, np.ndarray]:
-#     """
-#     Gets all cells being used for natural land uses.
-#     """
-#     dvar = sim.ag_dvars[yr_cal]
-#     dvar_nat = dvar[:,:,sim.data.LU_NATURAL]
 
-#     dvar_nat_val = np.einsum('mrj -> r', dvar_nat)
-#     dvar_nat_idx = np.nonzero(dvar_nat_val)[0]
+def get_non_ag_natural_lu_cells(data, lumap) -> np.ndarray:
+    """
+    Gets all cells being used for non-agricultural natural land uses.
+    """
+    return np.isin(lumap, data.NON_AG_LU_NATURAL)
 
-#     return dvar_nat_idx, dvar_nat_val[dvar_nat_idx]
 
+def get_ag_and_non_ag_natural_lu_cells(data, lumap) -> np.ndarray:
+    """
+    Gets all cells being used for natural land uses, both agricultural and non-agricultural.
+    """
+    return np.isin(lumap, data.LU_NATURAL + data.NON_AG_LU_NATURAL)
 
 
 def timethis(function, *args, **kwargs):

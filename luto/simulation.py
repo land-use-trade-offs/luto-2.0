@@ -127,10 +127,14 @@ class Data():
         self.AGGHG_IRRPAST = bdata.AGGHG_IRRPAST[self.MASK]                     # Float32
         self.BIODIV_SCORE_RAW = bdata.BIODIV_SCORE_RAW[self.MASK]               # Float32
         self.BIODIV_SCORE_WEIGHTED = bdata.BIODIV_SCORE_WEIGHTED[self.MASK]     # Float32
+        self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = (
+           bdata.BIODIV_SCORE_WEIGHTED_LDS_BURNING[self.MASK]
+        )                                                                       # Float32
         self.RP_PROPORTION = bdata.RP_PROPORTION[self.MASK]                     # Float32
         self.RP_FENCING_LENGTH = bdata.RP_FENCING_LENGTH[self.MASK]             # Float32
         self.EP_RIP_AVG_T_CO2_HA = bdata.EP_RIP_AVG_T_CO2_HA[self.MASK]         # Float32
         self.EP_BELT_AVG_T_CO2_HA = bdata.EP_BELT_AVG_T_CO2_HA[self.MASK]       # Float32
+        self.SAVBURN_ELIGIBLE = bdata.SAVBURN_ELIGIBLE[self.MASK]               # Float32
 
         # Slice this year off HDF5 bricks. TODO: This field is not in luto.data.
         # with h5py.File(bdata.fname_dr, 'r') as wy_dr_file:
