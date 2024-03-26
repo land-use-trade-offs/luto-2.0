@@ -15,9 +15,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var lucc_names = {
         "Ag_LU": ['Apples', 'Beef - modified land', 'Beef - natural land', 'Citrus', 'Cotton', 'Dairy - modified land', 'Dairy - natural land',
-            'Grapes', 'Hay', 'Nuts', 'Other non-cereal crops', 'Pears', 'Plantation fruit', 'Rice', 'Sheep - modified land',
-            'Sheep - natural land', 'Stone fruit', 'Sugar', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
-            'Unallocated - modified land', 'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes','Winter oilseeds'],
+                  'Grapes', 'Hay', 'Nuts', 'Other non-cereal crops', 'Pears', 'Plantation fruit', 'Rice', 'Sheep - modified land',
+                  'Sheep - natural land', 'Stone fruit', 'Sugar', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
+                  'Unallocated - modified land', 'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes','Winter oilseeds'],
         "Ag_Mgt": ['Asparagopsis taxiformis', 'Ecological Grazing', 'Precision Agriculture'],
         "Land_Mgt": ['dry', 'irr'],
         'Non-Ag_LU': ['Environmental Plantings', 'Riparian Plantings', 'Agroforestry'],
@@ -51,6 +51,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     });
 
+
+
     // Listen for changes in the select_2 dropdown
     document.getElementById("select_2").addEventListener("change", function () {
         // Load the selected data to report HTML
@@ -58,15 +60,12 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 
+
     // Load the the selected year
     document.getElementById("year").addEventListener("change", function () {
         // Load the selected data to report HTML
         load_data(update_fname());
     });
-
-
-
-
 
 
 

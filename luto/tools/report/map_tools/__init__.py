@@ -9,7 +9,7 @@ import numpy as np
 import imageio
 import pyproj
 
-from branca.element import Template,  MacroElement
+from branca.element import Template,  MacroElement, Element
 from shutil import move
 from rasterio.io import MemoryFile
 from rasterio.coords import BoundingBox
@@ -18,7 +18,7 @@ from rasterio.warp import (calculate_default_transform,
                            reproject, 
                            Resampling)
 
-from luto.tools.report.map_tools.helper import get_legend_css
+from luto.tools.report.map_tools.helper import get_legend_elemet
 
 
 # Set the PROJ_LIB environment variable to the path of the PROJ data directory
@@ -448,8 +448,6 @@ def save_map_to_html(tif_path:str = None,
                    zoom_start=5,
                    zoom_control=False)
     
-    
-    
     # Add ESRI Satellite base map 
     tile = folium.TileLayer(
         tiles = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -458,8 +456,6 @@ def save_map_to_html(tif_path:str = None,
         overlay = False,
         control = True
        ).add_to(m)
-
-
 
     # Overlay the image on folium base map
     img = folium.raster_layers.ImageOverlay(
@@ -472,11 +468,9 @@ def save_map_to_html(tif_path:str = None,
             zindex=1,
         ).add_to(m)
     
-    
     # Add the Shapefile
     gdf = gpd.read_file(shapefile_path).to_crs(epsg=4326)
     geojson_data = json.loads(gdf.to_json())
-    
     shp = folium.GeoJson(
         geojson_data,
         name='Australian States',
@@ -487,19 +481,30 @@ def save_map_to_html(tif_path:str = None,
         }
     ).add_to(m)
 
-    legend_css = get_legend_css(color_desc_dict, map_dtype)
-
     # Add the legend to the map
+    legend_css = get_legend_elemet(color_desc_dict, map_dtype)
     macro = MacroElement()
     macro._template = Template(legend_css)
     m.get_root().add_child(macro)
     
-
-    
-
-        
     # Add LayerControl
-    folium.LayerControl().add_to(m)
+    folium.LayerControl(position='bottomleft').add_to(m)
+    # Define custom CSS
+    css = """
+    <style>
+    .leaflet-control-layers {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+    }
+    </style>
+    """
+
+    # Create a new Element containing the CSS
+    css_element = Element(css)
+    # Add the CSS to the map
+    m.get_root().html.add_child(css_element)
+    
     
     # Save the map to interactive html
     m.save(html_save_path)
