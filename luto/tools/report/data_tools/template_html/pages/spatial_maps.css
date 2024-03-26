@@ -19,6 +19,11 @@
     color: rgb(0, 0, 0);
 }
 
+.selection{
+    margin-top: 10px;
+    margin-bottom: 15px;
+}
+
 .label {
     display: inline-block;
 }

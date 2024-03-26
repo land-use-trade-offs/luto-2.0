@@ -499,7 +499,6 @@ def save_map_to_html(tif_path:str = None,
     }
     </style>
     """
-
     # Create a new Element containing the CSS
     css_element = Element(css)
     # Add the CSS to the map

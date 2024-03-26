@@ -13,7 +13,7 @@ from luto.tools.report.map_tools.helper import (get_map_meta,
 
 
 
-def TIF2PNG(sim):
+def TIF2MAP(sim):
 
     # Get the output directory
     raw_data_dir = sim.path

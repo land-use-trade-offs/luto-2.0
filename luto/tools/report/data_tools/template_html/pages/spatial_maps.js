@@ -68,12 +68,35 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 
+    
+    // Increment year
+    document.getElementById('increment').addEventListener('click', function() {
+        var yearInput = document.getElementById('year');
+        if (yearInput.value < yearInput.max) {
+            yearInput.value = parseInt(yearInput.value) + 1;
+            document.getElementById('yearOutput').value = yearInput.value;
+        }
+        // Load the selected data to report HTML
+        load_data(update_fname());
+    });
+    
+
+    // Decrement year
+    document.getElementById('decrement').addEventListener('click', function() {
+        var yearInput = document.getElementById('year');
+        if (yearInput.value > yearInput.min) {
+            yearInput.value = parseInt(yearInput.value) - 1;
+            document.getElementById('yearOutput').value = yearInput.value;
+        }
+        // Load the selected data to report HTML
+        load_data(update_fname());
+    });
+
+
 
     function load_data(path) {
         document.getElementById("map").innerHTML = `<object type="text/html" data=${path} ></object>`;
     }
-
-
 
 
     function update_fname() {
