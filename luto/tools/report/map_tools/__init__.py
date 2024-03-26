@@ -1,11 +1,15 @@
+import json
 import os
+import rasterio
 import folium
+
+import geopandas as gpd
 import pandas as pd
 import numpy as np
 import imageio
 import pyproj
 
-import rasterio
+from branca.element import Template,  MacroElement
 from shutil import move
 from rasterio.io import MemoryFile
 from rasterio.coords import BoundingBox
@@ -13,6 +17,8 @@ from rasterio.warp import (calculate_default_transform,
                            transform_bounds, 
                            reproject, 
                            Resampling)
+
+from luto.tools.report.map_tools.helper import get_legend_css
 
 
 # Set the PROJ_LIB environment variable to the path of the PROJ data directory
@@ -421,9 +427,12 @@ def process_raster(tif_path: str,
 
 
 
-def save_map_to_html(tif_path:str, 
-                     center:list,
-                     bounds_for_folium:list):
+def save_map_to_html(tif_path:str = None, 
+                     shapefile_path: str = 'luto/tools/report/Assets/AUS_adm/STE11aAust_mercator_simplified.shp',
+                     map_dtype:str = None,
+                     center:list = None,
+                     bounds_for_folium:list = None,
+                     color_desc_dict:dict = None):
             
     # Get the input image path
     out_base = os.path.splitext(tif_path)[0]
@@ -438,19 +447,59 @@ def save_map_to_html(tif_path:str,
     m = folium.Map(center, 
                    zoom_start=5,
                    zoom_control=False)
+    
+    
+    
+    # Add ESRI Satellite base map 
+    tile = folium.TileLayer(
+        tiles = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attr = 'Esri',
+        name = 'Esri Satellite',
+        overlay = False,
+        control = True
+       ).add_to(m)
+
+
 
     # Overlay the image on folium base map
     img = folium.raster_layers.ImageOverlay(
-            name="Mercator projection SW",
+            name=os.path.basename(out_base),
             image=in_mercator_png,
             bounds=bounds_for_folium,
-            opacity=0.6,
+            opacity=0.75,
             interactive=True,
             cross_origin=False,
             zindex=1,
-        )
+        ).add_to(m)
+    
+    
+    # Add the Shapefile
+    gdf = gpd.read_file(shapefile_path).to_crs(epsg=4326)
+    geojson_data = json.loads(gdf.to_json())
+    
+    shp = folium.GeoJson(
+        geojson_data,
+        name='Australian States',
+        style_function=lambda feature: {
+        'fillColor': 'transparent',
+        'color': 'rgba(128, 128, 128, 0.7)',  # 70% grey
+        'weight': 1,  # thickness of the edge
+        }
+    ).add_to(m)
 
-    img.add_to(m)
+    legend_css = get_legend_css(color_desc_dict, map_dtype)
+
+    # Add the legend to the map
+    macro = MacroElement()
+    macro._template = Template(legend_css)
+    m.get_root().add_child(macro)
+    
+
+    
+
+        
+    # Add LayerControl
+    folium.LayerControl().add_to(m)
     
     # Save the map to interactive html
     m.save(html_save_path)
