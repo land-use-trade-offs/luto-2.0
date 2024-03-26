@@ -2,7 +2,6 @@ import json
 import os
 import rasterio
 import folium
-import folium.plugins as plugins
 
 import geopandas as gpd
 import pandas as pd
@@ -10,7 +9,7 @@ import numpy as np
 import imageio
 import pyproj
 
-from branca.element import Template, MacroElement
+from branca.element import Template,  MacroElement
 from shutil import move
 from rasterio.io import MemoryFile
 from rasterio.coords import BoundingBox
@@ -18,6 +17,8 @@ from rasterio.warp import (calculate_default_transform,
                            transform_bounds, 
                            reproject, 
                            Resampling)
+
+from luto.tools.report.map_tools.helper import get_legend_css
 
 
 # Set the PROJ_LIB environment variable to the path of the PROJ data directory
@@ -428,6 +429,7 @@ def process_raster(tif_path: str,
 
 def save_map_to_html(tif_path:str = None, 
                      shapefile_path: str = 'luto/tools/report/Assets/AUS_adm/STE11aAust_mercator_simplified.shp',
+                     map_dtype:str = None,
                      center:list = None,
                      bounds_for_folium:list = None,
                      color_desc_dict:dict = None):
@@ -485,38 +487,17 @@ def save_map_to_html(tif_path:str = None,
         }
     ).add_to(m)
 
-    # Create a custom HTML template for the legend
-    template = """
-    {% macro html(this, kwargs) %}
-    <div style="
-        position: fixed; 
-        padding: 10px;
-        bottom: 30px;
-        left: 30px;
-        width: auto;
-        height: auto;
-        z-index:9999;
-        font-size:14px;
-        background-color: rgba(255, 255, 255, 0.7);
-        border-radius: 10px;
-        ">
-        <p><a style="color:transparent;background-color:rgba(225, 225, 225, 255);">__   </a>&emsp;Non-Agricultural Land</p>
-        <p><a style="color:transparent;background-color:rgba(122, 142, 245, 255);">__   </a>&emsp;Crops</p>
-        <p><a style="color:transparent;background-color:rgba(255, 167, 127, 255);">__   </a>&emsp;Livestock</p>
-        <p><a style="color:transparent;background-color:rgba(1, 230, 169, 255);">__     </a>&emsp;Unallocated - modified land</p>
-        <p><a style="color:transparent;background-color:rgba(255, 235, 190, 255);">__   </a>&emsp;Unallocated - natural land</p>
-        <p><a style="color:transparent;background-color:rgba(38, 115, 1, 255);">__      </a>&emsp;Environmental Plantings</p>
-    </div>
-    {% endmacro %}
-    """
-    
-    
+    legend_css = get_legend_css(color_desc_dict, map_dtype)
 
     # Add the legend to the map
     macro = MacroElement()
-    macro._template = Template(template)
+    macro._template = Template(legend_css)
     m.get_root().add_child(macro)
     
+
+    
+
+        
     # Add LayerControl
     folium.LayerControl().add_to(m)
     

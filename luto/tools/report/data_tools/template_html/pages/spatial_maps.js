@@ -78,18 +78,24 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
     function update_fname() {
+
+        // Get the selected values
         lucc = document.getElementById("select_1").value;
         map_name = document.getElementById("select_2").value;
         year = document.getElementById("year").value;
         names = lucc_names[lucc];
+
+        // The index for Ag_Mgt is always 00
         map_idx = lucc == 'Ag_Mgt' ? '00' : String(names.indexOf(map_name)).padStart(2, '0');
         
+        // The file name for lumap is different
         file_name = lucc == 'lumap' ? 'lumap_' + year + '.html' : lucc + '_' +  map_idx + '_' + map_name + '_' + year + '.html';
+
+        // Get the full path to the file
         file_name = get_dataDir() + '/data/Map_data/' + file_name;
-        
-        // Replace spaces with %20
+
+        // Replace spaces with %20, so the file can be found by the browser
         file_name = file_name.replace(/ /g, '%20');
-        console.log(file_name);
 
         return file_name;
     }
