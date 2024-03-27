@@ -169,7 +169,7 @@ def create_png_map(tif_path: str,
         cbar = plt.colorbar(sm, cax=cbar_ax, orientation='vertical')
         
         # Add a label to the colorbar
-        cbar.set_label('Proportion to pixel', fontsize=12, labelpad=-30, y=1.25, rotation=0)
+        cbar.set_label('Proportion of grid cell', fontsize=12, labelpad=-30, y=1.25, rotation=0)
         
         
         
