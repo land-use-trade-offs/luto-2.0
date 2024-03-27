@@ -59,16 +59,11 @@
         <div class="selection">
             <label for="year" class="label">Select a year:</label><br>
             <button id="decrement">-</button>
-            <input type="range" id="year" name="year" min="2010" max="2050" step="1" value="2010"
+            <input type="range" id="year" name="year" step="1" value="2010"
                 oninput="yearOutput.value = year.value">
             <button id="increment">+</button>
             <output id="yearOutput">2010</output>
         </div>
-
-
-
-
-
 
     </div>
 
@@ -76,6 +71,9 @@
     <div class="content">
 
         <div id="map"></div>
+
+        <!-- The years that are available for the selected maps  -->
+        <pre id="model_years"></pre>
 
     </div>
 

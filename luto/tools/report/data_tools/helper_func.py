@@ -357,29 +357,43 @@ def list_all_files(directory):
         for file in files:
             file_list.append(os.path.join(root, file))
     return file_list
+    
 
+def add_txt_2_html(html_path:str, txt:str, id:str)->None:
+    """
+    Adds text content to an HTML file at a specified location.
 
-def add_settings_2_html(REPORT_DIR:str, RAW_DATA_ROOT:str)->None:
+    Args:
+        html_path (str): The file path of the HTML file.
+        txt (str): The text content to be added to the HTML file.
+            - It can be either a string or a file path.
+        id (str): The ID of the HTML element where the text content should be added.
+
+    Returns:
+        None
+    """
+    
     # Get the tree of the index page
-    index_tree = etree.parse(f"{REPORT_DIR}/REPORT_HTML/index.html", 
-                            etree.HTMLParser())
-
-    # Get the txt of the running settings
-    with open(f"{RAW_DATA_ROOT}/model_run_settings.txt",'r') as f:
-        settings_txt = f.read()
+    index_tree = etree.parse(html_path, etree.HTMLParser())
+    
+    # Check if txt is a file path
+    if os.path.isfile(txt):
+        # If it is, read the file
+        with open(txt,'r') as f:
+            txt = f.read()
         
-    # Replace the inner text of the <pre id="settingsTxt"></pre> with 
-    # the settings txt and make it to be invisible
-    settings_pre = index_tree.xpath('//pre[@id="settingsTxt"]')[0]
-    settings_pre.text = settings_txt
-    settings_pre.attrib['style'] = 'display:none'
+    # Write the txt to the html
+    txt_pre = index_tree.xpath(f'//pre[@id="{id}"]')[0]
+    txt_pre.text = txt
+    txt_pre.attrib['style'] = 'display:none'
     
-    
-    # Write the index page
-    index_tree.write(f"{REPORT_DIR}/REPORT_HTML/index.html", 
+    # Write changes to the html
+    index_tree.write(html_path, 
                     pretty_print=True,
                     encoding='utf-8',
                     method='html')
+        
+    
     
 
 def add_data_2_html(html_path:str, data_pathes:list)->None:

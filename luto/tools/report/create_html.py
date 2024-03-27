@@ -3,8 +3,9 @@ import shutil
 import pandas as pd
 from glob import glob
 
+from luto.tools.report.data_tools import get_all_files
 from luto.tools.report.data_tools.helper_func import (add_data_2_html, 
-                                                      add_settings_2_html)
+                                                      add_txt_2_html)
 
 
 
@@ -23,6 +24,11 @@ def data2html(sim):
     # Check if the report directory exists
     if not os.path.exists(report_dir):
         raise Exception(f"Report directory not found: {report_dir}")
+    
+    # Get the avaliable years for the model
+    files = get_all_files(raw_data_dir)
+    years = sorted(files['year'].unique().tolist())
+    years_str = str(years)
         
         
     ####################################################
@@ -40,7 +46,10 @@ def data2html(sim):
     #################################################### 
 
     # Add settings to the home page
-    add_settings_2_html(report_dir, raw_data_dir)
+    add_txt_2_html(f"{report_dir}/REPORT_HTML/index.html", f"{report_dir}/settings.txt", "settingsTxt")
+    # Add avaliable years to the spatial page
+    add_txt_2_html(f"{report_dir}/REPORT_HTML/pages/spatial_maps.html", years_str, "model_years")
+    
 
     # Get all html files needs data insertion
     html_df = pd.DataFrame([['production',f"{report_dir}/REPORT_HTML/pages/production.html"],

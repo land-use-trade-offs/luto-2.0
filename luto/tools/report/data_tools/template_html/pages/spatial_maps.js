@@ -134,6 +134,20 @@ document.addEventListener('DOMContentLoaded', function () {
         return dataDir;
     }
 
+    window.onload = function() {
+        var yearInput = document.getElementById('year');
+        var yearOutput = document.getElementById('yearOutput');
+        var modelYears = eval(document.getElementById('model_years').innerText);
+        
+        // Sort the modelYears array in ascending order
+        modelYears.sort(function(a, b) { return a - b; });
+        
+        yearInput.min = modelYears[0];
+        yearInput.max = modelYears[modelYears.length - 1];
+        yearInput.value = modelYears[0];
+        yearOutput.value = modelYears[0];
+    }
+
 
 });
 
