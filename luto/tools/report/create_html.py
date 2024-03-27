@@ -46,7 +46,7 @@ def data2html(sim):
     #################################################### 
 
     # Add settings to the home page
-    add_txt_2_html(f"{report_dir}/REPORT_HTML/index.html", f"{report_dir}/settings.txt", "settingsTxt")
+    add_txt_2_html(f"{report_dir}/REPORT_HTML/index.html", f"{raw_data_dir}/model_run_settings.txt", "settingsTxt")
     # Add avaliable years to the spatial page
     add_txt_2_html(f"{report_dir}/REPORT_HTML/pages/spatial_maps.html", years_str, "model_years")
     

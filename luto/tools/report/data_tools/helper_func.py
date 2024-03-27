@@ -377,7 +377,7 @@ def add_txt_2_html(html_path:str, txt:str, id:str)->None:
     index_tree = etree.parse(html_path, etree.HTMLParser())
     
     # Check if txt is a file path
-    if os.path.isfile(txt):
+    if os.path.exists(os.path.abspath(txt)):
         # If it is, read the file
         with open(txt,'r') as f:
             txt = f.read()
