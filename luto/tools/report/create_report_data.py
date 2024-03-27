@@ -51,6 +51,9 @@ def save_report_data(sim):
     # Get all LUTO output files and store them in a dataframe
     files = get_all_files(raw_data_dir)
     
+    # Set the years to be int
+    files['year'] = files['year'].astype(int)
+    
     # Select the years to reduce the column number to 
     # avoid cluttering in the multi-level axis graphing
     years = sorted(files['year'].unique().tolist())
@@ -677,11 +680,25 @@ def save_report_data(sim):
     map_files = files.query('base_ext == ".html" and year_types != "begin_end_year"')
     map_save_dir = f"{SAVE_DIR}/Map_data/"
     
-    if not os.path.exists(map_save_dir):
+    # Create the directory to save map_html if it does not exist
+    if  os.path.exists(map_save_dir):
+        # Delete the existing directory and the files in it
+        if os.name == 'nt':  
+            os.system(f'rd /s /q "{map_save_dir}"') # If the system is Windows
+        else:  
+            os.system(f'rm -rf {map_save_dir}') # If the system is Unix-based
+        # Create new directory
+        os.makedirs(map_save_dir)
+    else:
         os.makedirs(map_save_dir)
     
+    # Function to move a file from one location to another if the file exists
+    def move_html(path_from, path_to):
+        if os.path.exists(path_from):
+            shutil.move(path_from, path_to)
+    
     # Move the map files to the save directory
-    tasks = [delayed(shutil.move)(row['path'], map_save_dir)
+    tasks = [delayed(move_html)(row['path'], map_save_dir)
                 for _,row in map_files.iterrows()]
     
     worker = min(settings.WRITE_THREADS, len(tasks))
