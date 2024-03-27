@@ -15,9 +15,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var lucc_names = {
         "Ag_LU": ['Apples', 'Beef - modified land', 'Beef - natural land', 'Citrus', 'Cotton', 'Dairy - modified land', 'Dairy - natural land',
-            'Grapes', 'Hay', 'Nuts', 'Other non-cereal crops', 'Pears', 'Plantation fruit', 'Rice', 'Sheep - modified land',
-            'Sheep - natural land', 'Stone fruit', 'Sugar', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
-            'Unallocated - modified land', 'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes','Winter oilseeds'],
+                  'Grapes', 'Hay', 'Nuts', 'Other non-cereal crops', 'Pears', 'Plantation fruit', 'Rice', 'Sheep - modified land',
+                  'Sheep - natural land', 'Stone fruit', 'Sugar', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
+                  'Unallocated - modified land', 'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes','Winter oilseeds'],
         "Ag_Mgt": ['Asparagopsis taxiformis', 'Ecological Grazing', 'Precision Agriculture'],
         "Land_Mgt": ['dry', 'irr'],
         'Non-Ag_LU': ['Environmental Plantings', 'Riparian Plantings', 'Agroforestry'],
@@ -51,11 +51,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     });
 
+
+
     // Listen for changes in the select_2 dropdown
     document.getElementById("select_2").addEventListener("change", function () {
         // Load the selected data to report HTML
         load_data(update_fname());
     });
+
 
 
     // Load the the selected year
@@ -65,16 +68,35 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 
+    
+    // Increment year
+    document.getElementById('increment').addEventListener('click', function() {
+        var yearInput = document.getElementById('year');
+        if (yearInput.value < yearInput.max) {
+            yearInput.value = parseInt(yearInput.value) + 1;
+            document.getElementById('yearOutput').value = yearInput.value;
+        }
+        // Load the selected data to report HTML
+        load_data(update_fname());
+    });
+    
 
-
+    // Decrement year
+    document.getElementById('decrement').addEventListener('click', function() {
+        var yearInput = document.getElementById('year');
+        if (yearInput.value > yearInput.min) {
+            yearInput.value = parseInt(yearInput.value) - 1;
+            document.getElementById('yearOutput').value = yearInput.value;
+        }
+        // Load the selected data to report HTML
+        load_data(update_fname());
+    });
 
 
 
     function load_data(path) {
         document.getElementById("map").innerHTML = `<object type="text/html" data=${path} ></object>`;
     }
-
-
 
 
     function update_fname() {
@@ -110,6 +132,20 @@ document.addEventListener('DOMContentLoaded', function () {
         url.pathname = path.join('/');
         var dataDir = url.href;
         return dataDir;
+    }
+
+    window.onload = function() {
+        var yearInput = document.getElementById('year');
+        var yearOutput = document.getElementById('yearOutput');
+        var modelYears = eval(document.getElementById('model_years').innerText);
+        
+        // Sort the modelYears array in ascending order
+        modelYears.sort(function(a, b) { return a - b; });
+        
+        yearInput.min = modelYears[0];
+        yearInput.max = modelYears[modelYears.length - 1];
+        yearInput.value = modelYears[0];
+        yearOutput.value = modelYears[0];
     }
 
 

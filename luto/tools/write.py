@@ -55,7 +55,7 @@ from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_html import data2html
-from luto.tools.report.create_static_maps import TIF2PNG
+from luto.tools.report.create_static_maps import TIF2MAP
 
 
 timestamp_write = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
@@ -102,7 +102,7 @@ def write_data(sim):
     Parallel(n_jobs=num_jobs, prefer='threads')(jobs)
         
     # Create the report HTML and png maps
-    TIF2PNG(sim) if settings.WRITE_OUTPUT_GEOTIFFS else None
+    TIF2MAP(sim) if settings.WRITE_OUTPUT_GEOTIFFS else None
     save_report_data(sim)
     data2html(sim)
     

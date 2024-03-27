@@ -119,7 +119,7 @@ def get_scenario(data_root_dir:str):
                 return line.split(':')[-1].strip()
 
 
-def get_legend_css(color_desc_dict:dict, map_dtype:str='float'):
+def get_legend_elemet(color_desc_dict:dict, map_dtype:str='float'):
     
     if map_dtype == 'integer':
 
@@ -132,18 +132,17 @@ def get_legend_css(color_desc_dict:dict, map_dtype:str='float'):
         # Create a custom HTML template for the legend
         template = f"""
         {{% macro html(this, kwargs) %}}
-        <div style="
-            position: fixed; 
-            padding: 10px;
-            bottom: 30px;
-            left: 30px;
-            width: auto;
-            height: auto;
-            z-index:9999;
-            font-size:14px;
-            background-color: rgba(255, 255, 255, 0.7);
-            border-radius: 10px;
-            ">
+        <div id='legend'
+            style="position: fixed; 
+                   padding: 10px;
+                   bottom: 30px;
+                   left: 30px;
+                   width: auto;
+                   height: auto;
+                   z-index:9999;
+                   font-size:14px;
+                   background-color: rgba(255, 255, 255, 0.7);
+                   border-radius: 10px;">
             {legend_css}
         </div>
         {{% endmacro %}}
@@ -166,7 +165,7 @@ def get_legend_css(color_desc_dict:dict, map_dtype:str='float'):
         # Add the color map to the folium map as a legend
         template = f"""
         {{% macro html(this, kwargs) %}}
-        <div id='color_map' 
+        <div id='legend' 
             style= 'position: fixed; 
                     padding: 6px;
                     bottom: 30px; 

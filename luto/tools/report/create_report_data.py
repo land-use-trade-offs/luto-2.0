@@ -28,12 +28,12 @@ from luto.tools.report.data_tools.helper_func import (get_GHG_category,
                               
 
                                                      
-from luto.tools.report.data_tools.parameters import(COMMODITIES_OFF_LAND, 
-                                                    YR_BASE, 
-                                                    COMMODITIES_ALL, 
-                                                    LANDUSE_ALL,
-                                                    LU_NATURAL,
-                                                    NON_AG_LANDUSE)
+from luto.tools.report.data_tools.parameters import (COMMODITIES_OFF_LAND, 
+                                                     YR_BASE, 
+                                                     COMMODITIES_ALL, 
+                                                     LANDUSE_ALL,
+                                                     LU_NATURAL,
+                                                     NON_AG_LANDUSE)
 
 # Get the output directory
 def save_report_data(sim):
@@ -680,8 +680,8 @@ def save_report_data(sim):
     if not os.path.exists(map_save_dir):
         os.makedirs(map_save_dir)
     
-    # Copy the map files to the save directory
-    tasks = [delayed(shutil.copy)(row['path'], map_save_dir)
+    # Move the map files to the save directory
+    tasks = [delayed(shutil.move)(row['path'], map_save_dir)
                 for _,row in map_files.iterrows()]
     
     worker = min(settings.WRITE_THREADS, len(tasks))
