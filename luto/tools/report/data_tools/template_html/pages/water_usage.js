@@ -97,8 +97,8 @@ document.addEventListener("DOMContentLoaded", function () {
       },
     });
 
-    // Chart:water_2_volum_to_limit
-    Highcharts.chart("water_2_volum_to_limit", {
+    // Chart:water_2_volume_to_limit
+    Highcharts.chart("water_2_volume_to_limit", {
       chart: {
         type: "spline",
         marginRight: 200,
@@ -113,7 +113,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       data: {
-        csv: document.getElementById("water_2_volum_to_limit_csv").innerHTML,
+        csv: document.getElementById("water_2_volume_to_limit_csv").innerHTML,
       },
       yAxis: {
         title: {
@@ -147,8 +147,8 @@ document.addEventListener("DOMContentLoaded", function () {
       },
     });
 
-    // Chart:water_3_volum_by_sector
-    Highcharts.chart("water_3_volum_by_sector", {
+    // Chart:water_3_volume_by_sector
+    Highcharts.chart("water_3_volume_by_sector", {
       chart: {
         type: "column",
         marginRight: 200,
@@ -163,7 +163,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       series: JSON.parse(
-        document.getElementById("water_3_volum_by_sector_csv").innerHTML
+        document.getElementById("water_3_volume_by_sector_csv").innerHTML
       ),
 
       yAxis: {
@@ -203,8 +203,8 @@ document.addEventListener("DOMContentLoaded", function () {
       },
     });
 
-    // Chart:water_4_volum_by_landuse
-    Highcharts.chart("water_4_volum_by_landuse", {
+    // Chart:water_4_volume_by_landuse
+    Highcharts.chart("water_4_volume_by_landuse", {
       chart: {
         type: "column",
         marginRight: 200,
@@ -219,7 +219,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       data: {
-        csv: document.getElementById("water_4_volum_by_landuse_csv").innerHTML,
+        csv: document.getElementById("water_4_volume_by_landuse_csv").innerHTML,
       },
       xAxis: {
         tickPositions: tickposition,
@@ -265,8 +265,8 @@ document.addEventListener("DOMContentLoaded", function () {
       },
     });
 
-    // Chart:water_5_volum_by_irrigation
-    Highcharts.chart("water_5_volum_by_irrigation", {
+    // Chart:water_5_volume_by_irrigation
+    Highcharts.chart("water_5_volume_by_irrigation", {
       chart: {
         type: "column",
         marginRight: 200,
@@ -281,7 +281,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       data: {
-        csv: document.getElementById("water_5_volum_by_irrigation_csv")
+        csv: document.getElementById("water_5_volume_by_irrigation_csv")
           .innerHTML,
       },
       xAxis: {

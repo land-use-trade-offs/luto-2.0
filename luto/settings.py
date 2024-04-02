@@ -52,7 +52,7 @@ RAW_DATA = '../raw_data'
 
 # Climate change assumptions. Options include '126', '245', '370', '585'
 SSP = '245'
-RCP = 'rcp' + SSP[1] + 'p' + SSP[2]  # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
+RCP = 'rcp' + SSP[1] + 'p' + SSP[2] # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
 # Set demand parameters which define requirements for Australian production of agricultural commodities
 SCENARIO = SSP_NUM = 'SSP' + SSP[0] # SSP1, SSP2, SSP3, SSP4, SSP5
@@ -98,7 +98,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 10          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
 
 # How does the model run over time 
-MODE = 'timeseries'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
+MODE = 'snapshot'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****

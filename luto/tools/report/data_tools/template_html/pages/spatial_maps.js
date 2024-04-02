@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var year = '';
     var names = [];
     var file_name = '';
+    var map_idx = '0';
 
     // Load the selected data to report HTML
     load_data( get_dataDir() + '/data/Map_data/lumap_2010.html');
@@ -14,10 +15,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var lucc_names = {
         "Ag_LU": ['Apples', 'Beef - modified land', 'Beef - natural land', 'Citrus', 'Cotton', 'Dairy - modified land', 'Dairy - natural land',
-            'Grapes', 'Hay', 'Nuts', 'Other non-cereal crops', 'Pears', 'Plantation fruit', 'Rice', 'Sheep - modified land',
-            'Sheep - natural land', 'Stone fruit', 'Sugar', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
-            'Unallocated - modified land', 'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes',
-            'Winter oilseeds', 'Environmental Plantings', 'Riparian Plantings', 'Agroforestry'],
+                  'Grapes', 'Hay', 'Nuts', 'Other non-cereal crops', 'Pears', 'Plantation fruit', 'Rice', 'Sheep - modified land',
+                  'Sheep - natural land', 'Stone fruit', 'Sugar', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
+                  'Unallocated - modified land', 'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes','Winter oilseeds'],
         "Ag_Mgt": ['Asparagopsis taxiformis', 'Ecological Grazing', 'Precision Agriculture'],
         "Land_Mgt": ['dry', 'irr'],
         'Non-Ag_LU': ['Environmental Plantings', 'Riparian Plantings', 'Agroforestry'],
@@ -51,11 +51,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     });
 
+
+
     // Listen for changes in the select_2 dropdown
     document.getElementById("select_2").addEventListener("change", function () {
         // Load the selected data to report HTML
         load_data(update_fname());
     });
+
 
 
     // Load the the selected year
@@ -65,8 +68,29 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 
+    
+    // Increment year
+    document.getElementById('increment').addEventListener('click', function() {
+        var yearInput = document.getElementById('year');
+        if (yearInput.value < yearInput.max) {
+            yearInput.value = parseInt(yearInput.value) + 1;
+            document.getElementById('yearOutput').value = yearInput.value;
+        }
+        // Load the selected data to report HTML
+        load_data(update_fname());
+    });
+    
 
-
+    // Decrement year
+    document.getElementById('decrement').addEventListener('click', function() {
+        var yearInput = document.getElementById('year');
+        if (yearInput.value > yearInput.min) {
+            yearInput.value = parseInt(yearInput.value) - 1;
+            document.getElementById('yearOutput').value = yearInput.value;
+        }
+        // Load the selected data to report HTML
+        load_data(update_fname());
+    });
 
 
 
@@ -76,20 +100,29 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
     function update_fname() {
+
+        // Get the selected values
         lucc = document.getElementById("select_1").value;
         map_name = document.getElementById("select_2").value;
         year = document.getElementById("year").value;
         names = lucc_names[lucc];
 
-        file_name = lucc == 'lumap' ? 'lumap_' + year + '.html' : lucc + '_' + String(names.indexOf(map_name)).padStart(2, '0') + '_' + map_name + '_' + year + '.html';
-        file_name = get_dataDir() + '/data/Map_data/' + file_name;
-        // Replace spaces with %20
-        file_name = file_name.replace(/ /g, '%20');
+        // The index for Ag_Mgt is always 00
+        map_idx = lucc == 'Ag_Mgt' ? '00' : String(names.indexOf(map_name)).padStart(2, '0');
+        
+        // The file name for lumap is different
+        file_name = lucc == 'lumap' ? 'lumap_' + year + '.html' : lucc + '_' +  map_idx + '_' + map_name + '_' + year + '.html';
 
-        console.log(file_name);
+        // Get the full path to the file
+        file_name = get_dataDir() + '/data/Map_data/' + file_name;
+
+        // Replace spaces with %20, so the file can be found by the browser
+        file_name = file_name.replace(/ /g, '%20');
 
         return file_name;
     }
+
+
 
     function get_dataDir() {
         // Get the data path
@@ -99,6 +132,20 @@ document.addEventListener('DOMContentLoaded', function () {
         url.pathname = path.join('/');
         var dataDir = url.href;
         return dataDir;
+    }
+
+    window.onload = function() {
+        var yearInput = document.getElementById('year');
+        var yearOutput = document.getElementById('yearOutput');
+        var modelYears = eval(document.getElementById('model_years').innerText);
+        
+        // Sort the modelYears array in ascending order
+        modelYears.sort(function(a, b) { return a - b; });
+        
+        yearInput.min = modelYears[0];
+        yearInput.max = modelYears[modelYears.length - 1];
+        yearInput.value = modelYears[0];
+        yearOutput.value = modelYears[0];
     }
 
 

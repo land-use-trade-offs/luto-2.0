@@ -176,7 +176,7 @@ def get_path(bdata, start, end):
     # Get all paths 
     paths = [path]\
             + [f"{path}/out_{yr}" for yr in yr_all]\
-            + [f"{path}/out_{yr}/lucc_separate" for yr in yr_all[1:]] # Skip creating lucc_separate for base year
+            + [f"{path}/out_{yr}/lucc_separate" for yr in yr_all]
     
     # Add the path for the comparison between base-year and target-year if in the timeseries mode
     if settings.MODE == 'timeseries':

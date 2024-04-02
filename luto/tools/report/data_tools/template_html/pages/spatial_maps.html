@@ -34,7 +34,7 @@
         <div id="sidebarLine" class="NoHover"></div>
 
         <!-- The dropdown to select the category of the map: -->
-        <div >
+        <div class="selection">
             <label for="select_1" class="label">Select a category:</label>
             <select id="select_1">
                 <option value="lumap" selected>All Land-use</option>
@@ -47,7 +47,7 @@
 
 
         <!-- The dropdown to select the specific map: -->
-        <div >
+        <div class="selection">
             <label for="select_2" class="label">Select a map:</label>
             <select id="select_2">
                 <option value="lumap" selected>All Land-use</option>
@@ -56,17 +56,14 @@
 
 
         <!-- The dropdown to select the year of the map: -->
-        <div > 
+        <div class="selection">
             <label for="year" class="label">Select a year:</label><br>
-            <input type="range" id="year" name="year" min="2010" max="2050" step="1"
+            <button id="decrement">-</button>
+            <input type="range" id="year" name="year" step="1" value="2010"
                 oninput="yearOutput.value = year.value">
+            <button id="increment">+</button>
             <output id="yearOutput">2010</output>
         </div>
-
-
-
-
-
 
     </div>
 
@@ -74,6 +71,9 @@
     <div class="content">
 
         <div id="map"></div>
+
+        <!-- The years that are available for the selected maps  -->
+        <pre id="model_years"></pre>
 
     </div>
 

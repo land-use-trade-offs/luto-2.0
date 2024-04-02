@@ -38,7 +38,7 @@ def create_png_map(tif_path: str,
     - basemap_path (str): 
         The path to the basemap image. Default is 'Assets/basemap.tif'.
     - shapefile_path (str): 
-        The path to the shapefile for overlaying. Default is 'Assets/AUS_adm/STE11aAust_mercator_simplified.shp'.
+        The path to the shapefile for overlaying. Default is 'luto/tools/report/Assets/AUS_adm/STE11aAust_mercator_simplified.shp'.
     - anno_text (str): 
         The annotation text to be displayed on the map. Default is None.
     - mercator_bbox (tuple[int]):
@@ -169,7 +169,7 @@ def create_png_map(tif_path: str,
         cbar = plt.colorbar(sm, cax=cbar_ax, orientation='vertical')
         
         # Add a label to the colorbar
-        cbar.set_label('Proportion to pixel', fontsize=12, labelpad=-30, y=1.25, rotation=0)
+        cbar.set_label('Proportion of grid cell', fontsize=12, labelpad=-30, y=1.25, rotation=0)
         
         
         

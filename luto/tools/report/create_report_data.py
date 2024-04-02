@@ -28,12 +28,12 @@ from luto.tools.report.data_tools.helper_func import (get_GHG_category,
                               
 
                                                      
-from luto.tools.report.data_tools.parameters import(COMMODITIES_OFF_LAND, 
-                                                    YR_BASE, 
-                                                    COMMODITIES_ALL, 
-                                                    LANDUSE_ALL,
-                                                    LU_NATURAL,
-                                                    NON_AG_LANDUSE)
+from luto.tools.report.data_tools.parameters import (COMMODITIES_OFF_LAND, 
+                                                     YR_BASE, 
+                                                     COMMODITIES_ALL, 
+                                                     LANDUSE_ALL,
+                                                     LU_NATURAL,
+                                                     NON_AG_LANDUSE)
 
 # Get the output directory
 def save_report_data(sim):
@@ -50,6 +50,9 @@ def save_report_data(sim):
 
     # Get all LUTO output files and store them in a dataframe
     files = get_all_files(raw_data_dir)
+    
+    # Set the years to be int
+    files['year'] = files['year'].astype(int)
     
     # Select the years to reduce the column number to 
     # avoid cluttering in the multi-level axis graphing
@@ -561,7 +564,7 @@ def save_report_data(sim):
 
     # Plot_5-2: Water use compared to limite (ML)
     water_df_total_vol_wide = water_df_total.pivot(index='year', columns='REGION_NAME', values='TOT_WATER_REQ_ML')
-    water_df_total_vol_wide.to_csv(f'{SAVE_DIR}/water_2_volum_to_limit.csv')
+    water_df_total_vol_wide.to_csv(f'{SAVE_DIR}/water_2_volume_to_limit.csv')
 
     # Plot_5-3: Water use by sector (ML)
     water_df_separate_lu_type = water_df_separate.groupby(['year','Landuse Type']).sum()[['Water Use (ML)']].reset_index()
@@ -577,7 +580,7 @@ def save_report_data(sim):
 
     water_df_separate_lu_type.loc[len(water_df_separate_lu_type)] = ['Net Volume', list(map(list,zip(water_df_net['year'],water_df_net['Water Use (ML)']))), 'line']
 
-    water_df_separate_lu_type.to_json(f'{SAVE_DIR}/water_3_volum_by_sector.json',orient='records')
+    water_df_separate_lu_type.to_json(f'{SAVE_DIR}/water_3_volume_by_sector.json',orient='records')
 
 
 
@@ -587,12 +590,12 @@ def save_report_data(sim):
     # reorder the columns to match the order in LANDUSE_ALL
     water_df_seperate_lu_wide = water_df_seperate_lu_wide.reindex(
         columns = [water_df_seperate_lu_wide.columns[0]] + LANDUSE_ALL).reset_index(drop=True)
-    water_df_seperate_lu_wide.to_csv(f'{SAVE_DIR}/water_4_volum_by_landuse.csv',index=False)
+    water_df_seperate_lu_wide.to_csv(f'{SAVE_DIR}/water_4_volume_by_landuse.csv',index=False)
 
     # Plot_5-5: Water use by irrigation (ML)
     water_df_seperate_irr = water_df_separate.groupby(['year','Irrigation']).sum()[['Water Use (ML)']].reset_index()
     water_df_seperate_irr_wide = water_df_seperate_irr.pivot(index='year', columns='Irrigation', values='Water Use (ML)').reset_index()
-    water_df_seperate_irr_wide.to_csv(f'{SAVE_DIR}/water_5_volum_by_irrigation.csv',index=False)
+    water_df_seperate_irr_wide.to_csv(f'{SAVE_DIR}/water_5_volume_by_irrigation.csv',index=False)
 
 
 
@@ -677,11 +680,25 @@ def save_report_data(sim):
     map_files = files.query('base_ext == ".html" and year_types != "begin_end_year"')
     map_save_dir = f"{SAVE_DIR}/Map_data/"
     
-    if not os.path.exists(map_save_dir):
+    # Create the directory to save map_html if it does not exist
+    if  os.path.exists(map_save_dir):
+        # Delete the existing directory and the files in it
+        if os.name == 'nt':  
+            os.system(f'rd /s /q "{map_save_dir}"') # If the system is Windows
+        else:  
+            os.system(f'rm -rf {map_save_dir}') # If the system is Unix-based
+        # Create new directory
+        os.makedirs(map_save_dir)
+    else:
         os.makedirs(map_save_dir)
     
-    # Copy the map files to the save directory
-    tasks = [delayed(shutil.copy)(row['path'], map_save_dir)
+    # Function to move a file from one location to another if the file exists
+    def move_html(path_from, path_to):
+        if os.path.exists(path_from):
+            shutil.move(path_from, path_to)
+    
+    # Move the map files to the save directory
+    tasks = [delayed(move_html)(row['path'], map_save_dir)
                 for _,row in map_files.iterrows()]
     
     worker = min(settings.WRITE_THREADS, len(tasks))
