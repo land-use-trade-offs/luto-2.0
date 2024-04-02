@@ -407,15 +407,37 @@ def get_ecological_grazing_effect_g_mrj(data, yr_idx):
     return new_g_mrj
 
 
+def get_savanna_burning_effect_g_mrj(data, g_mrj):
+    """
+    Applies the effects of using ecological grazing to the GHG data
+    for all relevant agr. land uses.
+    """
+    nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
+    sb_g_mrj = np.zeros((data.NLMS, data.NCELLS, nlus))
+
+    eds_sav_burning_ghg_impact = data.SAVBURN_TOTAL_TCO2E_HA
+
+    for m in range(data.NLMS):
+        for j in range(nlus):
+            sb_g_mrj[m, :, j] = eds_sav_burning_ghg_impact
+
+    # TODO: check this
+    # SAVBURN_TOTAL_TCO2E_HA stores the carbon sequestration figures of SB plus natural land usage on a cell.
+    # Thus, to get the effect, get the difference between the new SB ghg matrix and the original g_mrj for agriculture.
+    return g_mrj - sb_g_mrj
+
+
 def get_agricultural_management_ghg_matrices(data, g_mrj, yr_idx) -> Dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_g_mrj(data, yr_idx)
     precision_agriculture_data = get_precision_agriculture_effect_g_mrj(data, yr_idx)
     eco_grazing_data = get_ecological_grazing_effect_g_mrj(data, yr_idx)
+    sav_burning_ghg_impact = get_savanna_burning_effect_g_mrj(data, yr_idx)
 
     ag_management_data = {
         'Asparagopsis taxiformis': asparagopsis_data,
         'Precision Agriculture': precision_agriculture_data,
         'Ecological Grazing': eco_grazing_data,
+        'Savanna Burning': sav_burning_ghg_impact,
     }
 
     return ag_management_data

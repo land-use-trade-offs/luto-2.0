@@ -187,7 +187,7 @@ def get_asparagopsis_effect_t_mrj(data):
 
 def get_precision_agriculture_effect_t_mrj(data):
     """
-    Gets the transition costs of asparagopsis taxiformis, which are none.
+    Gets the effects on transition costs of asparagopsis taxiformis, which are none.
     Transition/establishment costs are handled in the costs matrix.
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
@@ -196,10 +196,19 @@ def get_precision_agriculture_effect_t_mrj(data):
 
 def get_ecological_grazing_effect_t_mrj(data):
     """
-    Gets the transition costs of ecological grazing, which are none.
+    Gets the effects on transition costs of ecological grazing, which are none.
     Transition/establishment costs are handled in the costs matrix.
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
+    return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+
+def get_savanna_burning_effect_t_mrj(data):
+    """
+    Gets the effects on transition costs of savanna burning, which are none.
+    Transition/establishment costs are handled in the costs matrix.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning']
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
@@ -207,11 +216,13 @@ def get_agricultural_management_transition_matrices(data, t_mrj, yr_idx) -> Dict
     asparagopsis_data = get_asparagopsis_effect_t_mrj(data)
     precision_agriculture_data = get_precision_agriculture_effect_t_mrj(data)
     eco_grazing_data = get_ecological_grazing_effect_t_mrj(data)
+    sav_burning_data = get_savanna_burning_effect_t_mrj(data)
 
     ag_management_data = {
         'Asparagopsis taxiformis': asparagopsis_data,
         'Precision Agriculture': precision_agriculture_data,
         'Ecological Grazing': eco_grazing_data,
+        'Savanna Burning': sav_burning_data,
     }
 
     return ag_management_data
@@ -256,6 +267,18 @@ def get_ecological_grazing_adoption_limit(data, yr_idx):
     return eco_grazing_limits
 
 
+def get_savanna_burning_adoption_limit(data):
+    """
+    Gets the adoptoin limit of savanna burnign for each possible land use
+    """
+    sav_burning_limits = {}
+    for lu in AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning']:
+        j = data.DESC2AGLU[lu]
+        sav_burning_limits[j] = 1
+
+    return sav_burning_limits
+
+
 def get_agricultural_management_adoption_limits(data, yr_idx) -> Dict[str, dict]:
     """
     An adoption limit represents the maximum percentage of cells (for each land use) that can utilise
@@ -264,11 +287,13 @@ def get_agricultural_management_adoption_limits(data, yr_idx) -> Dict[str, dict]
     asparagopsis_limits = get_asparagopsis_adoption_limits(data, yr_idx)
     precision_agriculture_limits = get_precision_agriculture_adoption_limit(data, yr_idx)
     eco_grazing_limits = get_ecological_grazing_adoption_limit(data, yr_idx)
+    savanna_burning_limits = get_savanna_burning_adoption_limit(data)
 
     adoption_limits = {
         'Asparagopsis taxiformis': asparagopsis_limits,
         'Precision Agriculture': precision_agriculture_limits,
         'Ecological Grazing': eco_grazing_limits,
+        'Savanna Burning': savanna_burning_limits,
     }
 
     return adoption_limits

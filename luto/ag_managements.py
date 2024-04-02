@@ -37,4 +37,10 @@ AG_MANAGEMENTS_TO_LAND_USES = {
         'Sheep - modified land',
         'Dairy - modified land',
     ],
+    'Savanna Burning': [
+        'Beef - natural land',
+        'Dairy - natural land',
+        'Sheep - natural land',
+        'Unallocated - natural land',
+    ]
 }

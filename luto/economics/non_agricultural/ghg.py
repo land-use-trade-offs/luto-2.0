@@ -83,32 +83,6 @@ def get_ghg_reduction_agroforestry(data, aggregate) -> np.ndarray:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
     
 
-def get_ghg_reduction_savanna_burning(data, aggregate) -> np.ndarray:
-    """
-    Parameters
-    ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
-
-    Returns
-    -------
-    if aggregate == True (default)  -> np.ndarray
-       aggregate == False           -> pd.DataFrame
-    
-        Greenhouse gas emissions of Riparian Plantings for each cell. Same as environmental plantings.
-        Since riparian plantings reduces carbon in the air, each value will be <= 0.
-        1-D array Indexed by cell.
-    """
-
-    # Tonnes of CO2e per ha, adjusted for resfactor
-    if aggregate==True:
-        return -data.SAVBURN_TOTAL_TCO2E_HA * data.REAL_AREA
-    elif aggregate==False:
-        return pd.DataFrame(-data.SAVBURN_TOTAL_TCO2E_HA * data.REAL_AREA,columns=['SAV_BURNING'])
-    else:
-        raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
-
-
 def get_ghg_matrix(data, aggregate=True) -> np.ndarray:
     """
     Get the g_rk matrix containing non-agricultural greenhouse gas emissions.
@@ -117,7 +91,6 @@ def get_ghg_matrix(data, aggregate=True) -> np.ndarray:
     env_plantings_ghg_matrix = get_ghg_reduction_env_plantings(data, aggregate)
     rip_plantings_ghg_matrix = get_ghg_reduction_rip_plantings(data, aggregate)
     agroforestry_ghg_matrix = get_ghg_reduction_agroforestry(data, aggregate)
-    savanna_burning_matrix = get_ghg_reduction_savanna_burning(data, aggregate)
 
       
     if aggregate==True:
@@ -126,7 +99,6 @@ def get_ghg_matrix(data, aggregate=True) -> np.ndarray:
             env_plantings_ghg_matrix.reshape((data.NCELLS, 1)),
             rip_plantings_ghg_matrix.reshape((data.NCELLS, 1)),
             agroforestry_ghg_matrix.reshape((data.NCELLS, 1)),
-            savanna_burning_matrix.reshape((data.NCELLS, 1)),
         ]
         return np.concatenate(non_agr_ghg_matrices, axis=1)
     

@@ -120,16 +120,28 @@ def get_ecological_grazing_effect_w_mrj(data, w_mrj, yr_idx):
     return new_w_mrj
 
 
+def get_savanna_burning_effect_w_mrj(data):
+    """
+    Applies the effects of using savanna burning to the water requirements data
+    for all relevant agr. land uses.
+
+    Savanna burning does not affect water usage, so return an array of zeros.
+    """
+    nlus = len(AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
+    return np.zeros((data.NLMS, data.NCELLS, nlus))
+
 
 def get_agricultural_management_water_matrices(data, w_mrj, yr_idx) -> Dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_w_mrj(data, w_mrj, yr_idx)
     precision_agriculture_data = get_precision_agriculture_effect_w_mrj(data, w_mrj, yr_idx)
     eco_grazing_data = get_ecological_grazing_effect_w_mrj(data, w_mrj, yr_idx)
+    sav_burning_data = get_savanna_burning_effect_w_mrj(data)
 
     ag_management_data = {
         'Asparagopsis taxiformis': asparagopsis_data,
         'Precision Agriculture': precision_agriculture_data,
         'Ecological Grazing': eco_grazing_data,
+        'Savanna Burning': sav_burning_data,
     }
 
     return ag_management_data

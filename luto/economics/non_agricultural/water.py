@@ -74,14 +74,12 @@ def get_wreq_matrix(data) -> np.ndarray:
     env_plant_wreq_matrix = get_wreq_matrix_env_planting(data)
     rip_plant_wreq_matrix = get_wreq_matrix_rip_planting(data)
     agroforestry_wreq_matrix = get_wreq_matrix_agroforestry(data)
-    sav_burning_wreq_matrix = get_wreq_matrix_savanna_burning(data)
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     non_ag_wreq_matrices = [
         env_plant_wreq_matrix.reshape((data.NCELLS, 1)),
         rip_plant_wreq_matrix.reshape((data.NCELLS, 1)),
         agroforestry_wreq_matrix.reshape((data.NCELLS, 1)),
-        sav_burning_wreq_matrix.reshape((data.NCELLS, 1)),
     ]
 
     return np.concatenate(non_ag_wreq_matrices, axis=1)

@@ -48,21 +48,6 @@ def get_cost_agroforestry(data) -> np.ndarray:
     return settings.AGROFORESTRY_COST_PER_HA_PER_YEAR * data.REAL_AREA
 
 
-def get_cost_savanna_burning(data) -> np.ndarray:
-    """
-    Parameters
-    ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
-
-    Returns
-    -------
-    np.ndarray
-        Cost of savanna burning for each cell. 1-D array Indexed by cell.
-    """
-    return data.SAVBURN_COST_HA * data.REAL_AREA
-
-
 def get_cost_matrix(data):
     """
     Returns non-agricultural c_rk matrix of costs per cell and land use.

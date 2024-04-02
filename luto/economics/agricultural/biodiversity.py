@@ -6,6 +6,9 @@ from typing import Dict
 import numpy as np
 
 from luto import settings
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.tools import get_lds_savanna_burning_binary_array
+
 
 
 def get_non_penalty_land_uses(data) -> list[int]:
@@ -44,32 +47,57 @@ def get_asparagopsis_effect_b_mrj(data):
     """
     Gets biodiversity impacts of using Asparagopsis taxiformis (no effect)
     """
-    return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+    nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"])
+    return np.zeros((data.NLMS, data.NCELLS, nlus))
 
 
 def get_precision_agriculture_effect_b_mrj(data):
     """
     Gets biodiversity impacts of using Precision Agriculture (no effect)
     """
-    return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+    nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Precision Agriculture"])
+    return np.zeros((data.NLMS, data.NCELLS, nlus))
 
 
 def get_ecological_grazing_effect_b_mrj(data):
     """
     Gets biodiversity impacts of using Ecological Grazing (no effect)
     """
-    return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+    nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Ecological Grazing"])
+    return np.zeros((data.NLMS, data.NCELLS, nlus))
+
+
+def get_savanna_burning_effect_b_mrj(data):
+    """
+    Gets biodiversity impacts of using Savanna Burning.
+
+    Land that can perform Savanna Burning but does not is penalised for not doing so.
+    Thus, add back in the penalised amount to get the positive effect of Savanna
+    Burning on biodiversity.
+    """
+    nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
+    new_b_mrj = np.zeros((data.NLMS, data.NCELLS, nlus))
+
+    eds_sav_burning_biodiv_benefits = (1 - settings.LDS_BIODIVERSITY_VALUE) * data.BIODIV_SCORE_WEIGHTED
+
+    for m in range(data.NLMS):
+        for j in range(nlus):
+            new_b_mrj[m, :, j] = eds_sav_burning_biodiv_benefits
+
+    return new_b_mrj
 
 
 def get_agricultural_management_biodiversity_matrices(data):
     asparagopsis_data = get_asparagopsis_effect_b_mrj(data)
     precision_agriculture_data = get_precision_agriculture_effect_b_mrj(data)
     eco_grazing_data = get_ecological_grazing_effect_b_mrj(data)
+    sav_burning_data = get_savanna_burning_effect_b_mrj(data)
 
     ag_management_data = {
         'Asparagopsis taxiformis': asparagopsis_data,
         'Precision Agriculture': precision_agriculture_data,
         'Ecological Grazing': eco_grazing_data,
+        'Savanna Burning': sav_burning_data,
     }
 
     return ag_management_data
