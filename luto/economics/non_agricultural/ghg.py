@@ -81,6 +81,33 @@ def get_ghg_reduction_agroforestry(data, aggregate) -> np.ndarray:
     else:
     # If the aggregate arguments is not in [True,False]. That must be someting wrong
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
+    
+
+def get_ghg_reduction_beccs(data, aggregate) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    data: object/module
+        Data object or module with fields like in `luto.data`.
+
+    Returns
+    -------
+    if aggregate == True (default)  -> np.ndarray
+       aggregate == False           -> pd.DataFrame
+    
+        Greenhouse gas emissions of agroforestry for each cell.
+        Since agroforestry reduces carbon in the air, each value will be <= 0.
+        1-D array Indexed by cell.
+    """
+
+    # Tonnes of CO2e per ha, adjusted for resfactor
+    if aggregate==True:
+        return -data.BECCS_TCO2E_HA_YR * data.REAL_AREA
+    elif aggregate==False:
+        return pd.DataFrame(-data.BECCS_TCO2E_HA_YR * data.REAL_AREA,columns=['BECCS'])
+    else:
+    # If the aggregate arguments is not in [True,False]. That must be someting wrong
+        raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
 
 def get_ghg_matrix(data, aggregate=True) -> np.ndarray:
@@ -91,7 +118,7 @@ def get_ghg_matrix(data, aggregate=True) -> np.ndarray:
     env_plantings_ghg_matrix = get_ghg_reduction_env_plantings(data, aggregate)
     rip_plantings_ghg_matrix = get_ghg_reduction_rip_plantings(data, aggregate)
     agroforestry_ghg_matrix = get_ghg_reduction_agroforestry(data, aggregate)
-
+    beccs_ghg_matrix = get_ghg_reduction_beccs(data, aggregate)
       
     if aggregate==True:
         # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
@@ -99,11 +126,12 @@ def get_ghg_matrix(data, aggregate=True) -> np.ndarray:
             env_plantings_ghg_matrix.reshape((data.NCELLS, 1)),
             rip_plantings_ghg_matrix.reshape((data.NCELLS, 1)),
             agroforestry_ghg_matrix.reshape((data.NCELLS, 1)),
+            beccs_ghg_matrix.reshape((data.NCELLS, 1)),
         ]
         return np.concatenate(non_agr_ghg_matrices, axis=1)
     
     elif aggregate==False:
-        return pd.concat([env_plantings_ghg_matrix, rip_plantings_ghg_matrix, agroforestry_ghg_matrix], axis=1)
+        return pd.concat([env_plantings_ghg_matrix, rip_plantings_ghg_matrix, agroforestry_ghg_matrix, beccs_ghg_matrix], axis=1)
     
     else:
     # If the aggregate arguments is not in [True,False]. That must be someting wrong
