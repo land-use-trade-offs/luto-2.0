@@ -15,6 +15,14 @@ document.addEventListener("DOMContentLoaded", function () {
         ],
     });
 
+    // Get the available years for plotting
+    var years = eval(document.getElementById("model_years").innerHTML).map(function (x) { return parseInt(x); });
+    // Sort the years
+    years.sort(function (a, b) { return a - b; });
+    // Get the year ticks and interval
+    var year_ticks = years.length == 2 ? years : null;
+
+
 
 
     // biodiversity_1_total_score_by_category
@@ -31,6 +39,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 "biodiversity_1_total_score_by_category_csv"
             ).innerHTML
         ),
+        xAxis: {
+            tickPositions: year_ticks,
+        },
         yAxis: {
             title: {
                 text: "Quality-weighted Area (million ha)",
@@ -73,7 +84,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 "biodiversity_3_total_score_by_landuse_csv"
             ).innerHTML
         ),
-
+        xAxis: {
+            tickPositions: year_ticks,
+        },
         yAxis: {
             title: {
                 text: "Quality-weighted Area (million ha)",
@@ -117,6 +130,9 @@ document.addEventListener("DOMContentLoaded", function () {
         series: JSON.parse(
             document.getElementById("biodiversity_4_natural_land_area_csv").innerHTML
         ),
+        xAxis: {
+            tickPositions: year_ticks,
+        },
         yAxis: {
             title: {
                 text: "Area (million ha)",

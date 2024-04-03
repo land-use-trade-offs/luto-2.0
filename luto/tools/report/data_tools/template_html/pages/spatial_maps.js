@@ -93,12 +93,14 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 
-
+    // Function to load the data to the report HTML
     function load_data(path) {
         document.getElementById("map").innerHTML = `<object type="text/html" data=${path} ></object>`;
     }
 
 
+
+    // Function to update the file name
     function update_fname() {
 
         // Get the selected values
@@ -123,7 +125,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 
-
+    // Function to get the data directory
     function get_dataDir() {
         // Get the data path
         var url = new URL(window.location.href);

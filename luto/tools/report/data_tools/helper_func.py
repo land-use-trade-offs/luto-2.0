@@ -381,11 +381,13 @@ def add_txt_2_html(html_path:str, txt:str, id:str)->None:
         # If it is, read the file
         with open(txt,'r') as f:
             txt = f.read()
-        
-    # Write the txt to the html
-    txt_pre = index_tree.xpath(f'//pre[@id="{id}"]')[0]
-    txt_pre.text = txt
-    txt_pre.attrib['style'] = 'display:none'
+    
+    # Add a new div element to the page      
+    data_csv_div = index_tree.find('.//div[@id="data_csv"]')
+
+    pre_element = etree.SubElement(data_csv_div, "pre")
+    pre_element.set("id", id)
+    pre_element.text = txt
     
     # Write changes to the html
     index_tree.write(html_path, 
