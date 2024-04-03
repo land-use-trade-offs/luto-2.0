@@ -269,7 +269,7 @@ def get_ecological_grazing_adoption_limit(data, yr_idx):
 
 def get_savanna_burning_adoption_limit(data):
     """
-    Gets the adoptoin limit of savanna burnign for each possible land use
+    Gets the adoptoin limit of savanna burning for each possible land use
     """
     sav_burning_limits = {}
     for lu in AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning']:

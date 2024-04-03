@@ -431,7 +431,7 @@ def get_agricultural_management_ghg_matrices(data, g_mrj, yr_idx) -> Dict[str, n
     asparagopsis_data = get_asparagopsis_effect_g_mrj(data, yr_idx)
     precision_agriculture_data = get_precision_agriculture_effect_g_mrj(data, yr_idx)
     eco_grazing_data = get_ecological_grazing_effect_g_mrj(data, yr_idx)
-    sav_burning_ghg_impact = get_savanna_burning_effect_g_mrj(data, yr_idx)
+    sav_burning_ghg_impact = get_savanna_burning_effect_g_mrj(data, g_mrj)
 
     ag_management_data = {
         'Asparagopsis taxiformis': asparagopsis_data,

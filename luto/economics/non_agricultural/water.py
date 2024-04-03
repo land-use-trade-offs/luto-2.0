@@ -48,20 +48,6 @@ def get_wreq_matrix_agroforestry(data) -> np.ndarray:
     return get_wreq_matrix_env_planting(data)
 
 
-def get_wreq_matrix_savanna_burning(data) -> np.ndarray:
-    """
-    Get water requirements vector of agroforestry.
-
-    Savanna burning does not affect water usage at all.
-
-    Returns
-    -------
-    1-D array, indexed by cell.
-    """
-    # TODO: this does not seem right
-    return np.zeros(data.NCELLS)
-
-
 def get_wreq_matrix(data) -> np.ndarray:
     """
     Get the water requirements matrix for all non-agricultural land uses.
