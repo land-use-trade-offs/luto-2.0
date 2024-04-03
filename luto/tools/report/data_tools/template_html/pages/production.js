@@ -35,10 +35,9 @@ document.addEventListener("DOMContentLoaded", function () {
     title: {
       text: "Demand, Trade, and Production of Agricultural Commodities",
     },
-    data: {
-      csv: document.getElementById("production_1_demand_type_wide_csv")
-        .innerHTML,
-    },
+    series: JSON.parse(
+      document.getElementById("production_1_demand_type_wide_csv").innerHTML
+    ),
     credits: {
       enabled: false,
     },
@@ -82,19 +81,19 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   // Chart:production_2_demand_on_off_wide
-  let production_2_demand_on_off_wide_option = {
-    chart: {
-      renderTo: "production_2_demand_on_off_wide",
-      marginRight: 200,
-      type: "column",
-    },
+  Highcharts.chart("production_2_demand_on_off_wide", {
+
+
     title: {
       text: "Demand for Agricultural Commodities",
     },
 
     xAxis: {
       tickWidth: 0.05,
-      categories: [],
+      categories: JSON.parse(
+        document.getElementById("production_2_demand_on_off_wide_csv").innerHTML
+        )['categories'],
+
       labels: {
         y: 38,
         groupedOptions: [
@@ -132,7 +131,8 @@ document.addEventListener("DOMContentLoaded", function () {
       y: 260,
     },
 
-    series: [],
+    series: JSON.parse(
+      document.getElementById("production_2_demand_on_off_wide_csv").innerHTML)['series'],
 
     credits: {
       enabled: false,
@@ -150,68 +150,21 @@ document.addEventListener("DOMContentLoaded", function () {
       sourceWidth: 1200,
       sourceHeight: 600,
     },
-  };
-
-  // Extract data to populate chart
-  $(document).ready(function () {
-    let data, lines, years;
-
-    data = document.getElementById(
-      "production_2_demand_on_off_wide_csv"
-    ).innerHTML;
-
-    // Get the years and types
-    lines = data.split("\n");
-    years = lines[0].split(",").slice(1);
-    years = [...new Set(years)];
-    types = lines[1].split(",").slice(1);
-    types = [...new Set(types)];
-
-    years.forEach((year) => {
-      production_2_demand_on_off_wide_option.xAxis.categories.push({
-        name: year,
-        categories: types,
-      });
-    });
-
-    // Populate the chart options
-    $.each(lines, function (lineNo, line) {
-      var items = line.split(",");
-
-      if (lineNo <= 1) {
-        // Skip the first two lines (headers)
-      } else {
-        // if items is not empty, add series
-        if (items[0] == "") {
-          // Skip empty lines
-        } else {
-          // Add series
-          production_2_demand_on_off_wide_option.series.push({
-            name: items[0],
-            data: items.slice(1).map((x) => parseFloat(x)),
-            type: "column",
-          });
-        }
-      }
-    });
-
-    let chart = new Highcharts.Chart(production_2_demand_on_off_wide_option);
   });
 
+
   // Chart:production_3_demand_commodity
-  let production_3_demand_commodity_option = {
-    chart: {
-      renderTo: "production_3_demand_commodity",
-      marginRight: 200,
-      type: "column",
-    },
+  Highcharts.chart("production_3_demand_commodity", {
+
     title: {
       text: "Agricultural Demand by Commodity",
     },
 
     xAxis: {
       tickWidth: 0.05,
-      categories: [],
+      categories: JSON.parse(
+        document.getElementById("production_3_demand_commodity_csv").innerHTML
+      )['categories'],
       labels: {
         y: 38,
         groupedOptions: [
@@ -241,7 +194,9 @@ document.addEventListener("DOMContentLoaded", function () {
       y: -10,
     },
 
-    series: [],
+    series: JSON.parse(
+      document.getElementById("production_3_demand_commodity_csv").innerHTML
+    )['series'],
 
     credits: {
       enabled: false,
@@ -259,53 +214,9 @@ document.addEventListener("DOMContentLoaded", function () {
       sourceWidth: 1200,
       sourceHeight: 600,
     },
-  };
-
-  // Extract data to populate chart
-  $(document).ready(function () {
-    let data, lines, years;
-
-    data = document.getElementById(
-      "production_3_demand_commodity_csv"
-    ).innerHTML;
-
-    // Get the years and types
-    lines = data.split("\n");
-    years = lines[0].split(",").slice(1);
-    years = [...new Set(years)];
-    types = lines[1].split(",").slice(1);
-    types = [...new Set(types)];
-
-    years.forEach((year) => {
-      production_3_demand_commodity_option.xAxis.categories.push({
-        name: year,
-        categories: types,
-      });
-    });
-
-    // Populate the chart options
-    $.each(lines, function (lineNo, line) {
-      var items = line.split(",");
-
-      if (lineNo <= 1) {
-        // Skip the first two lines (headers)
-      } else {
-        // if items is not empty, add series
-        if (items[0] == "") {
-          // Skip empty lines
-        } else {
-          // Add series
-          production_3_demand_commodity_option.series.push({
-            name: items[0],
-            data: items.slice(1).map((x) => parseFloat(x)),
-            type: "column",
-          });
-        }
-      }
-    });
-
-    let chart = new Highcharts.Chart(production_3_demand_commodity_option);
   });
+
+
 
   // Chart:production_4_1_demand_domestic_On-land_commodity
   Highcharts.chart("production_4_1_demand_domestic_On-land_commodity", {
@@ -316,11 +227,9 @@ document.addEventListener("DOMContentLoaded", function () {
     title: {
       text: "Domestic Consumption (Food) - On-land Commodities",
     },
-    data: {
-      csv: document.getElementById(
-        "production_4_1_demand_domestic_On-land_commodity_csv"
-      ).innerHTML,
-    },
+    series: JSON.parse(
+      document.getElementById("production_4_1_demand_domestic_On-land_commodity_csv").innerHTML
+    ),
     credits: {
       enabled: false,
     },
@@ -369,11 +278,9 @@ document.addEventListener("DOMContentLoaded", function () {
     title: {
       text: "Domestic Consumption (Food) - Off-land Commodities",
     },
-    data: {
-      csv: document.getElementById(
-        "production_4_2_demand_domestic_Off-land_commodity_csv"
-      ).innerHTML,
-    },
+    series: JSON.parse(
+      document.getElementById("production_4_2_demand_domestic_Off-land_commodity_csv").innerHTML
+    ),
     credits: {
       enabled: false,
     },
@@ -504,7 +411,7 @@ document.addEventListener("DOMContentLoaded", function () {
       verticalAlign: "top",
       layout: "vertical",
       x: 10,
-      y: 0,
+      y: -20,
     },
 
     tooltip: {
@@ -644,11 +551,9 @@ document.addEventListener("DOMContentLoaded", function () {
       text: "Total Production by Agricultural Commodity (outputs from LUTO)",
     },
 
-    data: {
-      csv: document.getElementById(
-        "production_5_6_demand_Production_commodity_from_LUTO_csv"
-      ).innerHTML,
-    },
+    series: JSON.parse( 
+      document.getElementById("production_5_6_demand_Production_commodity_from_LUTO_csv").innerHTML
+    ),
 
     credits: {
       enabled: false,
