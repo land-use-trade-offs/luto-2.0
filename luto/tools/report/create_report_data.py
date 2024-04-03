@@ -701,7 +701,7 @@ def save_report_data(sim):
     tasks = [delayed(move_html)(row['path'], map_save_dir)
                 for _,row in map_files.iterrows()]
     
-    worker = min(settings.WRITE_THREADS, len(tasks))
+    worker = min(settings.WRITE_THREADS, len(tasks), 1)
     
     Parallel(n_jobs=worker)(tasks)
     

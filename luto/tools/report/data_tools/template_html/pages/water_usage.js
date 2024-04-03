@@ -199,7 +199,7 @@ document.addEventListener("DOMContentLoaded", function () {
         csv: document.getElementById("water_4_volume_by_landuse_csv").innerHTML,
       },
       xAxis: {
-        tickPositions: tickposition,
+        tickPositions: year_ticks,
       },
       yAxis: {
         title: {
@@ -261,7 +261,7 @@ document.addEventListener("DOMContentLoaded", function () {
           .innerHTML,
       },
       xAxis: {
-        tickPositions: tickposition,
+        tickPositions: year_ticks,
       },
       yAxis: {
         title: {
