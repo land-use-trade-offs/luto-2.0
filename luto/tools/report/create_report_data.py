@@ -271,7 +271,7 @@ def save_report_data(sim):
     
     # Plot_2_3: {Commodity} 'Domestic', 'Exports', 'Feed', 'Imports', 'Production' (Tonnes)
     DEMAND_DATA_commodity = DEMAND_DATA_long_filter_year.groupby(['Year','Type','COMMODITY']).sum(numeric_only=True).reset_index()
-    DEMAND_DATA_commodity = DEMAND_DATA_commodity.sort_values(['COMMODITY','Type', 'Year'])
+    DEMAND_DATA_commodity = DEMAND_DATA_commodity.sort_values(['COMMODITY','Year','Type'])
     
     DEMAND_DATA_commodity_series = DEMAND_DATA_commodity[['COMMODITY', 'Quantity (tonnes, ML)']]\
                                     .groupby('COMMODITY')[['Quantity (tonnes, ML)']]\
@@ -283,9 +283,10 @@ def save_report_data(sim):
     DEMAND_DATA_commodity_series['color'] = DEMAND_DATA_commodity_series['name'].apply(lambda x: COMMODITIES_ALL_COLORS[x])
     
     DEMAND_DATA_commodity_series = DEMAND_DATA_commodity_series.set_index('name').reindex(COMMODITIES_ALL).reset_index()
+    DEMAND_DATA_commodity_series = DEMAND_DATA_commodity_series.dropna()
     
-    DEMAND_DATA_commodity_categories = DEMAND_DATA_commodity[['Year','Type']]\
-                                        .groupby('Year')[['Type']]\
+    DEMAND_DATA_commodity_categories = DEMAND_DATA_commodity.query('COMMODITY == "Apples"')[['Year','Type']]\
+                                        .groupby('Year')[['Year','Type']]\
                                         .apply(lambda x: x['Type'].tolist())\
                                         .reset_index()
                                         
@@ -762,15 +763,7 @@ def save_report_data(sim):
     map_save_dir = f"{SAVE_DIR}/Map_data/"
     
     # Create the directory to save map_html if it does not exist
-    if  os.path.exists(map_save_dir):
-        # Delete the existing directory and the files in it
-        if os.name == 'nt':  
-            os.system(f'rd /s /q "{map_save_dir}"') # If the system is Windows
-        else:  
-            os.system(f'rm -rf {map_save_dir}') # If the system is Unix-based
-        # Create new directory
-        os.makedirs(map_save_dir)
-    else:
+    if  not os.path.exists(map_save_dir):
         os.makedirs(map_save_dir)
     
     # Function to move a file from one location to another if the file exists
@@ -782,7 +775,7 @@ def save_report_data(sim):
     tasks = [delayed(move_html)(row['path'], map_save_dir)
                 for _,row in map_files.iterrows()]
     
-    worker = min(settings.WRITE_THREADS, len(tasks), 1)
+    worker = min(settings.WRITE_THREADS, len(tasks)) if len(tasks) > 0 else 1
     
     Parallel(n_jobs=worker)(tasks)
     
