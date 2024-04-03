@@ -159,7 +159,7 @@ def get_legend_elemet(color_desc_dict:dict, map_dtype:str='float'):
         # Create a color map
         colors = [k for k in color_desc_dict_filtered.keys()]
         index = [v/100 for v in color_desc_dict_filtered.values()]
-        color_map = LinearColormap(colors, index=index, caption= "Propotion to Pixel")
+        color_map = LinearColormap(colors, index=index, caption= "Proportion of grid cell")
         color_map_str = color_map._repr_html_()
         
         # Add the color map to the folium map as a legend

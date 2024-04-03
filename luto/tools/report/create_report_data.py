@@ -564,7 +564,7 @@ def save_report_data(sim):
 
     # Plot_5-2: Water use compared to limite (ML)
     water_df_total_vol_wide = water_df_total.pivot(index='year', columns='REGION_NAME', values='TOT_WATER_REQ_ML')
-    water_df_total_vol_wide.to_csv(f'{SAVE_DIR}/water_2_volum_to_limit.csv')
+    water_df_total_vol_wide.to_csv(f'{SAVE_DIR}/water_2_volume_to_limit.csv')
 
     # Plot_5-3: Water use by sector (ML)
     water_df_separate_lu_type = water_df_separate.groupby(['year','Landuse Type']).sum()[['Water Use (ML)']].reset_index()
@@ -580,7 +580,7 @@ def save_report_data(sim):
 
     water_df_separate_lu_type.loc[len(water_df_separate_lu_type)] = ['Net Volume', list(map(list,zip(water_df_net['year'],water_df_net['Water Use (ML)']))), 'line']
 
-    water_df_separate_lu_type.to_json(f'{SAVE_DIR}/water_3_volum_by_sector.json',orient='records')
+    water_df_separate_lu_type.to_json(f'{SAVE_DIR}/water_3_volume_by_sector.json',orient='records')
 
 
 
@@ -590,12 +590,12 @@ def save_report_data(sim):
     # reorder the columns to match the order in LANDUSE_ALL
     water_df_seperate_lu_wide = water_df_seperate_lu_wide.reindex(
         columns = [water_df_seperate_lu_wide.columns[0]] + LANDUSE_ALL).reset_index(drop=True)
-    water_df_seperate_lu_wide.to_csv(f'{SAVE_DIR}/water_4_volum_by_landuse.csv',index=False)
+    water_df_seperate_lu_wide.to_csv(f'{SAVE_DIR}/water_4_volume_by_landuse.csv',index=False)
 
     # Plot_5-5: Water use by irrigation (ML)
     water_df_seperate_irr = water_df_separate.groupby(['year','Irrigation']).sum()[['Water Use (ML)']].reset_index()
     water_df_seperate_irr_wide = water_df_seperate_irr.pivot(index='year', columns='Irrigation', values='Water Use (ML)').reset_index()
-    water_df_seperate_irr_wide.to_csv(f'{SAVE_DIR}/water_5_volum_by_irrigation.csv',index=False)
+    water_df_seperate_irr_wide.to_csv(f'{SAVE_DIR}/water_5_volume_by_irrigation.csv',index=False)
 
 
 
