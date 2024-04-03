@@ -297,7 +297,10 @@ def get_exclusions_environmental_plantings(data, lumap) -> np.ndarray:
     exclude = (~np.isin(lumap, excluded_ag_lus_cells)).astype(int)
 
     # Ensure other non-agricultural land uses are excluded
-    exclude *= tools.get_non_ag_natural_lu_cells(data, lumap)
+    exclude[tools.get_non_ag_natural_lu_cells(data, lumap)] = 0
+
+    # Ensure cells being used for environmental plantings may retain that LU
+    exclude[tools.get_env_plantings_cells(lumap)] = 1
 
     return exclude
 
@@ -313,6 +316,10 @@ def get_exclusions_riparian_plantings(data, lumap) -> np.ndarray:
     # TODO - this means natural LU cells cannot transition to agriculture/RP splits, even though
     # they may transition to agriculture without the RP portion. Think about this before merging.
     exclude *= get_exclusions_for_excluding_all_natural_cells(data, lumap)
+
+    # Ensure cells being used for riparian plantings may retain that LU
+    exclude[tools.get_riparian_plantings_cells(lumap)] = 1
+
     return exclude
 
     
@@ -325,6 +332,10 @@ def get_exclusions_agroforestry(data, lumap) -> np.ndarray:
 
     # Exclude all cells used for natural land uses
     exclude *= get_exclusions_for_excluding_all_natural_cells(data, lumap)
+
+    # Ensure cells being used for agroforestry may retain that LU
+    exclude[tools.get_agroforestry_cells(lumap)] = 1
+
     return exclude
 
 
@@ -333,7 +344,13 @@ def get_exclusions_carbon_plantings_block(data, lumap) -> np.ndarray:
     Return a 1-D array indexed by r that represents how much carbon plantings (block) can possibly 
     be done at each cell.
     """
-    return get_exclusions_environmental_plantings(data, lumap)
+    exclude = np.ones(data.NCELLS)
+    exclude *= get_exclusions_for_excluding_all_natural_cells(data, lumap)
+
+    # Ensure cells being used for carbon plantings (block) may retain that LU
+    exclude[tools.get_carbon_plantings_block_cells(lumap)] = 1
+
+    return exclude
 
 
 def get_exclusions_carbon_plantings_belt(data, lumap) -> np.ndarray:
@@ -345,6 +362,10 @@ def get_exclusions_carbon_plantings_belt(data, lumap) -> np.ndarray:
 
     # Exclude all cells used for natural land uses
     exclude *= get_exclusions_for_excluding_all_natural_cells(data, lumap)
+
+    # Ensure cells being used for carbon plantings (belt) may retain that LU
+    exclude[tools.get_carbon_plantings_belt_cells(lumap)] = 1
+
     return exclude
 
 
