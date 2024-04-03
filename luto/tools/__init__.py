@@ -261,13 +261,42 @@ def get_agroforestry_cells(lumap) -> np.ndarray:
     return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 2)[0]
 
 
-def get_natural_lu_cells(data, lumap) -> Tuple[np.ndarray, np.ndarray]:
+def get_carbon_plantings_block_cells(lumap) -> np.ndarray:
     """
-    Gets all cells being used for natural land uses.
+    Get an array with all cells being used for carbon plantings (block)
+    """
+    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 3)[0]
+
+
+def get_carbon_plantings_belt_cells(lumap) -> np.ndarray:
+    """
+    Get an array with all cells being used for carbon plantings (block)
+    """
+    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 4)[0]
+
+
+def get_ag_natural_lu_cells(data, lumap) -> np.ndarray:
+    """
+    Gets all cells being used for agricultural natural land uses.
     """
     return np.nonzero(np.isin(lumap, data.LU_NATURAL))[0]
 
-# def get_natural_lu_cells(sim, yr_cal) -> Tuple[np.ndarray, np.ndarray]:
+
+def get_non_ag_natural_lu_cells(data, lumap) -> np.ndarray:
+    """
+    Gets all cells being used for non-agricultural natural land uses.
+    """
+    return np.nonzero(np.isin(lumap, data.NON_AG_LU_NATURAL))[0]
+
+
+def get_ag_and_non_ag_natural_lu_cells(data, lumap) -> np.ndarray:
+    """
+    Gets all cells being used for natural land uses, both agricultural and non-agricultural.
+    """
+    return np.nonzero(np.isin(lumap, data.LU_NATURAL + data.NON_AG_LU_NATURAL))[0]
+
+
+# def get_ag_natural_lu_cells(sim, yr_cal) -> np.ndarray::
 #     """
 #     Gets all cells being used for natural land uses.
 #     """

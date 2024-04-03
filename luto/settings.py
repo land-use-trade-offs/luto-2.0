@@ -167,6 +167,21 @@ CARBON_PRICE_PER_TONNE = 100
 
 # Environmental Plantings Parameters
 ENV_PLANTING_COST_PER_HA_PER_YEAR = 100     # Yearly cost of maintaining one hectare of environmental plantings
+# Plantings Parameters
+ENV_PLANTING_COST_PER_HA_PER_YEAR = 100           # Yearly cost of maintaining one hectare of environmental plantings
+CARBON_PLANTING_BLOCK_COST_PER_HA_PER_YEAR = 100  # Yearly cost of maintaining one hectare of carbon plantings (block)
+CARBON_PLANTING_BELT_COST_PER_HA_PER_YEAR = 100   # Yearly cost of maintaining one hectare of carbon plantings (belt)
+CARBON_PRICE_PER_TONNE = 100                      # Price of carbon per tonne - determines EP revenue in the model
+
+CP_BELT_ROW_WIDTH = 20
+CP_BELT_ROW_SPACING = 40
+# CARBON_PLANTINGS_BELT_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 100 metres per hectare
+CARBON_PLANTINGS_BELT_FENCING_COST_PER_M = 2           # $ per linear metre
+CP_BELT_PROPORTION = CP_BELT_ROW_WIDTH / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
+cp_no_alleys_per_ha = 100 / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
+CP_BELT_FENCING_LENGTH = 100 * cp_no_alleys_per_ha * 2 # Length of fencing required per ha in metres
+
+CARBON_PLANTINGS_BIODIV_BENEFIT = 0.1
 
 # Riparian Planting Parameters
 rp_annual_maintennance_cost_per_ha_per_year = 100
@@ -282,6 +297,8 @@ LAND_USAGE_CULL_PERCENTAGE = 0.15
 0: 'Environmental Plantings'
 1: 'Riparian Plantings'
 2: 'Agroforestry'
+3: 'Carbon Plantings (Block Arrangement)'
+4: 'Carbon Plantings (Belt Arrangement)'
 
 
 AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)
