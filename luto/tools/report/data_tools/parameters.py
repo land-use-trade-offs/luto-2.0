@@ -19,6 +19,10 @@ LU_NATURAL = ['Beef - natural land',
               'Unallocated - natural land']
 
 
+
+
+
+
 # Define the commodity categories
 COMMODITIES_ON_LAND = ['Apples','Beef live export','Beef meat','Citrus','Cotton','Dairy','Grapes',
                        'Hay','Nuts','Other non-cereal crops', 'Pears', 'Plantation fruit',
@@ -30,12 +34,20 @@ COMMODITIES_OFF_LAND = ['Aquaculture', 'Chicken', 'Eggs', 'Pork' ]
 
 COMMODITIES_ALL = COMMODITIES_ON_LAND + COMMODITIES_OFF_LAND
 
+
+
+
+
 # Define the file name patterns for each category
 GHG_FNAME2TYPE = {'GHG_emissions_separate_agricultural_landuse': 'Agricultural Landuse',
                   'GHG_emissions_separate_agricultural_management': 'Agricultural Management',
                   'GHG_emissions_separate_no_ag_reduction': 'Non-Agricultural Landuse',
                   'GHG_emissions_separate_transition_penalty': 'Transition Penalty',
                   'GHG_emissions_offland_commodity': 'Offland Commodity',}
+
+
+
+
 
 # Define all land uses for each category
 AG_LANDUSE = ['Apples', 'Beef - modified land', 'Beef - natural land', 'Citrus', 'Cotton', 'Dairy - modified land', 
