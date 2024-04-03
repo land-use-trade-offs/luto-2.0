@@ -131,6 +131,9 @@ class Data():
         self.RP_FENCING_LENGTH = bdata.RP_FENCING_LENGTH[self.MASK]             # Float32
         self.EP_RIP_AVG_T_CO2_HA = bdata.EP_RIP_AVG_T_CO2_HA[self.MASK]         # Float32
         self.EP_BELT_AVG_T_CO2_HA = bdata.EP_BELT_AVG_T_CO2_HA[self.MASK]       # Float32
+        self.CP_BLOCK_AVG_T_CO2_HA = bdata.CP_BLOCK_AVG_T_CO2_HA[self.MASK]     # Float32
+        self.CP_BELT_AVG_T_CO2_HA = bdata.CP_BELT_AVG_T_CO2_HA[self.MASK]       # Float32
+        self.CP_EST_COST_HA = bdata.CP_EST_COST_HA[self.MASK]
 
         # Slice this year off HDF5 bricks. TODO: This field is not in luto.data.
         # with h5py.File(bdata.fname_dr, 'r') as wy_dr_file:
@@ -250,8 +253,9 @@ def get_non_ag_w_rk():
 
 
 def get_non_ag_b_rk():
-    print('Getting non-agricultural biodiversity requirement matrices...')
+    print('Getting non-agricultural biodiversity requirement matrices...', end = ' ', flush = True)
     output = non_ag_biodiversity.get_breq_matrix(data)
+    print('Done.')
     return output.astype(np.float32)
 
 

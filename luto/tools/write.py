@@ -957,6 +957,7 @@ def write_biodiversity_separate(sim, yr_cal, path):
 
 
     # Get the biodiversity scores b_mrj
+    yr_idx = yr_cal - sim.data.YR_CAL_BASE
     ag_biodiv_mrj = ag_biodiversity.get_breq_matrices(sim.data)
     am_biodiv_mrj = ag_biodiversity.get_agricultural_management_biodiversity_matrices(sim.data)
     non_ag_biodiv_rk = non_ag_biodiversity.get_breq_matrix(sim.data)
