@@ -95,7 +95,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 10          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
+RESFACTOR = 10         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
 
 # How does the model run over time 
 MODE = 'snapshot'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
@@ -237,7 +237,7 @@ GHG_LIMITS = {
              }
 
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-GHG_LIMITS_FIELD = '1.5C (67%)'    
+GHG_LIMITS_FIELD = '1.5C (50%)'    
 
 SOC_AMORTISATION = 30           # Number of years over which to spread (average) soil carbon accumulation
 

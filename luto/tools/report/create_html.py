@@ -44,13 +44,7 @@ def data2html(sim):
     ####################################################
     #                Write data to HTML                #
     #################################################### 
-
-    # Add settings to the home page
-    add_txt_2_html(f"{report_dir}/REPORT_HTML/index.html", f"{raw_data_dir}/model_run_settings.txt", "settingsTxt")
-    # Add avaliable years to the spatial page
-    add_txt_2_html(f"{report_dir}/REPORT_HTML/pages/spatial_maps.html", years_str, "model_years")
     
-
     # Get all html files needs data insertion
     html_df = pd.DataFrame([['production',f"{report_dir}/REPORT_HTML/pages/production.html"],
                             ['economics',f"{report_dir}/REPORT_HTML/pages/economics.html"],
@@ -60,22 +54,30 @@ def data2html(sim):
                             ['biodiversity',f"{report_dir}/REPORT_HTML/pages/biodiversity.html"],])
 
     html_df.columns = ['name','path']
-
     # Get all data files
     all_data_files = glob(f"{report_dir}/data/*")
-
     # Add data path to html_df
     html_df['data_path'] = html_df.apply(lambda x: [i for i in all_data_files if x['name'] in i ], axis=1)
 
-
     # Parse html files
     for idx,row in html_df.iterrows():
-        
         html_path = row['path']
         data_pathes  = row['data_path']
-
         # Add data to html
         add_data_2_html(html_path,data_pathes)
+        
+
+    
+    
+    # Add settings to the home page
+    add_txt_2_html(f"{report_dir}/REPORT_HTML/index.html", f"{raw_data_dir}/model_run_settings.txt", "settingsTxt")
+    
+
+
+    # Write avaliable years to each page .content[#model_years pre]
+    for page in glob(f"{report_dir}/REPORT_HTML/pages/*.html"):
+        add_txt_2_html(page, years_str, "model_years")
+    
         
         
     #########################################################

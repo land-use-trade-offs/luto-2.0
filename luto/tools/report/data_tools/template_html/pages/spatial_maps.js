@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('increment').addEventListener('click', function() {
         var yearInput = document.getElementById('year');
         if (yearInput.value < yearInput.max) {
-            yearInput.value = parseInt(yearInput.value) + 1;
+            yearInput.value = parseInt(yearInput.value) + yearInput.step;
             document.getElementById('yearOutput').value = yearInput.value;
         }
         // Load the selected data to report HTML
@@ -85,7 +85,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('decrement').addEventListener('click', function() {
         var yearInput = document.getElementById('year');
         if (yearInput.value > yearInput.min) {
-            yearInput.value = parseInt(yearInput.value) - 1;
+            yearInput.value = parseInt(yearInput.value) -  yearInput.step;
             document.getElementById('yearOutput').value = yearInput.value;
         }
         // Load the selected data to report HTML
@@ -93,12 +93,14 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 
-
+    // Function to load the data to the report HTML
     function load_data(path) {
         document.getElementById("map").innerHTML = `<object type="text/html" data=${path} ></object>`;
     }
 
 
+
+    // Function to update the file name
     function update_fname() {
 
         // Get the selected values
@@ -123,7 +125,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 
-
+    // Function to get the data directory
     function get_dataDir() {
         // Get the data path
         var url = new URL(window.location.href);
@@ -134,6 +136,8 @@ document.addEventListener('DOMContentLoaded', function () {
         return dataDir;
     }
 
+
+    // Function to update the year range selection input and output values
     window.onload = function() {
         var yearInput = document.getElementById('year');
         var yearOutput = document.getElementById('yearOutput');
@@ -144,6 +148,7 @@ document.addEventListener('DOMContentLoaded', function () {
         
         yearInput.min = modelYears[0];
         yearInput.max = modelYears[modelYears.length - 1];
+        yearInput.step = modelYears[1] - modelYears[0];   // The step is the difference between the first two elements
         yearInput.value = modelYears[0];
         yearOutput.value = modelYears[0];
     }

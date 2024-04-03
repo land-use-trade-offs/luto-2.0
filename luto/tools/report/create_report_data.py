@@ -9,6 +9,7 @@ from joblib import Parallel, delayed
 import luto.settings as settings
 
 from luto.economics.off_land_commodity import get_demand_df
+from luto.tools.report.data_tools.colors import LANDUSE_ALL_COLORS, COMMODITIES_ALL_COLORS
 
 
 # import functions
@@ -59,153 +60,15 @@ def save_report_data(sim):
     years = sorted(files['year'].unique().tolist())
     years_select = select_years(years)
 
-
     ####################################################
-    #                   1) Demand                      #
-    ####################################################
-    
-    # Get the demand data
-    DEMAND_DATA_long = get_demand_df()
-
-    # Reorder the columns to match the order in COMMODITIES_ALL
-    DEMAND_DATA_long = DEMAND_DATA_long.reindex(COMMODITIES_ALL, level=1).reset_index()
-
-    # Add columns for on-land and off-land commodities
-    DEMAND_DATA_long['on_off_land'] = DEMAND_DATA_long['COMMODITY'].apply(
-        lambda x: 'On-land' if x not in COMMODITIES_OFF_LAND else 'Off-land')
-
-    # Convert quanlity to million tonnes
-    DEMAND_DATA_long['Quantity (tonnes, ML)'] = DEMAND_DATA_long['Quantity (tonnes, ML)'] / 1e6
-    DEMAND_DATA_long = DEMAND_DATA_long.query('Year.isin(@years)')
-    DEMAND_DATA_long.loc[:,'COMMODITY'] = DEMAND_DATA_long['COMMODITY'].str.replace('Beef lexp','Beef live export')
-    DEMAND_DATA_long_filter_year = DEMAND_DATA_long.query('Year.isin(@years_select)')
-
-    # Plot_1_1: {Total} for 'Domestic', 'Exports', 'Feed', 'Imports', 'Production'(Tonnes) 
-    DEMAND_DATA_type = DEMAND_DATA_long_filter_year.groupby(['Year','Type']).sum(numeric_only=True).reset_index()
-    DEMAND_DATA_type_wide = DEMAND_DATA_type.pivot(index='Year', columns='Type', values='Quantity (tonnes, ML)').reset_index()
-    DEMAND_DATA_type_wide.to_csv(f'{SAVE_DIR}/production_1_demand_type_wide.csv', index=False)
-
-
-    # Plot_1_2: {ON/OFF land} for 'Domestic', 'Exports', 'Feed', 'Imports', 'Production'(Tonnes) 
-    DEMAND_DATA_on_off = DEMAND_DATA_long_filter_year.groupby(['Year','Type','on_off_land']).sum(numeric_only=True).reset_index()
-    DEMAND_DATA_on_off_wide = DEMAND_DATA_on_off.pivot(index='on_off_land', 
-                                                    columns=['Year','Type'], 
-                                                    values='Quantity (tonnes, ML)')
-
-    DEMAND_DATA_on_off_wide = DEMAND_DATA_on_off_wide.reindex(
-        columns = pd.MultiIndex.from_product(DEMAND_DATA_on_off_wide.columns.levels)).reset_index()
-
-    DEMAND_DATA_on_off_wide.to_csv(f'{SAVE_DIR}/production_2_demand_on_off_wide.csv', index=False)
-
-    # Plot_1_3: {Commodity} 'Domestic', 'Exports', 'Feed', 'Imports', 'Production' (Tonnes)
-    DEMAND_DATA_wide = DEMAND_DATA_long_filter_year.pivot(
-        index=['COMMODITY'], 
-        columns=['Year','Type'], 
-        values='Quantity (tonnes, ML)')
-
-    DEMAND_DATA_wide = DEMAND_DATA_wide.reindex(
-        columns = pd.MultiIndex.from_product(DEMAND_DATA_wide.columns.levels)).reset_index()
-
-    DEMAND_DATA_wide = DEMAND_DATA_wide.set_index('COMMODITY').reindex(COMMODITIES_ALL).reset_index()
-
-    DEMAND_DATA_wide.to_csv(f'{SAVE_DIR}/production_3_demand_commodity.csv', index=False)
-
-
-    # Plot_1-4_(1-2): Domestic On/Off land commodities (Million Tonnes)
-    for idx,on_off_land in enumerate(DEMAND_DATA_long['on_off_land'].unique()):
-        DEMAND_DATA_on_off_commodity = DEMAND_DATA_long.query('on_off_land == @on_off_land and Type == "Domestic" ')
-        DEMAND_DATA_on_off_commodity_wide = DEMAND_DATA_on_off_commodity.pivot(
-            index=['Year'], 
-            columns=['COMMODITY'], 
-            values='Quantity (tonnes, ML)').reset_index()
-        
-        # Remove the rows of all 0 values
-        DEMAND_DATA_on_off_commodity_wide = DEMAND_DATA_on_off_commodity_wide.loc[:, (DEMAND_DATA_on_off_commodity_wide != 0).any(axis=0)]
-        
-        on_off_land = '_'.join(on_off_land.split(' '))
-        DEMAND_DATA_on_off_commodity_wide.to_csv(f'{SAVE_DIR}/production_4_{idx+1}_demand_domestic_{on_off_land}_commodity.csv', index=False)
-
-    # Plot_1-5_(1-4): Commodities for 'Exports','Feed','Imports','Production' (Million Tonnes)
-    for idx,Type in enumerate(DEMAND_DATA_long['Type'].unique()):
-        if Type == 'Domestic':
-            continue
-        DEMAND_DATA_commodity = DEMAND_DATA_long.query('Type == @Type')
-        DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity\
-            .groupby(['COMMODITY'])[['Year','Quantity (tonnes, ML)']]\
-            .apply(lambda x: list(zip(x['Year'],x['Quantity (tonnes, ML)'])))\
-            .reset_index()
-            
-        DEMAND_DATA_commodity_wide.columns = ['name','data']
-        DEMAND_DATA_commodity_wide['type'] = 'column'
-        DEMAND_DATA_commodity_wide.to_json(f'{SAVE_DIR}/production_5_{idx+1}_demand_{Type}_commodity.json', orient='records')
-        
-    # Plot_1-5-6: Production (LUTO outputs, Million Tonnes)
-    quantity_csv_paths = files.query('category == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)
-    quantity_df = get_quantity_df(quantity_csv_paths)
-    quantity_df['Commodity'] = quantity_df['Commodity'].str.replace('Beef lexp','Beef live export')
-
-    quantity_df_wide = quantity_df.pivot_table(index=['year'], 
-                                            columns='Commodity',
-                                            values='Prod_targ_year (tonnes, ML)').reset_index()
-    quantity_df_wide.to_csv(f'{SAVE_DIR}/production_5_6_demand_Production_commodity_from_LUTO.csv', index=False)
-
-
-
-
-    ####################################################
-    #                  2) Economics                    #
-    ####################################################
-
-    # Plot_2-2: Revenue and Cost data (Billion Dollars)
-    revenue_df = get_ag_rev_cost_df(files, 'revenue')
-    revenue_df['Source_type'] = revenue_df['Source_type'].str.replace(' Crop','')
-    revenue_df['Irrigation'] = revenue_df['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
-
-    keep_cols = ['year', 'value (billion)']
-    loop_cols = revenue_df.columns.difference(keep_cols)
-
-    for idx,col in enumerate(loop_cols):
-        take_cols = keep_cols + [col]
-        df = revenue_df[take_cols].groupby(['year', col]).sum(numeric_only=True).reset_index()
-        # convert to wide format
-        df_wide = df.pivot_table(index=['year'], columns=col, values='value (billion)').reset_index()
-        # save to csv
-        df_wide.to_csv(f'{SAVE_DIR}/economics_1_revenue_{idx+1}_{col}_wide.csv', index=False)
-
-
-
-    cost_df = get_ag_rev_cost_df(files, 'cost')
-    cost_df['Source_type'] = cost_df['Source_type'].str.replace(' Crop','')
-    cost_df['Irrigation'] = cost_df['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
-
-    keep_cols = ['year', 'value (billion)']
-    loop_cols = cost_df.columns.difference(keep_cols)
-
-    # Plot_2-3: Cost data (Billion Dollars)
-    for idx,col in enumerate(loop_cols):
-        take_cols = keep_cols + [col]
-        df = cost_df[take_cols].groupby(['year', col]).sum().reset_index()
-        # convert to wide format
-        df_wide = df.pivot_table(index=['year'], columns=col, values='value (billion)').reset_index()
-        # save to csv
-        df_wide.to_csv(f'{SAVE_DIR}/economics_2_cost_{idx+1}_{col}_wide.csv', index=False)
-
-
-    # Plot_2-4: Revenue and Cost data (Billion Dollars)
-    rev_cost_compare = get_rev_cost(revenue_df,cost_df)
-    rev_cost_compare.to_csv(f'{SAVE_DIR}/economics_3_rev_cost_all.csv', index=False)
-
-
-
-    ####################################################
-    #                    3) Area Change                #
+    #                    1) Area Change                #
     ####################################################
 
     area_dvar_paths = files.query('category == "area" and year_types == "single_year"').reset_index(drop=True)
     area_dvar = get_ag_dvar_area(area_dvar_paths)
     area_dvar['Water'] = area_dvar['Water'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
 
-    # Plot_3-1: Total Area (km2)
+    # Plot_1-1: Total Area (km2)
     lu_area_dvar = area_dvar.groupby(['Year','Land use']).sum(numeric_only=True).reset_index()
     lu_area_dvar = lu_area_dvar\
         .groupby('Land use')[['Year','Area (million km2)']]\
@@ -216,12 +79,14 @@ def save_report_data(sim):
     lu_area_dvar['type'] = 'column'
     lu_area_dvar['sort_index'] = lu_area_dvar['name'].apply(lambda x: LANDUSE_ALL.index(x))
     lu_area_dvar = lu_area_dvar.sort_values('sort_index').drop('sort_index',axis=1)
+    lu_area_dvar['color'] = lu_area_dvar['name'].apply(lambda x: LANDUSE_ALL_COLORS[x])
+    
     lu_area_dvar.to_json(f'{SAVE_DIR}/area_1_total_area_wide.json',orient='records')
 
 
 
 
-    # Plot_3-2: Total Area (km2) by Irrigation
+    # Plot_1-2: Total Area (km2) by Irrigation
     lm_dvar_area = area_dvar.groupby(['Year','Water']).sum(numeric_only=True).reset_index()
     lm_dvar_area['Water'] = lm_dvar_area['Water'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
 
@@ -237,7 +102,7 @@ def save_report_data(sim):
 
 
 
-    # Plot_3-3: Area (km2) by Non-Agricultural land use
+    # Plot_1-3: Area (km2) by Non-Agricultural land use
     non_ag_dvar_area = area_dvar.query('Type == "Non-agricultural landuse"').reset_index(drop=True)
     non_ag_dvar_area = non_ag_dvar_area\
         .groupby(['Land use'])[['Year','Area (million km2)']]\
@@ -250,7 +115,7 @@ def save_report_data(sim):
 
 
 
-    # Plot_3-4: Area (km2) by Agricultural management
+    # Plot_1-4: Area (km2) by Agricultural management
     am_dvar_dfs = area_dvar_paths.query('base_name.str.contains("area_agricultural_management")').reset_index(drop=True)
     am_dvar_area = pd.concat([pd.read_csv(path) for path in am_dvar_dfs['path']], ignore_index=True)
     am_dvar_area['Area (million km2)'] = am_dvar_area['Area (ha)'] / 100 / 1e6
@@ -268,7 +133,7 @@ def save_report_data(sim):
 
 
 
-    # Plot_3-5: Agricultural management Area (km2) by Land use
+    # Plot_1-5: Agricultural management Area (km2) by Land use
     am_dvar_area_lu = am_dvar_area.groupby(['Year','Land use']).sum(numeric_only=True).reset_index()
 
     am_dvar_area_lu = am_dvar_area_lu\
@@ -278,10 +143,11 @@ def save_report_data(sim):
         
     am_dvar_area_lu.columns = ['name','data']
     am_dvar_area_lu['type'] = 'column'
+    am_dvar_area_lu['color'] = am_dvar_area_lu['name'].apply(lambda x: LANDUSE_ALL_COLORS[x])
     am_dvar_area_lu.to_json(f'{SAVE_DIR}/area_5_am_lu_area_wide.json',orient='records')
 
 
-    # Plot_3-6/7: Area (km2) by Land use
+    # Plot_1-6/7: Area (km2) by Land use
     transition_path = files.query('category =="transition_matrix"')
 
     # Read the transition matrix (Area (ha))
@@ -332,6 +198,222 @@ def save_report_data(sim):
         
     with open(f'{SAVE_DIR}/area_7_begin_end_pct.html', 'w') as f:
         f.write(heat_pct_html)
+
+
+    ####################################################
+    #                   2) Demand                      #
+    ####################################################
+    
+    # Get the demand data
+    DEMAND_DATA_long = get_demand_df()
+
+    # Reorder the columns to match the order in COMMODITIES_ALL
+    DEMAND_DATA_long = DEMAND_DATA_long.reindex(COMMODITIES_ALL, level=1).reset_index()
+
+    # Add columns for on-land and off-land commodities
+    DEMAND_DATA_long['on_off_land'] = DEMAND_DATA_long['COMMODITY'].apply(
+        lambda x: 'On-land' if x not in COMMODITIES_OFF_LAND else 'Off-land')
+
+    # Convert quanlity to million tonnes
+    DEMAND_DATA_long['Quantity (tonnes, ML)'] = DEMAND_DATA_long['Quantity (tonnes, ML)'] / 1e6
+    DEMAND_DATA_long = DEMAND_DATA_long.query('Year.isin(@years)')
+    DEMAND_DATA_long.loc[:,'COMMODITY'] = DEMAND_DATA_long['COMMODITY'].str.replace('Beef lexp','Beef live export')
+    DEMAND_DATA_long_filter_year = DEMAND_DATA_long.query('Year.isin(@years_select)')
+
+    # Plot_2_1: {Total} for 'Domestic', 'Exports', 'Feed', 'Imports', 'Production'(Tonnes) 
+    DEMAND_DATA_type = DEMAND_DATA_long_filter_year.groupby(['Year','Type']).sum(numeric_only=True).reset_index()
+    DEMAND_DATA_type_wide = DEMAND_DATA_type\
+                                .groupby('Type')[['Year','Quantity (tonnes, ML)']]\
+                                .apply(lambda x:list(map(list,zip(x['Year'],x['Quantity (tonnes, ML)']))))\
+                                .reset_index()  
+                                
+    DEMAND_DATA_type_wide.columns = ['name','data']
+    DEMAND_DATA_type_wide['type'] = 'column'
+                                
+    DEMAND_DATA_type_wide.to_json(f'{SAVE_DIR}/production_1_demand_type_wide.json', orient='records')
+
+
+    # Plot_2_2: {ON/OFF land} for 'Domestic', 'Exports', 'Feed', 'Imports', 'Production'(Tonnes) 
+    DEMAND_DATA_on_off = DEMAND_DATA_long_filter_year.groupby(['Year','Type','on_off_land']).sum(numeric_only=True).reset_index()
+    DEMAND_DATA_on_off = DEMAND_DATA_on_off.sort_values(['on_off_land','Year','Type'])
+    
+    DEMAND_DATA_on_off_series = DEMAND_DATA_on_off[['on_off_land','Quantity (tonnes, ML)']]\
+                                .groupby('on_off_land')[['on_off_land','Quantity (tonnes, ML)']]\
+                                .apply(lambda x: x['Quantity (tonnes, ML)'].tolist())\
+                                .reset_index()
+                                
+    DEMAND_DATA_on_off_series.columns = ['name','data']
+    DEMAND_DATA_on_off_series['type'] = 'column'
+    
+    
+    DEMAND_DATA_on_off_categories = DEMAND_DATA_on_off.query('on_off_land == "On-land"')[['Year','Type']]\
+                                    .groupby('Year')[['Year','Type']]\
+                                    .apply(lambda x:x['Type'].tolist())\
+                                    .reset_index()
+                                    
+    DEMAND_DATA_on_off_categories.columns = ['name','categories']
+        
+    
+    
+    # Combine the JSON objects into one dictionary
+    combined_json = {
+        'series': json.loads(DEMAND_DATA_on_off_series.to_json(orient='records')),
+        'categories': json.loads(DEMAND_DATA_on_off_categories.to_json(orient='records'))
+    }
+
+    # Convert the dictionary to a JSON string
+    combined_json_str = json.dumps(combined_json)  
+    with open(f'{SAVE_DIR}/production_2_demand_on_off_wide.json', 'w') as outfile:
+        outfile.write(combined_json_str)                          
+        
+        
+    
+    
+    # Plot_2_3: {Commodity} 'Domestic', 'Exports', 'Feed', 'Imports', 'Production' (Tonnes)
+    DEMAND_DATA_commodity = DEMAND_DATA_long_filter_year.groupby(['Year','Type','COMMODITY']).sum(numeric_only=True).reset_index()
+    DEMAND_DATA_commodity = DEMAND_DATA_commodity.sort_values(['COMMODITY','Year','Type'])
+    
+    DEMAND_DATA_commodity_series = DEMAND_DATA_commodity[['COMMODITY', 'Quantity (tonnes, ML)']]\
+                                    .groupby('COMMODITY')[['Quantity (tonnes, ML)']]\
+                                    .apply(lambda x: x['Quantity (tonnes, ML)'].tolist())\
+                                    .reset_index()
+                                    
+    DEMAND_DATA_commodity_series.columns = ['name','data']
+    DEMAND_DATA_commodity_series['type'] = 'column' 
+    DEMAND_DATA_commodity_series['color'] = DEMAND_DATA_commodity_series['name'].apply(lambda x: COMMODITIES_ALL_COLORS[x])
+    
+    DEMAND_DATA_commodity_series = DEMAND_DATA_commodity_series.set_index('name').reindex(COMMODITIES_ALL).reset_index()
+    DEMAND_DATA_commodity_series = DEMAND_DATA_commodity_series.dropna()
+    
+    DEMAND_DATA_commodity_categories = DEMAND_DATA_commodity.query('COMMODITY == "Apples"')[['Year','Type']]\
+                                        .groupby('Year')[['Year','Type']]\
+                                        .apply(lambda x: x['Type'].tolist())\
+                                        .reset_index()
+                                        
+    DEMAND_DATA_commodity_categories.columns = ['name','categories']
+    
+    combined_json = {   
+        'series': json.loads(DEMAND_DATA_commodity_series.to_json(orient='records')),
+        'categories': json.loads(DEMAND_DATA_commodity_categories.to_json(orient='records'))
+    }
+    
+    combined_json_str = json.dumps(combined_json)
+    with open(f'{SAVE_DIR}/production_3_demand_commodity.json', 'w') as outfile:
+        outfile.write(combined_json_str)
+
+
+
+
+    # Plot_2-4_(1-2): Domestic On/Off land commodities (Million Tonnes)
+    for idx,on_off_land in enumerate(DEMAND_DATA_long['on_off_land'].unique()):
+        DEMAND_DATA_on_off_commodity = DEMAND_DATA_long.query('on_off_land == @on_off_land and Type == "Domestic" ')
+        
+        DEMAND_DATA_on_off_commodity_wide = DEMAND_DATA_on_off_commodity\
+            .groupby(['COMMODITY'])[['Year','Quantity (tonnes, ML)']]\
+            .apply(lambda x: list(zip(x['Year'],x['Quantity (tonnes, ML)'])))\
+            .reset_index()
+            
+        DEMAND_DATA_on_off_commodity_wide.columns = ['name','data']
+        DEMAND_DATA_on_off_commodity_wide['type'] = 'column'
+        DEMAND_DATA_on_off_commodity_wide['color'] = DEMAND_DATA_on_off_commodity_wide['name'].apply(lambda x: COMMODITIES_ALL_COLORS[x])
+
+        DEMAND_DATA_on_off_commodity_wide.to_json(f'{SAVE_DIR}/production_4_{idx+1}_demand_domestic_{on_off_land}_commodity.json', orient='records')
+        
+        
+
+    # Plot_2-5_(1-4): Commodities for 'Exports','Feed','Imports','Production' (Million Tonnes)
+    for idx,Type in enumerate(DEMAND_DATA_long['Type'].unique()):
+        if Type == 'Domestic':
+            continue
+        DEMAND_DATA_commodity = DEMAND_DATA_long.query('Type == @Type')
+        DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity\
+            .groupby(['COMMODITY'])[['Year','Quantity (tonnes, ML)']]\
+            .apply(lambda x: list(zip(x['Year'],x['Quantity (tonnes, ML)'])))\
+            .reset_index()
+            
+        DEMAND_DATA_commodity_wide.columns = ['name','data']
+        DEMAND_DATA_commodity_wide['type'] = 'column'
+        DEMAND_DATA_commodity_wide['color'] = DEMAND_DATA_commodity_wide['name'].apply(lambda x: COMMODITIES_ALL_COLORS[x])
+        
+        DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity_wide.set_index('name').reindex(COMMODITIES_ALL).reset_index()
+        DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity_wide.dropna()
+        
+        DEMAND_DATA_commodity_wide.to_json(f'{SAVE_DIR}/production_5_{idx+1}_demand_{Type}_commodity.json', orient='records')
+        
+    # Plot_2-5-6: Production (LUTO outputs, Million Tonnes)
+    quantity_csv_paths = files.query('category == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)
+    quantity_df = get_quantity_df(quantity_csv_paths)
+    quantity_df['Commodity'] = quantity_df['Commodity'].str.replace('Beef lexp','Beef live export')
+    
+    quantity_df_wide = quantity_df\
+        .groupby(['Commodity'])[['year','Prod_targ_year (tonnes, ML)']]\
+        .apply(lambda x: list(map(list,zip(x['year'],x['Prod_targ_year (tonnes, ML)']))))\
+        .reset_index()
+        
+    quantity_df_wide.columns = ['name','data']
+    quantity_df_wide['type'] = 'column'
+    quantity_df_wide['color'] = quantity_df_wide['name'].apply(lambda x: COMMODITIES_ALL_COLORS[x])
+    
+    quantity_df_wide = quantity_df_wide.set_index('name').reindex(COMMODITIES_ALL).reset_index()
+    quantity_df_wide = quantity_df_wide.dropna()
+    
+    quantity_df_wide.to_json(f'{SAVE_DIR}/production_5_6_demand_Production_commodity_from_LUTO.json', orient='records')    
+
+    # quantity_df_wide = quantity_df.pivot_table(index=['year'], 
+    #                                         columns='Commodity',
+    #                                         values='Prod_targ_year (tonnes, ML)').reset_index()
+    
+    # quantity_df_wide.to_csv(f'{SAVE_DIR}/production_5_6_demand_Production_commodity_from_LUTO.csv', index=False)
+
+
+
+
+    ####################################################
+    #                  2) Economics                    #
+    ####################################################
+
+    # Plot_2-2: Revenue and Cost data (Billion Dollars)
+    revenue_df = get_ag_rev_cost_df(files, 'revenue')
+    revenue_df['Source_type'] = revenue_df['Source_type'].str.replace(' Crop','')
+    revenue_df['Irrigation'] = revenue_df['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
+
+    keep_cols = ['year', 'value (billion)']
+    loop_cols = revenue_df.columns.difference(keep_cols)
+
+    for idx,col in enumerate(loop_cols):
+        take_cols = keep_cols + [col]
+        df = revenue_df[take_cols].groupby(['year', col]).sum(numeric_only=True).reset_index()
+        # convert to wide format
+        df_wide = df.pivot_table(index=['year'], columns=col, values='value (billion)').reset_index()
+        # save to csv
+        df_wide.to_csv(f'{SAVE_DIR}/economics_1_revenue_{idx+1}_{col}_wide.csv', index=False)
+
+
+
+    cost_df = get_ag_rev_cost_df(files, 'cost')
+    cost_df['Source_type'] = cost_df['Source_type'].str.replace(' Crop','')
+    cost_df['Irrigation'] = cost_df['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
+
+    keep_cols = ['year', 'value (billion)']
+    loop_cols = cost_df.columns.difference(keep_cols)
+
+    # Plot_2-3: Cost data (Billion Dollars)
+    for idx,col in enumerate(loop_cols):
+        take_cols = keep_cols + [col]
+        df = cost_df[take_cols].groupby(['year', col]).sum().reset_index()
+        # convert to wide format
+        df_wide = df.pivot_table(index=['year'], columns=col, values='value (billion)').reset_index()
+        # save to csv
+        df_wide.to_csv(f'{SAVE_DIR}/economics_2_cost_{idx+1}_{col}_wide.csv', index=False)
+
+
+    # Plot_2-4: Revenue and Cost data (Billion Dollars)
+    rev_cost_compare = get_rev_cost(revenue_df,cost_df)
+    rev_cost_compare.to_csv(f'{SAVE_DIR}/economics_3_rev_cost_all.csv', index=False)
+
+
+
+    
 
 
 
@@ -681,15 +763,7 @@ def save_report_data(sim):
     map_save_dir = f"{SAVE_DIR}/Map_data/"
     
     # Create the directory to save map_html if it does not exist
-    if  os.path.exists(map_save_dir):
-        # Delete the existing directory and the files in it
-        if os.name == 'nt':  
-            os.system(f'rd /s /q "{map_save_dir}"') # If the system is Windows
-        else:  
-            os.system(f'rm -rf {map_save_dir}') # If the system is Unix-based
-        # Create new directory
-        os.makedirs(map_save_dir)
-    else:
+    if  not os.path.exists(map_save_dir):
         os.makedirs(map_save_dir)
     
     # Function to move a file from one location to another if the file exists
@@ -701,7 +775,7 @@ def save_report_data(sim):
     tasks = [delayed(move_html)(row['path'], map_save_dir)
                 for _,row in map_files.iterrows()]
     
-    worker = min(settings.WRITE_THREADS, len(tasks))
+    worker = min(settings.WRITE_THREADS, len(tasks)) if len(tasks) > 0 else 1
     
     Parallel(n_jobs=worker)(tasks)
     
