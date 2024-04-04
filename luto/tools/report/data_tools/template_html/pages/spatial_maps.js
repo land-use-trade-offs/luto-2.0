@@ -12,6 +12,23 @@ document.addEventListener('DOMContentLoaded', function () {
     // Load the selected data to report HTML
     load_data( get_dataDir() + '/data/Map_data/lumap_2010.html');
 
+    // Update the year range selection input and output values
+    window.onload = function() {
+        var yearInput = document.getElementById('year');
+        var yearOutput = document.getElementById('yearOutput');
+        var modelYears = eval(document.getElementById('model_years').innerText);
+        
+        // Sort the modelYears array in ascending order
+        modelYears.sort(function(a, b) { return a - b; });
+        
+        yearInput.min = modelYears[0];
+        yearInput.max = modelYears[modelYears.length - 1];
+        yearInput.step = modelYears[1] - modelYears[0];   // The step is the difference between the first two elements
+        yearInput.value = modelYears[0];
+        yearOutput.value = modelYears[0];
+    }
+
+
 
     var lucc_names = {
         "Ag_LU": ['Apples', 'Beef - modified land', 'Beef - natural land', 'Citrus', 'Cotton', 'Dairy - modified land', 'Dairy - natural land',
@@ -137,22 +154,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 
-    // Function to update the year range selection input and output values
-    window.onload = function() {
-        var yearInput = document.getElementById('year');
-        var yearOutput = document.getElementById('yearOutput');
-        var modelYears = eval(document.getElementById('model_years').innerText);
-        
-        // Sort the modelYears array in ascending order
-        modelYears.sort(function(a, b) { return a - b; });
-        
-        yearInput.min = modelYears[0];
-        yearInput.max = modelYears[modelYears.length - 1];
-        yearInput.step = modelYears[1] - modelYears[0];   // The step is the difference between the first two elements
-        yearInput.value = modelYears[0];
-        yearOutput.value = modelYears[0];
-    }
-
+    
 
 });
 
