@@ -7,8 +7,6 @@ import numpy as np
 
 from luto import settings
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.tools import get_lds_savanna_burning_binary_array
-
 
 
 def get_non_penalty_land_uses(data) -> list[int]:
