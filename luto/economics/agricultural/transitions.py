@@ -212,17 +212,28 @@ def get_savanna_burning_effect_t_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
+def get_agtech_ei_effect_t_mrj(data):
+    """
+    Gets the effects on transition costs of AgTech EI, which are none.
+    Transition/establishment costs are handled in the costs matrix.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning']
+    return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+
 def get_agricultural_management_transition_matrices(data, t_mrj, yr_idx) -> Dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_t_mrj(data)
     precision_agriculture_data = get_precision_agriculture_effect_t_mrj(data)
     eco_grazing_data = get_ecological_grazing_effect_t_mrj(data)
     sav_burning_data = get_savanna_burning_effect_t_mrj(data)
+    agtech_ei_data = get_agtech_ei_effect_t_mrj(data)
 
     ag_management_data = {
         'Asparagopsis taxiformis': asparagopsis_data,
         'Precision Agriculture': precision_agriculture_data,
         'Ecological Grazing': eco_grazing_data,
         'Savanna Burning': sav_burning_data,
+        'AgTech EI': agtech_ei_data,
     }
 
     return ag_management_data
