@@ -90,7 +90,7 @@ def get_cost_beccs(data) -> np.ndarray:
     np.ndarray
         Cost of BECCS for each cell. 1-D array Indexed by cell.
     """
-    return data.BECCS_COSTS_AUD_HA_YR * data.REAL_AREA
+    return np.nan_to_num(data.BECCS_COSTS_AUD_HA_YR) * data.REAL_AREA
 
 
 def get_cost_matrix(data):

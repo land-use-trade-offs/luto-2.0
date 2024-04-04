@@ -275,6 +275,13 @@ def get_carbon_plantings_belt_cells(lumap) -> np.ndarray:
     return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 4)[0]
 
 
+def get_beccs_cells(lumap) -> np.ndarray:
+    """
+    Get an array with all cells being used for carbon plantings (block)
+    """
+    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 5)[0]
+
+
 def get_ag_natural_lu_cells(data, lumap) -> np.ndarray:
     """
     Gets all cells being used for agricultural natural land uses.

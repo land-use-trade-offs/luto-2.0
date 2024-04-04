@@ -153,9 +153,9 @@ def get_ghg_reduction_beccs(data, aggregate) -> np.ndarray:
 
     # Tonnes of CO2e per ha, adjusted for resfactor
     if aggregate==True:
-        return -data.BECCS_TCO2E_HA_YR * data.REAL_AREA
+        return -np.nan_to_num(data.BECCS_TCO2E_HA_YR) * data.REAL_AREA
     elif aggregate==False:
-        return pd.DataFrame(-data.BECCS_TCO2E_HA_YR * data.REAL_AREA,columns=['BECCS'])
+        return pd.DataFrame(-np.nan_to_num(data.BECCS_TCO2E_HA_YR) * data.REAL_AREA,columns=['BECCS'])
     else:
     # If the aggregate arguments is not in [True,False]. That must be someting wrong
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
@@ -187,7 +187,14 @@ def get_ghg_matrix(data, aggregate=True) -> np.ndarray:
     
     elif aggregate==False:
         return pd.concat(
-            [env_plantings_ghg_matrix, rip_plantings_ghg_matrix, agroforestry_ghg_matrix, carbon_plantings_block_ghg_matrix, carbon_plantings_belt_ghg_matrix beccs_ghg_matrix], axis=1)
+            [ env_plantings_ghg_matrix, 
+              rip_plantings_ghg_matrix, 
+              agroforestry_ghg_matrix, 
+              carbon_plantings_block_ghg_matrix, 
+              carbon_plantings_belt_ghg_matrix,
+              beccs_ghg_matrix ], 
+            axis=1
+        )
     
     else:
     # If the aggregate arguments is not in [True,False]. That must be someting wrong

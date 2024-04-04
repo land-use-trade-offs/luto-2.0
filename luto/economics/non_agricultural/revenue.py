@@ -96,8 +96,8 @@ def get_rev_beccs(data) -> np.ndarray:
     -------
     np.ndarray
     """
-    base_rev = data.BECCS_REV_AUD_HA_YR * data.REAL_AREA
-    return base_rev + data.BECCS_TCO2E_HA_YR * data.REAL_AREA * settings.CARBON_PRICE_PER_TONNE
+    base_rev = np.nan_to_num(data.BECCS_REV_AUD_HA_YR) * data.REAL_AREA
+    return base_rev + np.nan_to_num(data.BECCS_TCO2E_HA_YR) * data.REAL_AREA * settings.CARBON_PRICE_PER_TONNE
 
 
 def get_rev_matrix(data) -> np.ndarray:
@@ -117,7 +117,7 @@ def get_rev_matrix(data) -> np.ndarray:
         rip_plantings_rev_matrix.reshape((data.NCELLS, 1)),
         agroforestry_rev_matrix.reshape((data.NCELLS, 1)),
         carbon_plantings_block_rev_matrix.reshape((data.NCELLS, 1)),
-        carbon_plantings_belt_rev_matrix.reshape((data.NCELLS, 1))
+        carbon_plantings_belt_rev_matrix.reshape((data.NCELLS, 1)),
         beccs_rev_matrix.reshape((data.NCELLS, 1)),
     ]
 

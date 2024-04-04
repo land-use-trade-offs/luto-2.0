@@ -102,7 +102,6 @@ def get_quantity_beccs(data) -> np.ndarray:
         if used for BECCS.
         A matrix of zeros because BECCS doesn't produce anything.
     """
-
     return np.zeros((data.NCMS, data.NCELLS))
 
 

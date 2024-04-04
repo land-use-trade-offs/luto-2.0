@@ -109,7 +109,7 @@ def get_wreq_matrix(data) -> np.ndarray:
         rip_plant_wreq_matrix.reshape((data.NCELLS, 1)),
         agroforestry_wreq_matrix.reshape((data.NCELLS, 1)),
         carbon_plantings_block_wreq_matrix.reshape((data.NCELLS, 1)),
-        carbon_plantings_belt_wreq_matrix.reshape((data.NCELLS, 1))
+        carbon_plantings_belt_wreq_matrix.reshape((data.NCELLS, 1)),
         beccs_wreq_matrix.reshape((data.NCELLS, 1)),
     ]
 

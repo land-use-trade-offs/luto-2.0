@@ -302,6 +302,7 @@ LAND_USAGE_CULL_PERCENTAGE = 0.15
 2: 'Agroforestry'
 3: 'Carbon Plantings (Block Arrangement)'
 4: 'Carbon Plantings (Belt Arrangement)'
+5: 'BECCS'
 
 
 AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)
