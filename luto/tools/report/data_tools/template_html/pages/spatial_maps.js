@@ -76,9 +76,6 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('increment').addEventListener('click', function () {
         var yearInput = document.getElementById('year');
 
-        console.log(yearInput.value)
-        console.log(yearInput.step)
-
         if (yearInput.value < yearInput.max) {
             yearInput.value = parseInt(yearInput.value) + parseInt(yearInput.step);
             document.getElementById('yearOutput').value = yearInput.value;

@@ -1,6 +1,7 @@
 
 import os
 import json
+import itertools
 import re
 import shutil
 import pandas as pd
@@ -369,10 +370,10 @@ def save_report_data(sim):
 
 
     ####################################################
-    #                  2) Economics                    #
+    #                  3) Economics                    #
     ####################################################
 
-    # Plot_2-2: Revenue and Cost data (Billion Dollars)
+    # Plot_3-2: Revenue and Cost data (Billion Dollars)
     revenue_df = get_ag_rev_cost_df(files, 'revenue')
     revenue_df['Source_type'] = revenue_df['Source_type'].str.replace(' Crop','')
     revenue_df['Irrigation'] = revenue_df['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
@@ -384,32 +385,58 @@ def save_report_data(sim):
         take_cols = keep_cols + [col]
         df = revenue_df[take_cols].groupby(['year', col]).sum(numeric_only=True).reset_index()
         # convert to wide format
-        df_wide = df.pivot_table(index=['year'], columns=col, values='value (billion)').reset_index()
-        # save to csv
-        df_wide.to_csv(f'{SAVE_DIR}/economics_1_revenue_{idx+1}_{col}_wide.csv', index=False)
+        df_wide = df.groupby(col)[['year','value (billion)']]\
+                    .apply(lambda x: list(map(list,zip(x['year'],x['value (billion)']))))\
+                    .reset_index()
+                    
+        df_wide.columns = ['name','data']
+        df_wide['type'] = 'column'
+        
+        df_wide.to_json(f'{SAVE_DIR}/economics_1_revenue_{idx+1}_{col}_wide.json', orient='records')
 
-
-
+    # Plot_3-3: Cost data (Billion Dollars)
     cost_df = get_ag_rev_cost_df(files, 'cost')
     cost_df['Source_type'] = cost_df['Source_type'].str.replace(' Crop','')
     cost_df['Irrigation'] = cost_df['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
 
     keep_cols = ['year', 'value (billion)']
     loop_cols = cost_df.columns.difference(keep_cols)
-
-    # Plot_2-3: Cost data (Billion Dollars)
+    
     for idx,col in enumerate(loop_cols):
         take_cols = keep_cols + [col]
-        df = cost_df[take_cols].groupby(['year', col]).sum().reset_index()
+        df = cost_df[take_cols].groupby(['year', col]).sum(numeric_only=True).reset_index()
         # convert to wide format
-        df_wide = df.pivot_table(index=['year'], columns=col, values='value (billion)').reset_index()
-        # save to csv
-        df_wide.to_csv(f'{SAVE_DIR}/economics_2_cost_{idx+1}_{col}_wide.csv', index=False)
+        df_wide = df.groupby(col)[['year','value (billion)']]\
+                    .apply(lambda x: list(map(list,zip(x['year'],x['value (billion)']))))\
+                    .reset_index()
+        df_wide.columns = ['name','data']
+        df_wide['type'] = 'column'
+        # save to disk
+        df_wide.to_json(f'{SAVE_DIR}/economics_2_cost_{idx+1}_{col}_wide.json', orient='records')
 
 
-    # Plot_2-4: Revenue and Cost data (Billion Dollars)
+    # Plot_3-4: Revenue and Cost data (Billion Dollars)
     rev_cost_compare = get_rev_cost(revenue_df,cost_df)
-    rev_cost_compare.to_csv(f'{SAVE_DIR}/economics_3_rev_cost_all.csv', index=False)
+    rev_cost_compare = rev_cost_compare.sort_values(['year'])
+    rev_cost_compare['rev_low'] = 0
+    
+    rev_cost_compare_rev = rev_cost_compare[['rev_low','Revenue (billion)']].copy()
+    rev_cost_compare_rev.columns = ['low','high']
+    rev_cost_compare_rev_records = {'name' : 'Revenue',
+                                    'data': list(map(list,zip(rev_cost_compare['rev_low'],rev_cost_compare['Revenue (billion)'])))}
+    
+    
+    rev_cost_compare_cost = rev_cost_compare[['Profit (billion)','Revenue (billion)']].copy()
+    rev_cost_compare_cost.columns = ['low','high']
+    rev_cost_compare_cost_records = {'name' : 'Cost',
+                                    'data': list(map(list,zip(rev_cost_compare['Profit (billion)'],rev_cost_compare['Revenue (billion)'])))}
+    
+    rev_cost_compare_records = {'categories': [str(i) for i in rev_cost_compare['year'].unique()],
+                                'series': [rev_cost_compare_rev_records,rev_cost_compare_cost_records]}
+    
+
+    with open(f'{SAVE_DIR}/economics_3_rev_cost_all.json', 'w') as outfile:
+        outfile.write(json.dumps(rev_cost_compare_records))
 
 
 
