@@ -89,7 +89,7 @@ def get_agtech_ei_effect_b_mrj(data):
     """
     Gets biodiversity impacts of using AgTech EI (no effect)
     """
-    nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Precision Agriculture"])
+    nlus = len(AG_MANAGEMENTS_TO_LAND_USES["AgTech EI"])
     return np.zeros((data.NLMS, data.NCELLS, nlus))
 
 

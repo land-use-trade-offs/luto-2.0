@@ -418,10 +418,7 @@ def get_savanna_burning_effect_g_mrj(data, g_mrj):
         for j in range(nlus):
             sb_g_mrj[m, :, j] = eds_sav_burning_ghg_impact
 
-    # TODO: check this
-    # SAVBURN_TOTAL_TCO2E_HA stores the carbon sequestration figures of SB plus natural land usage on a cell.
-    # Thus, to get the effect, get the difference between the new SB ghg matrix and the original g_mrj for agriculture.
-    return g_mrj - sb_g_mrj
+    return sb_g_mrj
 
 
 def get_agtech_ei_effect_g_mrj(data, yr_idx):
