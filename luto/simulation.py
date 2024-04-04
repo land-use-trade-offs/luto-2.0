@@ -256,9 +256,8 @@ def get_non_ag_w_rk():
 
 
 def get_non_ag_b_rk():
-    print('Getting non-agricultural biodiversity requirement matrices...', end = ' ', flush = True)
+    print('Getting non-agricultural biodiversity requirement matrices...')
     output = non_ag_biodiversity.get_breq_matrix(data)
-    print('Done.')
     return output.astype(np.float32)
 
 
