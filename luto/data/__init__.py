@@ -139,6 +139,8 @@ NON_AG_LU_NATURAL = [
     DESC2NONAGLU["Environmental Plantings"],
     DESC2NONAGLU["Riparian Plantings"],
     DESC2NONAGLU["Agroforestry"],
+    DESC2NONAGLU["Carbon Plantings (Block)"],
+    DESC2NONAGLU["Carbon Plantings (Belt)"],
 ]
 
 # Derive land management types from AGEC.
@@ -342,7 +344,7 @@ CP_BELT_AVG_T_CO2_HA = (
                          + cp_df.CP_BELT_BG_AVG_T_CO2_HA_YR
                         ).to_numpy(dtype = np.float32)
 
-# Agricultural land use to environmental plantings raw transition costs:
+# Agricultural land use to plantings raw transition costs:
 AG2EP_TRANSITION_COSTS_HA = np.load( os.path.join(INPUT_DIR, 'ag_to_ep_tmatrix.npy') )  # shape: (28,)
 
 # EP to agricultural land use transition costs:
@@ -639,7 +641,6 @@ Kunming-Montreal Biodiversity Framework Target 2: Restore 30% of all Degraded Ec
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
 """
 # Load biodiversity data
-
 biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5') )
 
 # Get the Zonation output score between 0 and 1
@@ -655,7 +656,7 @@ BIODIV_SCORE_WEIGHTED_LDS_BURNING = BIODIV_SCORE_WEIGHTED * LDS_BIODIVERSITY_VAL
 # Calculate total biodiversity target score as the quality-weighted sum of biodiv raw score over the study area 
 biodiv_value_current = ( np.isin(LUMAP, 23) * BIODIV_SCORE_RAW +                                         # Biodiversity value of Unallocated - natural land 
                          np.isin(LUMAP, [2, 6, 15]) * BIODIV_SCORE_RAW * (1 - BIODIV_LIVESTOCK_IMPACT)   # Biodiversity value of livestock on natural land 
-                       ) * np.where(SAVBURN_ELIGIBLE, LDS_BIODIVERSITY_VALUE, 1) * REAL_AREA           # Reduce biodiversity value of area eligible for savanna burning 
+                       ) * np.where(SAVBURN_ELIGIBLE, LDS_BIODIVERSITY_VALUE, 1) * REAL_AREA             # Reduce biodiversity value of area eligible for savanna burning 
 
 biodiv_value_target = ( ( np.isin(LUMAP, [2, 6, 15, 23]) * BIODIV_SCORE_RAW * REAL_AREA - biodiv_value_current ) +  # On natural land calculate the difference between the raw biodiversity score and the current score
                           np.isin(LUMAP, LU_MODIFIED_LAND) * BIODIV_SCORE_RAW * REAL_AREA                           # Calculate raw biodiversity score of modified land

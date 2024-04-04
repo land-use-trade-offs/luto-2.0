@@ -55,7 +55,7 @@ from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_html import data2html
-from luto.tools.report.create_static_maps import TIF2PNG
+from luto.tools.report.create_static_maps import TIF2MAP
 
 
 timestamp_write = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
@@ -102,7 +102,7 @@ def write_data(sim):
     Parallel(n_jobs=num_jobs, prefer='threads')(jobs)
         
     # Create the report HTML and png maps
-    TIF2PNG(sim) if settings.WRITE_OUTPUT_GEOTIFFS else None
+    TIF2MAP(sim) if settings.WRITE_OUTPUT_GEOTIFFS else None
     save_report_data(sim)
     data2html(sim)
     
@@ -284,8 +284,6 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
     # In this way, if partial land-use is allowed (i.e, one pixel is determined to be 50% of apples and 50% citrus),
     #       we can handle the fractional land-use successfully.
 
-    # Skip writing if the yr_cal is the base year
-    if yr_cal == sim.data.YR_CAL_BASE: return
     
     # 1) Collapse the land management dimension (m -> [dry, irr])
     #    i.e., mrj -> rj
@@ -959,6 +957,7 @@ def write_biodiversity_separate(sim, yr_cal, path):
 
 
     # Get the biodiversity scores b_mrj
+    yr_idx = yr_cal - sim.data.YR_CAL_BASE
     ag_biodiv_mrj = ag_biodiversity.get_breq_matrices(sim.data)
     am_biodiv_mrj = ag_biodiversity.get_agricultural_management_biodiversity_matrices(sim.data)
     non_ag_biodiv_rk = non_ag_biodiversity.get_breq_matrix(sim.data)

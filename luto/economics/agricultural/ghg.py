@@ -245,7 +245,7 @@ def get_ghg_transition_penalties(data, lumap) -> np.ndarray:
     ncells, n_ag_lus = data.REAL_AREA.shape[0], len(data.AGRICULTURAL_LANDUSES)
     # Set up empty array of penalties
     penalties_rj = np.zeros((ncells, n_ag_lus), dtype=np.float32)
-    natural_lu_cells = tools.get_natural_lu_cells(data, lumap)
+    natural_lu_cells = tools.get_ag_natural_lu_cells(data, lumap)
 
     # Calculate penalties and add to g_rj matrix
     penalties_r = (
@@ -463,14 +463,12 @@ def get_agtech_ei_effect_g_mrj(data, yr_idx):
                     )
                     new_g_mrj[m, :, lu_idx] -= reduction_amnt
 
+            # Subtract extra 'CO2e_KG_HA_IRRIG' carbon for irrigated land uses
             if m == 1:
-                # Also subtract extra carbon on irrigated land uses
-                # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not use zeros
                 if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
                     continue
 
                 reduction_perc = 1 - lu_data.loc[yr_cal, 'CO2e_KG_HA_IRRIG']
-
                 if reduction_perc != 0:
                     reduction_amnt = (
                         np.nan_to_num(data.AGGHG_CROPS['CO2e_KG_HA_IRRIG', lm, lu].to_numpy(), 0) # type: ignore
@@ -480,9 +478,6 @@ def get_agtech_ei_effect_g_mrj(data, yr_idx):
                     )
                     new_g_mrj[m, :, lu_idx] -= reduction_amnt
 
-    if np.isnan(new_g_mrj).any():
-        raise ValueError("Error in data: NaNs detected in agricultural management options' GHG effect matrix.")
-
     return new_g_mrj
 
 
@@ -491,12 +486,14 @@ def get_agricultural_management_ghg_matrices(data, g_mrj, yr_idx) -> Dict[str, n
     precision_agriculture_data = get_precision_agriculture_effect_g_mrj(data, yr_idx)
     eco_grazing_data = get_ecological_grazing_effect_g_mrj(data, yr_idx)
     sav_burning_ghg_impact = get_savanna_burning_effect_g_mrj(data, g_mrj)
+    agtech_ei_ghg_impact = get_agtech_ei_effect_g_mrj(data, g_mrj)
 
     ag_management_data = {
         'Asparagopsis taxiformis': asparagopsis_data,
         'Precision Agriculture': precision_agriculture_data,
         'Ecological Grazing': eco_grazing_data,
         'Savanna Burning': sav_burning_ghg_impact,
+        'AgTech EI': agtech_ei_ghg_impact,
     }
 
     return ag_management_data

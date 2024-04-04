@@ -134,6 +134,9 @@ class Data():
         self.RP_FENCING_LENGTH = bdata.RP_FENCING_LENGTH[self.MASK]             # Float32
         self.EP_RIP_AVG_T_CO2_HA = bdata.EP_RIP_AVG_T_CO2_HA[self.MASK]         # Float32
         self.EP_BELT_AVG_T_CO2_HA = bdata.EP_BELT_AVG_T_CO2_HA[self.MASK]       # Float32
+        self.CP_BLOCK_AVG_T_CO2_HA = bdata.CP_BLOCK_AVG_T_CO2_HA[self.MASK]     # Float32
+        self.CP_BELT_AVG_T_CO2_HA = bdata.CP_BELT_AVG_T_CO2_HA[self.MASK]       # Float32
+        self.CP_EST_COST_HA = bdata.CP_EST_COST_HA[self.MASK]
         self.SAVBURN_ELIGIBLE = bdata.SAVBURN_ELIGIBLE[self.MASK]               # Float32
 
         # Slice this year off HDF5 bricks. TODO: This field is not in luto.data.
@@ -177,7 +180,7 @@ def get_path(bdata, start, end):
     # Get all paths 
     paths = [path]\
             + [f"{path}/out_{yr}" for yr in yr_all]\
-            + [f"{path}/out_{yr}/lucc_separate" for yr in yr_all[1:]] # Skip creating lucc_separate for base year
+            + [f"{path}/out_{yr}/lucc_separate" for yr in yr_all]
     
     # Add the path for the comparison between base-year and target-year if in the timeseries mode
     if settings.MODE == 'timeseries':
@@ -254,8 +257,9 @@ def get_non_ag_w_rk():
 
 
 def get_non_ag_b_rk():
-    print('Getting non-agricultural biodiversity requirement matrices...')
+    print('Getting non-agricultural biodiversity requirement matrices...', end = ' ', flush = True)
     output = non_ag_biodiversity.get_breq_matrix(data)
+    print('Done.')
     return output.astype(np.float32)
 
 

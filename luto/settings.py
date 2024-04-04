@@ -52,7 +52,7 @@ RAW_DATA = '../raw_data'
 
 # Climate change assumptions. Options include '126', '245', '370', '585'
 SSP = '245'
-RCP = 'rcp' + SSP[1] + 'p' + SSP[2]  # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
+RCP = 'rcp' + SSP[1] + 'p' + SSP[2] # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
 # Set demand parameters which define requirements for Australian production of agricultural commodities
 SCENARIO = SSP_NUM = 'SSP' + SSP[0] # SSP1, SSP2, SSP3, SSP4, SSP5
@@ -98,7 +98,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 3         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
 
 # How does the model run over time 
-MODE = 'timeseries'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
+MODE = 'snapshot'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****
@@ -167,6 +167,21 @@ CARBON_PRICE_PER_TONNE = 100
 
 # Environmental Plantings Parameters
 ENV_PLANTING_COST_PER_HA_PER_YEAR = 100     # Yearly cost of maintaining one hectare of environmental plantings
+# Plantings Parameters
+ENV_PLANTING_COST_PER_HA_PER_YEAR = 100           # Yearly cost of maintaining one hectare of environmental plantings
+CARBON_PLANTING_BLOCK_COST_PER_HA_PER_YEAR = 100  # Yearly cost of maintaining one hectare of carbon plantings (block)
+CARBON_PLANTING_BELT_COST_PER_HA_PER_YEAR = 100   # Yearly cost of maintaining one hectare of carbon plantings (belt)
+CARBON_PRICE_PER_TONNE = 100                      # Price of carbon per tonne - determines EP revenue in the model
+
+CP_BELT_ROW_WIDTH = 20
+CP_BELT_ROW_SPACING = 40
+# CARBON_PLANTINGS_BELT_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 100 metres per hectare
+CARBON_PLANTINGS_BELT_FENCING_COST_PER_M = 2           # $ per linear metre
+CP_BELT_PROPORTION = CP_BELT_ROW_WIDTH / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
+cp_no_alleys_per_ha = 100 / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
+CP_BELT_FENCING_LENGTH = 100 * cp_no_alleys_per_ha * 2 # Length of fencing required per ha in metres
+
+CARBON_PLANTINGS_BIODIV_BENEFIT = 0.1
 
 # Riparian Planting Parameters
 rp_annual_maintennance_cost_per_ha_per_year = 100
@@ -222,7 +237,7 @@ GHG_LIMITS = {
              }
 
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-GHG_LIMITS_FIELD = '1.5C (67%)'    
+GHG_LIMITS_FIELD = '1.5C (50%)'    
 
 SOC_AMORTISATION = 30           # Number of years over which to spread (average) soil carbon accumulation
 
@@ -282,6 +297,8 @@ LAND_USAGE_CULL_PERCENTAGE = 0.15
 0: 'Environmental Plantings'
 1: 'Riparian Plantings'
 2: 'Agroforestry'
+3: 'Carbon Plantings (Block Arrangement)'
+4: 'Carbon Plantings (Belt Arrangement)'
 
 
 AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)
