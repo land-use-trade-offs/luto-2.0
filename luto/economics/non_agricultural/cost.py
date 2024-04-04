@@ -78,6 +78,21 @@ def get_cost_carbon_plantings_belt(data) -> np.ndarray:
     return settings.CARBON_PLANTING_BELT_COST_PER_HA_PER_YEAR * data.REAL_AREA
 
 
+def get_cost_beccs(data) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    data: object/module
+        Data object or module with fields like in `luto.data`.
+
+    Returns
+    -------
+    np.ndarray
+        Cost of BECCS for each cell. 1-D array Indexed by cell.
+    """
+    return np.nan_to_num(data.BECCS_COSTS_AUD_HA_YR) * data.REAL_AREA
+
+
 def get_cost_matrix(data):
     """
     Returns non-agricultural c_rk matrix of costs per cell and land use.
@@ -87,6 +102,7 @@ def get_cost_matrix(data):
     agroforestry_costs = get_cost_agroforestry(data)
     carbon_plantings_block_costs = get_cost_carbon_plantings_block(data)
     carbon_plantings_belt_costs = get_cost_carbon_plantings_belt(data)
+    beccs_costs = get_cost_beccs(data)
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     non_agr_c_matrices = [
@@ -95,6 +111,7 @@ def get_cost_matrix(data):
         agroforestry_costs.reshape((data.NCELLS, 1)),
         carbon_plantings_block_costs.reshape((data.NCELLS, 1)),
         carbon_plantings_belt_costs.reshape((data.NCELLS, 1)),
+        beccs_costs.reshape((data.NCELLS, 1)),
     ]
 
     return np.concatenate(non_agr_c_matrices, axis=1)

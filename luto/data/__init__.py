@@ -141,6 +141,7 @@ NON_AG_LU_NATURAL = [
     DESC2NONAGLU["Agroforestry"],
     DESC2NONAGLU["Carbon Plantings (Block)"],
     DESC2NONAGLU["Carbon Plantings (Belt)"],
+    DESC2NONAGLU["BECCS"],
 ]
 
 # Derive land management types from AGEC.
@@ -662,8 +663,8 @@ TOTAL_BIODIV_TARGET_SCORE = (
 beccs_df = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_BECCS_df.h5') )
 
 # Capture as numpy arrays
-BECCS_COSTS_AUD_HA_YR = beccs_df['BECCS_COSTS_AUD_HA_YR']
-BECCS_REV_AUD_HA_YR = beccs_df['BECCS_REV_AUD_HA_YR']
-BECCS_TCO2E_HA_YR = beccs_df['BECCS_TCO2E_HA_YR']
-BECCS_MWH_HA_YR = beccs_df['BECCS_MWH_HA_YR']
+BECCS_COSTS_AUD_HA_YR = beccs_df['BECCS_COSTS_AUD_HA_YR'].to_numpy()
+BECCS_REV_AUD_HA_YR = beccs_df['BECCS_REV_AUD_HA_YR'].to_numpy()
+BECCS_TCO2E_HA_YR = beccs_df['BECCS_TCO2E_HA_YR'].to_numpy()
+BECCS_MWH_HA_YR = beccs_df['BECCS_MWH_HA_YR'].to_numpy()
 
