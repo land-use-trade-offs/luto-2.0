@@ -340,9 +340,6 @@ def get_precision_agriculture_effect_g_mrj(data, yr_idx):
 
                 reduction_perc = 1 - lu_data.loc[yr_cal, co2e_type]
 
-                # if co2e_type == "CO2E_KG_HA_SOIL":
-                #     co2e_type += "_N_SURP"  # TODO: determine why names differ between files
-
                 if reduction_perc != 0:
                     reduction_amnt = (
                         np.nan_to_num(data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy(), 0) # type: ignore
@@ -425,6 +422,71 @@ def get_savanna_burning_effect_g_mrj(data, g_mrj):
     # SAVBURN_TOTAL_TCO2E_HA stores the carbon sequestration figures of SB plus natural land usage on a cell.
     # Thus, to get the effect, get the difference between the new SB ghg matrix and the original g_mrj for agriculture.
     return g_mrj - sb_g_mrj
+
+
+def get_agtech_ei_effect_g_mrj(data, yr_idx):
+    """
+    Applies the effects of using AgTech EI to the GHG data
+    for all relevant agr. land uses.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Set up the effects matrix
+    new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    # Update values in the new matrix
+    for lu_idx, lu in enumerate(land_uses):
+        lu_data = data.PRECISION_AGRICULTURE_DATA[lu]
+
+        for lm in data.LANDMANS:
+            if lm == 'dry':
+                m = 0
+            else:
+                m = 1
+        
+            for co2e_type in [
+                'CO2E_KG_HA_CHEM_APPL',
+                'CO2E_KG_HA_CROP_MGT',
+                'CO2E_KG_HA_PEST_PROD',
+                'CO2E_KG_HA_SOIL'
+            ]:
+                # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not use zeros
+                if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
+                    continue
+
+                reduction_perc = 1 - lu_data.loc[yr_cal, co2e_type]
+
+                if reduction_perc != 0:
+                    reduction_amnt = (
+                        np.nan_to_num(data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy(), 0) # type: ignore
+                        * reduction_perc
+                        / 1000            # convert to tonnes
+                        * data.REAL_AREA  # adjust for resfactor
+                    )
+                    new_g_mrj[m, :, lu_idx] -= reduction_amnt
+
+            if m == 1:
+                # Also subtract extra carbon on irrigated land uses
+                # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not use zeros
+                if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
+                    continue
+
+                reduction_perc = 1 - lu_data.loc[yr_cal, 'CO2e_KG_HA_IRRIG']
+
+                if reduction_perc != 0:
+                    reduction_amnt = (
+                        np.nan_to_num(data.AGGHG_CROPS['CO2e_KG_HA_IRRIG', lm, lu].to_numpy(), 0) # type: ignore
+                        * reduction_perc
+                        / 1000            # convert to tonnes
+                        * data.REAL_AREA  # adjust for resfactor
+                    )
+                    new_g_mrj[m, :, lu_idx] -= reduction_amnt
+
+    if np.isnan(new_g_mrj).any():
+        raise ValueError("Error in data: NaNs detected in agricultural management options' GHG effect matrix.")
+
+    return new_g_mrj
 
 
 def get_agricultural_management_ghg_matrices(data, g_mrj, yr_idx) -> Dict[str, np.ndarray]:

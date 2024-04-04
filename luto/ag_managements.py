@@ -42,5 +42,30 @@ AG_MANAGEMENTS_TO_LAND_USES = {
         'Dairy - natural land',
         'Sheep - natural land',
         'Unallocated - natural land',
+    ],
+    'AgTech EI': [
+        # Cropping:
+        'Hay',
+        'Summer cereals',
+        'Summer legumes',
+        'Summer oilseeds',
+        'Winter cereals',
+        'Winter legumes',
+        'Winter oilseeds',
+        # Intensive Cropping:
+        'Cotton',
+        'Other non-cereal crops',
+        'Rice',
+        'Sugar',
+        'Vegetables',
+        # Horticulture:
+        'Apples',
+        'Citrus',
+        'Grapes',
+        'Nuts',
+        'Pears',
+        'Plantation fruit',
+        'Stone fruit',
+        'Tropical stone fruit',
     ]
 }

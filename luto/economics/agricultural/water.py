@@ -131,6 +131,30 @@ def get_savanna_burning_effect_w_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, nlus))
 
 
+def get_agtech_ei_effect_w_mrj(data, w_mrj, yr_idx):
+    """
+    Applies the effects of using AgTech EI to the water requirements data
+    for all relevant agr. land uses.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']
+    lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Set up the effects matrix
+    new_w_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    # Update values in the new matrix using the correct multiplier for each LU
+    for lu_idx, lu in enumerate(land_uses):
+        j = lu_codes[lu_idx]
+        multiplier = data.AGTECH_EI_DATA[lu].loc[yr_cal, "Water_use"]
+        if multiplier != 1:
+            # The effect is: new value = old value * multiplier - old value
+            # E.g. a multiplier of .95 means a 5% reduction in quantity produced
+            new_w_mrj[:, :, lu_idx] = w_mrj[:, :, j] * (multiplier - 1)
+
+    return new_w_mrj
+
+
 def get_agricultural_management_water_matrices(data, w_mrj, yr_idx) -> Dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_w_mrj(data, w_mrj, yr_idx)
     precision_agriculture_data = get_precision_agriculture_effect_w_mrj(data, w_mrj, yr_idx)

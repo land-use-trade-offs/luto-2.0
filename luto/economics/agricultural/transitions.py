@@ -279,6 +279,19 @@ def get_savanna_burning_adoption_limit(data):
     return sav_burning_limits
 
 
+def get_agtech_ei_adoption_limit(data, yr_idx):
+    """
+    Gets the adoption limit of AgTech EI for each possible land use.
+    """
+    prec_agr_limits = {}
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    for lu in AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']:
+        j = data.DESC2AGLU[lu]
+        prec_agr_limits[j] = data.AGTECH_EI_DATA[lu].loc[yr_cal, 'Technical_Adoption']
+
+    return prec_agr_limits
+
+
 def get_agricultural_management_adoption_limits(data, yr_idx) -> Dict[str, dict]:
     """
     An adoption limit represents the maximum percentage of cells (for each land use) that can utilise
@@ -288,12 +301,14 @@ def get_agricultural_management_adoption_limits(data, yr_idx) -> Dict[str, dict]
     precision_agriculture_limits = get_precision_agriculture_adoption_limit(data, yr_idx)
     eco_grazing_limits = get_ecological_grazing_adoption_limit(data, yr_idx)
     savanna_burning_limits = get_savanna_burning_adoption_limit(data)
+    agtech_ei_limits = get_agtech_ei_adoption_limit(data, yr_idx)
 
     adoption_limits = {
         'Asparagopsis taxiformis': asparagopsis_limits,
         'Precision Agriculture': precision_agriculture_limits,
         'Ecological Grazing': eco_grazing_limits,
         'Savanna Burning': savanna_burning_limits,
+        'AgTech EI': agtech_ei_limits,
     }
 
     return adoption_limits
