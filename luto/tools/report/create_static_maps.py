@@ -13,7 +13,7 @@ from luto.tools.report.map_tools.helper import (get_map_meta,
 
 
 
-def TIF2PNG(sim):
+def TIF2MAP(sim):
 
     # Get the output directory
     raw_data_dir = sim.path
@@ -35,7 +35,7 @@ def TIF2PNG(sim):
     Parallel(n_jobs=settings.THREADS)(delayed(create_maps)(row, model_run_scenario) 
                                       for _, row in tif_files_with_meta.iterrows())
         
-        
+     
 def create_maps(row, model_run_scenario):
     
     # Get the necessary variables
@@ -71,9 +71,12 @@ def create_maps(row, model_run_scenario):
     
     
     # Save the map to HTML
-    save_map_to_html(tif_path, 
+    save_map_to_html(tif_path,
+                     'luto/tools/report/Assets/AUS_adm/STE11aAust_mercator_simplified.shp', 
+                     data_type,
                      center, 
-                     bounds_for_folium)
+                     bounds_for_folium,
+                     color_desc_dict)
     
     
 

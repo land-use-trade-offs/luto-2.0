@@ -24,6 +24,11 @@ def extract_dtype_from_path(path):
     f_cat = {
             # decision variables (npy files)
             'dvar':['npy'],
+            'ag_X_mrj':['ag_X_mrj'],
+            'ag_man_X_mrj':['ag_man_X_mrjasparagopsis_taxiformis',
+                        'ag_man_X_mrjecological_grazing',
+                        'ag_man_X_mrjprecision_agriculture'],
+            'non_ag_X_rk':['non_ag_X_rk'],
             # CSVs
             'GHG':['GHG'],
             'water':['water'],
@@ -58,7 +63,10 @@ def extract_dtype_from_path(path):
             search_result.append(bool(reg.search(base_name)))
         
         # If any of the patterns are found, break the loop
-        if any(search_result): break
+        if any(search_result): 
+            break
+        else:
+            ftype = 'Unknown'
 
 
     # Check if this comes from the begin_end_compare folder
@@ -95,21 +103,33 @@ def get_all_files(data_root):
     # Only filepath containing "out_" are valid paths
     file_paths = sorted([i for i in file_paths if 'out_' in i])
 
-    # Get the year and the run number from the file name
+    # Get the year from the file name
     file_paths = pd.DataFrame({'path':file_paths})
     file_paths.insert(0, 'year', [re.compile(r'out_(\d{4})').findall(i)[0] for i in file_paths['path']])
 
+    # Try to get the year type and category from the file path
     yr_types, f_cats = zip(*[extract_dtype_from_path(i) for i in file_paths['path']])
+
+
+    # Append the year type and category to the file paths
     file_paths.insert(1, 'year_types', yr_types)
     file_paths.insert(2, 'category', f_cats)
 
+    # Get the base name and extension of the file path
     file_paths[['base_name','base_ext']] = [os.path.splitext(os.path.basename(i)) for i in file_paths['path']]
     file_paths = file_paths.reindex(columns=['year','year_types','category','base_name','base_ext','path'])
-
-    file_paths['year'] = file_paths['year'].astype(int)
     
-    # remove the datatime stamp from the base_name
+    # Remove the datatime stamp <YYYY_MM_DD__HH_mm_SS> from the base_name
     file_paths['base_name'] = file_paths['base_name'].apply(lambda x: re.sub(r'_\d{4}.*\d{2}','',x))
+    
+    # Report the unknown files
+    unknown_files = file_paths.query('category == "Unknown"')
+    if not unknown_files.empty:
+        print(f"Unknown files found: {unknown_files['path'].tolist()}")
+        
+    # Remove rows with category = 'Unknown'
+    file_paths = file_paths.query('category != "Unknown"').reset_index(drop=True)
+    
 
     return file_paths
 
