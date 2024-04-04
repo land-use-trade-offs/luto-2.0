@@ -10,14 +10,17 @@ document.addEventListener('DOMContentLoaded', function () {
     var map_idx = '0';
 
     // Load the selected data to report HTML
-    load_data( get_dataDir() + '/data/Map_data/lumap_2010.html');
+    load_data(get_dataDir() + '/data/Map_data/lumap_2010.html');
+
+
+
 
 
     var lucc_names = {
         "Ag_LU": ['Apples', 'Beef - modified land', 'Beef - natural land', 'Citrus', 'Cotton', 'Dairy - modified land', 'Dairy - natural land',
-                  'Grapes', 'Hay', 'Nuts', 'Other non-cereal crops', 'Pears', 'Plantation fruit', 'Rice', 'Sheep - modified land',
-                  'Sheep - natural land', 'Stone fruit', 'Sugar', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
-                  'Unallocated - modified land', 'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes','Winter oilseeds'],
+            'Grapes', 'Hay', 'Nuts', 'Other non-cereal crops', 'Pears', 'Plantation fruit', 'Rice', 'Sheep - modified land',
+            'Sheep - natural land', 'Stone fruit', 'Sugar', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
+            'Unallocated - modified land', 'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes', 'Winter oilseeds'],
         "Ag_Mgt": ['Asparagopsis taxiformis', 'Ecological Grazing', 'Precision Agriculture'],
         "Land_Mgt": ['dry', 'irr'],
         'Non-Ag_LU': ['Environmental Plantings', 'Riparian Plantings', 'Agroforestry'],
@@ -68,24 +71,28 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 
-    
+
     // Increment year
-    document.getElementById('increment').addEventListener('click', function() {
+    document.getElementById('increment').addEventListener('click', function () {
         var yearInput = document.getElementById('year');
+
+        console.log(yearInput.value)
+        console.log(yearInput.step)
+
         if (yearInput.value < yearInput.max) {
-            yearInput.value = parseInt(yearInput.value) + yearInput.step;
+            yearInput.value = parseInt(yearInput.value) + parseInt(yearInput.step);
             document.getElementById('yearOutput').value = yearInput.value;
         }
         // Load the selected data to report HTML
         load_data(update_fname());
     });
-    
+
 
     // Decrement year
-    document.getElementById('decrement').addEventListener('click', function() {
+    document.getElementById('decrement').addEventListener('click', function () {
         var yearInput = document.getElementById('year');
         if (yearInput.value > yearInput.min) {
-            yearInput.value = parseInt(yearInput.value) -  yearInput.step;
+            yearInput.value = parseInt(yearInput.value) - parseInt(yearInput.step);
             document.getElementById('yearOutput').value = yearInput.value;
         }
         // Load the selected data to report HTML
@@ -111,9 +118,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // The index for Ag_Mgt is always 00
         map_idx = lucc == 'Ag_Mgt' ? '00' : String(names.indexOf(map_name)).padStart(2, '0');
-        
+
         // The file name for lumap is different
-        file_name = lucc == 'lumap' ? 'lumap_' + year + '.html' : lucc + '_' +  map_idx + '_' + map_name + '_' + year + '.html';
+        file_name = lucc == 'lumap' ? 'lumap_' + year + '.html' : lucc + '_' + map_idx + '_' + map_name + '_' + year + '.html';
 
         // Get the full path to the file
         file_name = get_dataDir() + '/data/Map_data/' + file_name;
@@ -136,16 +143,15 @@ document.addEventListener('DOMContentLoaded', function () {
         return dataDir;
     }
 
-
-    // Function to update the year range selection input and output values
-    window.onload = function() {
+    // Update the year range selection input and output values
+    window.onload = function () {
         var yearInput = document.getElementById('year');
         var yearOutput = document.getElementById('yearOutput');
         var modelYears = eval(document.getElementById('model_years').innerText);
-        
+
         // Sort the modelYears array in ascending order
-        modelYears.sort(function(a, b) { return a - b; });
-        
+        modelYears.sort(function (a, b) { return a - b; });
+
         yearInput.min = modelYears[0];
         yearInput.max = modelYears[modelYears.length - 1];
         yearInput.step = modelYears[1] - modelYears[0];   // The step is the difference between the first two elements
