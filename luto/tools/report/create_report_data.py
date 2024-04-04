@@ -1,6 +1,7 @@
 
 import os
 import json
+import itertools
 import re
 import shutil
 import pandas as pd
@@ -59,6 +60,8 @@ def save_report_data(sim):
     # avoid cluttering in the multi-level axis graphing
     years = sorted(files['year'].unique().tolist())
     years_select = select_years(years)
+    
+    
 
     ####################################################
     #                    1) Area Change                #
@@ -369,10 +372,10 @@ def save_report_data(sim):
 
 
     ####################################################
-    #                  2) Economics                    #
+    #                  3) Economics                    #
     ####################################################
 
-    # Plot_2-2: Revenue and Cost data (Billion Dollars)
+    # Plot_3-2: Revenue and Cost data (Billion Dollars)
     revenue_df = get_ag_rev_cost_df(files, 'revenue')
     revenue_df['Source_type'] = revenue_df['Source_type'].str.replace(' Crop','')
     revenue_df['Irrigation'] = revenue_df['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
@@ -384,32 +387,58 @@ def save_report_data(sim):
         take_cols = keep_cols + [col]
         df = revenue_df[take_cols].groupby(['year', col]).sum(numeric_only=True).reset_index()
         # convert to wide format
-        df_wide = df.pivot_table(index=['year'], columns=col, values='value (billion)').reset_index()
-        # save to csv
-        df_wide.to_csv(f'{SAVE_DIR}/economics_1_revenue_{idx+1}_{col}_wide.csv', index=False)
+        df_wide = df.groupby(col)[['year','value (billion)']]\
+                    .apply(lambda x: list(map(list,zip(x['year'],x['value (billion)']))))\
+                    .reset_index()
+                    
+        df_wide.columns = ['name','data']
+        df_wide['type'] = 'column'
+        
+        df_wide.to_json(f'{SAVE_DIR}/economics_1_revenue_{idx+1}_{col}_wide.json', orient='records')
 
-
-
+    # Plot_3-3: Cost data (Billion Dollars)
     cost_df = get_ag_rev_cost_df(files, 'cost')
     cost_df['Source_type'] = cost_df['Source_type'].str.replace(' Crop','')
     cost_df['Irrigation'] = cost_df['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
 
     keep_cols = ['year', 'value (billion)']
     loop_cols = cost_df.columns.difference(keep_cols)
-
-    # Plot_2-3: Cost data (Billion Dollars)
+    
     for idx,col in enumerate(loop_cols):
         take_cols = keep_cols + [col]
-        df = cost_df[take_cols].groupby(['year', col]).sum().reset_index()
+        df = cost_df[take_cols].groupby(['year', col]).sum(numeric_only=True).reset_index()
         # convert to wide format
-        df_wide = df.pivot_table(index=['year'], columns=col, values='value (billion)').reset_index()
-        # save to csv
-        df_wide.to_csv(f'{SAVE_DIR}/economics_2_cost_{idx+1}_{col}_wide.csv', index=False)
+        df_wide = df.groupby(col)[['year','value (billion)']]\
+                    .apply(lambda x: list(map(list,zip(x['year'],x['value (billion)']))))\
+                    .reset_index()
+        df_wide.columns = ['name','data']
+        df_wide['type'] = 'column'
+        # save to disk
+        df_wide.to_json(f'{SAVE_DIR}/economics_2_cost_{idx+1}_{col}_wide.json', orient='records')
 
 
-    # Plot_2-4: Revenue and Cost data (Billion Dollars)
+    # Plot_3-4: Revenue and Cost data (Billion Dollars)
     rev_cost_compare = get_rev_cost(revenue_df,cost_df)
-    rev_cost_compare.to_csv(f'{SAVE_DIR}/economics_3_rev_cost_all.csv', index=False)
+    rev_cost_compare = rev_cost_compare.sort_values(['year'])
+    rev_cost_compare['rev_low'] = 0
+    
+    rev_cost_compare_rev = rev_cost_compare[['rev_low','Revenue (billion)']].copy()
+    rev_cost_compare_rev.columns = ['low','high']
+    rev_cost_compare_rev_records = {'name' : 'Revenue',
+                                    'data': list(map(list,zip(rev_cost_compare['rev_low'],rev_cost_compare['Revenue (billion)'])))}
+    
+    
+    rev_cost_compare_cost = rev_cost_compare[['Profit (billion)','Revenue (billion)']].copy()
+    rev_cost_compare_cost.columns = ['low','high']
+    rev_cost_compare_cost_records = {'name' : 'Cost',
+                                    'data': list(map(list,zip(rev_cost_compare['Profit (billion)'],rev_cost_compare['Revenue (billion)'])))}
+    
+    rev_cost_compare_records = {'categories': [str(i) for i in rev_cost_compare['year'].unique()],
+                                'series': [rev_cost_compare_rev_records,rev_cost_compare_cost_records]}
+    
+
+    with open(f'{SAVE_DIR}/economics_3_rev_cost_all.json', 'w') as outfile:
+        outfile.write(json.dumps(rev_cost_compare_records))
 
 
 
@@ -448,7 +477,13 @@ def save_report_data(sim):
     Cumsum_emissions = Net_emission.copy()
     Cumsum_emissions['Cumulative GHG emissions (Mt)'] = Cumsum_emissions.cumsum()['GHG_sum_Mt']
     Cumsum_emissions = Cumsum_emissions[['year','Cumulative GHG emissions (Mt)']]
-    Cumsum_emissions.to_csv(f'{SAVE_DIR}/GHG_1_cunsum_emission_Mt.csv',index=False)
+    
+    Cumsum_emissions_json = [{'data': list(map(list,zip(Cumsum_emissions['year'],Cumsum_emissions['Cumulative GHG emissions (Mt)']))),
+                             'type' : 'column'}]
+    
+    with open(f'{SAVE_DIR}/GHG_1_cunsum_emission_Mt.json', 'w') as outfile:
+        json.dump(Cumsum_emissions_json, outfile)
+    
 
     # Plot_4-2: GHG from individual emission sectors (Mt)
     GHG_files_wide_onland = GHG_files_onland[['year','base_name','GHG_sum_Mt']]
@@ -477,24 +512,58 @@ def save_report_data(sim):
 
     # Plot_4-3-1: Agricultural Emission (on-land) by crop/lvstk sectors (Mt)
     GHG_Ag_emission_total_crop_lvstk = get_GHG_emissions_by_crop_lvstk_df(GHG_emissions_long)
-    GHG_Ag_emission_total_crop_lvstk_wide = GHG_Ag_emission_total_crop_lvstk.pivot(index='Year', columns='Landuse_land_cat', values='Quantity (Mt CO2e)').reset_index()
-    GHG_Ag_emission_total_crop_lvstk_wide.to_csv(f'{SAVE_DIR}/GHG_3_crop_lvstk_emission_Mt.csv',index=False)
+    
+    GHG_Ag_emission_total_crop_lvstk_wide = GHG_Ag_emission_total_crop_lvstk\
+                                                .groupby(['Landuse_land_cat'])[['Year','Quantity (Mt CO2e)']]\
+                                                .apply(lambda x: list(map(list,zip(x['Year'],x['Quantity (Mt CO2e)']))))\
+                                                .reset_index()
+                                                
+    GHG_Ag_emission_total_crop_lvstk_wide.columns = ['name','data']
+    GHG_Ag_emission_total_crop_lvstk_wide['type'] = 'column'
+    GHG_Ag_emission_total_crop_lvstk_wide.to_json(f'{SAVE_DIR}/GHG_3_crop_lvstk_emission_Mt.json',orient='records')
+
+
 
     # Plot_4-3-2: Agricultural Emission (on-land) by dry/irrigation  (Mt)
     GHG_Ag_emission_total_dry_irr = GHG_emissions_long.groupby(['Year','Irrigation']).sum()['Quantity (Mt CO2e)'].reset_index()
-    GHG_Ag_emission_total_dry_irr_wide = GHG_Ag_emission_total_dry_irr.pivot(index='Year', columns='Irrigation', values='Quantity (Mt CO2e)').reset_index()
-    GHG_Ag_emission_total_dry_irr_wide.to_csv(f'{SAVE_DIR}/GHG_4_dry_irr_emission_Mt.csv',index=False)
+    
+    GHG_Ag_emission_total_dry_irr_wide = GHG_Ag_emission_total_dry_irr\
+                                            .groupby(['Irrigation'])[['Year','Quantity (Mt CO2e)']]\
+                                            .apply(lambda x: list(map(list,zip(x['Year'],x['Quantity (Mt CO2e)']))))\
+                                            .reset_index()
+                                            
+    GHG_Ag_emission_total_dry_irr_wide.columns = ['name','data']
+    GHG_Ag_emission_total_dry_irr_wide['type'] = 'column'
+    GHG_Ag_emission_total_dry_irr_wide.to_json(f'{SAVE_DIR}/GHG_4_dry_irr_emission_Mt.json',orient='records')
+    
+    
+
 
     # Plot_4-3-3: Agricultural Emission (on-land) by GHG type sectors (Mt)
     GHG_Ag_emission_total_GHG_type = GHG_emissions_long.groupby(['Year','GHG Category']).sum()['Quantity (Mt CO2e)'].reset_index()
-    GHG_Ag_emission_total_GHG_type_wide = GHG_Ag_emission_total_GHG_type.pivot(index='Year', columns='GHG Category', values='Quantity (Mt CO2e)').reset_index()
-    GHG_Ag_emission_total_GHG_type_wide.to_csv(f'{SAVE_DIR}/GHG_5_category_emission_Mt.csv',index=False)
+    
+    GHG_Ag_emission_total_GHG_type_wide = GHG_Ag_emission_total_GHG_type\
+                                            .groupby(['GHG Category'])[['Year','Quantity (Mt CO2e)']]\
+                                            .apply(lambda x: list(map(list,zip(x['Year'],x['Quantity (Mt CO2e)']))))\
+                                            .reset_index()
+                                            
+    GHG_Ag_emission_total_GHG_type_wide.columns = ['name','data']
+    GHG_Ag_emission_total_GHG_type_wide['type'] = 'column'
+    GHG_Ag_emission_total_GHG_type_wide.to_json(f'{SAVE_DIR}/GHG_5_category_emission_Mt.json',orient='records')
+
 
     # Plot_4-3-4: Agricultural Emission (on-land) by Sources (Mt)
     GHG_Ag_emission_total_Source = GHG_emissions_long.groupby(['Year','Sources']).sum()['Quantity (Mt CO2e)'].reset_index()
-    GHG_Ag_emission_total_Source_wide = GHG_Ag_emission_total_Source.pivot(index='Year', columns='Sources', values='Quantity (Mt CO2e)').reset_index()
-    GHG_Ag_emission_total_Source_wide.to_csv(f'{SAVE_DIR}/GHG_6_sources_emission_Mt.csv',index=False)
-
+    
+    GHG_Ag_emission_total_Source_wide = GHG_Ag_emission_total_Source\
+                                            .groupby(['Sources'])[['Year','Quantity (Mt CO2e)']]\
+                                            .apply(lambda x: list(map(list,zip(x['Year'],x['Quantity (Mt CO2e)']))))\
+                                            .reset_index()
+                                            
+    GHG_Ag_emission_total_Source_wide.columns = ['name','data']
+    GHG_Ag_emission_total_Source_wide['type'] = 'column'
+    GHG_Ag_emission_total_Source_wide.to_json(f'{SAVE_DIR}/GHG_6_sources_emission_Mt.json',orient='records')
+    
 
     # Plot_4-3-5: GHG emission (on-land) in start and end years (Mt)
     start_year,end_year = GHG_emissions_long['Year'].min(),GHG_emissions_long['Year'].max() 
@@ -508,9 +577,28 @@ def save_report_data(sim):
     GHG_lu_lm_df_end = GHG_lu_lm.query('Year == @end_year').reset_index(drop=True)
 
     GHG_lu_lm_df_begin_end = pd.concat([GHG_lu_lm_df_start,GHG_lu_lm_df_end],axis=0)
-    GHG_lu_lm_df_begin_end_wide = GHG_lu_lm_df_begin_end.pivot(index=['Year','Irrigation'], columns='Land use', values='Quantity (Mt CO2e)').reset_index()
-    GHG_lu_lm_df_begin_end_wide['Irrigation'] = GHG_lu_lm_df_begin_end_wide.apply(lambda x: f"{x['Irrigation']} ({x['Year']})", axis=1)
-    GHG_lu_lm_df_begin_end_wide.to_csv(f'{SAVE_DIR}/GHG_7_lu_lm_emission_Mt_wide.csv',index=False)
+    GHG_lu_lm_df_begin_end = GHG_lu_lm_df_begin_end.sort_values(['Irrigation','Land use','Year'])
+    
+    GHG_lu_lm_df_begin_end_category = GHG_lu_lm_df_begin_end.query('Irrigation == "Dryland"')\
+                                        .groupby('Land use')[['Year','Land use']]\
+                                        .apply(lambda x: x['Year'].tolist())\
+                                        .reset_index()                                   
+    GHG_lu_lm_df_begin_end_category.columns = ['name','categories']
+    
+    GHG_lu_lm_df_begin_end_series = GHG_lu_lm_df_begin_end[['Irrigation','Quantity (Mt CO2e)']]\
+                                        .groupby('Irrigation')[['Irrigation','Quantity (Mt CO2e)']]\
+                                        .apply(lambda x: list(map(list,zip(x['Irrigation'], x['Quantity (Mt CO2e)']))))\
+                                        .reset_index()
+    GHG_lu_lm_df_begin_end_series.columns = ['name','data']
+    GHG_lu_lm_df_begin_end_series['type'] = 'column'
+    
+    
+    GHG_lu_lm_df_begin_end_json = {'categories': json.loads(GHG_lu_lm_df_begin_end_category.to_json(orient='records')),
+                                    'series': json.loads(GHG_lu_lm_df_begin_end_series.to_json(orient='records'))}
+    
+    with open(f'{SAVE_DIR}/GHG_7_lu_lm_emission_Mt_wide.json', 'w') as outfile:
+        json.dump(GHG_lu_lm_df_begin_end_json, outfile)
+    
 
 
     # Plot_4-3-6: GHG emission (on-land) in the target year (Mt)
@@ -588,19 +676,21 @@ def save_report_data(sim):
     Non_ag_reduction_long_fake['Quantity (Mt CO2e)'] = 0
 
     # Concatenate the fake data with the real data
-    Non_ag_reduction_long = pd.concat([Non_ag_reduction_long,Non_ag_reduction_long_fake],axis=0)
-
-    Non_ag_reduction_total = Non_ag_reduction_long.groupby(['Year','Land use category'])\
-        .sum()['Quantity (Mt CO2e)'].reset_index()
-
+    Non_ag_reduction_long = pd.concat([Non_ag_reduction_long, Non_ag_reduction_long_fake],axis=0)  
+    
+    
+                                                      
     Non_ag_reduction_source = Non_ag_reduction_long.groupby(['Year','Land use category','Sources'])\
         .sum()['Quantity (Mt CO2e)'].reset_index()    
         
-    Non_ag_reduction_total_wide = Non_ag_reduction_total.pivot(index='Year', columns='Land use category', values='Quantity (Mt CO2e)').reset_index()
-    Non_ag_reduction_total_wide.to_csv(f'{SAVE_DIR}/GHG_9_1_ag_reduction_total_wide_Mt.csv',index=False)
-
-    Non_ag_reduction_source_wide = Non_ag_reduction_source.pivot(index='Year', columns='Sources', values='Quantity (Mt CO2e)').reset_index()
-    Non_ag_reduction_source_wide.to_csv(f'{SAVE_DIR}/GHG_9_2_ag_reduction_source_wide_Mt.csv',index=False)
+    Non_ag_reduction_source_wide = Non_ag_reduction_source\
+                                        .groupby(['Sources'])[['Year','Quantity (Mt CO2e)']]\
+                                        .apply(lambda x: list(map(list,zip(x['Year'],x['Quantity (Mt CO2e)']))))\
+                                        .reset_index()
+                                        
+    Non_ag_reduction_source_wide.columns = ['name','data']
+    Non_ag_reduction_source_wide['type'] = 'column'
+    Non_ag_reduction_source_wide.to_json(f'{SAVE_DIR}/GHG_9_2_ag_reduction_source_wide_Mt.json',orient='records')
 
 
 
@@ -610,28 +700,54 @@ def save_report_data(sim):
 
     # Plot_4-5-1: GHG reductions by Agricultural managements in total (Mt)
     Ag_man_sequestration_total = Ag_man_sequestration_long.groupby(['Year','GHG Category']).sum()['Quantity (Mt CO2e)'].reset_index()
-    Ag_man_sequestration_total_wide = Ag_man_sequestration_total.pivot(index='Year',columns='GHG Category',values='Quantity (Mt CO2e)').reset_index()
-    Ag_man_sequestration_total_wide.to_csv(f'{SAVE_DIR}/GHG_10_GHG_ag_man_df_wide_Mt.csv',index=False)
+    
+    Ag_man_sequestration_total_wide = Ag_man_sequestration_total\
+                                        .groupby(['GHG Category'])[['Year','Quantity (Mt CO2e)']]\
+                                        .apply(lambda x: list(map(list,zip(x['Year'],x['Quantity (Mt CO2e)']))))\
+                                        .reset_index()
+                                        
+    Ag_man_sequestration_total_wide.columns = ['name','data']
+    Ag_man_sequestration_total_wide['type'] = 'column'
+    Ag_man_sequestration_total_wide.to_json(f'{SAVE_DIR}/GHG_10_GHG_ag_man_df_wide_Mt.json',orient='records')
 
 
     # Plot_4-5-2: GHG reductions by Agricultural managements in subsector (Mt)
     Ag_man_sequestration_crop_lvstk_wide = Ag_man_sequestration_long.groupby(['Year','Land use category','Land category']).sum()['Quantity (Mt CO2e)'].reset_index()
     Ag_man_sequestration_crop_lvstk_wide['Landuse_land_cat'] = Ag_man_sequestration_crop_lvstk_wide.apply(lambda x: (x['Land use category'] + ' - ' + x['Land category']) 
                                     if (x['Land use category'] != x['Land category']) else x['Land use category'], axis=1)
-
-    Ag_man_sequestration_crop_lvstk_wide = Ag_man_sequestration_crop_lvstk_wide.pivot(index='Year',columns='Landuse_land_cat',values='Quantity (Mt CO2e)').reset_index()
-    Ag_man_sequestration_crop_lvstk_wide.to_csv(f'{SAVE_DIR}/GHG_11_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt.csv',index=False)
+    
+    
+    Ag_man_sequestration_crop_lvstk_wide = Ag_man_sequestration_crop_lvstk_wide\
+                                            .groupby(['Landuse_land_cat'])[['Year','Quantity (Mt CO2e)']]\
+                                            .apply(lambda x: list(map(list,zip(x['Year'],x['Quantity (Mt CO2e)']))))\
+                                            .reset_index()
+                                            
+    Ag_man_sequestration_crop_lvstk_wide.columns = ['name','data']
+    Ag_man_sequestration_crop_lvstk_wide['type'] = 'column'
+    Ag_man_sequestration_crop_lvstk_wide.to_json(f'{SAVE_DIR}/GHG_11_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt.json',orient='records')
+    
 
 
     # Plot_4-5-3: GHG reductions by Agricultural managements in subsector (Mt)
     Ag_man_sequestration_dry_irr_total = Ag_man_sequestration_long.groupby(['Year','Irrigation']).sum()['Quantity (Mt CO2e)'].reset_index()
-    Ag_man_sequestration_dry_irr_wide = Ag_man_sequestration_dry_irr_total.pivot(index='Year',columns='Irrigation',values='Quantity (Mt CO2e)').reset_index()
-    Ag_man_sequestration_dry_irr_wide.to_csv(f'{SAVE_DIR}/GHG_12_GHG_ag_man_dry_irr_df_wide_Mt.csv',index=False)
+    
+    Ag_man_sequestration_dry_irr_wide = Ag_man_sequestration_dry_irr_total\
+                                        .groupby(['Irrigation'])[['Year','Quantity (Mt CO2e)']]\
+                                        .apply(lambda x: list(map(list,zip(x['Year'], x['Quantity (Mt CO2e)']))))\
+                                        .reset_index()
+    Ag_man_sequestration_dry_irr_wide.columns = ['name','data']
+    Ag_man_sequestration_dry_irr_wide['type'] = 'column'
+    Ag_man_sequestration_dry_irr_wide.to_json(f'{SAVE_DIR}/GHG_12_GHG_ag_man_dry_irr_df_wide_Mt.json',orient='records')
+    
+    
+    
+    
 
 
     ####################################################
     #                     5) Water                     #
     ####################################################
+    
     water_paths_total = files.query('category == "water" and year_types == "single_year" and ~base_name.str.contains("separate")').reset_index(drop=True)
     water_paths_separate = files.query('category == "water" and year_types == "single_year" and base_name.str.contains("separate")').reset_index(drop=True)
 
@@ -641,15 +757,29 @@ def save_report_data(sim):
     water_df_separate['Irrigation'] = water_df_separate['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'}) 
 
     # Plot_5-1: Water use compared to limite (%)
-    water_df_total_pct_wide = water_df_total.pivot(index='year', columns='REGION_NAME', values='PROPORTION_%')
-    water_df_total_pct_wide.to_csv(f'{SAVE_DIR}/water_1_percent_to_limit.csv')
+    water_df_total_pct_wide = water_df_total\
+                                .groupby(['REGION_NAME'])[['year','PROPORTION_%']]\
+                                .apply(lambda x: list(map(list,zip(x['year'],x['PROPORTION_%']))))\
+                                .reset_index()
+                                
+    water_df_total_pct_wide.columns = ['name','data']
+    water_df_total_pct_wide['type'] = 'spline'
+    water_df_total_pct_wide.to_json(f'{SAVE_DIR}/water_1_percent_to_limit.json',orient='records')
+
 
     # Plot_5-2: Water use compared to limite (ML)
-    water_df_total_vol_wide = water_df_total.pivot(index='year', columns='REGION_NAME', values='TOT_WATER_REQ_ML')
-    water_df_total_vol_wide.to_csv(f'{SAVE_DIR}/water_2_volume_to_limit.csv')
-
+    water_df_total_vol_wide = water_df_total\
+                                .groupby(['REGION_NAME'])[['year','TOT_WATER_REQ_ML']]\
+                                .apply(lambda x: list(map(list,zip(x['year'],x['TOT_WATER_REQ_ML']))))\
+                                .reset_index()
+    water_df_total_vol_wide.columns = ['name','data']
+    water_df_total_vol_wide['type'] = 'spline'
+    water_df_total_vol_wide.to_json(f'{SAVE_DIR}/water_2_volume_to_limit.json',orient='records')                        
+    
+    
+    
     # Plot_5-3: Water use by sector (ML)
-    water_df_separate_lu_type = water_df_separate.groupby(['year','Landuse Type']).sum()[['Water Use (ML)']].reset_index()
+    water_df_separate_lu_type = water_df_separate.groupby(['year','Landuse Type']).sum(numeric_only=True)[['Water Use (ML)']].reset_index()
     water_df_net = water_df_separate.groupby('year').sum(numeric_only=True).reset_index()
 
     water_df_separate_lu_type = water_df_separate_lu_type\
@@ -668,16 +798,32 @@ def save_report_data(sim):
 
     # Plot_5-4: Water use by landuse (ML)
     water_df_seperate_lu = water_df_separate.groupby(['year','Landuse']).sum()[['Water Use (ML)']].reset_index()
-    water_df_seperate_lu_wide = water_df_seperate_lu.pivot(index='year', columns='Landuse', values='Water Use (ML)').reset_index()
-    # reorder the columns to match the order in LANDUSE_ALL
-    water_df_seperate_lu_wide = water_df_seperate_lu_wide.reindex(
-        columns = [water_df_seperate_lu_wide.columns[0]] + LANDUSE_ALL).reset_index(drop=True)
-    water_df_seperate_lu_wide.to_csv(f'{SAVE_DIR}/water_4_volume_by_landuse.csv',index=False)
-
+    
+    water_df_seperate_lu_wide = water_df_seperate_lu\
+                                    .groupby(['Landuse'])[['year','Water Use (ML)']]\
+                                    .apply(lambda x: list(map(list,zip(x['year'],x['Water Use (ML)']))))\
+                                    .reset_index()
+                                    
+    water_df_seperate_lu_wide.columns = ['name','data']
+    water_df_seperate_lu_wide['type'] = 'column'
+    water_df_seperate_lu_wide = water_df_seperate_lu_wide.set_index('name').reindex(LANDUSE_ALL).reset_index()
+    
+    
+    water_df_seperate_lu_wide.to_json(f'{SAVE_DIR}/water_4_volume_by_landuse.json',orient='records')
+    
+    
     # Plot_5-5: Water use by irrigation (ML)
     water_df_seperate_irr = water_df_separate.groupby(['year','Irrigation']).sum()[['Water Use (ML)']].reset_index()
-    water_df_seperate_irr_wide = water_df_seperate_irr.pivot(index='year', columns='Irrigation', values='Water Use (ML)').reset_index()
-    water_df_seperate_irr_wide.to_csv(f'{SAVE_DIR}/water_5_volume_by_irrigation.csv',index=False)
+    
+    water_df_seperate_irr_wide = water_df_seperate_irr\
+                                    .groupby(['Irrigation'])[['year','Water Use (ML)']]\
+                                    .apply(lambda x: list(map(list,zip(x['year'],x['Water Use (ML)']))))\
+                                    .reset_index()
+                                    
+    water_df_seperate_irr_wide.columns = ['name','data']
+    water_df_seperate_irr_wide['type'] = 'column'
+    water_df_seperate_irr_wide.to_json(f'{SAVE_DIR}/water_5_volume_by_irrigation.json',orient='records')
+    
 
 
 
