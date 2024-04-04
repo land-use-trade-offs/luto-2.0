@@ -90,6 +90,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     xAxis: {
       tickWidth: 0.05,
+      
       categories: JSON.parse(
         document.getElementById("production_2_demand_on_off_wide_csv").innerHTML
         )['categories'],
