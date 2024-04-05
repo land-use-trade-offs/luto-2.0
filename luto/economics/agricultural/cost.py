@@ -281,14 +281,15 @@ def get_savanna_burning_effect_c_mrj(data):
     Applies the effects of using LDS Savanna Burning to the cost data
     for all relevant agr. land uses.
     """
-    new_c_mrj = np.zeros((data.NLMS, data.NCELLS, data.NLUS))
+    nlus = AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"]
+    new_c_mrj = np.zeros((data.NLMS, data.NCELLS, nlus))
     sav_burning_effect = data.SAVBURN_COST_HA * data.REAL_AREA
 
     big_number = 99999999
     savburn_ineligible_cells = np.where(data.SAVBURN_ELIGIBLE == 0)[0]
 
     for m in range(data.NLMS):
-        for j in range(data.NLUS):
+        for j in range(nlus):
             new_c_mrj[m, :, j] = sav_burning_effect
 
             # TODO: build in hard constraints (ub for variables) instead of this temorary measure

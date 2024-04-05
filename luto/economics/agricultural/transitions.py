@@ -217,7 +217,7 @@ def get_agtech_ei_effect_t_mrj(data):
     Gets the effects on transition costs of AgTech EI, which are none.
     Transition/establishment costs are handled in the costs matrix.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning']
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
@@ -280,7 +280,7 @@ def get_ecological_grazing_adoption_limit(data, yr_idx):
 
 def get_savanna_burning_adoption_limit(data):
     """
-    Gets the adoptoin limit of savanna burning for each possible land use
+    Gets the adoption limit of Savanna Burning for each possible land use
     """
     sav_burning_limits = {}
     for lu in AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning']:
@@ -294,13 +294,13 @@ def get_agtech_ei_adoption_limit(data, yr_idx):
     """
     Gets the adoption limit of AgTech EI for each possible land use.
     """
-    prec_agr_limits = {}
+    agtech_ei_limits = {}
     yr_cal = data.YR_CAL_BASE + yr_idx
     for lu in AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']:
         j = data.DESC2AGLU[lu]
-        prec_agr_limits[j] = data.AGTECH_EI_DATA[lu].loc[yr_cal, 'Technical_Adoption']
+        agtech_ei_limits[j] = data.AGTECH_EI_DATA[lu].loc[yr_cal, 'Technical_Adoption']
 
-    return prec_agr_limits
+    return agtech_ei_limits
 
 
 def get_agricultural_management_adoption_limits(data, yr_idx) -> Dict[str, dict]:

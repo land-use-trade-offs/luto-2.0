@@ -412,11 +412,9 @@ def get_savanna_burning_effect_g_mrj(data, g_mrj):
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
     sb_g_mrj = np.zeros((data.NLMS, data.NCELLS, nlus))
 
-    eds_sav_burning_ghg_impact = data.SAVBURN_TOTAL_TCO2E_HA
-
     for m in range(data.NLMS):
         for j in range(nlus):
-            sb_g_mrj[m, :, j] = eds_sav_burning_ghg_impact
+            sb_g_mrj[m, :, j] = data.SAVBURN_TOTAL_TCO2E_HA
 
     return sb_g_mrj
 
