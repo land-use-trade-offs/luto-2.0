@@ -281,7 +281,7 @@ def get_savanna_burning_effect_c_mrj(data):
     Applies the effects of using LDS Savanna Burning to the cost data
     for all relevant agr. land uses.
     """
-    nlus = AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"]
+    nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
     new_c_mrj = np.zeros((data.NLMS, data.NCELLS, nlus))
     sav_burning_effect = data.SAVBURN_COST_HA * data.REAL_AREA
 
@@ -323,7 +323,7 @@ def get_agricultural_management_cost_matrices(data, c_mrj, yr_idx):
     precision_agriculture_data = get_precision_agriculture_effect_c_mrj(data, yr_idx)
     eco_grazing_data = get_ecological_grazing_effect_c_mrj(data, yr_idx)
     sav_burning_data = get_savanna_burning_effect_c_mrj(data)
-    agtech_ei_data = get_agtech_ei_effect_c_mrj(data)
+    agtech_ei_data = get_agtech_ei_effect_c_mrj(data, yr_idx)
 
     ag_management_data = {
         'Asparagopsis taxiformis': asparagopsis_data,

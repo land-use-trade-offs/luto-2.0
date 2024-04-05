@@ -160,12 +160,14 @@ def get_agricultural_management_water_matrices(data, w_mrj, yr_idx) -> Dict[str,
     precision_agriculture_data = get_precision_agriculture_effect_w_mrj(data, w_mrj, yr_idx)
     eco_grazing_data = get_ecological_grazing_effect_w_mrj(data, w_mrj, yr_idx)
     sav_burning_data = get_savanna_burning_effect_w_mrj(data)
+    agtech_ei_data = get_agtech_ei_effect_w_mrj(data, w_mrj, yr_idx)
 
     ag_management_data = {
         'Asparagopsis taxiformis': asparagopsis_data,
         'Precision Agriculture': precision_agriculture_data,
         'Ecological Grazing': eco_grazing_data,
         'Savanna Burning': sav_burning_data,
+        'AgTech EI': agtech_ei_data,
     }
 
     return ag_management_data

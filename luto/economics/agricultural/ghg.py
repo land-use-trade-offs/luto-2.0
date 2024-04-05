@@ -432,7 +432,7 @@ def get_agtech_ei_effect_g_mrj(data, yr_idx):
 
     # Update values in the new matrix
     for lu_idx, lu in enumerate(land_uses):
-        lu_data = data.PRECISION_AGRICULTURE_DATA[lu]
+        lu_data = data.AGTECH_EI_DATA[lu]
 
         for lm in data.LANDMANS:
             if lm == 'dry':
@@ -465,11 +465,17 @@ def get_agtech_ei_effect_g_mrj(data, yr_idx):
             if m == 1:
                 if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
                     continue
+                    
+                # Columns names for irrig. CO2e are inconsistent across sheets
+                irrig_co2e_col = 'CO2e_KG_HA_IRRIG'
+                if 'CO2E_KG_HA_IRRIG' in lu_data.columns:
+                    irrig_co2e_col = 'CO2E_KG_HA_IRRIG'
 
-                reduction_perc = 1 - lu_data.loc[yr_cal, 'CO2e_KG_HA_IRRIG']
+                reduction_perc = 1 - lu_data.loc[yr_cal, irrig_co2e_col]
+
                 if reduction_perc != 0:
                     reduction_amnt = (
-                        np.nan_to_num(data.AGGHG_CROPS['CO2e_KG_HA_IRRIG', lm, lu].to_numpy(), 0) # type: ignore
+                        np.nan_to_num(data.AGGHG_CROPS['CO2E_KG_HA_IRRIG', lm, lu].to_numpy(), 0) # type: ignore
                         * reduction_perc
                         / 1000            # convert to tonnes
                         * data.REAL_AREA  # adjust for resfactor
@@ -484,7 +490,7 @@ def get_agricultural_management_ghg_matrices(data, g_mrj, yr_idx) -> Dict[str, n
     precision_agriculture_data = get_precision_agriculture_effect_g_mrj(data, yr_idx)
     eco_grazing_data = get_ecological_grazing_effect_g_mrj(data, yr_idx)
     sav_burning_ghg_impact = get_savanna_burning_effect_g_mrj(data, g_mrj)
-    agtech_ei_ghg_impact = get_agtech_ei_effect_g_mrj(data, g_mrj)
+    agtech_ei_ghg_impact = get_agtech_ei_effect_g_mrj(data, yr_idx)
 
     ag_management_data = {
         'Asparagopsis taxiformis': asparagopsis_data,
