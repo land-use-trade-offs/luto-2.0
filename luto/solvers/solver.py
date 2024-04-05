@@ -872,12 +872,12 @@ class LutoSolver:
             for j in range(self._input_data.n_ag_lus):
                 if self._input_data.ag_x_mrj[0, r, j]:
                     self.X_ag_dry_vars_jr[j, r] = self.gurobi_model.addVar(
-                        lb=BLAH, ub=1, name=f"X_ag_dry_{j}_{r}"
+                        ub=1, name=f"X_ag_dry_{j}_{r}"
                     )
 
                 if self._input_data.ag_x_mrj[1, r, j]:
                     self.X_ag_irr_vars_jr[j, r] = self.gurobi_model.addVar(
-                        lb=BLAH, ub=1, name=f"X_ag_irr_{j}_{r}"
+                        ub=1, name=f"X_ag_irr_{j}_{r}"
                     )
 
             # non-agricultural land usage
@@ -887,6 +887,10 @@ class LutoSolver:
             self.X_non_ag_vars_kr[:, r] = non_ag_lus_zeros
             for k in range(self._input_data.n_non_ag_lus):
                 if self._input_data.non_ag_x_rk[r, k]:
+
+                    if (lambda x: 0 if x else self._input_data.non_ag_lb_rk[r, k])(settings.NON_AG_REVERSIBLE):
+                        print("Lower bound added")
+
                     self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
                         lb=(
                             lambda x: 0 if x else self._input_data.non_ag_lb_rk[r, k]
@@ -918,6 +922,9 @@ class LutoSolver:
 
                 for j_idx, j in enumerate(am_j_list):
                     if self._input_data.ag_x_mrj[0, r, j]:
+                        if (lambda x: 0 if x else self._input_data.ag_man_lb_mrj[am][0, r, j_idx])(settings.AG_MANAGEMENT_REVERSIBLE):
+                            print("Lower bound added")
+
                         self.X_ag_man_dry_vars_jr[am][
                             j_idx, r
                         ] = self.gurobi_model.addVar(
@@ -929,6 +936,9 @@ class LutoSolver:
                         )
 
                     if self._input_data.ag_x_mrj[1, r, j]:
+                        if (lambda x: 0 if x else self._input_data.ag_man_lb_mrj[am][1, r, j_idx])(settings.AG_MANAGEMENT_REVERSIBLE):
+                            print("lower bound added")
+
                         self.X_ag_man_irr_vars_jr[am][
                             j_idx, r
                         ] = self.gurobi_model.addVar(
