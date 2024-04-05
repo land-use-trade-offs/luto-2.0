@@ -790,7 +790,9 @@ class LutoSolver:
         input_data: InputData,
         d_c: np.array,
         old_ag_x_mrj: np.ndarray,
+        old_ag_man_lb_mrj: np.ndarray,
         old_non_ag_x_rk: np.ndarray,
+        old_non_ag_lb_rk: np.ndarray,
         old_lumap: np.array,
         current_lumap: np.array,
         old_lmmap: np.array,
@@ -805,7 +807,9 @@ class LutoSolver:
         print('Updating variables...', flush=True)
         updated_cells = self._update_variables(
             old_ag_x_mrj,
+            old_ag_man_lb_mrj,
             old_non_ag_x_rk,
+            old_non_ag_lb_rk,
             old_lumap,
             current_lumap,
             old_lmmap,
@@ -820,7 +824,9 @@ class LutoSolver:
     def _update_variables(
         self,
         old_ag_x_mrj: np.ndarray,
+        old_ag_man_lb_mrj: np.ndarray,
         old_non_ag_x_rk: np.ndarray,
+        old_non_ag_lb_rk: np.ndarray,
         old_lumap: np.array,
         current_lumap: np.array,
         old_lmmap: np.array,
@@ -847,6 +853,8 @@ class LutoSolver:
                 and old_m == new_m
                 and (old_ag_x_mrj[:, r, :] == self._input_data.ag_x_mrj[:, r, :]).all()
                 and (old_non_ag_x_rk[r, :] == self._input_data.non_ag_x_rk[r, :]).all()
+                and (old_ag_man_lb_mrj[:, r, :] == self._input_data.ag_man_lb_mrj[:, r, :]).all()
+                and (old_non_ag_lb_rk[r, :] == self._input_data.non_ag_lb_rk[r, :]).all()
             ):
                 # cell has not changed between years. No need to update variables
                 num_cells_skipped += 1
@@ -864,12 +872,12 @@ class LutoSolver:
             for j in range(self._input_data.n_ag_lus):
                 if self._input_data.ag_x_mrj[0, r, j]:
                     self.X_ag_dry_vars_jr[j, r] = self.gurobi_model.addVar(
-                        ub=1, name=f"X_ag_dry_{j}_{r}"
+                        lb=BLAH, ub=1, name=f"X_ag_dry_{j}_{r}"
                     )
 
                 if self._input_data.ag_x_mrj[1, r, j]:
                     self.X_ag_irr_vars_jr[j, r] = self.gurobi_model.addVar(
-                        ub=1, name=f"X_ag_irr_{j}_{r}"
+                        lb=BLAH, ub=1, name=f"X_ag_irr_{j}_{r}"
                     )
 
             # non-agricultural land usage
@@ -880,7 +888,11 @@ class LutoSolver:
             for k in range(self._input_data.n_non_ag_lus):
                 if self._input_data.non_ag_x_rk[r, k]:
                     self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
-                        ub=1, name=f"X_non_ag_{k}_{r}"
+                        lb=(
+                            lambda x: 0 if x else self._input_data.non_ag_lb_rk[r, k]
+                        )(settings.NON_AG_REVERSIBLE), 
+                        ub=1, 
+                        name=f"X_non_ag_{k}_{r}",
                     )
 
             # agricultural management
@@ -909,14 +921,22 @@ class LutoSolver:
                         self.X_ag_man_dry_vars_jr[am][
                             j_idx, r
                         ] = self.gurobi_model.addVar(
-                            ub=1, name=f"X_ag_man_dry_{am_name}_{j}_{r}"
+                            lb=(
+                                lambda x: 0 if x else self._input_data.ag_man_lb_mrj[am][0, r, j_idx]
+                            )(settings.AG_MANAGEMENT_REVERSIBLE), 
+                            ub=1, 
+                            name=f"X_ag_man_dry_{am_name}_{j}_{r}",
                         )
 
                     if self._input_data.ag_x_mrj[1, r, j]:
                         self.X_ag_man_irr_vars_jr[am][
                             j_idx, r
                         ] = self.gurobi_model.addVar(
-                            ub=1, name=f"X_ag_man_irr_{am_name}_{j}_{r}"
+                            lb=(
+                                lambda x: 0 if x else self._input_data.ag_man_lb_mrj[am][1, r, j_idx]
+                            )(settings.AG_MANAGEMENT_REVERSIBLE), 
+                            ub=1, 
+                            name=f"X_ag_man_irr_{am_name}_{j}_{r}",
                         )
 
             updated_cells.append(r)
