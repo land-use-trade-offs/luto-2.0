@@ -140,12 +140,14 @@ def get_wuse_limits(data):
     """
 
     # Set up data for river regions or drainage divisions
-    if settings.WATER_REGION_DEF == 'RR':
-        region_limits = data.RIVREG_LIMITS # settings.WATER_RIVREGS
+    if settings.WATER_REGION_DEF == 'River Region':
+        region_name = data.RIVREG_DICT
+        region_limits = data.RIVREG_LIMITS
         region_id = data.RIVREG_ID
         
-    elif settings.WATER_REGION_DEF == 'DD':
-        region_limits = data.DRAINDIV_LIMITS # settings.WATER_DRAINDIVS
+    elif settings.WATER_REGION_DEF == 'Drainage Division':
+        region_name = data.DRAINDIV_DICT
+        region_limits = data.DRAINDIV_LIMITS
         region_id = data.DRAINDIV_ID
         
     else:
@@ -174,7 +176,7 @@ def get_wuse_limits(data):
             wuse_reg_limit = np.sum( w_lim_r[ind] )
     
             # Append to list
-            wuse_limits.append( (region, wuse_reg_limit, ind) )
+            wuse_limits.append( (region, region_name[region], wuse_reg_limit, ind) )
             
     
     elif settings.WATER_LIMITS_TYPE == 'water_stress':
@@ -189,7 +191,7 @@ def get_wuse_limits(data):
             wuse_reg_limit = region_limits[region] * settings.WATER_STRESS_FRACTION   # np.sum( w_lim_r[ind] )
     
             # Append to list
-            wuse_limits.append( (region, wuse_reg_limit, ind) )
+            wuse_limits.append( (region, region_name[region], wuse_reg_limit, ind) )
             
 
     return wuse_limits

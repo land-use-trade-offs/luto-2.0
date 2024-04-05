@@ -1,0 +1,30 @@
+div.fig {
+    height: 600px;
+    margin-bottom: 100px;
+}
+
+div.mat {
+    height: 500px;
+    margin-bottom: 80px;
+}
+
+table, th, td{
+    font-size: 7px;
+    font-family: Helvetica, Arial, sans-serif;
+}
+
+td{
+    text-align: right
+}
+
+.fig object {
+    width: 100%;
+    height: 100%;
+}
+
+.content p {
+    font-size: 20px;
+    font-weight: bold;
+    text-align: center;
+}
+

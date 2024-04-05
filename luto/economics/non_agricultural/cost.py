@@ -49,6 +49,36 @@ def get_cost_agroforestry(data) -> np.ndarray:
     return settings.AGROFORESTRY_COST_PER_HA_PER_YEAR * data.REAL_AREA
 
 
+def get_cost_carbon_plantings_block(data) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    data: object/module
+        Data object or module with fields like in `luto.data`.
+
+    Returns
+    -------
+    np.ndarray
+        Cost of carbon plantings (block arrangement) for each cell. 1-D array Indexed by cell.
+    """
+    return settings.CARBON_PLANTING_BLOCK_COST_PER_HA_PER_YEAR * data.REAL_AREA
+
+
+def get_cost_carbon_plantings_belt(data) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    data: object/module
+        Data object or module with fields like in `luto.data`.
+
+    Returns
+    -------
+    np.ndarray
+        Cost of carbon plantings (belt arrangement) for each cell. 1-D array Indexed by cell.
+    """
+    return settings.CARBON_PLANTING_BELT_COST_PER_HA_PER_YEAR * data.REAL_AREA
+
+
 def get_cost_matrix(data):
     """
     Returns non-agricultural c_rk matrix of costs per cell and land use.
@@ -60,11 +90,20 @@ def get_cost_matrix(data):
     if NON_AG_LAND_USES['Environmental Plantings']:
         non_agr_c_matrices['Environmental Plantings'] = get_cost_env_plantings(data).reshape((data.NCELLS, 1))
 
+    carbon_plantings_block_costs = get_cost_carbon_plantings_block(data)
+    carbon_plantings_belt_costs = get_cost_carbon_plantings_belt(data)
+
     if NON_AG_LAND_USES['Riparian Plantings']:
         non_agr_c_matrices['Riparian Plantings'] = get_cost_rip_plantings(data).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['Agroforestry']:
         non_agr_c_matrices['Agroforestry'] = get_cost_agroforestry(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
+        non_agr_c_matrices['Carbon Plantings (Belt)'] = get_cost_carbon_plantings_belt(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Carbon Plantings (Block)']:
+        non_agr_c_matrices['Carbon Plantings (Block)'] = get_cost_carbon_plantings_block(data).reshape((data.NCELLS, 1))
 
     non_agr_c_matrices = list(non_agr_c_matrices.values())
     return np.concatenate(non_agr_c_matrices, axis=1)

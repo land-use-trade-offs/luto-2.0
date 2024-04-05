@@ -54,6 +54,40 @@ def get_quantity_agroforestry(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
+def get_quantity_carbon_plantings_block(data) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    data: object/module
+        Data object or module with fields like in `luto.data`.
+
+    Returns
+    -------
+    np.ndarray
+        Indexed by (c, r): represents the quantity commodity c produced by cell r
+        if used for carbon plantings (block).
+        A matrix of zeros because carbon plantings doesn't produce anything.
+    """
+    return np.zeros((data.NCMS, data.NCELLS))
+
+
+def get_quantity_carbon_plantings_belt(data) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    data: object/module
+        Data object or module with fields like in `luto.data`.
+
+    Returns
+    -------
+    np.ndarray
+        Indexed by (c, r): represents the quantity commodity c produced by cell r
+        if used for carbon plantings (belt).
+        A matrix of zeros because carbon plantings doesn't produce anything.
+    """
+    return np.zeros((data.NCMS, data.NCELLS))
+
+
 def get_quantity_matrix(data) -> np.ndarray:
     """
     Get the non-agricultural quantity matrix q_crk.
@@ -72,6 +106,12 @@ def get_quantity_matrix(data) -> np.ndarray:
 
     if NON_AG_LAND_USES['Agroforestry']:
         non_agr_quantity_matrices['Agroforestry'] = get_quantity_agroforestry(data).reshape((data.NCMS, data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
+        non_agr_quantity_matrices['Carbon Plantings (Belt)'] = get_quantity_carbon_plantings_belt(data).reshape((data.NCMS, data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Carbon Plantings (Block)']:
+        non_agr_quantity_matrices['Carbon Plantings (Block)'] = get_quantity_carbon_plantings_block(data).reshape((data.NCMS, data.NCELLS, 1))
 
     non_agr_quantity_matrices = list(non_agr_quantity_matrices.values())
 

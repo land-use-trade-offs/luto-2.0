@@ -39,10 +39,13 @@ write_outputs(sim)
 from luto.dataprep import create_new_dataset
 create_new_dataset()
 
-from luto.tools.write import *
 import luto.simulation as sim
 sim.run( 2010, 2050 )
+from luto.tools.write import write_outputs
 write_outputs(sim)
+
+from luto.tools.report.write_input_data.array2tif import write_input2tiff
+write_input2tiff(sim, 2050)
 
 
 

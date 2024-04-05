@@ -49,6 +49,32 @@ def get_wreq_matrix_agroforestry(data) -> np.ndarray:
     return get_wreq_matrix_env_planting(data)
 
 
+def get_wreq_matrix_carbon_plantings_block(data) -> np.ndarray:
+    """
+    Get water requirements vector of carbon plantings (block arrangement).
+
+    Note: this is the same as for environmental plantings.
+
+    Returns
+    -------
+    1-D array, indexed by cell.
+    """
+    return get_wreq_matrix_env_planting(data)
+
+
+def get_wreq_matrix_carbon_plantings_belt(data) -> np.ndarray:
+    """
+    Get water requirements vector of carbon plantings (belt arrangement).
+
+    Note: this is the same as for environmental plantings.
+
+    Returns
+    -------
+    1-D array, indexed by cell.
+    """
+    return get_wreq_matrix_env_planting(data)
+
+
 def get_wreq_matrix(data) -> np.ndarray:
     """
     Get the water requirements matrix for all non-agricultural land uses.
@@ -70,6 +96,12 @@ def get_wreq_matrix(data) -> np.ndarray:
 
     if NON_AG_LAND_USES['Agroforestry']:
         non_agr_wreq_matrices['Agroforestry'] = get_wreq_matrix_agroforestry(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
+        non_agr_wreq_matrices['Carbon Plantings (Belt)'] = get_wreq_matrix_carbon_plantings_belt(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Carbon Plantings (Block)']:
+        non_agr_wreq_matrices['Carbon Plantings (Block)'] = get_wreq_matrix_carbon_plantings_block(data).reshape((data.NCELLS, 1))
 
     non_agr_wreq_matrices = list(non_agr_wreq_matrices.values())
 
