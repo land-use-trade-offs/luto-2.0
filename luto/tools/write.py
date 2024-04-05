@@ -133,9 +133,9 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
         os.mkdir(path_yr)
 
     # # Write the decision variables, land-use and land management maps
-    if settings.WRITE_OUTPUT_GEOTIFFS:
-        write_files(sim, yr_cal, path_yr)
-        write_files_separate(sim, yr_cal, path_yr)
+    # if settings.WRITE_OUTPUT_GEOTIFFS:
+        # write_files(sim, yr_cal, path_yr)
+        # write_files_separate(sim, yr_cal, path_yr)
 
 
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CAUTION !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -994,7 +994,7 @@ def write_biodiversity_separate(sim, yr_cal, path):
         # Slice the arrays with the agricultural management land uses
         am_j = np.array([sim.data.DESC2AGLU[lu] for lu in am_lus])
         am_dvar = ag_mam_dvar_mrj[am][:,:,am_j]
-        am_biodiv = am_biodiv_mrj[am][:,:,am_j]
+        am_biodiv = am_biodiv_mrj[am]
         
         # Biodiversity score for each agricultural management in array format                    
         am_jm = np.einsum('mrj,mrj -> jm', am_dvar, am_biodiv)
