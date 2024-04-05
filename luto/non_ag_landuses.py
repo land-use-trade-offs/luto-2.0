@@ -5,4 +5,5 @@ NON_AG_LAND_USES = {
     'Agroforestry': True,
     'Carbon Plantings (Block)': False,
     'Carbon Plantings (Belt)': True,
+    'BECCS': True,
 }
