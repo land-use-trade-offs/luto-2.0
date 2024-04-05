@@ -1,0 +1,30 @@
+
+.content{
+    margin-left:250px; 
+}
+
+#map object{  
+    width:calc(100vw - 265px); 
+    height:calc(98vh - 1px)
+}
+
+#sidebarLine {
+    padding-top: 20px;
+    margin-top: 20px;
+    border-top: 1px dashed #8d8787; 
+}
+
+.NoHover:hover {
+    background-color: #f1f1f1;
+    color: rgb(0, 0, 0);
+}
+
+.selection{
+    margin-top: 10px;
+    margin-bottom: 15px;
+}
+
+.label {
+    display: inline-block;
+}
+  

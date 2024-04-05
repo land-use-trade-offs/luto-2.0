@@ -16,19 +16,25 @@
 
 """ LUTO model settings. """
 
-import os
 import pandas as pd
+
 
 # ---------------------------------------------------------------------------- #
 # LUTO model version.                                                                 #
 # ---------------------------------------------------------------------------- #
+
 VERSION = '2.3'
 
-############### Set some Spyder options
+
+# ---------------------------------------------------------------------------- #
+# Spyder options                                                            #
+# ---------------------------------------------------------------------------- #
+
 pd.set_option('display.width', 470)
 pd.set_option('display.max_columns', 200)
 pd.set_option('display.max_rows', 5000)
 pd.set_option('display.float_format', '{:,.4f}'.format)
+
 
 # ---------------------------------------------------------------------------- #
 # Directories.                                                                 #
@@ -46,7 +52,7 @@ RAW_DATA = '../raw_data'
 
 # Climate change assumptions. Options include '126', '245', '370', '585'
 SSP = '245'
-RCP = 'rcp' + SSP[1] + 'p' + SSP[2]  # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
+RCP = 'rcp' + SSP[1] + 'p' + SSP[2] # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
 # Set demand parameters which define requirements for Australian production of agricultural commodities
 SCENARIO = SSP_NUM = 'SSP' + SSP[0] # SSP1, SSP2, SSP3, SSP4, SSP5
@@ -63,12 +69,11 @@ CO2_FERT = 'on'   # or 'off'
 # Fire impacts on carbon sequestration
 RISK_OF_REVERSAL = 0.05  # Risk of reversal buffer under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
 FIRE_RISK = 'med'   # Options are 'low', 'med', 'high'. Determines whether to take the 5th, 50th, or 95th percentile of modelled fire impacts.
-""" 
-    Mean FIRE_RISK cell values (%)...
+
+""" Mean FIRE_RISK cell values (%)
     FD_RISK_PERC_5TH    80.3967
     FD_RISK_MEDIAN      89.2485
-    FD_RISK_PERC_95TH   93.2735
-"""
+    FD_RISK_PERC_95TH   93.2735 """
 
 
 # ---------------------------------------------------------------------------- #
@@ -85,16 +90,15 @@ DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 
-
 # ---------------------------------------------------------------------------- #
 # Model parameters
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 1          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
+RESFACTOR = 3         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
 
 # How does the model run over time 
-MODE = 'snapshot'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
+MODE = 'timeseries'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
 
 # If MODE == 'timeseries', these two settings determine whether the model is allowed to remove features previously added. For example 
 # if a cell has Riparian planing added if NON_AG_REVERSIBLE = False then Riparian planting will remain on that solve.
@@ -113,8 +117,19 @@ DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (li
 # 1e5 works well (i.e., demand are met), demands not met with anything less 
 PENALTY = 1e5
 
+
+# ---------------------------------------------------------------------------- #
+# Geographical raster writing parameters
+# ---------------------------------------------------------------------------- #
+
 # Write GeoTiffs to output directory: True or False
-WRITE_OUTPUT_GEOTIFFS = False
+WRITE_OUTPUT_GEOTIFFS = True
+
+# If use parallel processing to write GeoTiffs: True or False
+PARALLEL_WRITE = True
+
+# The Threads to use for writing GeoTiffs, and map making
+WRITE_THREADS = 50      # Works only if PARALLEL_WRITE = True
 
 
 # ---------------------------------------------------------------------------- #
@@ -134,7 +149,7 @@ VERBOSE = 1
 # Relax the tolerances for feasibility and optimality
 FEASIBILITY_TOLERANCE = 1e-2              # Primal feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2
 OPTIMALITY_TOLERANCE = 1e-2               # Dual feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2
-BARRIER_CONVERGENCE_TOLERANCE = 1e-5      # Range from 1e-2 to 1e-8 (default), that larger the number the faster but the less exact the solve. 1e-5 is a good compromise between optimality and speed.
+BARRIER_CONVERGENCE_TOLERANCE = 1e-6      # Range from 1e-2 to 1e-8 (default), that larger the number the faster but the less exact the solve. 1e-5 is a good compromise between optimality and speed.
 
 # Whether to use crossover in barrier solve. 0 = off, -1 = automatic. Auto cleans up sub-optimal termination errors without much additional compute time (apart from 2050 when it sometimes never finishes).
 CROSSOVER = 0
@@ -145,43 +160,72 @@ NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect a
 BARHOMOGENOUS = -1  # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 32
+THREADS = 50
 
 
 # ---------------------------------------------------------------------------- #
 # Non-agricultural land usage parameters
 # ---------------------------------------------------------------------------- #
-NON_AGRICULTURAL_LU_BASE_CODE = 100         # Non-agricultural land uses will appear on the land use map
-                                            # offset by this amount (e.g. land use 0 will appear as 100)
+
+# Price of carbon per tonne - determines revenue from carbon sequestration
+CARBON_PRICE_PER_TONNE = 100                
 
 # Environmental Plantings Parameters
 ENV_PLANTING_COST_PER_HA_PER_YEAR = 100     # Yearly cost of maintaining one hectare of environmental plantings
-CARBON_PRICE_PER_TONNE = 100                # Price of carbon per tonne - determines EP revenue in the model
+# Plantings Parameters
+ENV_PLANTING_COST_PER_HA_PER_YEAR = 100           # Yearly cost of maintaining one hectare of environmental plantings
+CARBON_PLANTING_BLOCK_COST_PER_HA_PER_YEAR = 100  # Yearly cost of maintaining one hectare of carbon plantings (block)
+CARBON_PLANTING_BELT_COST_PER_HA_PER_YEAR = 100   # Yearly cost of maintaining one hectare of carbon plantings (belt)
+CARBON_PRICE_PER_TONNE = 100                      # Price of carbon per tonne - determines EP revenue in the model
+
+CP_BELT_ROW_WIDTH = 20
+CP_BELT_ROW_SPACING = 40
+# CARBON_PLANTINGS_BELT_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 100 metres per hectare
+CARBON_PLANTINGS_BELT_FENCING_COST_PER_M = 2           # $ per linear metre
+CP_BELT_PROPORTION = CP_BELT_ROW_WIDTH / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
+cp_no_alleys_per_ha = 100 / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
+CP_BELT_FENCING_LENGTH = 100 * cp_no_alleys_per_ha * 2 # Length of fencing required per ha in metres
+
+CARBON_PLANTINGS_BIODIV_BENEFIT = 0.1
 
 # Riparian Planting Parameters
-RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR = 100
+rp_annual_maintennance_cost_per_ha_per_year = 100
+rp_annual_ecosystem_services_benefit_per_ha_per_year = 100
+RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR = rp_annual_maintennance_cost_per_ha_per_year - rp_annual_ecosystem_services_benefit_per_ha_per_year
 RIPARIAN_PLANTINGS_BUFFER_WIDTH = 20
-# RIPARIAN_PLANTINGS_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 100 metres per hectare
-RIPARIAN_PLANTINGS_FENCING_COST_PER_M = 2           # $ per linear metre
+RIPARIAN_PLANTINGS_FENCING_COST_PER_M = 5           # $ per linear metre
 RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR = 0.5
 
 # Agroforestry Parameters
 AGROFORESTRY_COST_PER_HA_PER_YEAR = 100
 AGROFORESTRY_ROW_WIDTH = 20
 AGROFORESTRY_ROW_SPACING = 40
-# AGROFORESTRY_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 100 metres per hectare
-AGROFORESTRY_FENCING_COST_PER_M = 2           # $ per linear metre
+AGROFORESTRY_FENCING_COST_PER_M = 5           # $ per linear metre
 AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
-no_alleys_per_ha = 100 / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
-AF_FENCING_LENGTH = 100 * no_alleys_per_ha * 2 # Length of fencing required per ha in metres
+no_belts_per_ha = 100 / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
+AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per ha in metres
                     
+NON_AGRICULTURAL_LU_BASE_CODE = 100         # Non-agricultural land uses will appear on the land use map
+                                            # offset by this amount (e.g. land use 0 will appear as 100)
+
+# BECCS Parameters
+BECCS_BIODIVERSITY_BENEFIT = 0.1
+
 
 # ---------------------------------------------------------------------------- #
 # Agricultural management parameters
 # ---------------------------------------------------------------------------- #
 
-AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  # The minimum value an agricultural management variable must take for the
-                                             # write_output function to consider it being used on a cell
+# The minimum value an agricultural management variable must take for the write_output function to consider it being used on a cell
+AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  
+                                             
+
+# ---------------------------------------------------------------------------- #
+# Off-land commodity parameters
+# ---------------------------------------------------------------------------- #
+
+OFF_LAND_COMMODITIES = ['pork', 'chicken', 'eggs', 'aquaculture']
+EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 
 
 # ---------------------------------------------------------------------------- #
@@ -201,10 +245,9 @@ GHG_LIMITS = {
              }
 
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-GHG_LIMITS_FIELD = '1.5C (67%)'    
+GHG_LIMITS_FIELD = '1.5C (50%)'    
 
 SOC_AMORTISATION = 30           # Number of years over which to spread (average) soil carbon accumulation
-
 
 
 # Water use limits and parameters *******************************
@@ -222,8 +265,7 @@ WATER_USE_REDUCTION_PERCENTAGE = 0
 WATER_STRESS_FRACTION = 0.2          
 
 # Regionalisation to enforce water use limits by
-WATER_REGION_DEF = 'DD'                 # 'RR' for River Region, 'DD' for Drainage Division
-
+WATER_REGION_DEF = 'Drainage Division'                 # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
 
 
 # Biodiversity limits and parameters *******************************
@@ -237,11 +279,13 @@ BIODIV_LIVESTOCK_IMPACT = 0.5
 # Set benefit level of EP, AF, and RP (0 = none, 1 = full)
 REFORESTATION_BIODIVERSITY_BENEFIT = 0.7
 
+# Biodiversity value under default late dry season savanna fire regime
+LDS_BIODIVERSITY_VALUE = 0.8  # For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value.
+
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 BIODIVERSITY_LIMITS = 'on'             # 'on' or 'off'
 BIODIV_TARGET = 0.3
 BIODIV_TARGET_ACHIEVEMENT_YEAR = 2030
-
 
 
 # ---------------------------------------------------------------------------- #
@@ -257,11 +301,13 @@ LAND_USAGE_CULL_PERCENTAGE = 0.15
 
 
 
-
 """ NON-AGRICULTURAL LAND USES (indexed by k)
 0: 'Environmental Plantings'
 1: 'Riparian Plantings'
 2: 'Agroforestry'
+3: 'Carbon Plantings (Block Arrangement)'
+4: 'Carbon Plantings (Belt Arrangement)'
+5: 'BECCS'
 
 
 AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)

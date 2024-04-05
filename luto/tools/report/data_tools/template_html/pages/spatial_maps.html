@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <!-- Make sure you put this AFTER Leaflet's CSS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <title>Spatial Maps</title>
+</head>
+
+<body>
+
+    <script src="spatial_maps.js"></script>
+    <link rel="stylesheet" href="spatial_maps.css">
+    <link rel="stylesheet" href="../style.css">
+
+
+    <!-- The sidebar -->
+    <div class="sidebar">
+        <a href="../index.html">Home</a>
+        <a href="./production.html">Demand and Production</a>
+        <a href="./economics.html">Economics</a>
+        <a href="./land-use_area.html">Land-use Area</a>
+        <a href="./GHG_emissions.html">GHG Emissions</a>
+        <a href="./water_usage.html">Water Use</a>
+        <a href="./biodiversity.html">Biodiversity</a>
+        <a class="active" href="./spatial_maps.html">Maps</a>
+
+        <!-- Add a line to separate the sidebar from the rest of the content -->
+        <div id="sidebarLine" class="NoHover"></div>
+
+        <!-- The dropdown to select the category of the map: -->
+        <div class="selection">
+            <label for="select_1" class="label">Select a category:</label>
+            <select id="select_1">
+                <option value="lumap" selected>All Land-use</option>
+                <option value="Ag_LU">Agricultural Land-use</option>
+                <option value="Ag_Mgt">Agricultural Management</option>
+                <option value="Land_Mgt">Water supply</option>
+                <option value="Non-Ag_LU">Non-agricultural Land-use</option>
+            </select>
+        </div>
+
+
+        <!-- The dropdown to select the specific map: -->
+        <div class="selection">
+            <label for="select_2" class="label">Select a map:</label>
+            <select id="select_2">
+                <option value="lumap" selected>All Land-use</option>
+            </select>
+        </div>
+
+
+        <!-- The dropdown to select the year of the map: -->
+        <div class="selection">
+            <label for="year" class="label">Select a year:</label><br>
+            <button id="decrement">-</button>
+            <input type="range" id="year" name="year" step="1" value="2010"
+                oninput="yearOutput.value = year.value">
+            <button id="increment">+</button>
+            <output id="yearOutput">2010</output>
+        </div>
+
+    </div>
+
+    <!-- The main content -->
+    <div class="content">
+
+        <div id="map"></div>
+
+    </div>
+
+    <!-- The data div -->
+    <div id="data_csv" style="display: none;"></div>
+
+
+
+
+
+</body>
+
+</html>

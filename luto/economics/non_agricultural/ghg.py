@@ -53,7 +53,6 @@ def get_ghg_reduction_rip_plantings(data, aggregate) -> np.ndarray:
     elif aggregate==False:
         return pd.DataFrame(-data.EP_RIP_AVG_T_CO2_HA * data.REAL_AREA,columns=['RIP_PLANTINGS'])
     else:
-    # If the aggregate arguments is not in [True,False]. That must be someting wrong
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
 
@@ -84,6 +83,85 @@ def get_ghg_reduction_agroforestry(data, aggregate) -> np.ndarray:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
 
+def get_ghg_reduction_carbon_plantings_block(data, aggregate) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    data: object/module
+        Data object or module with fields like in `luto.data`.
+
+    Returns
+    -------
+    if aggregate == True (default)  -> np.ndarray
+       aggregate == False           -> pd.DataFrame
+    
+        Greenhouse gas emissions of carbon plantings (block) for each cell.
+        Since carbon plantings reduces carbon in the air, each value will be <= 0.
+        1-D array Indexed by cell.
+    """
+    
+    # Tonnes of CO2e per ha, adjusted for resfactor
+    if aggregate==True:
+        return -data.CP_BLOCK_AVG_T_CO2_HA * data.REAL_AREA
+    elif aggregate==False:
+        return pd.DataFrame(-data.CP_BLOCK_AVG_T_CO2_HA * data.REAL_AREA,columns=['CARBON_PLANTINGS_BLOCK'])
+    else:
+        raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
+    
+
+def get_ghg_reduction_carbon_plantings_belt(data, aggregate) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    data: object/module
+        Data object or module with fields like in `luto.data`.
+
+    Returns
+    -------
+    if aggregate == True (default)  -> np.ndarray
+       aggregate == False           -> pd.DataFrame
+    
+        Greenhouse gas emissions of carbon plantings (belt) for each cell.
+        Since carbon plantings reduces carbon in the air, each value will be <= 0.
+        1-D array Indexed by cell.
+    """
+    
+    # Tonnes of CO2e per ha, adjusted for resfactor
+    if aggregate==True:
+        return -data.CP_BELT_AVG_T_CO2_HA * data.REAL_AREA
+    elif aggregate==False:
+        return pd.DataFrame(-data.CP_BELT_AVG_T_CO2_HA * data.REAL_AREA,columns=['CARBON_PLANTINGS_BELT'])
+    else:
+        raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
+
+
+def get_ghg_reduction_beccs(data, aggregate) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    data: object/module
+        Data object or module with fields like in `luto.data`.
+
+    Returns
+    -------
+    if aggregate == True (default)  -> np.ndarray
+       aggregate == False           -> pd.DataFrame
+    
+        Greenhouse gas emissions of agroforestry for each cell.
+        Since agroforestry reduces carbon in the air, each value will be <= 0.
+        1-D array Indexed by cell.
+    """
+
+    # Tonnes of CO2e per ha, adjusted for resfactor
+    if aggregate==True:
+        return -np.nan_to_num(data.BECCS_TCO2E_HA_YR) * data.REAL_AREA
+    elif aggregate==False:
+        return pd.DataFrame(-np.nan_to_num(data.BECCS_TCO2E_HA_YR) * data.REAL_AREA,columns=['BECCS'])
+    else:
+    # If the aggregate arguments is not in [True,False]. That must be someting wrong
+        raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
+
+
 def get_ghg_matrix(data, aggregate=True) -> np.ndarray:
     """
     Get the g_rk matrix containing non-agricultural greenhouse gas emissions.
@@ -100,6 +178,15 @@ def get_ghg_matrix(data, aggregate=True) -> np.ndarray:
 
     if NON_AG_LAND_USES['Agroforestry']:
         non_agr_ghg_matrices['Agroforestry'] = get_ghg_reduction_agroforestry(data, aggregate)
+
+    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
+        non_agr_ghg_matrices['Carbon Plantings (Belt)'] = get_ghg_reduction_carbon_plantings_belt(data, aggregate)
+
+    if NON_AG_LAND_USES['Carbon Plantings (Block)']:
+        non_agr_ghg_matrices['Carbon Plantings (Block)'] = get_ghg_reduction_carbon_plantings_block(data, aggregate)
+
+    if NON_AG_LAND_USES['BECCS']:
+        non_agr_ghg_matrices['BECCS'] = get_ghg_reduction_beccs(data, aggregate)
       
     if aggregate==True:
         # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing

@@ -19,18 +19,21 @@ Writes model output and statistics to files.
 """
 
 
-import os, math, re
+
+
+
+import os, re
 import shutil
+import time
 import numpy as np
 import pandas as pd
-
 from datetime import datetime
-import luto.data as bdata
+from joblib import Parallel, delayed
 
-import luto.settings as settings
 from luto import tools
 from luto.tools.spatializers import *
 from luto.tools.compmap import *
+import luto.settings as settings
 
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.agricultural.revenue as ag_revenue
@@ -50,8 +53,22 @@ import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
+from luto.tools.report.create_report_data import save_report_data
+from luto.tools.report.create_html import data2html
+from luto.tools.report.create_static_maps import TIF2MAP
+
+
+timestamp_write = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
 
 def write_outputs(sim):
+    # Write the model outputs to file
+    write_data(sim)
+    # Move the log files to the output directory
+    write_logs(sim)
+    
+
+@tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{timestamp_write}")
+def write_data(sim):
 
     # Write model run settings
     write_settings(sim.path)
@@ -66,52 +83,52 @@ def write_outputs(sim):
     
     # Write the area transition between base-year and target-year 
     write_area_transition_start_end(sim,f'{sim.path}/out_{years[-1]}')
+    write_ghg_offland_commodity(sim, f'{sim.path}/out_{years[-1]}')
     
     # Write outputs for each year
-    for yr, path_yr in zip(years, paths):
-        write_output_single_year(sim, yr, path_yr,yr_cal_sim_pre=None)
-        print(f"Finished writing {yr} out of {years[0]}-{years[-1]} years\n")
+    jobs = [delayed(write_output_single_year)(sim, yr, path_yr, None) for (yr, path_yr) in zip(years, paths)]
     
     # Write the area/quantity comparison between base-year and target-year for the timeseries mode
     if settings.MODE == 'timeseries':
         begin_end_path = f"{sim.path}/begin_end_compare_{years[0]}_{years[-1]}"
+        
         # 1) Simply copy the base-year outputs to the path_begin_end_compare
         shutil.copytree(f"{sim.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True)
         # 2) Write the target-year outputs to the path_begin_end_compare
-        write_output_single_year(sim, years[-1], f"{begin_end_path}/out_{years[-1]}", yr_cal_sim_pre=years[0])   
-        print(f"Finished writing {years[0]}-{years[-1]} comparison\n")
+        jobs = jobs + [delayed(write_output_single_year)(sim, years[-1], f"{begin_end_path}/out_{years[-1]}", years[0])]
+    
+    # Parallel write the outputs for each year
+    num_jobs = min(len(years), settings.WRITE_THREADS) if settings.PARALLEL_WRITE else 1   # Use the minimum between years and threads for parallel writing
+    Parallel(n_jobs=num_jobs, prefer='threads')(jobs)
         
-        
-    ###############################################################
-    #               Fire up the report script                     #
-    ###############################################################
-
-    # Use sub process to run the report script
-    import subprocess
-
-    # 1) Clean up the output CSVs 
-    result = subprocess.run(['python', 'luto/tools/report/create_report_data.py', '-p', sim.path], capture_output=True, text=True)
-    print("\nError occurred:", result.stderr) if result.returncode != 0 else print("\nReport data:", result.stdout)
-
-    # 2) Create the report
-    result = subprocess.run(['python', 'luto/tools/report/create_html.py', '-p', sim.path], capture_output=True, text=True)
-    print("\nError occurred:", result.stderr) if result.returncode != 0 else print("\nReport HTML:\n", result.stdout)
+    # Create the report HTML and png maps
+    TIF2MAP(sim) if settings.WRITE_OUTPUT_GEOTIFFS else None
+    save_report_data(sim)
+    data2html(sim)
     
     
-    ###############################################################
-    #           Move logs to current output dir                   #
-    ###############################################################
-    logs = ['run_stderr', 'run_stdout', 'write_stderr', 'write_stdout']
-    logs = [f"{settings.OUTPUT_DIR}/{log}.log" for log in logs]
+
+
+
+def write_logs(sim):
+    # Move the log files to the output directory
+    logs = [f"{settings.OUTPUT_DIR}/run_{sim.timestamp}_stdout.log",
+            f"{settings.OUTPUT_DIR}/run_{sim.timestamp}_stderr.log",
+            f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stdout.log",
+            f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stderr.log"]
     
     for log in logs:
         if os.path.exists(log):
+            # Move the file to the output directory
             shutil.move(log, f"{sim.path}/{os.path.basename(log)}")
 
 
-@tools.LogToFile(f"{settings.OUTPUT_DIR}/write")
+
 def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
+    
+    years = sorted(list(sim.lumaps.keys()))
+    
     if not os.path.isdir(path_yr):
         os.mkdir(path_yr)
 
@@ -119,7 +136,6 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     if settings.WRITE_OUTPUT_GEOTIFFS:
         write_files(sim, yr_cal, path_yr)
         write_files_separate(sim, yr_cal, path_yr)
-
 
 
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CAUTION !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -139,6 +155,8 @@ def write_output_single_year(sim, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_ghg_separate(sim, yr_cal, path_yr)
     write_biodiversity(sim, yr_cal, path_yr)
     write_biodiversity_separate(sim, yr_cal, path_yr)
+    
+    print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
     
        
 
@@ -195,28 +213,24 @@ def write_files(sim, yr_cal, path):
     """Writes numpy arrays and geotiffs to file"""
     
     print(f'Writing numpy arrays and geotiff outputs to {path}')
-
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
     
     # Save raw agricultural decision variables (float array).
-    ag_X_mrj_fname = 'ag_X_mrj' + '_' + timestamp + '.npy'
+    ag_X_mrj_fname = 'ag_X_mrj' + '_' + str(yr_cal) + '.npy'
     np.save(os.path.join(path, ag_X_mrj_fname), sim.ag_dvars[yr_cal].astype(np.float16))
     
     # Save raw non-agricultural decision variables (float array).
-    non_ag_X_rk_fname = 'non_ag_X_rk' + '_' + timestamp + '.npy'
+    non_ag_X_rk_fname = 'non_ag_X_rk' + '_' + str(yr_cal) + '.npy'
     np.save(os.path.join(path, non_ag_X_rk_fname), sim.non_ag_dvars[yr_cal].astype(np.float16))
 
     # Save raw agricultural management decision variables (float array).
     for am in AG_MANAGEMENTS_TO_LAND_USES:
         snake_case_am = tools.am_name_snake_case(am)
-        am_X_mrj_fname = 'ag_man_X_mrj' + snake_case_am + '_' + timestamp + ".npy"
+        am_X_mrj_fname = 'ag_man_X_mrj' + snake_case_am + '_' + str(yr_cal) + ".npy"
         np.save(os.path.join(path, am_X_mrj_fname), sim.ag_man_dvars[yr_cal][am].astype(np.float16))
     
     # Write out raw numpy arrays for land-use and land management
-    lumap_fname = 'lumap' + '_' + timestamp + '.npy'
-    lmmap_fname = 'lmmap' + '_' + timestamp + '.npy'
+    lumap_fname = 'lumap' + '_' + str(yr_cal) + '.npy'
+    lmmap_fname = 'lmmap' + '_' + str(yr_cal) + '.npy'
     
     np.save(os.path.join(path, lumap_fname), sim.lumaps[yr_cal])
     np.save(os.path.join(path, lmmap_fname), sim.lmmaps[yr_cal])
@@ -225,16 +239,16 @@ def write_files(sim, yr_cal, path):
     
     # Get the Agricultural Management applied to each pixel
     ag_man_dvar = np.stack([np.einsum('mrj -> r', v) for _,v in sim.ag_man_dvars[yr_cal].items()]).T   # (r, am)
-    ag_man_dvar_mask = ag_man_dvar.sum(1) > 0          # Meaning that they have some agricultural management applied
+    ag_man_dvar_mask = ag_man_dvar.sum(1) > 0.01            # Meaning that they have at least 1% of agricultural management applied
     # Get the maximum index of the agricultural management applied to the valid pixel
-    ag_man_dvar = np.argmax(ag_man_dvar, axis=1) + 1   # Start from 1
+    ag_man_dvar = np.argmax(ag_man_dvar, axis=1) + 1        # Start from 1
     # Let the pixels that were all zeros in the original array to be 0
     ag_man_dvar_argmax = np.where(ag_man_dvar_mask, ag_man_dvar, 0)
     
 
     # Get the non-agricultural landuse for each pixel
-    non_ag_dvar = sim.non_ag_dvars[yr_cal]              # (r, k)
-    non_ag_dvar_mask = non_ag_dvar.sum(1) > 0           # Meaning that they have some non-agricultural landuse applied
+    non_ag_dvar = sim.non_ag_dvars[yr_cal]                  # (r, k)
+    non_ag_dvar_mask = non_ag_dvar.sum(1) > 0.01            # Meaning that they have at least 1% of non-agricultural landuse applied
     # Get the maximum index of the non-agricultural landuse applied to the valid pixel
     non_ag_dvar = np.argmax(non_ag_dvar, axis=1) + sim.data.NON_AGRICULTURAL_LU_BASE_CODE    # Start from 100
     # Let the pixels that were all zeros in the original array to be 0
@@ -247,10 +261,10 @@ def write_files(sim, yr_cal, path):
     ammap = create_2d_map(sim, ag_man_dvar_argmax, filler = sim.data.MASK_LU_CODE)
     non_ag = create_2d_map(sim, non_ag_dvar_argmax, filler = sim.data.MASK_LU_CODE)
     
-    lumap_fname = 'lumap' + '_' + timestamp + '.tiff'
-    lmmap_fname = 'lmmap' + '_' + timestamp + '.tiff'
-    ammap_fname = 'ammap' + '_' + timestamp + '.tiff'
-    non_ag_fname = 'non_ag' + '_' + timestamp + '.tiff'
+    lumap_fname = 'lumap' + '_' + str(yr_cal) + '.tiff'
+    lmmap_fname = 'lmmap' + '_' + str(yr_cal) + '.tiff'
+    ammap_fname = 'ammap' + '_' + str(yr_cal) + '.tiff'
+    non_ag_fname = 'non_ag' + '_' + str(yr_cal) + '.tiff'
     
     write_gtiff(lumap, os.path.join(path, lumap_fname))
     write_gtiff(lmmap, os.path.join(path, lmmap_fname)) 
@@ -270,8 +284,6 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
     # In this way, if partial land-use is allowed (i.e, one pixel is determined to be 50% of apples and 50% citrus),
     #       we can handle the fractional land-use successfully.
 
-    # Skip writing if the yr_cal is the base year
-    if yr_cal == sim.data.YR_CAL_BASE: return
     
     # 1) Collapse the land management dimension (m -> [dry, irr])
     #    i.e., mrj -> rj
@@ -334,9 +346,7 @@ def write_files_separate(sim, yr_cal, path, ammap_separate=False):
 
 def write_quantity(sim, yr_cal, path, yr_cal_sim_pre=None):
     
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
 
     # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
     simulated_year_list = sorted(list(sim.lumaps.keys()))
@@ -396,9 +406,7 @@ def write_ag_revenue_cost(sim, yr_cal, path):
     """Calculate agricultural revenue. Takes a simulation object, a target calendar 
        year (e.g., 2030), and an output path as input."""
 
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
 
     print(f'Writing agricultural revenue outputs to {path}' )
 
@@ -453,9 +461,7 @@ def write_ag_management_revenue_cost(sim, yr_cal, path):
     """Calculate agricultural management revenue and cost."""
     
     # Get the timestamp so each CSV in the timeseries mode has a unique name
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
 
     print(f'Writing agricultural management revenue and cost outputs to {path}')
 
@@ -554,9 +560,7 @@ def write_non_ag_revenue_cost(sim, yr_cal, path):
 
 def write_dvar_area(sim, yr_cal, path):
     
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
     
     # Reprot the process
     print(f'Writing area calculated from dvars to {path}')
@@ -650,9 +654,7 @@ def write_area_transition_start_end(sim, path):
 def write_crosstab(sim, yr_cal, path, yr_cal_sim_pre=None): 
     """Write out land-use and production data"""
     
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
     
     # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
     simulated_year_list = sorted(list(sim.lumaps.keys()))
@@ -737,9 +739,7 @@ def write_water(sim, yr_cal, path):
     """Calculate water use totals. Takes a simulation object, a numeric
        target calendar year (e.g., 2030), and an output path as input."""
 
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
 
     print(f'Writing water outputs to {path}')
 
@@ -763,13 +763,13 @@ def write_water(sim, yr_cal, path):
     wuse_limits = ag_water.get_wuse_limits(sim.data)
 
     # Set up data for river regions or drainage divisions
-    if settings.WATER_REGION_DEF == 'RR':
+    if settings.WATER_REGION_DEF == 'River Region':
         region_limits = sim.data.RIVREG_LIMITS
         region_id = sim.data.RIVREG_ID
         # regions = settings.WATER_RIVREGS
         region_dict = sim.data.RIVREG_DICT
         
-    elif settings.WATER_REGION_DEF == 'DD':
+    elif settings.WATER_REGION_DEF == 'Drainage Division':
         region_limits = sim.data.DRAINDIV_LIMITS
         region_id = sim.data.DRAINDIV_ID
         # regions = settings.WATER_DRAINDIVS
@@ -851,7 +851,7 @@ def write_water(sim, yr_cal, path):
         
         
         # Calculate water use limits and actual water use
-        wul = wuse_limits[i][1]
+        wul = wuse_limits[i][2]
         wreq_reg = df_region['Water Use (ML)'].sum()
         
         # Calculate absolute and proportional difference between water use target and actual water use
@@ -883,12 +883,11 @@ def write_water(sim, yr_cal, path):
     
 
 def write_ghg(sim, yr_cal, path):
-    """Calculate total GHG emissions. Takes a simulation object, a target calendar 
-       year (e.g., 2030), and an output path as input."""
+    """Calculate total GHG emissions from on-land agricultural sector. 
+        Takes a simulation object, a target calendar year (e.g., 2030), 
+        and an output path as input."""
 
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
 
     print(f'Writing GHG outputs to {path}' )
     
@@ -921,9 +920,7 @@ def write_biodiversity(sim, yr_cal, path):
     and output path ('path').
     """
 
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
 
     print(f'Writing biodiversity outputs to {path}')
 
@@ -953,14 +950,13 @@ def write_biodiversity(sim, yr_cal, path):
     
 def write_biodiversity_separate(sim, yr_cal, path):
     
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
 
     print(f'Writing biodiversity_separate outputs to {path}')
 
 
     # Get the biodiversity scores b_mrj
+    yr_idx = yr_cal - sim.data.YR_CAL_BASE
     ag_biodiv_mrj = ag_biodiversity.get_breq_matrices(sim.data)
     am_biodiv_mrj = ag_biodiversity.get_agricultural_management_biodiversity_matrices(sim.data)
     non_ag_biodiv_rk = non_ag_biodiversity.get_breq_matrix(sim.data)
@@ -1025,16 +1021,13 @@ def write_biodiversity_separate(sim, yr_cal, path):
 
     # Write to file
     biodiv_df.to_csv(os.path.join(path, 'biodiversity_separate_' + timestamp + '.csv'), index=False)    
-    
-    
+      
     
   
 def write_ghg_separate(sim, yr_cal, path):
 
 
-    # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp
 
     print(f'Writing GHG emissions_Separate to {path}')
 
@@ -1191,5 +1184,18 @@ def write_ghg_separate(sim, yr_cal, path):
     ag_ghg_summary_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_management_{timestamp}.csv'))
     
 
+def write_ghg_offland_commodity(sim, path):
+    """Write out offland commodity GHG emissions"""
+    
+    print(f'Writing offland commodity GHG to {path}\n')
 
+    # Append the yr_cal to timestamp as prefix
+    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
+
+    # Get the offland commodity data
+    offland_ghg = sim.data.OFF_LAND_GHG_EMISSION
+    
+    # Save to disk
+    offland_ghg.to_csv(os.path.join(path, f'GHG_emissions_offland_commodity_{timestamp}.csv'), index = False)
+    
     
