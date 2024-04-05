@@ -88,6 +88,23 @@ def get_quantity_carbon_plantings_belt(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
+def get_quantity_beccs(data) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    data: object/module
+        Data object or module with fields like in `luto.data`.
+
+    Returns
+    -------
+    np.ndarray
+        Indexed by (c, r): represents the quantity commodity c produced by cell r
+        if used for BECCS.
+        A matrix of zeros because BECCS doesn't produce anything.
+    """
+    return np.zeros((data.NCMS, data.NCELLS))
+
+
 def get_quantity_matrix(data) -> np.ndarray:
     """
     Get the non-agricultural quantity matrix q_crk.
@@ -112,6 +129,9 @@ def get_quantity_matrix(data) -> np.ndarray:
 
     if NON_AG_LAND_USES['Carbon Plantings (Block)']:
         non_agr_quantity_matrices['Carbon Plantings (Block)'] = get_quantity_carbon_plantings_block(data).reshape((data.NCMS, data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['BECCS']:
+        non_agr_quantity_matrices['BECCS'] = get_quantity_beccs(data).reshape((data.NCMS, data.NCELLS, 1))
 
     non_agr_quantity_matrices = list(non_agr_quantity_matrices.values())
 

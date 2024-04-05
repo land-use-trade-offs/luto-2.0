@@ -18,22 +18,27 @@
 Pure helper functions and other tools.
 """
 
-from datetime import datetime
-import functools
+
+
 import sys
 import time
 import os.path
 import traceback
+import functools
 from typing import Tuple
-from contextlib import redirect_stderr, redirect_stdout
+from datetime import datetime
 
 import pandas as pd
 import numpy as np
 import numpy_financial as npf
+import luto.settings as settings
 
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
-import luto.settings as settings
+
+from luto.tools.report.create_html import data2html
+from luto.tools.report.create_report_data import save_report_data
+from luto.tools.report.create_static_maps import TIF2MAP
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.non_ag_landuses import NON_AG_LAND_USES
 
@@ -47,6 +52,30 @@ def amortise(cost, rate=settings.DISCOUNT_RATE, horizon=settings.AMORTISATION_PE
 # def show_map(yr_cal):
 #     """Show a plot of the lumap of `yr_cal`."""
 #     plotmap(lumaps[yr_cal], labels=bdata.AGLU2DESC)
+
+
+def report_on_path(path:str):
+    
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Path '{path}' does not exist.")
+    
+    # Remove old reporting data files, keep the folder
+    if os.path.exists(f"{path}/DATA_REPORT/data"):
+        for file in os.listdir(f"{path}/DATA_REPORT/data"):
+            fpath = f"{path}/DATA_REPORT/data/{file}"
+            os.remove(fpath) if os.path.isfile(fpath) else None
+    
+    # Creating the fake simulation object
+    class fake:pass
+    sim = fake()
+    sim.path = path
+    
+    if settings.WRITE_OUTPUT_GEOTIFFS and os.path.exists(f"{path}/data/Map_data"):
+        TIF2MAP(sim) 
+        
+    save_report_data(sim)
+    data2html(sim)
+
 
 
 def get_production(data, yr_cal, ag_X_mrj, non_ag_X_rk, ag_man_X_mrj):
@@ -274,6 +303,13 @@ def get_carbon_plantings_belt_cells(lumap) -> np.ndarray:
     Get an array with all cells being used for carbon plantings (block)
     """
     return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 4)[0]
+
+
+def get_beccs_cells(lumap) -> np.ndarray:
+    """
+    Get an array with all cells being used for carbon plantings (block)
+    """
+    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 5)[0]
 
 
 def get_ag_natural_lu_cells(data, lumap) -> np.ndarray:
