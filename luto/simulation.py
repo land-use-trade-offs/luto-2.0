@@ -136,6 +136,10 @@ class Data():
         self.EP_BELT_AVG_T_CO2_HA = bdata.EP_BELT_AVG_T_CO2_HA[self.MASK]       # Float32
         self.CP_BLOCK_AVG_T_CO2_HA = bdata.CP_BLOCK_AVG_T_CO2_HA[self.MASK]     # Float32
         self.CP_BELT_AVG_T_CO2_HA = bdata.CP_BELT_AVG_T_CO2_HA[self.MASK]       # Float32
+        self.CP_EST_COST_HA = bdata.CP_EST_COST_HA[self.MASK]                   # Float32
+        self.BECCS_COSTS_AUD_HA_YR = bdata.BECCS_COSTS_AUD_HA_YR[self.MASK]     # Float32
+        self.BECCS_REV_AUD_HA_YR = bdata.BECCS_REV_AUD_HA_YR[self.MASK]         # Float32
+        self.BECCS_TCO2E_HA_YR = bdata.BECCS_TCO2E_HA_YR[self.MASK]             # Float32
         self.CP_EST_COST_HA = bdata.CP_EST_COST_HA[self.MASK]
         self.SAVBURN_ELIGIBLE = bdata.SAVBURN_ELIGIBLE[self.MASK]               # Float32
 
@@ -257,9 +261,8 @@ def get_non_ag_w_rk():
 
 
 def get_non_ag_b_rk():
-    print('Getting non-agricultural biodiversity requirement matrices...', end = ' ', flush = True)
+    print('Getting non-agricultural biodiversity requirement matrices...')
     output = non_ag_biodiversity.get_breq_matrix(data)
-    print('Done.')
     return output.astype(np.float32)
 
 

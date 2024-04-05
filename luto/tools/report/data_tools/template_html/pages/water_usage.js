@@ -39,9 +39,9 @@ document.addEventListener("DOMContentLoaded", function () {
       enabled: false,
     },
 
-    data: {
-      csv: document.getElementById("water_1_percent_to_limit_csv").innerHTML,
-    },
+    series: JSON.parse(
+      document.getElementById("water_1_percent_to_limit_csv").innerHTML
+    ),
     xAxis: {
       tickPositions: year_ticks,
     },
@@ -91,14 +91,14 @@ document.addEventListener("DOMContentLoaded", function () {
       enabled: false,
     },
 
-      data: {
-        csv: document.getElementById("water_2_volume_to_limit_csv").innerHTML,
+    series: JSON.parse(
+      document.getElementById("water_2_volume_to_limit_csv").innerHTML
+    ),
+    yAxis: {
+      title: {
+        text: "Water Use (ML)",
       },
-      yAxis: {
-        title: {
-          text: "Water Use (ML)",
-        },
-      },
+    },
 
     legend: {
       itemStyle: {
@@ -125,12 +125,12 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-    // Chart:water_3_volume_by_sector
-    Highcharts.chart("water_3_volume_by_sector", {
-      chart: {
-        type: "column",
-        marginRight: 200,
-      },
+  // Chart:water_3_volume_by_sector
+  Highcharts.chart("water_3_volume_by_sector", {
+    chart: {
+      type: "column",
+      marginRight: 200,
+    },
 
     title: {
       text: "Water Use by Broad Land-use and Management Type",
@@ -140,9 +140,9 @@ document.addEventListener("DOMContentLoaded", function () {
       enabled: false,
     },
 
-      series: JSON.parse(
-        document.getElementById("water_3_volume_by_sector_csv").innerHTML
-      ),
+    series: JSON.parse(
+      document.getElementById("water_3_volume_by_sector_csv").innerHTML
+    ),
 
     yAxis: {
       title: {
@@ -180,12 +180,12 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-    // Chart:water_4_volume_by_landuse
-    Highcharts.chart("water_4_volume_by_landuse", {
-      chart: {
-        type: "column",
-        marginRight: 200,
-      },
+  // Chart:water_4_volume_by_landuse
+  Highcharts.chart("water_4_volume_by_landuse", {
+    chart: {
+      type: "column",
+      marginRight: 200,
+    },
 
     title: {
       text: "Water Use by Land-use and Agricultural Commodity",
@@ -195,17 +195,17 @@ document.addEventListener("DOMContentLoaded", function () {
       enabled: false,
     },
 
-      data: {
-        csv: document.getElementById("water_4_volume_by_landuse_csv").innerHTML,
+    series: JSON.parse(
+      document.getElementById("water_4_volume_by_landuse_csv").innerHTML
+    ),
+    xAxis: {
+      tickPositions: year_ticks,
+    },
+    yAxis: {
+      title: {
+        text: "Water Use (ML)",
       },
-      xAxis: {
-        tickPositions: year_ticks,
-      },
-      yAxis: {
-        title: {
-          text: "Water Use (ML)",
-        },
-      },
+    },
 
     legend: {
       itemStyle: {
@@ -241,12 +241,12 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-    // Chart:water_5_volume_by_irrigation
-    Highcharts.chart("water_5_volume_by_irrigation", {
-      chart: {
-        type: "column",
-        marginRight: 200,
-      },
+  // Chart:water_5_volume_by_irrigation
+  Highcharts.chart("water_5_volume_by_irrigation", {
+    chart: {
+      type: "column",
+      marginRight: 200,
+    },
 
     title: {
       text: "Water Use by Irrigation Type",
@@ -256,18 +256,17 @@ document.addEventListener("DOMContentLoaded", function () {
       enabled: false,
     },
 
-      data: {
-        csv: document.getElementById("water_5_volume_by_irrigation_csv")
-          .innerHTML,
+    series: JSON.parse(
+      document.getElementById("water_5_volume_by_irrigation_csv").innerHTML
+    ),
+    xAxis: {
+      tickPositions: year_ticks,
+    },
+    yAxis: {
+      title: {
+        text: "Water Use (ML)",
       },
-      xAxis: {
-        tickPositions: year_ticks,
-      },
-      yAxis: {
-        title: {
-          text: "Water Use (ML)",
-        },
-      },
+    },
 
     legend: {
       align: "right",

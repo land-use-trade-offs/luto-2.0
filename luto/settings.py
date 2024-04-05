@@ -98,7 +98,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 3         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
 
 # How does the model run over time 
-MODE = 'snapshot'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
+MODE = 'timeseries'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****
@@ -203,6 +203,9 @@ AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per h
 NON_AGRICULTURAL_LU_BASE_CODE = 100         # Non-agricultural land uses will appear on the land use map
                                             # offset by this amount (e.g. land use 0 will appear as 100)
 
+# BECCS Parameters
+BECCS_BIODIVERSITY_BENEFIT = 0.1
+
 
 # ---------------------------------------------------------------------------- #
 # Agricultural management parameters
@@ -299,6 +302,7 @@ LAND_USAGE_CULL_PERCENTAGE = 0.15
 2: 'Agroforestry'
 3: 'Carbon Plantings (Block Arrangement)'
 4: 'Carbon Plantings (Belt Arrangement)'
+5: 'BECCS'
 
 
 AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)

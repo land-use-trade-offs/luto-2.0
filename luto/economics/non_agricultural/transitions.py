@@ -104,8 +104,6 @@ def get_carbon_plantings_belt_from_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
     """
     Get transition costs from agricultural land uses to carbon plantings (belt) for each cell.
 
-    Note: calculations are identical to the block arrangement of carbon plantings.
-
     Returns
     -------
     np.ndarray
@@ -114,6 +112,18 @@ def get_carbon_plantings_belt_from_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
     base_costs = get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap)
     fencing_cost = settings.CP_BELT_FENCING_LENGTH * data.REAL_AREA * settings.CARBON_PLANTINGS_BELT_FENCING_COST_PER_M
     return base_costs + fencing_cost
+
+
+def get_beccs_from_ag(data, yr_idx, lumap, lmmap) -> np.ndarray:
+    """
+    Get transition costs from agricultural land uses to carbon plantings (belt) for each cell.
+
+    Returns
+    -------
+    np.ndarray
+        1-D array, indexed by cell.
+    """
+    return get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap)
 
 
 def get_from_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
@@ -129,6 +139,7 @@ def get_from_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
     agroforestry_transitions_from_ag_r = get_agroforestry_transitions_from_ag(data, yr_idx, lumap, lmmap)
     carbon_plantings_block_transitions_from_ag_r = get_carbon_plantings_block_from_ag(data, yr_idx, lumap, lmmap)
     carbon_plantings_belt_transitions_from_ag_r = get_carbon_plantings_block_from_ag(data, yr_idx, lumap, lmmap)
+    beccs_transitions_from_ag_r = get_beccs_from_ag(data, yr_idx, lumap, lmmap)
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     ag_to_non_agr_t_matrices = [
@@ -137,6 +148,7 @@ def get_from_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
         agroforestry_transitions_from_ag_r.reshape((data.NCELLS, 1)),
         carbon_plantings_block_transitions_from_ag_r.reshape((data.NCELLS, 1)),
         carbon_plantings_belt_transitions_from_ag_r.reshape((data.NCELLS, 1)),
+        beccs_transitions_from_ag_r.reshape((data.NCELLS, 1)),
     ]
 
     return np.concatenate(ag_to_non_agr_t_matrices, axis=1)
@@ -228,6 +240,20 @@ def get_carbon_plantings_belt_to_ag(data, yr_idx, lumap, lmmap):
     return get_env_plantings_to_ag(data, yr_idx, lumap, lmmap)
 
 
+def get_beccs_to_ag(data, yr_idx, lumap, lmmap):
+    """
+    Get transition costs from BECCS to agricultural land uses for each cell.
+    
+    Note: this is the same as for environmental plantings.
+
+    Returns
+    -------
+    np.ndarray
+        3-D array, indexed by (m, r, j).
+    """
+    return get_env_plantings_to_ag(data, yr_idx, lumap, lmmap)
+
+
 def get_to_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
     """
     Get the matrix containing transition costs from non-agricultural land uses to agricultural land uses.
@@ -241,6 +267,7 @@ def get_to_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
     agroforestry_transitions_to_ag_mrj = get_agroforestry_to_ag(data, yr_idx, lumap, lmmap)
     carbon_plantings_block_transitions_to_ag_mrj = get_carbon_plantings_block_to_ag(data, yr_idx, lumap, lmmap)
     carbon_plantings_belt_transitions_to_ag_mrj =  get_carbon_plantings_belt_to_ag(data, yr_idx, lumap, lmmap)
+    beccs_transitions_to_ag_mrj = get_beccs_to_ag(data, yr_idx, lumap, lmmap)
 
     # Reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     ag_to_non_agr_t_matrices = [
@@ -249,6 +276,7 @@ def get_to_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
         agroforestry_transitions_to_ag_mrj,
         carbon_plantings_block_transitions_to_ag_mrj,
         carbon_plantings_belt_transitions_to_ag_mrj,
+        beccs_transitions_to_ag_mrj,
     ]
 
     # Element-wise sum each mrj-indexed matrix to get the final transition matrix
@@ -365,6 +393,26 @@ def get_exclusions_carbon_plantings_belt(data, lumap) -> np.ndarray:
     return exclude
 
 
+def get_exclusions_beccs(data, lumap) -> np.ndarray:
+    """
+    Return a 1-D array indexed by r that represents how much BECCS can possibly 
+    be done at each cell.
+    """
+    exclude = np.zeros(data.NCELLS)
+
+    # All cells with NaN BECCS data should be excluded from eligibility
+    beccs_cells = np.argwhere(~np.isnan(data.BECCS_COSTS_AUD_HA_YR))[:, 0]
+    exclude[beccs_cells] = 1
+
+    # Exclude all cells used for natural land uses
+    exclude *= get_exclusions_for_excluding_all_natural_cells(data, lumap)
+
+    # Ensure cells being used for BECCS may retain that LU
+    exclude[tools.get_beccs_cells(lumap)] = 1
+
+    return exclude
+
+
 def get_exclude_matrices(data, lumap) -> np.ndarray:
     """
     Get the non-agricultural exclusions matrix.
@@ -379,6 +427,7 @@ def get_exclude_matrices(data, lumap) -> np.ndarray:
     agroforestry_exclusions = get_exclusions_agroforestry(data, lumap)
     carbon_plantings_block_exclusions = get_exclusions_carbon_plantings_block(data, lumap)
     carbon_plantings_belt_exclusions = get_exclusions_carbon_plantings_belt(data, lumap)
+    beccs_exclusions = get_exclusions_beccs(data, lumap)
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     non_ag_x_matrices = [
@@ -387,6 +436,7 @@ def get_exclude_matrices(data, lumap) -> np.ndarray:
         agroforestry_exclusions.reshape((data.NCELLS, 1)),
         carbon_plantings_block_exclusions.reshape((data.NCELLS, 1)),
         carbon_plantings_belt_exclusions.reshape((data.NCELLS, 1)),
+        beccs_exclusions.reshape((data.NCELLS, 1)),
     ]
 
     # Stack list and return to get x_rk
