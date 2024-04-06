@@ -47,8 +47,8 @@ def get_quantity_agroforestry(data) -> np.ndarray:
     -------
     np.ndarray
         Indexed by (c, r): represents the quantity commodity c produced by cell r
-        if used for riparian plantings.
-        A matrix of zeros because riparian plantings doesn't produce anything.
+        if used for agroforestry.
+        A matrix of zeros because agroforestry doesn't produce anything.
     """
 
     return np.zeros((data.NCMS, data.NCELLS))

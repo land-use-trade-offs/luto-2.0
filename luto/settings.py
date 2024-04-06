@@ -124,7 +124,7 @@ WRITE_OUTPUT_GEOTIFFS = True
 PARALLEL_WRITE = True
 
 # The Threads to use for writing GeoTiffs, and map making
-WRITE_THREADS = 50      # Works only if PARALLEL_WRITE = True
+WRITE_THREADS = 8      # Works only if PARALLEL_WRITE = True
 
 
 # ---------------------------------------------------------------------------- #
@@ -155,7 +155,7 @@ NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect a
 BARHOMOGENOUS = -1  # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 50
+THREADS = 8
 
 
 # ---------------------------------------------------------------------------- #

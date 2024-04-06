@@ -274,6 +274,26 @@ ECOLOGICAL_GRAZING_DATA['Dairy - modified land'] = pd.read_excel( eco_grazing_fi
 # Load soil carbon data, convert C to CO2e (x 44/12), and average over years
 SOIL_CARBON_AVG_T_CO2_HA = pd.read_hdf( os.path.join(INPUT_DIR, 'soil_carbon_t_ha.h5') ).to_numpy(dtype = np.float32) * (44 / 12) / SOC_AMORTISATION
 
+# AgTech EI Data
+prec_agr_file = os.path.join(INPUT_DIR, '20231107_Bundle_AgTech_EI.xlsx')
+AGTECH_EI_DATA = {}
+int_cropping_data = pd.read_excel( prec_agr_file, sheet_name='AgTech EI bundle (int cropping)', index_col='Year' )
+cropping_data = pd.read_excel( prec_agr_file, sheet_name='AgTech EI bundle (cropping)', index_col='Year' )
+horticulture_data = pd.read_excel( prec_agr_file, sheet_name='AgTech EI bundle (horticulture)', index_col='Year' )
+
+for lu in ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds',
+           'Winter cereals', 'Winter legumes', 'Winter oilseeds']:
+    # Cropping land uses
+    AGTECH_EI_DATA[lu] = cropping_data
+
+for lu in ['Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables']:
+    # Intensive Cropping land uses
+    AGTECH_EI_DATA[lu] = int_cropping_data
+
+for lu in ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 
+           'Plantation fruit', 'Stone fruit', 'Tropical stone fruit']:
+    # Horticulture land uses
+    AGTECH_EI_DATA[lu] = horticulture_data
 
 
 ###############################################################
@@ -632,6 +652,7 @@ conn_score = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.
 
 # Calculate weighted biodiversity score
 BIODIV_SCORE_WEIGHTED = BIODIV_SCORE_RAW - (BIODIV_SCORE_RAW * (1 - conn_score) * CONNECTIVITY_WEIGHTING)
+BIODIV_SCORE_WEIGHTED_LDS_BURNING = BIODIV_SCORE_WEIGHTED * LDS_BIODIVERSITY_VALUE
 
 # Calculate total biodiversity target score as the quality-weighted sum of biodiv raw score over the study area 
 biodiv_value_current = ( np.isin(LUMAP, 23) * BIODIV_SCORE_RAW +                                         # Biodiversity value of Unallocated - natural land 

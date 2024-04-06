@@ -994,7 +994,7 @@ def write_biodiversity_separate(sim, yr_cal, path):
         # Slice the arrays with the agricultural management land uses
         am_j = np.array([sim.data.DESC2AGLU[lu] for lu in am_lus])
         am_dvar = ag_mam_dvar_mrj[am][:,:,am_j]
-        am_biodiv = am_biodiv_mrj[am][:,:,am_j]
+        am_biodiv = am_biodiv_mrj[am]
         
         # Biodiversity score for each agricultural management in array format                    
         am_jm = np.einsum('mrj,mrj -> jm', am_dvar, am_biodiv)

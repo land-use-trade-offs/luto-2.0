@@ -61,7 +61,7 @@ AG_LANDUSE_MERGE_LANDTYPE = ['Apples', 'Beef', 'Citrus', 'Cotton', 'Dairy', 'Gra
                              'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit', 'Unallocated - modified land', 
                              'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes', 'Winter oilseeds']
 
-NON_AG_LANDUSE = ['Environmental Plantings','Riparian Plantings','Agroforestry']
+NON_AG_LANDUSE = ['Environmental Plantings','Riparian Plantings','Agroforestry', 'Carbon Plantings (Block)', 'Carbon Plantings (Belt)', 'BECCS']
 
 LANDUSE_ALL = AG_LANDUSE + NON_AG_LANDUSE
 
