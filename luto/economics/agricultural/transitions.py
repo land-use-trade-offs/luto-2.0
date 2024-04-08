@@ -280,7 +280,7 @@ def get_lower_bound_agricultural_management_matrices(data, ag_man_dvars, index) 
 
     ag_man_lb_mrj = {
         am: np.zeros(
-            (data.NLMS, data.LUMAP.shape[0], len(j_list)), dtype=np.float32
+            (data.NLMS, data.LUMAP.shape[0], data.N_AG_LUS), dtype=np.float32
         ) for (am,j_list) in AG_MANAGEMENTS_TO_LAND_USES.items()
     }
 

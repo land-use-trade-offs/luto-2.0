@@ -3,7 +3,7 @@ NON_AG_LAND_USES = {
     'Environmental Plantings': True,
     'Riparian Plantings': True,
     'Agroforestry': True,
-    'Carbon Plantings (Block)': False,
+    'Carbon Plantings (Block)': True,
     'Carbon Plantings (Belt)': True,
     'BECCS': True,
 }

@@ -790,7 +790,7 @@ class LutoSolver:
         input_data: InputData,
         d_c: np.array,
         old_ag_x_mrj: np.ndarray,
-        old_ag_man_lb_mrj: np.ndarray,
+        old_ag_man_lb_mrj: dict,
         old_non_ag_x_rk: np.ndarray,
         old_non_ag_lb_rk: np.ndarray,
         old_lumap: np.array,
@@ -824,7 +824,7 @@ class LutoSolver:
     def _update_variables(
         self,
         old_ag_x_mrj: np.ndarray,
-        old_ag_man_lb_mrj: np.ndarray,
+        old_ag_man_lb_mrj: dict,
         old_non_ag_x_rk: np.ndarray,
         old_non_ag_lb_rk: np.ndarray,
         old_lumap: np.array,
@@ -848,17 +848,23 @@ class LutoSolver:
             new_j = current_lumap[r]
             old_m = old_lmmap[r]
             new_m = current_lmmap[r]
+
             if (
                 old_j == new_j
                 and old_m == new_m
                 and (old_ag_x_mrj[:, r, :] == self._input_data.ag_x_mrj[:, r, :]).all()
                 and (old_non_ag_x_rk[r, :] == self._input_data.non_ag_x_rk[r, :]).all()
-                and (old_ag_man_lb_mrj[:, r, :] == self._input_data.ag_man_lb_mrj[:, r, :]).all()
                 and (old_non_ag_lb_rk[r, :] == self._input_data.non_ag_lb_rk[r, :]).all()
             ):
                 # cell has not changed between years. No need to update variables
                 num_cells_skipped += 1
                 continue
+            
+            for ag_man_lu in AG_MANAGEMENTS_TO_LAND_USES.keys():
+                if (old_ag_man_lb_mrj.get(ag_man_lu)[:, r, :] == self._input_data.ag_man_lb_mrj.get(ag_man_lu)[:, r, :]).all():
+                    # cell has not changed between years. No need to update variables
+                    num_cells_skipped += 1
+                    continue
 
             # agricultural land usage
             self.gurobi_model.remove(
@@ -887,10 +893,6 @@ class LutoSolver:
             self.X_non_ag_vars_kr[:, r] = non_ag_lus_zeros
             for k in range(self._input_data.n_non_ag_lus):
                 if self._input_data.non_ag_x_rk[r, k]:
-
-                    if (lambda x: 0 if x else self._input_data.non_ag_lb_rk[r, k])(settings.NON_AG_REVERSIBLE):
-                        print("Lower bound added")
-
                     self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
                         lb=(
                             lambda x: 0 if x else self._input_data.non_ag_lb_rk[r, k]
@@ -922,9 +924,6 @@ class LutoSolver:
 
                 for j_idx, j in enumerate(am_j_list):
                     if self._input_data.ag_x_mrj[0, r, j]:
-                        if (lambda x: 0 if x else self._input_data.ag_man_lb_mrj[am][0, r, j_idx])(settings.AG_MANAGEMENT_REVERSIBLE):
-                            print("Lower bound added")
-
                         self.X_ag_man_dry_vars_jr[am][
                             j_idx, r
                         ] = self.gurobi_model.addVar(
@@ -936,9 +935,6 @@ class LutoSolver:
                         )
 
                     if self._input_data.ag_x_mrj[1, r, j]:
-                        if (lambda x: 0 if x else self._input_data.ag_man_lb_mrj[am][1, r, j_idx])(settings.AG_MANAGEMENT_REVERSIBLE):
-                            print("lower bound added")
-
                         self.X_ag_man_irr_vars_jr[am][
                             j_idx, r
                         ] = self.gurobi_model.addVar(
