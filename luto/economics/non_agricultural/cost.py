@@ -28,7 +28,7 @@ def get_cost_rip_plantings(data) -> np.ndarray:
     Returns
     -------
     np.ndarray
-        Cost of environmental plantings for each cell. 1-D array Indexed by cell.
+        Cost of riparian plantings for each cell. 1-D array Indexed by cell.
     """
     return settings.RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR * data.REAL_AREA
 
@@ -43,7 +43,7 @@ def get_cost_agroforestry(data) -> np.ndarray:
     Returns
     -------
     np.ndarray
-        Cost of environmental plantings for each cell. 1-D array Indexed by cell.
+        Cost of agroforestry for each cell. 1-D array Indexed by cell.
     """
     return settings.AGROFORESTRY_COST_PER_HA_PER_YEAR * data.REAL_AREA
 

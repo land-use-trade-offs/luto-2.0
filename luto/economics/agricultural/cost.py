@@ -276,15 +276,61 @@ def get_ecological_grazing_effect_c_mrj(data, yr_idx):
     return new_c_mrj
 
 
+def get_savanna_burning_effect_c_mrj(data):
+    """
+    Applies the effects of using LDS Savanna Burning to the cost data
+    for all relevant agr. land uses.
+    """
+    nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
+    new_c_mrj = np.zeros((data.NLMS, data.NCELLS, nlus))
+    sav_burning_effect = data.SAVBURN_COST_HA * data.REAL_AREA
+
+    big_number = 99999999
+    savburn_ineligible_cells = np.where(data.SAVBURN_ELIGIBLE == 0)[0]
+
+    for m in range(data.NLMS):
+        for j in range(nlus):
+            new_c_mrj[m, :, j] = sav_burning_effect
+
+            # TODO: build in hard constraints (ub for variables) instead of this temorary measure
+            # to block certain cells from using Savanna Burning
+            new_c_mrj[m, savburn_ineligible_cells, j] = big_number
+
+    return new_c_mrj
+
+
+def get_agtech_ei_effect_c_mrj(data, yr_idx):
+    """
+    Applies the effects of using AgTech EI to the cost data
+    for all relevant agr. land uses.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Set up the effects matrix
+    new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    for m in range(data.NLMS):
+        for lu_idx, lu in enumerate(land_uses):
+            cost_per_ha = data.AGTECH_EI_DATA[lu].loc[yr_cal, 'AnnCost_per_Ha']
+            new_c_mrj[m, :, lu_idx] = cost_per_ha * data.REAL_AREA
+
+    return new_c_mrj
+
+
 def get_agricultural_management_cost_matrices(data, c_mrj, yr_idx):
     asparagopsis_data = get_asparagopsis_effect_c_mrj(data, yr_idx)
     precision_agriculture_data = get_precision_agriculture_effect_c_mrj(data, yr_idx)
     eco_grazing_data = get_ecological_grazing_effect_c_mrj(data, yr_idx)
+    sav_burning_data = get_savanna_burning_effect_c_mrj(data)
+    agtech_ei_data = get_agtech_ei_effect_c_mrj(data, yr_idx)
 
     ag_management_data = {
         'Asparagopsis taxiformis': asparagopsis_data,
         'Precision Agriculture': precision_agriculture_data,
         'Ecological Grazing': eco_grazing_data,
+        'Savanna Burning': sav_burning_data,
+        'AgTech EI': agtech_ei_data,
     }
 
     return ag_management_data

@@ -37,4 +37,35 @@ AG_MANAGEMENTS_TO_LAND_USES = {
         'Sheep - modified land',
         'Dairy - modified land',
     ],
+    'Savanna Burning': [
+        'Beef - natural land',
+        'Dairy - natural land',
+        'Sheep - natural land',
+        'Unallocated - natural land',
+    ],
+    'AgTech EI': [
+        # Cropping:
+        'Hay',
+        'Summer cereals',
+        'Summer legumes',
+        'Summer oilseeds',
+        'Winter cereals',
+        'Winter legumes',
+        'Winter oilseeds',
+        # Intensive Cropping:
+        'Cotton',
+        'Other non-cereal crops',
+        'Rice',
+        'Sugar',
+        'Vegetables',
+        # Horticulture:
+        'Apples',
+        'Citrus',
+        'Grapes',
+        'Nuts',
+        'Pears',
+        'Plantation fruit',
+        'Stone fruit',
+        'Tropical stone fruit',
+    ]
 }

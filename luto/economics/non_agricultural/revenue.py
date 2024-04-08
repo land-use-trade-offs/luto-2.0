@@ -13,7 +13,7 @@ def get_rev_env_plantings(data) -> np.ndarray:
     Returns
     -------
     np.ndarray
-        The cost of environmental plantings for each cell. A 1-D array indexed by cell.
+        The revenue produced by environmental plantings for each cell. A 1-D array indexed by cell.
     """
     # Multiply carbon reduction by carbon price for each cell and adjust for resfactor.
     return data.EP_BLOCK_AVG_T_CO2_HA * data.REAL_AREA * settings.CARBON_PRICE_PER_TONNE
@@ -31,7 +31,7 @@ def get_rev_rip_plantings(data) -> np.ndarray:
     Returns
     -------
     np.ndarray
-        The cost of riparian plantings for each cell. A 1-D array indexed by cell.
+        The revenue produced by riparian plantings for each cell. A 1-D array indexed by cell.
     """
     return get_rev_env_plantings(data)
 
@@ -48,7 +48,7 @@ def get_rev_agroforestry(data) -> np.ndarray:
     Returns
     -------
     np.ndarray
-        The cost of agroforestry for each cell. A 1-D array indexed by cell.
+        The revenue produced by agroforestry for each cell. A 1-D array indexed by cell.
     """
     return get_rev_env_plantings(data)
 
@@ -102,7 +102,7 @@ def get_rev_beccs(data) -> np.ndarray:
 
 def get_rev_matrix(data) -> np.ndarray:
     """
-    Gets the matrix containing the revenue figures for each non-agricultural land use.
+    Gets the matrix containing the revenue produced by each non-agricultural land use for each cell.
     """
     env_plantings_rev_matrix = get_rev_env_plantings(data)
     rip_plantings_rev_matrix = get_rev_rip_plantings(data)

@@ -2,23 +2,23 @@ import numpy as np
 from luto.settings import REFORESTATION_BIODIVERSITY_BENEFIT, CARBON_PLANTINGS_BIODIV_BENEFIT, BECCS_BIODIVERSITY_BENEFIT
 
 
-def get_biodiv_environmental_plantings(data):
+def get_biodiv_environmental_plantings(data) -> np.ndarray:
     return data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * REFORESTATION_BIODIVERSITY_BENEFIT
 
 
-def get_biodiv_riparian_plantings(data):
+def get_biodiv_riparian_plantings(data) -> np.ndarray:
     return data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * REFORESTATION_BIODIVERSITY_BENEFIT
 
 
-def get_biodiv_agroforestry(data):
+def get_biodiv_agroforestry(data) -> np.ndarray:
     return data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * REFORESTATION_BIODIVERSITY_BENEFIT
 
 
-def get_biodiv_carbon_plantings_block(data):
+def get_biodiv_carbon_plantings_block(data) -> np.ndarray:
     return data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * CARBON_PLANTINGS_BIODIV_BENEFIT
 
 
-def get_biodiv_carbon_plantings_belt(data):
+def get_biodiv_carbon_plantings_belt(data) -> np.ndarray:
     return data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * CARBON_PLANTINGS_BIODIV_BENEFIT
 
 

@@ -53,8 +53,6 @@ def get_rip_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate=False
     """
     Get transition costs from agricultural land uses to riparian plantings for each cell.
 
-    Note: this is the same as for environmental plantings.
-
     Returns
     -------
     np.ndarray
@@ -74,8 +72,6 @@ def get_rip_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate=False
 def get_agroforestry_transitions_from_ag(data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
     """
     Get transition costs from agricultural land uses to agroforestry for each cell.
-
-    Note: this is the same as for environmental plantings.
 
     Returns
     -------
