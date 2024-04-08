@@ -473,5 +473,5 @@ def get_lower_bound_non_agricultural_matrices(data, non_ag_dvars, index) -> np.n
     non_ag_lb_rk = non_ag_dvars.get(index, np.empty(0))
 
     if not non_ag_lb_rk.size:
-        return np.zeros((data.NCELLS, len([lu for lu in NON_AG_LAND_USES if NON_AG_LAND_USES[lu]])))
+        return np.zeros((data.NCELLS, len(NON_AG_LAND_USES)))
     return non_ag_lb_rk.astype(np.float32)
