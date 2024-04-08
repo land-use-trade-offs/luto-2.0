@@ -496,13 +496,13 @@ def get_water_delta_matrix(w_mrj, l_mrj, data):
     # Water license cost calculated as net water requirements (ML/ha) x licence price ($/ML).
     w_delta_mrj = w_net_mrj * data.WATER_LICENCE_PRICE[:, np.newaxis]
 
-    # When land-use changes from dryland to irrigated add $7.5k per hectare for establishing irrigation infrastructure
-    new_irrig_cost = 7500 * data.REAL_AREA[:, np.newaxis]
+    # When land-use changes from dryland to irrigated add <settings.REMOVE_IRRIG_COST> per hectare for establishing irrigation infrastructure
+    new_irrig_cost = settings.REMOVE_IRRIG_COST * data.REAL_AREA[:, np.newaxis]
     w_delta_mrj[1] = np.where(
         l_mrj[0], w_delta_mrj[1] + new_irrig_cost, w_delta_mrj[1])
 
-    # When land-use changes from irrigated to dryland add $3k per hectare for removing irrigation infrastructure
-    remove_irrig_cost = 3000 * data.REAL_AREA[:, np.newaxis]
+    # When land-use changes from irrigated to dryland add <settings.NEW_IRRIG_COST> per hectare for removing irrigation infrastructure
+    remove_irrig_cost = settings.NEW_IRRIG_COST * data.REAL_AREA[:, np.newaxis]
     w_delta_mrj[0] = np.where(
         l_mrj[1], w_delta_mrj[0] + remove_irrig_cost, w_delta_mrj[0])
 

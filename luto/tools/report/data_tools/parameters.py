@@ -47,26 +47,17 @@ GHG_FNAME2TYPE = {'GHG_emissions_separate_agricultural_landuse': 'Agricultural L
                   'GHG_emissions_offland_commodity': 'Offland Commodity',}
 
 
-
-
-
-# Define all land uses for each category
-AG_LANDUSE = ['Apples', 'Beef - modified land', 'Beef - natural land', 'Citrus', 'Cotton', 'Dairy - modified land', 
-              'Dairy - natural land', 'Grapes', 'Hay', 'Nuts', 'Other non-cereal crops', 'Pears', 'Plantation fruit', 
-              'Rice', 'Sheep - modified land', 'Sheep - natural land', 'Stone fruit', 'Sugar', 'Summer cereals', 
-              'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit', 'Unallocated - modified land', 
-              'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes', 'Winter oilseeds']
-
-
-# Read the non-agricultural land uses from the file
-with open('input/non_ag_landuses.csv') as f:
-    NON_AG_LANDUSE = [line.strip() for line in f]
-    
-    
 AG_LANDUSE_MERGE_LANDTYPE = ['Apples', 'Beef', 'Citrus', 'Cotton', 'Dairy', 'Grapes', 'Hay', 'Nuts', 'Other non-cereal crops',
                              'Pears', 'Plantation fruit', 'Rice', 'Sheep', 'Stone fruit', 'Sugar', 'Summer cereals',
                              'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit', 'Unallocated - modified land', 
                              'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes', 'Winter oilseeds']
+
+# Read the land uses from the file
+with open('input/ag_landuses.csv') as f:
+    AG_LANDUSE = [line.strip() for line in f]
+
+with open('input/non_ag_landuses.csv') as f:
+    NON_AG_LANDUSE = [line.strip() for line in f]
 
 LANDUSE_ALL = AG_LANDUSE + NON_AG_LANDUSE
 
@@ -102,6 +93,7 @@ GHG_NAMES = {
     'TCO2E_Riparian Plantings': 'Riparian Plantings',
     'TCO2E_Carbon Plantings (Belt)': 'Carbon Plantings (Belt)',
     'TCO2E_Carbon Plantings (Block)': 'Carbon Plantings (Block)',
+    'TCO2E_BECCS': 'BECCS',
 }
 
 GHG_CATEGORY = {'Agricultural soils: Animal production, dung and urine': {"CH4":0.5,"CO2":0.5},

@@ -681,7 +681,11 @@ def save_report_data(sim):
     
                                                       
     Non_ag_reduction_source = Non_ag_reduction_long.groupby(['Year','Land use category','Sources'])\
-        .sum()['Quantity (Mt CO2e)'].reset_index()    
+        .sum()['Quantity (Mt CO2e)'].reset_index()
+    
+    # Fill the missing years with 0 values    
+    fill_years = set(years) - set(Non_ag_reduction_source['Year'].unique())
+    Non_ag_reduction_source = pd.concat([Non_ag_reduction_source, pd.DataFrame({'Year': list(fill_years), 'Sources':'Agroforestry','Quantity (Mt CO2e)': 0})], axis=0)
         
     Non_ag_reduction_source_wide = Non_ag_reduction_source\
                                         .groupby(['Sources'])[['Year','Quantity (Mt CO2e)']]\
@@ -690,6 +694,7 @@ def save_report_data(sim):
                                         
     Non_ag_reduction_source_wide.columns = ['name','data']
     Non_ag_reduction_source_wide['type'] = 'column'
+    
     Non_ag_reduction_source_wide.to_json(f'{SAVE_DIR}/GHG_9_2_ag_reduction_source_wide_Mt.json',orient='records')
 
 
