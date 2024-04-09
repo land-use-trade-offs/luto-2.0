@@ -469,12 +469,13 @@ def inspect(lumap, highpos, d_j, q_rj, c_rj, landuses):
 
 def get_water_delta_matrix(w_mrj, l_mrj, data):
     """
-    Gets the water delta matrix that applies the cost of installing/removing irrigation to
+    Gets the water delta matrix ($/ha) that applies the cost of installing/removing irrigation to
     base transition costs. Includes the costs of water license fees.
     """
     # Get water requirements from current agriculture, converting water requirements for LVSTK from ML per head to ML per cell (inc. REAL_AREA).
     # Sum total water requirements of current land-use and land management
     w_r = (w_mrj * l_mrj).sum(axis=0).sum(axis=1)
+
 
     # Net water requirements calculated as the diff in water requirements between current land-use and all other land-uses j.
     w_net_mrj = w_mrj - w_r[:, np.newaxis]
@@ -483,14 +484,12 @@ def get_water_delta_matrix(w_mrj, l_mrj, data):
     w_delta_mrj = w_net_mrj * data.WATER_LICENCE_PRICE[:, np.newaxis]
 
     # When land-use changes from dryland to irrigated add <settings.REMOVE_IRRIG_COST> per hectare for establishing irrigation infrastructure
-    new_irrig_cost = settings.REMOVE_IRRIG_COST * data.REAL_AREA[:, np.newaxis]
-    w_delta_mrj[1] = np.where(
-        l_mrj[0], w_delta_mrj[1] + new_irrig_cost, w_delta_mrj[1])
+    new_irrig_cost = settings.REMOVE_IRRIG_COST * np.ones_like(data.REAL_AREA[:, np.newaxis])   # Convert scalar to array (r)
+    w_delta_mrj[1] = np.where(l_mrj[0], w_delta_mrj[1] + new_irrig_cost, w_delta_mrj[1])
 
     # When land-use changes from irrigated to dryland add <settings.NEW_IRRIG_COST> per hectare for removing irrigation infrastructure
-    remove_irrig_cost = settings.NEW_IRRIG_COST * data.REAL_AREA[:, np.newaxis]
-    w_delta_mrj[0] = np.where(
-        l_mrj[1], w_delta_mrj[0] + remove_irrig_cost, w_delta_mrj[0])
+    remove_irrig_cost = settings.NEW_IRRIG_COST * np.ones_like(data.REAL_AREA[:, np.newaxis])   # Convert scalar to array (r)
+    w_delta_mrj[0] = np.where(l_mrj[1], w_delta_mrj[0] + remove_irrig_cost, w_delta_mrj[0])
 
     # Amortise upfront costs to annualised costs
     w_delta_mrj = amortise(w_delta_mrj)

@@ -101,7 +101,7 @@ def get_transition_matrices(data, yr_idx, base_year, lumaps, lmmaps, separate=Fa
         numpy.ndarray or dict: The transition matrices for land-use and land management transitions.
                                If `separate` is False, returns a numpy array representing the total costs.
                                If `separate` is True, returns a dictionary with separate cost matrices for
-                               establishment costs, water license costs, and carbon releasing costs.
+                               establishment costs, Water license cost, and carbon releasing costs.
     """
     
     lumap = lumaps[base_year]
@@ -138,11 +138,11 @@ def get_transition_matrices(data, yr_idx, base_year, lumaps, lmmaps, separate=Fa
     e_rj_irr = np.einsum('rj,r->rj', e_rj, lmmap == 1)
     e_mrj = np.stack([e_rj_dry, e_rj_irr], axis=0)
     
-    # Update the cost matrix with exclude matrices; the transition cost for a cell to remain the same is 0.
+    # Update the cost matrix with exclude matrices; the transition cost for a cell that remain the same is 0.
     e_mrj = np.einsum('mrj,mrj,mrj->mrj', e_mrj, x_mrj, l_mrj_not)
 
     # -------------------------------------------------------------- #
-    # Water license costs (upfront, amortised to annual, per cell).  #
+    # Water license cost (upfront, amortised to annual, per cell).  #
     # -------------------------------------------------------------- #
 
     w_mrj = get_wreq_matrices(data, yr_idx)
@@ -163,7 +163,7 @@ def get_transition_matrices(data, yr_idx, base_year, lumaps, lmmaps, separate=Fa
     # -------------------------------------------------------------- #
     
     if separate:
-        return {'Establishment cost': e_mrj, 'Water license costs': w_delta_mrj, 'Carborn resleasing costs': ghg_t_mrj_cost}  
+        return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, 'Carborn resleasing cost': ghg_t_mrj_cost}  
     else:
         t_mrj = e_mrj + w_delta_mrj + ghg_t_mrj_cost
         return t_mrj
