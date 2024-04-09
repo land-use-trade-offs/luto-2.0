@@ -76,7 +76,7 @@ def get_savanna_burning_effect_b_mrj(data):
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
     new_b_mrj = np.zeros((data.NLMS, data.NCELLS, nlus))
 
-    eds_sav_burning_biodiv_benefits = (1 - settings.LDS_BIODIVERSITY_VALUE) * data.BIODIV_SCORE_WEIGHTED
+    eds_sav_burning_biodiv_benefits = (1 - settings.LDS_BIODIVERSITY_VALUE) * data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA
 
     for m in range(data.NLMS):
         for j in range(nlus):
