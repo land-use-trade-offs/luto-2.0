@@ -362,11 +362,6 @@ def save_report_data(sim):
     
     quantity_df_wide.to_json(f'{SAVE_DIR}/production_5_6_demand_Production_commodity_from_LUTO.json', orient='records')    
 
-    # quantity_df_wide = quantity_df.pivot_table(index=['year'], 
-    #                                         columns='Commodity',
-    #                                         values='Prod_targ_year (tonnes, ML)').reset_index()
-    
-    # quantity_df_wide.to_csv(f'{SAVE_DIR}/production_5_6_demand_Production_commodity_from_LUTO.csv', index=False)
 
 
 
@@ -374,18 +369,127 @@ def save_report_data(sim):
     ####################################################
     #                  3) Economics                    #
     ####################################################
+    
+    
+    # Get the revenue and cost data
+    revenue_ag_df = get_ag_rev_cost_df(files, 'revenue')
+    revenue_ag_df['Source_type'] = revenue_ag_df['Source_type'].str.replace(' Crop','')
+    revenue_ag_df['Irrigation'] = revenue_ag_df['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})  
+    
+    revenue_am_df = files.query('category == "revenue" and base_name == "revenue_agricultural_management" and year_types != "begin_end_year"').reset_index(drop=True)
+    revenue_am_df = pd.concat([pd.read_csv(path) for path in revenue_am_df['path']], ignore_index=True)
+    revenue_am_df['value (billion)'] = revenue_am_df['Value (AU$)'] / 1e9
+    
+    revenue_non_ag_df = files.query('category == "revenue" and base_name == "revenue_non_ag" and year_types != "begin_end_year"').reset_index(drop=True)
+    revenue_non_ag_df = pd.concat([pd.read_csv(path) for path in revenue_non_ag_df['path']], ignore_index=True)
+    revenue_non_ag_df['value (billion)'] = revenue_non_ag_df['Value AU$'] / 1e9
+    
+    cost_ag_df = get_ag_rev_cost_df(files, 'cost')
+    cost_ag_df['Source_type'] = cost_ag_df['Source_type'].str.replace(' Crop','')
+    cost_ag_df['Irrigation'] = cost_ag_df['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
+    cost_ag_df['value (billion)'] = cost_ag_df['value (billion)'] * -1
 
-    # Plot_3-2: Revenue and Cost data (Billion Dollars)
-    revenue_df = get_ag_rev_cost_df(files, 'revenue')
-    revenue_df['Source_type'] = revenue_df['Source_type'].str.replace(' Crop','')
-    revenue_df['Irrigation'] = revenue_df['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
+    
+    cost_am_df = files.query('category == "cost" and base_name == "cost_agricultural_management" and year_types != "begin_end_year"').reset_index(drop=True)
+    cost_am_df = pd.concat([pd.read_csv(path) for path in cost_am_df['path']], ignore_index=True)
+    cost_am_df['Value (AU$)'] = cost_am_df['Value (AU$)'] * -1
+    cost_am_df['value (billion)'] = cost_am_df['Value (AU$)'] / 1e9
+    
+    cost_non_ag_df = files.query('category == "cost" and base_name == "cost_non_ag" and year_types != "begin_end_year"').reset_index(drop=True)
+    cost_non_ag_df = pd.concat([pd.read_csv(path) for path in cost_non_ag_df['path']], ignore_index=True)
+    cost_non_ag_df['Value AU$'] = cost_non_ag_df['Value AU$'] * -1
+    cost_non_ag_df['value (billion)'] = cost_non_ag_df['Value AU$'] / 1e9
+    
+    cost_transition_ag2ag_df = files.query('category == "cost" and base_name == "cost_transition_ag2ag" and year_types != "begin_end_year"').reset_index(drop=True)
+    cost_transition_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2ag_df['path']], ignore_index=True)
+    cost_transition_ag2ag_df['Cost ($)'] = cost_transition_ag2ag_df['Cost ($)'] * -1
+    cost_transition_ag2ag_df['value (billion)'] = cost_transition_ag2ag_df['Cost ($)'] / 1e9
+    
+    cost_transition_ag2non_ag_df = files.query('category == "cost" and base_name == "cost_transition_ag2non_ag" and year_types != "begin_end_year"').reset_index(drop=True)
+    cost_transition_ag2non_ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2non_ag_df['path']], ignore_index=True)
+    cost_transition_ag2non_ag_df['Cost ($)'] = cost_transition_ag2non_ag_df['Cost ($)'] * -1
+    cost_transition_ag2non_ag_df['value (billion)'] = cost_transition_ag2non_ag_df['Cost ($)'] / 1e9
+    
+    cost_transition_non_ag2ag_df = files.query('base_name == "cost_transition_non_ag2_ag" and year_types != "begin_end_year"')
+    cost_transition_non_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_non_ag2ag_df['path']], ignore_index=True)
+    cost_transition_non_ag2ag_df['Cost ($)'] = cost_transition_non_ag2ag_df['Cost ($)'] * -1
+    cost_transition_non_ag2ag_df['value (billion)'] = cost_transition_non_ag2ag_df['Cost ($)'] / 1e9
+    
 
+    # Plot_3-1: Revenue and Cost data for all types (Billion $)
+    revenue_ag_sum = revenue_ag_df.groupby(['year']).sum(numeric_only=True).reset_index()
+    revenue_ag_sum.insert(1,'Type','Agricultural land-use (revenue)')
+    
+    revenue_am_sum = revenue_am_df.groupby(['year']).sum(numeric_only=True).reset_index()
+    revenue_am_sum.insert(1,'Type','Agricultural management (revenue)')
+    
+    revenue_non_ag_sum = revenue_non_ag_df.groupby(['year']).sum(numeric_only=True).reset_index()
+    revenue_non_ag_sum.insert(1,'Type','Non-agricultural land-use (revenue)')
+    
+    cost_ag_sum = cost_ag_df.groupby(['year']).sum(numeric_only=True).reset_index()
+    cost_ag_sum.insert(1,'Type','Agricultural land-use (cost)')
+    
+    cost_am_sum = cost_am_df.groupby(['year']).sum(numeric_only=True).reset_index()
+    cost_am_sum.insert(1,'Type','Agricultural management (cost)')
+    
+    cost_non_ag_sum = cost_non_ag_df.groupby(['year']).sum(numeric_only=True).reset_index()
+    cost_non_ag_sum.insert(1,'Type','Non-agricultural land-use (cost)')
+    
+    cost_transition_ag2ag_sum = cost_transition_ag2ag_df.groupby(['year']).sum(numeric_only=True).reset_index()
+    cost_transition_ag2ag_sum.insert(1,'Type','Transition cost')
+    
+    cost_transition_ag2non_sum = cost_transition_ag2non_ag_df.groupby(['year']).sum(numeric_only=True).reset_index()
+    cost_transition_ag2non_sum.insert(1,'Type','Transition cost')
+    
+    
+    cost_transition_non_ag2ag_sum = cost_transition_non_ag2ag_df.groupby(['year']).sum(numeric_only=True).reset_index()
+    cost_transition_non_ag2ag_sum.insert(1,'Type','Transition cost')
+    
+    
+    rev_cost_all = pd.concat([revenue_ag_sum,revenue_am_sum,revenue_non_ag_sum,
+                            cost_ag_sum,cost_am_sum,cost_non_ag_sum,
+                            cost_transition_ag2ag_sum,cost_transition_ag2non_sum,
+                            cost_transition_non_ag2ag_sum],axis=0)
+    rev_cost_all = rev_cost_all.groupby(['year','Type']).sum(numeric_only=True).reset_index()
+
+    rev_cost_net = rev_cost_all.groupby(['year']).sum(numeric_only=True).reset_index()
+    rev_cost_net['Type'] = 'Profit'
+    
+    rev_cost_all_wide = rev_cost_all\
+        .groupby(['Type'])[['year','value (billion)']]\
+        .apply(lambda x: list(map(list,zip(x['year'],x['value (billion)']))))\
+        .reset_index()
+    rev_cost_all_wide.columns = ['name','data']
+    rev_cost_all_wide['type'] = 'column'
+        
+    rev_cost_net_wide = rev_cost_net\
+        .groupby(['Type'])[['year','value (billion)']]\
+        .apply(lambda x: list(map(list,zip(x['year'],x['value (billion)']))))\
+        .reset_index()
+    rev_cost_net_wide.columns = ['name','data']
+    rev_cost_net_wide['type'] = 'spline'
+    
+    # Define the specific order
+    order = ['Agricultural land-use (revenue)', 'Agricultural management (revenue)', 'Non-agricultural land-use (revenue)',
+             'Agricultural land-use (cost)', 'Agricultural management (cost)', 'Non-agricultural land-use (cost)',
+             'Transition cost','Profit']
+    rev_cost_wide_json['name'] = pd.Categorical(rev_cost_wide_json['name'], categories=order, ordered=True)
+    rev_cost_wide_json = rev_cost_wide_json.sort_values('name')
+    
+    rev_cost_wide_json = pd.concat([rev_cost_all_wide,rev_cost_net_wide],axis=0)
+    rev_cost_wide_json.to_json(f'{SAVE_DIR}/economics_0_rev_cost_all_wide.json', orient='records')
+    
+    
+    
+    
+
+    # Plot_3-1: Revenue for Agricultural land-use (Billion Dollars)
     keep_cols = ['year', 'value (billion)']
-    loop_cols = revenue_df.columns.difference(keep_cols)
+    loop_cols = revenue_ag_df.columns.difference(keep_cols)
 
     for idx,col in enumerate(loop_cols):
         take_cols = keep_cols + [col]
-        df = revenue_df[take_cols].groupby(['year', col]).sum(numeric_only=True).reset_index()
+        df = revenue_ag_df[take_cols].groupby(['year', col]).sum(numeric_only=True).reset_index()
         # convert to wide format
         df_wide = df.groupby(col)[['year','value (billion)']]\
                     .apply(lambda x: list(map(list,zip(x['year'],x['value (billion)']))))\
@@ -394,19 +498,17 @@ def save_report_data(sim):
         df_wide.columns = ['name','data']
         df_wide['type'] = 'column'
         
-        df_wide.to_json(f'{SAVE_DIR}/economics_1_revenue_{idx+1}_{col}_wide.json', orient='records')
+        df_wide.to_json(f'{SAVE_DIR}/economics_1_ag_revenue_{idx+1}_{col}_wide.json', orient='records')
 
-    # Plot_3-3: Cost data (Billion Dollars)
-    cost_df = get_ag_rev_cost_df(files, 'cost')
-    cost_df['Source_type'] = cost_df['Source_type'].str.replace(' Crop','')
-    cost_df['Irrigation'] = cost_df['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
 
+
+    # Plot_3-2: Cost for Agricultural land-use (Billion Dollars)
     keep_cols = ['year', 'value (billion)']
-    loop_cols = cost_df.columns.difference(keep_cols)
+    loop_cols = cost_ag_df.columns.difference(keep_cols)
     
     for idx,col in enumerate(loop_cols):
         take_cols = keep_cols + [col]
-        df = cost_df[take_cols].groupby(['year', col]).sum(numeric_only=True).reset_index()
+        df = cost_ag_df[take_cols].groupby(['year', col]).sum(numeric_only=True).reset_index()
         # convert to wide format
         df_wide = df.groupby(col)[['year','value (billion)']]\
                     .apply(lambda x: list(map(list,zip(x['year'],x['value (billion)']))))\
@@ -414,31 +516,158 @@ def save_report_data(sim):
         df_wide.columns = ['name','data']
         df_wide['type'] = 'column'
         # save to disk
-        df_wide.to_json(f'{SAVE_DIR}/economics_2_cost_{idx+1}_{col}_wide.json', orient='records')
+        df_wide.to_json(f'{SAVE_DIR}/economics_2_ag_cost_{idx+1}_{col}_wide.json', orient='records')
 
 
-    # Plot_3-4: Revenue and Cost data (Billion Dollars)
-    rev_cost_compare = get_rev_cost(revenue_df,cost_df)
-    rev_cost_compare = rev_cost_compare.sort_values(['year'])
-    rev_cost_compare['rev_low'] = 0
+    # # Plot_3-3: Revenue and Cost data (Billion Dollars)
+    # rev_cost_compare = get_rev_cost(revenue_ag_df,cost_ag_df)
+    # rev_cost_compare = rev_cost_compare.sort_values(['year'])
+    # rev_cost_compare['rev_low'] = 0
     
-    rev_cost_compare_rev = rev_cost_compare[['rev_low','Revenue (billion)']].copy()
-    rev_cost_compare_rev.columns = ['low','high']
-    rev_cost_compare_rev_records = {'name' : 'Revenue',
-                                    'data': list(map(list,zip(rev_cost_compare['rev_low'],rev_cost_compare['Revenue (billion)'])))}
+    # rev_cost_compare_rev = rev_cost_compare[['rev_low','Revenue (billion)']].copy()
+    # rev_cost_compare_rev.columns = ['low','high']
+    # rev_cost_compare_rev_records = {'name' : 'Revenue',
+    #                                 'data': list(map(list,zip(rev_cost_compare['rev_low'],rev_cost_compare['Revenue (billion)'])))}
     
     
-    rev_cost_compare_cost = rev_cost_compare[['Profit (billion)','Revenue (billion)']].copy()
-    rev_cost_compare_cost.columns = ['low','high']
-    rev_cost_compare_cost_records = {'name' : 'Cost',
-                                    'data': list(map(list,zip(rev_cost_compare['Profit (billion)'],rev_cost_compare['Revenue (billion)'])))}
+    # rev_cost_compare_cost = rev_cost_compare[['Profit (billion)','Revenue (billion)']].copy()
+    # rev_cost_compare_cost.columns = ['low','high']
+    # rev_cost_compare_cost_records = {'name' : 'Cost',
+    #                                 'data': list(map(list,zip(rev_cost_compare['Profit (billion)'],rev_cost_compare['Revenue (billion)'])))}
     
-    rev_cost_compare_records = {'categories': [str(i) for i in rev_cost_compare['year'].unique()],
-                                'series': [rev_cost_compare_rev_records,rev_cost_compare_cost_records]}
+    # rev_cost_compare_records = {'categories': [str(i) for i in rev_cost_compare['year'].unique()],
+    #                             'series': [rev_cost_compare_rev_records,rev_cost_compare_cost_records]}
     
 
-    with open(f'{SAVE_DIR}/economics_3_rev_cost_all.json', 'w') as outfile:
-        outfile.write(json.dumps(rev_cost_compare_records))
+    # with open(f'{SAVE_DIR}/economics_3_rev_cost_all.json', 'w') as outfile:
+    #     outfile.write(json.dumps(rev_cost_compare_records))
+    
+    
+    
+    # Plot_3-4: Revenue for Agricultural Management (Billion $)
+    revenue_am_df['Water'] = revenue_am_df['Water'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
+    keep_cols = ['year', 'value (billion)','Value (AU$)']
+    loop_cols = revenue_am_df.columns.difference(keep_cols)
+    
+    for idx,col in enumerate(loop_cols):
+        take_cols = keep_cols + [col]
+        df = revenue_am_df[take_cols].groupby(['year', col]).sum(numeric_only=True).reset_index()
+        # convert to wide format
+        df_wide = df.groupby(col)[['year','value (billion)']]\
+                    .apply(lambda x: list(map(list,zip(x['year'],x['value (billion)']))))\
+                    .reset_index()
+        df_wide.columns = ['name','data']
+        df_wide['type'] = 'column'
+        # save to disk
+        df_wide.to_json(f'{SAVE_DIR}/economics_4_am_revenue_{idx+1}_{col}_wide.json', orient='records')
+
+
+
+    # Plot_3-5: Cost for Agricultural Management (Billion $)
+    cost_am_df['Water'] = cost_am_df['Water'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
+    keep_cols = ['year', 'value (billion)','Value (AU$)']
+    loop_cols = cost_am_df.columns.difference(keep_cols)
+    
+    for idx,col in enumerate(loop_cols):
+        take_cols = keep_cols + [col]
+        df = cost_am_df[take_cols].groupby(['year', col]).sum(numeric_only=True).reset_index()
+        # convert to wide format
+        df_wide = df.groupby(col)[['year','value (billion)']]\
+                    .apply(lambda x: list(map(list,zip(x['year'],x['value (billion)']))))\
+                    .reset_index()
+        df_wide.columns = ['name','data']
+        df_wide['type'] = 'column'
+        # save to disk
+        df_wide.to_json(f'{SAVE_DIR}/economics_5_am_cost_{idx+1}_{col}_wide.json', orient='records')
+        
+        
+    # Plot_3-6: Revenue for Non-Agricultural land-use (Billion $)
+    keep_cols = ['year', 'value (billion)','Value AU$']
+    loop_cols = revenue_non_ag_df.columns.difference(keep_cols)
+    
+    for idx,col in enumerate(loop_cols):
+        take_cols = keep_cols + [col]
+        df = revenue_non_ag_df[take_cols].groupby(['year', col]).sum(numeric_only=True).reset_index()
+        # convert to wide format
+        df_wide = df.groupby(col)[['year','value (billion)']]\
+                    .apply(lambda x: list(map(list,zip(x['year'],x['value (billion)']))))\
+                    .reset_index()
+        df_wide.columns = ['name','data']
+        df_wide['type'] = 'column'
+        # save to disk
+        df_wide.to_json(f'{SAVE_DIR}/economics_6_non_ag_revenue_{idx+1}_{col}_wide.json', orient='records')
+        
+        
+    # Plot_3-7: Cost for Non-Agricultural land-use (Billion $)
+    keep_cols = ['year', 'value (billion)','Value AU$']
+    loop_cols = cost_non_ag_df.columns.difference(keep_cols)
+    
+    for idx,col in enumerate(loop_cols):
+        take_cols = keep_cols + [col]
+        df = cost_non_ag_df[take_cols].groupby(['year', col]).sum(numeric_only=True).reset_index()
+        # convert to wide format
+        df_wide = df.groupby(col)[['year','value (billion)']]\
+                    .apply(lambda x: list(map(list,zip(x['year'],x['value (billion)']))))\
+                    .reset_index()
+        df_wide.columns = ['name','data']
+        df_wide['type'] = 'column'
+        # save to disk
+        df_wide.to_json(f'{SAVE_DIR}/economics_7_non_ag_cost_{idx+1}_{col}_wide.json', orient='records')
+    
+    
+    # Plot_3-8: Transition cost for Ag to Ag (Billion $)
+    cost_transition_ag2ag_df['Water Supply'] = cost_transition_ag2ag_df['Water Supply'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
+    keep_cols = ['year', 'value (billion)','Cost ($)']
+    loop_cols = cost_transition_ag2ag_df.columns.difference(keep_cols)
+    
+    for idx,col in enumerate(loop_cols):
+        take_cols = keep_cols + [col]
+        df = cost_transition_ag2ag_df[take_cols].groupby(['year', col]).sum(numeric_only=True).reset_index()
+        # convert to wide format
+        df_wide = df.groupby(col)[['year','value (billion)']]\
+                    .apply(lambda x: list(map(list,zip(x['year'],x['value (billion)']))))\
+                    .reset_index()
+        df_wide.columns = ['name','data']
+        df_wide['type'] = 'column'
+        # save to disk
+        df_wide.to_json(f'{SAVE_DIR}/economics_8_transition_ag2ag_cost_{idx+1}_{col}_wide.json', orient='records')
+        
+        
+    # Plot_3-9: Transition cost for Ag to Non-Ag (Billion $)
+    cost_transition_ag2non_ag_df['Water supply'] = cost_transition_ag2non_ag_df['Water supply'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
+    keep_cols = ['year', 'value (billion)','Cost ($)']
+    loop_cols = cost_transition_ag2non_ag_df.columns.difference(keep_cols)
+    
+    for idx,col in enumerate(loop_cols):
+        take_cols = keep_cols + [col]
+        df = cost_transition_ag2non_ag_df[take_cols].groupby(['year', col]).sum(numeric_only=True).reset_index()
+        # convert to wide format
+        df_wide = df.groupby(col)[['year','value (billion)']]\
+                    .apply(lambda x: list(map(list,zip(x['year'],x['value (billion)']))))\
+                    .reset_index()
+        df_wide.columns = ['name','data']
+        df_wide['type'] = 'column'
+        # save to disk
+        df_wide.to_json(f'{SAVE_DIR}/economics_9_transition_ag2non_cost_{idx+1}_{col}_wide.json', orient='records')
+        
+        
+    # Plot_3-10: Transition cost for Non-Ag to Ag (Billion $)
+    cost_transition_non_ag2ag_df['Water supply'] = cost_transition_non_ag2ag_df['Water supply'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
+    keep_cols = ['year', 'value (billion)','Cost ($)']
+    loop_cols = cost_transition_non_ag2ag_df.columns.difference(keep_cols)
+    
+    for idx,col in enumerate(loop_cols):
+        take_cols = keep_cols + [col]
+        df = cost_transition_non_ag2ag_df[take_cols].groupby(['year', col]).sum(numeric_only=True).reset_index()
+        # convert to wide format
+        df_wide = df.groupby(col)[['year','value (billion)']]\
+                    .apply(lambda x: list(map(list,zip(x['year'],x['value (billion)']))))\
+                    .reset_index()
+        df_wide.columns = ['name','data']
+        df_wide['type'] = 'column'
+        # save to disk
+        df_wide.to_json(f'{SAVE_DIR}/economics_10_transition_non_ag2ag_cost_{idx+1}_{col}_wide.json', orient='records')
+    
 
 
 
@@ -848,8 +1077,6 @@ def save_report_data(sim):
 
     # Plot_6-1: Biodiversity total by category
     bio_df_category = bio_df.groupby(['Year','Landuse type']).sum(numeric_only=True).reset_index()
-    # bio_df_category_wide = bio_df_category.pivot(index='Year', columns='Landuse type', values='Biodiversity score (million)').reset_index()
-    # bio_df_category_wide.to_csv(f'{SAVE_DIR}/biodiversity_1_total_score_by_category.csv',index=False)
     bio_df_category = bio_df_category\
         .groupby('Landuse type')[['Year','Biodiversity score (million)']]\
         .apply(lambda x:list(map(list,zip(x['Year'],x['Biodiversity score (million)']))))\

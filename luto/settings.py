@@ -122,7 +122,7 @@ PENALTY = 1e5
 # ---------------------------------------------------------------------------- #
 
 # Write GeoTiffs to output directory: True or False
-WRITE_OUTPUT_GEOTIFFS = True
+WRITE_OUTPUT_GEOTIFFS = False
 
 # If use parallel processing to write GeoTiffs: True or False
 PARALLEL_WRITE = True

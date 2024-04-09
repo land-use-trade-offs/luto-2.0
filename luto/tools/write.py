@@ -574,7 +574,7 @@ def write_cost_transition(sim, yr_cal, path, yr_cal_sim_pre=None):
                         names=['Water Supply', 'Land Use']), 
                         columns=['Cost ($)']).reset_index()
         arr_df.insert(0, 'Type', cost_type)
-        
+        arr_df.insert(1, 'year', yr_cal)
         cost_dfs.append(arr_df)
 
     # Save the cost DataFrames 
@@ -622,6 +622,7 @@ def write_cost_transition(sim, yr_cal, path, yr_cal_sim_pre=None):
                                 columns=['Cost ($)']).reset_index()
             arr_df.insert(0, 'To land-use', non_ag_type)
             arr_df.insert(1, 'Cost type', cost_type)
+            arr_df.insert(2, 'year', yr_cal)
             cost_dfs.append(arr_df)
     
     # Save the cost DataFrames
@@ -659,6 +660,7 @@ def write_cost_transition(sim, yr_cal, path, yr_cal_sim_pre=None):
                                 columns=['Cost ($)']).reset_index()
             arr_df.insert(0, 'From land-use', non_ag_type)
             arr_df.insert(1, 'Cost type', cost_type)
+            arr_df.insert(2, 'year', yr_cal)
             cost_dfs.append(arr_df)
 
     # Save the cost DataFrames
@@ -671,16 +673,10 @@ def write_cost_transition(sim, yr_cal, path, yr_cal_sim_pre=None):
 
 
 
-
-
-
-
 def write_revenue_cost_non_ag(sim, yr_cal, path):
     """Calculate non_agricultural cost. """
 
-    # Get the timestamp so each CSV in the timeseries mode has a unique name
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = sim.timestamp 
 
     print(f'Writing non agricultural management cost outputs to {path}')
     
@@ -766,7 +762,7 @@ def write_dvar_area(sim, yr_cal, path):
 def write_area_transition_start_end(sim, path):
     
     # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
+    timestamp = sim.timestamp 
     
     print(f'Save transition matrix for start year to end year to {path}\n')
     
@@ -1334,7 +1330,7 @@ def write_ghg_offland_commodity(sim, path):
     print(f'Writing offland commodity GHG to {path}\n')
 
     # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
+    timestamp = sim.timestamp 
 
     # Get the offland commodity data
     offland_ghg = sim.data.OFF_LAND_GHG_EMISSION
