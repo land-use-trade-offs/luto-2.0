@@ -414,7 +414,7 @@ def get_savanna_burning_effect_g_mrj(data, g_mrj):
 
     for m in range(data.NLMS):
         for j in range(nlus):
-            sb_g_mrj[m, :, j] = -data.SAVBURN_TOTAL_TCO2E_HA
+            sb_g_mrj[m, :, j] = -data.SAVBURN_TOTAL_TCO2E_HA * data.REAL_AREA
 
     return sb_g_mrj
 
