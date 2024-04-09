@@ -469,14 +469,18 @@ def save_report_data(sim):
     rev_cost_net_wide.columns = ['name','data']
     rev_cost_net_wide['type'] = 'spline'
     
-    # Define the specific order
-    order = ['Agricultural land-use (revenue)', 'Agricultural management (revenue)', 'Non-agricultural land-use (revenue)',
-             'Agricultural land-use (cost)', 'Agricultural management (cost)', 'Non-agricultural land-use (cost)',
-             'Transition cost','Profit']
-    rev_cost_wide_json['name'] = pd.Categorical(rev_cost_wide_json['name'], categories=order, ordered=True)
-    rev_cost_wide_json = rev_cost_wide_json.sort_values('name')
-    
     rev_cost_wide_json = pd.concat([rev_cost_all_wide,rev_cost_net_wide],axis=0)
+    
+    # Define the specific order
+    order = ['Agricultural land-use (revenue)', 
+             'Agricultural management (revenue)', 
+             'Non-agricultural land-use (revenue)',
+             'Agricultural land-use (cost)', 
+             'Agricultural management (cost)', 
+             'Non-agricultural land-use (cost)',
+             'Transition cost','Profit']
+    rev_cost_wide_json = rev_cost_wide_json.set_index('name').reindex(order).reset_index()
+    
     rev_cost_wide_json.to_json(f'{SAVE_DIR}/economics_0_rev_cost_all_wide.json', orient='records')
     
     
@@ -933,10 +937,10 @@ def save_report_data(sim):
     Ag_man_sequestration_long['Irrigation'] = Ag_man_sequestration_long['Irrigation'].replace({'dry': 'Dryland', 'irr': 'Irrigated'}) 
 
     # Plot_4-5-1: GHG reductions by Agricultural managements in total (Mt)
-    Ag_man_sequestration_total = Ag_man_sequestration_long.groupby(['Year','GHG Category']).sum()['Quantity (Mt CO2e)'].reset_index()
+    Ag_man_sequestration_total = Ag_man_sequestration_long.groupby(['Year','Sources']).sum()['Quantity (Mt CO2e)'].reset_index()
     
     Ag_man_sequestration_total_wide = Ag_man_sequestration_total\
-                                        .groupby(['GHG Category'])[['Year','Quantity (Mt CO2e)']]\
+                                        .groupby(['Sources'])[['Year','Quantity (Mt CO2e)']]\
                                         .apply(lambda x: list(map(list,zip(x['Year'],x['Quantity (Mt CO2e)']))))\
                                         .reset_index()
                                         
