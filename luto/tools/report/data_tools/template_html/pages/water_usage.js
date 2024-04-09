@@ -209,14 +209,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       itemStyle: {
-        fontSize: "11px",
+        fontSize: "13px",
         textOverflow: "ellipsis",
       },
       align: "right",
       verticalAlign: "top",
       layout: "vertical",
       x: 5,
-      y: -10,
+      y: -15,
+      itemMarginTop: 0,
+      itemMarginBottom: 1,
     },
 
     tooltip: {

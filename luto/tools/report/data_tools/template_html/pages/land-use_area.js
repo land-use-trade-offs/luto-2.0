@@ -57,8 +57,10 @@ document.addEventListener("DOMContentLoaded", function () {
       x: 5,
       y: -15,
       itemStyle: {
-        fontSize: '11px'
-      }
+        fontSize: '13px'
+      },
+      itemMarginTop: 0,    // Reduce the top margin
+      itemMarginBottom: 1, // Reduce the bottom margin
     },
 
     tooltip: {
