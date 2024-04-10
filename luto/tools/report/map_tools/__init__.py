@@ -42,10 +42,10 @@ def hex_color_to_numeric(hex_color: str, toFloat: bool = False) -> tuple:
     hex_color = hex_color.lstrip('#')
 
     # Get the red, green, blue, and (optional) alpha components
-    red = int(hex_color[0:2], 16)
+    red = int(hex_color[:2], 16)
     green = int(hex_color[2:4], 16)
     blue = int(hex_color[4:6], 16)
-    
+
     # Add 1 if any of the value equals 0
     if red == 0:
         red += 1
@@ -53,17 +53,14 @@ def hex_color_to_numeric(hex_color: str, toFloat: bool = False) -> tuple:
         green += 1
     if blue == 0:
         blue += 1
-    
+
     # If the color includes an alpha channel
-    if len(hex_color) == 8:  # If the color includes an alpha channel
-        alpha = int(hex_color[6:8], 16)
-    else:
-        alpha = 255
+    alpha = int(hex_color[6:8], 16) if len(hex_color) == 8 else 255
     
     # Convert to float if toFloat is True
     if toFloat:
         red, green, blue, alpha = red/255, green/255, blue/255, alpha/255
- 
+
     return red, green, blue, alpha
     
 
@@ -87,13 +84,13 @@ def convert_1band_to_4band_in_memory(initial_tif:str,
     
     with rasterio.open(initial_tif) as src:
         # Read the 1-band array, return a 2D array (HW)
-        lu_arr = src.read(band)               
+        lu_arr = src.read(band)
         nodata = src.meta['nodata']
-        
+
         # Set the color of nodata value to transparent
         if nodata is not None:
-            color_dict.update({nodata:(0,0,0,0)}) 
-        
+            color_dict[nodata] = (0,0,0,0) 
+
         # Create a new metadata for the 4-band array
         lu_meta = src.meta.copy()
         lu_meta.update(count=4, compress='lzw', dtype='uint8', nodata=None)

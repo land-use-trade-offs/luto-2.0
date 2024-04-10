@@ -39,6 +39,15 @@ from luto.tools.report.data_tools.parameters import (COMMODITIES_OFF_LAND,
 
 # Get the output directory
 def save_report_data(sim):
+    """
+    Save report data for generating graphs and charts.
+
+    Parameters:
+    - sim (Simulation): The simulation object.
+
+    Returns:
+    - None
+    """
     
     # Get the output directory
     raw_data_dir = sim.path

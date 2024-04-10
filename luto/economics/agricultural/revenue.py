@@ -18,10 +18,10 @@
 Pure functions to calculate economic profit from land use.
 """
 
-from typing import Dict
 import numpy as np
 import pandas as pd
 
+from typing import Dict
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
 
@@ -68,7 +68,7 @@ def get_rev_lvstk( data   # Data object or module.
 
     # Get the yield potential, i.e. the total number of heads per hectare.
     yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
-    
+
     # Revenue in $ per cell (includes RESMULT via get_quantity)
     if lvstype == 'BEEF':
 
@@ -78,13 +78,13 @@ def get_rev_lvstk( data   # Data object or module.
                             * data.AGEC_LVSTK['Q1', lvstype]   # Quantity produced per head (meat tonnes/head)
                             * data.AGEC_LVSTK['P1', lvstype] ) # Price per unit quantity ($/tonne of meat)
                             )
-        
+
         rev_lexp = yield_pot * (  
                             ( data.AGEC_LVSTK['F3', lvstype]   # Fraction of herd producing (0 - 1)
                             * data.AGEC_LVSTK['Q3', lvstype]   # Quantity produced per head (animal weight tonnes/head)
                             * data.AGEC_LVSTK['P3', lvstype] ) # Price per unit quantity ($/tonne of animal)
                             )  
-        
+
         # Set Wool and Milk to zero as they are not produced by beef cattle
         rev_wool = rev_milk = np.zeros((data.NCELLS))
 
@@ -101,17 +101,15 @@ def get_rev_lvstk( data   # Data object or module.
                                 * data.AGEC_LVSTK['Q2', lvstype]   # Quantity produced per head (wool tonnes/head)
                                 * data.AGEC_LVSTK['P2', lvstype] ) # Price per unit quantity ($/tonne wool)
                                 )   
-        
+
         rev_lexp = yield_pot * (  # Live exports                   # Stocking density (head/ha)
                                 ( data.AGEC_LVSTK['F3', lvstype]   # Fraction of herd producing (0 - 1) 
                                 * data.AGEC_LVSTK['Q3', lvstype]   # Quantity produced per head (animal weight tonnes/head)
                                 * data.AGEC_LVSTK['P3', lvstype] ) # Price per unit quantity ($/tonne of whole animal)
                                 )
-        
+
         # Set Milk to zero as it is not produced by sheep
         rev_milk = np.zeros((data.NCELLS)) # Set Milk to zero as it is not produced by sheep
-
-
 
 
     elif lvstype == 'DAIRY':
@@ -122,20 +120,20 @@ def get_rev_lvstk( data   # Data object or module.
                                 * data.AGEC_LVSTK['Q1', lvstype]   # Quantity produced per head (milk litres/head)
                                 * data.AGEC_LVSTK['P1', lvstype] ) # Price per unit quantity ($/litre milk)
                                 )
-        
+
         # Set Meat, Wool and Live exports to zero
         rev_meat = rev_wool = rev_lexp = np.zeros((data.NCELLS)) 
 
     else:  # Livestock type is unknown.
-        raise KeyError("Unknown %s livestock type. Check `lvstype`." % lvstype)   
+        raise KeyError(f"Unknown {lvstype} livestock type. Check `lvstype`.")   
 
     # Put the revenues into a MultiIndex DataFrame
     rev_seperate = pd.DataFrame(np.stack((rev_meat, rev_wool, rev_lexp, rev_milk), axis=1), 
                                 columns=pd.MultiIndex.from_product([[lu], [lm], ['Meat', 'Wool', 'Live Exports', 'Milk']]))
-    
+
     # Revenue so far in AUD/ha. Now convert to AUD/cell including resfactor.
     rev_seperate = rev_seperate * data.REAL_AREA.reshape(-1,1) # Convert to AUD/cell
-    
+
     # Return revenue as numpy array.
     return rev_seperate
 
@@ -155,19 +153,16 @@ def get_rev( data    # Data object or module.
     # If it is a crop, it is known how to get the revenue.
     if lu in data.LU_CROPS:
         return get_rev_crop(data, lu, lm, yr_idx)
-    
-    # If it is livestock, it is known how to get the revenue.
+
     elif lu in data.LU_LVSTK:
         return get_rev_lvstk(data, lu, lm, yr_idx)
-    
-    # If neither crop nor livestock but in LANDUSES it is unallocated land.
+
     elif lu in data.AGRICULTURAL_LANDUSES:
         return  pd.DataFrame(np.zeros((data.NCELLS, 1)),
                              columns=pd.MultiIndex.from_product([[lu],[lm],['Revenue']]))
-    
-    # If it is none of the above, it is not known how to get the revenue.
+
     else:
-        raise KeyError("Land-use '%s' not found in data.LANDUSES" % lu)
+        raise KeyError(f"Land-use '{lu}' not found in data.LANDUSES")
 
 
 def get_rev_matrix(data, lm, yr_idx):
@@ -184,21 +179,17 @@ def get_rev_matrices(data, yr_idx, aggregate:bool = True):
 
     # Concatenate the revenue from each land management into a single Multiindex DataFrame.
     rev_rjms = pd.concat([get_rev_matrix(data, lm, yr_idx) for lm in data.LANDMANS], axis=1)
-    
+
     # Reorder the columns to match the multi-level dimension of r*jms.
     rev_rjms = rev_rjms.reindex(columns=pd.MultiIndex.from_product(rev_rjms.columns.levels), fill_value=0)
 
-    if aggregate == True:
-        j,m,s = rev_rjms.columns.levshape
-        r_rjms = rev_rjms.values.reshape(-1,j,m,s)
-        r_mrj = np.einsum('rjms->mrj',r_rjms)
-        return r_mrj
-    
-    elif aggregate == False:
+    if not aggregate:
         # Concatenate the revenue from each land management into a single Multiindex DataFrame.
         return rev_rjms
-    else:
-        raise KeyError("aggregate must be either True or False")
+    
+    j,m,s = rev_rjms.columns.levshape
+    r_rjms = rev_rjms.values.reshape(-1,j,m,s)
+    return np.einsum('rjms->mrj',r_rjms)
 
 
 def get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx):
@@ -215,9 +206,9 @@ def get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx):
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
-        j = lu_codes[lu_idx]
         multiplier = data.ASPARAGOPSIS_DATA[lu].loc[yr_cal, 'Productivity']
         if multiplier != 1:
+            j = lu_codes[lu_idx]
             # The effect is: new value = old value * multiplier - old value
             # E.g. a multiplier of .95 means a 5% reduction in quantity produced
             new_r_mrj[:, :, lu_idx] = r_mrj[:, :, j] * (multiplier - 1)
@@ -239,9 +230,9 @@ def get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx):
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
-        j = lu_codes[lu_idx]
         multiplier = data.PRECISION_AGRICULTURE_DATA[lu].loc[yr_cal, 'Productivity']
         if multiplier != 1:
+            j = lu_codes[lu_idx]
             new_r_mrj[:, :, lu_idx] = r_mrj[:, :, j] * (multiplier - 1)
 
     return new_r_mrj
@@ -261,9 +252,9 @@ def get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx):
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
-        j = lu_codes[lu_idx]
         multiplier = data.ECOLOGICAL_GRAZING_DATA[lu].loc[yr_cal, 'Productivity']
         if multiplier != 1:
+            j = lu_codes[lu_idx]
             new_r_mrj[:, :, lu_idx] = r_mrj[:, :, j] * (multiplier - 1)
 
     return new_r_mrj
@@ -294,27 +285,38 @@ def get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx):
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
-        j = lu_codes[lu_idx]
         multiplier = data.AGTECH_EI_DATA[lu].loc[yr_cal, 'Productivity']
         if multiplier != 1:
+            j = lu_codes[lu_idx]
             new_r_mrj[:, :, lu_idx] = r_mrj[:, :, j] * (multiplier - 1)
 
     return new_r_mrj
 
 
 def get_agricultural_management_revenue_matrices(data, r_mrj, yr_idx) -> Dict[str, np.ndarray]:
+    """
+    Calculate the revenue matrices for different agricultural management practices.
+
+    Args:
+        data: The input data for revenue calculation.
+        r_mrj: The value of r_mrj parameter.
+        yr_idx: The index of the year.
+
+    Returns:
+        A dictionary containing revenue matrices for different agricultural management practices.
+        The keys of the dictionary represent the management practices, and the values are numpy arrays.
+
+    """
     asparagopsis_data = get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx)
     precision_agriculture_data = get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx)
     eco_grazing_data = get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx)
     sav_burning_data = get_savanna_burning_effect_r_mrj(data)
     agtech_ei_data = get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx)
 
-    ag_management_data = {
+    return {
         'Asparagopsis taxiformis': asparagopsis_data,
         'Precision Agriculture': precision_agriculture_data,
         'Ecological Grazing': eco_grazing_data,
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
     }
-
-    return ag_management_data

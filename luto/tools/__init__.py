@@ -240,11 +240,10 @@ def get_base_am_vars(ncells, ncms, n_ag_lus):
     It is assumed that no agricultural management options were used in 2010, 
     so get zero arrays in the correct format.
     """
-    am_vars = {}
-    for am in AG_MANAGEMENTS_TO_LAND_USES:
-        am_vars[am] = np.zeros((ncms, ncells, n_ag_lus))
-
-    return am_vars
+    return {
+        am: np.zeros((ncms, ncells, n_ag_lus))
+        for am in AG_MANAGEMENTS_TO_LAND_USES
+    }
 
 
 def get_ag_and_non_ag_cells(lumap) -> Tuple[np.ndarray, np.ndarray]:
@@ -349,8 +348,8 @@ def timethis(function, *args, **kwargs):
     stop_time_str = time.strftime("%Y-%m-%d %H:%M:%S", stop_time)
 
     print()
-    print("Start time: %s" % start_time_str)
-    print("Stop time: %s" % stop_time_str)
+    print(f"Start time: {start_time_str}")
+    print(f"Stop time: {stop_time_str}")
     print("Elapsed time: %d seconds." % (stop - start))
 
     return return_value
@@ -361,13 +360,7 @@ def mergeorderly(dict1, dict2):
     list1 = list(dict1.keys())
     list2 = list(dict2.keys())
     lst = sorted(list1 + list2)
-    merged = {}
-    for key in lst:
-        if key in list1:
-            merged[key] = dict1[key]
-        else:
-            merged[key] = dict2[key]
-    return merged
+    return {key: dict1[key] if key in list1 else dict2[key] for key in lst}
 
 
 def crosstabulate(before, after, labels):
@@ -471,11 +464,18 @@ def get_water_delta_matrix(w_mrj, l_mrj, data):
     """
     Gets the water delta matrix ($/ha) that applies the cost of installing/removing irrigation to
     base transition costs. Includes the costs of water license fees.
+
+    Parameters:
+    - w_mrj (numpy.ndarray, <unit:ML/cell>): Water requirements matrix for each land-use and land management combination.
+    - l_mrj (numpy.ndarray): Land-use and land management matrix.
+    - data (object): Data object containing necessary information.
+
+    Returns:
+    - w_delta_mrj (numpy.ndarray, <unit:$/cell>).
     """
     # Get water requirements from current agriculture, converting water requirements for LVSTK from ML per head to ML per cell (inc. REAL_AREA).
     # Sum total water requirements of current land-use and land management
     w_r = (w_mrj * l_mrj).sum(axis=0).sum(axis=1)
-
 
     # Net water requirements calculated as the diff in water requirements between current land-use and all other land-uses j.
     w_net_mrj = w_mrj - w_r[:, np.newaxis]
@@ -493,7 +493,7 @@ def get_water_delta_matrix(w_mrj, l_mrj, data):
 
     # Amortise upfront costs to annualised costs
     w_delta_mrj = amortise(w_delta_mrj)
-    return w_delta_mrj
+    return w_delta_mrj * data.REAL_AREA[:, np.newaxis] # <unit:$/cell>
 
 
 def am_name_snake_case(am_name):

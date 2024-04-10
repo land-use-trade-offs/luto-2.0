@@ -96,6 +96,12 @@ def get_cost_beccs(data) -> np.ndarray:
 def get_cost_matrix(data):
     """
     Returns non-agricultural c_rk matrix of costs per cell and land use.
+
+    Parameters:
+    - data: The input data containing information about the cells and land use.
+
+    Returns:
+    - cost_matrix: A 2D numpy array of costs per cell and land use.
     """
     env_plantings_costs = get_cost_env_plantings(data)
     rip_plantings_costs = get_cost_rip_plantings(data)

@@ -67,21 +67,18 @@ def get_exclude_matrices(data, base_year: int, lumaps: Dict[int, np.ndarray]):
 
     # Get all agricultural and non-agricultural cells
     ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)
-    
+
     # Transition costs from current land-use to all other land-uses j using current land-use map (in $/ha).
     t_rj = np.zeros((data.NCELLS, len(data.AGRICULTURAL_LANDUSES)))
     t_rj[ag_cells, :] = t_ij[lumap[ag_cells]]
-    
+
     # For non-agricultural cells, use the original 2010 solve's LUs to determine what LUs are possible for a cell
     t_rj[non_ag_cells, :] = t_ij[lumap_2010[non_ag_cells]]
 
     # To be excluded based on disallowed switches as specified in transition cost matrix i.e., where t_rj is NaN.
     t_rj = np.where(np.isnan(t_rj), 0, 1)
 
-    # Overall exclusion as elementwise, logical `and` of the 0/1 exclude matrices.
-    x_mrj = (x_mrj * t_rj).astype(np.int8)
-    
-    return x_mrj
+    return (x_mrj * t_rj).astype(np.int8)
 
 
 def get_transition_matrices(data, yr_idx, base_year, lumaps, lmmaps, separate=False):
@@ -136,37 +133,36 @@ def get_transition_matrices(data, yr_idx, base_year, lumaps, lmmaps, separate=Fa
     # Separate the establishment costs into dryland and irrigated land management types
     e_rj_dry = np.einsum('rj,r->rj', e_rj, lmmap == 0)
     e_rj_irr = np.einsum('rj,r->rj', e_rj, lmmap == 1)
-    e_mrj = np.stack([e_rj_dry, e_rj_irr], axis=0)
-    
+    e_mrj = np.stack([e_rj_dry, e_rj_irr], axis=0)                                  
+
     # Update the cost matrix with exclude matrices; the transition cost for a cell that remain the same is 0.
-    e_mrj = np.einsum('mrj,mrj,mrj->mrj', e_mrj, x_mrj, l_mrj_not)
+    e_mrj = np.einsum('mrj,mrj,mrj->mrj', e_mrj, x_mrj, l_mrj_not)                   
 
     # -------------------------------------------------------------- #
     # Water license cost (upfront, amortised to annual, per cell).  #
     # -------------------------------------------------------------- #
 
-    w_mrj = get_wreq_matrices(data, yr_idx)
-    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data)
-    w_delta_mrj = np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not)  
+    w_mrj = get_wreq_matrices(data, yr_idx)                                          
+    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data)                  
+    w_delta_mrj = np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not)       
 
     # -------------------------------------------------------------- #
     # Carborn costs of transitioning cells.                          #
     # -------------------------------------------------------------- #
 
     # apply the cost of carbon released by transitioning modified land to natural land
-    ghg_t_mrj = ag_ghg.get_ghg_transition_penalties(data, lumap)
-    ghg_t_mrj_cost = tools.amortise(ghg_t_mrj * settings.CARBON_PRICE_PER_TONNE)
-    ghg_t_mrj_cost = np.einsum('mrj,mrj,mrj->mrj', ghg_t_mrj_cost, x_mrj, l_mrj_not) 
+    ghg_t_mrj = ag_ghg.get_ghg_transition_penalties(data, lumap)                     
+    ghg_t_mrj_cost = tools.amortise(ghg_t_mrj * settings.CARBON_PRICE_PER_TONNE)     
+    ghg_t_mrj_cost = np.einsum('mrj,mrj,mrj->mrj', ghg_t_mrj_cost, x_mrj, l_mrj_not)
 
     # -------------------------------------------------------------- #
     # Total costs.                                                   #
     # -------------------------------------------------------------- #
-    
+
     if separate:
-        return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, 'Carborn resleasing cost': ghg_t_mrj_cost}  
+        return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, 'Carbon emissions cost': ghg_t_mrj_cost}
     else:
-        t_mrj = e_mrj + w_delta_mrj + ghg_t_mrj_cost
-        return t_mrj
+        return e_mrj + w_delta_mrj + ghg_t_mrj_cost
 
 
 def get_asparagopsis_effect_t_mrj(data):
@@ -221,15 +217,13 @@ def get_agricultural_management_transition_matrices(data, t_mrj, yr_idx) -> Dict
     sav_burning_data = get_savanna_burning_effect_t_mrj(data)
     agtech_ei_data = get_agtech_ei_effect_t_mrj(data)
 
-    ag_management_data = {
+    return {
         'Asparagopsis taxiformis': asparagopsis_data,
         'Precision Agriculture': precision_agriculture_data,
         'Ecological Grazing': eco_grazing_data,
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
     }
-
-    return ag_management_data
 
 
 def get_asparagopsis_adoption_limits(data, yr_idx):
@@ -307,13 +301,12 @@ def get_agricultural_management_adoption_limits(data, yr_idx) -> Dict[str, dict]
     savanna_burning_limits = get_savanna_burning_adoption_limit(data)
     agtech_ei_limits = get_agtech_ei_adoption_limit(data, yr_idx)
 
-    adoption_limits = {
+    return {
         'Asparagopsis taxiformis': asparagopsis_limits,
         'Precision Agriculture': precision_agriculture_limits,
         'Ecological Grazing': eco_grazing_limits,
         'Savanna Burning': savanna_burning_limits,
         'AgTech EI': agtech_ei_limits,
     }
-
-    return adoption_limits
-
+    
+    

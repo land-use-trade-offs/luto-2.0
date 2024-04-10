@@ -109,7 +109,14 @@ def get_quantity_matrix(data) -> np.ndarray:
     """
     Get the non-agricultural quantity matrix q_crk.
     Values represent the yield of each commodity c from the cell r when using
-        the non-agricultural land use k.
+    the non-agricultural land use k.
+
+    Parameters:
+    - data: The input data containing information about the land use and commodities.
+
+    Returns:
+    - np.ndarray: The non-agricultural quantity matrix q_crk.
+
     """
     env_plantings_quantity_matrix = get_quantity_env_plantings(data)
     rip_plantings_quantity_matrix = get_quantity_rip_plantings(data)
