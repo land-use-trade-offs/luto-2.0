@@ -553,7 +553,7 @@ def write_cost_transition(sim, yr_cal, path, yr_cal_sim_pre=None):
     # Get the transition cost matrices for agricultural land-use
     if yr_idx == 0:
         ag_transitions_cost_mat = {k: np.zeros((sim.data.NLMS, sim.data.NCELLS, sim.data.N_AG_LUS))  
-                                for k in ['Establishment cost', 'Water license cost', 'Carborn resleasing cost']}
+                                for k in ['Establishment cost', 'Water license cost', 'Carbon emissions cost']}
     else:
         ag_transitions_cost_mat = ag_transitions.get_transition_matrices(sim.data, 
                                                                          yr_idx, 
