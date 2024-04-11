@@ -40,8 +40,8 @@ class SolverInputData:
     ag_x_mrj: np.ndarray  # Agricultural exclude matrices.
     ag_q_mrp: np.ndarray  # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
     ag_ghg_t_mrj: np.ndarray  # GHG emissions released during transitions between agricultural land uses.
-
     ag_to_non_ag_t_rk: np.ndarray  # Agricultural to non-agricultural transition cost matrix.
+    
     non_ag_to_ag_t_mrj: np.ndarray  # Non-agricultural to agricultural transition cost matrices.
     non_ag_t_rk: np.ndarray  # Non-agricultural transition costs matrix
     non_ag_c_rk: np.ndarray  # Non-agricultural production cost matrix.
@@ -60,6 +60,8 @@ class SolverInputData:
     ag_man_w_mrj: dict  # Agricultural management options' water requirement effects.
     ag_man_b_mrj: dict  # Agricultural management options' biodiversity effects.
     ag_man_limits: dict  # Agricultural management options' adoption limits.
+
+    offland_ghg: np.ndarray  # GHG emissions from off-land commodities.
 
     lu2pr_pj: np.ndarray  # Conversion matrix: land-use to product(s).
     pr2cm_cp: np.ndarray  # Conversion matrix: product(s) to commodity.

@@ -19,7 +19,7 @@ To maintain state and handle iteration and data-view changes. This module
 functions as a singleton class. It is intended to be the _only_ part of the
 model that has 'global' varying state.
 """
-
+from datetime import datetime
 import time
 
 import luto.settings as settings

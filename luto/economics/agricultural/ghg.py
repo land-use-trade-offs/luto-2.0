@@ -527,7 +527,7 @@ def get_agtech_ei_effect_g_mrj(data, yr_idx):
                 'CO2E_KG_HA_CROP_MGT',
                 'CO2E_KG_HA_PEST_PROD',
                 'CO2E_KG_HA_SOIL'
-            ]:
+            ]:    
                 # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not use zeros
                 if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
                     continue
