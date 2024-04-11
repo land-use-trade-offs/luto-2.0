@@ -35,7 +35,7 @@ from luto.tools.spatializers import *
 from luto.tools.compmap import *
 import luto.settings as settings
 
-import luto.economics.agricultural.quantity as ag_quantity
+import luto.economics.agricultural.quantity as ag_quantity                      # ag_quantity has already been calculated and stored in <sim.prod_data>
 import luto.economics.agricultural.revenue as ag_revenue
 import luto.economics.agricultural.cost as ag_cost
 import luto.economics.agricultural.transitions as ag_transitions
@@ -43,7 +43,7 @@ import luto.economics.agricultural.ghg as ag_ghg
 import luto.economics.agricultural.water as ag_water
 import luto.economics.agricultural.biodiversity as ag_biodiversity
 
-import luto.economics.non_agricultural.quantity as non_ag_quantity
+import luto.economics.non_agricultural.quantity as non_ag_quantity              # non_ag_quantity is all zeros, so skip the calculation here
 import luto.economics.non_agricultural.revenue as non_ag_revenue
 import luto.economics.non_agricultural.cost as non_ag_cost
 import luto.economics.non_agricultural.transitions as non_ag_transitions
@@ -152,9 +152,10 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     # Write the reset outputs
     write_dvar_area(data, yr_cal, path_yr)
     write_quantity(data, yr_cal, path_yr, yr_cal_sim_pre)
-    write_ag_revenue_cost(data, yr_cal, path_yr)
-    write_ag_management_revenue_cost(data, yr_cal, path_yr)
-    write_non_ag_revenue_cost(data, yr_cal, path_yr)
+    write_revenue_cost_ag(data, yr_cal, path_yr)
+    write_revenue_cost_ag_management(data, yr_cal, path_yr)
+    write_revenue_cost_non_ag(data, yr_cal, path_yr)
+    write_cost_transition(data, yr_cal, path_yr)
     write_water(data, yr_cal, path_yr)
     write_ghg(data, yr_cal, path_yr)
     write_ghg_separate(data, yr_cal, path_yr)
@@ -404,7 +405,7 @@ def write_quantity(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         
 
 
-def write_ag_revenue_cost(data: Data, yr_cal, path):
+def write_revenue_cost_ag(data: Data, yr_cal, path):
     """Calculate agricultural revenue. Takes a simulation object, a target calendar 
        year (e.g., 2030), and an output path as input."""
 
@@ -458,7 +459,7 @@ def write_ag_revenue_cost(data: Data, yr_cal, path):
     df_cost.to_csv(os.path.join(path, f'cost_agricultural_commodity_{timestamp}.csv'))
     
 
-def write_ag_management_revenue_cost(data: Data, yr_cal, path):
+def write_revenue_cost_ag_management(data: Data, yr_cal, path):
     """Calculate agricultural management revenue and cost."""
     
     # Get the timestamp so each CSV in the timeseries mode has a unique name
@@ -520,15 +521,163 @@ def write_ag_management_revenue_cost(data: Data, yr_cal, path):
     
     revenue_am_df.to_csv(os.path.join(path, f'revenue_agricultural_management_{timestamp}.csv'), index = False)
     cost_am_df.to_csv(os.path.join(path, f'cost_agricultural_management_{timestamp}.csv'), index = False)
+    
+    
+    
+def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
+    """Calculate transition cost."""
+    
+    print(f'Writing transition cost outputs to {path}')
+    
+    timestamp = data.timestamp_sim
+    
+    # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
+    simulated_year_list = sorted(list(data.lumaps.keys()))
+    # Get index of yr_cal in timeseries (e.g., if yr_cal is 2050 then yr_idx = 40)
+    yr_idx = yr_cal - data.YR_CAL_BASE
+    # Get index of yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_idx_sim = 2 if snapshot)
+    yr_idx_sim = simulated_year_list.index(yr_cal)
+    # Get index of year previous to yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_cal_sim_pre = 2010 if snapshot)
+    yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
+    
+    
+    # Get the decision variables for agricultural land-use
+    ag_dvar = data.ag_dvars[yr_cal]                          # (m,r,j)
+    # Get the non-agricultural decision variable
+    non_ag_dvar = data.non_ag_dvars[yr_cal]                  # (r,k)
+    
+
+    #---------------------------------------------------------------------
+    #              Agricultural land-use transition costs
+    #---------------------------------------------------------------------
+    
+    # Get the transition cost matrices for agricultural land-use
+    if yr_idx == 0:
+        ag_transitions_cost_mat = {k: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))  
+                                for k in ['Establishment cost', 'Water license cost', 'Carbon emissions cost']}
+    else:
+        ag_transitions_cost_mat = ag_transitions.get_transition_matrices(data, 
+                                                                         yr_idx, 
+                                                                         yr_cal_sim_pre,
+                                                                         data.lumaps,
+                                                                         data.lmmaps,
+                                                                         separate = True)
+        
+    cost_dfs = []   
+    # Convert the transition cost matrices to a DataFrame
+    for cost_type in ag_transitions_cost_mat.keys():
+        
+        arr = np.nan_to_num(ag_transitions_cost_mat[cost_type])     # Get the transition cost matrix
+        arr = np.einsum('mrj,mrj->mj', arr, ag_dvar)                # Multiply by decision variables, sum over landmans (m dimension)    
+        
+        arr_df = pd.DataFrame(arr.flatten(), 
+                        index=pd.MultiIndex.from_product([data.LANDMANS, data.AGRICULTURAL_LANDUSES], 
+                        names=['Water Supply', 'Land Use']), 
+                        columns=['Cost ($)']).reset_index()
+        arr_df.insert(0, 'Type', cost_type)
+        arr_df.insert(1, 'year', yr_cal)
+        cost_dfs.append(arr_df)
+
+    # Save the cost DataFrames 
+    cost_df = pd.concat(cost_dfs, axis=0)
+    cost_df.to_csv(os.path.join(path, f'cost_transition_ag2ag_{timestamp}.csv'), index=False)
+    
+    
+    
+    
+    #---------------------------------------------------------------------
+    #              Agricultural management transition costs
+    #---------------------------------------------------------------------
+    
+    # The agricultural management transition cost are all zeros, so skip the calculation here
+    # am_cost = ag_transitions.get_agricultural_management_transition_matrices(sim.data) 
+    
+    
+    
+    
+    #--------------------------------------------------------------------
+    #              Non-agricultural land-use transition costs (from ag to non-ag)
+    #--------------------------------------------------------------------
+    
+    # Get the transition cost matirces for non-agricultural land-use
+    if yr_idx == 0:
+        non_ag_transitions_cost_mat = {k:{'Transition cost':np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))}
+                                   for k in data.NON_AGRICULTURAL_LANDUSES}
+    else:
+        non_ag_transitions_cost_mat = non_ag_transitions.get_from_ag_transition_matrix(data,
+                                                                                       yr_idx,
+                                                                                       data.lumaps[yr_cal],
+                                                                                       data.lmmaps[yr_cal],
+                                                                                       separate=True)
+        
+    cost_dfs = []
+    for idx,non_ag_type in enumerate(non_ag_transitions_cost_mat):
+        for cost_type in non_ag_transitions_cost_mat[non_ag_type]:
+            
+            arr = non_ag_transitions_cost_mat[non_ag_type][cost_type]          # Get the transition cost matrix 
+            arr = np.einsum('mrj,r->mj', arr, non_ag_dvar[:,idx])              # Multiply the transition cost matrix by the cost of non-agricultural land-use
+            
+                    
+            arr_df = pd.DataFrame(arr.flatten(), 
+                                index=pd.MultiIndex.from_product([data.LANDMANS, data.AGRICULTURAL_LANDUSES],names=['Water supply', 'From land-use']), 
+                                columns=['Cost ($)']).reset_index()
+            arr_df.insert(0, 'To land-use', non_ag_type)
+            arr_df.insert(1, 'Cost type', cost_type)
+            arr_df.insert(2, 'year', yr_cal)
+            cost_dfs.append(arr_df)
+    
+    # Save the cost DataFrames
+    cost_df = pd.concat(cost_dfs, axis=0)
+    cost_df.to_csv(os.path.join(path, f'cost_transition_ag2non_ag_{timestamp}.csv'), index=False)
+    
+    
+    
+    
+    #--------------------------------------------------------------------
+    #              Non-agricultural land-use transition costs (from non-ag to ag)
+    #--------------------------------------------------------------------
+    
+    # Get the transition cost matirces for non-agricultural land-use
+    if yr_idx == 0:
+        non_ag_transitions_cost_mat = {k:{'Transition cost':np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))}
+                                        for k in data.NON_AGRICULTURAL_LANDUSES}
+    else:
+        non_ag_transitions_cost_mat = non_ag_transitions.get_to_ag_transition_matrix(data,
+                                                                                    yr_idx,
+                                                                                    data.lumaps[yr_cal],
+                                                                                    data.lmmaps[yr_cal],
+                                                                                    separate=True)
+        
+    cost_dfs = []
+    for idx, non_ag_type in enumerate(non_ag_transitions_cost_mat):
+        for cost_type in non_ag_transitions_cost_mat[non_ag_type]:
+            
+            arr = non_ag_transitions_cost_mat[non_ag_type][cost_type]          # Get the transition cost matrix 
+            arr = np.einsum('mrj,mrj->mj', arr, ag_dvar)                       # Multiply the transition cost matrix by the cost of non-agricultural land-use
+            
+                    
+            arr_df = pd.DataFrame(arr.flatten(), 
+                                index=pd.MultiIndex.from_product([data.LANDMANS, data.AGRICULTURAL_LANDUSES],names=['Water supply', 'To land-use']), 
+                                columns=['Cost ($)']).reset_index()
+            arr_df.insert(0, 'From land-use', non_ag_type)
+            arr_df.insert(1, 'Cost type', cost_type)
+            arr_df.insert(2, 'year', yr_cal)
+            cost_dfs.append(arr_df)
+
+    # Save the cost DataFrames
+    cost_df = pd.concat(cost_dfs, axis=0)
+    cost_df.to_csv(os.path.join(path, f'cost_transition_non_ag2_ag_{timestamp}.csv'), index=False)
 
 
 
-def write_non_ag_revenue_cost(data: Data, yr_cal, path):
+
+
+
+
+def write_revenue_cost_non_ag(data: Data, yr_cal, path):
     """Calculate non_agricultural cost. """
 
-    # Get the timestamp so each CSV in the timeseries mode has a unique name
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
-    timestamp = str(yr_cal) + '_' + timestamp
+    timestamp = data.timestamp_sim
 
     print(f'Writing non agricultural management cost outputs to {path}')
     non_ag_dvar = data.non_ag_dvars[yr_cal]
@@ -612,7 +761,7 @@ def write_dvar_area(data: Data, yr_cal, path):
 def write_area_transition_start_end(data: Data, path):
     
     # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
+    timestamp = data.timestamp_sim 
     
     print(f'Save transition matrix for start year to end year to {path}\n')
     
@@ -696,15 +845,10 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
                                      , data.NON_AGRICULTURAL_LANDUSES
                                      , data.REAL_AREA)
         
-        # ctams = {}
-        # swams = {}
+
         ctass = {}
         swass = {}
-        for am in AG_MANAGEMENTS_TO_LAND_USES:
-            # ctam, swam = ammap_crossmap(data.ammaps[yr_pre][am], data.ammaps[yr_cal][am], am)
-            # ctams[am] = ctam
-            # swams[am] = swam
-        
+        for am in AG_MANAGEMENTS_TO_LAND_USES:        
             ctas, swas = crossmap_amstat( am
                                         , data.lumaps[yr_cal_sim_pre]
                                         , data.ammaps[yr_cal_sim_pre][am]
@@ -718,18 +862,13 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             
         ctlu.to_csv(os.path.join(path, f'crosstab-lumap_{timestamp}.csv'))
         ctlm.to_csv(os.path.join(path, f'crosstab-lmmap_{timestamp}.csv'))
-
         swlu.to_csv(os.path.join(path, f'switches-lumap_{timestamp}.csv'))
         swlm.to_csv(os.path.join(path, f'switches-lmmap_{timestamp}.csv'))
-
         cthp.to_csv(os.path.join(path, f'crosstab-irrstat_{timestamp}.csv'))
         swhp.to_csv(os.path.join(path, f'switches-irrstat_{timestamp}.csv'))
         
         for am in AG_MANAGEMENTS_TO_LAND_USES:
             am_snake_case = tools.am_name_snake_case(am).replace("_", "-")
-            # ctams[am].to_csv(os.path.join(path, f'crosstab-{am_snake_case}-ammap_{timestamp}.csv'))
-            # swams[am].to_csv(os.path.join(path, f'switches-{am_snake_case}-ammap_{timestamp}.csv'))
-
             ctass[am].to_csv(os.path.join(path, f'crosstab-amstat-{am_snake_case}_{timestamp}.csv'))
             swass[am].to_csv(os.path.join(path, f'switches-amstat-{am_snake_case}_{timestamp}.csv'))
 
@@ -1190,7 +1329,7 @@ def write_ghg_offland_commodity(data: Data, path):
     print(f'Writing offland commodity GHG to {path}\n')
 
     # Append the yr_cal to timestamp as prefix
-    timestamp = re.findall(r'\d{4}_\d{2}_\d{2}__\d{2}_\d{2}_\d{2}', path)[0]
+    timestamp = data.timestamp_sim
 
     # Get the offland commodity data
     offland_ghg = data.OFF_LAND_GHG_EMISSION
