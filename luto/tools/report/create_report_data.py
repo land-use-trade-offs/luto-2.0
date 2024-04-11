@@ -8,6 +8,7 @@ import pandas as pd
 from glob import glob
 from joblib import Parallel, delayed
 import luto.settings as settings
+from luto.data import Data
 
 from luto.economics.off_land_commodity import get_demand_df
 from luto.tools.report.data_tools.colors import LANDUSE_ALL_COLORS, COMMODITIES_ALL_COLORS
@@ -38,10 +39,10 @@ from luto.tools.report.data_tools.parameters import (COMMODITIES_OFF_LAND,
                                                      NON_AG_LANDUSE)
 
 # Get the output directory
-def save_report_data(sim):
+def save_report_data(data: Data):
     
     # Get the output directory
-    raw_data_dir = sim.path
+    raw_data_dir = data.path
 
     # Set the save directory    
     SAVE_DIR = f'{raw_data_dir}/DATA_REPORT/data'

@@ -109,13 +109,16 @@ class Data:
     Contains all data required for the LUTO model to run. Loads all data upon initialisation.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, timestamp: str) -> None:
         """
         Sets up output containers (lumaps, lmmaps, etc) and loads all LUTO data, adjusted
         for resfactor.
         """
         # Path for write module - overwrite when provided with a base and target year
         self.path = None
+        # Timestamp of simulation to which this object belongs - will be updated each time a simulation
+        # is run using this Data object.
+        self.timestamp_sim = timestamp
 
         # Setup output containers
         self.lumaps = {}
@@ -1038,9 +1041,6 @@ class Data:
     def set_path(self, base_year, target_year) -> str:
         """Create a folder for storing outputs and return folder name."""
 
-        # Get date and time
-        timestamp = datetime.today().strftime("%Y_%m_%d__%H_%M_%S")
-
         # Get the years to write
         if MODE == "snapshot":
             yr_all = [base_year, target_year]
@@ -1069,7 +1069,7 @@ class Data:
         )
 
         # Create path name
-        self.path = "output/" + timestamp + post
+        self.path = "output/" + self.timestamp_sim + post
 
         # Get all paths
         paths = (

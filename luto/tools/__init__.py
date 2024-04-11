@@ -63,14 +63,14 @@ def report_on_path(path:str):
     
     # Creating the fake simulation object
     class fake:pass
-    sim = fake()
-    sim.path = path
+    data = fake()
+    data.path = path
     
     if settings.WRITE_OUTPUT_GEOTIFFS and os.path.exists(f"{path}/data/Map_data"):
-        TIF2MAP(sim) 
+        TIF2MAP(data) 
         
-    save_report_data(sim)
-    data2html(sim)
+    save_report_data(data)
+    data2html(data)
 
 
 def lumap2ag_l_mrj(lumap, lmmap):

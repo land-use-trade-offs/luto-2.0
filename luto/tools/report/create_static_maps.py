@@ -1,5 +1,6 @@
 from joblib import Parallel, delayed
 import luto.settings as settings
+from luto.data import Data
 
 from luto.tools.report.data_tools import  get_all_files
 
@@ -13,10 +14,10 @@ from luto.tools.report.map_tools.helper import (get_map_meta,
 
 
 
-def TIF2MAP(sim):
+def TIF2MAP(data: Data):
 
     # Get the output directory
-    raw_data_dir = sim.path
+    raw_data_dir = data.path
     # Get all LUTO output files and store them in a dataframe
     files = get_all_files(raw_data_dir)
     # Get the initial tif files

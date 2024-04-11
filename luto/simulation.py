@@ -38,7 +38,7 @@ def load_data() -> Data:
     """
     Load the Data object containing all required data to run a LUTO simulation.
     """
-    return Data()
+    return Data(timestamp=timestamp)
 
 
 def solve_timeseries(data: Data, steps: int, base: int, target: int):
