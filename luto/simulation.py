@@ -30,6 +30,9 @@ from luto.economics.production import get_production
 from luto.solvers.input_data import SolverInputData, get_input_data
 from luto.solvers.solver import LutoSolver
 
+# Get date and time
+timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
+
 
 def load_data() -> Data:
     """
@@ -39,12 +42,13 @@ def load_data() -> Data:
 
 
 def solve_timeseries(data: Data, steps: int, base: int, target: int):
+    print('\n')
     print( "\nRunning LUTO %s timeseries from %s to %s at resfactor %s, starting at %s." % (settings.VERSION, base, target, settings.RESFACTOR, time.ctime()), flush=True )
 
     for s in range(steps):
-        print( "\n-------------------------------------------------", end=' ')
-        print( f"Running for year %s... {base + s + 1}"   )
-        print( "-------------------------------------------------\n", end=' ' )
+        print( "-------------------------------------------------")
+        print( f"Running for year {base + s + 1}"   )
+        print( "-------------------------------------------------\n" )
         start_time = time.time()
 
         input_data = get_input_data(data, base + s, base + s + 1)
@@ -79,7 +83,7 @@ def solve_timeseries(data: Data, steps: int, base: int, target: int):
         data.add_ag_man_dvars(yr, solution.ag_man_X_mrj)
         data.add_production_data(yr, solution.prod_data)
 
-        print(f'Total processing time... {round(time.time() - start_time)} seconds', end=' ' )
+        print(f'Processing for {base + s + 1} completed in {round(time.time() - start_time)} seconds\n\n' )
 
 
 def solve_snapshot(data: Data, base: int, target: int):
@@ -88,10 +92,11 @@ def solve_snapshot(data: Data, base: int, target: int):
     else:
         d_c = data.D_CY
 
-    print( "\nRunning LUTO %s snapshot for %s at resfactor %s, starting at %s" % (settings.VERSION, target, settings.RESFACTOR, time.ctime()), flush=True )
-    print( "\n-------------------------------------------------", end=' ')
-    print( f"Running for year... {target}"   )
-    print( "-------------------------------------------------\n", end=' ' )
+    print('\n')
+    print( f"Running LUTO {settings.VERSION} snapshot for {target} at resfactor {settings.RESFACTOR}" )
+    print( "-------------------------------------------------" )
+    print( f"Running for year {target}" )
+    print( "-------------------------------------------------" )
 
     start_time = time.time()
     input_data = get_input_data(data, base, target)
@@ -107,10 +112,9 @@ def solve_snapshot(data: Data, base: int, target: int):
     data.add_ag_man_dvars(target, solution.ag_man_X_mrj)
     data.add_production_data(target, solution.prod_data)
     
-    print(f'Total processing time... {round(time.time() - start_time)} seconds', end=' ')
+    print(f'Processing for {target} completed in {round(time.time() - start_time)} seconds\n\n')
 
-
-@tools.LogToFile(f"{settings.OUTPUT_DIR}/run")
+@tools.LogToFile(f"{settings.OUTPUT_DIR}/run_{timestamp}")
 def run( data: Data, base: int, target: int) -> None:
     """
     Run the simulation.

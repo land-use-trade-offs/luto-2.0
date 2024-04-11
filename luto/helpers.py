@@ -39,14 +39,27 @@ write_outputs(sim)
 from luto.dataprep import create_new_dataset
 create_new_dataset()
 
-from luto.tools.write import *
 import luto.simulation as sim
 from luto.data import Data
 from luto.economics.production import get_production
 
 
 sim.run( 2010, 2050 )
+from luto.tools.write import write_outputs
 write_outputs(sim)
+
+
+
+
+
+# Generating report on existing output folder
+from luto.tools import report_on_path
+data_path = 'path_to_output_folder'
+report_on_path(data_path)  
+
+# Write input arrays to tiff files
+from luto.tools.report.write_input_data.array2tif import write_input2tiff
+write_input2tiff(sim, 2050)
 
 
 
@@ -56,7 +69,6 @@ write_outputs(sim)
 
 import pandas as pd
 import numpy as np
-from luto.tools import amortise
 import luto.simulation as sim
 import luto.economics.agricultural.transitions as ag_transition
 import luto.economics.agricultural.cost as ag_cost

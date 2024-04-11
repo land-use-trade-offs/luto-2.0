@@ -21,11 +21,7 @@ By Fjalar de Haan and Brett Bryan (b.bryan@deakin.edu.au).
 
 import os.path
 import numpy as np
-try:
-    import rasterio
-except:
-    from osgeo import gdal
-    import rasterio
+import rasterio
 from scipy.interpolate import NearestNDInterpolator
 import luto.settings as settings
 from luto.data import Data
@@ -103,7 +99,7 @@ def uncoursify(data: Data, lxmap):
     f = NearestNDInterpolator(knownindices, lxmap)
     
     # The uncoursified map is obtained by interpolating the missing values.
-    return f(allindices).astype(np.float16) 
+    return f(allindices)
 
 
 

@@ -121,16 +121,54 @@ def get_ecological_grazing_effect_w_mrj(data: Data, w_mrj, yr_idx):
     return new_w_mrj
 
 
+def get_savanna_burning_effect_w_mrj(data):
+    """
+    Applies the effects of using savanna burning to the water requirements data
+    for all relevant agr. land uses.
+
+    Savanna burning does not affect water usage, so return an array of zeros.
+    """
+    nlus = len(AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
+    return np.zeros((data.NLMS, data.NCELLS, nlus))
+
+
+def get_agtech_ei_effect_w_mrj(data, w_mrj, yr_idx):
+    """
+    Applies the effects of using AgTech EI to the water requirements data
+    for all relevant agr. land uses.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']
+    lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Set up the effects matrix
+    new_w_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    # Update values in the new matrix using the correct multiplier for each LU
+    for lu_idx, lu in enumerate(land_uses):
+        j = lu_codes[lu_idx]
+        multiplier = data.AGTECH_EI_DATA[lu].loc[yr_cal, "Water_use"]
+        if multiplier != 1:
+            # The effect is: new value = old value * multiplier - old value
+            # E.g. a multiplier of .95 means a 5% reduction in quantity produced
+            new_w_mrj[:, :, lu_idx] = w_mrj[:, :, j] * (multiplier - 1)
+
+    return new_w_mrj
+
 
 def get_agricultural_management_water_matrices(data: Data, w_mrj, yr_idx) -> Dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_w_mrj(data, w_mrj, yr_idx)
     precision_agriculture_data = get_precision_agriculture_effect_w_mrj(data, w_mrj, yr_idx)
     eco_grazing_data = get_ecological_grazing_effect_w_mrj(data, w_mrj, yr_idx)
+    sav_burning_data = get_savanna_burning_effect_w_mrj(data)
+    agtech_ei_data = get_agtech_ei_effect_w_mrj(data, w_mrj, yr_idx)
 
     ag_management_data = {
         'Asparagopsis taxiformis': asparagopsis_data,
         'Precision Agriculture': precision_agriculture_data,
         'Ecological Grazing': eco_grazing_data,
+        'Savanna Burning': sav_burning_data,
+        'AgTech EI': agtech_ei_data,
     }
 
     return ag_management_data
@@ -142,12 +180,14 @@ def get_wuse_limits(data):
     """
 
     # Set up data for river regions or drainage divisions
-    if settings.WATER_REGION_DEF == 'RR':
-        region_limits = data.RIVREG_LIMITS # settings.WATER_RIVREGS
+    if settings.WATER_REGION_DEF == 'River Region':
+        region_name = data.RIVREG_DICT
+        region_limits = data.RIVREG_LIMITS
         region_id = data.RIVREG_ID
         
-    elif settings.WATER_REGION_DEF == 'DD':
-        region_limits = data.DRAINDIV_LIMITS # settings.WATER_DRAINDIVS
+    elif settings.WATER_REGION_DEF == 'Drainage Division':
+        region_name = data.DRAINDIV_DICT
+        region_limits = data.DRAINDIV_LIMITS
         region_id = data.DRAINDIV_ID
         
     else:
@@ -176,7 +216,7 @@ def get_wuse_limits(data):
             wuse_reg_limit = np.sum( w_lim_r[ind] )
     
             # Append to list
-            wuse_limits.append( (region, wuse_reg_limit, ind) )
+            wuse_limits.append( (region, region_name[region], wuse_reg_limit, ind) )
             
     
     elif settings.WATER_LIMITS_TYPE == 'water_stress':
@@ -191,7 +231,7 @@ def get_wuse_limits(data):
             wuse_reg_limit = region_limits[region] * settings.WATER_STRESS_FRACTION   # np.sum( w_lim_r[ind] )
     
             # Append to list
-            wuse_limits.append( (region, wuse_reg_limit, ind) )
+            wuse_limits.append( (region, region_name[region], wuse_reg_limit, ind) )
             
 
     return wuse_limits

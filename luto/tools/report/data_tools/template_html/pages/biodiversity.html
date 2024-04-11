@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/danfojs@1.1.2/lib/bundle.min.js"></script>
+
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/modules/accessibility.js"></script>
+    <script src="https://code.highcharts.com/modules/data.js"></script>
+    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+    <script src="https://code.highcharts.com/modules/export-data.js"></script>
+    <script src="https://code.highcharts.com/highcharts-more.js"></script>
+    <script src="https://blacklabel.github.io/grouped_categories/grouped-categories.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+    <title>Biodiversity</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="biodiversity.css">
+</head>
+<body>
+    <script src="biodiversity.js">
+    </script>
+
+    <!-- The sidebar -->
+    <div class="sidebar">
+        <a href="../index.html">Scenario Settings</a>
+        <a href="./land-use_area.html">Land-use Area</a>
+        <a href="./production.html">Demand and Production</a>
+        <a href="./economics.html">Economics</a>         
+        <a href="./GHG_emissions.html">GHG Emissions</a>
+        <a href="./water_usage.html">Water Use</a>        
+        <a class="active" href="./biodiversity.html">Biodiversity</a>  
+        <a href="./spatial_maps.html">Maps</a>       
+
+
+    </div>
+
+    <div class="content">
+        <h1>Biodiversity</h1>
+
+        <!-- Chart:biodiversity_1_total_score_by_category -->
+        <div class="fig" id="biodiversity_1_total_score_by_category"></div>
+
+        <!-- Chart:biodiversity_2_total_score_by_irrigation -->
+        <!-- <div class="fig" id="biodiversity_2_total_score_by_irrigation"></div> -->
+
+        <!-- Chart:biodiversity_3_total_score_by_landuse -->
+        <div class="fig" id="biodiversity_3_total_score_by_landuse"></div>
+
+        <!-- Chart:biodiversity_4_natural_land_area -->
+        <div class="fig" id="biodiversity_4_natural_land_area"></div>
+
+
+    </div>
+
+
+    <div id="data_csv" style="display: none;"></div>
+    
+</body>
+</html>

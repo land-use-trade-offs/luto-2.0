@@ -185,12 +185,15 @@ def get_rev_matrices(data: Data, yr_idx, aggregate:bool = True):
 
     # Concatenate the revenue from each land management into a single Multiindex DataFrame.
     rev_rjms = pd.concat([get_rev_matrix(data, lm, yr_idx) for lm in data.LANDMANS], axis=1)
+    
+    # Reorder the columns to match the multi-level dimension of r*jms.
+    rev_rjms = rev_rjms.reindex(columns=pd.MultiIndex.from_product(rev_rjms.columns.levels), fill_value=0)
 
     if aggregate == True:
         j,m,s = rev_rjms.columns.levshape
-        rev_rjm = rev_rjms.groupby(level=[0,1],axis=1).sum().values.reshape(-1,*[j,m])
-        rev_mrj = np.einsum('rjm->mrj',rev_rjm)
-        return rev_mrj
+        r_rjms = rev_rjms.values.reshape(-1,j,m,s)
+        r_mrj = np.einsum('rjms->mrj',r_rjms)
+        return r_mrj
     
     elif aggregate == False:
         # Concatenate the revenue from each land management into a single Multiindex DataFrame.
@@ -267,15 +270,85 @@ def get_ecological_grazing_effect_r_mrj(data: Data, r_mrj, yr_idx):
     return new_r_mrj
 
 
+def get_savanna_burning_effect_r_mrj(data):
+    """
+    Applies the effects of using EDS savanna burning to the revenue data
+    for all relevant agr. land uses.
+
+    Since EDSSB has no effect on revenue, return an array of zeros.
+    """
+    nlus = len(AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
+    return np.zeros((data.NLMS, data.NCELLS, nlus))
+
+
+def get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx):
+    """
+    Applies the effects of using AgTech EI to the revenue data
+    for all relevant agr. land uses.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Set up the effects matrix
+    new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    # Update values in the new matrix using the correct multiplier for each LU
+    for lu_idx, lu in enumerate(land_uses):
+        j = lu_codes[lu_idx]
+        multiplier = data.AGTECH_EI_DATA[lu].loc[yr_cal, 'Productivity']
+        if multiplier != 1:
+            new_r_mrj[:, :, lu_idx] = r_mrj[:, :, j] * (multiplier - 1)
+
+    return new_r_mrj
+
+
+def get_savanna_burning_effect_r_mrj(data):
+    """
+    Applies the effects of using EDS savanna burning to the revenue data
+    for all relevant agr. land uses.
+
+    Since EDSSB has no effect on revenue, return an array of zeros.
+    """
+    nlus = len(AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
+    return np.zeros((data.NLMS, data.NCELLS, nlus))
+
+
+def get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx):
+    """
+    Applies the effects of using AgTech EI to the revenue data
+    for all relevant agr. land uses.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Set up the effects matrix
+    new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    # Update values in the new matrix using the correct multiplier for each LU
+    for lu_idx, lu in enumerate(land_uses):
+        j = lu_codes[lu_idx]
+        multiplier = data.AGTECH_EI_DATA[lu].loc[yr_cal, 'Productivity']
+        if multiplier != 1:
+            new_r_mrj[:, :, lu_idx] = r_mrj[:, :, j] * (multiplier - 1)
+
+    return new_r_mrj
+
+
 def get_agricultural_management_revenue_matrices(data: Data, r_mrj, yr_idx) -> Dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx)
     precision_agriculture_data = get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx)
     eco_grazing_data = get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx)
+    sav_burning_data = get_savanna_burning_effect_r_mrj(data)
+    agtech_ei_data = get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx)
 
     ag_management_data = {
         'Asparagopsis taxiformis': asparagopsis_data,
         'Precision Agriculture': precision_agriculture_data,
         'Ecological Grazing': eco_grazing_data,
+        'Savanna Burning': sav_burning_data,
+        'AgTech EI': agtech_ei_data,
     }
 
     return ag_management_data
