@@ -387,6 +387,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_w_mrj=get_ag_man_water(data, target_index, ag_w_mrj),
         ag_man_b_mrj=get_ag_man_biodiversity(data, ag_b_mrj),
         ag_man_limits=get_ag_man_limits(data, target_index),
+        offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_year - data.YR_CAL_BASE],
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,
         limits=get_limits(data, target_year),

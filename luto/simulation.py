@@ -23,7 +23,7 @@ from datetime import datetime
 import time
 
 import luto.settings as settings
-from luto.data import Data
+from luto.data import Data, get_base_am_vars, lumap2ag_l_mrj, lumap2non_ag_l_mk
 
 from luto import tools
 from luto.economics.production import get_production
@@ -132,9 +132,9 @@ def run( data: Data, base: int, target: int) -> None:
         data.prod_data[data.YR_CAL_BASE]["Production"] = get_production(
             data,
             data.YR_CAL_BASE,
-            tools.lumap2ag_l_mrj(data.LUMAP, data.LMMAP),
-            tools.lumap2non_ag_l_mk(data.LUMAP, len(data.NON_AGRICULTURAL_LANDUSES)),
-            tools.get_base_am_vars(data.NCELLS, data.NLMS, data.N_AG_LUS),
+            lumap2ag_l_mrj(data.LUMAP, data.LMMAP),
+            lumap2non_ag_l_mk(data.LUMAP, len(data.NON_AGRICULTURAL_LANDUSES)),
+            get_base_am_vars(data.NCELLS, data.NLMS, data.N_AG_LUS),
         )
         print("Done.")
 
@@ -155,3 +155,8 @@ def run( data: Data, base: int, target: int) -> None:
 
     else:
         raise ValueError("Unkown MODE: %s." % settings.MODE)
+    
+
+def load_data_and_run_test():
+    from memory_profiler import memory_usage
+    

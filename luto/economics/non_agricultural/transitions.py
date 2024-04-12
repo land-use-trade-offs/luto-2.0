@@ -1,7 +1,7 @@
 import numpy as np
 
 from luto import settings
-from luto.data import Data
+from luto.data import Data, lumap2ag_l_mrj
 import luto.tools as tools
 import luto.economics.agricultural.water as ag_water
 
@@ -22,7 +22,7 @@ def get_env_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
     """
     
     base_ag_to_ep_t = data.AG2EP_TRANSITION_COSTS_HA
-    l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
+    l_mrj = lumap2ag_l_mrj(lumap, lmmap)
     base_ag_to_ep_t_mrj = np.broadcast_to(base_ag_to_ep_t, (data.NLMS, data.NCELLS, base_ag_to_ep_t.shape[0]))
 
     # Amortise base costs to be annualised
@@ -65,7 +65,7 @@ def get_rip_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
     fencing_cost = data.RP_FENCING_LENGTH * data.REAL_AREA * settings.RIPARIAN_PLANTINGS_FENCING_COST_PER_M
     
     if separate:
-        l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
+        l_mrj = lumap2ag_l_mrj(lumap, lmmap)
         base_costs.update({'Fencing cost':np.einsum('r,mrj->mrj', fencing_cost, l_mrj)})
         return base_costs
     else:
@@ -85,7 +85,7 @@ def get_agroforestry_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separ
     fencing_cost = settings.AF_FENCING_LENGTH * data.REAL_AREA * settings.AGROFORESTRY_FENCING_COST_PER_M
     
     if separate:
-        l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
+        l_mrj = lumap2ag_l_mrj(lumap, lmmap)
         base_costs.update({'Fencing cost':np.einsum('r,mrj->mrj', fencing_cost, l_mrj)})
         return base_costs
     else:
@@ -102,7 +102,7 @@ def get_carbon_plantings_block_from_ag(data, yr_idx, lumap, lmmap, separate=Fals
         1-D array, indexed by cell.
     """
     base_ag_to_cp_t = data.AG2EP_TRANSITION_COSTS_HA
-    l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
+    l_mrj = lumap2ag_l_mrj(lumap, lmmap)
     base_ag_to_cp_t_mrj = np.broadcast_to(base_ag_to_cp_t, (2, data.NCELLS, base_ag_to_cp_t.shape[0]))
 
     # Amortise base costs to be annualised
@@ -144,7 +144,7 @@ def get_carbon_plantings_belt_from_ag(data, yr_idx, lumap, lmmap, separate=False
     fencing_cost = settings.CP_BELT_FENCING_LENGTH * data.REAL_AREA * settings.CARBON_PLANTINGS_BELT_FENCING_COST_PER_M
     
     if separate:
-        l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
+        l_mrj = lumap2ag_l_mrj(lumap, lmmap)
         base_costs.update({'Fencing cost':np.einsum('r,mrj->mrj', fencing_cost, l_mrj)})
         return base_costs
     else:
@@ -235,7 +235,7 @@ def get_env_plantings_to_ag(data: Data, yr_idx, lumap, lmmap, separate=False) ->
 
     # Get water license price and costs of installing/removing irrigation where appropriate
     w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
-    l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
+    l_mrj = lumap2ag_l_mrj(lumap, lmmap)
     w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data)
     w_delta_mrj[:, ag_cells, :] = 0
 

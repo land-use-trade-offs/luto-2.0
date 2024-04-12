@@ -25,7 +25,6 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto import tools
 from luto.settings import (
     INPUT_DIR,
     RESFACTOR,
@@ -57,7 +56,8 @@ from luto.settings import (
     BIODIV_LIVESTOCK_IMPACT,
     LDS_BIODIVERSITY_VALUE,
     OFF_LAND_COMMODITIES,
-    EGGS_AVG_WEIGHT
+    EGGS_AVG_WEIGHT,
+    NON_AGRICULTURAL_LU_BASE_CODE,
 )
 
 
@@ -101,6 +101,62 @@ def lvs_veg_types(lu: str) -> tuple[str, str]:
         raise KeyError("Vegetation type '%s' not identified." % lu)
 
     return lvstype, vegtype
+
+
+def get_base_am_vars(ncells, ncms, n_ag_lus):
+    """
+    Get the 2010 agricultural management option vars.
+    It is assumed that no agricultural management options were used in 2010, 
+    so get zero arrays in the correct format.
+    """
+    am_vars = {}
+    for am in AG_MANAGEMENTS_TO_LAND_USES:
+        am_vars[am] = np.zeros((ncms, ncells, n_ag_lus))
+
+    return am_vars
+
+
+def lumap2ag_l_mrj(lumap, lmmap):
+    """
+    Return land-use maps in decision-variable (X_mrj) format.
+    Where 'm' is land mgt, 'r' is cell, and 'j' is agricultural land-use.
+
+    Cells used for non-agricultural land uses will have value 0 for all agricultural
+    land uses, i.e. all r.
+    """
+    # Set up a container array of shape m, r, j.
+    x_mrj = np.zeros((2, lumap.shape[0], 28), dtype=bool)   # TODO - remove 2
+
+    # Populate the 3D land-use, land mgt mask.
+    for j in range(28):
+        # One boolean map for each land use.
+        jmap = np.where(lumap == j, True, False).astype(bool)
+        # Keep only dryland version.
+        x_mrj[0, :, j] = np.where(lmmap == False, jmap, False)
+        # Keep only irrigated version.
+        x_mrj[1, :, j] = np.where(lmmap == True, jmap, False)
+
+    return x_mrj.astype(bool)
+
+
+def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
+    """
+    Convert the land-use map to a decision variable X_rk, where 'r' indexes cell and
+    'k' indexes non-agricultural land use.
+
+    Cells used for agricultural purposes have value 0 for all k.
+    """
+    base_code = NON_AGRICULTURAL_LU_BASE_CODE
+    non_ag_lu_codes = list(range(base_code, base_code + num_non_ag_land_uses))
+
+    # Set up a container array of shape r, k.
+    x_rk = np.zeros((lumap.shape[0], num_non_ag_land_uses), dtype=bool)
+
+    for i,k in enumerate(non_ag_lu_codes):
+        kmap = np.where(lumap == k, True, False)
+        x_rk[:, i] = kmap
+
+    return x_rk.astype(bool)
 
 
 @dataclass
@@ -760,7 +816,9 @@ class Data:
 
         # Convert to numpy array of shape (91, 26)
         self.DEMAND_C = self.DEMAND_C.to_numpy(dtype = np.float32).T
+        self.D_CY = self.DEMAND_C # new demand is in tonnes rather than deltas
         print("Done.")
+        
 
         ###############################################################
         # Carbon emissions from off-land commodities.
@@ -892,10 +950,10 @@ class Data:
         beccs_df = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_BECCS_df.h5') )
 
         # Capture as numpy arrays
-        BECCS_COSTS_AUD_HA_YR = beccs_df['BECCS_COSTS_AUD_HA_YR'].to_numpy()
-        BECCS_REV_AUD_HA_YR = beccs_df['BECCS_REV_AUD_HA_YR'].to_numpy()
-        BECCS_TCO2E_HA_YR = beccs_df['BECCS_TCO2E_HA_YR'].to_numpy()
-        BECCS_MWH_HA_YR = beccs_df['BECCS_MWH_HA_YR'].to_numpy()
+        self.BECCS_COSTS_AUD_HA_YR = beccs_df['BECCS_COSTS_AUD_HA_YR'].to_numpy()
+        self.BECCS_REV_AUD_HA_YR = beccs_df['BECCS_REV_AUD_HA_YR'].to_numpy()
+        self.BECCS_TCO2E_HA_YR = beccs_df['BECCS_TCO2E_HA_YR'].to_numpy()
+        self.BECCS_MWH_HA_YR = beccs_df['BECCS_MWH_HA_YR'].to_numpy()
         
         print("Done.")
 
@@ -928,40 +986,51 @@ class Data:
         self.AMMAP_DICT = {
             am: array[self.MASK] for am, array in self.AMMAP_DICT.items()
         }  # Dictionary containing Int8 arrays
-        self.AG_L_MRJ = tools.lumap2ag_l_mrj(self.LUMAP, self.LMMAP)  # Boolean [2, 4218733, 28]
-        self.NON_AG_L_RK = tools.lumap2non_ag_l_mk(
+        self.AG_L_MRJ = lumap2ag_l_mrj(self.LUMAP, self.LMMAP)  # Boolean [2, 4218733, 28]
+        self.NON_AG_L_RK = lumap2non_ag_l_mk(
             self.LUMAP, len(self.NON_AGRICULTURAL_LANDUSES)
         )  # Int8
-        self.AG_MAN_L_MRJ_DICT = tools.get_base_am_vars(
+        self.AG_MAN_L_MRJ_DICT = get_base_am_vars(
             self.NCELLS, self.NLMS, self.N_AG_LUS
         )  # Dictionary containing Int8 arrays
-        self.WREQ_IRR_RJ = self.WREQ_IRR_RJ[self.MASK]  # Water requirements for irrigated landuses
-        self.WREQ_DRY_RJ = self.WREQ_DRY_RJ[self.MASK]  # Water requirements for dryland landuses
-        self.WATER_LICENCE_PRICE = self.WATER_LICENCE_PRICE[self.MASK]  # Int16
-        self.WATER_DELIVERY_PRICE = self.WATER_DELIVERY_PRICE[self.MASK]  # Float32
-        # self.WATER_YIELD_BASE_DR = bdata.WATER_YIELD_BASE_DR[self.MASK]        # Float32
-        self.WATER_YIELD_BASE_SR = self.WATER_YIELD_BASE_SR[self.MASK]  # Float32
-        self.WATER_YIELD_BASE = self.WATER_YIELD_BASE[self.MASK]  # Float32
-        self.FEED_REQ = self.FEED_REQ[self.MASK]  # Float32
-        self.PASTURE_KG_DM_HA = self.PASTURE_KG_DM_HA[self.MASK]  # Int16
-        self.SAFE_PUR_MODL = self.SAFE_PUR_MODL[self.MASK]  # Float32
-        self.SAFE_PUR_NATL = self.SAFE_PUR_NATL[self.MASK]  # Float32
-        self.RIVREG_ID = self.RIVREG_ID[self.MASK]  # Int16
-        self.DRAINDIV_ID = self.DRAINDIV_ID[self.MASK]  # Int8
+        self.WREQ_IRR_RJ = self.WREQ_IRR_RJ[self.MASK]                          # Water requirements for irrigated landuses
+        self.WREQ_DRY_RJ = self.WREQ_DRY_RJ[self.MASK]                          # Water requirements for dryland landuses
+        self.WATER_LICENCE_PRICE = self.WATER_LICENCE_PRICE[self.MASK]          # Int16
+        self.WATER_DELIVERY_PRICE = self.WATER_DELIVERY_PRICE[self.MASK]        # Float32
+        # self.WATER_YIELD_BASE_DR = bdata.WATER_YIELD_BASE_DR[self.MASK]       # Float32
+        self.WATER_YIELD_BASE_SR = self.WATER_YIELD_BASE_SR[self.MASK]          # Float32
+        self.WATER_YIELD_BASE = self.WATER_YIELD_BASE[self.MASK]                # Float32
+        self.FEED_REQ = self.FEED_REQ[self.MASK]                                # Float32
+        self.PASTURE_KG_DM_HA = self.PASTURE_KG_DM_HA[self.MASK]                # Int16
+        self.SAFE_PUR_MODL = self.SAFE_PUR_MODL[self.MASK]                      # Float32
+        self.SAFE_PUR_NATL = self.SAFE_PUR_NATL[self.MASK]                      # Float32
+        self.RIVREG_ID = self.RIVREG_ID[self.MASK]                              # Int16
+        self.DRAINDIV_ID = self.DRAINDIV_ID[self.MASK]                          # Int8
         self.CLIMATE_CHANGE_IMPACT = self.CLIMATE_CHANGE_IMPACT[self.MASK]
-        self.EP_EST_COST_HA = self.EP_EST_COST_HA[self.MASK]  # Float32
-        self.AG2EP_TRANSITION_COSTS_HA = self.AG2EP_TRANSITION_COSTS_HA  # Float32
-        self.EP2AG_TRANSITION_COSTS_HA = self.EP2AG_TRANSITION_COSTS_HA  # Float32
-        self.EP_BLOCK_AVG_T_CO2_HA = self.EP_BLOCK_AVG_T_CO2_HA[self.MASK]  # Float32
-        self.NATURAL_LAND_T_CO2_HA = self.NATURAL_LAND_T_CO2_HA[self.MASK]  # Float32
+        self.EP_EST_COST_HA = self.EP_EST_COST_HA[self.MASK]                    # Float32
+        self.AG2EP_TRANSITION_COSTS_HA = self.AG2EP_TRANSITION_COSTS_HA         # Float32
+        self.EP2AG_TRANSITION_COSTS_HA = self.EP2AG_TRANSITION_COSTS_HA         # Float32
+        self.EP_BLOCK_AVG_T_CO2_HA = self.EP_BLOCK_AVG_T_CO2_HA[self.MASK]      # Float32
+        self.NATURAL_LAND_T_CO2_HA = self.NATURAL_LAND_T_CO2_HA[self.MASK]      # Float32
         self.SOIL_CARBON_AVG_T_CO2_HA = self.SOIL_CARBON_AVG_T_CO2_HA[self.MASK]
-        self.AGGHG_IRRPAST = self.AGGHG_IRRPAST[self.MASK]  # Float32
-        self.BIODIV_SCORE_RAW = self.BIODIV_SCORE_RAW[self.MASK]  # Float32
-        self.BIODIV_SCORE_WEIGHTED = self.BIODIV_SCORE_WEIGHTED[self.MASK]  # Float32
-        self.RP_PROPORTION = self.RP_PROPORTION[self.MASK]  # Float32
-        self.RP_FENCING_LENGTH = self.RP_FENCING_LENGTH[self.MASK]  # Float32
-        self.EP_RIP_AVG_T_CO2_HA = self.EP_RIP_AVG_T_CO2_HA[self.MASK]  # Float32
-        self.EP_BELT_AVG_T_CO2_HA = self.EP_BELT_AVG_T_CO2_HA[self.MASK]  # Float32
+        self.AGGHG_IRRPAST = self.AGGHG_IRRPAST[self.MASK]                      # Float32
+        self.BIODIV_SCORE_RAW = self.BIODIV_SCORE_RAW[self.MASK]                # Float32
+        self.BIODIV_SCORE_WEIGHTED = self.BIODIV_SCORE_WEIGHTED[self.MASK]      # Float32
+        self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = (
+            self.BIODIV_SCORE_WEIGHTED_LDS_BURNING[self.MASK]
+        )
+        self.RP_PROPORTION = self.RP_PROPORTION[self.MASK]                      # Float32
+        self.RP_FENCING_LENGTH = self.RP_FENCING_LENGTH[self.MASK]              # Float32
+        self.EP_RIP_AVG_T_CO2_HA = self.EP_RIP_AVG_T_CO2_HA[self.MASK]          # Float32
+        self.EP_BELT_AVG_T_CO2_HA = self.EP_BELT_AVG_T_CO2_HA[self.MASK]        # Float32
+        self.CP_BLOCK_AVG_T_CO2_HA = self.CP_BLOCK_AVG_T_CO2_HA[self.MASK]      # Float32
+        self.CP_BELT_AVG_T_CO2_HA = self.CP_BELT_AVG_T_CO2_HA[self.MASK]        # Float32
+        self.CP_EST_COST_HA = self.CP_EST_COST_HA[self.MASK]                    # Float32
+        self.BECCS_COSTS_AUD_HA_YR = self.BECCS_COSTS_AUD_HA_YR[self.MASK]      # Float32
+        self.BECCS_REV_AUD_HA_YR = self.BECCS_REV_AUD_HA_YR[self.MASK]          # Float32
+        self.BECCS_TCO2E_HA_YR = self.BECCS_TCO2E_HA_YR[self.MASK]              # Float32
+        self.SAVBURN_ELIGIBLE = self.SAVBURN_ELIGIBLE[self.MASK]                # Int8
+        self.SAVBURN_TOTAL_TCO2E_HA = self.SAVBURN_TOTAL_TCO2E_HA[self.MASK]    # Float32
 
         # Slice this year off HDF5 bricks. TODO: This field is not in luto.data.
         # with h5py.File(bdata.fname_dr, 'r') as wy_dr_file:

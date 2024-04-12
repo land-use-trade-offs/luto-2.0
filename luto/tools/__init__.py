@@ -73,62 +73,6 @@ def report_on_path(path:str):
     data2html(data)
 
 
-def lumap2ag_l_mrj(lumap, lmmap):
-    """
-    Return land-use maps in decision-variable (X_mrj) format.
-    Where 'm' is land mgt, 'r' is cell, and 'j' is agricultural land-use.
-
-    Cells used for non-agricultural land uses will have value 0 for all agricultural
-    land uses, i.e. all r.
-    """
-    # Set up a container array of shape m, r, j.
-    x_mrj = np.zeros((2, lumap.shape[0], 28), dtype=bool)   # TODO - remove 2
-
-    # Populate the 3D land-use, land mgt mask.
-    for j in range(28):
-        # One boolean map for each land use.
-        jmap = np.where(lumap == j, True, False).astype(bool)
-        # Keep only dryland version.
-        x_mrj[0, :, j] = np.where(lmmap == False, jmap, False)
-        # Keep only irrigated version.
-        x_mrj[1, :, j] = np.where(lmmap == True, jmap, False)
-
-    return x_mrj.astype(bool)
-
-
-def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
-    """
-    Convert the land-use map to a decision variable X_rk, where 'r' indexes cell and
-    'k' indexes non-agricultural land use.
-
-    Cells used for agricultural purposes have value 0 for all k.
-    """
-    base_code = settings.NON_AGRICULTURAL_LU_BASE_CODE
-    non_ag_lu_codes = list(range(base_code, base_code + num_non_ag_land_uses))
-
-    # Set up a container array of shape r, k.
-    x_rk = np.zeros((lumap.shape[0], num_non_ag_land_uses), dtype=bool)
-
-    for i,k in enumerate(non_ag_lu_codes):
-        kmap = np.where(lumap == k, True, False)
-        x_rk[:, i] = kmap
-
-    return x_rk.astype(bool)
-
-
-def get_base_am_vars(ncells, ncms, n_ag_lus):
-    """
-    Get the 2010 agricultural management option vars.
-    It is assumed that no agricultural management options were used in 2010, 
-    so get zero arrays in the correct format.
-    """
-    am_vars = {}
-    for am in AG_MANAGEMENTS_TO_LAND_USES:
-        am_vars[am] = np.zeros((ncms, ncells, n_ag_lus))
-
-    return am_vars
-
-
 def get_ag_and_non_ag_cells(lumap) -> Tuple[np.ndarray, np.ndarray]:
     """
     Splits the index of cells based on whether that cell is used for agricultural

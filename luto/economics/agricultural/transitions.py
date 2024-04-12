@@ -21,7 +21,7 @@ Data about transitions costs.
 import numpy as np
 from typing import Dict
 
-from luto.data import Data 
+from luto.data import Data, lumap2ag_l_mrj
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.economics.agricultural.water import get_wreq_matrices
 import luto.economics.agricultural.ghg as ag_ghg
@@ -120,7 +120,7 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
     lmmap = lmmaps[base_year]
 
     # Return l_mrj (Boolean) for current land-use and land management
-    l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
+    l_mrj = lumap2ag_l_mrj(lumap, lmmap)
     l_mrj_not = np.logical_not(l_mrj)
 
     # Get the exclusion matrix
