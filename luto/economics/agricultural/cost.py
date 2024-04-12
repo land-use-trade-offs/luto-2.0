@@ -275,7 +275,7 @@ def get_ecological_grazing_effect_c_mrj(data: Data, yr_idx):
     return new_c_mrj
 
 
-def get_savanna_burning_effect_c_mrj(data):
+def get_savanna_burning_effect_c_mrj(data: Data):
     """
     Applies the effects of using LDS Savanna Burning to the cost data
     for all relevant agr. land uses.
@@ -298,49 +298,7 @@ def get_savanna_burning_effect_c_mrj(data):
     return new_c_mrj
 
 
-def get_agtech_ei_effect_c_mrj(data, yr_idx):
-    """
-    Applies the effects of using AgTech EI to the cost data
-    for all relevant agr. land uses.
-    """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']
-    yr_cal = data.YR_CAL_BASE + yr_idx
-
-    # Set up the effects matrix
-    new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
-
-    for m in range(data.NLMS):
-        for lu_idx, lu in enumerate(land_uses):
-            cost_per_ha = data.AGTECH_EI_DATA[lu].loc[yr_cal, 'AnnCost_per_Ha']
-            new_c_mrj[m, :, lu_idx] = cost_per_ha * data.REAL_AREA
-
-    return new_c_mrj
-
-
-def get_savanna_burning_effect_c_mrj(data):
-    """
-    Applies the effects of using LDS Savanna Burning to the cost data
-    for all relevant agr. land uses.
-    """
-    nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
-    new_c_mrj = np.zeros((data.NLMS, data.NCELLS, nlus))
-    sav_burning_effect = data.SAVBURN_COST_HA * data.REAL_AREA
-
-    big_number = 99999999
-    savburn_ineligible_cells = np.where(data.SAVBURN_ELIGIBLE == 0)[0]
-
-    for m in range(data.NLMS):
-        for j in range(nlus):
-            new_c_mrj[m, :, j] = sav_burning_effect
-
-            # TODO: build in hard constraints (ub for variables) instead of this temorary measure
-            # to block certain cells from using Savanna Burning
-            new_c_mrj[m, savburn_ineligible_cells, j] = big_number
-
-    return new_c_mrj
-
-
-def get_agtech_ei_effect_c_mrj(data, yr_idx):
+def get_agtech_ei_effect_c_mrj(data: Data, yr_idx):
     """
     Applies the effects of using AgTech EI to the cost data
     for all relevant agr. land uses.

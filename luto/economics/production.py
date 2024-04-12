@@ -7,7 +7,7 @@ import luto.economics.non_agricultural.quantity as non_ag_quantity
 
 
 def get_production(
-    data: Data, 
+    data: "Data", 
     yr_cal: int, 
     ag_X_mrj: np.ndarray,
     non_ag_X_rk: np.ndarray,

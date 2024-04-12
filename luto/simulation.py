@@ -38,7 +38,25 @@ def load_data() -> Data:
     """
     Load the Data object containing all required data to run a LUTO simulation.
     """
-    return Data(timestamp=timestamp)
+    data = Data(timestamp=timestamp)
+
+    # Calculate base year production figures
+    print(f"Calculating base year ({data.YR_CAL_BASE}) production data...", end = " ", flush = True)
+    yr_cal_base_prod_data = get_production( 
+        data,
+        data.YR_CAL_BASE,
+        lumap2ag_l_mrj(data.LUMAP, data.LMMAP),
+        lumap2non_ag_l_mk(data.LUMAP, len(data.NON_AGRICULTURAL_LANDUSES)),
+        get_base_am_vars(data.NCELLS, data.NLMS, data.N_AG_LUS),
+    )
+    data.add_production_data(data.YR_CAL_BASE, yr_cal_base_prod_data)
+    print("Done.")
+
+    # apply resfactor for solve and set up initial data for base year
+    data.apply_resfactor()
+    data.add_base_year_data_to_containers()
+
+    return data
 
 
 def solve_timeseries(data: Data, steps: int, base: int, target: int):
@@ -126,19 +144,6 @@ def run( data: Data, base: int, target: int) -> None:
     
     # Set Data object's path and create output directories
     data.set_path(base, target)
-
-    # Calculate base year production figures if they don't already exist
-    if data.YR_CAL_BASE not in data.prod_data:
-        print(f"Calculating base year ({data.YR_CAL_BASE}) production data...", end = " ", flush = True)
-        yr_cal_base_prod_data = get_production( 
-            data,
-            data.YR_CAL_BASE,
-            lumap2ag_l_mrj(data.LUMAP, data.LMMAP),
-            lumap2non_ag_l_mk(data.LUMAP, len(data.NON_AGRICULTURAL_LANDUSES)),
-            get_base_am_vars(data.NCELLS, data.NLMS, data.N_AG_LUS),
-        )
-        data.add_production_data(data.YR_CAL_BASE, yr_cal_base_prod_data)
-        print("Done.")
 
     # Run the simulation up to `year` sequentially.         *** Not sure that timeseries mode is working ***
     if settings.MODE == 'timeseries':

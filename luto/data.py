@@ -227,22 +227,12 @@ class Data:
         print("\tSetting up lists of land uses, commodities, etc...", end=" ", flush=True)
 
         # Read in lexicographically ordered list of land-uses.
-        self.AGRICULTURAL_LANDUSES = pd.read_csv(
-            (os.path.join(INPUT_DIR, "ag_landuses.csv")), header=None
-        )[0].to_list()
-        self.NON_AGRICULTURAL_LANDUSES = pd.read_csv(
-            (os.path.join(INPUT_DIR, "non_ag_landuses.csv")), header=None
-        )[0].to_list()
+        self.AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'ag_landuses.csv')), header = None)[0].to_list()
+        self.NON_AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'non_ag_landuses.csv')), header = None)[0].to_list()
 
-        self.NONAGLU2DESC = dict(
-            zip(
-                range(
-                    NON_AGRICULTURAL_LU_BASE_CODE,
-                    NON_AGRICULTURAL_LU_BASE_CODE + len(self.NON_AGRICULTURAL_LANDUSES),
-                ),
-                self.NON_AGRICULTURAL_LANDUSES,
-            )
-        )
+        self.NONAGLU2DESC = dict(zip(range(NON_AGRICULTURAL_LU_BASE_CODE, 
+                                    NON_AGRICULTURAL_LU_BASE_CODE + len(self.NON_AGRICULTURAL_LANDUSES)),
+                            self.NON_AGRICULTURAL_LANDUSES))
 
         self.DESC2NONAGLU = {value: key for key, value in self.NONAGLU2DESC.items()}
 
@@ -253,53 +243,31 @@ class Data:
         # Construct land-use index dictionary (distinct from LU_IDs!)
         self.AGLU2DESC = {i: lu for i, lu in enumerate(self.AGRICULTURAL_LANDUSES)}
         self.DESC2AGLU = {value: key for key, value in self.AGLU2DESC.items()}
-        self.AGLU2DESC[-1] = "Non-agricultural land"
+        self.AGLU2DESC[-1] = 'Non-agricultural land'
 
         # Some useful sub-sets of the land uses.
-        self.LU_CROPS = [
-            lu
-            for lu in self.AGRICULTURAL_LANDUSES
-            if "Beef" not in lu
-            and "Sheep" not in lu
-            and "Dairy" not in lu
-            and "Unallocated" not in lu
-            and "Non-agricultural" not in lu
-        ]
-        self.LU_LVSTK = [
-            lu
-            for lu in self.AGRICULTURAL_LANDUSES
-            if "Beef" in lu or "Sheep" in lu or "Dairy" in lu
-        ]
-        self.LU_UNALL = [lu for lu in self.AGRICULTURAL_LANDUSES if "Unallocated" in lu]
+        self.LU_CROPS = [ lu for lu in self.AGRICULTURAL_LANDUSES if 'Beef' not in lu
+                                                                  and 'Sheep' not in lu
+                                                                  and 'Dairy' not in lu
+                                                                  and 'Unallocated' not in lu
+                                                                  and 'Non-agricultural' not in lu ]
+        self.LU_LVSTK = [ lu for lu in self.AGRICULTURAL_LANDUSES if 'Beef' in lu
+                                                        or 'Sheep' in lu
+                                                        or 'Dairy' in lu ]
+        self.LU_UNALL = [ lu for lu in self.AGRICULTURAL_LANDUSES if 'Unallocated' in lu ]
         self.LU_NATURAL = [
             self.DESC2AGLU["Beef - natural land"],
             self.DESC2AGLU["Dairy - natural land"],
             self.DESC2AGLU["Sheep - natural land"],
             self.DESC2AGLU["Unallocated - natural land"],
         ]
-        self.LU_MODIFIED_LAND = [
-            self.DESC2AGLU[lu]
-            for lu in self.AGRICULTURAL_LANDUSES
-            if self.DESC2AGLU[lu] not in self.LU_NATURAL
-        ]
+        self.LU_MODIFIED_LAND = [self.DESC2AGLU[lu] for lu in self.AGRICULTURAL_LANDUSES if self.DESC2AGLU[lu] not in self.LU_NATURAL]
 
-        self.LU_CROPS_INDICES = [
-            self.AGRICULTURAL_LANDUSES.index(lu)
-            for lu in self.AGRICULTURAL_LANDUSES
-            if lu in self.LU_CROPS
-        ]
-        self.LU_LVSTK_INDICES = [
-            self.AGRICULTURAL_LANDUSES.index(lu)
-            for lu in self.AGRICULTURAL_LANDUSES
-            if lu in self.LU_LVSTK
-        ]
-        self.LU_UNALL_INDICES = [
-            self.AGRICULTURAL_LANDUSES.index(lu)
-            for lu in self.AGRICULTURAL_LANDUSES
-            if lu in self.LU_UNALL
-        ]
+        self.LU_CROPS_INDICES = [self.AGRICULTURAL_LANDUSES.index(lu) for lu in self.AGRICULTURAL_LANDUSES if lu in self.LU_CROPS]
+        self.LU_LVSTK_INDICES = [self.AGRICULTURAL_LANDUSES.index(lu) for lu in self.AGRICULTURAL_LANDUSES if lu in self.LU_LVSTK]
+        self.LU_UNALL_INDICES = [self.AGRICULTURAL_LANDUSES.index(lu) for lu in self.AGRICULTURAL_LANDUSES if lu in self.LU_UNALL]
 
-        self.NON_AG_LU_NATURAL = [
+        self.NON_AG_LU_NATURAL = [ 
             self.DESC2NONAGLU["Environmental Plantings"],
             self.DESC2NONAGLU["Riparian Plantings"],
             self.DESC2NONAGLU["Agroforestry"],
@@ -318,25 +286,20 @@ class Data:
 
         # List of products. Everything upper case to avoid mistakes.
         self.PR_CROPS = [s.upper() for s in self.LU_CROPS]
-        self.PR_LVSTK = [
-            s.upper() + " " + p
-            for s in self.LU_LVSTK
-            if "DAIRY" not in s.upper()
-            for p in ["LEXP", "MEAT"]
-        ]
-        self.PR_LVSTK += [s.upper() for s in self.LU_LVSTK if "DAIRY" in s.upper()]
-        self.PR_LVSTK += [s.upper() + " WOOL" for s in self.LU_LVSTK if "SHEEP" in s.upper()]
+        self.PR_LVSTK = [ s.upper() + ' ' + p
+                          for s in self.LU_LVSTK if 'DAIRY' not in s.upper()
+                          for p in ['LEXP', 'MEAT'] ]
+        self.PR_LVSTK += [s.upper() for s in self.LU_LVSTK if 'DAIRY' in s.upper()]
+        self.PR_LVSTK += [s.upper() + ' WOOL' for s in self.LU_LVSTK if 'SHEEP' in s.upper()]
         self.PRODUCTS = self.PR_CROPS + self.PR_LVSTK
-        self.PRODUCTS.sort()  # Ensure lexicographic order.
+        self.PRODUCTS.sort() # Ensure lexicographic order.
 
         # Get number of products
         self.NPRS = len(self.PRODUCTS)
 
         # Some land-uses map to multiple products -- a dict and matrix to capture this.
         # Crops land-uses and crop products are one-one. Livestock is more complicated.
-        self.LU2PR_DICT = {
-            key: [key.upper()] if key in self.LU_CROPS else [] for key in self.AGRICULTURAL_LANDUSES
-        }
+        self.LU2PR_DICT = {key: [key.upper()] if key in self.LU_CROPS else [] for key in self.AGRICULTURAL_LANDUSES}
         for lu in self.LU_LVSTK:
             for PR in self.PR_LVSTK:
                 if lu.upper() in PR:
@@ -350,12 +313,13 @@ class Data:
 
         self.LU2PR = dict2matrix(self.LU2PR_DICT, self.AGRICULTURAL_LANDUSES, self.PRODUCTS)
 
+
         # List of commodities. Everything lower case to avoid mistakes.
         # Basically collapse 'NATURAL LAND' and 'MODIFIED LAND' products and remove duplicates.
-        self.COMMODITIES = {
-            (s.replace(" - NATURAL LAND", "").replace(" - MODIFIED LAND", "").lower())
-            for s in self.PRODUCTS
-        }
+        self.COMMODITIES = { ( s.replace(' - NATURAL LAND', '')
+                                .replace(' - MODIFIED LAND', '')
+                                .lower() )
+                                for s in self.PRODUCTS }
         self.COMMODITIES = list(self.COMMODITIES)
         self.COMMODITIES.sort()
         self.CM_CROPS = [s for s in self.COMMODITIES if s in [k.lower() for k in self.LU_CROPS]]
@@ -363,29 +327,27 @@ class Data:
         # Get number of commodities
         self.NCMS = len(self.COMMODITIES)
 
+
         # Some commodities map to multiple products -- dict and matrix to capture this.
         # Crops commodities and products are one-one. Livestock is more complicated.
-        self.CM2PR_DICT = {
-            key.lower(): [key.upper()] if key in self.CM_CROPS else [] for key in self.COMMODITIES
-        }
+        self.CM2PR_DICT = { key.lower(): [key.upper()] if key in self.CM_CROPS else []
+                    for key in self.COMMODITIES }
         for key, value in self.CM2PR_DICT.items():
-            if len(key.split()) == 1:
+            if len(key.split())==1:
                 head = key.split()[0]
                 tail = 0
             else:
                 head = key.split()[0]
                 tail = key.split()[1]
             for PR in self.PR_LVSTK:
-                if tail == 0 and head.upper() in PR:
+                if tail==0 and head.upper() in PR:
                     self.CM2PR_DICT[key] = self.CM2PR_DICT[key] + [PR]
                 elif (head.upper()) in PR and (tail.upper() in PR):
                     self.CM2PR_DICT[key] = self.CM2PR_DICT[key] + [PR]
                 else:
-                    ...  # Do nothing, this should be a crop.
+                    ... # Do nothing, this should be a crop.
 
-        self.PR2CM = dict2matrix(
-            self.CM2PR_DICT, self.COMMODITIES, self.PRODUCTS
-        ).T  # Note the transpose.
+        self.PR2CM = dict2matrix(self.CM2PR_DICT, self.COMMODITIES, self.PRODUCTS).T # Note the transpose.
         print("Done.")
 
         ###############################################################
@@ -957,30 +919,19 @@ class Data:
         self.BECCS_MWH_HA_YR = beccs_df['BECCS_MWH_HA_YR'].to_numpy()
         
         print("Done.")
-
-        self.apply_resfactor()
-        self.add_base_year_data_to_containers()
         print("\nData loading complete.")
 
     def apply_resfactor(self):
         """
         Sub-set spatial data is based on the masks.
         """
-        print("\tAdjusting data for resfactor...", end=" ", flush=True)
+        print("Adjusting data for resfactor...", end=" ", flush=True)
         self.NCELLS = self.MASK.sum()
         self.EXCLUDE = self.EXCLUDE[:, self.MASK, :]
-        self.AGEC_CROPS = self.AGEC_CROPS.iloc[
-            self.MASK
-        ]  # MultiIndex Dataframe [4218733 rows x 342 columns]
-        self.AGEC_LVSTK = self.AGEC_LVSTK.iloc[
-            self.MASK
-        ]  # MultiIndex Dataframe [4218733 rows x 39 columns]
-        self.AGGHG_CROPS = self.AGGHG_CROPS.iloc[
-            self.MASK
-        ]  # MultiIndex Dataframe [4218733 rows x ? columns]
-        self.AGGHG_LVSTK = self.AGGHG_LVSTK.iloc[
-            self.MASK
-        ]  # MultiIndex Dataframe [4218733 rows x ? columns]
+        self.AGEC_CROPS = self.AGEC_CROPS.iloc[self.MASK]  # MultiIndex Dataframe [4218733 rows x 342 columns]
+        self.AGEC_LVSTK = self.AGEC_LVSTK.iloc[self.MASK]  # MultiIndex Dataframe [4218733 rows x 39 columns]
+        self.AGGHG_CROPS = self.AGGHG_CROPS.iloc[self.MASK]  # MultiIndex Dataframe [4218733 rows x ? columns]
+        self.AGGHG_LVSTK = self.AGGHG_LVSTK.iloc[self.MASK]  # MultiIndex Dataframe [4218733 rows x ? columns]
         self.REAL_AREA = self.REAL_AREA[self.MASK] * self.RESMULT  # Actual Float32
         self.LUMAP = self.LUMAP[self.MASK]  # Int8
         self.LMMAP = self.LMMAP[self.MASK]  # Int8
@@ -1108,6 +1059,8 @@ class Data:
     def add_base_year_data_to_containers(self):
         """
         Adds all 'solution' data for the base year to the corresponding containers.
+
+        To be called after applying resfactor to data using 'self.apply_resfactor()'
         """
         self.add_lumap(self.YR_CAL_BASE, self.LUMAP)
         self.add_lmmap(self.YR_CAL_BASE, self.LMMAP)
