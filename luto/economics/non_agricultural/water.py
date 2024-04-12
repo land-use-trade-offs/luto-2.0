@@ -89,45 +89,6 @@ def get_wreq_matrix_beccs(data) -> np.ndarray:
     return get_wreq_matrix_env_planting(data)
 
 
-def get_wreq_matrix_carbon_plantings_block(data) -> np.ndarray:
-    """
-    Get water requirements vector of carbon plantings (block arrangement).
-
-    Note: this is the same as for environmental plantings.
-
-    Returns
-    -------
-    1-D array, indexed by cell.
-    """
-    return get_wreq_matrix_env_planting(data)
-
-
-def get_wreq_matrix_carbon_plantings_belt(data) -> np.ndarray:
-    """
-    Get water requirements vector of carbon plantings (belt arrangement).
-
-    Note: this is the same as for environmental plantings.
-
-    Returns
-    -------
-    1-D array, indexed by cell.
-    """
-    return get_wreq_matrix_env_planting(data)
-
-
-def get_wreq_matrix_beccs(data) -> np.ndarray:
-    """
-    Get water requirements vector of BECCS.
-
-    Note: this is the same as for environmental plantings.
-
-    Returns
-    -------
-    1-D array, indexed by cell.
-    """
-    return get_wreq_matrix_env_planting(data)
-
-
 def get_wreq_matrix(data: Data) -> np.ndarray:
     """
     Get the water requirements matrix for all non-agricultural land uses.

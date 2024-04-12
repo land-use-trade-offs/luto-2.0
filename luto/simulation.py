@@ -130,7 +130,6 @@ def run( data: Data, base: int, target: int) -> None:
     # Calculate base year production figures if they don't already exist
     if data.YR_CAL_BASE not in data.prod_data:
         print(f"Calculating base year ({data.YR_CAL_BASE}) production data...", end = " ", flush = True)
-        data.prod_data[data.YR_CAL_BASE] = dict()
         yr_cal_base_prod_data = get_production( 
             data,
             data.YR_CAL_BASE,

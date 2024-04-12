@@ -1103,6 +1103,7 @@ class Data:
         """
         if yr in self.obj_vals:
             raise ValueError(f"Objective value for year {yr} already stored in Data object.")
+        self.obj_vals[yr] = obj_val
 
     def add_base_year_data_to_containers(self):
         """

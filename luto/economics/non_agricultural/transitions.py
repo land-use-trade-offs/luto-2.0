@@ -338,57 +338,6 @@ def get_beccs_to_ag(data: Data, yr_idx, lumap, lmmap, separate=False) -> np.ndar
         return get_env_plantings_to_ag(data, yr_idx, lumap, lmmap)
 
 
-def get_carbon_plantings_block_to_ag(data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
-    """
-    Get transition costs from carbon plantings (block) to agricultural land uses for each cell.
-    
-    Note: this is the same as for environmental plantings.
-
-    Returns
-    -------
-    np.ndarray
-        3-D array, indexed by (m, r, j).
-    """
-    if separate:
-        return get_env_plantings_to_ag(data, yr_idx, lumap, lmmap, separate)
-    else:
-        return get_env_plantings_to_ag(data, yr_idx, lumap, lmmap)
-
-
-def get_carbon_plantings_belt_to_ag(data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
-    """
-    Get transition costs from carbon plantings (belt) to agricultural land uses for each cell.
-    
-    Note: this is the same as for environmental plantings.
-
-    Returns
-    -------
-    np.ndarray
-        3-D array, indexed by (m, r, j).
-    """
-    if separate:
-        return get_env_plantings_to_ag(data, yr_idx, lumap, lmmap, separate)
-    else:
-        return get_env_plantings_to_ag(data, yr_idx, lumap, lmmap)
-
-
-def get_beccs_to_ag(data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
-    """
-    Get transition costs from BECCS to agricultural land uses for each cell.
-    
-    Note: this is the same as for environmental plantings.
-
-    Returns
-    -------
-    np.ndarray
-        3-D array, indexed by (m, r, j).
-    """
-    if separate:
-        return get_env_plantings_to_ag(data, yr_idx, lumap, lmmap, separate)
-    else:
-        return get_env_plantings_to_ag(data, yr_idx, lumap, lmmap)
-
-
 def get_to_ag_transition_matrix(data: Data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
     """
     Get the matrix containing transition costs from non-agricultural land uses to agricultural land uses.
@@ -439,21 +388,6 @@ def get_non_ag_transition_matrix(data: Data, yr_idx, lumap, lmmap) -> np.ndarray
     # Currently, non of the non-agricultural land uses may transition between each other.
     # Thus, transition costs need not be considered.
     return t_rk
-
-
-def get_exclusions_for_excluding_all_natural_cells(data, lumap) -> np.ndarray:
-    """
-    A number of non-agricultural land uses can only be applied to cells that
-    don't already utilise a natural land use. This function gets the exclusion
-    matrix for all such non-ag land uses, returning an array valued 0 at the 
-    indeces of cells that use natural land uses, and 1 everywhere else.
-    """
-    exclude = np.ones(data.NCELLS)
-
-    natural_lu_cells = tools.get_ag_and_non_ag_natural_lu_cells(data, lumap)
-    exclude[natural_lu_cells] = 0
-
-    return exclude
 
 
 def get_exclusions_for_excluding_all_natural_cells(data: Data, lumap) -> np.ndarray:

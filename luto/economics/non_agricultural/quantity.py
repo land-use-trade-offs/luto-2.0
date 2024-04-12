@@ -74,56 +74,6 @@ def get_quantity_carbon_plantings_belt(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
-    data: Data object.
-
-    Returns
-    -------
-    np.ndarray
-        Indexed by (c, r): represents the quantity commodity c produced by cell r
-        if used for carbon plantings (belt).
-        A matrix of zeros because carbon plantings doesn't produce anything.
-    """
-    return np.zeros((data.NCMS, data.NCELLS))
-
-
-def get_quantity_beccs(data: Data) -> np.ndarray:
-    """
-    Parameters
-    ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
-
-    Returns
-    -------
-    np.ndarray
-        Indexed by (c, r): represents the quantity commodity c produced by cell r
-        if used for BECCS.
-        A matrix of zeros because BECCS doesn't produce anything.
-    """
-    return np.zeros((data.NCMS, data.NCELLS))
-
-
-def get_quantity_carbon_plantings_block(data: Data) -> np.ndarray:
-    """
-    Parameters
-    ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
-
-    Returns
-    -------
-    np.ndarray
-        Indexed by (c, r): represents the quantity commodity c produced by cell r
-        if used for carbon plantings (block).
-        A matrix of zeros because carbon plantings doesn't produce anything.
-    """
-    return np.zeros((data.NCMS, data.NCELLS))
-
-
-def get_quantity_carbon_plantings_belt(data: Data) -> np.ndarray:
-    """
-    Parameters
-    ----------
     data: object/module
         Data object or module with fields like in `luto.data`.
 

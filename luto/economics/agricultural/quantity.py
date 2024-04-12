@@ -355,40 +355,6 @@ def get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx):
 
 
 def get_agricultural_management_quantity_matrices(data: Data, q_mrp, yr_idx) -> Dict[str, np.ndarray]:
-    """
-    Applies the effects of using EDS savanna burning to the quantity data
-    for all relevant agr. land uses.
-
-    Since EDSSB has no effect on quantity produced, return an array of zeros.
-    """
-    return np.zeros((data.NLMS, data.NCELLS, data.NPRS))
-
-
-def get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx):
-    """
-    Applies the effects of using AgTech EI to the quantity data
-    for all relevant agr. land uses.
-    """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']
-    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
-    yr_cal = data.YR_CAL_BASE + yr_idx
-
-    # Set up the effects matrix
-    new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
-
-    # Update values in the new matrix    
-    for lu, j in zip(land_uses, lu_codes):
-        multiplier = data.AGTECH_EI_DATA[lu].loc[yr_cal, 'Productivity']
-        if multiplier != 1:
-            # Apply to all products associated with land use
-            for p in range(data.NPRS):
-                if data.LU2PR[p, j]:
-                    new_q_mrp[:, :, p] = q_mrp[:, :, p] * (multiplier - 1)
-
-    return new_q_mrp
-
-
-def get_agricultural_management_quantity_matrices(data: Data, q_mrp, yr_idx) -> Dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx)
     precision_agriculture_data = get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx)
     eco_grazing_data = get_ecological_grazing_effect_q_mrp(data, q_mrp, yr_idx)

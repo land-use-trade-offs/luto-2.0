@@ -85,37 +85,23 @@ def get_exclude_matrices(data: Data, base_year: int, lumaps: Dict[int, np.ndarra
 
 
 def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separate=False):
-    """Return t_mrj transition-cost matrices.
-
-    A transition-cost matrix gives the cost of switching a cell r from its 
-    current land-use and land management type to every other land-use and land 
-    management type. The base costs are taken from the raw transition costs in 
-    the `data` module and additional costs are added depending on the land 
-    management type (e.g. costs of irrigation infrastructure). 
-
-    Parameters
-    ----------
-
-    data: Data object.
-    yr_idx : int
-        Number of years from base year, counting from zero.
-    base_year: int
-        The base year of the current solve.
-    lumaps : dict[int, numpy.ndarray]
-        All previously generated land-use maps (shape = ncells, dtype=int).
-    lmmaps : dict[int, numpy.ndarray]
-        ll previously generated land management maps (shape = ncells, dtype=int).
-    separate (bool, optional): Whether to return separate cost matrices for each cost component. 
-        Defaults to False.
-
-    Returns
-    -------
-
-    numpy.ndarray
-        t_mrj transition-cost matrices. The m-slices correspond to the
-        different land management types, r is grid cell, and j is land-use.
     """
-    
+    Calculate the transition matrices for land-use and land management transitions.
+    Args:
+        data (Data object): The data object containing the necessary input data.
+        data (Data object): The data object containing the necessary input data.
+        yr_idx (int): The index of the current year.
+        base_year (int): The base year for the transition calculations.
+        lumaps (dict): A dictionary of land-use maps for each year.
+        lmmaps (dict): A dictionary of land management maps for each year.
+        separate (bool, optional): Whether to return separate cost matrices for each cost component. 
+                                   Defaults to False.
+    Returns:
+        numpy.ndarray or dict: The transition matrices for land-use and land management transitions.
+                               If `separate` is False, returns a numpy array representing the total costs.
+                               If `separate` is True, returns a dictionary with separate cost matrices for
+                               establishment costs, Water license cost, and carbon releasing costs.
+    """    
     lumap = lumaps[base_year]
     lmmap = lmmaps[base_year]
 
@@ -226,24 +212,6 @@ def get_agtech_ei_effect_t_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
-def get_savanna_burning_effect_t_mrj(data):
-    """
-    Gets the effects on transition costs of savanna burning, which are none.
-    Transition/establishment costs are handled in the costs matrix.
-    """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning']
-    return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
-
-
-def get_agtech_ei_effect_t_mrj(data):
-    """
-    Gets the effects on transition costs of AgTech EI, which are none.
-    Transition/establishment costs are handled in the costs matrix.
-    """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']
-    return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
-
-
 def get_agricultural_management_transition_matrices(data: Data, t_mrj, yr_idx) -> Dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_t_mrj(data)
     precision_agriculture_data = get_precision_agriculture_effect_t_mrj(data)
@@ -299,31 +267,6 @@ def get_ecological_grazing_adoption_limit(data: Data, yr_idx):
         eco_grazing_limits[j] = data.ECOLOGICAL_GRAZING_DATA[lu].loc[yr_cal, 'Feasible Adoption (%)']
 
     return eco_grazing_limits
-
-
-def get_savanna_burning_adoption_limit(data):
-    """
-    Gets the adoption limit of Savanna Burning for each possible land use
-    """
-    sav_burning_limits = {}
-    for lu in AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning']:
-        j = data.DESC2AGLU[lu]
-        sav_burning_limits[j] = 1
-
-    return sav_burning_limits
-
-
-def get_agtech_ei_adoption_limit(data, yr_idx):
-    """
-    Gets the adoption limit of AgTech EI for each possible land use.
-    """
-    agtech_ei_limits = {}
-    yr_cal = data.YR_CAL_BASE + yr_idx
-    for lu in AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']:
-        j = data.DESC2AGLU[lu]
-        agtech_ei_limits[j] = data.AGTECH_EI_DATA[lu].loc[yr_cal, 'Technical_Adoption']
-
-    return agtech_ei_limits
 
 
 def get_savanna_burning_adoption_limit(data):
