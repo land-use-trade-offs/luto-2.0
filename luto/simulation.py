@@ -82,6 +82,7 @@ def solve_timeseries(data: Data, steps: int, base: int, target: int):
         data.add_non_ag_dvars(yr, solution.non_ag_X_rk)
         data.add_ag_man_dvars(yr, solution.ag_man_X_mrj)
         data.add_production_data(yr, solution.prod_data)
+        data.add_obj_vals(yr, solution.obj_val)
 
         print(f'Processing for {base + s + 1} completed in {round(time.time() - start_time)} seconds\n\n' )
 
@@ -111,6 +112,7 @@ def solve_snapshot(data: Data, base: int, target: int):
     data.add_non_ag_dvars(target, solution.non_ag_X_rk)
     data.add_ag_man_dvars(target, solution.ag_man_X_mrj)
     data.add_production_data(target, solution.prod_data)
+    data.add_obj_vals(yr, solution.obj_val)
     
     print(f'Processing for {target} completed in {round(time.time() - start_time)} seconds\n\n')
 

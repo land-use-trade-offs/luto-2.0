@@ -184,6 +184,7 @@ class Data:
         self.non_ag_dvars = {}
         self.ag_man_dvars = {}
         self.prod_data = {}
+        self.obj_vals = {}
 
         print('\n' + time.strftime("%Y-%m-%d %H:%M:%S"), 'Beginning data initialisation...')
 
@@ -1095,6 +1096,13 @@ class Data:
         if yr in self.prod_data:
             raise ValueError(f"Production data for year {yr} already stored in Data object.")
         self.prod_data[yr] = prod_data
+
+    def add_obj_vals(self, yr: int, obj_val: float):
+        """
+        Safely save objective value for a given year to the Data object
+        """
+        if yr in self.obj_vals:
+            raise ValueError(f"Objective value for year {yr} already stored in Data object.")
 
     def add_base_year_data_to_containers(self):
         """
