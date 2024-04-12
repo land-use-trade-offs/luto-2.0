@@ -171,15 +171,13 @@ CARBON_PRICE_PER_TONNE = 100
 
 # Environmental Plantings Parameters
 ENV_PLANTING_COST_PER_HA_PER_YEAR = 100     # Yearly cost of maintaining one hectare of environmental plantings
-# Plantings Parameters
-ENV_PLANTING_COST_PER_HA_PER_YEAR = 100           # Yearly cost of maintaining one hectare of environmental plantings
+
+# Carbon Plantings Parameters
 CARBON_PLANTING_BLOCK_COST_PER_HA_PER_YEAR = 100  # Yearly cost of maintaining one hectare of carbon plantings (block)
 CARBON_PLANTING_BELT_COST_PER_HA_PER_YEAR = 100   # Yearly cost of maintaining one hectare of carbon plantings (belt)
-CARBON_PRICE_PER_TONNE = 100                      # Price of carbon per tonne - determines EP revenue in the model
 
 CP_BELT_ROW_WIDTH = 20
 CP_BELT_ROW_SPACING = 40
-# CARBON_PLANTINGS_BELT_FENCING_COST_PER_HA = 10 * 100  # $10 per metre, 100 metres per hectare
 CARBON_PLANTINGS_BELT_FENCING_COST_PER_M = 2           # $ per linear metre
 CP_BELT_PROPORTION = CP_BELT_ROW_WIDTH / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
 cp_no_alleys_per_ha = 100 / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
@@ -192,7 +190,7 @@ rp_annual_maintennance_cost_per_ha_per_year = 100
 rp_annual_ecosystem_services_benefit_per_ha_per_year = 100
 RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR = rp_annual_maintennance_cost_per_ha_per_year - rp_annual_ecosystem_services_benefit_per_ha_per_year
 RIPARIAN_PLANTINGS_BUFFER_WIDTH = 20
-RIPARIAN_PLANTINGS_FENCING_COST_PER_M = 5           # $ per linear metre
+RIPARIAN_PLANTINGS_FENCING_COST_PER_M = 2           # $ per linear metre
 RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR = 0.5
 
 # Agroforestry Parameters
@@ -244,7 +242,7 @@ GHG_LIMITS = {
              }
 
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-GHG_LIMITS_FIELD = '1.5C (50%)'    
+GHG_LIMITS_FIELD = '1.5C (67%)'    
 
 SOC_AMORTISATION = 30           # Number of years over which to spread (average) soil carbon accumulation
 
