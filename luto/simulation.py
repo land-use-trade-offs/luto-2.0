@@ -112,7 +112,7 @@ def solve_snapshot(data: Data, base: int, target: int):
     data.add_non_ag_dvars(target, solution.non_ag_X_rk)
     data.add_ag_man_dvars(target, solution.ag_man_X_mrj)
     data.add_production_data(target, solution.prod_data)
-    data.add_obj_vals(yr, solution.obj_val)
+    data.add_obj_vals(target, solution.obj_val)
     
     print(f'Processing for {target} completed in {round(time.time() - start_time)} seconds\n\n')
 
@@ -131,13 +131,14 @@ def run( data: Data, base: int, target: int) -> None:
     if data.YR_CAL_BASE not in data.prod_data:
         print(f"Calculating base year ({data.YR_CAL_BASE}) production data...", end = " ", flush = True)
         data.prod_data[data.YR_CAL_BASE] = dict()
-        data.prod_data[data.YR_CAL_BASE]["Production"] = get_production(
+        yr_cal_base_prod_data = get_production( 
             data,
             data.YR_CAL_BASE,
             lumap2ag_l_mrj(data.LUMAP, data.LMMAP),
             lumap2non_ag_l_mk(data.LUMAP, len(data.NON_AGRICULTURAL_LANDUSES)),
             get_base_am_vars(data.NCELLS, data.NLMS, data.N_AG_LUS),
         )
+        data.add_production_data(data.YR_CAL_BASE, yr_cal_base_prod_data)
         print("Done.")
 
     # Run the simulation up to `year` sequentially.         *** Not sure that timeseries mode is working ***
@@ -159,6 +160,6 @@ def run( data: Data, base: int, target: int) -> None:
         raise ValueError("Unkown MODE: %s." % settings.MODE)
     
 
-def load_data_and_run_test():
-    from memory_profiler import memory_usage
+# def load_data_and_run_test():
+#     from memory_profiler import memory_usage
     
