@@ -147,7 +147,7 @@ def get_transition_matrices(data, yr_idx, base_year, lumaps, lmmaps, separate=Fa
     w_delta_mrj = np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not)       
 
     # -------------------------------------------------------------- #
-    # Carborn costs of transitioning cells.                          #
+    # Carbon costs of transitioning cells.                          #
     # -------------------------------------------------------------- #
 
     # apply the cost of carbon released by transitioning modified land to natural land
@@ -160,7 +160,7 @@ def get_transition_matrices(data, yr_idx, base_year, lumaps, lmmaps, separate=Fa
     # -------------------------------------------------------------- #
 
     if separate:
-        return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, 'Carbon emissions cost': ghg_t_mrj_cost}
+        return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, 'Carbon emissions cost': ghg_t_mrj_cost}  
     else:
         return e_mrj + w_delta_mrj + ghg_t_mrj_cost
 

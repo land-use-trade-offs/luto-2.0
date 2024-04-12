@@ -42,7 +42,7 @@ def get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate=False
 
 
     if separate:
-        return {'Transition cost':np.einsum('mrj,mrj,r->mrj', base_ag_to_ep_t_mrj, l_mrj, data.REAL_AREA), 
+        return {'Transition cost': np.einsum('mrj,mrj,r->mrj', base_ag_to_ep_t_mrj, l_mrj, data.REAL_AREA), 
                 'Establishment cost': np.einsum('r,mrj,r->mrj', est_costs_r, l_mrj, data.REAL_AREA),
                 'Water license cost': np.einsum('mrj,mrj,r->mrj', w_delta_mrj, l_mrj, data.REAL_AREA)}
         
