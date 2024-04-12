@@ -39,15 +39,15 @@ def get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate=False
 
     # Amortise establishment costs  to be annualised
     est_costs_r = tools.amortise(est_costs_r)
-    
+
 
     if separate:
         return {'Transition cost': np.einsum('mrj,mrj,r->mrj', base_ag_to_ep_t_mrj, l_mrj, data.REAL_AREA), 
                 'Establishment cost': np.einsum('r,mrj,r->mrj', est_costs_r, l_mrj, data.REAL_AREA),
                 'Water license cost': np.einsum('mrj,mrj,r->mrj', w_delta_mrj, l_mrj, data.REAL_AREA)}
-    else:
-        ag2ep_transitions_r += est_costs_r
-        return ag2ep_transitions_r * data.REAL_AREA
+        
+    ag2ep_transitions_r += est_costs_r
+    return ag2ep_transitions_r * data.REAL_AREA
 
 
 def get_rip_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
@@ -203,17 +203,17 @@ def get_from_ag_transition_matrix(data, yr_idx, lumap, lmmap, separate=False) ->
                 'Carbon Plantings (Block)': carbon_plantings_block_transitions_from_ag_r,
                 'Carbon Plantings (Belt)': carbon_plantings_belt_transitions_from_ag_r,
                 'BECCS': beccs_transitions_from_ag_r}
-    else:
-        # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-        ag_to_non_agr_t_matrices = [
-            env_plant_transitions_from_ag_r.reshape((data.NCELLS, 1)),
-            rip_plant_transitions_from_ag_r.reshape((data.NCELLS, 1)),
-            agroforestry_transitions_from_ag_r.reshape((data.NCELLS, 1)),
-            carbon_plantings_block_transitions_from_ag_r.reshape((data.NCELLS, 1)),
-            carbon_plantings_belt_transitions_from_ag_r.reshape((data.NCELLS, 1)),
-            beccs_transitions_from_ag_r.reshape((data.NCELLS, 1)),
-        ]
-        return np.concatenate(ag_to_non_agr_t_matrices, axis=1)
+        
+    # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
+    ag_to_non_agr_t_matrices = [
+        env_plant_transitions_from_ag_r.reshape((data.NCELLS, 1)),
+        rip_plant_transitions_from_ag_r.reshape((data.NCELLS, 1)),
+        agroforestry_transitions_from_ag_r.reshape((data.NCELLS, 1)),
+        carbon_plantings_block_transitions_from_ag_r.reshape((data.NCELLS, 1)),
+        carbon_plantings_belt_transitions_from_ag_r.reshape((data.NCELLS, 1)),
+        beccs_transitions_from_ag_r.reshape((data.NCELLS, 1)),
+    ]
+    return np.concatenate(ag_to_non_agr_t_matrices, axis=1)
 
 
 def get_env_plantings_to_ag(data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
@@ -227,7 +227,7 @@ def get_env_plantings_to_ag(data, yr_idx, lumap, lmmap, separate=False) -> np.nd
     """
     # Get base transition costs: add cost of installing irrigation
     base_ep_to_ag_t = data.EP2AG_TRANSITION_COSTS_HA
-    
+
     # Get the agricultural cells, and the env-ag can not happen on these cells
     ag_cells, _ = tools.get_ag_and_non_ag_cells(lumap)
 
@@ -241,14 +241,14 @@ def get_env_plantings_to_ag(data, yr_idx, lumap, lmmap, separate=False) -> np.nd
     base_ep_to_ag_t_mrj = np.broadcast_to(base_ep_to_ag_t, (2, data.NCELLS, base_ep_to_ag_t.shape[0]))
     base_ep_to_ag_t_mrj = tools.amortise(base_ep_to_ag_t_mrj).copy()
     base_ep_to_ag_t_mrj[:, ag_cells, :] = 0
-    
+
     if separate:
         return {'Transition cost':np.einsum('mrj,mrj,r->mrj', base_ep_to_ag_t_mrj, l_mrj, data.REAL_AREA), 
                 'Water license cost': np.einsum('mrj,mrj,r->mrj', w_delta_mrj, l_mrj, data.REAL_AREA)}
-    else:
-        # Add cost of water license and cost of installing/removing irrigation where relevant (pre-amortised)
-        ep_to_ag_t_mrj = base_ep_to_ag_t_mrj + w_delta_mrj
-        return ep_to_ag_t_mrj * data.REAL_AREA[np.newaxis, :, np.newaxis]
+        
+    # Add cost of water license and cost of installing/removing irrigation where relevant (pre-amortised)
+    ep_to_ag_t_mrj = base_ep_to_ag_t_mrj + w_delta_mrj
+    return ep_to_ag_t_mrj * data.REAL_AREA[np.newaxis, :, np.newaxis]
 
 
 def get_rip_plantings_to_ag(data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
@@ -340,12 +340,28 @@ def get_to_ag_transition_matrix(data, yr_idx, lumap, lmmap, separate=False) -> n
     """
     Get the matrix containing transition costs from non-agricultural land uses to agricultural land uses.
 
+    Parameters
+    ----------
+    data : np.ndarray
+        The input data array.
+    yr_idx : int
+        The index of the year.
+    lumap : dict
+        The land use mapping dictionary.
+    lmmap : dict
+        The land management mapping dictionary.
+    separate : bool, optional
+        If True, returns a dictionary of transition matrices for each land use category.
+        If False, returns a single aggregated transition matrix.
+
     Returns
     -------
-    3-D array, indexed by (m, r, j).
+    np.ndarray or dict
+        If `separate` is True, returns a dictionary of transition matrices, where the keys are the land use categories.
+        If `separate` is False, returns a single aggregated transition matrix.
+
     """
     
-    # Note: The order of the keys in the dictionary must match the order of the non-agricultural land uses
     env_plant_transitions_to_ag_mrj = get_env_plantings_to_ag(data, yr_idx, lumap, lmmap, separate)
     rip_plant_transitions_to_ag_mrj = get_rip_plantings_to_ag(data, yr_idx, lumap, lmmap, separate)
     agroforestry_transitions_to_ag_mrj = get_agroforestry_to_ag(data, yr_idx, lumap, lmmap, separate)
@@ -353,39 +369,43 @@ def get_to_ag_transition_matrix(data, yr_idx, lumap, lmmap, separate=False) -> n
     carbon_plantings_belt_transitions_to_ag_mrj =  get_carbon_plantings_belt_to_ag(data, yr_idx, lumap, lmmap, separate)
     beccs_transitions_to_ag_mrj = get_beccs_to_ag(data, yr_idx, lumap, lmmap, separate)
 
-    
-
-    # Element-wise sum each mrj-indexed matrix to get the final transition matrix
     if separate:
+        # Note: The order of the keys in the dictionary must match the order of the non-agricultural land uses
         return {'Environmental Plantings' : env_plant_transitions_to_ag_mrj, 
                 'Riparian Plantings': rip_plant_transitions_to_ag_mrj,
                 'Agroforestry': agroforestry_transitions_to_ag_mrj,
                 'Carbon Plantings (Block)': carbon_plantings_block_transitions_to_ag_mrj, 
                 'Carbon Plantings (Belt)': carbon_plantings_belt_transitions_to_ag_mrj, 
                 'BECCS':beccs_transitions_to_ag_mrj}
-    else:
-        # Reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-        ag_to_non_agr_t_matrices = [
-            env_plant_transitions_to_ag_mrj,
-            rip_plant_transitions_to_ag_mrj,
-            agroforestry_transitions_to_ag_mrj,
-            carbon_plantings_block_transitions_to_ag_mrj,
-            carbon_plantings_belt_transitions_to_ag_mrj,
-            beccs_transitions_to_ag_mrj,
-        ]
-        return np.add.reduce(ag_to_non_agr_t_matrices)
+        
+    # Reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
+    ag_to_non_agr_t_matrices = [
+        env_plant_transitions_to_ag_mrj,
+        rip_plant_transitions_to_ag_mrj,
+        agroforestry_transitions_to_ag_mrj,
+        carbon_plantings_block_transitions_to_ag_mrj,
+        carbon_plantings_belt_transitions_to_ag_mrj,
+        beccs_transitions_to_ag_mrj,
+    ]
+    return np.add.reduce(ag_to_non_agr_t_matrices)
 
 
 def get_non_ag_transition_matrix(data, yr_idx, lumap, lmmap) -> np.ndarray:
     """
-    Get the matrix that contains transition costs for non-agricultural land uses.
-    That is, the cost of transitioning between non-agricultural land uses.
+    Get the matrix that contains transition costs for non-agricultural land uses. 
+    There are no transition costs for non-agricultural land uses, therefore the matrix is filled with zeros.
+    
+    Parameters:
+        data (object): The data object containing information about the model.
+        yr_idx (int): The index of the year for which to calculate the transition costs.
+        lumap (dict): A dictionary mapping land use codes to land use names.
+        lmmap (dict): A dictionary mapping land market codes to land market names.
+    
+    Returns:
+        np.ndarray: The transition cost matrix, filled with zeros.
     """
-    t_rk = np.zeros((data.NCELLS, data.N_NON_AG_LUS))
+    return np.zeros((data.NCELLS, data.N_NON_AG_LUS))
 
-    # Currently, non of the non-agricultural land uses may transition between each other.
-    # Thus, transition costs need not be considered.
-    return t_rk
 
 
 def get_exclusions_for_excluding_all_natural_cells(data, lumap) -> np.ndarray:
@@ -393,7 +413,15 @@ def get_exclusions_for_excluding_all_natural_cells(data, lumap) -> np.ndarray:
     A number of non-agricultural land uses can only be applied to cells that
     don't already utilise a natural land use. This function gets the exclusion
     matrix for all such non-ag land uses, returning an array valued 0 at the 
-    indeces of cells that use natural land uses, and 1 everywhere else.
+    indices of cells that use natural land uses, and 1 everywhere else.
+
+    Parameters:
+    - data: The data object containing information about the cells.
+    - lumap: The land use map.
+
+    Returns:
+    - exclude: An array of shape (NCELLS,) with values 0 at the indices of cells
+               that use natural land uses, and 1 everywhere else.
     """
     exclude = np.ones(data.NCELLS)
 
@@ -406,6 +434,13 @@ def get_exclusions_for_excluding_all_natural_cells(data, lumap) -> np.ndarray:
 def get_exclusions_environmental_plantings(data, lumap) -> np.ndarray:
     """
     Get the exclusion array for the environmental plantings land use.
+
+    Parameters:
+    - data: The data object containing information about land use transitions.
+    - lumap: The land use map.
+
+    Returns:
+    - exclude: The exclusion array where 0 represents excluded land uses and 1 represents allowed land uses.
     """
     # Get (agricultural) land uses that cannot transition to environmental plantings
     excluded_ag_lus_cells = np.where(np.isnan(data.AG2EP_TRANSITION_COSTS_HA))[0]
@@ -425,7 +460,15 @@ def get_exclusions_environmental_plantings(data, lumap) -> np.ndarray:
 def get_exclusions_riparian_plantings(data, lumap) -> np.ndarray:
     """
     Get the exclusion array for the Riparian plantings land use.
-    Return a 1-D array indexed by r that represents how much RP can be utilised.
+    
+    This function calculates and returns a 1-D array indexed by r that represents how much Riparian Plantings (RP) land use can be utilized.
+    
+    Parameters:
+        data (DataFrame): The data containing information about the land use.
+        lumap (array-like): The land use map.
+        
+    Returns:
+        np.ndarray: The exclusion array for Riparian Plantings land use.
     """
     exclude = (data.RP_PROPORTION).astype(np.float32)
 
@@ -444,6 +487,13 @@ def get_exclusions_agroforestry(data, lumap) -> np.ndarray:
     """
     Return a 1-D array indexed by r that represents how much riparian plantings can possibly 
     be done at each cell.
+
+    Parameters:
+    - data: The data object containing information about the landscape.
+    - lumap: The land use map.
+
+    Returns:
+    - exclude: A 1-D array.
     """
     exclude = (np.ones(data.NCELLS) * settings.AF_PROPORTION).astype(np.float32)
 
@@ -460,6 +510,13 @@ def get_exclusions_carbon_plantings_block(data, lumap) -> np.ndarray:
     """
     Return a 1-D array indexed by r that represents how much carbon plantings (block) can possibly 
     be done at each cell.
+
+    Parameters:
+    - data: The data object containing information about the cells.
+    - lumap: The land use map.
+
+    Returns:
+    - exclude: A 1-D numpy array
     """
     exclude = np.ones(data.NCELLS)
     exclude *= get_exclusions_for_excluding_all_natural_cells(data, lumap)
@@ -474,6 +531,13 @@ def get_exclusions_carbon_plantings_belt(data, lumap) -> np.ndarray:
     """
     Return a 1-D array indexed by r that represents how much carbon plantings (belt) can possibly 
     be done at each cell.
+
+    Parameters:
+    - data: The data object containing information about the cells.
+    - lumap: The land use map.
+
+    Returns:
+    - exclude: A 1-D array
     """
     exclude = (np.ones(data.NCELLS) * settings.CP_BELT_PROPORTION).astype(np.float32)
 
@@ -490,6 +554,13 @@ def get_exclusions_beccs(data, lumap) -> np.ndarray:
     """
     Return a 1-D array indexed by r that represents how much BECCS can possibly 
     be done at each cell.
+
+    Parameters:
+    - data: The data object containing BECCS costs and other relevant information.
+    - lumap: The land use map object.
+
+    Returns:
+    - exclude: A 1-D array
     """
     exclude = np.zeros(data.NCELLS)
 
@@ -510,9 +581,23 @@ def get_exclude_matrices(data, lumap) -> np.ndarray:
     """
     Get the non-agricultural exclusions matrix.
 
+    Parameters
+    ----------
+    data : object
+        The data object containing information about the model.
+    lumap : object
+        The lumap object containing land usage mapping information.
+
     Returns
     -------
-    2-D array, indexed by (r, k) where r is cell and k is non-agricultural land usage.
+    np.ndarray
+        A 2-D array indexed by (r, k) where r is the cell and k is the non-agricultural land usage.
+
+    Notes
+    -----
+    This function calculates the non-agricultural exclusions matrix by combining several exclusion matrices
+    related to different non-agricultural land uses. The resulting matrix is a concatenation of these matrices
+    along the k indexing.
     """
     # Environmental plantings exclusions
     env_plant_exclusions = get_exclusions_environmental_plantings(data, lumap)

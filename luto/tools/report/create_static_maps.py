@@ -13,10 +13,8 @@ from luto.tools.report.map_tools.helper import (get_map_meta,
 
 
 
-def TIF2MAP(sim):
+def TIF2MAP(raw_data_dir:str):
 
-    # Get the output directory
-    raw_data_dir = sim.path
     # Get all LUTO output files and store them in a dataframe
     files = get_all_files(raw_data_dir)
     # Get the initial tif files
@@ -37,6 +35,16 @@ def TIF2MAP(sim):
         
      
 def create_maps(row, model_run_scenario):
+    """
+    Creates a static map based on the given row data and model run scenario.
+
+    Args:
+        row (pandas.Series): A row of data containing information about the map.
+        model_run_scenario (str): The model run scenario text (or path to).
+
+    Returns:
+        None
+    """
     
     # Get the necessary variables
     tif_path = row['path']

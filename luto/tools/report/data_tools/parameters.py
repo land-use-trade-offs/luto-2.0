@@ -95,6 +95,7 @@ GHG_NAMES = {
     'TCO2E_Carbon Plantings (Block)': 'Carbon Plantings (Block)',
     'TCO2E_BECCS': 'BECCS',
     'TCO2E_Savanna Burning': 'Savanna Burning',
+    'TCO2E_AgTech EI': 'AgTech EI',
 }
 
 GHG_CATEGORY = {'Agricultural soils: Animal production, dung and urine': {"CH4":0.5,"CO2":0.5},

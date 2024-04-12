@@ -29,6 +29,12 @@ def get_biodiv_beccs(data):
 def get_breq_matrix(data):
     """
     Returns non-agricultural c_rk matrix of costs per cell and land use.
+
+    Parameters:
+    - data: The input data object containing necessary information.
+
+    Returns:
+    - numpy.ndarray: The non-agricultural c_rk matrix of costs per cell and land use.
     """
     env_plantings_biodiv = get_biodiv_environmental_plantings(data)
     rip_plantings_biodiv = get_biodiv_riparian_plantings(data)

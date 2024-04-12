@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 
-def get_ghg_reduction_env_plantings(data, aggregate) -> np.ndarray:
+def get_ghg_reduction_env_plantings(data, aggregate) -> np.ndarray|pd.DataFrame:
     """
     Parameters
     ----------
@@ -14,9 +14,8 @@ def get_ghg_reduction_env_plantings(data, aggregate) -> np.ndarray:
     if aggregate == True (default)  -> np.ndarray
        aggregate == False           -> pd.DataFrame
     
-        Greenhouse gas emissions of environmental plantings for each cell.
-        Since environmental plantings reduces carbon in the air, each value will be <= 0.
-        1-D array Indexed by cell.
+    Greenhouse gas emissions of environmental plantings for each cell.
+    Since environmental plantings reduces carbon in the air, each value will be <= 0.
     """
     
     # Tonnes of CO2e per ha, adjusted for resfactor
@@ -29,7 +28,7 @@ def get_ghg_reduction_env_plantings(data, aggregate) -> np.ndarray:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
 
-def get_ghg_reduction_rip_plantings(data, aggregate) -> np.ndarray:
+def get_ghg_reduction_rip_plantings(data, aggregate) -> np.ndarray|pd.DataFrame:
     """
     Parameters
     ----------
@@ -41,9 +40,8 @@ def get_ghg_reduction_rip_plantings(data, aggregate) -> np.ndarray:
     if aggregate == True (default)  -> np.ndarray
        aggregate == False           -> pd.DataFrame
     
-        Greenhouse gas emissions of Riparian Plantings for each cell. Same as environmental plantings.
-        Since riparian plantings reduces carbon in the air, each value will be <= 0.
-        1-D array Indexed by cell.
+    Greenhouse gas emissions of Riparian Plantings for each cell. Same as environmental plantings.
+    Since riparian plantings reduces carbon in the air, each value will be <= 0.
     """
 
     # Tonnes of CO2e per ha, adjusted for resfactor
@@ -55,7 +53,7 @@ def get_ghg_reduction_rip_plantings(data, aggregate) -> np.ndarray:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
 
-def get_ghg_reduction_agroforestry(data, aggregate) -> np.ndarray:
+def get_ghg_reduction_agroforestry(data, aggregate) -> np.ndarray|pd.DataFrame:
     """
     Parameters
     ----------
@@ -67,9 +65,8 @@ def get_ghg_reduction_agroforestry(data, aggregate) -> np.ndarray:
     if aggregate == True (default)  -> np.ndarray
        aggregate == False           -> pd.DataFrame
     
-        Greenhouse gas emissions of agroforestry for each cell.
-        Since agroforestry reduces carbon in the air, each value will be <= 0.
-        1-D array Indexed by cell.
+    Greenhouse gas emissions of agroforestry for each cell.
+    Since agroforestry reduces carbon in the air, each value will be <= 0.
     """
     
     # Tonnes of CO2e per ha, adjusted for resfactor
@@ -82,7 +79,7 @@ def get_ghg_reduction_agroforestry(data, aggregate) -> np.ndarray:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
 
-def get_ghg_reduction_carbon_plantings_block(data, aggregate) -> np.ndarray:
+def get_ghg_reduction_carbon_plantings_block(data, aggregate) -> np.ndarray|pd.DataFrame:
     """
     Parameters
     ----------
@@ -94,9 +91,8 @@ def get_ghg_reduction_carbon_plantings_block(data, aggregate) -> np.ndarray:
     if aggregate == True (default)  -> np.ndarray
        aggregate == False           -> pd.DataFrame
     
-        Greenhouse gas emissions of carbon plantings (block) for each cell.
-        Since carbon plantings reduces carbon in the air, each value will be <= 0.
-        1-D array Indexed by cell.
+    Greenhouse gas emissions of carbon plantings (block) for each cell.
+    Since carbon plantings reduces carbon in the air, each value will be <= 0.
     """
     
     # Tonnes of CO2e per ha, adjusted for resfactor
@@ -108,7 +104,7 @@ def get_ghg_reduction_carbon_plantings_block(data, aggregate) -> np.ndarray:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
     
 
-def get_ghg_reduction_carbon_plantings_belt(data, aggregate) -> np.ndarray:
+def get_ghg_reduction_carbon_plantings_belt(data, aggregate) -> np.ndarray|pd.DataFrame:
     """
     Parameters
     ----------
@@ -120,9 +116,8 @@ def get_ghg_reduction_carbon_plantings_belt(data, aggregate) -> np.ndarray:
     if aggregate == True (default)  -> np.ndarray
        aggregate == False           -> pd.DataFrame
     
-        Greenhouse gas emissions of carbon plantings (belt) for each cell.
-        Since carbon plantings reduces carbon in the air, each value will be <= 0.
-        1-D array Indexed by cell.
+    Greenhouse gas emissions of carbon plantings (belt) for each cell.
+    Since carbon plantings reduces carbon in the air, each value will be <= 0.
     """
     
     # Tonnes of CO2e per ha, adjusted for resfactor
@@ -134,7 +129,7 @@ def get_ghg_reduction_carbon_plantings_belt(data, aggregate) -> np.ndarray:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
 
-def get_ghg_reduction_beccs(data, aggregate) -> np.ndarray:
+def get_ghg_reduction_beccs(data, aggregate) -> np.ndarray|pd.DataFrame:
     """
     Parameters
     ----------
@@ -146,9 +141,8 @@ def get_ghg_reduction_beccs(data, aggregate) -> np.ndarray:
     if aggregate == True (default)  -> np.ndarray
        aggregate == False           -> pd.DataFrame
     
-        Greenhouse gas emissions of agroforestry for each cell.
-        Since agroforestry reduces carbon in the air, each value will be <= 0.
-        1-D array Indexed by cell.
+    Greenhouse gas emissions of agroforestry for each cell.
+    Since agroforestry reduces carbon in the air, each value will be <= 0.
     """
 
     # Tonnes of CO2e per ha, adjusted for resfactor
@@ -161,9 +155,23 @@ def get_ghg_reduction_beccs(data, aggregate) -> np.ndarray:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
 
-def get_ghg_matrix(data, aggregate=True) -> np.ndarray:
+def get_ghg_matrix(data, aggregate=True) -> np.ndarray|pd.DataFrame:
     """
     Get the g_rk matrix containing non-agricultural greenhouse gas emissions.
+
+    Parameters:
+    - data: The input data for calculating greenhouse gas emissions.
+    - aggregate: A boolean flag indicating whether to aggregate the matrices or not. Default is True.
+
+    Returns:
+    - If aggregate is True, returns a numpy ndarray representing the aggregated g_rk matrix.
+    - If aggregate is False, returns a pandas DataFrame representing the g_rk matrix.
+
+    Raises:
+    - KeyError: If the aggregate argument is not a boolean value.
+
+    Note:
+    - The function internally calls several other functions to calculate different components of the g_rk matrix.
     """
 
     env_plantings_ghg_matrix = get_ghg_reduction_env_plantings(data, aggregate)

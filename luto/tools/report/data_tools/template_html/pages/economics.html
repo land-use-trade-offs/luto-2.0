@@ -12,6 +12,7 @@
     <script src="https://code.highcharts.com/modules/exporting.js"></script>
     <script src="https://code.highcharts.com/modules/export-data.js"></script>
     <script src="https://code.highcharts.com/highcharts-more.js"></script>
+    <script src="https://code.highcharts.com/modules/heatmap.js"></script>
     <script src="https://blacklabel.github.io/grouped_categories/grouped-categories.js"></script>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 
@@ -103,14 +104,55 @@
         <!-- Chart:economics_7_non_ag_cost_1_Land-use_wide -->
         <div class="fig" id="economics_7_non_ag_cost_1_Land-use_wide"></div>
 
-        <!-- Chart:economics_8_transition_ag2ag_cost_1_Land Use_wide -->
-        <div class="fig" id="economics_8_transition_ag2ag_cost_1_Land Use_wide"></div>
 
-        <!-- Chart:economics_8_transition_ag2ag_cost_2_Type_wide -->
-        <div class="fig" id="economics_8_transition_ag2ag_cost_2_Type_wide"></div>
+        
+        <!-- The dropdown to select the year of the map: -->
+        <div class="selection" style="text-align: center;">
+            <label for="year_ag2ag" class="label" style="font-size: 1.2em; color: rgb(51, 51, 51); font-weight: bold; fill: rgb(51, 51, 51);">
+                Transition Cost (Agricultural to Agricultural) Matrix for
+                <output id="yearOutput_ag2ag">2010</output> (
+                <button id="decrement_ag2ag">-</button>
+                <input type="range" id="year_ag2ag" step="1" value="2010" oninput="yearOutput_ag2ag.value = year_ag2ag.value">
+                <button id="increment_ag2ag">+</button>)
+            </label>
+        </div>
 
-        <!-- Chart:economics_8_transition_ag2ag_cost_3_Water Supply_wide -->
-        <div class="fig" id="economics_8_transition_ag2ag_cost_3_Water Supply_wide"></div>
+        <!-- Chart:economics_8_transition_ag2ag_cost_5_transition_matrix -->
+        <div class="fig" id="economics_8_transition_ag2ag_cost_5_transition_matrix"></div>
+
+
+
+        <!-- Chart:economics_8_transition_ag2ag_cost_1_From land-use_wide -->
+        <div class="fig" id="economics_8_transition_ag2ag_cost_1_From land-use_wide"></div>
+
+        <!-- Chart:economics_8_transition_ag2ag_cost_2_To land-use_wide -->
+        <div class="fig" id="economics_8_transition_ag2ag_cost_2_To land-use_wide"></div>
+    
+        <!-- Chart:economics_8_transition_ag2ag_cost_3_Type_wide -->
+        <div class="fig" id="economics_8_transition_ag2ag_cost_3_Type_wide"></div>
+
+        <!-- Chart:economics_8_transition_ag2ag_cost_4_Water Supply_wide -->
+        <div class="fig" id="economics_8_transition_ag2ag_cost_4_Water Supply_wide"></div>
+
+
+
+
+        <!-- The dropdown to select the year of the map: -->
+        <div class="selection" style="text-align: center;">
+            <label for="year_ag2non_ag" class="label" style="font-size: 1.2em; color: rgb(51, 51, 51); font-weight: bold; fill: rgb(51, 51, 51);">
+                Transition Cost (Agricultural to Non-Agricultural) Matrix for
+                <output id="yearOutput_ag2non_ag">2010</output> (
+                <button id="decrement_ag2non_ag">-</button>
+                <input type="range" id="year_ag2non_ag" step="1" value="2010" oninput="yearOutput_ag2non_ag.value = year_ag2non_ag.value">
+                <button id="increment_ag2non_ag">+</button>)
+            </label>
+        </div>
+
+        <!-- Chart:economics_9_transition_ag2non_cost_5_transition_matrix -->
+        <div class="fig" id="economics_9_transition_ag2non_cost_5_transition_matrix"></div>
+
+
+
 
         <!-- Chart:economics_9_transition_ag2non_cost_1_Cost type_wide -->
         <div class="fig" id="economics_9_transition_ag2non_cost_1_Cost type_wide"></div>
