@@ -559,7 +559,7 @@ def write_cost_transition(sim, yr_cal, path, yr_cal_sim_pre=None):
     if yr_idx == 0:
         base_mrj = np.zeros((sim.data.NLMS, sim.data.NCELLS, sim.data.N_AG_LUS))
         ag_transitions_cost_mat = {k: np.zeros((sim.data.NLMS, sim.data.NCELLS, sim.data.N_AG_LUS))  
-                                for k in ['Establishment cost', 'Water license cost', 'Carbon emissions cost']}
+                                for k in ['Establishment cost', 'Water license cost', 'Carborn releasing cost']}
     else:
         # Get the base_year mrj matirx 
         base_mrj = tools.lumap2ag_l_mrj(sim.lumaps[yr_cal_sim_pre], sim.lmmaps[yr_cal_sim_pre])

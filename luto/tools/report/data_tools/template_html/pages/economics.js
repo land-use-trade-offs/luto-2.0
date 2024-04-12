@@ -1382,7 +1382,7 @@ document.addEventListener("DOMContentLoaded", function () {
         reversed: false,
         labels: {
           formatter: function () {
-            return this.value.toFixed(2);
+            return this.value.toFixed(0);
           }
         }
       },

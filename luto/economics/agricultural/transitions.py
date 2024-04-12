@@ -160,7 +160,7 @@ def get_transition_matrices(data, yr_idx, base_year, lumaps, lmmaps, separate=Fa
     # -------------------------------------------------------------- #
 
     if separate:
-        return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, 'Carbon emissions cost': ghg_t_mrj_cost}  
+        return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, 'Carborn releasing cost': ghg_t_mrj_cost}  
     else:
         return e_mrj + w_delta_mrj + ghg_t_mrj_cost
 
