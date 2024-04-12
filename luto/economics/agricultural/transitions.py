@@ -139,7 +139,7 @@ def get_transition_matrices(data, yr_idx, base_year, lumaps, lmmaps, separate=Fa
     e_mrj = np.einsum('mrj,mrj,mrj->mrj', e_mrj, x_mrj, l_mrj_not)                   
 
     # -------------------------------------------------------------- #
-    # Water license cost (upfront, amortised to annual, per cell).  #
+    # Water license cost (upfront, amortised to annual, per cell).   #
     # -------------------------------------------------------------- #
 
     w_mrj = get_wreq_matrices(data, yr_idx)                                          

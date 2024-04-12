@@ -13,19 +13,8 @@ from luto.tools.report.map_tools.helper import (get_map_meta,
 
 
 
-def TIF2MAP(sim):
-    """
-    Convert TIF files to maps (PNG and HTML).
+def TIF2MAP(raw_data_dir:str):
 
-    Args:
-        sim (Simulation): The simulation object.
-
-    Returns:
-        None
-    """
-
-    # Get the output directory
-    raw_data_dir = sim.path
     # Get all LUTO output files and store them in a dataframe
     files = get_all_files(raw_data_dir)
     # Get the initial tif files

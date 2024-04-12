@@ -63,17 +63,13 @@ def report_on_path(path:str):
         for file in os.listdir(f"{path}/DATA_REPORT/data"):
             fpath = f"{path}/DATA_REPORT/data/{file}"
             os.remove(fpath) if os.path.isfile(fpath) else None
-    
-    # Creating the fake simulation object
-    class fake:pass
-    sim = fake()
-    sim.path = path
+
     
     if settings.WRITE_OUTPUT_GEOTIFFS and os.path.exists(f"{path}/data/Map_data"):
-        TIF2MAP(sim) 
+        TIF2MAP(path) 
         
-    save_report_data(sim)
-    data2html(sim)
+    save_report_data(path)
+    data2html(path)
 
 
 
