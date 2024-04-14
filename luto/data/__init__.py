@@ -647,7 +647,7 @@ Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inlan
 # Load biodiversity data
 biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5') )
 
-# Get the Zonation output score between 0 and 1
+# Get the Zonation output score between 0 and 1. BIODIV_SCORE_RAW.sum() = 153 million
 BIODIV_SCORE_RAW = biodiv_priorities['BIODIV_PRIORITY_SSP' + SSP].to_numpy(dtype = np.float32)
 
 # Get the natural area connectivity score between 0 and 1 (1 is highly connected, 0 is not connected)
@@ -666,7 +666,7 @@ biodiv_value_target = ( ( np.isin(LUMAP, [2, 6, 15, 23]) * BIODIV_SCORE_RAW * RE
                           np.isin(LUMAP, LU_MODIFIED_LAND) * BIODIV_SCORE_RAW * REAL_AREA                           # Calculate raw biodiversity score of modified land
                       ) * BIODIV_TARGET                                                                             # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
                         
-# Sum the current biodiversity value and the addition biodiversity score required to meet the target
+# Sum the current biodiversity value and the additional biodiversity score required to meet the target
 TOTAL_BIODIV_TARGET_SCORE = biodiv_value_current.sum() + biodiv_value_target.sum()                         
 
 """
