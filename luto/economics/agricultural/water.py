@@ -51,7 +51,7 @@ def get_wreq_matrices(data, yr_idx):
     
     # Convert to ML per cell via REAL_AREA
     w_mrj *= data.REAL_AREA[:, np.newaxis]                      # <unit: ML/ha> * <unit: ha/cell> -> <unit: ML/cell>
-    
+
     return w_mrj
 
 
