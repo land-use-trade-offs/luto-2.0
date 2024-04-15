@@ -1,5 +1,6 @@
 from joblib import Parallel, delayed
 import luto.settings as settings
+from luto.data import Data
 
 from luto.tools.report.data_tools import  get_all_files
 

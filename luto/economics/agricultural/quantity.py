@@ -21,10 +21,12 @@ Pure functions for calculating the production quantities of agricutlural commodi
 from typing import Dict
 import numpy as np
 from scipy.interpolate import interp1d
+
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.data import Data, lvs_veg_types
 
 
-def get_ccimpact(data, lu, lm, yr_idx):
+def get_ccimpact(data: Data, lu, lm, yr_idx):
     """
     Return climate change impact multiplier at (zero-based) year index.
 
@@ -56,41 +58,6 @@ def get_ccimpact(data, lu, lm, yr_idx):
     # Create linear function f and interpolate climate change impact
     f = interp1d(xs, yys, kind='linear', fill_value='extrapolate')
     return f(yr_cal)
-
-
-def lvs_veg_types(lu):
-    """Return livestock and vegetation types of the livestock land-use `lu`.
-
-    Args:
-        lu (str): The livestock land-use.
-
-    Returns:
-        tuple: A tuple containing the livestock type and vegetation type.
-
-    Raises:
-        KeyError: If the livestock type or vegetation type cannot be identified.
-
-    """
-
-    # Determine type of livestock.
-    if 'beef' in lu.lower():
-        lvstype = 'BEEF'
-    elif 'sheep' in lu.lower():
-        lvstype = 'SHEEP'
-    elif 'dairy' in lu.lower():
-        lvstype = 'DAIRY'
-    else:
-        raise KeyError(f"Livestock type '{lu}' not identified.")
-
-    # Determine type of vegetation.
-    if 'natural' in lu.lower():
-        vegtype = 'natural land'
-    elif 'modified' in lu.lower():
-        vegtype = 'modified land'
-    else:
-        raise KeyError(f"Vegetation type '{lu}' not identified.")
-
-    return lvstype, vegtype
 
 
 def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
@@ -138,7 +105,7 @@ def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
     return yield_pot
 
 
-def get_quantity_lvstk(data, pr, lm, yr_idx):
+def get_quantity_lvstk(data: Data, pr, lm, yr_idx):
     """Return livestock yield of `pr`+`lm` in `yr_idx` as 1D Numpy array.
 
     Args:
@@ -208,7 +175,7 @@ def get_quantity_lvstk(data, pr, lm, yr_idx):
     return quantity
 
 
-def get_quantity_crop(data, pr, lm, yr_idx):
+def get_quantity_crop(data: Data, pr, lm, yr_idx):
     """Return crop yield <unit: t/cell> of `pr`+`lm` in `yr_idx` as 1D Numpy array.
 
     Args:
@@ -248,7 +215,7 @@ def get_quantity_crop(data, pr, lm, yr_idx):
     return quantity
 
 
-def get_quantity(data, pr, lm, yr_idx):
+def get_quantity(data: Data, pr, lm, yr_idx):
     """Return yield <unit: t/cell> of `pr`+`lm` in `yr_idx` as 1D Numpy array.
 
     Args:
@@ -284,7 +251,7 @@ def get_quantity(data, pr, lm, yr_idx):
     return q
 
 
-def get_quantity_matrix(data, lm, yr_idx):
+def get_quantity_matrix(data: Data, lm, yr_idx):
     """
     Return q_rp matrix of quantities per cell per product as 2D Numpy array.
 
@@ -320,7 +287,7 @@ def get_quantity_matrices(data, yr_idx):
                            for lm in data.LANDMANS ))
 
 
-def get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx):
+def get_asparagopsis_effect_q_mrp(data: Data, q_mrp, yr_idx):
     """
     Applies the effects of using asparagopsis to the quantity data
     for all relevant agr. land uses.
@@ -354,7 +321,7 @@ def get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx):
     return new_q_mrp
 
 
-def get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx):
+def get_precision_agriculture_effect_q_mrp(data: Data, q_mrp, yr_idx):
     """
     Applies the effects of using precision agriculture to the quantity data
     for all relevant agricultural land uses.
@@ -386,7 +353,7 @@ def get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx):
     return new_q_mrp
 
 
-def get_ecological_grazing_effect_q_mrp(data, q_mrp, yr_idx):
+def get_ecological_grazing_effect_q_mrp(data: Data, q_mrp, yr_idx):
     """
     Applies the effects of using ecological grazing to the quantity data
     for all relevant agricultural land uses.
@@ -466,7 +433,7 @@ def get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx):
     return new_q_mrp
 
 
-def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[str, np.ndarray]:
+def get_agricultural_management_quantity_matrices(data: Data, q_mrp, yr_idx) -> Dict[str, np.ndarray]:
     """
     Calculates the quantity matrices for different agricultural management practices.
 

@@ -8,6 +8,7 @@ import pandas as pd
 from glob import glob
 from joblib import Parallel, delayed
 import luto.settings as settings
+from luto.data import Data
 
 from luto.economics.off_land_commodity import get_demand_df
 from luto.tools.report.data_tools.colors import LANDUSE_ALL_COLORS, COMMODITIES_ALL_COLORS

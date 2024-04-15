@@ -21,6 +21,7 @@ Data about transitions costs.
 import numpy as np
 from typing import Dict
 
+from luto.data import Data, lumap2ag_l_mrj
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.economics.agricultural.water import get_wreq_matrices
 import luto.economics.agricultural.ghg as ag_ghg
@@ -28,7 +29,7 @@ from luto import settings
 import luto.tools as tools
 
 
-def get_exclude_matrices(data, base_year: int, lumaps: Dict[int, np.ndarray]):
+def get_exclude_matrices(data: Data, base_year: int, lumaps: Dict[int, np.ndarray]):
     """Return x_mrj exclude matrices.
 
     An exclude matrix indicates whether switching land-use for a certain cell r 
@@ -38,8 +39,7 @@ def get_exclude_matrices(data, base_year: int, lumaps: Dict[int, np.ndarray]):
     Parameters
     ----------
 
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
     base_year: int
         Current base year of the solve.
     lumaps: dict[str, numpy.ndarray]
@@ -81,31 +81,29 @@ def get_exclude_matrices(data, base_year: int, lumaps: Dict[int, np.ndarray]):
     return (x_mrj * t_rj).astype(np.int8)
 
 
-def get_transition_matrices(data, yr_idx, base_year, lumaps, lmmaps, separate=False):
+def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separate=False):
     """
     Calculate the transition matrices for land-use and land management transitions.
-
     Args:
-        data (object): The data object containing the necessary input data.
+        data (Data object): The data object containing the necessary input data.
+        data (Data object): The data object containing the necessary input data.
         yr_idx (int): The index of the current year.
         base_year (int): The base year for the transition calculations.
         lumaps (dict): A dictionary of land-use maps for each year.
         lmmaps (dict): A dictionary of land management maps for each year.
         separate (bool, optional): Whether to return separate cost matrices for each cost component. 
                                    Defaults to False.
-
     Returns:
         numpy.ndarray or dict: The transition matrices for land-use and land management transitions.
                                If `separate` is False, returns a numpy array representing the total costs.
                                If `separate` is True, returns a dictionary with separate cost matrices for
                                establishment costs, Water license cost, and carbon releasing costs.
-    """
-    
+    """    
     lumap = lumaps[base_year]
     lmmap = lmmaps[base_year]
 
     # Return l_mrj (Boolean) for current land-use and land management
-    l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
+    l_mrj = lumap2ag_l_mrj(lumap, lmmap)
     l_mrj_not = np.logical_not(l_mrj)
 
     # Get the exclusion matrix
@@ -165,7 +163,7 @@ def get_transition_matrices(data, yr_idx, base_year, lumaps, lmmaps, separate=Fa
         return e_mrj + w_delta_mrj + ghg_t_mrj_cost
 
 
-def get_asparagopsis_effect_t_mrj(data):
+def get_asparagopsis_effect_t_mrj(data: Data):
     """
     Gets the transition costs of asparagopsis taxiformis, which are none.
     Transition/establishment costs are handled in the costs matrix.
@@ -174,7 +172,7 @@ def get_asparagopsis_effect_t_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
-def get_precision_agriculture_effect_t_mrj(data):
+def get_precision_agriculture_effect_t_mrj(data: Data):
     """
     Gets the effects on transition costs of asparagopsis taxiformis, which are none.
     Transition/establishment costs are handled in the costs matrix.
@@ -183,7 +181,7 @@ def get_precision_agriculture_effect_t_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
-def get_ecological_grazing_effect_t_mrj(data):
+def get_ecological_grazing_effect_t_mrj(data: Data):
     """
     Gets the effects on transition costs of ecological grazing, which are none.
     Transition/establishment costs are handled in the costs matrix.
@@ -210,7 +208,7 @@ def get_agtech_ei_effect_t_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
-def get_agricultural_management_transition_matrices(data, t_mrj, yr_idx) -> Dict[str, np.ndarray]:
+def get_agricultural_management_transition_matrices(data: Data, t_mrj, yr_idx) -> Dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_t_mrj(data)
     precision_agriculture_data = get_precision_agriculture_effect_t_mrj(data)
     eco_grazing_data = get_ecological_grazing_effect_t_mrj(data)
@@ -226,7 +224,7 @@ def get_agricultural_management_transition_matrices(data, t_mrj, yr_idx) -> Dict
     }
 
 
-def get_asparagopsis_adoption_limits(data, yr_idx):
+def get_asparagopsis_adoption_limits(data: Data, yr_idx):
     """
     Gets the adoption limit of Asparagopsis taxiformis for each possible land use.
     """
@@ -239,7 +237,7 @@ def get_asparagopsis_adoption_limits(data, yr_idx):
     return asparagopsis_limits
 
 
-def get_precision_agriculture_adoption_limit(data, yr_idx):
+def get_precision_agriculture_adoption_limit(data: Data, yr_idx):
     """
     Gets the adoption limit of precision agriculture for each possible land use.
     """
@@ -252,7 +250,7 @@ def get_precision_agriculture_adoption_limit(data, yr_idx):
     return prec_agr_limits
 
 
-def get_ecological_grazing_adoption_limit(data, yr_idx):
+def get_ecological_grazing_adoption_limit(data: Data, yr_idx):
     """
     Gets the adoption limit of ecological grazing for each possible land use.
     """
@@ -290,7 +288,7 @@ def get_agtech_ei_adoption_limit(data, yr_idx):
     return agtech_ei_limits
 
 
-def get_agricultural_management_adoption_limits(data, yr_idx) -> Dict[str, dict]:
+def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str, dict]:
     """
     An adoption limit represents the maximum percentage of cells (for each land use) that can utilise
     each agricultural management option.

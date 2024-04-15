@@ -1,13 +1,14 @@
 import numpy as np
 import pandas as pd
 
+from luto.data import Data
 
-def get_ghg_reduction_env_plantings(data, aggregate) -> np.ndarray|pd.DataFrame:
+
+def get_ghg_reduction_env_plantings(data: Data, aggregate) -> np.ndarray|pd.DataFrame:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Returns
     -------
@@ -28,12 +29,11 @@ def get_ghg_reduction_env_plantings(data, aggregate) -> np.ndarray|pd.DataFrame:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
 
-def get_ghg_reduction_rip_plantings(data, aggregate) -> np.ndarray|pd.DataFrame:
+def get_ghg_reduction_rip_plantings(data: Data, aggregate) -> np.ndarray|pd.DataFrame:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Returns
     -------
@@ -53,12 +53,11 @@ def get_ghg_reduction_rip_plantings(data, aggregate) -> np.ndarray|pd.DataFrame:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
 
-def get_ghg_reduction_agroforestry(data, aggregate) -> np.ndarray|pd.DataFrame:
+def get_ghg_reduction_agroforestry(data: Data, aggregate) -> np.ndarray|pd.DataFrame:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Returns
     -------
@@ -155,7 +154,7 @@ def get_ghg_reduction_beccs(data, aggregate) -> np.ndarray|pd.DataFrame:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
 
-def get_ghg_matrix(data, aggregate=True) -> np.ndarray|pd.DataFrame:
+def get_ghg_matrix(data: Data, aggregate=True) -> np.ndarray:
     """
     Get the g_rk matrix containing non-agricultural greenhouse gas emissions.
 
