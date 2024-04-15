@@ -752,14 +752,10 @@ class Data:
         ###############################################################
         print("\tLoading demand data...", end=" ", flush=True)
 
-        # Load demand data (actual production (tonnes, ML) by commodity) - from demand model
-        dd = pd.read_hdf(os.path.join(INPUT_DIR, "demand_projections.h5"))
+        # Load demand data (actual production (tonnes, ML) by commodity) - from demand model     
+        dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
 
-        # Convert eggs from count to tonnes, assuming each egg weighs 60g
-        mask = dd.index.get_level_values(7) == "eggs"
-        dd.loc[:, :, :, :, :, :, :, mask] = dd.loc[:, :, :, :, :, :, :, mask] * 60 / 1e6
-
-        # Select the demand scenario (returns commodity x year dataframe) - includes off-land commodities
+        # Select the demand data under the running scenario
         self.DEMAND_DATA = dd.loc[(SCENARIO, 
                                    DIET_DOM, 
                                    DIET_GLOB, 
@@ -767,7 +763,7 @@ class Data:
                                    IMPORT_TREND, 
                                    WASTE, 
                                    FEED_EFFICIENCY)].copy()
-        
+
         # Convert eggs from count to tonnes
         self.DEMAND_DATA.loc['eggs'] = self.DEMAND_DATA.loc['eggs'] * EGGS_AVG_WEIGHT / 1000 / 1000
 
@@ -810,6 +806,8 @@ class Data:
 
         # Get the GHG constraints for luto, shape is (91, 1)
         self.OFF_LAND_GHG_EMISSION_C = self.OFF_LAND_GHG_EMISSION.groupby(['YEAR']).sum(numeric_only=True).values
+
+        breakpoint()
         print("Done.")
 
         ###############################################################
