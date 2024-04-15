@@ -6,12 +6,12 @@ Pure functions to calculate biodiversity by lm, lu.
 import itertools
 import numpy as np
 
-from typing import Dict
 from luto import settings
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.data import Data
 
 
-def get_non_penalty_land_uses(data) -> list[int]:
+def get_non_penalty_land_uses(data: Data) -> list[int]:
     """
     Return a list of land uses that contribute to biodiversity output without penalty.
 
@@ -24,7 +24,7 @@ def get_non_penalty_land_uses(data) -> list[int]:
     return list(set(data.LU_NATURAL) - set(data.LU_LVSTK_INDICES))  # returns [23], the index of Unallocated - natural land index
 
 
-def get_livestock_natural_land_land_uses(data) -> list[int]:
+def get_livestock_natural_land_land_uses(data: Data) -> list[int]:
     """
     Return a list of land uses that contribute to biodiversity but are penalised as per the 
     BIODIV_LIVESTOCK_IMPACT setting (i.e., livestock on natural land).
@@ -64,7 +64,7 @@ def get_breq_matrices(data):
     return b_mrj
 
 
-def get_asparagopsis_effect_b_mrj(data):
+def get_asparagopsis_effect_b_mrj(data: Data):
     """
     Gets biodiversity impacts of using Asparagopsis taxiformis (no effect)
 
@@ -78,7 +78,7 @@ def get_asparagopsis_effect_b_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, nlus))
 
 
-def get_precision_agriculture_effect_b_mrj(data):
+def get_precision_agriculture_effect_b_mrj(data: Data):
     """
     Gets biodiversity impacts of using Precision Agriculture (no effect)
 
@@ -92,7 +92,7 @@ def get_precision_agriculture_effect_b_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, nlus))
 
 
-def get_ecological_grazing_effect_b_mrj(data):
+def get_ecological_grazing_effect_b_mrj(data: Data):
     """
     Gets biodiversity impacts of using Ecological Grazing (no effect)
 
@@ -145,7 +145,7 @@ def get_agtech_ei_effect_b_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, nlus))
 
 
-def get_agricultural_management_biodiversity_matrices(data):
+def get_agricultural_management_biodiversity_matrices(data: Data):
     """
     Calculate the biodiversity matrices for different agricultural management practices.
 
@@ -172,7 +172,8 @@ def get_agricultural_management_biodiversity_matrices(data):
     }
 
 
-def get_base_year_biodiversity_score(data):
+
+def get_base_year_biodiversity_score(data: Data):
     """
     Gets the biodiversity score of the base year (2010).
 
@@ -197,7 +198,7 @@ def get_base_year_biodiversity_score(data):
     return biodiv_2010_non_pen_score + biodiv_2010_pen_score
 
 
-def get_biodiversity_limits(data, yr_cal):
+def get_biodiversity_limits(data: Data, yr_cal: int):
     """
     Calculate the biodiversity limits for a given year.
 
@@ -229,12 +230,12 @@ def get_biodiversity_limits(data, yr_cal):
     biodiv_target_score = max(biodiv_target_score, biodiv_score_2010)
     
     if yr_cal >= settings.BIODIV_TARGET_ACHIEVEMENT_YEAR:
-            # For each year after the target achievement year, the limit is equal
-            # to that of the target achievement year.
-            return biodiv_target_score
+        # For each year after the target achievement year, the limit is equal
+        # to that of the target achievement year.
+        return biodiv_target_score
 
     biodiv_targets_each_year = np.linspace(
-            biodiv_score_2010, biodiv_target_score, no_years_to_reach_limit + 1
+        biodiv_score_2010, biodiv_target_score, no_years_to_reach_limit + 1
     )
 
     return biodiv_targets_each_year[yr_cal - data.YR_CAL_BASE]

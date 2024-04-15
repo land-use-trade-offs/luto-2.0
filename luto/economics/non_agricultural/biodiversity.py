@@ -1,8 +1,10 @@
 import numpy as np
+
+from luto.data import Data
 from luto.settings import REFORESTATION_BIODIVERSITY_BENEFIT, CARBON_PLANTINGS_BIODIV_BENEFIT, BECCS_BIODIVERSITY_BENEFIT
 
 
-def get_biodiv_environmental_plantings(data) -> np.ndarray:
+def get_biodiv_environmental_plantings(data: Data) -> np.ndarray:
     return data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * REFORESTATION_BIODIVERSITY_BENEFIT
 
 

@@ -40,6 +40,10 @@ from luto.dataprep import create_new_dataset
 create_new_dataset()
 
 import luto.simulation as sim
+from luto.data import Data
+from luto.economics.production import get_production
+
+
 sim.run( 2010, 2050 )
 from luto.tools.write import write_outputs
 write_outputs(sim)
@@ -172,7 +176,7 @@ for row in ind:
     print(old[row], new[row])
 
 # Get commodity production totals when no resfactor used and check against raw data
-x = sim.get_production()
+x = get_production()
 for i, j in enumerate(sim.data.COMMODITIES):
     print(j, x[i])
 

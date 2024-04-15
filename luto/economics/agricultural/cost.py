@@ -26,9 +26,11 @@ import pandas as pd
 
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.data import Data, lvs_veg_types
+from luto.economics.agricultural.quantity import get_yield_pot, get_quantity
 
 
-def get_cost_crop(data, lu, lm, yr_idx):
+def get_cost_crop(data: Data, lu, lm, yr_idx):
     """Return crop production cost <unit: $/cell> of `lu`+`lm` in `yr_idx` as np array.
 
     Args:
@@ -90,7 +92,7 @@ def get_cost_crop(data, lu, lm, yr_idx):
                             columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost', 'Fixed cost', 'Water cost', 'Quantity cost']]))
 
 
-def get_cost_lvstk(data, lu, lm, yr_idx):
+def get_cost_lvstk(data: Data, lu, lm, yr_idx):
     """Return lvstk prodution cost <unit: $/cell> of `lu`+`lm` in `yr_idx` as np array.
 
     Args:
@@ -146,7 +148,7 @@ def get_cost_lvstk(data, lu, lm, yr_idx):
                          columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost', 'Fixed cost', 'Water cost', 'Quantity cost']]))
 
 
-def get_cost(data, lu, lm, yr_idx):
+def get_cost(data: Data, lu, lm, yr_idx):
     """Return production cost <unit: $/cell> of `lu`+`lm` in `yr_idx` as np array.
 
     Args:
@@ -176,7 +178,7 @@ def get_cost(data, lu, lm, yr_idx):
         raise KeyError(f"Land use '{lu}' not found in any LANDUSES")
 
 
-def get_cost_matrix(data, lm, yr_idx):
+def get_cost_matrix(data: Data, lm, yr_idx):
     """
     Return agricultural c_rj matrix <unit: $/cell> per lu under `lm` in `yr_idx`.
     
@@ -195,7 +197,7 @@ def get_cost_matrix(data, lm, yr_idx):
     return cost.fillna(0)
 
 
-def get_cost_matrices(data, yr_idx, aggregate=True):
+def get_cost_matrices(data: Data, yr_idx, aggregate=True):
     """
     Return agricultural c_mrj matrix <unit: $/cell> as 3D Numpy array.
 
@@ -229,7 +231,7 @@ def get_cost_matrices(data, yr_idx, aggregate=True):
         raise ValueError("aggregate must be True or False")
 
 
-def get_asparagopsis_effect_c_mrj(data, yr_idx):
+def get_asparagopsis_effect_c_mrj(data: Data, yr_idx):
     """
     Applies the effects of using asparagopsis to the cost data
     for all relevant agricultural land uses.
@@ -265,7 +267,7 @@ def get_asparagopsis_effect_c_mrj(data, yr_idx):
     return new_c_mrj
 
 
-def get_precision_agriculture_effect_c_mrj(data, yr_idx):
+def get_precision_agriculture_effect_c_mrj(data: Data, yr_idx):
     """
     Applies the effects of using precision agriculture to the cost data
     for all relevant agr. land uses.
@@ -291,7 +293,7 @@ def get_precision_agriculture_effect_c_mrj(data, yr_idx):
     return new_c_mrj
 
 
-def get_ecological_grazing_effect_c_mrj(data, yr_idx):
+def get_ecological_grazing_effect_c_mrj(data: Data, yr_idx):
     """
     Applies the effects of using ecological grazing to the cost data
     for all relevant agr. land uses.
@@ -330,7 +332,7 @@ def get_ecological_grazing_effect_c_mrj(data, yr_idx):
     return new_c_mrj
 
 
-def get_savanna_burning_effect_c_mrj(data):
+def get_savanna_burning_effect_c_mrj(data: Data):
     """
     Applies the effects of using LDS Savanna Burning to the cost data
     for all relevant agr. land uses.
@@ -358,7 +360,7 @@ def get_savanna_burning_effect_c_mrj(data):
     return new_c_mrj
 
 
-def get_agtech_ei_effect_c_mrj(data, yr_idx):
+def get_agtech_ei_effect_c_mrj(data: Data, yr_idx):
     """
     Applies the effects of using AgTech EI to the cost data
     for all relevant agr. land uses.
@@ -384,7 +386,7 @@ def get_agtech_ei_effect_c_mrj(data, yr_idx):
     return new_c_mrj
 
 
-def get_agricultural_management_cost_matrices(data, c_mrj, yr_idx):
+def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
     """
     Calculate the cost matrices for different agricultural management practices.
 
