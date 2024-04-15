@@ -249,7 +249,7 @@ def get_ghg_transition_penalties(data, lumap) -> np.ndarray:
         lumap (1D array): The lumap object containing land use mapping.
 
     Returns:
-        np.ndarray, <unit : t/cell>.
+        np.ndarray, <unit : t/ha>.
     """
     ncells, n_ag_lus = data.REAL_AREA.shape[0], len(data.AGRICULTURAL_LANDUSES)
     # Set up empty array of penalties

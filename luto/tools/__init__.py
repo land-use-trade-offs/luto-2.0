@@ -458,12 +458,12 @@ def inspect(lumap, highpos, d_j, q_rj, c_rj, landuses):
 
 def get_water_delta_matrix(w_mrj, l_mrj, data):
     """
-    Gets the water delta matrix ($/ha) that applies the cost of installing/removing irrigation to
+    Gets the water delta matrix ($/cell) that applies the cost of installing/removing irrigation to
     base transition costs. Includes the costs of water license fees.
 
     Parameters:
-    - w_mrj (numpy.ndarray, <unit:ML/cell>): Water requirements matrix for each land-use and land management combination.
-    - l_mrj (numpy.ndarray): Land-use and land management matrix.
+    - w_mrj (numpy.ndarray, <unit:ML/cell>): Water requirements matrix for target year.
+    - l_mrj (numpy.ndarray): Land-use and land management matrix for the base_year.
     - data (object): Data object containing necessary information.
 
     Returns:
@@ -476,20 +476,21 @@ def get_water_delta_matrix(w_mrj, l_mrj, data):
     # Net water requirements calculated as the diff in water requirements between current land-use and all other land-uses j.
     w_net_mrj = w_mrj - w_r[:, np.newaxis]
 
-    # Water license cost calculated as net water requirements (ML/ha) x licence price ($/ML).
+    # Water license cost calculated as net water requirements (ML/cell) x licence price ($/ML).
     w_delta_mrj = w_net_mrj * data.WATER_LICENCE_PRICE[:, np.newaxis]
 
     # When land-use changes from dryland to irrigated add <settings.REMOVE_IRRIG_COST> per hectare for establishing irrigation infrastructure
-    new_irrig_cost = settings.REMOVE_IRRIG_COST * np.ones_like(data.REAL_AREA[:, np.newaxis])   # Convert scalar to array (r)
-    w_delta_mrj[1] = np.where(l_mrj[0], w_delta_mrj[1] + new_irrig_cost, w_delta_mrj[1])
+    remove_irrig = settings.REMOVE_IRRIG_COST * data.REAL_AREA[:, np.newaxis]      # <unit:$/cell>
+    w_delta_mrj[1] = np.where(l_mrj[0], w_delta_mrj[1] + remove_irrig, w_delta_mrj[1])
 
     # When land-use changes from irrigated to dryland add <settings.NEW_IRRIG_COST> per hectare for removing irrigation infrastructure
-    remove_irrig_cost = settings.NEW_IRRIG_COST * np.ones_like(data.REAL_AREA[:, np.newaxis])   # Convert scalar to array (r)
-    w_delta_mrj[0] = np.where(l_mrj[1], w_delta_mrj[0] + remove_irrig_cost, w_delta_mrj[0])
+    new_irrig = settings.NEW_IRRIG_COST * data.REAL_AREA[:, np.newaxis]            # <unit:$/cell>
+    w_delta_mrj[0] = np.where(l_mrj[1], w_delta_mrj[0] + new_irrig, w_delta_mrj[0])
+    
 
     # Amortise upfront costs to annualised costs
     w_delta_mrj = amortise(w_delta_mrj)
-    return w_delta_mrj * data.REAL_AREA[:, np.newaxis] # <unit:$/cell>
+    return w_delta_mrj  # <unit:$/cell>
 
 
 def am_name_snake_case(am_name):
