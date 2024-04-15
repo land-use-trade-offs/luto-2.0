@@ -21,10 +21,8 @@ Writes model output and statistics to files.
 
 
 
-
 import os, re
 import shutil
-import time
 import numpy as np
 import pandas as pd
 from datetime import datetime
@@ -58,7 +56,7 @@ from luto.tools.report.create_html import data2html
 from luto.tools.report.create_static_maps import TIF2MAP
 
 
-timestamp_write = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
+timestamp_write = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
 def write_outputs(data: Data):
     # Write the model outputs to file
@@ -85,31 +83,36 @@ def write_data(data):
     ###############################################################
     #                     Create raw outputs                      #
     ###############################################################
-    
+
     # Write the area transition between base-year and target-year 
     write_area_transition_start_end(data,f'{data.path}/out_{years[-1]}')
     write_ghg_offland_commodity(data, f'{data.path}/out_{years[-1]}')
-    
+
     # Write outputs for each year
     jobs = [delayed(write_output_single_year)(data, yr, path_yr, None) for (yr, path_yr) in zip(years, paths)]
-    
+
     # Write the area/quantity comparison between base-year and target-year for the timeseries mode
     if settings.MODE == 'timeseries':
         begin_end_path = f"{data.path}/begin_end_compare_{years[0]}_{years[-1]}"
-        
-        # 1) Simply copy the base-year outputs to the path_begin_end_compare
-        shutil.copytree(f"{data.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True)
-        # 2) Write the target-year outputs to the path_begin_end_compare
-        jobs = jobs + [delayed(write_output_single_year)(data, years[-1], f"{begin_end_path}/out_{years[-1]}", years[0])]
-    
+
+        # Write the target-year outputs to the path_begin_end_compare
+        jobs += [
+            delayed(write_output_single_year)(
+                data, years[-1], f"{begin_end_path}/out_{years[-1]}", years[0]
+            )
+        ]
+
     # Parallel write the outputs for each year
-    num_jobs = min(len(years), settings.WRITE_THREADS) if settings.PARALLEL_WRITE else 1   # Use the minimum between years and threads for parallel writing
+    num_jobs = min(len(jobs), settings.WRITE_THREADS) if settings.PARALLEL_WRITE else 1   # Use the minimum between jobs_num and threads for parallel writing
     Parallel(n_jobs=num_jobs, prefer='threads')(jobs)
-        
+    
+    # Copy the base-year outputs to the path_begin_end_compare
+    shutil.copytree(f"{data.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True)
+
     # Create the report HTML and png maps
-    TIF2MAP(data) if settings.WRITE_OUTPUT_GEOTIFFS else None
-    save_report_data(data)
-    data2html(data)
+    TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
+    save_report_data(data.path)
+    data2html(data.path)
     
     
 
@@ -167,12 +170,13 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
        
 
 def write_settings(path):
+    # sourcery skip: extract-method, swap-nested-ifs, use-named-expression
     """Write model run settings"""
 
     # Open the settings.py file
     with open('luto/settings.py', 'r') as file:
         lines = file.readlines()
-        
+
         # Regex patterns that matches variable assignments from settings
         parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=")
 
@@ -180,20 +184,20 @@ def write_settings(path):
         for line in lines:
             match = parameter_reg.match(line)
             if match:
-                settings_order.append(match.group(1).strip())
+                settings_order.append(match[1].strip())
 
-                
+
         # Reorder the settings dictionary to match the order in the settings.py file
         settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
         settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
-        
+
         # Some variables are mutually exclusive, 
         # so we set the unsed variable to None here.
         if settings.GHG_LIMITS_TYPE == 'dict': 
             settings_dict['GHG_LIMITS_FIELD'] = 'None'
         elif settings.GHG_LIMITS_TYPE == 'file':
             settings_dict['GHG_LIMITS'] = 'None'
-            
+
         if settings.CULL_MODE == 'absolute':
             settings_dict['LAND_USAGE_CULL_PERCENTAGE'] = 'None'
         elif settings.CULL_MODE == 'percentage':
@@ -539,8 +543,8 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     yr_idx_sim = simulated_year_list.index(yr_cal)
     # Get index of year previous to yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_cal_sim_pre = 2010 if snapshot)
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
-    
-    
+
+
     # Get the decision variables for agricultural land-use
     ag_dvar = data.ag_dvars[yr_cal]                          # (m,r,j)
     # Get the non-agricultural decision variable
@@ -553,52 +557,59 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     
     # Get the transition cost matrices for agricultural land-use
     if yr_idx == 0:
+        base_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
         ag_transitions_cost_mat = {k: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))  
-                                for k in ['Establishment cost', 'Water license cost', 'Carbon emissions cost']}
+                                for k in ['Establishment cost', 'Water license cost', 'Carborn releasing cost']}
     else:
+        # Get the base_year mrj matirx 
+        base_mrj = tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre])
+        # Get the transition cost matrices for agricultural land-use
         ag_transitions_cost_mat = ag_transitions.get_transition_matrices(data, 
-                                                                         yr_idx, 
-                                                                         yr_cal_sim_pre,
-                                                                         data.lumaps,
-                                                                         data.lmmaps,
-                                                                         separate = True)
-        
-    cost_dfs = []   
+                                                                        yr_idx, 
+                                                                        yr_cal_sim_pre,
+                                                                        data.lumaps,
+                                                                        data.lmmaps,
+                                                                        separate = True)
+
+    cost_dfs = []
     # Convert the transition cost matrices to a DataFrame
-    for cost_type in ag_transitions_cost_mat.keys():
-        
-        arr = np.nan_to_num(ag_transitions_cost_mat[cost_type])     # Get the transition cost matrix
-        arr = np.einsum('mrj,mrj->mj', arr, ag_dvar)                # Multiply by decision variables, sum over landmans (m dimension)    
-        
-        arr_df = pd.DataFrame(arr.flatten(), 
-                        index=pd.MultiIndex.from_product([data.LANDMANS, data.AGRICULTURAL_LANDUSES], 
-                        names=['Water Supply', 'Land Use']), 
-                        columns=['Cost ($)']).reset_index()
-        arr_df.insert(0, 'Type', cost_type)
-        arr_df.insert(1, 'year', yr_cal)
-        cost_dfs.append(arr_df)
+    for lu_desc, lu_idx in data.DESC2AGLU.items():
+        for cost_type in ag_transitions_cost_mat.keys():
+            
+            base_lu_arr = base_mrj[:, :, lu_idx]                                      # Get the base land-use array                       (m,r)
+            arr = np.nan_to_num(ag_transitions_cost_mat[cost_type])                   # Get the transition cost matrix                    (m,r,j)
+            arr = np.einsum('mr,mrj,mrj->mj', base_lu_arr, arr, ag_dvar)              # Multiply by decision variables
+            
+            arr_df = pd.DataFrame(arr.flatten(), 
+                            index=pd.MultiIndex.from_product([data.LANDMANS, data.AGRICULTURAL_LANDUSES], 
+                            names=['Water Supply', 'To land-use']), 
+                            columns=['Cost ($)']).reset_index()
+            arr_df.insert(0, 'Type', cost_type)
+            arr_df.insert(1, 'year', yr_cal)
+            arr_df.insert(2, 'From land-use', lu_desc)
+            cost_dfs.append(arr_df)
 
     # Save the cost DataFrames 
     cost_df = pd.concat(cost_dfs, axis=0)
     cost_df.to_csv(os.path.join(path, f'cost_transition_ag2ag_{timestamp}.csv'), index=False)
-    
-    
-    
-    
+
+
+
+
     #---------------------------------------------------------------------
     #              Agricultural management transition costs
     #---------------------------------------------------------------------
-    
+
     # The agricultural management transition cost are all zeros, so skip the calculation here
     # am_cost = ag_transitions.get_agricultural_management_transition_matrices(sim.data) 
-    
-    
-    
-    
+
+
+
+
     #--------------------------------------------------------------------
     #              Non-agricultural land-use transition costs (from ag to non-ag)
     #--------------------------------------------------------------------
-    
+
     # Get the transition cost matirces for non-agricultural land-use
     if yr_idx == 0:
         non_ag_transitions_cost_mat = {k:{'Transition cost':np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))}
@@ -609,15 +620,15 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
                                                                                        data.lumaps[yr_cal],
                                                                                        data.lmmaps[yr_cal],
                                                                                        separate=True)
-        
+
     cost_dfs = []
     for idx,non_ag_type in enumerate(non_ag_transitions_cost_mat):
         for cost_type in non_ag_transitions_cost_mat[non_ag_type]:
-            
+
             arr = non_ag_transitions_cost_mat[non_ag_type][cost_type]          # Get the transition cost matrix 
             arr = np.einsum('mrj,r->mj', arr, non_ag_dvar[:,idx])              # Multiply the transition cost matrix by the cost of non-agricultural land-use
-            
-                    
+
+
             arr_df = pd.DataFrame(arr.flatten(), 
                                 index=pd.MultiIndex.from_product([data.LANDMANS, data.AGRICULTURAL_LANDUSES],names=['Water supply', 'From land-use']), 
                                 columns=['Cost ($)']).reset_index()
@@ -625,18 +636,18 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             arr_df.insert(1, 'Cost type', cost_type)
             arr_df.insert(2, 'year', yr_cal)
             cost_dfs.append(arr_df)
-    
+
     # Save the cost DataFrames
     cost_df = pd.concat(cost_dfs, axis=0)
     cost_df.to_csv(os.path.join(path, f'cost_transition_ag2non_ag_{timestamp}.csv'), index=False)
-    
-    
-    
-    
+
+
+
+
     #--------------------------------------------------------------------
     #              Non-agricultural land-use transition costs (from non-ag to ag)
     #--------------------------------------------------------------------
-    
+
     # Get the transition cost matirces for non-agricultural land-use
     if yr_idx == 0:
         non_ag_transitions_cost_mat = {k:{'Transition cost':np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))}
@@ -647,15 +658,15 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
                                                                                     data.lumaps[yr_cal],
                                                                                     data.lmmaps[yr_cal],
                                                                                     separate=True)
-        
+
     cost_dfs = []
-    for idx, non_ag_type in enumerate(non_ag_transitions_cost_mat):
+    for non_ag_type in non_ag_transitions_cost_mat:
         for cost_type in non_ag_transitions_cost_mat[non_ag_type]:
-            
+
             arr = non_ag_transitions_cost_mat[non_ag_type][cost_type]          # Get the transition cost matrix 
             arr = np.einsum('mrj,mrj->mj', arr, ag_dvar)                       # Multiply the transition cost matrix by the cost of non-agricultural land-use
-            
-                    
+
+
             arr_df = pd.DataFrame(arr.flatten(), 
                                 index=pd.MultiIndex.from_product([data.LANDMANS, data.AGRICULTURAL_LANDUSES],names=['Water supply', 'To land-use']), 
                                 columns=['Cost ($)']).reset_index()
@@ -667,11 +678,6 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     # Save the cost DataFrames
     cost_df = pd.concat(cost_dfs, axis=0)
     cost_df.to_csv(os.path.join(path, f'cost_transition_non_ag2_ag_{timestamp}.csv'), index=False)
-
-
-
-
-
 
 
 def write_revenue_cost_non_ag(data: Data, yr_cal, path):
@@ -706,6 +712,9 @@ def write_revenue_cost_non_ag(data: Data, yr_cal, path):
     # Save to disk
     rev_non_ag_df.to_csv(os.path.join(path, f'revenue_non_ag_{timestamp}.csv'), index = False)
     cost_non_ag_df.to_csv(os.path.join(path, f'cost_non_ag_{timestamp}.csv'), index = False)
+    
+    
+    
 
 def write_dvar_area(data: Data, yr_cal, path):
     
@@ -902,19 +911,20 @@ def write_water(data: Data, yr_cal, path):
     wuse_limits = ag_water.get_wuse_limits(data)
 
     # Set up data for river regions or drainage divisions
-    if settings.WATER_REGION_DEF == 'River Region':
-        region_limits = data.RIVREG_LIMITS
-        region_id = data.RIVREG_ID
-        # regions = settings.WATER_RIVREGS
-        region_dict = data.RIVREG_DICT
-        
-    elif settings.WATER_REGION_DEF == 'Drainage Division':
+    if settings.WATER_REGION_DEF == 'Drainage Division':
         region_limits = data.DRAINDIV_LIMITS
         region_id = data.DRAINDIV_ID
         # regions = settings.WATER_DRAINDIVS
         region_dict = data.DRAINDIV_DICT
-        
-    else: print('Incorrect option for WATER_REGION_DEF in settings')
+
+    elif settings.WATER_REGION_DEF == 'River Region':
+        region_limits = data.RIVREG_LIMITS
+        region_id = data.RIVREG_ID
+        # regions = settings.WATER_RIVREGS
+        region_dict = data.RIVREG_DICT
+
+    else:
+        print('Incorrect option for WATER_REGION_DEF in settings')
 
     # Loop through specified water regions
     df_water_seperate_dfs = []
@@ -922,50 +932,50 @@ def write_water(data: Data, yr_cal, path):
         
         # Get indices of cells in region
         ind = np.flatnonzero(region_id == region).astype(np.int32)
-        
+
         # Calculate water requirements by agriculture for year and region.
-        
+
         index_levels = ['Landuse Type', 'Landuse', 'Irrigation',  'Water Use (ML)']
-        
+
         # Agricultural water use
         ag_mrj = ag_w_mrj[:, ind, :] * data.ag_dvars[yr_cal][:, ind, :]   
         ag_jm = np.einsum('mrj->jm', ag_mrj)                             
-        
+
         ag_df = pd.DataFrame(ag_jm.reshape(-1).tolist(),
                             index=pd.MultiIndex.from_product([['Agricultural Landuse'],
                                                             data.AGRICULTURAL_LANDUSES,
                                                             data.LANDMANS
                                                             ])).reset_index()
-        
+
         ag_df.columns = index_levels
 
-        
+
         # Non-agricultural water use
         non_ag_rk = non_ag_w_rk[ind, :] * data.non_ag_dvars[yr_cal][ind, :]  # Non-agricultural contribution
         non_ag_k = np.einsum('rk->k', non_ag_rk)                            # Sum over cells
-        
+
         non_ag_df = pd.DataFrame(non_ag_k, 
                                 index= pd.MultiIndex.from_product([['Non-agricultural Landuse'],
                                                                     data.NON_AGRICULTURAL_LANDUSES ,
                                                                     ['dry']  # non-agricultural land is always dry
                                                                     ])).reset_index()
-        
+
         non_ag_df.columns = index_levels
 
-        
-        
+
+
         # Agricultural management water use
         AM_dfs = []
         for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
 
             am_j = np.array([data.DESC2AGLU[lu] for lu in am_lus])
-            
+
             # Water requirements for each agricultural management in array format
             am_mrj = ag_man_w_mrj[am][:, ind, :]\
                             * data.ag_man_dvars[yr_cal][am][:, ind[:,np.newaxis], am_j] 
-                            
+
             am_jm = np.einsum('mrj->jm', am_mrj)
-            
+
             # Water requirements for each agricultural management in long dataframe format
             df_am = pd.DataFrame(am_jm.reshape(-1).tolist(),
                                 index=pd.MultiIndex.from_product([['Agricultural Management'],
@@ -973,33 +983,29 @@ def write_water(data: Data, yr_cal, path):
                                                                 data.LANDMANS
                                                                 ])).reset_index()
             df_am.columns = index_levels
-            
+
             # Add to list of dataframes
             AM_dfs.append(df_am)
-            
+
         # Combine all AM dataframes
         AM_df = pd.concat(AM_dfs)
-        
+
         # Combine all dataframes
         df_region = pd.concat([ag_df, non_ag_df, AM_df])
         df_region.insert(0, 'region', region_dict[region])
         df_region.insert(0, 'year', yr_cal)
-        
+
         # Add to list of dataframes
         df_water_seperate_dfs.append(df_region)
-        
-        
+
+
         # Calculate water use limits and actual water use
         wul = wuse_limits[i][2]
         wreq_reg = df_region['Water Use (ML)'].sum()
-        
+
         # Calculate absolute and proportional difference between water use target and actual water use
         abs_diff = wreq_reg - wul
-        if wul > 0:
-            prop_diff = (wreq_reg / wul) * 100
-        else:
-            prop_diff = np.nan
-        
+        prop_diff = (wreq_reg / wul) * 100 if wul > 0 else np.nan
         # Add to dataframe
         df.loc[i] = ( region
                     , region_dict[region]
@@ -1007,12 +1013,12 @@ def write_water(data: Data, yr_cal, path):
                     , wreq_reg 
                     , abs_diff
                     , prop_diff )
-    
+
     # Write to CSV with 2 DP
     df.to_csv( os.path.join(path, f'water_demand_vs_use_{timestamp}.csv')
              , index = False
              , float_format = '{:0,.2f}'.format)
-    
+
     # Write the separate water use to CSV
     df_water_seperate = pd.concat(df_water_seperate_dfs)
     df_water_seperate.to_csv( os.path.join(path, f'water_demand_vs_use_separate_{timestamp}.csv')

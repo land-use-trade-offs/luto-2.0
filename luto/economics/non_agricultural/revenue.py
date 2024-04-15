@@ -100,9 +100,13 @@ def get_rev_beccs(data: Data) -> np.ndarray:
 
 def get_rev_matrix(data: Data) -> np.ndarray:
     """
-    Get the non-agricultural revenue matrix r_rk.
-    Values represent the revenue gained by the cell r when using the
-        non-agricultural land use k.
+    Gets the matrix containing the revenue produced by each non-agricultural land use for each cell.
+
+    Parameters:
+        data (Data): The data object containing the necessary information.
+
+    Returns:
+        np.ndarray.
     """
     env_plantings_rev_matrix = get_rev_env_plantings(data)
     rip_plantings_rev_matrix = get_rev_rip_plantings(data)

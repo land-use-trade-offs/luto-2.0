@@ -11,7 +11,20 @@ from luto.solvers.input_data import get_input_data
 
 
 def write_input2tiff(data: Data, year):
-    
+    """
+    Write input data to TIFF files for a specific year of the simulation.
+
+    Args:
+        data (Data): The Data object.
+        year (int): The year for which to write the input data.
+
+    Raises:
+        ValueError: If the specified year is not a valid year for the simulation.
+
+    Returns:
+        None
+    """
+
     # Check if the year is valid
     if year not in data.lumaps.keys():
         raise ValueError(f"Year {year} is not a valid year for the simulation")
@@ -33,7 +46,7 @@ def write_input2tiff(data: Data, year):
     input_data = get_input_data(data, base_year, year)
     # Global the {index: desc} dictionary. The <index> is the position of the array, and the <desc> in the description of the array
     get_idx2desc(data)
-    # Write the input data to tiff files
+    # Write the input data to TIFF files
     input2tiff(data, input_data, out_dir)
     
     
@@ -58,7 +71,7 @@ def get_arry(in_data, in_attr, am=None):
         return in_data.__getattribute__(in_attr)
     
 def slice_lu_lm(in_arry, *args):
-    slice_args = tuple([*args])
+    slice_args = (*args, )
     return in_arry.__getitem__(slice_args)
 
 
@@ -128,45 +141,96 @@ def write_non_ag_commodity_arr2tif(data: Data, in_data, in_attr, commodity_idx, 
 def input2tiff(data: Data, input_data, out_dir):
     with concurrent.futures.ThreadPoolExecutor(WRITE_THREADS) as executor:
         futures = []
-        
+
         # ag_mrj
         for att in ag_in_data:
             for lu_idx in ag_idx2desc:
-                for lm_idx in lm_code2desc:
-                    futures.append(executor.submit(write_ag_arr2tif, data, input_data, att, lm_idx, lu_idx, out_dir))
-        
-        # am_mrj        
+                futures.extend(
+                    executor.submit(
+                        write_ag_arr2tif,
+                        data,
+                        input_data,
+                        att,
+                        lm_idx,
+                        lu_idx,
+                        out_dir,
+                    )
+                    for lm_idx in lm_code2desc
+                )
+        # am_mrj
         for att in ag_mam_in_data:
             for am in am_idx2desc:
                 for lu_code in am_idx2desc[am]:
-                    for lm_idx in lm_code2desc:
-                        futures.append(executor.submit(write_am_arr2tif, data, input_data, att, am, lm_idx, lu_code, out_dir))
-        
-        # non_ag_rk            
+                    futures.extend(
+                        executor.submit(
+                            write_am_arr2tif,
+                            data,
+                            input_data,
+                            att,
+                            am,
+                            lm_idx,
+                            lu_code,
+                            out_dir,
+                        )
+                        for lm_idx in lm_code2desc
+                    )
+        # non_ag_rk
         for att in non_ag_in_data:
-            for non_ag_idx in non_ag_idx2desc:
-                futures.append(executor.submit(write_non_ag_arr2tif, data, input_data, att, non_ag_idx, out_dir))
-            
-                    
+            futures.extend(
+                executor.submit(
+                    write_non_ag_arr2tif,
+                    data,
+                    input_data,
+                    att,
+                    non_ag_idx,
+                    out_dir,
+                )
+                for non_ag_idx in non_ag_idx2desc
+            )
         # ag_q_mrp
         for lm_code in lm_code2desc:
-            for product_code in products_idx2desc:
-                futures.append(executor.submit(write_ag_product_arr2tif, data, input_data, 'ag_q_mrp', lm_code, product_code, out_dir))
-                
-        
+            futures.extend(
+                executor.submit(
+                    write_ag_product_arr2tif,
+                    data,
+                    input_data,
+                    'ag_q_mrp',
+                    lm_code,
+                    product_code,
+                    out_dir,
+                )
+                for product_code in products_idx2desc
+            )
         # ag_man_q_mrp
         for am in am_idx2desc:
             for lm_code in lm_code2desc:
-                for product_code in products_idx2desc:
-                    futures.append(executor.submit(write_am_product_arr2tif, data, input_data, 'ag_man_q_mrp', am, lm_code, product_code, out_dir))
-
-                    
+                futures.extend(
+                    executor.submit(
+                        write_am_product_arr2tif,
+                        data,
+                        input_data,
+                        'ag_man_q_mrp',
+                        am,
+                        lm_code,
+                        product_code,
+                        out_dir,
+                    )
+                    for product_code in products_idx2desc
+                )
         # non_ag_q_crk
         for commodity_idx in commodity_idx2desc:
-            for non_ag_idx in non_ag_idx2desc:
-                futures.append(executor.submit(write_non_ag_commodity_arr2tif, data, input_data, 'non_ag_q_crk', commodity_idx, non_ag_idx, out_dir))
-
-        
+            futures.extend(
+                executor.submit(
+                    write_non_ag_commodity_arr2tif,
+                    data,
+                    input_data,
+                    'non_ag_q_crk',
+                    commodity_idx,
+                    non_ag_idx,
+                    out_dir,
+                )
+                for non_ag_idx in non_ag_idx2desc
+            )
         # Execute the futures as they are completed, report the process
         for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)):
             try:

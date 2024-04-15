@@ -60,17 +60,68 @@ def report_on_path(path:str):
         for file in os.listdir(f"{path}/DATA_REPORT/data"):
             fpath = f"{path}/DATA_REPORT/data/{file}"
             os.remove(fpath) if os.path.isfile(fpath) else None
-    
-    # Creating the fake simulation object
-    class fake:pass
-    data = fake()
-    data.path = path
+
     
     if settings.WRITE_OUTPUT_GEOTIFFS and os.path.exists(f"{path}/data/Map_data"):
-        TIF2MAP(data) 
+        TIF2MAP(path) 
         
-    save_report_data(data)
-    data2html(data)
+    save_report_data(path)
+    data2html(path)
+
+
+def lumap2ag_l_mrj(lumap, lmmap):
+    """
+    Return land-use maps in decision-variable (X_mrj) format.
+    Where 'm' is land mgt, 'r' is cell, and 'j' is agricultural land-use.
+
+    Cells used for non-agricultural land uses will have value 0 for all agricultural
+    land uses, i.e. all r.
+    """
+    # Set up a container array of shape m, r, j.
+    x_mrj = np.zeros((2, lumap.shape[0], 28), dtype=bool)   # TODO - remove 2
+
+    # Populate the 3D land-use, land mgt mask.
+    for j in range(28):
+        # One boolean map for each land use.
+        jmap = np.where(lumap == j, True, False).astype(bool)
+        # Keep only dryland version.
+        x_mrj[0, :, j] = np.where(lmmap == False, jmap, False)
+        # Keep only irrigated version.
+        x_mrj[1, :, j] = np.where(lmmap == True, jmap, False)
+
+    return x_mrj.astype(bool)
+
+
+def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
+    """
+    Convert the land-use map to a decision variable X_rk, where 'r' indexes cell and
+    'k' indexes non-agricultural land use.
+
+    Cells used for agricultural purposes have value 0 for all k.
+    """
+    base_code = settings.NON_AGRICULTURAL_LU_BASE_CODE
+    non_ag_lu_codes = list(range(base_code, base_code + num_non_ag_land_uses))
+
+    # Set up a container array of shape r, k.
+    x_rk = np.zeros((lumap.shape[0], num_non_ag_land_uses), dtype=bool)
+
+    for i,k in enumerate(non_ag_lu_codes):
+        kmap = np.where(lumap == k, True, False)
+        x_rk[:, i] = kmap
+
+    return x_rk.astype(bool)
+
+
+def get_base_am_vars(ncells, ncms, n_ag_lus):
+    """
+    Get the 2010 agricultural management option vars.
+    It is assumed that no agricultural management options were used in 2010, 
+    so get zero arrays in the correct format.
+    """
+    return {
+        am: np.zeros((ncms, ncells, n_ag_lus))
+        for am in AG_MANAGEMENTS_TO_LAND_USES
+    }
 
 
 def get_ag_and_non_ag_cells(lumap) -> Tuple[np.ndarray, np.ndarray]:
@@ -175,8 +226,8 @@ def timethis(function, *args, **kwargs):
     stop_time_str = time.strftime("%Y-%m-%d %H:%M:%S", stop_time)
 
     print()
-    print("Start time: %s" % start_time_str)
-    print("Stop time: %s" % stop_time_str)
+    print(f"Start time: {start_time_str}")
+    print(f"Stop time: {stop_time_str}")
     print("Elapsed time: %d seconds." % (stop - start))
 
     return return_value
@@ -187,13 +238,7 @@ def mergeorderly(dict1, dict2):
     list1 = list(dict1.keys())
     list2 = list(dict2.keys())
     lst = sorted(list1 + list2)
-    merged = {}
-    for key in lst:
-        if key in list1:
-            merged[key] = dict1[key]
-        else:
-            merged[key] = dict2[key]
-    return merged
+    return {key: dict1[key] if key in list1 else dict2[key] for key in lst}
 
 
 def crosstabulate(before, after, labels):
@@ -297,11 +342,18 @@ def get_water_delta_matrix(w_mrj, l_mrj, data):
     """
     Gets the water delta matrix ($/ha) that applies the cost of installing/removing irrigation to
     base transition costs. Includes the costs of water license fees.
+
+    Parameters:
+    - w_mrj (numpy.ndarray, <unit:ML/cell>): Water requirements matrix for each land-use and land management combination.
+    - l_mrj (numpy.ndarray): Land-use and land management matrix.
+    - data (object): Data object containing necessary information.
+
+    Returns:
+    - w_delta_mrj (numpy.ndarray, <unit:$/cell>).
     """
     # Get water requirements from current agriculture, converting water requirements for LVSTK from ML per head to ML per cell (inc. REAL_AREA).
     # Sum total water requirements of current land-use and land management
     w_r = (w_mrj * l_mrj).sum(axis=0).sum(axis=1)
-
 
     # Net water requirements calculated as the diff in water requirements between current land-use and all other land-uses j.
     w_net_mrj = w_mrj - w_r[:, np.newaxis]
@@ -319,7 +371,7 @@ def get_water_delta_matrix(w_mrj, l_mrj, data):
 
     # Amortise upfront costs to annualised costs
     w_delta_mrj = amortise(w_delta_mrj)
-    return w_delta_mrj
+    return w_delta_mrj * data.REAL_AREA[:, np.newaxis] # <unit:$/cell>
 
 
 def am_name_snake_case(am_name):

@@ -79,26 +79,37 @@ def dict2matrix(d, fromlist, tolist):
     return A
 
 
-def lvs_veg_types(lu: str) -> tuple[str, str]:
-    """Return livestock and vegetation types of the livestock land-use `lu`."""
+def lvs_veg_types(lu) -> tuple[str, str]:
+    """Return livestock and vegetation types of the livestock land-use `lu`.
+
+    Args:
+        lu (str): The livestock land-use.
+
+    Returns:
+        tuple: A tuple containing the livestock type and vegetation type.
+
+    Raises:
+        KeyError: If the livestock type or vegetation type cannot be identified.
+
+    """
 
     # Determine type of livestock.
-    if "beef" in lu.lower():
-        lvstype = "BEEF"
-    elif "sheep" in lu.lower():
-        lvstype = "SHEEP"
-    elif "dairy" in lu.lower():
-        lvstype = "DAIRY"
+    if 'beef' in lu.lower():
+        lvstype = 'BEEF'
+    elif 'sheep' in lu.lower():
+        lvstype = 'SHEEP'
+    elif 'dairy' in lu.lower():
+        lvstype = 'DAIRY'
     else:
-        raise KeyError("Livestock type '%s' not identified." % lu)
+        raise KeyError(f"Livestock type '{lu}' not identified.")
 
     # Determine type of vegetation.
-    if "natural" in lu.lower():
-        vegtype = "natural land"
-    elif "modified" in lu.lower():
-        vegtype = "modified land"
+    if 'natural' in lu.lower():
+        vegtype = 'natural land'
+    elif 'modified' in lu.lower():
+        vegtype = 'modified land'
     else:
-        raise KeyError("Vegetation type '%s' not identified." % lu)
+        raise KeyError(f"Vegetation type '{lu}' not identified.")
 
     return lvstype, vegtype
 
@@ -870,7 +881,7 @@ class Data:
         # Load biodiversity data
         biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5') )
 
-        # Get the Zonation output score between 0 and 1
+        # Get the Zonation output score between 0 and 1. BIODIV_SCORE_RAW.sum() = 153 million
         self.BIODIV_SCORE_RAW = biodiv_priorities['BIODIV_PRIORITY_SSP' + SSP].to_numpy(dtype = np.float32)
 
         # Get the natural area connectivity score between 0 and 1 (1 is highly connected, 0 is not connected)
@@ -889,7 +900,7 @@ class Data:
                                 np.isin(self.LUMAP, self.LU_MODIFIED_LAND) * self.BIODIV_SCORE_RAW * self.REAL_AREA                        # Calculate raw biodiversity score of modified land
                               ) * BIODIV_TARGET                                                                                            # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
                                 
-        # Sum the current biodiversity value and the addition biodiversity score required to meet the target
+        # Sum the current biodiversity value and the additional biodiversity score required to meet the target
         self.TOTAL_BIODIV_TARGET_SCORE = biodiv_value_current.sum() + biodiv_value_target.sum()                         
 
         """

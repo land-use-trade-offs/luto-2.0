@@ -93,10 +93,16 @@ def get_wreq_matrix(data: Data) -> np.ndarray:
     """
     Get the water requirements matrix for all non-agricultural land uses.
 
+    Parameters
+    ----------
+    data : object
+        The data object containing necessary information for calculating the water requirements.
+
     Returns
     -------
     np.ndarray
-        Indexed by (r, k) where r is cell and k is non-agricultural land usage.
+        The water requirements matrix for all non-agricultural land uses.
+        Indexed by (r, k) where r is the cell index and k is the non-agricultural land usage index.
     """
     env_plant_wreq_matrix = get_wreq_matrix_env_planting(data)
     rip_plant_wreq_matrix = get_wreq_matrix_rip_planting(data)

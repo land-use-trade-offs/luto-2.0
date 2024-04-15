@@ -33,17 +33,24 @@ from luto.tools.report.data_tools.helper_func import (get_GHG_category,
                                                      
 from luto.tools.report.data_tools.parameters import (COMMODITIES_OFF_LAND, 
                                                      YR_BASE, 
-                                                     COMMODITIES_ALL, 
+                                                     COMMODITIES_ALL,
+                                                     AG_LANDUSE, 
                                                      LANDUSE_ALL,
                                                      LU_NATURAL,
                                                      NON_AG_LANDUSE)
 
 # Get the output directory
-def save_report_data(data: Data):
-    
-    # Get the output directory
-    raw_data_dir = data.path
+def save_report_data(raw_data_dir:str):
+    """
+    Saves the report data in the specified directory.
 
+    Parameters:
+    raw_data_dir (str): The directory path where the raw output data is.
+
+    Returns:
+    None
+    """
+    
     # Set the save directory    
     SAVE_DIR = f'{raw_data_dir}/DATA_REPORT/data'
     
@@ -180,14 +187,6 @@ def save_report_data(data: Data):
                                                         vmin=0, 
                                                         vmax=100).format('{:,.2f}')
 
-    # Define the style
-    # style = "<style>table, th, td {font-size: 7px;font-family: Helvetica, Arial, sans-serif;} </style>\n"
-    # style = style + "<style>td {text-align: right; } </style>\n"
-    # style = style + "<style>html { height: 100%; } </style>\n"
-
-    # # Add the style to the HTML
-    # heat_area_html = style + heat_area.to_html()
-    # heat_pct_html = style + heat_pct.to_html()
 
     heat_area_html = heat_area.to_html()
     heat_pct_html = heat_pct.to_html()
@@ -637,7 +636,35 @@ def save_report_data(data: Data):
         # save to disk
         df_wide.to_json(f'{SAVE_DIR}/economics_8_transition_ag2ag_cost_{idx+1}_{col}_wide.json', orient='records')
         
-        
+    
+    # Save the transition matrix cost
+    cost_transition_ag2ag_trans_mat = cost_transition_ag2ag_df.groupby(['year','From land-use', 'To land-use']).sum(numeric_only=True).reset_index()
+    cost_transition_ag2ag_trans_mat = cost_transition_ag2ag_trans_mat.set_index(['year','From land-use', 'To land-use'])
+    cost_transition_ag2ag_trans_mat = cost_transition_ag2ag_trans_mat\
+                                        .reindex(index = pd.MultiIndex.from_product([years, AG_LANDUSE, AG_LANDUSE], 
+                                                 names = ['year','From land-use', 'To land-use'])).reset_index()
+    
+    cost_transition_ag2ag_trans_mat['idx_from'] = cost_transition_ag2ag_trans_mat['From land-use']\
+                                                    .apply(lambda x: AG_LANDUSE.index(x))
+    cost_transition_ag2ag_trans_mat['idx_to'] = cost_transition_ag2ag_trans_mat['To land-use']\
+                                                    .apply(lambda x: AG_LANDUSE.index(x))
+                                                    
+    cost_transition_ag2ag_trans_mat_data = cost_transition_ag2ag_trans_mat\
+                                    .groupby(['year'])[['idx_from','idx_to', 'value (billion)']]\
+                                    .apply(lambda x: list(map(list,zip(x['idx_from'],x['idx_to'],x['value (billion)']))))\
+                                    .reset_index()                             
+    cost_transition_ag2ag_trans_mat_data.columns = ['year','data']
+    
+    cost_transition_ag2ag_trans_mat_json = {'categories': AG_LANDUSE,
+                                            'series': json.loads(cost_transition_ag2ag_trans_mat_data.to_json(orient='records'))}
+    
+    with open(f'{SAVE_DIR}/economics_8_transition_ag2ag_cost_5_transition_matrix.json', 'w') as outfile:
+        outfile.write(json.dumps(cost_transition_ag2ag_trans_mat_json))
+                                    
+                                    
+                                    
+                                        
+                                
     # Plot_3-9: Transition cost for Ag to Non-Ag (Billion $)
     cost_transition_ag2non_ag_df['Water supply'] = cost_transition_ag2non_ag_df['Water supply'].replace({'dry': 'Dryland', 'irr': 'Irrigated'})
     keep_cols = ['year', 'value (billion)','Cost ($)']
@@ -654,6 +681,45 @@ def save_report_data(data: Data):
         df_wide['type'] = 'column'
         # save to disk
         df_wide.to_json(f'{SAVE_DIR}/economics_9_transition_ag2non_cost_{idx+1}_{col}_wide.json', orient='records')
+        
+        
+    # Get the transition matrix cost
+    cost_transition_ag2non_ag_trans_mat = cost_transition_ag2non_ag_df\
+                                            .groupby(['year','From land-use', 'To land-use'])\
+                                            .sum(numeric_only=True).reset_index()
+                                            
+    cost_transition_ag2non_ag_trans_mat = cost_transition_ag2non_ag_trans_mat\
+                                           .set_index(['year','From land-use', 'To land-use'])\
+                                           .reindex(index = pd.MultiIndex.from_product([years, AG_LANDUSE, NON_AG_LANDUSE],
+                                                    names = ['year','From land-use', 'To land-use'])).reset_index()
+                                           
+    cost_transition_ag2non_ag_trans_mat['idx_from'] = cost_transition_ag2non_ag_trans_mat['From land-use']\
+                                                    .apply(lambda x: AG_LANDUSE.index(x))
+    cost_transition_ag2non_ag_trans_mat['idx_to']  = cost_transition_ag2non_ag_trans_mat['To land-use']\
+                                                    .apply(lambda x: NON_AG_LANDUSE.index(x))
+                                                    
+
+    cost_transition_ag2non_ag_trans_mat_data = cost_transition_ag2non_ag_trans_mat\
+                                    .groupby(['year'])[['idx_from','idx_to', 'value (billion)']]\
+                                    .apply(lambda x: list(map(list,zip(x['idx_from'],x['idx_to'],x['value (billion)']))))\
+                                    .reset_index()                            
+    cost_transition_ag2non_ag_trans_mat_data.columns = ['year','data']
+    
+    
+    cost_transition_ag2non_ag_trans_mat_json = {'categories_from': AG_LANDUSE,
+                                                'categories_to': NON_AG_LANDUSE,
+                                                'series': json.loads(cost_transition_ag2non_ag_trans_mat_data.to_json(orient='records'))}
+    
+    
+    with open(f'{SAVE_DIR}/economics_9_transition_ag2non_cost_5_transition_matrix.json', 'w') as outfile:
+        outfile.write(json.dumps(cost_transition_ag2non_ag_trans_mat_json))
+    
+    
+
+        
+        
+        
+    
         
         
     # Plot_3-10: Transition cost for Non-Ag to Ag (Billion $)
