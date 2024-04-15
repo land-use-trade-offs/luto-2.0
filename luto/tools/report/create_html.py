@@ -3,6 +3,7 @@ import shutil
 import pandas as pd
 from glob import glob
 
+from luto.data import Data
 from luto.tools.report.data_tools import get_all_files
 from luto.tools.report.data_tools.helper_func import (add_data_2_html, 
                                                       add_txt_2_html)

@@ -23,12 +23,13 @@ import pandas as pd
 
 from typing import Dict
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
+from luto.data import Data, lvs_veg_types
+from luto.economics.agricultural.quantity import get_yield_pot, get_quantity
 
-def get_rev_crop( data   # Data object or module.
-                , lu     # Land use.
-                , lm     # Land management.
-                , yr_idx # Number of years post base-year ('YR_CAL_BASE').
+def get_rev_crop( data: Data   # Data object.
+                , lu           # Land use.
+                , lm           # Land management.
+                , yr_idx       # Number of years post base-year ('YR_CAL_BASE').
                 ):
     """Return crop profit [AUD/cell] of `lu`+`lm` in `yr_idx` as np array.
 
@@ -51,10 +52,10 @@ def get_rev_crop( data   # Data object or module.
     # Return revenue as MultiIndexed DataFrame.
     return pd.DataFrame(rev_t, columns=pd.MultiIndex.from_product([[lu],[lm],['Revenue']]))
 
-def get_rev_lvstk( data   # Data object or module.
-                 , lu     # Land use.
-                 , lm     # Land management.
-                 , yr_idx # Number of years post base-year ('YR_CAL_BASE').
+def get_rev_lvstk( data: Data   # Data object.
+                 , lu           # Land use.
+                 , lm           # Land management.
+                 , yr_idx       # Number of years post base-year ('YR_CAL_BASE').
                  ):
     """Return livestock revenue [AUD/cell] of `lu`+`lm` in `yr_idx` as np array.
 
@@ -138,10 +139,10 @@ def get_rev_lvstk( data   # Data object or module.
     return rev_seperate
 
 
-def get_rev( data    # Data object or module.
-            , lu     # Land use.
-            , lm     # Land management.
-            , yr_idx # Number of years post base-year ('YR_CAL_BASE')
+def get_rev( data: Data    # Data object.
+            , lu           # Land use.
+            , lm           # Land management.
+            , yr_idx       # Number of years post base-year ('YR_CAL_BASE')
             ):
     """Return revenue from production [AUD/cell] of `lu`+`lm` in `yr_idx` as np array.
 
@@ -165,7 +166,7 @@ def get_rev( data    # Data object or module.
         raise KeyError(f"Land-use '{lu}' not found in data.LANDUSES")
 
 
-def get_rev_matrix(data, lm, yr_idx):
+def get_rev_matrix(data: Data, lm, yr_idx):
     """Return r_rj matrix of revenue/cell per lu under `lm` in `yr_idx`."""
     
     # Concatenate the revenue from each land use into a single Multiindex DataFrame.
@@ -174,7 +175,7 @@ def get_rev_matrix(data, lm, yr_idx):
     return r_rjs
 
 
-def get_rev_matrices(data, yr_idx, aggregate:bool = True):
+def get_rev_matrices(data: Data, yr_idx, aggregate:bool = True):
     """Return r_mrj matrix of revenue per cell as 3D Numpy array."""
 
     # Concatenate the revenue from each land management into a single Multiindex DataFrame.
@@ -192,7 +193,7 @@ def get_rev_matrices(data, yr_idx, aggregate:bool = True):
     return np.einsum('rjms->mrj',r_rjms)
 
 
-def get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx):
+def get_asparagopsis_effect_r_mrj(data: Data, r_mrj, yr_idx):
     """
     Applies the effects of using asparagopsis to the revenue data
     for all relevant agr. land uses.
@@ -216,7 +217,7 @@ def get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx):
+def get_precision_agriculture_effect_r_mrj(data: Data, r_mrj, yr_idx):
     """
     Applies the effects of using precision agriculture to the revenue data
     for all relevant agr. land uses.
@@ -238,7 +239,7 @@ def get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx):
+def get_ecological_grazing_effect_r_mrj(data: Data, r_mrj, yr_idx):
     """
     Applies the effects of using ecologiacl grazing to the revenue data
     for all relevant agr. land uses.
@@ -293,7 +294,7 @@ def get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_agricultural_management_revenue_matrices(data, r_mrj, yr_idx) -> Dict[str, np.ndarray]:
+def get_agricultural_management_revenue_matrices(data: Data, r_mrj, yr_idx) -> Dict[str, np.ndarray]:
     """
     Calculate the revenue matrices for different agricultural management practices.
 
