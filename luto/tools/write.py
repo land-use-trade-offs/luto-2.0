@@ -256,7 +256,7 @@ def write_files(data: Data, yr_cal, path):
     non_ag_dvar = data.non_ag_dvars[yr_cal]                  # (r, k)
     non_ag_dvar_mask = non_ag_dvar.sum(1) > 0.01            # Meaning that they have at least 1% of non-agricultural landuse applied
     # Get the maximum index of the non-agricultural landuse applied to the valid pixel
-    non_ag_dvar = np.argmax(non_ag_dvar, axis=1) + data.NON_AGRICULTURAL_LU_BASE_CODE    # Start from 100
+    non_ag_dvar = np.argmax(non_ag_dvar, axis=1) + settings.NON_AGRICULTURAL_LU_BASE_CODE    # Start from 100
     # Let the pixels that were all zeros in the original array to be 0
     non_ag_dvar_argmax = np.where(non_ag_dvar_mask, non_ag_dvar, 0)
  
