@@ -817,8 +817,6 @@ class Data:
 
         # Get the GHG constraints for luto, shape is (91, 1)
         self.OFF_LAND_GHG_EMISSION_C = self.OFF_LAND_GHG_EMISSION.groupby(['YEAR']).sum(numeric_only=True).values
-
-        breakpoint()
         print("Done.")
 
         ###############################################################
