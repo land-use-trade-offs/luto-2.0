@@ -433,8 +433,10 @@ for lu in AGRICULTURAL_LANDUSES:
         # First find out which animal is involved.
         animal, _ = lvs_veg_types(lu)
         # Water requirements per head are for drinking and irrigation.
-        wreq_lvstk_dry[lu] = AGEC_LVSTK['WR_DRN', animal]
-        wreq_lvstk_irr[lu] = ( AGEC_LVSTK['WR_DRN', animal] + AGEC_LVSTK['WR_IRR', animal] )
+        # wreq_lvstk_dry[lu] = AGEC_LVSTK['WR_DRN', animal]
+        # wreq_lvstk_irr[lu] = ( AGEC_LVSTK['WR_DRN', animal] + AGEC_LVSTK['WR_IRR', animal] )
+        wreq_lvstk_dry[lu] = AGEC_LVSTK['WR_DRN', animal] * 0
+        wreq_lvstk_irr[lu] = AGEC_LVSTK['WR_IRR', animal]
     else:
         wreq_lvstk_dry[lu] = 0.0
         wreq_lvstk_irr[lu] = 0.0
