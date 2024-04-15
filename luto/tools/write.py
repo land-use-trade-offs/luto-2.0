@@ -32,6 +32,7 @@ from luto import tools
 from luto.tools.spatializers import *
 from luto.tools.compmap import *
 import luto.settings as settings
+from luto.data import Data
 
 import luto.economics.agricultural.quantity as ag_quantity                      # ag_quantity has already been calculated and stored in <sim.prod_data>
 import luto.economics.agricultural.revenue as ag_revenue
@@ -66,7 +67,7 @@ def write_outputs(data: Data):
     
 
 @tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{timestamp_write}")
-def write_data(data):
+def write_data(data: Data):
 
     # Write model run settings
     if not data.path:
@@ -92,9 +93,8 @@ def write_data(data):
     jobs = [delayed(write_output_single_year)(data, yr, path_yr, None) for (yr, path_yr) in zip(years, paths)]
 
     # Write the area/quantity comparison between base-year and target-year for the timeseries mode
+    begin_end_path = f"{data.path}/begin_end_compare_{years[0]}_{years[-1]}"
     if settings.MODE == 'timeseries':
-        begin_end_path = f"{data.path}/begin_end_compare_{years[0]}_{years[-1]}"
-
         # Write the target-year outputs to the path_begin_end_compare
         jobs += [
             delayed(write_output_single_year)(
@@ -334,6 +334,10 @@ def write_files_separate(data: Data, yr_cal, path, ammap_separate=False):
     
     # Combine the desc2dvar table for agricultural land-use, agricultural management, and non-agricultural land-use
     desc2dvar_df = pd.concat([ag_dvar_map, ag_man_map, non_ag_dvar_map, lm_dvar_map])
+
+    lucc_separate_dir =  os.path.join(path, 'lucc_separate')
+    if not os.path.isdir(lucc_separate_dir):
+        os.mkdir(lucc_separate_dir)
     
     # 3) Export to GeoTiff
     for _,row in desc2dvar_df.iterrows():
@@ -348,9 +352,10 @@ def write_files_separate(data: Data, yr_cal, path, ammap_separate=False):
 
         # Create output file name
         fname = f'{category}_{dvar_idx:02}_{desc}_{yr_cal}.tiff'
+        lucc_separate_path = os.path.join(lucc_separate_dir, fname)
 
         # Write to GeoTiff
-        write_gtiff(dvar, os.path.join(path, 'lucc_separate', fname))
+        write_gtiff(dvar, lucc_separate_path)
 
 
 

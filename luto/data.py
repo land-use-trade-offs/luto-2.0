@@ -23,6 +23,7 @@ from dataclasses import dataclass
 import pandas as pd
 import numpy as np
 from scipy.interpolate import interp1d
+from typing import Any
 
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.settings import (
@@ -1047,13 +1048,22 @@ class Data:
             raise ValueError(f"Ag management DVars for year {yr} already stored in Data object.")
         self.ag_man_dvars[yr] = ag_man_dvars
 
-    def add_production_data(self, yr: int, prod_data: dict[str, float]):
+    def add_production_data(self, yr: int, data_type: str, prod_data: Any):
         """
         Safely save production data for a given year to the Data object.
+
+        Parameters
+        ----
+        yr: int
+            Year of production data being saved.
+        data_type: str
+            Type of production data being saved. Typically either 'Production', 'GHG Emissions' or 'Biodiversity'.
+        prod_data: Any
+            Actual production data to save.
         """
-        if yr in self.prod_data:
-            raise ValueError(f"Production data for year {yr} already stored in Data object.")
-        self.prod_data[yr] = prod_data
+        if yr not in self.prod_data:
+            self.prod_data[yr] = {}
+        self.prod_data[yr][data_type] = prod_data
 
     def add_obj_vals(self, yr: int, obj_val: float):
         """

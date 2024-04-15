@@ -49,7 +49,7 @@ def load_data() -> Data:
         lumap2non_ag_l_mk(data.LUMAP, len(data.NON_AGRICULTURAL_LANDUSES)),
         get_base_am_vars(data.NCELLS, data.NLMS, data.N_AG_LUS),
     )
-    data.add_production_data(data.YR_CAL_BASE, yr_cal_base_prod_data)
+    data.add_production_data(data.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
     print("Done.")
 
     # apply resfactor for solve and set up initial data for base year
@@ -99,8 +99,10 @@ def solve_timeseries(data: Data, steps: int, base: int, target: int):
         data.add_ag_dvars(yr, solution.ag_X_mrj)
         data.add_non_ag_dvars(yr, solution.non_ag_X_rk)
         data.add_ag_man_dvars(yr, solution.ag_man_X_mrj)
-        data.add_production_data(yr, solution.prod_data)
         data.add_obj_vals(yr, solution.obj_val)
+
+        for data_type, prod_data in solution.prod_data.items():
+            data.add_production_data(yr, data_type, prod_data)
 
         print(f'Processing for {base + s + 1} completed in {round(time.time() - start_time)} seconds\n\n' )
 
@@ -129,8 +131,10 @@ def solve_snapshot(data: Data, base: int, target: int):
     data.add_ag_dvars(target, solution.ag_X_mrj)
     data.add_non_ag_dvars(target, solution.non_ag_X_rk)
     data.add_ag_man_dvars(target, solution.ag_man_X_mrj)
-    data.add_production_data(target, solution.prod_data)
     data.add_obj_vals(target, solution.obj_val)
+
+    for data_type, prod_data in solution.prod_data.items():
+        data.add_production_data(target, data_type, prod_data)
     
     print(f'Processing for {target} completed in {round(time.time() - start_time)} seconds\n\n')
 

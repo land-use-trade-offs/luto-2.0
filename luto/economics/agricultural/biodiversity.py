@@ -145,7 +145,7 @@ def get_agtech_ei_effect_b_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, nlus))
 
 
-def get_agricultural_management_biodiversity_matrices(data: Data, ag_b_mrj):
+def get_agricultural_management_biodiversity_matrices(data: Data):
     """
     Calculate the biodiversity matrices for different agricultural management practices.
 
@@ -230,12 +230,12 @@ def get_biodiversity_limits(data: Data, yr_cal: int):
     biodiv_target_score = max(biodiv_target_score, biodiv_score_2010)
     
     if yr_cal >= settings.BIODIV_TARGET_ACHIEVEMENT_YEAR:
-            # For each year after the target achievement year, the limit is equal
-            # to that of the target achievement year.
-            return biodiv_target_score
+        # For each year after the target achievement year, the limit is equal
+        # to that of the target achievement year.
+        return biodiv_target_score
 
     biodiv_targets_each_year = np.linspace(
-            biodiv_score_2010, biodiv_target_score, no_years_to_reach_limit + 1
+        biodiv_score_2010, biodiv_target_score, no_years_to_reach_limit + 1
     )
 
     return biodiv_targets_each_year[yr_cal - data.YR_CAL_BASE]
