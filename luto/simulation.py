@@ -166,8 +166,3 @@ def run( data: Data, base: int, target: int) -> None:
 
     else:
         raise ValueError("Unkown MODE: %s." % settings.MODE)
-    
-
-# def load_data_and_run_test():
-#     from memory_profiler import memory_usage
-    
