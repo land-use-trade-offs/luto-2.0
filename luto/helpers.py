@@ -40,13 +40,11 @@ from luto.dataprep import create_new_dataset
 create_new_dataset()
 
 import luto.simulation as sim
-from luto.data import Data
-from luto.economics.production import get_production
+data = sim.load_data()
+sim.run(data=data, base=2010, target=2050 )
 
-
-sim.run( 2010, 2050 )
 from luto.tools.write import write_outputs
-write_outputs(sim)
+write_outputs(data)
 
 
 
@@ -59,7 +57,7 @@ report_on_path(data_path)
 
 # Write input arrays to tiff files
 from luto.tools.report.write_input_data.array2tif import write_input2tiff
-write_input2tiff(sim, 2050)
+write_input2tiff(data, 2050)
 
 
 
@@ -73,6 +71,7 @@ import luto.simulation as sim
 import luto.economics.agricultural.transitions as ag_transition
 import luto.economics.agricultural.cost as ag_cost
 import luto.economics.agricultural.revenue as ag_revenue
+from luto.economics.production import get_production
 from luto.economics.agricultural.ghg import get_ghg_transition_penalties
 from luto import settings
 import random as rand

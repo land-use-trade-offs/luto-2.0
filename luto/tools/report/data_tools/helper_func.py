@@ -5,7 +5,8 @@ from  lxml.etree import Element
 
 from luto.tools.report.data_tools.parameters import (GHG_CATEGORY, 
                                                      GHG_FNAME2TYPE, 
-                                                     GHG_NAMES,
+                                                     GHG_NAMES, 
+                                                     LANDUSE_ALL,
                                                      LU_CROPS, 
                                                      LU_LVSTKS, 
                                                      LU_UNALLOW, 
@@ -196,6 +197,7 @@ def add_crop_lvstk_to_df(all_files,GHG_type):
     CSVs = []
     for _,row in GHG_files.iterrows():
         csv = pd.read_csv(row['path'],index_col=0,header=[0,1,2]).drop('SUM',axis=1)
+        csv = csv.reindex(index=LANDUSE_ALL, fill_value=0)
 
         # Get the land use and land use category
         if GHG_type != 'Non-Agricultural Landuse':
@@ -239,7 +241,7 @@ def add_crop_lvstk_to_df(all_files,GHG_type):
 
 
 def read_GHG_to_long(all_files, GHG_type):
-    
+
     """
     This function is used to convert the GHG data into long format.
 
@@ -252,9 +254,9 @@ def read_GHG_to_long(all_files, GHG_type):
     """
     
     GHG_df = add_crop_lvstk_to_df(all_files,GHG_type)
-        
+
     # Define the index levels
-    idx_level_name = ['Year','Land use','Land category','Land use category']
+    idx_level_name = ['Year', 'Land use', 'Land category', 'Land use category']
 
     # Remove the first level in the multiindex columns
     GHG_df_long = GHG_df.copy()
@@ -282,7 +284,7 @@ def read_GHG_to_long(all_files, GHG_type):
     # Drop unnecessary columns and reorder the columns
     GHG_df_long.drop(['val_t','variable'],axis=1,inplace=True)
     GHG_df_long = GHG_df_long.reindex(columns= idx_level_name + ['Irrigation','Sources', 'Quantity (Mt CO2e)'])
-    
+
     return GHG_df_long
 
 

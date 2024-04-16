@@ -41,7 +41,7 @@ def get_wreq_matrices(data: Data, yr_idx):
     """
     
     # Stack water requirements data
-    w_mrj = np.stack(( data.WREQ_DRY_RJ, data.WREQ_IRR_RJ ))    # <unit: ML/head>
+    w_mrj = np.stack(( data.WREQ_DRY_RJ, data.WREQ_IRR_RJ ))    # <unit: ML/head|ha>
     
     # Covert water requirements units from ML/head to ML/ha
     for j, lu in enumerate(data.AGRICULTURAL_LANDUSES):
@@ -51,8 +51,8 @@ def get_wreq_matrices(data: Data, yr_idx):
             w_mrj[1, :, j] = w_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)       # Water reqs depend on initial stocking rate for irrigation
     
     # Convert to ML per cell via REAL_AREA
-    w_mrj *= data.REAL_AREA[:, np.newaxis]                      # <unit: ML/ha> * <unit: ha/cell> -> <unit: ML/cell>
-    
+    w_mrj *= data.REAL_AREA[:, np.newaxis]                      # <unit: ML/head|ha> * <unit: head|ha/cell> -> <unit: ML/cell>
+
     return w_mrj
 
 

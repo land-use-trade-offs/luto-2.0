@@ -19,19 +19,19 @@ To maintain state and handle iteration and data-view changes. This module
 functions as a singleton class. It is intended to be the _only_ part of the
 model that has 'global' varying state.
 """
-from datetime import datetime
+
 import time
+from datetime import datetime
 
 import luto.settings as settings
-from luto.data import Data, get_base_am_vars, lumap2ag_l_mrj, lumap2non_ag_l_mk
-
 from luto import tools
+from luto.data import Data, get_base_am_vars, lumap2ag_l_mrj, lumap2non_ag_l_mk
 from luto.economics.production import get_production
 from luto.solvers.input_data import SolverInputData, get_input_data
 from luto.solvers.solver import LutoSolver
 
 # Get date and time
-timestamp = datetime.today().strftime('%Y_%m_%d__%H_%M_%S')
+timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
 
 def load_data() -> Data:
@@ -52,7 +52,7 @@ def load_data() -> Data:
     data.add_production_data(data.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
     print("Done.")
 
-    # apply resfactor for solve and set up initial data for base year
+    # Apply resfactor for solve and set up initial data for base year
     data.apply_resfactor()
     data.add_base_year_data_to_containers()
 
@@ -61,7 +61,7 @@ def load_data() -> Data:
 
 def solve_timeseries(data: Data, steps: int, base: int, target: int):
     print('\n')
-    print( "\nRunning LUTO %s timeseries from %s to %s at resfactor %s, starting at %s." % (settings.VERSION, base, target, settings.RESFACTOR, time.ctime()), flush=True )
+    print(f"\nRunning LUTO {settings.VERSION} timeseries from {base} to {target} at resfactor {settings.RESFACTOR}, starting at {time.ctime()}.", flush=True)
 
     for s in range(steps):
         print( "-------------------------------------------------")
@@ -159,10 +159,9 @@ def run( data: Data, base: int, target: int) -> None:
         steps = target - base
         solve_timeseries(data, steps, base, target)
 
-    # Run the simulation from YR_CAL_BASE to `target` year directly.
     elif settings.MODE == 'snapshot':
         # If demands is a time series, choose the appropriate entry.
         solve_snapshot(data, base, target)
 
     else:
-        raise ValueError("Unkown MODE: %s." % settings.MODE)
+        raise ValueError(f"Unkown MODE: {settings.MODE}.")

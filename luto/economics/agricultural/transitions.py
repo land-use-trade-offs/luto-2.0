@@ -140,7 +140,7 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
     # Water license cost (upfront, amortised to annual, per cell).   #
     # -------------------------------------------------------------- #
 
-    w_mrj = get_wreq_matrices(data, yr_idx)                                          
+    w_mrj = get_wreq_matrices(data, yr_idx)                                     # <unit: ML/cell>                                     
     w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data)                  
     w_delta_mrj = np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not)       
 
@@ -149,7 +149,7 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
     # -------------------------------------------------------------- #
 
     # apply the cost of carbon released by transitioning modified land to natural land
-    ghg_t_mrj = ag_ghg.get_ghg_transition_penalties(data, lumap)                     
+    ghg_t_mrj = ag_ghg.get_ghg_transition_penalties(data, lumap)               # <unit: t/ha>      
     ghg_t_mrj_cost = tools.amortise(ghg_t_mrj * settings.CARBON_PRICE_PER_TONNE)     
     ghg_t_mrj_cost = np.einsum('mrj,mrj,mrj->mrj', ghg_t_mrj_cost, x_mrj, l_mrj_not)
 
