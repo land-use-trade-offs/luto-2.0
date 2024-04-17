@@ -441,9 +441,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     """Calculate transition cost."""
     
     print('Writing transition cost outputs')
-    
-    timestamp = data.timestamp_sim
-    
+        
     # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
     simulated_year_list = sorted(list(data.lumaps.keys()))
     # Get index of yr_cal in timeseries (e.g., if yr_cal is 2050 then yr_idx = 40)
@@ -500,7 +498,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     # Save the cost DataFrames 
     cost_df = pd.concat(cost_dfs, axis=0)
-    cost_df.to_csv(os.path.join(path, f'cost_transition_ag2ag_{timestamp}.csv'), index=False)
+    cost_df.to_csv(os.path.join(path, f'cost_transition_ag2ag_{yr_cal}.csv'), index=False)
 
 
 
@@ -548,7 +546,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     # Save the cost DataFrames
     cost_df = pd.concat(cost_dfs, axis=0)
-    cost_df.to_csv(os.path.join(path, f'cost_transition_ag2non_ag_{timestamp}.csv'), index=False)
+    cost_df.to_csv(os.path.join(path, f'cost_transition_ag2non_ag_{yr_cal}.csv'), index=False)
 
 
 
@@ -586,13 +584,11 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     # Save the cost DataFrames
     cost_df = pd.concat(cost_dfs, axis=0)
-    cost_df.to_csv(os.path.join(path, f'cost_transition_non_ag2_ag_{timestamp}.csv'), index=False)
+    cost_df.to_csv(os.path.join(path, f'cost_transition_non_ag2_ag_{yr_cal}.csv'), index=False)
 
 
 def write_revenue_cost_non_ag(data: Data, yr_cal, path):
     """Calculate non_agricultural cost. """
-
-    timestamp = data.timestamp_sim
 
     print('Writing non agricultural management cost outputs')
     non_ag_dvar = data.non_ag_dvars[yr_cal]
@@ -619,8 +615,8 @@ def write_revenue_cost_non_ag(data: Data, yr_cal, path):
     cost_non_ag_df['Land-use'] = data.NON_AGRICULTURAL_LANDUSES
 
     # Save to disk
-    rev_non_ag_df.to_csv(os.path.join(path, f'revenue_non_ag_{timestamp}.csv'), index = False)
-    cost_non_ag_df.to_csv(os.path.join(path, f'cost_non_ag_{timestamp}.csv'), index = False)
+    rev_non_ag_df.to_csv(os.path.join(path, f'revenue_non_ag_{yr_cal}.csv'), index = False)
+    cost_non_ag_df.to_csv(os.path.join(path, f'cost_non_ag_{yr_cal}.csv'), index = False)
     
     
     
@@ -674,10 +670,7 @@ def write_dvar_area(data: Data, yr_cal, path):
 
 
 def write_area_transition_start_end(data: Data, path):
-    
-    # Append the yr_cal to timestamp as prefix
-    timestamp = data.timestamp_sim 
-    
+        
     print(f'Save transition matrix for start year to end year to {path}\n')
     
     # Get all years from sim
@@ -709,9 +702,11 @@ def write_area_transition_start_end(data: Data, path):
 
     # Concatenate the two transition matrices
     transition = pd.concat([transition_ag2ag, transition_ag2non_ag], axis=1)
+    transition = transition.stack().reset_index()
+    transition.columns = ['From land-use','To land-use','Area (ha)']
     
     # Write the transition matrix to a csv file
-    transition.to_csv(os.path.join(path, f'transition_matrix_{data.YR_CAL_BASE}_{yr_cal_end}_{timestamp}.csv'))
+    transition.to_csv(os.path.join(path, f'transition_matrix_{data.YR_CAL_BASE}_{yr_cal_end}.csv'), index=False)
 
 
 
@@ -783,8 +778,6 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 def write_water(data: Data, yr_cal, path):
     """Calculate water use totals. Takes a simulation object, a numeric
        target calendar year (e.g., 2030), and an output path as input."""
-
-    timestamp = data.timestamp_sim
 
     print('Writing water outputs')
 
@@ -912,14 +905,13 @@ def write_water(data: Data, yr_cal, path):
                     , prop_diff )
 
     # Write to CSV with 2 DP
-    df.to_csv( os.path.join(path, f'water_demand_vs_use_{timestamp}.csv')
-             , index = False
-             , float_format = '{:0,.2f}'.format)
+    df = df.drop(columns=['REGION_ID']).set_index('REGION_NAME').stack().reset_index()
+    df.columns = ['REGION_NAME', 'Variable', 'Value (ML)']
+    df.to_csv( os.path.join(path, f'water_demand_vs_use_{yr_cal}.csv'), index=False)
 
     # Write the separate water use to CSV
     df_water_seperate = pd.concat(df_water_seperate_dfs)
-    df_water_seperate.to_csv( os.path.join(path, f'water_demand_vs_use_separate_{timestamp}.csv')
-                            , index = False)
+    df_water_seperate.to_csv( os.path.join(path, f'water_demand_vs_use_separate_{yr_cal}.csv'), index=False)
     
     
     
@@ -928,8 +920,6 @@ def write_ghg(data: Data, yr_cal, path):
     """Calculate total GHG emissions from on-land agricultural sector. 
         Takes a simulation object, a target calendar year (e.g., 2030), 
         and an output path as input."""
-
-    timestamp = data.timestamp_sim
 
     print('Writing GHG outputs' )
     
@@ -945,8 +935,14 @@ def write_ghg(data: Data, yr_cal, path):
         ghg_emissions = (ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True) * data.ag_dvars[data.YR_CAL_BASE]).sum()
 
     # Save GHG emissions to file
-    df = pd.DataFrame({'GHG_EMISSIONS_LIMIT_TCO2e': [ghg_limits], 'GHG_EMISSIONS_TCO2e': [ghg_emissions]})
-    df.to_csv(os.path.join(path, f'GHG_emissions_{timestamp}.csv'), index=False)
+    df = pd.DataFrame({
+        'Variable':['GHG_EMISSIONS_LIMIT_TCO2e','GHG_EMISSIONS_TCO2e'], 
+        'Emissions (t CO2e)':[ghg_limits, ghg_emissions]
+        })
+    df.to_csv(os.path.join(path, f'GHG_emissions_{yr_cal}.csv'), index=False)
+
+
+
 
 
 def write_biodiversity(data: Data, yr_cal, path):
@@ -955,16 +951,8 @@ def write_biodiversity(data: Data, yr_cal, path):
     and output path ('path').
     """
 
-    timestamp = data.timestamp_sim
-
     print('Writing biodiversity outputs')
 
-
-    yr_idx = yr_cal - data.YR_CAL_BASE
-
-    df = pd.DataFrame( columns=[ 'Biodiversity score limit'
-                               , f'Solve biodiversity score ({yr_cal})' ] )
-    
     # Get limits used as constraints in model
     biodiv_limit = ag_biodiversity.get_biodiversity_limits(data, yr_cal)
 
@@ -977,23 +965,23 @@ def write_biodiversity(data: Data, yr_cal, path):
         biodiv_score = ag_biodiversity.get_base_year_biodiversity_score(data)
 
     # Add to dataframe
-    df.loc[0] = ("{:,.0f}".format(biodiv_limit), "{:,.0f}".format(biodiv_score))
+    df = pd.DataFrame({
+            'Variable':['Biodiversity score limit',
+                        'Solve biodiversity score'], 
+            'Score':[biodiv_limit, biodiv_score]
+            })
     
     # Save to file
-    df.to_csv(os.path.join(path, f'biodiversity_{timestamp}.csv'), index = False)
+    df.to_csv(os.path.join(path, f'biodiversity_{yr_cal}.csv'), index = False)
     
     
     
     
 def write_biodiversity_separate(data: Data, yr_cal, path):
     
-    timestamp = data.timestamp_sim
-
     print('Writing biodiversity_separate outputs')
 
-
     # Get the biodiversity scores b_mrj
-    yr_idx = yr_cal - data.YR_CAL_BASE
     ag_biodiv_mrj = ag_biodiversity.get_breq_matrices(data)
     am_biodiv_mrj = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data)
     non_ag_biodiv_rk = non_ag_biodiversity.get_breq_matrix(data)
@@ -1057,18 +1045,14 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
     biodiv_df.insert(0, 'Year', yr_cal)
 
     # Write to file
-    biodiv_df.to_csv(os.path.join(path, 'biodiversity_separate_' + timestamp + '.csv'), index=False)    
+    biodiv_df.to_csv(os.path.join(path, f'biodiversity_separate_{yr_cal}.csv'), index=False)    
       
     
   
 def write_ghg_separate(data: Data, yr_cal, path):
 
-
-    timestamp = data.timestamp_sim
-
     print('Writing GHG emissions_Separate to {path}')
 
-        
     # Convert calendar year to year index.
     yr_idx = yr_cal - data.YR_CAL_BASE
 
@@ -1118,7 +1102,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
     ghg_df = ghg_df.fillna(0)                                       
 
     # Save table to disk
-    ghg_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_landuse_{timestamp}.csv'))
+    ghg_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_landuse_{yr_cal}.csv'))
 
 
 
@@ -1146,7 +1130,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
     )
     
     # Save table to disk
-    non_ag_g_rk_summary.to_csv(os.path.join(path, f'GHG_emissions_separate_no_ag_reduction_{timestamp}.csv'))
+    non_ag_g_rk_summary.to_csv(os.path.join(path, f'GHG_emissions_separate_no_ag_reduction_{yr_cal}.csv'))
                         
 
     # -------------------------------------------------------------------#
@@ -1179,7 +1163,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
     
     
     # Save table to disk
-    ghg_t_separate_summary.to_csv(os.path.join(path, f'GHG_emissions_separate_transition_penalty_{timestamp}.csv'))
+    ghg_t_separate_summary.to_csv(os.path.join(path, f'GHG_emissions_separate_transition_penalty_{yr_cal}.csv'))
     
     
     
@@ -1218,24 +1202,21 @@ def write_ghg_separate(data: Data, yr_cal, path):
                                                        lu_desc)
         
     # Save table to disk
-    ag_ghg_summary_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_management_{timestamp}.csv'))
+    ag_ghg_summary_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_management_{yr_cal}.csv'))
     
     
     
     
 
-def write_ghg_offland_commodity(data: Data, path):
+def write_ghg_offland_commodity(data: Data, path, yr_cal):
     """Write out offland commodity GHG emissions"""
     
     print('Writing offland commodity GHG\n')
 
-    # Append the yr_cal to timestamp as prefix
-    timestamp = data.timestamp_sim
-
     # Get the offland commodity data
-    offland_ghg = data.OFF_LAND_GHG_EMISSION
+    offland_ghg = data.OFF_LAND_GHG_EMISSION.query(f'year == {yr_cal}')
     
     # Save to disk
-    offland_ghg.to_csv(os.path.join(path, f'GHG_emissions_offland_commodity_{timestamp}.csv'), index = False)
+    offland_ghg.to_csv(os.path.join(path, f'GHG_emissions_offland_commodity_{yr_cal}.csv'), index = False)
     
     

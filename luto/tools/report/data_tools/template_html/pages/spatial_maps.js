@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', function () {
             'Unallocated - modified land', 'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes', 'Winter oilseeds'],
         "Ag_Mgt": ['Asparagopsis taxiformis', 'Ecological Grazing', 'Precision Agriculture'],
         "Land_Mgt": ['dry', 'irr'],
-        'Non-Ag_LU': ['Environmental Plantings', 'Riparian Plantings', 'Agroforestry'],
+        'Non-Ag_LU': ['Environmental Plantings', 'Riparian Plantings', 'Agroforestry', 'Carbon Plantings (Block)', 'Carbon Plantings (Belt)', 'BECCS'],
         "lumap": ['Land-use All']
     }
 
