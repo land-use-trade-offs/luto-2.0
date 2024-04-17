@@ -1094,13 +1094,12 @@ def write_ghg_separate(data: Data, yr_cal, path):
     column_rename = [(i[0],i[1],i[2].replace('CO2E_KG_HA','TCO2E')) for i in ghg_df.columns]
     column_rename = [(i[0],i[1],i[2].replace('CO2E_KG_HEAD','TCO2E')) for i in column_rename]
     ghg_df.columns = pd.MultiIndex.from_tuples(column_rename)
-    
-    
-    # Add the sum of each column
-    ghg_df.loc['SUM'] = ghg_df.sum(axis=0)
-    ghg_df['SUM'] = ghg_df.sum(axis=1)
-    ghg_df = ghg_df.fillna(0)                                       
+    ghg_df = ghg_df.fillna(0)  
 
+    # Reorganize the df to long format
+    ghg_df = ghg_df.melt(ignore_index=False).reset_index()   
+    ghg_df.columns = ['Land-use','Type','Water_supply','CO2_type','Value (t CO2e)']
+    
     # Save table to disk
     ghg_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_landuse_{yr_cal}.csv'))
 
@@ -1112,25 +1111,23 @@ def write_ghg_separate(data: Data, yr_cal, path):
     
     # Get the non_ag GHG reduction
     non_ag_g_rk = non_ag_ghg.get_ghg_matrix(data)
-    
+
     # Multiply with decision variable to get the GHG in yr_cal
     non_ag_g_rk = non_ag_g_rk * data.non_ag_dvars[yr_cal]
-    
-    # get the non_ag GHG reduction on dry/irri land
-    non_ag_g_rk_dry = np.einsum('rk,r -> rk', non_ag_g_rk, (data.LMMAP != 1))
-    non_ag_g_rk_irri = np.einsum('rk,r -> rk', non_ag_g_rk, (data.LMMAP == 1))
-    non_ag_g_mrk = np.array([non_ag_g_rk_dry,non_ag_g_rk_irri])        # mrk
-    non_ag_g_rmk = np.swapaxes(non_ag_g_mrk,0,1)                       # rmk
-    
-    # Summarize the array as a df
-    non_ag_g_rk_summary = tools.summarize_ghg_separate_df(
-        non_ag_g_rmk,
-        (['Non_Agricultural Landuse'], data.LANDMANS, [f'TCO2E_{non_ag}' for non_ag in data.NON_AGRICULTURAL_LANDUSES]),
-        lu_desc
-    )
+    lmmap_mr = np.stack([data.lmmaps[yr_cal] ==0, data.lmmaps[yr_cal] ==1], axis=0)
+
+    # get the non_ag GHG reduction on dry/irr land
+    non_ag_g_mrk = np.einsum('rk, mr -> mrk', non_ag_g_rk, lmmap_mr)
+    non_ag_g_mk = np.sum(non_ag_g_mrk, axis=1)
+
+    # Convert arr to df
+    df = pd.DataFrame(non_ag_g_mk.flatten(), index=pd.MultiIndex.from_product((data.LANDMANS, data.NON_AGRICULTURAL_LANDUSES))).reset_index()
+    df.columns = ['Water_supply', 'Land-use', 'Value (t CO2e)']
+    df['Type'] = 'Non-Agricultural land-use'
+    df = df.replace({'dry': 'Dryland', 'irr':'Irrigated'})
     
     # Save table to disk
-    non_ag_g_rk_summary.to_csv(os.path.join(path, f'GHG_emissions_separate_no_ag_reduction_{yr_cal}.csv'))
+    df.to_csv(os.path.join(path, f'GHG_emissions_separate_no_ag_reduction_{yr_cal}.csv'))
                         
 
     # -------------------------------------------------------------------#
@@ -1139,70 +1136,67 @@ def write_ghg_separate(data: Data, yr_cal, path):
     
     # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
     simulated_year_list = sorted(list(data.lumaps.keys()))
-    
+
     # Get index of yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_idx_sim = 2 if snapshot)
     yr_idx_sim = simulated_year_list.index(yr_cal)
-    
+
     # Get index of year previous to yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_cal_sim_pre = 2010 if snapshot)
     if yr_cal == data.YR_CAL_BASE:
         ghg_t = np.zeros(data.ag_dvars[yr_cal].shape, dtype=np.bool_)
     else:
         yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
         ghg_t = ag_ghg.get_ghg_transition_penalties(data, data.lumaps[yr_cal_sim_pre])
-    
-    
+
+
     # Get the GHG emissions from lucc-convertion compared to the previous year
-    ghg_t_separate = np.einsum('mrj,mrj -> rmj', data.ag_dvars[yr_cal], ghg_t)         
+    ghg_t_mj = np.einsum('mrj,mrj -> mj', data.ag_dvars[yr_cal], ghg_t)         
 
     # Summarize the array as a df
-    ghg_t_separate_summary = tools.summarize_ghg_separate_df(ghg_t_separate,(['Deforestation'], 
-                                                                       data.LANDMANS,
-                                                                       [f"TCO2E_{i}" for i in data.AGRICULTURAL_LANDUSES]),
-                                                             lu_desc)
+    ghg_t_df = pd.DataFrame(ghg_t_mj.flatten(), index=pd.MultiIndex.from_product((data.LANDMANS, data.AGRICULTURAL_LANDUSES))).reset_index()
+    ghg_t_df.columns = ['Water_supply', 'Land-use', 'Value (t CO2e)']
+    ghg_t_df['Type'] = 'Deforestation'
+    ghg_t_df = ghg_t_df.replace({'dry': 'Dryland', 'irr':'Irrigated'})
+    ghg_t_df['Year'] = yr_cal
 
-    
-    
     # Save table to disk
-    ghg_t_separate_summary.to_csv(os.path.join(path, f'GHG_emissions_separate_transition_penalty_{yr_cal}.csv'))
+    ghg_t_df.to_csv(os.path.join(path, f'GHG_emissions_separate_transition_penalty_{yr_cal}.csv'))
     
     
-    
-    
+
     # -------------------------------------------------------------------#
     # Get greenhouse gas emissions from agricultural management          #
     # -------------------------------------------------------------------#
      
     ag_g_mrj = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True)
-    
+
     # Get the ag_man_g_mrj
     ag_man_g_mrj = ag_ghg.get_agricultural_management_ghg_matrices(data, ag_g_mrj, yr_idx)
-    
-    ag_ghg_arrays = []
+
+    am_dfs = []
     for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():
         
         # Get the lucc_code for this the agricultural management in this loop
         am_j = np.array([data.DESC2AGLU[lu] for lu in am_lus]) 
-    
+
         # Get the GHG emission from agricultural management, then reshape it to starte with row (r) dimension
-        am_ghg_mrj = ag_man_g_mrj[am] * data.ag_man_dvars[yr_cal][am][:, :, am_j]              # mrj 
-        am_ghg_rm = np.einsum('mrj -> rm',am_ghg_mrj)                                         # rm
-    
+        am_ghg_mrj = ag_man_g_mrj[am] * data.ag_man_dvars[yr_cal][am][:, :, am_j]              
+        am_ghg_rm = np.einsum('mrj -> mj', am_ghg_mrj)         
+        
+        am_ghg_df = pd.DataFrame(am_ghg_rm.flatten(), index=pd.MultiIndex.from_product([data.LANDMANS, am_lus])).reset_index()
+        am_ghg_df.columns = ['Water_supply', 'Land-use', 'Value (t CO2e)']
+        am_ghg_df['Type'] = 'Agricultural Management'
+        am_ghg_df['Agricultural Management Type'] = am
+        am_ghg_df = am_ghg_df.replace({'dry': 'Dryland', 'irr':'Irrigated'})
+        am_ghg_df['Year'] = yr_cal                         
+
         # Summarize the df by calculating the total value of each column
-        ag_ghg_arrays.append(am_ghg_rm)
-    
-    
-    # Concat all summary tables
-    ag_ghg_summary = np.stack(ag_ghg_arrays)                                           # srm
-    ag_ghg_summary = np.einsum('srm -> rms',ag_ghg_summary)                            # rms
-    
-    # Summarize the array as a df
-    ag_ghg_summary_df = tools.summarize_ghg_separate_df(ag_ghg_summary,( ['Agricultural Management']
-                                                                , data.LANDMANS
-                                                                , [f"TCO2E_{i}" for i in AG_MANAGEMENTS_TO_LAND_USES.keys()]),
-                                                       lu_desc)
+        am_dfs.append(am_ghg_df)
+        
+    # Concatenate all the dataframes in the list
+    am_df = pd.concat(am_dfs, axis=0)
         
     # Save table to disk
-    ag_ghg_summary_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_management_{yr_cal}.csv'))
+    am_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_management_{yr_cal}.csv'))
     
     
     
@@ -1214,7 +1208,7 @@ def write_ghg_offland_commodity(data: Data, path, yr_cal):
     print('Writing offland commodity GHG\n')
 
     # Get the offland commodity data
-    offland_ghg = data.OFF_LAND_GHG_EMISSION.query(f'year == {yr_cal}')
+    offland_ghg = data.OFF_LAND_GHG_EMISSION.query(f'YEAR == {yr_cal}').rename(columns={'YEAR':'Year'})
     
     # Save to disk
     offland_ghg.to_csv(os.path.join(path, f'GHG_emissions_offland_commodity_{yr_cal}.csv'), index = False)
