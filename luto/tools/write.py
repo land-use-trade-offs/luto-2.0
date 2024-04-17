@@ -208,7 +208,7 @@ def write_files(data: Data, yr_cal, path):
     # Save raw agricultural management decision variables (float array).
     for am in AG_MANAGEMENTS_TO_LAND_USES:
         snake_case_am = tools.am_name_snake_case(am)
-        am_X_mrj_fname = f'ag_man_X_mrj{snake_case_am}_{yr_cal}.npy'
+        am_X_mrj_fname = f'ag_man_X_mrj_{snake_case_am}_{yr_cal}.npy'
         np.save(os.path.join(path, am_X_mrj_fname), data.ag_man_dvars[yr_cal][am].astype(np.float16))
     
     # Write out raw numpy arrays for land-use and land management
@@ -222,18 +222,14 @@ def write_files(data: Data, yr_cal, path):
     # Get the Agricultural Management applied to each pixel
     ag_man_dvar = np.stack([np.einsum('mrj -> r', v) for _,v in data.ag_man_dvars[yr_cal].items()]).T   # (r, am)
     ag_man_dvar_mask = ag_man_dvar.sum(1) > 0.01            # Meaning that they have at least 1% of agricultural management applied
-    # Get the maximum index of the agricultural management applied to the valid pixel
     ag_man_dvar = np.argmax(ag_man_dvar, axis=1) + 1        # Start from 1
-    # Let the pixels that were all zeros in the original array to be 0
     ag_man_dvar_argmax = np.where(ag_man_dvar_mask, ag_man_dvar, 0)
 
 
     # Get the non-agricultural landuse for each pixel
-    non_ag_dvar = data.non_ag_dvars[yr_cal]                  # (r, k)
+    non_ag_dvar = data.non_ag_dvars[yr_cal]                 # (r, k)
     non_ag_dvar_mask = non_ag_dvar.sum(1) > 0.01            # Meaning that they have at least 1% of non-agricultural landuse applied
-    # Get the maximum index of the non-agricultural landuse applied to the valid pixel
     non_ag_dvar = np.argmax(non_ag_dvar, axis=1) + settings.NON_AGRICULTURAL_LU_BASE_CODE    # Start from 100
-    # Let the pixels that were all zeros in the original array to be 0
     non_ag_dvar_argmax = np.where(non_ag_dvar_mask, non_ag_dvar, 0)
 
     # Put the excluded land-use and land management types back in the array.
@@ -297,7 +293,7 @@ def write_files_separate(data: Data, yr_cal, path, ammap_separate=False):
 
 def write_quantity(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     
-    timestamp = data.timestamp_sim
+    simulated_year_list = sorted(list(data.lumaps.keys()))
     yr_idx = yr_cal - data.YR_CAL_BASE
     yr_idx_sim = sorted(list(data.lumaps.keys())).index(yr_cal)
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
@@ -327,12 +323,12 @@ def write_quantity(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         })
 
         # Save files to disk
-        df.to_csv(os.path.join(path, f'quantity_comparison_{timestamp}.csv'), index=False)
+        df.to_csv(os.path.join(path, f'quantity_comparison_{yr_cal}.csv'), index=False)
 
         # Write the production of each year to disk
-        production_years = pd.DataFrame({yr: data.prod_data[yr]['Production'] for yr in data.prod_data.keys()})
+        production_years = pd.DataFrame({yr_cal: data.prod_data[yr_cal]['Production']})
         production_years.insert(0, 'Commodity', data.COMMODITIES)
-        production_years.to_csv(os.path.join(path, f'quantity_production_kt_{timestamp}.csv'), index=False)
+        production_years.to_csv(os.path.join(path, f'quantity_production_kt_{yr_cal}.csv'), index=False)
 
     # --------------------------------------------------------------------------------------------
     # NOTE:Non-agricultural production are all zeros, therefore skip the calculation
@@ -344,7 +340,6 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
     """Calculate agricultural revenue. Takes a simulation object, a target calendar 
        year (e.g., 2030), and an output path as input."""
 
-    timestamp = data.timestamp_sim
     yr_idx = yr_cal - data.YR_CAL_BASE
     ag_dvar_mrj = data.ag_dvars[yr_cal]
     print('Writing agricultural revenue_cost outputs')
@@ -370,16 +365,15 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
                            columns=pd.MultiIndex.from_product(ag_cost_df_rjms.columns.levels[1:]),
                            index=ag_cost_df_rjms.columns.levels[0])
     
-    # Add the SUM column to the last row and column
-    df_rev.loc['SUM'] = df_rev.sum(axis=0)
-    df_rev['SUM'] = df_rev.sum(axis=1)
-
-    df_cost.loc['SUM'] = df_cost.sum(axis=0)
-    df_cost['SUM'] = df_cost.sum(axis=1)
+    # Reformat the revenue/cost matrix into a long dataframe
+    df_rev = df_rev.melt(ignore_index=False).reset_index()
+    df_rev.columns = ['Land-use', 'Water_supply', 'Type', 'Value ($)']
+    df_cost = df_cost.melt(ignore_index=False).reset_index()
+    df_cost.columns = ['Land-use', 'Water_supply', 'Type', 'Value ($)']
 
     # Save to file
-    df_rev.to_csv(os.path.join(path, f'revenue_agricultural_commodity_{timestamp}.csv'))
-    df_cost.to_csv(os.path.join(path, f'cost_agricultural_commodity_{timestamp}.csv'))
+    df_rev.to_csv(os.path.join(path, f'revenue_agricultural_commodity_{yr_cal}.csv'))
+    df_cost.to_csv(os.path.join(path, f'cost_agricultural_commodity_{yr_cal}.csv'))
     
 
 def write_revenue_cost_ag_management(data: Data, yr_cal, path):
@@ -387,7 +381,6 @@ def write_revenue_cost_ag_management(data: Data, yr_cal, path):
     
     print('Writing agricultural management revenue_cost outputs')
 
-    timestamp = data.timestamp_sim
     yr_idx = yr_cal - data.YR_CAL_BASE
 
     # Get the revenue/cost matirces for each agricultural land-use
@@ -439,8 +432,8 @@ def write_revenue_cost_ag_management(data: Data, yr_cal, path):
     revenue_am_df = pd.concat(revenue_am_dfs)
     cost_am_df = pd.concat(cost_am_dfs)
 
-    revenue_am_df.to_csv(os.path.join(path, f'revenue_agricultural_management_{timestamp}.csv'), index=False)
-    cost_am_df.to_csv(os.path.join(path, f'cost_agricultural_management_{timestamp}.csv'), index=False)
+    revenue_am_df.to_csv(os.path.join(path, f'revenue_agricultural_management_{yr_cal}.csv'), index=False)
+    cost_am_df.to_csv(os.path.join(path, f'cost_agricultural_management_{yr_cal}.csv'), index=False)
     
     
     
@@ -633,13 +626,10 @@ def write_revenue_cost_non_ag(data: Data, yr_cal, path):
     
 
 def write_dvar_area(data: Data, yr_cal, path):
-    
-    timestamp = data.timestamp_sim
-    
+        
     # Reprot the process
     print('Writing area calculated from dvars to {path}')
     
-
     # Get the decision variables for the year, multiply them by the area of each pixel, 
     # and sum over the landuse dimension (j/k)
     ag_area = np.einsum('mrj,r -> mj', data.ag_dvars[yr_cal], data.REAL_AREA)  
@@ -678,9 +668,9 @@ def write_dvar_area(data: Data, yr_cal, path):
     df_am_area = pd.concat(am_areas)
 
     # Save to file
-    df_ag_area.to_csv(os.path.join(path, f'area_agricultural_landuse_{timestamp}.csv'), index = False)
-    df_non_ag_area.to_csv(os.path.join(path, f'area_non_agricultural_landuse_{timestamp}.csv'), index = False)
-    df_am_area.to_csv(os.path.join(path, f'area_agricultural_management_{timestamp}.csv'), index = False)
+    df_ag_area.to_csv(os.path.join(path, f'area_agricultural_landuse_{yr_cal}.csv'), index = False)
+    df_non_ag_area.to_csv(os.path.join(path, f'area_non_agricultural_landuse_{yr_cal}.csv'), index = False)
+    df_am_area.to_csv(os.path.join(path, f'area_agricultural_management_{yr_cal}.csv'), index = False)
 
 
 def write_area_transition_start_end(data: Data, path):
@@ -727,19 +717,9 @@ def write_area_transition_start_end(data: Data, path):
 
 def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None): 
     """Write out land-use and production data"""
-    
-    timestamp = data.timestamp_sim
-    
-    # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
+        
     simulated_year_list = sorted(list(data.lumaps.keys()))
-    
-    # Get index of yr_cal in timeseries (e.g., if yr_cal is 2050 then yr_idx = 40)
-    yr_idx = yr_cal - data.YR_CAL_BASE
-    
-    # Get index of yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_idx_sim = 2 if snapshot)
     yr_idx_sim = simulated_year_list.index(yr_cal)
-    
-    # Get index of year previous to yr_cal in simulated_year_list (e.g., if yr_cal is 2050 then yr_cal_sim_pre = 2010 if snapshot)
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
     
 
@@ -761,7 +741,8 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         
         ctlm, swlm = lmmap_crossmap( data.lmmaps[yr_cal_sim_pre]
                                    , data.lmmaps[yr_cal]
-                                   , data.REAL_AREA)
+                                   , data.REAL_AREA
+                                   , data.LANDMANS)
 
         cthp, swhp = crossmap_irrstat( data.lumaps[yr_cal_sim_pre]
                                      , data.lmmaps[yr_cal_sim_pre]
@@ -785,17 +766,17 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             ctass[am] = ctas
             swass[am] = swas
             
-        ctlu.to_csv(os.path.join(path, f'crosstab-lumap_{timestamp}.csv'))
-        ctlm.to_csv(os.path.join(path, f'crosstab-lmmap_{timestamp}.csv'))
-        swlu.to_csv(os.path.join(path, f'switches-lumap_{timestamp}.csv'))
-        swlm.to_csv(os.path.join(path, f'switches-lmmap_{timestamp}.csv'))
-        cthp.to_csv(os.path.join(path, f'crosstab-irrstat_{timestamp}.csv'))
-        swhp.to_csv(os.path.join(path, f'switches-irrstat_{timestamp}.csv'))
+        ctlu.to_csv(os.path.join(path, f'crosstab-lumap_{yr_cal}.csv'))
+        ctlm.to_csv(os.path.join(path, f'crosstab-lmmap_{yr_cal}.csv'))
+        swlu.to_csv(os.path.join(path, f'switches-lumap_{yr_cal}.csv'))
+        swlm.to_csv(os.path.join(path, f'switches-lmmap_{yr_cal}.csv'))
+        cthp.to_csv(os.path.join(path, f'crosstab-irrstat_{yr_cal}.csv'))
+        swhp.to_csv(os.path.join(path, f'switches-irrstat_{yr_cal}.csv'))
         
         for am in AG_MANAGEMENTS_TO_LAND_USES:
             am_snake_case = tools.am_name_snake_case(am).replace("_", "-")
-            ctass[am].to_csv(os.path.join(path, f'crosstab-amstat-{am_snake_case}_{timestamp}.csv'))
-            swass[am].to_csv(os.path.join(path, f'switches-amstat-{am_snake_case}_{timestamp}.csv'))
+            ctass[am].to_csv(os.path.join(path, f'crosstab-amstat-{am_snake_case}_{yr_cal}.csv'))
+            swass[am].to_csv(os.path.join(path, f'switches-amstat-{am_snake_case}_{yr_cal}.csv'))
 
 
 
