@@ -314,7 +314,7 @@ def write_quantity(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
         # Create pandas dataframe
         df = pd.DataFrame({
-            'Commodity': data.COMMODITIES,
+            'Commodity': [i[0].capitalize() + i[1:] for i in data.COMMODITIES],
             'Prod_base_year (tonnes, KL)': prod_base,
             'Prod_targ_year (tonnes, KL)': prod_targ,
             'Demand (tonnes, KL)': demands,
@@ -323,11 +323,14 @@ def write_quantity(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         })
 
         # Save files to disk
+        df['Year'] = yr_cal
         df.to_csv(os.path.join(path, f'quantity_comparison_{yr_cal}.csv'), index=False)
 
         # Write the production of each year to disk
         production_years = pd.DataFrame({yr_cal: data.prod_data[yr_cal]['Production']})
-        production_years.insert(0, 'Commodity', data.COMMODITIES)
+        production_years.insert(0, 'Commodity', [i[0].capitalize() + i[1:] for i in data.COMMODITIES])
+        production_years = production_years.rename(columns={2011: 'Value (tonnes, KL)'})
+        production_years['Year'] = yr_cal   
         production_years.to_csv(os.path.join(path, f'quantity_production_kt_{yr_cal}.csv'), index=False)
 
     # --------------------------------------------------------------------------------------------
@@ -368,10 +371,15 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
     # Reformat the revenue/cost matrix into a long dataframe
     df_rev = df_rev.melt(ignore_index=False).reset_index()
     df_rev.columns = ['Land-use', 'Water_supply', 'Type', 'Value ($)']
+    df_rev['Year'] = yr_cal
     df_cost = df_cost.melt(ignore_index=False).reset_index()
     df_cost.columns = ['Land-use', 'Water_supply', 'Type', 'Value ($)']
+    df_cost['Year'] = yr_cal
 
     # Save to file
+    df_rev = df_rev.replace({'dry':'Dryland', 'irr':'Irrigated'})
+    df_cost = df_cost.replace({'dry':'Dryland', 'irr':'Irrigated'})
+    
     df_rev.to_csv(os.path.join(path, f'revenue_agricultural_commodity_{yr_cal}.csv'))
     df_cost.to_csv(os.path.join(path, f'cost_agricultural_commodity_{yr_cal}.csv'))
     
@@ -414,14 +422,14 @@ def write_revenue_cost_ag_management(data: Data, yr_cal, path):
         am_rev_yr_df['Land-use'] = am_desc
         am_rev_yr_df = am_rev_yr_df.melt(id_vars='Land-use', value_vars=data.LANDMANS, var_name='Water',
                                          value_name='Value (AU$)')
-        am_rev_yr_df['year'] = yr_cal
+        am_rev_yr_df['Year'] = yr_cal
         am_rev_yr_df['Management Type'] = am
 
         am_cost_yr_df = pd.DataFrame(am_cost_yr, columns=data.LANDMANS)
         am_cost_yr_df['Land-use'] = am_desc
         am_cost_yr_df = am_cost_yr_df.melt(id_vars='Land-use', value_vars=data.LANDMANS, var_name='Water',
                                           value_name='Value (AU$)')
-        am_cost_yr_df['year'] = yr_cal
+        am_cost_yr_df['Year'] = yr_cal
         am_cost_yr_df['Management Type'] = am
 
         # Store the revenue/cost dataframes
@@ -429,6 +437,9 @@ def write_revenue_cost_ag_management(data: Data, yr_cal, path):
         cost_am_dfs.append(am_cost_yr_df)
 
     # Concatenate the revenue/cost dataframes
+    revenue_am_df = revenue_am_df.replace({'dry':'Dryland', 'irr':'Irrigated'})
+    cost_am_df = cost_am_df.replace({'dry':'Dryland', 'irr':'Irrigated'})
+    
     revenue_am_df = pd.concat(revenue_am_dfs)
     cost_am_df = pd.concat(cost_am_dfs)
 
@@ -492,12 +503,13 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
                             names=['Water Supply', 'To land-use']), 
                             columns=['Cost ($)']).reset_index()
             arr_df.insert(0, 'Type', cost_type)
-            arr_df.insert(1, 'year', yr_cal)
+            arr_df.insert(1, 'Year', yr_cal)
             arr_df.insert(2, 'From land-use', lu_desc)
             cost_dfs.append(arr_df)
 
     # Save the cost DataFrames 
     cost_df = pd.concat(cost_dfs, axis=0)
+    cost_df = cost_df.replace({'dry':'Dryland', 'irr':'Irrigated'})
     cost_df.to_csv(os.path.join(path, f'cost_transition_ag2ag_{yr_cal}.csv'), index=False)
 
 
@@ -541,11 +553,12 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
                                 columns=['Cost ($)']).reset_index()
             arr_df.insert(0, 'To land-use', non_ag_type)
             arr_df.insert(1, 'Cost type', cost_type)
-            arr_df.insert(2, 'year', yr_cal)
+            arr_df.insert(2, 'Year', yr_cal)
             cost_dfs.append(arr_df)
 
     # Save the cost DataFrames
     cost_df = pd.concat(cost_dfs, axis=0)
+    cost_df = cost_df.replace({'dry':'Dryland', 'irr':'Irrigated'})
     cost_df.to_csv(os.path.join(path, f'cost_transition_ag2non_ag_{yr_cal}.csv'), index=False)
 
 
@@ -579,11 +592,12 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
                                 columns=['Cost ($)']).reset_index()
             arr_df.insert(0, 'From land-use', non_ag_type)
             arr_df.insert(1, 'Cost type', cost_type)
-            arr_df.insert(2, 'year', yr_cal)
+            arr_df.insert(2, 'Year', yr_cal)
             cost_dfs.append(arr_df)
 
     # Save the cost DataFrames
     cost_df = pd.concat(cost_dfs, axis=0)
+    cost_df = cost_df.replace({'dry':'Dryland', 'irr':'Irrigated'})
     cost_df.to_csv(os.path.join(path, f'cost_transition_non_ag2_ag_{yr_cal}.csv'), index=False)
 
 
@@ -607,11 +621,11 @@ def write_revenue_cost_non_ag(data: Data, yr_cal, path):
 
     # Reformat the revenue/cost matrix into a dataframe
     rev_non_ag_df = pd.DataFrame(rev_non_ag.reshape(-1,1), columns=['Value AU$'])
-    rev_non_ag_df['year'] = yr_cal
+    rev_non_ag_df['Year'] = yr_cal
     rev_non_ag_df['Land-use'] = data.NON_AGRICULTURAL_LANDUSES
 
     cost_non_ag_df = pd.DataFrame(cost_non_ag.reshape(-1,1), columns=['Value AU$'])
-    cost_non_ag_df['year'] = yr_cal
+    cost_non_ag_df['Year'] = yr_cal
     cost_non_ag_df['Land-use'] = data.NON_AGRICULTURAL_LANDUSES
 
     # Save to disk
@@ -664,6 +678,10 @@ def write_dvar_area(data: Data, yr_cal, path):
     df_am_area = pd.concat(am_areas)
 
     # Save to file
+    df_ag_area = df_ag_area.replace({'dry':'Dryland', 'irr':'Irrigated'})
+    df_non_ag_area = df_non_ag_area.replace({'dry':'Dryland', 'irr':'Irrigated'})
+    df_am_area = df_am_area.replace({'dry':'Dryland', 'irr':'Irrigated'})
+    
     df_ag_area.to_csv(os.path.join(path, f'area_agricultural_landuse_{yr_cal}.csv'), index = False)
     df_non_ag_area.to_csv(os.path.join(path, f'area_non_agricultural_landuse_{yr_cal}.csv'), index = False)
     df_am_area.to_csv(os.path.join(path, f'area_agricultural_management_{yr_cal}.csv'), index = False)
@@ -760,7 +778,11 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
                                         , data.REAL_AREA)
             ctass[am] = ctas
             swass[am] = swas
-            
+        
+        ctlu['Year'] = yr_cal
+        ctlm['Year'] = yr_cal
+        cthp['Year'] = yr_cal
+        
         ctlu.to_csv(os.path.join(path, f'crosstab-lumap_{yr_cal}.csv'))
         ctlm.to_csv(os.path.join(path, f'crosstab-lmmap_{yr_cal}.csv'))
         swlu.to_csv(os.path.join(path, f'switches-lumap_{yr_cal}.csv'))
@@ -770,6 +792,7 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         
         for am in AG_MANAGEMENTS_TO_LAND_USES:
             am_snake_case = tools.am_name_snake_case(am).replace("_", "-")
+            ctass[am]['Year'] = yr_cal
             ctass[am].to_csv(os.path.join(path, f'crosstab-amstat-{am_snake_case}_{yr_cal}.csv'))
             swass[am].to_csv(os.path.join(path, f'switches-amstat-{am_snake_case}_{yr_cal}.csv'))
 
@@ -883,7 +906,7 @@ def write_water(data: Data, yr_cal, path):
         # Combine all dataframes
         df_region = pd.concat([ag_df, non_ag_df, AM_df])
         df_region.insert(0, 'region', region_dict[region])
-        df_region.insert(0, 'year', yr_cal)
+        df_region.insert(0, 'Year', yr_cal)
 
         # Add to list of dataframes
         df_water_seperate_dfs.append(df_region)
@@ -907,6 +930,7 @@ def write_water(data: Data, yr_cal, path):
     # Write to CSV with 2 DP
     df = df.drop(columns=['REGION_ID']).set_index('REGION_NAME').stack().reset_index()
     df.columns = ['REGION_NAME', 'Variable', 'Value (ML)']
+    df['Year'] = yr_cal
     df.to_csv( os.path.join(path, f'water_demand_vs_use_{yr_cal}.csv'), index=False)
 
     # Write the separate water use to CSV
@@ -939,6 +963,7 @@ def write_ghg(data: Data, yr_cal, path):
         'Variable':['GHG_EMISSIONS_LIMIT_TCO2e','GHG_EMISSIONS_TCO2e'], 
         'Emissions (t CO2e)':[ghg_limits, ghg_emissions]
         })
+    df['Year'] = yr_cal
     df.to_csv(os.path.join(path, f'GHG_emissions_{yr_cal}.csv'), index=False)
 
 
@@ -972,6 +997,7 @@ def write_biodiversity(data: Data, yr_cal, path):
             })
     
     # Save to file
+    df['Year'] = yr_cal
     df.to_csv(os.path.join(path, f'biodiversity_{yr_cal}.csv'), index = False)
     
     
@@ -1101,6 +1127,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
     ghg_df.columns = ['Land-use','Type','Water_supply','CO2_type','Value (t CO2e)']
     
     # Save table to disk
+    ghg_df['Year'] = yr_cal
     ghg_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_landuse_{yr_cal}.csv'))
 
 
@@ -1127,6 +1154,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
     df = df.replace({'dry': 'Dryland', 'irr':'Irrigated'})
     
     # Save table to disk
+    df['Year'] = yr_cal
     df.to_csv(os.path.join(path, f'GHG_emissions_separate_no_ag_reduction_{yr_cal}.csv'))
                         
 
@@ -1159,6 +1187,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
     ghg_t_df['Year'] = yr_cal
 
     # Save table to disk
+    ghg_t_df['Year'] = yr_cal
     ghg_t_df.to_csv(os.path.join(path, f'GHG_emissions_separate_transition_penalty_{yr_cal}.csv'))
     
     
@@ -1191,11 +1220,10 @@ def write_ghg_separate(data: Data, yr_cal, path):
 
         # Summarize the df by calculating the total value of each column
         am_dfs.append(am_ghg_df)
-        
-    # Concatenate all the dataframes in the list
-    am_df = pd.concat(am_dfs, axis=0)
-        
+          
     # Save table to disk
+    am_df = pd.concat(am_dfs, axis=0)
+    am_df['Year'] = yr_cal
     am_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_management_{yr_cal}.csv'))
     
     
