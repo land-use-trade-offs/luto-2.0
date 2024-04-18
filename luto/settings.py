@@ -122,7 +122,7 @@ PENALTY = 1e5
 # ---------------------------------------------------------------------------- #
 
 # Write GeoTiffs to output directory: True or False
-WRITE_OUTPUT_GEOTIFFS = False
+WRITE_OUTPUT_GEOTIFFS = True
 
 # If use parallel processing to write GeoTiffs: True or False
 PARALLEL_WRITE = True
@@ -159,42 +159,60 @@ NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect a
 BARHOMOGENOUS = -1  # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 8
+THREADS = 50
 
 
 # ---------------------------------------------------------------------------- #
 # Non-agricultural land usage parameters
 # ---------------------------------------------------------------------------- #
 
-# Price of carbon per tonne - determines revenue from carbon sequestration
-CARBON_PRICE_PER_TONNE = 100                
+# Price of carbon per tonne - determines revenue from carbon sequestration (used when maximising revenue only)
+CARBON_PRICE_PER_TONNE = 100
 
 # Environmental Plantings Parameters
-ENV_PLANTING_COST_PER_HA_PER_YEAR = 100     # Yearly cost of maintaining one hectare of environmental plantings
+ep_annual_maintennance_cost_per_ha_per_year = 100
+ep_annual_ecosystem_services_benefit_per_ha_per_year = 100
+ENV_PLANTING_COST_PER_HA_PER_YEAR = ep_annual_maintennance_cost_per_ha_per_year - ep_annual_ecosystem_services_benefit_per_ha_per_year   # Yearly cost of maintaining one hectare of environmental plantings
 
-# Carbon Plantings Parameters
-CARBON_PLANTING_BLOCK_COST_PER_HA_PER_YEAR = 100  # Yearly cost of maintaining one hectare of carbon plantings (block)
-CARBON_PLANTING_BELT_COST_PER_HA_PER_YEAR = 100   # Yearly cost of maintaining one hectare of carbon plantings (belt)
+ENV_PLANTING_BIODIVERSITY_BENEFIT = 0.8    # Set benefit level of EP, AF, and RP (0 = none, 1 = full)
+
+# Carbon Plantings Block Parameters
+cp_block_annual_maintennance_cost_per_ha_per_year = 100
+cp_block_annual_ecosystem_services_benefit_per_ha_per_year = 0
+CARBON_PLANTING_BLOCK_COST_PER_HA_PER_YEAR = cp_block_annual_maintennance_cost_per_ha_per_year - cp_block_annual_ecosystem_services_benefit_per_ha_per_year   # Yearly cost of maintaining one hectare of carbon plantings (block)
+
+CARBON_PLANTING_BLOCK_BIODIV_BENEFIT = 0
+
+# Carbon Plantings Belt Parameters
+cp_belt_annual_maintennance_cost_per_ha_per_year = 100
+cp_belt_annual_ecosystem_services_benefit_per_ha_per_year = 0
+CARBON_PLANTING_BELT_COST_PER_HA_PER_YEAR = cp_belt_annual_maintennance_cost_per_ha_per_year - cp_belt_annual_ecosystem_services_benefit_per_ha_per_year      # Yearly cost of maintaining one hectare of carbon plantings (belt)
 
 CP_BELT_ROW_WIDTH = 20
 CP_BELT_ROW_SPACING = 40
-CARBON_PLANTINGS_BELT_FENCING_COST_PER_M = 2           # $ per linear metre
+CARBON_PLANTINGS_BELT_FENCING_COST_PER_M = 2               # $ per linear metre
 CP_BELT_PROPORTION = CP_BELT_ROW_WIDTH / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
 cp_no_alleys_per_ha = 100 / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
-CP_BELT_FENCING_LENGTH = 100 * cp_no_alleys_per_ha * 2 # Length of fencing required per ha in metres
+CP_BELT_FENCING_LENGTH = 100 * cp_no_alleys_per_ha * 2     # Length (average) of fencing required per ha in metres
 
-CARBON_PLANTINGS_BIODIV_BENEFIT = 0.1
+CARBON_PLANTING_BELT_BIODIV_BENEFIT = 0
 
 # Riparian Planting Parameters
 rp_annual_maintennance_cost_per_ha_per_year = 100
-rp_annual_ecosystem_services_benefit_per_ha_per_year = 100
+rp_annual_ecosystem_services_benefit_per_ha_per_year = 200
 RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR = rp_annual_maintennance_cost_per_ha_per_year - rp_annual_ecosystem_services_benefit_per_ha_per_year
-RIPARIAN_PLANTINGS_BUFFER_WIDTH = 20
-RIPARIAN_PLANTINGS_FENCING_COST_PER_M = 2           # $ per linear metre
-RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR = 0.5
+
+RIPARIAN_PLANTING_BUFFER_WIDTH = 20
+RIPARIAN_PLANTING_FENCING_COST_PER_M = 2           # $ per linear metre
+RIPARIAN_PLANTING_TORTUOSITY_FACTOR = 0.5
+
+RIPARIAN_PLANTING_BIODIV_BENEFIT = 1.0
 
 # Agroforestry Parameters
-AGROFORESTRY_COST_PER_HA_PER_YEAR = 100
+af_annual_maintennance_cost_per_ha_per_year = 100
+af_annual_ecosystem_services_benefit_per_ha_per_year = 50
+AGROFORESTRY_COST_PER_HA_PER_YEAR = af_annual_maintennance_cost_per_ha_per_year - af_annual_ecosystem_services_benefit_per_ha_per_year
+
 AGROFORESTRY_ROW_WIDTH = 20
 AGROFORESTRY_ROW_SPACING = 40
 AGROFORESTRY_FENCING_COST_PER_M = 5           # $ per linear metre
@@ -205,13 +223,18 @@ AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per h
 NON_AGRICULTURAL_LU_BASE_CODE = 100         # Non-agricultural land uses will appear on the land use map
                                             # offset by this amount (e.g. land use 0 will appear as 100)
 
+AGROFORESTRY_BIODIV_BENEFIT = 0.7
+
 # BECCS Parameters
-BECCS_BIODIVERSITY_BENEFIT = 0.1
+BECCS_BIODIVERSITY_BENEFIT = 0
 
 
 # ---------------------------------------------------------------------------- #
 # Agricultural management parameters
 # ---------------------------------------------------------------------------- #
+
+# Savanna burning cost per hectare per year ($/ha/yr)
+SAVBURN_COST_HA_YR = 20
 
 # The minimum value an agricultural management variable must take for the write_output function to consider it being used on a cell
 AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  
@@ -272,9 +295,6 @@ CONNECTIVITY_WEIGHTING = 1
 
 # Set livestock impact on biodiversity (0 = no impact, 1 = total annihilation)
 BIODIV_LIVESTOCK_IMPACT = 0.5
-
-# Set benefit level of EP, AF, and RP (0 = none, 1 = full)
-REFORESTATION_BIODIVERSITY_BENEFIT = 0.7
 
 # Biodiversity value under default late dry season savanna fire regime
 LDS_BIODIVERSITY_VALUE = 0.8  # For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value.

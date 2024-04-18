@@ -1,27 +1,34 @@
 import numpy as np
 
 from luto.data import Data
-from luto.settings import REFORESTATION_BIODIVERSITY_BENEFIT, CARBON_PLANTINGS_BIODIV_BENEFIT, BECCS_BIODIVERSITY_BENEFIT
+from luto.settings import (
+    ENV_PLANTING_BIODIVERSITY_BENEFIT, 
+    CARBON_PLANTING_BLOCK_BIODIV_BENEFIT, 
+    CARBON_PLANTING_BELT_BIODIV_BENEFIT, 
+    RIPARIAN_PLANTING_BIODIV_BENEFIT,
+    AGROFORESTRY_BIODIV_BENEFIT,
+    BECCS_BIODIVERSITY_BENEFIT,
+    )
 
 
 def get_biodiv_environmental_plantings(data: Data) -> np.ndarray:
-    return data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * REFORESTATION_BIODIVERSITY_BENEFIT
+    return data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * ENV_PLANTING_BIODIVERSITY_BENEFIT
 
 
 def get_biodiv_riparian_plantings(data) -> np.ndarray:
-    return data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * REFORESTATION_BIODIVERSITY_BENEFIT
+    return data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * RIPARIAN_PLANTING_BIODIV_BENEFIT
 
 
 def get_biodiv_agroforestry(data) -> np.ndarray:
-    return data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * REFORESTATION_BIODIVERSITY_BENEFIT
+    return data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * AGROFORESTRY_BIODIV_BENEFIT
 
 
 def get_biodiv_carbon_plantings_block(data) -> np.ndarray:
-    return data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * CARBON_PLANTINGS_BIODIV_BENEFIT
+    return data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * CARBON_PLANTING_BLOCK_BIODIV_BENEFIT
 
 
 def get_biodiv_carbon_plantings_belt(data) -> np.ndarray:
-    return data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * CARBON_PLANTINGS_BIODIV_BENEFIT
+    return data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * CARBON_PLANTING_BELT_BIODIV_BENEFIT
 
 
 def get_biodiv_beccs(data):
