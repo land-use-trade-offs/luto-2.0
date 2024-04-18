@@ -27,21 +27,10 @@ document.addEventListener('DOMContentLoaded', function () {
         "lumap": ['Land-use All']
     }
 
-    let name_formal = {
-        // Agricultural Management
-        'AgTech EI': "Agricultural technology (energy)",
-        'Asparagopsis taxiformis': "Methane reduction (livestock)", 
-        'Ecological Grazing': "Regenerative agriculture (livestock)", 
-        'Precision Agriculture': "Agricultural technology (fertiliser)", 
-        'Savanna Burning':"Early dry-season savanna burning",
-        // Non-Agricultural Strategies
-        'Environmental Plantings':"Environmental plantings (mixed species)",
-        'Riparian Plantings': "Riparian buffer restoration (mixed species)",
-        'Agroforestry': "Agroforestry",
-        'Carbon Plantings (Block)': "Carbon plantings (monoculture)",
-        'Carbon Plantings (Belt)': "Farm forestry (food + timber)",
-        'BECCS': "BECCS (Bioenergy with Carbon Capture and Storage)",
-       }
+    // Get the formal names for the maps
+    let name_formal = document.getElementById('RENAME_AM_NON_AG').innerText;
+    name_formal = name_formal.replace(/'/g, '"');
+    name_formal = JSON.parse(name_formal);
 
 
     // Listen for changes in the lucc dropdown

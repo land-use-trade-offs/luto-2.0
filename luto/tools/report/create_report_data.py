@@ -13,20 +13,21 @@ from luto.tools.report.data_tools import   get_all_files, get_quantity_df
 from luto.tools.report.data_tools.helper_func import select_years
 
 from luto.tools.report.data_tools.colors import LANDUSE_ALL_COLORS, COMMODITIES_ALL_COLORS                                                                             
-from luto.tools.report.data_tools.parameters import (COMMODITIES_OFF_LAND, 
+from luto.tools.report.data_tools.parameters import (AG_LANDUSE, 
+                                                     COMMODITIES_ALL,
+                                                     COMMODITIES_OFF_LAND, 
                                                      GHG_CATEGORY, 
                                                      GHG_NAMES, 
+                                                     LANDUSE_ALL,
                                                      LU_CROPS, 
+                                                     LU_NATURAL,
                                                      LVSTK_MODIFIED, 
                                                      LVSTK_NATURAL, 
-                                                     YR_BASE, 
-                                                     COMMODITIES_ALL,
-                                                     AG_LANDUSE, 
-                                                     LANDUSE_ALL,
-                                                     LU_NATURAL,
-                                                     NON_AG_LANDUSE)
+                                                     NON_AG_LANDUSE, 
+                                                     RENAME_AM_NON_AG)
 
-# Get the output directory
+
+
 def save_report_data(raw_data_dir:str):
     """
     Saves the report data in the specified directory.
@@ -74,7 +75,8 @@ def save_report_data(raw_data_dir:str):
     non_ag_dvar_area['Area (million km2)'] = non_ag_dvar_area['Area (ha)'] / 100 / 1e6
     non_ag_dvar_area['Type'] = 'Non-agricultural landuse'
 
-    area_dvar = pd.concat([ag_dvar_area, non_ag_dvar_area], ignore_index=True) 
+    area_dvar = pd.concat([ag_dvar_area, non_ag_dvar_area], ignore_index=True)
+    area_dvar = area_dvar.replace(RENAME_AM_NON_AG)
 
     # Plot_1-1: Total Area (km2)
     lu_area_dvar = area_dvar.groupby(['Year','Land-use']).sum(numeric_only=True).reset_index()
@@ -127,6 +129,7 @@ def save_report_data(raw_data_dir:str):
     am_dvar_dfs = area_dvar_paths.query('base_name.str.contains("area_agricultural_management")').reset_index(drop=True)
     am_dvar_area = pd.concat([pd.read_csv(path) for path in am_dvar_dfs['path']], ignore_index=True)
     am_dvar_area['Area (million km2)'] = am_dvar_area['Area (ha)'] / 100 / 1e6
+    am_dvar_area = am_dvar_area.replace(RENAME_AM_NON_AG)
 
     am_dvar_area_type = am_dvar_area.groupby(['Year','Type']).sum(numeric_only=True).reset_index()
 
@@ -159,6 +162,7 @@ def save_report_data(raw_data_dir:str):
     transition_path = files.query('category =="transition_matrix"')
     transition_df_area = pd.read_csv(transition_path['path'].values[0], index_col=0).reset_index()
     transition_df_area['Area (km2)'] = transition_df_area['Area (ha)'] / 100   
+    transition_df_area = transition_df_area.replace(RENAME_AM_NON_AG)
 
     # Get the total area of each land use
     transition_mat = transition_df_area.pivot(index='From land-use', columns='To land-use', values='Area (km2)')
@@ -208,6 +212,7 @@ def save_report_data(raw_data_dir:str):
 
     # Reorder the columns to match the order in COMMODITIES_ALL
     DEMAND_DATA_long = DEMAND_DATA_long.reindex(COMMODITIES_ALL, level=1).reset_index()
+    DEMAND_DATA_long = DEMAND_DATA_long.replace(RENAME_AM_NON_AG)
 
     # Add columns for on-land and off-land commodities
     DEMAND_DATA_long['on_off_land'] = DEMAND_DATA_long['COMMODITY'].apply(
@@ -217,7 +222,7 @@ def save_report_data(raw_data_dir:str):
     DEMAND_DATA_long['Quantity (tonnes, ML)'] = DEMAND_DATA_long['Quantity (tonnes, ML)'] / 1e6
     DEMAND_DATA_long = DEMAND_DATA_long.query('Year.isin(@years)')
     DEMAND_DATA_long.loc[:,'COMMODITY'] = DEMAND_DATA_long['COMMODITY'].str.replace('Beef lexp','Beef live export')
-    DEMAND_DATA_long_filter_year = DEMAND_DATA_long.query('Year.isin(@years_select)')
+    DEMAND_DATA_long_filter_year = DEMAND_DATA_long.query(f'Year.isin({years_select})')
 
     # Plot_2_1: {Total} for 'Domestic', 'Exports', 'Feed', 'Imports', 'Production'(Tonnes) 
     DEMAND_DATA_type = DEMAND_DATA_long_filter_year.groupby(['Year','Type']).sum(numeric_only=True).reset_index()
@@ -371,38 +376,47 @@ def save_report_data(raw_data_dir:str):
     revenue_ag_df = files.query('category == "revenue" and base_name == "revenue_agricultural_commodity" and year_types != "begin_end_year"').reset_index(drop=True)
     revenue_ag_df = pd.concat([pd.read_csv(path) for path in revenue_ag_df['path']], ignore_index=True)
     revenue_ag_df['Value (billion)'] = revenue_ag_df['Value ($)'] / 1e9
+    revenue_ag_df = revenue_ag_df.replace(RENAME_AM_NON_AG)
     
     revenue_am_df = files.query('category == "revenue" and base_name == "revenue_agricultural_management" and year_types != "begin_end_year"').reset_index(drop=True)
     revenue_am_df = pd.concat([pd.read_csv(path) for path in revenue_am_df['path']], ignore_index=True)
     revenue_am_df['Value (billion)'] = revenue_am_df['Value ($)'] / 1e9
+    revenue_am_df = revenue_am_df.replace(RENAME_AM_NON_AG)
     
     revenue_non_ag_df = files.query('category == "revenue" and base_name == "revenue_non_ag" and year_types != "begin_end_year"').reset_index(drop=True)
     revenue_non_ag_df = pd.concat([pd.read_csv(path) for path in revenue_non_ag_df['path']], ignore_index=True)
     revenue_non_ag_df['Value (billion)'] = revenue_non_ag_df['Value ($)'] / 1e9
+    revenue_non_ag_df = revenue_non_ag_df.replace(RENAME_AM_NON_AG)
     
     cost_ag_df = files.query('category == "cost" and base_name == "cost_agricultural_commodity" and year_types != "begin_end_year"').reset_index(drop=True)
     cost_ag_df = pd.concat([pd.read_csv(path) for path in cost_ag_df['path']], ignore_index=True)
     cost_ag_df['Value (billion)'] = cost_ag_df['Value ($)'] * -1 / 1e9
+    cost_ag_df = cost_ag_df.replace(RENAME_AM_NON_AG)
 
     cost_am_df = files.query('category == "cost" and base_name == "cost_agricultural_management" and year_types != "begin_end_year"').reset_index(drop=True)
     cost_am_df = pd.concat([pd.read_csv(path) for path in cost_am_df['path']], ignore_index=True)
     cost_am_df['Value (billion)'] = cost_am_df['Value ($)'] * -1 / 1e9
+    cost_am_df = cost_am_df.replace(RENAME_AM_NON_AG)
     
     cost_non_ag_df = files.query('category == "cost" and base_name == "cost_non_ag" and year_types != "begin_end_year"').reset_index(drop=True)
     cost_non_ag_df = pd.concat([pd.read_csv(path) for path in cost_non_ag_df['path']], ignore_index=True)
     cost_non_ag_df['Value (billion)'] = cost_non_ag_df['Value ($)'] * -1 / 1e9
+    cost_non_ag_df = cost_non_ag_df.replace(RENAME_AM_NON_AG)
     
     cost_transition_ag2ag_df = files.query('category == "cost" and base_name == "cost_transition_ag2ag" and year_types != "begin_end_year"').reset_index(drop=True)
     cost_transition_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2ag_df['path']], ignore_index=True)
     cost_transition_ag2ag_df['Value (billion)'] = cost_transition_ag2ag_df['Cost ($)'] * -1 / 1e9
+    cost_transition_ag2ag_df = cost_transition_ag2ag_df.replace(RENAME_AM_NON_AG)
     
     cost_transition_ag2non_ag_df = files.query('category == "cost" and base_name == "cost_transition_ag2non_ag" and year_types != "begin_end_year"').reset_index(drop=True)
     cost_transition_ag2non_ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2non_ag_df['path']], ignore_index=True)
     cost_transition_ag2non_ag_df['Value (billion)'] = cost_transition_ag2non_ag_df['Cost ($)'] * -1 / 1e9
+    cost_transition_ag2non_ag_df = cost_transition_ag2non_ag_df.replace(RENAME_AM_NON_AG)
     
     cost_transition_non_ag2ag_df = files.query('base_name == "cost_transition_non_ag2_ag" and year_types != "begin_end_year"')
     cost_transition_non_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_non_ag2ag_df['path']], ignore_index=True)
     cost_transition_non_ag2ag_df['Value (billion)'] = cost_transition_non_ag2ag_df['Cost ($)'] * -1 / 1e9
+    cost_transition_non_ag2ag_df = cost_transition_non_ag2ag_df.replace(RENAME_AM_NON_AG)
     
 
     # Plot_3-1: Revenue and Cost data for all types (Billion $)
@@ -726,6 +740,7 @@ def save_report_data(raw_data_dir:str):
     GHG_files_onland = pd.concat([pd.read_csv(path) for path in GHG_files_onland['path']], ignore_index=True)
     GHG_files_onland['CO2_type'] = GHG_files_onland['CO2_type'].replace(GHG_NAMES)
     GHG_files_onland['Value (Mt CO2e)'] = GHG_files_onland['Value (t CO2e)'] / 1e6
+    GHG_files_onland = GHG_files_onland.replace(RENAME_AM_NON_AG)
     
     def get_landuse_type(x):
         if x in LU_CROPS:
@@ -1062,6 +1077,7 @@ def save_report_data(raw_data_dir:str):
     
     water_df_separate = files.query('category == "water" and year_types == "single_year" and base_name.str.contains("separate")').reset_index(drop=True)
     water_df_separate = pd.concat([pd.read_csv(path) for path in water_df_separate['path']], ignore_index=True)
+    water_df_separate = water_df_separate.replace(RENAME_AM_NON_AG)
     
 
     # Plot_5-1: Water use compared to limite (%)
@@ -1145,6 +1161,7 @@ def save_report_data(raw_data_dir:str):
     bio_paths = files.query('category == "biodiversity" and year_types == "single_year" and base_name == "biodiversity_separate"').reset_index(drop=True)
     bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
     bio_df['Biodiversity score (million)'] = bio_df['Biodiversity score'] / 1e6
+    bio_df = bio_df.replace(RENAME_AM_NON_AG)
 
     # Filter out landuse that are reated to biodiversity
     bio_lucc = LU_NATURAL + NON_AG_LANDUSE

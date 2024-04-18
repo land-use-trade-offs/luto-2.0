@@ -99,7 +99,7 @@ NEW_IRRIG_COST = 7500
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 10         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
+RESFACTOR = 5         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
 
 # How does the model run over time 
 MODE = 'timeseries'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
@@ -122,13 +122,13 @@ PENALTY = 1e5
 # ---------------------------------------------------------------------------- #
 
 # Write GeoTiffs to output directory: True or False
-WRITE_OUTPUT_GEOTIFFS = True
+WRITE_OUTPUT_GEOTIFFS = False
 
 # If use parallel processing to write GeoTiffs: True or False
 PARALLEL_WRITE = True
 
 # The Threads to use for writing GeoTiffs, and map making
-WRITE_THREADS = 40      # Works only if PARALLEL_WRITE = True
+WRITE_THREADS = 100      # Works only if PARALLEL_WRITE = True
 
 
 # ---------------------------------------------------------------------------- #
@@ -136,7 +136,7 @@ WRITE_THREADS = 40      # Works only if PARALLEL_WRITE = True
 # ---------------------------------------------------------------------------- #
 
 # Select Gurobi algorithm used to solve continuous models or the initial root relaxation of a MIP model. Default is automatic. 
-SOLVE_METHOD = 2  # 'automatic: -1, primal simplex: 0, dual simplex: 1, barrier: 2, concurrent: 3, deterministic concurrent: 4, deterministic concurrent simplex: 5
+SOLVE_METHOD = 2  # 'automatic: -1, primal simplex: 0, dual simplex: 0, barrier: 2, concurrent: 3, deterministic concurrent: 4, deterministic concurrent simplex: 5
 
 # Presolve parameters (switching both to 0 solves numerical problems)
 PRESOLVE = 0     # automatic (-1), off (0), conservative (1), or aggressive (2)

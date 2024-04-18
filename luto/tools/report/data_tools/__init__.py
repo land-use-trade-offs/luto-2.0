@@ -3,7 +3,6 @@ import re
 import pandas as pd
 
 from luto.tools.report.data_tools.parameters import YR_BASE
-from luto.tools.report.data_tools.helper_func import merge_LVSTK_UAALLOW
 
 # Set up working directory to the root of the report folder
 if __name__ == '__main__':

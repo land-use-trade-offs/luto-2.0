@@ -754,7 +754,7 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         assert yr_cal_sim_pre >= data.YR_CAL_BASE and yr_cal_sim_pre < yr_cal,\
             f"yr_cal_sim_pre ({yr_cal_sim_pre}) must be >= {data.YR_CAL_BASE} and < {yr_cal}"
 
-        print('Writing production outputs')
+        print(f'Writing production outputs for {yr_cal}')
 
         # LUS = ['Non-agricultural land'] + data.AGRICULTURAL_LANDUSES + data.NON_AGRICULTURAL_LANDUSES
         ctlu, swlu = lumap_crossmap( data.lumaps[yr_cal_sim_pre]

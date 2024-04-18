@@ -100,16 +100,16 @@ def crossmap_irrstat( lumap_old
                     , real_area):
 
     ludict = {-2: 'Non-agricultural land (dry)',
-              -1: 'Non-agricultural land (irr)'}
-    
+            -1: 'Non-agricultural land (irr)'}
+
     for j, lu in enumerate(ag_landuses):
-        ludict[j*2] = lu + ' (dry)'
-        ludict[j*2 + 1] = lu + ' (irr)'
+        ludict[j*2] = f'{lu} (dry)'
+        ludict[j*2 + 1] = f'{lu} (irr)'
 
     base = settings.NON_AGRICULTURAL_LU_BASE_CODE
     for k, lu in enumerate(non_ag_landuses):
-        ludict[(k + base)*2] = lu + ' (dry)'
-        ludict[(k + base)*2 + 1] = lu + ' (irr)'
+        ludict[(k + base)*2] = f'{lu} (dry)'
+        ludict[(k + base)*2 + 1] = f'{lu} (irr)'
 
     # Expand the value range to avoid mem-spill-out
     lumap_old, lmmap_old , lumap_new , lmmap_new = (i.astype(np.int16) for i in  [lumap_old, lmmap_old , lumap_new , lmmap_new])
@@ -119,10 +119,10 @@ def crossmap_irrstat( lumap_old
 
     # Produce the cross-tabulation matrix with labels.
     crosstab = pd.crosstab(highpos_old,         
-                           highpos_new,        
-                           values = real_area,        
-                           aggfunc = lambda x:x.sum()/100, # {sum/100} -> convert {ha} to {km2}        
-                           margins=False)
+                            highpos_new,        
+                            values = real_area,        
+                            aggfunc = lambda x:x.sum()/100, # {sum/100} -> convert {ha} to {km2}        
+                            margins=False)
 
     # Make sure the cross-tabulation matrix is square.
     crosstab = crosstab.rename(index=ludict,columns=ludict)
@@ -144,12 +144,12 @@ def crossmap_irrstat( lumap_old
     df['Switches [ km2 ]'] = switches
     df['Switches [ % ]'] = 100 * switches / area_km2_prior
     df.loc['Total'] = area_km2_prior.sum(), area_km2_after.sum(), nswitches, pswitches
-    
+
     # Rearrange crosstab to long format
     crosstab = crosstab.stack().reset_index().rename(columns={0: 'Area (km2)'})
-    crosstab[['From land-use','From water_supply']] = crosstab['level_0'].str.split(' \(', expand=True)
-    crosstab[['To land-use', 'To water_supply']] = crosstab['level_1'].str.split(' \(', expand=True)
-    crosstab = crosstab.replace('irr)', 'Irrigated').replace('dry)', 'Dryland').drop(['level_0','level_1'], axis=1)
+    crosstab[['From land-use','From water_supply','tmp' ]] = crosstab['level_0'].str.split('\((dry|irr)', expand=True)
+    crosstab[['To land-use', 'To water_supply', 'tmp']] = crosstab['level_1'].str.split('\((dry|irr)', expand=True)
+    crosstab = crosstab.replace('irr', 'Irrigated').replace('dry', 'Dryland').drop(['level_0','level_1', 'tmp' ], axis=1)
 
     return crosstab, df
 
