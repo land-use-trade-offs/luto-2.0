@@ -99,10 +99,10 @@ NEW_IRRIG_COST = 7500
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 7         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
+RESFACTOR = 10         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
 
 # How does the model run over time 
-MODE = 'snapshot'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
+MODE = 'timeseries'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****
@@ -210,12 +210,12 @@ RIPARIAN_PLANTING_BIODIV_BENEFIT = 1.0
 
 # Agroforestry Parameters
 af_annual_maintennance_cost_per_ha_per_year = 100
-af_annual_ecosystem_services_benefit_per_ha_per_year = 50
+af_annual_ecosystem_services_benefit_per_ha_per_year = 80
 AGROFORESTRY_COST_PER_HA_PER_YEAR = af_annual_maintennance_cost_per_ha_per_year - af_annual_ecosystem_services_benefit_per_ha_per_year
 
 AGROFORESTRY_ROW_WIDTH = 20
 AGROFORESTRY_ROW_SPACING = 40
-AGROFORESTRY_FENCING_COST_PER_M = 5           # $ per linear metre
+AGROFORESTRY_FENCING_COST_PER_M = 2           # $ per linear metre
 AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
 no_belts_per_ha = 100 / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
 AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per ha in metres
