@@ -25,7 +25,7 @@ import numpy as np
 import pandas as pd
 
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.ag_managements import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data, lvs_veg_types
 from luto.economics.agricultural.quantity import get_yield_pot, get_quantity
 
@@ -253,6 +253,9 @@ def get_asparagopsis_effect_c_mrj(data: Data, yr_idx):
     # Set up the effects matrix
     new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
+    if not AG_MANAGEMENTS['Asparagopsis taxiformis']:
+        return new_c_mrj
+
     # Update values in the new matrix
     for lm in data.LANDMANS:
         m = 0 if lm == 'dry' else 1
@@ -285,6 +288,9 @@ def get_precision_agriculture_effect_c_mrj(data: Data, yr_idx):
     # Set up the effects matrix
     new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
+    if not AG_MANAGEMENTS['Precision Agriculture']:
+        return new_c_mrj
+
     for m in range(data.NLMS):
         for lu_idx, lu in enumerate(land_uses):
             cost_per_ha = data.PRECISION_AGRICULTURE_DATA[lu].loc[yr_cal, 'AnnCost_per_Ha']
@@ -311,6 +317,9 @@ def get_ecological_grazing_effect_c_mrj(data: Data, yr_idx):
 
     # Set up the effects matrix
     new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+    
+    if not AG_MANAGEMENTS['Ecological Grazing']:
+        return new_c_mrj
 
     for lu_idx, lu in enumerate(land_uses):
         lvstype, _ = lvs_veg_types(lu)
@@ -345,6 +354,10 @@ def get_savanna_burning_effect_c_mrj(data: Data):
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
     new_c_mrj = np.zeros((data.NLMS, data.NCELLS, nlus))
+
+    if not AG_MANAGEMENTS['Savanna Burning']:
+        return new_c_mrj
+
     sav_burning_effect = data.SAVBURN_COST_HA * data.REAL_AREA
 
     big_number = 99999999
@@ -377,6 +390,9 @@ def get_agtech_ei_effect_c_mrj(data: Data, yr_idx):
 
     # Set up the effects matrix
     new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    if not AG_MANAGEMENTS['AgTech EI']:
+        return new_c_mrj
 
     for m in range(data.NLMS):
         for lu_idx, lu in enumerate(land_uses):

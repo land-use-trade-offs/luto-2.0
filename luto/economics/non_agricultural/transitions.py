@@ -600,7 +600,14 @@ def get_exclude_matrices(data: Data, lumap) -> np.ndarray:
 
     Returns
     -------
-    2-D array, indexed by (r, k) where r is cell and k is non-agricultural land usage.
+    np.ndarray
+        A 2-D array indexed by (r, k) where r is the cell and k is the non-agricultural land usage.
+
+    Notes
+    -----
+    This function calculates the non-agricultural exclusions matrix by combining several exclusion matrices
+    related to different non-agricultural land uses. The resulting matrix is a concatenation of these matrices
+    along the k indexing.
     """
 
     non_ag_x_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}

@@ -5,7 +5,7 @@ import numpy as np
 
 from luto import settings
 from luto.economics import land_use_culling
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.ag_managements import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data
 
 import luto.economics.agricultural.cost as ag_cost
@@ -99,6 +99,7 @@ class SolverInputData:
         return {
             am: [self.desc2aglu[lu] for lu in am_lus]
             for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items()
+            if AG_MANAGEMENTS[am]
         }
 
     @cached_property

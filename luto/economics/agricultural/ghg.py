@@ -26,7 +26,7 @@ import pandas as pd
 from luto.data import Data, lvs_veg_types
 from luto.economics.agricultural.quantity import get_yield_pot
 import luto.tools as tools
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.ag_managements import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 
 
 def get_ghg_crop(data: Data, lu, lm, yr_idx, aggregate):
@@ -305,6 +305,9 @@ def get_asparagopsis_effect_g_mrj(data, yr_idx):
     # Set up the effects matrix
     new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
+    if not AG_MANAGEMENTS['Asparagopsis taxiformis']:
+        return new_g_mrj
+
     # Update values in the new matrix, taking into account the CH4 reduction of asparagopsis
     for lu_idx, lu in enumerate(land_uses):
         ch4_reduction_perc = 1 - data.ASPARAGOPSIS_DATA[lu].loc[yr_cal, "CO2E_KG_HEAD_ENTERIC"]
@@ -347,6 +350,9 @@ def get_precision_agriculture_effect_g_mrj(data: Data, yr_idx):
 
     # Set up the effects matrix
     new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    if not AG_MANAGEMENTS['Precision Agriculture']:
+        return new_g_mrj
 
     # Update values in the new matrix
     for lu_idx, lu in enumerate(land_uses):
@@ -400,6 +406,9 @@ def get_ecological_grazing_effect_g_mrj(data: Data, yr_idx):
     # Set up the effects matrix
     new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
+    if not AG_MANAGEMENTS['Ecological Grazing']:
+        return new_g_mrj
+
     # Update values in the new matrix
     for lu_idx, lu in enumerate(land_uses):
         lu_data = data.ECOLOGICAL_GRAZING_DATA[lu]
@@ -449,6 +458,9 @@ def get_savanna_burning_effect_g_mrj(data, g_mrj):
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
     sb_g_mrj = np.zeros((data.NLMS, data.NCELLS, nlus))
 
+    if not AG_MANAGEMENTS['Savanna Burning']:
+        return sb_g_mrj
+
     for m, j in itertools.product(range(data.NLMS), range(nlus)):
         sb_g_mrj[m, :, j] = -data.SAVBURN_TOTAL_TCO2E_HA * data.REAL_AREA
 
@@ -472,6 +484,9 @@ def get_agtech_ei_effect_g_mrj(data, yr_idx):
 
     # Set up the effects matrix
     new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    if not AG_MANAGEMENTS['AgTech EI']:
+        return new_g_mrj
 
     # Update values in the new matrix
     for lu_idx, lu in enumerate(land_uses):
