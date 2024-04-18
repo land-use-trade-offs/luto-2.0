@@ -54,13 +54,14 @@ from luto.settings import (
     GHG_LIMITS_TYPE,
     GHG_LIMITS,
     GHG_LIMITS_FIELD,
-    RIPARIAN_PLANTINGS_BUFFER_WIDTH,
-    RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR,
+    RIPARIAN_PLANTING_BUFFER_WIDTH,
+    RIPARIAN_PLANTING_TORTUOSITY_FACTOR,
     BIODIV_LIVESTOCK_IMPACT,
     LDS_BIODIVERSITY_VALUE,
     OFF_LAND_COMMODITIES,
     EGGS_AVG_WEIGHT,
     NON_AGRICULTURAL_LU_BASE_CODE,
+    SAVBURN_COST_HA_YR,
 )
 
 
@@ -561,12 +562,12 @@ class Data:
 
         # Calculate the proportion of the area of each cell within stream buffer (convert REAL_AREA from ha to m2 and divide m2 by m2)
         self.RP_PROPORTION = (
-            (2 * RIPARIAN_PLANTINGS_BUFFER_WIDTH * self.STREAM_LENGTH) / (self.REAL_AREA * 10000)
+            (2 * RIPARIAN_PLANTING_BUFFER_WIDTH * self.STREAM_LENGTH) / (self.REAL_AREA * 10000)
         ).astype(np.float32)
 
         # Calculate the length of fencing required for each cell in per hectare terms for riparian plantings
         self.RP_FENCING_LENGTH = (
-            (2 * RIPARIAN_PLANTINGS_TORTUOSITY_FACTOR * self.STREAM_LENGTH) / self.REAL_AREA
+            (2 * RIPARIAN_PLANTING_TORTUOSITY_FACTOR * self.STREAM_LENGTH) / self.REAL_AREA
         ).astype(np.float32)
         print("Done.")
 
@@ -857,8 +858,8 @@ class Data:
         self.SAVBURN_SEQ_CO2_TCO2E_HA = savburn_df.SAV_SEQ_CO2_TCO2E_HA.to_numpy()    # Additional carbon sequestration - carbon dioxide
         self.SAVBURN_TOTAL_TCO2E_HA = savburn_df.AEA_TOTAL_TCO2E_HA.to_numpy()        # Total emissions abatement from EDS savanna burning
 
-        # Cost per hectare in dollars
-        self.SAVBURN_COST_HA = 2
+        # Cost per hectare in dollars from settings
+        self.SAVBURN_COST_HA = SAVBURN_COST_HA_YR
         print("Done.")
 
         ###############################################################
