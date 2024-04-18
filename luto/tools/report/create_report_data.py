@@ -11,17 +11,10 @@ from glob import glob
 from joblib import Parallel, delayed
 
 from luto.economics.off_land_commodity import get_demand_df
-from luto.tools.report.data_tools.colors import LANDUSE_ALL_COLORS, COMMODITIES_ALL_COLORS
-
-
-# import functions
-from luto.tools.report.data_tools import   get_all_files, get_quantity_df
-
-              
+from luto.tools.report.data_tools import   get_all_files, get_quantity_df        
 from luto.tools.report.data_tools.helper_func import select_years
-                              
 
-                                                     
+from luto.tools.report.data_tools.colors import LANDUSE_ALL_COLORS, COMMODITIES_ALL_COLORS                                                                             
 from luto.tools.report.data_tools.parameters import (COMMODITIES_OFF_LAND, 
                                                      GHG_CATEGORY, 
                                                      GHG_NAMES, 
