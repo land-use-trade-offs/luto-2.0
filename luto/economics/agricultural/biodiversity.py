@@ -55,7 +55,7 @@ def get_breq_matrices(data):
     livestock_nat_land_lus = get_livestock_natural_land_land_uses(data)
 
     for j in biodiv_non_penalty_lus:
-        b_mrj[:, :, j] = data.BIODIV_SCORE_RAW * data.REAL_AREA
+        b_mrj[:, :, j] = data.BIODIV_SCORE_WEIGHTED_LDS_BURNING * data.REAL_AREA
 
     # if settings.BIODIV_LIVESTOCK_IMPACT > 0:
     for j in livestock_nat_land_lus:

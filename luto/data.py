@@ -881,7 +881,7 @@ class Data:
 
         # Calculate weighted biodiversity score
         self.BIODIV_SCORE_WEIGHTED = self.BIODIV_SCORE_RAW - (self.BIODIV_SCORE_RAW * (1 - conn_score) * CONNECTIVITY_WEIGHTING)
-        self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = self.BIODIV_SCORE_WEIGHTED * LDS_BIODIVERSITY_VALUE
+        self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = self.BIODIV_SCORE_WEIGHTED * np.where(self.SAVBURN_ELIGIBLE, LDS_BIODIVERSITY_VALUE, 1)
 
         # Calculate total biodiversity target score as the quality-weighted sum of biodiv raw score over the study area 
         biodiv_value_current = ( np.isin(self.LUMAP, 23) * self.BIODIV_SCORE_RAW +                                         # Biodiversity value of Unallocated - natural land 
