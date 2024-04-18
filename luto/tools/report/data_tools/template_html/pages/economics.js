@@ -51,7 +51,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_0_rev_cost_all_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -96,13 +96,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
-      x: 19,
-      y: 200,
-      itemStyle: {
-        fontSize: '11px'
-      }
+      x: -100,
+      verticalAlign: "middle",
     },
 
     exporting: {
@@ -116,7 +113,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_1_ag_revenue_3_Water_supply_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -143,10 +140,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
-      x: -50,
-      y: 300,
+      x: -150,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -173,7 +170,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_1_ag_revenue_1_Land-use_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -200,10 +197,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
-      x: 10,
-      y: 20,
+      x: -100,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -230,7 +227,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_1_ag_revenue_2_Type_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -257,10 +254,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
-      x: -50,
-      y: 280,
+      x: -150,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -287,7 +284,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_2_ag_cost_3_Water_supply_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -313,10 +310,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
-      x: -50,
-      y: 250,
+      x: -150,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -342,7 +339,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_2_ag_cost_1_Land-use_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -368,10 +365,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
-      x: 10,
-      y: 10,
+      x: -100,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -398,7 +395,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_2_ag_cost_2_Type_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -424,10 +421,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
-      x: -50,
-      y: 250,
+      x: -150,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -455,7 +452,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_4_am_revenue_1_Land-use_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -481,10 +478,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
-      x: 0,
-      y: 30,
+      x: -100,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -511,7 +508,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_4_am_revenue_2_Management Type_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -537,10 +534,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
       x: 0,
-      y: 250,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -566,7 +563,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_4_am_revenue_3_Water_supply_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -592,10 +589,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
-      x: -100,
-      y: 280,
+      x: -180,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -622,7 +619,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_5_am_cost_1_Land-use_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -648,10 +645,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
-      x: 0,
-      y: 30,
+      x: -100,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -678,7 +675,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_5_am_cost_2_Management Type_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -704,10 +701,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
       x: 0,
-      y: 250,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -734,7 +731,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_5_am_cost_3_Water_supply_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -760,10 +757,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
-      x: -50,
-      y: 280,
+      x: -180,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -790,7 +787,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_6_non_ag_revenue_1_Land-use_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -816,10 +813,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "right",
+      verticalalign: "left",
       layout: "vertical",
       x: 0,
-      y: 250,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -844,7 +841,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_7_non_ag_cost_1_Land-use_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -870,10 +867,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
       x: 0,
-      y: 250,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -898,7 +895,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_8_transition_ag2ag_cost_1_From land-use_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -924,10 +921,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
-      x: 0,
-      y: 10,
+      x: -100,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -951,7 +948,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_8_transition_ag2ag_cost_2_To land-use_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -977,10 +974,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
-      x: 0,
-      y: 10,
+      x: -100,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -1039,7 +1036,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("economics_8_transition_ag2ag_cost_5_transition_matrix", {
       chart: {
         type: "heatmap",
-        marginRight: 200,
+        marginRight: 380,
         inverted: true,
       },
 
@@ -1104,10 +1101,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
       legend: {
         align: "right",
-        verticalAlign: "left",
+        verticalalign: "left",
         layout: "vertical",
-        x: -50,
-        y: 130,
+        x: -180,
+        verticalAlign: "middle",
       },
 
       exporting: {
@@ -1124,7 +1121,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_8_transition_ag2ag_cost_3_Type_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -1150,10 +1147,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
-      x: 0,
-      y: 280,
+      x: -150,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -1177,7 +1174,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_8_transition_ag2ag_cost_4_Water Supply_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -1203,10 +1200,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
-      x: -50,
-      y: 280,
+      x: -180,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -1265,7 +1262,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("economics_9_transition_ag2non_cost_5_transition_matrix", {
       chart: {
         type: "heatmap",
-        marginRight: 200,
+        marginRight: 380,
         inverted: true,
       },
 
@@ -1329,10 +1326,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
       legend: {
         align: "right",
-        verticalAlign: "left",
+        verticalalign: "left",
         layout: "vertical",
-        x: -50,
-        y: 130,
+        x: -180,
+        verticalAlign: "middle",
       },
 
       exporting: {
@@ -1347,7 +1344,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_9_transition_ag2non_cost_1_Cost type_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -1373,10 +1370,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
-      x: 0,
-      y: 250,
+      x: -150,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -1401,7 +1398,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_9_transition_ag2non_cost_2_From land-use_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -1427,10 +1424,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
-      x: 10,
-      y: 10,
+      x: -100,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -1455,7 +1452,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_9_transition_ag2non_cost_3_To land-use_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -1481,10 +1478,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
-      x: 10,
-      y: 250,
+      x: 0,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -1510,7 +1507,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("economics_9_transition_ag2non_cost_4_Water supply_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -1536,10 +1533,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "left",
+      verticalalign: "left",
       layout: "vertical",
-      x: -30,
-      y: 250,
+      x: -180,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -1564,7 +1561,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // Highcharts.chart("economics_10_transition_non_ag2ag_cost_1_Cost type_wide", {
   //   chart: {
   //     type: "column",
-  //     marginRight: 200,
+  //     marginRight: 380,
   //   },
 
   //   title: {
@@ -1590,10 +1587,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   //   legend: {
   //     align: "right",
-  //     verticalAlign: "left",
+  //     verticalalign: "left",
   //     layout: "vertical",
-  //     x: -50,
-  //     y: 280,
+  //     x: 0,
+  //     verticalAlign: "middle",
   //   },
 
   //   tooltip: {
@@ -1618,7 +1615,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // Highcharts.chart("economics_10_transition_non_ag2ag_cost_2_From land-use_wide", {
   //   chart: {
   //     type: "column",
-  //     marginRight: 200,
+  //     marginRight: 380,
   //   },
 
   //   title: {
@@ -1644,10 +1641,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   //   legend: {
   //     align: "right",
-  //     verticalAlign: "left",
+  //     verticalalign: "left",
   //     layout: "vertical",
-  //     x: -50,
-  //     y: 280,
+  //     x: 0,
+  //     verticalAlign: "middle",
   //   },
 
   //   tooltip: {
@@ -1672,7 +1669,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // Highcharts.chart("economics_10_transition_non_ag2ag_cost_3_To land-use_wide", {
   //   chart: {
   //     type: "column",
-  //     marginRight: 200,
+  //     marginRight: 380,
   //   },
 
   //   title: {
@@ -1698,10 +1695,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   //   legend: {
   //     align: "right",
-  //     verticalAlign: "left",
+  //     verticalalign: "left",
   //     layout: "vertical",
-  //     x: -50,
-  //     y: 280,
+  //     x: 0,
+  //     verticalAlign: "middle",
   //   },
 
   //   tooltip: {
@@ -1726,7 +1723,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // Highcharts.chart("economics_10_transition_non_ag2ag_cost_4_Water supply_wide", {
   //   chart: {
   //     type: "column",
-  //     marginRight: 200,
+  //     marginRight: 380,
   //   },
 
   //   title: {
@@ -1752,10 +1749,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   //   legend: {
   //     align: "right",
-  //     verticalAlign: "left",
+  //     verticalalign: "left",
   //     layout: "vertical",
-  //     x: -50,
-  //     y: 280,
+  //     x: 0,
+  //     verticalAlign: "middle",
   //   },
 
   //   tooltip: {

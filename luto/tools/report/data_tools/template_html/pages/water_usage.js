@@ -28,7 +28,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("water_1_percent_to_limit", {
     chart: {
       type: "spline",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -52,15 +52,10 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     legend: {
-      itemStyle: {
-        fontSize: "11px",
-        textOverflow: "ellipsis",
-      },
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: 5,
-      y: 180,
+      x: -80,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -80,7 +75,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("water_2_volume_to_limit", {
     chart: {
       type: "spline",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -101,15 +96,10 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     legend: {
-      itemStyle: {
-        fontSize: "10px",
-        textOverflow: "ellipsis",
-      },
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: -10,
-      y: 180,
+      x: -80,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -129,7 +119,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("water_3_volume_by_sector", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -152,10 +142,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: 10,
-      y: 250,
+      x: -150,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -184,7 +173,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("water_4_volume_by_landuse", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -209,14 +198,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       itemStyle: {
-        fontSize: "13px",
-        textOverflow: "ellipsis",
+        fontSize: "11px",
       },
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: 5,
-      y: -15,
+      x: 0,
+      y: -30,
+      verticalAlign: "middle",
       itemMarginTop: 0,
       itemMarginBottom: 1,
     },
@@ -247,7 +235,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("water_5_volume_by_Water_supply", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -272,10 +260,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: -50,
-      y: 280,
+      x: -180,
+      verticalAlign: "middle",
     },
 
     tooltip: {

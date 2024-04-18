@@ -136,7 +136,7 @@ WRITE_THREADS = 40      # Works only if PARALLEL_WRITE = True
 # ---------------------------------------------------------------------------- #
 
 # Select Gurobi algorithm used to solve continuous models or the initial root relaxation of a MIP model. Default is automatic. 
-SOLVE_METHOD = 2  # 'automatic: -1, primal simplex: 0, dual simplex: 1, barrier: 2, concurrent: 3, deterministic concurrent: 4, deterministic concurrent simplex: 5
+SOLVE_METHOD = 2  # 'automatic: -1, primal simplex: 0, dual simplex: 0, barrier: 2, concurrent: 3, deterministic concurrent: 4, deterministic concurrent simplex: 5
 
 # Presolve parameters (switching both to 0 solves numerical problems)
 PRESOLVE = 0     # automatic (-1), off (0), conservative (1), or aggressive (2)

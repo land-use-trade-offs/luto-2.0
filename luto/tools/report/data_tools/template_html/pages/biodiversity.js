@@ -29,7 +29,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("biodiversity_1_total_score_by_category", {
         chart: {
             type: "column",
-            marginRight: 200,
+            marginRight: 380,
         },
         title: {
             text: "Total Biodiversity Score by Land-use/Management",
@@ -60,10 +60,10 @@ document.addEventListener("DOMContentLoaded", function () {
         },
         legend: {
             align: "right",
-            verticalAlign: "left",
+            verticalalign: "left",
             layout: "vertical",
-            x: 0,
-            y: 250,
+            x: -150,
+            verticalAlign: "middle",
         },
         credits: {
             enabled: false,
@@ -74,7 +74,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("biodiversity_3_total_score_by_landuse", {
         chart: {
             type: "column",
-            marginRight: 200,
+            marginRight: 380,
         },
         title: {
             text: "Total Biodiversity Score by Land-use",
@@ -105,10 +105,10 @@ document.addEventListener("DOMContentLoaded", function () {
         },
         legend: {
             align: "right",
-            verticalAlign: "left",
+            verticalalign: "left",
             layout: "vertical",
-            x: 10,
-            y: 250,
+            x: 0,
+            verticalAlign: "middle",
             itemStyle: {
                 // "fontSize": "11.5px",
             },
@@ -122,7 +122,7 @@ document.addEventListener("DOMContentLoaded", function () {
     Highcharts.chart("biodiversity_4_natural_land_area", {
         chart: {
             type: "column",
-            marginRight: 200,
+            marginRight: 380,
         },
         title: {
             text: "Land-Use Area (Natural land & Non-Agricultural land)",
@@ -151,10 +151,10 @@ document.addEventListener("DOMContentLoaded", function () {
         },
         legend: {
             align: "right",
-            verticalAlign: "left",
+            verticalalign: "left",
             layout: "vertical",
             x: 0,
-            y: 250,
+            verticalAlign: "middle",
         },
         credits: {
             enabled: false,
