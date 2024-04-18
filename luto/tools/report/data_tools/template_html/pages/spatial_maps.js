@@ -2,12 +2,12 @@
 document.addEventListener('DOMContentLoaded', function () {
 
     // Load the default values
-    var lucc = '';
-    var map_name = '';
-    var year = '';
-    var names = [];
-    var file_name = '';
-    var map_idx = '0';
+    let lucc = '';
+    let map_name = '';
+    let year = '';
+    let names = [];
+    let file_name = '';
+    let map_idx = '0';
 
     // Load the selected data to report HTML
     load_data(get_dataDir() + '/data/Map_data/lumap_2010.html');
@@ -16,16 +16,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-    var lucc_names = {
+    let lucc_names = {
         "Ag_LU": ['Apples', 'Beef - modified land', 'Beef - natural land', 'Citrus', 'Cotton', 'Dairy - modified land', 'Dairy - natural land',
             'Grapes', 'Hay', 'Nuts', 'Other non-cereal crops', 'Pears', 'Plantation fruit', 'Rice', 'Sheep - modified land',
             'Sheep - natural land', 'Stone fruit', 'Sugar', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
             'Unallocated - modified land', 'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes', 'Winter oilseeds'],
-        "Ag_Mgt": ['Asparagopsis taxiformis', 'Ecological Grazing', 'Precision Agriculture'],
+        "Ag_Mgt": ['AgTech EI', 'Asparagopsis taxiformis', 'Ecological Grazing', 'Precision Agriculture', 'Savanna Burning'],
         "Land_Mgt": ['dry', 'irr'],
         'Non-Ag_LU': ['Environmental Plantings', 'Riparian Plantings', 'Agroforestry', 'Carbon Plantings (Block)', 'Carbon Plantings (Belt)', 'BECCS'],
         "lumap": ['Land-use All']
     }
+
+    let name_formal = {
+        // Agricultural Management
+        'AgTech EI': "Agricultural technology (energy)",
+        'Asparagopsis taxiformis': "Methane reduction (livestock)", 
+        'Ecological Grazing': "Regenerative agriculture (livestock)", 
+        'Precision Agriculture': "Agricultural technology (fertiliser)", 
+        'Savanna Burning':"Early dry-season savanna burning",
+        // Non-Agricultural Strategies
+        'Environmental Plantings':"Environmental plantings (mixed species)",
+        'Riparian Plantings': "Riparian buffer restoration (mixed species)",
+        'Agroforestry': "Agroforestry",
+        'Carbon Plantings (Block)': "Carbon plantings (monoculture)",
+        'Carbon Plantings (Belt)': "Farm forestry (food + timber)",
+        'BECCS': "BECCS (Bioenergy with Carbon Capture and Storage)",
+       }
 
 
     // Listen for changes in the lucc dropdown
@@ -33,7 +49,7 @@ document.addEventListener('DOMContentLoaded', function () {
         lucc = this.value;
 
         // Get the select_2 element
-        var select_2 = document.getElementById("select_2");
+        let select_2 = document.getElementById("select_2");
 
         // Clear any existing options in select_2
         select_2.innerHTML = "";
@@ -42,10 +58,10 @@ document.addEventListener('DOMContentLoaded', function () {
         names = lucc_names[lucc];
 
         // Add each name as an option in select_2
-        for (var i = 0; i < names.length; i++) {
-            var option = document.createElement("option");
+        for (let i = 0; i < names.length; i++) {
+            let option = document.createElement("option");
             option.value = names[i];
-            option.text = names[i].charAt(0).toUpperCase() + names[i].slice(1);
+            option.text = names[i] in name_formal ? name_formal[names[i]] : names[i];
             select_2.appendChild(option);
         }
 
@@ -74,7 +90,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Increment year
     document.getElementById('increment').addEventListener('click', function () {
-        var yearInput = document.getElementById('year');
+        let yearInput = document.getElementById('year');
 
         if (yearInput.value < yearInput.max) {
             yearInput.value = parseInt(yearInput.value) + parseInt(yearInput.step);
@@ -87,7 +103,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Decrement year
     document.getElementById('decrement').addEventListener('click', function () {
-        var yearInput = document.getElementById('year');
+        let yearInput = document.getElementById('year');
         if (yearInput.value > yearInput.min) {
             yearInput.value = parseInt(yearInput.value) - parseInt(yearInput.step);
             document.getElementById('yearOutput').value = yearInput.value;
@@ -132,19 +148,19 @@ document.addEventListener('DOMContentLoaded', function () {
     // Function to get the data directory
     function get_dataDir() {
         // Get the data path
-        var url = new URL(window.location.href);
-        var path = url.pathname.split('/');
+        let url = new URL(window.location.href);
+        let path = url.pathname.split('/');
         path.splice(-3, 3);
         url.pathname = path.join('/');
-        var dataDir = url.href;
+        let dataDir = url.href;
         return dataDir;
     }
 
     // Update the year range selection input and output values
     window.onload = function () {
-        var yearInput = document.getElementById('year');
-        var yearOutput = document.getElementById('yearOutput');
-        var modelYears = eval(document.getElementById('model_years').innerText);
+        let yearInput = document.getElementById('year');
+        let yearOutput = document.getElementById('yearOutput');
+        let modelYears = eval(document.getElementById('model_years').innerText);
 
         // Sort the modelYears array in ascending order
         modelYears.sort(function (a, b) { return a - b; });

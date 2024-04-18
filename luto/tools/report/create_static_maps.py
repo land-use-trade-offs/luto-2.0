@@ -51,7 +51,7 @@ def create_maps(row, model_run_scenario):
     tif_path = row['path']
     color_csv = row['color_csv']
     data_type = row['data_type']
-    year = row['year']
+    year = row['Year']
     legend_params = row['legend_params']
     
     print(f'Making map for {row["base_name"]} in {year}...')
