@@ -385,8 +385,8 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
     df_rev = df_rev.replace({'dry':'Dryland', 'irr':'Irrigated'})
     df_cost = df_cost.replace({'dry':'Dryland', 'irr':'Irrigated'})
     
-    df_rev.to_csv(os.path.join(path, f'revenue_agricultural_commodity_{yr_cal}.csv'))
-    df_cost.to_csv(os.path.join(path, f'cost_agricultural_commodity_{yr_cal}.csv'))
+    df_rev.to_csv(os.path.join(path, f'revenue_agricultural_commodity_{yr_cal}.csv'), index=False)
+    df_cost.to_csv(os.path.join(path, f'cost_agricultural_commodity_{yr_cal}.csv'), index=False)
     
 
 def write_revenue_cost_ag_management(data: Data, yr_cal, path):
@@ -425,15 +425,19 @@ def write_revenue_cost_ag_management(data: Data, yr_cal, path):
         # Reformat the revenue/cost matrix into a dataframe
         am_rev_yr_df = pd.DataFrame(am_rev_yr, columns=data.LANDMANS)
         am_rev_yr_df['Land-use'] = am_desc
-        am_rev_yr_df = am_rev_yr_df.melt(id_vars='Land-use', value_vars=data.LANDMANS, var_name='Water',
-                                         value_name='Value (AU$)')
+        am_rev_yr_df = am_rev_yr_df.melt(id_vars='Land-use', 
+                                         value_vars=data.LANDMANS, 
+                                         var_name='Water_supply',
+                                         value_name='Value ($)')
         am_rev_yr_df['Year'] = yr_cal
         am_rev_yr_df['Management Type'] = am
 
         am_cost_yr_df = pd.DataFrame(am_cost_yr, columns=data.LANDMANS)
         am_cost_yr_df['Land-use'] = am_desc
-        am_cost_yr_df = am_cost_yr_df.melt(id_vars='Land-use', value_vars=data.LANDMANS, var_name='Water',
-                                          value_name='Value (AU$)')
+        am_cost_yr_df = am_cost_yr_df.melt(id_vars='Land-use', 
+                                           value_vars=data.LANDMANS, 
+                                           var_name='Water_supply',
+                                           value_name='Value ($)')
         am_cost_yr_df['Year'] = yr_cal
         am_cost_yr_df['Management Type'] = am
 
@@ -625,11 +629,11 @@ def write_revenue_cost_non_ag(data: Data, yr_cal, path):
     cost_non_ag = np.einsum('rk,rk->k', non_ag_dvar, non_ag_cost_mat)
 
     # Reformat the revenue/cost matrix into a dataframe
-    rev_non_ag_df = pd.DataFrame(rev_non_ag.reshape(-1,1), columns=['Value AU$'])
+    rev_non_ag_df = pd.DataFrame(rev_non_ag.reshape(-1,1), columns=['Value ($)'])
     rev_non_ag_df['Year'] = yr_cal
     rev_non_ag_df['Land-use'] = data.NON_AGRICULTURAL_LANDUSES
 
-    cost_non_ag_df = pd.DataFrame(cost_non_ag.reshape(-1,1), columns=['Value AU$'])
+    cost_non_ag_df = pd.DataFrame(cost_non_ag.reshape(-1,1), columns=['Value ($)'])
     cost_non_ag_df['Year'] = yr_cal
     cost_non_ag_df['Land-use'] = data.NON_AGRICULTURAL_LANDUSES
 
@@ -657,14 +661,14 @@ def write_dvar_area(data: Data, yr_cal, path):
                                 index=pd.MultiIndex.from_product([[yr_cal],
                                                                 data.LANDMANS,
                                                                 data.AGRICULTURAL_LANDUSES],
-                                                                names=['Year', 'Water','Land use']),
+                                                                names=['Year', 'Water_supply','Land-use']),
                                 columns=['Area (ha)']).reset_index()
     # Non-agricultural landuse
     df_non_ag_area = pd.DataFrame(non_ag_area.reshape(-1),
                                 index=pd.MultiIndex.from_product([[yr_cal],
                                                                 ['dry'],
                                                                 data.NON_AGRICULTURAL_LANDUSES],
-                                                                names=['Year', 'Water', 'Land use']),
+                                                                names=['Year', 'Water_supply', 'Land-use']),
                                 columns=['Area (ha)']).reset_index()
 
     # Agricultural management
@@ -675,7 +679,7 @@ def write_dvar_area(data: Data, yr_cal, path):
                                                                 [am],
                                                                 data.LANDMANS,
                                                                 data.AGRICULTURAL_LANDUSES],
-                                                                names=['Year', 'Type', 'Water','Land use']),
+                                                                names=['Year', 'Type', 'Water_supply','Land-use']),
                                 columns=['Area (ha)']).reset_index()
         am_areas.append(df_am_area)
     
@@ -855,7 +859,7 @@ def write_water(data: Data, yr_cal, path):
 
         # Calculate water requirements by agriculture for year and region.
 
-        index_levels = ['Landuse Type', 'Landuse', 'Irrigation',  'Water Use (ML)']
+        index_levels = ['Landuse Type', 'Landuse', 'Water_supply',  'Water Use (ML)']
 
         # Agricultural water use
         ag_mrj = ag_w_mrj[:, ind, :] * data.ag_dvars[yr_cal][:, ind, :]   
@@ -942,6 +946,7 @@ def write_water(data: Data, yr_cal, path):
 
     # Write the separate water use to CSV
     df_water_seperate = pd.concat(df_water_seperate_dfs)
+    df_water_seperate['Water_supply'] = df_water_seperate['Water_supply'].replace({'dry':'Dryland', 'irr':'Irrigated'})
     df_water_seperate.to_csv( os.path.join(path, f'water_demand_vs_use_separate_{yr_cal}.csv'), index=False)
     
     
@@ -1117,10 +1122,10 @@ def write_ghg_separate(data: Data, yr_cal, path):
         
     # Concatenate the GHG emissions
     ghg_df = pd.concat(GHG_cols).reset_index()
-    ghg_df.columns = ['Source','Water','Landuse','GHG Emissions (t)']
+    ghg_df.columns = ['Source','Water_supply','Landuse','GHG Emissions (t)']
 
     # Pivot the dataframe
-    ghg_df = ghg_df.pivot(index='Landuse', columns=['Water','Source'], values='GHG Emissions (t)')
+    ghg_df = ghg_df.pivot(index='Landuse', columns=['Water_supply','Source'], values='GHG Emissions (t)')
 
     # Rename the columns
     ghg_df.columns = pd.MultiIndex.from_tuples([['Agricultural Landuse'] + list(col) for col in ghg_df.columns])
@@ -1132,10 +1137,11 @@ def write_ghg_separate(data: Data, yr_cal, path):
     # Reorganize the df to long format
     ghg_df = ghg_df.melt(ignore_index=False).reset_index()   
     ghg_df.columns = ['Land-use','Type','Water_supply','CO2_type','Value (t CO2e)']
+    ghg_df['Water_supply'] = ghg_df['Water_supply'].replace({'dry':'Dryland', 'irr':'Irrigated'})
     
     # Save table to disk
     ghg_df['Year'] = yr_cal
-    ghg_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_landuse_{yr_cal}.csv'))
+    ghg_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_landuse_{yr_cal}.csv'), index=False)
 
 
 
@@ -1162,7 +1168,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
     
     # Save table to disk
     df['Year'] = yr_cal
-    df.to_csv(os.path.join(path, f'GHG_emissions_separate_no_ag_reduction_{yr_cal}.csv'))
+    df.to_csv(os.path.join(path, f'GHG_emissions_separate_no_ag_reduction_{yr_cal}.csv'), index=False)
                         
 
     # -------------------------------------------------------------------#
@@ -1195,7 +1201,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
 
     # Save table to disk
     ghg_t_df['Year'] = yr_cal
-    ghg_t_df.to_csv(os.path.join(path, f'GHG_emissions_separate_transition_penalty_{yr_cal}.csv'))
+    ghg_t_df.to_csv(os.path.join(path, f'GHG_emissions_separate_transition_penalty_{yr_cal}.csv'), index=False)
     
     
 
@@ -1231,7 +1237,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
     # Save table to disk
     am_df = pd.concat(am_dfs, axis=0)
     am_df['Year'] = yr_cal
-    am_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_management_{yr_cal}.csv'))
+    am_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_management_{yr_cal}.csv'), index=False)
     
     
     

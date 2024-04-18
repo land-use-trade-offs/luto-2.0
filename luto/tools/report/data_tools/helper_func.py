@@ -69,38 +69,6 @@ def df_wide2long(df:pd.DataFrame):
     return df
 
 
-# Get dataframe of Revenue vs Cost
-def get_rev_cost(revenue_df,cost_df):
-    """
-    This function is used to get the dataframe of Revenue vs Cost
-
-    Parameters:
-    revenue_df (pandas.DataFrame): The input dataframe containing revenue data.
-    cost_df (pandas.DataFrame): The input dataframe containing cost data.
-
-    Returns:
-    pandas.DataFrame: The dataframe containing revenue and cost data.
-    """
-    rev_source = revenue_df.groupby(['year', 'Source']).sum(numeric_only=True).reset_index()
-    cost_source = cost_df.groupby(['year', 'Source']).sum(numeric_only=True).reset_index()
-
-    rev_cost_source = rev_source.merge(cost_source, on=['year', 'Source'], suffixes=('_rev', '_cost'))
-
-    # rename columns
-    rev_cost_source = rev_cost_source.rename(columns={'value (billion)_rev': 'Revenue (billion)',
-                                                    'value (billion)_cost': 'Cost (billion)'})
-    # calculate profit
-    rev_cost_source['Cost (billion)'] = -rev_cost_source['Cost (billion)']
-    rev_cost_source['Profit (billion)'] = rev_cost_source['Revenue (billion)'] + rev_cost_source['Cost (billion)']
-
-    rev_cost_all = rev_cost_source.groupby('year').sum(numeric_only=True).reset_index()
-
-    # add two dummy columns for plotting the color of rev and cost
-    rev_cost_all['rev_color'] = 'Revenue'
-    rev_cost_all['cost_color'] = 'Cost'
-    
-    return rev_cost_all
-
 
 def merge_LVSTK_UAALLOW(df):
     """
@@ -132,25 +100,6 @@ def merge_LVSTK_UAALLOW(df):
     return pd.concat([df_crop,df_non_ag,df_lvstk,df_unallow]).reset_index(drop=True)
 
 
-
-def get_GHG_file_df(all_files_df):
-        
-    """
-    This function is used to get the dataframe containing the GHG data.
-
-    Parameters:
-    all_files_df (pandas.DataFrame): The input dataframe containing the file paths.
-
-    Returns:
-    pandas.DataFrame: The dataframe containing the GHG data.
-    """
-    
-    # Get only GHG_seperate files
-    GHG_files = all_files_df.query('category == "GHG" and base_name != "GHG_emissions"  and base_name != "GHG_emissions_offland_commodity" and year_types == "single_year"').reset_index(drop=True)
-    GHG_files['GHG_sum_t'] = GHG_files['path'].apply(lambda x: pd.read_csv(x,index_col=0).loc['SUM','SUM'])
-    GHG_files = GHG_files.replace({'base_name': GHG_FNAME2TYPE})
-
-    return GHG_files
 
 
 # Check if the GHG type is valid
@@ -288,52 +237,7 @@ def read_GHG_to_long(all_files, GHG_type):
     return GHG_df_long
 
 
-def get_GHG_category(all_files, GHG_type):
-    
-    """
-    This function is used to get the GHG data for the given GHG type.
 
-    Parameters:
-    GHG_files (pandas.DataFrame): The input dataframe containing the GHG data.
-    GHG_type (str): The given GHG type.
-
-    Returns:
-    pandas.DataFrame: The dataframe containing the GHG data for the given GHG type.
-    """
-    
-    GHG_df_long = read_GHG_to_long(all_files, GHG_type)
-
-    # 1) get CO2 GHG
-    GHG_CO2 = GHG_df_long.query('~Sources.isin(@GHG_CATEGORY.keys())').copy()
-    GHG_CO2['GHG Category'] = 'CO2'
-
-    # 2) get non-CO2 GHG
-    GHG_nonCO2 = GHG_df_long.query('Sources.isin(@GHG_CATEGORY.keys())').copy()
-    GHG_nonCO2['GHG Category'] = GHG_nonCO2['Sources'].apply(lambda x: GHG_CATEGORY[x].keys())
-    GHG_nonCO2['Multiplier'] = GHG_nonCO2['Sources'].apply(lambda x: GHG_CATEGORY[x].values())
-    GHG_nonCO2 = GHG_nonCO2.explode(['GHG Category','Multiplier']).reset_index(drop=True)
-    GHG_nonCO2['Quantity (Mt CO2e)'] = GHG_nonCO2['Quantity (Mt CO2e)'] * GHG_nonCO2['Multiplier']
-    GHG_nonCO2 = GHG_nonCO2.drop(columns=['Multiplier'])
-    
-    dfs = [GHG_CO2.dropna(axis=1, how='all'),
-           GHG_nonCO2.dropna(axis=1, how='all')]
-
-    return pd.concat(dfs,axis=0).reset_index(drop=True)
-
-
-def target_GHG_2_Json(GHG_lu_source_target_yr):
-    GHG_lu_source_nest = GHG_lu_source_target_yr.groupby(['Sources','Land use']).sum()[['Quantity (Mt CO2e)']]
-
-    GHG_lu_source_nest_dict = []
-    for idx_s,s in enumerate(GHG_lu_source_nest.index.levels[0]):
-        GHG_lu_source_nest_dict.append({"name":s,"data":[]})
-        for l in GHG_lu_source_nest.index.levels[1]:
-            try:
-                GHG_lu_source_nest_dict[idx_s]["data"].append({'name':l,'value':GHG_lu_source_nest.loc[s,l].values[0]})
-            except Exception:
-                print(f"{s},{l} not found")
-
-    return GHG_lu_source_nest_dict
 
 
 def list_all_files(directory):

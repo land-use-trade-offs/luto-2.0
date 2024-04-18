@@ -1,10 +1,9 @@
-import sys
 import os
 import re
 import pandas as pd
 
-from luto.tools.report.data_tools.parameters import LU_CROPS, LU_LVSTKS, YR_BASE, COMMODITIES_OFF_LAND, COMMODITIES_ALL
-from luto.tools.report.data_tools.helper_func import df_wide2long, get_GHG_category, merge_LVSTK_UAALLOW
+from luto.tools.report.data_tools.parameters import YR_BASE
+from luto.tools.report.data_tools.helper_func import merge_LVSTK_UAALLOW
 
 # Set up working directory to the root of the report folder
 if __name__ == '__main__':
@@ -25,11 +24,11 @@ def extract_dtype_from_path(path):
             # decision variables (npy files)
             'dvar':['npy'],
             'ag_X_mrj':['ag_X_mrj'],
-            'ag_man_X_mrj':['ag_man_X_mrjasparagopsis_taxiformis',
-                            'ag_man_X_mrjecological_grazing',
-                            'ag_man_X_mrjprecision_agriculture',
-                            'ag_man_X_mrjsavanna_burning',
-                            'ag_man_X_mrjagtech_ei'],
+            'ag_man_X_mrj':['ag_man_X_mrj_asparagopsis_taxiformis',
+                            'ag_man_X_mrj_ecological_grazing',
+                            'ag_man_X_mrj_precision_agriculture',
+                            'ag_man_X_mrj_savanna_burning',
+                            'ag_man_X_mrj_agtech_ei'],
             'non_ag_X_rk':['non_ag_X_rk'],
             # CSVs
             'GHG':['GHG'],
@@ -51,19 +50,19 @@ def extract_dtype_from_path(path):
             'Land_Mgt':['Land_Mgt'],
             'Non-Ag':['Non-Ag'],
             }
-    
+
     # Get the base name of the file path
     base_name = os.path.basename(path)
-    
+
     # Check the file type
     for ftype, fpat in f_cat.items():
-        
+
         search_result = []
         for pat in fpat:
             # Registry to check the start of the base name
             reg = re.compile(fr'^{pat}')
             search_result.append(bool(reg.search(base_name)))
-        
+
         # If any of the patterns are found, break the loop
         if any(search_result): 
             break
@@ -72,10 +71,7 @@ def extract_dtype_from_path(path):
 
 
     # Check if this comes from the begin_end_compare folder
-    if 'begin_end_compare' in path:
-        yr_type = 'begin_end_year'
-    else:
-        yr_type = 'single_year'
+    yr_type = 'begin_end_year' if 'begin_end_compare' in path else 'single_year'
     return yr_type, ftype
 
 
@@ -107,7 +103,7 @@ def get_all_files(data_root):
 
     # Get the year from the file name
     file_paths = pd.DataFrame({'path':file_paths})
-    file_paths.insert(0, 'year', [re.compile(r'out_(\d{4})').findall(i)[0] for i in file_paths['path']])
+    file_paths.insert(0, 'Year', [re.compile(r'out_(\d{4})').findall(i)[0] for i in file_paths['path']])
 
     # Try to get the year type and category from the file path
     yr_types, f_cats = zip(*[extract_dtype_from_path(i) for i in file_paths['path']])
@@ -119,10 +115,10 @@ def get_all_files(data_root):
 
     # Get the base name and extension of the file path
     file_paths[['base_name','base_ext']] = [os.path.splitext(os.path.basename(i)) for i in file_paths['path']]
-    file_paths = file_paths.reindex(columns=['year','year_types','category','base_name','base_ext','path'])
+    file_paths = file_paths.reindex(columns=['Year','year_types','category','base_name','base_ext','path'])
     
     # Remove the datatime stamp <YYYY_MM_DD__HH_mm_SS> from the base_name
-    file_paths['base_name'] = file_paths['base_name'].apply(lambda x: re.sub(r'_\d{4}.*\d{2}','',x))
+    file_paths['base_name'] = file_paths['base_name'].apply(lambda x: re.sub(r'_\d{4}','',x))
     
     # Report the unknown files
     unknown_files = file_paths.query('category == "Unknown"')
@@ -156,14 +152,14 @@ def get_quantity_df(in_dfs):
 
         # get the df for the year of the loop
         df_this_yr = df[['Commodity','Prod_targ_year (tonnes, KL)']].copy()             
-        df_this_yr['year'] = row['year']
+        df_this_yr['Year'] = row['Year']
 
         # check if this is the first row, then get the df for base year
         if idx == 0:
             df_base_yr = df[['Commodity','Prod_base_year (tonnes, KL)']].copy()         
                                                                                         
             # add the year to the df
-            df_base_yr['year'] = YR_BASE
+            df_base_yr['Year'] = YR_BASE
             
             # reanme the columns so it can be concatenated with df_this_yr
             df_base_yr.columns = df_this_yr.columns
@@ -184,63 +180,6 @@ def get_quantity_df(in_dfs):
     return all_df
 
 
-def get_ag_rev_cost_df(files_df:pd.DataFrame, in_type:str):
-    
-    """
-    Given a DataFrame containing information about files, this function returns a DataFrame of revenue or cost (in billion dollars) for each year in the input DataFrame.
-
-    Parameters:
-    files_df (pandas.DataFrame): A DataFrame containing at least the columns 'year' and 'path', where 'year' is the year of the data and 'path' is the file path to the data file.
-    in_type (str): Either 'Revenue' or 'Cost', depending on which type of data to return.
-
-    Returns:
-    pandas.DataFrame: A DataFrame of revenue or cost (in billion dollars) for each year in the input DataFrame.
-    """
-    
-    # in_type = 'Revenue' or 'Cost', otherwise raise error
-    if in_type not in ['revenue','cost']:
-        raise ValueError('in_type must be either "revenue" or "cost"')
-    
-    path_df = files_df.query('category == @in_type and year_types == "single_year"').reset_index(drop=True) 
-    
-    # Remove the non-ag, ag-mam, and cost_trans from the path_df
-    remove_list = ['cost_non_ag', 
-                   'cost_agricultural_management',
-                   'revenue_non_ag', 
-                   'revenue_agricultural_management',
-                   'cost_transition_ag2ag',
-                   'cost_transition_ag2non_ag', 
-                   'cost_transition_non_ag2_ag']
-    
-    path_df = path_df[~path_df['base_name'].str.contains('|'.join(remove_list))]
-       
-    dfs =[]  
-    for _,row in path_df.iterrows():
-        df = df_wide2long(row['path'])
-        # insert year as a column
-        df.insert(0, 'year', row['year'])
-        dfs.append(df)
-    
-    # concatenate all the dfs, remove rows with value of 0    
-    out_df = pd.concat(dfs).reset_index(drop=True)
-    out_df = out_df.query('`value (billion)` != 0')
-    
-    # sort the df by year, Source
-    out_df = out_df.sort_values(['year','Source']).reset_index(drop=True)
-    
-    # merge the Source and Type columns
-    out_df['Source_type'] = out_df.apply(lambda x: x['Source'] + ' ' + x['Type'], axis=1)
-    
-    # manually change the Source_type to remove "Revenue" from "Crop Revenue", and change "Dairy Milk" to "Dairy"
-    out_df['Source_type'] = out_df['Source_type'].str.replace(' Revenue','')
-    out_df['Source_type'] = out_df['Source_type'].str.replace('Dairy  Milk','Dairy')
-    
-    # add the column to show if this is a corp or livestock
-    lvstk = [i.split(' - ')[0] for i in LU_LVSTKS]
-    out_df['crop_lvstk'] = out_df['Source'].apply(lambda x: 'Crop' if any(x == s for s in LU_CROPS) else 'Livestock')
-
-    return out_df
-
 
 
 def get_AREA_lu(df):
@@ -248,14 +187,14 @@ def get_AREA_lu(df):
     Returns a pandas DataFrame containing processed data on land use and area (in km2) for each year in the input DataFrame.
 
     Parameters:
-    df (pandas.DataFrame): A DataFrame containing at least the columns 'year' and 'path', where 'year' is the year of the data and 'path' is the file path to the data file.
+    df (pandas.DataFrame): A DataFrame containing at least the columns 'Year' and 'path', where 'Year' is the year of the data and 'path' is the file path to the data file.
 
     Returns:
     pandas.DataFrame: A DataFrame containing processed data on land use and area (in km2) for each year in the input DataFrame.
     """
     area_df = []
     for idx, (_, row) in enumerate(df.iterrows()):
-        year = row['year']
+        year = row['Year']
         file_path = row['path']
         df = pd.read_csv(file_path, index_col=0)
         column_names = ['Land use', 'Area (km2)']
@@ -286,23 +225,6 @@ def get_AREA_lu(df):
 
     return pd.concat(area_df).reset_index(drop=True)
 
-def get_ag_dvar_area(area_dvar_paths):
-
-    ag_dvar_dfs = area_dvar_paths.query('base_name.str.contains("area_agricultural_landuse")').reset_index(drop=True)
-    ag_dvar_area = pd.concat([pd.read_csv(path) for path in ag_dvar_dfs['path']], ignore_index=True)
-    # ag_dvar_area = merge_LVSTK_UAALLOW(ag_dvar_area)
-    ag_dvar_area['Area (million km2)'] = ag_dvar_area['Area (ha)'] / 100 / 1e6
-    ag_dvar_area['Type'] = 'Agricultural landuse'
-
-    non_ag_dvar_dfs = area_dvar_paths.query('base_name.str.contains("area_non_agricultural_landuse")').reset_index(drop=True)
-    non_ag_dvar_area = pd.concat([pd.read_csv(path) for path in non_ag_dvar_dfs['path']], ignore_index=True)
-    non_ag_dvar_area['Area (million km2)'] = non_ag_dvar_area['Area (ha)'] / 100 / 1e6
-    non_ag_dvar_area['Type'] = 'Non-agricultural landuse'
-
-    area_dvar = pd.concat([ag_dvar_area, non_ag_dvar_area], ignore_index=True) 
-    
-    return area_dvar
-
 def get_AREA_lm(df):
     """
     Processes a DataFrame of irrigation data and returns a concatenated DataFrame of processed data.
@@ -315,7 +237,7 @@ def get_AREA_lm(df):
     """
     area_df = []
     for idx, (_, row) in enumerate(df.iterrows()):
-        year = row['year']
+        year = row['Year']
         file_path = row['path']
         df = pd.read_csv(file_path, index_col=0)
         
@@ -358,7 +280,7 @@ def get_AREA_am(df):
     this function returns a new DataFrame containing the area of each land use category in each year.
     The input DataFrame `df` should have the following columns:
     - 'path': the file path of the data file
-    - 'year': the year of the data
+    - 'Year': the year of the data
     - 'Area prior [ km2 ]': the area of each land use category before any changes
     - 'Area after [ km2 ]': the area of each land use category after any changes
     - 'Land use': the name of each land use category
@@ -369,7 +291,7 @@ def get_AREA_am(df):
     for idx,(_,row) in enumerate(df.iterrows()):
 
         path = row['path']
-        year = row['year']
+        year = row['Year']
         file_path = row['path']
         df = pd.read_csv(file_path,index_col=0)
 
@@ -398,7 +320,7 @@ def get_begin_end_df(files,timeseries = False):
     - begin_end_df_pct: the percentage change of each land use category in each year
     The input DataFrame `files` should have the following columns:
     - 'path': the file path of the data file
-    - 'year': the year of the data
+    - 'Year': the year of the data
     - 'year_types': the year type of the data
     - 'base_name': the base name of the data file
     - 'base_ext': the base extension of the data file
@@ -425,27 +347,3 @@ def get_begin_end_df(files,timeseries = False):
     begin_end_df_pct = begin_end_df_pct.fillna(0)
     
     return begin_end_df_area, begin_end_df_pct
-
-
-def get_GHG_emissions_by_crop_lvstk_df(GHG_emissions_long):
-    GHG_crop_lvstk_total = GHG_emissions_long.groupby(['Year','Land use category','Land category']).sum()['Quantity (Mt CO2e)'].reset_index()
-    GHG_crop_lvstk_total['Landuse_land_cat'] = GHG_crop_lvstk_total.apply(lambda x: (x['Land use category'] + ' - ' + x['Land category']) 
-                                    if (x['Land use category'] != x['Land category']) else x['Land use category'], axis=1)
-    
-    return GHG_crop_lvstk_total
-
-
-
-
-def get_water_df(water_dfs):
-    dfs = []
-    for _,row in water_dfs.iterrows():
-        df = pd.read_csv(row['path'], index_col=0).reset_index(drop=True)
-        # insert year column
-        df.insert(0, 'year', row['year'])
-        df['TOT_WATER_REQ_ML'] = df['TOT_WATER_REQ_ML'].str.replace(',','').astype(float)
-        df['WATER_USE_LIMIT_ML'] = df['WATER_USE_LIMIT_ML'].str.replace(',','').astype(float)
-        df['ABS_DIFF_ML'] = df['ABS_DIFF_ML'].str.replace(',','').astype(float)
-        dfs.append(df)
-
-    return pd.concat(dfs, axis=0).reset_index(drop=True)
