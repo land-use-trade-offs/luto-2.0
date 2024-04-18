@@ -26,8 +26,10 @@ def extract_dtype_from_path(path):
             'dvar':['npy'],
             'ag_X_mrj':['ag_X_mrj'],
             'ag_man_X_mrj':['ag_man_X_mrjasparagopsis_taxiformis',
-                        'ag_man_X_mrjecological_grazing',
-                        'ag_man_X_mrjprecision_agriculture'],
+                            'ag_man_X_mrjecological_grazing',
+                            'ag_man_X_mrjprecision_agriculture',
+                            'ag_man_X_mrjsavanna_burning',
+                            'ag_man_X_mrjagtech_ei'],
             'non_ag_X_rk':['non_ag_X_rk'],
             # CSVs
             'GHG':['GHG'],
@@ -58,7 +60,7 @@ def extract_dtype_from_path(path):
         
         search_result = []
         for pat in fpat:
-            # Registry of chekcing the start of the base name
+            # Registry to check the start of the base name
             reg = re.compile(fr'^{pat}')
             search_result.append(bool(reg.search(base_name)))
         
@@ -182,7 +184,7 @@ def get_quantity_df(in_dfs):
     return all_df
 
 
-def get_ag_rev_cost_df(files_df:pd.DataFrame,in_type:str):
+def get_ag_rev_cost_df(files_df:pd.DataFrame, in_type:str):
     
     """
     Given a DataFrame containing information about files, this function returns a DataFrame of revenue or cost (in billion dollars) for each year in the input DataFrame.
@@ -201,11 +203,15 @@ def get_ag_rev_cost_df(files_df:pd.DataFrame,in_type:str):
     
     path_df = files_df.query('category == @in_type and year_types == "single_year"').reset_index(drop=True) 
     
-    # Remove the non-ag and ag-mam from the path_df
+    # Remove the non-ag, ag-mam, and cost_trans from the path_df
     remove_list = ['cost_non_ag', 
                    'cost_agricultural_management',
                    'revenue_non_ag', 
-                   'revenue_agricultural_management']
+                   'revenue_agricultural_management',
+                   'cost_transition_ag2ag',
+                   'cost_transition_ag2non_ag', 
+                   'cost_transition_non_ag2_ag']
+    
     path_df = path_df[~path_df['base_name'].str.contains('|'.join(remove_list))]
        
     dfs =[]  

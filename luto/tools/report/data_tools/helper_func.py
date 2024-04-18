@@ -5,7 +5,8 @@ from  lxml.etree import Element
 
 from luto.tools.report.data_tools.parameters import (GHG_CATEGORY, 
                                                      GHG_FNAME2TYPE, 
-                                                     GHG_NAMES,
+                                                     GHG_NAMES, 
+                                                     LANDUSE_ALL,
                                                      LU_CROPS, 
                                                      LU_LVSTKS, 
                                                      LU_UNALLOW, 
@@ -112,15 +113,15 @@ def merge_LVSTK_UAALLOW(df):
     Returns:
     pandas.DataFrame: The merged dataframe containing land use data for different types of land use.
     """
-    df_crop = df[[True if i in LU_CROPS else False for i in  df['Land use']]]
+    df_crop = df[[i in LU_CROPS for i in  df['Land use']]]
 
-    df_non_ag = df[[True if i in NON_AG_LANDUSE else False for i in  df['Land use']]]
+    df_non_ag = df[[i in NON_AG_LANDUSE for i in  df['Land use']]]
 
-    df_unallow = df[[True if i in LU_UNALLOW else False for i in  df['Land use']]]
+    df_unallow = df[[i in LU_UNALLOW for i in  df['Land use']]]
     # df_unallow.index = pd.MultiIndex.from_tuples(tuple(df_unallow['Land use'].str.split(' - ')))
     # df_unallow = df_unallow.groupby(level=0).sum(numeric_only=True).reset_index(names='Land use')
 
-    df_lvstk = df[[True if i in LU_LVSTKS else False for i in  df['Land use']]]
+    df_lvstk = df[[i in LU_LVSTKS for i in  df['Land use']]]
     df_lvstk.index = pd.MultiIndex.from_tuples(tuple(df_lvstk['Land use'].str.split(' - ')),
                                                names =  ['Lvstk','Land category'])
 
@@ -154,7 +155,7 @@ def get_GHG_file_df(all_files_df):
 
 # Check if the GHG type is valid
 def get_GHG_subsector_files(all_files,GHG_type):
-    
+
     """
     This function is used to get the dataframe containing the GHG data for the given GHG type.
 
@@ -168,20 +169,17 @@ def get_GHG_subsector_files(all_files,GHG_type):
     
     if GHG_type not in ['Agricultural Landuse','Agricultural Management', 
                         'Non-Agricultural Landuse', 'Transition Penalty']:
-        
+
         raise ValueError('GHG_type can only be one of the following: \
                             ["Agricultural Landuse","Agricultural Management", \
                             "Non-Agricultural Landuse", "Transition Penalty"].')
 
-    # Get GHG file paths under the given GHG type
-    GHG_files = all_files.query(f'base_name == "{GHG_type}"').reset_index(drop=True)
-    
-    return GHG_files
+    return all_files.query(f'base_name == "{GHG_type}"').reset_index(drop=True)
 
 
 
 def add_crop_lvstk_to_df(all_files,GHG_type):
-    
+
     """
     This function is used to add the crop and livestock data to the dataframe containing the GHG data.
 
@@ -195,23 +193,24 @@ def add_crop_lvstk_to_df(all_files,GHG_type):
 
     # Read GHG emissions of ag lucc 
     GHG_files = get_GHG_subsector_files(all_files, GHG_type)
-    
+
     CSVs = []
     for _,row in GHG_files.iterrows():
         csv = pd.read_csv(row['path'],index_col=0,header=[0,1,2]).drop('SUM',axis=1)
+        csv = csv.reindex(index=LANDUSE_ALL, fill_value=0)
 
         # Get the land use and land use category
         if GHG_type != 'Non-Agricultural Landuse':
 
             # Subset the crop landuse
-            csv_crop = csv[[True if i in LU_CROPS else False for i in  csv.index]]
+            csv_crop = csv[[i in LU_CROPS for i in  csv.index]]
             csv_crop.index = pd.MultiIndex.from_product(([row['year']], 
                                                          csv_crop.index, 
                                                          ['Crop'],
                                                          ['Crop']))
 
             # Subset the livestock landuse
-            csv_lvstk = csv[[True if i in LU_LVSTKS else False for i in  csv.index]]
+            csv_lvstk = csv[[i in LU_LVSTKS for i in  csv.index]]
             lvstk_old_index = csv_lvstk.index.str.split(' - ').tolist()
 
             # Add the year and land use category
@@ -227,25 +226,22 @@ def add_crop_lvstk_to_df(all_files,GHG_type):
             #               land use category: str,     [Crop, Livestock]
             csv = pd.concat([csv_crop,csv_lvstk],axis=0)
         else:
-            csv = csv[[True if i in NON_AG_LANDUSE else False for i in csv.index]]
+            csv = csv[[i in NON_AG_LANDUSE for i in csv.index]]
             # Add the year and land use category, land category, so that the csv.index has 4 levels
             # which are matches the other GHG emissions data
             csv.index = pd.MultiIndex.from_product(([row['year']], 
                                                     csv.index, 
                                                     ['Non-Agricultural Landuse'],
                                                     ['Non-Agricultural Landuse']))
-            
+
         # Append the csv to the list
         CSVs.append(csv)
 
-    # Concatenate the csvs
-    GHG_df = pd.concat(CSVs,axis=0)
-
-    return GHG_df
+    return pd.concat(CSVs,axis=0)
 
 
 def read_GHG_to_long(all_files, GHG_type):
-    
+
     """
     This function is used to convert the GHG data into long format.
 
@@ -258,9 +254,9 @@ def read_GHG_to_long(all_files, GHG_type):
     """
     
     GHG_df = add_crop_lvstk_to_df(all_files,GHG_type)
-        
+
     # Define the index levels
-    idx_level_name = ['Year','Land use','Land category','Land use category']
+    idx_level_name = ['Year', 'Land use', 'Land category', 'Land use category']
 
     # Remove the first level in the multiindex columns
     GHG_df_long = GHG_df.copy()
@@ -288,7 +284,7 @@ def read_GHG_to_long(all_files, GHG_type):
     # Drop unnecessary columns and reorder the columns
     GHG_df_long.drop(['val_t','variable'],axis=1,inplace=True)
     GHG_df_long = GHG_df_long.reindex(columns= idx_level_name + ['Irrigation','Sources', 'Quantity (Mt CO2e)'])
-    
+
     return GHG_df_long
 
 
@@ -331,17 +327,17 @@ def target_GHG_2_Json(GHG_lu_source_target_yr):
     GHG_lu_source_nest_dict = []
     for idx_s,s in enumerate(GHG_lu_source_nest.index.levels[0]):
         GHG_lu_source_nest_dict.append({"name":s,"data":[]})
-        for idx_l,l in enumerate(GHG_lu_source_nest.index.levels[1]):
+        for l in GHG_lu_source_nest.index.levels[1]:
             try:
                 GHG_lu_source_nest_dict[idx_s]["data"].append({'name':l,'value':GHG_lu_source_nest.loc[s,l].values[0]})
-            except:
+            except Exception:
                 print(f"{s},{l} not found")
 
     return GHG_lu_source_nest_dict
 
 
 def list_all_files(directory):
-    
+
     """
     This function is used to get all the file paths under the given directory
 
@@ -354,8 +350,7 @@ def list_all_files(directory):
     
     file_list = []
     for root, dirs, files in os.walk(directory):
-        for file in files:
-            file_list.append(os.path.join(root, file))
+        file_list.extend(os.path.join(root, file) for file in files)
     return file_list
     
 
@@ -466,13 +461,13 @@ def select_years(year_list):
 
     """
     year_list = sorted(year_list)
-    
+
     if year_list[-1] == 2050:
         # Return [2010, 2020, ..., 2050] if the last year is 2050 
-        return list(range(2010, 2051, 10)) 
+        return list(range(2010, 2051, 10))
     elif len(year_list) <= 6:
         # Return the list as is if 5 or fewer elements
-        return year_list 
+        return year_list
     else:
         # Select the start and end years
         selected_years = [year_list[0], year_list[-1]]
@@ -484,9 +479,7 @@ def select_years(year_list):
         interval = (len(year_list) - 2) / (slots + 1)
 
         # Select years based on calculated interval, ensuring even distribution
-        for i in range(1, slots + 1):
-            # Calculate index for selection
-            index = int(round(i * interval))
-            selected_years.append(year_list[index])
-
+        selected_years.extend(
+            year_list[int(round(i * interval))] for i in range(1, slots + 1)
+        )
         return selected_years

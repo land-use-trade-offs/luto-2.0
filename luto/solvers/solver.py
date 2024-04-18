@@ -19,6 +19,8 @@ Provides minimalist Solver class and pure helper functions.
 """
 
 
+from collections import defaultdict
+from dataclasses import dataclass
 import time
 from typing import Optional
 from collections import defaultdict
@@ -32,6 +34,8 @@ from gurobipy import GRB
 import luto.settings as settings
 from luto import tools
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.solvers.input_data import SolverInputData
+
 
 # Set Gurobi environment.
 gurenv = gp.Env(logfilename="gurobi.log", empty=True)  # (empty = True)
@@ -51,109 +55,15 @@ gurenv.start()
 
 
 @dataclass
-class InputData:
-    """
-    An object that collects and stores all relevant data for solver.py.
-    """
-
-    ag_t_mrj: np.ndarray  # Agricultural transition cost matrices.
-    ag_c_mrj: np.ndarray  # Agricultural production cost matrices.
-    ag_r_mrj: np.ndarray  # Agricultural production revenue matrices.
-    ag_g_mrj: np.ndarray  # Agricultural greenhouse gas emissions matrices.
-    ag_w_mrj: np.ndarray  # Agricultural water requirements matrices.
-    ag_b_mrj: np.ndarray  # Agricultural biodiversity matrices.
-    ag_x_mrj: np.ndarray  # Agricultural exclude matrices.
-    ag_q_mrp: np.ndarray  # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
-    ag_ghg_t_mrj: np.ndarray  # GHG emissions released during transitions between agricultural land uses.
-    ag_to_non_ag_t_rk: np.ndarray  # Agricultural to non-agricultural transition cost matrix.
-    
-    non_ag_to_ag_t_mrj: np.ndarray  # Non-agricultural to agricultural transition cost matrices.
-    non_ag_t_rk: np.ndarray  # Non-agricultural transition costs matrix
-    non_ag_c_rk: np.ndarray  # Non-agricultural production cost matrix.
-    non_ag_r_rk: np.ndarray  # Non-agricultural revenue matrix.
-    non_ag_g_rk: np.ndarray  # Non-agricultural greenhouse gas emissions matrix.
-    non_ag_w_rk: np.ndarray  # Non-agricultural water requirements matrix.
-    non_ag_b_rk: np.ndarray  # Non-agricultural biodiversity matrix.
-    non_ag_x_rk: np.ndarray  # Non-agricultural exclude matrices.
-    non_ag_q_crk: np.ndarray  # Non-agricultural yield matrix.
-
-    ag_man_c_mrj: dict  # Agricultural management options' cost effects.
-    ag_man_g_mrj: dict  # Agricultural management options' GHG emission effects.
-    ag_man_q_mrp: dict  # Agricultural management options' quantity effects.
-    ag_man_r_mrj: dict  # Agricultural management options' revenue effects.
-    ag_man_t_mrj: dict  # Agricultural management options' transition cost effects.
-    ag_man_w_mrj: dict  # Agricultural management options' water requirement effects.
-    ag_man_b_mrj: dict  # Agricultural management options' biodiversity effects.
-    ag_man_limits: dict  # Agricultural management options' adoption limits.
-    
-    offland_ghg: np.ndarray  # GHG emissions from off-land commodities.
-
-    lu2pr_pj: np.ndarray  # Conversion matrix: land-use to product(s).
-    pr2cm_cp: np.ndarray  # Conversion matrix: product(s) to commodity.
-    limits: dict  # Targets to use.
-    desc2aglu: dict  # Map of agricultural land use descriptions to codes.
-
-    @property
-    def n_ag_lms(self):
-        # Number of agricultural landmans
-        return self.ag_t_mrj.shape[0]
-
-    @property
-    def ncells(self):
-        # Number of cells
-        return self.ag_t_mrj.shape[1]
-
-    @property
-    def n_ag_lus(self):
-        # Number of agricultural landuses
-        return self.ag_t_mrj.shape[2]
-
-    @property
-    def n_non_ag_lus(self):
-        # Number of non-agricultural landuses
-        return self.non_ag_c_rk.shape[1]
-
-    @property
-    def nprs(self):
-        # Number of products
-        return self.ag_q_mrp.shape[2]
-
-    @cached_property
-    def am2j(self):
-        # Map of agricultural management options to land use codes
-        return {
-            am: [self.desc2aglu[lu] for lu in am_lus]
-            for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items()
-        }
-
-    @cached_property
-    def j2am(self):
-        _j2am = defaultdict(list)
-        for am, am_j_list in self.am2j.items():
-            for j in am_j_list:
-                _j2am[j].append(am)
-
-        return _j2am
-
-    @cached_property
-    def j2p(self):
-        return {
-            j: [p for p in range(self.nprs) if self.lu2pr_pj[p, j]]
-            for j in range(self.n_ag_lus)
-        }
-
-    @cached_property
-    def ag_lu2cells(self):
-        # Make an index of each cell permitted to transform to each land use / land management combination
-        return {
-            (m, j): np.where(self.ag_x_mrj[m, :, j])[0]
-            for j in range(self.n_ag_lus)
-            for m in range(self.n_ag_lms)
-        }
-
-    @cached_property
-    def non_ag_lu2cells(self):
-        return {k: np.where(self.non_ag_x_rk[:, k])[0] for k in range(self.n_non_ag_lus)}
+class SolverSolution:
+    lumap: np.ndarray
+    lmmap: np.ndarray
+    ammaps: dict[str, np.ndarray]
+    ag_X_mrj: np.ndarray
+    non_ag_X_rk: np.ndarray
+    ag_man_X_mrj: np.ndarray
+    prod_data: dict[str, float]
+    obj_val: float
 
 
 class LutoSolver:
@@ -161,7 +71,7 @@ class LutoSolver:
     Class responsible for grouping the Gurobi model, relevant input data, and its variables.
     """
 
-    def __init__(self, input_data: InputData, d_c: np.array):
+    def __init__(self, input_data: SolverInputData, d_c: np.array):
         self._input_data = input_data
         self.d_c = d_c
         self.gurobi_model = gp.Model("LUTO " + settings.VERSION, env=gurenv)
@@ -773,7 +683,7 @@ class LutoSolver:
 
     def update_formulation(
         self,
-        input_data: InputData,
+        input_data: SolverInputData,
         d_c: np.array,
         old_ag_x_mrj: np.ndarray,
         old_non_ag_x_rk: np.ndarray,
@@ -957,7 +867,7 @@ class LutoSolver:
         self._add_biodiversity_limit_constraints()
 
 
-    def solve(self):
+    def solve(self) -> SolverSolution:
         print("Starting solve...\n")
 
         # Magic.
@@ -1111,15 +1021,16 @@ class LutoSolver:
 
         ag_X_mrj_processed[:, non_ag_bools_r, :] = False
         non_ag_X_rk_processed[~non_ag_bools_r, :] = False
-
-        return (
-            lumap,
-            lmmap,
-            ammaps,
-            ag_X_mrj_processed,
-            non_ag_X_sol_rk,
-            ag_man_X_mrj_processed,
-            prod_data,
+            
+        return SolverSolution(
+            lumap=lumap,
+            lmmap=lmmap,
+            ammaps=ammaps,
+            ag_X_mrj=ag_X_mrj_processed,
+            non_ag_X_rk=non_ag_X_sol_rk,
+            ag_man_X_mrj=ag_man_X_mrj_processed,
+            prod_data=prod_data,
+            obj_val=self.gurobi_model.ObjVal,
         )
 
     @property

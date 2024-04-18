@@ -1,15 +1,15 @@
 import numpy as np
 
+from luto.data import Data
 import luto.settings as settings
 from luto.non_ag_landuses import NON_AG_LAND_USES
 
 
-def get_cost_env_plantings(data) -> np.ndarray:
+def get_cost_env_plantings(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Returns
     -------
@@ -19,32 +19,30 @@ def get_cost_env_plantings(data) -> np.ndarray:
     return settings.ENV_PLANTING_COST_PER_HA_PER_YEAR * data.REAL_AREA
 
 
-def get_cost_rip_plantings(data) -> np.ndarray:
+def get_cost_rip_plantings(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Returns
     -------
     np.ndarray
-        Cost of environmental plantings for each cell. 1-D array Indexed by cell.
+        Cost of riparian plantings for each cell. 1-D array Indexed by cell.
     """
     return settings.RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR * data.REAL_AREA
 
 
-def get_cost_agroforestry(data) -> np.ndarray:
+def get_cost_agroforestry(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Returns
     -------
     np.ndarray
-        Cost of environmental plantings for each cell. 1-D array Indexed by cell.
+        Cost of agroforestry for each cell. 1-D array Indexed by cell.
     """
     return settings.AGROFORESTRY_COST_PER_HA_PER_YEAR * data.REAL_AREA
 
@@ -68,8 +66,7 @@ def get_cost_carbon_plantings_belt(data) -> np.ndarray:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Returns
     -------
@@ -79,12 +76,11 @@ def get_cost_carbon_plantings_belt(data) -> np.ndarray:
     return settings.CARBON_PLANTING_BELT_COST_PER_HA_PER_YEAR * data.REAL_AREA
 
 
-def get_cost_beccs(data) -> np.ndarray:
+def get_cost_beccs(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Returns
     -------
@@ -94,9 +90,15 @@ def get_cost_beccs(data) -> np.ndarray:
     return np.nan_to_num(data.BECCS_COSTS_AUD_HA_YR) * data.REAL_AREA
 
 
-def get_cost_matrix(data):
+def get_cost_matrix(data: Data):
     """
     Returns non-agricultural c_rk matrix of costs per cell and land use.
+
+    Parameters:
+    - data: The input data containing information about the cells and land use.
+
+    Returns:
+    - cost_matrix: A 2D numpy array of costs per cell and land use.
     """
 
     non_agr_c_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}

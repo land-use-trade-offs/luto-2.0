@@ -1,12 +1,13 @@
 import numpy as np
 from luto.non_ag_landuses import NON_AG_LAND_USES
+from luto.data import Data
 
-def get_quantity_env_plantings(data) -> np.ndarray:
+
+def get_quantity_env_plantings(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Returns
     -------
@@ -18,12 +19,11 @@ def get_quantity_env_plantings(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_rip_plantings(data) -> np.ndarray:
+def get_quantity_rip_plantings(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Returns
     -------
@@ -36,25 +36,24 @@ def get_quantity_rip_plantings(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_agroforestry(data) -> np.ndarray:
+def get_quantity_agroforestry(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Returns
     -------
     np.ndarray
         Indexed by (c, r): represents the quantity commodity c produced by cell r
-        if used for riparian plantings.
-        A matrix of zeros because riparian plantings doesn't produce anything.
+        if used for agroforestry.
+        A matrix of zeros because agroforestry doesn't produce anything.
     """
 
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_carbon_plantings_block(data) -> np.ndarray:
+def get_quantity_carbon_plantings_block(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
@@ -71,7 +70,7 @@ def get_quantity_carbon_plantings_block(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_carbon_plantings_belt(data) -> np.ndarray:
+def get_quantity_carbon_plantings_belt(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
@@ -88,7 +87,7 @@ def get_quantity_carbon_plantings_belt(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_beccs(data) -> np.ndarray:
+def get_quantity_beccs(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
@@ -105,11 +104,18 @@ def get_quantity_beccs(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_matrix(data) -> np.ndarray:
+def get_quantity_matrix(data: Data) -> np.ndarray:
     """
     Get the non-agricultural quantity matrix q_crk.
     Values represent the yield of each commodity c from the cell r when using
-        the non-agricultural land use k.
+    the non-agricultural land use k.
+
+    Parameters:
+    - data: The input data containing information about the land use and commodities.
+
+    Returns:
+    - np.ndarray: The non-agricultural quantity matrix q_crk.
+
     """
 
     non_agr_quantity_matrices = {use: np.zeros((data.NCMS, data.NCELLS, 1)) for use in NON_AG_LAND_USES}

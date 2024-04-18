@@ -1,8 +1,10 @@
 import numpy as np
 from luto.non_ag_landuses import NON_AG_LAND_USES
 
+from luto.data import Data
 
-def get_wreq_matrix_env_planting(data) -> np.ndarray:
+
+def get_wreq_matrix_env_planting(data: Data) -> np.ndarray:
     """
     Get water requirements vector of environmental plantings.
 
@@ -17,7 +19,7 @@ def get_wreq_matrix_env_planting(data) -> np.ndarray:
     return (data.WATER_YIELD_BASE_SR - data.WATER_YIELD_BASE) * data.REAL_AREA
 
 
-def get_wreq_matrix_rip_planting(data) -> np.ndarray:
+def get_wreq_matrix_rip_planting(data: Data) -> np.ndarray:
     """
     Get water requirements vector of riparian plantings.
 
@@ -33,7 +35,7 @@ def get_wreq_matrix_rip_planting(data) -> np.ndarray:
     return get_wreq_matrix_env_planting(data)
 
 
-def get_wreq_matrix_agroforestry(data) -> np.ndarray:
+def get_wreq_matrix_agroforestry(data: Data) -> np.ndarray:
     """
     Get water requirements vector of agroforestry.
 
@@ -88,14 +90,20 @@ def get_wreq_matrix_beccs(data) -> np.ndarray:
     return get_wreq_matrix_env_planting(data)
 
 
-def get_wreq_matrix(data) -> np.ndarray:
+def get_wreq_matrix(data: Data) -> np.ndarray:
     """
     Get the water requirements matrix for all non-agricultural land uses.
+
+    Parameters
+    ----------
+    data : object
+        The data object containing necessary information for calculating the water requirements.
 
     Returns
     -------
     np.ndarray
-        Indexed by (r, k) where r is cell and k is non-agricultural land usage.
+        The water requirements matrix for all non-agricultural land uses.
+        Indexed by (r, k) where r is the cell index and k is the non-agricultural land usage index.
     """
 
     non_agr_wreq_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}

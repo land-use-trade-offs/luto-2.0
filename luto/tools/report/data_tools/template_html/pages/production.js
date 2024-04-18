@@ -412,7 +412,7 @@ document.addEventListener("DOMContentLoaded", function () {
       verticalAlign: "top",
       layout: "vertical",
       x: 10,
-      y: -20,
+      y: -15,
     },
 
     tooltip: {

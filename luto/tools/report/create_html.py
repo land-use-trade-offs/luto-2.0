@@ -3,6 +3,7 @@ import shutil
 import pandas as pd
 from glob import glob
 
+from luto.data import Data
 from luto.tools.report.data_tools import get_all_files
 from luto.tools.report.data_tools.helper_func import (add_data_2_html, 
                                                       add_txt_2_html)
@@ -13,10 +14,8 @@ from luto.tools.report.data_tools.helper_func import (add_data_2_html,
 #         setting up working variables             #
 ####################################################
 
-def data2html(sim):
-
-    # Get the raw data directory
-    raw_data_dir = sim.path
+def data2html(raw_data_dir):
+    
 
     # Set the save directory    
     report_dir = f'{raw_data_dir}/DATA_REPORT'
