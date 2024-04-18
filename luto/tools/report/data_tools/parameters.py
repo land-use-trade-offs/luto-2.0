@@ -8,8 +8,11 @@ LU_CROPS = ['Apples','Citrus','Cotton','Grapes','Hay','Nuts','Other non-cereal c
             'Summer legumes','Summer oilseeds','Tropical stone fruit','Vegetables',
             'Winter cereals','Winter legumes','Winter oilseeds']
 
-LU_LVSTKS = ['Beef - modified land','Beef - natural land','Dairy - modified land',
-             'Dairy - natural land','Sheep - modified land','Sheep - natural land']
+LVSTK_NATURAL = ['Beef - natural land','Dairy - natural land','Sheep - natural land']
+
+LVSTK_MODIFIED = ['Beef - modified land','Dairy - modified land','Sheep - modified land']
+
+LU_LVSTKS = LVSTK_NATURAL + LVSTK_MODIFIED
 
 LU_UNALLOW = ['Unallocated - modified land','Unallocated - natural land']
 

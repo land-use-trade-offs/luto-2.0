@@ -82,8 +82,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:area_2_irrigation_area_wide
-  Highcharts.chart("area_2_irrigation_area_wide", {
+  // Chart:area_2_Water_supply_area_wide
+  Highcharts.chart("area_2_Water_supply_area_wide", {
     chart: {
       type: "column",
       marginRight: 200,
@@ -92,7 +92,7 @@ document.addEventListener("DOMContentLoaded", function () {
       text: "Total Area by Irrigation Type",
     },
     series: JSON.parse(
-      document.getElementById("area_2_irrigation_area_wide_csv").innerHTML
+      document.getElementById("area_2_Water_supply_area_wide_csv").innerHTML
     ),
     credits: {
       enabled: false,
