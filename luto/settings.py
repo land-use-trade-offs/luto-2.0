@@ -99,10 +99,10 @@ NEW_IRRIG_COST = 7500
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 10         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
+RESFACTOR = 7         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
 
 # How does the model run over time 
-MODE = 'timeseries'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
+MODE = 'snapshot'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****
@@ -222,7 +222,6 @@ AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per h
                     
 NON_AGRICULTURAL_LU_BASE_CODE = 100         # Non-agricultural land uses will appear on the land use map
                                             # offset by this amount (e.g. land use 0 will appear as 100)
-
 AGROFORESTRY_BIODIV_BENEFIT = 0.7
 
 # BECCS Parameters
@@ -234,7 +233,7 @@ BECCS_BIODIVERSITY_BENEFIT = 0
 # ---------------------------------------------------------------------------- #
 
 # Savanna burning cost per hectare per year ($/ha/yr)
-SAVBURN_COST_HA_YR = 20
+SAVBURN_COST_HA_YR = 100
 
 # The minimum value an agricultural management variable must take for the write_output function to consider it being used on a cell
 AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  
