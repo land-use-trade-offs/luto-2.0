@@ -794,18 +794,18 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ctlm['Year'] = yr_cal
         cthp['Year'] = yr_cal
         
-        ctlu.to_csv(os.path.join(path, f'crosstab-lumap_{yr_cal}.csv'))
-        ctlm.to_csv(os.path.join(path, f'crosstab-lmmap_{yr_cal}.csv'))
-        swlu.to_csv(os.path.join(path, f'switches-lumap_{yr_cal}.csv'))
-        swlm.to_csv(os.path.join(path, f'switches-lmmap_{yr_cal}.csv'))
-        cthp.to_csv(os.path.join(path, f'crosstab-irrstat_{yr_cal}.csv'))
-        swhp.to_csv(os.path.join(path, f'switches-irrstat_{yr_cal}.csv'))
+        ctlu.to_csv(os.path.join(path, f'crosstab-lumap_{yr_cal}.csv'), index=False)
+        ctlm.to_csv(os.path.join(path, f'crosstab-lmmap_{yr_cal}.csv'), index=False)
+        swlu.to_csv(os.path.join(path, f'switches-lumap_{yr_cal}.csv'), index=False)
+        swlm.to_csv(os.path.join(path, f'switches-lmmap_{yr_cal}.csv'), index=False)
+        cthp.to_csv(os.path.join(path, f'crosstab-irrstat_{yr_cal}.csv'), index=False)
+        swhp.to_csv(os.path.join(path, f'switches-irrstat_{yr_cal}.csv'), index=False)
         
         for am in AG_MANAGEMENTS_TO_LAND_USES:
             am_snake_case = tools.am_name_snake_case(am).replace("_", "-")
             ctass[am]['Year'] = yr_cal
-            ctass[am].to_csv(os.path.join(path, f'crosstab-amstat-{am_snake_case}_{yr_cal}.csv'))
-            swass[am].to_csv(os.path.join(path, f'switches-amstat-{am_snake_case}_{yr_cal}.csv'))
+            ctass[am].to_csv(os.path.join(path, f'crosstab-amstat-{am_snake_case}_{yr_cal}.csv'), index=False)
+            swass[am].to_csv(os.path.join(path, f'switches-amstat-{am_snake_case}_{yr_cal}.csv'), index=False)
 
 
 
