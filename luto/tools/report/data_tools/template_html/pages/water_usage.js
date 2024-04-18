@@ -203,7 +203,7 @@ document.addEventListener("DOMContentLoaded", function () {
       align: "right",
       layout: "vertical",
       x: 0,
-      y: -30,
+      y: -10,
       verticalAlign: "middle",
       itemMarginTop: 0,
       itemMarginBottom: 1,

@@ -536,7 +536,7 @@ document.addEventListener("DOMContentLoaded", function () {
       align: "right",
       verticalalign: "left",
       layout: "vertical",
-      x: 0,
+      x: -80,
       verticalAlign: "middle",
     },
 
@@ -703,7 +703,7 @@ document.addEventListener("DOMContentLoaded", function () {
       align: "right",
       verticalalign: "left",
       layout: "vertical",
-      x: 0,
+      x: -80,
       verticalAlign: "middle",
     },
 
