@@ -112,8 +112,8 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
 
-  // Chart:economics_1_ag_revenue_1_Irrigation_wide
-  Highcharts.chart("economics_1_ag_revenue_1_Irrigation_wide", {
+  // Chart:economics_1_ag_revenue_3_Water_supply_wide
+  Highcharts.chart("economics_1_ag_revenue_3_Water_supply_wide", {
     chart: {
       type: "column",
       marginRight: 200,
@@ -128,7 +128,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_1_ag_revenue_1_Irrigation_wide_csv").innerHTML
+      document.getElementById("economics_1_ag_revenue_3_Water_supply_wide_csv").innerHTML
     ),
 
     xAxis: {
@@ -168,66 +168,9 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:economics_1_ag_revenue_2_Source_wide
-  // Highcharts.chart("economics_1_ag_revenue_2_Source_wide", {
-  //   chart: {
-  //     type: "column",
-  //     marginRight: 200,
-  //   },
 
-  //   title: {
-  //     text: "Revenue by Agricultural Product",
-  //   },
-
-  //   credits: {
-  //     enabled: false,
-  //   },
-
-  //   data: {
-  //     csv: document.getElementById("economics_1_ag_revenue_2_Source_wide_csv")
-  //       .innerHTML,
-  //   },
-
-  //   yAxis: {
-  //     title: {
-  //       text: "Revenue (billion AU$)",
-  //     },
-  //   },
-
-  //   xAxis: {
-  //     tickPositions: year_ticks,
-  //   },
-
-  //   legend: {
-  //     align: "right",
-  //     verticalAlign: "left",
-  //     layout: "vertical",
-  //     x: 10,
-  //     y: 50,
-  //   },
-
-  //   tooltip: {
-  //     formatter: function () {
-  //       return `<b>Year:</b> ${this.x}<br><b>${
-  //         this.series.name
-  //       }:</b>${this.y.toFixed(2)}<br/>`;
-  //     },
-  //   },
-
-  //   plotOptions: {
-  //     column: {
-  //       stacking: "normal",
-  //     },
-  //   },
-
-  //   exporting: {
-  //     sourceWidth: 1200,
-  //     sourceHeight: 600,
-  //   },
-  // });
-
-  // Chart:economics_1_ag_revenue_3_Source_type_wide
-  Highcharts.chart("economics_1_ag_revenue_3_Source_type_wide", {
+  // Chart:economics_1_ag_revenue_1_Land-use_wide
+  Highcharts.chart("economics_1_ag_revenue_1_Land-use_wide", {
     chart: {
       type: "column",
       marginRight: 200,
@@ -242,7 +185,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_1_ag_revenue_3_Source_type_wide_csv").innerHTML
+      document.getElementById("economics_1_ag_revenue_1_Land-use_wide_csv").innerHTML
     ),
 
     yAxis: {
@@ -260,7 +203,7 @@ document.addEventListener("DOMContentLoaded", function () {
       verticalAlign: "left",
       layout: "vertical",
       x: 10,
-      y: 50,
+      y: 20,
     },
 
     tooltip: {
@@ -283,8 +226,8 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
 
-  // Chart:economics_1_ag_revenue_4_Type_wide
-  Highcharts.chart("economics_1_ag_revenue_4_Type_wide", {
+  // Chart:economics_1_ag_revenue_2_Type_wide
+  Highcharts.chart("economics_1_ag_revenue_2_Type_wide", {
     chart: {
       type: "column",
       marginRight: 200,
@@ -299,7 +242,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_1_ag_revenue_4_Type_wide_csv").innerHTML
+      document.getElementById("economics_1_ag_revenue_2_Type_wide_csv").innerHTML
     ),
 
     xAxis: {
@@ -340,64 +283,8 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
 
-
-  // Chart:economics_1_ag_revenue_5_crop_lvstk_wide
-  Highcharts.chart("economics_1_ag_revenue_5_crop_lvstk_wide", {
-    chart: {
-      type: "column",
-      marginRight: 200,
-    },
-
-    title: {
-      text: "Agricultural Revenue by Crop/Livestock",
-    },
-
-    series: JSON.parse(
-      document.getElementById("economics_1_ag_revenue_5_crop_lvstk_wide_csv").innerHTML
-    ),
-
-    credits: {
-      enabled: false,
-    },
-
-    yAxis: {
-      title: {
-        text: "Revenue (billion AU$)",
-      },
-    },
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-
-    legend: {
-      align: "right",
-      verticalAlign: "left",
-      layout: "vertical",
-      x: -50,
-      y: 280,
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-
-    plotOptions: {
-      column: {
-        stacking: "normal",
-      },
-    },
-
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-  // Chart:economics_2_ag_cost_1_Irrigation_wide
-  Highcharts.chart("economics_2_ag_cost_1_Irrigation_wide", {
+  // Chart:economics_2_ag_cost_3_Water_supply_wide
+  Highcharts.chart("economics_2_ag_cost_3_Water_supply_wide", {
     chart: {
       type: "column",
       marginRight: 200,
@@ -412,7 +299,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_2_ag_cost_1_Irrigation_wide_csv").innerHTML
+      document.getElementById("economics_2_ag_cost_3_Water_supply_wide_csv").innerHTML
     ),
 
     yAxis: {
@@ -451,8 +338,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:economics_2_ag_cost_2_Source_wide
-  Highcharts.chart("economics_2_ag_cost_2_Source_wide", {
+  // Chart:economics_2_ag_cost_1_Land-use_wide
+  Highcharts.chart("economics_2_ag_cost_1_Land-use_wide", {
     chart: {
       type: "column",
       marginRight: 200,
@@ -467,7 +354,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_2_ag_cost_2_Source_wide_csv").innerHTML
+      document.getElementById("economics_2_ag_cost_1_Land-use_wide_csv").innerHTML
     ),
 
     yAxis: {
@@ -506,63 +393,9 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // // Chart:economics_2_ag_cost_3_Source_type_wide
-  // Highcharts.chart('economics_2_ag_cost_3_Source_type_wide', {
-
-  //     chart: {
-  //         type: 'column',
-  //         marginRight: 200
-  //     },
-
-  //     title: {
-  //         text: 'Cost of Production by Commodity'
-  //     },
-
-  //     credits: {
-  //         enabled: false
-  //     },
-
-  //     data: {
-  //         csv: document.getElementById('economics_2_ag_cost_3_Source_type_wide_csv').innerHTML,
-  //     },
-
-  //     yAxis: {
-  //         title: {
-  //             text: 'Cost (billion AU$)'
-  //         },
-  //     },xAxis: {
-  //     tickPositions: tickposition
-  // },
-
-  //     legend: {
-  //         align: 'right',
-  //         verticalAlign: 'left',
-  //         layout: 'vertical',
-  //         x: 80,
-  //         y: 10
-
-  //     },
-
-  //     tooltip: {
-  //         formatter: function () {
-  //             return `<b>Year:</b> ${this.x}<br><b>${this.series.name}:</b>${this.y.toFixed(2)}<br/>`;
-  //         }
-  //     },
-
-  //     plotOptions: {
-  //         column: {
-  //             stacking: 'normal',
-  //         }
-  //     },
-
-  //     exporting: {
-  //         sourceWidth: 1200,
-  //         sourceHeight: 600,
-  //     }
-  // });
-
-  // Chart:economics_2_ag_cost_4_Type_wide
-  Highcharts.chart("economics_2_ag_cost_4_Type_wide", {
+  
+  // Chart:economics_2_ag_cost_2_Type_wide
+  Highcharts.chart("economics_2_ag_cost_2_Type_wide", {
     chart: {
       type: "column",
       marginRight: 200,
@@ -577,7 +410,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_2_ag_cost_4_Type_wide_csv").innerHTML
+      document.getElementById("economics_2_ag_cost_2_Type_wide_csv").innerHTML
     ),
 
     yAxis: {
@@ -616,125 +449,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:economics_2_ag_cost_5_crop_lvstk_wide
-  Highcharts.chart("economics_2_ag_cost_5_crop_lvstk_wide", {
-    chart: {
-      type: "column",
-      marginRight: 200,
-    },
 
-    title: {
-      text: "Agricultural Cost of by Crop/Livestock",
-    },
-
-    series: JSON.parse(
-      document.getElementById("economics_2_ag_cost_5_crop_lvstk_wide_csv").innerHTML
-    ),
-
-    credits: {
-      enabled: false,
-    },
-
-    yAxis: {
-      title: {
-        text: "Cost (billion AU$)",
-      },
-    },
-
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-
-    legend: {
-      align: "right",
-      verticalAlign: "left",
-      layout: "vertical",
-      x: -50,
-      y: 280,
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-
-    plotOptions: {
-      column: {
-        stacking: "normal",
-      },
-    },
-
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-  // Chart:economics_3_rev_cost_all
-
-  // Highcharts.chart("economics_3_rev_cost_all", {
-
-  //   chart: {
-  //     type: "columnrange",
-  //     marginRight: 200,
-  //   },
-
-  //   title: {
-  //     text: "Agricultural Revenue and Cost of Production",
-  //   },
-
-  //   credits: {
-  //     enabled: false,
-  //   },
-
-  //   series:
-  //     JSON.parse(
-  //       document.getElementById("economics_3_rev_cost_all_csv").innerText
-  //     )['series']
-  //   ,
-
-  //   xAxis: {
-  //     categories: JSON.parse(
-  //       document.getElementById("economics_3_rev_cost_all_csv").innerText
-  //     )['categories'],
-  //   },
-
-  //   yAxis: {
-  //     title: {
-  //       text: "Value (billion AU$)",
-  //     },
-  //   },
-
-  //   tooltip: {
-  //     formatter: function () {
-  //       return (
-  //         "<b>" +
-  //         this.series.name +
-  //         "</b>: " +
-  //         Highcharts.numberFormat(this.point.low, 2) +
-  //         " - " +
-  //         Highcharts.numberFormat(this.point.high, 2) +
-  //         " (billion AU$)"
-  //       );
-  //     },
-  //   },
-
-  //   plotOptions: {
-  //     columnrange: {
-  //       borderRadius: "50%",
-  //     },
-  //   },
-
-  //   legend: {
-  //     align: "right",
-  //     verticalAlign: "left",
-  //     layout: "vertical",
-  //     x: -50,
-  //     y: 280,
-  //   },
-  // });
 
   // Chart:economics_4_am_revenue_1_Land-use_wide
   Highcharts.chart("economics_4_am_revenue_1_Land-use_wide", {
@@ -847,8 +562,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:economics_4_am_revenue_3_Water_wide
-  Highcharts.chart("economics_4_am_revenue_3_Water_wide", {
+  // Chart:economics_4_am_revenue_3_Water_supply_wide
+  Highcharts.chart("economics_4_am_revenue_3_Water_supply_wide", {
     chart: {
       type: "column",
       marginRight: 200,
@@ -863,7 +578,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_4_am_revenue_3_Water_wide_csv").innerHTML
+      document.getElementById("economics_4_am_revenue_3_Water_supply_wide_csv").innerHTML
     ),
 
     yAxis: {
@@ -1015,8 +730,8 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
 
-  // Chart:economics_5_am_cost_3_Water_wide
-  Highcharts.chart("economics_5_am_cost_3_Water_wide", {
+  // Chart:economics_5_am_cost_3_Water_supply_wide
+  Highcharts.chart("economics_5_am_cost_3_Water_supply_wide", {
     chart: {
       type: "column",
       marginRight: 200,
@@ -1031,7 +746,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_5_am_cost_3_Water_wide_csv").innerHTML
+      document.getElementById("economics_5_am_cost_3_Water_supply_wide_csv").innerHTML
     ),
 
     yAxis: {
@@ -1316,7 +1031,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // Function to draw the chart
   draw_cost_ag2ag = function () {
 
-    let values = data_ag2ag['series'].find(item => item.year == slider_ag2ag.value)['data'];
+    let values = data_ag2ag['series'].find(item => item.Year == slider_ag2ag.value)['data'];
     let lastElements = values.map(sublist => sublist[sublist.length - 1]);
     let vale_min = Math.min(...lastElements.flat());
     let vale_max = Math.max(...lastElements.flat());
@@ -1542,7 +1257,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // Function to draw the chart
   draw_cost_ag2non_ag = function () {
 
-    values = data_ag2non_ag['series'].find(item => item.year == slider_ag2non_ag.value)['data'];
+    values = data_ag2non_ag['series'].find(item => item.Year == slider_ag2non_ag.value)['data'];
     lastElements = values.map(sublist => sublist[sublist.length - 1]);
     vale_min = Math.min(...lastElements.flat());
     vale_max = Math.max(...lastElements.flat());

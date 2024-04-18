@@ -5,9 +5,7 @@ import re
 import shutil
 import pandas as pd
 import numpy as np
-from pyparsing import C
 import luto.settings as settings
-from glob import glob
 from joblib import Parallel, delayed
 
 from luto.economics.off_land_commodity import get_demand_df
@@ -775,7 +773,10 @@ def save_report_data(raw_data_dir:str):
     # Plot_4-2: GHG from individual emission sectors (Mt)
     GHG_files_wide_onland = GHG_files_onland[['Year','Type','Value (Mt CO2e)']]
     GHG_files_wide_offland = Emission_offland[['Year','Type','Value (Mt CO2e)']]
+    
     GHG_files_wide = pd.concat([GHG_files_wide_onland,GHG_files_wide_offland],axis=0)
+    GHG_files_wide = GHG_files_wide.groupby(['Type','Year']).sum(numeric_only=True).reset_index()
+    
     
     GHG_files_wide = GHG_files_wide\
         .groupby(['Type'])[['Year','Value (Mt CO2e)']]\

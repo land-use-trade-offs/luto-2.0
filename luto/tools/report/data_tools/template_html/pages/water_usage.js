@@ -243,8 +243,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:water_5_volume_by_irrigation
-  Highcharts.chart("water_5_volume_by_irrigation", {
+  // Chart:water_5_volume_by_Water_supply
+  Highcharts.chart("water_5_volume_by_Water_supply", {
     chart: {
       type: "column",
       marginRight: 200,
@@ -259,7 +259,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("water_5_volume_by_irrigation_csv").innerHTML
+      document.getElementById("water_5_volume_by_Water_supply_csv").innerHTML
     ),
     xAxis: {
       tickPositions: year_ticks,
