@@ -436,15 +436,15 @@ def get_ecological_grazing_effect_g_mrj(data: Data, yr_idx):
 
 def get_savanna_burning_effect_g_mrj(data, g_mrj):
     """
-    Applies the effects of using ecological grazing to the GHG data
+    Applies the effects of using savanna burning to the GHG data
     for all relevant agr. land uses.
 
     Parameters:
     - data: The input data containing relevant information.
-    - g_mrj: The ecological grazing factor.
+    - g_mrj: The savanna burning factor.
 
     Returns:
-    - sb_g_mrj: The GHG data <unit: t/cell> with the effects of ecological grazing applied.
+    - sb_g_mrj: The GHG data <unit: t/cell> with the effects of savanna burning applied.
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
     sb_g_mrj = np.zeros((data.NLMS, data.NCELLS, nlus))
