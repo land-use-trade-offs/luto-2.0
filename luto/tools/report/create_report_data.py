@@ -166,15 +166,14 @@ def save_report_data(raw_data_dir:str):
 
     # Get the total area of each land use
     transition_mat = transition_df_area.pivot(index='From land-use', columns='To land-use', values='Area (km2)')
-    total_area_from = transition_mat.sum(axis=1)
+    transition_mat = transition_mat.reindex(columns=LANDUSE_ALL, fill_value=0)
+    total_area_from = transition_mat.sum(axis=1).values.reshape(-1, 1)
     
     # Calculate the percentage of each land use
     transition_df_pct = transition_mat / total_area_from * 100
     transition_df_pct = transition_df_pct.fillna(0).replace([np.inf, -np.inf], 0)
 
-
     # Add the total area to the transition matrix
-    transition_mat = transition_mat.reindex(columns=LANDUSE_ALL, fill_value=0)
     transition_mat['SUM'] = transition_mat.sum(axis=1)
     transition_mat.loc['SUM'] = transition_mat.sum(axis=0)
 
