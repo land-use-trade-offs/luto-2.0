@@ -883,27 +883,30 @@ class Data:
         self.BIODIV_SCORE_WEIGHTED = self.BIODIV_SCORE_RAW - (self.BIODIV_SCORE_RAW * (1 - conn_score) * CONNECTIVITY_WEIGHTING)
         self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = self.BIODIV_SCORE_WEIGHTED * np.where(self.SAVBURN_ELIGIBLE, LDS_BIODIVERSITY_VALUE, 1)
 
-        # Calculate total biodiversity target score as the quality-weighted sum of biodiv raw score over the study area 
-        biodiv_value_current = ( np.isin(self.LUMAP, 23) * self.BIODIV_SCORE_RAW +                                         # Biodiversity value of Unallocated - natural land 
-                                 np.isin(self.LUMAP, [2, 6, 15]) * self.BIODIV_SCORE_RAW * (1 - BIODIV_LIVESTOCK_IMPACT)   # Biodiversity value of livestock on natural land 
-                               ) * np.where(self.SAVBURN_ELIGIBLE, LDS_BIODIVERSITY_VALUE, 1) * self.REAL_AREA             # Reduce biodiversity value of area eligible for savanna burning 
+        # Calculate total biodiversity target score as the quality-weighted sum of biodiv raw score over the study area. Reduce biodiversity value of area eligible for savanna burning 
+        biodiv_value_current = ( np.isin(self.LUMAP, 23) * self.BIODIV_SCORE_WEIGHTED_LDS_BURNING +                                         # Biodiversity value of Unallocated - natural land 
+                                 np.isin(self.LUMAP, [2, 6, 15]) * self.BIODIV_SCORE_WEIGHTED_LDS_BURNING * (1 - BIODIV_LIVESTOCK_IMPACT)   # Biodiversity value of livestock on natural land 
+                               ) * self.REAL_AREA             
 
         biodiv_value_target = ( ( np.isin(self.LUMAP, [2, 6, 15, 23]) * self.BIODIV_SCORE_RAW * self.REAL_AREA - biodiv_value_current ) +  # On natural land calculate the difference between the raw biodiversity score and the current score
-                                np.isin(self.LUMAP, self.LU_MODIFIED_LAND) * self.BIODIV_SCORE_RAW * self.REAL_AREA                        # Calculate raw biodiversity score of modified land
+                                  np.isin(self.LUMAP, self.LU_MODIFIED_LAND) * self.BIODIV_SCORE_RAW * self.REAL_AREA                        # Calculate raw biodiversity score of modified land
                               ) * BIODIV_TARGET                                                                                            # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
+
+        # # Calculate total biodiversity target score as the quality-weighted sum of biodiv raw score over the study area 
+        # biodiv_value_current = ( np.isin(self.LUMAP, 23) * self.BIODIV_SCORE_RAW +                                         # Biodiversity value of Unallocated - natural land 
+        #                          np.isin(self.LUMAP, [2, 6, 15]) * self.BIODIV_SCORE_RAW * (1 - BIODIV_LIVESTOCK_IMPACT)   # Biodiversity value of livestock on natural land 
+        #                        ) * np.where(self.SAVBURN_ELIGIBLE, LDS_BIODIVERSITY_VALUE, 1) * self.REAL_AREA             # Reduce biodiversity value of area eligible for savanna burning 
+
+        # biodiv_value_target = ( ( np.isin(self.LUMAP, [2, 6, 15, 23]) * self.BIODIV_SCORE_RAW * self.REAL_AREA - biodiv_value_current ) +  # On natural land calculate the difference between the raw biodiversity score and the current score
+        #                         np.isin(self.LUMAP, self.LU_MODIFIED_LAND) * self.BIODIV_SCORE_RAW * self.REAL_AREA                        # Calculate raw biodiversity score of modified land
+        #                       ) * BIODIV_TARGET                                                                                            # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
                                 
         # Sum the current biodiversity value and the additional biodiversity score required to meet the target
-        self.TOTAL_BIODIV_TARGET_SCORE = biodiv_value_current.sum() + biodiv_value_target.sum()                         
+        self.TOTAL_BIODIV_SCORE_BASE_YEAR = biodiv_value_current.sum()
+        self.TOTAL_BIODIV_TARGET_SCORE = self.TOTAL_BIODIV_SCORE_BASE_YEAR + biodiv_value_target.sum()                         
 
-        """
-        TOTAL_BIODIV_TARGET_SCORE = ( 
-                                    np.isin(LUMAP, 23) * BIODIV_SCORE_RAW * REAL_AREA +                                                   # Biodiversity value of Unallocated - natural land 
-                                    np.isin(LUMAP, [2, 6, 15]) * BIODIV_SCORE_RAW * (1 - BIODIV_LIVESTOCK_IMPACT) * REAL_AREA +           # Biodiversity value of livestock on natural land 
-                                    np.isin(LUMAP, [2, 6, 15]) * BIODIV_SCORE_RAW * BIODIV_LIVESTOCK_IMPACT * BIODIV_TARGET * REAL_AREA + # Add 30% improvement to the degraded part of livestock on natural land
-                                    np.isin(LUMAP, LU_MODIFIED_LAND) * BIODIV_SCORE_RAW * BIODIV_TARGET * REAL_AREA                       # Add 30% improvement to modified land
-                                    ).sum() 
-        """
         print("Done.")
+
 
         ###############################################################
         # BECCS data.

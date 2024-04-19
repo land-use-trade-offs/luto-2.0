@@ -172,32 +172,6 @@ def get_agricultural_management_biodiversity_matrices(data: Data):
     }
 
 
-
-def get_base_year_biodiversity_score(data: Data):
-    """
-    Gets the biodiversity score of the base year (2010).
-
-    Parameters:
-    - data: The input data containing land use and biodiversity information.
-
-    Returns:
-    - The biodiversity score of the base year (2010).
-    """
-    biodiv_non_penalty_lus = get_non_penalty_land_uses(data)
-    livestock_nat_land_lus = get_livestock_natural_land_land_uses(data)
-
-    non_penalty_cells_2010 = np.isin(data.LUMAP, np.array(list(biodiv_non_penalty_lus))).astype(int)
-    livestock_cells_2010 = np.isin(data.LUMAP, np.array(list(livestock_nat_land_lus))).astype(int)
-
-    # Apply penalties for livestock land uses
-    biodiv_2010_non_pen_score = (non_penalty_cells_2010 * data.BIODIV_SCORE_RAW * data.REAL_AREA).sum()
-    biodiv_2010_pen_score = (1 - settings.BIODIV_LIVESTOCK_IMPACT) * (
-        livestock_cells_2010 * data.BIODIV_SCORE_RAW * data.REAL_AREA
-    ).sum()
-
-    return biodiv_2010_non_pen_score + biodiv_2010_pen_score
-
-
 def get_biodiversity_limits(data: Data, yr_cal: int):
     """
     Calculate the biodiversity limits for a given year.
@@ -221,7 +195,7 @@ def get_biodiversity_limits(data: Data, yr_cal: int):
         the target score.
 
     """
-    biodiv_score_2010 = get_base_year_biodiversity_score(data)
+    biodiv_score_2010 = data.TOTAL_BIODIV_SCORE_BASE_YEAR # get_base_year_biodiversity_score(data)
 
     no_years_to_reach_limit = settings.BIODIV_TARGET_ACHIEVEMENT_YEAR - data.YR_CAL_BASE
 
