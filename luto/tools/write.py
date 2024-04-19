@@ -1006,7 +1006,7 @@ def write_biodiversity(data: Data, yr_cal, path):
     else:
         # Limits are based on the 2010 biodiversity scores, with the base year
         # biodiversity score equal to the 
-        biodiv_score = ag_biodiversity.get_base_year_biodiversity_score(data)
+        biodiv_score = data.TOTAL_BIODIV_SCORE_BASE_YEAR # ag_biodiversity.get_base_year_biodiversity_score(data)
 
     # Add to dataframe
     df = pd.DataFrame({
