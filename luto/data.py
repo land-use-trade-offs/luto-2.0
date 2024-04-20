@@ -62,6 +62,7 @@ from luto.settings import (
     EGGS_AVG_WEIGHT,
     NON_AGRICULTURAL_LU_BASE_CODE,
     SAVBURN_COST_HA_YR,
+    BIODIV_GBF_TARGET_2_DICT,
 )
 
 
@@ -838,7 +839,7 @@ class Data:
                 kind="linear",
                 fill_value="extrapolate",
             )
-            keys = range(2010, 2101)
+            # keys = range(2010, 2101)
             for yr in range(2010, 2101):
                 self.GHG_TARGETS[yr] = f(yr)
         print("Done.")
@@ -874,37 +875,51 @@ class Data:
         biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5') )
 
         # Get the Zonation output score between 0 and 1. BIODIV_SCORE_RAW.sum() = 153 million
-        self.BIODIV_SCORE_RAW = biodiv_priorities['BIODIV_PRIORITY_SSP' + SSP].to_numpy(dtype = np.float32)
+        biodiv_score_raw = biodiv_priorities['BIODIV_PRIORITY_SSP' + SSP].to_numpy(dtype = np.float32)
 
         # Get the natural area connectivity score between 0 and 1 (1 is highly connected, 0 is not connected)
         conn_score = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.float32)
 
         # Calculate weighted biodiversity score
-        self.BIODIV_SCORE_WEIGHTED = self.BIODIV_SCORE_RAW - (self.BIODIV_SCORE_RAW * (1 - conn_score) * CONNECTIVITY_WEIGHTING)
+        self.BIODIV_SCORE_WEIGHTED = biodiv_score_raw - (biodiv_score_raw * (1 - conn_score) * CONNECTIVITY_WEIGHTING)
         self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = self.BIODIV_SCORE_WEIGHTED * np.where(self.SAVBURN_ELIGIBLE, LDS_BIODIVERSITY_VALUE, 1)
 
-        # Calculate total biodiversity target score as the quality-weighted sum of biodiv raw score over the study area. Reduce biodiversity value of area eligible for savanna burning 
+        # Calculate the quality-weighted sum of biodiv raw score over the study area. 
+        # Quality weighting includes connectivity score, land-use (i.e., livestock impacts), and land management (LDS burning impacts in area eligible for savanna burning) 
         biodiv_value_current = ( np.isin(self.LUMAP, 23) * self.BIODIV_SCORE_WEIGHTED_LDS_BURNING +                                         # Biodiversity value of Unallocated - natural land 
                                  np.isin(self.LUMAP, [2, 6, 15]) * self.BIODIV_SCORE_WEIGHTED_LDS_BURNING * (1 - BIODIV_LIVESTOCK_IMPACT)   # Biodiversity value of livestock on natural land 
-                               ) * self.REAL_AREA             
+                               ) * self.REAL_AREA    
+        
+        # Calculate the sum of biodiversity score lost to land degradation (i.e., raw score minus current score with current score on cropland being zero)
+        biodiv_value_degraded_land = ( ( np.isin(self.LUMAP, [2, 6, 15, 23]) * biodiv_score_raw * self.REAL_AREA - biodiv_value_current ) +   # On natural land calculate the difference between the raw biodiversity score and the current score
+                                       ( np.isin(self.LUMAP, self.LU_MODIFIED_LAND) * biodiv_score_raw * self.REAL_AREA )                     # Calculate raw biodiversity score of modified land
+                                     )                                                                                       
 
-        biodiv_value_target = ( ( np.isin(self.LUMAP, [2, 6, 15, 23]) * self.BIODIV_SCORE_RAW * self.REAL_AREA - biodiv_value_current ) +  # On natural land calculate the difference between the raw biodiversity score and the current score
-                                  np.isin(self.LUMAP, self.LU_MODIFIED_LAND) * self.BIODIV_SCORE_RAW * self.REAL_AREA                        # Calculate raw biodiversity score of modified land
-                              ) * BIODIV_TARGET                                                                                            # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
+        # Create a dictionary to hold the annual biodiversity target proportion data for GBF Target 2
+        biodiv_GBF_target_2_proportions_2010_2100 = {}
+        
+        # Create linear function f and interpolate annual biodiversity target proportions from target dictionary specified in settings
+        f = interp1d(
+            list(BIODIV_GBF_TARGET_2_DICT.keys()),
+            list(BIODIV_GBF_TARGET_2_DICT.values()),
+            kind = "linear",
+            fill_value = "extrapolate",
+        )
+        for yr in range(2010, 2101):
+            biodiv_GBF_target_2_proportions_2010_2100[yr] = f(yr).item()
+        
+        # Sum the current biodiversity score and the biodiversity score of degraded land
+        biodiv_value_current_total = biodiv_value_current.sum()
+        biodiv_value_degraded_total = biodiv_value_degraded_land.sum()
 
-        # # Calculate total biodiversity target score as the quality-weighted sum of biodiv raw score over the study area 
-        # biodiv_value_current = ( np.isin(self.LUMAP, 23) * self.BIODIV_SCORE_RAW +                                         # Biodiversity value of Unallocated - natural land 
-        #                          np.isin(self.LUMAP, [2, 6, 15]) * self.BIODIV_SCORE_RAW * (1 - BIODIV_LIVESTOCK_IMPACT)   # Biodiversity value of livestock on natural land 
-        #                        ) * np.where(self.SAVBURN_ELIGIBLE, LDS_BIODIVERSITY_VALUE, 1) * self.REAL_AREA             # Reduce biodiversity value of area eligible for savanna burning 
-
-        # biodiv_value_target = ( ( np.isin(self.LUMAP, [2, 6, 15, 23]) * self.BIODIV_SCORE_RAW * self.REAL_AREA - biodiv_value_current ) +  # On natural land calculate the difference between the raw biodiversity score and the current score
-        #                         np.isin(self.LUMAP, self.LU_MODIFIED_LAND) * self.BIODIV_SCORE_RAW * self.REAL_AREA                        # Calculate raw biodiversity score of modified land
-        #                       ) * BIODIV_TARGET                                                                                            # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
-                                
-        # Sum the current biodiversity value and the additional biodiversity score required to meet the target
-        self.TOTAL_BIODIV_SCORE_BASE_YEAR = biodiv_value_current.sum()
-        self.TOTAL_BIODIV_TARGET_SCORE = self.TOTAL_BIODIV_SCORE_BASE_YEAR + biodiv_value_target.sum()                         
-
+        # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
+        self.BIODIV_GBF_TARGET_2 = {}
+        
+        # For each year add current biodiversity score total and X% of degraded land which must be restored under GBF target 2
+        for yr in range(2010, 2101):
+            self.BIODIV_GBF_TARGET_2[yr] = biodiv_value_current_total + (biodiv_value_degraded_total * biodiv_GBF_target_2_proportions_2010_2100[yr]) 
+        
+        
         print("Done.")
 
 
@@ -953,7 +968,6 @@ class Data:
         self.WREQ_DRY_RJ = self.WREQ_DRY_RJ[self.MASK]                          # Water requirements for dryland landuses
         self.WATER_LICENCE_PRICE = self.WATER_LICENCE_PRICE[self.MASK]          # Int16
         self.WATER_DELIVERY_PRICE = self.WATER_DELIVERY_PRICE[self.MASK]        # Float32
-        # self.WATER_YIELD_BASE_DR = bdata.WATER_YIELD_BASE_DR[self.MASK]       # Float32
         self.WATER_YIELD_BASE_SR = self.WATER_YIELD_BASE_SR[self.MASK]          # Float32
         self.WATER_YIELD_BASE = self.WATER_YIELD_BASE[self.MASK]                # Float32
         self.FEED_REQ = self.FEED_REQ[self.MASK]                                # Float32
@@ -970,7 +984,6 @@ class Data:
         self.NATURAL_LAND_T_CO2_HA = self.NATURAL_LAND_T_CO2_HA[self.MASK]      # Float32
         self.SOIL_CARBON_AVG_T_CO2_HA = self.SOIL_CARBON_AVG_T_CO2_HA[self.MASK]
         self.AGGHG_IRRPAST = self.AGGHG_IRRPAST[self.MASK]                      # Float32
-        self.BIODIV_SCORE_RAW = self.BIODIV_SCORE_RAW[self.MASK]                # Float32
         self.BIODIV_SCORE_WEIGHTED = self.BIODIV_SCORE_WEIGHTED[self.MASK]      # Float32
         self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = (
             self.BIODIV_SCORE_WEIGHTED_LDS_BURNING[self.MASK]

@@ -99,10 +99,10 @@ NEW_IRRIG_COST = 7500
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 7         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
+RESFACTOR = 10         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
 
 # How does the model run over time 
-MODE = 'timeseries'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
+MODE = 'snapshot'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****
@@ -174,7 +174,7 @@ ep_annual_maintennance_cost_per_ha_per_year = 100
 ep_annual_ecosystem_services_benefit_per_ha_per_year = 100
 ENV_PLANTING_COST_PER_HA_PER_YEAR = ep_annual_maintennance_cost_per_ha_per_year - ep_annual_ecosystem_services_benefit_per_ha_per_year   # Yearly cost of maintaining one hectare of environmental plantings
 
-ENV_PLANTING_BIODIVERSITY_BENEFIT = 0.8    # Set benefit level of EP, AF, and RP (0 = none, 1 = full)
+ENV_PLANTING_BIODIVERSITY_BENEFIT = 0.85    # Set benefit level of EP, AF, and RP (0 = none, 1 = full)
 
 # Carbon Plantings Block Parameters
 cp_block_annual_maintennance_cost_per_ha_per_year = 100
@@ -206,7 +206,7 @@ RIPARIAN_PLANTING_BUFFER_WIDTH = 20
 RIPARIAN_PLANTING_FENCING_COST_PER_M = 2           # $ per linear metre
 RIPARIAN_PLANTING_TORTUOSITY_FACTOR = 0.5
 
-RIPARIAN_PLANTING_BIODIV_BENEFIT = 1.0
+RIPARIAN_PLANTING_BIODIV_BENEFIT = 1.2
 
 # Agroforestry Parameters
 af_annual_maintennance_cost_per_ha_per_year = 100
@@ -222,7 +222,7 @@ AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per h
                     
 NON_AGRICULTURAL_LU_BASE_CODE = 100         # Non-agricultural land uses will appear on the land use map
                                             # offset by this amount (e.g. land use 0 will appear as 100)
-AGROFORESTRY_BIODIV_BENEFIT = 0.7
+AGROFORESTRY_BIODIV_BENEFIT = 0.8
 
 # BECCS Parameters
 BECCS_BIODIVERSITY_BENEFIT = 0
@@ -293,16 +293,30 @@ WATER_REGION_DEF = 'Drainage Division'                 # 'River Region' or 'Drai
 CONNECTIVITY_WEIGHTING = 1
 
 # Set livestock impact on biodiversity (0 = no impact, 1 = total annihilation)
-BIODIV_LIVESTOCK_IMPACT = 0.5
+BIODIV_LIVESTOCK_IMPACT = 0.3
 
 # Biodiversity value under default late dry season savanna fire regime
-LDS_BIODIVERSITY_VALUE = 0.8  # For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value.
+LDS_BIODIVERSITY_VALUE = 0.85  # For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value.
 
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 BIODIVERSITY_LIMITS = 'on'             # 'on' or 'off'
 BIODIV_TARGET = 0.3
 BIODIV_TARGET_ACHIEVEMENT_YEAR = 2030
 
+"""
+Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
+Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
+
+"""
+# Set biodiversity targets in dictionary below (i.e., year: proportion of degraded land restored)
+BIODIV_GBF_TARGET_2_DICT = {                     
+              2010: 0,    # Proportion of degraded land restored in year 2010
+              2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
+              2050: 0.5,   # Principle from LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
+              2100: 0.5   # Stays at 2050 level
+             }            # (can add more years/targets)\
+
+    
 
 # ---------------------------------------------------------------------------- #
 # Cell Culling
