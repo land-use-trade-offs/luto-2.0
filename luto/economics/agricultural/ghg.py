@@ -450,8 +450,11 @@ def get_savanna_burning_effect_g_mrj(data, g_mrj):
     sb_g_mrj = np.zeros((data.NLMS, data.NCELLS, nlus))
 
     for m, j in itertools.product(range(data.NLMS), range(nlus)):
-        sb_g_mrj[m, :, j] = -data.SAVBURN_TOTAL_TCO2E_HA * data.REAL_AREA
-
+        # sb_g_mrj[m, :, j] = -data.SAVBURN_TOTAL_TCO2E_HA * data.REAL_AREA
+        sb_g_mrj[m, :, j] = np.where( data.SAVBURN_ELIGIBLE, 
+                                     -data.SAVBURN_TOTAL_TCO2E_HA * data.REAL_AREA, 
+                                      0
+                                    )
     return sb_g_mrj
 
 

@@ -93,7 +93,7 @@ def write_data(data: Data):
 
     # Write the area/quantity comparison between base-year and target-year for the timeseries mode
     begin_end_path = f"{data.path}/begin_end_compare_{years[0]}_{years[-1]}"
-    jobs += [delayed(write_output_single_year)(data, years[-1], f"{begin_end_path}/out_{years[-1]}", years[0])] if settings.MODE == 'timeseries' else None
+    jobs += [delayed(write_output_single_year)(data, years[-1], f"{begin_end_path}/out_{years[-1]}", years[0])] if settings.MODE == 'timeseries' else []
 
     # Parallel write the outputs for each year
     num_jobs = min(len(jobs), settings.WRITE_THREADS) if settings.PARALLEL_WRITE else 1   # Use the minimum between jobs_num and threads for parallel writing

@@ -877,21 +877,24 @@ class Data:
         # Get the Zonation output score between 0 and 1. BIODIV_SCORE_RAW.sum() = 153 million
         biodiv_score_raw = biodiv_priorities['BIODIV_PRIORITY_SSP' + SSP].to_numpy(dtype = np.float32)
 
-        # Get the natural area connectivity score between 0 and 1 (1 is highly connected, 0 is not connected)
-        conn_score = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.float32)
-
-        # Calculate weighted biodiversity score
-        self.BIODIV_SCORE_WEIGHTED = biodiv_score_raw - (biodiv_score_raw * (1 - conn_score) * CONNECTIVITY_WEIGHTING)
-        self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = self.BIODIV_SCORE_WEIGHTED * np.where(self.SAVBURN_ELIGIBLE, LDS_BIODIVERSITY_VALUE, 1)
+        # Get the distance (km) of modified grid cells to nearest natural cell (natural areas have a distance of 0).
+        dist_to_natural = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.float32)
+        
+        # Linearly rescale distance to natural areas to a multiplier score and invert (1 being natural areas and modified land adjacent to natural areas, grading to CONNECTIVITY_WEIGHTING score for the most distant cell)
+        conn_score = 1 - np.interp(dist_to_natural, (dist_to_natural.min(), dist_to_natural.max()), (0, 1)).astype('float32')
+        
+        # Calculate biodiversity score adjusted for landscape connectivity. Note BIODIV_SCORE_WEIGHTED = biodiv_score_raw on natural land
+        self.BIODIV_SCORE_WEIGHTED = biodiv_score_raw * conn_score
+        self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = biodiv_score_raw * np.where(self.SAVBURN_ELIGIBLE, LDS_BIODIVERSITY_VALUE, 1)
 
         # Calculate the quality-weighted sum of biodiv raw score over the study area. 
-        # Quality weighting includes connectivity score, land-use (i.e., livestock impacts), and land management (LDS burning impacts in area eligible for savanna burning) 
-        biodiv_value_current = ( np.isin(self.LUMAP, 23) * self.BIODIV_SCORE_WEIGHTED_LDS_BURNING +                                         # Biodiversity value of Unallocated - natural land 
-                                 np.isin(self.LUMAP, [2, 6, 15]) * self.BIODIV_SCORE_WEIGHTED_LDS_BURNING * (1 - BIODIV_LIVESTOCK_IMPACT)   # Biodiversity value of livestock on natural land 
-                               ) * self.REAL_AREA    
+        # Quality weighting includes connectivity score, land-use (i.e., livestock impacts), and land management (LDS burning impacts in area eligible for savanna burning). Note BIODIV_SCORE_RAW = BIODIV_SCORE_WEIGHTED on natural land
+        biodiv_value_current = ( np.isin(self.LUMAP, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED_LDS_BURNING -   # Biodiversity value of Unallocated - natural land and livestock on natural land considering LDS burning impacts
+                                 np.isin(self.LUMAP, [2, 6, 15]) * BIODIV_SCORE_WEIGHTED * BIODIV_LIVESTOCK_IMPACT     # Biodiversity impact of livestock on natural land 
+                               ) * self.REAL_AREA                                                                 # Modified land assumed to have zero biodiversity value  
         
         # Calculate the sum of biodiversity score lost to land degradation (i.e., raw score minus current score with current score on cropland being zero)
-        biodiv_value_degraded_land = ( ( np.isin(self.LUMAP, [2, 6, 15, 23]) * biodiv_score_raw * self.REAL_AREA - biodiv_value_current ) +   # On natural land calculate the difference between the raw biodiversity score and the current score
+        biodiv_value_degraded_land = ( ( np.isin(self.LUMAP, [2, 6, 15, 23]) * BIODIV_SCORE_WEIGHTED * self.REAL_AREA - biodiv_value_current ) +   # On natural land calculate the difference between the raw biodiversity score and the current score
                                        ( np.isin(self.LUMAP, self.LU_MODIFIED_LAND) * biodiv_score_raw * self.REAL_AREA )                     # Calculate raw biodiversity score of modified land
                                      )                                                                                       
 
