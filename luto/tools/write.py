@@ -493,7 +493,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     if yr_idx == 0:
         base_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
         ag_transitions_cost_mat = {k: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))  
-                                for k in ['Establishment cost', 'Water license cost', 'Carborn releasing cost']}
+                                for k in ['Establishment cost', 'Water license cost', 'GHG emissions cost']}
     else:
         # Get the base_year mrj matirx 
         base_mrj = tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre])
@@ -1000,13 +1000,12 @@ def write_biodiversity(data: Data, yr_cal, path):
     # Get limits used as constraints in model
     biodiv_limit = ag_biodiversity.get_biodiversity_limits(data, yr_cal)
 
-    # Get GHG emissions from model
+    # Get biodiversity score from model
     if yr_cal >= data.YR_CAL_BASE + 1:
         biodiv_score = data.prod_data[yr_cal]['Biodiversity']
     else:
-        # Limits are based on the 2010 biodiversity scores, with the base year
-        # biodiversity score equal to the 
-        biodiv_score = data.TOTAL_BIODIV_SCORE_BASE_YEAR # ag_biodiversity.get_base_year_biodiversity_score(data)
+        # Return the base year biodiversity score
+        biodiv_score = data.BIODIV_GBF_TARGET_2[data.YR_CAL_BASE]
 
     # Add to dataframe
     df = pd.DataFrame({
@@ -1076,13 +1075,11 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
                                                             data.LANDMANS
                                                             ])).reset_index()
 
-        
         # Add to list of dataframes
         AM_dfs.append(df_am)
         
     # Combine all AM dataframes
     AM_df = pd.concat(AM_dfs)
-
 
     # Combine all dataframes
     biodiv_df = pd.concat([AG_df, NON_AG_df, AM_df])

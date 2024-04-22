@@ -174,11 +174,9 @@ def get_agricultural_management_biodiversity_matrices(data: Data):
 
 def get_biodiversity_limits(data: Data, yr_cal: int):
     """
-    Calculate the biodiversity limits for a given year.
+    Calculate the biodiversity limits for a given year used as a constraint.
 
-    The biodiversity score must hit `data.TOTAL_BIODIV_TARGET_SCORE` by 
-    `settings.BIODIV_TARGET_ACHIEVEMENT_YEAR`, beginning in 2010. 
-    It is assumed that the biodiversity score may increase linearly over this time.
+    The biodiversity score target timeline is specified in data.BIODIV_GBF_TARGET_2.
 
     Parameters:
     - data: The data object containing relevant information.
@@ -187,29 +185,6 @@ def get_biodiversity_limits(data: Data, yr_cal: int):
     Returns:
     - The biodiversity limit for the given year.
 
-    Note:
-    - If `yr_cal` is greater than or equal to `settings.BIODIV_TARGET_ACHIEVEMENT_YEAR`,
-        the limit is equal to `data.TOTAL_BIODIV_TARGET_SCORE`.
-    - If `yr_cal` is less than `settings.BIODIV_TARGET_ACHIEVEMENT_YEAR`, the limit is
-        calculated based on a linear increase from the base year biodiversity score to
-        the target score.
-
     """
-    biodiv_score_2010 = data.TOTAL_BIODIV_SCORE_BASE_YEAR # get_base_year_biodiversity_score(data)
 
-    no_years_to_reach_limit = settings.BIODIV_TARGET_ACHIEVEMENT_YEAR - data.YR_CAL_BASE
-
-    biodiv_target_score = data.TOTAL_BIODIV_TARGET_SCORE
-
-    biodiv_target_score = max(biodiv_target_score, biodiv_score_2010)
-    
-    if yr_cal >= settings.BIODIV_TARGET_ACHIEVEMENT_YEAR:
-        # For each year after the target achievement year, the limit is equal
-        # to that of the target achievement year.
-        return biodiv_target_score
-
-    biodiv_targets_each_year = np.linspace(
-        biodiv_score_2010, biodiv_target_score, no_years_to_reach_limit + 1
-    )
-
-    return biodiv_targets_each_year[yr_cal - data.YR_CAL_BASE]
+    return data.BIODIV_GBF_TARGET_2[yr_cal]
