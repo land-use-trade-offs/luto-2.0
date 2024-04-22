@@ -29,6 +29,9 @@ group_code,lu_code,lu_desc,lu_color_HEX
 2,15,Livestock,#ffa77f
 3,22,Unallocated - modified land,#00e6a9
 4,23,Unallocated - natural land,#ffebbe
-5,100,Environmental Plantings,#267300
-5,101,Environmental Plantings,#267300
-5,102,Environmental Plantings,#267300
+5,100,Environmental plantings (mixed species),#007a53
+5,101,Riparian buffer restoration (mixed species) ,#70a800
+5,102,Agroforestry (food + nature),#98e600
+5,103,Environmental plantings (mixed species),#007a53
+5,104,Environmental plantings (mixed species),#007a53
+5,105,BECCS (Bioenergy with Carbon Capture and Storage),#a8a800

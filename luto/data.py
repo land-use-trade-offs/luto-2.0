@@ -41,7 +41,6 @@ from luto.settings import (
     RISK_OF_REVERSAL,
     FIRE_RISK,
     CONNECTIVITY_WEIGHTING,
-    BIODIV_TARGET,
     SSP,
     RCP,
     SCENARIO,
@@ -62,6 +61,7 @@ from luto.settings import (
     EGGS_AVG_WEIGHT,
     NON_AGRICULTURAL_LU_BASE_CODE,
     SAVBURN_COST_HA_YR,
+    BIODIV_GBF_TARGET_2_DICT,
 )
 
 
@@ -199,7 +199,7 @@ class Data:
         ###############################################################
         # Agricultural economic data.
         ###############################################################
-        print("\tLoading agricultural economic data...", end=" ", flush=True)
+        print("\tLoading agricultural economic data...", flush=True)
 
         # Load the agro-economic data (constructed using dataprep.py).
         self.AGEC_CROPS = pd.read_hdf(os.path.join(INPUT_DIR, "agec_crops.h5"))
@@ -215,24 +215,24 @@ class Data:
 
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
         self.EXCLUDE = np.load(os.path.join(INPUT_DIR, "x_mrj.npy"))
-        print("Done.")
+
 
         ###############################################################
         # Miscellaneous parameters.
         ###############################################################
-        print("\tLoading miscellaneous parameters...", end=" ", flush=True)
+        print("\tLoading miscellaneous parameters...", flush=True)
 
         # Derive NCELLS (number of spatial cells) from AGEC.
         (self.NCELLS,) = self.AGEC_CROPS.index.shape
 
         # The base year, i.e. where year index yr_idx == 0.
         self.YR_CAL_BASE = 2010
-        print("Done.")
+
 
         ###############################################################
         # Set up lists of land-uses, commodities etc.
         ###############################################################
-        print("\tSetting up lists of land uses, commodities, etc...", end=" ", flush=True)
+        print("\tSetting up lists of land uses, commodities, etc...", flush=True)
 
         # Read in lexicographically ordered list of land-uses.
         self.AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'ag_landuses.csv')), header = None)[0].to_list()
@@ -353,12 +353,12 @@ class Data:
                     ... # Do nothing, this should be a crop.
 
         self.PR2CM = dict2matrix(self.CM2PR_DICT, self.COMMODITIES, self.PRODUCTS).T # Note the transpose.
-        print("Done.")
+
 
         ###############################################################
         # Agricultural management options data.
         ###############################################################
-        print("\tLoading agricultural management options' data...", end=" ", flush=True)
+        print("\tLoading agricultural management options' data...", flush=True)
 
         # Asparagopsis taxiformis data
         asparagopsis_file = os.path.join(INPUT_DIR, "20231101_Bundle_MR.xlsx")
@@ -465,12 +465,12 @@ class Data:
             # Horticulture land uses
             self.AGTECH_EI_DATA[lu] = horticulture_data
 
-        print("Done.")
+
 
         ###############################################################
         # Non-agricultural data.
         ###############################################################
-        print("\tLoading non-agricultural data...", end=" ", flush=True)
+        print("\tLoading non-agricultural data...", flush=True)
 
         # Load plantings economic data
         self.EP_EST_COST_HA = pd.read_hdf(os.path.join(INPUT_DIR, "ep_est_cost_ha.h5")).to_numpy(
@@ -529,12 +529,12 @@ class Data:
         self.EP2AG_TRANSITION_COSTS_HA = np.load(
             os.path.join(INPUT_DIR, "ep_to_ag_tmatrix.npy")
         )  # shape: (28,)
-        print("Done.")
+
 
         ###############################################################
         # Spatial layers.
         ###############################################################
-        print("\tSetting up spatial layers data...", end=" ", flush=True)
+        print("\tSetting up spatial layers data...", flush=True)
 
         # NLUM mask.
         with rasterio.open(os.path.join(INPUT_DIR, "NLUM_2010-11_mask.tif")) as rst:
@@ -569,12 +569,12 @@ class Data:
         self.RP_FENCING_LENGTH = (
             (2 * RIPARIAN_PLANTING_TORTUOSITY_FACTOR * self.STREAM_LENGTH) / self.REAL_AREA
         ).astype(np.float32)
-        print("Done.")
+
 
         ###############################################################
         # Masking and spatial coarse graining.
         ###############################################################
-        print("\tSetting up masking and spatial course graining data...", end=" ", flush=True)
+        print("\tSetting up masking and spatial course graining data...", flush=True)
 
         # Set resfactor multiplier
         self.RESMULT = RESFACTOR**2
@@ -603,12 +603,12 @@ class Data:
 
         # Create a mask indices array for subsetting arrays
         self.MINDICES = np.where(self.MASK)[0].astype(np.int32)
-        print("Done.")
+
 
         ###############################################################
         # Water data.
         ###############################################################
-        print("\tLoading water data...", end=" ", flush=True)
+        print("\tLoading water data...", flush=True)
 
         # Water requirements by land use -- LVSTK.
         wreq_lvstk_dry = pd.DataFrame()
@@ -698,12 +698,11 @@ class Data:
         # WATER_YIELD_NUNC_DR = wy_dr_file[list(wy_dr_file.keys())[0]][0]                   # This might go in the simulation module where year is specified to save loading into memory
         # WATER_YIELD_NUNC_SR = wy_sr_file[list(wy_sr_file.keys())[0]][0]
 
-        print("Done.")
 
         ###############################################################
         # Carbon sequestration by trees data.
         ###############################################################
-        print("\tLoading carbon sequestration by trees data...", end=" ", flush=True)
+        print("\tLoading carbon sequestration by trees data...", flush=True)
 
         # Load the remnant vegetation carbon data.
         rem_veg = pd.read_hdf(os.path.join(INPUT_DIR, "natural_land_t_co2_ha.h5")).to_numpy(
@@ -713,24 +712,24 @@ class Data:
 
         # Discount by fire risk.
         self.NATURAL_LAND_T_CO2_HA = rem_veg * (fire_risk.to_numpy() / 100)
-        print("Done.")
+
 
         ###############################################################
         # Climate change impact data.
         ###############################################################
-        print("\tLoading climate change data...", end=" ", flush=True)
+        print("\tLoading climate change data...", flush=True)
 
         self.CLIMATE_CHANGE_IMPACT = pd.read_hdf(
             os.path.join(
                 INPUT_DIR, "climate_change_impacts_" + RCP + "_CO2_FERT_" + CO2_FERT.upper() + ".h5"
             )
         )
-        print("Done.")
+
 
         ###############################################################
         # Livestock related data.
         ###############################################################
-        print("\tLoading livestock related data...", end=" ", flush=True)
+        print("\tLoading livestock related data...", flush=True)
 
         self.FEED_REQ = np.nan_to_num(
             pd.read_hdf(os.path.join(INPUT_DIR, "feed_req.h5")).to_numpy()
@@ -740,22 +739,22 @@ class Data:
         ).to_numpy()
         self.SAFE_PUR_NATL = pd.read_hdf(os.path.join(INPUT_DIR, "safe_pur_natl.h5")).to_numpy()
         self.SAFE_PUR_MODL = pd.read_hdf(os.path.join(INPUT_DIR, "safe_pur_modl.h5")).to_numpy()
-        print("Done.")
+
 
         ###############################################################
         # Productivity data.
         ###############################################################
-        print("\tLoading productivity data...", end=" ", flush=True)
+        print("\tLoading productivity data...", flush=True)
 
         # Yield increases.
         fpath = os.path.join(INPUT_DIR, "yieldincreases_bau2022.csv")
         self.BAU_PROD_INCR = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
-        print("Done.")
+
 
         ###############################################################
         # Demand data.
         ###############################################################
-        print("\tLoading demand data...", end=" ", flush=True)
+        print("\tLoading demand data...", flush=True)
 
         # Load demand data (actual production (tonnes, ML) by commodity) - from demand model     
         dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
@@ -781,13 +780,12 @@ class Data:
         # Convert to numpy array of shape (91, 26)
         self.DEMAND_C = self.DEMAND_C.to_numpy(dtype = np.float32).T
         self.D_CY = self.DEMAND_C # new demand is in tonnes rather than deltas
-        print("Done.")
-        
+       
 
         ###############################################################
         # Carbon emissions from off-land commodities.
         ###############################################################
-        print("\tLoading off-land commodities' carbon emissions data...", end=" ", flush=True)
+        print("\tLoading off-land commodities' carbon emissions data...", flush=True)
 
         # Read the greenhouse gas intensity data
         off_land_ghg_intensity = pd.read_csv(f'{INPUT_DIR}/agGHG_lvstk_off_land.csv')
@@ -811,12 +809,12 @@ class Data:
 
         # Get the GHG constraints for luto, shape is (91, 1)
         self.OFF_LAND_GHG_EMISSION_C = self.OFF_LAND_GHG_EMISSION.groupby(['YEAR']).sum(numeric_only=True).values
-        print("Done.")
+
 
         ###############################################################
         # GHG targets data.
         ###############################################################
-        print("\tLoading GHG targets data...", end=" ", flush=True)
+        print("\tLoading GHG targets data...", flush=True)
 
         # If GHG_LIMITS_TYPE == 'file' then import the Excel spreadsheet and import the results to a python dictionary {year: target (tCO2e), ...}
         if GHG_LIMITS_TYPE == "file":
@@ -838,15 +836,15 @@ class Data:
                 kind="linear",
                 fill_value="extrapolate",
             )
-            keys = range(2010, 2101)
+            # keys = range(2010, 2101)
             for yr in range(2010, 2101):
                 self.GHG_TARGETS[yr] = f(yr)
-        print("Done.")
+
 
         ###############################################################
         # Savanna burning data.
         ###############################################################
-        print("\tLoading savanna burning data...", end=" ", flush=True)
+        print("\tLoading savanna burning data...", flush=True)
 
         # Read in the dataframe
         savburn_df = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_savanna_burning.h5') )
@@ -860,12 +858,12 @@ class Data:
 
         # Cost per hectare in dollars from settings
         self.SAVBURN_COST_HA = SAVBURN_COST_HA_YR
-        print("Done.")
+
 
         ###############################################################
         # Biodiversity data.
         ###############################################################
-        print("\tLoading biodiversity data...", end=" ", flush=True)
+        print("\tLoading biodiversity data...", flush=True)
         """
         Kunming-Montreal Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
         Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
@@ -874,41 +872,58 @@ class Data:
         biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5') )
 
         # Get the Zonation output score between 0 and 1. BIODIV_SCORE_RAW.sum() = 153 million
-        self.BIODIV_SCORE_RAW = biodiv_priorities['BIODIV_PRIORITY_SSP' + SSP].to_numpy(dtype = np.float32)
+        biodiv_score_raw = biodiv_priorities['BIODIV_PRIORITY_SSP' + SSP].to_numpy(dtype = np.float32)
 
-        # Get the natural area connectivity score between 0 and 1 (1 is highly connected, 0 is not connected)
-        conn_score = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.float32)
+        # Get the distance (km) of modified grid cells to nearest natural cell (natural areas have a distance of 0).
+        dist_to_natural = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.float32)
+        
+        # Linearly rescale distance to natural areas to a multiplier score and invert (1 being natural areas and modified land adjacent to natural areas, grading to CONNECTIVITY_WEIGHTING score for the most distant cell)
+        conn_score = 1 - np.interp(dist_to_natural, (dist_to_natural.min(), dist_to_natural.max()), (0, 1)).astype('float32')
+        
+        # Calculate biodiversity score adjusted for landscape connectivity. Note BIODIV_SCORE_WEIGHTED = biodiv_score_raw on natural land
+        self.BIODIV_SCORE_WEIGHTED = biodiv_score_raw * conn_score
+        self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = biodiv_score_raw * np.where(self.SAVBURN_ELIGIBLE, LDS_BIODIVERSITY_VALUE, 1)
 
-        # Calculate weighted biodiversity score
-        self.BIODIV_SCORE_WEIGHTED = self.BIODIV_SCORE_RAW - (self.BIODIV_SCORE_RAW * (1 - conn_score) * CONNECTIVITY_WEIGHTING)
-        self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = self.BIODIV_SCORE_WEIGHTED * np.where(self.SAVBURN_ELIGIBLE, LDS_BIODIVERSITY_VALUE, 1)
+        # Calculate the quality-weighted sum of biodiv raw score over the study area. 
+        # Quality weighting includes connectivity score, land-use (i.e., livestock impacts), and land management (LDS burning impacts in area eligible for savanna burning). Note BIODIV_SCORE_RAW = BIODIV_SCORE_WEIGHTED on natural land
+        biodiv_value_current = ( np.isin(self.LUMAP, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED_LDS_BURNING -   # Biodiversity value of Unallocated - natural land and livestock on natural land considering LDS burning impacts
+                                 np.isin(self.LUMAP, [2, 6, 15]) * self.BIODIV_SCORE_WEIGHTED * BIODIV_LIVESTOCK_IMPACT     # Biodiversity impact of livestock on natural land 
+                               ) * self.REAL_AREA                                                                 # Modified land assumed to have zero biodiversity value  
+        
+        # Calculate the sum of biodiversity score lost to land degradation (i.e., raw score minus current score with current score on cropland being zero)
+        biodiv_value_degraded_land = ( ( np.isin(self.LUMAP, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED * self.REAL_AREA - biodiv_value_current ) +   # On natural land calculate the difference between the raw biodiversity score and the current score
+                                       ( np.isin(self.LUMAP, self.LU_MODIFIED_LAND) * biodiv_score_raw * self.REAL_AREA )                     # Calculate raw biodiversity score of modified land
+                                     )                                                                                       
 
-        # Calculate total biodiversity target score as the quality-weighted sum of biodiv raw score over the study area 
-        biodiv_value_current = ( np.isin(self.LUMAP, 23) * self.BIODIV_SCORE_RAW +                                         # Biodiversity value of Unallocated - natural land 
-                                 np.isin(self.LUMAP, [2, 6, 15]) * self.BIODIV_SCORE_RAW * (1 - BIODIV_LIVESTOCK_IMPACT)   # Biodiversity value of livestock on natural land 
-                               ) * np.where(self.SAVBURN_ELIGIBLE, LDS_BIODIVERSITY_VALUE, 1) * self.REAL_AREA             # Reduce biodiversity value of area eligible for savanna burning 
+        # Create a dictionary to hold the annual biodiversity target proportion data for GBF Target 2
+        biodiv_GBF_target_2_proportions_2010_2100 = {}
+        
+        # Create linear function f and interpolate annual biodiversity target proportions from target dictionary specified in settings
+        f = interp1d(
+            list(BIODIV_GBF_TARGET_2_DICT.keys()),
+            list(BIODIV_GBF_TARGET_2_DICT.values()),
+            kind = "linear",
+            fill_value = "extrapolate",
+        )
+        for yr in range(2010, 2101):
+            biodiv_GBF_target_2_proportions_2010_2100[yr] = f(yr).item()
+        
+        # Sum the current biodiversity score and the biodiversity score of degraded land
+        biodiv_value_current_total = biodiv_value_current.sum()
+        biodiv_value_degraded_total = biodiv_value_degraded_land.sum()
 
-        biodiv_value_target = ( ( np.isin(self.LUMAP, [2, 6, 15, 23]) * self.BIODIV_SCORE_RAW * self.REAL_AREA - biodiv_value_current ) +  # On natural land calculate the difference between the raw biodiversity score and the current score
-                                np.isin(self.LUMAP, self.LU_MODIFIED_LAND) * self.BIODIV_SCORE_RAW * self.REAL_AREA                        # Calculate raw biodiversity score of modified land
-                              ) * BIODIV_TARGET                                                                                            # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
-                                
-        # Sum the current biodiversity value and the additional biodiversity score required to meet the target
-        self.TOTAL_BIODIV_TARGET_SCORE = biodiv_value_current.sum() + biodiv_value_target.sum()                         
-
-        """
-        TOTAL_BIODIV_TARGET_SCORE = ( 
-                                    np.isin(LUMAP, 23) * BIODIV_SCORE_RAW * REAL_AREA +                                                   # Biodiversity value of Unallocated - natural land 
-                                    np.isin(LUMAP, [2, 6, 15]) * BIODIV_SCORE_RAW * (1 - BIODIV_LIVESTOCK_IMPACT) * REAL_AREA +           # Biodiversity value of livestock on natural land 
-                                    np.isin(LUMAP, [2, 6, 15]) * BIODIV_SCORE_RAW * BIODIV_LIVESTOCK_IMPACT * BIODIV_TARGET * REAL_AREA + # Add 30% improvement to the degraded part of livestock on natural land
-                                    np.isin(LUMAP, LU_MODIFIED_LAND) * BIODIV_SCORE_RAW * BIODIV_TARGET * REAL_AREA                       # Add 30% improvement to modified land
-                                    ).sum() 
-        """
-        print("Done.")
+        # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
+        self.BIODIV_GBF_TARGET_2 = {}
+        
+        # For each year add current biodiversity score total and X% of degraded land which must be restored under GBF target 2
+        for yr in range(2010, 2101):
+            self.BIODIV_GBF_TARGET_2[yr] = biodiv_value_current_total + (biodiv_value_degraded_total * biodiv_GBF_target_2_proportions_2010_2100[yr]) 
+        
 
         ###############################################################
         # BECCS data.
         ###############################################################
-        print("\tLoading BECCS data...", end=" ", flush=True)
+        print("\tLoading BECCS data...", flush=True)
 
         # Load dataframe
         beccs_df = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_BECCS_df.h5') )
@@ -919,14 +934,15 @@ class Data:
         self.BECCS_TCO2E_HA_YR = beccs_df['BECCS_TCO2E_HA_YR'].to_numpy()
         self.BECCS_MWH_HA_YR = beccs_df['BECCS_MWH_HA_YR'].to_numpy()
         
-        print("Done.")
+
         print("\nData loading complete.")
+
 
     def apply_resfactor(self):
         """
         Sub-set spatial data is based on the masks.
         """
-        print("Adjusting data for resfactor...", end=" ", flush=True)
+        print("Adjusting data for resfactor...", flush=True)
         self.NCELLS = self.MASK.sum()
         self.EXCLUDE = self.EXCLUDE[:, self.MASK, :]
         self.AGEC_CROPS = self.AGEC_CROPS.iloc[self.MASK]                       # MultiIndex Dataframe [4218733 rows x 342 columns]
@@ -950,7 +966,6 @@ class Data:
         self.WREQ_DRY_RJ = self.WREQ_DRY_RJ[self.MASK]                          # Water requirements for dryland landuses
         self.WATER_LICENCE_PRICE = self.WATER_LICENCE_PRICE[self.MASK]          # Int16
         self.WATER_DELIVERY_PRICE = self.WATER_DELIVERY_PRICE[self.MASK]        # Float32
-        # self.WATER_YIELD_BASE_DR = bdata.WATER_YIELD_BASE_DR[self.MASK]       # Float32
         self.WATER_YIELD_BASE_SR = self.WATER_YIELD_BASE_SR[self.MASK]          # Float32
         self.WATER_YIELD_BASE = self.WATER_YIELD_BASE[self.MASK]                # Float32
         self.FEED_REQ = self.FEED_REQ[self.MASK]                                # Float32
@@ -967,7 +982,6 @@ class Data:
         self.NATURAL_LAND_T_CO2_HA = self.NATURAL_LAND_T_CO2_HA[self.MASK]      # Float32
         self.SOIL_CARBON_AVG_T_CO2_HA = self.SOIL_CARBON_AVG_T_CO2_HA[self.MASK]
         self.AGGHG_IRRPAST = self.AGGHG_IRRPAST[self.MASK]                      # Float32
-        self.BIODIV_SCORE_RAW = self.BIODIV_SCORE_RAW[self.MASK]                # Float32
         self.BIODIV_SCORE_WEIGHTED = self.BIODIV_SCORE_WEIGHTED[self.MASK]      # Float32
         self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = (
             self.BIODIV_SCORE_WEIGHTED_LDS_BURNING[self.MASK]
@@ -991,7 +1005,6 @@ class Data:
         # with h5py.File(bdata.fname_sr, 'r') as wy_sr_file:
         #     self.WATER_YIELD_SR = wy_sr_file[list(wy_sr_file.keys())[0]][yr_idx][self.MASK]
 
-        print("Done.")
 
     def add_lumap(self, yr: int, lumap: np.ndarray):
         """

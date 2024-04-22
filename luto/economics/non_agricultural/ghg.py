@@ -147,7 +147,7 @@ def get_ghg_reduction_beccs(data, aggregate) -> np.ndarray|pd.DataFrame:
 
     # Tonnes of CO2e per ha, adjusted for resfactor
     if aggregate==True:
-        return -np.nan_to_num(data.BECCS_TCO2E_HA_YR) * data.REAL_AREA
+        return -np.nan_to_num(data.BECCS_TCO2E_HA_YR) * data.REAL_AREA * 0
     elif aggregate==False:
         return pd.DataFrame(-np.nan_to_num(data.BECCS_TCO2E_HA_YR) * data.REAL_AREA,columns=['BECCS'])
     else:

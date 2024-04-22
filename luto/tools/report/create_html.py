@@ -5,8 +5,8 @@ from glob import glob
 
 from luto.data import Data
 from luto.tools.report.data_tools import get_all_files
-from luto.tools.report.data_tools.helper_func import (add_data_2_html, 
-                                                      add_txt_2_html)
+from luto.tools.report.data_tools.helper_func import add_data_2_html, add_txt_2_html
+from luto.tools.report.data_tools.parameters import RENAME_AM_NON_AG
 
 
 
@@ -21,12 +21,11 @@ def data2html(raw_data_dir):
     report_dir = f'{raw_data_dir}/DATA_REPORT'
     
     # Check if the report directory exists
-    if not os.path.exists(report_dir):
-        raise Exception(f"Report directory not found: {report_dir}")
+    if not os.path.exists(report_dir): raise f"Report directory not found: {report_dir}"
     
     # Get the avaliable years for the model
     files = get_all_files(raw_data_dir)
-    years = sorted(files['year'].unique().tolist())
+    years = sorted(files['Year'].unique().tolist())
     years_str = str(years)
         
         
@@ -70,12 +69,11 @@ def data2html(raw_data_dir):
     
     # Add settings to the home page
     add_txt_2_html(f"{report_dir}/REPORT_HTML/index.html", f"{raw_data_dir}/model_run_settings.txt", "settingsTxt")
-    
-
 
     # Write avaliable years to each page .content[#model_years pre]
     for page in glob(f"{report_dir}/REPORT_HTML/pages/*.html"):
         add_txt_2_html(page, years_str, "model_years")
+        add_txt_2_html(page, str(RENAME_AM_NON_AG), "RENAME_AM_NON_AG")
     
         
         

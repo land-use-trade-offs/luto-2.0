@@ -249,7 +249,7 @@ def get_ghg_transition_penalties(data: Data, lumap) -> np.ndarray:
         lumap (1D array): The lumap object containing land use mapping.
 
     Returns:
-        np.ndarray, <unit : t/ha>.
+        np.ndarray, <unit : t/cell>.
     """
     ncells, n_ag_lus = data.REAL_AREA.shape[0], len(data.AGRICULTURAL_LANDUSES)
     # Set up empty array of penalties
@@ -445,15 +445,15 @@ def get_ecological_grazing_effect_g_mrj(data: Data, yr_idx):
 
 def get_savanna_burning_effect_g_mrj(data, g_mrj):
     """
-    Applies the effects of using ecological grazing to the GHG data
+    Applies the effects of using savanna burning to the GHG data
     for all relevant agr. land uses.
 
     Parameters:
     - data: The input data containing relevant information.
-    - g_mrj: The ecological grazing factor.
+    - g_mrj: The savanna burning factor.
 
     Returns:
-    - sb_g_mrj: The GHG data <unit: t/cell> with the effects of ecological grazing applied.
+    - sb_g_mrj: The GHG data <unit: t/cell> with the effects of savanna burning applied.
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
     sb_g_mrj = np.zeros((data.NLMS, data.NCELLS, nlus))
@@ -462,8 +462,11 @@ def get_savanna_burning_effect_g_mrj(data, g_mrj):
         return sb_g_mrj
 
     for m, j in itertools.product(range(data.NLMS), range(nlus)):
-        sb_g_mrj[m, :, j] = -data.SAVBURN_TOTAL_TCO2E_HA * data.REAL_AREA
-
+        # sb_g_mrj[m, :, j] = -data.SAVBURN_TOTAL_TCO2E_HA * data.REAL_AREA
+        sb_g_mrj[m, :, j] = np.where( data.SAVBURN_ELIGIBLE, 
+                                     -data.SAVBURN_TOTAL_TCO2E_HA * data.REAL_AREA, 
+                                      0
+                                    )
     return sb_g_mrj
 
 

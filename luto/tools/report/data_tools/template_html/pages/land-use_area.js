@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("area_1_total_area_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
     title: {
       text: "Total Area by Land-use and Agricultural Commodity",
@@ -52,12 +52,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: 5,
-      y: -15,
+      x: 0,
+      verticalAlign: "middle",
       itemStyle: {
-        fontSize: '13px'
+        fontSize: '12px'
       },
       itemMarginTop: 0,    // Reduce the top margin
       itemMarginBottom: 1, // Reduce the bottom margin
@@ -82,17 +81,17 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:area_2_irrigation_area_wide
-  Highcharts.chart("area_2_irrigation_area_wide", {
+  // Chart:area_2_Water_supply_area_wide
+  Highcharts.chart("area_2_Water_supply_area_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
     title: {
       text: "Total Area by Irrigation Type",
     },
     series: JSON.parse(
-      document.getElementById("area_2_irrigation_area_wide_csv").innerHTML
+      document.getElementById("area_2_Water_supply_area_wide_csv").innerHTML
     ),
     credits: {
       enabled: false,
@@ -108,10 +107,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: -50,
-      y: 250,
+      x: -250,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -137,7 +135,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("area_3_non_ag_lu_area_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
     title: {
       text: "Non-Agricultural Land-Use Area",
@@ -159,10 +157,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: 10,
-      y: 250,
+      x: 0,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -188,7 +185,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("area_4_am_total_area_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
     title: {
       text: "Agricultural Management Area by Type",
@@ -210,10 +207,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: 10,
-      y: 250,
+      x: -100,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -239,7 +235,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("area_5_am_lu_area_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
     title: {
       text: "Agricultural Management Area by Land-use Type",
@@ -261,10 +257,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: 10,
-      y: 0,
+      x: -150,
+      verticalAlign: "middle",
     },
 
     tooltip: {

@@ -18,6 +18,10 @@
 LUTO 2.0 temporary helper code.
 """
 
+# Protect against accidental running of entire script and deleting input data
+import sys
+sys.exit()
+
 # # To run LUTO, execute steps 1-4 below...
 
 # 1. Refresh input data (if required)
@@ -27,11 +31,12 @@ create_new_dataset()
 # 2. Run the simulation and profile memory use
 %load_ext memory_profiler
 import luto.simulation as sim
-%memit sim.run( 2010, 2050 )
+data = sim.load_data()
+%memit sim.run(data=data, base=2010, target=2050 )
 
 # 3. Write the ouputs to file
-from luto.tools.write import *
-write_outputs(sim)
+from luto.tools.write import write_outputs
+write_outputs(data)
 
 
 
@@ -48,12 +53,12 @@ write_outputs(data)
 
 
 
-
-
 # Generating report on existing output folder
 from luto.tools import report_on_path
 data_path = 'path_to_output_folder'
 report_on_path(data_path)  
+
+
 
 # Write input arrays to tiff files
 from luto.tools.report.write_input_data.array2tif import write_input2tiff

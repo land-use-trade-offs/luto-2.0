@@ -8,8 +8,11 @@ LU_CROPS = ['Apples','Citrus','Cotton','Grapes','Hay','Nuts','Other non-cereal c
             'Summer legumes','Summer oilseeds','Tropical stone fruit','Vegetables',
             'Winter cereals','Winter legumes','Winter oilseeds']
 
-LU_LVSTKS = ['Beef - modified land','Beef - natural land','Dairy - modified land',
-             'Dairy - natural land','Sheep - modified land','Sheep - natural land']
+LVSTK_NATURAL = ['Beef - natural land','Dairy - natural land','Sheep - natural land']
+
+LVSTK_MODIFIED = ['Beef - modified land','Dairy - modified land','Sheep - modified land']
+
+LU_LVSTKS = LVSTK_NATURAL + LVSTK_MODIFIED
 
 LU_UNALLOW = ['Unallocated - modified land','Unallocated - natural land']
 
@@ -18,10 +21,6 @@ LU_NATURAL = ['Beef - natural land',
               'Dairy - natural land',
               'Sheep - natural land',
               'Unallocated - natural land']
-
-
-
-
 
 
 # Define the commodity categories
@@ -34,8 +33,6 @@ COMMODITIES_ON_LAND = ['Apples','Beef live export','Beef meat','Citrus','Cotton'
 COMMODITIES_OFF_LAND = ['Aquaculture', 'Chicken', 'Eggs', 'Pork' ]
 
 COMMODITIES_ALL = COMMODITIES_ON_LAND + COMMODITIES_OFF_LAND
-
-
 
 
 
@@ -52,6 +49,24 @@ AG_LANDUSE_MERGE_LANDTYPE = ['Apples', 'Beef', 'Citrus', 'Cotton', 'Dairy', 'Gra
                              'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit', 'Unallocated - modified land', 
                              'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes', 'Winter oilseeds']
 
+
+# Define the renaming of the Agricultural-Managment and Non-Agricultural 
+RENAME_AM_NON_AG = {
+    # Agricultural Management
+    "AgTech EI": "Agricultural technology (energy)",
+    "Asparagopsis taxiformis": "Methane reduction (livestock)", 
+    "Ecological Grazing": "Regenerative agriculture (livestock)", 
+    "Precision Agriculture": "Agricultural technology (fertiliser)", 
+    "Savanna Burning": "Early dry-season savanna burning",
+    # Non-Agricultural Landuse
+    "Environmental Plantings": "Environmental plantings (mixed species)",
+    "Riparian Plantings": "Riparian buffer restoration (mixed species)",
+    "Agroforestry": "Agroforestry",
+    "Carbon Plantings (Block)": "Carbon plantings (monoculture)",
+    "Carbon Plantings (Belt)": "Farm forestry (food + timber)",
+    "BECCS": "BECCS (Bioenergy with Carbon Capture and Storage)"
+}
+
 # Read the land uses from the file
 with open('input/ag_landuses.csv') as f:
     AG_LANDUSE = [line.strip() for line in f]
@@ -59,11 +74,15 @@ with open('input/ag_landuses.csv') as f:
 with open('input/non_ag_landuses.csv') as f:
     NON_AG_LANDUSE = [line.strip() for line in f]
 
+# Rename the land uses
+NON_AG_LANDUSE = [RENAME_AM_NON_AG.get(item, item) for item in NON_AG_LANDUSE]
+
+# Merge the land uses
 LANDUSE_ALL = AG_LANDUSE + NON_AG_LANDUSE
 
 
-# Define the GHG categories
 
+# Define the GHG categories
 GHG_NAMES = {
     # Agricultural Landuse
     'TCO2E_CHEM_APPL': 'Chemical Application',

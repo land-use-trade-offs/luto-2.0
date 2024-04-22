@@ -360,7 +360,7 @@ def get_savanna_burning_effect_c_mrj(data: Data):
 
     sav_burning_effect = data.SAVBURN_COST_HA * data.REAL_AREA
 
-    big_number = 99999999
+    big_number = 999999999999
     savburn_ineligible_cells = np.where(data.SAVBURN_ELIGIBLE == 0)[0]
 
     for m, j in itertools.product(range(data.NLMS), range(nlus)):
