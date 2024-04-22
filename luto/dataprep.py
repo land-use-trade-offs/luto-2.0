@@ -23,6 +23,7 @@ and Brett Bryan, Deakin University
 
 # Load libraries
 import csv
+from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
 import shutil, os, time
@@ -493,57 +494,60 @@ def create_new_dataset():
     
     ############### Calculate climate impacts - includes data with and without CO2 fertilisation
     
-    CO2F_dict = {0: 'CO2_FERT_OFF', 1: 'CO2_FERT_ON'}
-    
-    for i in CO2F_dict.keys():
+    CO2F_dict = {'CO2_FERT_OFF': 0 , 'CO2_FERT_ON':1 }
+
+    # Distill list of RCP labels from dataset
+    rcps = sorted(list({col[1] for col in cci_raw.columns})) # curly brackets remove duplicates
+
+    # Create luid_desc -- old LU_ID to LU_DESC concordance table
+    luid_desc = lmap.groupby('LU_ID').first()['LU_DESC'].astype(str)
+
+
+    def process_climate_impacts(co2_on_off, rcp, cci_raw, concordance, luid_desc, outpath):
         
-        # Distill list of RCP labels from dataset
-        rcps = sorted(list({col[1] for col in cci_raw.columns})) # curly brackets remove duplicates
+        co2_on_off_idx = CO2F_dict[co2_on_off]
         
-        # Create luid_desc -- old LU_ID to LU_DESC concordance table
-        luid_desc = lmap.groupby('LU_ID').first()['LU_DESC'].astype(str)
+        # Slice off RCP data and get rid of MultiIndex.
+        cci_ptable = cci_raw[co2_on_off_idx][rcp].reset_index()
         
-        # Loop through RCPs and format climate change impacts table
-        for rcp in rcps:    # rcp = 'rcp2p6'
-            
-            print('Processing', CO2F_dict[i], rcp.upper())
-            
-            # Slice off RCP data and get rid of MultiIndex.
-            cci_ptable = cci_raw[i][rcp].reset_index()
-            
-            # Merge with SA2-Cell concordance to obtain cell-based table.
-            cci = concordance.merge(cci_ptable, on = 'SA2_ID', how = 'left')
-            
-            # Not all columns are needed, drop unwanted cols.
-            cci = cci.drop(['SA2_ID'], axis = 1)
-            
-            # Convert columns to integer (need 64-bit integer which can accomodate NaNs)
-            cci['IRRIGATION'] = cci['IRRIGATION'].astype('Int64')
-            cci['LU_ID'] = cci['LU_ID'].astype('Int64')
-            
-            # Create the MultiIndex structure
-            cci = cci.pivot( index = 'CELL_ID', 
-                             columns = ['IRRIGATION', 'LU_ID'], 
-                             values = ['YR_2020', 'YR_2050', 'YR_2080']
-                           ).dropna( axis = 'columns', how = 'all')
-            
-            # Name the YEAR level and reorder levels
-            cci.columns.set_names('YEAR', level = 0, inplace = True)
-            cci = cci.reorder_levels( ['IRRIGATION', 'LU_ID', 'YEAR'], axis = 1 )
-            
-            # Convert land management/use column names to strings and years to integers.
-            lmid_desc = {0: 'dry', 1: 'irr'}
-            coltups = [ (lmid_desc[col[0]], luid_desc[col[1]], int(col[2][3:])) 
-                        for col in cci.columns ]
-            cci.columns = pd.MultiIndex.from_tuples(coltups)
-            
-            # Sort land use in lexicographical order
-            cci.sort_index(axis = 1, inplace = True)
-            
-            # Write to HDF5 file.
-            fname = outpath + 'climate_change_impacts_' + rcp + '_' + CO2F_dict[i] + '.h5'
-            kname = 'climate_change_impacts_' + rcp 
-            cci.to_hdf(fname, key = kname, mode = 'w', format = 'fixed', index = False, complevel = 9)
+        # Merge with SA2-Cell concordance to obtain cell-based table.
+        cci = concordance.merge(cci_ptable, on = 'SA2_ID', how = 'left')
+        
+        # Not all columns are needed, drop unwanted cols.
+        cci = cci.drop(['SA2_ID'], axis = 1)
+        
+        # Convert columns to integer (need 64-bit integer which can accomodate NaNs)
+        cci['IRRIGATION'] = cci['IRRIGATION'].astype('Int64')
+        cci['LU_ID'] = cci['LU_ID'].astype('Int64')
+        
+        # Create the MultiIndex structure
+        cci = cci.pivot( index = 'CELL_ID', 
+                        columns = ['IRRIGATION', 'LU_ID'], 
+                        values = ['YR_2020', 'YR_2050', 'YR_2080']
+                    ).dropna( axis = 'columns', how = 'all')
+        
+        # Name the YEAR level and reorder levels
+        cci.columns.set_names('YEAR', level = 0, inplace = True)
+        cci = cci.reorder_levels( ['IRRIGATION', 'LU_ID', 'YEAR'], axis = 1 )
+        
+        # Convert land management/use column names to strings and years to integers.
+        lmid_desc = {0: 'dry', 1: 'irr'}
+        coltups = [ (lmid_desc[col[0]], luid_desc[col[1]], int(col[2][3:])) 
+                    for col in cci.columns ]
+        cci.columns = pd.MultiIndex.from_tuples(coltups)
+        
+        # Sort land use in lexicographical order
+        cci.sort_index(axis = 1, inplace = True)
+        
+        # Write to HDF5 file.
+        fname = outpath + 'climate_change_impacts_' + rcp + '_' + CO2F_dict[i] + '.h5'
+        kname = 'climate_change_impacts_' + rcp 
+        cci.to_hdf(fname, key = kname, mode = 'w', format = 'fixed', index = False, complevel = 9)
+
+    # Parallelise the process
+    jobs = ([delayed(process_climate_impacts)(on_off, rcp, cci_raw, concordance, luid_desc, outpath ) for on_off in CO2F_dict for rcp in rcps])
+    Parallel(n_jobs=len(CO2F_dict) * len(rcps), prefer='processes')(jobs) # Reduce processing time from ~25 min to ~3 min
+        
         
         
         

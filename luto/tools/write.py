@@ -158,14 +158,11 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
     
-       
-
-def write_settings(path):
-    # sourcery skip: extract-method, swap-nested-ifs, use-named-expression
-    """Write model run settings"""
+    
+def get_settings(setting_path:str):
 
     # Open the settings.py file
-    with open('luto/settings.py', 'r') as file:
+    with open(setting_path, 'r') as file:
         lines = file.readlines()
 
         # Regex patterns that matches variable assignments from settings
@@ -185,6 +182,16 @@ def write_settings(path):
 
         settings_dict['WATER_STRESS_FRACTION'] = 'None' if settings.WATER_USE_LIMITS == 'on' and settings.WATER_LIMITS_TYPE == 'pct_ag' else None
         settings_dict['WATER_USE_REDUCTION_PERCENTAGE'] = 'None' if settings.WATER_USE_LIMITS == 'on' and settings.WATER_LIMITS_TYPE == 'water_stress' else None
+        
+    return settings_dict
+    
+    
+       
+def write_settings(path):
+    # sourcery skip: extract-method, swap-nested-ifs, use-named-expression
+    """Write model run settings"""
+
+    settings_dict = get_settings('luto/settings.py')
 
     # Write the settings to a file
     with open(os.path.join(path, 'model_run_settings.txt'), 'w') as f:
