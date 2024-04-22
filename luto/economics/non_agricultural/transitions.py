@@ -62,7 +62,7 @@ def get_rip_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
         1-D array, indexed by cell.
     """
     base_costs = get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate)
-    fencing_cost = data.RP_FENCING_LENGTH * data.REAL_AREA * settings.RIPARIAN_PLANTING_FENCING_COST_PER_M
+    fencing_cost = data.RP_FENCING_LENGTH * data.REAL_AREA * settings.FENCING_COST_PER_M
     
     if separate:
         l_mrj = lumap2ag_l_mrj(lumap, lmmap)
@@ -82,7 +82,7 @@ def get_agroforestry_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separ
         1-D array, indexed by cell.
     """
     base_costs = get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate)
-    fencing_cost = settings.AF_FENCING_LENGTH * data.REAL_AREA * settings.AGROFORESTRY_FENCING_COST_PER_M
+    fencing_cost = settings.AF_FENCING_LENGTH * data.REAL_AREA * settings.FENCING_COST_PER_M
     
     if separate:
         l_mrj = lumap2ag_l_mrj(lumap, lmmap)
@@ -141,7 +141,7 @@ def get_carbon_plantings_belt_from_ag(data, yr_idx, lumap, lmmap, separate=False
         1-D array, indexed by cell.
     """
     base_costs = get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate)
-    fencing_cost = settings.CP_BELT_FENCING_LENGTH * data.REAL_AREA * settings.CARBON_PLANTINGS_BELT_FENCING_COST_PER_M
+    fencing_cost = settings.CP_BELT_FENCING_LENGTH * data.REAL_AREA * settings.FENCING_COST_PER_M
     
     if separate:
         l_mrj = lumap2ag_l_mrj(lumap, lmmap)

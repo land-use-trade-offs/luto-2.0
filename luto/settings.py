@@ -99,7 +99,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 10         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
 
 # How does the model run over time 
-MODE = 'snapshot'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
+MODE = 'timeseries'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****
@@ -166,6 +166,9 @@ THREADS = 50
 # Price of carbon per tonne - determines revenue from carbon sequestration (used when maximising revenue only)
 CARBON_PRICE_PER_TONNE = 100
 
+# Cost of fencing per linear metre
+FENCING_COST_PER_M = 0
+
 # Environmental Plantings Parameters
 ep_annual_maintennance_cost_per_ha_per_year = 100
 ep_annual_ecosystem_services_benefit_per_ha_per_year = 0
@@ -178,7 +181,7 @@ cp_block_annual_maintennance_cost_per_ha_per_year = 100
 cp_block_annual_ecosystem_services_benefit_per_ha_per_year = 0
 CARBON_PLANTING_BLOCK_COST_PER_HA_PER_YEAR = cp_block_annual_maintennance_cost_per_ha_per_year - cp_block_annual_ecosystem_services_benefit_per_ha_per_year   # Yearly cost of maintaining one hectare of carbon plantings (block)
 
-CARBON_PLANTING_BLOCK_BIODIV_BENEFIT = 0
+CARBON_PLANTING_BLOCK_BIODIV_BENEFIT = 0.1
 
 # Carbon Plantings Belt Parameters
 cp_belt_annual_maintennance_cost_per_ha_per_year = 100
@@ -187,38 +190,33 @@ CARBON_PLANTING_BELT_COST_PER_HA_PER_YEAR = cp_belt_annual_maintennance_cost_per
 
 CP_BELT_ROW_WIDTH = 20
 CP_BELT_ROW_SPACING = 40
-CARBON_PLANTINGS_BELT_FENCING_COST_PER_M = 2               # $ per linear metre
 CP_BELT_PROPORTION = CP_BELT_ROW_WIDTH / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
 cp_no_alleys_per_ha = 100 / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
 CP_BELT_FENCING_LENGTH = 100 * cp_no_alleys_per_ha * 2     # Length (average) of fencing required per ha in metres
 
-CARBON_PLANTING_BELT_BIODIV_BENEFIT = 0
+CARBON_PLANTING_BELT_BIODIV_BENEFIT = 0.1
 
 # Riparian Planting Parameters
 rp_annual_maintennance_cost_per_ha_per_year = 100
-rp_annual_ecosystem_services_benefit_per_ha_per_year = 200
+rp_annual_ecosystem_services_benefit_per_ha_per_year = 0
 RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR = rp_annual_maintennance_cost_per_ha_per_year - rp_annual_ecosystem_services_benefit_per_ha_per_year
 
 RIPARIAN_PLANTING_BUFFER_WIDTH = 20
-RIPARIAN_PLANTING_FENCING_COST_PER_M = 2           # $ per linear metre
 RIPARIAN_PLANTING_TORTUOSITY_FACTOR = 0.5
 
 RIPARIAN_PLANTING_BIODIV_BENEFIT = 1
 
 # Agroforestry Parameters
 af_annual_maintennance_cost_per_ha_per_year = 100
-af_annual_ecosystem_services_benefit_per_ha_per_year = 80
+af_annual_ecosystem_services_benefit_per_ha_per_year = 0
 AGROFORESTRY_COST_PER_HA_PER_YEAR = af_annual_maintennance_cost_per_ha_per_year - af_annual_ecosystem_services_benefit_per_ha_per_year
 
 AGROFORESTRY_ROW_WIDTH = 20
 AGROFORESTRY_ROW_SPACING = 40
-AGROFORESTRY_FENCING_COST_PER_M = 2           # $ per linear metre
 AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
 no_belts_per_ha = 100 / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
 AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per ha in metres
-                    
-NON_AGRICULTURAL_LU_BASE_CODE = 100         # Non-agricultural land uses will appear on the land use map
-                                            # offset by this amount (e.g. land use 0 will appear as 100)
+
 AGROFORESTRY_BIODIV_BENEFIT = 0.75
 
 # BECCS Parameters
@@ -267,7 +265,8 @@ GHG_LIMITS = {
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
 GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'    
 
-SOC_AMORTISATION = 30           # Number of years over which to spread (average) soil carbon accumulation
+# Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
+SOC_AMORTISATION = 15    
 
 
 # Water use limits and parameters *******************************
@@ -321,15 +320,19 @@ BIODIV_GBF_TARGET_2_DICT = {
     
 
 # ---------------------------------------------------------------------------- #
-# Cell Culling
+# Other parameters
 # ---------------------------------------------------------------------------- #
 
+# Cell culling
 CULL_MODE = 'absolute'      # cull to include at most MAX_LAND_USES_PER_CELL
 # CULL_MODE = 'percentage'    # cull the LAND_USAGE_THRESHOLD_PERCENTAGE % most expensive options
 # CULL_MODE = 'none'          # do no culling
 
 MAX_LAND_USES_PER_CELL = 12 
 LAND_USAGE_CULL_PERCENTAGE = 0.15
+
+# Non-ag output coding. Non-agricultural land uses will appear on the land use map offset by this amount (e.g. land use 0 will appear as 100)
+NON_AGRICULTURAL_LU_BASE_CODE = 100         
 
 
 
