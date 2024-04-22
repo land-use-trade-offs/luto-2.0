@@ -200,7 +200,7 @@ class Data:
         ###############################################################
         # Agricultural economic data.
         ###############################################################
-        print("\tLoading agricultural economic data...", end=" ", flush=True)
+        print("\tLoading agricultural economic data...", flush=True)
 
         # Load the agro-economic data (constructed using dataprep.py).
         self.AGEC_CROPS = pd.read_hdf(os.path.join(INPUT_DIR, "agec_crops.h5"))
@@ -216,24 +216,24 @@ class Data:
 
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
         self.EXCLUDE = np.load(os.path.join(INPUT_DIR, "x_mrj.npy"))
-        print("Done.")
+
 
         ###############################################################
         # Miscellaneous parameters.
         ###############################################################
-        print("\tLoading miscellaneous parameters...", end=" ", flush=True)
+        print("\tLoading miscellaneous parameters...", flush=True)
 
         # Derive NCELLS (number of spatial cells) from AGEC.
         (self.NCELLS,) = self.AGEC_CROPS.index.shape
 
         # The base year, i.e. where year index yr_idx == 0.
         self.YR_CAL_BASE = 2010
-        print("Done.")
+
 
         ###############################################################
         # Set up lists of land-uses, commodities etc.
         ###############################################################
-        print("\tSetting up lists of land uses, commodities, etc...", end=" ", flush=True)
+        print("\tSetting up lists of land uses, commodities, etc...", flush=True)
 
         # Read in lexicographically ordered list of land-uses.
         self.AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'ag_landuses.csv')), header = None)[0].to_list()
@@ -354,12 +354,12 @@ class Data:
                     ... # Do nothing, this should be a crop.
 
         self.PR2CM = dict2matrix(self.CM2PR_DICT, self.COMMODITIES, self.PRODUCTS).T # Note the transpose.
-        print("Done.")
+
 
         ###############################################################
         # Agricultural management options data.
         ###############################################################
-        print("\tLoading agricultural management options' data...", end=" ", flush=True)
+        print("\tLoading agricultural management options' data...", flush=True)
 
         # Asparagopsis taxiformis data
         asparagopsis_file = os.path.join(INPUT_DIR, "20231101_Bundle_MR.xlsx")
@@ -466,12 +466,12 @@ class Data:
             # Horticulture land uses
             self.AGTECH_EI_DATA[lu] = horticulture_data
 
-        print("Done.")
+
 
         ###############################################################
         # Non-agricultural data.
         ###############################################################
-        print("\tLoading non-agricultural data...", end=" ", flush=True)
+        print("\tLoading non-agricultural data...", flush=True)
 
         # Load plantings economic data
         self.EP_EST_COST_HA = pd.read_hdf(os.path.join(INPUT_DIR, "ep_est_cost_ha.h5")).to_numpy(
@@ -530,12 +530,12 @@ class Data:
         self.EP2AG_TRANSITION_COSTS_HA = np.load(
             os.path.join(INPUT_DIR, "ep_to_ag_tmatrix.npy")
         )  # shape: (28,)
-        print("Done.")
+
 
         ###############################################################
         # Spatial layers.
         ###############################################################
-        print("\tSetting up spatial layers data...", end=" ", flush=True)
+        print("\tSetting up spatial layers data...", flush=True)
 
         # NLUM mask.
         with rasterio.open(os.path.join(INPUT_DIR, "NLUM_2010-11_mask.tif")) as rst:
@@ -570,12 +570,12 @@ class Data:
         self.RP_FENCING_LENGTH = (
             (2 * RIPARIAN_PLANTING_TORTUOSITY_FACTOR * self.STREAM_LENGTH) / self.REAL_AREA
         ).astype(np.float32)
-        print("Done.")
+
 
         ###############################################################
         # Masking and spatial coarse graining.
         ###############################################################
-        print("\tSetting up masking and spatial course graining data...", end=" ", flush=True)
+        print("\tSetting up masking and spatial course graining data...", flush=True)
 
         # Set resfactor multiplier
         self.RESMULT = RESFACTOR**2
@@ -604,12 +604,12 @@ class Data:
 
         # Create a mask indices array for subsetting arrays
         self.MINDICES = np.where(self.MASK)[0].astype(np.int32)
-        print("Done.")
+
 
         ###############################################################
         # Water data.
         ###############################################################
-        print("\tLoading water data...", end=" ", flush=True)
+        print("\tLoading water data...", flush=True)
 
         # Water requirements by land use -- LVSTK.
         wreq_lvstk_dry = pd.DataFrame()
@@ -699,12 +699,11 @@ class Data:
         # WATER_YIELD_NUNC_DR = wy_dr_file[list(wy_dr_file.keys())[0]][0]                   # This might go in the simulation module where year is specified to save loading into memory
         # WATER_YIELD_NUNC_SR = wy_sr_file[list(wy_sr_file.keys())[0]][0]
 
-        print("Done.")
 
         ###############################################################
         # Carbon sequestration by trees data.
         ###############################################################
-        print("\tLoading carbon sequestration by trees data...", end=" ", flush=True)
+        print("\tLoading carbon sequestration by trees data...", flush=True)
 
         # Load the remnant vegetation carbon data.
         rem_veg = pd.read_hdf(os.path.join(INPUT_DIR, "natural_land_t_co2_ha.h5")).to_numpy(
@@ -714,24 +713,24 @@ class Data:
 
         # Discount by fire risk.
         self.NATURAL_LAND_T_CO2_HA = rem_veg * (fire_risk.to_numpy() / 100)
-        print("Done.")
+
 
         ###############################################################
         # Climate change impact data.
         ###############################################################
-        print("\tLoading climate change data...", end=" ", flush=True)
+        print("\tLoading climate change data...", flush=True)
 
         self.CLIMATE_CHANGE_IMPACT = pd.read_hdf(
             os.path.join(
                 INPUT_DIR, "climate_change_impacts_" + RCP + "_CO2_FERT_" + CO2_FERT.upper() + ".h5"
             )
         )
-        print("Done.")
+
 
         ###############################################################
         # Livestock related data.
         ###############################################################
-        print("\tLoading livestock related data...", end=" ", flush=True)
+        print("\tLoading livestock related data...", flush=True)
 
         self.FEED_REQ = np.nan_to_num(
             pd.read_hdf(os.path.join(INPUT_DIR, "feed_req.h5")).to_numpy()
@@ -741,22 +740,22 @@ class Data:
         ).to_numpy()
         self.SAFE_PUR_NATL = pd.read_hdf(os.path.join(INPUT_DIR, "safe_pur_natl.h5")).to_numpy()
         self.SAFE_PUR_MODL = pd.read_hdf(os.path.join(INPUT_DIR, "safe_pur_modl.h5")).to_numpy()
-        print("Done.")
+
 
         ###############################################################
         # Productivity data.
         ###############################################################
-        print("\tLoading productivity data...", end=" ", flush=True)
+        print("\tLoading productivity data...", flush=True)
 
         # Yield increases.
         fpath = os.path.join(INPUT_DIR, "yieldincreases_bau2022.csv")
         self.BAU_PROD_INCR = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
-        print("Done.")
+
 
         ###############################################################
         # Demand data.
         ###############################################################
-        print("\tLoading demand data...", end=" ", flush=True)
+        print("\tLoading demand data...", flush=True)
 
         # Load demand data (actual production (tonnes, ML) by commodity) - from demand model     
         dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
@@ -782,13 +781,12 @@ class Data:
         # Convert to numpy array of shape (91, 26)
         self.DEMAND_C = self.DEMAND_C.to_numpy(dtype = np.float32).T
         self.D_CY = self.DEMAND_C # new demand is in tonnes rather than deltas
-        print("Done.")
-        
+       
 
         ###############################################################
         # Carbon emissions from off-land commodities.
         ###############################################################
-        print("\tLoading off-land commodities' carbon emissions data...", end=" ", flush=True)
+        print("\tLoading off-land commodities' carbon emissions data...", flush=True)
 
         # Read the greenhouse gas intensity data
         off_land_ghg_intensity = pd.read_csv(f'{INPUT_DIR}/agGHG_lvstk_off_land.csv')
@@ -812,12 +810,12 @@ class Data:
 
         # Get the GHG constraints for luto, shape is (91, 1)
         self.OFF_LAND_GHG_EMISSION_C = self.OFF_LAND_GHG_EMISSION.groupby(['YEAR']).sum(numeric_only=True).values
-        print("Done.")
+
 
         ###############################################################
         # GHG targets data.
         ###############################################################
-        print("\tLoading GHG targets data...", end=" ", flush=True)
+        print("\tLoading GHG targets data...", flush=True)
 
         # If GHG_LIMITS_TYPE == 'file' then import the Excel spreadsheet and import the results to a python dictionary {year: target (tCO2e), ...}
         if GHG_LIMITS_TYPE == "file":
@@ -842,12 +840,12 @@ class Data:
             # keys = range(2010, 2101)
             for yr in range(2010, 2101):
                 self.GHG_TARGETS[yr] = f(yr)
-        print("Done.")
+
 
         ###############################################################
         # Savanna burning data.
         ###############################################################
-        print("\tLoading savanna burning data...", end=" ", flush=True)
+        print("\tLoading savanna burning data...", flush=True)
 
         # Read in the dataframe
         savburn_df = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_savanna_burning.h5') )
@@ -861,12 +859,12 @@ class Data:
 
         # Cost per hectare in dollars from settings
         self.SAVBURN_COST_HA = SAVBURN_COST_HA_YR
-        print("Done.")
+
 
         ###############################################################
         # Biodiversity data.
         ###############################################################
-        print("\tLoading biodiversity data...", end=" ", flush=True)
+        print("\tLoading biodiversity data...", flush=True)
         """
         Kunming-Montreal Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
         Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
@@ -922,14 +920,11 @@ class Data:
         for yr in range(2010, 2101):
             self.BIODIV_GBF_TARGET_2[yr] = biodiv_value_current_total + (biodiv_value_degraded_total * biodiv_GBF_target_2_proportions_2010_2100[yr]) 
         
-        
-        print("Done.")
-
 
         ###############################################################
         # BECCS data.
         ###############################################################
-        print("\tLoading BECCS data...", end=" ", flush=True)
+        print("\tLoading BECCS data...", flush=True)
 
         # Load dataframe
         beccs_df = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_BECCS_df.h5') )
@@ -940,14 +935,15 @@ class Data:
         self.BECCS_TCO2E_HA_YR = beccs_df['BECCS_TCO2E_HA_YR'].to_numpy()
         self.BECCS_MWH_HA_YR = beccs_df['BECCS_MWH_HA_YR'].to_numpy()
         
-        print("Done.")
+
         print("\nData loading complete.")
+
 
     def apply_resfactor(self):
         """
         Sub-set spatial data is based on the masks.
         """
-        print("Adjusting data for resfactor...", end=" ", flush=True)
+        print("Adjusting data for resfactor...", flush=True)
         self.NCELLS = self.MASK.sum()
         self.EXCLUDE = self.EXCLUDE[:, self.MASK, :]
         self.AGEC_CROPS = self.AGEC_CROPS.iloc[self.MASK]                       # MultiIndex Dataframe [4218733 rows x 342 columns]
@@ -1010,7 +1006,6 @@ class Data:
         # with h5py.File(bdata.fname_sr, 'r') as wy_sr_file:
         #     self.WATER_YIELD_SR = wy_sr_file[list(wy_sr_file.keys())[0]][yr_idx][self.MASK]
 
-        print("Done.")
 
     def add_lumap(self, yr: int, lumap: np.ndarray):
         """
