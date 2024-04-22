@@ -41,7 +41,6 @@ from luto.settings import (
     RISK_OF_REVERSAL,
     FIRE_RISK,
     CONNECTIVITY_WEIGHTING,
-    BIODIV_TARGET,
     SSP,
     RCP,
     SCENARIO,

@@ -18,6 +18,10 @@
 LUTO 2.0 temporary helper code.
 """
 
+# Protect against accidental running of entire script and deleting input data
+import sys
+sys.exit()
+
 # # To run LUTO, execute steps 1-4 below...
 
 # 1. Refresh input data (if required)

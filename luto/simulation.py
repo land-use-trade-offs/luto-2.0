@@ -41,7 +41,7 @@ def load_data() -> Data:
     data = Data(timestamp=timestamp)
 
     # Calculate base year production figures
-    print(f"Calculating base year ({data.YR_CAL_BASE}) production data...", end = " ", flush = True)
+    print(f"Calculating base year ({data.YR_CAL_BASE}) production data...", flush = True)
     yr_cal_base_prod_data = get_production( 
         data,
         data.YR_CAL_BASE,
@@ -50,7 +50,6 @@ def load_data() -> Data:
         get_base_am_vars(data.NCELLS, data.NLMS, data.N_AG_LUS),
     )
     data.add_production_data(data.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
-    print("Done.")
 
     # Apply resfactor for solve and set up initial data for base year
     data.apply_resfactor()

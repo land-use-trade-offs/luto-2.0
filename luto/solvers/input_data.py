@@ -132,203 +132,176 @@ class SolverInputData:
     
 
 def get_ag_c_mrj(data: Data, target_index):
-    print('Getting agricultural production cost matrices...', end = ' ', flush = True)
+    print('Getting agricultural production cost matrices...', flush = True)
     output = ag_cost.get_cost_matrices(data, target_index)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_c_rk(data: Data):
-    print('Getting non-agricultural production cost matrices...', end=' ', flush = True)
+    print('Getting non-agricultural production cost matrices...', flush = True)
     output = non_ag_cost.get_cost_matrix(data)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_r_mrj(data: Data, target_index):
-    print('Getting agricultural production revenue matrices...', end = ' ', flush = True)
+    print('Getting agricultural production revenue matrices...', flush = True)
     output = ag_revenue.get_rev_matrices(data, target_index)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_r_rk(data: Data):
-    print('Getting non-agricultural production revenue matrices...', end = ' ', flush = True)
+    print('Getting non-agricultural production revenue matrices...', flush = True)
     output = non_ag_revenue.get_rev_matrix(data)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_g_mrj(data: Data, target_index):
-    print('Getting agricultural GHG emissions matrices...', end = ' ', flush = True)
+    print('Getting agricultural GHG emissions matrices...', flush = True)
     output = ag_ghg.get_ghg_matrices(data, target_index)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_g_rk(data: Data):
-    print('Getting non-agricultural GHG emissions matrices...', end = ' ', flush = True)
+    print('Getting non-agricultural GHG emissions matrices...', flush = True)
     output = non_ag_ghg.get_ghg_matrix(data)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_w_mrj(data: Data, target_index):
-    print('Getting agricultural water requirement matrices...', end = ' ', flush = True)
+    print('Getting agricultural water requirement matrices...', flush = True)
     output = ag_water.get_wreq_matrices(data, target_index)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_b_mrj(data: Data):
-    print('Getting agricultural biodiversity requirement matrices...', end = ' ', flush = True)
+    print('Getting agricultural biodiversity requirement matrices...', flush = True)
     output = ag_biodiversity.get_breq_matrices(data)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_w_rk(data: Data):
-    print('Getting non-agricultural water requirement matrices...', end = ' ', flush = True)
+    print('Getting non-agricultural water requirement matrices...', flush = True)
     output = non_ag_water.get_wreq_matrix(data)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_b_rk(data: Data):
-    print('Getting non-agricultural biodiversity requirement matrices...', end = ' ', flush = True)
+    print('Getting non-agricultural biodiversity requirement matrices...', flush = True)
     output = non_ag_biodiversity.get_breq_matrix(data)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_q_mrp(data: Data, target_index):
-    print('Getting agricultural production quantity matrices...', end = ' ', flush = True)
+    print('Getting agricultural production quantity matrices...', flush = True)
     output = ag_quantity.get_quantity_matrices(data, target_index)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_q_crk(data: Data):
-    print('Getting non-agricultural production quantity matrices...', end = ' ', flush = True)
+    print('Getting non-agricultural production quantity matrices...', flush = True)
     output = non_ag_quantity.get_quantity_matrix(data)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_t_mrj(data: Data, target_index, base_year):
-    print('Getting agricultural transition cost matrices...', end = ' ', flush = True)
+    print('Getting agricultural transition cost matrices...', flush = True)
     output = ag_transition.get_transition_matrices( data
                                                   , target_index
                                                   , base_year
                                                   , data.lumaps
                                                   , data.lmmaps)
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_ghg_t_mrj(data: Data, base_year):
-    print('Getting agricultural transitions GHG emissions...', end = ' ', flush = True)
+    print('Getting agricultural transitions GHG emissions...', flush = True)
     output = ag_ghg.get_ghg_transition_penalties(data, data.lumaps[base_year])
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_to_non_ag_t_rk(data: Data, base_year):
-    print('Getting agricultural to non-agricultural transition cost matrices...', end = ' ', flush = True)
+    print('Getting agricultural to non-agricultural transition cost matrices...', flush = True)
     output = non_ag_transition.get_from_ag_transition_matrix(data
                                                            , base_year
                                                            , data.lumaps[base_year]
                                                            , data.lmmaps[base_year])
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_to_ag_t_mrj(data: Data, base_year):
-    print('Getting non-agricultural to agricultural transition cost matrices...', end = ' ', flush = True)
+    print('Getting non-agricultural to agricultural transition cost matrices...', flush = True)
     output = non_ag_transition.get_to_ag_transition_matrix(data, base_year, data.lumaps[base_year], data.lmmaps[base_year])
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_non_ag_t_rk(data: Data, base_year):
-    print('Getting non-agricultural transition cost matrices...', end = ' ', flush = True)
+    print('Getting non-agricultural transition cost matrices...', flush = True)
     output = non_ag_transition.get_non_ag_transition_matrix(data, base_year, data.lumaps[base_year], data.lmmaps[base_year])
-    print('Done.')
     return output.astype(np.float32)
 
 
 def get_ag_x_mrj(data: Data, base_year):
-    print('Getting agricultural exclude matrices...', end = ' ', flush = True)
+    print('Getting agricultural exclude matrices...', flush = True)
     output = ag_transition.get_exclude_matrices(data, base_year, data.lumaps)
-    print('Done.')
     return output
 
 
 def get_non_ag_x_rk(data: Data, base_year):
-    print('Getting non-agricultural exclude matrices...', end = ' ', flush = True)
+    print('Getting non-agricultural exclude matrices...', flush = True)
     output = non_ag_transition.get_exclude_matrices(data, data.lumaps[base_year])
-    print('Done.')
     return output
 
 
 def get_ag_man_costs(data: Data, target_index, ag_c_mrj: np.ndarray):
-    print('Getting agricultural management options\' cost effects...', end = ' ', flush = True)
+    print('Getting agricultural management options\' cost effects...', flush = True)
     output = ag_cost.get_agricultural_management_cost_matrices(data, ag_c_mrj, target_index)
-    print('Done.')
     return output
 
 
 def get_ag_man_ghg(data: Data, target_index, ag_g_mrj):
-    print('Getting agricultural management options\' GHG emission effects...', end = ' ', flush = True)
+    print('Getting agricultural management options\' GHG emission effects...', flush = True)
     output = ag_ghg.get_agricultural_management_ghg_matrices(data, ag_g_mrj, target_index)
-    print('Done.')
     return output
 
 
 def get_ag_man_quantity(data: Data, target_index, ag_q_mrp):
-    print('Getting agricultural management options\' quantity effects...', end = ' ', flush = True)
+    print('Getting agricultural management options\' quantity effects...', flush = True)
     output = ag_quantity.get_agricultural_management_quantity_matrices(data, ag_q_mrp, target_index)
-    print('Done.')
     return output
 
 
 def get_ag_man_revenue(data: Data, target_index, ag_r_mrj):
-    print('Getting agricultural management options\' revenue effects...', end = ' ', flush = True)
+    print('Getting agricultural management options\' revenue effects...', flush = True)
     output = ag_revenue.get_agricultural_management_revenue_matrices(data, ag_r_mrj, target_index)
-    print('Done.')
     return output
 
 
 def get_ag_man_transitions(data: Data, target_index, ag_t_mrj):
-    print('Getting agricultural management options\' transition cost effects...', end = ' ', flush = True)
+    print('Getting agricultural management options\' transition cost effects...', flush = True)
     output = ag_transition.get_agricultural_management_transition_matrices(data, ag_t_mrj, target_index)
-    print('Done.')
     return output
 
 
 def get_ag_man_water(data: Data, target_index, ag_w_mrj):
-    print('Getting agricultural management options\' water requirement effects...', end = ' ', flush = True)
+    print('Getting agricultural management options\' water requirement effects...', flush = True)
     output = ag_water.get_agricultural_management_water_matrices(data, ag_w_mrj, target_index)
-    print('Done.')
     return output
 
 
 def get_ag_man_biodiversity(data: Data):
-    print('Getting agricultural management options\' biodiversity effects...', end = ' ', flush = True)
+    print('Getting agricultural management options\' biodiversity effects...', flush = True)
     output = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data)
-    print('Done.')
     return output
 
 
 def get_ag_man_limits(data: Data, target_index):
-    print('Getting agricultural management options\' adoption limits...', end = ' ', flush = True)
+    print('Getting agricultural management options\' adoption limits...', flush = True)
     output = ag_transition.get_agricultural_management_adoption_limits(data, target_index)
-    print('Done.')
     return output
 
 
 def get_limits(data: Data, target: int):
-    print('Getting environmental limits...', end = ' ', flush = True)
+    print('Getting environmental limits...', flush = True)
     # Limits is a dictionary with heterogeneous value sets.
     limits = {}
     
@@ -336,7 +309,6 @@ def get_limits(data: Data, target: int):
     if settings.GHG_EMISSIONS_LIMITS == 'on':  limits['ghg'] = ag_ghg.get_ghg_limits(data, target)
     if settings.BIODIVERSITY_LIMITS == 'on':  limits['biodiversity'] = ag_biodiversity.get_biodiversity_limits(data, target)
     
-    print('Done.')
     return limits
 
 
