@@ -28,42 +28,8 @@ import rasterio
 from scipy.interpolate import interp1d
 
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.settings import (
-    INPUT_DIR,
-    RESFACTOR,
-    MODE,
-    DEMAND_CONSTRAINT_TYPE,
-    OBJECTIVE,
-    PENALTY,
-    CO2_FERT,
-    SOC_AMORTISATION,
-    NON_AGRICULTURAL_LU_BASE_CODE,
-    RISK_OF_REVERSAL,
-    FIRE_RISK,
-    CONNECTIVITY_WEIGHTING,
-    SSP,
-    RCP,
-    SCENARIO,
-    DIET_DOM,
-    DIET_GLOB,
-    CONVERGENCE,
-    IMPORT_TREND,
-    WASTE,
-    FEED_EFFICIENCY,
-    GHG_LIMITS_TYPE,
-    GHG_LIMITS,
-    GHG_LIMITS_FIELD,
-    RIPARIAN_PLANTING_BUFFER_WIDTH,
-    RIPARIAN_PLANTING_TORTUOSITY_FACTOR,
-    BIODIV_LIVESTOCK_IMPACT,
-    LDS_BIODIVERSITY_VALUE,
-    OFF_LAND_COMMODITIES,
-    EGGS_AVG_WEIGHT,
-    NON_AGRICULTURAL_LU_BASE_CODE,
-    SAVBURN_COST_HA_YR,
-    BIODIV_GBF_TARGET_2_DICT,
-)
-
+import luto.settings as settings
+from luto.settings import INPUT_DIR
 
 
 def dict2matrix(d, fromlist, tolist):
@@ -154,7 +120,7 @@ def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
 
     Cells used for agricultural purposes have value 0 for all k.
     """
-    base_code = NON_AGRICULTURAL_LU_BASE_CODE
+    base_code = settings.NON_AGRICULTURAL_LU_BASE_CODE
     non_ag_lu_codes = list(range(base_code, base_code + num_non_ag_land_uses))
 
     # Set up a container array of shape r, k.
@@ -238,8 +204,8 @@ class Data:
         self.AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'ag_landuses.csv')), header = None)[0].to_list()
         self.NON_AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'non_ag_landuses.csv')), header = None)[0].to_list()
 
-        self.NONAGLU2DESC = dict(zip(range(NON_AGRICULTURAL_LU_BASE_CODE, 
-                                    NON_AGRICULTURAL_LU_BASE_CODE + len(self.NON_AGRICULTURAL_LANDUSES)),
+        self.NONAGLU2DESC = dict(zip(range(settings.NON_AGRICULTURAL_LU_BASE_CODE, 
+                                    settings.NON_AGRICULTURAL_LU_BASE_CODE + len(self.NON_AGRICULTURAL_LANDUSES)),
                             self.NON_AGRICULTURAL_LANDUSES))
 
         self.DESC2NONAGLU = {value: key for key, value in self.NONAGLU2DESC.items()}
@@ -441,7 +407,7 @@ class Data:
         self.SOIL_CARBON_AVG_T_CO2_HA = (
             pd.read_hdf(os.path.join(INPUT_DIR, "soil_carbon_t_ha.h5")).to_numpy(dtype=np.float32)
             * (44 / 12)
-            / SOC_AMORTISATION
+            / settings.SOC_AMORTISATION
         )
 
         # Load AgTech EI data
@@ -483,40 +449,40 @@ class Data:
         # Load fire risk data (reduced carbon sequestration by this amount)
         fr_df = pd.read_hdf(os.path.join(INPUT_DIR, "fire_risk.h5"))
         fr_dict = {"low": "FD_RISK_PERC_5TH", "med": "FD_RISK_MEDIAN", "high": "FD_RISK_PERC_95TH"}
-        fire_risk = fr_df[fr_dict[FIRE_RISK]]
+        fire_risk = fr_df[fr_dict[settings.FIRE_RISK]]
 
-        # Load environmental plantings (block) GHG sequestration (aboveground carbon discounted by RISK_OF_REVERSAL and FIRE_RISK)
+        # Load environmental plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
         ep_df = pd.read_hdf(os.path.join(INPUT_DIR, "ep_block_avg_t_co2_ha_yr.h5"))
         self.EP_BLOCK_AVG_T_CO2_HA = (
-            (ep_df.EP_BLOCK_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - RISK_OF_REVERSAL))
+            (ep_df.EP_BLOCK_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
             + ep_df.EP_BLOCK_BG_AVG_T_CO2_HA_YR
         ).to_numpy(dtype=np.float32)
 
-        # Load environmental plantings (belt) GHG sequestration (aboveground carbon discounted by RISK_OF_REVERSAL and FIRE_RISK)
+        # Load environmental plantings (belt) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
         ep_df = pd.read_hdf(os.path.join(INPUT_DIR, "ep_belt_avg_t_co2_ha_yr.h5"))
         self.EP_BELT_AVG_T_CO2_HA = (
-            (ep_df.EP_BELT_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - RISK_OF_REVERSAL))
+            (ep_df.EP_BELT_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
             + ep_df.EP_BELT_BG_AVG_T_CO2_HA_YR
         ).to_numpy(dtype=np.float32)
 
-        # Load environmental plantings (riparian) GHG sequestration (aboveground carbon discounted by RISK_OF_REVERSAL and FIRE_RISK)
+        # Load environmental plantings (riparian) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
         ep_df = pd.read_hdf(os.path.join(INPUT_DIR, "ep_rip_avg_t_co2_ha_yr.h5"))
         self.EP_RIP_AVG_T_CO2_HA = (
-            (ep_df.EP_RIP_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - RISK_OF_REVERSAL))
+            (ep_df.EP_RIP_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
             + ep_df.EP_RIP_BG_AVG_T_CO2_HA_YR
         ).to_numpy(dtype=np.float32)
 
-        # Load carbon plantings (block) GHG sequestration (aboveground carbon discounted by RISK_OF_REVERSAL and FIRE_RISK)
+        # Load carbon plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
         cp_df = pd.read_hdf(os.path.join(INPUT_DIR, "cp_block_avg_t_co2_ha_yr.h5"))
         self.CP_BLOCK_AVG_T_CO2_HA = (
-            (cp_df.CP_BLOCK_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - RISK_OF_REVERSAL))
+            (cp_df.CP_BLOCK_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
             + cp_df.CP_BLOCK_BG_AVG_T_CO2_HA_YR
         ).to_numpy(dtype=np.float32)
 
-        # Load farm forestry [i.e. carbon plantings (belt)] GHG sequestration (aboveground carbon discounted by RISK_OF_REVERSAL and FIRE_RISK)
+        # Load farm forestry [i.e. carbon plantings (belt)] GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
         cp_df = pd.read_hdf(os.path.join(INPUT_DIR, "cp_belt_avg_t_co2_ha_yr.h5"))
         self.CP_BELT_AVG_T_CO2_HA = (
-            (cp_df.CP_BELT_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - RISK_OF_REVERSAL))
+            (cp_df.CP_BELT_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
             + cp_df.CP_BELT_BG_AVG_T_CO2_HA_YR
         ).to_numpy(dtype=np.float32)
 
@@ -562,12 +528,12 @@ class Data:
 
         # Calculate the proportion of the area of each cell within stream buffer (convert REAL_AREA from ha to m2 and divide m2 by m2)
         self.RP_PROPORTION = (
-            (2 * RIPARIAN_PLANTING_BUFFER_WIDTH * self.STREAM_LENGTH) / (self.REAL_AREA * 10000)
+            (2 * settings.RIPARIAN_PLANTING_BUFFER_WIDTH * self.STREAM_LENGTH) / (self.REAL_AREA * 10000)
         ).astype(np.float32)
 
         # Calculate the length of fencing required for each cell in per hectare terms for riparian plantings
         self.RP_FENCING_LENGTH = (
-            (2 * RIPARIAN_PLANTING_TORTUOSITY_FACTOR * self.STREAM_LENGTH) / self.REAL_AREA
+            (2 * settings.RIPARIAN_PLANTING_TORTUOSITY_FACTOR * self.STREAM_LENGTH) / self.REAL_AREA
         ).astype(np.float32)
 
 
@@ -577,32 +543,32 @@ class Data:
         print("\tSetting up masking and spatial course graining data...", flush=True)
 
         # Set resfactor multiplier
-        self.RESMULT = RESFACTOR**2
+        self.RESMULT = settings.RESFACTOR ** 2
 
         # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap (True means included cells. Boolean dtype.)
         self.MASK_LU_CODE = -1
         self.LUMASK = self.LUMAP != self.MASK_LU_CODE
 
         # Return combined land-use and resfactor mask
-        if RESFACTOR > 1:
+        if settings.RESFACTOR > 1:
 
-            # Create resfactor mask for spatial coarse-graining.
+            # Create settings.RESFACTOR mask for spatial coarse-graining.
             rf_mask = self.NLUM_MASK.copy()
             nonzeroes = np.nonzero(rf_mask)
-            rf_mask[::RESFACTOR, ::RESFACTOR] = 0
+            rf_mask[::settings.RESFACTOR, ::settings.RESFACTOR] = 0
             resmask = np.where(rf_mask[nonzeroes] == 0, True, False)
 
             # Superimpose resfactor mask upon land-use map mask (Boolean).
             self.MASK = self.LUMASK * resmask
 
-        elif RESFACTOR == 1:
+        elif settings.RESFACTOR == 1:
             self.MASK = self.LUMASK
 
         else:
-            raise KeyError("RESFACTOR setting invalid")
+            raise KeyError("Resfactor setting invalid")
 
-        # Create a mask indices array for subsetting arrays
-        self.MINDICES = np.where(self.MASK)[0].astype(np.int32)
+        # # Create a mask indices array for subsetting arrays
+        # self.MINDICES = np.where(self.MASK)[0].astype(np.int32)
 
 
         ###############################################################
@@ -688,8 +654,8 @@ class Data:
             dtype=np.float32
         )
 
-        # fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + SSP + '_2010-2100_dr_ml_ha.h5')
-        # fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + SSP + '_2010-2100_sr_ml_ha.h5')
+        # fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + settings.SSP + '_2010-2100_dr_ml_ha.h5')
+        # fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + settings.SSP + '_2010-2100_sr_ml_ha.h5')
 
         # wy_dr_file = h5py.File(fname_dr, 'r')
         # wy_sr_file = h5py.File(fname_sr, 'r')
@@ -721,7 +687,7 @@ class Data:
 
         self.CLIMATE_CHANGE_IMPACT = pd.read_hdf(
             os.path.join(
-                INPUT_DIR, "climate_change_impacts_" + RCP + "_CO2_FERT_" + CO2_FERT.upper() + ".h5"
+                INPUT_DIR, "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".h5"
             )
         )
 
@@ -760,22 +726,22 @@ class Data:
         dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
 
         # Select the demand data under the running scenario
-        self.DEMAND_DATA = dd.loc[(SCENARIO, 
-                                   DIET_DOM, 
-                                   DIET_GLOB, 
-                                   CONVERGENCE,
-                                   IMPORT_TREND, 
-                                   WASTE, 
-                                   FEED_EFFICIENCY)].copy()
+        self.DEMAND_DATA = dd.loc[(settings.SCENARIO, 
+                                   settings.DIET_DOM, 
+                                   settings.DIET_GLOB, 
+                                   settings.CONVERGENCE,
+                                   settings.IMPORT_TREND, 
+                                   settings.WASTE, 
+                                   settings.FEED_EFFICIENCY)].copy()
 
         # Convert eggs from count to tonnes
-        self.DEMAND_DATA.loc['eggs'] = self.DEMAND_DATA.loc['eggs'] * EGGS_AVG_WEIGHT / 1000 / 1000
+        self.DEMAND_DATA.loc['eggs'] = self.DEMAND_DATA.loc['eggs'] * settings.EGGS_AVG_WEIGHT / 1000 / 1000
 
         # Get the off-land commodities
-        self.DEMAND_OFFLAND = self.DEMAND_DATA.loc[self.DEMAND_DATA.query("COMMODITY in @OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
+        self.DEMAND_OFFLAND = self.DEMAND_DATA.loc[self.DEMAND_DATA.query("COMMODITY in @settings.OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
 
         # Remove off-land commodities
-        self.DEMAND_C = self.DEMAND_DATA.loc[self.DEMAND_DATA.query("COMMODITY not in @OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
+        self.DEMAND_C = self.DEMAND_DATA.loc[self.DEMAND_DATA.query("COMMODITY not in @settings.OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
 
         # Convert to numpy array of shape (91, 26)
         self.DEMAND_C = self.DEMAND_C.to_numpy(dtype = np.float32).T
@@ -817,22 +783,22 @@ class Data:
         print("\tLoading GHG targets data...", flush=True)
 
         # If GHG_LIMITS_TYPE == 'file' then import the Excel spreadsheet and import the results to a python dictionary {year: target (tCO2e), ...}
-        if GHG_LIMITS_TYPE == "file":
+        if settings.GHG_LIMITS_TYPE == "file":
             self.GHG_TARGETS = pd.read_excel(
                 os.path.join(INPUT_DIR, "GHG_targets.xlsx"), sheet_name="Data", index_col="YEAR"
             )
-            self.GHG_TARGETS = self.GHG_TARGETS[GHG_LIMITS_FIELD].to_dict()
+            self.GHG_TARGETS = self.GHG_TARGETS[settings.GHG_LIMITS_FIELD].to_dict()
 
-        # If GHG_LIMITS_TYPE == 'dict' then import the Excel spreadsheet and import the results to a python dictionary {year: target (tCO2e), ...}
-        elif GHG_LIMITS_TYPE == "dict":
+        # If settings.GHG_LIMITS_TYPE == 'dict' then import the Excel spreadsheet and import the results to a python dictionary {year: target (tCO2e), ...}
+        elif settings.GHG_LIMITS_TYPE == "dict":
 
             # Create a dictionary to hold the GHG target data
             self.GHG_TARGETS = {}  # pd.DataFrame(columns = ['TOTAL_GHG_TCO2E'])
 
             # # Create linear function f and interpolate
             f = interp1d(
-                list(GHG_LIMITS.keys()),
-                list(GHG_LIMITS.values()),
+                list(settings.GHG_LIMITS.keys()),
+                list(settings.GHG_LIMITS.values()),
                 kind="linear",
                 fill_value="extrapolate",
             )
@@ -857,7 +823,7 @@ class Data:
         self.SAVBURN_TOTAL_TCO2E_HA = savburn_df.AEA_TOTAL_TCO2E_HA.to_numpy()        # Total emissions abatement from EDS savanna burning
 
         # Cost per hectare in dollars from settings
-        self.SAVBURN_COST_HA = SAVBURN_COST_HA_YR
+        self.SAVBURN_COST_HA = settings.SAVBURN_COST_HA_YR
 
 
         ###############################################################
@@ -872,22 +838,22 @@ class Data:
         biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5') )
 
         # Get the Zonation output score between 0 and 1. BIODIV_SCORE_RAW.sum() = 153 million
-        biodiv_score_raw = biodiv_priorities['BIODIV_PRIORITY_SSP' + SSP].to_numpy(dtype = np.float32)
+        biodiv_score_raw = biodiv_priorities['BIODIV_PRIORITY_SSP' + settings.SSP].to_numpy(dtype = np.float32)
 
         # Get the distance (km) of modified grid cells to nearest natural cell (natural areas have a distance of 0).
         dist_to_natural = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.float32)
         
-        # Linearly rescale distance to natural areas to a multiplier score and invert (1 being natural areas and modified land adjacent to natural areas, grading to CONNECTIVITY_WEIGHTING score for the most distant cell)
+        # Linearly rescale distance to natural areas to a multiplier score and invert (1 being natural areas and modified land adjacent to natural areas, grading to settings.CONNECTIVITY_WEIGHTING score for the most distant cell)
         conn_score = 1 - np.interp(dist_to_natural, (dist_to_natural.min(), dist_to_natural.max()), (0, 1)).astype('float32')
         
         # Calculate biodiversity score adjusted for landscape connectivity. Note BIODIV_SCORE_WEIGHTED = biodiv_score_raw on natural land
         self.BIODIV_SCORE_WEIGHTED = biodiv_score_raw * conn_score
-        self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = biodiv_score_raw * np.where(self.SAVBURN_ELIGIBLE, LDS_BIODIVERSITY_VALUE, 1)
+        self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = biodiv_score_raw * np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)
 
         # Calculate the quality-weighted sum of biodiv raw score over the study area. 
         # Quality weighting includes connectivity score, land-use (i.e., livestock impacts), and land management (LDS burning impacts in area eligible for savanna burning). Note BIODIV_SCORE_RAW = BIODIV_SCORE_WEIGHTED on natural land
         biodiv_value_current = ( np.isin(self.LUMAP, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED_LDS_BURNING -   # Biodiversity value of Unallocated - natural land and livestock on natural land considering LDS burning impacts
-                                 np.isin(self.LUMAP, [2, 6, 15]) * self.BIODIV_SCORE_WEIGHTED * BIODIV_LIVESTOCK_IMPACT     # Biodiversity impact of livestock on natural land 
+                                 np.isin(self.LUMAP, [2, 6, 15]) * self.BIODIV_SCORE_WEIGHTED * settings.BIODIV_LIVESTOCK_IMPACT     # Biodiversity impact of livestock on natural land 
                                ) * self.REAL_AREA                                                                 # Modified land assumed to have zero biodiversity value  
         
         # Calculate the sum of biodiversity score lost to land degradation (i.e., raw score minus current score with current score on cropland being zero)
@@ -900,8 +866,8 @@ class Data:
         
         # Create linear function f and interpolate annual biodiversity target proportions from target dictionary specified in settings
         f = interp1d(
-            list(BIODIV_GBF_TARGET_2_DICT.keys()),
-            list(BIODIV_GBF_TARGET_2_DICT.values()),
+            list(settings.BIODIV_GBF_TARGET_2_DICT.keys()),
+            list(settings.BIODIV_GBF_TARGET_2_DICT.values()),
             kind = "linear",
             fill_value = "extrapolate",
         )
@@ -1096,27 +1062,27 @@ class Data:
         """Create a folder for storing outputs and return folder name."""
 
         # Get the years to write
-        if MODE == "snapshot":
+        if settings.MODE == "snapshot":
             yr_all = [base_year, target_year]
-        elif MODE == "timeseries":
+        elif settings.MODE == "timeseries":
             yr_all = list(range(base_year, target_year + 1))
 
         # Add some shorthand details about the model run
         post = (
             "_"
-            + DEMAND_CONSTRAINT_TYPE
+            + settings.DEMAND_CONSTRAINT_TYPE
             + "_"
-            + OBJECTIVE
+            + settings.OBJECTIVE
             + "_RF"
-            + str(RESFACTOR)
+            + str(settings.RESFACTOR)
             + "_P1e"
-            + str(int(math.log10(PENALTY)))
+            + str(int(math.log10(settings.PENALTY)))
             + "_"
             + str(yr_all[0])
             + "-"
             + str(yr_all[-1])
             + "_"
-            + MODE
+            + settings.MODE
             + "_"
             + str(int(self.GHG_TARGETS[yr_all[-1]] / 1e6))
             + "Mt"
@@ -1133,7 +1099,7 @@ class Data:
         )  # Skip creating lucc_separate for base year
 
         # Add the path for the comparison between base-year and target-year if in the timeseries mode
-        if MODE == "timeseries":
+        if settings.MODE == "timeseries":
             path_begin_end_compare = f"{self.path}/begin_end_compare_{yr_all[0]}_{yr_all[-1]}"
             paths = (
                 paths
