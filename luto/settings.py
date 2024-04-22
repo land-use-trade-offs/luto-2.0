@@ -99,10 +99,10 @@ NEW_IRRIG_COST = 7500
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 3         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
+RESFACTOR = 20         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
 
 # How does the model run over time 
-MODE = 'snapshot'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
+MODE = 'timeseries'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****
@@ -264,7 +264,7 @@ GHG_LIMITS = {
              }
 
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-GHG_LIMITS_FIELD = '1.5C (50%) excl. avoided emis'    
+GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'    
 
 SOC_AMORTISATION = 30           # Number of years over which to spread (average) soil carbon accumulation
 
@@ -289,8 +289,13 @@ WATER_REGION_DEF = 'Drainage Division'                 # 'River Region' or 'Drai
 
 # Biodiversity limits and parameters *******************************
 
-# Set the weighting of landscape connectivity on biodiversity value (0 (no influence) - 1 (full influence))
-CONNECTIVITY_WEIGHTING = 1
+# Set the influence of landscape connectivity on biodiversity value in modified land
+""" Applies to modified land only. The most distant cell receives this biodiversity score multiplier. Creates a
+    gradient of scores from 1 (natural land and modified land cells adjacent to natural land and water) to the most 
+    distant cell which received the score specified under CONNECTIVITY_WEIGHTING. The scores are linearly rescaled 
+    Euclidean distance to natural areas. Setting CONNECTIVITY_WEIGHTING = 1.0 means no effect of connectivity on biodiversity score. 
+"""
+CONNECTIVITY_WEIGHTING = 0.7
 
 # Set livestock impact on biodiversity (0 = no impact, 1 = total annihilation)
 BIODIV_LIVESTOCK_IMPACT = 0.3
@@ -303,18 +308,14 @@ BIODIVERSITY_LIMITS = 'on'             # 'on' or 'off'
 BIODIV_TARGET = 0.3
 BIODIV_TARGET_ACHIEVEMENT_YEAR = 2030
 
-"""
-Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, 
-and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity 
-and ecosystem functions and services, ecological integrity and connectivity.
-
+""" Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
+    Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
 """
 # Set biodiversity targets in dictionary below (i.e., year: proportion of degraded land restored)
 BIODIV_GBF_TARGET_2_DICT = {                     
               2010: 0,    # Proportion of degraded land restored in year 2010
               2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
-              2050: 0.5,   # Principle from LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
+              2050: 0.5,  # Principle from LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
               2100: 0.5   # Stays at 2050 level
              }            # (can add more years/targets)\
 

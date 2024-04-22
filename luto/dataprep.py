@@ -90,7 +90,7 @@ def create_new_dataset():
     shutil.copyfile(fdh_inpath + 'yieldincreases-bau2022.csv', outpath + 'yieldincreases_bau2022.csv')
     shutil.copyfile(nlum_inpath + 'NLUM_2010-11_mask.tif', outpath + 'NLUM_2010-11_mask.tif')
         
-    shutil.copyfile(luto_1D_inpath + 'GHG_targets.xlsx', outpath + 'GHG_targets.xlsx')
+    shutil.copyfile(luto_1D_inpath + 'GHG_targets_20240421.xlsx', outpath + 'GHG_targets.xlsx')
     
     shutil.copyfile(luto_2D_inpath + 'cell_savanna_burning.h5', outpath + 'cell_savanna_burning.h5')
 
@@ -188,11 +188,10 @@ def create_new_dataset():
 
     # Create a non-agricultural landuses file
     # Do not sort the whole list alphabetically when adding new landuses to the model.
-    non_ag_landuses = ["Environmental Plantings", "Riparian Plantings", "Agroforestry", 'Carbon Plantings (Block)', 'Carbon Plantings (Belt)']
-    with open(outpath + 'non_ag_landuses.csv', 'w') as non_ag_lu_csv:
-        writer = csv.writer(non_ag_lu_csv)
-        for lu in non_ag_landuses:
-            writer.writerow([lu])
+    non_ag_landuses = ['Environmental Plantings', 'Riparian Plantings', 'Agroforestry', 'Carbon Plantings (Block)', 'Carbon Plantings (Belt)', 'BECCS']
+
+    # Save to file
+    pd.DataFrame(non_ag_landuses).to_csv(outpath + 'non_ag_landuses.csv', index = False, header = False)
     
     
     

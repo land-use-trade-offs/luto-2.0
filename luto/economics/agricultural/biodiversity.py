@@ -59,7 +59,9 @@ def get_breq_matrices(data):
 
     # if settings.BIODIV_LIVESTOCK_IMPACT > 0:
     for j in livestock_nat_land_lus:
-        b_mrj[:, :, j] = data.BIODIV_SCORE_WEIGHTED_LDS_BURNING * data.REAL_AREA * (1 - settings.BIODIV_LIVESTOCK_IMPACT)
+        b_mrj[:, :, j] = ( data.BIODIV_SCORE_WEIGHTED_LDS_BURNING -                       # Base biodiversity score considering assumed late-dry season burning
+                          (data.BIODIV_SCORE_WEIGHTED * settings.BIODIV_LIVESTOCK_IMPACT) # Minus impact of livestock on biodiversity value
+                         ) * data.REAL_AREA
     
     return b_mrj
 
@@ -123,7 +125,11 @@ def get_savanna_burning_effect_b_mrj(data):
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
     new_b_mrj = np.zeros((data.NLMS, data.NCELLS, nlus))
 
-    eds_sav_burning_biodiv_benefits = (1 - settings.LDS_BIODIVERSITY_VALUE) * data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA
+    eds_sav_burning_biodiv_benefits = np.where( data.SAVBURN_ELIGIBLE, 
+                                                (1 - settings.LDS_BIODIVERSITY_VALUE) * data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA, 
+                                                0
+                                              )
+    
 
     for m, j in itertools.product(range(data.NLMS), range(nlus)):
         new_b_mrj[m, :, j] = eds_sav_burning_biodiv_benefits
