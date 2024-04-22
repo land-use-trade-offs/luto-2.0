@@ -168,7 +168,7 @@ def get_asparagopsis_effect_t_mrj(data: Data):
     Gets the transition costs of asparagopsis taxiformis, which are none.
     Transition/establishment costs are handled in the costs matrix.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES.get('Asparagopsis taxiformis', [])
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
@@ -177,7 +177,7 @@ def get_precision_agriculture_effect_t_mrj(data: Data):
     Gets the effects on transition costs of asparagopsis taxiformis, which are none.
     Transition/establishment costs are handled in the costs matrix.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES.get('Precision Agriculture', [])
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
@@ -186,7 +186,7 @@ def get_ecological_grazing_effect_t_mrj(data: Data):
     Gets the effects on transition costs of ecological grazing, which are none.
     Transition/establishment costs are handled in the costs matrix.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES.get('Ecological Grazing', [])
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 

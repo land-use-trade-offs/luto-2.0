@@ -247,7 +247,7 @@ def get_asparagopsis_effect_c_mrj(data: Data, yr_idx):
     when using asparagopsis. It takes into account the yield potential, annual cost per
     animal, and the real area of the cell. The function returns the updated cost matrix.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES.get("Asparagopsis taxiformis", [])
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
     yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
@@ -282,7 +282,7 @@ def get_precision_agriculture_effect_c_mrj(data: Data, yr_idx):
     Returns:
     - new_c_mrj: The updated cost data matrix <unit: $/cell>.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES.get('Precision Agriculture', [])
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
     yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix

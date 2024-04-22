@@ -389,12 +389,7 @@ def get_to_ag_transition_matrix(data: Data, yr_idx, lumap, lmmap, separate=False
 
     if separate:
         # Note: The order of the keys in the dictionary must match the order of the non-agricultural land uses
-        return {'Environmental Plantings' : env_plant_transitions_to_ag_mrj, 
-                'Riparian Plantings': rip_plant_transitions_to_ag_mrj,
-                'Agroforestry': agroforestry_transitions_to_ag_mrj,
-                'Carbon Plantings (Block)': carbon_plantings_block_transitions_to_ag_mrj, 
-                'Carbon Plantings (Belt)': carbon_plantings_belt_transitions_to_ag_mrj, 
-                'BECCS':beccs_transitions_to_ag_mrj}
+        return ag_to_non_agr_t_matrices
         
     ag_to_non_agr_t_matrices = list(ag_to_non_agr_t_matrices.values())
     return np.add.reduce(ag_to_non_agr_t_matrices)

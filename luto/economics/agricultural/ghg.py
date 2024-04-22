@@ -299,7 +299,7 @@ def get_asparagopsis_effect_g_mrj(data, yr_idx):
     Note: This function relies on other helper functions such as lvs_veg_types and get_yield_pot to calculate
     the reduction amount for each land use and management type.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES.get('Asparagopsis taxiformis', [])
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
     yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix

@@ -7,9 +7,11 @@ AG_MANAGEMENTS dictionary to False.
 """
 
 AG_MANAGEMENTS = {
-    'Asparagopsis taxiformis': True,
-    'Precision Agriculture': True,
+    'Asparagopsis taxiformis': False,
+    'Precision Agriculture': False,
     'Ecological Grazing': True,
+    'Savanna Burning': True,
+    'AgTech EI': False,
 }
 
 AG_MANAGEMENTS_TO_LAND_USES = {

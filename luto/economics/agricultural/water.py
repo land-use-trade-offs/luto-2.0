@@ -72,7 +72,7 @@ def get_asparagopsis_effect_w_mrj(data: Data, w_mrj, yr_idx):
     Notes:
         Asparagopsis taxiformis has no effect on the water required.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES.get("Asparagopsis taxiformis", [])
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
 
@@ -104,7 +104,7 @@ def get_precision_agriculture_effect_w_mrj(data: Data, w_mrj, yr_idx):
     Returns:
     - new_w_mrj <unit:ML/cell>: The updated water requirements data after applying precision agriculture effects.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES.get('Precision Agriculture', [])
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
 
@@ -136,7 +136,7 @@ def get_ecological_grazing_effect_w_mrj(data: Data, w_mrj, yr_idx):
     Returns:
     - new_w_mrj <unit:ML/cell>: The updated water requirements data after applying ecological grazing effects.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES.get('Ecological Grazing', [])
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
 

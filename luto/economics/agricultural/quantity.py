@@ -300,7 +300,7 @@ def get_asparagopsis_effect_q_mrp(data: Data, q_mrp, yr_idx):
     Returns:
     - new_q_mrp: The updated quantity data after applying the effects of using asparagopsis.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES.get("Asparagopsis taxiformis", [])
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     yr_cal = data.YR_CAL_BASE + yr_idx
 
@@ -337,7 +337,7 @@ def get_precision_agriculture_effect_q_mrp(data: Data, q_mrp, yr_idx):
     Returns:
     - new_q_mrp: The updated quantity data after applying precision agriculture effects.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES.get('Precision Agriculture', [])
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     yr_cal = data.YR_CAL_BASE + yr_idx
 
@@ -372,7 +372,7 @@ def get_ecological_grazing_effect_q_mrp(data: Data, q_mrp, yr_idx):
     Returns:
     - new_q_mrp: The updated quantity data after applying ecological grazing effects.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES.get('Ecological Grazing', [])
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     yr_cal = data.YR_CAL_BASE + yr_idx
 

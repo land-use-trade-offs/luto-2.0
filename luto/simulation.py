@@ -25,6 +25,7 @@ from datetime import datetime
 
 import luto.settings as settings
 from luto import tools
+from luto.non_ag_landuses import NON_AG_LAND_USES
 from luto.data import Data, get_base_am_vars, lumap2ag_l_mrj, lumap2non_ag_l_mk
 from luto.economics.production import get_production
 from luto.solvers.input_data import SolverInputData, get_input_data
@@ -46,7 +47,7 @@ def load_data() -> Data:
         data,
         data.YR_CAL_BASE,
         lumap2ag_l_mrj(data.LUMAP, data.LMMAP),
-        lumap2non_ag_l_mk(data.LUMAP, len(data.NON_AGRICULTURAL_LANDUSES)),
+        lumap2non_ag_l_mk(data.LUMAP, len(NON_AG_LAND_USES.keys())),
         get_base_am_vars(data.NCELLS, data.NLMS, data.N_AG_LUS),
     )
     data.add_production_data(data.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
