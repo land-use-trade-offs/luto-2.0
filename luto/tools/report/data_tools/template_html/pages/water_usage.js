@@ -89,6 +89,9 @@ document.addEventListener("DOMContentLoaded", function () {
     series: JSON.parse(
       document.getElementById("water_2_volume_to_limit_csv").innerHTML
     ),
+    xAxis: {
+      tickPositions: year_ticks,
+    },
     yAxis: {
       title: {
         text: "Water Use (ML)",
@@ -133,7 +136,9 @@ document.addEventListener("DOMContentLoaded", function () {
     series: JSON.parse(
       document.getElementById("water_3_volume_by_sector_csv").innerHTML
     ),
-
+    xAxis: {
+      tickPositions: year_ticks,
+    },
     yAxis: {
       title: {
         text: "Water Use (ML)",
