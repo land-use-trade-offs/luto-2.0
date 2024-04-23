@@ -29,7 +29,7 @@ from scipy.interpolate import interp1d
 
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 import luto.settings as settings
-from luto.settings import INPUT_DIR
+from luto.settings import INPUT_DIR, OUTPUT_DIR
 
 
 def dict2matrix(d, fromlist, tolist):
@@ -654,8 +654,8 @@ class Data:
             dtype=np.float32
         )
 
-        # fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + settings.SSP + '_2010-2100_dr_ml_ha.h5')
-        # fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + settings.SSP + '_2010-2100_sr_ml_ha.h5')
+        # fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_dr_ml_ha.h5')
+        # fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_sr_ml_ha.h5')
 
         # wy_dr_file = h5py.File(fname_dr, 'r')
         # wy_sr_file = h5py.File(fname_sr, 'r')
@@ -838,7 +838,7 @@ class Data:
         biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5') )
 
         # Get the Zonation output score between 0 and 1. BIODIV_SCORE_RAW.sum() = 153 million
-        biodiv_score_raw = biodiv_priorities['BIODIV_PRIORITY_SSP' + settings.SSP].to_numpy(dtype = np.float32)
+        biodiv_score_raw = biodiv_priorities['BIODIV_PRIORITY_SSP' + str(settings.SSP)].to_numpy(dtype = np.float32)
 
         # Get the distance (km) of modified grid cells to nearest natural cell (natural areas have a distance of 0).
         dist_to_natural = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.float32)
@@ -1089,7 +1089,7 @@ class Data:
         )
 
         # Create path name
-        self.path = "output/" + self.timestamp_sim + post
+        self.path = f"{OUTPUT_DIR}/{self.timestamp_sim}{post}"
 
         # Get all paths
         paths = (
