@@ -74,7 +74,7 @@ class LutoSolver:
     def __init__(self, input_data: SolverInputData, d_c: np.array):
         self._input_data = input_data
         self.d_c = d_c
-        self.gurobi_model = gp.Model("LUTO " + settings.VERSION, env=gurenv)
+        self.gurobi_model = gp.Model(f"LUTO {settings.VERSION}", env=gurenv)
 
         # Initialise variable stores
         self.X_ag_dry_vars_jr = None
