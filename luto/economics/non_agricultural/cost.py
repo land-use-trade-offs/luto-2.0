@@ -113,11 +113,11 @@ def get_cost_matrix(data: Data):
     if NON_AG_LAND_USES['Agroforestry']:
         non_agr_c_matrices['Agroforestry'] = get_cost_agroforestry(data).reshape((data.NCELLS, 1))
 
-    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
-        non_agr_c_matrices['Carbon Plantings (Belt)'] = get_cost_carbon_plantings_belt(data).reshape((data.NCELLS, 1))
-
     if NON_AG_LAND_USES['Carbon Plantings (Block)']:
         non_agr_c_matrices['Carbon Plantings (Block)'] = get_cost_carbon_plantings_block(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
+        non_agr_c_matrices['Carbon Plantings (Belt)'] = get_cost_carbon_plantings_belt(data).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['BECCS']:
         non_agr_c_matrices['BECCS'] = get_cost_beccs(data).reshape((data.NCELLS, 1))

@@ -118,11 +118,11 @@ def get_wreq_matrix(data: Data) -> np.ndarray:
     if NON_AG_LAND_USES['Agroforestry']:
         non_agr_wreq_matrices['Agroforestry'] = get_wreq_matrix_agroforestry(data).reshape((data.NCELLS, 1))
 
-    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
-        non_agr_wreq_matrices['Carbon Plantings (Belt)'] = get_wreq_matrix_carbon_plantings_belt(data).reshape((data.NCELLS, 1))
-
     if NON_AG_LAND_USES['Carbon Plantings (Block)']:
         non_agr_wreq_matrices['Carbon Plantings (Block)'] = get_wreq_matrix_carbon_plantings_block(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
+        non_agr_wreq_matrices['Carbon Plantings (Belt)'] = get_wreq_matrix_carbon_plantings_belt(data).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['BECCS']:
         non_agr_wreq_matrices['BECCS'] = get_wreq_matrix_beccs(data).reshape((data.NCELLS, 1))

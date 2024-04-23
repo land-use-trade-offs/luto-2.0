@@ -186,11 +186,11 @@ def get_ghg_matrix(data: Data, aggregate=True) -> np.ndarray:
     if NON_AG_LAND_USES['Agroforestry']:
         non_agr_ghg_matrices['Agroforestry'] = get_ghg_reduction_agroforestry(data, aggregate)
 
-    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
-        non_agr_ghg_matrices['Carbon Plantings (Belt)'] = get_ghg_reduction_carbon_plantings_belt(data, aggregate)
-
     if NON_AG_LAND_USES['Carbon Plantings (Block)']:
         non_agr_ghg_matrices['Carbon Plantings (Block)'] = get_ghg_reduction_carbon_plantings_block(data, aggregate)
+
+    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
+        non_agr_ghg_matrices['Carbon Plantings (Belt)'] = get_ghg_reduction_carbon_plantings_belt(data, aggregate)
 
     if NON_AG_LAND_USES['BECCS']:
         non_agr_ghg_matrices['BECCS'] = get_ghg_reduction_beccs(data, aggregate)

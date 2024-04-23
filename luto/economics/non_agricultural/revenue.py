@@ -120,11 +120,11 @@ def get_rev_matrix(data: Data) -> np.ndarray:
     if NON_AG_LAND_USES['Agroforestry']:
         non_agr_rev_matrices['Agroforestry'] = get_rev_agroforestry(data).reshape((data.NCELLS, 1))
 
-    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
-        non_agr_rev_matrices['Carbon Plantings (Belt)'] = get_rev_carbon_plantings_belt(data).reshape((data.NCELLS, 1))
-
     if NON_AG_LAND_USES['Carbon Plantings (Block)']:
         non_agr_rev_matrices['Carbon Plantings (Block)'] = get_rev_carbon_plantings_block(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
+        non_agr_rev_matrices['Carbon Plantings (Belt)'] = get_rev_carbon_plantings_belt(data).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['BECCS']:
         non_agr_rev_matrices['BECCS'] = get_rev_beccs(data).reshape((data.NCELLS, 1))
