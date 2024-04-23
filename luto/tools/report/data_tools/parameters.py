@@ -61,7 +61,7 @@ RENAME_AM_NON_AG = {
     # Non-Agricultural Landuse
     "Environmental Plantings": "Environmental plantings (mixed species)",
     "Riparian Plantings": "Riparian buffer restoration (mixed species)",
-    "Agroforestry": "Agroforestry (food + biodiversity)'",
+    "Agroforestry": "Agroforestry (food + biodiversity)",
     "Carbon Plantings (Block)": "Carbon plantings (monoculture)",
     "Carbon Plantings (Belt)": "Farm forestry (food + timber)",
     "BECCS": "BECCS (Bioenergy with Carbon Capture and Storage)"
