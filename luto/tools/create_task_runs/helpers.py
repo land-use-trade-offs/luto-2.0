@@ -4,9 +4,12 @@ import os
 import re
 import keyword
 import pandas as pd
-import luto.settings as settings
+import shutil
+from luto.settings import WRITE_THREADS
+from joblib import delayed, Parallel
 
-from luto.tools.create_task_runs.parameters import PARAMS_TO_EVAL
+import luto.settings as settings
+from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, PARAMS_TO_EVAL, TASK_ROOT_DIR
 
 def is_float(s):
     try:
@@ -14,11 +17,10 @@ def is_float(s):
         return True
     except ValueError:
         return False
-    
-    
-    
-
-
+ 
+ 
+ 
+ 
 def is_valid_variable_name(name):
     if name in keyword.kwlist:
         print(f"{name} is a keyword")
@@ -36,7 +38,30 @@ def is_valid_variable_name(name):
 
 
 
-def create_settings_template(to_path:str='../Custom_runs'):
+
+
+def copy_folder_custom(source, destination, ignore_dirs=None):
+    
+    ignore_dirs = set() if ignore_dirs is None else set(ignore_dirs)
+
+    jobs = []
+    os.makedirs(destination, exist_ok=True)
+    for item in os.listdir(source):
+        
+        if item in ignore_dirs: continue   
+
+        s = os.path.join(source, item)
+        d = os.path.join(destination, item)
+        jobs += copy_folder_custom(s, d) if os.path.isdir(s) else [(s, d)]
+        
+    return jobs      
+
+
+
+
+
+
+def create_settings_template(to_path:str=TASK_ROOT_DIR):
     
     if os.path.exists(f'{to_path}/settings_template.csv'):
         print('settings_template.csv already exists! Skip creating a new one!')
@@ -69,7 +94,7 @@ def create_settings_template(to_path:str='../Custom_runs'):
     
     
     
-def create_custom_settings(from_path:str='../Custom_runs/settings_template.csv'):
+def create_task_folders(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
     # Read the custom settings file
     custom_settings = pd.read_csv(from_path, index_col=0)
     custom_settings = custom_settings.replace({'TRUE': 'True', 'FALSE': 'False'})
@@ -78,25 +103,30 @@ def create_custom_settings(from_path:str='../Custom_runs/settings_template.csv')
     # Create a dictionary of custom settings
     reserve_cols = ['Default_run']
     custom_cols = [col for col in custom_settings.columns if col not in reserve_cols]
-
-
-    # Check if the column name is valid
+    
+    
     for col in custom_cols:
+        # Check if the column name is valid
         if not is_valid_variable_name(col):  
             raise ValueError(f'"{col}" is not a valid column name!')
-
-    # Report the changed settings
-    for idx,row in custom_settings.iterrows():
-        for col in custom_cols:
+    
+        # Report the changed settings
+        for idx,_ in custom_settings.iterrows():
             if custom_settings.loc[idx,col] != custom_settings.loc[idx,'Default_run']:
-                print(f'"{col}" has changed <{idx}>: "{custom_settings.loc[idx,"Default_run"]}" ==> "{custom_settings.loc[idx,col]}>')
-
-
-    # Write the custom settings to different settings files
+                print(f'"{col}" has changed <{idx}>: "{custom_settings.loc[idx,"Default_run"]}" ==> "{custom_settings.loc[idx,col]}">')
+    
+        # Copy the custom settings to the custom runs folder
+        s_d = copy_folder_custom(os.getcwd(), f'{TASK_ROOT_DIR}/{col}', EXCLUDE_DIRS)
+        worker = min(WRITE_THREADS, len(s_d))
+        Parallel(n_jobs=worker)(delayed(shutil.copy2)(s, d) for s, d in s_d)
+            
+    
+    
+    # Write the custom settings to each task folder
     custom_dict = custom_settings[custom_cols].to_dict()
 
     for para_d in custom_dict:
-        with open(f'../Custom_runs/settings_{para_d}.py', 'w') as file:
+        with open(f'{TASK_ROOT_DIR}/{col}/luto/settings.py', 'w') as file:
             for k, v in custom_dict[para_d].items():
                 if str(v).isdigit() or is_float(str(v)):
                     file.write(f'{k} = {v}\n')

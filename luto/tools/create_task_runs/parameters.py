@@ -1,3 +1,5 @@
+TASK_ROOT_DIR = '../Custom_runs'
+
 
 # The path to the script that import settings as variables
 SETTING_IN_USE = [
@@ -28,3 +30,5 @@ PARAMS_TO_EVAL = [
     'GHG_LIMITS',
     'BIODIV_GBF_TARGET_2_DICT'
 ]
+
+EXCLUDE_DIRS = ['input', 'output', '.git', '.vscode', '__pycache__', 'jinzhu_inspect_code']
