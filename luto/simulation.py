@@ -78,13 +78,17 @@ def solve_timeseries(data: Data, steps: int, base: int, target: int):
 
         if s > 0:
             old_ag_x_mrj = luto_solver._input_data.ag_x_mrj.copy()
+            old_ag_man_lb_mrj = luto_solver._input_data.ag_man_lb_mrj.copy()
             old_non_ag_x_rk = luto_solver._input_data.non_ag_x_rk.copy()
+            old_non_ag_lb_rk = luto_solver._input_data.non_ag_lb_rk.copy()
 
             luto_solver.update_formulation(
                 input_data=input_data,
                 d_c=d_c,
                 old_ag_x_mrj=old_ag_x_mrj,
+                old_ag_man_lb_mrj=old_ag_man_lb_mrj,
                 old_non_ag_x_rk=old_non_ag_x_rk,
+                old_non_ag_lb_rk=old_non_ag_lb_rk,
                 old_lumap=data.lumaps[base + s - 1],
                 current_lumap=data.lumaps[base + s],
                 old_lmmap=data.lmmaps[base + s - 1],

@@ -490,7 +490,7 @@ def get_exclusions_riparian_plantings(data: Data, lumap) -> np.ndarray:
     
 def get_exclusions_agroforestry(data: Data, lumap) -> np.ndarray:
     """
-    Return a 1-D array indexed by r that represents how much riparian plantings can possibly 
+    Return a 1-D array indexed by r that represents how much agroforestry can possibly 
     be done at each cell.
 
     Parameters:
@@ -604,29 +604,38 @@ def get_exclude_matrices(data: Data, lumap) -> np.ndarray:
     related to different non-agricultural land uses. The resulting matrix is a concatenation of these matrices
     along the k indexing.
     """
-
-    non_ag_x_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}
+    # Environmental plantings exclusions
+    env_plant_exclusions = get_exclusions_environmental_plantings(data, lumap)
+    rip_plant_exclusions = get_exclusions_riparian_plantings(data, lumap)
+    agroforestry_exclusions = get_exclusions_agroforestry(data, lumap)
+    carbon_plantings_block_exclusions = get_exclusions_carbon_plantings_block(data, lumap)
+    carbon_plantings_belt_exclusions = get_exclusions_carbon_plantings_belt(data, lumap)
+    beccs_exclusions = get_exclusions_beccs(data, lumap)
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-    if NON_AG_LAND_USES['Environmental Plantings']:
-        non_ag_x_matrices['Environmental Plantings'] = get_exclusions_environmental_plantings(data, lumap).reshape((data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['Riparian Plantings']:
-        non_ag_x_matrices['Riparian Plantings'] = get_exclusions_riparian_plantings(data, lumap).reshape((data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['Agroforestry']:
-        non_ag_x_matrices['Agroforestry'] = get_exclusions_agroforestry(data, lumap).reshape((data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
-        non_ag_x_matrices['Carbon Plantings (Belt)'] = get_exclusions_carbon_plantings_belt(data, lumap).reshape((data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['Carbon Plantings (Block)']:
-        non_ag_x_matrices['Carbon Plantings (Block)'] = get_exclusions_carbon_plantings_block(data, lumap).reshape((data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['BECCS']:
-        non_ag_x_matrices['BECCS'] = get_exclusions_beccs(data, lumap).reshape((data.NCELLS, 1))
-
-    non_ag_x_matrices = list(non_ag_x_matrices.values())
+    non_ag_x_matrices = [
+        env_plant_exclusions.reshape((data.NCELLS, 1)),
+        rip_plant_exclusions.reshape((data.NCELLS, 1)),
+        agroforestry_exclusions.reshape((data.NCELLS, 1)),
+        carbon_plantings_block_exclusions.reshape((data.NCELLS, 1)),
+        carbon_plantings_belt_exclusions.reshape((data.NCELLS, 1)),
+        beccs_exclusions.reshape((data.NCELLS, 1)),
+    ]
 
     # Stack list and return to get x_rk
     return np.concatenate(non_ag_x_matrices, axis=1).astype(np.float32)
+
+
+def get_lower_bound_non_agricultural_matrices(data: Data, yr) -> np.ndarray:
+    """
+    Get the non-agricultural lower bound matrix.
+
+    Returns
+    -------
+    2-D array, indexed by (r,k) where r is the cell and k is the non-agricultural land usage.
+    """
+
+    if yr not in data.non_ag_dvars:
+        return np.zeros((data.NCELLS, len(NON_AG_LAND_USES)))
+        
+    return data.non_ag_dvars[yr].astype(np.float32)

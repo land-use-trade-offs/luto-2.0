@@ -1,7 +1,7 @@
 import numpy as np
-from luto.non_ag_landuses import NON_AG_LAND_USES
-from luto.data import Data
 
+from luto.data import Data
+from luto.non_ag_landuses import NON_AG_LAND_USES
 
 def get_quantity_env_plantings(data: Data) -> np.ndarray:
     """
@@ -115,30 +115,22 @@ def get_quantity_matrix(data: Data) -> np.ndarray:
 
     Returns:
     - np.ndarray: The non-agricultural quantity matrix q_crk.
-
     """
+    env_plantings_quantity_matrix = get_quantity_env_plantings(data)
+    rip_plantings_quantity_matrix = get_quantity_rip_plantings(data)
+    agroforestry_quantity_matrix = get_quantity_agroforestry(data)
+    carbon_plantings_block_quantity_matrix = get_quantity_carbon_plantings_block(data)
+    carbon_plantings_belt_quantity_matrix = get_quantity_carbon_plantings_belt(data)
+    beccs_quantity_matrix = get_quantity_beccs(data)
 
-    non_agr_quantity_matrices = {use: np.zeros((data.NCMS, data.NCELLS, 1)) for use in NON_AG_LAND_USES}
-
-    # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-    if NON_AG_LAND_USES['Environmental Plantings']:
-        non_agr_quantity_matrices['Environmental Plantings'] = get_quantity_env_plantings(data).reshape((data.NCMS, data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['Riparian Plantings']:
-        non_agr_quantity_matrices['Riparian Plantings'] = get_quantity_rip_plantings(data).reshape((data.NCMS, data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['Agroforestry']:
-        non_agr_quantity_matrices['Agroforestry'] = get_quantity_agroforestry(data).reshape((data.NCMS, data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
-        non_agr_quantity_matrices['Carbon Plantings (Belt)'] = get_quantity_carbon_plantings_belt(data).reshape((data.NCMS, data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['Carbon Plantings (Block)']:
-        non_agr_quantity_matrices['Carbon Plantings (Block)'] = get_quantity_carbon_plantings_block(data).reshape((data.NCMS, data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['BECCS']:
-        non_agr_quantity_matrices['BECCS'] = get_quantity_beccs(data).reshape((data.NCMS, data.NCELLS, 1))
-
-    non_agr_quantity_matrices = list(non_agr_quantity_matrices.values())
+    # reshape each matrix to be indexed (c, r, k) and concatenate on the k indexing
+    non_agr_quantity_matrices = [
+        env_plantings_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
+        rip_plantings_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
+        agroforestry_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
+        carbon_plantings_block_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
+        carbon_plantings_belt_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
+        beccs_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
+    ]
 
     return np.concatenate(non_agr_quantity_matrices, axis=2)

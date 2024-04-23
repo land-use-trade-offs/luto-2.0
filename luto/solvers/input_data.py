@@ -51,6 +51,7 @@ class SolverInputData:
     non_ag_b_rk: np.ndarray  # Non-agricultural biodiversity matrix.
     non_ag_x_rk: np.ndarray  # Non-agricultural exclude matrices.
     non_ag_q_crk: np.ndarray  # Non-agricultural yield matrix.
+    non_ag_lb_rk: np.ndarray # Non-agricultural lower bound matrices.
 
     ag_man_c_mrj: dict  # Agricultural management options' cost effects.
     ag_man_g_mrj: dict  # Agricultural management options' GHG emission effects.
@@ -60,6 +61,7 @@ class SolverInputData:
     ag_man_w_mrj: dict  # Agricultural management options' water requirement effects.
     ag_man_b_mrj: dict  # Agricultural management options' biodiversity effects.
     ag_man_limits: dict  # Agricultural management options' adoption limits.
+    ag_man_lb_mrj: dict  # Agricultural management options' lower bounds.
 
     offland_ghg: np.ndarray  # GHG emissions from off-land commodities.
 
@@ -253,6 +255,20 @@ def get_non_ag_x_rk(data: Data, base_year):
     return output
 
 
+def get_ag_man_lb_mrj(data: Data, base_year):
+    print('Getting agricultural lower bound matrices...', end = ' ', flush = True)
+    output = ag_transition.get_lower_bound_agricultural_management_matrices(data, base_year)
+    print("Done.")
+    return output
+
+
+def get_non_ag_lb_rk(data: Data, base_year):
+    print('Getting non-agricultural lower bound matrices...', end = ' ', flush = True)
+    output = non_ag_transition.get_lower_bound_non_agricultural_matrices(data, base_year)
+    print('Done.')
+    return output
+
+
 def get_ag_man_costs(data: Data, target_index, ag_c_mrj: np.ndarray):
     print('Getting agricultural management options\' cost effects...', flush = True)
     output = ag_cost.get_agricultural_management_cost_matrices(data, ag_c_mrj, target_index)
@@ -352,6 +368,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         non_ag_b_rk=get_non_ag_b_rk(data),
         non_ag_x_rk=get_non_ag_x_rk(data, base_year),
         non_ag_q_crk=get_non_ag_q_crk(data),
+        non_ag_lb_rk=get_non_ag_lb_rk(data, base_year),
         ag_man_c_mrj=get_ag_man_costs(data, target_index, ag_c_mrj),
         ag_man_g_mrj=get_ag_man_ghg(data, target_index, ag_g_mrj),
         ag_man_q_mrp=get_ag_man_quantity(data, target_index, ag_q_mrp),
@@ -360,6 +377,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_w_mrj=get_ag_man_water(data, target_index, ag_w_mrj),
         ag_man_b_mrj=get_ag_man_biodiversity(data),
         ag_man_limits=get_ag_man_limits(data, target_index),
+        ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,

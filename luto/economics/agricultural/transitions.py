@@ -313,3 +313,22 @@ def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str,
 
     return ag_management_data
 
+
+def get_lower_bound_agricultural_management_matrices(data: Data, yr) -> Dict[str, dict]:
+    """
+    Gets the lower bound for the agricultural land use of the current years optimisation.
+    """
+
+    ag_man_lb_mrj = {
+        am: np.zeros((data.NLMS, data.LUMAP.shape[0], data.N_AG_LUS), dtype=np.float32) 
+        for am in AG_MANAGEMENTS_TO_LAND_USES
+    }
+
+    if yr not in data.ag_man_dvars:
+        return ag_man_lb_mrj
+        
+    for am in AG_MANAGEMENTS_TO_LAND_USES:
+        ag_man_lb_mrj[am] = data.ag_man_dvars[yr][am].astype(np.float32)
+
+    return ag_man_lb_mrj
+
