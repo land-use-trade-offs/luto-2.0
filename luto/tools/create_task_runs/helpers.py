@@ -141,7 +141,6 @@ def create_task_folders(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
         # The input dir for each task will point to the absolute path of the input dir
         custom_dict['INPUT_DIR'] = os.path.abspath(custom_dict['INPUT_DIR']).replace('\\','/')
         custom_dict['DATA_DIR'] = custom_dict['INPUT_DIR']
-        custom_dict['OUTPUT_DIR'] = os.path.abspath(f"{TASK_ROOT_DIR}/output/{col}").replace('\\','/')
 
         # Write the custom settings to the settings.py of each task
         with open(f'{TASK_ROOT_DIR}/{col}/luto/settings.py', 'w') as file:
