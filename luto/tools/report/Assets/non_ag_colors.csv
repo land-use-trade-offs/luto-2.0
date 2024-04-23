@@ -1,6 +1,9 @@
 lu_code,lu_desc,lu_color_HEX
 -1,Non-Agricultural Land,#e1e1e1
 0,Other Agricultural Land,#cccccc
-100,Environmental Plantings,#73b2ff
-101,Riparian Plantings,#ff5500
+100,Environmental plantings (mixed species),#73b2ff
+101,Riparian buffer restoration (mixed species),#ffebbe
 102,Agroforestry,#38a800
+103,Carbon plantings (monoculture),#01e6a9
+104,Farm forestry (food + timber),#98e601
+105,BECCS (Bioenergy with Carbon Capture and Storage),#ff5500

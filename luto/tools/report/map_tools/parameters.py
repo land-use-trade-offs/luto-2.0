@@ -40,7 +40,7 @@ map_single_lucc = {k:k for k in map_single_lucc}
 
 # Dictionary {k:v} for renaming the map names
 # if <k> exists in the map name, the map full name will be <v>
-map_basename_rename = {**map_multiple_lucc, **map_single_lucc}
+map_basename_rename = map_multiple_lucc | map_single_lucc
 
 
 # The extra colors for the float rasters
@@ -69,52 +69,52 @@ data_types = {'lumap': 'integer',
 legend_params = {'lumap': {'bbox_to_anchor': (0.02, 0.19),
                             'loc': 'upper left',
                             'ncol': 2,
-                            'fontsize': 15,
+                            'fontsize': 10,
                             'framealpha': 0,
                             'columnspacing': 1},
-                 
+
                  'lmmap': {'bbox_to_anchor': (0.1, 0.25),
                             'loc': 'upper left',
                             'ncol': 1,
-                            'fontsize': 15,
+                            'fontsize': 10,
                             'framealpha': 0,
                             'columnspacing': 1},
-                 
+
                  'ammap': {'bbox_to_anchor': (0.02, 0.19),
                             'loc': 'upper left',
                             'ncol': 2,
-                            'fontsize': 15,
+                            'fontsize': 10,
                             'framealpha': 0,
                             'columnspacing': 1},
-                 
+
                  'non_ag': {'bbox_to_anchor': (0.02, 0.19),
                             'loc': 'upper left',
                             'ncol': 2,
-                            'fontsize': 15,
+                            'fontsize': 10,
                             'framealpha': 0,
                             'columnspacing': 1},
-                 
+
                  'Ag_LU': {'bbox_to_anchor': (0.05, 0.23),
                             'loc': 'upper left',
                             'ncol': 1,
                             'labelspacing': 2.0,
                             'fontsize': 15,
                             'framealpha': 0},
-                 
+
                  'Ag_Mgt': {'bbox_to_anchor': (0.05, 0.23),
                             'loc': 'upper left',
                             'ncol': 1,
                             'labelspacing': 2.0,
                             'fontsize': 15,
                             'framealpha': 0},
-                 
+
                  'Land_Mgt': {'bbox_to_anchor': (0.05, 0.23),
                             'loc': 'upper left',
                             'ncol': 1,
                             'labelspacing': 2.0,
                             'fontsize': 15,
                             'framealpha': 0},
-                 
+
                  'Non-Ag': {'bbox_to_anchor': (0.05, 0.23),
                             'loc': 'upper left',
                             'ncol': 1,

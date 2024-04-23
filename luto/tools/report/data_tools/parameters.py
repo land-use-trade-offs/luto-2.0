@@ -1,3 +1,4 @@
+
 # Get the root directory of the data
 YR_BASE = 2010
 
@@ -7,8 +8,11 @@ LU_CROPS = ['Apples','Citrus','Cotton','Grapes','Hay','Nuts','Other non-cereal c
             'Summer legumes','Summer oilseeds','Tropical stone fruit','Vegetables',
             'Winter cereals','Winter legumes','Winter oilseeds']
 
-LU_LVSTKS = ['Beef - modified land','Beef - natural land','Dairy - modified land',
-             'Dairy - natural land','Sheep - modified land','Sheep - natural land']
+LVSTK_NATURAL = ['Beef - natural land','Dairy - natural land','Sheep - natural land']
+
+LVSTK_MODIFIED = ['Beef - modified land','Dairy - modified land','Sheep - modified land']
+
+LU_LVSTKS = LVSTK_NATURAL + LVSTK_MODIFIED
 
 LU_UNALLOW = ['Unallocated - modified land','Unallocated - natural land']
 
@@ -17,10 +21,6 @@ LU_NATURAL = ['Beef - natural land',
               'Dairy - natural land',
               'Sheep - natural land',
               'Unallocated - natural land']
-
-
-
-
 
 
 # Define the commodity categories
@@ -36,8 +36,6 @@ COMMODITIES_ALL = COMMODITIES_ON_LAND + COMMODITIES_OFF_LAND
 
 
 
-
-
 # Define the file name patterns for each category
 GHG_FNAME2TYPE = {'GHG_emissions_separate_agricultural_landuse': 'Agricultural Landuse',
                   'GHG_emissions_separate_agricultural_management': 'Agricultural Management',
@@ -46,28 +44,45 @@ GHG_FNAME2TYPE = {'GHG_emissions_separate_agricultural_landuse': 'Agricultural L
                   'GHG_emissions_offland_commodity': 'Offland Commodity',}
 
 
-
-
-
-# Define all land uses for each category
-AG_LANDUSE = ['Apples', 'Beef - modified land', 'Beef - natural land', 'Citrus', 'Cotton', 'Dairy - modified land', 
-              'Dairy - natural land', 'Grapes', 'Hay', 'Nuts', 'Other non-cereal crops', 'Pears', 'Plantation fruit', 
-              'Rice', 'Sheep - modified land', 'Sheep - natural land', 'Stone fruit', 'Sugar', 'Summer cereals', 
-              'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit', 'Unallocated - modified land', 
-              'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes', 'Winter oilseeds']
-
 AG_LANDUSE_MERGE_LANDTYPE = ['Apples', 'Beef', 'Citrus', 'Cotton', 'Dairy', 'Grapes', 'Hay', 'Nuts', 'Other non-cereal crops',
                              'Pears', 'Plantation fruit', 'Rice', 'Sheep', 'Stone fruit', 'Sugar', 'Summer cereals',
                              'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit', 'Unallocated - modified land', 
                              'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes', 'Winter oilseeds']
 
-NON_AG_LANDUSE = ['Environmental Plantings','Riparian Plantings','Agroforestry']
 
+# Define the renaming of the Agricultural-Managment and Non-Agricultural 
+RENAME_AM_NON_AG = {
+    # Agricultural Management
+    "AgTech EI": "Agricultural technology (energy)",
+    "Asparagopsis taxiformis": "Methane reduction (livestock)", 
+    "Ecological Grazing": "Regenerative agriculture (livestock)", 
+    "Precision Agriculture": "Agricultural technology (fertiliser)", 
+    "Savanna Burning": "Early dry-season savanna burning",
+    # Non-Agricultural Landuse
+    "Environmental Plantings": "Environmental plantings (mixed species)",
+    "Riparian Plantings": "Riparian buffer restoration (mixed species)",
+    "Agroforestry": "Agroforestry",
+    "Carbon Plantings (Block)": "Carbon plantings (monoculture)",
+    "Carbon Plantings (Belt)": "Farm forestry (food + timber)",
+    "BECCS": "BECCS (Bioenergy with Carbon Capture and Storage)"
+}
+
+# Read the land uses from the file
+with open('input/ag_landuses.csv') as f:
+    AG_LANDUSE = [line.strip() for line in f]
+
+with open('input/non_ag_landuses.csv') as f:
+    NON_AG_LANDUSE = [line.strip() for line in f]
+
+# Rename the land uses
+NON_AG_LANDUSE = [RENAME_AM_NON_AG.get(item, item) for item in NON_AG_LANDUSE]
+
+# Merge the land uses
 LANDUSE_ALL = AG_LANDUSE + NON_AG_LANDUSE
 
 
-# Define the GHG categories
 
+# Define the GHG categories
 GHG_NAMES = {
     # Agricultural Landuse
     'TCO2E_CHEM_APPL': 'Chemical Application',
@@ -95,6 +110,11 @@ GHG_NAMES = {
     'TCO2E_Agroforestry': 'Agroforestry', 
     'TCO2E_Environmental Plantings': 'Environmental Plantings',
     'TCO2E_Riparian Plantings': 'Riparian Plantings',
+    'TCO2E_Carbon Plantings (Belt)': 'Carbon Plantings (Belt)',
+    'TCO2E_Carbon Plantings (Block)': 'Carbon Plantings (Block)',
+    'TCO2E_BECCS': 'BECCS',
+    'TCO2E_Savanna Burning': 'Savanna Burning',
+    'TCO2E_AgTech EI': 'AgTech EI',
 }
 
 GHG_CATEGORY = {'Agricultural soils: Animal production, dung and urine': {"CH4":0.5,"CO2":0.5},

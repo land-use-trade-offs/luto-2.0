@@ -1,12 +1,13 @@
 import numpy as np
+
+from luto.data import Data
 from luto.non_ag_landuses import NON_AG_LAND_USES
 
-def get_quantity_env_plantings(data) -> np.ndarray:
+def get_quantity_env_plantings(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Returns
     -------
@@ -18,12 +19,11 @@ def get_quantity_env_plantings(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_rip_plantings(data) -> np.ndarray:
+def get_quantity_rip_plantings(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Returns
     -------
@@ -36,25 +36,24 @@ def get_quantity_rip_plantings(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_agroforestry(data) -> np.ndarray:
+def get_quantity_agroforestry(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
-    data: object/module
-        Data object or module with fields like in `luto.data`.
+    data: Data object.
 
     Returns
     -------
     np.ndarray
         Indexed by (c, r): represents the quantity commodity c produced by cell r
-        if used for riparian plantings.
-        A matrix of zeros because riparian plantings doesn't produce anything.
+        if used for agroforestry.
+        A matrix of zeros because agroforestry doesn't produce anything.
     """
 
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_carbon_plantings_block(data) -> np.ndarray:
+def get_quantity_carbon_plantings_block(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
@@ -71,7 +70,7 @@ def get_quantity_carbon_plantings_block(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_carbon_plantings_belt(data) -> np.ndarray:
+def get_quantity_carbon_plantings_belt(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
@@ -88,7 +87,7 @@ def get_quantity_carbon_plantings_belt(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_beccs(data) -> np.ndarray:
+def get_quantity_beccs(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
@@ -105,34 +104,33 @@ def get_quantity_beccs(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_matrix(data) -> np.ndarray:
+def get_quantity_matrix(data: Data) -> np.ndarray:
     """
     Get the non-agricultural quantity matrix q_crk.
     Values represent the yield of each commodity c from the cell r when using
-        the non-agricultural land use k.
+    the non-agricultural land use k.
+
+    Parameters:
+    - data: The input data containing information about the land use and commodities.
+
+    Returns:
+    - np.ndarray: The non-agricultural quantity matrix q_crk.
     """
+    env_plantings_quantity_matrix = get_quantity_env_plantings(data)
+    rip_plantings_quantity_matrix = get_quantity_rip_plantings(data)
+    agroforestry_quantity_matrix = get_quantity_agroforestry(data)
+    carbon_plantings_block_quantity_matrix = get_quantity_carbon_plantings_block(data)
+    carbon_plantings_belt_quantity_matrix = get_quantity_carbon_plantings_belt(data)
+    beccs_quantity_matrix = get_quantity_beccs(data)
 
-    non_agr_quantity_matrices = {use: np.zeros((data.NCMS, data.NCELLS, 1)) for use in NON_AG_LAND_USES}
-
-    # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-    if NON_AG_LAND_USES['Environmental Plantings']:
-        non_agr_quantity_matrices['Environmental Plantings'] = get_quantity_env_plantings(data).reshape((data.NCMS, data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['Riparian Plantings']:
-        non_agr_quantity_matrices['Riparian Plantings'] = get_quantity_rip_plantings(data).reshape((data.NCMS, data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['Agroforestry']:
-        non_agr_quantity_matrices['Agroforestry'] = get_quantity_agroforestry(data).reshape((data.NCMS, data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
-        non_agr_quantity_matrices['Carbon Plantings (Belt)'] = get_quantity_carbon_plantings_belt(data).reshape((data.NCMS, data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['Carbon Plantings (Block)']:
-        non_agr_quantity_matrices['Carbon Plantings (Block)'] = get_quantity_carbon_plantings_block(data).reshape((data.NCMS, data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['BECCS']:
-        non_agr_quantity_matrices['BECCS'] = get_quantity_beccs(data).reshape((data.NCMS, data.NCELLS, 1))
-
-    non_agr_quantity_matrices = list(non_agr_quantity_matrices.values())
+    # reshape each matrix to be indexed (c, r, k) and concatenate on the k indexing
+    non_agr_quantity_matrices = [
+        env_plantings_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
+        rip_plantings_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
+        agroforestry_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
+        carbon_plantings_block_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
+        carbon_plantings_belt_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
+        beccs_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
+    ]
 
     return np.concatenate(non_agr_quantity_matrices, axis=2)

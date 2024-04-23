@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("production_1_demand_type_wide", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
     title: {
       text: "Demand, Trade, and Production of Agricultural Commodities",
@@ -54,10 +54,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: -50,
-      y: 250,
+      x: -150,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -83,6 +82,9 @@ document.addEventListener("DOMContentLoaded", function () {
   // Chart:production_2_demand_on_off_wide
   Highcharts.chart("production_2_demand_on_off_wide", {
 
+    chart: {
+      marginRight: 380,
+    },
 
     title: {
       text: "Demand for Agricultural Commodities",
@@ -96,7 +98,7 @@ document.addEventListener("DOMContentLoaded", function () {
         )['categories'],
 
       labels: {
-        y: 38,
+        verticalAlign: "middle",
         groupedOptions: [
           {
             rotation: -90, // rotate labels for a 2st-level
@@ -124,13 +126,14 @@ document.addEventListener("DOMContentLoaded", function () {
       },
     },
 
+
     legend: {
-      align: "right",
-      verticalAlign: "top",
-      layout: "vertical",
-      x: -80,
-      y: 260,
-    },
+      align: 'right', // Aligns the legend to the right side of the chart container
+      verticalAlign: 'middle', // Centers the legend vertically
+      layout: 'vertical', // Arranges the legend items vertically
+      x: -200, // Shifts the legend left by 150px, effectively positioning it 50px from the plot area
+  },
+    
 
     series: JSON.parse(
       document.getElementById("production_2_demand_on_off_wide_csv").innerHTML)['series'],
@@ -157,6 +160,10 @@ document.addEventListener("DOMContentLoaded", function () {
   // Chart:production_3_demand_commodity
   Highcharts.chart("production_3_demand_commodity", {
 
+    chart: {
+      marginRight: 380,
+    },
+
     title: {
       text: "Agricultural Demand by Commodity",
     },
@@ -167,7 +174,7 @@ document.addEventListener("DOMContentLoaded", function () {
         document.getElementById("production_3_demand_commodity_csv").innerHTML
       )['categories'],
       labels: {
-        y: 38,
+        verticalAlign: "middle",
         groupedOptions: [
           {
             rotation: -90, // rotate labels for a 2st-level
@@ -189,10 +196,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: 0,
-      y: -10,
+      x: -100,
     },
 
     series: JSON.parse(
@@ -223,7 +228,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("production_4_1_demand_domestic_On-land_commodity", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
     title: {
       text: "Domestic Consumption (Food) - On-land Commodities",
@@ -245,10 +250,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: 10,
-      y: 80,
+      x: -100,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -274,7 +278,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("production_4_2_demand_domestic_Off-land_commodity", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
     title: {
       text: "Domestic Consumption (Food) - Off-land Commodities",
@@ -299,10 +303,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: -50,
-      y: 250,
+      x: -150,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -328,7 +331,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("production_5_2_demand_Exports_commodity", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -355,10 +358,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: 10,
-      y: -10,
+      x: -100,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -384,7 +386,7 @@ document.addEventListener("DOMContentLoaded", function () {
   new Highcharts.Chart("production_5_3_demand_Imports_commodity", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
     title: {
       text: "Imports by Agricultural Commodity",
@@ -409,10 +411,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: 10,
-      y: -20,
+      x: -100,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -440,7 +441,7 @@ document.addEventListener("DOMContentLoaded", function () {
     chart: {
       renderTo: "production_5_4_demand_Feed_commodity",
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
     title: {
       text: "Domestic Consumption (Feed) by Agricultural Commodity",
@@ -464,10 +465,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: -10,
-      y: 0,
+      x: -100,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -494,7 +494,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("production_5_5_demand_Production_commodity", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
     title: {
       text: "Total Production Requirement by Agricultural Commodity (inputs into LUTO)",
@@ -517,10 +517,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: 0,
-      y: -10,
+      x: -100,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -546,7 +545,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("production_5_6_demand_Production_commodity_from_LUTO", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
     title: {
       text: "Total Production by Agricultural Commodity (outputs from LUTO)",
@@ -570,10 +569,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: 0,
-      y: 30,
+      x: -100,
+      verticalAlign: "middle",
     },
 
     tooltip: {

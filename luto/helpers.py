@@ -18,6 +18,10 @@
 LUTO 2.0 temporary helper code.
 """
 
+# Protect against accidental running of entire script and deleting input data
+import sys
+sys.exit()
+
 # # To run LUTO, execute steps 1-4 below...
 
 # 1. Refresh input data (if required)
@@ -27,11 +31,12 @@ create_new_dataset()
 # 2. Run the simulation and profile memory use
 %load_ext memory_profiler
 import luto.simulation as sim
-%memit sim.run( 2010, 2050 )
+data = sim.load_data()
+%memit sim.run(data=data, base=2010, target=2050 )
 
 # 3. Write the ouputs to file
-from luto.tools.write import *
-write_outputs(sim)
+from luto.tools.write import write_outputs
+write_outputs(data)
 
 
 
@@ -40,11 +45,11 @@ from luto.dataprep import create_new_dataset
 create_new_dataset()
 
 import luto.simulation as sim
-sim.run( 2010, 2050 )
+data = sim.load_data()
+sim.run(data=data, base=2010, target=2050 )
+
 from luto.tools.write import write_outputs
-write_outputs(sim)
-
-
+write_outputs(data)
 
 
 
@@ -53,9 +58,11 @@ from luto.tools import report_on_path
 data_path = 'path_to_output_folder'
 report_on_path(data_path)  
 
+
+
 # Write input arrays to tiff files
 from luto.tools.report.write_input_data.array2tif import write_input2tiff
-write_input2tiff(sim, 2050)
+write_input2tiff(data, 2050)
 
 
 
@@ -69,6 +76,7 @@ import luto.simulation as sim
 import luto.economics.agricultural.transitions as ag_transition
 import luto.economics.agricultural.cost as ag_cost
 import luto.economics.agricultural.revenue as ag_revenue
+from luto.economics.production import get_production
 from luto.economics.agricultural.ghg import get_ghg_transition_penalties
 from luto import settings
 import random as rand
@@ -172,7 +180,7 @@ for row in ind:
     print(old[row], new[row])
 
 # Get commodity production totals when no resfactor used and check against raw data
-x = sim.get_production()
+x = get_production()
 for i, j in enumerate(sim.data.COMMODITIES):
     print(j, x[i])
 

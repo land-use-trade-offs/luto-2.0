@@ -28,7 +28,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("GHG_1_cunsum_emission_Mt", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -57,7 +57,7 @@ document.addEventListener("DOMContentLoaded", function () {
       // align: 'right',
       // verticalAlign: 'top',
       // layout: 'vertical',
-      // x: 10,
+      // x: 0,
       // y: 50
     },
 
@@ -86,7 +86,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // Chart:GHG_2_individual_emission_Mt
   Highcharts.chart("GHG_2_individual_emission_Mt", {
     chart: {
-      marginRight: 200,
+      marginRight: 380,
     },
     title: {
       text: "GHG Emissions by Land-use/Management Type",
@@ -98,10 +98,9 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: 10,
-      y: 250,
+      x: -150,
+      verticalAlign: "middle",
     },
     tooltip: {
       formatter: function () {
@@ -131,11 +130,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 
-  // Chart:GHG_3_crop_lvstk_emission_Mt
-  Highcharts.chart("GHG_3_crop_lvstk_emission_Mt", {
+  // Chart:GHG_4_3_1_crop_lvstk_emission_Mt
+  Highcharts.chart("GHG_4_3_1_crop_lvstk_emission_Mt", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -147,7 +146,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_3_crop_lvstk_emission_Mt_csv").innerHTML
+      document.getElementById("GHG_4_3_1_crop_lvstk_emission_Mt_csv").innerHTML
     ),
 
     yAxis: {
@@ -161,10 +160,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: 10,
-      y: 250,
+      x: -150,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -189,11 +187,11 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_4_dry_irr_emission_Mt
-  Highcharts.chart("GHG_4_dry_irr_emission_Mt", {
+  // Chart:GHG_4_3_2_dry_irr_emission_Mt
+  Highcharts.chart("GHG_4_3_2_dry_irr_emission_Mt", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -205,7 +203,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_4_dry_irr_emission_Mt_csv").innerHTML
+      document.getElementById("GHG_4_3_2_dry_irr_emission_Mt_csv").innerHTML
     ),
 
     yAxis: {
@@ -219,10 +217,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: -50,
-      y: 250,
+      x: -180,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -247,11 +244,11 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_5_category_emission_Mt
-  Highcharts.chart("GHG_5_category_emission_Mt", {
+  // Chart:GHG_4_3_3_category_emission_Mt
+  Highcharts.chart("GHG_4_3_3_category_emission_Mt", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -263,7 +260,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_5_category_emission_Mt_csv").innerHTML
+      document.getElementById("GHG_4_3_3_category_emission_Mt_csv").innerHTML
     ),
 
     yAxis: {
@@ -277,10 +274,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: 0,
-      y: 250,
+      x: -150,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -305,11 +301,11 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_6_sources_emission_Mt
-  Highcharts.chart("GHG_6_sources_emission_Mt", {
+  // Chart:GHG_4_3_4_sources_emission_Mt
+  Highcharts.chart("GHG_4_3_4_sources_emission_Mt", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
       marginBottom: 200,
     },
 
@@ -322,7 +318,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_6_sources_emission_Mt_csv").innerHTML
+      document.getElementById("GHG_4_3_4_sources_emission_Mt_csv").innerHTML
     ),
 
     yAxis: {
@@ -334,17 +330,12 @@ document.addEventListener("DOMContentLoaded", function () {
       tickPositions: year_ticks,
     },
 
-    // legend: {
-    //     // itemStyle: {
-    //     //     "fontSize": "6px",
-    //     //     "textOverflow": "ellipsis",
-    //     // },
-    //     align: 'bottom',
-    //     // verticalAlign: 'top',
-    //     // layout: 'vertical',
-    //     x: 80,
-    //     y: 0
-    // },
+    legend: {
+        align: 'right',
+        verticalAlign: 'middle',
+        layout: 'vertical',
+        x: 0,
+    },
 
     tooltip: {
       formatter: function () {
@@ -368,11 +359,11 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_7_lu_lm_emission_Mt_wide
-  Highcharts.chart("GHG_7_lu_lm_emission_Mt_wide", {
+  // Chart:GHG_4_3_5_lu_lm_emission_Mt_wide
+  Highcharts.chart("GHG_4_3_5_lu_lm_emission_Mt_wide", {
     chart: {
-      renderTo: "GHG_7_lu_lm_emission_Mt_wide",
-      marginRight: 200,
+      renderTo: "GHG_4_3_5_lu_lm_emission_Mt_wide",
+      marginRight: 380,
     },
     title: {
       text: "GHG Emissions (on-land) - Start and End Year",
@@ -382,12 +373,12 @@ document.addEventListener("DOMContentLoaded", function () {
       tickWidth: 0.05,
 
       categories: JSON.parse(
-        document.getElementById("GHG_7_lu_lm_emission_Mt_wide_csv").innerHTML
+        document.getElementById("GHG_4_3_5_lu_lm_emission_Mt_wide_csv").innerHTML
       )['categories'],
 
       labels: {
         y:10,
-        rotation: -45,
+        rotation: -90,
         align: "right",
 
     },
@@ -395,7 +386,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_7_lu_lm_emission_Mt_wide_csv").innerHTML
+      document.getElementById("GHG_4_3_5_lu_lm_emission_Mt_wide_csv").innerHTML
     )['series'],
 
     yAxis: {
@@ -405,10 +396,9 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: -10,
-      y: 200,
+      x: -180,
+      verticalAlign: "middle",
     },
     tooltip: {
       formatter: function () {
@@ -435,8 +425,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_8_lu_source_emission_Mt
-  Highcharts.chart("GHG_8_lu_source_emission_Mt", {
+  // Chart:GHG_4_3_6_lu_source_emission_Mt
+  Highcharts.chart("GHG_4_3_6_lu_source_emission_Mt", {
     chart: {
       type: "packedbubble",
     },
@@ -465,7 +455,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
     },
 
-    series: JSON.parse($("#GHG_8_lu_source_emission_Mt_csv").html()),
+    series: JSON.parse($("#GHG_4_3_6_lu_source_emission_Mt_csv").html()),
 
     credits: {
       enabled: false,
@@ -476,7 +466,13 @@ document.addEventListener("DOMContentLoaded", function () {
           }:</b>${this.y.toFixed(3)}<br/>`;
       },
     },
-
+  
+    legend: {
+      align: "right",
+      layout: "vertical",
+      x: 0,
+      verticalAlign: "middle",
+    },
     exporting: {
       sourceWidth: 1200,
       sourceHeight: 600,
@@ -486,7 +482,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("GHG_4_3_7_off_land_commodity_emission_Mt", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -513,10 +509,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: -10,
-      y: 250,
+      x: -150,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -544,7 +539,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("GHG_4_3_8_off_land_sources_emission_Mt", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -568,10 +563,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: -10,
-      y: 250,
+      x: -150,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -600,7 +594,7 @@ document.addEventListener("DOMContentLoaded", function () {
   Highcharts.chart("GHG_4_3_9_off_land_type_emission_Mt", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -625,10 +619,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: -10,
-      y: 250,
+      x: -150,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -655,66 +648,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 
-  // Chart:GHG_9_1_ag_reduction_total_wide_Mt
-  // Highcharts.chart('GHG_9_1_ag_reduction_total_wide_Mt', {
-  //     chart: {
-  //         type: 'column',
-  //         marginRight: 200
-  //     },
 
-  //     title: {
-  //         text: 'Non Agricultural Land-use Sequestration in total'
-  //     },
-
-  //     credits: {
-  //         enabled: false
-  //     },
-
-  //     data: {
-  //         csv: document.getElementById('GHG_9_1_ag_reduction_total_wide_Mt_csv').innerHTML,
-  //     },
-
-  //     yAxis: {
-  //         title: {
-  //             text: 'Emissions (Mt CO2e)'
-  //         },
-  //     },xAxis: {
-  //     tickPositions: year_ticks,
-  // },
-
-  //     legend: {
-  //         align: 'right',
-  //         verticalAlign: 'top',
-  //         layout: 'vertical',
-  //         x: 10,
-  //         y: 250
-  //     },
-
-  //     tooltip: {
-  //         formatter: function () {
-  //             return `<b>Year:</b> ${this.x}<br><b>${this.series.name}:</b>${this.y.toFixed(2)}<br/>`;
-  //         }
-  //     },
-
-  //     plotOptions: {
-  //         column: {
-  //             dataLabels: {
-  //                 enabled: false
-  //             }
-  //         }
-  //     },
-
-  //     exporting: {
-  //         sourceWidth: 1200,
-  //         sourceHeight: 600,
-  //     }
-  // });
-
-  // Chart:GHG_9_2_ag_reduction_source_wide_Mt
-  Highcharts.chart("GHG_9_2_ag_reduction_source_wide_Mt", {
+  // Chart:GHG_4_4_ag_reduction_source_wide_Mt
+  Highcharts.chart("GHG_4_4_ag_reduction_source_wide_Mt", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -726,7 +665,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_9_2_ag_reduction_source_wide_Mt_csv").innerHTML
+      document.getElementById("GHG_4_4_ag_reduction_source_wide_Mt_csv").innerHTML
 
     ),
 
@@ -741,10 +680,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: 10,
-      y: 250,
+      x: 0,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -769,11 +707,11 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_10_GHG_ag_man_df_wide_Mt
-  Highcharts.chart("GHG_10_GHG_ag_man_df_wide_Mt", {
+  // Chart:GHG_4_5_1_GHG_ag_man_df_wide_Mt
+  Highcharts.chart("GHG_4_5_1_GHG_ag_man_df_wide_Mt", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -785,7 +723,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_10_GHG_ag_man_df_wide_Mt_csv").innerHTML
+      document.getElementById("GHG_4_5_1_GHG_ag_man_df_wide_Mt_csv").innerHTML
     ),
 
     yAxis: {
@@ -799,10 +737,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: 10,
-      y: 250,
+      x: -100,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -827,11 +764,11 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_11_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt
-  Highcharts.chart("GHG_11_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt", {
+  // Chart:GHG_4_5_2_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt
+  Highcharts.chart("GHG_4_5_2_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -843,7 +780,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_11_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt_csv").innerHTML
+      document.getElementById("GHG_4_5_2_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt_csv").innerHTML
     ),
 
     yAxis: {
@@ -857,10 +794,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: 10,
-      y: 250,
+      x: -150,
+      verticalAlign: "middle",
     },
 
     tooltip: {
@@ -885,11 +821,11 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_12_GHG_ag_man_dry_irr_df_wide_Mt
-  Highcharts.chart("GHG_12_GHG_ag_man_dry_irr_df_wide_Mt", {
+  // Chart:GHG_4_5_3_GHG_ag_man_dry_irr_df_wide_Mt
+  Highcharts.chart("GHG_4_5_3_GHG_ag_man_dry_irr_df_wide_Mt", {
     chart: {
       type: "column",
-      marginRight: 200,
+      marginRight: 380,
     },
 
     title: {
@@ -901,7 +837,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_12_GHG_ag_man_dry_irr_df_wide_Mt_csv").innerHTML
+      document.getElementById("GHG_4_5_3_GHG_ag_man_dry_irr_df_wide_Mt_csv").innerHTML
     ),
 
     yAxis: {
@@ -915,10 +851,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       align: "right",
-      verticalAlign: "top",
       layout: "vertical",
-      x: -50,
-      y: 250,
+      x: -180,
+      verticalAlign: "middle",
     },
 
     tooltip: {
