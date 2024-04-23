@@ -33,7 +33,8 @@ from gurobipy import GRB
 
 import luto.settings as settings
 from luto import tools
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES, AG_MANAGEMENTS_REVERSIBLE
+from luto.non_ag_landuses import NON_AG_LAND_USES, NON_AG_LAND_USES_REVERSIBLE
 from luto.solvers.input_data import SolverInputData
 
 
@@ -143,16 +144,21 @@ class LutoSolver:
                     ub=1, name=f"X_ag_irr_{j}_{r}"
                 )
 
-        for k in range(self._input_data.n_non_ag_lus):
+        for k, non_ag_lu_desc in enumerate(NON_AG_LAND_USES):
             lu_cells = self._input_data.non_ag_lu2cells[k]
-            for r in lu_cells:
-                self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
-                    lb=(
-                        lambda x: 0 if x else self._input_data.non_ag_lb_rk[r, k]
-                    )(settings.NON_AG_REVERSIBLE),
-                    ub=self._input_data.non_ag_x_rk[r, k], 
-                    name=f"X_non_ag_{k}_{r}",
-                )
+            if NON_AG_LAND_USES_REVERSIBLE[non_ag_lu_desc]:
+                for r in lu_cells:
+                    self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
+                        lb=0, ub=1, name=f"X_non_ag_{k}_{r}",
+                    )
+
+            else:
+                for r in lu_cells:
+                    self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
+                        lb=self._input_data.non_ag_lb_rk[r, k],
+                        ub=1, 
+                        name=f"X_non_ag_{k}_{r}",
+                    )
 
     def _setup_ag_management_variables(self):
         """
@@ -173,29 +179,43 @@ class LutoSolver:
             # Get snake_case version of the AM name for the variable name
             am_name = tools.am_name_snake_case(am)
 
-            for j_idx, j in enumerate(am_j_list):
-                # Create variable for all eligible cells
-                dry_lu_cells = self._input_data.ag_lu2cells[0, j]
-                for r in dry_lu_cells:
-                    dry_var_name = f"X_ag_man_dry_{am_name}_{j}_{r}"
-                    self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
-                        lb=(
-                            lambda x: 0 if x else self._input_data.ag_man_lb_mrj[am][0, r, j_idx]
-                        )(settings.AG_MANAGEMENT_REVERSIBLE),
-                        ub=1, 
-                        name=dry_var_name,
-                    )
+            if AG_MANAGEMENTS_REVERSIBLE[am]:
+                for j_idx, j in enumerate(am_j_list):
+                    # Create variable for all eligible cells - all lower bounds are zero
+                    dry_lu_cells = self._input_data.ag_lu2cells[0, j]
+                    for r in dry_lu_cells:
+                        dry_var_name = f"X_ag_man_dry_{am_name}_{j}_{r}"
+                        self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
+                            lb=0, ub=1, name=dry_var_name,
+                        )
 
-                irr_lu_cells = self._input_data.ag_lu2cells[1, j]
-                for r in irr_lu_cells:
-                    irr_var_name = f"X_ag_man_irr_{am_name}_{j}_{r}"
-                    self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
-                        lb=(
-                            lambda x: 0 if x else self._input_data.ag_man_lb_mrj[am][1, r, j_idx]
-                        )(settings.AG_MANAGEMENT_REVERSIBLE),
-                        ub=1, 
-                        name=irr_var_name,
-                    )
+                    irr_lu_cells = self._input_data.ag_lu2cells[1, j]
+                    for r in irr_lu_cells:
+                        irr_var_name = f"X_ag_man_irr_{am_name}_{j}_{r}"
+                        self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
+                            lb=0, ub=1, name=irr_var_name,
+                        )
+
+            else:
+                for j_idx, j in enumerate(am_j_list):
+                # Create variable for all eligible cells - existing ag management options must be respected
+                    dry_lu_cells = self._input_data.ag_lu2cells[0, j]
+                    for r in dry_lu_cells:
+                        dry_var_name = f"X_ag_man_dry_{am_name}_{j}_{r}"
+                        self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
+                            lb=self._input_data.ag_man_lb_mrj[am][0, r, j],
+                            ub=1,
+                            name=dry_var_name,
+                        )
+
+                    irr_lu_cells = self._input_data.ag_lu2cells[1, j]
+                    for r in irr_lu_cells:
+                        irr_var_name = f"X_ag_man_irr_{am_name}_{j}_{r}"
+                        self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
+                            lb=self._input_data.ag_man_lb_mrj[am][1, r, j], 
+                            ub=1, 
+                            name=irr_var_name,
+                        )
 
     def _setup_decision_variables(self):
         """
@@ -748,9 +768,6 @@ class LutoSolver:
         num_cells_skipped = 0
         updated_cells = []
 
-        ag_lus_zeros = np.zeros(self._input_data.n_ag_lus)
-        non_ag_lus_zeros = np.zeros(self._input_data.n_non_ag_lus)
-
         for r in range(self._input_data.ncells):
             old_j = old_lumap[r]
             new_j = current_lumap[r]
@@ -762,17 +779,18 @@ class LutoSolver:
                 and old_m == new_m
                 and (old_ag_x_mrj[:, r, :] == self._input_data.ag_x_mrj[:, r, :]).all()
                 and (old_non_ag_x_rk[r, :] == self._input_data.non_ag_x_rk[r, :]).all()
-                and (old_non_ag_lb_rk[r, :] == self._input_data.non_ag_lb_rk[r, :]).all()
+                and all(
+                    old_non_ag_lb_rk[r, k] == self._input_data.non_ag_lb_rk[r, k]
+                    for k, non_ag_desc in enumerate(NON_AG_LAND_USES) if not NON_AG_LAND_USES_REVERSIBLE[non_ag_desc]
+                )
+                and all(
+                    (old_ag_man_lb_mrj.get(am)[:, r, :] == self._input_data.ag_man_lb_mrj.get(am)[:, r, :]).all()
+                    for am in AG_MANAGEMENTS_TO_LAND_USES if not AG_MANAGEMENTS_REVERSIBLE[am]
+                )
             ):
                 # cell has not changed between years. No need to update variables
                 num_cells_skipped += 1
                 continue
-            
-            for ag_man_lu in AG_MANAGEMENTS_TO_LAND_USES.keys():
-                if (old_ag_man_lb_mrj.get(ag_man_lu)[:, r, :] == self._input_data.ag_man_lb_mrj.get(ag_man_lu)[:, r, :]).all():
-                    # cell has not changed between years. No need to update variables
-                    num_cells_skipped += 1
-                    continue
 
             # agricultural land usage
             self.gurobi_model.remove(
@@ -781,8 +799,8 @@ class LutoSolver:
             self.gurobi_model.remove(
                 list(self.X_ag_irr_vars_jr[:, r][np.where(self.X_ag_irr_vars_jr[:, r])])
             )
-            self.X_ag_dry_vars_jr[:, r] = ag_lus_zeros
-            self.X_ag_irr_vars_jr[:, r] = ag_lus_zeros
+            self.X_ag_dry_vars_jr[:, r] = np.zeros(self._input_data.n_ag_lus)
+            self.X_ag_irr_vars_jr[:, r] = np.zeros(self._input_data.n_ag_lus)
             for j in range(self._input_data.n_ag_lus):
                 if self._input_data.ag_x_mrj[0, r, j]:
                     self.X_ag_dry_vars_jr[j, r] = self.gurobi_model.addVar(
@@ -798,16 +816,20 @@ class LutoSolver:
             self.gurobi_model.remove(
                 list(self.X_non_ag_vars_kr[:, r][np.where(self.X_non_ag_vars_kr[:, r])])
             )
-            self.X_non_ag_vars_kr[:, r] = non_ag_lus_zeros
-            for k in range(self._input_data.n_non_ag_lus):
+            self.X_non_ag_vars_kr[:, r] = np.zeros(self._input_data.n_non_ag_lus)
+            for k, non_ag_lu_desc in zip(range(self._input_data.n_non_ag_lus), NON_AG_LAND_USES):
                 if self._input_data.non_ag_x_rk[r, k]:
-                    self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
-                        lb=(
-                            lambda x: 0 if x else self._input_data.non_ag_lb_rk[r, k]
-                        )(settings.NON_AG_REVERSIBLE), 
-                        ub=1, 
-                        name=f"X_non_ag_{k}_{r}",
-                    )
+                    if NON_AG_LAND_USES_REVERSIBLE[non_ag_lu_desc]:
+                        self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
+                            lb=0, ub=1, name=f"X_non_ag_{k}_{r}",
+                        )
+
+                    else:
+                        self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
+                            lb=self._input_data.non_ag_lb_rk[r, k],
+                            ub=1, 
+                            name=f"X_non_ag_{k}_{r}",
+                        )
 
             # agricultural management
             for am, am_j_list in self._input_data.am2j.items():
@@ -830,27 +852,32 @@ class LutoSolver:
                 self.X_ag_man_dry_vars_jr[am][:, r] = np.zeros(len(am_j_list))
                 self.X_ag_man_irr_vars_jr[am][:, r] = np.zeros(len(am_j_list))
 
-                for j_idx, j in enumerate(am_j_list):
-                    if self._input_data.ag_x_mrj[0, r, j]:
-                        self.X_ag_man_dry_vars_jr[am][
-                            j_idx, r
-                        ] = self.gurobi_model.addVar(
-                            lb=(
-                                lambda x: 0 if x else self._input_data.ag_man_lb_mrj[am][0, r, j_idx]
-                            )(settings.AG_MANAGEMENT_REVERSIBLE), 
-                            ub=1, 
-                            name=f"X_ag_man_dry_{am_name}_{j}_{r}",
+                if AG_MANAGEMENTS_REVERSIBLE[am]:
+                    for j_idx, j in enumerate(am_j_list):
+                        dry_var_name = f"X_ag_man_dry_{am_name}_{j}_{r}"
+                        irr_var_name = f"X_ag_man_irr_{am_name}_{j}_{r}"
+
+                        self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
+                            lb=0, ub=1, name=dry_var_name,
+                        )
+                        self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
+                            lb=0, ub=1, name=irr_var_name,
                         )
 
-                    if self._input_data.ag_x_mrj[1, r, j]:
-                        self.X_ag_man_irr_vars_jr[am][
-                            j_idx, r
-                        ] = self.gurobi_model.addVar(
-                            lb=(
-                                lambda x: 0 if x else self._input_data.ag_man_lb_mrj[am][1, r, j_idx]
-                            )(settings.AG_MANAGEMENT_REVERSIBLE), 
+                else:
+                    for j_idx, j in enumerate(am_j_list):
+                        dry_var_name = f"X_ag_man_dry_{am_name}_{j}_{r}"
+                        irr_var_name = f"X_ag_man_irr_{am_name}_{j}_{r}"
+                        
+                        self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
+                            lb=self._input_data.ag_man_lb_mrj[am][0, r, j],
+                            ub=1,
+                            name=dry_var_name,
+                        )
+                        self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
+                            lb=self._input_data.ag_man_lb_mrj[am][1, r, j], 
                             ub=1, 
-                            name=f"X_ag_man_irr_{am_name}_{j}_{r}",
+                            name=irr_var_name,
                         )
 
             updated_cells.append(r)

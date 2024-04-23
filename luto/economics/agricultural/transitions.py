@@ -320,7 +320,7 @@ def get_lower_bound_agricultural_management_matrices(data: Data, yr) -> Dict[str
     """
 
     ag_man_lb_mrj = {
-        am: np.zeros((data.NLMS, data.LUMAP.shape[0], data.N_AG_LUS), dtype=np.float32) 
+        am: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32) 
         for am in AG_MANAGEMENTS_TO_LAND_USES
     }
 

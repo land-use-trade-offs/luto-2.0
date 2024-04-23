@@ -14,3 +14,19 @@ NON_AG_LAND_USES = {
     'Carbon Plantings (Belt)': True,
     'BECCS': True,
 }
+
+"""
+If settings.MODE == 'timeseries', the values of the below dictionary determine whether the model is allowed to abandon non-agr.
+land uses on cells in the years after it chooses to utilise them. For example, if a cell has is using 'Environmental Plantings'
+and the corresponding value in this dictionary is False, all cells using EP must also utilise this land use in all subsequent 
+years.
+"""
+
+NON_AG_LAND_USES_REVERSIBLE = {
+    'Environmental Plantings': False,
+    'Riparian Plantings': False,
+    'Agroforestry': False,
+    'Carbon Plantings (Block)': False,
+    'Carbon Plantings (Belt)': False,
+    'BECCS': False,
+}

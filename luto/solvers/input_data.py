@@ -256,16 +256,14 @@ def get_non_ag_x_rk(data: Data, base_year):
 
 
 def get_ag_man_lb_mrj(data: Data, base_year):
-    print('Getting agricultural lower bound matrices...', end = ' ', flush = True)
+    print('Getting agricultural lower bound matrices...', flush = True)
     output = ag_transition.get_lower_bound_agricultural_management_matrices(data, base_year)
-    print("Done.")
     return output
 
 
 def get_non_ag_lb_rk(data: Data, base_year):
-    print('Getting non-agricultural lower bound matrices...', end = ' ', flush = True)
+    print('Getting non-agricultural lower bound matrices...', flush = True)
     output = non_ag_transition.get_lower_bound_non_agricultural_matrices(data, base_year)
-    print('Done.')
     return output
 
 
