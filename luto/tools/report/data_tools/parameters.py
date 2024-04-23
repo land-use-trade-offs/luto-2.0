@@ -1,3 +1,5 @@
+import luto.settings as settings
+
 
 # Get the root directory of the data
 YR_BASE = 2010
@@ -68,10 +70,10 @@ RENAME_AM_NON_AG = {
 }
 
 # Read the land uses from the file
-with open('input/ag_landuses.csv') as f:
+with open(f'{settings.INPUT_DIR}/ag_landuses.csv') as f:
     AG_LANDUSE = [line.strip() for line in f]
 
-with open('input/non_ag_landuses.csv') as f:
+with open(f'{settings.INPUT_DIR}/non_ag_landuses.csv') as f:
     NON_AG_LANDUSE = [line.strip() for line in f]
 
 # Rename the land uses

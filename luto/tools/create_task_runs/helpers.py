@@ -3,6 +3,7 @@
 import os
 import re
 import keyword
+from matplotlib.pylab import f
 import pandas as pd
 import shutil
 from luto.settings import WRITE_THREADS
@@ -94,7 +95,11 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
     
     
     
+    
+    
+    
 def create_task_folders(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
+    
     # Read the custom settings file
     custom_settings = pd.read_csv(from_path, index_col=0)
     custom_settings = custom_settings.replace({'TRUE': 'True', 'FALSE': 'False'})
@@ -111,26 +116,50 @@ def create_task_folders(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
             raise ValueError(f'"{col}" is not a valid column name!')
     
         # Report the changed settings
+        changed_params = 0
         for idx,_ in custom_settings.iterrows():
             if custom_settings.loc[idx,col] != custom_settings.loc[idx,'Default_run']:
+                changed_params = changed_params + 1
                 print(f'"{col}" has changed <{idx}>: "{custom_settings.loc[idx,"Default_run"]}" ==> "{custom_settings.loc[idx,col]}">')
+        
+        print(f'"{col}" has no changed parameters compared to "Default_run"') if changed_params == 0 else None
+    
     
         # Copy the custom settings to the custom runs folder
         s_d = copy_folder_custom(os.getcwd(), f'{TASK_ROOT_DIR}/{col}', EXCLUDE_DIRS)
         worker = min(WRITE_THREADS, len(s_d))
         Parallel(n_jobs=worker)(delayed(shutil.copy2)(s, d) for s, d in s_d)
+        
+        # Create an output folder for the task
+        os.makedirs(f'{TASK_ROOT_DIR}/{col}/output', exist_ok=True)
             
     
     
-    # Write the custom settings to each task folder
-    custom_dict = custom_settings[custom_cols].to_dict()
+        # Write the custom settings to each task folder
+        custom_dict = custom_settings[col].to_dict()
+        
+        # The input dir for each task will point to the absolute path of the input dir
+        custom_dict['INPUT_DIR'] = os.path.abspath(custom_dict['INPUT_DIR']).replace('\\','/')
+        custom_dict['DATA_DIR'] = custom_dict['INPUT_DIR']
 
-    for para_d in custom_dict:
+        # Write the custom settings to the settings.py of each task
         with open(f'{TASK_ROOT_DIR}/{col}/luto/settings.py', 'w') as file:
-            for k, v in custom_dict[para_d].items():
+            for k, v in custom_dict.items():
                 if str(v).isdigit() or is_float(str(v)):
                     file.write(f'{k} = {v}\n')
                 elif isinstance(v, str):
                     file.write(f'{k} = "{v}"\n')
                 else:
                     file.write(f'{k} = {v}\n')
+
+
+
+
+
+
+
+
+
+
+
+
