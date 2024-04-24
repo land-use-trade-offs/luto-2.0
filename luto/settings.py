@@ -84,7 +84,7 @@ FIRE_RISK = 'med'   # Options are 'low', 'med', 'high'. Determines whether to ta
 AMORTISE_UPFRONT_COSTS = False
 
 # Discount rate for amortisation
-DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
+DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 
 # Set amortisation period
 AMORTISATION_PERIOD = 30 # years
@@ -201,7 +201,7 @@ rp_annual_maintennance_cost_per_ha_per_year = 100
 rp_annual_ecosystem_services_benefit_per_ha_per_year = 0
 RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR = rp_annual_maintennance_cost_per_ha_per_year - rp_annual_ecosystem_services_benefit_per_ha_per_year
 
-RIPARIAN_PLANTING_BUFFER_WIDTH = 20
+RIPARIAN_PLANTING_BUFFER_WIDTH = 30
 RIPARIAN_PLANTING_TORTUOSITY_FACTOR = 0.5
 
 RIPARIAN_PLANTING_BIODIV_BENEFIT = 1
