@@ -33,7 +33,7 @@ from luto.solvers.solver import LutoSolver
 # Get date and time
 timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
-
+@tools.LogToFile(f"{settings.OUTPUT_DIR}/run_{timestamp}")
 def load_data() -> Data:
     """
     Load the Data object containing all required data to run a LUTO simulation.
@@ -137,7 +137,7 @@ def solve_snapshot(data: Data, base: int, target: int):
     
     print(f'Processing for {target} completed in {round(time.time() - start_time)} seconds\n\n')
 
-@tools.LogToFile(f"{settings.OUTPUT_DIR}/run_{timestamp}")
+@tools.LogToFile(f"{settings.OUTPUT_DIR}/run_{timestamp}", 'a')
 def run( data: Data, base: int, target: int) -> None:
     """
     Run the simulation.

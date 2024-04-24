@@ -1,16 +1,17 @@
-    
 
 import os
 import re
-import keyword
-from matplotlib.pylab import f
-import pandas as pd
 import shutil
-from luto.settings import WRITE_THREADS
+import keyword
+import pandas as pd
+
 from joblib import delayed, Parallel
 
-import luto.settings as settings
 from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, PARAMS_TO_EVAL, TASK_ROOT_DIR
+from luto import settings
+
+
+
 
 def is_float(s):
     try:
@@ -127,7 +128,7 @@ def create_task_folders(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
     
         # Copy the custom settings to the custom runs folder
         s_d = copy_folder_custom(os.getcwd(), f'{TASK_ROOT_DIR}/{col}', EXCLUDE_DIRS)
-        worker = min(WRITE_THREADS, len(s_d))
+        worker = min(settings.WRITE_THREADS, len(s_d))
         Parallel(n_jobs=worker)(delayed(shutil.copy2)(s, d) for s, d in s_d)
         
         # Create an output folder for the task
