@@ -96,15 +96,11 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 10         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
+RESFACTOR = 7
+         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
 
 # How does the model run over time 
-MODE = 'snapshot'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
-
-# If MODE == 'timeseries', these two settings determine whether the model is allowed to remove features previously added. For example 
-# if a cell has Riparian planing added if NON_AG_REVERSIBLE = False then Riparian planting will remain on that solve.
-AG_MANAGEMENT_REVERSIBLE = True
-NON_AG_REVERSIBLE = True
+MODE = 'timeseries'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****
@@ -130,7 +126,7 @@ WRITE_OUTPUT_GEOTIFFS = True
 PARALLEL_WRITE = True
 
 # The Threads to use for writing GeoTiffs, and map making
-WRITE_THREADS = 50      # Works only if PARALLEL_WRITE = True
+WRITE_THREADS = 8      # Works only if PARALLEL_WRITE = True
 
 
 # ---------------------------------------------------------------------------- #
@@ -161,7 +157,7 @@ NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect a
 BARHOMOGENOUS = -1  # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 50
+THREADS = 8
 
 
 # ---------------------------------------------------------------------------- #
@@ -270,7 +266,7 @@ GHG_LIMITS = {
              }
 
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'    
+GHG_LIMITS_FIELD = '1.5C (67%)'
 
 SOC_AMORTISATION = 30           # Number of years over which to spread (average) soil carbon accumulation
 

@@ -62,7 +62,7 @@ class SolverSolution:
     ammaps: dict[str, np.ndarray]
     ag_X_mrj: np.ndarray
     non_ag_X_rk: np.ndarray
-    ag_man_X_mrj: np.ndarray
+    ag_man_X_mrj: dict[str, np.ndarray]
     prod_data: dict[str, float]
     obj_val: float
 
