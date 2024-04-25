@@ -18,7 +18,6 @@
 Writes model output and statistics to files.
 """
 
-# test for singularity
 
 
 import os, re
