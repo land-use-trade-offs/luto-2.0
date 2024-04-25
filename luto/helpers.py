@@ -55,7 +55,7 @@ write_outputs(data)
 
 # Generating report on existing output folder
 from luto.tools import report_on_path
-data_path = 'path_to_output_folder'
+data_path = r'N:\LUF-Modelling\LUTO2_BB\LUTO_2.0.2\output\2024_04_22__21_49_32_hard_mincost_RF5_P1e5_2010-2050_timeseries_-269Mt'
 report_on_path(data_path)  
 
 
