@@ -161,7 +161,7 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
 
         # Start the task
         os.chdir(f'{TASK_ROOT_DIR}/{col}')
-        os.system('sbatch slurm.sh')
+        os.system('sbatch -p mem slurm.sh')
         os.chdir(original_dir)
 
 
