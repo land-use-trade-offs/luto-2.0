@@ -96,7 +96,7 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
     
     
     
-def create_task_folders(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
+def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
     
     # Read the custom settings file
     custom_settings = pd.read_csv(from_path, index_col=0)
@@ -106,39 +106,39 @@ def create_task_folders(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
     # Create a dictionary of custom settings
     reserve_cols = ['Default_run']
     custom_cols = [col for col in custom_settings.columns if col not in reserve_cols]
-    
+
     if not custom_cols:
         raise ValueError('No custom settings found in the settings_template.csv file!')
-    
-    
+
+    original_dir = os.getcwd()
     for col in custom_cols:
         # Check if the column name is valid
         if not is_valid_variable_name(col):  
             raise ValueError(f'"{col}" is not a valid column name!')
-    
+
         # Report the changed settings
         changed_params = 0
         for idx,_ in custom_settings.iterrows():
             if custom_settings.loc[idx,col] != custom_settings.loc[idx,'Default_run']:
                 changed_params = changed_params + 1
                 print(f'"{col}" has changed <{idx}>: "{custom_settings.loc[idx,"Default_run"]}" ==> "{custom_settings.loc[idx,col]}">')
-        
+
         print(f'"{col}" has no changed parameters compared to "Default_run"') if changed_params == 0 else None
-    
-    
+
+
         # Copy the custom settings to the custom runs folder
         s_d = copy_folder_custom(os.getcwd(), f'{TASK_ROOT_DIR}/{col}', EXCLUDE_DIRS)
         worker = min(settings.WRITE_THREADS, len(s_d))
         Parallel(n_jobs=worker)(delayed(shutil.copy2)(s, d) for s, d in s_d)
-        
+
         # Create an output folder for the task
         os.makedirs(f'{TASK_ROOT_DIR}/{col}/output', exist_ok=True)
-            
-    
-    
+
+
+
         # Write the custom settings to each task folder
         custom_dict = custom_settings[col].to_dict()
-        
+
         # The input dir for each task will point to the absolute path of the input dir
         custom_dict['INPUT_DIR'] = os.path.abspath(custom_dict['INPUT_DIR']).replace('\\','/')
         custom_dict['DATA_DIR'] = custom_dict['INPUT_DIR']
@@ -152,9 +152,16 @@ def create_task_folders(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
                     file.write(f'{k} = "{v}"\n')
                 else:
                     file.write(f'{k} = {v}\n')
-                    
+
+
         # Copy the slurm script to the task folder
         shutil.copyfile('luto/tools/create_task_runs/bash_scripts/bash_cmd.sh', f'{TASK_ROOT_DIR}/{col}/slurm.sh')
+
+
+        # Start the task
+        os.chdir(f'{TASK_ROOT_DIR}/{col}')
+        os.system('sbatch slurm.sh')
+        os.chdir(original_dir)
 
 
 
