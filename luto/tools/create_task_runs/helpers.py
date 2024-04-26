@@ -60,6 +60,23 @@ def copy_folder_custom(source, destination, ignore_dirs=None):
 
 
 
+def create_env_script(output_dir:str=TASK_ROOT_DIR):
+    with open('requirements.txt') as f:
+        lines = f.readlines()
+        split_idx = lines.index('# Below can only be installed with pip \n')
+        conda_pkg = " ".join([i.strip() for i in lines[:split_idx] if i.strip()])
+        pip_pkg = " ".join([i.strip() for i in lines[split_idx+1:] if i.strip()])
+        
+    with open(f'{output_dir}/conda_pkg.txt','w') as conda_f, open(f'{output_dir}/pip_pkg.txt','w') as pip_f:
+        conda_f.write(conda_pkg)
+        pip_f.write(pip_pkg)
+        
+    shutil.copy('luto/tools/create_task_runs/bash_scripts/create_env.sh', f'{output_dir}/create_env.sh')
+    shutil.copy('luto/tools/create_task_runs/bash_scripts/install_pkg.sh', f'{output_dir}/install_pkg.sh')
+    
+    print('Environment setup script has been created! \nRun "bash create_env.sh" to create the environment!')
+
+
 
 
 
