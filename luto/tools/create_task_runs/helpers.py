@@ -60,26 +60,6 @@ def copy_folder_custom(source, destination, ignore_dirs=None):
 
 
 
-def create_env_script(output_dir:str=TASK_ROOT_DIR):
-    with open('requirements.txt') as f:
-        lines = f.readlines()
-        split_idx = lines.index('# Below can only be installed with pip \n')
-        conda_pkg = " ".join([i.strip() for i in lines[:split_idx] if i.strip()])
-        pip_pkg = " ".join([i.strip() for i in lines[split_idx+1:] if i.strip()])
-        
-    with open(f'{output_dir}/conda_pkg.txt','w') as conda_f, open(f'{output_dir}/pip_pkg.txt','w') as pip_f:
-        conda_f.write(conda_pkg)
-        pip_f.write(pip_pkg)
-        
-    shutil.copy('luto/tools/create_task_runs/bash_scripts/create_env.sh', f'{output_dir}/create_env.sh')
-    shutil.copy('luto/tools/create_task_runs/bash_scripts/install_pkg.sh', f'{output_dir}/install_pkg.sh')
-    
-    print('Environment setup script has been created! \nRun "bash create_env.sh" to create the environment!')
-
-
-
-
-
 def create_settings_template(to_path:str=TASK_ROOT_DIR):
     
     if os.path.exists(f'{to_path}/settings_template.csv'):
@@ -127,6 +107,9 @@ def create_task_folders(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
     reserve_cols = ['Default_run']
     custom_cols = [col for col in custom_settings.columns if col not in reserve_cols]
     
+    if not custom_cols:
+        raise ValueError('No custom settings found in the settings_template.csv file!')
+    
     
     for col in custom_cols:
         # Check if the column name is valid
@@ -169,6 +152,9 @@ def create_task_folders(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
                     file.write(f'{k} = "{v}"\n')
                 else:
                     file.write(f'{k} = {v}\n')
+                    
+        # Copy the slurm script to the task folder
+        shutil.copyfile('luto/tools/create_task_runs/bash_scripts/bash_cmd.sh', f'{TASK_ROOT_DIR}/{col}/slurm.sh')
 
 
 
