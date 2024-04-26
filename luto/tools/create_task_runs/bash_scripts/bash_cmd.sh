@@ -39,6 +39,9 @@ JOB_NAME="LUTO_${PARENT_DIR}"
 
 
 # Activate the Conda environment
+source ~/miniconda3/etc/profile.d/conda.sh
+source ~/miniforge3/etc/profile.d/conda.sh
+source ~/anaconda3/etc/profile.d/conda.sh
 conda activate luto
 
 
