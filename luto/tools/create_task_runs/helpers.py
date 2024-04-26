@@ -147,11 +147,12 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
         with open(f'{TASK_ROOT_DIR}/{col}/luto/settings.py', 'w') as file:
             for k, v in custom_dict.items():
                 if str(v).isdigit() or is_float(str(v)):
-                    file.write(f'{k} = {v}\n')
+                    file.write(f'{k}={v}\n')
                 elif isinstance(v, str):
-                    file.write(f'{k} = "{v}"\n')
+                    file.write(f'{k}="{v}"\n')
                 else:
-                    file.write(f'{k} = {v}\n')
+                    file.write(f'{k}={v}\n')
+                    
 
 
         # Copy the slurm script to the task folder
