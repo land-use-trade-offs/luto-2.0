@@ -1,10 +1,8 @@
 #!/bin/bash
 
-
-
 # Create a new Conda environment, and install the required packages
-mamba create -c conda-forge -n luto_py311 python=3.11 -y
-mamba activate luto_py311
+mamba create -c conda-forge -n luto python=3.11 -y
+mamba activate luto
 
 
 #  Install packages

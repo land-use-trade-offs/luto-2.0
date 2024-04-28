@@ -6,6 +6,7 @@ import keyword
 import pandas as pd
 
 from joblib import delayed, Parallel
+import pip
 
 from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, PARAMS_TO_EVAL, TASK_ROOT_DIR
 from luto import settings
@@ -60,6 +61,21 @@ def copy_folder_custom(source, destination, ignore_dirs=None):
 
 
 
+def get_requirements():
+    with open('requirements.txt', 'r') as file:
+        requirements = file.read().splitlines()
+        
+    split_idx = requirements.index('# Below can only be installed with pip')
+    
+    conda_pkgs = " ".join(requirements[:split_idx])
+    pip_pkgs = " ".join(requirements[split_idx+1:])
+    
+    return conda_pkgs, pip_pkgs
+    
+        
+    
+
+
 def create_settings_template(to_path:str=TASK_ROOT_DIR):
     
     if os.path.exists(f'{to_path}/settings_template.csv'):
@@ -85,9 +101,14 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
     settings_df = settings_df.map(str)
 
 
-    # Create a folder for the custom settings
-    if not os.path.exists(to_path):
-        os.makedirs(to_path)
+    # Save the settings template to the root task folder
+    os.makedirs(to_path)
+    conda_pkgs, pip_pkgs = get_requirements()
+    with open(f'{to_path}/requirements_conda.txt', 'w') as conda_f, \
+            open(f'{to_path}/requirements_pip.txt', 'w') as pip_f:
+        conda_f.write(conda_pkgs)
+        pip_f.write(pip_pkgs)
+        
     settings_df.to_csv(f'{to_path}/settings_template.csv', index=False)
     
     
@@ -144,14 +165,24 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
         custom_dict['DATA_DIR'] = custom_dict['INPUT_DIR']
 
         # Write the custom settings to the settings.py of each task
-        with open(f'{TASK_ROOT_DIR}/{col}/luto/settings.py', 'w') as file:
+        with open(f'{TASK_ROOT_DIR}/{col}/luto/settings.py', 'w') as file, \
+             open(f'{TASK_ROOT_DIR}/{col}/luto/settings_bash.py', 'w') as bash_file:
             for k, v in custom_dict.items():
-                if str(v).isdigit() or is_float(str(v)):
+                if isinstance(v, list):
+                    bash_file.write(f'{k}=({ " ".join([str(elem) for elem in v]) })\n')
+                elif isinstance(v, dict):
+                    bash_file.write(f'# {k} is a dictionary, which is not natively supported in bash\n')
+                    for key, value in v.items():
+                        bash_file.write(f'{k}_{key}={value}\n')
+                elif str(v).isdigit() or is_float(str(v)):
                     file.write(f'{k}={v}\n')
+                    bash_file.write(f'{k}={v}\n')
                 elif isinstance(v, str):
                     file.write(f'{k}="{v}"\n')
+                    bash_file.write(f'{k}="{v}"\n')
                 else:
                     file.write(f'{k}={v}\n')
+                    bash_file.write(f'{k}={v}\n')
                     
 
 
@@ -159,10 +190,11 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
         shutil.copyfile('luto/tools/create_task_runs/bash_scripts/bash_cmd.sh', f'{TASK_ROOT_DIR}/{col}/slurm.sh')
 
 
-        # Start the task
-        os.chdir(f'{TASK_ROOT_DIR}/{col}')
-        os.system('sbatch -p mem slurm.sh')
-        os.chdir(original_dir)
+        # Start the task if the os is linux
+        if os.name == 'posix':
+            os.chdir(f'{TASK_ROOT_DIR}/{col}')
+            os.system('sbatch -p mem slurm.sh')
+            os.chdir(original_dir)
 
 
 

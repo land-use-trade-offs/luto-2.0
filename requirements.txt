@@ -12,8 +12,7 @@ folium==0.15.1
 contextily==1.5.1
 imageio==2.34.0
 geopandas
-# Below can only be installed with pip 
+# Below can only be installed with pip
 gurobipy==10.0.3
 numpy_financial==1.0.0
-matplotlib_scalebar==0.8.1
 tables==3.9.2

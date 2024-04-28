@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Read the settings file
-source luto/settings.py
+# Read the settings_bash file
+source luto/settings_bash.py
 
 
 # Set the memory and time based on the resolution factor
@@ -22,8 +22,8 @@ fi
 
 
 # Get the job name based on the task directory
-CWD=$(pwd)
-PARENT_DIR=$(basename $(dirname "$CWD"))
+SCRIPT_PATH=$(dirname "$0")
+PARENT_DIR=$(basename "${SCRIPT_PATH}")
 JOB_NAME="LUTO_${PARENT_DIR}"
 
 
