@@ -6,7 +6,6 @@ import keyword
 import pandas as pd
 
 from joblib import delayed, Parallel
-import pip
 
 from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, PARAMS_TO_EVAL, TASK_ROOT_DIR
 from luto import settings
@@ -77,39 +76,39 @@ def get_requirements():
 
 
 def create_settings_template(to_path:str=TASK_ROOT_DIR):
-    
-    if os.path.exists(f'{to_path}/settings_template.csv'):
-        print('settings_template.csv already exists! Skip creating a new one!')
-        return
-
-    # Get the settings from luto.settings
-    with open('luto/settings.py', 'r') as file:
-        lines = file.readlines()
-
-        # Regex patterns that matches variable assignments from settings
-        parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=")
-        settings_order = [match[1].strip() for line in lines if (match := parameter_reg.match(line))]
-
-        # Reorder the settings dictionary to match the order in the settings.py file
-        settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
-        settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
-
-
-    # Create a template for cutom settings
-    settings_df = pd.DataFrame({k:[v] for k,v in settings_dict.items()}).T.reset_index()
-    settings_df.columns = ['Name','Default_run']
-    settings_df = settings_df.map(str)
 
 
     # Save the settings template to the root task folder
-    os.makedirs(to_path)
+    None if os.path.exists(to_path) else os.makedirs(to_path)
+    
     conda_pkgs, pip_pkgs = get_requirements()
     with open(f'{to_path}/requirements_conda.txt', 'w') as conda_f, \
             open(f'{to_path}/requirements_pip.txt', 'w') as pip_f:
         conda_f.write(conda_pkgs)
         pip_f.write(pip_pkgs)
+    
         
-    settings_df.to_csv(f'{to_path}/settings_template.csv', index=False)
+    if os.path.exists(f'{to_path}/settings_template.csv'):
+        print('settings_template.csv already exists! Skip creating a new one!')
+    else:
+        # Get the settings from luto.settings
+        with open('luto/settings.py', 'r') as file:
+            lines = file.readlines()
+
+            # Regex patterns that matches variable assignments from settings
+            parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=")
+            settings_order = [match[1].strip() for line in lines if (match := parameter_reg.match(line))]
+
+            # Reorder the settings dictionary to match the order in the settings.py file
+            settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
+            settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
+
+
+        # Create a template for cutom settings
+        settings_df = pd.DataFrame({k:[v] for k,v in settings_dict.items()}).T.reset_index()
+        settings_df.columns = ['Name','Default_run']
+        settings_df = settings_df.map(str)    
+        settings_df.to_csv(f'{to_path}/settings_template.csv', index=False)
     
     
     
