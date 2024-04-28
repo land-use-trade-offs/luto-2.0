@@ -6,5 +6,5 @@ mamba activate luto
 
 
 #  Install packages
-mamba install -c conda-forge -y $(cat conda_pkg.txt)
-pip install $(cat pip_pkg.txt)
+mamba install -c conda-forge -y $(cat requirements_conda.txt)
+pip install $(cat requirements_pip.txt)
