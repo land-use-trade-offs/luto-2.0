@@ -26,6 +26,17 @@ SCRIPT_PATH=$(realpath $(dirname "$0"))
 PARENT_DIR=$(basename "${SCRIPT_PATH}")
 JOB_NAME="LUTO_${PARENT_DIR}"
 
+# Get the number of CPUs
+CPU_COUNT=$(nproc)
+
+# Calculate CPU_PER_JOB
+CPU_PER_JOB=$(($CPU_COUNT / $DIR_COUNT - 2))
+
+# Ensure CPU_PER_JOB is not less than 1
+if (( CPU_PER_JOB < 1 )); then
+    CPU_PER_JOB=1
+fi
+
 
 
 
@@ -57,9 +68,9 @@ EOF
 sbatch -p mem \
     --time=${TIME} \
     --mem=${MEM} \
-    --cpus-per-task=32 \
+    --cpus-per-task=${CPU_PER_JOB} \
     --job-name=${JOB_NAME} \
-    $SCRIPT
+    ${SCRIPT}
 
 # Remove the temporary script file
 rm $SCRIPT
