@@ -2,15 +2,7 @@
 
 # Add the Conda binaries to the PATH
 export PATH="$HOME/miniforge3/bin:$PATH"
-export PATH="$HOME/miniconda/bin:$PATH"
 
-# Install conda
-if ! command -v conda &> /dev/null
-then
-    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O $HOME/miniconda.sh
-    bash $HOME/miniconda.sh -b -p $HOME/miniconda
-    rm $HOME/miniconda.sh
-fi
 
 # Install mini-forge
 if [[ ! -d $HOME/miniforge3 ]]
@@ -22,5 +14,4 @@ fi
 
 # Initialize mamba or conda
 mamba init
-source ~/.bashrc
 

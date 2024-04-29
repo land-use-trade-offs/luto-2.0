@@ -14,6 +14,78 @@ from luto import settings
 
 
 
+
+def create_settings_template(to_path:str=TASK_ROOT_DIR):
+
+    # Save the settings template to the root task folder
+    None if os.path.exists(to_path) else os.makedirs(to_path)
+    
+    # conda_pkgs, pip_pkgs = get_requirements()
+    # with open(f'{to_path}/requirements_conda.txt', 'w') as conda_f, \
+    #         open(f'{to_path}/requirements_pip.txt', 'w') as pip_f:
+    #     conda_f.write(conda_pkgs)
+    #     pip_f.write(pip_pkgs)
+    
+        
+    if os.path.exists(f'{to_path}/settings_template.csv'):
+        print('settings_template.csv already exists! Skip creating a new one!')
+    else:
+        # Get the settings from luto.settings
+        with open('luto/settings.py', 'r') as file:
+            lines = file.readlines()
+
+            # Regex patterns that matches variable assignments from settings
+            parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=")
+            settings_order = [match[1].strip() for line in lines if (match := parameter_reg.match(line))]
+
+            # Reorder the settings dictionary to match the order in the settings.py file
+            settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
+            settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
+
+
+        # Create a template for cutom settings
+        settings_df = pd.DataFrame({k:[v] for k,v in settings_dict.items()}).T.reset_index()
+        settings_df.columns = ['Name','Default_run']
+        settings_df = settings_df.map(str)    
+        settings_df.to_csv(f'{to_path}/settings_template.csv', index=False)
+
+
+
+
+
+def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
+     
+    # Read the custom settings file
+    custom_settings = pd.read_csv(from_path, index_col=0)
+    custom_settings = custom_settings.replace({'TRUE': 'True', 'FALSE': 'False'})
+    custom_settings.loc[PARAMS_TO_EVAL] = custom_settings.loc[PARAMS_TO_EVAL].map(eval)
+
+    # Create a dictionary of custom settings
+    custom_cols = [col for col in custom_settings.columns if col not in ['Default_run']]
+    num_task = len(custom_cols)
+
+    if not custom_cols:
+        raise ValueError('No custom settings found in the settings_template.csv file!')
+
+    cwd = os.getcwd()
+    for col in custom_cols:
+        # Get the settings for the run
+        custom_dict = update_settings(custom_settings[col].to_dict(), num_task)
+        # Check if the column name is valid, and report the changed settings
+        check_settings_name(custom_settings, col)     
+        # Create a folder for each run
+        create_run_folders(col)    
+        # Write the custom settings to the task folder
+        write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)  
+        # Submit the task
+        submit_task(cwd, col)
+        
+
+
+
+
+
+    
 def is_float(s):
     try:
         float(s)
@@ -72,45 +144,8 @@ def get_requirements():
     
     return conda_pkgs, pip_pkgs
     
-        
-    
-
-
-def create_settings_template(to_path:str=TASK_ROOT_DIR):
-
-
-    # Save the settings template to the root task folder
-    None if os.path.exists(to_path) else os.makedirs(to_path)
-    
-    conda_pkgs, pip_pkgs = get_requirements()
-    with open(f'{to_path}/requirements_conda.txt', 'w') as conda_f, \
-            open(f'{to_path}/requirements_pip.txt', 'w') as pip_f:
-        conda_f.write(conda_pkgs)
-        pip_f.write(pip_pkgs)
-    
-        
-    if os.path.exists(f'{to_path}/settings_template.csv'):
-        print('settings_template.csv already exists! Skip creating a new one!')
-    else:
-        # Get the settings from luto.settings
-        with open('luto/settings.py', 'r') as file:
-            lines = file.readlines()
-
-            # Regex patterns that matches variable assignments from settings
-            parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=")
-            settings_order = [match[1].strip() for line in lines if (match := parameter_reg.match(line))]
-
-            # Reorder the settings dictionary to match the order in the settings.py file
-            settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
-            settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
-
-
-        # Create a template for cutom settings
-        settings_df = pd.DataFrame({k:[v] for k,v in settings_dict.items()}).T.reset_index()
-        settings_df.columns = ['Name','Default_run']
-        settings_df = settings_df.map(str)    
-        settings_df.to_csv(f'{to_path}/settings_template.csv', index=False)
-    
+  
+  
     
 def write_custom_settings(task_dir:str, settings_dict:dict):
     # Write the custom settings to the settings.py of each task
@@ -163,7 +198,6 @@ def update_settings(settings_dict:dict, n_tasks:int):
 
 
 
-
 def check_settings_name(settings:dict, col:str):
     # Check if the column name is valid
     if not is_valid_variable_name(col):  
@@ -180,7 +214,6 @@ def check_settings_name(settings:dict, col:str):
     
     
     
-
     
 def create_run_folders(col):
     # Copy codes to the each custom run folder, excluding {EXCLUDE_DIRS} directories
@@ -195,7 +228,7 @@ def create_run_folders(col):
 
 def submit_task(cwd:str, col:str):
     # Copy the slurm script to the task folder
-    shutil.copyfile('luto/tools/create_task_runs/bash_scripts/bash_cmd.sh', f'{TASK_ROOT_DIR}/{col}/slurm.sh')
+    shutil.copyfile('luto/tools/create_task_runs/bash_scripts/slurm_cmd.sh', f'{TASK_ROOT_DIR}/{col}/slurm.sh')
     # Start the task if the os is linux
     if os.name == 'posix':
         os.chdir(f'{TASK_ROOT_DIR}/{col}')
@@ -205,33 +238,7 @@ def submit_task(cwd:str, col:str):
     
     
     
-def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
-     
-    # Read the custom settings file
-    custom_settings = pd.read_csv(from_path, index_col=0)
-    custom_settings = custom_settings.replace({'TRUE': 'True', 'FALSE': 'False'})
-    custom_settings.loc[PARAMS_TO_EVAL] = custom_settings.loc[PARAMS_TO_EVAL].map(eval)
 
-    # Create a dictionary of custom settings
-    custom_cols = [col for col in custom_settings.columns if col not in ['Default_run']]
-    num_task = len(custom_cols)
-
-    if not custom_cols:
-        raise ValueError('No custom settings found in the settings_template.csv file!')
-
-    cwd = os.getcwd()
-    for col in custom_cols:
-        # Get the settings for the run
-        custom_dict = update_settings(custom_settings[col].to_dict(), num_task)
-        # Check if the column name is valid, and report the changed settings
-        check_settings_name(custom_settings, col)     
-        # Create a folder for each run
-        create_run_folders(col)    
-        # Write the custom settings to the task folder
-        write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)  
-        # Submit the task
-        submit_task(cwd, col)
-        
         
         
 
