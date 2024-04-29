@@ -34,6 +34,7 @@ SCRIPT=$(mktemp)
 
 # Write the script content to the file
 cat << EOF > $SCRIPT
+#!/bin/bash
 # Activate the Conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 source ~/miniforge3/etc/profile.d/conda.sh
@@ -52,15 +53,13 @@ EOF
 
 
 
-
+# Submit the job
 sbatch -p mem \
     --time=${TIME} \
     --mem=${MEM} \
     --cpus-per-task=32 \
     --job-name=${JOB_NAME} \
     $SCRIPT
-
-
 
 # Remove the temporary script file
 rm $SCRIPT

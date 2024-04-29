@@ -167,23 +167,24 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
         with open(f'{TASK_ROOT_DIR}/{col}/luto/settings.py', 'w') as file, \
              open(f'{TASK_ROOT_DIR}/{col}/luto/settings_bash.py', 'w') as bash_file:
             for k, v in custom_dict.items():
+                # List values need to be converted to bash arrays
                 if isinstance(v, list):
-                    bash_file.write(f'{k}=({ " ".join([str(elem) for elem in v]) })\n')
+                    bash_file.write(f'{k}=({ " ".join([str(elem) for elem in v])})\n')
+                    file.write(f'{k}={v}\n')
+                # Dict values need to be converted to bash variables
                 elif isinstance(v, dict):
                     bash_file.write(f'# {k} is a dictionary, which is not natively supported in bash\n')
                     for key, value in v.items():
                         bash_file.write(f'{k}_{key}={value}\n')
-                elif str(v).isdigit() or is_float(str(v)):
-                    file.write(f'{k}={v}\n')
-                    bash_file.write(f'{k}={v}\n')
+                # Strings need to be enclosed in quotes
                 elif isinstance(v, str):
                     file.write(f'{k}="{v}"\n')
-                    bash_file.write(f'{k}="{v}"\n')
+                    bash_file.write(f'{k}="{v}"\n')         
+                # The rest can be written as it is
                 else:
                     file.write(f'{k}={v}\n')
                     bash_file.write(f'{k}={v}\n')
-                    
-
+    
 
         # Copy the slurm script to the task folder
         shutil.copyfile('luto/tools/create_task_runs/bash_scripts/bash_cmd.sh', f'{TASK_ROOT_DIR}/{col}/slurm.sh')
