@@ -70,7 +70,7 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
     cwd = os.getcwd()
     for col in custom_cols:
         # Get the settings for the run
-        custom_dict = update_settings(custom_settings[col].to_dict(), num_task)
+        custom_dict = update_settings(custom_settings[col].to_dict(), num_task, col)
         # Check if the column name is valid, and report the changed settings
         check_settings_name(custom_settings, col)     
         # Create a folder for each run
@@ -178,7 +178,7 @@ def write_custom_settings(task_dir:str, settings_dict:dict):
     
                 
                 
-def update_settings(settings_dict:dict, n_tasks:int):
+def update_settings(settings_dict:dict, n_tasks:int, col:str):
     # The input dir for each task will point to the absolute path of the input dir
     settings_dict['INPUT_DIR'] = os.path.abspath(settings_dict['INPUT_DIR']).replace('\\','/')
     settings_dict['DATA_DIR'] = settings_dict['INPUT_DIR']
@@ -192,6 +192,30 @@ def update_settings(settings_dict:dict, n_tasks:int):
     settings_dict['THREADS'] = CPU_PER_TASK 
     settings_dict['WRITE_THREADS'] = CPU_PER_TASK
     
+
+    # Set the memory and time based on the resolution factor
+    if settings_dict['RESFACTOR'] == 1:
+        MEM = "200G"
+        TIME = "30-0:00:00"
+    elif settings_dict['RESFACTOR'] == 2:
+        MEM = "150G"
+        TIME = "10-0:00:00"
+    elif settings_dict['RESFACTOR'] == 3:
+        MEM = "100G"
+        TIME = "5-0:00:00"
+    else:
+        MEM = "80G"
+        TIME = "2-0:00:00"
+        
+    # Set the job name base on the columns name
+    JOB_NAME = f"LUTO_{col}"
+    
+    settings_dict['MEM'] = MEM
+    settings_dict['TIME'] = TIME
+    settings_dict['JOB_NAME'] = JOB_NAME
+
+
+        
     return settings_dict
 
 
