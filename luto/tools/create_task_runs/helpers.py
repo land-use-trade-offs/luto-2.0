@@ -117,7 +117,7 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
     
     
 def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
-    
+     
     # Read the custom settings file
     custom_settings = pd.read_csv(from_path, index_col=0)
     custom_settings = custom_settings.replace({'TRUE': 'True', 'FALSE': 'False'})
@@ -155,7 +155,6 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
         os.makedirs(f'{TASK_ROOT_DIR}/{col}/output', exist_ok=True)
 
 
-
         # Write the custom settings to each task folder
         custom_dict = custom_settings[col].to_dict()
 
@@ -176,11 +175,15 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
                     bash_file.write(f'# {k} is a dictionary, which is not natively supported in bash\n')
                     for key, value in v.items():
                         bash_file.write(f'{k}_{key}={value}\n')
-                # Strings need to be enclosed in quotes
+                # If the value is a number, write it as number
+                elif str(v).isdigit() or is_float(str(v)):
+                    file.write(f'{k}={eval(v)}\n')
+                    bash_file.write(f'{k}={eval(v)}\n')
+                # If the value is a string, write it as a string
                 elif isinstance(v, str):
                     file.write(f'{k}="{v}"\n')
-                    bash_file.write(f'{k}="{v}"\n')         
-                # The rest can be written as it is
+                    bash_file.write(f'{k}="{v}"\n')
+                # Write the rest as strings
                 else:
                     file.write(f'{k}={v}\n')
                     bash_file.write(f'{k}={v}\n')
