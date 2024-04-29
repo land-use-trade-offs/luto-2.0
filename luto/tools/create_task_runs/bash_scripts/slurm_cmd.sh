@@ -29,6 +29,7 @@ sbatch -p mem \
     --time=${TIME} \
     --mem=${MEM} \
     --cpus-per-task=${THREADS} \
+    --export=ALL \
     --job-name=${JOB_NAME} \
     ${SCRIPT}
 
