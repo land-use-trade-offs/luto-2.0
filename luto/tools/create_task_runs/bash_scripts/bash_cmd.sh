@@ -30,10 +30,11 @@ JOB_NAME="LUTO_${PARENT_DIR}"
 
 
 #SBATCH -p mem                      	# Partition name
-#SBATCH --time=$TIME            	    # Runtime in D-HH:MM:SS
-#SBATCH --mem=$MEM                  	# Memory total in GB
+#SBATCH --time=${TIME}            	    # Runtime in D-HH:MM:SS
+#SBATCH --mem=${MEM}                	# Memory total in GB
 #SBATCH --cpus-per-task=32          	# Number of CPUs per task
-#SBATCH --job-name=$JOB_NAME            # Job name
+#SBATCH --job-name=${JOB_NAME}          # Job name
+
 
 
 
