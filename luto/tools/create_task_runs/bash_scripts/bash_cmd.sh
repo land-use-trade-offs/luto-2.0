@@ -22,7 +22,7 @@ fi
 
 
 # Get the job name based on the task directory
-SCRIPT_PATH=$(dirname "$0")
+SCRIPT_PATH=$(realpath $(dirname "$0"))
 PARENT_DIR=$(basename "${SCRIPT_PATH}")
 JOB_NAME="LUTO_${PARENT_DIR}"
 
