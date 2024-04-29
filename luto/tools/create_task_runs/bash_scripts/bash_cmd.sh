@@ -29,22 +29,16 @@ JOB_NAME="LUTO_${PARENT_DIR}"
 
 
 
-#SBATCH -p mem                      	# Partition name
-#SBATCH --time=${TIME}            	    # Runtime in D-HH:MM:SS
-#SBATCH --mem=${MEM}                	# Memory total in GB
-#SBATCH --cpus-per-task=32          	# Number of CPUs per task
-#SBATCH --job-name=${JOB_NAME}          # Job name
+# Create a temporary script file
+SCRIPT=$(mktemp)
 
-
-
-
-
+# Write the script content to the file
+cat << EOF > $SCRIPT
 # Activate the Conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 source ~/miniforge3/etc/profile.d/conda.sh
 source ~/anaconda3/etc/profile.d/conda.sh
 conda activate luto
-
 
 # Run the simulation
 python <<-EOF
@@ -54,3 +48,19 @@ sim.run(data=data, base=2010, target=2050)
 from luto.tools.write import write_outputs
 write_outputs(data)
 EOF
+EOF
+
+
+
+
+sbatch -p mem \
+    --time=${TIME} \
+    --mem=${MEM} \
+    --cpus-per-task=32 \
+    --job-name=${JOB_NAME} \
+    $SCRIPT
+
+
+
+# Remove the temporary script file
+rm $SCRIPT
