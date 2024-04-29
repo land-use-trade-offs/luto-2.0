@@ -4,6 +4,7 @@ import re
 import shutil
 import keyword
 import pandas as pd
+import multiprocessing
 
 from joblib import delayed, Parallel
 
@@ -154,13 +155,23 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
         # Create an output folder for the task
         os.makedirs(f'{TASK_ROOT_DIR}/{col}/output', exist_ok=True)
 
-
         # Write the custom settings to each task folder
         custom_dict = custom_settings[col].to_dict()
 
         # The input dir for each task will point to the absolute path of the input dir
         custom_dict['INPUT_DIR'] = os.path.abspath(custom_dict['INPUT_DIR']).replace('\\','/')
         custom_dict['DATA_DIR'] = custom_dict['INPUT_DIR']
+
+        # The THREADS setting will be set to the number of CPU cores divided by the number of tasks
+        CPU_COUNT = multiprocessing.cpu_count()
+        CPU_PER_TASK = CPU_COUNT // len(custom_cols) - 2
+        CPU_PER_TASK = max(CPU_PER_TASK, 1)
+        CPU_PER_TASK = min(CPU_PER_TASK, int(custom_dict['THREADS']))
+        
+        custom_dict['THREADS'] = CPU_PER_TASK 
+        custom_dict['WRITE_THREADS'] = CPU_PER_TASK
+
+
 
         # Write the custom settings to the settings.py of each task
         with open(f'{TASK_ROOT_DIR}/{col}/luto/settings.py', 'w') as file, \
@@ -176,9 +187,9 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
                     for key, value in v.items():
                         bash_file.write(f'{k}_{key}={value}\n')
                 # If the value is a number, write it as number
-                elif str(v).isdigit() or is_float(str(v)):
-                    file.write(f'{k}={eval(v)}\n')
-                    bash_file.write(f'{k}={eval(v)}\n')
+                elif str(v).isdigit() or is_float(v):
+                    file.write(f'{k}={v}\n')
+                    bash_file.write(f'{k}={v}\n')
                 # If the value is a string, write it as a string
                 elif isinstance(v, str):
                     file.write(f'{k}="{v}"\n')
@@ -187,7 +198,7 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
                 else:
                     file.write(f'{k}={v}\n')
                     bash_file.write(f'{k}={v}\n')
-    
+
 
         # Copy the slurm script to the task folder
         shutil.copyfile('luto/tools/create_task_runs/bash_scripts/bash_cmd.sh', f'{TASK_ROOT_DIR}/{col}/slurm.sh')
