@@ -44,7 +44,7 @@ fi
 SCRIPT=$(mktemp)
 
 # Write the script content to the file
-cat << EOF > $SCRIPT
+cat << OUTER_EOF > $SCRIPT
 #!/bin/bash
 # Activate the Conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
@@ -53,16 +53,14 @@ source ~/anaconda3/etc/profile.d/conda.sh
 conda activate luto
 
 # Run the simulation
-python <<-EOF
+python <<-INNER_EOF
 import luto.simulation as sim
 data = sim.load_data()
 sim.run(data=data, base=2010, target=2050)
 from luto.tools.write import write_outputs
 write_outputs(data)
-EOF
-EOF
-
-
+INNER_EOF
+OUTER_EOF
 
 # Submit the job
 sbatch -p mem \

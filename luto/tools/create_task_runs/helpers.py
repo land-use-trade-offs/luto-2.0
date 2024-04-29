@@ -183,6 +183,7 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
                     file.write(f'{k}={v}\n')
                 # Dict values need to be converted to bash variables
                 elif isinstance(v, dict):
+                    file.write(f'{k}={v}\n')
                     bash_file.write(f'# {k} is a dictionary, which is not natively supported in bash\n')
                     for key, value in v.items():
                         bash_file.write(f'{k}_{key}={value}\n')
