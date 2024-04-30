@@ -24,7 +24,9 @@ import pandas as pd
 from typing import Dict
 from luto.ag_managements import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data, lvs_veg_types
+from luto import settings
 from luto.economics.agricultural.quantity import get_yield_pot, get_quantity
+from luto.economics.agricultural.ghg import get_savanna_burning_effect_g_mrj
 
 def get_rev_crop( data: Data   # Data object.
                 , lu           # Land use.
@@ -277,8 +279,8 @@ def get_savanna_burning_effect_r_mrj(data):
 
     Since EDSSB has no effect on revenue, return an array of zeros.
     """
-    nlus = len(AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
-    return np.zeros((data.NLMS, data.NCELLS, nlus))
+    ghg_effect = get_savanna_burning_effect_g_mrj(data)
+    return ghg_effect * settings.CARBON_PRICE_PER_TONNE
 
 
 def get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx):

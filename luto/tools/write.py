@@ -20,7 +20,6 @@ Writes model output and statistics to files.
 
 
 
-
 import os, re
 import shutil
 import numpy as np

@@ -6,10 +6,7 @@ import geopandas as gpd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from matplotlib_scalebar.scalebar import ScaleBar
 from luto.tools.report.map_tools.helper import download_basemap
-from rasterio.coords import BoundingBox
-
 from luto.tools.report.map_tools.parameters import  extra_desc_float_tif
 
 

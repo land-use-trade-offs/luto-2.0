@@ -406,15 +406,16 @@ def map_desc_to_dvar_index(category: str,
 
 
 class LogToFile:
-    def __init__(self, log_path):
+    def __init__(self, log_path, mode:str='w'):
         self.log_path_stdout = f"{log_path}_stdout.log"
         self.log_path_stderr = f"{log_path}_stderr.log"
+        self.mode = mode
 
     def __call__(self, func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             # Open files for writing here, ensuring they're only created upon function call
-            with open(self.log_path_stdout, 'w') as file_stdout, open(self.log_path_stderr, 'w') as file_stderr:
+            with open(self.log_path_stdout, self.mode) as file_stdout, open(self.log_path_stderr, self.mode) as file_stderr:
                 original_stdout = sys.stdout
                 original_stderr = sys.stderr
                 try:
