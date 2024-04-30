@@ -1,4 +1,5 @@
 import numpy as np
+from luto.non_ag_landuses import NON_AG_LAND_USES
 
 from luto.data import Data
 
@@ -104,21 +105,28 @@ def get_wreq_matrix(data: Data) -> np.ndarray:
         The water requirements matrix for all non-agricultural land uses.
         Indexed by (r, k) where r is the cell index and k is the non-agricultural land usage index.
     """
-    env_plant_wreq_matrix = get_wreq_matrix_env_planting(data)
-    rip_plant_wreq_matrix = get_wreq_matrix_rip_planting(data)
-    agroforestry_wreq_matrix = get_wreq_matrix_agroforestry(data)
-    carbon_plantings_block_wreq_matrix = get_wreq_matrix_carbon_plantings_block(data)
-    carbon_plantings_belt_wreq_matrix = get_wreq_matrix_carbon_plantings_belt(data)
-    beccs_wreq_matrix = get_wreq_matrix_beccs(data)
+
+    non_agr_wreq_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-    non_ag_wreq_matrices = [
-        env_plant_wreq_matrix.reshape((data.NCELLS, 1)),
-        rip_plant_wreq_matrix.reshape((data.NCELLS, 1)),
-        agroforestry_wreq_matrix.reshape((data.NCELLS, 1)),
-        carbon_plantings_block_wreq_matrix.reshape((data.NCELLS, 1)),
-        carbon_plantings_belt_wreq_matrix.reshape((data.NCELLS, 1)),
-        beccs_wreq_matrix.reshape((data.NCELLS, 1)),
-    ]
+    if NON_AG_LAND_USES['Environmental Plantings']:
+        non_agr_wreq_matrices['Environmental Plantings'] = get_wreq_matrix_env_planting(data).reshape((data.NCELLS, 1))
 
-    return np.concatenate(non_ag_wreq_matrices, axis=1)
+    if NON_AG_LAND_USES['Riparian Plantings']:
+        non_agr_wreq_matrices['Riparian Plantings'] = get_wreq_matrix_rip_planting(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Agroforestry']:
+        non_agr_wreq_matrices['Agroforestry'] = get_wreq_matrix_agroforestry(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Carbon Plantings (Block)']:
+        non_agr_wreq_matrices['Carbon Plantings (Block)'] = get_wreq_matrix_carbon_plantings_block(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
+        non_agr_wreq_matrices['Carbon Plantings (Belt)'] = get_wreq_matrix_carbon_plantings_belt(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['BECCS']:
+        non_agr_wreq_matrices['BECCS'] = get_wreq_matrix_beccs(data).reshape((data.NCELLS, 1))
+
+    non_agr_wreq_matrices = list(non_agr_wreq_matrices.values())
+
+    return np.concatenate(non_agr_wreq_matrices, axis=1)

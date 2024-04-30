@@ -49,7 +49,8 @@ import luto.economics.non_agricultural.ghg as non_ag_ghg
 import luto.economics.non_agricultural.water as non_ag_water
 import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.non_ag_landuses import NON_AG_LAND_USES
+from luto.ag_managements import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 
 from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_html import data2html
@@ -213,6 +214,9 @@ def write_files(data: Data, yr_cal, path):
 
     # Save raw agricultural management decision variables (float array).
     for am in AG_MANAGEMENTS_TO_LAND_USES:
+        if not AG_MANAGEMENTS[am]:
+            continue
+
         snake_case_am = tools.am_name_snake_case(am)
         am_X_mrj_fname = f'ag_man_X_mrj_{snake_case_am}_{yr_cal}.npy'
         np.save(os.path.join(path, am_X_mrj_fname), data.ag_man_dvars[yr_cal][am].astype(np.float16))
@@ -269,7 +273,7 @@ def write_files_separate(data: Data, yr_cal, path, ammap_separate=False):
 
     # Get the desc2dvar table. 
     ag_dvar_map = tools.map_desc_to_dvar_index('Ag_LU', data.DESC2AGLU, ag_dvar_rj)
-    non_ag_dvar_map = tools.map_desc_to_dvar_index('Non-Ag_LU', {v:k for k,v in enumerate(data.NON_AGRICULTURAL_LANDUSES)}, non_ag_rk)
+    non_ag_dvar_map = tools.map_desc_to_dvar_index('Non-Ag_LU', {v:k for k,v in enumerate(NON_AG_LAND_USES.keys())}, non_ag_rk)
     lm_dvar_map = tools.map_desc_to_dvar_index('Land_Mgt', {v:k for k,v in enumerate(data.LANDMANS)},ag_dvar_rm)
     
     # Get the desc2dvar table for agricultural management
@@ -414,6 +418,9 @@ def write_revenue_cost_ag_management(data: Data, yr_cal, path):
     cost_am_dfs = []
     # Loop through the agricultural managements
     for am, am_desc in AG_MANAGEMENTS_TO_LAND_USES.items():
+        if not AG_MANAGEMENTS[am]:
+            continue
+        
         # Get the land use codes for the agricultural management
         am_code = [data.DESC2AGLU[desc] for desc in am_desc]
 
@@ -547,7 +554,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     # Get the transition cost matirces for non-agricultural land-use
     if yr_idx == 0:
         non_ag_transitions_cost_mat = {k:{'Transition cost':np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))}
-                                   for k in data.NON_AGRICULTURAL_LANDUSES}
+                                   for k in NON_AG_LAND_USES.keys()}
     else:
         non_ag_transitions_cost_mat = non_ag_transitions.get_from_ag_transition_matrix(data,
                                                                                        yr_idx,
@@ -558,7 +565,6 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     cost_dfs = []
     for idx,non_ag_type in enumerate(non_ag_transitions_cost_mat):
         for cost_type in non_ag_transitions_cost_mat[non_ag_type]:
-
             arr = non_ag_transitions_cost_mat[non_ag_type][cost_type]          # Get the transition cost matrix 
             arr = np.einsum('mrj,r->mj', arr, non_ag_dvar[:,idx])              # Multiply the transition cost matrix by the cost of non-agricultural land-use
 
@@ -586,7 +592,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     # Get the transition cost matirces for non-agricultural land-use
     if yr_idx == 0:
         non_ag_transitions_cost_mat = {k:{'Transition cost':np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))}
-                                        for k in data.NON_AGRICULTURAL_LANDUSES}
+                                        for k in NON_AG_LAND_USES.keys()}
     else:
         non_ag_transitions_cost_mat = non_ag_transitions.get_to_ag_transition_matrix(data,
                                                                                     yr_idx,
@@ -637,11 +643,11 @@ def write_revenue_cost_non_ag(data: Data, yr_cal, path):
     # Reformat the revenue/cost matrix into a dataframe
     rev_non_ag_df = pd.DataFrame(rev_non_ag.reshape(-1,1), columns=['Value ($)'])
     rev_non_ag_df['Year'] = yr_cal
-    rev_non_ag_df['Land-use'] = data.NON_AGRICULTURAL_LANDUSES
+    rev_non_ag_df['Land-use'] = NON_AG_LAND_USES.keys()
 
     cost_non_ag_df = pd.DataFrame(cost_non_ag.reshape(-1,1), columns=['Value ($)'])
     cost_non_ag_df['Year'] = yr_cal
-    cost_non_ag_df['Land-use'] = data.NON_AGRICULTURAL_LANDUSES
+    cost_non_ag_df['Land-use'] = NON_AG_LAND_USES.keys()
 
     # Save to disk
     rev_non_ag_df.to_csv(os.path.join(path, f'revenue_non_ag_{yr_cal}.csv'), index = False)
@@ -673,7 +679,7 @@ def write_dvar_area(data: Data, yr_cal, path):
     df_non_ag_area = pd.DataFrame(non_ag_area.reshape(-1),
                                 index=pd.MultiIndex.from_product([[yr_cal],
                                                                 ['dry'],
-                                                                data.NON_AGRICULTURAL_LANDUSES],
+                                                                NON_AG_LAND_USES.keys()],
                                                                 names=['Year', 'Water_supply', 'Land-use']),
                                 columns=['Area (ha)']).reset_index()
 
@@ -726,7 +732,7 @@ def write_area_transition_start_end(data: Data, path):
 
     # Calculate the transition matrix for agricultural land uses (start) to non-agricultural land uses (end)
     trainsitions_ag2non_ag = []
-    for lu_idx, lu in enumerate(data.NON_AGRICULTURAL_LANDUSES):
+    for lu_idx, lu in enumerate(NON_AG_LAND_USES.keys()):
         dvar_target = data.non_ag_dvars[yr_cal_end][:,lu_idx]
         trans = np.einsum('mrj, r, r -> j', dvar_base, dvar_target, data.REAL_AREA)
         trans_df = pd.DataFrame({lu:trans.flatten()}, index=data.AGRICULTURAL_LANDUSES)
@@ -762,11 +768,11 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
         print(f'Writing production outputs for {yr_cal}')
 
-        # LUS = ['Non-agricultural land'] + data.AGRICULTURAL_LANDUSES + data.NON_AGRICULTURAL_LANDUSES
+        # LUS = ['Non-agricultural land'] + data.AGRICULTURAL_LANDUSES + NON_AG_LAND_USES.keys()
         ctlu, swlu = lumap_crossmap( data.lumaps[yr_cal_sim_pre]
                                    , data.lumaps[yr_cal]
                                    , data.AGRICULTURAL_LANDUSES
-                                   , data.NON_AGRICULTURAL_LANDUSES
+                                   , NON_AG_LAND_USES.keys()
                                    , data.REAL_AREA)
         
         ctlm, swlm = lmmap_crossmap( data.lmmaps[yr_cal_sim_pre]
@@ -778,7 +784,7 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
                                      , data.lmmaps[yr_cal_sim_pre]
                                      , data.lumaps[yr_cal], data.lmmaps[yr_cal]
                                      , data.AGRICULTURAL_LANDUSES
-                                     , data.NON_AGRICULTURAL_LANDUSES
+                                     , NON_AG_LAND_USES.keys()
                                      , data.REAL_AREA)
         
 
@@ -791,7 +797,7 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
                                         , data.lumaps[yr_cal]
                                         , data.ammaps[yr_cal][am]
                                         , data.AGRICULTURAL_LANDUSES
-                                        , data.NON_AGRICULTURAL_LANDUSES
+                                        , NON_AG_LAND_USES.keys()
                                         , data.REAL_AREA)
             ctass[am] = ctas
             swass[am] = swas
@@ -886,7 +892,7 @@ def write_water(data: Data, yr_cal, path):
 
         non_ag_df = pd.DataFrame(non_ag_k, 
                                 index= pd.MultiIndex.from_product([['Non-agricultural Landuse'],
-                                                                    data.NON_AGRICULTURAL_LANDUSES ,
+                                                                    NON_AG_LAND_USES.keys() ,
                                                                     ['dry']  # non-agricultural land is always dry
                                                                     ])).reset_index()
 
@@ -1050,7 +1056,7 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
     NON_AG_df = pd.DataFrame(non_ag_biodiv_k.reshape(-1),
                             index=pd.MultiIndex.from_product([['Non-Agricultural Landuse'],
                                                             ['Non-Agricultural Landuse'],
-                                                            data.NON_AGRICULTURAL_LANDUSES,
+                                                            NON_AG_LAND_USES.keys(),
                                                             ['dry'],
                                                             ])).reset_index()
 
@@ -1164,7 +1170,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
     non_ag_g_mk = np.sum(non_ag_g_mrk, axis=1)
 
     # Convert arr to df
-    df = pd.DataFrame(non_ag_g_mk.flatten(), index=pd.MultiIndex.from_product((data.LANDMANS, data.NON_AGRICULTURAL_LANDUSES))).reset_index()
+    df = pd.DataFrame(non_ag_g_mk.flatten(), index=pd.MultiIndex.from_product((data.LANDMANS, NON_AG_LAND_USES.keys()))).reset_index()
     df.columns = ['Water_supply', 'Land-use', 'Value (t CO2e)']
     df['Type'] = 'Non-Agricultural land-use'
     df = df.replace({'dry': 'Dryland', 'irr':'Irrigated'})

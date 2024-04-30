@@ -1,7 +1,7 @@
 import numpy as np
 
 from luto.data import Data
-
+from luto.non_ag_landuses import NON_AG_LAND_USES
 
 def get_quantity_env_plantings(data: Data) -> np.ndarray:
     """
@@ -115,7 +115,6 @@ def get_quantity_matrix(data: Data) -> np.ndarray:
 
     Returns:
     - np.ndarray: The non-agricultural quantity matrix q_crk.
-
     """
     env_plantings_quantity_matrix = get_quantity_env_plantings(data)
     rip_plantings_quantity_matrix = get_quantity_rip_plantings(data)

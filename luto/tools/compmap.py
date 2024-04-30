@@ -44,7 +44,7 @@ def lumap_crossmap(oldmap, newmap, ag_landuses, non_ag_landuses, real_area):
     crosstab = crosstab.reindex(reindex, axis = 0, fill_value = 0)
     crosstab = crosstab.reindex(reindex, axis = 1, fill_value = 0)
     
-    lus = ag_landuses + non_ag_landuses
+    lus = list(ag_landuses) + list(non_ag_landuses)
     crosstab.columns = lus
     crosstab.index = lus
     crosstab = crosstab.fillna(0)
@@ -102,12 +102,12 @@ def crossmap_irrstat( lumap_old
     ludict = {-2: 'Non-agricultural land (dry)',
             -1: 'Non-agricultural land (irr)'}
 
-    for j, lu in enumerate(ag_landuses):
+    for j, lu in enumerate(list(ag_landuses)):
         ludict[j*2] = f'{lu} (dry)'
         ludict[j*2 + 1] = f'{lu} (irr)'
 
     base = settings.NON_AGRICULTURAL_LU_BASE_CODE
-    for k, lu in enumerate(non_ag_landuses):
+    for k, lu in enumerate(list(non_ag_landuses)):
         ludict[(k + base)*2] = f'{lu} (dry)'
         ludict[(k + base)*2 + 1] = f'{lu} (irr)'
 
@@ -167,12 +167,12 @@ def crossmap_amstat( am
     """
     ludict = {-2: 'Non-agricultural land (None)'}
     
-    for j, lu in enumerate(ag_landuses):
+    for j, lu in enumerate(list(ag_landuses)):
         ludict[j*2] = f"{lu} (None)"
         ludict[j*2 + 1] = f"{lu} ({am})"
 
     base = settings.NON_AGRICULTURAL_LU_BASE_CODE
-    for k, lu in enumerate(non_ag_landuses):
+    for k, lu in enumerate(list(non_ag_landuses)):
         ludict[(k + base)*2] = f"{lu} (None)"
         ludict[(k + base)*2 + 1] = f"{lu} ({am})"
 

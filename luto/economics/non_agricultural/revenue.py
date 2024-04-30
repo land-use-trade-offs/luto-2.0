@@ -1,5 +1,5 @@
 import numpy as np
-
+from luto.non_ag_landuses import NON_AG_LAND_USES
 import luto.settings as settings
 from luto.data import Data
 
@@ -108,21 +108,27 @@ def get_rev_matrix(data: Data) -> np.ndarray:
     Returns:
         np.ndarray.
     """
-    env_plantings_rev_matrix = get_rev_env_plantings(data)
-    rip_plantings_rev_matrix = get_rev_rip_plantings(data)
-    agroforestry_rev_matrix = get_rev_agroforestry(data)
-    carbon_plantings_block_rev_matrix = get_rev_carbon_plantings_block(data)
-    carbon_plantings_belt_rev_matrix = get_rev_carbon_plantings_belt(data)
-    beccs_rev_matrix = get_rev_beccs(data)
+    non_agr_rev_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-    non_agr_rev_matrices = [
-        env_plantings_rev_matrix.reshape((data.NCELLS, 1)),
-        rip_plantings_rev_matrix.reshape((data.NCELLS, 1)),
-        agroforestry_rev_matrix.reshape((data.NCELLS, 1)),
-        carbon_plantings_block_rev_matrix.reshape((data.NCELLS, 1)),
-        carbon_plantings_belt_rev_matrix.reshape((data.NCELLS, 1)),
-        beccs_rev_matrix.reshape((data.NCELLS, 1)),
-    ]
+    if NON_AG_LAND_USES['Environmental Plantings']:
+        non_agr_rev_matrices['Environmental Plantings'] = get_rev_env_plantings(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Riparian Plantings']:
+        non_agr_rev_matrices['Riparian Plantings'] = get_rev_rip_plantings(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Agroforestry']:
+        non_agr_rev_matrices['Agroforestry'] = get_rev_agroforestry(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Carbon Plantings (Block)']:
+        non_agr_rev_matrices['Carbon Plantings (Block)'] = get_rev_carbon_plantings_block(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
+        non_agr_rev_matrices['Carbon Plantings (Belt)'] = get_rev_carbon_plantings_belt(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['BECCS']:
+        non_agr_rev_matrices['BECCS'] = get_rev_beccs(data).reshape((data.NCELLS, 1))
+
+    non_agr_rev_matrices = list(non_agr_rev_matrices.values())
 
     return np.concatenate(non_agr_rev_matrices, axis=1)

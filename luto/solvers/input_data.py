@@ -5,7 +5,7 @@ import numpy as np
 
 from luto import settings
 from luto.economics import land_use_culling
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.ag_managements import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data
 
 import luto.economics.agricultural.cost as ag_cost
@@ -51,6 +51,7 @@ class SolverInputData:
     non_ag_b_rk: np.ndarray  # Non-agricultural biodiversity matrix.
     non_ag_x_rk: np.ndarray  # Non-agricultural exclude matrices.
     non_ag_q_crk: np.ndarray  # Non-agricultural yield matrix.
+    non_ag_lb_rk: np.ndarray # Non-agricultural lower bound matrices.
 
     ag_man_c_mrj: dict  # Agricultural management options' cost effects.
     ag_man_g_mrj: dict  # Agricultural management options' GHG emission effects.
@@ -60,6 +61,7 @@ class SolverInputData:
     ag_man_w_mrj: dict  # Agricultural management options' water requirement effects.
     ag_man_b_mrj: dict  # Agricultural management options' biodiversity effects.
     ag_man_limits: dict  # Agricultural management options' adoption limits.
+    ag_man_lb_mrj: dict  # Agricultural management options' lower bounds.
 
     offland_ghg: np.ndarray  # GHG emissions from off-land commodities.
 
@@ -99,6 +101,7 @@ class SolverInputData:
         return {
             am: [self.desc2aglu[lu] for lu in am_lus]
             for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items()
+            if AG_MANAGEMENTS[am]
         }
 
     @cached_property
@@ -127,8 +130,18 @@ class SolverInputData:
         }
 
     @cached_property
-    def non_ag_lu2cells(self):
+    def non_ag_lu2cells(self) -> dict[int, np.ndarray]:
         return {k: np.where(self.non_ag_x_rk[:, k])[0] for k in range(self.n_non_ag_lus)}
+    
+    @cached_property
+    def cells2non_ag_lu(self) -> dict[int, list[int]]:
+        non_ag_lu2cells = self.non_ag_lu2cells
+        cells2non_ag_lu = defaultdict(list)
+        for k, k_cells in non_ag_lu2cells.items():
+            for r in k_cells:
+                cells2non_ag_lu[r].append(k)
+        
+        return dict(cells2non_ag_lu)
     
 
 def get_ag_c_mrj(data: Data, target_index):
@@ -252,6 +265,18 @@ def get_non_ag_x_rk(data: Data, base_year):
     return output
 
 
+def get_ag_man_lb_mrj(data: Data, base_year):
+    print('Getting agricultural lower bound matrices...', flush = True)
+    output = ag_transition.get_lower_bound_agricultural_management_matrices(data, base_year)
+    return output
+
+
+def get_non_ag_lb_rk(data: Data, base_year):
+    print('Getting non-agricultural lower bound matrices...', flush = True)
+    output = non_ag_transition.get_lower_bound_non_agricultural_matrices(data, base_year)
+    return output
+
+
 def get_ag_man_costs(data: Data, target_index, ag_c_mrj: np.ndarray):
     print('Getting agricultural management options\' cost effects...', flush = True)
     output = ag_cost.get_agricultural_management_cost_matrices(data, ag_c_mrj, target_index)
@@ -351,6 +376,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         non_ag_b_rk=get_non_ag_b_rk(data),
         non_ag_x_rk=get_non_ag_x_rk(data, base_year),
         non_ag_q_crk=get_non_ag_q_crk(data),
+        non_ag_lb_rk=get_non_ag_lb_rk(data, base_year),
         ag_man_c_mrj=get_ag_man_costs(data, target_index, ag_c_mrj),
         ag_man_g_mrj=get_ag_man_ghg(data, target_index, ag_g_mrj),
         ag_man_q_mrp=get_ag_man_quantity(data, target_index, ag_q_mrp),
@@ -359,6 +385,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_w_mrj=get_ag_man_water(data, target_index, ag_w_mrj),
         ag_man_b_mrj=get_ag_man_biodiversity(data),
         ag_man_limits=get_ag_man_limits(data, target_index),
+        ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,
