@@ -318,7 +318,7 @@ BIODIVERSITY_LIMITS = 'on'             # 'on' or 'off'
 BIODIV_GBF_TARGET_2_DICT = {                     
               2010: 0,    # Proportion of degraded land restored in year 2010
               2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
-              2050: 0.5,  # Principle from LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
+              2050: 0.5,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
               2100: 0.5   # Stays at 2050 level
              }            # (can add more years/targets)\
 
