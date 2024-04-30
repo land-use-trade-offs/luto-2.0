@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/danfojs@1.1.2/lib/bundle.min.js"></script>
+
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/modules/accessibility.js"></script>
+    <script src="https://code.highcharts.com/modules/data.js"></script>
+    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+    <script src="https://code.highcharts.com/highcharts-more.js"></script>
+    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+    <script src="https://code.highcharts.com/modules/export-data.js"></script>
+    <script src="https://blacklabel.github.io/grouped_categories/grouped-categories.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+    <title>Revenue, and Cost</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="GHG_emissions.css">
+</head>
+
+<body>
+    <script src="GHG_emissions.js">
+    </script>
+
+
+    <!-- The sidebar -->
+    <div class="sidebar">
+        <a href="../index.html">Scenario Settings</a>
+        <a href="./land-use_area.html">Land-use Area</a> 
+        <a href="./production.html">Demand and Production</a>
+        <a href="./economics.html">Economics</a>         
+        <a class="active" href="./GHG_emissions.html">GHG Emissions</a>
+        <a href="./water_usage.html">Water Use</a>
+        <a href="./biodiversity.html">Biodiversity</a>
+        <a href="./spatial_maps.html">Maps</a>  
+
+    </div>
+
+    <!-- The main content -->
+    <div class="content">
+        <h1>GHG Emissions and Abatement</h1>
+
+        <!-- Chart:GHG_1_cunsum_emission_Mt -->
+        <div class="fig" id="GHG_1_cunsum_emission_Mt"></div>
+
+        <!-- Chart:GHG_2_individual_emission_Mt -->
+        <div class="fig" id="GHG_2_individual_emission_Mt"></div>
+
+        <!-- Chart:GHG_4_3_1_crop_lvstk_emission_Mt -->
+        <div class="fig" id="GHG_4_3_1_crop_lvstk_emission_Mt"></div>
+
+        <!-- Chart:GHG_4_3_2_dry_irr_emission_Mt -->
+        <div class="fig" id="GHG_4_3_2_dry_irr_emission_Mt"></div>
+
+        <!-- Chart:GHG_4_3_3_category_emission_Mt -->
+        <div class="fig" id="GHG_4_3_3_category_emission_Mt"></div>
+
+        <!-- Chart:GHG_4_3_4_sources_emission_Mt -->
+        <div class="fig" id="GHG_4_3_4_sources_emission_Mt"></div>
+
+        <!-- Chart:GHG_4_3_5_lu_lm_emission_Mt_wide -->
+        <div class="fig" id="GHG_4_3_5_lu_lm_emission_Mt_wide"></div>
+
+        <!-- Chart:GHG_4_3_6_lu_source_emission_Mt -->
+        <div class="fig" id="GHG_4_3_6_lu_source_emission_Mt"></div>
+
+        <!-- Chart:GHG_4_3_7_off_land_commodity_emission_Mt -->
+        <div class="fig" id="GHG_4_3_7_off_land_commodity_emission_Mt"></div>
+
+        <!-- Chart:GHG_4_3_8_off_land_sources_emission_Mt -->
+        <div class="fig" id="GHG_4_3_8_off_land_sources_emission_Mt"></div>
+
+        <!-- Chart:GHG_4_3_9_off_land_type_emission_Mt -->
+        <div class="fig" id="GHG_4_3_9_off_land_type_emission_Mt"></div>
+
+
+        <!-- Chart:GHG_4_4_ag_reduction_source_wide_Mt -->
+        <div class="fig" id="GHG_4_4_ag_reduction_source_wide_Mt"></div>
+
+        <!-- Chart:GHG_4_5_1_GHG_ag_man_df_wide_Mt -->
+        <div class="fig" id="GHG_4_5_1_GHG_ag_man_df_wide_Mt"></div>
+
+        <!-- Chart:GHG_4_5_2_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt -->
+        <div class="fig" id="GHG_4_5_2_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt"></div>
+
+        <!-- Chart:GHG_4_5_3_GHG_ag_man_dry_irr_df_wide_Mt -->
+        <div class="fig" id="GHG_4_5_3_GHG_ag_man_dry_irr_df_wide_Mt"></div>
+
+
+    </div>
+
+
+    <div id="data_csv" style="display: none;"></div>
+
+</body>
+
+</html>

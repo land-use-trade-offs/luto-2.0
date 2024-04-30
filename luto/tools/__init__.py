@@ -19,145 +19,55 @@ Pure helper functions and other tools.
 """
 
 
+
+import sys
 import time
 import os.path
+import traceback
+import functools
+from typing import Tuple
+from datetime import datetime
+
 import pandas as pd
 import numpy as np
 import numpy_financial as npf
-from typing import Tuple
-from itertools import product
-from glob import glob
-import re
-from itertools import product
-
-import luto.economics.agricultural.quantity as ag_quantity
-import luto.economics.non_agricultural.quantity as non_ag_quantity
 import luto.settings as settings
+
+from luto.tools.report.create_html import data2html
+from luto.tools.report.create_report_data import save_report_data
+from luto.tools.report.create_static_maps import TIF2MAP
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.non_ag_landuses import NON_AG_LAND_USES
 
 
 def amortise(cost, rate=settings.DISCOUNT_RATE, horizon=settings.AMORTISATION_PERIOD):
     """Return NPV of future `cost` amortised to annual value at discount `rate` over `horizon` years."""
-    return -1 * npf.pmt(rate, horizon, pv=cost, fv=0, when='begin')
+    if settings.AMORTISE_UPFRONT_COSTS: return -1 * npf.pmt(rate, horizon, pv=cost, fv=0, when='begin')
+    else: return cost
 
 
-def show_map(yr_cal):
-    """Show a plot of the lumap of `yr_cal`."""
-    plotmap(lumaps[yr_cal], labels=bdata.AGLU2DESC)
+# def show_map(yr_cal):
+#     """Show a plot of the lumap of `yr_cal`."""
+#     plotmap(lumaps[yr_cal], labels=bdata.AGLU2DESC)
 
 
-def get_production(data, yr_cal, ag_X_mrj, non_ag_X_rk, ag_man_X_mrj):
-    """Return total production of commodities for a specific year...
+def report_on_path(path:str):
+    
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Path '{path}' does not exist.")
+    
+    # Remove old reporting data files, keep the folder
+    if os.path.exists(f"{path}/DATA_REPORT/data"):
+        for file in os.listdir(f"{path}/DATA_REPORT/data"):
+            fpath = f"{path}/DATA_REPORT/data/{file}"
+            os.remove(fpath) if os.path.isfile(fpath) else None
 
-    'data' is a sim.data or bdata like object, 'yr_cal' is calendar year, and X_mrj 
-    is land-use and land management in mrj decision-variable format.
-
-    Can return base year production (e.g., year = 2010) or can return production for 
-    a simulated year if one exists (i.e., year = 2030) check sim.info()).
-
-    Includes the impacts of land-use change, productivity increases, and 
-    climate change on yield."""
-
-    # Calculate year index (i.e., number of years since 2010)
-    yr_idx = yr_cal - data.YR_CAL_BASE
-
-    # Get the quantity of each commodity produced by agricultural land uses
-    # Get the quantity matrices. Quantity array of shape m, r, p
-    ag_q_mrp = ag_quantity.get_quantity_matrices(data, yr_idx)
-
-    # Convert map of land-use in mrj format to mrp format
-    ag_X_mrp = np.stack([ag_X_mrj[:, :, j] for p in range(data.NPRS)
-                         for j in range(data.N_AG_LUS)
-                         if data.LU2PR[p, j]
-                         ], axis=2)
-
-    # Sum quantities in product (PR/p) representation.
-    ag_q_p = np.sum(ag_q_mrp * ag_X_mrp, axis=(0, 1), keepdims=False)
-
-    # Transform quantities to commodity (CM/c) representation.
-    ag_q_c = [sum(ag_q_p[p] for p in range(data.NPRS) if data.PR2CM[c, p])
-              for c in range(data.NCMS)]
-
-    # Get the quantity of each commodity produced by non-agricultural land uses
-    # Quantity matrix in the shape of c, r, k
-    q_crk = non_ag_quantity.get_quantity_matrix(data)
-    non_ag_q_c = [(q_crk[c, :, :] * non_ag_X_rk).sum()
-                  for c in range(data.NCMS)]
-
-    # Get quantities produced by agricultural management options
-    j2p = {j: [p for p in range(data.NPRS) if data.LU2PR[p, j]]
-           for j in range(data.N_AG_LUS)}
-    ag_man_q_mrp = ag_quantity.get_agricultural_management_quantity_matrices(
-        data, ag_q_mrp, yr_idx)
-    ag_man_q_c = np.zeros(data.NCMS)
-
-    for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():
-        am_j_list = [data.DESC2AGLU[lu] for lu in am_lus]
-        current_ag_man_X_mrp = np.zeros(ag_q_mrp.shape, dtype=np.float32)
-
-        for j in am_j_list:
-            for p in j2p[j]:
-                current_ag_man_X_mrp[:, :, p] = ag_man_X_mrj[am][:, :, j]
-
-        ag_man_q_p = np.sum(
-            ag_man_q_mrp[am] * current_ag_man_X_mrp, axis=(0, 1), keepdims=False)
-
-        for c in range(data.NCMS):
-            ag_man_q_c[c] += sum(ag_man_q_p[p]
-                                 for p in range(data.NPRS) if data.PR2CM[c, p])
-
-    # Return total commodity production as numpy array.
-    total_q_c = [ag_q_c[c] + non_ag_q_c[c] + ag_man_q_c[c]
-                 for c in range(data.NCMS)]
-    return np.array(total_q_c)
-
-
-def get_production_copy(sim, yr_cal):
-    """Return total production of commodities for a specific year...
-
-    Can return base year production (e.g., year = 2010) or can return production for 
-    a simulated year if one exists (i.e., year = 2030) check sim.info()).
-
-    Includes the impacts of land-use change, productivity increases, and 
-    climate change on yield."""
-
-    # Calculate year index (i.e., number of years since 2010)
-    yr_idx = yr_cal - sim.data.YR_CAL_BASE
-
-    # Acquire local names for matrices and shapes.
-    lu2pr_pj = sim.data.LU2PR
-    pr2cm_cp = sim.data.PR2CM
-    nlus = sim.data.N_AG_LUS
-    nprs = sim.data.NPRS
-    ncms = sim.data.NCMS
-
-    # Get the maps in decision-variable format. 0/1 array of shape j, r
-    X_dry = sim.dvars[yr_cal][0].T
-    X_irr = sim.dvars[yr_cal][1].T
-
-    # Get the quantity matrices. Quantity array of shape m, r, p
-    q_mrp = get_quantity_matrices(sim.data, yr_idx)
-
-    X_dry_pr = [X_dry[j] for p in range(nprs) for j in range(nlus)
-                if lu2pr_pj[p, j]]
-    X_irr_pr = [X_irr[j] for p in range(nprs) for j in range(nlus)
-                if lu2pr_pj[p, j]]
-
-    # Quantities in product (PR/p) representation by land management (dry/irr).
-    q_dry_p = [q_mrp[0, :, p] @ X_dry_pr[p] for p in range(nprs)]
-    q_irr_p = [q_mrp[1, :, p] @ X_irr_pr[p] for p in range(nprs)]
-
-    # Transform quantities to commodity (CM/c) representation by land management (dry/irr).
-    q_dry_c = [sum(q_dry_p[p] for p in range(nprs) if pr2cm_cp[c, p])
-               for c in range(ncms)]
-    q_irr_c = [sum(q_irr_p[p] for p in range(nprs) if pr2cm_cp[c, p])
-               for c in range(ncms)]
-
-    # Total quantities in commodity (CM/c) representation.
-    q_c = [q_dry_c[c] + q_irr_c[c] for c in range(ncms)]
-
-    # Return total commodity production.
-    return np.array(q_c)
+    
+    if settings.WRITE_OUTPUT_GEOTIFFS and os.path.exists(f"{path}/data/Map_data"):
+        TIF2MAP(path) 
+        
+    save_report_data(path)
+    data2html(path)
 
 
 def lumap2ag_l_mrj(lumap, lmmap):
@@ -196,9 +106,9 @@ def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
     # Set up a container array of shape r, k.
     x_rk = np.zeros((lumap.shape[0], num_non_ag_land_uses), dtype=bool)
 
-    for k in range(len(non_ag_lu_codes)):
+    for i,k in enumerate(non_ag_lu_codes):
         kmap = np.where(lumap == k, True, False)
-        x_rk[:, k] = kmap
+        x_rk[:, i] = kmap
 
     return x_rk.astype(bool)
 
@@ -209,11 +119,10 @@ def get_base_am_vars(ncells, ncms, n_ag_lus):
     It is assumed that no agricultural management options were used in 2010, 
     so get zero arrays in the correct format.
     """
-    am_vars = {}
-    for am in AG_MANAGEMENTS_TO_LAND_USES:
-        am_vars[am] = np.zeros((ncms, ncells, n_ag_lus))
-
-    return am_vars
+    return {
+        am: np.zeros((ncms, ncells, n_ag_lus))
+        for am in AG_MANAGEMENTS_TO_LAND_USES
+    }
 
 
 def get_ag_and_non_ag_cells(lumap) -> Tuple[np.ndarray, np.ndarray]:
@@ -232,27 +141,73 @@ def get_ag_and_non_ag_cells(lumap) -> Tuple[np.ndarray, np.ndarray]:
     # get all agricultural and non agricultural cells
     non_agricultural_cells = np.nonzero(lumap >= non_ag_base)[0]
     agricultural_cells = np.nonzero(
-        ~np.isin(all_cells, non_agricultural_cells))[0]
+        ~np.isin(all_cells, non_agricultural_cells)
+    )[0]
 
     return agricultural_cells, non_agricultural_cells
 
 
-def get_natural_and_unnatural_lu_cells(data, lumap) -> Tuple[np.ndarray, np.ndarray]:
+def get_env_plantings_cells(lumap) -> np.ndarray:
     """
-    Splits the index of cells based on whether that cell is used for natural
-    land, given the lumap.
-
-    Returns
-    -------
-    ( np.ndarray, np.ndarray )
-        Two numpy arrays containing the split cell index.
+    Get an array with cells used for environmental plantings
     """
-    all_cells = np.array(range(lumap.shape[0]))
+    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 0)[0]
 
-    # get all cells currently being used for natural and unnatural land uses
-    natural_cells = np.nonzero(np.isin(lumap, data.LU_NATURAL))[0]
-    unnatural_cells = np.nonzero(np.isin(all_cells, natural_cells))[0]
-    return natural_cells, unnatural_cells
+
+def get_riparian_plantings_cells(lumap) -> np.ndarray:
+    """
+    Get an array with cells used for riparian plantings
+    """
+    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 1)[0]
+
+
+def get_agroforestry_cells(lumap) -> np.ndarray:
+    """
+    Get an array with cells used for riparian plantings
+    """
+    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 2)[0]
+
+
+def get_carbon_plantings_block_cells(lumap) -> np.ndarray:
+    """
+    Get an array with all cells being used for carbon plantings (block)
+    """
+    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 3)[0]
+
+
+def get_carbon_plantings_belt_cells(lumap) -> np.ndarray:
+    """
+    Get an array with all cells being used for carbon plantings (block)
+    """
+    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 4)[0]
+
+
+def get_beccs_cells(lumap) -> np.ndarray:
+    """
+    Get an array with all cells being used for carbon plantings (block)
+    """
+    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 5)[0]
+
+
+def get_ag_natural_lu_cells(data, lumap) -> np.ndarray:
+    """
+    Gets all cells being used for agricultural natural land uses.
+    """
+    return np.nonzero(np.isin(lumap, data.LU_NATURAL))[0]
+
+
+def get_non_ag_natural_lu_cells(data, lumap) -> np.ndarray:
+    """
+    Gets all cells being used for non-agricultural natural land uses.
+    """
+    return np.nonzero(np.isin(lumap, data.NON_AG_LU_NATURAL))[0]
+
+
+def get_ag_and_non_ag_natural_lu_cells(data, lumap) -> np.ndarray:
+    """
+    Gets all cells being used for natural land uses, both agricultural and non-agricultural.
+    """
+    return np.nonzero(np.isin(lumap, data.LU_NATURAL + data.NON_AG_LU_NATURAL))[0]
 
 
 def timethis(function, *args, **kwargs):
@@ -272,8 +227,8 @@ def timethis(function, *args, **kwargs):
     stop_time_str = time.strftime("%Y-%m-%d %H:%M:%S", stop_time)
 
     print()
-    print("Start time: %s" % start_time_str)
-    print("Stop time: %s" % stop_time_str)
+    print(f"Start time: {start_time_str}")
+    print(f"Stop time: {stop_time_str}")
     print("Elapsed time: %d seconds." % (stop - start))
 
     return return_value
@@ -284,13 +239,7 @@ def mergeorderly(dict1, dict2):
     list1 = list(dict1.keys())
     list2 = list(dict2.keys())
     lst = sorted(list1 + list2)
-    merged = {}
-    for key in lst:
-        if key in list1:
-            merged[key] = dict1[key]
-        else:
-            merged[key] = dict2[key]
-    return merged
+    return {key: dict1[key] if key in list1 else dict2[key] for key in lst}
 
 
 def crosstabulate(before, after, labels):
@@ -392,8 +341,16 @@ def inspect(lumap, highpos, d_j, q_rj, c_rj, landuses):
 
 def get_water_delta_matrix(w_mrj, l_mrj, data):
     """
-    Gets the water delta matrix that applies the cost of installing/removing irrigation to
+    Gets the water delta matrix ($/cell) that applies the cost of installing/removing irrigation to
     base transition costs. Includes the costs of water license fees.
+
+    Parameters:
+    - w_mrj (numpy.ndarray, <unit:ML/cell>): Water requirements matrix for target year.
+    - l_mrj (numpy.ndarray): Land-use and land management matrix for the base_year.
+    - data (object): Data object containing necessary information.
+
+    Returns:
+    - w_delta_mrj (numpy.ndarray, <unit:$/cell>).
     """
     # Get water requirements from current agriculture, converting water requirements for LVSTK from ML per head to ML per cell (inc. REAL_AREA).
     # Sum total water requirements of current land-use and land management
@@ -402,69 +359,27 @@ def get_water_delta_matrix(w_mrj, l_mrj, data):
     # Net water requirements calculated as the diff in water requirements between current land-use and all other land-uses j.
     w_net_mrj = w_mrj - w_r[:, np.newaxis]
 
-    # Water license cost calculated as net water requirements (ML/ha) x licence price ($/ML).
+    # Water license cost calculated as net water requirements (ML/cell) x licence price ($/ML).
     w_delta_mrj = w_net_mrj * data.WATER_LICENCE_PRICE[:, np.newaxis]
 
-    # When land-use changes from dryland to irrigated add $7.5k per hectare for establishing irrigation infrastructure
-    new_irrig_cost = 7500 * data.REAL_AREA[:, np.newaxis]
-    w_delta_mrj[1] = np.where(
-        l_mrj[0], w_delta_mrj[1] + new_irrig_cost, w_delta_mrj[1])
+    # When land-use changes from dryland to irrigated add <settings.REMOVE_IRRIG_COST> per hectare for establishing irrigation infrastructure
+    remove_irrig = settings.REMOVE_IRRIG_COST * data.REAL_AREA[:, np.newaxis]      # <unit:$/cell>
+    w_delta_mrj[1] = np.where(l_mrj[0], w_delta_mrj[1] + remove_irrig, w_delta_mrj[1])
 
-    # When land-use changes from irrigated to dryland add $3k per hectare for removing irrigation infrastructure
-    remove_irrig_cost = 3000 * data.REAL_AREA[:, np.newaxis]
-    w_delta_mrj[0] = np.where(
-        l_mrj[1], w_delta_mrj[0] + remove_irrig_cost, w_delta_mrj[0])
+    # When land-use changes from irrigated to dryland add <settings.NEW_IRRIG_COST> per hectare for removing irrigation infrastructure
+    new_irrig = settings.NEW_IRRIG_COST * data.REAL_AREA[:, np.newaxis]            # <unit:$/cell>
+    w_delta_mrj[0] = np.where(l_mrj[1], w_delta_mrj[0] + new_irrig, w_delta_mrj[0])
+    
 
     # Amortise upfront costs to annualised costs
     w_delta_mrj = amortise(w_delta_mrj)
-    return w_delta_mrj
+    return w_delta_mrj  # <unit:$/cell>
 
 
 def am_name_snake_case(am_name):
     """Get snake_case version of the AM name"""
     return am_name.lower().replace(' ', '_')
 
-
-def summarize_ghg_separate_df(in_array, column_level, lu_desc):
-    '''Function to summarize the in_array to a df
-    Arguments:
-        in_array: a n-d np.array with the first dimension to be pixels/rows (dimension r)
-
-        column_level: The levels of the in_array being reshaped to (r,-1). For example, if
-                      the in_array has a shape of (r,2,3), then the levels could be a tuple 
-                      of list as below. Note here add a ['Agricultural Landuse] as an extra
-                      level to indicate the origin of this array.
-
-                      (['Agricultural Landuse],
-                       ['dry','irri']),
-                       ['chemical_co2_emission','transportation_co2_emission']).
-
-        lu_desc: The description of each pixel. 
-
-    Return:
-        pd.DataFrame: A multilevel (column-wise) df.
-    '''
-
-    # warp the array back to a df
-    df = pd.DataFrame(in_array.reshape(
-        (in_array.shape[0], -1)), columns=pd.MultiIndex.from_product(column_level))
-
-    # add landuse describtion
-    df['lu'] = lu_desc
-
-    # sumarize the column
-    df_summary = df.groupby('lu').sum(0).reset_index()
-    df_summary = df_summary.set_index('lu')
-
-    # add SUM row/index
-    df_summary.loc['SUM'] = df_summary.sum(axis=0)
-    df_summary['SUM'] = df_summary.sum(axis=1)
-
-    # remove column/index names
-    df_summary.columns = pd.MultiIndex.from_tuples(df_summary.columns.tolist())
-    df_summary.index = df_summary.index.tolist()
-
-    return df_summary
 
 
 # function to create mapping table between lu_desc and dvar index
@@ -487,3 +402,74 @@ def map_desc_to_dvar_index(category: str,
     df['dvar'] = [dvar_arr[:, j] for j in df['dvar_idx']]
 
     return df.reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+
+
+
+class LogToFile:
+    def __init__(self, log_path):
+        self.log_path_stdout = f"{log_path}_stdout.log"
+        self.log_path_stderr = f"{log_path}_stderr.log"
+
+    def __call__(self, func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            # Open files for writing here, ensuring they're only created upon function call
+            with open(self.log_path_stdout, 'w') as file_stdout, open(self.log_path_stderr, 'w') as file_stderr:
+                original_stdout = sys.stdout
+                original_stderr = sys.stderr
+                try:
+                    sys.stdout = self.StreamToLogger(file_stdout, original_stdout)
+                    sys.stderr = self.StreamToLogger(file_stderr, original_stderr)
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    # Capture the full traceback
+                    exc_info = traceback.format_exc()
+                    # Log the traceback to stderr log before re-raising the exception
+                    sys.stderr.write(exc_info + '\n')
+                    raise  # Re-raise the caught exception to propagate it
+                finally:
+                    # Reset stdout and stderr
+                    sys.stdout = original_stdout
+                    sys.stderr = original_stderr
+        return wrapper
+
+    class StreamToLogger(object):
+        def __init__(self, file, orig_stream=None):
+            self.file = file
+            self.orig_stream = orig_stream
+
+        def write(self, buf):
+            if buf.strip():  # Only prepend timestamp to non-newline content
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                formatted_buf = f"{timestamp} - {buf}"
+            else:
+                formatted_buf = buf  # If buf is just a newline/whitespace, don't prepend timestamp
+            
+            if self.orig_stream:
+                self.orig_stream.write(formatted_buf)  # Write to the original stream if it exists
+            self.file.write(formatted_buf)  # Write to the log file
+
+        def flush(self):
+            self.file.flush()  # Ensure content is written to disk
+
+        def __init__(self, file, orig_stream=None):
+            self.file = file
+            self.orig_stream = orig_stream
+
+        def write(self, buf):
+            if buf.strip():  # Check if buf is not just whitespace/newline
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                formatted_buf = f"{timestamp} - {buf}"
+            else:
+                formatted_buf = buf  # If buf is just a newline/whitespace, don't prepend timestamp
+
+            # Write to the original stream if it exists
+            if self.orig_stream:
+                self.orig_stream.write(formatted_buf)
+            
+            # Write to the log file
+            self.file.write(formatted_buf)
+
+        def flush(self):
+            # Ensure content is written to disk
+            self.file.flush()

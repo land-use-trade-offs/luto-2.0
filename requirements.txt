@@ -10,3 +10,10 @@ tables==3.8.0
 openpyxl==3.1.2
 pytest==7.4.2
 hypothesis==6.86.2
+keplergl
+lxml==5.1.0
+folium==0.16.0
+contextily==1.5.1
+imageio==2.34.0
+matplotlib_scalebar==0.8.1
+geopandas==0.14.3

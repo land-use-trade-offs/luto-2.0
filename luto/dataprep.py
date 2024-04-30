@@ -23,6 +23,7 @@ and Brett Bryan, Deakin University
 
 # Load libraries
 import csv
+from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
 import shutil, os, time
@@ -35,7 +36,7 @@ def create_new_dataset():
     
     # Set up a timer and print the time
     start_time = time.time()
-    print('Beginning input data refresh at', time.strftime("%H:%M:%S", time.localtime()) + '...')
+    print('\nBeginning input data refresh at', time.strftime("%H:%M:%S", time.localtime()) + '...')
     
     
     ############### Copy key input data layers from their source folders to the raw_data folder for processing
@@ -48,6 +49,8 @@ def create_new_dataset():
     fdh_inpath = 'N:/LUF-Modelling/fdh-archive/data/neoluto-data/new-data-and-domain/'
     profit_map_inpath = 'N:/Data-Master/Profit_map/'
     nlum_inpath = 'N:/Data-Master/National_Landuse_Map/'
+    BECCS_inpath = 'N:/Data-Master/BECCS/From_CSIRO/20211124_as_submitted/'
+    GHG_off_land_inpath = 'N:/LUF-Modelling/Food_demand_AU/au.food.demand/Inputs/Off_land_GHG_emissions'
     
     # Set data output paths
     raw_data = RAW_DATA + '/' # '../raw_data/'
@@ -59,12 +62,12 @@ def create_new_dataset():
             os.remove(file.path)
     for file in os.scandir(raw_data): os.remove(file.path)
     
-    # Copy in the raw data files from their source
+    # Copy raw data files from their source into raw_data folder for further processing
+    
     shutil.copyfile(fdh_inpath + 'tmatrix-cat2lus.csv', raw_data + 'tmatrix_cat2lus.csv')
     shutil.copyfile(fdh_inpath + 'transitions_costs_20230901.xlsx', raw_data + 'transitions_costs_20230901.xlsx')    
 
     shutil.copyfile(profit_map_inpath + 'NLUM_SPREAD_LU_ID_Mapped_Concordance.h5', raw_data + 'NLUM_SPREAD_LU_ID_Mapped_Concordance.h5')
-    # shutil.copyfile(profit_map_inpath + 'cell_ag_data.h5', raw_data + 'cell_ag_data.h5')
 
     shutil.copyfile(luto_2D_inpath + 'cell_LU_mapping.h5', raw_data + 'cell_LU_mapping.h5')
     shutil.copyfile(luto_2D_inpath + 'cell_zones_df.h5', raw_data + 'cell_zones_df.h5')
@@ -76,14 +79,20 @@ def create_new_dataset():
     shutil.copyfile(luto_2D_inpath + 'cell_biophysical_df.h5', raw_data + 'cell_biophysical_df.h5')
     shutil.copyfile(luto_2D_inpath + 'SA2_climate_damage_mult.h5', raw_data + 'SA2_climate_damage_mult.h5')
     
-    shutil.copyfile(luto_1D_inpath + 'BAU_demands_from_MH_20230810.csv', raw_data + 'BAU_demands_from_MH_20230810.csv')
+    shutil.copyfile('N:/LUF-Modelling/Food_demand_AU/au.food.demand/Outputs/All_LUTO_demand_scenarios_with_convergences.csv',  raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
+
+    # Read raw BECCS data from CSIRO and save as HDF5
+    BECCS_raw = pd.read_pickle(BECCS_inpath + 'df_info_best_grid_20211116.pkl')
+
     
     # Copy data straight to LUTO input folder, no processing required
     
     shutil.copyfile(fdh_inpath + 'yieldincreases-bau2022.csv', outpath + 'yieldincreases_bau2022.csv')
     shutil.copyfile(nlum_inpath + 'NLUM_2010-11_mask.tif', outpath + 'NLUM_2010-11_mask.tif')
         
-    shutil.copyfile(luto_1D_inpath + 'GHG_targets.xlsx', outpath + 'GHG_targets.xlsx')
+    shutil.copyfile(luto_1D_inpath + 'GHG_targets_20240421.xlsx', outpath + 'GHG_targets.xlsx')
+    
+    shutil.copyfile(luto_2D_inpath + 'cell_savanna_burning.h5', outpath + 'cell_savanna_burning.h5')
 
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp126_2010-2100_DR_ML_HA_mean.h5', outpath + 'water_yield_ssp126_2010-2100_dr_ml_ha.h5')
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp126_2010-2100_SR_ML_HA_mean.h5', outpath + 'water_yield_ssp126_2010-2100_sr_ml_ha.h5')
@@ -94,13 +103,11 @@ def create_new_dataset():
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp585_2010-2100_DR_ML_HA_mean.h5', outpath + 'water_yield_ssp585_2010-2100_dr_ml_ha.h5')
     shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp585_2010-2100_SR_ML_HA_mean.h5', outpath + 'water_yield_ssp585_2010-2100_sr_ml_ha.h5')
     
-    # Load delta demands file
-    shutil.copyfile(luto_1D_inpath + 'demand_deltas_c.npy', outpath + 'demand_deltas_c.npy')
-    
-    # Load agricultural management datafiles
+    # Copy agricultural management datafiles
     shutil.copyfile(luto_1D_inpath + '20231101_Bundle_MR.xlsx', outpath + '20231101_Bundle_MR.xlsx')
     shutil.copyfile(luto_1D_inpath + '20231101_Bundle_AgTech_NE.xlsx', outpath + '20231101_Bundle_AgTech_NE.xlsx')
     shutil.copyfile(luto_1D_inpath + '20231107_ECOGRAZE_Bundle.xlsx', outpath + '20231107_ECOGRAZE_Bundle.xlsx')
+    shutil.copyfile(luto_1D_inpath + '20231107_Bundle_AgTech_EI.xlsx', outpath + '20231107_Bundle_AgTech_EI.xlsx')
     
     
     
@@ -154,8 +161,8 @@ def create_new_dataset():
     # Read raw climate impact data.
     cci_raw = pd.read_hdf(raw_data + 'SA2_climate_damage_mult.h5')
     
-    # Read raw demand data
-    demand = pd.read_csv( raw_data + 'BAU_demands_from_MH_20230810.csv')
+    # Read in demand data
+    demand = pd.read_csv(raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
     
     
     
@@ -173,7 +180,7 @@ def create_new_dataset():
     ############### Create landuses -- lexicographically ordered list of land-uses (strings)
     
     # Lexicographically ordered list of land-uses
-    ag_landuses = sorted(lmap['LU_DESC'].unique().to_list())
+    ag_landuses = sorted(lmap['LU_DESC'].unique().tolist())
     ag_landuses.remove('Non-agricultural land')
     
     # Save to file
@@ -181,11 +188,10 @@ def create_new_dataset():
 
     # Create a non-agricultural landuses file
     # Do not sort the whole list alphabetically when adding new landuses to the model.
-    non_ag_landuses = ["Environmental Plantings"]
-    with open(outpath + 'non_ag_landuses.csv', 'w') as non_ag_lu_csv:
-        writer = csv.writer(non_ag_lu_csv)
-        for lu in non_ag_landuses:
-            writer.writerow([lu])
+    non_ag_landuses = ['Environmental Plantings', 'Riparian Plantings', 'Agroforestry', 'Carbon Plantings (Block)', 'Carbon Plantings (Belt)', 'BECCS']
+
+    # Save to file
+    pd.DataFrame(non_ag_landuses).to_csv(outpath + 'non_ag_landuses.csv', index = False, header = False)
     
     
     
@@ -291,7 +297,8 @@ def create_new_dataset():
     lvstk['WP'].to_hdf(outpath + 'water_delivery_price.h5', key = 'water_delivery_price', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
     # Get water license price and save to file
-    bioph['WATER_PRICE_ML_BOM'].to_hdf(outpath + 'water_licence_price.h5', key = 'water_licence_price', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    # bioph['WATER_PRICE_ML_BOM'].to_hdf(outpath + 'water_licence_price.h5', key = 'water_licence_price', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    bioph['WATER_PRICE_ML_ABARES'].to_hdf(outpath + 'water_licence_price.h5', key = 'water_licence_price', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
     
     
@@ -307,9 +314,9 @@ def create_new_dataset():
     ############### Calculate exclusion matrix -- x_mrj
     
     # Turn it into a pivot table. Non-NaN entries are permitted land-uses in the SA2.
-    ut_ptable = ut.pivot_table(index = 'SA2_ID', columns = ['IRRIGATION', 'LU_DESC'])['LU_ID']
-    x_dry = concordance.merge(ut_ptable[0], on = 'SA2_ID', how = 'left')
-    x_irr = concordance.merge(ut_ptable[1], on = 'SA2_ID', how = 'left')
+    ut_ptable = ut.pivot_table(index = 'SA2_ID', columns = ['IRRIGATION', 'LU_DESC'], observed = False)['LU_ID']
+    x_dry = concordance.merge(ut_ptable[0].reset_index(), on = 'SA2_ID', how = 'left')
+    x_irr = concordance.merge(ut_ptable[1].reset_index(), on = 'SA2_ID', how = 'left')
     x_dry = x_dry.drop(columns = ['CELL_ID', 'SA2_ID'])
     x_irr = x_irr.drop(columns = ['CELL_ID', 'SA2_ID'])
     
@@ -396,12 +403,37 @@ def create_new_dataset():
     ############### Get water yield historical baseline data 
     
     # Select historical (1970 - 2000) water yield under deep rooted and shallow rooted vegetation
-    water_yield_baselines = bioph[['WATER_YIELD_HIST_DR_ML_HA', 'WATER_YIELD_HIST_SR_ML_HA', 'WATER_YIELD_HIST_BASELINE_ML_HA']]
+    water_yield_baselines = bioph[['WATER_YIELD_HIST_SR_ML_HA', 'WATER_YIELD_HIST_BASELINE_ML_HA']]
     
     # Save to file
     water_yield_baselines.to_hdf(outpath + 'water_yield_baselines.h5', key = 'water_yield_baselines', mode = 'w', format = 'fixed', index = False, complevel = 9)
-        
     
+    
+    
+    
+    
+    ############### Get biodiversity priority layers 
+    
+    # Biodiversity priorities under the four SSPs
+    biodiv_priorities = bioph[['BIODIV_PRIORITY_SSP126', 'BIODIV_PRIORITY_SSP245', 'BIODIV_PRIORITY_SSP370', 'BIODIV_PRIORITY_SSP585', 'NATURAL_AREA_CONNECTIVITY']].copy()
+    
+    # Save to file
+    biodiv_priorities.to_hdf(outpath + 'biodiv_priorities.h5', key = 'biodiv_priorities', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    
+    
+    
+    
+    
+    ############### Get stream length 
+    
+    # Get stream lenght per cell
+    stream_length_m_cell = bioph['RIP_LENGTH_M_CELL'].copy()
+    
+    # Save to file
+    stream_length_m_cell.to_hdf(outpath + 'stream_length_m_cell.h5', key = 'stream_length_m_cell', mode = 'w', format = 'fixed', index = False, complevel = 9)
+
+
+
     
     
     ############### Forest and reforestation data
@@ -453,8 +485,8 @@ def create_new_dataset():
     # Average establishment costs for Environmental Plantings ($/ha) and save to file
     bioph['EP_EST_COST_HA'].to_hdf(outpath + 'ep_est_cost_ha.h5', key = 'ep_est_cost_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
-    # Average establishment costs for Hardwood Plantings ($/ha) and save to file
-    bioph['CP_EST_COST_HA'].to_hdf(outpath + 'hp_est_cost_ha.h5', key = 'hp_est_cost_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    # Average establishment costs for Carbon Plantings ($/ha) and save to file
+    bioph['CP_EST_COST_HA'].to_hdf(outpath + 'cp_est_cost_ha.h5', key = 'cp_est_cost_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
     
     
@@ -462,57 +494,60 @@ def create_new_dataset():
     
     ############### Calculate climate impacts - includes data with and without CO2 fertilisation
     
-    CO2F_dict = {0: 'CO2_FERT_OFF', 1: 'CO2_FERT_ON'}
-    
-    for i in CO2F_dict.keys():
+    CO2F_dict = {'CO2_FERT_OFF': 0 , 'CO2_FERT_ON':1 }
+
+    # Distill list of RCP labels from dataset
+    rcps = sorted(list({col[1] for col in cci_raw.columns})) # curly brackets remove duplicates
+
+    # Create luid_desc -- old LU_ID to LU_DESC concordance table
+    luid_desc = lmap.groupby('LU_ID').first()['LU_DESC'].astype(str)
+
+
+    def process_climate_impacts(co2_on_off, rcp, cci_raw, concordance, luid_desc, outpath):
         
-        # Distill list of RCP labels from dataset
-        rcps = sorted(list({col[1] for col in cci_raw.columns})) # curly brackets remove duplicates
+        co2_on_off_idx = CO2F_dict[co2_on_off]
         
-        # Create luid_desc -- old LU_ID to LU_DESC concordance table
-        luid_desc = lmap.groupby('LU_ID').first()['LU_DESC'].astype(str)
+        # Slice off RCP data and get rid of MultiIndex.
+        cci_ptable = cci_raw[co2_on_off_idx][rcp].reset_index()
         
-        # Loop through RCPs and format climate change impacts table
-        for rcp in rcps:    # rcp = 'rcp2p6'
-            
-            print('Processing', CO2F_dict[i], rcp.upper())
-            
-            # Slice off RCP data and get rid of MultiIndex.
-            cci_ptable = cci_raw[i][rcp].reset_index()
-            
-            # Merge with SA2-Cell concordance to obtain cell-based table.
-            cci = concordance.merge(cci_ptable, on = 'SA2_ID', how = 'left')
-            
-            # Not all columns are needed, drop unwanted cols.
-            cci = cci.drop(['SA2_ID'], axis = 1)
-            
-            # Convert columns to integer (need 64-bit integer which can accomodate NaNs)
-            cci['IRRIGATION'] = cci['IRRIGATION'].astype('Int64')
-            cci['LU_ID'] = cci['LU_ID'].astype('Int64')
-            
-            # Create the MultiIndex structure
-            cci = cci.pivot( index = 'CELL_ID', 
-                             columns = ['IRRIGATION', 'LU_ID'], 
-                             values = ['YR_2020', 'YR_2050', 'YR_2080']
-                           ).dropna( axis = 'columns', how = 'all')
-            
-            # Name the YEAR level and reorder levels
-            cci.columns.set_names('YEAR', level = 0, inplace = True)
-            cci = cci.reorder_levels( ['IRRIGATION', 'LU_ID', 'YEAR'], axis = 1 )
-            
-            # Convert land management/use column names to strings and years to integers.
-            lmid_desc = {0: 'dry', 1: 'irr'}
-            coltups = [ (lmid_desc[col[0]], luid_desc[col[1]], int(col[2][3:])) 
-                        for col in cci.columns ]
-            cci.columns = pd.MultiIndex.from_tuples(coltups)
-            
-            # Sort land use in lexicographical order
-            cci.sort_index(axis = 1, inplace = True)
-            
-            # Write to HDF5 file.
-            fname = outpath + 'climate_change_impacts_' + rcp + '_' + CO2F_dict[i] + '.h5'
-            kname = 'climate_change_impacts_' + rcp 
-            cci.to_hdf(fname, key = kname, mode = 'w', format = 'fixed', index = False, complevel = 9)
+        # Merge with SA2-Cell concordance to obtain cell-based table.
+        cci = concordance.merge(cci_ptable, on = 'SA2_ID', how = 'left')
+        
+        # Not all columns are needed, drop unwanted cols.
+        cci = cci.drop(['SA2_ID'], axis = 1)
+        
+        # Convert columns to integer (need 64-bit integer which can accomodate NaNs)
+        cci['IRRIGATION'] = cci['IRRIGATION'].astype('Int64')
+        cci['LU_ID'] = cci['LU_ID'].astype('Int64')
+        
+        # Create the MultiIndex structure
+        cci = cci.pivot( index = 'CELL_ID', 
+                        columns = ['IRRIGATION', 'LU_ID'], 
+                        values = ['YR_2020', 'YR_2050', 'YR_2080']
+                    ).dropna( axis = 'columns', how = 'all')
+        
+        # Name the YEAR level and reorder levels
+        cci.columns.set_names('YEAR', level = 0, inplace = True)
+        cci = cci.reorder_levels( ['IRRIGATION', 'LU_ID', 'YEAR'], axis = 1 )
+        
+        # Convert land management/use column names to strings and years to integers.
+        lmid_desc = {0: 'dry', 1: 'irr'}
+        coltups = [ (lmid_desc[col[0]], luid_desc[col[1]], int(col[2][3:])) 
+                    for col in cci.columns ]
+        cci.columns = pd.MultiIndex.from_tuples(coltups)
+        
+        # Sort land use in lexicographical order
+        cci.sort_index(axis = 1, inplace = True)
+        
+        # Write to HDF5 file.
+        fname = outpath + 'climate_change_impacts_' + rcp + '_' + CO2F_dict[i] + '.h5'
+        kname = 'climate_change_impacts_' + rcp 
+        cci.to_hdf(fname, key = kname, mode = 'w', format = 'fixed', index = False, complevel = 9)
+
+    # Parallelise the process
+    jobs = ([delayed(process_climate_impacts)(on_off, rcp, cci_raw, concordance, luid_desc, outpath ) for on_off in CO2F_dict for rcp in rcps])
+    Parallel(n_jobs=len(CO2F_dict) * len(rcps), prefer='processes')(jobs) # Reduce processing time from ~25 min to ~3 min
+        
         
         
         
@@ -547,10 +582,6 @@ def create_new_dataset():
     # Sort land use in lexicographical order
     agec_crops.sort_index(axis = 1, inplace = True)
     
-    # Check against previous data
-    aec_orig = pd.read_hdf('N:/LUF-Modelling/LUTO2_BB/LUTO2/input/agec_crops.h5')
-    print('agec_crops matches previous data =', agec_crops.equals(aec_orig))
-    
     # Save to HDF5
     agec_crops.to_hdf(outpath + 'agec_crops.h5', key = 'agec_crops', mode = 'w', format = 'fixed', index = False, complevel = 9)
         
@@ -570,10 +601,6 @@ def create_new_dataset():
     
     # Make and set the multi-index.
     agec_lvstk.columns = pd.MultiIndex.from_tuples(cols)
-    
-    # Check against previous data
-    lvstk_orig = pd.read_hdf('N:/LUF-Modelling/LUTO2_BB/LUTO2/input/agec_lvstk.h5')
-    print('agec_lvstk matches previous data =', agec_lvstk.equals(lvstk_orig))
 
     # Save to HDF5
     agec_lvstk.to_hdf(outpath + 'agec_lvstk.h5', key = 'agec_lvstk', mode = 'w', format = 'fixed', index = False, complevel = 9)
@@ -616,6 +643,7 @@ def create_new_dataset():
     
     
     # TEMPORARY CODE to Check total crop GHG emissions
+    
     agGHGmap = lmap[['CELL_ID', 'SA2_ID', 'LU_ID', 'IRRIGATION']].merge( cropsGHG_ptable, 
                                                                          on = ['SA2_ID', 'LU_ID', 'IRRIGATION'], 
                                                                          how = 'left' )
@@ -662,11 +690,10 @@ def create_new_dataset():
     
     ############### Agricultural Greenhouse Gas Emissions - livestock
     
-    # Merge to create a cell-based table.
-    agGHG_lvstk = concordance.merge( lvstkGHG.stack(level = 0).reset_index()
+    # Merge to create a cell-based table. Added future_stack = True to silence warning: The previous implementation of stack is deprecated and will be removed in a future version of pandas. See the What's New notes for pandas 2.1.0 for details. Specify future_stack=True to adopt the new implementation and silence this warning.
+    agGHG_lvstk = concordance.merge( lvstkGHG.stack(level = 0, future_stack = True).reset_index()
                                    , on = 'SA2_ID'
                                    , how = 'left' )
-    
     # Drop unnecessary columns.
     agGHG_lvstk = agGHG_lvstk.drop(['SA2_ID'], axis = 1)
     
@@ -688,59 +715,149 @@ def create_new_dataset():
     # Save to HDF5
     agGHG_lvstk.to_hdf(outpath + 'agGHG_lvstk.h5', key = 'agGHG_lvstk', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
-
     # Copy over irrigated pasture emissions
-    agGHG_irrpast = concordance.merge( irrpastGHG
-                                     , on = 'SA2_ID'
-                                     , how = 'left' )
+    agGHG_irrpast = concordance.merge( irrpastGHG, on = 'SA2_ID', how = 'left' )
     
     # Save to HDF5
     agGHG_irrpast.to_hdf(outpath + 'agGHG_irrpast.h5', key = 'agGHG_irrpast', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
     
+    # CODE to Check total livestock GHG emissions - see N:\Data-Master\LUTO_2.0_input_data\Scripts\2_assemble_agricultural_data.py
+
+    
+    ############### Agricultural Greenhouse Gas Emissions - livestock - off-land
+    
+    # Read in raw data
+    agGHG_lvstk_off_land_eggs = pd.read_csv(f"{GHG_off_land_inpath}/GLEAM3Results2024-02-16_Eggs_ANZ_AR6.csv")
+    agGHG_lvstk_off_land_meat = pd.read_csv(f"{GHG_off_land_inpath}/GLEAM3Results2024-02-16_Meat_ANZ_AR6.csv")
+    
+    # Rename the HerdType column to math the LUTO convention
+    agGHG_lvstk_off_land_eggs['COMMODITY'] = agGHG_lvstk_off_land_eggs['HerdType'].replace({'Chickens': 'eggs'})
+    agGHG_lvstk_off_land_meat['COMMODITY'] = agGHG_lvstk_off_land_meat['HerdType'].replace({'Pigs': 'pork', 
+                                                                                           'Chickens': 'chicken'})
+    
+    # Create df for aquaculture, fill 0 for the GHG values
+    agGHG_lvstk_off_land_aquaculture = agGHG_lvstk_off_land_eggs.copy()
+    agGHG_lvstk_off_land_aquaculture['Emission Source'] = agGHG_lvstk_off_land_eggs['Emission Source']
+    agGHG_lvstk_off_land_aquaculture['Animal'] = 'Aquaculture'
+    agGHG_lvstk_off_land_aquaculture['HerdType'] = 'Aquaculture'
+    agGHG_lvstk_off_land_aquaculture['COMMODITY'] = 'aquaculture'
+    agGHG_lvstk_off_land_aquaculture['Emissions [ t CO2eq ]'] = 0
+    agGHG_lvstk_off_land_aquaculture['Emission Intensity [ kg CO2eq / kg ]'] = 0
+    agGHG_lvstk_off_land_aquaculture['Production [ t ]'] = None
+
+    
+    
+    agGHG_lvstk_off_land = pd.concat([agGHG_lvstk_off_land_eggs, 
+                                      agGHG_lvstk_off_land_meat,
+                                      agGHG_lvstk_off_land_aquaculture], axis = 0)
+
+    # Define the GHG emissions that need to be considered by LUTO
+    #       {Feed}, {Land Use Change}, and {Post Farm} have already 
+    #       being included in LUTO. So there is no need to include them here.
+    exclude_GHG = ['Feed (CO2)',
+                   'Feed (N2O)',
+                   'Feed (CH4)',
+                   'LUC: soy and palm (CO2)',
+                   'LUC: pasture expansion (CO2)',
+                   'Post-farm (CO2)',]
+
+    # Query the GHG emissions that need to be included in LUTO
+    agGHG_lvstk_off_land = agGHG_lvstk_off_land.query("`Emission Source` not in @exclude_GHG")
+    
+    # Filter only the off-land commodities
+    agGHG_lvstk_off_land = agGHG_lvstk_off_land.query("COMMODITY in ['pork', 'chicken', 'eggs', 'aquaculture']")
+    
+    # Save to the input data folder
+    agGHG_lvstk_off_land.to_csv(outpath + 'agGHG_lvstk_off_land.csv', index = False)
+    
+
     
     ############### Agricultural demand
     
-    demand = pd.read_csv( raw_data + 'BAU_demands_from_MH_20230810.csv')
-
-    # Take out 2010 as they all = 1, drop unwanted columns
-    demand['Commodity'] = demand['SPREAD_Commodity'].str.lower()
-    demand = demand.drop(columns = ['X', 'Production', 'SPREAD_Commodity'])
+    # Convert NaNs to zeros
+    demand.fillna(0, inplace = True)
     
-        
+    # Rename columns
+    demand = demand.rename(columns = {'Scenario': 'SCENARIO', 
+                                      'Domestic_diet': 'DIET_DOM', 
+                                      'Global_diet': 'DIET_GLOB', 
+                                      'Convergence': 'CONVERGENCE', 
+                                      'Imports': 'IMPORT_TREND', 
+                                      'Waste': 'WASTE', 
+                                      'Feed': 'FEED_EFFICIENCY', 
+                                      'SPREAD_Commodity': 'COMMODITY', 
+                                      'Year': 'YEAR', 
+                                      'domestic': 'DOMESTIC', 
+                                      'exports': 'EXPORTS', 
+                                      'imports': 'IMPORTS', 
+                                      'feed': 'FEED', 
+                                      'All_demand': 'PRODUCTION'})
+    
     # Create the MultiIndex structure
-    demand = demand.pivot( index = ['Scenario', 'Diet', 'Waste', 'Feed', 'Commodity'], 
-                     columns = ['Year'], 
-                     values = 'Multiplier')
+    demand = demand.pivot( index = ['SCENARIO', 'DIET_DOM', 'DIET_GLOB', 'CONVERGENCE', 'IMPORT_TREND', 'WASTE', 'FEED_EFFICIENCY', 'COMMODITY'], 
+                         columns = ['YEAR'], 
+                          values = ['DOMESTIC', 'EXPORTS', 'IMPORTS', 'FEED', 'PRODUCTION'])
     
-    d2 = demand.copy()
-    d2 = d2.drop(columns = d2.columns)
-    
-    for tup in demand.index:
-        s = demand.loc[(tup)]
-        xs = s.index.values   
-        ys = s.values
-        
-        # # Create linear function f and interpolate
-        f = interp1d(xs, ys, kind = 'linear', fill_value = 'extrapolate')
-        yr = range(2010, 2101)
-        d2.loc[tup, yr] = f(yr)    
-        
     # Save to HDF5
-    d2.to_hdf(outpath + 'demand_projections.h5', key = 'demand_projections', mode = 'w', format = 'fixed', index = False, complevel = 9)
-
-
+    demand.to_hdf(outpath + 'demand_projections.h5', key = 'demand_projections', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
-    ############### BECCS
-    
-
 
     
     # Complete processing and report back
     t = round(time.time() - start_time)
-    print('Completed input data refresh at', time.strftime("%H:%M:%S", time.localtime()), ', taking', t, 'seconds')
-
-
-
-
+    print('Completed input data refresh at', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), ', taking', t, 'seconds')
+    
+    
+    
+    ############## BECCS data 
+    # from Lei Gao at CSIRO (N:\Data-Master\BECCS\From_CSIRO\20211124_as_submitted)
+    
+    # Get latitude, longitude coordinates for study area
+    cell_xy = zones[['CELL_ID', 'X', 'Y', 'CELL_HA']].copy()
+    
+    # Round off XY coordinates to cell_df to join BECCS data
+    cell_xy[['X', 'Y']] = round(cell_xy[['X', 'Y']] * 100).astype('int64')
+    
+    # Round off XY coordinates to cell_BECCS_raw to join BECCS data
+    BECCS_raw[['X', 'Y']] = round(BECCS_raw[['Longitude', 'Latitude']] * 100).astype('int64')
+    
+    # Grab REAL_AREA
+    BECCS_raw = BECCS_raw.merge(cell_xy.iloc[:, -3:], how = 'left', on = ['X', 'Y'])
+    
+    # Create conversion factor to convert costs and revenue to equal annual equivalent terms (dx.doi.org/10.1016/j.landusepol.2009.09.012)
+    r, t = 0.05, 30
+    annualiser = (r * (1 + r) ** t) / ((1 + r) ** t - 1)
+    
+    # Calculate cost of biomass production for BECCS (not including opportunity costs, "N:\Data-Master\BECCS\From_CSIRO\20211124_as_submitted\LUF_BECCS_Methods_20211116.docx")
+    BECCS_raw['BECCS_COSTS_AUD_HA_YR'] = ( ( BECCS_raw['Biomass_production_cost_no_oppotunity (2010AUD)'] +
+                                      BECCS_raw['Biomass_transportation_cost (2010AUD)'] +
+                                      BECCS_raw['Biomass_processing_cost (2010AUD)'] +
+                                      BECCS_raw['CO2_transportation_cost (2010AUD)'] +
+                                      BECCS_raw['CO2_storage_cost (2010AUD)'] )     # sum costs in NPV $2010 terms over 30 years
+                                      / BECCS_raw['CELL_HA']                        # convert to per hectare values
+                                  ) * annualiser                             # convert to equal annual equivalent values
+                                             
+    # Calculate revenue from biomass production for BECCS assuming a 50% profit share with the processing plant
+    BECCS_raw['BECCS_REV_AUD_HA_YR'] = (0.5 * BECCS_raw['Revenue_electricity (2010AUD)'] / BECCS_raw['CELL_HA']) * annualiser
+    
+    # Calculate average annual net CO2 removal capacity per hectare from biomass production for BECCS over the 30 year lifespan
+    BECCS_raw['BECCS_TCO2E_HA_YR'] = (BECCS_raw['Net_carbon_removal (tCO2e)'] / BECCS_raw['CELL_HA']) / 30
+    
+    # Calculate average annual amount of renewable energy produced per hectare over the 30 year lifespan
+    BECCS_raw['BECCS_MWH_HA_YR'] = (BECCS_raw['Electricity_produced (Mwh)'] / BECCS_raw['CELL_HA']) / 30
+    
+    # Downsample to float32
+    cols = ['BECCS_COSTS_AUD_HA_YR', 'BECCS_REV_AUD_HA_YR', 'BECCS_TCO2E_HA_YR', 'BECCS_MWH_HA_YR']
+    BECCS_raw[cols] = BECCS_raw[cols].astype('float32')
+    
+    # Merge table to tmp dataframe to get values for all cells
+    BECCS_raw = BECCS_raw.drop(columns = 'CELL_HA')
+    cell_xy = cell_xy.merge(BECCS_raw.iloc[:, -6:], how = 'left', on = ['X', 'Y'])
+    cell_xy = cell_xy.drop(columns = ['X', 'Y', 'CELL_HA'])
+    
+    # Save to HDF5 file
+    cell_xy.to_hdf(outpath + 'cell_BECCS_df.h5', key = 'cell_BECCS_df', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    
+    
 

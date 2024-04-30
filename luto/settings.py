@@ -16,19 +16,25 @@
 
 """ LUTO model settings. """
 
-import os
 import pandas as pd
+
 
 # ---------------------------------------------------------------------------- #
 # LUTO model version.                                                                 #
 # ---------------------------------------------------------------------------- #
-VERSION = '2.1'
 
-############### Set some Spyder options
+VERSION = '2.3'
+
+
+# ---------------------------------------------------------------------------- #
+# Spyder options                                                            #
+# ---------------------------------------------------------------------------- #
+
 pd.set_option('display.width', 470)
 pd.set_option('display.max_columns', 200)
 pd.set_option('display.max_rows', 5000)
 pd.set_option('display.float_format', '{:,.4f}'.format)
+
 
 # ---------------------------------------------------------------------------- #
 # Directories.                                                                 #
@@ -40,20 +46,22 @@ DATA_DIR = 'input'
 RAW_DATA = '../raw_data'
 
 
-
 # ---------------------------------------------------------------------------- #
-# Model parameters.                                                                  #
+# Scenario parameters.                                                                  #
 # ---------------------------------------------------------------------------- #
 
 # Climate change assumptions. Options include '126', '245', '370', '585'
 SSP = '245'
-RCP = 'rcp' + SSP[1] + 'p' + SSP[2]  # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
+RCP = 'rcp' + SSP[1] + 'p' + SSP[2] # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
-# Set diet parameters
-SCENARIO = SSP_NUM = 'SSP' + SSP[0] # i.e., SSP1, SSP2 etc.
-DIET = 'BAU' # or '2050-FLX'
-WASTE = 1 # 1 for full waste, 0.5 for half waste
-FEED_EFFICIENCY = 'BAU' # 'BAU' or 'High'
+# Set demand parameters which define requirements for Australian production of agricultural commodities
+SCENARIO = SSP_NUM = 'SSP' + SSP[0] # SSP1, SSP2, SSP3, SSP4, SSP5
+DIET_DOM = 'BAU'                    # 'BAU', 'FLX', 'VEG', 'VGN' - domestic diets in Australia
+DIET_GLOB = 'BAU'                   # 'BAU', 'FLX', 'VEG', 'VGN' - global diets
+CONVERGENCE = 2050                  # 2050 or 2100 - date at which dietary transformation is completed (velocity of transformation)
+IMPORT_TREND = 'Static'             # 'Static' (assumes 2010 shares of imports for each commodity) or 'Trend' (follows historical rate of change in shares of imports for each commodity)
+WASTE = 1                           # 1 for full waste, 0.5 for half waste 
+FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4 
 CO2_FERT = 'on'   # or 'off'
@@ -61,23 +69,37 @@ CO2_FERT = 'on'   # or 'off'
 # Fire impacts on carbon sequestration
 RISK_OF_REVERSAL = 0.05  # Risk of reversal buffer under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
 FIRE_RISK = 'med'   # Options are 'low', 'med', 'high'. Determines whether to take the 5th, 50th, or 95th percentile of modelled fire impacts.
-""" 
-    Mean cell values ...
+
+""" Mean FIRE_RISK cell values (%)
     FD_RISK_PERC_5TH    80.3967
     FD_RISK_MEDIAN      89.2485
-    FD_RISK_PERC_95TH   93.2735
-"""
+    FD_RISK_PERC_95TH   93.2735 """
 
+
+# ---------------------------------------------------------------------------- #
 # Economic parameters
-DISCOUNT_RATE = 0.05     # 0.05 = 5% pa.
+# ---------------------------------------------------------------------------- #
+
+# Amortise upfront (i.e., establishment and transitions) costs 
+AMORTISE_UPFRONT_COSTS = False
+
+# Discount rate for amortisation
+DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
+
+# Set amortisation period
 AMORTISATION_PERIOD = 30 # years
 
+
+
+# ---------------------------------------------------------------------------- #
+# Model parameters
+# ---------------------------------------------------------------------------- #
+""" NOTE - BECCS IS TURNED OFF """
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 5          # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution
+RESFACTOR = 10         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
 
 # How does the model run over time 
-# MODE = 'snapshot'       # runs for target year only
-MODE = 'timeseries'   # runs each year from base year to target year
+MODE = 'timeseries'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****
@@ -87,119 +109,245 @@ OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production co
 DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
 # DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
 
+# Penalty in objective function to balance influence of demand versus cost when DEMAND_CONSTRAINT_TYPE = 'soft'
+# 1e5 works well (i.e., demand are met), demands not met with anything less 
+PENALTY = 1e5
+
+# A penalty to discourage the simultaneous use of more than one non-agricultural land use on a single cell.
+# E.g., the model is penalised for using both Environmental Plantings and Riparian Plantings on the same cell.
+# Set to 0 to disable.
+NON_AG_DOUBLING_PENALTY = 1e5
+NON_AG_DOUBLING_CONSTR_BIG_M = 1e6
+
+# ---------------------------------------------------------------------------- #
+# Geographical raster writing parameters
+# ---------------------------------------------------------------------------- #
+
+# Write GeoTiffs to output directory: True or False
+WRITE_OUTPUT_GEOTIFFS = True
+
+# If use parallel processing to write GeoTiffs: True or False
+PARALLEL_WRITE = True
+
+# The Threads to use for writing GeoTiffs, and map making
+WRITE_THREADS = 50      # Works only if PARALLEL_WRITE = True
+
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
 # ---------------------------------------------------------------------------- #
 
-# Select Gurobi algorithm used to solve continuous models or the initial root relaxation of a MIP model.
-# Set solve method. Default is automatic. Dual simplex uses less memory.
-SOLVE_METHOD = 2
+# Select Gurobi algorithm used to solve continuous models or the initial root relaxation of a MIP model. Default is automatic. 
+SOLVE_METHOD = 2  # 'automatic: -1, primal simplex: 0, dual simplex: 0, barrier: 2, concurrent: 3, deterministic concurrent: 4, deterministic concurrent simplex: 5
 
-""" SOLVE METHODS
-   'automatic':                       -1
-   'primal simplex':                   0
-   'dual simplex':                     1
-   'barrier':                          2
-   'concurrent':                       3
-   'deterministic concurrent':         4
-   'deterministic concurrent simplex': 5 """
-
-# Penalty in objective function  *** Needs to be balanced against OPTIMALITY_TOLERANCE to trade-off speed for optimality 
-# 1e5 works (i.e., demand are met), demands not met with anything less 
-PENALTY = 1e5
+# Presolve parameters (switching both to 0 solves numerical problems)
+PRESOLVE = 0     # automatic (-1), off (0), conservative (1), or aggressive (2)
+AGGREGATE = 0    # Controls the aggregation level in presolve. The options are off (0), moderate (1), or aggressive (2). In rare instances, aggregation can lead to an accumulation of numerical errors. Turning it off can sometimes improve solution accuracy (it did not fix sub-optimal termination issue)
 
 # Print detailed output to screen
 VERBOSE = 1
 
-# Relax the tolerance for proving optimality
-OPTIMALITY_TOLERANCE = 1e-2
+# Relax the tolerances for feasibility and optimality
+FEASIBILITY_TOLERANCE = 1e-2              # Primal feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2
+OPTIMALITY_TOLERANCE = 1e-2               # Dual feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2
+BARRIER_CONVERGENCE_TOLERANCE = 1e-6      # Range from 1e-2 to 1e-8 (default), that larger the number the faster but the less exact the solve. 1e-5 is a good compromise between optimality and speed.
 
-"""Default value:	1e-6
-   Minimum value:	1e-9
-   Maximum value:	1e-2"""
+# Whether to use crossover in barrier solve. 0 = off, -1 = automatic. Auto cleans up sub-optimal termination errors without much additional compute time (apart from 2050 when it sometimes never finishes).
+CROSSOVER = 0
+
+# Parameters for dealing with numerical issues. NUMERIC_FOCUS = 2 fixes most things but roughly doubles solve time.
+SCALE_FLAG = -1     # Scales the rows and columns of the model to improve the numerical properties of the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each row to make its largest nonzero entry to be magnitude one, then scale each column to max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing revealed that 1 tripled solve time, 3 led to numerical problems.
+NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect and manage numerical issues. Default (0) makes an automatic choice, with a slight preference for speed. Settings 1-3 increasingly shift the focus towards being more careful in numerical computations. NUMERIC_FOCUS = 1 is ok, but 2 increases solve time by ~4x
+BARHOMOGENOUS = -1  # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 96
-
-# Use homogenous barrier algorithm
-BARHOMOGENOUS = -1
-
-"""Determines whether to use the homogeneous barrier algorithm. At the default setting (-1), it is only used 
-   when barrier solves a node relaxation for a MIP model. Setting the parameter to 0 turns it off, and setting 
-   it to 1 forces it on. The homogeneous algorithm is useful for recognizing infeasibility or unboundedness. 
-   It is a bit slower than the default algorithm.
-"""
+THREADS = 50
 
 
 # ---------------------------------------------------------------------------- #
 # Non-agricultural land usage parameters
 # ---------------------------------------------------------------------------- #
-NON_AGRICULTURAL_LU_BASE_CODE = 100         # Non-agricultural land uses will appear on the land use map
-                                            # offset by this amount (e.g. land use 0 will appear as 100)
+
+# Price of carbon per tonne - determines revenue from carbon sequestration (used when maximising revenue only)
+CARBON_PRICE_PER_TONNE = 100
+
+# Cost of fencing per linear metre
+FENCING_COST_PER_M = 0
 
 # Environmental Plantings Parameters
-ENV_PLANTING_COST_PER_HA_PER_YEAR = 100     # Yearly cost of maintaining one hectare of environmental plantings
-CARBON_PRICE_PER_TONNE = 50                 # Price of carbon per tonne - determines EP revenue in the model
+ep_annual_maintennance_cost_per_ha_per_year = 100
+ep_annual_ecosystem_services_benefit_per_ha_per_year = 0
+ENV_PLANTING_COST_PER_HA_PER_YEAR = ep_annual_maintennance_cost_per_ha_per_year - ep_annual_ecosystem_services_benefit_per_ha_per_year   # Yearly cost of maintaining one hectare of environmental plantings
+
+ENV_PLANTING_BIODIVERSITY_BENEFIT = 0.8    # Set benefit level of EP, AF, and RP (0 = none, 1 = full)
+
+# Carbon Plantings Block Parameters
+cp_block_annual_maintennance_cost_per_ha_per_year = 100
+cp_block_annual_ecosystem_services_benefit_per_ha_per_year = 0
+CARBON_PLANTING_BLOCK_COST_PER_HA_PER_YEAR = cp_block_annual_maintennance_cost_per_ha_per_year - cp_block_annual_ecosystem_services_benefit_per_ha_per_year   # Yearly cost of maintaining one hectare of carbon plantings (block)
+
+CARBON_PLANTING_BLOCK_BIODIV_BENEFIT = 0.1
+
+# Carbon Plantings Belt Parameters
+cp_belt_annual_maintennance_cost_per_ha_per_year = 100
+cp_belt_annual_ecosystem_services_benefit_per_ha_per_year = 0
+CARBON_PLANTING_BELT_COST_PER_HA_PER_YEAR = cp_belt_annual_maintennance_cost_per_ha_per_year - cp_belt_annual_ecosystem_services_benefit_per_ha_per_year      # Yearly cost of maintaining one hectare of carbon plantings (belt)
+
+CP_BELT_ROW_WIDTH = 20
+CP_BELT_ROW_SPACING = 40
+CP_BELT_PROPORTION = CP_BELT_ROW_WIDTH / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
+cp_no_alleys_per_ha = 100 / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
+CP_BELT_FENCING_LENGTH = 100 * cp_no_alleys_per_ha * 2     # Length (average) of fencing required per ha in metres
+
+CARBON_PLANTING_BELT_BIODIV_BENEFIT = 0.1
+
+# Riparian Planting Parameters
+rp_annual_maintennance_cost_per_ha_per_year = 100
+rp_annual_ecosystem_services_benefit_per_ha_per_year = 0
+RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR = rp_annual_maintennance_cost_per_ha_per_year - rp_annual_ecosystem_services_benefit_per_ha_per_year
+
+RIPARIAN_PLANTING_BUFFER_WIDTH = 30
+RIPARIAN_PLANTING_TORTUOSITY_FACTOR = 0.5
+
+RIPARIAN_PLANTING_BIODIV_BENEFIT = 1
+
+# Agroforestry Parameters
+af_annual_maintennance_cost_per_ha_per_year = 100
+af_annual_ecosystem_services_benefit_per_ha_per_year = 0
+AGROFORESTRY_COST_PER_HA_PER_YEAR = af_annual_maintennance_cost_per_ha_per_year - af_annual_ecosystem_services_benefit_per_ha_per_year
+
+AGROFORESTRY_ROW_WIDTH = 20
+AGROFORESTRY_ROW_SPACING = 40
+AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
+no_belts_per_ha = 100 / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
+AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per ha in metres
+
+AGROFORESTRY_BIODIV_BENEFIT = 0.75
+
+# BECCS Parameters
+BECCS_BIODIVERSITY_BENEFIT = 0
 
 
 # ---------------------------------------------------------------------------- #
 # Agricultural management parameters
 # ---------------------------------------------------------------------------- #
 
-AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  # The minimum value an agricultural management variable must take for the
-                                             # write_output function to consider it being used on a cell
+# The cost for removing and establishing irrigation infrastructure ($ per hectare)
+REMOVE_IRRIG_COST = 3000
+NEW_IRRIG_COST = 7500
+
+# Savanna burning cost per hectare per year ($/ha/yr)
+SAVBURN_COST_HA_YR = 100
+
+# The minimum value an agricultural management variable must take for the write_output function to consider it being used on a cell
+AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  
+                                             
+
+# ---------------------------------------------------------------------------- #
+# Off-land commodity parameters
+# ---------------------------------------------------------------------------- #
+
+OFF_LAND_COMMODITIES = ['pork', 'chicken', 'eggs', 'aquaculture']
+EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 
 
 # ---------------------------------------------------------------------------- #
 # Environmental parameters
 # ---------------------------------------------------------------------------- #
 
-# Greenhouse gas emissions limits parameters
-SOC_AMORTISATION = 91           # Number of years over which to spread (average) soil carbon accumulation
-
+# Greenhouse gas emissions limits and parameters *******************************
 GHG_EMISSIONS_LIMITS = 'on'        # 'on' or 'off'
-GHG_LIMITS_TYPE = 'file'           # If GHG_EMISSIONS_LIMITS = 'on' then set GHG_LIMITS_TYPE = 'dict' or 'file'
-GHG_LIMITS_FIELD = 'CWC1.5_TCO2E'  # If GHG_LIMITS_TYPE = 'file' then need to add field name in 'GHG_targets.xlsx' ('CWC1.5_TCO2E', 'CWC2.0_TCO2E')
-GHG_LIMITS = {                     # If GHG_LIMITS_TYPE = 'dict' then need to set emissions limits in dictionary below (i.e., year: tonnes)
-                2010: 90 * 1e6,    # Agricultural emissions in 2010 in tonnes CO2e
-                2050: -337 * 1e6,  # GHG emissions target and year (can add more years/targets)
-                2100: -337 * 1e6   # GHG emissions target and year (can add more years/targets)
-              }
+
+GHG_LIMITS_TYPE = 'file' # 'dict' or 'file'
+
+# Set emissions limits in dictionary below (i.e., year: tonnes)
+GHG_LIMITS = {                     
+              2010: 90 * 1e6,    # Agricultural emissions in 2010 in tonnes CO2e
+              2050: -337 * 1e6,  # GHG emissions target and year (can add more years/targets)
+              2100: -337 * 1e6   # GHG emissions target and year (can add more years/targets)
+             }
+
+# Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
+GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'    
+
+# Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
+SOC_AMORTISATION = 15    
 
 
-# Water use limits parameters
+# Water use limits and parameters *******************************
+
 WATER_USE_LIMITS = 'on'               # 'on' or 'off'
 WATER_LIMITS_TYPE = 'water_stress'    # 'water_stress' or 'pct_ag'
-WATER_USE_REDUCTION_PERCENTAGE = 0    # If WATER_LIMITS_TYPE = 'pct_ag'...       Set reduction in water use as percentage of 2010 irrigation water use
-WATER_STRESS_FRACTION = 0.25          # If WATER_LIMITS_TYPE = 'water_stress'... Set proportion of catchment water use above which is high water stress (following Aqueduct classification of 0.4 but leaving 0.15 for urban/industrial/indigenous use).
+
+# If WATER_LIMITS_TYPE = 'pct_ag'...       
+# Set reduction in water use as percentage of 2010 irrigation water use
+WATER_USE_REDUCTION_PERCENTAGE = 0  
+
+# If WATER_LIMITS_TYPE = 'water_stress'...                                           
+# (0.25 follows Aqueduct classification of 0.4 but leaving 0.15 for urban/industrial/indigenous use).
+# Safe and just Earth system boundaries says 0.2 inclusive of domestic/industrial https://www.nature.com/articles/s41586-023-06083-8  
+WATER_STRESS_FRACTION = 0.2          
 
 # Regionalisation to enforce water use limits by
-WATER_REGION_DEF = 'DD'                 # 'RR' for River Region, 'DD' for Drainage Division
-# WATER_DRAINDIVS = list(range(1, 14, 1)) # List of drainage divisions e.g., [1, 2].
-# WATER_RIVREGS = list(range(1, 219, 1))  # List of river regions  e.g., [1, 2].
+WATER_REGION_DEF = 'Drainage Division'                 # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
 
 
+# Biodiversity limits and parameters *******************************
+
+# Set the influence of landscape connectivity on biodiversity value in modified land
+""" Applies to modified land only. The most distant cell receives this biodiversity score multiplier. Creates a
+    gradient of scores from 1 (natural land and modified land cells adjacent to natural land and water) to the most 
+    distant cell which received the score specified under CONNECTIVITY_WEIGHTING. The scores are linearly rescaled 
+    Euclidean distance to natural areas. Setting CONNECTIVITY_WEIGHTING = 1.0 means no effect of connectivity on biodiversity score. 
+"""
+CONNECTIVITY_WEIGHTING = 0.7
+
+# Set livestock impact on biodiversity (0 = no impact, 1 = total annihilation)
+BIODIV_LIVESTOCK_IMPACT = 0.3
+
+# Biodiversity value under default late dry season savanna fire regime
+LDS_BIODIVERSITY_VALUE = 0.8  # For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value.
+
+# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
+BIODIVERSITY_LIMITS = 'on'             # 'on' or 'off'
+
+""" Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
+    Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
+"""
+# Set biodiversity targets in dictionary below (i.e., year: proportion of degraded land restored)
+BIODIV_GBF_TARGET_2_DICT = {                     
+              2010: 0,    # Proportion of degraded land restored in year 2010
+              2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
+              2050: 0.5,  # Principle from LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
+              2100: 0.5   # Stays at 2050 level
+             }            # (can add more years/targets)\
+
+    
 
 # ---------------------------------------------------------------------------- #
-# Cell Culling
+# Other parameters
 # ---------------------------------------------------------------------------- #
 
+# Cell culling
 CULL_MODE = 'absolute'      # cull to include at most MAX_LAND_USES_PER_CELL
 # CULL_MODE = 'percentage'    # cull the LAND_USAGE_THRESHOLD_PERCENTAGE % most expensive options
 # CULL_MODE = 'none'          # do no culling
 
-# if CULL_MODE = 'absolute'. How many land uses should remain after culling the most expensive options
-MAX_LAND_USES_PER_CELL = 12
-
-# if CULL_MODE = 'percentage'. Cull this percentage of the most expensive land usage options
+MAX_LAND_USES_PER_CELL = 12 
 LAND_USAGE_CULL_PERCENTAGE = 0.15
 
+# Non-ag output coding. Non-agricultural land uses will appear on the land use map offset by this amount (e.g. land use 0 will appear as 100)
+NON_AGRICULTURAL_LU_BASE_CODE = 100         
 
 
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)
 0: 'Environmental Plantings'
+1: 'Riparian Plantings'
+2: 'Agroforestry'
+3: 'Carbon Plantings (Block Arrangement)'
+4: 'Carbon Plantings (Belt Arrangement)'
+5: 'BECCS'
 
 
 AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)
