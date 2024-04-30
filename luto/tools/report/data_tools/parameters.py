@@ -1,3 +1,5 @@
+import luto.settings as settings
+
 
 # Get the root directory of the data
 YR_BASE = 2010
@@ -61,17 +63,17 @@ RENAME_AM_NON_AG = {
     # Non-Agricultural Landuse
     "Environmental Plantings": "Environmental plantings (mixed species)",
     "Riparian Plantings": "Riparian buffer restoration (mixed species)",
-    "Agroforestry": "Agroforestry",
+    "Agroforestry": "Agroforestry (food + biodiversity)",
     "Carbon Plantings (Block)": "Carbon plantings (monoculture)",
     "Carbon Plantings (Belt)": "Farm forestry (food + timber)",
     "BECCS": "BECCS (Bioenergy with Carbon Capture and Storage)"
 }
 
 # Read the land uses from the file
-with open('input/ag_landuses.csv') as f:
+with open(f'{settings.INPUT_DIR}/ag_landuses.csv') as f:
     AG_LANDUSE = [line.strip() for line in f]
 
-with open('input/non_ag_landuses.csv') as f:
+with open(f'{settings.INPUT_DIR}/non_ag_landuses.csv') as f:
     NON_AG_LANDUSE = [line.strip() for line in f]
 
 # Rename the land uses

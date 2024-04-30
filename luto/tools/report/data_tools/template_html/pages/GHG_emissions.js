@@ -91,6 +91,9 @@ document.addEventListener("DOMContentLoaded", function () {
     title: {
       text: "GHG Emissions by Land-use/Management Type",
     },
+    xAxis: {
+      tickPositions: year_ticks,
+    },
     yAxis: {
       title: {
         text: "Greenhouse Gas (Mt CO2e)",
@@ -554,7 +557,9 @@ document.addEventListener("DOMContentLoaded", function () {
       document.getElementById("GHG_4_3_8_off_land_sources_emission_Mt_csv")
         .innerHTML
     ),
-
+    xAxis: {
+      tickPositions: year_ticks,
+    },
     yAxis: {
       title: {
         text: "Greenhouse Gas (Mt CO2e)",
@@ -609,7 +614,9 @@ document.addEventListener("DOMContentLoaded", function () {
       document.getElementById("GHG_4_3_9_off_land_type_emission_Mt_csv")
         .innerHTML
     ),
-
+    xAxis: {
+      tickPositions: year_ticks,
+    },
     yAxis: {
       title: {
         text: "Greenhouse Gas (Mt CO2e)",

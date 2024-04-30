@@ -32,7 +32,7 @@ def get_rev_rip_plantings(data: Data) -> np.ndarray:
     np.ndarray
         The revenue produced by riparian plantings for each cell. A 1-D array indexed by cell.
     """
-    return get_rev_env_plantings(data)
+    return data.EP_RIP_AVG_T_CO2_HA * data.REAL_AREA * settings.CARBON_PRICE_PER_TONNE
 
 
 def get_rev_agroforestry(data: Data) -> np.ndarray:
@@ -48,7 +48,7 @@ def get_rev_agroforestry(data: Data) -> np.ndarray:
     np.ndarray
         The revenue produced by agroforestry for each cell. A 1-D array indexed by cell.
     """
-    return get_rev_env_plantings(data)
+    return data.EP_BELT_AVG_T_CO2_HA * data.REAL_AREA * settings.CARBON_PRICE_PER_TONNE
 
 
 def get_rev_carbon_plantings_block(data: Data) -> np.ndarray:
