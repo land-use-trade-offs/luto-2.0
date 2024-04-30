@@ -22,7 +22,7 @@ from typing import Dict
 import numpy as np
 from scipy.interpolate import interp1d
 
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.ag_managements import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data, lvs_veg_types
 
 
@@ -307,6 +307,9 @@ def get_asparagopsis_effect_q_mrp(data: Data, q_mrp, yr_idx):
     # Set up the effects matrix
     new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
 
+    if not AG_MANAGEMENTS['Asparagopsis taxiformis']:
+        return new_q_mrp
+
     # Update values in the new matrix using the correct multiplier for each LU
     for lu, j in zip(land_uses, lu_codes):
         multiplier = data.ASPARAGOPSIS_DATA[lu].loc[yr_cal, 'Productivity']
@@ -341,6 +344,9 @@ def get_precision_agriculture_effect_q_mrp(data: Data, q_mrp, yr_idx):
     # Set up the effects matrix
     new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
 
+    if not AG_MANAGEMENTS['Precision Agriculture']:
+        return new_q_mrp
+
     # Update values in the new matrix    
     for lu, j in zip(land_uses, lu_codes):
         multiplier = data.PRECISION_AGRICULTURE_DATA[lu].loc[yr_cal, 'Productivity']
@@ -372,6 +378,9 @@ def get_ecological_grazing_effect_q_mrp(data: Data, q_mrp, yr_idx):
 
     # Set up the effects matrix
     new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
+
+    if not AG_MANAGEMENTS['Ecological Grazing']:
+        return new_q_mrp
 
     # Update values in the new matrix    
     for lu, j in zip(land_uses, lu_codes):
@@ -420,6 +429,9 @@ def get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx):
 
     # Set up the effects matrix
     new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
+
+    if not AG_MANAGEMENTS['AgTech EI']:
+        return new_q_mrp
 
     # Update values in the new matrix    
     for lu, j in zip(land_uses, lu_codes):

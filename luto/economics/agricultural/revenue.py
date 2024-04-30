@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 
 from typing import Dict
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.ag_managements import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data, lvs_veg_types
 from luto import settings
 from luto.economics.agricultural.quantity import get_yield_pot, get_quantity
@@ -200,12 +200,15 @@ def get_asparagopsis_effect_r_mrj(data: Data, r_mrj, yr_idx):
     Applies the effects of using asparagopsis to the revenue data
     for all relevant agr. land uses.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis']
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
     new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    if not AG_MANAGEMENTS['Asparagopsis taxiformis']:
+        return new_r_mrj
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
@@ -231,6 +234,9 @@ def get_precision_agriculture_effect_r_mrj(data: Data, r_mrj, yr_idx):
     # Set up the effects matrix
     new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
+    if not AG_MANAGEMENTS['Precision Agriculture']:
+        return new_r_mrj
+
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
         multiplier = data.PRECISION_AGRICULTURE_DATA[lu].loc[yr_cal, 'Productivity']
@@ -252,6 +258,9 @@ def get_ecological_grazing_effect_r_mrj(data: Data, r_mrj, yr_idx):
 
     # Set up the effects matrix
     new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    if not AG_MANAGEMENTS['Ecological Grazing']:
+        return new_r_mrj
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
@@ -285,6 +294,9 @@ def get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx):
 
     # Set up the effects matrix
     new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    if not AG_MANAGEMENTS['AgTech EI']:
+        return new_r_mrj
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):

@@ -2,6 +2,7 @@ import numpy as np
 
 from luto.data import Data
 import luto.settings as settings
+from luto.non_ag_landuses import NON_AG_LAND_USES
 
 
 def get_cost_env_plantings(data: Data) -> np.ndarray:
@@ -99,21 +100,27 @@ def get_cost_matrix(data: Data):
     Returns:
     - cost_matrix: A 2D numpy array of costs per cell and land use.
     """
-    env_plantings_costs = get_cost_env_plantings(data)
-    rip_plantings_costs = get_cost_rip_plantings(data)
-    agroforestry_costs = get_cost_agroforestry(data)
-    carbon_plantings_block_costs = get_cost_carbon_plantings_block(data)
-    carbon_plantings_belt_costs = get_cost_carbon_plantings_belt(data)
-    beccs_costs = get_cost_beccs(data)
+
+    non_agr_c_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-    non_agr_c_matrices = [
-        env_plantings_costs.reshape((data.NCELLS, 1)),
-        rip_plantings_costs.reshape((data.NCELLS, 1)),
-        agroforestry_costs.reshape((data.NCELLS, 1)),
-        carbon_plantings_block_costs.reshape((data.NCELLS, 1)),
-        carbon_plantings_belt_costs.reshape((data.NCELLS, 1)),
-        beccs_costs.reshape((data.NCELLS, 1)),
-    ]
+    if NON_AG_LAND_USES['Environmental Plantings']:
+        non_agr_c_matrices['Environmental Plantings'] = get_cost_env_plantings(data).reshape((data.NCELLS, 1))
 
+    if NON_AG_LAND_USES['Riparian Plantings']:
+        non_agr_c_matrices['Riparian Plantings'] = get_cost_rip_plantings(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Agroforestry']:
+        non_agr_c_matrices['Agroforestry'] = get_cost_agroforestry(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Carbon Plantings (Block)']:
+        non_agr_c_matrices['Carbon Plantings (Block)'] = get_cost_carbon_plantings_block(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
+        non_agr_c_matrices['Carbon Plantings (Belt)'] = get_cost_carbon_plantings_belt(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['BECCS']:
+        non_agr_c_matrices['BECCS'] = get_cost_beccs(data).reshape((data.NCELLS, 1))
+
+    non_agr_c_matrices = list(non_agr_c_matrices.values())
     return np.concatenate(non_agr_c_matrices, axis=1)

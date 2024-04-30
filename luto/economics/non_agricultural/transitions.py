@@ -4,6 +4,7 @@ from luto import settings
 from luto.data import Data, lumap2ag_l_mrj
 import luto.tools as tools
 import luto.economics.agricultural.water as ag_water
+from luto.non_ag_landuses import NON_AG_LAND_USES
 
 
 def get_env_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
@@ -364,31 +365,33 @@ def get_to_ag_transition_matrix(data: Data, yr_idx, lumap, lmmap, separate=False
 
     """
     
-    env_plant_transitions_to_ag_mrj = get_env_plantings_to_ag(data, yr_idx, lumap, lmmap, separate)
-    rip_plant_transitions_to_ag_mrj = get_rip_plantings_to_ag(data, yr_idx, lumap, lmmap, separate)
-    agroforestry_transitions_to_ag_mrj = get_agroforestry_to_ag(data, yr_idx, lumap, lmmap, separate)
-    carbon_plantings_block_transitions_to_ag_mrj = get_carbon_plantings_block_to_ag(data, yr_idx, lumap, lmmap, separate)
-    carbon_plantings_belt_transitions_to_ag_mrj =  get_carbon_plantings_belt_to_ag(data, yr_idx, lumap, lmmap, separate)
-    beccs_transitions_to_ag_mrj = get_beccs_to_ag(data, yr_idx, lumap, lmmap, separate)
+
+    ag_to_non_agr_t_matrices = {use: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)) for use in NON_AG_LAND_USES}
+
+    # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
+    if NON_AG_LAND_USES['Environmental Plantings']:
+        ag_to_non_agr_t_matrices['Environmental Plantings'] = get_env_plantings_to_ag(data, yr_idx, lumap, lmmap, separate)
+
+    if NON_AG_LAND_USES['Riparian Plantings']:
+        ag_to_non_agr_t_matrices['Riparian Plantings'] = get_rip_plantings_to_ag(data, yr_idx, lumap, lmmap, separate)
+
+    if NON_AG_LAND_USES['Agroforestry']:
+        ag_to_non_agr_t_matrices['Agroforestry'] = get_agroforestry_to_ag(data, yr_idx, lumap, lmmap, separate)
+
+    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
+        ag_to_non_agr_t_matrices['Carbon Plantings (Belt)'] = get_carbon_plantings_belt_to_ag(data, yr_idx, lumap, lmmap, separate)
+
+    if NON_AG_LAND_USES['Carbon Plantings (Block)']:
+        ag_to_non_agr_t_matrices['Carbon Plantings (Block)'] = get_carbon_plantings_block_to_ag(data, yr_idx, lumap, lmmap, separate)
+
+    if NON_AG_LAND_USES['BECCS']:
+        ag_to_non_agr_t_matrices['BECCS'] = get_beccs_to_ag(data, yr_idx, lumap, lmmap, separate)
 
     if separate:
         # Note: The order of the keys in the dictionary must match the order of the non-agricultural land uses
-        return {'Environmental Plantings' : env_plant_transitions_to_ag_mrj, 
-                'Riparian Plantings': rip_plant_transitions_to_ag_mrj,
-                'Agroforestry': agroforestry_transitions_to_ag_mrj,
-                'Carbon Plantings (Block)': carbon_plantings_block_transitions_to_ag_mrj, 
-                'Carbon Plantings (Belt)': carbon_plantings_belt_transitions_to_ag_mrj, 
-                'BECCS':beccs_transitions_to_ag_mrj}
+        return ag_to_non_agr_t_matrices
         
-    # Reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-    ag_to_non_agr_t_matrices = [
-        env_plant_transitions_to_ag_mrj,
-        rip_plant_transitions_to_ag_mrj,
-        agroforestry_transitions_to_ag_mrj,
-        carbon_plantings_block_transitions_to_ag_mrj,
-        carbon_plantings_belt_transitions_to_ag_mrj,
-        beccs_transitions_to_ag_mrj,
-    ]
+    ag_to_non_agr_t_matrices = list(ag_to_non_agr_t_matrices.values())
     return np.add.reduce(ag_to_non_agr_t_matrices)
 
 
@@ -487,7 +490,7 @@ def get_exclusions_riparian_plantings(data: Data, lumap) -> np.ndarray:
     
 def get_exclusions_agroforestry(data: Data, lumap) -> np.ndarray:
     """
-    Return a 1-D array indexed by r that represents how much riparian plantings can possibly 
+    Return a 1-D array indexed by r that represents how much agroforestry can possibly 
     be done at each cell.
 
     Parameters:
@@ -621,3 +624,18 @@ def get_exclude_matrices(data: Data, lumap) -> np.ndarray:
 
     # Stack list and return to get x_rk
     return np.concatenate(non_ag_x_matrices, axis=1).astype(np.float32)
+
+
+def get_lower_bound_non_agricultural_matrices(data: Data, yr) -> np.ndarray:
+    """
+    Get the non-agricultural lower bound matrix.
+
+    Returns
+    -------
+    2-D array, indexed by (r,k) where r is the cell and k is the non-agricultural land usage.
+    """
+
+    if yr not in data.non_ag_dvars:
+        return np.zeros((data.NCELLS, len(NON_AG_LAND_USES)))
+        
+    return data.non_ag_dvars[yr].astype(np.float32)

@@ -59,7 +59,7 @@ def get_idx2desc(data: Data):
     lm_code2desc = dict(enumerate(data.LANDMANS))
     ag_idx2desc  = {v:k for k,v in data.DESC2AGLU.items()}
     am_idx2desc  = {k:dict(enumerate(v)) for k,v in data.AG_MANAGEMENTS_TO_LAND_USES.items()}
-    non_ag_idx2desc = dict(enumerate(data.NON_AGRICULTURAL_LANDUSES))
+    non_ag_idx2desc = dict(enumerate(NON_AG_LAND_USES.keys()))
     commodity_idx2desc = dict(enumerate(data.COMMODITIES))
     products_idx2desc = dict(enumerate(data.PRODUCTS))
     

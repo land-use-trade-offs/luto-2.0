@@ -22,7 +22,7 @@ import numpy as np
 from typing import Dict
 
 from luto.data import Data, lumap2ag_l_mrj
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.ag_managements import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.economics.agricultural.water import get_wreq_matrices
 import luto.economics.agricultural.ghg as ag_ghg
 from luto import settings
@@ -168,7 +168,7 @@ def get_asparagopsis_effect_t_mrj(data: Data):
     Gets the transition costs of asparagopsis taxiformis, which are none.
     Transition/establishment costs are handled in the costs matrix.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis']
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
@@ -293,18 +293,39 @@ def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str,
     An adoption limit represents the maximum percentage of cells (for each land use) that can utilise
     each agricultural management option.
     """
-    asparagopsis_limits = get_asparagopsis_adoption_limits(data, yr_idx)
-    precision_agriculture_limits = get_precision_agriculture_adoption_limit(data, yr_idx)
-    eco_grazing_limits = get_ecological_grazing_adoption_limit(data, yr_idx)
-    savanna_burning_limits = get_savanna_burning_adoption_limit(data)
-    agtech_ei_limits = get_agtech_ei_adoption_limit(data, yr_idx)
-
-    return {
-        'Asparagopsis taxiformis': asparagopsis_limits,
-        'Precision Agriculture': precision_agriculture_limits,
-        'Ecological Grazing': eco_grazing_limits,
-        'Savanna Burning': savanna_burning_limits,
-        'AgTech EI': agtech_ei_limits,
+    # Initialise by setting all options/land uses to zero adoption limits, and replace
+    # enabled options with the correct values.
+    ag_management_data = {
+        ag_man_option: {data.DESC2AGLU[lu]: 0 for lu in land_uses}
+        for ag_man_option, land_uses in AG_MANAGEMENTS_TO_LAND_USES.items()
     }
+
+    if AG_MANAGEMENTS['Asparagopsis taxiformis']:
+        ag_management_data['Asparagopsis taxiformis'] = get_asparagopsis_adoption_limits(data, yr_idx)
+    if AG_MANAGEMENTS['Precision Agriculture']:
+        ag_management_data['Precision Agriculture'] = get_precision_agriculture_adoption_limit(data, yr_idx)
+    if AG_MANAGEMENTS['Ecological Grazing']:
+        ag_management_data['Ecological Grazing'] = get_ecological_grazing_adoption_limit(data, yr_idx)
+    if AG_MANAGEMENTS['Savanna Burning']:
+        ag_management_data['Savanna Burning'] = get_savanna_burning_adoption_limit(data)
+    if AG_MANAGEMENTS['AgTech EI']:
+        ag_management_data['AgTech EI'] = get_agtech_ei_adoption_limit(data, yr_idx)
+
+    return ag_management_data
+
+
+def get_lower_bound_agricultural_management_matrices(data: Data, yr) -> Dict[str, dict]:
+    """
+    Gets the lower bound for the agricultural land use of the current years optimisation.
+    """
+
+    if yr not in data.ag_man_dvars:
+        return {
+            am: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32) 
+            for am in AG_MANAGEMENTS_TO_LAND_USES
+        }
     
-    
+    return {
+        am: data.ag_man_dvars[yr][am].astype(np.float32)
+        for am in AG_MANAGEMENTS_TO_LAND_USES
+    }

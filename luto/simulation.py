@@ -25,6 +25,7 @@ from datetime import datetime
 
 import luto.settings as settings
 from luto import tools
+from luto.non_ag_landuses import NON_AG_LAND_USES
 from luto.data import Data, get_base_am_vars, lumap2ag_l_mrj, lumap2non_ag_l_mk
 from luto.economics.production import get_production
 from luto.solvers.input_data import SolverInputData, get_input_data
@@ -46,7 +47,7 @@ def load_data() -> Data:
         data,
         data.YR_CAL_BASE,
         lumap2ag_l_mrj(data.LUMAP, data.LMMAP),
-        lumap2non_ag_l_mk(data.LUMAP, len(data.NON_AGRICULTURAL_LANDUSES)),
+        lumap2non_ag_l_mk(data.LUMAP, len(NON_AG_LAND_USES.keys())),
         get_base_am_vars(data.NCELLS, data.NLMS, data.N_AG_LUS),
     )
     data.add_production_data(data.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
@@ -77,13 +78,17 @@ def solve_timeseries(data: Data, steps: int, base: int, target: int):
 
         if s > 0:
             old_ag_x_mrj = luto_solver._input_data.ag_x_mrj.copy()
+            old_ag_man_lb_mrj = luto_solver._input_data.ag_man_lb_mrj.copy()
             old_non_ag_x_rk = luto_solver._input_data.non_ag_x_rk.copy()
+            old_non_ag_lb_rk = luto_solver._input_data.non_ag_lb_rk.copy()
 
             luto_solver.update_formulation(
                 input_data=input_data,
                 d_c=d_c,
                 old_ag_x_mrj=old_ag_x_mrj,
+                old_ag_man_lb_mrj=old_ag_man_lb_mrj,
                 old_non_ag_x_rk=old_non_ag_x_rk,
+                old_non_ag_lb_rk=old_non_ag_lb_rk,
                 old_lumap=data.lumaps[base + s - 1],
                 current_lumap=data.lumaps[base + s],
                 old_lmmap=data.lmmaps[base + s - 1],

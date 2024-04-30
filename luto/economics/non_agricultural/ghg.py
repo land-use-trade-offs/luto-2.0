@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from luto.non_ag_landuses import NON_AG_LAND_USES
 
 from luto.data import Data
 
@@ -173,36 +174,36 @@ def get_ghg_matrix(data: Data, aggregate=True) -> np.ndarray:
     - The function internally calls several other functions to calculate different components of the g_rk matrix.
     """
 
-    env_plantings_ghg_matrix = get_ghg_reduction_env_plantings(data, aggregate)
-    rip_plantings_ghg_matrix = get_ghg_reduction_rip_plantings(data, aggregate)
-    agroforestry_ghg_matrix = get_ghg_reduction_agroforestry(data, aggregate)
-    carbon_plantings_block_ghg_matrix = get_ghg_reduction_carbon_plantings_block(data, aggregate)
-    carbon_plantings_belt_ghg_matrix = get_ghg_reduction_carbon_plantings_belt(data, aggregate)
-    beccs_ghg_matrix = get_ghg_reduction_beccs(data, aggregate)
+    non_agr_ghg_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}
+
+    # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
+    if NON_AG_LAND_USES['Environmental Plantings']:
+        non_agr_ghg_matrices['Environmental Plantings'] = get_ghg_reduction_env_plantings(data, aggregate)
+
+    if NON_AG_LAND_USES['Riparian Plantings']:
+        non_agr_ghg_matrices['Riparian Plantings'] = get_ghg_reduction_rip_plantings(data, aggregate)
+
+    if NON_AG_LAND_USES['Agroforestry']:
+        non_agr_ghg_matrices['Agroforestry'] = get_ghg_reduction_agroforestry(data, aggregate)
+
+    if NON_AG_LAND_USES['Carbon Plantings (Block)']:
+        non_agr_ghg_matrices['Carbon Plantings (Block)'] = get_ghg_reduction_carbon_plantings_block(data, aggregate)
+
+    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
+        non_agr_ghg_matrices['Carbon Plantings (Belt)'] = get_ghg_reduction_carbon_plantings_belt(data, aggregate)
+
+    if NON_AG_LAND_USES['BECCS']:
+        non_agr_ghg_matrices['BECCS'] = get_ghg_reduction_beccs(data, aggregate)
       
     if aggregate==True:
         # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
         non_agr_ghg_matrices = [
-            env_plantings_ghg_matrix.reshape((data.NCELLS, 1)),
-            rip_plantings_ghg_matrix.reshape((data.NCELLS, 1)),
-            agroforestry_ghg_matrix.reshape((data.NCELLS, 1)),
-            carbon_plantings_block_ghg_matrix.reshape((data.NCELLS, 1)),
-            carbon_plantings_belt_ghg_matrix.reshape((data.NCELLS, 1)),
-            beccs_ghg_matrix.reshape((data.NCELLS, 1)),
+            non_agr_ghg_matrix.reshape((data.NCELLS, 1)) for non_agr_ghg_matrix in non_agr_ghg_matrices.values()
         ]
         return np.concatenate(non_agr_ghg_matrices, axis=1)
     
     elif aggregate==False:
-        return pd.concat(
-            [ env_plantings_ghg_matrix, 
-              rip_plantings_ghg_matrix, 
-              agroforestry_ghg_matrix, 
-              carbon_plantings_block_ghg_matrix, 
-              carbon_plantings_belt_ghg_matrix,
-              beccs_ghg_matrix ], 
-            axis=1
-        )
-    
+        return pd.concat(list(non_agr_ghg_matrices.values()), axis=1)
     else:
     # If the aggregate arguments is not in [True,False]. That must be someting wrong
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
