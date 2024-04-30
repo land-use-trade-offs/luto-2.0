@@ -1,0 +1,1 @@
+gurobipy==10.0.3 numpy_financial==1.0.0 tables==3.9.2

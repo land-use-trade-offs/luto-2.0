@@ -160,7 +160,7 @@ class Data:
         self.prod_data = {}
         self.obj_vals = {}
 
-        print('\n' + time.strftime("%Y-%m-%d %H:%M:%S"), 'Beginning data initialisation...')
+        print('Beginning data initialisation...')
 
         ###############################################################
         # Agricultural economic data.
@@ -901,7 +901,7 @@ class Data:
         self.BECCS_MWH_HA_YR = beccs_df['BECCS_MWH_HA_YR'].to_numpy()
         
 
-        print("\nData loading complete.")
+        print("Data loading complete\n")
 
 
     def apply_resfactor(self):
