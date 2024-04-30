@@ -754,30 +754,42 @@ class LutoSolver:
             for k1, k2 in combinations(self._input_data.cells2non_ag_lu.get(r, []), 2):
                 # Constraints on Y_rkk:
                 self.non_ag_doubling_constraints_r[r].append(
-                    self.X_non_ag_vars_kr[k2, r] - self.X_non_ag_vars_kr[k1, r] 
-                    <= M * self.Y_rkk[r, k1, k2]
+                    self.gurobi_model.addConstr(
+                        self.X_non_ag_vars_kr[k2, r] - self.X_non_ag_vars_kr[k1, r] 
+                        <= M * self.Y_rkk[r, k1, k2]
+                    )
                 )
                 self.non_ag_doubling_constraints_r[r].append(
-                    self.X_non_ag_vars_kr[k1, r] - self.X_non_ag_vars_kr[k2, r] 
-                    <= M * (1 - self.Y_rkk[r, k1, k2])
+                    self.gurobi_model.addConstr(
+                        self.X_non_ag_vars_kr[k1, r] - self.X_non_ag_vars_kr[k2, r] 
+                        <= M * (1 - self.Y_rkk[r, k1, k2])
+                    )
                 )
 
                 # Constraints on the non-ag doubling penalty variables:
                 self.non_ag_doubling_constraints_r[r].append(
-                    self.non_ag_doubling_vars_rkk[r, k1, k2] 
-                    <= self.X_non_ag_vars_kr[k1, r]
+                    self.gurobi_model.addConstr(
+                        self.non_ag_doubling_vars_rkk[r, k1, k2] 
+                        <= self.X_non_ag_vars_kr[k1, r]
+                    )
                 )
                 self.non_ag_doubling_constraints_r[r].append(
-                    self.non_ag_doubling_vars_rkk[r, k1, k2] 
-                    <= self.X_non_ag_vars_kr[k2, r]
+                    self.gurobi_model.addConstr(
+                        self.non_ag_doubling_vars_rkk[r, k1, k2] 
+                        <= self.X_non_ag_vars_kr[k2, r]
+                    )
                 )
                 self.non_ag_doubling_constraints_r[r].append(
-                    self.non_ag_doubling_vars_rkk[r, k1, k2] 
-                    >= self.X_non_ag_vars_kr[k1, r] - M * (1 - self.Y_rkk[r, k1, k2])
+                    self.gurobi_model.addConstr(
+                        self.non_ag_doubling_vars_rkk[r, k1, k2] 
+                        >= self.X_non_ag_vars_kr[k1, r] - M * (1 - self.Y_rkk[r, k1, k2])
+                    )
                 )
                 self.non_ag_doubling_constraints_r[r].append(
-                    self.non_ag_doubling_vars_rkk[r, k1, k2] 
-                    >= self.X_non_ag_vars_kr[k2, r] - M * self.Y_rkk[r, k1, k2]
+                    self.gurobi_model.addConstr(
+                        self.non_ag_doubling_vars_rkk[r, k1, k2] 
+                        >= self.X_non_ag_vars_kr[k2, r] - M * self.Y_rkk[r, k1, k2]
+                    )
                 )
                 
         print(f"    ...penalty value added: {settings.NON_AG_DOUBLING_PENALTY:,.0f}\n")
