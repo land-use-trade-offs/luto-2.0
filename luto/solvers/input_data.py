@@ -130,8 +130,18 @@ class SolverInputData:
         }
 
     @cached_property
-    def non_ag_lu2cells(self):
+    def non_ag_lu2cells(self) -> dict[int, np.ndarray]:
         return {k: np.where(self.non_ag_x_rk[:, k])[0] for k in range(self.n_non_ag_lus)}
+    
+    @cached_property
+    def cells2non_ag_lu(self) -> dict[int, list[int]]:
+        non_ag_lu2cells = self.non_ag_lu2cells
+        cells2non_ag_lu = defaultdict(list)
+        for k, k_cells in non_ag_lu2cells.items():
+            for r in k_cells:
+                cells2non_ag_lu[r].append(k)
+        
+        return dict(cells2non_ag_lu)
     
 
 def get_ag_c_mrj(data: Data, target_index):
