@@ -746,7 +746,7 @@ class LutoSolver:
         
         print('  ...non-agricultural doubling penalty constraints...')
         
-        cells: iter = cells or range(self._input_data.ncells)
+        cells: iter = cells if cells is not None else range(self._input_data.ncells)
         M = settings.NON_AG_DOUBLING_CONSTR_BIG_M
         
         for r in cells:
@@ -905,7 +905,7 @@ class LutoSolver:
 
             # non agricultural doubling penalty vars
             self.gurobi_model.remove(
-                list(self.non_ag_doubling_vars_rkk[r, :, :][np.where(self.X_ag_irr_vars_jr[:, r])])
+                list(self.non_ag_doubling_vars_rkk[r, :, :][np.where(self.non_ag_doubling_vars_rkk[r, :, :])])
             )
             for k1, k2 in combinations(self._input_data.cells2non_ag_lu.get(r, []), 2):
                 self.non_ag_doubling_vars_rkk[r, k1, k2] = self.gurobi_model.addVar(
