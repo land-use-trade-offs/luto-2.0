@@ -18,7 +18,11 @@
 LUTO 2.0 temporary helper code.
 """
 
-# To run LUTO, execute steps 1-4 below...
+# Protect against accidental running of entire script and deleting input data
+import sys
+sys.exit()
+
+# # To run LUTO, execute steps 1-4 below...
 
 # 1. Refresh input data (if required)
 from luto.dataprep import create_new_dataset
@@ -27,12 +31,12 @@ create_new_dataset()
 # 2. Run the simulation and profile memory use
 %load_ext memory_profiler
 import luto.simulation as sim
-%memit sim.run( 2010, 2030 )
+data = sim.load_data()
+%memit sim.run(data=data, base=2010, target=2050 )
 
 # 3. Write the ouputs to file
-from luto.tools.write import *
-path = get_path()
-write_outputs(sim, 2030, path)
+from luto.tools.write import write_outputs
+write_outputs(data)
 
 
 
@@ -41,11 +45,25 @@ from luto.dataprep import create_new_dataset
 create_new_dataset()
 
 import luto.simulation as sim
-sim.run( 2010, 2050 )
+data = sim.load_data()
+sim.run(data=data, base=2010, target=2050 )
 
-from luto.tools.write import *
-path = get_path(sim)
-write_outputs(sim, path)
+from luto.tools.write import write_outputs
+write_outputs(data)
+
+
+
+# Generating report on existing output folder
+from luto.tools import report_on_path
+data_path = r'N:\LUF-Modelling\LUTO2_BB\LUTO_2.0.2\output\2024_04_22__21_49_32_hard_mincost_RF5_P1e5_2010-2050_timeseries_-269Mt'
+report_on_path(data_path)  
+
+
+
+# Write input arrays to tiff files
+from luto.tools.report.write_input_data.array2tif import write_input2tiff
+write_input2tiff(data, 2050)
+
 
 
 
@@ -54,11 +72,11 @@ write_outputs(sim, path)
 
 import pandas as pd
 import numpy as np
-from luto.tools import amortise
 import luto.simulation as sim
 import luto.economics.agricultural.transitions as ag_transition
 import luto.economics.agricultural.cost as ag_cost
 import luto.economics.agricultural.revenue as ag_revenue
+from luto.economics.production import get_production
 from luto.economics.agricultural.ghg import get_ghg_transition_penalties
 from luto import settings
 import random as rand
@@ -162,7 +180,7 @@ for row in ind:
     print(old[row], new[row])
 
 # Get commodity production totals when no resfactor used and check against raw data
-x = sim.get_production()
+x = get_production()
 for i, j in enumerate(sim.data.COMMODITIES):
     print(j, x[i])
 

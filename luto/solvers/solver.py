@@ -18,138 +18,55 @@
 Provides minimalist Solver class and pure helper functions.
 """
 
+
 from collections import defaultdict
-import time
+from dataclasses import dataclass
 from typing import Optional
+from collections import defaultdict
+from dataclasses import dataclass
+from itertools import combinations
+
 import numpy as np
-import pandas as pd
-import scipy.sparse as sp
 import gurobipy as gp
 from gurobipy import GRB
-from dataclasses import dataclass
-from functools import cached_property
 
 import luto.settings as settings
 from luto import tools
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES, AG_MANAGEMENTS_REVERSIBLE
+from luto.non_ag_landuses import NON_AG_LAND_USES, NON_AG_LAND_USES_REVERSIBLE
+from luto.solvers.input_data import SolverInputData
+
 
 # Set Gurobi environment.
 gurenv = gp.Env(logfilename="gurobi.log", empty=True)  # (empty = True)
 gurenv.setParam("Method", settings.SOLVE_METHOD)
 gurenv.setParam("OutputFlag", settings.VERBOSE)
+gurenv.setParam("Presolve", settings.PRESOLVE)
+gurenv.setParam("Aggregate", settings.AGGREGATE)
 gurenv.setParam("OptimalityTol", settings.OPTIMALITY_TOLERANCE)
+gurenv.setParam("FeasibilityTol", settings.FEASIBILITY_TOLERANCE)
+gurenv.setParam("BarConvTol", settings.BARRIER_CONVERGENCE_TOLERANCE)
+gurenv.setParam("ScaleFlag", settings.SCALE_FLAG)
+gurenv.setParam("NumericFocus", settings.NUMERIC_FOCUS)
 gurenv.setParam("Threads", settings.THREADS)
 gurenv.setParam("BarHomogeneous", settings.BARHOMOGENOUS)
+gurenv.setParam("Crossover", settings.CROSSOVER)
+if settings.NON_AG_DOUBLING_PENALTY != 0:
+    gurenv.setParam("DegenMoves", 0)
+    gurenv.setParam("CrossoverBasis", 1)
 gurenv.start()
 
 
 @dataclass
-class InputData:
-    """
-    An object that collects and stores all relevant data for solver.py.
-    """
-
-    ag_t_mrj: np.ndarray  # Agricultural transition cost matrices.
-    ag_c_mrj: np.ndarray  # Agricultural production cost matrices.
-    ag_r_mrj: np.ndarray  # Agricultural production revenue matrices.
-    ag_g_mrj: np.ndarray  # Agricultural greenhouse gas emissions matrices.
-    ag_w_mrj: np.ndarray  # Agricultural water requirements matrices.
-    ag_x_mrj: np.ndarray  # Agricultural exclude matrices.
-    ag_q_mrp: np.ndarray  # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
-    ag_ghg_t_mrj: np.ndarray  # GHG emissions released during transitions between agricultural land uses.
-
-    ag_t_mrj: np.ndarray  # Agricultural transition cost matrices.
-    ag_c_mrj: np.ndarray  # Agricultural production cost matrices.
-    ag_r_mrj: np.ndarray  # Agricultural production revenue matrices.
-    ag_g_mrj: np.ndarray  # Agricultural greenhouse gas emissions matrices.
-    ag_w_mrj: np.ndarray  # Agricultural water requirements matrices.
-    ag_x_mrj: np.ndarray  # Agricultural exclude matrices.
-    ag_q_mrp: np.ndarray  # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
-    ag_ghg_t_mrj: np.ndarray  # GHG emissions released during transitions between agricultural land uses.
-
-    ag_to_non_ag_t_rk: np.ndarray  # Agricultural to non-agricultural transition cost matrix.
-    non_ag_to_ag_t_mrj: np.ndarray  # Non-agricultural to agricultural transition cost matrices.
-    non_ag_c_rk: np.ndarray  # Non-agricultural production cost matrix.
-    non_ag_r_rk: np.ndarray  # Non-agricultural revenue matrix.
-    non_ag_g_rk: np.ndarray  # Non-agricultural greenhouse gas emissions matrix.
-    non_ag_w_rk: np.ndarray  # Non-agricultural water requirements matrix.
-    non_ag_x_rk: np.ndarray  # Non-agricultural exclude matrices.
-    non_ag_q_crk: np.ndarray  # Non-agricultural yield matrix.
-
-    ag_man_c_mrj: np.ndarray  # Agricultural management options' cost effects.
-    ag_man_g_mrj: np.ndarray  # Agricultural management options' GHG emission effects.
-    ag_man_q_mrp: np.ndarray  # Agricultural management options' quantity effects.
-    ag_man_r_mrj: np.ndarray  # Agricultural management options' revenue effects.
-    ag_man_t_mrj: np.ndarray  # Agricultural management options' transition cost effects.
-    ag_man_w_mrj: np.ndarray  # Agricultural management options' water requirement effects.
-    ag_man_limits: np.ndarray  # Agricultural management options' adoption limits.
-
-    lu2pr_pj: np.ndarray  # Conversion matrix: land-use to product(s).
-    pr2cm_cp: np.ndarray  # Conversion matrix: product(s) to commodity.
-    limits: dict  # Targets to use.
-    desc2aglu: dict  # Map of agricultural land use descriptions to codes.
-
-    @property
-    def n_ag_lms(self):
-        # Number of agricultural landmans
-        return self.ag_t_mrj.shape[0]
-
-    @property
-    def ncells(self):
-        # Number of cells
-        return self.ag_t_mrj.shape[1]
-
-    @property
-    def n_ag_lus(self):
-        # Number of agricultural landuses
-        return self.ag_t_mrj.shape[2]
-
-    @property
-    def n_non_ag_lus(self):
-        # Number of non-agricultural landuses
-        return self.non_ag_c_rk.shape[1]
-
-    @property
-    def nprs(self):
-        # Number of products
-        return self.ag_q_mrp.shape[2]
-
-    @cached_property
-    def am2j(self):
-        # Map of agricultural management options to land use codes
-        return {
-            am: [self.desc2aglu[lu] for lu in am_lus]
-            for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items()
-        }
-
-    @cached_property
-    def j2am(self):
-        _j2am = defaultdict(list)
-        for am, am_j_list in self.am2j.items():
-            for j in am_j_list:
-                _j2am[j].append(am)
-
-        return _j2am
-
-    @cached_property
-    def j2p(self):
-        return {
-            j: [p for p in range(self.nprs) if self.lu2pr_pj[p, j]]
-            for j in range(self.n_ag_lus)
-        }
-
-    @cached_property
-    def ag_lu2cells(self):
-        # Make an index of each cell permitted to transform to each land use / land management combination
-        return {
-            (m, j): np.where(self.ag_x_mrj[m, :, j])[0]
-            for j in range(self.n_ag_lus)
-            for m in range(self.n_ag_lms)
-        }
-
-    @cached_property
-    def non_ag_lu2cells(self):
-        return {k: np.where(self.non_ag_x_rk[:, k])[0] for k in range(self.n_non_ag_lus)}
+class SolverSolution:
+    lumap: np.ndarray
+    lmmap: np.ndarray
+    ammaps: dict[str, np.ndarray]
+    ag_X_mrj: np.ndarray
+    non_ag_X_rk: np.ndarray
+    ag_man_X_mrj: dict[str, np.ndarray]
+    prod_data: dict[str, float]
+    obj_val: float
 
 
 class LutoSolver:
@@ -157,10 +74,10 @@ class LutoSolver:
     Class responsible for grouping the Gurobi model, relevant input data, and its variables.
     """
 
-    def __init__(self, input_data: InputData, d_c: np.array):
+    def __init__(self, input_data: SolverInputData, d_c: np.array):
         self._input_data = input_data
         self.d_c = d_c
-        self.gurobi_model = gp.Model("LUTO " + settings.VERSION, env=gurenv)
+        self.gurobi_model = gp.Model(f"LUTO {settings.VERSION}", env=gurenv)
 
         # Initialise variable stores
         self.X_ag_dry_vars_jr = None
@@ -169,6 +86,8 @@ class LutoSolver:
         self.X_ag_man_dry_vars_jr = None
         self.X_ag_man_irr_vars_jr = None
         self.V = None
+        self.non_ag_doubling_vars_rkk = None
+        self.Y_rkk = None
 
         # initialise constraint lookups
         self.cell_usage_constraint_r = {}
@@ -176,26 +95,33 @@ class LutoSolver:
         self.adoption_limit_constraints = []
         self.demand_penalty_constraints = []
         self.water_limit_constraints_r = defaultdict(list)
+        self.ghg_emissions_expr = None
         self.ghg_emissions_limit_constraint = None
+        self.biodiversity_expr = None
+        self.biodiversity_limit_constraint = None
+        self.non_ag_doubling_constraints_r = {}
 
     def formulate(self):
         """
         Performs the initial formulation of the model - setting up decision variables, 
         constraints, and the objective.
         """
-        print("\nSetting up the model...", time.ctime() + "\n")
+        print("Setting up the model...\n")
+
+        print("Adding the decision variables...\n")
         self._setup_vars()
+        
+        print(f"Adding the objective function - {settings.OBJECTIVE}...\n", flush=True)
         self._setup_objective()
+        
+        print("Adding the constraints...\n")
         self._setup_constraints()
 
     def _setup_vars(self):
-        print(f"Adding decision variables ({time.ctime()})...", end=" ", flush=True)
-        st = time.time()
         self._setup_x_vars()
         self._setup_ag_management_variables()
         self._setup_decision_variables()
-        ft = time.time()
-        print(f"Done in {round(ft - st, 1)}s")
+        self._setup_non_ag_doubling_penalty_variables()
 
     def _setup_x_vars(self):
         """
@@ -224,11 +150,15 @@ class LutoSolver:
                     ub=1, name=f"X_ag_irr_{j}_{r}"
                 )
 
-        for k in range(self._input_data.n_non_ag_lus):
+        for k, non_ag_lu_desc in enumerate(NON_AG_LAND_USES):
             lu_cells = self._input_data.non_ag_lu2cells[k]
             for r in lu_cells:
+                x_lb = (
+                    0 if NON_AG_LAND_USES_REVERSIBLE[non_ag_lu_desc] 
+                    else self._input_data.non_ag_lb_rk[r, k]
+                )
                 self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
-                    ub=1, name=f"X_non_ag_{k}_{r}"
+                    lb=x_lb, ub=self._input_data.non_ag_x_rk[r, k], name=f"X_non_ag_{k}_{r}",
                 )
 
     def _setup_ag_management_variables(self):
@@ -251,19 +181,22 @@ class LutoSolver:
             am_name = tools.am_name_snake_case(am)
 
             for j_idx, j in enumerate(am_j_list):
-                # Create variable for all eligible cells
+                dry_x_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][0, r, j]
+                irr_x_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][1, r, j]
+
+                # Create variable for all eligible cells - all lower bounds are zero
                 dry_lu_cells = self._input_data.ag_lu2cells[0, j]
                 for r in dry_lu_cells:
                     dry_var_name = f"X_ag_man_dry_{am_name}_{j}_{r}"
                     self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
-                        ub=1, name=dry_var_name
+                        lb=dry_x_lb, ub=1, name=dry_var_name,
                     )
 
                 irr_lu_cells = self._input_data.ag_lu2cells[1, j]
                 for r in irr_lu_cells:
                     irr_var_name = f"X_ag_man_irr_{am_name}_{j}_{r}"
                     self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
-                        ub=1, name=irr_var_name
+                        lb=irr_x_lb, ub=1, name=irr_var_name,
                     )
 
     def _setup_decision_variables(self):
@@ -273,14 +206,45 @@ class LutoSolver:
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             self.V = self.gurobi_model.addMVar(self.ncms, name="V")
 
+    def _setup_non_ag_doubling_penalty_variables(self):
+        """
+        Create Penalty variables greater than or equal to min(X_non_ag_vars_kr[k1, r], X_non_ag_vars_kr[k2, r])
+        """
+        if settings.NON_AG_DOUBLING_PENALTY == 0:
+            return
+
+        # shapes: (NCELLS, 5, 5)
+        self.non_ag_doubling_vars_rkk = np.zeros(
+            (self._input_data.ncells, self._input_data.n_non_ag_lus, self._input_data.n_non_ag_lus),
+            dtype=object,
+        ) 
+        self.Y_rkk = np.zeros(
+            (self._input_data.ncells, self._input_data.n_non_ag_lus, self._input_data.n_non_ag_lus),
+            dtype=object,
+        )
+        for r in range(self._input_data.ncells):
+            for k1, k2 in combinations(self._input_data.cells2non_ag_lu.get(r, []), 2):
+                # Penalty variables greater than or equal to min(X_non_ag_vars_kr[k1, r], X_non_ag_vars_kr[k2, r])
+                self.non_ag_doubling_vars_rkk[r, k1, k2] = self.gurobi_model.addVar(
+                    name=f"non_ag_doubling_penalty_{r}_{k1}_{k2}"
+                )
+
     def _setup_objective(self):
         """
         Formulate the objective based on settings.OBJECTIVE
         """
-        print(f"Setting up objective function to {settings.OBJECTIVE} ({time.ctime()})...", end=" ", flush=True)
+        # print(f"Setting objective function to {settings.OBJECTIVE}...\n", flush=True)
 
-        st = time.time()
+        # Penalties for simultaneous use of non-agricultural land
+        if settings.NON_AG_DOUBLING_PENALTY == 0:
+            non_ag_doubling_penalty_contr = 0
+        else:
+            non_ag_doubling_penalty_contr = settings.NON_AG_DOUBLING_PENALTY * self.non_ag_doubling_vars_rkk.sum()
+
         if settings.OBJECTIVE == "maxrev":
+            # Flip the sign of the non-agricultural doubling penalty so it becomes a cost
+            non_ag_doubling_penalty_contr = -non_ag_doubling_penalty_contr
+
             # Pre-calculate revenue minus (production and transition) costs
             ag_obj_mrj = (
                 -(
@@ -298,6 +262,7 @@ class LutoSolver:
                     self._input_data.non_ag_r_rk
                     - (
                         self._input_data.non_ag_c_rk
+                        + self._input_data.non_ag_t_rk
                         + self._input_data.ag_to_non_ag_t_rk
                     )
                 ) / settings.PENALTY
@@ -324,7 +289,9 @@ class LutoSolver:
             ) / settings.PENALTY
 
             non_ag_obj_rk = (
-                self._input_data.non_ag_c_rk + self._input_data.ag_to_non_ag_t_rk
+                self._input_data.non_ag_c_rk
+                + self._input_data.non_ag_t_rk
+                + self._input_data.ag_to_non_ag_t_rk
             ) / settings.PENALTY
 
             # Store calculations for each agricultural management option in a dict
@@ -375,21 +342,27 @@ class LutoSolver:
                 + ag_man_obj_contr
                 + non_ag_obj_contr
                 + gp.quicksum(self.V[c] for c in range(self.ncms))
+                + non_ag_doubling_penalty_contr
             )
         elif settings.DEMAND_CONSTRAINT_TYPE == "hard":
-            objective = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr
+            objective = (
+                ag_obj_contr 
+                + ag_man_obj_contr 
+                + non_ag_obj_contr
+                + non_ag_doubling_penalty_contr
+            )
         else:
             raise ValueError('DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"')
 
         self.gurobi_model.setObjective(objective, GRB.MINIMIZE)
-        ft = time.time()
-        print(f"Done in {round(ft - st, 1)}s")
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
         """
         Constraint that all of every cell is used for some land use.
         If `cells` is provided, only adds constraints for the given cells
         """
+        print('  ...cell usage constraints...\n')
+
         if cells is None:
             cells = np.array(range(self._input_data.ncells))
 
@@ -414,6 +387,8 @@ class LutoSolver:
         Constraint handling alternative agricultural management options:
         Ag. man. variables cannot exceed the value of the agricultural variable.
         """
+        print('  ...agricultural management constraints...\n')
+
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx, j in enumerate(am_j_list):
                 if cells is not None:
@@ -438,6 +413,8 @@ class LutoSolver:
         """
         Add adoption limits constraints for agricultural management options.
         """
+        print('  ...agricultural management adoption constraints...\n')
+
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx, j in enumerate(am_j_list):
                 adoption_limit = self._input_data.ag_man_limits[am][j]
@@ -460,6 +437,7 @@ class LutoSolver:
         """
         Constraints to penalise under and over production compared to demand.
         """
+        print('  ...demand constraints...\n')
 
         # Quantities in PR/p representation by land-management (dry/irr).
         ag_q_dry_p = [
@@ -588,16 +566,18 @@ class LutoSolver:
         If `cells` is provided, only adds constraints for regions containing at least one of the
         provided cells.
         """
+        print(f'  ...water constraints by {settings.WATER_REGION_DEF}...')
+
         if settings.WATER_USE_LIMITS != "on":
             return
 
-        print("Adding water constraints by", settings.WATER_REGION_DEF + "...", time.ctime())
+        # print(f"Adding water constraints by {settings.WATER_REGION_DEF}...")
 
         # Returns region-specific water use limits
         w_limits = self._input_data.limits["water"]
 
         # Ensure water use remains below limit for each region
-        for region, wreq_reg_limit, ind in w_limits:
+        for region, name, wreq_reg_limit, ind in w_limits:
             if cells is not None and np.intersect1d(cells, ind).size == 0:
                 continue
 
@@ -639,14 +619,16 @@ class LutoSolver:
                     self.water_limit_constraints_r[r].append(constr)
 
             if settings.VERBOSE == 1:
-                print("    ...setting water limit for %s <= %.2f ML" % (region, wreq_reg_limit))
+                print(f"    ...water use in {name} <= {wreq_reg_limit:.2f} ML")
+        print('')
 
     def _add_ghg_emissions_limit_constraints(self):
+        
         if settings.GHG_EMISSIONS_LIMITS != "on":
             return
-
-        print("\nAdding GHG emissions constraints...", time.ctime() + "\n")
-
+        
+        print('  ...GHG emissions constraints...')
+        
         # Returns GHG emissions limits
         ghg_limits = self._input_data.limits["ghg"]
 
@@ -689,31 +671,147 @@ class LutoSolver:
             for k in range(self._input_data.n_non_ag_lus)
         )
 
-        self.ghg_emissions_expr = ag_contr + ag_man_contr + non_ag_contr
+        self.ghg_emissions_expr = ag_contr + ag_man_contr + non_ag_contr + self._input_data.offland_ghg
 
-        print("    ...setting GHG emissions reduction target: {:,.0f} tCO2e\n".format(ghg_limits))
+        print(f"    ...GHG emissions reduction target: {ghg_limits:,.0f} tCO2e\n")
         self.ghg_emissions_limit_constraint = self.gurobi_model.addConstr(
             self.ghg_emissions_expr <= ghg_limits
         )
 
+    def _add_biodiversity_limit_constraints(self):
+        if settings.BIODIVERSITY_LIMITS != "on":
+            return
+        
+        print('  ...biodiversity constraints...')
+
+        # Returns biodiversity limits
+        biodiversity_limits = self._input_data.limits["biodiversity"]
+
+        ag_contr = gp.quicksum(
+            gp.quicksum(
+                self._input_data.ag_b_mrj[0, :, :][:, j] * self.X_ag_dry_vars_jr[j, :]
+            )  # Dryland agriculture contribution
+            + gp.quicksum(
+                self._input_data.ag_b_mrj[1, :, :][:, j] * self.X_ag_irr_vars_jr[j, :]
+            )  # Irrigated agriculture contribution
+            for j in range(self._input_data.n_ag_lus)
+        )
+
+        ag_man_contr = gp.quicksum(
+            gp.quicksum(
+                self._input_data.ag_man_b_mrj[am][0, :, j_idx]
+                * self.X_ag_man_dry_vars_jr[am][j_idx, :]
+            )  # Dryland alt. ag. management contributions
+            + gp.quicksum(
+                self._input_data.ag_man_b_mrj[am][1, :, j_idx]
+                * self.X_ag_man_irr_vars_jr[am][j_idx, :]
+            )  # Irrigated alt. ag. management contributions
+            for am, am_j_list in self._input_data.am2j.items()
+            for j_idx in range(len(am_j_list))
+        )
+
+        non_ag_contr = gp.quicksum(
+            gp.quicksum(
+                self._input_data.non_ag_b_rk[:, k] * self.X_non_ag_vars_kr[k, :]
+            )  # Non-agricultural contribution
+            for k in range(self._input_data.n_non_ag_lus)
+        )
+
+        self.biodiversity_expr = ag_contr + ag_man_contr + non_ag_contr
+
+        print(f"    ...biodiversity target score: {biodiversity_limits:,.0f}\n")
+        self.biodiversity_limit_constraint = self.gurobi_model.addConstr(
+            self.biodiversity_expr >= biodiversity_limits
+        )
+
+    def _add_non_ag_doubling_penalty_constraints(self, cells: Optional[list[int]] = None):
+        """
+        Linearised big-M min constraint.
+        Goal: to set self.non_ag_doubling_penalty_vars_rkk[r, k1, k2] = min(self.X_non_ag_vars_kr[k1, r], self.X_non_ag_vars_kr[k2, r])
+        We wish to do this using 'big M' constraints to keep the entire model linear.
+
+        Method: To set X = min{A, B} where X, A, B are continuous variables, use the
+        following big M method:
+            Step 1: introduce the continuous variable Y and set the constraints:
+                B - A <= MY
+                A - B <= M(1 - Y)
+            Step 2: introduce the following four constraints on X:
+                X <= A
+                X <= B
+                X >= A - M(1 - Y)
+                X >= B - MY
+        """
+        if settings.NON_AG_DOUBLING_PENALTY == 0:
+            return
+        
+        print('  ...non-agricultural doubling penalty constraints...')
+        
+        cells: iter = cells if cells is not None else range(self._input_data.ncells)
+        M = settings.NON_AG_DOUBLING_CONSTR_BIG_M
+        
+        for r in cells:
+            self.non_ag_doubling_constraints_r[r] = []
+            for k1, k2 in combinations(self._input_data.cells2non_ag_lu.get(r, []), 2):
+                # Constraints on Y_rkk:
+                self.non_ag_doubling_constraints_r[r].append(
+                    self.gurobi_model.addConstr(
+                        self.X_non_ag_vars_kr[k2, r] - self.X_non_ag_vars_kr[k1, r] 
+                        <= M * self.Y_rkk[r, k1, k2]
+                    )
+                )
+                self.non_ag_doubling_constraints_r[r].append(
+                    self.gurobi_model.addConstr(
+                        self.X_non_ag_vars_kr[k1, r] - self.X_non_ag_vars_kr[k2, r] 
+                        <= M * (1 - self.Y_rkk[r, k1, k2])
+                    )
+                )
+
+                # Constraints on the non-ag doubling penalty variables:
+                self.non_ag_doubling_constraints_r[r].append(
+                    self.gurobi_model.addConstr(
+                        self.non_ag_doubling_vars_rkk[r, k1, k2] 
+                        <= self.X_non_ag_vars_kr[k1, r]
+                    )
+                )
+                self.non_ag_doubling_constraints_r[r].append(
+                    self.gurobi_model.addConstr(
+                        self.non_ag_doubling_vars_rkk[r, k1, k2] 
+                        <= self.X_non_ag_vars_kr[k2, r]
+                    )
+                )
+                self.non_ag_doubling_constraints_r[r].append(
+                    self.gurobi_model.addConstr(
+                        self.non_ag_doubling_vars_rkk[r, k1, k2] 
+                        >= self.X_non_ag_vars_kr[k1, r] - M * (1 - self.Y_rkk[r, k1, k2])
+                    )
+                )
+                self.non_ag_doubling_constraints_r[r].append(
+                    self.gurobi_model.addConstr(
+                        self.non_ag_doubling_vars_rkk[r, k1, k2] 
+                        >= self.X_non_ag_vars_kr[k2, r] - M * self.Y_rkk[r, k1, k2]
+                    )
+                )
+                
+        print(f"    ...penalty value added: {settings.NON_AG_DOUBLING_PENALTY:,.0f}\n")
+
     def _setup_constraints(self):
-        print(f"Setting up constraints ({time.ctime()})...")
-        st = time.time()
         self._add_cell_usage_constraints()
         self._add_agricultural_management_constraints()
         self._add_agricultural_management_adoption_limit_constraints()
         self._add_demand_penalty_constraints()
         self._add_water_usage_limit_constraints()
         self._add_ghg_emissions_limit_constraints()
-        ft = time.time()
-        print(f"Constraint setup took {round(ft - st, 1)}s")
+        self._add_biodiversity_limit_constraints()
+        self._add_non_ag_doubling_penalty_constraints()
 
     def update_formulation(
         self,
-        input_data: InputData,
+        input_data: SolverInputData,
         d_c: np.array,
         old_ag_x_mrj: np.ndarray,
+        old_ag_man_lb_mrj: dict,
         old_non_ag_x_rk: np.ndarray,
+        old_non_ag_lb_rk: np.ndarray,
         old_lumap: np.array,
         current_lumap: np.array,
         old_lmmap: np.array,
@@ -725,51 +823,61 @@ class LutoSolver:
         self._input_data = input_data
         self.d_c = d_c
 
+        print('Updating variables...', flush=True)
         updated_cells = self._update_variables(
             old_ag_x_mrj,
+            old_ag_man_lb_mrj,
             old_non_ag_x_rk,
+            old_non_ag_lb_rk,
             old_lumap,
             current_lumap,
             old_lmmap,
             current_lmmap,
         )
+        print('Updating constraints...\n', flush=True)
         self._update_constraints(updated_cells)
+        
+        print('Updating objective function...\n', flush=True)
         self._setup_objective()
 
     def _update_variables(
         self,
         old_ag_x_mrj: np.ndarray,
+        old_ag_man_lb_mrj: dict,
         old_non_ag_x_rk: np.ndarray,
+        old_non_ag_lb_rk: np.ndarray,
         old_lumap: np.array,
         current_lumap: np.array,
         old_lmmap: np.array,
         current_lmmap: np.array,
-    ) -> np.array:
+    ):
         """
         Updates the variables only for cells that have changed land use or land management.
         Returns an array of cells that have been updated.
         """
-        # update x vars
-        print("Updating variables...", end=" ", flush=True)
-        st = time.time()
-
         # metrics
         num_cells_skipped = 0
         updated_cells = []
-
-        ag_lus_zeros = np.zeros(self._input_data.n_ag_lus)
-        non_ag_lus_zeros = np.zeros(self._input_data.n_non_ag_lus)
 
         for r in range(self._input_data.ncells):
             old_j = old_lumap[r]
             new_j = current_lumap[r]
             old_m = old_lmmap[r]
             new_m = current_lmmap[r]
+
             if (
                 old_j == new_j
                 and old_m == new_m
                 and (old_ag_x_mrj[:, r, :] == self._input_data.ag_x_mrj[:, r, :]).all()
                 and (old_non_ag_x_rk[r, :] == self._input_data.non_ag_x_rk[r, :]).all()
+                and all(
+                    old_non_ag_lb_rk[r, k] == self._input_data.non_ag_lb_rk[r, k]
+                    for k, non_ag_desc in enumerate(NON_AG_LAND_USES) if not NON_AG_LAND_USES_REVERSIBLE[non_ag_desc]
+                )
+                and all(
+                    (old_ag_man_lb_mrj.get(am)[:, r, :] == self._input_data.ag_man_lb_mrj.get(am)[:, r, :]).all()
+                    for am in AG_MANAGEMENTS_TO_LAND_USES if not AG_MANAGEMENTS_REVERSIBLE[am]
+                )
             ):
                 # cell has not changed between years. No need to update variables
                 num_cells_skipped += 1
@@ -782,8 +890,8 @@ class LutoSolver:
             self.gurobi_model.remove(
                 list(self.X_ag_irr_vars_jr[:, r][np.where(self.X_ag_irr_vars_jr[:, r])])
             )
-            self.X_ag_dry_vars_jr[:, r] = ag_lus_zeros
-            self.X_ag_irr_vars_jr[:, r] = ag_lus_zeros
+            self.X_ag_dry_vars_jr[:, r] = np.zeros(self._input_data.n_ag_lus)
+            self.X_ag_irr_vars_jr[:, r] = np.zeros(self._input_data.n_ag_lus)
             for j in range(self._input_data.n_ag_lus):
                 if self._input_data.ag_x_mrj[0, r, j]:
                     self.X_ag_dry_vars_jr[j, r] = self.gurobi_model.addVar(
@@ -795,15 +903,28 @@ class LutoSolver:
                         ub=1, name=f"X_ag_irr_{j}_{r}"
                     )
 
+            # non agricultural doubling penalty vars
+            self.gurobi_model.remove(
+                list(self.non_ag_doubling_vars_rkk[r, :, :][np.where(self.non_ag_doubling_vars_rkk[r, :, :])])
+            )
+            for k1, k2 in combinations(self._input_data.cells2non_ag_lu.get(r, []), 2):
+                self.non_ag_doubling_vars_rkk[r, k1, k2] = self.gurobi_model.addVar(
+                    name=f"non_ag_doubling_penalty_{r}_{k1}_{k2}"
+                )
+
             # non-agricultural land usage
             self.gurobi_model.remove(
                 list(self.X_non_ag_vars_kr[:, r][np.where(self.X_non_ag_vars_kr[:, r])])
             )
-            self.X_non_ag_vars_kr[:, r] = non_ag_lus_zeros
-            for k in range(self._input_data.n_non_ag_lus):
+            self.X_non_ag_vars_kr[:, r] = np.zeros(self._input_data.n_non_ag_lus)
+            for k, non_ag_lu_desc in zip(range(self._input_data.n_non_ag_lus), NON_AG_LAND_USES):
                 if self._input_data.non_ag_x_rk[r, k]:
+                    x_lb = (
+                        0 if NON_AG_LAND_USES_REVERSIBLE[non_ag_lu_desc] 
+                        else self._input_data.non_ag_lb_rk[r, k]
+                    )
                     self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
-                        ub=1, name=f"X_non_ag_{k}_{r}"
+                        lb=x_lb, ub=self._input_data.non_ag_x_rk[r, k], name=f"X_non_ag_{k}_{r}",
                     )
 
             # agricultural management
@@ -828,28 +949,23 @@ class LutoSolver:
                 self.X_ag_man_irr_vars_jr[am][:, r] = np.zeros(len(am_j_list))
 
                 for j_idx, j in enumerate(am_j_list):
-                    if self._input_data.ag_x_mrj[0, r, j]:
-                        self.X_ag_man_dry_vars_jr[am][
-                            j_idx, r
-                        ] = self.gurobi_model.addVar(
-                            ub=1, name=f"X_ag_man_dry_{am_name}_{j}_{r}"
-                        )
+                    dry_x_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][0, r, j]
+                    irr_x_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][1, r, j]
 
-                    if self._input_data.ag_x_mrj[1, r, j]:
-                        self.X_ag_man_irr_vars_jr[am][
-                            j_idx, r
-                        ] = self.gurobi_model.addVar(
-                            ub=1, name=f"X_ag_man_irr_{am_name}_{j}_{r}"
-                        )
+                    dry_var_name = f"X_ag_man_dry_{am_name}_{j}_{r}"
+                    irr_var_name = f"X_ag_man_irr_{am_name}_{j}_{r}"
+
+                    self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
+                        lb=dry_x_lb, ub=1, name=dry_var_name,
+                    )
+                    self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
+                        lb=irr_x_lb, ub=1, name=irr_var_name,
+                    )
 
             updated_cells.append(r)
 
         updated_cells = np.array(updated_cells)
-        ft = time.time()
-        print(
-            f"Done in {round(ft - st, 1)}s. "
-            f"Skipped {num_cells_skipped} cells, updated {len(updated_cells)} cells."
-        )
+        print(f"    ...skipped {num_cells_skipped} cells, updated {len(updated_cells)} cells.\n")
         return updated_cells
 
     def _update_constraints(self, updated_cells: np.array):
@@ -857,42 +973,55 @@ class LutoSolver:
             print("No constraints need updating.")
             return
 
-        print("Updating constraints...")
-        st = time.time()
+        # for r in updated_cells:
+        #     self.gurobi_model.remove(self.cell_usage_constraint_r.pop(r, []))
+        #     self.gurobi_model.remove(self.ag_management_constraints_r.pop(r, []))
+        #     self.gurobi_model.remove(self.water_limit_constraints_r.pop(r, []))
+        #     self.gurobi_model.remove(self.adoption_limit_constraints)
+        #     self.gurobi_model.remove(self.demand_penalty_constraints)
+        #     self.gurobi_model.remove(self.biodiversity_limit_constraint)
+            
+        #     self.adoption_limit_constraints = []
+        #     self.demand_penalty_constraints = []
+
+        #     if self.ghg_emissions_limit_constraint is not None:
+        #         self.gurobi_model.remove(self.ghg_emissions_limit_constraint)
+        #         self.ghg_emissions_limit_constraint = None
+        
+        print('  ...removing existing constraints...\n')
         for r in updated_cells:
             self.gurobi_model.remove(self.cell_usage_constraint_r.pop(r, []))
             self.gurobi_model.remove(self.ag_management_constraints_r.pop(r, []))
             self.gurobi_model.remove(self.water_limit_constraints_r.pop(r, []))
+            self.gurobi_model.remove(self.non_ag_doubling_constraints_r.pop(r, []))
+        
+        self.gurobi_model.remove(self.adoption_limit_constraints)
+        self.gurobi_model.remove(self.demand_penalty_constraints)
+        self.gurobi_model.remove(self.biodiversity_limit_constraint)
+        
+        self.adoption_limit_constraints = []
+        self.demand_penalty_constraints = []
 
-            self.gurobi_model.remove(self.adoption_limit_constraints)
-            self.gurobi_model.remove(self.demand_penalty_constraints)
-            self.adoption_limit_constraints = []
-            self.demand_penalty_constraints = []
-
-            if self.ghg_emissions_limit_constraint is not None:
-                self.gurobi_model.remove(self.ghg_emissions_limit_constraint)
-                self.ghg_emissions_limit_constraint = None
-
+        if self.ghg_emissions_limit_constraint is not None:
+            self.gurobi_model.remove(self.ghg_emissions_limit_constraint)
+            self.ghg_emissions_limit_constraint = None
+                
         self._add_cell_usage_constraints(updated_cells)
         self._add_agricultural_management_constraints(updated_cells)
         self._add_agricultural_management_adoption_limit_constraints()
         self._add_demand_penalty_constraints()
         self._add_water_usage_limit_constraints(updated_cells)
         self._add_ghg_emissions_limit_constraints()
-        ft = time.time()
-        print(f"Constraint update took {round(ft - st, 1)}s")
+        self._add_biodiversity_limit_constraints()
+        self._add_non_ag_doubling_penalty_constraints(updated_cells)
 
-    def solve(self):
-        st = time.time()
-        print("Starting solve... ", time.ctime(), "\n")
+    def solve(self) -> SolverSolution:
+        print("Starting solve...\n")
 
         # Magic.
         self.gurobi_model.optimize()
 
-        ft = time.time()
-        print("Completed solve... ", time.ctime())
-        print("Found optimal objective value", round(self.gurobi_model.objVal, 2), "in", round(ft - st), "seconds\n")
-        print("Collecting results...", end=" ", flush=True)
+        print("Completed solve, collecting results...\n", flush=True)
 
         prod_data = {}  # Dictionary that stores information about production and GHG emissions for the write module
 
@@ -1034,25 +1163,22 @@ class LutoSolver:
                     ammaps[am][r] = 1
 
         # # Process production amount for each commodity
-        print("Processing commodity production amounts...")
         prod_data["Production"] = [self.total_q_exprs_c[c].getValue() for c in range(self.ncms)]
-
-        print("Processing GHG emissions amount...")
         prod_data["GHG Emissions"] = self.ghg_emissions_expr.getValue()
+        prod_data["Biodiversity"] = self.biodiversity_expr.getValue()
 
         ag_X_mrj_processed[:, non_ag_bools_r, :] = False
         non_ag_X_rk_processed[~non_ag_bools_r, :] = False
-
-        print("Done\n")
-
-        return (
-            lumap,
-            lmmap,
-            ammaps,
-            ag_X_mrj_processed,
-            non_ag_X_sol_rk,
-            ag_man_X_mrj_processed,
-            prod_data,
+            
+        return SolverSolution(
+            lumap=lumap,
+            lmmap=lmmap,
+            ammaps=ammaps,
+            ag_X_mrj=ag_X_mrj_processed,
+            non_ag_X_rk=non_ag_X_sol_rk,
+            ag_man_X_mrj=ag_man_X_mrj_processed,
+            prod_data=prod_data,
+            obj_val=self.gurobi_model.ObjVal,
         )
 
     @property

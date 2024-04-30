@@ -1,9 +1,57 @@
 import numpy as np
-
+from luto.non_ag_landuses import NON_AG_LAND_USES
 import luto.settings as settings
+from luto.data import Data
 
 
-def get_rev_env_plantings(data) -> np.ndarray:
+def get_rev_env_plantings(data: Data) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    data: Data object.
+
+    Returns
+    -------
+    np.ndarray
+        The revenue produced by environmental plantings for each cell. A 1-D array indexed by cell.
+    """
+    # Multiply carbon reduction by carbon price for each cell and adjust for resfactor.
+    return data.EP_BLOCK_AVG_T_CO2_HA * data.REAL_AREA * settings.CARBON_PRICE_PER_TONNE
+
+
+def get_rev_rip_plantings(data: Data) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    data: Data object.
+
+    Note: this is the same as for environmental plantings.
+
+    Returns
+    -------
+    np.ndarray
+        The revenue produced by riparian plantings for each cell. A 1-D array indexed by cell.
+    """
+    return data.EP_RIP_AVG_T_CO2_HA * data.REAL_AREA * settings.CARBON_PRICE_PER_TONNE
+
+
+def get_rev_agroforestry(data: Data) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    data: Data object.
+
+    Note: this is the same as for environmental plantings.
+
+    Returns
+    -------
+    np.ndarray
+        The revenue produced by agroforestry for each cell. A 1-D array indexed by cell.
+    """
+    return data.EP_BELT_AVG_T_CO2_HA * data.REAL_AREA * settings.CARBON_PRICE_PER_TONNE
+
+
+def get_rev_carbon_plantings_block(data: Data) -> np.ndarray:
     """
     Parameters
     ----------
@@ -13,21 +61,74 @@ def get_rev_env_plantings(data) -> np.ndarray:
     Returns
     -------
     np.ndarray
-        The cost of environmental plantings for each cell. A 1-D array indexed by cell.
+        The cost of carbon plantings (block) for each cell. A 1-D array indexed by cell.
     """
     # Multiply carbon reduction by carbon price for each cell and adjust for resfactor.
-    return data.EP_BLOCK_AVG_T_C02_HA * data.REAL_AREA * settings.CARBON_PRICE_PER_TONNE
+    return data.CP_BLOCK_AVG_T_CO2_HA * data.REAL_AREA * settings.CARBON_PRICE_PER_TONNE
 
 
-def get_rev_matrix(data) -> np.ndarray:
+def get_rev_carbon_plantings_belt(data: Data) -> np.ndarray:
     """
+    Parameters
+    ----------
+    data: object/module
+        Data object or module with fields like in `luto.data`.
 
+    Returns
+    -------
+    np.ndarray
+        The cost of carbon plantings (belt) for each cell. A 1-D array indexed by cell.
     """
-    env_plantings_rev_matrix = get_rev_env_plantings(data)
+    # Multiply carbon reduction by carbon price for each cell and adjust for resfactor.
+    return data.CP_BELT_AVG_T_CO2_HA * data.REAL_AREA * settings.CARBON_PRICE_PER_TONNE
+
+
+def get_rev_beccs(data: Data) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    data: object/module
+        Data object or module with fields like in `luto.data`.
+
+    Returns
+    -------
+    np.ndarray
+    """
+    base_rev = np.nan_to_num(data.BECCS_REV_AUD_HA_YR) * data.REAL_AREA
+    return base_rev + np.nan_to_num(data.BECCS_TCO2E_HA_YR) * data.REAL_AREA * settings.CARBON_PRICE_PER_TONNE
+
+
+def get_rev_matrix(data: Data) -> np.ndarray:
+    """
+    Gets the matrix containing the revenue produced by each non-agricultural land use for each cell.
+
+    Parameters:
+        data (Data): The data object containing the necessary information.
+
+    Returns:
+        np.ndarray.
+    """
+    non_agr_rev_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-    non_agr_rev_matrices = [
-        env_plantings_rev_matrix.reshape((data.NCELLS, 1)),
-    ]
+    if NON_AG_LAND_USES['Environmental Plantings']:
+        non_agr_rev_matrices['Environmental Plantings'] = get_rev_env_plantings(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Riparian Plantings']:
+        non_agr_rev_matrices['Riparian Plantings'] = get_rev_rip_plantings(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Agroforestry']:
+        non_agr_rev_matrices['Agroforestry'] = get_rev_agroforestry(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Carbon Plantings (Block)']:
+        non_agr_rev_matrices['Carbon Plantings (Block)'] = get_rev_carbon_plantings_block(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
+        non_agr_rev_matrices['Carbon Plantings (Belt)'] = get_rev_carbon_plantings_belt(data).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['BECCS']:
+        non_agr_rev_matrices['BECCS'] = get_rev_beccs(data).reshape((data.NCELLS, 1))
+
+    non_agr_rev_matrices = list(non_agr_rev_matrices.values())
 
     return np.concatenate(non_agr_rev_matrices, axis=1)

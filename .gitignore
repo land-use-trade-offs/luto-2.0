@@ -20,3 +20,4 @@ gurobi.log
 # Except this very file:
 !.gitignore
 
+*.zip
