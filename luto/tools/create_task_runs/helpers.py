@@ -158,6 +158,7 @@ def write_custom_settings(task_dir:str, settings_dict:dict):
     with open(f'{task_dir}/luto/settings.py', 'w') as file, \
             open(f'{task_dir}/luto/settings_bash.py', 'w') as bash_file:
         for k, v in settings_dict.items():
+            k = k.replace(' ', '_').replace('(','').replace(')','')
             # List values need to be converted to bash arrays
             if isinstance(v, list):
                 bash_file.write(f'{k}=({ " ".join([str(elem) for elem in v])})\n')
@@ -167,6 +168,7 @@ def write_custom_settings(task_dir:str, settings_dict:dict):
                 file.write(f'{k}={v}\n')
                 bash_file.write(f'# {k} is a dictionary, which is not natively supported in bash\n')
                 for key, value in v.items():
+                    key = str(key).replace(' ', '_').replace('(','').replace(')','')
                     bash_file.write(f'{k}_{key}={value}\n')
             # If the value is a number, write it as number
             elif str(v).isdigit() or is_float(v):
