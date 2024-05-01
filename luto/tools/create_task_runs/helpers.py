@@ -196,7 +196,7 @@ def update_settings(settings_dict:dict, n_tasks:int, col:str):
 
     # The THREADS setting will be set to the number of CPU cores divided by the number of tasks
     CPU_COUNT = multiprocessing.cpu_count()
-    CPU_PER_TASK = CPU_COUNT // n_tasks - 2
+    CPU_PER_TASK = CPU_COUNT // n_tasks - 1
     CPU_PER_TASK = max(CPU_PER_TASK, 1)
     CPU_PER_TASK = min(CPU_PER_TASK, int(settings_dict['THREADS']))
     
@@ -228,6 +228,7 @@ def update_settings(settings_dict:dict, n_tasks:int, col:str):
     settings_dict['MEM'] = MEM
     settings_dict['TIME'] = TIME
     settings_dict['JOB_NAME'] = JOB_NAME
+    settings_dict['CPU_PER_TASK'] = CPU_PER_TASK
     
     return settings_dict
 
