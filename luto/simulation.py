@@ -25,7 +25,7 @@ from datetime import datetime
 
 import luto.settings as settings
 from luto import tools
-from luto.non_ag_landuses import NON_AG_LAND_USES
+from luto.settings import NON_AG_LAND_USES
 from luto.data import Data, get_base_am_vars, lumap2ag_l_mrj, lumap2non_ag_l_mk
 from luto.economics.production import get_production
 from luto.solvers.input_data import SolverInputData, get_input_data

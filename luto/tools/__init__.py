@@ -37,7 +37,7 @@ from luto.tools.report.create_html import data2html
 from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_static_maps import TIF2MAP
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.non_ag_landuses import NON_AG_LAND_USES
+from luto.settings import NON_AG_LAND_USES
 
 
 def amortise(cost, rate=settings.DISCOUNT_RATE, horizon=settings.AMORTISATION_PERIOD):

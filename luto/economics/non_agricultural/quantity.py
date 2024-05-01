@@ -1,7 +1,7 @@
 import numpy as np
 
 from luto.data import Data
-from luto.non_ag_landuses import NON_AG_LAND_USES
+from luto.settings import NON_AG_LAND_USES
 
 def get_quantity_env_plantings(data: Data) -> np.ndarray:
     """

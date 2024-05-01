@@ -96,7 +96,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 """ NOTE - BECCS IS TURNED OFF """
 # Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
+RESFACTOR = 10         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
 
 # How does the model run over time 
 MODE = 'timeseries'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
@@ -168,6 +168,37 @@ THREADS = 50
 # Non-agricultural land usage parameters
 # ---------------------------------------------------------------------------- #
 
+"""
+The dictionary below is the master list of all of the non agricultural land uses
+and whether they are currently enabled in the solver (True/False). 
+
+To disable a non-agricultural land use, change the correpsonding value of the
+NON_AG_LAND_USES dictionary to false.
+"""
+NON_AG_LAND_USES = {
+    'Environmental Plantings': True,
+    'Riparian Plantings': True,
+    'Agroforestry': True,
+    'Carbon Plantings (Block)': True,
+    'Carbon Plantings (Belt)': True,
+    'BECCS': True,
+}
+
+"""
+If settings.MODE == 'timeseries', the values of the below dictionary determine whether the model is allowed to abandon non-agr.
+land uses on cells in the years after it chooses to utilise them. For example, if a cell has is using 'Environmental Plantings'
+and the corresponding value in this dictionary is False, all cells using EP must also utilise this land use in all subsequent 
+years.
+"""
+NON_AG_LAND_USES_REVERSIBLE = {
+    'Environmental Plantings': False,
+    'Riparian Plantings': False,
+    'Agroforestry': False,
+    'Carbon Plantings (Block)': False,
+    'Carbon Plantings (Belt)': False,
+    'BECCS': False,
+}
+
 # Price of carbon per tonne - determines revenue from carbon sequestration (used when maximising revenue only)
 CARBON_PRICE_PER_TONNE = 100
 
@@ -231,6 +262,37 @@ BECCS_BIODIVERSITY_BENEFIT = 0
 # ---------------------------------------------------------------------------- #
 # Agricultural management parameters
 # ---------------------------------------------------------------------------- #
+
+"""
+The dictionary below contains a master list of all agricultural management options and
+which land uses they correspond to. 
+
+To disable an ag-mangement option, change the corresponding value in the AG_MANAGEMENTS dictionary to False.
+"""
+AG_MANAGEMENTS = {
+    'Asparagopsis taxiformis': True,
+    'Precision Agriculture': True,
+    'Ecological Grazing': True,
+    'Savanna Burning': True,
+    'AgTech EI': True,
+}
+
+"""
+If settings.MODE == 'timeseries', the values of the below dictionary determine whether the model is allowed to abandon agricultural
+management options on cells in the years after it chooses to utilise them. For example, if a cell has is using 'Asparagopsis taxiformis',
+and the corresponding value in this dictionary is False, all cells using Asparagopsis taxiformis must also utilise this land use
+and agricultural management combination in all subsequent years.
+
+WARNING: changing to False will result in 'locking in' land uses on cells that utilise the agricultural management option for 
+the rest of the simulation. This may be an unintended side effect.
+"""
+AG_MANAGEMENTS_REVERSIBLE = {
+    'Asparagopsis taxiformis': True,
+    'Precision Agriculture': True,
+    'Ecological Grazing': True,
+    'Savanna Burning': True,
+    'AgTech EI': True,
+}
 
 # The cost for removing and establishing irrigation infrastructure ($ per hectare)
 REMOVE_IRRIG_COST = 3000
@@ -318,7 +380,7 @@ BIODIVERSITY_LIMITS = 'on'             # 'on' or 'off'
 BIODIV_GBF_TARGET_2_DICT = {                     
               2010: 0,    # Proportion of degraded land restored in year 2010
               2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
-              2050: 0.5,  # Principle from LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
+              2050: 0.5,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
               2100: 0.5   # Stays at 2050 level
              }            # (can add more years/targets)\
 

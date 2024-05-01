@@ -31,9 +31,10 @@ import gurobipy as gp
 from gurobipy import GRB
 
 import luto.settings as settings
+from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_REVERSIBLE
 from luto import tools
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES, AG_MANAGEMENTS_REVERSIBLE
-from luto.non_ag_landuses import NON_AG_LAND_USES, NON_AG_LAND_USES_REVERSIBLE
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import NON_AG_LAND_USES, NON_AG_LAND_USES_REVERSIBLE
 from luto.solvers.input_data import SolverInputData
 
 
@@ -151,6 +152,9 @@ class LutoSolver:
                 )
 
         for k, non_ag_lu_desc in enumerate(NON_AG_LAND_USES):
+            if not NON_AG_LAND_USES[non_ag_lu_desc]:
+                continue
+
             lu_cells = self._input_data.non_ag_lu2cells[k]
             for r in lu_cells:
                 x_lb = (
@@ -177,6 +181,9 @@ class LutoSolver:
         }
 
         for am, am_j_list in self._input_data.am2j.items():
+            if not AG_MANAGEMENTS[am]:
+                continue
+
             # Get snake_case version of the AM name for the variable name
             am_name = tools.am_name_snake_case(am)
 
@@ -239,7 +246,11 @@ class LutoSolver:
         if settings.NON_AG_DOUBLING_PENALTY == 0:
             non_ag_doubling_penalty_contr = 0
         else:
-            non_ag_doubling_penalty_contr = settings.NON_AG_DOUBLING_PENALTY * self.non_ag_doubling_vars_rkk.sum()
+            non_ag_doubling_penalty_contr = (
+                settings.NON_AG_DOUBLING_PENALTY
+                * self._input_data.resmult             # Adjust penalty size of cells for resfactor
+                * self.non_ag_doubling_vars_rkk.sum()
+            )
 
         if settings.OBJECTIVE == "maxrev":
             # Flip the sign of the non-agricultural doubling penalty so it becomes a cost
@@ -727,7 +738,7 @@ class LutoSolver:
     def _add_non_ag_doubling_penalty_constraints(self, cells: Optional[list[int]] = None):
         """
         Linearised big-M min constraint.
-        Goal: to set self.non_ag_doubling_penalty_vars_rkk[r, k1, k2] = min(self.X_non_ag_vars_kr[k1, r], self.X_non_ag_vars_kr[k2, r])
+        Goal: to set self.non_ag_doubling_vars_rkk[r, k1, k2] = min(self.X_non_ag_vars_kr[k1, r], self.X_non_ag_vars_kr[k2, r])
         We wish to do this using 'big M' constraints to keep the entire model linear.
 
         Method: To set X = min{A, B} where X, A, B are continuous variables, use the
@@ -747,7 +758,7 @@ class LutoSolver:
         print('  ...non-agricultural doubling penalty constraints...')
         
         cells: iter = cells if cells is not None else range(self._input_data.ncells)
-        M = settings.NON_AG_DOUBLING_CONSTR_BIG_M
+        M = settings.NON_AG_DOUBLING_CONSTR_BIG_M * self._input_data.resmult
         
         for r in cells:
             self.non_ag_doubling_constraints_r[r] = []
@@ -906,6 +917,9 @@ class LutoSolver:
             # non agricultural doubling penalty vars
             self.gurobi_model.remove(
                 list(self.non_ag_doubling_vars_rkk[r, :, :][np.where(self.non_ag_doubling_vars_rkk[r, :, :])])
+            )
+            self.non_ag_doubling_vars_rkk[r, :, :] = np.zeros(
+                (self._input_data.n_non_ag_lus, self._input_data.n_non_ag_lus)
             )
             for k1, k2 in combinations(self._input_data.cells2non_ag_lu.get(r, []), 2):
                 self.non_ag_doubling_vars_rkk[r, k1, k2] = self.gurobi_model.addVar(
