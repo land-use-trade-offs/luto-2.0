@@ -25,7 +25,8 @@ import numpy as np
 import pandas as pd
 
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
-from luto.ag_managements import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import AG_MANAGEMENTS
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data, lvs_veg_types
 from luto.economics.agricultural.quantity import get_yield_pot, get_quantity
 

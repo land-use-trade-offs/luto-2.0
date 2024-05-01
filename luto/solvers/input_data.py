@@ -5,7 +5,8 @@ import numpy as np
 
 from luto import settings
 from luto.economics import land_use_culling
-from luto.ag_managements import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import AG_MANAGEMENTS
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data
 
 import luto.economics.agricultural.cost as ag_cost
@@ -69,6 +70,7 @@ class SolverInputData:
     pr2cm_cp: np.ndarray  # Conversion matrix: product(s) to commodity.
     limits: dict  # Targets to use.
     desc2aglu: dict  # Map of agricultural land use descriptions to codes.
+    resmult: float  # Resolution factor multiplier from data.RESMULT
 
     @property
     def n_ag_lms(self):
@@ -391,4 +393,5 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         pr2cm_cp=data.PR2CM,
         limits=get_limits(data, target_year),
         desc2aglu=data.DESC2AGLU,
+        resmult=data.RESMULT,
     )

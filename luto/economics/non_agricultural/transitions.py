@@ -4,7 +4,7 @@ from luto import settings
 from luto.data import Data, lumap2ag_l_mrj
 import luto.tools as tools
 import luto.economics.agricultural.water as ag_water
-from luto.non_ag_landuses import NON_AG_LAND_USES
+from luto.settings import NON_AG_LAND_USES
 
 
 def get_env_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
@@ -366,24 +366,19 @@ def get_to_ag_transition_matrix(data: Data, yr_idx, lumap, lmmap, separate=False
     """
     
 
-    ag_to_non_agr_t_matrices = {use: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)) for use in NON_AG_LAND_USES}
+    ag_to_non_agr_t_matrices = {lu: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)) for lu in NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     if NON_AG_LAND_USES['Environmental Plantings']:
         ag_to_non_agr_t_matrices['Environmental Plantings'] = get_env_plantings_to_ag(data, yr_idx, lumap, lmmap, separate)
-
     if NON_AG_LAND_USES['Riparian Plantings']:
         ag_to_non_agr_t_matrices['Riparian Plantings'] = get_rip_plantings_to_ag(data, yr_idx, lumap, lmmap, separate)
-
     if NON_AG_LAND_USES['Agroforestry']:
         ag_to_non_agr_t_matrices['Agroforestry'] = get_agroforestry_to_ag(data, yr_idx, lumap, lmmap, separate)
-
     if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
         ag_to_non_agr_t_matrices['Carbon Plantings (Belt)'] = get_carbon_plantings_belt_to_ag(data, yr_idx, lumap, lmmap, separate)
-
     if NON_AG_LAND_USES['Carbon Plantings (Block)']:
         ag_to_non_agr_t_matrices['Carbon Plantings (Block)'] = get_carbon_plantings_block_to_ag(data, yr_idx, lumap, lmmap, separate)
-
     if NON_AG_LAND_USES['BECCS']:
         ag_to_non_agr_t_matrices['BECCS'] = get_beccs_to_ag(data, yr_idx, lumap, lmmap, separate)
 
@@ -483,7 +478,8 @@ def get_exclusions_riparian_plantings(data: Data, lumap) -> np.ndarray:
     exclude *= get_exclusions_for_excluding_all_natural_cells(data, lumap)
 
     # Ensure cells being used for riparian plantings may retain that LU
-    exclude[tools.get_riparian_plantings_cells(lumap)] = 1
+    rp_cells = tools.get_riparian_plantings_cells(lumap)
+    exclude[rp_cells] = data.RP_PROPORTION[rp_cells]
 
     return exclude
 
@@ -506,7 +502,7 @@ def get_exclusions_agroforestry(data: Data, lumap) -> np.ndarray:
     exclude *= get_exclusions_for_excluding_all_natural_cells(data, lumap)
 
     # Ensure cells being used for agroforestry may retain that LU
-    exclude[tools.get_agroforestry_cells(lumap)] = 1
+    exclude[tools.get_agroforestry_cells(lumap)] = settings.AF_PROPORTION
 
     return exclude
 
@@ -550,7 +546,7 @@ def get_exclusions_carbon_plantings_belt(data, lumap) -> np.ndarray:
     exclude *= get_exclusions_for_excluding_all_natural_cells(data, lumap)
 
     # Ensure cells being used for carbon plantings (belt) may retain that LU
-    exclude[tools.get_carbon_plantings_belt_cells(lumap)] = 1
+    exclude[tools.get_carbon_plantings_belt_cells(lumap)] = settings.CP_BELT_PROPORTION
 
     return exclude
 
@@ -604,25 +600,24 @@ def get_exclude_matrices(data: Data, lumap) -> np.ndarray:
     related to different non-agricultural land uses. The resulting matrix is a concatenation of these matrices
     along the k indexing.
     """
+    non_ag_x_matrices = {lu: np.zeros((data.NCELLS, data.N_NON_AG_LUS)) for lu in NON_AG_LAND_USES}
+
     # Environmental plantings exclusions
-    env_plant_exclusions = get_exclusions_environmental_plantings(data, lumap)
-    rip_plant_exclusions = get_exclusions_riparian_plantings(data, lumap)
-    agroforestry_exclusions = get_exclusions_agroforestry(data, lumap)
-    carbon_plantings_block_exclusions = get_exclusions_carbon_plantings_block(data, lumap)
-    carbon_plantings_belt_exclusions = get_exclusions_carbon_plantings_belt(data, lumap)
-    beccs_exclusions = get_exclusions_beccs(data, lumap)
+    if NON_AG_LAND_USES['Environmental Plantings']:
+        non_ag_x_matrices['Environmental Plantings'] = get_exclusions_environmental_plantings(data, lumap)
+    if NON_AG_LAND_USES['Riparian Plantings']:
+        non_ag_x_matrices['Riparian Plantings'] = get_exclusions_riparian_plantings(data, lumap)
+    if NON_AG_LAND_USES['Agroforestry']:
+        non_ag_x_matrices['Agroforestry'] = get_exclusions_agroforestry(data, lumap)
+    if NON_AG_LAND_USES['Carbon Plantings (Block)']:
+        non_ag_x_matrices['Carbon Plantings (Block)'] = get_exclusions_carbon_plantings_block(data, lumap)
+    if NON_AG_LAND_USES['Carbon Plantings (Belt)']:
+        non_ag_x_matrices['Carbon Plantings (Belt)'] = get_exclusions_carbon_plantings_belt(data, lumap)
+    if NON_AG_LAND_USES['BECCS']:
+        non_ag_x_matrices['BECCS'] = get_exclusions_beccs(data, lumap)
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-    non_ag_x_matrices = [
-        env_plant_exclusions.reshape((data.NCELLS, 1)),
-        rip_plant_exclusions.reshape((data.NCELLS, 1)),
-        agroforestry_exclusions.reshape((data.NCELLS, 1)),
-        carbon_plantings_block_exclusions.reshape((data.NCELLS, 1)),
-        carbon_plantings_belt_exclusions.reshape((data.NCELLS, 1)),
-        beccs_exclusions.reshape((data.NCELLS, 1)),
-    ]
-
-    # Stack list and return to get x_rk
+    non_ag_x_matrices = [array.reshape((data.NCELLS, 1)) for array in non_ag_x_matrices.values()]
     return np.concatenate(non_ag_x_matrices, axis=1).astype(np.float32)
 
 
