@@ -28,7 +28,12 @@ PARAMS_TO_EVAL = [
     'PARALLEL_WRITE',
     'OFF_LAND_COMMODITIES',
     'GHG_LIMITS',
-    'BIODIV_GBF_TARGET_2_DICT'
+    'BIODIV_GBF_TARGET_2_DICT',
+    'AG_MANAGEMENTS',
+    'AG_MANAGEMENTS_REVERSIBLE',
+    'NON_AG_LAND_USES',
+    'NON_AG_LAND_USES_REVERSIBLE'
+
 ]
 
 EXCLUDE_DIRS = ['input', 'output', '.git', '.vscode', '__pycache__', 'jinzhu_inspect_code']

@@ -2,6 +2,7 @@
 
 # Read the settings_bash file ==> MEM, TIME, THREADS, JOB_NAME
 source luto/settings_bash.py
+export PATH=$PATH:/usr/local/bin
 
 
 # Create a temporary script file
@@ -25,11 +26,10 @@ INNER_EOF
 OUTER_EOF
 
 # Submit the job
-sbatch -p mem \
+sbatch -p ${NODE} \
     --time=${TIME} \
     --mem=${MEM} \
-    --cpus-per-task=${THREADS} \
-    --export=ALL \
+    --cpus-per-task=${CPU_PER_TASK} \
     --job-name=${JOB_NAME} \
     ${SCRIPT}
 
