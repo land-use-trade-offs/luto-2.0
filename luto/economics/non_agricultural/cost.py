@@ -2,7 +2,7 @@ import numpy as np
 
 from luto.data import Data
 import luto.settings as settings
-from luto.non_ag_landuses import NON_AG_LAND_USES
+from luto.settings import NON_AG_LAND_USES
 
 
 def get_cost_env_plantings(data: Data) -> np.ndarray:

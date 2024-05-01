@@ -7,7 +7,7 @@ import itertools
 import numpy as np
 
 from luto import settings
-from luto.ag_managements import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data
 
 

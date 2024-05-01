@@ -1,5 +1,5 @@
 import numpy as np
-from luto.non_ag_landuses import NON_AG_LAND_USES
+from luto.settings import NON_AG_LAND_USES
 
 from luto.data import Data
 

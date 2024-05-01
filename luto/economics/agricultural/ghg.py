@@ -26,7 +26,8 @@ import pandas as pd
 from luto.data import Data, lvs_veg_types
 from luto.economics.agricultural.quantity import get_yield_pot
 import luto.tools as tools
-from luto.ag_managements import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import AG_MANAGEMENTS
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
 def get_ghg_crop(data: Data, lu, lm, yr_idx, aggregate):

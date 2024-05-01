@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from luto.non_ag_landuses import NON_AG_LAND_USES
+from luto.settings import NON_AG_LAND_USES
 
 from luto.data import Data
 
