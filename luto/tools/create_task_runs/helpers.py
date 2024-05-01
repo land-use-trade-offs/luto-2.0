@@ -102,7 +102,6 @@ def is_float(s):
  
  
  
- 
 def is_valid_variable_name(name):
     if name in keyword.kwlist:
         print(f"{name} is a keyword")
