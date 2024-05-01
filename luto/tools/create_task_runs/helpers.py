@@ -3,8 +3,8 @@ import os
 import re
 import shutil
 import keyword
-import pandas as pd
 import multiprocessing
+import pandas as pd
 
 from joblib import delayed, Parallel
 
@@ -41,6 +41,13 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
             # Reorder the settings dictionary to match the order in the settings.py file
             settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
             settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
+            
+            # Add the NODE parameters
+            settings_dict['NODE'] = 'Please specify the node name'
+            settings_dict['MEM'] = 'auto'
+            settings_dict['CPU_PER_TASK'] = 'auto'
+            settings_dict['TIME'] = 'auto'
+            settings_dict['JOB_NAME'] = 'auto'
 
 
         # Create a template for cutom settings
@@ -179,6 +186,10 @@ def write_custom_settings(task_dir:str, settings_dict:dict):
                 
                 
 def update_settings(settings_dict:dict, n_tasks:int, col:str):
+    
+    if settings_dict['NODE'] == 'Please specify the node name':
+        raise ValueError('NODE must be specified!')
+
     # The input dir for each task will point to the absolute path of the input dir
     settings_dict['INPUT_DIR'] = os.path.abspath(settings_dict['INPUT_DIR']).replace('\\','/')
     settings_dict['DATA_DIR'] = settings_dict['INPUT_DIR']
@@ -198,7 +209,7 @@ def update_settings(settings_dict:dict, n_tasks:int, col:str):
         MEM = "200G"
         TIME = "30-0:00:00"
     elif int(settings_dict['RESFACTOR']) == 2:
-        MEM = "150G"
+        MEM = "150G" 
         TIME = "10-0:00:00"
     elif int(settings_dict['RESFACTOR']) == 3:
         MEM = "100G"
@@ -207,15 +218,17 @@ def update_settings(settings_dict:dict, n_tasks:int, col:str):
         MEM = "80G"
         TIME = "2-0:00:00"
         
-    # Set the job name base on the columns name
-    JOB_NAME = f"LUTO_{col}"
-    
+    # If the MEM and TIME are not set to auto, set them to the custom values
+    MEM = settings_dict['MEM'] if settings_dict['MEM'] != 'auto' else MEM
+    TIME = settings_dict['TIME'] if settings_dict['TIME'] != 'auto' else TIME
+    CPU_PER_TASK = settings_dict['CPU_PER_TASK'] if settings_dict['CPU_PER_TASK'] != 'auto' else CPU_PER_TASK
+    JOB_NAME = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
+   
+    # Update the settings dictionary
     settings_dict['MEM'] = MEM
     settings_dict['TIME'] = TIME
     settings_dict['JOB_NAME'] = JOB_NAME
-
-
-        
+    
     return settings_dict
 
 
