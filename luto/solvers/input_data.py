@@ -130,6 +130,16 @@ class SolverInputData:
             for j in range(self.n_ag_lus)
             for m in range(self.n_ag_lms)
         }
+    
+    @cached_property
+    def cells2ag_lu(self) -> dict[int, list[tuple[int, int]]]:
+        ag_lu2cells = self.ag_lu2cells
+        cells2ag_lu = defaultdict(list)
+        for (m, j), j_cells in ag_lu2cells.items():
+            for r in j_cells:
+                cells2ag_lu[r].append((m,j))
+
+        return dict(cells2ag_lu)
 
     @cached_property
     def non_ag_lu2cells(self) -> dict[int, np.ndarray]:

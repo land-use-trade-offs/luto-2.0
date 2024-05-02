@@ -72,6 +72,9 @@ def get_asparagopsis_effect_w_mrj(data: Data, w_mrj, yr_idx):
     Notes:
         Asparagopsis taxiformis has no effect on the water required.
     """
+    if not settings.AG_MANAGEMENTS['Asparagopsis taxiformis']:
+        return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+
     land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
@@ -104,6 +107,9 @@ def get_precision_agriculture_effect_w_mrj(data: Data, w_mrj, yr_idx):
     Returns:
     - new_w_mrj <unit:ML/cell>: The updated water requirements data after applying precision agriculture effects.
     """
+    if not settings.AG_MANAGEMENTS['Precision Agriculture']:
+        return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
@@ -136,6 +142,9 @@ def get_ecological_grazing_effect_w_mrj(data: Data, w_mrj, yr_idx):
     Returns:
     - new_w_mrj <unit:ML/cell>: The updated water requirements data after applying ecological grazing effects.
     """
+    if not settings.AG_MANAGEMENTS['Ecological Grazing']:
+        return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
@@ -171,6 +180,9 @@ def get_savanna_burning_effect_w_mrj(data):
             - NCELLS: Number of cells
             - nlus: Number of land uses affected by savanna burning
         """
+        if not settings.AG_MANAGEMENTS['Savanna Burning']:
+            return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+
         nlus = len(AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
         return np.zeros((data.NLMS, data.NCELLS, nlus))
 
@@ -188,6 +200,9 @@ def get_agtech_ei_effect_w_mrj(data, w_mrj, yr_idx):
     Returns:
     - new_w_mrj <unit:ML/cell>: The updated water requirements data with AgTech EI effects applied.
     """
+    if not settings.AG_MANAGEMENTS['AgTech EI']:
+        return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+    
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
@@ -223,7 +238,7 @@ def get_agricultural_management_water_matrices(data: Data, w_mrj, yr_idx) -> Dic
     }
 
 
-def get_wuse_limits(data):
+def get_wuse_limits(data: Data):
     """
     Return water use limits for regions (River Regions or Drainage Divisions as specified in luto.settings.py).
     Currently set such that water limits are set at 2010 agricultural water requirements.
