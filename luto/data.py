@@ -976,48 +976,36 @@ class Data:
         """
         Safely adds a land-use map to the the Data object.
         """
-        if yr in self.lumaps:
-            raise ValueError(f"LUMAP for year {yr} already stored in Data object.")
         self.lumaps[yr] = lumap
 
     def add_lmmap(self, yr: int, lmmap: np.ndarray):
         """
         Safely adds a land-management map to the Data object.
         """
-        if yr in self.lmmaps:
-            raise ValueError(f"LMMAP for year {yr} already stored in Data object.")
         self.lmmaps[yr] = lmmap
 
     def add_ammaps(self, yr: int, ammap: np.ndarray):
         """
         Safely adds an agricultural management map to the Data object.
         """
-        if yr in self.ammaps:
-            raise ValueError(f"LUMAP for year {yr} already stored in Data object.")
         self.ammaps[yr] = ammap
 
     def add_ag_dvars(self, yr: int, ag_dvars: np.ndarray):
         """
         Safely adds agricultural decision variables' values to the Data object.
         """
-        if yr in self.ag_dvars:
-            raise ValueError(f"Agr. DVars for year {yr} already stored in Data object.")
         self.ag_dvars[yr] = ag_dvars
 
     def add_non_ag_dvars(self, yr: int, non_ag_dvars: np.ndarray):
         """
         Safely adds non-agricultural decision variables' values to the Data object.
         """
-        if yr in self.non_ag_dvars:
-            raise ValueError(f"Non-agr. DVars for year {yr} already stored in Data object.")
         self.non_ag_dvars[yr] = non_ag_dvars
 
     def add_ag_man_dvars(self, yr: int, ag_man_dvars: dict[str, np.ndarray]):
         """
         Safely adds agricultural management decision variables' values to the Data object.
         """
-        if yr in self.ag_man_dvars:
-            raise ValueError(f"Ag management DVars for year {yr} already stored in Data object.")
         self.ag_man_dvars[yr] = ag_man_dvars
 
     def add_production_data(self, yr: int, data_type: str, prod_data: Any):
@@ -1041,8 +1029,6 @@ class Data:
         """
         Safely save objective value for a given year to the Data object
         """
-        if yr in self.obj_vals:
-            raise ValueError(f"Objective value for year {yr} already stored in Data object.")
         self.obj_vals[yr] = obj_val
 
     def add_base_year_data_to_containers(self):
