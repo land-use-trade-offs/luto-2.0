@@ -159,7 +159,8 @@ class Data:
         self.ag_man_dvars = {}
         self.prod_data = {}
         self.obj_vals = {}
-
+        
+        print('')
         print('Beginning data initialisation...')
 
         ###############################################################
