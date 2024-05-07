@@ -647,13 +647,9 @@ class Data:
 
         # Water yields -- run off from a cell into catchment by deep-rooted, shallow-rooted, and natural vegetation types
         water_yield_base = pd.read_hdf(os.path.join(INPUT_DIR, "water_yield_baselines.h5"))
-        # WATER_YIELD_BASE_DR = water_yield_base['WATER_YIELD_HIST_DR_ML_HA'].to_numpy(dtype = np.float32)
-        self.WATER_YIELD_BASE_SR = water_yield_base["WATER_YIELD_HIST_SR_ML_HA"].to_numpy(
-            dtype=np.float32
-        )
-        self.WATER_YIELD_BASE = water_yield_base["WATER_YIELD_HIST_BASELINE_ML_HA"].to_numpy(
-            dtype=np.float32
-        )
+        self.WATER_YIELD_BASE_DR = water_yield_base['WATER_YIELD_HIST_DR_ML_HA'].to_numpy(dtype = np.float32)
+        self.WATER_YIELD_BASE_SR = water_yield_base["WATER_YIELD_HIST_SR_ML_HA"].to_numpy(dtype = np.float32)
+        self.WATER_YIELD_BASE = water_yield_base["WATER_YIELD_HIST_BASELINE_ML_HA"].to_numpy(dtype = np.float32)
 
         # fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_dr_ml_ha.h5')
         # fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_sr_ml_ha.h5')
@@ -934,6 +930,7 @@ class Data:
         self.WATER_LICENCE_PRICE = self.WATER_LICENCE_PRICE[self.MASK]          # Int16
         self.WATER_DELIVERY_PRICE = self.WATER_DELIVERY_PRICE[self.MASK]        # Float32
         self.WATER_YIELD_BASE_SR = self.WATER_YIELD_BASE_SR[self.MASK]          # Float32
+        self.WATER_YIELD_BASE_DR = self.WATER_YIELD_BASE_DR[self.MASK]          # Float32
         self.WATER_YIELD_BASE = self.WATER_YIELD_BASE[self.MASK]                # Float32
         self.FEED_REQ = self.FEED_REQ[self.MASK]                                # Float32
         self.PASTURE_KG_DM_HA = self.PASTURE_KG_DM_HA[self.MASK]                # Int16
