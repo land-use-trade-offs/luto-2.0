@@ -600,7 +600,7 @@ def get_exclude_matrices(data: Data, lumap) -> np.ndarray:
     related to different non-agricultural land uses. The resulting matrix is a concatenation of these matrices
     along the k indexing.
     """
-    non_ag_x_matrices = {lu: np.zeros((data.NCELLS, data.N_NON_AG_LUS)) for lu in NON_AG_LAND_USES}
+    non_ag_x_matrices = {lu: np.zeros(data.NCELLS) for lu in NON_AG_LAND_USES}
 
     # Environmental plantings exclusions
     if NON_AG_LAND_USES['Environmental Plantings']:

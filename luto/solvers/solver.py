@@ -235,6 +235,9 @@ class LutoSolver:
                 self.non_ag_doubling_vars_rkk[r, k1, k2] = self.gurobi_model.addVar(
                     name=f"non_ag_doubling_penalty_{r}_{k1}_{k2}"
                 )
+                self.Y_rkk[r, k1, k2] = self.gurobi_model.addVar(
+                    name=f"Y_{r}_{k1}_{k2}"
+                )
 
     def _setup_objective(self):
         """
