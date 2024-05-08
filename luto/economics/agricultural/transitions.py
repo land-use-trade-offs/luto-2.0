@@ -210,11 +210,11 @@ def get_agtech_ei_effect_t_mrj(data):
 
 
 def get_agricultural_management_transition_matrices(data: Data, t_mrj, yr_idx) -> Dict[str, np.ndarray]:
-    asparagopsis_data = get_asparagopsis_effect_t_mrj(data)
-    precision_agriculture_data = get_precision_agriculture_effect_t_mrj(data)
-    eco_grazing_data = get_ecological_grazing_effect_t_mrj(data)
-    sav_burning_data = get_savanna_burning_effect_t_mrj(data)
-    agtech_ei_data = get_agtech_ei_effect_t_mrj(data)
+    asparagopsis_data = get_asparagopsis_effect_t_mrj(data) if AG_MANAGEMENTS['Asparagopsis taxiformis'] else 0
+    precision_agriculture_data = get_precision_agriculture_effect_t_mrj(data) if AG_MANAGEMENTS['Precision Agriculture'] else 0
+    eco_grazing_data = get_ecological_grazing_effect_t_mrj(data) if AG_MANAGEMENTS['Ecological Grazing'] else 0
+    sav_burning_data = get_savanna_burning_effect_t_mrj(data) if AG_MANAGEMENTS['Savanna Burning'] else 0
+    agtech_ei_data = get_agtech_ei_effect_t_mrj(data) if AG_MANAGEMENTS['AgTech EI'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
