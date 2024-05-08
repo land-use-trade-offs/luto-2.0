@@ -519,7 +519,7 @@ class Data:
         
         self.CLIMATE_CHANGE_IMPACT = self.get_df_resfactor_applied(self.CLIMATE_CHANGE_IMPACT)
         self.REAL_AREA_NO_RESFACTOR = self.REAL_AREA.copy()
-        self.REAL_AREA = self.get_array_resfactor_applied(self.REAL_AREA)
+        self.REAL_AREA = self.get_array_resfactor_applied(self.REAL_AREA) * self.RESMULT
         self.NCELLS = self.REAL_AREA.shape[0]
 
         self.FEED_REQ = self.get_array_resfactor_applied(self.FEED_REQ)
@@ -556,11 +556,11 @@ class Data:
 
 
         ###############################################################
-        # Additoinal agricultural economic data.
+        # Additional agricultural economic data.
         ###############################################################
         print("\tLoading additional agricultural economic data...", flush=True)
 
-        # Load the agro-economic data (constructed using dataprep.py).
+         # Load the agro-economic data (constructed using dataprep.py).
         self.AGEC_CROPS = self.get_df_resfactor_applied(self.AGEC_CROPS)
         self.AGEC_LVSTK = self.get_df_resfactor_applied(self.AGEC_LVSTK)
 
@@ -964,7 +964,7 @@ class Data:
 
         ###############################################################
         # Apply resfactor to various arrays required for data loading.
-        ###############################################################
+        ###############################################################        
         self.SAVBURN_ELIGIBLE = self.get_array_resfactor_applied(self.SAVBURN_ELIGIBLE)
         self.BIODIV_SCORE_WEIGHTED = self.get_array_resfactor_applied(self.BIODIV_SCORE_WEIGHTED)
         self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = self.get_array_resfactor_applied(self.BIODIV_SCORE_WEIGHTED_LDS_BURNING)
