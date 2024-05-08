@@ -95,21 +95,21 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
 def create_grid_search_template(num_runs:int = 10):
     # Gird parameters for {AG_MANAGEMENTS} and {AG_MANAGEMENTS_REVERSIBLE}
     grid_am = {
+        'Asparagopsis taxiformis': [True, False],
+        'Precision Agriculture': [True, False],
+        'Ecological Grazing': [True, False],
+        'Savanna Burning': [True, False],
+        'AgTech EI': [True, False],
+    }
+
+    # Grid parameters for {NON_AG_LAND_USES} and {NON_AG_LAND_USES_REVERSIBLE}
+    grid_non_ag = {
         'Environmental Plantings': [True, False],
         'Riparian Plantings': [True, False],
         'Agroforestry': [True, False],
         'Carbon Plantings (Block)': [True, False],
         'Carbon Plantings (Belt)': [True, False],
         'BECCS': [True, False],
-    }
-
-    # Grid parameters for {NON_AG_LAND_USES} and {NON_AG_LAND_USES_REVERSIBLE}
-    grid_non_ag = {
-        'Asparagopsis taxiformis': [True, False],
-        'Precision Agriculture': [True, False],
-        'Ecological Grazing': [True, False],
-        'Savanna Burning': [True, False],
-        'AgTech EI': [True, False],
     }
 
     # Grid parameters for {MODE}
@@ -120,19 +120,19 @@ def create_grid_search_template(num_runs:int = 10):
     custom_settings = pd.read_csv(f'{TASK_ROOT_DIR}/settings_template.csv')
     custom_settings = custom_settings[['Name', 'Default_run']]
 
-    
+
     seen_am = set()
     seen_non_ag = set()
-    random_choices = int(num_runs/len(grid_mode))
+    random_choices = num_runs // len(grid_mode)
 
     for idx, (mode, _) in enumerate(itertools.product(grid_mode, range(random_choices))):
-        
+
         select_am = {key: random.choice(value) for key, value in grid_am.items()}
         select_non_ag = {key: random.choice(value) for key, value in grid_non_ag.items()}
 
         if str(select_am) in seen_am and str(select_non_ag) in seen_non_ag:
             continue
-        
+
         seen_am.add(str(select_am))
         seen_non_ag.add(str(select_non_ag))
 
