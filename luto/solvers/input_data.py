@@ -368,61 +368,6 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_x_mrj, ag_c_mrj, ag_t_mrj, ag_r_mrj
     )
 
-    # x = {}
-    # x["ag_c_mrj"] = ag_c_mrj
-    # x["ag_g_mrj"] = ag_g_mrj
-    # x["ag_q_mrp"] = ag_q_mrp
-    # x["ag_r_mrj"] = ag_r_mrj
-    # x["ag_t_mrj"] = ag_t_mrj
-    # x["ag_w_mrj"] = ag_w_mrj
-    # x["ag_b_mrj"] = ag_b_mrj
-    # x["ag_x_mrj"] = ag_x_mrj
-    # x["ag_ghg_t_mrj"] = get_ag_ghg_t_mrj(data, base_year)
-    # x["ag_to_non_ag_t_rk"] = get_ag_to_non_ag_t_rk(data, base_year)
-    # x["non_ag_to_ag_t_mrj"] = get_non_ag_to_ag_t_mrj(data, base_year)
-    # x["non_ag_t_rk"] = get_non_ag_t_rk(data, base_year)
-    # x["non_ag_c_rk"] = get_non_ag_c_rk(data)
-    # x["non_ag_r_rk"] = get_non_ag_r_rk(data)
-    # x["non_ag_g_rk"] = get_non_ag_g_rk(data)
-    # x["non_ag_w_rk"] = get_non_ag_w_rk(data)
-    # x["non_ag_b_rk"] = get_non_ag_b_rk(data)
-    # x["non_ag_x_rk"]= get_non_ag_x_rk(data, base_year)
-    # x["non_ag_q_crk"] = get_non_ag_q_crk(data)
-    # x["non_ag_lb_rk"] = get_non_ag_lb_rk(data, base_year)
-    # x["ag_man_c_mrj"] = get_ag_man_costs(data, target_index, ag_c_mrj)
-    # x["ag_man_g_mrj"] = get_ag_man_ghg(data, target_index, ag_g_mrj)
-    # x["ag_man_q_mrp"] = get_ag_man_quantity(data, target_index, ag_q_mrp)
-    # x["ag_man_r_mrj"] = get_ag_man_revenue(data, target_index, ag_r_mrj)
-    # x["ag_man_t_mrj"] = get_ag_man_transitions(data, target_index, ag_t_mrj)
-    # x["ag_man_w_mrj"] = get_ag_man_water(data, target_index, ag_w_mrj)
-    # x["ag_man_b_mrj"] = get_ag_man_biodiversity(data)
-    # x["ag_man_limits"] = get_ag_man_limits(data, target_index)
-    # x["ag_man_lb_mrj"] = get_ag_man_lb_mrj(data, base_year)
-    # x["offland_ghg"]= data.OFF_LAND_GHG_EMISSION_C[target_index]
-    # dict_things = [
-    #     "ag_man_c_mrj",
-    #     "ag_man_g_mrj",
-    #     "ag_man_q_mrp",
-    #     "ag_man_r_mrj",
-    #     "ag_man_t_mrj",
-    #     "ag_man_w_mrj",
-    #     "ag_man_b_mrj",
-    # ]
-
-
-    # for name, thing in x.items():
-    #     if name in dict_things:
-    #         for key, array in thing.items():
-    #             path = f"arrays/{name}_{key}"
-    #             np.save(path, array)
-
-    #     else:       
-    #         path = f"arrays/{name}"
-    #         np.save(path, thing)        
-
-    # raise Exception
-
-
     return SolverInputData(
         ag_t_mrj=ag_t_mrj,
         ag_c_mrj=ag_c_mrj,
