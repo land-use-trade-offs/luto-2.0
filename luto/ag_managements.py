@@ -1,3 +1,5 @@
+import luto.settings as settings
+
 AG_MANAGEMENTS_TO_LAND_USES = {
     'Asparagopsis taxiformis': [
         'Beef - natural land',
@@ -68,4 +70,10 @@ AG_MANAGEMENTS_TO_LAND_USES = {
         'Stone fruit',
         'Tropical stone fruit',
     ]
+}
+
+# Remove the am if it is set False in the settings
+AG_MANAGEMENTS_TO_LAND_USES = {
+    k:v  for k,v in AG_MANAGEMENTS_TO_LAND_USES.items() 
+    if settings.AG_MANAGEMENTS[k]
 }
