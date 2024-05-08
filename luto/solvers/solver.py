@@ -188,20 +188,21 @@ class LutoSolver:
             am_name = tools.am_name_snake_case(am)
 
             for j_idx, j in enumerate(am_j_list):
-                dry_x_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][0, r, j]
-                irr_x_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][1, r, j]
-
                 # Create variable for all eligible cells - all lower bounds are zero
                 dry_lu_cells = self._input_data.ag_lu2cells[0, j]
                 for r in dry_lu_cells:
+                    dry_x_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][0, r, j]
                     dry_var_name = f"X_ag_man_dry_{am_name}_{j}_{r}"
+
                     self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                         lb=dry_x_lb, ub=1, name=dry_var_name,
                     )
 
                 irr_lu_cells = self._input_data.ag_lu2cells[1, j]
                 for r in irr_lu_cells:
+                    irr_x_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][1, r, j]
                     irr_var_name = f"X_ag_man_irr_{am_name}_{j}_{r}"
+                    
                     self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                         lb=irr_x_lb, ub=1, name=irr_var_name,
                     )
@@ -233,7 +234,10 @@ class LutoSolver:
             for k1, k2 in combinations(self._input_data.cells2non_ag_lu.get(r, []), 2):
                 # Penalty variables greater than or equal to min(X_non_ag_vars_kr[k1, r], X_non_ag_vars_kr[k2, r])
                 self.non_ag_doubling_vars_rkk[r, k1, k2] = self.gurobi_model.addVar(
-                    name=f"non_ag_doubling_penalty_{r}_{k1}_{k2}"
+                    name=f"non_ag_doubling_penalty_{r}_{k1}_{k2}", lb=0
+                )
+                self.Y_rkk[r, k1, k2] = self.gurobi_model.addVar(
+                    name=f"Y_{r}_{k1}_{k2}"
                 )
 
     def _setup_objective(self):

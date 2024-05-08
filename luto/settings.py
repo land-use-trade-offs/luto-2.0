@@ -124,7 +124,7 @@ NON_AG_DOUBLING_CONSTR_BIG_M = 1e5
 # ---------------------------------------------------------------------------- #
 
 # Write GeoTiffs to output directory: True or False
-WRITE_OUTPUT_GEOTIFFS = False
+WRITE_OUTPUT_GEOTIFFS = True
 
 # If use parallel processing to write GeoTiffs: True or False
 PARALLEL_WRITE = False
@@ -191,12 +191,12 @@ and the corresponding value in this dictionary is False, all cells using EP must
 years.
 """
 NON_AG_LAND_USES_REVERSIBLE = {
-    'Environmental Plantings': True,
-    'Riparian Plantings': True,
-    'Agroforestry': True,
-    'Carbon Plantings (Block)': True,
-    'Carbon Plantings (Belt)': True,
-    'BECCS': True,
+    'Environmental Plantings': False,
+    'Riparian Plantings': False,
+    'Agroforestry': False,
+    'Carbon Plantings (Block)': False,
+    'Carbon Plantings (Belt)': False,
+    'BECCS': False,
 }
 
 # Price of carbon per tonne - determines revenue from carbon sequestration (used when maximising revenue only)
