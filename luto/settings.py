@@ -116,8 +116,8 @@ PENALTY = 1e5
 # A penalty to discourage the simultaneous use of more than one non-agricultural land use on a single cell.
 # E.g., the model is penalised for using both Environmental Plantings and Riparian Plantings on the same cell.
 # Set to 0 to disable.
-NON_AG_DOUBLING_PENALTY = 0 # 1e5
-NON_AG_DOUBLING_CONSTR_BIG_M = 0 # 1e6
+NON_AG_DOUBLING_PENALTY = 1e5
+NON_AG_DOUBLING_CONSTR_BIG_M = 1e6
 
 
 # ---------------------------------------------------------------------------- #
@@ -125,7 +125,7 @@ NON_AG_DOUBLING_CONSTR_BIG_M = 0 # 1e6
 # ---------------------------------------------------------------------------- #
 
 # Write GeoTiffs to output directory: True or False
-WRITE_OUTPUT_GEOTIFFS = False
+WRITE_OUTPUT_GEOTIFFS = True
 
 # If use parallel processing to write GeoTiffs: True or False
 PARALLEL_WRITE = True
