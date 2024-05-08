@@ -24,8 +24,8 @@ import numpy as np
 
 import luto.settings as settings
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.data import Data, lvs_veg_types
-from luto.economics.agricultural.quantity import get_yield_pot
+from luto.data import Data
+from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
 
 
 def get_wreq_matrices(data: Data, yr_idx):

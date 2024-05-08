@@ -116,9 +116,8 @@ PENALTY = 1e5
 # A penalty to discourage the simultaneous use of more than one non-agricultural land use on a single cell.
 # E.g., the model is penalised for using both Environmental Plantings and Riparian Plantings on the same cell.
 # Set to 0 to disable.
-NON_AG_DOUBLING_PENALTY = 0 # 1e5
-NON_AG_DOUBLING_CONSTR_BIG_M = 0 # 1e6
-
+NON_AG_DOUBLING_PENALTY = 1e4
+NON_AG_DOUBLING_CONSTR_BIG_M = 1e5
 
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
@@ -128,10 +127,10 @@ NON_AG_DOUBLING_CONSTR_BIG_M = 0 # 1e6
 WRITE_OUTPUT_GEOTIFFS = False
 
 # If use parallel processing to write GeoTiffs: True or False
-PARALLEL_WRITE = True
+PARALLEL_WRITE = False
 
 # The Threads to use for writing GeoTiffs, and map making
-WRITE_THREADS = 50      # Works only if PARALLEL_WRITE = True
+WRITE_THREADS = 8      # Works only if PARALLEL_WRITE = True
 
 
 # ---------------------------------------------------------------------------- #
@@ -162,7 +161,7 @@ NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect a
 BARHOMOGENOUS = -1  # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 50
+THREADS = 8
 
 
 # ---------------------------------------------------------------------------- #
@@ -331,7 +330,7 @@ GHG_LIMITS = {
              }
 
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'    
+GHG_LIMITS_FIELD = '1.5C (67%)'    
 
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
 SOC_AMORTISATION = 15    

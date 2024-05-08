@@ -142,9 +142,16 @@ class Data:
         # Set resfactor multiplier
         self.RESMULT = settings.RESFACTOR ** 2
 
+        # Load LUMAP wih no resfactor
+        self.LUMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lumap.h5")).to_numpy()
+
+        # NLUM mask.
+        with rasterio.open(os.path.join(INPUT_DIR, "NLUM_2010-11_mask.tif")) as rst:
+            self.NLUM_MASK = rst.read(1)
+
         # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap (True means included cells. Boolean dtype.)
         self.MASK_LU_CODE = -1
-        self.LUMASK = self.LUMAP != self.MASK_LU_CODE
+        self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE
 
         # Return combined land-use and resfactor mask
         if settings.RESFACTOR > 1:
@@ -170,55 +177,10 @@ class Data:
 
 
         ###############################################################
-        # Spatial layers.
+        # Load agricultural crop data.
         ###############################################################
-        print("\tSetting up spatial layers data...", flush=True)
-
-        # NLUM mask.
-        with rasterio.open(os.path.join(INPUT_DIR, "NLUM_2010-11_mask.tif")) as rst:
-            self.NLUM_MASK = rst.read(1)
-
-        # Actual hectares per cell, including projection corrections.
-        self.REAL_AREA_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "real_area.h5")).to_numpy()
-        self.REAL_AREA = self.get_array_resfactor_applied(self.REAL_AREA) * self.RESMULT
-
-        # Derive NCELLS (number of spatial cells) real area.
-        self.NCELLS_NO_RESFACTOR = self.REAL_AREA_NO_RESFACTOR.shape[0]
-        self.NCELLS = self.REAL_AREA.shape[0]
-
-        # Initial (2010) land-use map, mapped as lexicographic land-use class indices.
-        self.LUMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lumap.h5")).to_numpy()
-        self.LUMAP = self.get_array_resfactor_applied(self.LUMAP_NO_RESFACTOR)
-        self.add_lumap(self.YR_CAL_BASE, self.LUMAP)
-
-        # Initial (2010) land management map.
-        self.LMMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lmmap.h5")).to_numpy()
-        self.LMMAP = self.get_array_resfactor_applied(self.LMMAP_NO_RESFACTOR)
-        self.add_lmmap(self.YR_CAL_BASE, self.LMMAP)
-
-        # Initial (2010) agricutural management maps - no cells are used for alternative agricultural management options.
-        # Includes a separate AM map for each agricultural management option, because they can be stacked.
-        self.AMMAP_DICT_NO_RESFACTOR = {
-            am: np.zeros(self.NCELLS_NO_RESFACTOR).astype("int8") for am in AG_MANAGEMENTS_TO_LAND_USES
-        }
-        self.AMMAP_DICT = {
-            am: self.get_array_resfactor_applied(array) 
-            for am, array in self.AMMAP_DICT_NO_RESFACTOR.items()
-        }
-        self.add_ammaps(self.YR_CAL_BASE, self.AMMAP_DICT)
-
-        self.AG_L_MRJ = lumap2ag_l_mrj(self.LUMAP, self.LMMAP)  # Boolean [2, 4218733, 28]
-        self.add_ag_dvars(self.YR_CAL_BASE, self.AG_L_MRJ)
-
-        self.NON_AG_L_RK = lumap2non_ag_l_mk(
-            self.LUMAP, len(self.NON_AGRICULTURAL_LANDUSES)     # Int8
-        )
-        self.add_non_ag_dvars(self.YR_CAL_BASE, self.NON_AG_L_RK)
-
-        self.AG_MAN_L_MRJ_DICT = get_base_am_vars(
-            self.NCELLS, self.NLMS, self.N_AG_LUS               # Dictionary containing Int8 arrays
-        )
-        self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
+        print("\tLoading agricultural crop data...", flush=True)
+        self.AGEC_CROPS = pd.read_hdf(os.path.join(INPUT_DIR, "agec_crops.h5"))
 
 
 
@@ -350,6 +312,75 @@ class Data:
 
 
         ###############################################################
+        # Spatial layers.
+        ###############################################################
+        print("\tSetting up spatial layers data...", flush=True)
+
+        # Actual hectares per cell, including projection corrections.
+        self.REAL_AREA = pd.read_hdf(os.path.join(INPUT_DIR, "real_area.h5")).to_numpy()
+        self.REAL_AREA_W_RESFACTOR = self.get_array_resfactor_applied(self.REAL_AREA) * self.RESMULT
+
+        # Derive NCELLS (number of spatial cells) real area.
+        self.NCELLS = self.REAL_AREA.shape[0]
+
+        # Initial (2010) land-use map, mapped as lexicographic land-use class indices.
+        self.LUMAP = self.get_array_resfactor_applied(self.LUMAP_NO_RESFACTOR)
+        self.add_lumap(self.YR_CAL_BASE, self.LUMAP)
+
+        # Initial (2010) land management map.
+        self.LMMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lmmap.h5")).to_numpy()
+        self.LMMAP = self.get_array_resfactor_applied(self.LMMAP_NO_RESFACTOR)
+        self.add_lmmap(self.YR_CAL_BASE, self.LMMAP)
+
+        # Initial (2010) agricutural management maps - no cells are used for alternative agricultural management options.
+        # Includes a separate AM map for each agricultural management option, because they can be stacked.
+        self.AMMAP_DICT_NO_RESFACTOR = {
+            am: np.zeros(self.NCELLS).astype("int8") for am in AG_MANAGEMENTS_TO_LAND_USES
+        }
+        self.AMMAP_DICT = {
+            am: self.get_array_resfactor_applied(array) 
+            for am, array in self.AMMAP_DICT_NO_RESFACTOR.items()
+        }
+        self.add_ammaps(self.YR_CAL_BASE, self.AMMAP_DICT)
+
+        self.AG_L_MRJ = lumap2ag_l_mrj(self.LUMAP, self.LMMAP)  # Boolean [2, 4218733, 28]
+        self.add_ag_dvars(self.YR_CAL_BASE, self.AG_L_MRJ)
+
+        self.NON_AG_L_RK = lumap2non_ag_l_mk(
+            self.LUMAP, len(self.NON_AGRICULTURAL_LANDUSES)     # Int8
+        )
+        self.add_non_ag_dvars(self.YR_CAL_BASE, self.NON_AG_L_RK)
+
+
+
+        ###############################################################
+        # Climate change impact data.
+        ###############################################################
+        print("\tLoading climate change data...", flush=True)
+
+        self.CLIMATE_CHANGE_IMPACT = pd.read_hdf(
+            os.path.join(INPUT_DIR, "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".h5")
+        )
+
+
+
+        ###############################################################
+        # Livestock related data.
+        ###############################################################
+        print("\tLoading livestock related data...", flush=True)
+
+        self.FEED_REQ = np.nan_to_num(
+            pd.read_hdf(os.path.join(INPUT_DIR, "feed_req.h5")).to_numpy()
+        )
+        self.PASTURE_KG_DM_HA = pd.read_hdf(
+            os.path.join(INPUT_DIR, "pasture_kg_dm_ha.h5")
+        ).to_numpy()
+        self.SAFE_PUR_NATL = pd.read_hdf(os.path.join(INPUT_DIR, "safe_pur_natl.h5")).to_numpy()
+        self.SAFE_PUR_MODL = pd.read_hdf(os.path.join(INPUT_DIR, "safe_pur_modl.h5")).to_numpy()
+
+
+
+        ###############################################################
         # Productivity data.
         ###############################################################
         print("\tLoading productivity data...", flush=True)
@@ -361,15 +392,27 @@ class Data:
 
 
         ###############################################################
-        # Calculate base year production
+        # Calculate base year production and apply resfactor to
+        # various required data arrays
         ###############################################################
+        print("\tCalculating base year productivity...", flush=True)
         yr_cal_base_prod_data = self.get_production(
             self.YR_CAL_BASE,
             ag_X_mrj = lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR),
             non_ag_X_rk = lumap2non_ag_l_mk(self.LUMAP_NO_RESFACTOR, len(settings.NON_AG_LAND_USES.keys())),
-            ag_man_X_mrj = get_base_am_vars(self.NCELLS_NO_RESFACTOR, self.NLMS, self.N_AG_LUS),
+            ag_man_X_mrj = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS),
         )
         self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
+        
+        self.CLIMATE_CHANGE_IMPACT = self.get_df_resfactor_applied(self.CLIMATE_CHANGE_IMPACT)
+        self.REAL_AREA_NO_RESFACTOR = self.REAL_AREA.copy()
+        self.REAL_AREA = self.get_df_resfactor_applied(self.REAL_AREA)
+        self.NCELLS = self.REAL_AREA.shape[0]
+
+        self.FEED_REQ = self.get_array_resfactor_applied(self.FEED_REQ)
+        self.PASTURE_KG_DM_HA = self.get_array_resfactor_applied(self.PASTURE_KG_DM_HA)
+        self.SAFE_PUR_MODL = self.get_array_resfactor_applied(self.SAFE_PUR_MODL)
+        self.SAFE_PUR_NATL = self.get_array_resfactor_applied(self.SAFE_PUR_NATL)
 
 
 
@@ -400,9 +443,7 @@ class Data:
         print("\tLoading agricultural economic data...", flush=True)
 
         # Load the agro-economic data (constructed using dataprep.py).
-        self.AGEC_CROPS = self.get_df_resfactor_applied(
-            pd.read_hdf(os.path.join(INPUT_DIR, "agec_crops.h5"))
-        )
+        self.AGEC_CROPS = self.get_df_resfactor_applied(self.AGEC_CROPS)
         self.AGEC_LVSTK = self.get_df_resfactor_applied(
             pd.read_hdf(os.path.join(INPUT_DIR, "agec_lvstk.h5"))
         )
@@ -432,6 +473,11 @@ class Data:
         # Agricultural management options data.
         ###############################################################
         print("\tLoading agricultural management options' data...", flush=True)
+
+        self.AG_MAN_L_MRJ_DICT = get_base_am_vars(
+            self.NCELLS, self.NLMS, self.N_AG_LUS               # Dictionary containing Int8 arrays
+        )
+        self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
 
         # Asparagopsis taxiformis data
         asparagopsis_file = os.path.join(INPUT_DIR, "20231101_Bundle_MR.xlsx")
@@ -732,41 +778,6 @@ class Data:
         # Discount by fire risk.
         self.NATURAL_LAND_T_CO2_HA = self.get_array_resfactor_applied(
             rem_veg * (fire_risk.to_numpy() / 100)
-        )
-
-
-        ###############################################################
-        # Climate change impact data.
-        ###############################################################
-        print("\tLoading climate change data...", flush=True)
-
-        self.CLIMATE_CHANGE_IMPACT = self.get_array_resfactor_applied(
-            pd.read_hdf(
-                os.path.join(INPUT_DIR, "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".h5")
-            )
-        )
-
-
-        ###############################################################
-        # Livestock related data.
-        ###############################################################
-        print("\tLoading livestock related data...", flush=True)
-
-        self.FEED_REQ = self.get_array_resfactor_applied(
-            np.nan_to_num(
-                pd.read_hdf(os.path.join(INPUT_DIR, "feed_req.h5")).to_numpy()
-            )
-        )
-        self.PASTURE_KG_DM_HA = self.get_array_resfactor_applied(
-            pd.read_hdf(
-                os.path.join(INPUT_DIR, "pasture_kg_dm_ha.h5")
-            ).to_numpy()
-        )
-        self.SAFE_PUR_NATL = self.get_array_resfactor_applied(
-            pd.read_hdf(os.path.join(INPUT_DIR, "safe_pur_natl.h5")).to_numpy()
-        )
-        self.SAFE_PUR_MODL = self.get_array_resfactor_applied(
-            pd.read_hdf(os.path.join(INPUT_DIR, "safe_pur_modl.h5")).to_numpy()
         )
 
 
