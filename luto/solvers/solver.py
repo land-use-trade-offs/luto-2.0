@@ -233,7 +233,7 @@ class LutoSolver:
             for k1, k2 in combinations(self._input_data.cells2non_ag_lu.get(r, []), 2):
                 # Penalty variables greater than or equal to min(X_non_ag_vars_kr[k1, r], X_non_ag_vars_kr[k2, r])
                 self.non_ag_doubling_vars_rkk[r, k1, k2] = self.gurobi_model.addVar(
-                    name=f"non_ag_doubling_penalty_{r}_{k1}_{k2}"
+                    name=f"non_ag_doubling_penalty_{r}_{k1}_{k2}", lb=0
                 )
                 self.Y_rkk[r, k1, k2] = self.gurobi_model.addVar(
                     name=f"Y_{r}_{k1}_{k2}"
