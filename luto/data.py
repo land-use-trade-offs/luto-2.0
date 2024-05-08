@@ -177,10 +177,11 @@ class Data:
 
 
         ###############################################################
-        # Load agricultural crop data.
+        # Load agricultural crop and livestock data.
         ###############################################################
-        print("\tLoading agricultural crop data...", flush=True)
+        print("\tLoading agricultural crop and livestock data...", flush=True)
         self.AGEC_CROPS = pd.read_hdf(os.path.join(INPUT_DIR, "agec_crops.h5"))
+        self.AGEC_LVSTK = pd.read_hdf(os.path.join(INPUT_DIR, "agec_lvstk.h5"))
 
 
 
@@ -381,103 +382,9 @@ class Data:
 
 
         ###############################################################
-        # Productivity data.
-        ###############################################################
-        print("\tLoading productivity data...", flush=True)
-
-        # Yield increases.
-        fpath = os.path.join(INPUT_DIR, "yieldincreases_bau2022.csv")
-        self.BAU_PROD_INCR = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
-
-
-
-        ###############################################################
-        # Calculate base year production and apply resfactor to
-        # various required data arrays
-        ###############################################################
-        print("\tCalculating base year productivity...", flush=True)
-        yr_cal_base_prod_data = self.get_production(
-            self.YR_CAL_BASE,
-            ag_X_mrj = lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR),
-            non_ag_X_rk = lumap2non_ag_l_mk(self.LUMAP_NO_RESFACTOR, len(settings.NON_AG_LAND_USES.keys())),
-            ag_man_X_mrj = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS),
-        )
-        self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
-        
-        self.CLIMATE_CHANGE_IMPACT = self.get_df_resfactor_applied(self.CLIMATE_CHANGE_IMPACT)
-        self.REAL_AREA_NO_RESFACTOR = self.REAL_AREA.copy()
-        self.REAL_AREA = self.get_df_resfactor_applied(self.REAL_AREA)
-        self.NCELLS = self.REAL_AREA.shape[0]
-
-        self.FEED_REQ = self.get_array_resfactor_applied(self.FEED_REQ)
-        self.PASTURE_KG_DM_HA = self.get_array_resfactor_applied(self.PASTURE_KG_DM_HA)
-        self.SAFE_PUR_MODL = self.get_array_resfactor_applied(self.SAFE_PUR_MODL)
-        self.SAFE_PUR_NATL = self.get_array_resfactor_applied(self.SAFE_PUR_NATL)
-
-
-
-        ###############################################################
-        # Auxiliary Spatial Layers 
-        # (spatial layers not required for production calculation)
-        ###############################################################
-        print("\tLoading auxiliary spatial layers data...", flush=True)
-
-        # Load stream length data in metres of stream per cell
-        self.STREAM_LENGTH = pd.read_hdf(
-            os.path.join(INPUT_DIR, "stream_length_m_cell.h5")
-        ).to_numpy()
-
-        # Calculate the proportion of the area of each cell within stream buffer (convert REAL_AREA from ha to m2 and divide m2 by m2)
-        self.RP_PROPORTION = self.get_array_resfactor_applied(
-            ((2 * settings.RIPARIAN_PLANTING_BUFFER_WIDTH * self.STREAM_LENGTH) / (self.REAL_AREA_NO_RESFACTOR * 10000)).astype(np.float32)
-        )
-        # Calculate the length of fencing required for each cell in per hectare terms for riparian plantings
-        self.RP_FENCING_LENGTH = self.get_array_resfactor_applied(
-            ((2 * settings.RIPARIAN_PLANTING_TORTUOSITY_FACTOR * self.STREAM_LENGTH) / self.REAL_AREA_NO_RESFACTOR).astype(np.float32)
-        )
-
-
-        ###############################################################
-        # Agricultural economic data.
-        ###############################################################
-        print("\tLoading agricultural economic data...", flush=True)
-
-        # Load the agro-economic data (constructed using dataprep.py).
-        self.AGEC_CROPS = self.get_df_resfactor_applied(self.AGEC_CROPS)
-        self.AGEC_LVSTK = self.get_df_resfactor_applied(
-            pd.read_hdf(os.path.join(INPUT_DIR, "agec_lvstk.h5"))
-        )
-
-        # Load greenhouse gas emissions from agriculture
-        self.AGGHG_CROPS = self.get_df_resfactor_applied(
-            pd.read_hdf(os.path.join(INPUT_DIR, "agGHG_crops.h5"))
-        )
-        self.AGGHG_LVSTK = self.get_df_resfactor_applied(
-            pd.read_hdf(os.path.join(INPUT_DIR, "agGHG_lvstk.h5"))
-        )
-        self.AGGHG_IRRPAST = self.get_array_resfactor_applied(
-            pd.read_hdf(os.path.join(INPUT_DIR, "agGHG_irrpast.h5"))
-        )
-
-        # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
-        self.AG_TMATRIX = np.load(os.path.join(INPUT_DIR, "ag_tmatrix.npy"))
-
-        # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
-        self.EXCLUDE = self.get_array_resfactor_applied(
-            np.load(os.path.join(INPUT_DIR, "x_mrj.npy"))
-        )
-
-
-
-        ###############################################################
         # Agricultural management options data.
         ###############################################################
         print("\tLoading agricultural management options' data...", flush=True)
-
-        self.AG_MAN_L_MRJ_DICT = get_base_am_vars(
-            self.NCELLS, self.NLMS, self.N_AG_LUS               # Dictionary containing Int8 arrays
-        )
-        self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
 
         # Asparagopsis taxiformis data
         asparagopsis_file = os.path.join(INPUT_DIR, "20231101_Bundle_MR.xlsx")
@@ -583,6 +490,97 @@ class Data:
                 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit']:
             # Horticulture land uses
             self.AGTECH_EI_DATA[lu] = horticulture_data
+
+
+
+        ###############################################################
+        # Productivity data.
+        ###############################################################
+        print("\tLoading productivity data...", flush=True)
+
+        # Yield increases.
+        fpath = os.path.join(INPUT_DIR, "yieldincreases_bau2022.csv")
+        self.BAU_PROD_INCR = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
+
+
+
+        ###############################################################
+        # Calculate base year production and apply resfactor to
+        # various required data arrays
+        ###############################################################
+        print("\tCalculating base year productivity...", flush=True)
+        yr_cal_base_prod_data = self.get_production(
+            self.YR_CAL_BASE,
+            ag_X_mrj = lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR),
+            non_ag_X_rk = lumap2non_ag_l_mk(self.LUMAP_NO_RESFACTOR, len(settings.NON_AG_LAND_USES.keys())),
+            ag_man_X_mrj = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS),
+        )
+        self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
+        
+        self.CLIMATE_CHANGE_IMPACT = self.get_df_resfactor_applied(self.CLIMATE_CHANGE_IMPACT)
+        self.REAL_AREA_NO_RESFACTOR = self.REAL_AREA.copy()
+        self.REAL_AREA = self.get_array_resfactor_applied(self.REAL_AREA)
+        self.NCELLS = self.REAL_AREA.shape[0]
+
+        self.FEED_REQ = self.get_array_resfactor_applied(self.FEED_REQ)
+        self.PASTURE_KG_DM_HA = self.get_array_resfactor_applied(self.PASTURE_KG_DM_HA)
+        self.SAFE_PUR_MODL = self.get_array_resfactor_applied(self.SAFE_PUR_MODL)
+        self.SAFE_PUR_NATL = self.get_array_resfactor_applied(self.SAFE_PUR_NATL)
+
+        self.AG_MAN_L_MRJ_DICT = get_base_am_vars(
+            self.NCELLS, self.NLMS, self.N_AG_LUS               # Dictionary containing Int8 arrays
+        )
+        self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
+
+
+
+        ###############################################################
+        # Auxiliary Spatial Layers 
+        # (spatial layers not required for production calculation)
+        ###############################################################
+        print("\tLoading auxiliary spatial layers data...", flush=True)
+
+        # Load stream length data in metres of stream per cell
+        self.STREAM_LENGTH = pd.read_hdf(
+            os.path.join(INPUT_DIR, "stream_length_m_cell.h5")
+        ).to_numpy()
+
+        # Calculate the proportion of the area of each cell within stream buffer (convert REAL_AREA from ha to m2 and divide m2 by m2)
+        self.RP_PROPORTION = self.get_array_resfactor_applied(
+            ((2 * settings.RIPARIAN_PLANTING_BUFFER_WIDTH * self.STREAM_LENGTH) / (self.REAL_AREA_NO_RESFACTOR * 10000)).astype(np.float32)
+        )
+        # Calculate the length of fencing required for each cell in per hectare terms for riparian plantings
+        self.RP_FENCING_LENGTH = self.get_array_resfactor_applied(
+            ((2 * settings.RIPARIAN_PLANTING_TORTUOSITY_FACTOR * self.STREAM_LENGTH) / self.REAL_AREA_NO_RESFACTOR).astype(np.float32)
+        )
+
+
+        ###############################################################
+        # Additoinal agricultural economic data.
+        ###############################################################
+        print("\tLoading additional agricultural economic data...", flush=True)
+
+        # Load the agro-economic data (constructed using dataprep.py).
+        self.AGEC_CROPS = self.get_df_resfactor_applied(self.AGEC_CROPS)
+        self.AGEC_LVSTK = self.get_df_resfactor_applied(self.AGEC_LVSTK)
+
+        # Load greenhouse gas emissions from agriculture
+        self.AGGHG_CROPS = self.get_df_resfactor_applied(
+            pd.read_hdf(os.path.join(INPUT_DIR, "agGHG_crops.h5"))
+        )
+        self.AGGHG_LVSTK = self.get_df_resfactor_applied(
+            pd.read_hdf(os.path.join(INPUT_DIR, "agGHG_lvstk.h5"))
+        )
+        self.AGGHG_IRRPAST = self.get_array_resfactor_applied(
+            pd.read_hdf(os.path.join(INPUT_DIR, "agGHG_irrpast.h5"))
+        )
+
+        # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
+        self.AG_TMATRIX = np.load(os.path.join(INPUT_DIR, "ag_tmatrix.npy"))
+
+        # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
+        self.EXCLUDE = np.load(os.path.join(INPUT_DIR, "x_mrj.npy"))
+        self.EXCLUDE = self.EXCLUDE[:, self.MASK, :]  # Apply resfactor specially for the exclude matrix
 
 
 
@@ -694,13 +692,9 @@ class Data:
                 wreq_crops_irr[lu] = 0.0
 
         # Add together as they have nans where not lvstk/crops
-        self.WREQ_DRY_RJ = self.get_array_resfactor_applied(
-            np.nan_to_num(wreq_lvstk_dry.to_numpy(dtype=np.float32))
-        )
-        self.WREQ_IRR_RJ = self.get_array_resfactor_applied(
-            np.nan_to_num(wreq_crops_irr.to_numpy(dtype=np.float32)) + np.nan_to_num(
-                wreq_lvstk_irr.to_numpy(dtype=np.float32)
-            )
+        self.WREQ_DRY_RJ = np.nan_to_num(wreq_lvstk_dry.to_numpy(dtype=np.float32))
+        self.WREQ_IRR_RJ = np.nan_to_num(wreq_crops_irr.to_numpy(dtype=np.float32)) + np.nan_to_num(
+            wreq_lvstk_irr.to_numpy(dtype=np.float32)
         )
 
         # Spatially explicit costs of a water licence per ML.
