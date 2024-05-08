@@ -22,13 +22,13 @@ and Brett Bryan, Deakin University
 
 
 # Load libraries
-import csv
 from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
 import shutil, os, time
-from scipy.interpolate import interp1d
 from luto.settings import INPUT_DIR, RAW_DATA
+# import csv
+# from scipy.interpolate import interp1d
 
     
 def create_new_dataset():
@@ -44,7 +44,7 @@ def create_new_dataset():
     # Set data input paths
     luto_1D_inpath = 'N:/Data-Master/LUTO_2.0_input_data/Input_data/1D_Parameter_Timeseries/'
     luto_2D_inpath = 'N:/Data-Master/LUTO_2.0_input_data/Input_data/2D_Spatial_Snapshot/'
-    luto_3D_inpath = 'N:/Data-Master/LUTO_2.0_input_data/Input_data/3D_Spatial_Timeseries/'
+    # luto_3D_inpath = 'N:/Data-Master/LUTO_2.0_input_data/Input_data/3D_Spatial_Timeseries/'
     luto_4D_inpath = 'N:/Data-Master/LUTO_2.0_input_data/Input_data/4D_Spatial_SSP_Timeseries/'
     fdh_inpath = 'N:/LUF-Modelling/fdh-archive/data/neoluto-data/new-data-and-domain/'
     profit_map_inpath = 'N:/Data-Master/Profit_map/'
@@ -212,7 +212,7 @@ def create_new_dataset():
     ############### Create lmmap -- present (2010) land management mapping.
     
     # For now only 'rain-fed' ('dry' == 0) and 'irrigated' ('irr' == 1) available.
-    lmmap = lmap['IRRIGATION'].to_numpy()
+    # lmmap = lmap['IRRIGATION'].to_numpy()
     
     # Save to file (int8)
     lmap['IRRIGATION'].to_hdf(outpath + 'lmmap.h5', key = 'lmmap', mode = 'w', format = 'fixed', index = False, complevel = 9)
@@ -223,7 +223,7 @@ def create_new_dataset():
     ############### Create real_area -- hectares per cell, corrected for geographic map projection.
     
     # Select the appropriate column
-    real_area = zones['CELL_HA'].to_numpy()
+    # real_area = zones['CELL_HA'].to_numpy()
     
     # Save to file
     zones['CELL_HA'].to_hdf(outpath + 'real_area.h5', key = 'real_area', mode = 'w', format = 'fixed', index = False, complevel = 9)
@@ -403,7 +403,7 @@ def create_new_dataset():
     ############### Get water yield historical baseline data 
     
     # Select historical (1970 - 2000) water yield under deep rooted and shallow rooted vegetation
-    water_yield_baselines = bioph[['WATER_YIELD_HIST_SR_ML_HA', 'WATER_YIELD_HIST_BASELINE_ML_HA']]
+    water_yield_baselines = bioph[['WATER_YIELD_HIST_SR_ML_HA', 'WATER_YIELD_HIST_DR_ML_HA', 'WATER_YIELD_HIST_BASELINE_ML_HA']]
     
     # Save to file
     water_yield_baselines.to_hdf(outpath + 'water_yield_baselines.h5', key = 'water_yield_baselines', mode = 'w', format = 'fixed', index = False, complevel = 9)

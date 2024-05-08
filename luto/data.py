@@ -697,12 +697,14 @@ class Data:
 
         # Water yields -- run off from a cell into catchment by deep-rooted, shallow-rooted, and natural vegetation types
         water_yield_base = pd.read_hdf(os.path.join(INPUT_DIR, "water_yield_baselines.h5"))
-        # WATER_YIELD_BASE_DR = water_yield_base['WATER_YIELD_HIST_DR_ML_HA'].to_numpy(dtype = np.float32)
+        self.WATER_YIELD_BASE_DR = self.get_array_resfactor_applied(
+            water_yield_base['WATER_YIELD_HIST_DR_ML_HA'].to_numpy(dtype = np.float32)
+        )
         self.WATER_YIELD_BASE_SR = self.get_array_resfactor_applied(
-            water_yield_base["WATER_YIELD_HIST_SR_ML_HA"].to_numpy(dtype=np.float32)
+            water_yield_base["WATER_YIELD_HIST_SR_ML_HA"].to_numpy(dtype = np.float32)
         )
         self.WATER_YIELD_BASE = self.get_array_resfactor_applied(
-            water_yield_base["WATER_YIELD_HIST_BASELINE_ML_HA"].to_numpy(dtype=np.float32)
+            water_yield_base["WATER_YIELD_HIST_BASELINE_ML_HA"].to_numpy(dtype = np.float32)
         )
 
         # fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_dr_ml_ha.h5')

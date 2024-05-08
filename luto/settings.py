@@ -99,7 +99,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 10         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
 
 # How does the model run over time 
-MODE = 'timeseries'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
+MODE = 'snapshot'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****
@@ -116,15 +116,16 @@ PENALTY = 1e5
 # A penalty to discourage the simultaneous use of more than one non-agricultural land use on a single cell.
 # E.g., the model is penalised for using both Environmental Plantings and Riparian Plantings on the same cell.
 # Set to 0 to disable.
-NON_AG_DOUBLING_PENALTY = 1e5
-NON_AG_DOUBLING_CONSTR_BIG_M = 1e6
+NON_AG_DOUBLING_PENALTY = 0 # 1e5
+NON_AG_DOUBLING_CONSTR_BIG_M = 0 # 1e6
+
 
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
 
 # Write GeoTiffs to output directory: True or False
-WRITE_OUTPUT_GEOTIFFS = True
+WRITE_OUTPUT_GEOTIFFS = False
 
 # If use parallel processing to write GeoTiffs: True or False
 PARALLEL_WRITE = True
@@ -191,12 +192,12 @@ and the corresponding value in this dictionary is False, all cells using EP must
 years.
 """
 NON_AG_LAND_USES_REVERSIBLE = {
-    'Environmental Plantings': False,
-    'Riparian Plantings': False,
-    'Agroforestry': False,
-    'Carbon Plantings (Block)': False,
-    'Carbon Plantings (Belt)': False,
-    'BECCS': False,
+    'Environmental Plantings': True,
+    'Riparian Plantings': True,
+    'Agroforestry': True,
+    'Carbon Plantings (Block)': True,
+    'Carbon Plantings (Belt)': True,
+    'BECCS': True,
 }
 
 # Price of carbon per tonne - determines revenue from carbon sequestration (used when maximising revenue only)
