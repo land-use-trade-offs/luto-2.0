@@ -67,7 +67,7 @@ class SolverSolution:
     non_ag_X_rk: np.ndarray
     ag_man_X_mrj: dict[str, np.ndarray]
     prod_data: dict[str, float]
-    # obj_val: float
+    obj_val: float
 
 
 class LutoSolver:
@@ -1193,7 +1193,7 @@ class LutoSolver:
             non_ag_X_rk=non_ag_X_sol_rk,
             ag_man_X_mrj=ag_man_X_mrj_processed,
             prod_data=prod_data,
-            # obj_val=self.gurobi_model.ObjVal,
+            obj_val=self.gurobi_model.ObjVal,
         )
 
     @property
