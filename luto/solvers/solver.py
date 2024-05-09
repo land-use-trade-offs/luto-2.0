@@ -52,9 +52,6 @@ gurenv.setParam("NumericFocus", settings.NUMERIC_FOCUS)
 gurenv.setParam("Threads", settings.THREADS)
 gurenv.setParam("BarHomogeneous", settings.BARHOMOGENOUS)
 gurenv.setParam("Crossover", settings.CROSSOVER)
-if settings.NON_AG_DOUBLING_PENALTY != 0:
-    gurenv.setParam("DegenMoves", 0)
-    gurenv.setParam("CrossoverBasis", 1)
 gurenv.start()
 
 
@@ -87,8 +84,6 @@ class LutoSolver:
         self.X_ag_man_dry_vars_jr = None
         self.X_ag_man_irr_vars_jr = None
         self.V = None
-        self.non_ag_doubling_vars_rkk = None
-        self.Y_rkk = None
 
         # initialise constraint lookups
         self.cell_usage_constraint_r = {}
@@ -100,7 +95,6 @@ class LutoSolver:
         self.ghg_emissions_limit_constraint = None
         self.biodiversity_expr = None
         self.biodiversity_limit_constraint = None
-        self.non_ag_doubling_constraints_r = {}
 
     def formulate(self):
         """
@@ -122,7 +116,6 @@ class LutoSolver:
         self._setup_x_vars()
         self._setup_ag_management_variables()
         self._setup_decision_variables()
-        self._setup_non_ag_doubling_penalty_variables()
 
     def _setup_x_vars(self):
         """
@@ -214,52 +207,13 @@ class LutoSolver:
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             self.V = self.gurobi_model.addMVar(self.ncms, name="V")
 
-    def _setup_non_ag_doubling_penalty_variables(self):
-        """
-        Create Penalty variables greater than or equal to min(X_non_ag_vars_kr[k1, r], X_non_ag_vars_kr[k2, r])
-        """
-        if settings.NON_AG_DOUBLING_PENALTY == 0:
-            return
-
-        # shapes: (NCELLS, 5, 5)
-        self.non_ag_doubling_vars_rkk = np.zeros(
-            (self._input_data.ncells, self._input_data.n_non_ag_lus, self._input_data.n_non_ag_lus),
-            dtype=object,
-        ) 
-        self.Y_rkk = np.zeros(
-            (self._input_data.ncells, self._input_data.n_non_ag_lus, self._input_data.n_non_ag_lus),
-            dtype=object,
-        )
-        for r in range(self._input_data.ncells):
-            for k1, k2 in combinations(self._input_data.cells2non_ag_lu.get(r, []), 2):
-                # Penalty variables greater than or equal to min(X_non_ag_vars_kr[k1, r], X_non_ag_vars_kr[k2, r])
-                self.non_ag_doubling_vars_rkk[r, k1, k2] = self.gurobi_model.addVar(
-                    name=f"non_ag_doubling_penalty_{r}_{k1}_{k2}", lb=0
-                )
-                self.Y_rkk[r, k1, k2] = self.gurobi_model.addVar(
-                    name=f"Y_{r}_{k1}_{k2}"
-                )
-
     def _setup_objective(self):
         """
         Formulate the objective based on settings.OBJECTIVE
         """
         # print(f"Setting objective function to {settings.OBJECTIVE}...\n", flush=True)
 
-        # Penalties for simultaneous use of non-agricultural land
-        if settings.NON_AG_DOUBLING_PENALTY == 0:
-            non_ag_doubling_penalty_contr = 0
-        else:
-            non_ag_doubling_penalty_contr = (
-                settings.NON_AG_DOUBLING_PENALTY
-                * self._input_data.resmult             # Adjust penalty size of cells for resfactor
-                * self.non_ag_doubling_vars_rkk.sum()
-            )
-
         if settings.OBJECTIVE == "maxrev":
-            # Flip the sign of the non-agricultural doubling penalty so it becomes a cost
-            non_ag_doubling_penalty_contr = -non_ag_doubling_penalty_contr
-
             # Pre-calculate revenue minus (production and transition) costs
             ag_obj_mrj = (
                 -(
@@ -357,14 +311,12 @@ class LutoSolver:
                 + ag_man_obj_contr
                 + non_ag_obj_contr
                 + gp.quicksum(self.V[c] for c in range(self.ncms))
-                + non_ag_doubling_penalty_contr
             )
         elif settings.DEMAND_CONSTRAINT_TYPE == "hard":
             objective = (
                 ag_obj_contr 
                 + ag_man_obj_contr 
                 + non_ag_obj_contr
-                + non_ag_doubling_penalty_contr
             )
         else:
             raise ValueError('DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"')
@@ -739,76 +691,6 @@ class LutoSolver:
             self.biodiversity_expr >= biodiversity_limits
         )
 
-    def _add_non_ag_doubling_penalty_constraints(self, cells: Optional[list[int]] = None):
-        """
-        Linearised big-M min constraint.
-        Goal: to set self.non_ag_doubling_vars_rkk[r, k1, k2] = min(self.X_non_ag_vars_kr[k1, r], self.X_non_ag_vars_kr[k2, r])
-        We wish to do this using 'big M' constraints to keep the entire model linear.
-
-        Method: To set X = min{A, B} where X, A, B are continuous variables, use the
-        following big M method:
-            Step 1: introduce the continuous variable Y and set the constraints:
-                B - A <= MY
-                A - B <= M(1 - Y)
-            Step 2: introduce the following four constraints on X:
-                X <= A
-                X <= B
-                X >= A - M(1 - Y)
-                X >= B - MY
-        """
-        if settings.NON_AG_DOUBLING_PENALTY == 0:
-            return
-        
-        print('  ...non-agricultural doubling penalty constraints...')
-        
-        cells: iter = cells if cells is not None else range(self._input_data.ncells)
-        M = settings.NON_AG_DOUBLING_CONSTR_BIG_M * self._input_data.resmult
-        
-        for r in cells:
-            self.non_ag_doubling_constraints_r[r] = []
-            for k1, k2 in combinations(self._input_data.cells2non_ag_lu.get(r, []), 2):
-                # Constraints on Y_rkk:
-                self.non_ag_doubling_constraints_r[r].append(
-                    self.gurobi_model.addConstr(
-                        self.X_non_ag_vars_kr[k2, r] - self.X_non_ag_vars_kr[k1, r] 
-                        <= M * self.Y_rkk[r, k1, k2]
-                    )
-                )
-                self.non_ag_doubling_constraints_r[r].append(
-                    self.gurobi_model.addConstr(
-                        self.X_non_ag_vars_kr[k1, r] - self.X_non_ag_vars_kr[k2, r] 
-                        <= M * (1 - self.Y_rkk[r, k1, k2])
-                    )
-                )
-
-                # Constraints on the non-ag doubling penalty variables:
-                self.non_ag_doubling_constraints_r[r].append(
-                    self.gurobi_model.addConstr(
-                        self.non_ag_doubling_vars_rkk[r, k1, k2] 
-                        <= self.X_non_ag_vars_kr[k1, r]
-                    )
-                )
-                self.non_ag_doubling_constraints_r[r].append(
-                    self.gurobi_model.addConstr(
-                        self.non_ag_doubling_vars_rkk[r, k1, k2] 
-                        <= self.X_non_ag_vars_kr[k2, r]
-                    )
-                )
-                self.non_ag_doubling_constraints_r[r].append(
-                    self.gurobi_model.addConstr(
-                        self.non_ag_doubling_vars_rkk[r, k1, k2] 
-                        >= self.X_non_ag_vars_kr[k1, r] - M * (1 - self.Y_rkk[r, k1, k2])
-                    )
-                )
-                self.non_ag_doubling_constraints_r[r].append(
-                    self.gurobi_model.addConstr(
-                        self.non_ag_doubling_vars_rkk[r, k1, k2] 
-                        >= self.X_non_ag_vars_kr[k2, r] - M * self.Y_rkk[r, k1, k2]
-                    )
-                )
-                
-        print(f"    ...penalty value added: {settings.NON_AG_DOUBLING_PENALTY:,.0f}\n")
-
     def _setup_constraints(self):
         self._add_cell_usage_constraints()
         self._add_agricultural_management_constraints()
@@ -817,7 +699,6 @@ class LutoSolver:
         self._add_water_usage_limit_constraints()
         self._add_ghg_emissions_limit_constraints()
         self._add_biodiversity_limit_constraints()
-        self._add_non_ag_doubling_penalty_constraints()
 
     def update_formulation(
         self,
@@ -918,19 +799,6 @@ class LutoSolver:
                         ub=1, name=f"X_ag_irr_{j}_{r}"
                     )
 
-            # non agricultural doubling penalty vars
-            if settings.NON_AG_DOUBLING_PENALTY != 0:
-                self.gurobi_model.remove(
-                    list(self.non_ag_doubling_vars_rkk[r, :, :][np.where(self.non_ag_doubling_vars_rkk[r, :, :])])
-                )
-                self.non_ag_doubling_vars_rkk[r, :, :] = np.zeros(
-                    (self._input_data.n_non_ag_lus, self._input_data.n_non_ag_lus)
-                )
-                for k1, k2 in combinations(self._input_data.cells2non_ag_lu.get(r, []), 2):
-                    self.non_ag_doubling_vars_rkk[r, k1, k2] = self.gurobi_model.addVar(
-                        name=f"non_ag_doubling_penalty_{r}_{k1}_{k2}"
-                    )
-
             # non-agricultural land usage
             self.gurobi_model.remove(
                 list(self.X_non_ag_vars_kr[:, r][np.where(self.X_non_ag_vars_kr[:, r])])
@@ -1008,7 +876,6 @@ class LutoSolver:
             self.gurobi_model.remove(self.cell_usage_constraint_r.pop(r, []))
             self.gurobi_model.remove(self.ag_management_constraints_r.pop(r, []))
             self.gurobi_model.remove(self.water_limit_constraints_r.pop(r, []))
-            self.gurobi_model.remove(self.non_ag_doubling_constraints_r.pop(r, []))
         
         self.gurobi_model.remove(self.adoption_limit_constraints)
         self.gurobi_model.remove(self.demand_penalty_constraints)
@@ -1028,7 +895,6 @@ class LutoSolver:
         self._add_water_usage_limit_constraints(updated_cells)
         self._add_ghg_emissions_limit_constraints()
         self._add_biodiversity_limit_constraints()
-        self._add_non_ag_doubling_penalty_constraints(updated_cells)
 
     def solve(self) -> SolverSolution:
         print("Starting solve...\n")

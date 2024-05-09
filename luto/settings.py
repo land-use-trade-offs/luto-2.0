@@ -113,13 +113,6 @@ DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (li
 # 1e5 works well (i.e., demand are met), demands not met with anything less 
 PENALTY = 1e5
 
-# A penalty to discourage the simultaneous use of more than one non-agricultural land use on a single cell.
-# E.g., the model is penalised for using both Environmental Plantings and Riparian Plantings on the same cell.
-# Set to 0 to disable.
-NON_AG_DOUBLING_PENALTY = 1e5
-NON_AG_DOUBLING_CONSTR_BIG_M = 1e6
-
-
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
