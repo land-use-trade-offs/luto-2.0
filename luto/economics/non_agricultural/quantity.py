@@ -1,9 +1,7 @@
 import numpy as np
 
-from luto.data import Data
-from luto.settings import NON_AG_LAND_USES
 
-def get_quantity_env_plantings(data: Data) -> np.ndarray:
+def get_quantity_env_plantings(data) -> np.ndarray:
     """
     Parameters
     ----------
@@ -19,7 +17,7 @@ def get_quantity_env_plantings(data: Data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_rip_plantings(data: Data) -> np.ndarray:
+def get_quantity_rip_plantings(data) -> np.ndarray:
     """
     Parameters
     ----------
@@ -36,7 +34,7 @@ def get_quantity_rip_plantings(data: Data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_agroforestry(data: Data) -> np.ndarray:
+def get_quantity_agroforestry(data) -> np.ndarray:
     """
     Parameters
     ----------
@@ -53,7 +51,7 @@ def get_quantity_agroforestry(data: Data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_carbon_plantings_block(data: Data) -> np.ndarray:
+def get_quantity_carbon_plantings_block(data) -> np.ndarray:
     """
     Parameters
     ----------
@@ -70,7 +68,7 @@ def get_quantity_carbon_plantings_block(data: Data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_carbon_plantings_belt(data: Data) -> np.ndarray:
+def get_quantity_carbon_plantings_belt(data) -> np.ndarray:
     """
     Parameters
     ----------
@@ -87,7 +85,7 @@ def get_quantity_carbon_plantings_belt(data: Data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_beccs(data: Data) -> np.ndarray:
+def get_quantity_beccs(data) -> np.ndarray:
     """
     Parameters
     ----------
@@ -104,7 +102,7 @@ def get_quantity_beccs(data: Data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_matrix(data: Data) -> np.ndarray:
+def get_quantity_matrix(data) -> np.ndarray:
     """
     Get the non-agricultural quantity matrix q_crk.
     Values represent the yield of each commodity c from the cell r when using

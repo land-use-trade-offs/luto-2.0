@@ -628,7 +628,9 @@ class LutoSolver:
 
             wreq_region = ag_contr + ag_man_contr + non_ag_contr
 
-            if wreq_region is not 0:
+            # Check that the contributions are not all zero, and add constraint if so.
+            # Must check the type because 'Gurobi expression == 0' returns another expression 
+            if not type(wreq_region) == int:
                 constr = self.gurobi_model.addConstr(wreq_region <= wreq_reg_limit)
                 for r in ind:
                     self.water_limit_constraints_r[r].append(constr)

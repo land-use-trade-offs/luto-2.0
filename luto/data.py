@@ -30,6 +30,8 @@ from scipy.interpolate import interp1d
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 import luto.settings as settings
 from luto.settings import INPUT_DIR, OUTPUT_DIR
+import luto.economics.agricultural.quantity as ag_quantity
+import luto.economics.non_agricultural.quantity as non_ag_quantity
 
 
 def dict2matrix(d, fromlist, tolist):
@@ -40,41 +42,6 @@ def dict2matrix(d, fromlist, tolist):
             i = tolist.index(istr)
             A[i, j] = True
     return A
-
-
-def lvs_veg_types(lu) -> tuple[str, str]:
-    """Return livestock and vegetation types of the livestock land-use `lu`.
-
-    Args:
-        lu (str): The livestock land-use.
-
-    Returns:
-        tuple: A tuple containing the livestock type and vegetation type.
-
-    Raises:
-        KeyError: If the livestock type or vegetation type cannot be identified.
-
-    """
-
-    # Determine type of livestock.
-    if 'beef' in lu.lower():
-        lvstype = 'BEEF'
-    elif 'sheep' in lu.lower():
-        lvstype = 'SHEEP'
-    elif 'dairy' in lu.lower():
-        lvstype = 'DAIRY'
-    else:
-        raise KeyError(f"Livestock type '{lu}' not identified.")
-
-    # Determine type of vegetation.
-    if 'natural' in lu.lower():
-        vegtype = 'natural land'
-    elif 'modified' in lu.lower():
-        vegtype = 'modified land'
-    else:
-        raise KeyError(f"Vegetation type '{lu}' not identified.")
-
-    return lvstype, vegtype
 
 
 def get_base_am_vars(ncells, ncms, n_ag_lus):
@@ -163,37 +130,59 @@ class Data:
         print('')
         print('Beginning data initialisation...')
 
-        ###############################################################
-        # Agricultural economic data.
-        ###############################################################
-        print("\tLoading agricultural economic data...", flush=True)
+        self.YR_CAL_BASE = 2010  # The base year, i.e. where year index yr_idx == 0.
 
-        # Load the agro-economic data (constructed using dataprep.py).
+
+
+        ###############################################################
+        # Masking and spatial coarse graining.
+        ###############################################################
+        print("\tSetting up masking and spatial course graining data...", flush=True)
+
+        # Set resfactor multiplier
+        self.RESMULT = settings.RESFACTOR ** 2
+
+        # Load LUMAP wih no resfactor
+        self.LUMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lumap.h5")).to_numpy()
+
+        # NLUM mask.
+        with rasterio.open(os.path.join(INPUT_DIR, "NLUM_2010-11_mask.tif")) as rst:
+            self.NLUM_MASK = rst.read(1)
+
+        # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap (True means included cells. Boolean dtype.)
+        self.MASK_LU_CODE = -1
+        self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE
+
+        # Return combined land-use and resfactor mask
+        if settings.RESFACTOR > 1:
+
+            # Create settings.RESFACTOR mask for spatial coarse-graining.
+            rf_mask = self.NLUM_MASK.copy()
+            nonzeroes = np.nonzero(rf_mask)
+            rf_mask[::settings.RESFACTOR, ::settings.RESFACTOR] = 0
+            resmask = np.where(rf_mask[nonzeroes] == 0, True, False)
+
+            # Superimpose resfactor mask upon land-use map mask (Boolean).
+            self.MASK = self.LUMASK * resmask
+
+        elif settings.RESFACTOR == 1:
+            self.MASK = self.LUMASK
+
+        else:
+            raise KeyError("Resfactor setting invalid")
+
+        # # Create a mask indices array for subsetting arrays
+        # self.MINDICES = np.where(self.MASK)[0].astype(np.int32)
+
+
+
+        ###############################################################
+        # Load agricultural crop and livestock data.
+        ###############################################################
+        print("\tLoading agricultural crop and livestock data...", flush=True)
         self.AGEC_CROPS = pd.read_hdf(os.path.join(INPUT_DIR, "agec_crops.h5"))
         self.AGEC_LVSTK = pd.read_hdf(os.path.join(INPUT_DIR, "agec_lvstk.h5"))
 
-        # Load greenhouse gas emissions from agriculture
-        self.AGGHG_CROPS = pd.read_hdf(os.path.join(INPUT_DIR, "agGHG_crops.h5"))
-        self.AGGHG_LVSTK = pd.read_hdf(os.path.join(INPUT_DIR, "agGHG_lvstk.h5"))
-        self.AGGHG_IRRPAST = pd.read_hdf(os.path.join(INPUT_DIR, "agGHG_irrpast.h5"))
-
-        # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
-        self.AG_TMATRIX = np.load(os.path.join(INPUT_DIR, "ag_tmatrix.npy"))
-
-        # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
-        self.EXCLUDE = np.load(os.path.join(INPUT_DIR, "x_mrj.npy"))
-
-
-        ###############################################################
-        # Miscellaneous parameters.
-        ###############################################################
-        print("\tLoading miscellaneous parameters...", flush=True)
-
-        # Derive NCELLS (number of spatial cells) from AGEC.
-        (self.NCELLS,) = self.AGEC_CROPS.index.shape
-
-        # The base year, i.e. where year index yr_idx == 0.
-        self.YR_CAL_BASE = 2010
 
 
         ###############################################################
@@ -203,7 +192,7 @@ class Data:
 
         # Read in lexicographically ordered list of land-uses.
         self.AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'ag_landuses.csv')), header = None)[0].to_list()
-        self.NON_AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'non_ag_landuses.csv')), header = None)[0].to_list()
+        self.NON_AGRICULTURAL_LANDUSES = list(settings.NON_AG_LAND_USES.keys())
 
         self.NONAGLU2DESC = dict(zip(range(settings.NON_AGRICULTURAL_LU_BASE_CODE, 
                                     settings.NON_AGRICULTURAL_LU_BASE_CODE + len(self.NON_AGRICULTURAL_LANDUSES)),
@@ -322,6 +311,76 @@ class Data:
         self.PR2CM = dict2matrix(self.CM2PR_DICT, self.COMMODITIES, self.PRODUCTS).T # Note the transpose.
 
 
+
+        ###############################################################
+        # Spatial layers.
+        ###############################################################
+        print("\tSetting up spatial layers data...", flush=True)
+
+        # Actual hectares per cell, including projection corrections.
+        self.REAL_AREA = pd.read_hdf(os.path.join(INPUT_DIR, "real_area.h5")).to_numpy()
+        self.REAL_AREA_W_RESFACTOR = self.get_array_resfactor_applied(self.REAL_AREA) * self.RESMULT
+
+        # Derive NCELLS (number of spatial cells) real area.
+        self.NCELLS = self.REAL_AREA.shape[0]
+
+        # Initial (2010) land-use map, mapped as lexicographic land-use class indices.
+        self.LUMAP = self.get_array_resfactor_applied(self.LUMAP_NO_RESFACTOR)
+        self.add_lumap(self.YR_CAL_BASE, self.LUMAP)
+
+        # Initial (2010) land management map.
+        self.LMMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lmmap.h5")).to_numpy()
+        self.LMMAP = self.get_array_resfactor_applied(self.LMMAP_NO_RESFACTOR)
+        self.add_lmmap(self.YR_CAL_BASE, self.LMMAP)
+
+        # Initial (2010) agricutural management maps - no cells are used for alternative agricultural management options.
+        # Includes a separate AM map for each agricultural management option, because they can be stacked.
+        self.AMMAP_DICT_NO_RESFACTOR = {
+            am: np.zeros(self.NCELLS).astype("int8") for am in AG_MANAGEMENTS_TO_LAND_USES
+        }
+        self.AMMAP_DICT = {
+            am: self.get_array_resfactor_applied(array) 
+            for am, array in self.AMMAP_DICT_NO_RESFACTOR.items()
+        }
+        self.add_ammaps(self.YR_CAL_BASE, self.AMMAP_DICT)
+
+        self.AG_L_MRJ = lumap2ag_l_mrj(self.LUMAP, self.LMMAP)  # Boolean [2, 4218733, 28]
+        self.add_ag_dvars(self.YR_CAL_BASE, self.AG_L_MRJ)
+
+        self.NON_AG_L_RK = lumap2non_ag_l_mk(
+            self.LUMAP, len(self.NON_AGRICULTURAL_LANDUSES)     # Int8
+        )
+        self.add_non_ag_dvars(self.YR_CAL_BASE, self.NON_AG_L_RK)
+
+
+
+        ###############################################################
+        # Climate change impact data.
+        ###############################################################
+        print("\tLoading climate change data...", flush=True)
+
+        self.CLIMATE_CHANGE_IMPACT = pd.read_hdf(
+            os.path.join(INPUT_DIR, "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".h5")
+        )
+
+
+
+        ###############################################################
+        # Livestock related data.
+        ###############################################################
+        print("\tLoading livestock related data...", flush=True)
+
+        self.FEED_REQ = np.nan_to_num(
+            pd.read_hdf(os.path.join(INPUT_DIR, "feed_req.h5")).to_numpy()
+        )
+        self.PASTURE_KG_DM_HA = pd.read_hdf(
+            os.path.join(INPUT_DIR, "pasture_kg_dm_ha.h5")
+        ).to_numpy()
+        self.SAFE_PUR_NATL = pd.read_hdf(os.path.join(INPUT_DIR, "safe_pur_natl.h5")).to_numpy()
+        self.SAFE_PUR_MODL = pd.read_hdf(os.path.join(INPUT_DIR, "safe_pur_modl.h5")).to_numpy()
+
+
+
         ###############################################################
         # Agricultural management options data.
         ###############################################################
@@ -405,7 +464,7 @@ class Data:
         )
 
         # Load soil carbon data, convert C to CO2e (x 44/12), and average over years
-        self.SOIL_CARBON_AVG_T_CO2_HA = (
+        self.SOIL_CARBON_AVG_T_CO2_HA = self.get_array_resfactor_applied(
             pd.read_hdf(os.path.join(INPUT_DIR, "soil_carbon_t_ha.h5")).to_numpy(dtype=np.float32)
             * (44 / 12)
             / settings.SOC_AMORTISATION
@@ -435,16 +494,107 @@ class Data:
 
 
         ###############################################################
+        # Productivity data.
+        ###############################################################
+        print("\tLoading productivity data...", flush=True)
+
+        # Yield increases.
+        fpath = os.path.join(INPUT_DIR, "yieldincreases_bau2022.csv")
+        self.BAU_PROD_INCR = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
+
+
+
+        ###############################################################
+        # Calculate base year production and apply resfactor to
+        # various required data arrays
+        ###############################################################
+        print("\tCalculating base year productivity...", flush=True)
+        yr_cal_base_prod_data = self.get_production(
+            self.YR_CAL_BASE,
+            ag_X_mrj = lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR),
+            non_ag_X_rk = lumap2non_ag_l_mk(self.LUMAP_NO_RESFACTOR, len(settings.NON_AG_LAND_USES.keys())),
+            ag_man_X_mrj = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS),
+        )
+        self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
+        
+        self.CLIMATE_CHANGE_IMPACT = self.get_df_resfactor_applied(self.CLIMATE_CHANGE_IMPACT)
+        self.REAL_AREA_NO_RESFACTOR = self.REAL_AREA.copy()
+        self.REAL_AREA = self.get_array_resfactor_applied(self.REAL_AREA) * self.RESMULT
+        self.NCELLS = self.REAL_AREA.shape[0]
+
+        self.FEED_REQ = self.get_array_resfactor_applied(self.FEED_REQ)
+        self.PASTURE_KG_DM_HA = self.get_array_resfactor_applied(self.PASTURE_KG_DM_HA)
+        self.SAFE_PUR_MODL = self.get_array_resfactor_applied(self.SAFE_PUR_MODL)
+        self.SAFE_PUR_NATL = self.get_array_resfactor_applied(self.SAFE_PUR_NATL)
+
+        self.AG_MAN_L_MRJ_DICT = get_base_am_vars(
+            self.NCELLS, self.NLMS, self.N_AG_LUS               # Dictionary containing Int8 arrays
+        )
+        self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
+
+
+
+        ###############################################################
+        # Auxiliary Spatial Layers 
+        # (spatial layers not required for production calculation)
+        ###############################################################
+        print("\tLoading auxiliary spatial layers data...", flush=True)
+
+        # Load stream length data in metres of stream per cell
+        self.STREAM_LENGTH = pd.read_hdf(
+            os.path.join(INPUT_DIR, "stream_length_m_cell.h5")
+        ).to_numpy()
+
+        # Calculate the proportion of the area of each cell within stream buffer (convert REAL_AREA from ha to m2 and divide m2 by m2)
+        self.RP_PROPORTION = self.get_array_resfactor_applied(
+            ((2 * settings.RIPARIAN_PLANTING_BUFFER_WIDTH * self.STREAM_LENGTH) / (self.REAL_AREA_NO_RESFACTOR * 10000)).astype(np.float32)
+        )
+        # Calculate the length of fencing required for each cell in per hectare terms for riparian plantings
+        self.RP_FENCING_LENGTH = self.get_array_resfactor_applied(
+            ((2 * settings.RIPARIAN_PLANTING_TORTUOSITY_FACTOR * self.STREAM_LENGTH) / self.REAL_AREA_NO_RESFACTOR).astype(np.float32)
+        )
+
+
+        ###############################################################
+        # Additional agricultural economic data.
+        ###############################################################
+        print("\tLoading additional agricultural economic data...", flush=True)
+
+         # Load the agro-economic data (constructed using dataprep.py).
+        self.AGEC_CROPS = self.get_df_resfactor_applied(self.AGEC_CROPS)
+        self.AGEC_LVSTK = self.get_df_resfactor_applied(self.AGEC_LVSTK)
+
+        # Load greenhouse gas emissions from agriculture
+        self.AGGHG_CROPS = self.get_df_resfactor_applied(
+            pd.read_hdf(os.path.join(INPUT_DIR, "agGHG_crops.h5"))
+        )
+        self.AGGHG_LVSTK = self.get_df_resfactor_applied(
+            pd.read_hdf(os.path.join(INPUT_DIR, "agGHG_lvstk.h5"))
+        )
+        self.AGGHG_IRRPAST = self.get_array_resfactor_applied(
+            pd.read_hdf(os.path.join(INPUT_DIR, "agGHG_irrpast.h5"))
+        )
+
+        # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
+        self.AG_TMATRIX = np.load(os.path.join(INPUT_DIR, "ag_tmatrix.npy"))
+
+        # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
+        self.EXCLUDE = np.load(os.path.join(INPUT_DIR, "x_mrj.npy"))
+        self.EXCLUDE = self.EXCLUDE[:, self.MASK, :]  # Apply resfactor specially for the exclude matrix
+
+
+
+        ###############################################################
         # Non-agricultural data.
         ###############################################################
         print("\tLoading non-agricultural data...", flush=True)
 
         # Load plantings economic data
-        self.EP_EST_COST_HA = pd.read_hdf(os.path.join(INPUT_DIR, "ep_est_cost_ha.h5")).to_numpy(
-            dtype=np.float32
+        self.EP_EST_COST_HA = self.get_array_resfactor_applied(
+            pd.read_hdf(os.path.join(INPUT_DIR, "ep_est_cost_ha.h5")).to_numpy(dtype=np.float32)
         )
-        self.CP_EST_COST_HA = pd.read_hdf(os.path.join(INPUT_DIR, "cp_est_cost_ha.h5")).to_numpy(
-            dtype=np.float32
+        self.CP_EST_COST_HA = self.get_array_resfactor_applied(
+            pd.read_hdf(os.path.join(INPUT_DIR, "cp_est_cost_ha.h5")).to_numpy(dtype=np.float32)
         )
 
         # Load fire risk data (reduced carbon sequestration by this amount)
@@ -454,38 +604,48 @@ class Data:
 
         # Load environmental plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
         ep_df = pd.read_hdf(os.path.join(INPUT_DIR, "ep_block_avg_t_co2_ha_yr.h5"))
-        self.EP_BLOCK_AVG_T_CO2_HA = (
-            (ep_df.EP_BLOCK_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
-            + ep_df.EP_BLOCK_BG_AVG_T_CO2_HA_YR
-        ).to_numpy(dtype=np.float32)
+        self.EP_BLOCK_AVG_T_CO2_HA = self.get_array_resfactor_applied(
+            (
+                ep_df.EP_BLOCK_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL)
+                + ep_df.EP_BLOCK_BG_AVG_T_CO2_HA_YR
+            ).to_numpy(dtype=np.float32)
+        )
 
         # Load environmental plantings (belt) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
         ep_df = pd.read_hdf(os.path.join(INPUT_DIR, "ep_belt_avg_t_co2_ha_yr.h5"))
-        self.EP_BELT_AVG_T_CO2_HA = (
-            (ep_df.EP_BELT_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
-            + ep_df.EP_BELT_BG_AVG_T_CO2_HA_YR
-        ).to_numpy(dtype=np.float32)
+        self.EP_BELT_AVG_T_CO2_HA = self.get_array_resfactor_applied(
+            (
+                (ep_df.EP_BELT_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
+                + ep_df.EP_BELT_BG_AVG_T_CO2_HA_YR
+            ).to_numpy(dtype=np.float32)
+        )
 
         # Load environmental plantings (riparian) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
         ep_df = pd.read_hdf(os.path.join(INPUT_DIR, "ep_rip_avg_t_co2_ha_yr.h5"))
-        self.EP_RIP_AVG_T_CO2_HA = (
-            (ep_df.EP_RIP_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
-            + ep_df.EP_RIP_BG_AVG_T_CO2_HA_YR
-        ).to_numpy(dtype=np.float32)
+        self.EP_RIP_AVG_T_CO2_HA = self.get_array_resfactor_applied(
+            (
+                (ep_df.EP_RIP_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
+                + ep_df.EP_RIP_BG_AVG_T_CO2_HA_YR
+            ).to_numpy(dtype=np.float32)
+        )
 
         # Load carbon plantings (block) GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
         cp_df = pd.read_hdf(os.path.join(INPUT_DIR, "cp_block_avg_t_co2_ha_yr.h5"))
-        self.CP_BLOCK_AVG_T_CO2_HA = (
-            (cp_df.CP_BLOCK_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
-            + cp_df.CP_BLOCK_BG_AVG_T_CO2_HA_YR
-        ).to_numpy(dtype=np.float32)
+        self.CP_BLOCK_AVG_T_CO2_HA = self.get_array_resfactor_applied(
+            (
+                (cp_df.CP_BLOCK_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
+                + cp_df.CP_BLOCK_BG_AVG_T_CO2_HA_YR
+            ).to_numpy(dtype=np.float32)
+        )
 
         # Load farm forestry [i.e. carbon plantings (belt)] GHG sequestration (aboveground carbon discounted by settings.RISK_OF_REVERSAL and settings.FIRE_RISK)
         cp_df = pd.read_hdf(os.path.join(INPUT_DIR, "cp_belt_avg_t_co2_ha_yr.h5"))
-        self.CP_BELT_AVG_T_CO2_HA = (
-            (cp_df.CP_BELT_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
-            + cp_df.CP_BELT_BG_AVG_T_CO2_HA_YR
-        ).to_numpy(dtype=np.float32)
+        self.CP_BELT_AVG_T_CO2_HA = self.get_array_resfactor_applied(
+            (
+                (cp_df.CP_BELT_AG_AVG_T_CO2_HA_YR * (fire_risk / 100) * (1 - settings.RISK_OF_REVERSAL))
+                + cp_df.CP_BELT_BG_AVG_T_CO2_HA_YR
+            ).to_numpy(dtype=np.float32)
+        )
 
         # Agricultural land use to plantings raw transition costs:
         self.AG2EP_TRANSITION_COSTS_HA = np.load(
@@ -496,80 +656,6 @@ class Data:
         self.EP2AG_TRANSITION_COSTS_HA = np.load(
             os.path.join(INPUT_DIR, "ep_to_ag_tmatrix.npy")
         )  # shape: (28,)
-
-
-        ###############################################################
-        # Spatial layers.
-        ###############################################################
-        print("\tSetting up spatial layers data...", flush=True)
-
-        # NLUM mask.
-        with rasterio.open(os.path.join(INPUT_DIR, "NLUM_2010-11_mask.tif")) as rst:
-            self.NLUM_MASK = rst.read(1)
-
-        # Actual hectares per cell, including projection corrections.
-        self.REAL_AREA = pd.read_hdf(os.path.join(INPUT_DIR, "real_area.h5")).to_numpy()
-
-        # Initial (2010) land-use map, mapped as lexicographic land-use class indices.
-        self.LUMAP = pd.read_hdf(os.path.join(INPUT_DIR, "lumap.h5")).to_numpy()
-
-        # Initial (2010) land management map.
-        self.LMMAP = pd.read_hdf(os.path.join(INPUT_DIR, "lmmap.h5")).to_numpy()
-
-        # Initial (2010) agricutural management maps - no cells are used for alternative agricultural management options.
-        # Includes a separate AM map for each agricultural management option, because they can be stacked.
-        self.AMMAP_DICT = {
-            am: np.zeros(self.NCELLS).astype("int8") for am in AG_MANAGEMENTS_TO_LAND_USES
-        }
-
-        # Load stream length data in metres of stream per cell
-        self.STREAM_LENGTH = pd.read_hdf(
-            os.path.join(INPUT_DIR, "stream_length_m_cell.h5")
-        ).to_numpy()
-
-        # Calculate the proportion of the area of each cell within stream buffer (convert REAL_AREA from ha to m2 and divide m2 by m2)
-        self.RP_PROPORTION = (
-            (2 * settings.RIPARIAN_PLANTING_BUFFER_WIDTH * self.STREAM_LENGTH) / (self.REAL_AREA * 10000)
-        ).astype(np.float32)
-
-        # Calculate the length of fencing required for each cell in per hectare terms for riparian plantings
-        self.RP_FENCING_LENGTH = (
-            (2 * settings.RIPARIAN_PLANTING_TORTUOSITY_FACTOR * self.STREAM_LENGTH) / self.REAL_AREA
-        ).astype(np.float32)
-
-
-        ###############################################################
-        # Masking and spatial coarse graining.
-        ###############################################################
-        print("\tSetting up masking and spatial course graining data...", flush=True)
-
-        # Set resfactor multiplier
-        self.RESMULT = settings.RESFACTOR ** 2
-
-        # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap (True means included cells. Boolean dtype.)
-        self.MASK_LU_CODE = -1
-        self.LUMASK = self.LUMAP != self.MASK_LU_CODE
-
-        # Return combined land-use and resfactor mask
-        if settings.RESFACTOR > 1:
-
-            # Create settings.RESFACTOR mask for spatial coarse-graining.
-            rf_mask = self.NLUM_MASK.copy()
-            nonzeroes = np.nonzero(rf_mask)
-            rf_mask[::settings.RESFACTOR, ::settings.RESFACTOR] = 0
-            resmask = np.where(rf_mask[nonzeroes] == 0, True, False)
-
-            # Superimpose resfactor mask upon land-use map mask (Boolean).
-            self.MASK = self.LUMASK * resmask
-
-        elif settings.RESFACTOR == 1:
-            self.MASK = self.LUMASK
-
-        else:
-            raise KeyError("Resfactor setting invalid")
-
-        # # Create a mask indices array for subsetting arrays
-        # self.MINDICES = np.where(self.MASK)[0].astype(np.int32)
 
 
         ###############################################################
@@ -585,7 +671,7 @@ class Data:
         for lu in self.AGRICULTURAL_LANDUSES:
             if lu in self.LU_LVSTK:
                 # First find out which animal is involved.
-                animal, _ = lvs_veg_types(lu)
+                animal, _ = ag_quantity.lvs_veg_types(lu)
                 # Water requirements per head are for drinking and irrigation.
                 wreq_lvstk_dry[lu] = self.AGEC_LVSTK["WR_DRN", animal]
                 wreq_lvstk_irr[lu] = (
@@ -612,19 +698,23 @@ class Data:
         )
 
         # Spatially explicit costs of a water licence per ML.
-        self.WATER_LICENCE_PRICE = np.nan_to_num(
-            pd.read_hdf(os.path.join(INPUT_DIR, "water_licence_price.h5")).to_numpy()
+        self.WATER_LICENCE_PRICE = self.get_array_resfactor_applied(
+            np.nan_to_num(
+                pd.read_hdf(os.path.join(INPUT_DIR, "water_licence_price.h5")).to_numpy()
+            )
         )
 
         # Spatially explicit costs of water delivery per ML.
-        self.WATER_DELIVERY_PRICE = np.nan_to_num(
-            pd.read_hdf(os.path.join(INPUT_DIR, "water_delivery_price.h5")).to_numpy()
+        self.WATER_DELIVERY_PRICE = self.get_array_resfactor_applied(
+            np.nan_to_num(
+                pd.read_hdf(os.path.join(INPUT_DIR, "water_delivery_price.h5")).to_numpy()
+            )
         )
 
         # River regions.
-        self.RIVREG_ID = pd.read_hdf(
-            os.path.join(INPUT_DIR, "rivreg_id.h5")
-        ).to_numpy()  # River region ID mapped.
+        self.RIVREG_ID = self.get_array_resfactor_applied(
+            pd.read_hdf(os.path.join(INPUT_DIR, "rivreg_id.h5")).to_numpy()  # River region ID mapped.
+        )
         rr = pd.read_hdf(os.path.join(INPUT_DIR, "rivreg_lut.h5"))
         self.RIVREG_DICT = dict(
             zip(rr.HR_RIVREG_ID, rr.HR_RIVREG_NAME)
@@ -634,9 +724,9 @@ class Data:
         )  # River region ID and water use limits
 
         # Drainage divisions
-        self.DRAINDIV_ID = pd.read_hdf(
-            os.path.join(INPUT_DIR, "draindiv_id.h5")
-        ).to_numpy()  # Drainage div ID mapped.
+        self.DRAINDIV_ID = self.get_array_resfactor_applied(
+            pd.read_hdf(os.path.join(INPUT_DIR, "draindiv_id.h5")).to_numpy()  # Drainage div ID mapped.
+        )
         dd = pd.read_hdf(os.path.join(INPUT_DIR, "draindiv_lut.h5"))
         self.DRAINDIV_DICT = dict(
             zip(dd.HR_DRAINDIV_ID, dd.HR_DRAINDIV_NAME)
@@ -647,9 +737,15 @@ class Data:
 
         # Water yields -- run off from a cell into catchment by deep-rooted, shallow-rooted, and natural vegetation types
         water_yield_base = pd.read_hdf(os.path.join(INPUT_DIR, "water_yield_baselines.h5"))
-        self.WATER_YIELD_BASE_DR = water_yield_base['WATER_YIELD_HIST_DR_ML_HA'].to_numpy(dtype = np.float32)
-        self.WATER_YIELD_BASE_SR = water_yield_base["WATER_YIELD_HIST_SR_ML_HA"].to_numpy(dtype = np.float32)
-        self.WATER_YIELD_BASE = water_yield_base["WATER_YIELD_HIST_BASELINE_ML_HA"].to_numpy(dtype = np.float32)
+        self.WATER_YIELD_BASE_DR = self.get_array_resfactor_applied(
+            water_yield_base['WATER_YIELD_HIST_DR_ML_HA'].to_numpy(dtype = np.float32)
+        )
+        self.WATER_YIELD_BASE_SR = self.get_array_resfactor_applied(
+            water_yield_base["WATER_YIELD_HIST_SR_ML_HA"].to_numpy(dtype = np.float32)
+        )
+        self.WATER_YIELD_BASE = self.get_array_resfactor_applied(
+            water_yield_base["WATER_YIELD_HIST_BASELINE_ML_HA"].to_numpy(dtype = np.float32)
+        )
 
         # fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_dr_ml_ha.h5')
         # fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_sr_ml_ha.h5')
@@ -674,44 +770,10 @@ class Data:
         rem_veg = np.squeeze(rem_veg)  # Remove extraneous extra dimension
 
         # Discount by fire risk.
-        self.NATURAL_LAND_T_CO2_HA = rem_veg * (fire_risk.to_numpy() / 100)
-
-
-        ###############################################################
-        # Climate change impact data.
-        ###############################################################
-        print("\tLoading climate change data...", flush=True)
-
-        self.CLIMATE_CHANGE_IMPACT = pd.read_hdf(
-            os.path.join(
-                INPUT_DIR, "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".h5"
-            )
+        self.NATURAL_LAND_T_CO2_HA = self.get_array_resfactor_applied(
+            rem_veg * (fire_risk.to_numpy() / 100)
         )
 
-
-        ###############################################################
-        # Livestock related data.
-        ###############################################################
-        print("\tLoading livestock related data...", flush=True)
-
-        self.FEED_REQ = np.nan_to_num(
-            pd.read_hdf(os.path.join(INPUT_DIR, "feed_req.h5")).to_numpy()
-        )
-        self.PASTURE_KG_DM_HA = pd.read_hdf(
-            os.path.join(INPUT_DIR, "pasture_kg_dm_ha.h5")
-        ).to_numpy()
-        self.SAFE_PUR_NATL = pd.read_hdf(os.path.join(INPUT_DIR, "safe_pur_natl.h5")).to_numpy()
-        self.SAFE_PUR_MODL = pd.read_hdf(os.path.join(INPUT_DIR, "safe_pur_modl.h5")).to_numpy()
-
-
-        ###############################################################
-        # Productivity data.
-        ###############################################################
-        print("\tLoading productivity data...", flush=True)
-
-        # Yield increases.
-        fpath = os.path.join(INPUT_DIR, "yieldincreases_bau2022.csv")
-        self.BAU_PROD_INCR = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
 
 
         ###############################################################
@@ -817,7 +879,9 @@ class Data:
         self.SAVBURN_AVEM_CH4_TCO2E_HA = savburn_df.SAV_AVEM_CH4_TCO2E_HA.to_numpy()  # Avoided emissions - methane
         self.SAVBURN_AVEM_N2O_TCO2E_HA = savburn_df.SAV_AVEM_N2O_TCO2E_HA.to_numpy()  # Avoided emissions - nitrous oxide
         self.SAVBURN_SEQ_CO2_TCO2E_HA = savburn_df.SAV_SEQ_CO2_TCO2E_HA.to_numpy()    # Additional carbon sequestration - carbon dioxide
-        self.SAVBURN_TOTAL_TCO2E_HA = savburn_df.AEA_TOTAL_TCO2E_HA.to_numpy()        # Total emissions abatement from EDS savanna burning
+        self.SAVBURN_TOTAL_TCO2E_HA = self.get_array_resfactor_applied(
+            savburn_df.AEA_TOTAL_TCO2E_HA.to_numpy()
+        )
 
         # Cost per hectare in dollars from settings
         self.SAVBURN_COST_HA = settings.SAVBURN_COST_HA_YR
@@ -849,13 +913,13 @@ class Data:
 
         # Calculate the quality-weighted sum of biodiv raw score over the study area. 
         # Quality weighting includes connectivity score, land-use (i.e., livestock impacts), and land management (LDS burning impacts in area eligible for savanna burning). Note BIODIV_SCORE_RAW = BIODIV_SCORE_WEIGHTED on natural land
-        biodiv_value_current = ( np.isin(self.LUMAP, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED_LDS_BURNING -   # Biodiversity value of Unallocated - natural land and livestock on natural land considering LDS burning impacts
-                                 np.isin(self.LUMAP, [2, 6, 15]) * self.BIODIV_SCORE_WEIGHTED * settings.BIODIV_LIVESTOCK_IMPACT     # Biodiversity impact of livestock on natural land 
-                               ) * self.REAL_AREA                                                                 # Modified land assumed to have zero biodiversity value  
+        biodiv_value_current = ( np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED_LDS_BURNING -   # Biodiversity value of Unallocated - natural land and livestock on natural land considering LDS burning impacts
+                                 np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15]) * self.BIODIV_SCORE_WEIGHTED * settings.BIODIV_LIVESTOCK_IMPACT     # Biodiversity impact of livestock on natural land 
+                               ) * self.REAL_AREA_NO_RESFACTOR                                                             # Modified land assumed to have zero biodiversity value  
         
         # Calculate the sum of biodiversity score lost to land degradation (i.e., raw score minus current score with current score on cropland being zero)
-        biodiv_value_degraded_land = ( ( np.isin(self.LUMAP, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED * self.REAL_AREA - biodiv_value_current ) +   # On natural land calculate the difference between the raw biodiversity score and the current score
-                                       ( np.isin(self.LUMAP, self.LU_MODIFIED_LAND) * biodiv_score_raw * self.REAL_AREA )                     # Calculate raw biodiversity score of modified land
+        biodiv_value_degraded_land = ( ( np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED * self.REAL_AREA_NO_RESFACTOR - biodiv_value_current ) +   # On natural land calculate the difference between the raw biodiversity score and the current score
+                                       ( np.isin(self.LUMAP_NO_RESFACTOR, self.LU_MODIFIED_LAND) * biodiv_score_raw * self.REAL_AREA_NO_RESFACTOR )                     # Calculate raw biodiversity score of modified land
                                      )                                                                                       
 
         # Create a dictionary to hold the annual biodiversity target proportion data for GBF Target 2
@@ -892,83 +956,32 @@ class Data:
         beccs_df = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_BECCS_df.h5') )
 
         # Capture as numpy arrays
-        self.BECCS_COSTS_AUD_HA_YR = beccs_df['BECCS_COSTS_AUD_HA_YR'].to_numpy()
-        self.BECCS_REV_AUD_HA_YR = beccs_df['BECCS_REV_AUD_HA_YR'].to_numpy()
-        self.BECCS_TCO2E_HA_YR = beccs_df['BECCS_TCO2E_HA_YR'].to_numpy()
-        self.BECCS_MWH_HA_YR = beccs_df['BECCS_MWH_HA_YR'].to_numpy()
+        self.BECCS_COSTS_AUD_HA_YR = self.get_array_resfactor_applied(beccs_df['BECCS_COSTS_AUD_HA_YR'].to_numpy())
+        self.BECCS_REV_AUD_HA_YR = self.get_array_resfactor_applied(beccs_df['BECCS_REV_AUD_HA_YR'].to_numpy())
+        self.BECCS_TCO2E_HA_YR = self.get_array_resfactor_applied(beccs_df['BECCS_TCO2E_HA_YR'].to_numpy())
+        self.BECCS_MWH_HA_YR = self.get_array_resfactor_applied(beccs_df['BECCS_MWH_HA_YR'].to_numpy())
         
+
+        ###############################################################
+        # Apply resfactor to various arrays required for data loading.
+        ###############################################################        
+        self.SAVBURN_ELIGIBLE = self.get_array_resfactor_applied(self.SAVBURN_ELIGIBLE)
+        self.BIODIV_SCORE_WEIGHTED = self.get_array_resfactor_applied(self.BIODIV_SCORE_WEIGHTED)
+        self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = self.get_array_resfactor_applied(self.BIODIV_SCORE_WEIGHTED_LDS_BURNING)
 
         print("Data loading complete\n")
 
-
-    def apply_resfactor(self):
+    def get_array_resfactor_applied(self, array: np.ndarray):
         """
-        Sub-set spatial data is based on the masks.
+        Returns a version of the given array with the ResFactor applied.
         """
-        print("Adjusting data for resfactor...", flush=True)
-        self.NCELLS = self.MASK.sum()
-        self.EXCLUDE = self.EXCLUDE[:, self.MASK, :]
-        self.AGEC_CROPS = self.AGEC_CROPS.iloc[self.MASK]                       # MultiIndex Dataframe [4218733 rows x 342 columns]
-        self.AGEC_LVSTK = self.AGEC_LVSTK.iloc[self.MASK]                       # MultiIndex Dataframe [4218733 rows x 39 columns]
-        self.AGGHG_CROPS = self.AGGHG_CROPS.iloc[self.MASK]                     # MultiIndex Dataframe [4218733 rows x ? columns]
-        self.AGGHG_LVSTK = self.AGGHG_LVSTK.iloc[self.MASK]                     # MultiIndex Dataframe [4218733 rows x ? columns]
-        self.REAL_AREA = self.REAL_AREA[self.MASK] * self.RESMULT               # Actual Float32
-        self.LUMAP = self.LUMAP[self.MASK]                                      # Int8
-        self.LMMAP = self.LMMAP[self.MASK]                                      # Int8
-        self.AMMAP_DICT = {
-            am: array[self.MASK] for am, array in self.AMMAP_DICT.items()
-        }                                                                       # Dictionary containing Int8 arrays
-        self.AG_L_MRJ = lumap2ag_l_mrj(self.LUMAP, self.LMMAP)                  # Boolean [2, 4218733, 28]
-        self.NON_AG_L_RK = lumap2non_ag_l_mk(
-            self.LUMAP, len(self.NON_AGRICULTURAL_LANDUSES)
-        )                                                                       # Int8
-        self.AG_MAN_L_MRJ_DICT = get_base_am_vars(
-            self.NCELLS, self.NLMS, self.N_AG_LUS
-        )                                                                       # Dictionary containing Int8 arrays
-        self.WREQ_IRR_RJ = self.WREQ_IRR_RJ[self.MASK]                          # Water requirements for irrigated landuses
-        self.WREQ_DRY_RJ = self.WREQ_DRY_RJ[self.MASK]                          # Water requirements for dryland landuses
-        self.WATER_LICENCE_PRICE = self.WATER_LICENCE_PRICE[self.MASK]          # Int16
-        self.WATER_DELIVERY_PRICE = self.WATER_DELIVERY_PRICE[self.MASK]        # Float32
-        self.WATER_YIELD_BASE_SR = self.WATER_YIELD_BASE_SR[self.MASK]          # Float32
-        self.WATER_YIELD_BASE_DR = self.WATER_YIELD_BASE_DR[self.MASK]          # Float32
-        self.WATER_YIELD_BASE = self.WATER_YIELD_BASE[self.MASK]                # Float32
-        self.FEED_REQ = self.FEED_REQ[self.MASK]                                # Float32
-        self.PASTURE_KG_DM_HA = self.PASTURE_KG_DM_HA[self.MASK]                # Int16
-        self.SAFE_PUR_MODL = self.SAFE_PUR_MODL[self.MASK]                      # Float32
-        self.SAFE_PUR_NATL = self.SAFE_PUR_NATL[self.MASK]                      # Float32
-        self.RIVREG_ID = self.RIVREG_ID[self.MASK]                              # Int16
-        self.DRAINDIV_ID = self.DRAINDIV_ID[self.MASK]                          # Int8
-        self.CLIMATE_CHANGE_IMPACT = self.CLIMATE_CHANGE_IMPACT[self.MASK]
-        self.EP_EST_COST_HA = self.EP_EST_COST_HA[self.MASK]                    # Float32
-        self.AG2EP_TRANSITION_COSTS_HA = self.AG2EP_TRANSITION_COSTS_HA         # Float32
-        self.EP2AG_TRANSITION_COSTS_HA = self.EP2AG_TRANSITION_COSTS_HA         # Float32
-        self.EP_BLOCK_AVG_T_CO2_HA = self.EP_BLOCK_AVG_T_CO2_HA[self.MASK]      # Float32
-        self.NATURAL_LAND_T_CO2_HA = self.NATURAL_LAND_T_CO2_HA[self.MASK]      # Float32
-        self.SOIL_CARBON_AVG_T_CO2_HA = self.SOIL_CARBON_AVG_T_CO2_HA[self.MASK]
-        self.AGGHG_IRRPAST = self.AGGHG_IRRPAST[self.MASK]                      # Float32
-        self.BIODIV_SCORE_WEIGHTED = self.BIODIV_SCORE_WEIGHTED[self.MASK]      # Float32
-        self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = (
-            self.BIODIV_SCORE_WEIGHTED_LDS_BURNING[self.MASK]
-        )
-        self.RP_PROPORTION = self.RP_PROPORTION[self.MASK]                      # Float32
-        self.RP_FENCING_LENGTH = self.RP_FENCING_LENGTH[self.MASK]              # Float32
-        self.EP_RIP_AVG_T_CO2_HA = self.EP_RIP_AVG_T_CO2_HA[self.MASK]          # Float32
-        self.EP_BELT_AVG_T_CO2_HA = self.EP_BELT_AVG_T_CO2_HA[self.MASK]        # Float32
-        self.CP_BLOCK_AVG_T_CO2_HA = self.CP_BLOCK_AVG_T_CO2_HA[self.MASK]      # Float32
-        self.CP_BELT_AVG_T_CO2_HA = self.CP_BELT_AVG_T_CO2_HA[self.MASK]        # Float32
-        self.CP_EST_COST_HA = self.CP_EST_COST_HA[self.MASK]                    # Float32
-        self.BECCS_COSTS_AUD_HA_YR = self.BECCS_COSTS_AUD_HA_YR[self.MASK]      # Float32
-        self.BECCS_REV_AUD_HA_YR = self.BECCS_REV_AUD_HA_YR[self.MASK]          # Float32
-        self.BECCS_TCO2E_HA_YR = self.BECCS_TCO2E_HA_YR[self.MASK]              # Float32
-        self.SAVBURN_ELIGIBLE = self.SAVBURN_ELIGIBLE[self.MASK]                # Int8
-        self.SAVBURN_TOTAL_TCO2E_HA = self.SAVBURN_TOTAL_TCO2E_HA[self.MASK]    # Float32
+        return array[self.MASK]
 
-        # Slice this year off HDF5 bricks. TODO: This field is not in luto.data.
-        # with h5py.File(bdata.fname_dr, 'r') as wy_dr_file:
-        #     self.WATER_YIELD_DR = wy_dr_file[list(wy_dr_file.keys())[0]][yr_idx][self.MASK]
-        # with h5py.File(bdata.fname_sr, 'r') as wy_sr_file:
-        #     self.WATER_YIELD_SR = wy_sr_file[list(wy_sr_file.keys())[0]][yr_idx][self.MASK]
-
+    def get_df_resfactor_applied(self, df: pd.DataFrame):
+        """
+        Returns a version of the given DataFrame with the ResFactor applied.
+        """
+        return df.iloc[self.MASK]
 
     def add_lumap(self, yr: int, lumap: np.ndarray):
         """
@@ -1029,19 +1042,6 @@ class Data:
         """
         self.obj_vals[yr] = obj_val
 
-    def add_base_year_data_to_containers(self):
-        """
-        Adds all 'solution' data for the base year to the corresponding containers.
-
-        To be called after applying resfactor to data using 'self.apply_resfactor()'
-        """
-        self.add_lumap(self.YR_CAL_BASE, self.LUMAP)
-        self.add_lmmap(self.YR_CAL_BASE, self.LMMAP)
-        self.add_ammaps(self.YR_CAL_BASE, self.AMMAP_DICT)
-        self.add_ag_dvars(self.YR_CAL_BASE, self.AG_L_MRJ)
-        self.add_non_ag_dvars(self.YR_CAL_BASE, self.NON_AG_L_RK)
-        self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
-
     def set_path(self, base_year, target_year) -> str:
         """Create a folder for storing outputs and return folder name."""
 
@@ -1101,3 +1101,75 @@ class Data:
                 os.mkdir(p)
 
         return self.path
+    
+    def get_production(
+        self,
+        yr_cal: int,
+        ag_X_mrj: np.ndarray,
+        non_ag_X_rk: np.ndarray,
+        ag_man_X_mrj: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Return total production of commodities for a specific year...
+
+        'yr_cal' is calendar year
+
+        Can return base year production (e.g., year = 2010) or can return production for 
+        a simulated year if one exists (i.e., year = 2030).
+
+        Includes the impacts of land-use change, productivity increases, and 
+        climate change on yield.
+        """
+
+        # Calculate year index (i.e., number of years since 2010)
+        yr_idx = yr_cal - self.YR_CAL_BASE
+
+        # Get the quantity of each commodity produced by agricultural land uses
+        # Get the quantity matrices. Quantity array of shape m, r, p
+        ag_q_mrp = ag_quantity.get_quantity_matrices(self, yr_idx)
+
+        # Convert map of land-use in mrj format to mrp format
+        ag_X_mrp = np.stack([ag_X_mrj[:, :, j] for p in range(self.NPRS)
+                            for j in range(self.N_AG_LUS)
+                            if self.LU2PR[p, j]
+                            ], axis=2)
+
+        # Sum quantities in product (PR/p) representation.
+        ag_q_p = np.sum(ag_q_mrp * ag_X_mrp, axis=(0, 1), keepdims=False)
+
+        # Transform quantities to commodity (CM/c) representation.
+        ag_q_c = [sum(ag_q_p[p] for p in range(self.NPRS) if self.PR2CM[c, p])
+                for c in range(self.NCMS)]
+
+        # Get the quantity of each commodity produced by non-agricultural land uses
+        # Quantity matrix in the shape of c, r, k
+        q_crk = non_ag_quantity.get_quantity_matrix(self)
+        non_ag_q_c = [(q_crk[c, :, :] * non_ag_X_rk).sum()
+                    for c in range(self.NCMS)]
+
+        # Get quantities produced by agricultural management options
+        j2p = {j: [p for p in range(self.NPRS) if self.LU2PR[p, j]]
+            for j in range(self.N_AG_LUS)}
+        ag_man_q_mrp = ag_quantity.get_agricultural_management_quantity_matrices(
+            self, ag_q_mrp, yr_idx)
+        ag_man_q_c = np.zeros(self.NCMS)
+
+        for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():
+            am_j_list = [self.DESC2AGLU[lu] for lu in am_lus]
+            current_ag_man_X_mrp = np.zeros(ag_q_mrp.shape, dtype=np.float32)
+
+            for j in am_j_list:
+                for p in j2p[j]:
+                    current_ag_man_X_mrp[:, :, p] = ag_man_X_mrj[am][:, :, j]
+
+            ag_man_q_p = np.sum(
+                ag_man_q_mrp[am] * current_ag_man_X_mrp, axis=(0, 1), keepdims=False)
+
+            for c in range(self.NCMS):
+                ag_man_q_c[c] += sum(ag_man_q_p[p]
+                                    for p in range(self.NPRS) if self.PR2CM[c, p])
+
+        # Return total commodity production as numpy array.
+        total_q_c = [ag_q_c[c] + non_ag_q_c[c] + ag_man_q_c[c]
+                    for c in range(self.NCMS)]
+        return np.array(total_q_c)

@@ -24,9 +24,9 @@ import pandas as pd
 from typing import Dict
 from luto.settings import AG_MANAGEMENTS
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.data import Data, lvs_veg_types
+from luto.data import Data
 from luto import settings
-from luto.economics.agricultural.quantity import get_yield_pot, get_quantity
+from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types
 from luto.economics.agricultural.ghg import get_savanna_burning_effect_g_mrj
 
 def get_rev_crop( data: Data   # Data object.

@@ -23,11 +23,12 @@ import itertools
 import numpy as np
 import pandas as pd
 
-from luto.data import Data, lvs_veg_types
+from luto.data import Data
 from luto.economics.agricultural.quantity import get_yield_pot
 import luto.tools as tools
 from luto.settings import AG_MANAGEMENTS
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.economics.agricultural.quantity import lvs_veg_types
 
 
 def get_ghg_crop(data: Data, lu, lm, yr_idx, aggregate):
