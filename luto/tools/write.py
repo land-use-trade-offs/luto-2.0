@@ -841,7 +841,8 @@ def write_water(data: Data, yr_cal, path):
                                 , 'WATER_USE_LIMIT_ML'
                                 , 'TOT_WATER_REQ_ML'
                                 , 'ABS_DIFF_ML'
-                                , 'PROPORTION_%'  ] )
+                                , 'PROPORTION_LIMIT_%'
+                                , 'PROPORTION_ALL_%'] )
 
     # Get 2010 water use limits used as constraints in model
     wuse_limits = ag_water.get_wuse_limits(data)
@@ -870,7 +871,6 @@ def write_water(data: Data, yr_cal, path):
         ind = np.flatnonzero(region_id == region).astype(np.int32)
 
         # Calculate water requirements by agriculture for year and region.
-
         index_levels = ['Landuse Type', 'Landuse', 'Water_supply',  'Water Use (ML)']
 
         # Agricultural water use
@@ -936,19 +936,22 @@ def write_water(data: Data, yr_cal, path):
 
 
         # Calculate water use limits and actual water use
-        wul = wuse_limits[i][2]
+        water_all =  wuse_limits[i][2]                  # Total available water
+        wul = wuse_limits[i][3]                         # Water use limit
         wreq_reg = df_region['Water Use (ML)'].sum()
 
         # Calculate absolute and proportional difference between water use target and actual water use
         abs_diff = wreq_reg - wul
         prop_diff = (wreq_reg / wul) * 100 if wul > 0 else np.nan
+        prop_all = (wreq_reg / water_all) * 100 if water_all > 0 else np.nan
         # Add to dataframe
         df.loc[i] = ( region
                     , region_dict[region]
                     , wul
                     , wreq_reg 
                     , abs_diff
-                    , prop_diff )
+                    , prop_diff
+                    , prop_all)
 
     # Write to CSV with 2 DP
     df = df.drop(columns=['REGION_ID']).set_index('REGION_NAME').stack().reset_index()

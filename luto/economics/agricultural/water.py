@@ -247,8 +247,8 @@ def get_wuse_limits(data: Data):
     - data: The data object containing the necessary input data.
 
     Returns:
-    - wuse_limits: A list of tuples containing the water use limits for each region. Each tuple contains the region ID,
-      region name, water use limit, and the indices of cells in the region.
+    - wuse_limits: A list of tuples containing the water use limits for each region
+      (region index, region name, water use limit, water all, indices of cells in the region).
 
     Raises:
     - None
@@ -304,10 +304,11 @@ def get_wuse_limits(data: Data):
             ind = np.flatnonzero(region_id == region).astype(np.int32)
     
             # Retrieve the pre-calculated 2010 water use limit (ML) for each region.
-            wuse_reg_limit = region_limits[region] * settings.WATER_STRESS_FRACTION   # np.sum( w_lim_r[ind] )
+            water_all = region_limits[region]
+            wuse_reg_limit =  water_all * settings.WATER_STRESS_FRACTION   # np.sum( w_lim_r[ind] )
     
             # Append to list
-            wuse_limits.append( (region, region_name[region], wuse_reg_limit, ind) )
+            wuse_limits.append( (region, region_name[region], water_all, wuse_reg_limit, ind) )
             
 
     return wuse_limits
