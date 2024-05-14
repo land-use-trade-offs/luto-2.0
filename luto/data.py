@@ -164,6 +164,17 @@ class Data:
 
             # Superimpose resfactor mask upon land-use map mask (Boolean).
             self.MASK = self.LUMASK * resmask
+            
+            # Below are the coordinates ((row, ....), (col, ...)) for each valid cell in the original 2D array
+            self.MASK_IDX_2D_DENSE = nonzeroes[0], nonzeroes[1]
+            
+            # The 2D lumap in the begining year at full resolution. -1 for non-agricultural land, -9999 for nodata
+            self.LUMAP_2D = np.full(self.NLUM_MASK.shape, -9999)
+            np.place(self.LUMAP_2D, self.NLUM_MASK, self.LUMAP_NO_RESFACTOR)
+            
+            # Suppose we have a 2D resfactored array, below is the coordinates ((row, ....), (col, ...)) for each valid cell
+            self.MASK_IDX_2D_SPARSE = nonzeroes[0][self.MASK]//settings.RESFACTOR, nonzeroes[1][self.MASK]//settings.RESFACTOR
+            
 
         elif settings.RESFACTOR == 1:
             self.MASK = self.LUMASK
