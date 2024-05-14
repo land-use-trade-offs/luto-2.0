@@ -3,6 +3,7 @@ import pandas as pd
 from luto.settings import NON_AG_LAND_USES
 
 from luto.data import Data
+from luto import tools
 
 
 def get_ghg_env_plantings(data: Data, aggregate) -> np.ndarray|pd.DataFrame:
@@ -74,9 +75,9 @@ def get_ghg_agroforestry_base(data: Data) -> np.ndarray:
 
 def get_ghg_sheep_agroforestry(
     data: Data,
-    aggregate: bool,
     ag_g_mrj: np.ndarray, 
-    agroforestry_x_r: np.ndarray
+    agroforestry_x_r: np.ndarray,
+    aggregate: bool,
 ) -> np.ndarray|pd.DataFrame:
     """
     Parameters
@@ -111,9 +112,9 @@ def get_ghg_sheep_agroforestry(
 
 def get_ghg_beef_agroforestry(
     data: Data,
-    aggregate: bool,
     ag_g_mrj: np.ndarray, 
-    agroforestry_x_r: np.ndarray
+    agroforestry_x_r: np.ndarray,
+    aggregate: bool,
 ) -> np.ndarray|pd.DataFrame:
     """
     Parameters
@@ -191,9 +192,9 @@ def get_ghg_carbon_plantings_belt_base(data) -> np.ndarray:
 
 def get_ghg_sheep_carbon_plantings_belt(
     data: Data,
-    aggregate: bool,
     ag_g_mrj: np.ndarray, 
-    cp_belt_x_r: np.ndarray
+    cp_belt_x_r: np.ndarray,
+    aggregate: bool,
 ) -> np.ndarray|pd.DataFrame:
     """
     Parameters
@@ -228,9 +229,9 @@ def get_ghg_sheep_carbon_plantings_belt(
 
 def get_ghg_beef_carbon_plantings_belt(
     data: Data,
-    aggregate: bool,
     ag_g_mrj: np.ndarray, 
-    cp_belt_x_r: np.ndarray
+    cp_belt_x_r: np.ndarray,
+    aggregate: bool,
 ) -> np.ndarray|pd.DataFrame:
     """
     Parameters
@@ -289,7 +290,7 @@ def get_ghg_beccs(data, aggregate) -> np.ndarray|pd.DataFrame:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
 
-def get_ghg_matrix(data: Data, aggregate=True) -> np.ndarray:
+def get_ghg_matrix(data: Data, ag_g_mrj, lumap, aggregate=True) -> np.ndarray:
     """
     Get the g_rk matrix containing non-agricultural greenhouse gas emissions.
 
@@ -308,6 +309,9 @@ def get_ghg_matrix(data: Data, aggregate=True) -> np.ndarray:
     - The function internally calls several other functions to calculate different components of the g_rk matrix.
     """
 
+    agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
+    cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
+
     non_agr_ghg_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
@@ -318,19 +322,19 @@ def get_ghg_matrix(data: Data, aggregate=True) -> np.ndarray:
         non_agr_ghg_matrices['Riparian Plantings'] = get_ghg_rip_plantings(data, aggregate)
 
     if NON_AG_LAND_USES['Sheep Agroforestry']:
-        non_agr_ghg_matrices['Sheep Agroforestry'] = get_ghg_sheep_agroforestry(data, aggregate)
+        non_agr_ghg_matrices['Sheep Agroforestry'] = get_ghg_sheep_agroforestry(data, ag_g_mrj, agroforestry_x_r, aggregate)
 
     if NON_AG_LAND_USES['Beef Agroforestry']:
-        non_agr_ghg_matrices['Beef Agroforestry'] = get_ghg_beef_agroforestry(data, aggregate)
+        non_agr_ghg_matrices['Beef Agroforestry'] = get_ghg_beef_agroforestry(data, ag_g_mrj, agroforestry_x_r, aggregate)
 
     if NON_AG_LAND_USES['Carbon Plantings (Block)']:
         non_agr_ghg_matrices['Carbon Plantings (Block)'] = get_ghg_carbon_plantings_block(data, aggregate)
 
     if NON_AG_LAND_USES['Sheep Carbon Plantings (Belt)']:
-        non_agr_ghg_matrices['Sheep Carbon Plantings (Belt)'] = get_ghg_sheep_carbon_plantings_belt(data, aggregate)
+        non_agr_ghg_matrices['Sheep Carbon Plantings (Belt)'] = get_ghg_sheep_carbon_plantings_belt(data, ag_g_mrj, cp_belt_x_r, aggregate)
 
     if NON_AG_LAND_USES['Beef Carbon Plantings (Belt)']:
-        non_agr_ghg_matrices['Beef Carbon Plantings (Belt)'] = get_ghg_beef_carbon_plantings_belt(data, aggregate)
+        non_agr_ghg_matrices['Beef Carbon Plantings (Belt)'] = get_ghg_beef_carbon_plantings_belt(data, ag_g_mrj, cp_belt_x_r, aggregate)
 
     if NON_AG_LAND_USES['BECCS']:
         non_agr_ghg_matrices['BECCS'] = get_ghg_beccs(data, aggregate)

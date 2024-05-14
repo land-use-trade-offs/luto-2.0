@@ -1,11 +1,9 @@
 import numpy as np
 
-from luto.data import Data
-from luto.settings import NON_AG_LAND_USES
 from luto import tools
 
 
-def get_sheep_q_cr(data: Data, ag_q_mrp: np.ndarray) -> np.ndarray:
+def get_sheep_q_cr(data, ag_q_mrp: np.ndarray) -> np.ndarray:
     """
     Gets the matrix containing the commodities produced by sheep (natural land) 
     """
@@ -25,7 +23,7 @@ def get_sheep_q_cr(data: Data, ag_q_mrp: np.ndarray) -> np.ndarray:
     return sheep_q_cr
         
 
-def get_beef_q_cr(data: Data, ag_q_mrp: np.ndarray) -> np.ndarray:
+def get_beef_q_cr(data, ag_q_mrp: np.ndarray) -> np.ndarray:
     """
     Gets the matrix containing the commodities produced by beef (natural land) 
     """
@@ -78,7 +76,7 @@ def get_quantity_rip_plantings(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_agroforestry_base(data: Data) -> np.ndarray:
+def get_quantity_agroforestry_base(data) -> np.ndarray:
     """
     Parameters
     ----------
@@ -96,7 +94,7 @@ def get_quantity_agroforestry_base(data: Data) -> np.ndarray:
 
 
 def get_quantity_sheep_agroforestry(
-    data: Data,
+    data,
     ag_q_mrp: np.ndarray, 
     agroforestry_x_r: np.ndarray
 ) -> np.ndarray:
@@ -127,7 +125,7 @@ def get_quantity_sheep_agroforestry(
 
 
 def get_quantity_beef_agroforestry(
-    data: Data, 
+    data, 
     ag_q_mrp: np.ndarray, 
     agroforestry_x_r: np.ndarray
 ) -> np.ndarray:
@@ -159,7 +157,7 @@ def get_quantity_beef_agroforestry(
 
 
 def get_quantity_sheep_agroforestry(
-    data: Data, 
+    data, 
     ag_q_mrp: np.ndarray, 
     agroforestry_x_r: np.ndarray
 ) -> np.ndarray:
@@ -190,7 +188,7 @@ def get_quantity_sheep_agroforestry(
 
 
 def get_quantity_beef_agroforestry(
-    data: Data, 
+    data, 
     ag_q_mrp: np.ndarray, 
     agroforestry_x_r: np.ndarray
 ) -> np.ndarray:
@@ -238,7 +236,7 @@ def get_quantity_carbon_plantings_block(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_carbon_plantings_belt_base(data: Data) -> np.ndarray:
+def get_quantity_carbon_plantings_belt_base(data) -> np.ndarray:
     """
     Parameters
     ----------
@@ -256,7 +254,7 @@ def get_quantity_carbon_plantings_belt_base(data: Data) -> np.ndarray:
 
 
 def get_quantity_sheep_carbon_plantings_belt(
-    data: Data, 
+    data, 
     ag_q_mrp: np.ndarray, 
     cp_belt_x_r: np.ndarray
 ) -> np.ndarray:
@@ -287,7 +285,7 @@ def get_quantity_sheep_carbon_plantings_belt(
 
 
 def get_quantity_beef_carbon_plantings_belt(
-    data: Data, 
+    data, 
     ag_q_mrp: np.ndarray, 
     cp_belt_x_r: np.ndarray
 ) -> np.ndarray:
@@ -318,7 +316,7 @@ def get_quantity_beef_carbon_plantings_belt(
 
 
 def get_quantity_sheep_carbon_plantings_belt(
-    data: Data, 
+    data, 
     ag_q_mrp: np.ndarray, 
     cp_belt_x_r: np.ndarray
 ) -> np.ndarray:
@@ -349,7 +347,7 @@ def get_quantity_sheep_carbon_plantings_belt(
 
 
 def get_quantity_beef_carbon_plantings_belt(
-    data: Data, 
+    data, 
     ag_q_mrp: np.ndarray, 
     cp_belt_x_r: np.ndarray
 ) -> np.ndarray:
@@ -396,7 +394,7 @@ def get_quantity_beccs(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS))
 
 
-def get_quantity_matrix(data: Data, ag_q_mrp: np.ndarray, lumap: np.ndarray) -> np.ndarray:
+def get_quantity_matrix(data, ag_q_mrp: np.ndarray, lumap: np.ndarray) -> np.ndarray:
     """
     Get the non-agricultural quantity matrix q_crk.
     Values represent the yield of each commodity c from the cell r when using

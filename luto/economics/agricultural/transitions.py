@@ -107,7 +107,7 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
     l_mrj_not = np.logical_not(l_mrj)
 
     # Get the exclusion matrix
-    x_mrj = get_exclude_matrices(data, base_year, lumaps)
+    x_mrj = get_exclude_matrices(data, lumap)
 
     ag_cells, _ = tools.get_ag_and_non_ag_cells(lumap)
 

@@ -234,9 +234,11 @@ class Data:
         self.NON_AG_LU_NATURAL = [ 
             self.DESC2NONAGLU["Environmental Plantings"],
             self.DESC2NONAGLU["Riparian Plantings"],
-            self.DESC2NONAGLU["Agroforestry"],
+            self.DESC2NONAGLU["Sheep Agroforestry"],
+            self.DESC2NONAGLU["Beef Agroforestry"],
             self.DESC2NONAGLU["Carbon Plantings (Block)"],
-            self.DESC2NONAGLU["Carbon Plantings (Belt)"],
+            self.DESC2NONAGLU["Sheep Carbon Plantings (Belt)"],
+            self.DESC2NONAGLU["Beef Carbon Plantings (Belt)"],
             self.DESC2NONAGLU["BECCS"],
         ]
 
@@ -510,10 +512,7 @@ class Data:
         ###############################################################
         print("\tCalculating base year productivity...", flush=True)
         yr_cal_base_prod_data = self.get_production(
-            self.YR_CAL_BASE,
-            ag_X_mrj = lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR),
-            non_ag_X_rk = lumap2non_ag_l_mk(self.LUMAP_NO_RESFACTOR, len(settings.NON_AG_LAND_USES.keys())),
-            ag_man_X_mrj = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS),
+            self.YR_CAL_BASE, self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR
         )
         self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
         
@@ -1105,9 +1104,8 @@ class Data:
     def get_production(
         self,
         yr_cal: int,
-        ag_X_mrj: np.ndarray,
-        non_ag_X_rk: np.ndarray,
-        ag_man_X_mrj: np.ndarray,
+        lumap: np.ndarray,
+        lmmap: np.ndarray,
     ) -> np.ndarray:
         """
         Return total production of commodities for a specific year...
@@ -1120,6 +1118,9 @@ class Data:
         Includes the impacts of land-use change, productivity increases, and 
         climate change on yield.
         """
+        ag_X_mrj = lumap2ag_l_mrj(lumap, lmmap)
+        non_ag_X_rk = lumap2non_ag_l_mk(lumap, len(settings.NON_AG_LAND_USES.keys()))
+        ag_man_X_mrj = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
 
         # Calculate year index (i.e., number of years since 2010)
         yr_idx = yr_cal - self.YR_CAL_BASE
@@ -1143,7 +1144,7 @@ class Data:
 
         # Get the quantity of each commodity produced by non-agricultural land uses
         # Quantity matrix in the shape of c, r, k
-        q_crk = non_ag_quantity.get_quantity_matrix(self)
+        q_crk = non_ag_quantity.get_quantity_matrix(self, ag_q_mrp, lumap)
         non_ag_q_c = [(q_crk[c, :, :] * non_ag_X_rk).sum()
                     for c in range(self.NCMS)]
 

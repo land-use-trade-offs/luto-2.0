@@ -245,13 +245,13 @@ def get_wreq_matrix(data: Data, ag_w_mrj: np.ndarray, lumap: np.ndarray) -> np.n
         non_agr_wreq_matrices['Beef Agroforestry'] = get_wreq_beef_agroforestry(data, ag_w_mrj, agroforestry_x_r).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['Carbon Plantings (Block)']:
-        non_agr_wreq_matrices['Carbon Plantings (Block)'] = get_wreq_matrix_carbon_plantings_block(data, ag_w_mrj, cp_belt_x_r).reshape((data.NCELLS, 1))
+        non_agr_wreq_matrices['Carbon Plantings (Block)'] = get_wreq_matrix_carbon_plantings_block(data).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['Sheep Carbon Plantings (Belt)']:
         non_agr_wreq_matrices['Sheep Carbon Plantings (Belt)'] = get_wreq_sheep_carbon_plantings_belt(data, ag_w_mrj, cp_belt_x_r).reshape((data.NCELLS, 1))
     
     if NON_AG_LAND_USES['Beef Carbon Plantings (Belt)']:
-        non_agr_wreq_matrices['Beef Carbon Plantings (Belt)'] = get_wreq_beef_carbon_plantings_belt(data).reshape((data.NCELLS, 1))
+        non_agr_wreq_matrices['Beef Carbon Plantings (Belt)'] = get_wreq_beef_carbon_plantings_belt(data, ag_w_mrj, cp_belt_x_r).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['BECCS']:
         non_agr_wreq_matrices['BECCS'] = get_wreq_matrix_beccs(data).reshape((data.NCELLS, 1))

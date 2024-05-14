@@ -186,9 +186,9 @@ def get_ag_g_mrj(data: Data, target_index):
     return output.astype(np.float32)
 
 
-def get_non_ag_g_rk(data: Data):
+def get_non_ag_g_rk(data: Data, ag_g_mrj, base_year):
     print('Getting non-agricultural GHG emissions matrices...', flush = True)
-    output = non_ag_ghg.get_ghg_matrix(data)
+    output = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj, data.lumaps[base_year])
     return output.astype(np.float32)
 
 
@@ -244,12 +244,11 @@ def get_ag_ghg_t_mrj(data: Data, base_year):
     return output.astype(np.float32)
 
 
-def get_ag_to_non_ag_t_rk(data: Data, base_year):
+def get_ag_to_non_ag_t_rk(data: Data, yr_idx, base_year):
     print('Getting agricultural to non-agricultural transition cost matrices...', flush = True)
-    output = non_ag_transition.get_from_ag_transition_matrix(data
-                                                           , base_year
-                                                           , data.lumaps[base_year]
-                                                           , data.lmmaps[base_year])
+    output = non_ag_transition.get_from_ag_transition_matrix(
+        data, yr_idx, base_year, data.lumaps[base_year], data.lmmaps[base_year]
+    )
     return output.astype(np.float32)
 
 
@@ -271,9 +270,9 @@ def get_ag_x_mrj(data: Data, base_year):
     return output
 
 
-def get_non_ag_x_rk(data: Data, base_year):
+def get_non_ag_x_rk(data: Data, ag_x_mrj, base_year):
     print('Getting non-agricultural exclude matrices...', flush = True)
-    output = non_ag_transition.get_exclude_matrices(data, data.lumaps[base_year])
+    output = non_ag_transition.get_exclude_matrices(data, ag_x_mrj, data.lumaps[base_year])
     return output
 
 
@@ -378,7 +377,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_x_mrj=ag_x_mrj,
         ag_q_mrp=ag_q_mrp,
         ag_ghg_t_mrj=get_ag_ghg_t_mrj(data, base_year),
-        ag_to_non_ag_t_rk=get_ag_to_non_ag_t_rk(data, base_year),
+        ag_to_non_ag_t_rk=get_ag_to_non_ag_t_rk(data, target_index, base_year),
         non_ag_to_ag_t_mrj=get_non_ag_to_ag_t_mrj(data, base_year),
         non_ag_t_rk=get_non_ag_t_rk(data, base_year),
         non_ag_c_rk=get_non_ag_c_rk(data, ag_c_mrj, base_year),
@@ -386,7 +385,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         non_ag_g_rk=get_non_ag_g_rk(data, ag_g_mrj, base_year),
         non_ag_w_rk=get_non_ag_w_rk(data, ag_w_mrj, base_year),
         non_ag_b_rk=get_non_ag_b_rk(data, ag_b_mrj, base_year),
-        non_ag_x_rk=get_non_ag_x_rk(data, base_year),
+        non_ag_x_rk=get_non_ag_x_rk(data, ag_x_mrj, base_year),
         non_ag_q_crk=get_non_ag_q_crk(data, ag_q_mrp, base_year),
         non_ag_lb_rk=get_non_ag_lb_rk(data, base_year),
         ag_man_c_mrj=get_ag_man_costs(data, target_index, ag_c_mrj),
