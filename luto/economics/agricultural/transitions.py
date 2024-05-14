@@ -30,7 +30,7 @@ from luto import settings
 import luto.tools as tools
 
 
-def get_exclude_matrices(data: Data, base_year: int, lumaps: Dict[int, np.ndarray]):
+def get_exclude_matrices(data: Data, lumap: np.ndarray):
     """Return x_mrj exclude matrices.
 
     An exclude matrix indicates whether switching land-use for a certain cell r 
@@ -63,8 +63,7 @@ def get_exclude_matrices(data: Data, base_year: int, lumaps: Dict[int, np.ndarra
     # Raw transition-cost matrix is in $/ha and lexicographically ordered by land-use (shape = 28 x 28).
     t_ij = data.AG_TMATRIX
 
-    lumap = lumaps[base_year]
-    lumap_2010 = lumaps[2010]
+    lumap_2010 = data.LUMAP
 
     # Get all agricultural and non-agricultural cells
     ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)

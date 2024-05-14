@@ -162,9 +162,9 @@ def get_ag_c_mrj(data: Data, target_index):
     return output.astype(np.float32)
 
 
-def get_non_ag_c_rk(data: Data):
+def get_non_ag_c_rk(data: Data, ag_c_mrj: np.ndarray, lumap: np.ndarray):
     print('Getting non-agricultural production cost matrices...', flush = True)
-    output = non_ag_cost.get_cost_matrix(data)
+    output = non_ag_cost.get_cost_matrix(data, ag_c_mrj, lumap)
     return output.astype(np.float32)
 
 
@@ -174,9 +174,9 @@ def get_ag_r_mrj(data: Data, target_index):
     return output.astype(np.float32)
 
 
-def get_non_ag_r_rk(data: Data):
+def get_non_ag_r_rk(data: Data, ag_r_mrj: np.ndarray, base_year: int):
     print('Getting non-agricultural production revenue matrices...', flush = True)
-    output = non_ag_revenue.get_rev_matrix(data)
+    output = non_ag_revenue.get_rev_matrix(data, ag_r_mrj, data.lumaps[base_year])
     return output.astype(np.float32)
 
 
@@ -204,15 +204,15 @@ def get_ag_b_mrj(data: Data):
     return output.astype(np.float32)
 
 
-def get_non_ag_w_rk(data: Data):
+def get_non_ag_w_rk(data: Data, ag_w_mrj: np.ndarray, base_year):
     print('Getting non-agricultural water requirement matrices...', flush = True)
-    output = non_ag_water.get_wreq_matrix(data)
+    output = non_ag_water.get_wreq_matrix(data, ag_w_mrj, data.lumaps[base_year])
     return output.astype(np.float32)
 
 
-def get_non_ag_b_rk(data: Data):
+def get_non_ag_b_rk(data: Data, ag_b_mrj: np.ndarray, base_year):
     print('Getting non-agricultural biodiversity requirement matrices...', flush = True)
-    output = non_ag_biodiversity.get_breq_matrix(data)
+    output = non_ag_biodiversity.get_breq_matrix(data, ag_b_mrj, data.lumaps[base_year])
     return output.astype(np.float32)
 
 
@@ -222,9 +222,9 @@ def get_ag_q_mrp(data: Data, target_index):
     return output.astype(np.float32)
 
 
-def get_non_ag_q_crk(data: Data):
+def get_non_ag_q_crk(data: Data, ag_q_mrp: np.ndarray, base_year: int):
     print('Getting non-agricultural production quantity matrices...', flush = True)
-    output = non_ag_quantity.get_quantity_matrix(data)
+    output = non_ag_quantity.get_quantity_matrix(data, ag_q_mrp, data.lumaps[base_year])
     return output.astype(np.float32)
 
 
@@ -267,7 +267,7 @@ def get_non_ag_t_rk(data: Data, base_year):
 
 def get_ag_x_mrj(data: Data, base_year):
     print('Getting agricultural exclude matrices...', flush = True)
-    output = ag_transition.get_exclude_matrices(data, base_year, data.lumaps)
+    output = ag_transition.get_exclude_matrices(data, data.lumaps[base_year])
     return output
 
 
@@ -381,13 +381,13 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_to_non_ag_t_rk=get_ag_to_non_ag_t_rk(data, base_year),
         non_ag_to_ag_t_mrj=get_non_ag_to_ag_t_mrj(data, base_year),
         non_ag_t_rk=get_non_ag_t_rk(data, base_year),
-        non_ag_c_rk=get_non_ag_c_rk(data),
-        non_ag_r_rk=get_non_ag_r_rk(data),
-        non_ag_g_rk=get_non_ag_g_rk(data),
-        non_ag_w_rk=get_non_ag_w_rk(data),
-        non_ag_b_rk=get_non_ag_b_rk(data),
+        non_ag_c_rk=get_non_ag_c_rk(data, ag_c_mrj, base_year),
+        non_ag_r_rk=get_non_ag_r_rk(data, ag_r_mrj, base_year),
+        non_ag_g_rk=get_non_ag_g_rk(data, ag_g_mrj, base_year),
+        non_ag_w_rk=get_non_ag_w_rk(data, ag_w_mrj, base_year),
+        non_ag_b_rk=get_non_ag_b_rk(data, ag_b_mrj, base_year),
         non_ag_x_rk=get_non_ag_x_rk(data, base_year),
-        non_ag_q_crk=get_non_ag_q_crk(data),
+        non_ag_q_crk=get_non_ag_q_crk(data, ag_q_mrp, base_year),
         non_ag_lb_rk=get_non_ag_lb_rk(data, base_year),
         ag_man_c_mrj=get_ag_man_costs(data, target_index, ag_c_mrj),
         ag_man_g_mrj=get_ag_man_ghg(data, target_index, ag_g_mrj),
