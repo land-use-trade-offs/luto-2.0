@@ -7,7 +7,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from luto.tools.report.map_tools.helper import download_basemap
-from luto.tools.report.map_tools.parameters import  extra_desc_float_tif
+from luto.tools.report.map_tools.parameters import  DPI, FIG_SIZE, extra_desc_float_tif
 
 
 
@@ -66,19 +66,16 @@ def create_png_map(tif_path: str,
     # Mosaic the raster with the basemap
     with rasterio.open(in_mercator_path) as src, rasterio.open(basemap_path) as base:
         # Mosaic the raster with the basemap
-        mosaic, out_transform = merge([src, base])
+        mosaic, out_transform = merge([src, base], res=base.res)
 
     # Get the shape of the mosaic array
     array_shape = mosaic.shape[-2:]  # (height, width)  
     # Calculate the extent
     left, bottom, right, top = rasterio.transform.array_bounds(array_shape[0], array_shape[1], out_transform)
 
-    # Set the DPI so that one dot corresponds to one pixel
-    dpi = 300
-    # Calculate the figure size in inches
-    figsize = [dim / dpi for dim in array_shape]
+
     # Create the figure and axis
-    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+    fig, ax = plt.subplots(figsize=FIG_SIZE, dpi=DPI)
 
     # Display the array with the correct extent
     ax.imshow(mosaic.transpose(1,2,0), extent=[left, right, bottom, top], interpolation='none')
@@ -112,7 +109,7 @@ def create_png_map(tif_path: str,
 
     # Optionally remove axis
     ax.set_axis_off()
-    plt.savefig(png_out_path, dpi=dpi, bbox_inches='tight', pad_inches=0)
+    plt.savefig(png_out_path, dpi=DPI, bbox_inches='tight', pad_inches=0)
 
     plt.close(fig)
 

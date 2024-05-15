@@ -1,5 +1,7 @@
 
+import itertools
 import os
+import random
 import re
 import shutil
 import keyword
@@ -88,6 +90,61 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
         submit_task(cwd, col)
         
 
+
+# Grid search to set grid search parameters
+def create_grid_search_template(num_runs:int = 10):
+    # Gird parameters for {AG_MANAGEMENTS} and {AG_MANAGEMENTS_REVERSIBLE}
+    grid_am = {
+        'Asparagopsis taxiformis': [True, False],
+        'Precision Agriculture': [True, False],
+        'Ecological Grazing': [True, False],
+        'Savanna Burning': [True, False],
+        'AgTech EI': [True, False],
+    }
+
+    # Grid parameters for {NON_AG_LAND_USES} and {NON_AG_LAND_USES_REVERSIBLE}
+    grid_non_ag = {
+        'Environmental Plantings': [True, False],
+        'Riparian Plantings': [True, False],
+        'Agroforestry': [True, False],
+        'Carbon Plantings (Block)': [True, False],
+        'Carbon Plantings (Belt)': [True, False],
+        'BECCS': [True, False],
+    }
+
+    # Grid parameters for {MODE}
+    grid_mode = ['timeseries', 'snapshot']
+
+
+    # Create grid search parameter space
+    custom_settings = pd.read_csv(f'{TASK_ROOT_DIR}/settings_template.csv')
+    custom_settings = custom_settings[['Name', 'Default_run']]
+
+
+    seen_am = set()
+    seen_non_ag = set()
+    random_choices = num_runs // len(grid_mode)
+
+    for idx, (mode, _) in enumerate(itertools.product(grid_mode, range(random_choices))):
+
+        select_am = {key: random.choice(value) for key, value in grid_am.items()}
+        select_non_ag = {key: random.choice(value) for key, value in grid_non_ag.items()}
+
+        if str(select_am) in seen_am and str(select_non_ag) in seen_non_ag:
+            continue
+
+        seen_am.add(str(select_am))
+        seen_non_ag.add(str(select_non_ag))
+
+        custom_settings[f'run_{idx:02}'] = custom_settings['Default_run']
+        custom_settings.loc[(custom_settings['Name'] == 'MODE'), f'run_{idx:02}'] = mode
+        custom_settings.loc[(custom_settings['Name'] == 'AG_MANAGEMENTS'), f'run_{idx:02}'] = str(select_am)
+        custom_settings.loc[(custom_settings['Name'] == 'AG_MANAGEMENTS_REVERSIBLE'), f'run_{idx:02}'] = str(select_am)
+        custom_settings.loc[(custom_settings['Name'] == 'NON_AG_LAND_USES'), f'run_{idx:02}'] = str(select_non_ag)
+        custom_settings.loc[(custom_settings['Name'] == 'NON_AG_LAND_USES_REVERSIBLE'), f'run_{idx:02}'] = str(select_non_ag)
+
+    custom_settings = custom_settings[['Name','Default_run'] + sorted(custom_settings.columns[2:])]
+    custom_settings.to_csv(f'{TASK_ROOT_DIR}/settings_template.csv', index=False)
 
 
 

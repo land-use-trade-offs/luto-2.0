@@ -163,11 +163,11 @@ def get_agricultural_management_biodiversity_matrices(data: Data):
     The keys of the dictionary represent the management practices, and the values represent the corresponding biodiversity matrices.
     """
 
-    asparagopsis_data = get_asparagopsis_effect_b_mrj(data)
-    precision_agriculture_data = get_precision_agriculture_effect_b_mrj(data)
-    eco_grazing_data = get_ecological_grazing_effect_b_mrj(data)
-    sav_burning_data = get_savanna_burning_effect_b_mrj(data)
-    agtech_ei_data = get_agtech_ei_effect_b_mrj(data)
+    asparagopsis_data = get_asparagopsis_effect_b_mrj(data) if settings.AG_MANAGEMENTS['Asparagopsis taxiformis'] else 0
+    precision_agriculture_data = get_precision_agriculture_effect_b_mrj(data) if settings.AG_MANAGEMENTS['Precision Agriculture'] else 0
+    eco_grazing_data = get_ecological_grazing_effect_b_mrj(data) if settings.AG_MANAGEMENTS['Ecological Grazing'] else 0
+    sav_burning_data = get_savanna_burning_effect_b_mrj(data) if settings.AG_MANAGEMENTS['Savanna Burning'] else 0
+    agtech_ei_data = get_agtech_ei_effect_b_mrj(data) if settings.AG_MANAGEMENTS['AgTech EI'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,

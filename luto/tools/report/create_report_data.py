@@ -1080,7 +1080,7 @@ def save_report_data(raw_data_dir:str):
     
 
     # Plot_5-1: Water use compared to limite (%)
-    water_df_total_pct = water_df_total.query('Variable == "PROPORTION_%" ')
+    water_df_total_pct = water_df_total.query('Variable == "PROPORTION_ALL_%" ')
     water_df_total_pct_wide = water_df_total_pct\
                                 .groupby(['REGION_NAME'])[['Year','Value (ML)']]\
                                 .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\

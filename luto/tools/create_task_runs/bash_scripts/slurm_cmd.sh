@@ -4,6 +4,14 @@
 source luto/settings_bash.py
 export PATH=$PATH:/usr/local/bin
 
+if [ -f ~/gurobi.lic ]; then
+    grb_license=~/gurobi.lic
+else
+    grb_license=~/gurobi_${NODE}.lic
+fi
+
+export GRB_LICENSE_FILE=$grb_license
+
 
 # Create a temporary script file
 SCRIPT=$(mktemp)

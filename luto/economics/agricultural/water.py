@@ -223,11 +223,11 @@ def get_agtech_ei_effect_w_mrj(data, w_mrj, yr_idx):
 
 
 def get_agricultural_management_water_matrices(data: Data, w_mrj, yr_idx) -> Dict[str, np.ndarray]:
-    asparagopsis_data = get_asparagopsis_effect_w_mrj(data, w_mrj, yr_idx)
-    precision_agriculture_data = get_precision_agriculture_effect_w_mrj(data, w_mrj, yr_idx)
-    eco_grazing_data = get_ecological_grazing_effect_w_mrj(data, w_mrj, yr_idx)
-    sav_burning_data = get_savanna_burning_effect_w_mrj(data)
-    agtech_ei_data = get_agtech_ei_effect_w_mrj(data, w_mrj, yr_idx)
+    asparagopsis_data = get_asparagopsis_effect_w_mrj(data, w_mrj, yr_idx) if settings.AG_MANAGEMENTS['Asparagopsis taxiformis'] else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+    precision_agriculture_data = get_precision_agriculture_effect_w_mrj(data, w_mrj, yr_idx) if settings.AG_MANAGEMENTS['Precision Agriculture'] else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+    eco_grazing_data = get_ecological_grazing_effect_w_mrj(data, w_mrj, yr_idx) if settings.AG_MANAGEMENTS['Ecological Grazing'] else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+    sav_burning_data = get_savanna_burning_effect_w_mrj(data) if settings.AG_MANAGEMENTS['Savanna Burning'] else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+    agtech_ei_data = get_agtech_ei_effect_w_mrj(data, w_mrj, yr_idx) if settings.AG_MANAGEMENTS['AgTech EI'] else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -247,8 +247,8 @@ def get_wuse_limits(data: Data):
     - data: The data object containing the necessary input data.
 
     Returns:
-    - wuse_limits: A list of tuples containing the water use limits for each region. Each tuple contains the region ID,
-      region name, water use limit, and the indices of cells in the region.
+    - wuse_limits: A list of tuples containing the water use limits for each region
+      (region index, region name, water use limit, water all, indices of cells in the region).
 
     Raises:
     - None
@@ -304,10 +304,11 @@ def get_wuse_limits(data: Data):
             ind = np.flatnonzero(region_id == region).astype(np.int32)
     
             # Retrieve the pre-calculated 2010 water use limit (ML) for each region.
-            wuse_reg_limit = region_limits[region] * settings.WATER_STRESS_FRACTION   # np.sum( w_lim_r[ind] )
+            water_all = region_limits[region]
+            wuse_reg_limit =  water_all * settings.WATER_STRESS_FRACTION   # np.sum( w_lim_r[ind] )
     
             # Append to list
-            wuse_limits.append( (region, region_name[region], wuse_reg_limit, ind) )
+            wuse_limits.append( (region, region_name[region], water_all, wuse_reg_limit, ind) )
             
 
     return wuse_limits

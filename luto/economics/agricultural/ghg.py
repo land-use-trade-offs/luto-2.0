@@ -558,11 +558,11 @@ def get_agricultural_management_ghg_matrices(data: Data, g_mrj, yr_idx) -> dict[
         The keys of the dictionary represent the management practices, and the values are numpy arrays.
 
     """
-    asparagopsis_data = get_asparagopsis_effect_g_mrj(data, yr_idx)
-    precision_agriculture_data = get_precision_agriculture_effect_g_mrj(data, yr_idx)
-    eco_grazing_data = get_ecological_grazing_effect_g_mrj(data, yr_idx)
-    sav_burning_ghg_impact = get_savanna_burning_effect_g_mrj(data)
-    agtech_ei_ghg_impact = get_agtech_ei_effect_g_mrj(data, yr_idx)
+    asparagopsis_data = get_asparagopsis_effect_g_mrj(data, yr_idx) if AG_MANAGEMENTS['Asparagopsis taxiformis'] else 0
+    precision_agriculture_data = get_precision_agriculture_effect_g_mrj(data, yr_idx) if AG_MANAGEMENTS['Precision Agriculture'] else 0
+    eco_grazing_data = get_ecological_grazing_effect_g_mrj(data, yr_idx) if AG_MANAGEMENTS['Ecological Grazing'] else 0
+    sav_burning_ghg_impact = get_savanna_burning_effect_g_mrj(data) if AG_MANAGEMENTS['Savanna Burning'] else 0
+    agtech_ei_ghg_impact = get_agtech_ei_effect_g_mrj(data, yr_idx) if AG_MANAGEMENTS['AgTech EI'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,

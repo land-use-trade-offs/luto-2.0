@@ -1,9 +1,7 @@
-from joblib import Parallel, delayed
 import luto.settings as settings
-from luto.data import Data
+from joblib import Parallel, delayed
 
 from luto.tools.report.data_tools import  get_all_files
-
 from luto.tools.report.map_tools import process_raster, save_map_to_html
 from luto.tools.report.map_tools.map_making import create_png_map
 from luto.tools.report.map_tools.parameters import lucc_rename
