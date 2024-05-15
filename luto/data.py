@@ -159,7 +159,7 @@ class Data:
             # Create settings.RESFACTOR mask for spatial coarse-graining.
             rf_mask = self.NLUM_MASK.copy()
             nonzeroes = np.nonzero(rf_mask)
-            rf_mask[::settings.RESFACTOR, ::settings.RESFACTOR] = 0
+            rf_mask[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR] = 0
             resmask = np.where(rf_mask[nonzeroes] == 0, True, False)
 
             # Superimpose resfactor mask upon land-use map mask (Boolean).
@@ -175,7 +175,6 @@ class Data:
             # Suppose we have a 2D resfactored array, below is the coordinates ((row, ....), (col, ...)) for each valid cell
             self.MASK_IDX_2D_SPARSE = nonzeroes[0][self.MASK]//settings.RESFACTOR, nonzeroes[1][self.MASK]//settings.RESFACTOR
             
-
         elif settings.RESFACTOR == 1:
             self.MASK = self.LUMASK
 

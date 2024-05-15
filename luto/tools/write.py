@@ -174,14 +174,14 @@ def get_settings(setting_path:str):
         settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
 
         # Set unused variables to None
-        settings_dict['GHG_LIMITS_FIELD'] = 'None' if settings.GHG_LIMITS_TYPE == 'dict' else None
-        settings_dict['GHG_LIMITS'] = 'None' if settings.GHG_LIMITS_TYPE == 'file' else None
+        settings_dict['GHG_LIMITS_FIELD'] = 'None' if settings.GHG_LIMITS_TYPE == 'dict' else settings_dict['GHG_LIMITS_FIELD']
+        settings_dict['GHG_LIMITS'] = 'None' if settings.GHG_LIMITS_TYPE == 'file' else settings_dict['GHG_LIMITS']
 
-        settings_dict['LAND_USAGE_CULL_PERCENTAGE'] = 'None' if settings.CULL_MODE in ['absolute', 'none'] else None
-        settings_dict['MAX_LAND_USES_PER_CELL'] = 'None' if settings.CULL_MODE in ['percentage', 'none'] else None
+        settings_dict['LAND_USAGE_CULL_PERCENTAGE'] = 'None' if settings.CULL_MODE in ['absolute', 'none'] else settings_dict['LAND_USAGE_CULL_PERCENTAGE']
+        settings_dict['MAX_LAND_USES_PER_CELL'] = 'None' if settings.CULL_MODE in ['percentage', 'none'] else settings_dict['MAX_LAND_USES_PER_CELL']
 
-        settings_dict['WATER_STRESS_FRACTION'] = 'None' if settings.WATER_USE_LIMITS == 'on' and settings.WATER_LIMITS_TYPE == 'pct_ag' else None
-        settings_dict['WATER_USE_REDUCTION_PERCENTAGE'] = 'None' if settings.WATER_USE_LIMITS == 'on' and settings.WATER_LIMITS_TYPE == 'water_stress' else None
+        settings_dict['WATER_STRESS_FRACTION'] = 'None' if settings.WATER_USE_LIMITS == 'on' and settings.WATER_LIMITS_TYPE == 'pct_ag' else settings_dict['WATER_STRESS_FRACTION']
+        settings_dict['WATER_USE_REDUCTION_PERCENTAGE'] = 'None' if settings.WATER_USE_LIMITS == 'on' and settings.WATER_LIMITS_TYPE == 'water_stress' else settings_dict['WATER_USE_REDUCTION_PERCENTAGE']
         
     return settings_dict
     

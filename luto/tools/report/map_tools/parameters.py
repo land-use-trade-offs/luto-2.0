@@ -10,6 +10,10 @@ ag_management = ['Asparagopsis taxiformis',
 lucc_rename = {'Asparagopsis taxiformis' : 'Methane Inhibitors',
                'Precision Agriculture' : 'AgTech Non-Energy'}
 
+# The figure size and DPI for PNG map
+FIG_SIZE = (11.2, 13.6)
+DPI = 300
+
 
 # The val-color(HEX) records for each map type
 color_types ={
