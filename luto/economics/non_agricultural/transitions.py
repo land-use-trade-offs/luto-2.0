@@ -834,10 +834,7 @@ def get_to_ag_transition_matrix(data: Data, yr_idx, lumap, lmmap, separate=False
 
     """
     
-    if separate:
-        non_ag_to_agr_t_matrices = {lu: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)) for lu in NON_AG_LAND_USES}
-    else:
-        non_ag_to_agr_t_matrices = {lu: np.zeros(data.NCELLS) for lu in NON_AG_LAND_USES}
+    non_ag_to_agr_t_matrices = {lu: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)) for lu in NON_AG_LAND_USES}
 
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
@@ -863,7 +860,7 @@ def get_to_ag_transition_matrix(data: Data, yr_idx, lumap, lmmap, separate=False
     if separate:
         # Note: The order of the keys in the dictionary must match the order of the non-agricultural land uses
         return non_ag_to_agr_t_matrices
-        
+            
     non_ag_to_agr_t_matrices = list(non_ag_to_agr_t_matrices.values())
     return np.add.reduce(non_ag_to_agr_t_matrices)
 
@@ -1102,7 +1099,7 @@ def get_lower_bound_non_agricultural_matrices(data: Data, yr) -> np.ndarray:
     2-D array, indexed by (r,k) where r is the cell and k is the non-agricultural land usage.
     """
 
-    if yr not in data.non_ag_dvars:
+    if yr == data.YR_CAL_BASE or yr not in data.non_ag_dvars:
         return np.zeros((data.NCELLS, len(NON_AG_LAND_USES)))
         
     return data.non_ag_dvars[yr].astype(np.float32).round(decimals=settings.LB_ROUND_DECMIALS)

@@ -172,11 +172,11 @@ NON_AG_LAND_USES dictionary to false.
 NON_AG_LAND_USES = {
     'Environmental Plantings': True,
     'Riparian Plantings': True,
-    'Sheep Agroforestry': False,
-    'Beef Agroforestry': False,
+    'Sheep Agroforestry': True,
+    'Beef Agroforestry': True,
     'Carbon Plantings (Block)': True,
-    'Sheep Carbon Plantings (Belt)': False,
-    'Beef Carbon Plantings (Belt)': False,
+    'Sheep Carbon Plantings (Belt)': True,
+    'Beef Carbon Plantings (Belt)': True,
     'BECCS': True,
 }
 
