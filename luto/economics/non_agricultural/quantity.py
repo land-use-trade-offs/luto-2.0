@@ -155,7 +155,6 @@ def get_quantity_beef_agroforestry(
     return agroforestry_contr + beef_contr
 
 
-
 def get_quantity_sheep_agroforestry(
     data, 
     ag_q_mrp: np.ndarray, 
@@ -216,7 +215,6 @@ def get_quantity_beef_agroforestry(
         beef_contr[c, :] *= (1 - agroforestry_x_r)
 
     return agroforestry_contr + beef_contr
-
 
 
 def get_quantity_carbon_plantings_block(data) -> np.ndarray:

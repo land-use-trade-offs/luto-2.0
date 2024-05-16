@@ -20,6 +20,10 @@ def get_biodiv_riparian_plantings(data: Data) -> np.ndarray:
     return data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * RIPARIAN_PLANTING_BIODIV_BENEFIT
 
 
+def get_biodiv_agroforestry_base(data: Data) -> np.ndarray:
+    return data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * AGROFORESTRY_BIODIV_BENEFIT
+
+
 def get_biodiv_sheep_agroforestry(
     data: Data, 
     ag_b_mrj: np.ndarray, 
@@ -138,11 +142,6 @@ def get_biodiv_beef_carbon_plantings_belt(
     cp_contr = base_cp_biodiv * cp_belt_x_r
     beef_contr = beef_biodiv * (1 - cp_belt_x_r)
     return cp_contr + beef_contr
-
-
-def get_biodiv_agroforestry_base(data: Data) -> np.ndarray:
-    return data.BIODIV_SCORE_WEIGHTED * data.REAL_AREA * AGROFORESTRY_BIODIV_BENEFIT
-
 
 
 def get_biodiv_beccs(data: Data):

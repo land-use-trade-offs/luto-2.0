@@ -510,9 +510,18 @@ def get_agroforestry_to_ag_base(data: Data, yr_idx, lumap, lmmap, separate) -> n
         return get_env_plantings_to_ag(data, yr_idx, lumap, lmmap)
 
 
-def get_sheep_to_ag_base(data: Data, yr_idx, lumap, separate=False) -> np.ndarray:
+def get_sheep_to_ag_base(data: Data, yr_idx, lumap, separate=False) -> np.ndarray|dict:
     """
-    
+    Get sheep contribution to transition costs to agricultural land uses.
+    Used for getting transition costs for Sheep Agroforestry and CP (Belt).
+
+    Returns
+    -------
+    np.ndarray separate = False
+        3-D array, indexed by (m, r, j).
+    dict (separate = True)
+        Dictionary of separated out transition costs.
+    ------
     """
     sheep_j = tools.get_sheep_natural_land_code(data)
 
@@ -559,9 +568,17 @@ def get_sheep_to_ag_base(data: Data, yr_idx, lumap, separate=False) -> np.ndarra
         return e_mrj + w_delta_mrj + ghg_t_mrj_cost
 
 
-def get_beef_to_ag_base(data: Data, yr_idx, lumap, separate) -> np.ndarray:
+def get_beef_to_ag_base(data: Data, yr_idx, lumap, separate) -> np.ndarray|dict:
     """
-    Get transition costs of beef to agricultural
+    Get beef contribution to transition costs to agricultural land uses.
+    Used for getting transition costs for Beef Agroforestry and CP (Belt).
+
+    Returns
+    -------
+    np.ndarray separate = False
+        3-D array, indexed by (m, r, j).
+    dict (separate = True)
+        Dictionary of separated out transition costs.
     """
     beef_j = tools.get_beef_natural_land_code(data)
 
@@ -614,9 +631,16 @@ def get_beef_to_ag_base(data: Data, yr_idx, lumap, separate) -> np.ndarray:
 
 def get_sheep_agroforestry_to_ag(
     data: Data, yr_idx, lumap, lmmap, agroforestry_x_r, separate
-) -> np.ndarray:
+) -> np.ndarray|dict:
     """
-    
+    Get transition costs of Sheep Agroforestry to all agricultural land uses.
+
+    Returns
+    -------
+    np.ndarray separate = False
+        3-D array, indexed by (m, r, j).
+    dict (separate = True)
+        Dictionary of separated out transition costs.
     """
     sheep_tcosts = get_sheep_to_ag_base(data, yr_idx, lumap, separate)
     agroforestry_tcosts = get_agroforestry_to_ag_base(data, yr_idx, lumap, lmmap, separate)
@@ -655,9 +679,16 @@ def get_sheep_agroforestry_to_ag(
 
 def get_beef_agroforestry_to_ag(
     data: Data, yr_idx, lumap, lmmap, agroforestry_x_r, separate
-) -> np.ndarray:
+) -> np.ndarray|dict:
     """
+    Get transition costs of Beef Agroforestry to all agricultural land uses.
     
+    Returns
+    -------
+    np.ndarray separate = False
+        3-D array, indexed by (m, r, j).
+    dict (separate = True)
+        Dictionary of separated out transition costs.
     """
     beef_tcosts = get_beef_to_ag_base(data, yr_idx, lumap, separate)
     agroforestry_tcosts = get_agroforestry_to_ag_base(data, yr_idx, lumap, lmmap, separate)
@@ -724,9 +755,16 @@ def get_carbon_plantings_belt_to_ag_base(data, yr_idx, lumap, lmmap, separate=Fa
 
 def get_sheep_carbon_plantings_belt_to_ag(
     data: Data, yr_idx, lumap, lmmap, cp_belt_x_r, separate
-) -> np.ndarray:
+) -> np.ndarray|dict:
     """
+    Get transition costs of Sheep Carbon Plantings (Belt) to all agricultural land uses.
     
+    Returns
+    -------
+    np.ndarray separate = False
+        3-D array, indexed by (m, r, j).
+    dict (separate = True)
+        Dictionary of separated out transition costs.
     """
     sheep_tcosts = get_sheep_to_ag_base(data, yr_idx, lumap, separate)
     cp_belt_tcosts = get_carbon_plantings_belt_to_ag_base(data, yr_idx, lumap, lmmap, separate)
@@ -765,9 +803,16 @@ def get_sheep_carbon_plantings_belt_to_ag(
 
 def get_beef_carbon_plantings_belt_to_ag(
     data: Data, yr_idx, lumap, lmmap, cp_belt_x_r, separate
-) -> np.ndarray:
+) -> np.ndarray|dict:
     """
+    Get transition costs of Beef Carbon Plantings (Belt) to all agricultural land uses.
     
+    Returns
+    -------
+    np.ndarray separate = False
+        3-D array, indexed by (m, r, j).
+    dict (separate = True)
+        Dictionary of separated out transition costs.
     """
     beef_tcosts = get_beef_to_ag_base(data, yr_idx, lumap, separate)
     cp_belt_tcosts = get_carbon_plantings_belt_to_ag_base(data, yr_idx, lumap, lmmap, separate)

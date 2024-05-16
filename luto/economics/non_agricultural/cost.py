@@ -189,7 +189,6 @@ def get_cost_beef_carbon_plantings_belt(
     return cp_contr + beef_contr
 
 
-
 def get_cost_beccs(data: Data) -> np.ndarray:
     """
     Parameters

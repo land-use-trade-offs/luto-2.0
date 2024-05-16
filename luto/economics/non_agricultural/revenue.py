@@ -108,7 +108,6 @@ def get_rev_beef_agroforestry(
     return agroforestry_contr + beef_contr
 
 
-
 def get_rev_carbon_plantings_block(data: Data) -> np.ndarray:
     """
     Parameters
