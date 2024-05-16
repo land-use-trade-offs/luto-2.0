@@ -68,15 +68,15 @@ def get_coarse2D_map(data, map_:np.ndarray, filler:int, nodata:int)-> np.ndarray
     """
     # Get the dimensions of the full-res 2D map and the coarse 2D map.
     dense_2d_height, dense_2d_width = data.NLUM_MASK.shape
-    coarse_2d_height = (dense_2d_height // settings.RESFACTOR) + 1 if (dense_2d_height % settings.RESFACTOR != 0) else (dense_2d_height // settings.RESFACTOR)
-    coarse_2d_width = (dense_2d_width // settings.RESFACTOR) + 1 if (dense_2d_width % settings.RESFACTOR != 0) else (dense_2d_width // settings.RESFACTOR)
+    coarse_2d_height = (dense_2d_height - settings.RESFACTOR) // settings.RESFACTOR + 1 
+    coarse_2d_width = (dense_2d_width - settings.RESFACTOR)// settings.RESFACTOR + 1 
 
     # Create the coarse 2D map.
     coarse_2d_map = np.zeros((coarse_2d_height,coarse_2d_width)) + filler
     coarse_2d_map[data.MASK_IDX_2D_SPARSE[0], data.MASK_IDX_2D_SPARSE[1]] = map_
     
     # Apply the NLUM mask to introduce no-data to the coarse 2D map.
-    coarse_2d_NLUM_MASK = data.NLUM_MASK[::settings.RESFACTOR, ::settings.RESFACTOR]
+    coarse_2d_NLUM_MASK = data.NLUM_MASK[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR]
     coarse_2d_map = np.where(coarse_2d_NLUM_MASK, coarse_2d_map, nodata)
     
     return coarse_2d_map
@@ -136,7 +136,7 @@ def write_gtiff(map_:np.ndarray, fname:str, nodata=-9999):
     Write a GeoTiff file with the given map data.
 
     Parameters:
-    map_ (np.ndarray): The map data to be written as a GeoTiff.
+    map_ (np.ndarray, 2D): The map data to be written as a GeoTiff.
     fname (str): The file name (including path) of the output GeoTiff file.
     nodata (int, optional): The nodata value to be used in the GeoTiff file. Default is -9999.
 
