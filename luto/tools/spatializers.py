@@ -68,15 +68,21 @@ def get_coarse2D_map(data, map_:np.ndarray, filler:int, nodata:int)-> np.ndarray
     """
     # Get the dimensions of the full-res 2D map and the coarse 2D map.
     dense_2d_height, dense_2d_width = data.NLUM_MASK.shape
-    coarse_2d_height = (dense_2d_height - settings.RESFACTOR) // settings.RESFACTOR + 1 
-    coarse_2d_width = (dense_2d_width - settings.RESFACTOR)// settings.RESFACTOR + 1 
+    coarse_2d_height = dense_2d_height // settings.RESFACTOR if (dense_2d_height % settings.RESFACTOR == 0) else dense_2d_height // settings.RESFACTOR + 1
+    coarse_2d_width = dense_2d_width // settings.RESFACTOR if (dense_2d_width % settings.RESFACTOR == 0) else dense_2d_width // settings.RESFACTOR + 1
 
     # Create the coarse 2D map.
     coarse_2d_map = np.zeros((coarse_2d_height,coarse_2d_width)) + filler
     coarse_2d_map[data.MASK_IDX_2D_SPARSE[0], data.MASK_IDX_2D_SPARSE[1]] = map_
-    
-    # Apply the NLUM mask to introduce no-data to the coarse 2D map.
-    coarse_2d_NLUM_MASK = data.NLUM_MASK[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR]
+
+    # Pad the NLUM_MASK to the right/bottom so that it is divisible by the RESFACTOR.
+    nlum_mask_pad = data.NLUM_MASK.copy()
+    reminder_right = settings.RESFACTOR - (dense_2d_width % settings.RESFACTOR)         # How many cols to be paded in the right 
+    reminder_bottom = settings.RESFACTOR - (dense_2d_height % settings.RESFACTOR)       # How many rows to be paded in the bottom 
+    nlum_mask_pad = np.pad(nlum_mask_pad, ((0, reminder_bottom), (0, reminder_right)), mode='edge')
+
+    # Apply the padded NLUM_MASK to the coarse 2D map.
+    coarse_2d_NLUM_MASK = nlum_mask_pad[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR]
     coarse_2d_map = np.where(coarse_2d_NLUM_MASK, coarse_2d_map, nodata)
     
     return coarse_2d_map
@@ -113,11 +119,11 @@ def replace_with_nearest(map_: np.ndarray, filler: int) -> np.ndarray:
     Replaces invalid values in the input array with the nearest non-filler values.
 
     Parameters:
-        map_ (np.ndarray): The input array.
+        map_ (np.ndarray, 2D): The input array.
         filler (int): The value to be considered as invalid.
 
     Returns:
-        np.ndarray: The array with invalid values replaced by the nearest non-invalid values.
+        np.ndarray (2D): The array with invalid values replaced by the nearest non-invalid values.
     """
     # Create a mask for invalid values
     mask = (map_ == filler)
@@ -162,51 +168,3 @@ def write_gtiff(map_:np.ndarray, fname:str, nodata=-9999):
         dst.write_band(1, map_)
 
 
-# def reconstitute(map_, mask, filler=-1):
-#     """
-#     Reconstitutes a map based on a spatial mask.
-
-#     Args:
-#         map_ (numpy.ndarray): The input map.
-#         mask (numpy.ndarray): The spatial mask.
-#         filler (int, optional): The value to fill in the non-masked cells. Defaults to -1.
-
-#     Returns:
-#         numpy.ndarray: The reconstituted map.
-
-#     Raises:
-#         ValueError: If the map is not of the right shape.
-
-#     """
-#     if map_.shape[0] == mask.sum():
-#         indices = np.cumsum(mask) - 1
-#         return np.where(mask, map_[indices], filler)
-#     elif map_.shape != mask.shape:
-#         raise ValueError("Map not of right shape.")
-#     else:
-#         return np.where(mask, map_, filler)
-
-
-# def uncoursify(data: Data, lxmap):
-#     """
-#     Uncoursify the map by interpolating missing values based on known indices.
-
-#     Parameters:
-#     data (object): Data object.
-#     lxmap (ndarray): The map containing the values to be uncoursified.
-
-#     Returns:
-#     ndarray: The uncoursified map.
-
-#     """
-#     # Arrays with all x, y -coordinates on the larger map.
-#     allindices = np.nonzero(data.NLUM_MASK)
-    
-#     # Arrays with x, y -coordinates on the larger map of entries in lxmap.
-#     knownindices = tuple(np.stack(allindices)[:, data.MASK])
-    
-#     # Instantiate an interpolation function.
-#     f = NearestNDInterpolator(knownindices, lxmap)
-    
-#     # The uncoursified map is obtained by interpolating the missing values.
-#     return f(allindices)
