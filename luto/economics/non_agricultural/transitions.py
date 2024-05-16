@@ -526,10 +526,10 @@ def get_sheep_to_ag_base(data: Data, yr_idx, lumap, separate=False) -> np.ndarra
 
     # Calculate sheep contribution to transition costs
     # Establishment costs
-    sheep_af_cells = tools.get_sheep_agroforestry_cells(lumap)
+    ag_cells = tools.get_ag_cells(lumap)
 
     e_rj = np.zeros((data.NCELLS, data.N_AG_LUS))
-    e_rj[sheep_af_cells, :] = t_ij[all_sheep_lumap[sheep_af_cells]]
+    e_rj[ag_cells, :] = t_ij[all_sheep_lumap[ag_cells]]
 
     e_rj = tools.amortise(e_rj) * data.REAL_AREA[:, np.newaxis]
     e_rj_dry = np.einsum('rj,r->rj', e_rj, all_sheep_lumap == 0)
@@ -547,6 +547,11 @@ def get_sheep_to_ag_base(data: Data, yr_idx, lumap, separate=False) -> np.ndarra
     ghg_t_mrj_cost = tools.amortise(ghg_t_mrj * settings.CARBON_PRICE_PER_TONNE)     
     ghg_t_mrj_cost = np.einsum('mrj,mrj,mrj->mrj', ghg_t_mrj_cost, x_mrj, l_mrj_not)
 
+    # Ensure transition costs are zero for all agricultural cells 
+    e_mrj[:, ag_cells, :] = np.zeros((data.NLMS, ag_cells.shape[0], data.N_AG_LUS))
+    w_delta_mrj[:, ag_cells, :] = np.zeros((data.NLMS, ag_cells.shape[0], data.N_AG_LUS))
+    ghg_t_mrj_cost[:, ag_cells, :] = np.zeros((data.NLMS, ag_cells.shape[0], data.N_AG_LUS))
+
     if separate:
         return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, 'GHG emissions cost': ghg_t_mrj_cost}
     
@@ -556,7 +561,7 @@ def get_sheep_to_ag_base(data: Data, yr_idx, lumap, separate=False) -> np.ndarra
 
 def get_beef_to_ag_base(data: Data, yr_idx, lumap, separate) -> np.ndarray:
     """
-    
+    Get transition costs of beef to agricultural
     """
     beef_j = tools.get_beef_natural_land_code(data)
 
@@ -570,8 +575,11 @@ def get_beef_to_ag_base(data: Data, yr_idx, lumap, separate) -> np.ndarray:
 
     # Calculate sheep contribution to transition costs
     # Establishment costs
+    ag_cells = tools.get_ag_cells(lumap)
+
     e_rj = np.zeros((data.NCELLS, data.N_AG_LUS))
-    e_rj = t_ij[beef_j, :]
+    e_rj[ag_cells, :] = t_ij[all_beef_lumap[ag_cells]]
+
     e_rj = tools.amortise(e_rj) * data.REAL_AREA[:, np.newaxis]
     e_mrj = np.stack([e_rj] * 2, axis=0)
     e_mrj = np.einsum('mrj,mrj,mrj->mrj', e_mrj, x_mrj, l_mrj_not)
@@ -588,6 +596,11 @@ def get_beef_to_ag_base(data: Data, yr_idx, lumap, separate) -> np.ndarray:
 
     beef_af_cells = tools.get_beef_agroforestry_cells(lumap)
     non_beef_af_cells = np.array([r for r in range(data.NCELLS) if r not in beef_af_cells])
+
+    # Ensure transition costs are zero for all agricultural cells 
+    e_mrj[:, ag_cells, :] = np.zeros((data.NLMS, ag_cells.shape[0], data.N_AG_LUS))
+    w_delta_mrj[:, ag_cells, :] = np.zeros((data.NLMS, ag_cells.shape[0], data.N_AG_LUS))
+    ghg_t_mrj_cost[:, ag_cells, :] = np.zeros((data.NLMS, ag_cells.shape[0], data.N_AG_LUS))
 
     if separate:
         return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, 'GHG emissions cost': ghg_t_mrj_cost}
