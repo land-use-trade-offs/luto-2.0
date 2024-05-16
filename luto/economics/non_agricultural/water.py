@@ -89,7 +89,7 @@ def get_wreq_sheep_agroforestry(
     ------
     Numpy array indexed by r
     """
-    sheep_j = data.DESC2AGLU['Sheep - natural land']
+    sheep_j = tools.get_sheep_natural_land_code(data)
 
     # Only use the dryland version of natural land sheep
     sheep_wreq = ag_w_mrj[0, :, sheep_j]
@@ -117,7 +117,7 @@ def get_wreq_beef_agroforestry(
     ------
     Numpy array indexed by r
     """
-    beef_j = data.DESC2AGLU['Beef - natural land']
+    beef_j = tools.get_beef_natural_land_code(data)
 
     # Only use the dryland version of natural land sheep
     beef_wreq = ag_w_mrj[0, :, beef_j]
@@ -158,7 +158,7 @@ def get_wreq_sheep_carbon_plantings_belt(
     ------
     Numpy array indexed by r
     """
-    sheep_j = data.DESC2AGLU['Sheep - natural land']
+    sheep_j = tools.get_sheep_natural_land_code(data)
 
     # Only use the dryland version of natural land sheep
     sheep_wreq = ag_w_mrj[0, :, sheep_j]
@@ -186,7 +186,7 @@ def get_wreq_beef_carbon_plantings_belt(
     ------
     Numpy array indexed by r
     """
-    beef_j = data.DESC2AGLU['Beef - natural land']
+    beef_j = tools.get_beef_natural_land_code(data)
 
     # Only use the dryland version of natural land sheep
     beef_wreq = ag_w_mrj[0, :, beef_j]

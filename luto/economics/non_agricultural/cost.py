@@ -64,7 +64,7 @@ def get_cost_sheep_agroforestry(
     ------
     Numpy array indexed by r
     """
-    sheep_j = data.DESC2AGLU['Sheep - natural land']
+    sheep_j = tools.get_sheep_natural_land_code(data)
 
     # Only use the dryland version of natural land sheep
     sheep_cost = ag_c_mrj[0, :, sheep_j]
@@ -92,7 +92,7 @@ def get_cost_beef_agroforestry(
     ------
     Numpy array indexed by r
     """
-    beef_j = data.DESC2AGLU['Beef - natural land']
+    beef_j = tools.get_beef_natural_land_code(data)
 
     # Only use the dryland version of natural land sheep
     beef_cost = ag_c_mrj[0, :, beef_j]
@@ -149,7 +149,7 @@ def get_cost_sheep_carbon_plantings_belt(
     ------
     Numpy array indexed by r
     """
-    sheep_j = data.DESC2AGLU['Sheep - natural land']
+    sheep_j = tools.get_sheep_natural_land_code(data)
 
     # Only use the dryland version of natural land sheep
     sheep_cost = ag_c_mrj[0, :, sheep_j]
@@ -177,7 +177,7 @@ def get_cost_beef_carbon_plantings_belt(
     ------
     Numpy array indexed by r
     """
-    beef_j = data.DESC2AGLU['Beef - natural land']
+    beef_j = tools.get_beef_natural_land_code(data)
 
     # Only use the dryland version of natural land sheep
     beef_cost = ag_c_mrj[0, :, beef_j]

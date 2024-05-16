@@ -463,9 +463,6 @@ def get_exclusions_agroforestry_base(data, lumap) -> np.ndarray:
     """
     exclude = (np.ones(data.NCELLS) * settings.AF_PROPORTION).astype(np.float32)
 
-    # Exclude all cells used for natural land uses
-    exclude *= get_exclusions_for_excluding_all_natural_cells(data, lumap)
-
     # Ensure cells being used for agroforestry may retain that LU
     exclude[get_agroforestry_cells(lumap)] = settings.AF_PROPORTION
 
@@ -486,13 +483,24 @@ def get_exclusions_carbon_plantings_belt_base(data, lumap) -> np.ndarray:
     """
     exclude = (np.ones(data.NCELLS) * settings.CP_BELT_PROPORTION).astype(np.float32)
 
-    # Exclude all cells used for natural land uses
-    exclude *= get_exclusions_for_excluding_all_natural_cells(data, lumap)
-
     # Ensure cells being used for carbon plantings (belt) may retain that LU
     exclude[get_carbon_plantings_belt_cells(lumap)] = settings.CP_BELT_PROPORTION
 
     return exclude
+
+
+def get_sheep_natural_land_code(data):
+    """
+    Get the land use code (j) for 'Sheep - natural land'
+    """
+    return data.DESC2AGLU['Sheep - natural land']
+
+
+def get_beef_natural_land_code(data):
+    """
+    Get the land use code (j) for 'Beef - natural land'
+    """
+    return data.DESC2AGLU['Beef - natural land']
 
 
 # function to create mapping table between lu_desc and dvar index

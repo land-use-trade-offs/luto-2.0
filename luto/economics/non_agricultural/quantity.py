@@ -7,7 +7,7 @@ def get_sheep_q_cr(data, ag_q_mrp: np.ndarray) -> np.ndarray:
     """
     Gets the matrix containing the commodities produced by sheep (natural land) 
     """
-    sheep_j = data.DESC2AGLU['Sheep - natural land']
+    sheep_j = tools.get_sheep_natural_land_code(data)
 
     sheep_p = []
     for p in range(data.NPRS):
@@ -27,7 +27,7 @@ def get_beef_q_cr(data, ag_q_mrp: np.ndarray) -> np.ndarray:
     """
     Gets the matrix containing the commodities produced by beef (natural land) 
     """
-    beef_j = data.DESC2AGLU['Beef - natural land']
+    beef_j = tools.get_beef_natural_land_code(data)
 
     beef_p = []
     for p in range(data.NPRS):
@@ -119,7 +119,7 @@ def get_quantity_sheep_agroforestry(
 
     sheep_contr = sheep_quantity_cr
     for c in range(data.NCMS):
-        sheep_contr *= (1 - agroforestry_x_r)
+        sheep_contr[c, :] *= (1 - agroforestry_x_r)
 
     return agroforestry_contr + sheep_contr
 
@@ -150,7 +150,7 @@ def get_quantity_beef_agroforestry(
 
     beef_contr = beef_quantity_cr
     for c in range(data.NCMS):
-        beef_contr *= (1 - agroforestry_x_r)
+        beef_contr[c, :] *= (1 - agroforestry_x_r)
 
     return agroforestry_contr + beef_contr
 
@@ -182,7 +182,7 @@ def get_quantity_sheep_agroforestry(
 
     sheep_contr = sheep_quantity_cr
     for c in range(data.NCMS):
-        sheep_contr *= (1 - agroforestry_x_r)
+        sheep_contr[c, :] *= (1 - agroforestry_x_r)
 
     return agroforestry_contr + sheep_contr
 
@@ -213,7 +213,7 @@ def get_quantity_beef_agroforestry(
 
     beef_contr = beef_quantity_cr
     for c in range(data.NCMS):
-        beef_contr *= (1 - agroforestry_x_r)
+        beef_contr[c, :] *= (1 - agroforestry_x_r)
 
     return agroforestry_contr + beef_contr
 

@@ -558,6 +558,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     else:
         non_ag_transitions_cost_mat = non_ag_transitions.get_from_ag_transition_matrix(data,
                                                                                        yr_idx,
+                                                                                       yr_cal_sim_pre,
                                                                                        data.lumaps[yr_cal],
                                                                                        data.lmmaps[yr_cal],
                                                                                        separate=True)
@@ -627,10 +628,13 @@ def write_revenue_cost_non_ag(data: Data, yr_cal, path):
 
     print(f'Writing non agricultural management cost outputs for {yr_cal}')
     non_ag_dvar = data.non_ag_dvars[yr_cal]
+    yr_idx = yr_cal - data.YR_CAL_BASE
 
     # Get the non-agricultural revenue/cost matrices
-    non_ag_rev_mat = non_ag_revenue.get_rev_matrix(data)    # rk
-    non_ag_cost_mat = non_ag_cost.get_cost_matrix(data)     # rk
+    ag_r_mrj = ag_revenue.get_rev_matrices(data, yr_idx)
+    non_ag_rev_mat = non_ag_revenue.get_rev_matrix(data, ag_r_mrj, data.lumaps[yr_cal])    # rk
+    ag_c_mrj = ag_cost.get_cost_matrices(data, yr_idx)
+    non_ag_cost_mat = non_ag_cost.get_cost_matrix(data, ag_c_mrj, data.lumaps[yr_cal])     # rk
 
     # Replace nan with 0
     non_ag_rev_mat = np.nan_to_num(non_ag_rev_mat)
@@ -832,7 +836,7 @@ def write_water(data: Data, yr_cal, path):
 
     # Get water use for year in mrj format
     ag_w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
-    non_ag_w_rk = non_ag_water.get_wreq_matrix(data)
+    non_ag_w_rk = non_ag_water.get_wreq_matrix(data, ag_w_mrj, data.lumaps[yr_cal])
     ag_man_w_mrj = ag_water.get_agricultural_management_water_matrices(data, ag_w_mrj, yr_idx)
 
     # Prepare a data frame.
@@ -1033,7 +1037,8 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
     # Get the biodiversity scores b_mrj
     ag_biodiv_mrj = ag_biodiversity.get_breq_matrices(data)
     am_biodiv_mrj = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data)
-    non_ag_biodiv_rk = non_ag_biodiversity.get_breq_matrix(data)
+    ag_b_mrj = ag_biodiversity.get_breq_matrices(data)
+    non_ag_biodiv_rk = non_ag_biodiversity.get_breq_matrix(data, ag_b_mrj, data.lumaps[yr_cal])
 
     # Get the decision variables for the year
     ag_dvar_mrj = data.ag_dvars[yr_cal]
@@ -1111,6 +1116,8 @@ def write_ghg_separate(data: Data, yr_cal, path):
     # Get greenhouse gas emissions from agricultural landuse #
     # -------------------------------------------------------#
 
+    # Get ghg array
+    ag_g_mrj = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True)
     # Get the ghg_df
     ag_g_df = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=False)
 
@@ -1159,7 +1166,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
     # -----------------------------------------------------------#
     
     # Get the non_ag GHG reduction
-    non_ag_g_rk = non_ag_ghg.get_ghg_matrix(data)
+    non_ag_g_rk = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj, data.lumaps[yr_cal])
 
     # Multiply with decision variable to get the GHG in yr_cal
     non_ag_g_rk = non_ag_g_rk * data.non_ag_dvars[yr_cal]
@@ -1217,8 +1224,6 @@ def write_ghg_separate(data: Data, yr_cal, path):
     # -------------------------------------------------------------------#
     # Get greenhouse gas emissions from agricultural management          #
     # -------------------------------------------------------------------#
-     
-    ag_g_mrj = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True)
 
     # Get the ag_man_g_mrj
     ag_man_g_mrj = ag_ghg.get_agricultural_management_ghg_matrices(data, ag_g_mrj, yr_idx)

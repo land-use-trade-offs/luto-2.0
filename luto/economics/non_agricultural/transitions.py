@@ -96,7 +96,7 @@ def get_agroforestry_transitions_from_ag_base(data: Data, yr_idx, lumap, lmmap, 
     
 
 def get_sheep_agroforestry_transitions_from_ag(
-    data: Data, agroforestry_x_r, yr_idx, base_year, lumap, lmmap, separate=False
+    data: Data, agroforestry_x_r, agroforestry_costs, ag_t_costs, yr_idx, base_year, lumap, lmmap, separate=False
 ):
     """
     Get the base transition costs from agricultural land uses to Sheep Agroforestry for each cell.
@@ -108,29 +108,28 @@ def get_sheep_agroforestry_transitions_from_ag(
     dict
         (separate = True) Dict of separated transition costs.
     """
-    agroforestry_costs = get_agroforestry_transitions_from_ag_base(data, yr_idx, lumap, lmmap, separate)
-    ag_t_costs = ag_transitions.get_transition_matrices(data, yr_idx, base_year, data.lumaps, data.lmmaps, separate)
+    
     
     if separate:
         # Combine and return separated costs
         combined_costs = {}
-        for key, array in agroforestry_costs:
+        for key, array in agroforestry_costs.items():
             combined_costs[key] = np.zeros(array.shape)
             for m in range(data.NLMS):
                 for j in range(data.N_AG_LUS):
-                    combined_costs[key][m, :, j] = array * agroforestry_x_r
+                    combined_costs[key][m, :, j] = array[m, :, j] * agroforestry_x_r
 
-        for key, array in ag_t_costs:
+        for key, array in ag_t_costs.items():
             if key not in combined_costs:
                 combined_costs[key] = np.zeros(array.shape)
             for m in range(data.NLMS):
                 for j in range(data.N_AG_LUS):
-                    combined_costs[key][m, :, j] += array * (1 - agroforestry_x_r)
+                    combined_costs[key][m, :, j] += array[m, :, j] * (1 - agroforestry_x_r)
 
         return combined_costs
 
     else:
-        sheep_j = data.DESC2AGLU['Sheep - natural land']
+        sheep_j = tools.get_sheep_natural_land_code(data)
         sheep_costs_r = ag_t_costs[0, :, sheep_j]        
     
         sheep_contr = sheep_costs_r * (1 - agroforestry_x_r)
@@ -145,7 +144,7 @@ def get_sheep_agroforestry_transitions_from_ag(
     
 
 def get_beef_agroforestry_transitions_from_ag(
-    data: Data, agroforestry_x_r, yr_idx, base_year, lumap, lmmap, separate=False
+    data: Data, agroforestry_x_r, agroforestry_costs, ag_t_costs, yr_idx, base_year, lumap, lmmap, separate=False
 ):
     """
     Get the base transition costs from agricultural land uses to Beef Agroforestry for each cell.
@@ -164,24 +163,24 @@ def get_beef_agroforestry_transitions_from_ag(
         # Combine and return separated costs
         # Agroforestry keys: 'Transition cost', 'Establishment cost', 'Water license cost', 'Fencing cost'
         combined_costs = {}
-        for key, array in agroforestry_costs:
+        for key, array in agroforestry_costs.items():
             combined_costs[key] = np.zeros(array.shape)
             for m in range(data.NLMS):
                 for j in range(data.N_AG_LUS):
-                    combined_costs[key][m, :, j] = array * agroforestry_x_r
+                    combined_costs[key][m, :, j] = array[m, :, j] * agroforestry_x_r
 
         # Beef cost keys: 'Establishment cost', 'Water license cost', 'GHG emissions cost'
-        for key, array in ag_t_costs:
+        for key, array in ag_t_costs.items():
             if key not in combined_costs:
                 combined_costs[key] = np.zeros(array.shape)
             for m in range(data.NLMS):
                 for j in range(data.N_AG_LUS):
-                    combined_costs[key][m, :, j] += array * (1 - agroforestry_x_r)
+                    combined_costs[key][m, :, j] += array[m, :, j] * (1 - agroforestry_x_r)
 
         return combined_costs
 
     else:
-        beef_j = data.DESC2AGLU['Beef - natural land']
+        beef_j = tools.get_beef_natural_land_code(data)
         beef_costs_r = ag_t_costs[0, :, beef_j]        
     
         beef_contr = beef_costs_r * (1 - agroforestry_x_r)
@@ -257,7 +256,7 @@ def get_carbon_plantings_belt_from_ag_base(data, yr_idx, lumap, lmmap, separate)
 
 
 def get_sheep_carbon_plantings_belt_from_ag(
-    data: Data, cp_belt_x_r, yr_idx, base_year, lumap, lmmap, separate=False
+    data: Data, cp_belt_x_r, cp_belt_costs, ag_t_costs, yr_idx, base_year, lumap, lmmap, separate=False
 ):
     """
     Get the transition costs from agricultural land uses to Sheep Carbon Plantings (belt) for each cell.
@@ -269,29 +268,29 @@ def get_sheep_carbon_plantings_belt_from_ag(
     dict
         (separate = True) Dict of separated transition costs.
     """
-    cp_belt_costs = get_carbon_plantings_belt_from_ag_base(data, yr_idx, lumap, lmmap, separate)
+    
     ag_t_costs = ag_transitions.get_transition_matrices(data, yr_idx, base_year, data.lumaps, data.lmmaps, separate)
     
     if separate:
         # Combine and return separated costs
         combined_costs = {}
-        for key, array in cp_belt_costs:
+        for key, array in cp_belt_costs.items():
             combined_costs[key] = np.zeros(array.shape)
             for m in range(data.NLMS):
                 for j in range(data.N_AG_LUS):
-                    combined_costs[key][m, :, j] = array * cp_belt_x_r
+                    combined_costs[key][m, :, j] = array[m, :, j] * cp_belt_x_r
 
-        for key, array in ag_t_costs:
+        for key, array in ag_t_costs.items():
             if key not in combined_costs:
                 combined_costs[key] = np.zeros(array.shape)
             for m in range(data.NLMS):
                 for j in range(data.N_AG_LUS):
-                    combined_costs[key][m, :, j] += array * (1 - cp_belt_x_r)
+                    combined_costs[key][m, :, j] += array[m, :, j] * (1 - cp_belt_x_r)
 
         return combined_costs
 
     else:
-        sheep_j = data.DESC2AGLU['Sheep - natural land']
+        sheep_j = tools.get_sheep_natural_land_code(data)
         sheep_costs_r = ag_t_costs[0, :, sheep_j]        
     
         sheep_contr = sheep_costs_r * (1 - cp_belt_x_r)
@@ -306,7 +305,7 @@ def get_sheep_carbon_plantings_belt_from_ag(
 
 
 def get_beef_carbon_plantings_belt_from_ag(
-    data: Data, cp_belt_x_r, yr_idx, base_year, lumap, lmmap, separate=False
+    data: Data, cp_belt_x_r, cp_belt_costs, ag_t_costs, yr_idx, base_year, lumap, lmmap, separate=False
 ):
     """
     Get the base transition costs from agricultural land uses to Beef Carbon Plantings (belt) for each cell.
@@ -324,24 +323,24 @@ def get_beef_carbon_plantings_belt_from_ag(
     if separate:
         # Combine and return separated costs
         combined_costs = {}
-        for key, array in cp_belt_costs:
+        for key, array in cp_belt_costs.items():
             combined_costs[key] = np.zeros(array.shape)
             for m in range(data.NLMS):
                 for j in range(data.N_AG_LUS):
-                    combined_costs[key][m, :, j] = array * cp_belt_x_r
+                    combined_costs[key][m, :, j] = array[m, :, j] * cp_belt_x_r
 
-        for key, array in ag_t_costs:
+        for key, array in ag_t_costs.items():
             if key not in combined_costs:
                 combined_costs[key] = np.zeros(array.shape)
             for m in range(data.NLMS):
                 for j in range(data.N_AG_LUS):
-                    combined_costs[key][m, :, j] += array * (1 - cp_belt_x_r)
+                    combined_costs[key][m, :, j] += array[m, :, j] * (1 - cp_belt_x_r)
 
         return combined_costs
 
     else:
-        beef_j = data.DESC2AGLU['Beef - natural land']
-        beef_costs_r = ag_t_costs[0, :, beef_j]        
+        beef_j = tools.get_beef_natural_land_code(data)
+        beef_costs_r = ag_t_costs[0, :, beef_j]
     
         beef_contr = beef_costs_r * (1 - cp_belt_x_r)
         cp_belt_contr = cp_belt_costs * cp_belt_x_r
@@ -396,20 +395,24 @@ def get_from_ag_transition_matrix(data: Data, yr_idx, base_year, lumap, lmmap, s
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
 
+    agroforestry_costs = get_agroforestry_transitions_from_ag_base(data, yr_idx, lumap, lmmap, separate)
+    ag_t_costs = ag_transitions.get_transition_matrices(data, yr_idx, base_year, data.lumaps, data.lmmaps, separate)
+    cp_belt_costs = get_carbon_plantings_belt_from_ag_base(data, yr_idx, lumap, lmmap, separate)
+
     env_plant_transitions_from_ag = get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate)
     rip_plant_transitions_from_ag = get_rip_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate)
     sheep_agroforestry_transitions_from_ag = get_sheep_agroforestry_transitions_from_ag(
-        data, agroforestry_x_r, yr_idx, base_year, lumap, lmmap, separate
+        data, agroforestry_x_r, agroforestry_costs, ag_t_costs, yr_idx, base_year, lumap, lmmap, separate
     )
     beef_agroforestry_transitions_from_ag = get_beef_agroforestry_transitions_from_ag(
-        data, agroforestry_x_r, yr_idx, base_year, lumap, lmmap, separate
+        data, agroforestry_x_r, agroforestry_costs, ag_t_costs, yr_idx, base_year, lumap, lmmap, separate
     )
     carbon_plantings_block_transitions_from_ag = get_carbon_plantings_block_from_ag(data, yr_idx, lumap, lmmap, separate)
     sheep_carbon_plantings_belt_transitions_from_ag = get_sheep_carbon_plantings_belt_from_ag(
-        data, cp_belt_x_r, yr_idx, base_year, lumap, lmmap, separate
+        data, cp_belt_x_r, cp_belt_costs, ag_t_costs, yr_idx, base_year, lumap, lmmap, separate
     )
     beef_carbon_plantings_belt_transitions_from_ag = get_beef_carbon_plantings_belt_from_ag(
-        data, cp_belt_x_r, yr_idx, base_year, lumap, lmmap, separate
+        data, cp_belt_x_r, cp_belt_costs, ag_t_costs, yr_idx, base_year, lumap, lmmap, separate
     )
     beccs_transitions_from_ag = get_beccs_from_ag(data, yr_idx, lumap, lmmap, separate)
 
@@ -511,7 +514,7 @@ def get_sheep_to_ag_base(data: Data, yr_idx, lumap, separate=False) -> np.ndarra
     """
     
     """
-    sheep_j = data.DESC2AGLU['Sheep - natural land']
+    sheep_j = tools.get_sheep_natural_land_code(data)
 
     all_sheep_lumap = (np.ones(data.NCELLS) * sheep_j).astype(np.int8)
     all_dry_lmmap = np.zeros(data.NCELLS)
@@ -523,10 +526,15 @@ def get_sheep_to_ag_base(data: Data, yr_idx, lumap, separate=False) -> np.ndarra
 
     # Calculate sheep contribution to transition costs
     # Establishment costs
+    sheep_af_cells = tools.get_sheep_agroforestry_cells(lumap)
+
     e_rj = np.zeros((data.NCELLS, data.N_AG_LUS))
-    e_rj = t_ij[sheep_j, :]
+    e_rj[sheep_af_cells, :] = t_ij[all_sheep_lumap[sheep_af_cells]]
+
     e_rj = tools.amortise(e_rj) * data.REAL_AREA[:, np.newaxis]
-    e_mrj = np.stack([e_rj] * 2, axis=0)
+    e_rj_dry = np.einsum('rj,r->rj', e_rj, all_sheep_lumap == 0)
+    e_rj_irr = np.einsum('rj,r->rj', e_rj, all_dry_lmmap == 1)
+    e_mrj = np.stack([e_rj_dry, e_rj_irr], axis=0)
     e_mrj = np.einsum('mrj,mrj,mrj->mrj', e_mrj, x_mrj, l_mrj_not)
 
     # Water license cost
@@ -539,24 +547,18 @@ def get_sheep_to_ag_base(data: Data, yr_idx, lumap, separate=False) -> np.ndarra
     ghg_t_mrj_cost = tools.amortise(ghg_t_mrj * settings.CARBON_PRICE_PER_TONNE)     
     ghg_t_mrj_cost = np.einsum('mrj,mrj,mrj->mrj', ghg_t_mrj_cost, x_mrj, l_mrj_not)
 
-    sheep_af_cells = tools.get_sheep_agroforestry_cells(lumap)
-    non_sheep_af_cells = np.array([r for r in range(data.NCELLS) if r not in sheep_af_cells])
-
     if separate:
         return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, 'GHG emissions cost': ghg_t_mrj_cost}
     
     else:
-        t_mrj = e_mrj + w_delta_mrj + ghg_t_mrj_cost
-        # Set all costs for non-sheep-agroforestry cells to zero
-        t_mrj[:, non_sheep_af_cells, :] = 0
-        return t_mrj
+        return e_mrj + w_delta_mrj + ghg_t_mrj_cost
 
 
 def get_beef_to_ag_base(data: Data, yr_idx, lumap, separate) -> np.ndarray:
     """
     
     """
-    beef_j = data.DESC2AGLU['Beef - natural land']
+    beef_j = tools.get_beef_natural_land_code(data)
 
     all_beef_lumap = (np.ones(data.NCELLS) * beef_j).astype(np.int8)
     all_dry_lmmap = np.zeros(data.NCELLS)
@@ -609,18 +611,18 @@ def get_sheep_agroforestry_to_ag(
     if separate:
         # Combine and return separated costs
         combined_costs = {}
-        for key, array in agroforestry_tcosts:
+        for key, array in agroforestry_tcosts.items():
             combined_costs[key] = np.zeros(array.shape)
             for m in range(data.NLMS):
                 for j in range(data.N_AG_LUS):
-                    combined_costs[key][m, :, j] = array * agroforestry_x_r
+                    combined_costs[key][m, :, j] = array[m, :, j] * agroforestry_x_r
 
-        for key, array in sheep_tcosts:
+        for key, array in sheep_tcosts.items():
             if key not in combined_costs:
                 combined_costs[key] = np.zeros(array.shape)
             for m in range(data.NLMS):
                 for j in range(data.N_AG_LUS):
-                    combined_costs[key][m, :, j] += array * (1 - agroforestry_x_r)
+                    combined_costs[key][m, :, j] += array[m, :, j] * (1 - agroforestry_x_r)
 
         return combined_costs
     
@@ -650,18 +652,18 @@ def get_beef_agroforestry_to_ag(
     if separate:
         # Combine and return separated costs
         combined_costs = {}
-        for key, array in agroforestry_tcosts:
+        for key, array in agroforestry_tcosts.items():
             combined_costs[key] = np.zeros(array.shape)
             for m in range(data.NLMS):
                 for j in range(data.N_AG_LUS):
-                    combined_costs[key][m, :, j] = array * agroforestry_x_r
+                    combined_costs[key][m, :, j] = array[m, :, j] * agroforestry_x_r
 
-        for key, array in beef_tcosts:
+        for key, array in beef_tcosts.items():
             if key not in combined_costs:
                 combined_costs[key] = np.zeros(array.shape)
             for m in range(data.NLMS):
                 for j in range(data.N_AG_LUS):
-                    combined_costs[key][m, :, j] += array * (1 - agroforestry_x_r)
+                    combined_costs[key][m, :, j] += array[m, :, j] * (1 - agroforestry_x_r)
 
         return combined_costs
     
@@ -719,18 +721,18 @@ def get_sheep_carbon_plantings_belt_to_ag(
     if separate:
         # Combine and return separated costs
         combined_costs = {}
-        for key, array in cp_belt_tcosts:
+        for key, array in cp_belt_tcosts.items():
             combined_costs[key] = np.zeros(array.shape)
             for m in range(data.NLMS):
                 for j in range(data.N_AG_LUS):
-                    combined_costs[key][m, :, j] = array * cp_belt_x_r
+                    combined_costs[key][m, :, j] = array[m, :, j] * cp_belt_x_r
 
-        for key, array in sheep_tcosts:
+        for key, array in sheep_tcosts.items():
             if key not in combined_costs:
                 combined_costs[key] = np.zeros(array.shape)
             for m in range(data.NLMS):
                 for j in range(data.N_AG_LUS):
-                    combined_costs[key][m, :, j] += array * (1 - cp_belt_x_r)
+                    combined_costs[key][m, :, j] += array[m, :, j] * (1 - cp_belt_x_r)
 
         return combined_costs
     
@@ -760,18 +762,18 @@ def get_beef_carbon_plantings_belt_to_ag(
     if separate:
         # Combine and return separated costs
         combined_costs = {}
-        for key, array in cp_belt_tcosts:
+        for key, array in cp_belt_tcosts.items():
             combined_costs[key] = np.zeros(array.shape)
             for m in range(data.NLMS):
                 for j in range(data.N_AG_LUS):
-                    combined_costs[key][m, :, j] = array * cp_belt_x_r
+                    combined_costs[key][m, :, j] = array[m, :, j] * cp_belt_x_r
 
-        for key, array in beef_tcosts:
+        for key, array in beef_tcosts.items():
             if key not in combined_costs:
                 combined_costs[key] = np.zeros(array.shape)
             for m in range(data.NLMS):
                 for j in range(data.N_AG_LUS):
-                    combined_costs[key][m, :, j] += array * (1 - cp_belt_x_r)
+                    combined_costs[key][m, :, j] += array[m, :, j] * (1 - cp_belt_x_r)
 
         return combined_costs
     
@@ -939,34 +941,30 @@ def get_exclusions_riparian_plantings(data: Data, lumap) -> np.ndarray:
 def get_exclusions_sheep_agroforestry(
     data: Data, ag_x_mrj: np.ndarray, lumap: np.ndarray
 ) -> np.ndarray:
-    sheep_j = data.DESC2AGLU['Sheep - natural land']
+    sheep_j = tools.get_sheep_natural_land_code(data)
     sheep_x_r = ag_x_mrj[0, :, sheep_j]
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
 
-    exclusions = np.ones(data.NCELLS)
-    for r in range(data.NCELLS):
-        if sheep_x_r[r] == 0:
-            exclusions[r] = 0
-        if agroforestry_x_r[r] == 0:
-            exclusions[r] = 0
-    
+    exclusions = np.zeros(data.NCELLS)
+
+    # Block cells that can't utilise both agroforestry and sheep - natural land.
+    intersect = np.intersect1d(np.nonzero(sheep_x_r)[0], np.nonzero(agroforestry_x_r)[0])
+    exclusions[intersect] = 1
     return exclusions
 
 
 def get_exclusions_beef_agroforestry(
     data: Data, ag_x_mrj: np.ndarray, lumap: np.ndarray
 ) -> np.ndarray:
-    beef_j = data.DESC2AGLU['Beef - natural land']
+    beef_j = tools.get_beef_natural_land_code(data)
     beef_x_r = ag_x_mrj[0, :, beef_j]
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
 
-    exclusions = np.ones(data.NCELLS)
-    for r in range(data.NCELLS):
-        if beef_x_r[r] == 0:
-            exclusions[r] = 0
-        if agroforestry_x_r[r] == 0:
-            exclusions[r] = 0
+    exclusions = np.zeros(data.NCELLS)
 
+    # Block cells that can't utilise both agroforestry and beef - natural land.
+    intersect = np.intersect1d(np.nonzero(beef_x_r)[0], np.nonzero(agroforestry_x_r)[0])
+    exclusions[intersect] = 1
     return exclusions
 
 
@@ -994,34 +992,30 @@ def get_exclusions_carbon_plantings_block(data, lumap) -> np.ndarray:
 def get_exclusions_sheep_carbon_plantings_belt(
     data: Data, ag_x_mrj: np.ndarray, lumap: np.ndarray
 ) -> np.ndarray:
-    sheep_j = data.DESC2AGLU['Sheep - natural land']
+    sheep_j = tools.get_sheep_natural_land_code(data)
     sheep_x_r = ag_x_mrj[0, :, sheep_j]
     cp_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
 
-    exclusions = np.ones(data.NCELLS)
-    for r in range(data.NCELLS):
-        if sheep_x_r[r] == 0:
-            exclusions[r] = 0
-        if cp_x_r[r] == 0:
-            exclusions[r] = 0
-    
+    exclusions = np.zeros(data.NCELLS)
+
+    # Block cells that can't utilise both agroforestry and sheep - natural land.
+    intersect = np.intersect1d(np.nonzero(sheep_x_r)[0], np.nonzero(cp_x_r)[0])
+    exclusions[intersect] = 1
     return exclusions
 
 
 def get_exclusions_beef_carbon_plantings_belt(
     data: Data, ag_x_mrj: np.ndarray, lumap: np.ndarray
 ) -> np.ndarray:
-    beef_j = data.DESC2AGLU['Beef - natural land']
+    beef_j = tools.get_beef_natural_land_code(data)
     beef_x_r = ag_x_mrj[0, :, beef_j]
     cp_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
 
-    exclusions = np.ones(data.NCELLS)
-    for r in range(data.NCELLS):
-        if beef_x_r[r] == 0:
-            exclusions[r] = 0
-        if cp_x_r[r] == 0:
-            exclusions[r] = 0
+    exclusions = np.zeros(data.NCELLS)
 
+    # Block cells that can't utilise both agroforestry and beef - natural land.
+    intersect = np.intersect1d(np.nonzero(beef_x_r)[0], np.nonzero(cp_x_r)[0])
+    exclusions[intersect] = 1
     return exclusions
 
 

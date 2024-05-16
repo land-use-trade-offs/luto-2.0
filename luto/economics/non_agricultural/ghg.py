@@ -91,7 +91,7 @@ def get_ghg_sheep_agroforestry(
     ------
     Numpy array indexed by r
     """
-    sheep_j = data.DESC2AGLU['Beef - modified land']
+    sheep_j = tools.get_sheep_natural_land_code(data)
 
     # Only use the dryland version of natural land sheep
     sheep_cost = ag_g_mrj[0, :, sheep_j]
@@ -128,7 +128,7 @@ def get_ghg_beef_agroforestry(
     ------
     Numpy array indexed by r
     """
-    beef_j = data.DESC2AGLU['Beef - modified land']
+    beef_j = tools.get_beef_natural_land_code(data)
 
     # Only use the dryland version of natural land sheep
     beef_cost = ag_g_mrj[0, :, beef_j]
@@ -208,7 +208,7 @@ def get_ghg_sheep_carbon_plantings_belt(
     ------
     Numpy array indexed by r
     """
-    sheep_j = data.DESC2AGLU['Sheep - modified land']
+    sheep_j = tools.get_sheep_natural_land_code(data)
 
     # Only use the dryland version of natural land sheep
     sheep_cost = ag_g_mrj[0, :, sheep_j]
@@ -245,7 +245,7 @@ def get_ghg_beef_carbon_plantings_belt(
     ------
     Numpy array indexed by r
     """
-    beef_j = data.DESC2AGLU['Beef - modified land']
+    beef_j = tools.get_beef_natural_land_code(data)
 
     # Only use the dryland version of natural land sheep
     beef_cost = ag_g_mrj[0, :, beef_j]

@@ -935,7 +935,11 @@ class LutoSolver:
                 X_irr_sol_rj[r, j] = self.X_ag_irr_vars_jr[j, r].X
 
         # Get non-agricultural results
-        for k in range(self._input_data.n_non_ag_lus):
+        for k, lu in zip(range(self._input_data.n_non_ag_lus), settings.NON_AG_LAND_USES):
+            if not settings.NON_AG_LAND_USES[lu]:
+                non_ag_X_sol_rk[:, k] = np.zeros(self._input_data.ncells)
+                continue
+
             for r in self._input_data.non_ag_lu2cells[k]:
                 non_ag_X_sol_rk[r, k] = self.X_non_ag_vars_kr[k, r].X
 

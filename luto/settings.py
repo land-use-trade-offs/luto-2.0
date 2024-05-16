@@ -118,10 +118,10 @@ PENALTY = 1e5
 # ---------------------------------------------------------------------------- #
 
 # Write GeoTiffs to output directory: True or False
-WRITE_OUTPUT_GEOTIFFS = True
+WRITE_OUTPUT_GEOTIFFS = False
 
 # If use parallel processing to write GeoTiffs: True or False
-PARALLEL_WRITE = True
+PARALLEL_WRITE = False
 
 # The Threads to use for writing GeoTiffs, and map making
 WRITE_THREADS = 8      # Works only if PARALLEL_WRITE = True
@@ -172,11 +172,11 @@ NON_AG_LAND_USES dictionary to false.
 NON_AG_LAND_USES = {
     'Environmental Plantings': True,
     'Riparian Plantings': True,
-    'Sheep Agroforestry': True,
-    'Beef Agroforestry': True,
+    'Sheep Agroforestry': False,
+    'Beef Agroforestry': False,
     'Carbon Plantings (Block)': True,
-    'Sheep Carbon Plantings (Belt)': True,
-    'Beef Carbon Plantings (Belt)': True,
+    'Sheep Carbon Plantings (Belt)': False,
+    'Beef Carbon Plantings (Belt)': False,
     'BECCS': True,
 }
 
@@ -189,9 +189,11 @@ years.
 NON_AG_LAND_USES_REVERSIBLE = {
     'Environmental Plantings': False,
     'Riparian Plantings': False,
-    'Agroforestry': False,
+    'Sheep Agroforestry': False,
+    'Beef Agroforestry': False,
     'Carbon Plantings (Block)': False,
-    'Carbon Plantings (Belt)': False,
+    'Sheep Carbon Plantings (Belt)': False,
+    'Beef Carbon Plantings (Belt)': False,
     'BECCS': False,
 }
 
