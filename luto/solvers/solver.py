@@ -544,7 +544,7 @@ class LutoSolver:
         w_limits = self._input_data.limits["water"]
 
         # Ensure water use remains below limit for each region
-        for region, name, wreq_reg_limit, ind in w_limits:
+        for region, name, water_all, wreq_reg_limit, ind in w_limits:
             if cells is not None and np.intersect1d(cells, ind).size == 0:
                 continue
 

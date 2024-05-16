@@ -494,11 +494,11 @@ def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[s
         A dictionary containing the quantity matrices for different agricultural management practices.
         The keys of the dictionary represent the names of the practices, and the values are the corresponding quantity matrices.
     """
-    asparagopsis_data = get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx)
-    precision_agriculture_data = get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx)
-    eco_grazing_data = get_ecological_grazing_effect_q_mrp(data, q_mrp, yr_idx)
-    sav_burning_data = get_savanna_burning_effect_q_mrp(data)
-    agtech_ei_data = get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx)
+    asparagopsis_data = get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx) if AG_MANAGEMENTS['Asparagopsis taxiformis'] else 0
+    precision_agriculture_data = get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx) if AG_MANAGEMENTS['Precision Agriculture'] else 0
+    eco_grazing_data = get_ecological_grazing_effect_q_mrp(data, q_mrp, yr_idx) if AG_MANAGEMENTS['Ecological Grazing'] else 0
+    sav_burning_data = get_savanna_burning_effect_q_mrp(data) if AG_MANAGEMENTS['Savanna Burning'] else 0
+    agtech_ei_data = get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx) if AG_MANAGEMENTS['AgTech EI'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,

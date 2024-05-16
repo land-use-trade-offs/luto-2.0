@@ -416,11 +416,11 @@ def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
         dict: A dictionary containing the cost matrices for different agricultural management practices.
             The keys are the names of the practices and the values are the corresponding cost matrices.
     """
-    asparagopsis_data = get_asparagopsis_effect_c_mrj(data, yr_idx)
-    precision_agriculture_data = get_precision_agriculture_effect_c_mrj(data, yr_idx)
-    eco_grazing_data = get_ecological_grazing_effect_c_mrj(data, yr_idx)
-    sav_burning_data = get_savanna_burning_effect_c_mrj(data)
-    agtech_ei_data = get_agtech_ei_effect_c_mrj(data, yr_idx)
+    asparagopsis_data = get_asparagopsis_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Asparagopsis taxiformis'] else 0
+    precision_agriculture_data = get_precision_agriculture_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Precision Agriculture'] else 0
+    eco_grazing_data = get_ecological_grazing_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Ecological Grazing'] else 0
+    sav_burning_data = get_savanna_burning_effect_c_mrj(data) if AG_MANAGEMENTS['Savanna Burning'] else 0
+    agtech_ei_data = get_agtech_ei_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['AgTech EI'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,

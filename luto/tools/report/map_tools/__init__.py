@@ -9,6 +9,8 @@ import numpy as np
 import imageio
 import pyproj
 
+import luto.settings as settings
+
 from branca.element import Template,  MacroElement, Element
 from shutil import move
 from rasterio.io import MemoryFile
@@ -293,7 +295,7 @@ def mask_invalid_data(memfile: MemoryFile,
 
     Args:
         memfile (MemoryFile): The input memory file containing the data to be masked.
-        mask_path (str): The path to the mask file (1-band file, -9999 as the nodata value).
+        mask_path (str): The path to the mask file (1-band file, 0 as the nodata value).
 
     Returns:
         MemoryFile: The memory file with the invalid data masked.
@@ -305,12 +307,16 @@ def mask_invalid_data(memfile: MemoryFile,
         mask_arr = mask.read(1)
         mask_arr = mask_arr.astype(np.int16)
         
+        # Apply the resefactor if not working with the full resolution
+        if settings.RESFACTOR > 1 and not settings.WRITE_FULL_RES_MAPS:
+            mask_arr = mask_arr[::settings.RESFACTOR, ::settings.RESFACTOR]
+        
         # read the 4-band array
         out_arr = src.read() # CHW
         out_arr = out_arr.transpose(1, 2, 0) # CHW -> HWC
         
         # Mask the invalid data
-        out_arr[mask_arr == -9999] = (0, 0, 0, 0)
+        out_arr[mask_arr == 0] = (0, 0, 0, 0)
         out_arr = out_arr.transpose(2, 0, 1) # HWC -> CHW
         
         meta = src.meta.copy()

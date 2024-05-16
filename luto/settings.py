@@ -117,14 +117,10 @@ PENALTY = 1e5
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
 
-# Write GeoTiffs to output directory: True or False
-WRITE_OUTPUT_GEOTIFFS = True
-
-# If use parallel processing to write GeoTiffs: True or False
-PARALLEL_WRITE = True
-
-# The Threads to use for writing GeoTiffs, and map making
-WRITE_THREADS = 50      # Works only if PARALLEL_WRITE = True
+WRITE_OUTPUT_GEOTIFFS = True    # Write GeoTiffs to output directory: True or False
+WRITE_FULL_RES_MAPS = True      # Write GeoTiffs all full or resfactored resolution: True or False
+PARALLEL_WRITE = True           # If use parallel processing to write GeoTiffs: True or False
+WRITE_THREADS = 50              # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 
 # ---------------------------------------------------------------------------- #

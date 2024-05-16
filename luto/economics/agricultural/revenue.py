@@ -323,11 +323,11 @@ def get_agricultural_management_revenue_matrices(data: Data, r_mrj, yr_idx) -> D
         The keys of the dictionary represent the management practices, and the values are numpy arrays.
 
     """
-    asparagopsis_data = get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx)
-    precision_agriculture_data = get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx)
-    eco_grazing_data = get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx)
-    sav_burning_data = get_savanna_burning_effect_r_mrj(data)
-    agtech_ei_data = get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx)
+    asparagopsis_data = get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['Asparagopsis taxiformis'] else 0
+    precision_agriculture_data = get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['Precision Agriculture'] else 0
+    eco_grazing_data = get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['Ecological Grazing'] else 0
+    sav_burning_data = get_savanna_burning_effect_r_mrj(data) if AG_MANAGEMENTS['Savanna Burning'] else 0
+    agtech_ei_data = get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['AgTech EI'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,

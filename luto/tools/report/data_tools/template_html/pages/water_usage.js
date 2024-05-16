@@ -32,7 +32,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     title: {
-      text: "Water Use as Percentage of Sustainable Limit",
+      text: "Water Use as Percentage to Avaliable Water Resources",
     },
 
     credits: {
