@@ -30,7 +30,7 @@ from luto import settings
 import luto.tools as tools
 
 
-def get_exclude_matrices(data: Data, base_year: int, lumaps: Dict[int, np.ndarray]):
+def get_exclude_matrices(data: Data, lumap: np.ndarray):
     """Return x_mrj exclude matrices.
 
     An exclude matrix indicates whether switching land-use for a certain cell r 
@@ -63,8 +63,7 @@ def get_exclude_matrices(data: Data, base_year: int, lumaps: Dict[int, np.ndarra
     # Raw transition-cost matrix is in $/ha and lexicographically ordered by land-use (shape = 28 x 28).
     t_ij = data.AG_TMATRIX
 
-    lumap = lumaps[base_year]
-    lumap_2010 = lumaps[2010]
+    lumap_2010 = data.LUMAP
 
     # Get all agricultural and non-agricultural cells
     ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)
@@ -108,7 +107,7 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
     l_mrj_not = np.logical_not(l_mrj)
 
     # Get the exclusion matrix
-    x_mrj = get_exclude_matrices(data, base_year, lumaps)
+    x_mrj = get_exclude_matrices(data, lumap)
 
     ag_cells, _ = tools.get_ag_and_non_ag_cells(lumap)
 
@@ -320,7 +319,7 @@ def get_lower_bound_agricultural_management_matrices(data: Data, yr) -> Dict[str
     Gets the lower bound for the agricultural land use of the current years optimisation.
     """
 
-    if yr not in data.ag_man_dvars:
+    if yr == data.YR_CAL_BASE or yr not in data.non_ag_dvars:
         return {
             am: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32) 
             for am in AG_MANAGEMENTS_TO_LAND_USES

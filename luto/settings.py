@@ -99,7 +99,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 9         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
-MODE = 'snapshot'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
+MODE = 'timeseries'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxrev'   # maximise profit (revenue - costs)
@@ -112,13 +112,6 @@ DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (li
 # Penalty in objective function to balance influence of demand versus cost when DEMAND_CONSTRAINT_TYPE = 'soft'
 # 1e5 works well (i.e., demand are met), demands not met with anything less 
 PENALTY = 1e5
-
-# A penalty to discourage the simultaneous use of more than one non-agricultural land use on a single cell.
-# E.g., the model is penalised for using both Environmental Plantings and Riparian Plantings on the same cell.
-# Set to 0 to disable.
-NON_AG_DOUBLING_PENALTY = 0  # 1e5
-NON_AG_DOUBLING_CONSTR_BIG_M = 0  # 1e6
-
 
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
@@ -175,9 +168,11 @@ NON_AG_LAND_USES dictionary to false.
 NON_AG_LAND_USES = {
     'Environmental Plantings': True,
     'Riparian Plantings': True,
-    'Agroforestry': True,
+    'Sheep Agroforestry': True,
+    'Beef Agroforestry': True,
     'Carbon Plantings (Block)': True,
-    'Carbon Plantings (Belt)': True,
+    'Sheep Carbon Plantings (Belt)': True,
+    'Beef Carbon Plantings (Belt)': True,
     'BECCS': True,
 }
 
@@ -190,9 +185,11 @@ years.
 NON_AG_LAND_USES_REVERSIBLE = {
     'Environmental Plantings': False,
     'Riparian Plantings': False,
-    'Agroforestry': False,
+    'Sheep Agroforestry': False,
+    'Beef Agroforestry': False,
     'Carbon Plantings (Block)': False,
-    'Carbon Plantings (Belt)': False,
+    'Sheep Carbon Plantings (Belt)': False,
+    'Beef Carbon Plantings (Belt)': False,
     'BECCS': False,
 }
 
