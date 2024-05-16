@@ -95,17 +95,17 @@ AMORTISATION_PERIOD = 30 # years
 # Model parameters
 # ---------------------------------------------------------------------------- #
 
-# Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 10         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
+# Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 9 x 9 cell block
+RESFACTOR = 9         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
 MODE = 'snapshot'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
 
 # Define the objective function
-# OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****
-OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs) **** Use either DEMAND_CONSTRAINT_TYPE = 'soft' or 'hard' ****
+OBJECTIVE = 'maxrev'   # maximise profit (revenue - costs)
+# OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
-# Specify how demand should be met in the solver
+# Specify how demand for agricultural commodity production should be met in the solver
 DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
 # DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
 
@@ -125,7 +125,7 @@ NON_AG_DOUBLING_CONSTR_BIG_M = 0  # 1e6
 # ---------------------------------------------------------------------------- #
 
 WRITE_OUTPUT_GEOTIFFS = True    # Write GeoTiffs to output directory: True or False
-WRITE_FULL_RES_MAPS = False      # Write GeoTiffs all full or resfactored resolution: True or False
+WRITE_FULL_RES_MAPS = True      # Write GeoTiffs all full or resfactored resolution: True or False
 PARALLEL_WRITE = True           # If use parallel processing to write GeoTiffs: True or False
 WRITE_THREADS = 50              # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
