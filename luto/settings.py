@@ -96,13 +96,14 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 9 x 9 cell block
-RESFACTOR = 9         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
+RESFACTOR = 1         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
-MODE = 'timeseries'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
+MODE = 'snapshot'   # Runs for target year only
+# MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
-OBJECTIVE = 'maxrev'   # maximise profit (revenue - costs)
+OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
 # OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
 # Specify how demand for agricultural commodity production should be met in the solver
@@ -110,7 +111,8 @@ DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (li
 # DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
 
 # Penalty in objective function to balance influence of demand versus cost when DEMAND_CONSTRAINT_TYPE = 'soft'
-# 1e5 works well (i.e., demand are met), demands not met with anything less 
+# 1e5 works well (i.e., demand are met), demands not met with anything less (i.e., large deviations)
+# Don't set too high though otherwise it meets demand exactly (minimises deviations) even if the cost is ridiculously high
 PENALTY = 1e5
 
 # ---------------------------------------------------------------------------- #

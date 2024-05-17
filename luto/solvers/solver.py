@@ -213,7 +213,8 @@ class LutoSolver:
         """
         # print(f"Setting objective function to {settings.OBJECTIVE}...\n", flush=True)
 
-        if settings.OBJECTIVE == "maxrev":
+        if settings.OBJECTIVE == "maxprofit":
+
             # Pre-calculate revenue minus (production and transition) costs
             ag_obj_mrj = (
                 -(

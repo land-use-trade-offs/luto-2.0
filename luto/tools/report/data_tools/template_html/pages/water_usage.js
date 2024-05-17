@@ -47,7 +47,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Percentage to Limit (%)",
+        text: "Water stress (water use as % of yield)",
       },
     },
 
