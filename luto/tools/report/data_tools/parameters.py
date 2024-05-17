@@ -63,9 +63,11 @@ RENAME_AM_NON_AG = {
     # Non-Agricultural Landuse
     "Environmental Plantings": "Environmental plantings (mixed species)",
     "Riparian Plantings": "Riparian buffer restoration (mixed species)",
-    "Agroforestry": "Agroforestry (food + biodiversity)",
+    "Sheep Agroforestry": "Sheep Agroforestry (food + biodiversity)",
+    "Beef Agroforestry": "Beef Agroforestry (food + biodiversity)",
     "Carbon Plantings (Block)": "Carbon plantings (monoculture)",
-    "Carbon Plantings (Belt)": "Farm forestry (food + timber)",
+    "Sheep Carbon Plantings (Belt)": "Sheep farm forestry (food + timber)",
+    "Beef Carbon Plantings (Belt)": "Beef farm forestry (food + timber)",
     "BECCS": "BECCS (Bioenergy with Carbon Capture and Storage)"
 }
 
@@ -73,8 +75,7 @@ RENAME_AM_NON_AG = {
 with open(f'{settings.INPUT_DIR}/ag_landuses.csv') as f:
     AG_LANDUSE = [line.strip() for line in f]
 
-with open(f'{settings.INPUT_DIR}/non_ag_landuses.csv') as f:
-    NON_AG_LANDUSE = [line.strip() for line in f]
+NON_AG_LANDUSE = list(settings.NON_AG_LAND_USES.keys())
 
 # Rename the land uses
 NON_AG_LANDUSE = [RENAME_AM_NON_AG.get(item, item) for item in NON_AG_LANDUSE]
