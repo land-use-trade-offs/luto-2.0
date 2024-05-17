@@ -95,30 +95,25 @@ AMORTISATION_PERIOD = 30 # years
 # Model parameters
 # ---------------------------------------------------------------------------- #
 
-# Optionally coarse-grain spatial domain (faster runs useful for testing)
-RESFACTOR = 1         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. E.g. RESFACTOR 5 selects every 5 x 5 cell
+# Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 9 x 9 cell block
+RESFACTOR = 9         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
-MODE = 'snapshot'   # 'snapshot' runs for target year only, 'timeseries' runs each year from base year to target year
+# MODE = 'snapshot'   # Runs for target year only
+MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
-# OBJECTIVE = 'maxrev' # maximise revenue (price x quantity - costs)                 **** Must use DEMAND_CONSTRAINT_TYPE = 'soft' ****
-OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs) **** Use either DEMAND_CONSTRAINT_TYPE = 'soft' or 'hard' ****
+# OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
+OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
-# Specify how demand should be met in the solver
+# Specify how demand for agricultural commodity production should be met in the solver
 DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
 # DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
 
 # Penalty in objective function to balance influence of demand versus cost when DEMAND_CONSTRAINT_TYPE = 'soft'
-# 1e5 works well (i.e., demand are met), demands not met with anything less 
+# 1e5 works well (i.e., demand are met), demands not met with anything less (i.e., large deviations)
+# Don't set too high though otherwise it meets demand exactly (minimises deviations) even if the cost is ridiculously high
 PENALTY = 1e5
-
-# A penalty to discourage the simultaneous use of more than one non-agricultural land use on a single cell.
-# E.g., the model is penalised for using both Environmental Plantings and Riparian Plantings on the same cell.
-# Set to 0 to disable.
-NON_AG_DOUBLING_PENALTY = 1e5
-NON_AG_DOUBLING_CONSTR_BIG_M = 1e6
-
 
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
@@ -175,9 +170,11 @@ NON_AG_LAND_USES dictionary to false.
 NON_AG_LAND_USES = {
     'Environmental Plantings': True,
     'Riparian Plantings': True,
-    'Agroforestry': True,
+    'Sheep Agroforestry': True,
+    'Beef Agroforestry': True,
     'Carbon Plantings (Block)': True,
-    'Carbon Plantings (Belt)': True,
+    'Sheep Carbon Plantings (Belt)': True,
+    'Beef Carbon Plantings (Belt)': True,
     'BECCS': True,
 }
 
@@ -190,9 +187,11 @@ years.
 NON_AG_LAND_USES_REVERSIBLE = {
     'Environmental Plantings': False,
     'Riparian Plantings': False,
-    'Agroforestry': False,
+    'Sheep Agroforestry': False,
+    'Beef Agroforestry': False,
     'Carbon Plantings (Block)': False,
-    'Carbon Plantings (Belt)': False,
+    'Sheep Carbon Plantings (Belt)': False,
+    'Beef Carbon Plantings (Belt)': False,
     'BECCS': False,
 }
 

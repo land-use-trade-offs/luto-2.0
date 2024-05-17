@@ -161,32 +161,63 @@ def get_riparian_plantings_cells(lumap) -> np.ndarray:
     return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 1)[0]
 
 
-def get_agroforestry_cells(lumap) -> np.ndarray:
+def get_sheep_agroforestry_cells(lumap) -> np.ndarray:
     """
     Get an array with cells used for riparian plantings
     """
     return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 2)[0]
 
 
-def get_carbon_plantings_block_cells(lumap) -> np.ndarray:
+def get_beef_agroforestry_cells(lumap) -> np.ndarray:
     """
-    Get an array with all cells being used for carbon plantings (block)
+    Get an array with cells used for riparian plantings
     """
     return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 3)[0]
 
 
-def get_carbon_plantings_belt_cells(lumap) -> np.ndarray:
+def get_agroforestry_cells(lumap) -> np.ndarray:
+    """
+    Get an array with cells used that currently use agroforestry (either sheep or beef)
+    """
+    agroforestry_lus = [settings.NON_AGRICULTURAL_LU_BASE_CODE + 2, settings.NON_AGRICULTURAL_LU_BASE_CODE + 3]
+    return np.nonzero(np.isin(lumap, agroforestry_lus))[0]
+
+
+def get_carbon_plantings_block_cells(lumap) -> np.ndarray:
     """
     Get an array with all cells being used for carbon plantings (block)
     """
     return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 4)[0]
 
 
+def get_sheep_carbon_plantings_belt_cells(lumap) -> np.ndarray:
+    """
+    Get an array with all cells being used for sheep carbon plantings (belt)
+    """
+    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 5)[0]
+
+
+def get_beef_carbon_plantings_belt_cells(lumap) -> np.ndarray:
+    """
+    Get an array with all cells being used for beef carbon plantings (belt)
+    """
+    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 6)[0]
+
+
+def get_carbon_plantings_belt_cells(lumap) -> np.ndarray:
+    """
+    Get an array with cells used that currently use carbon plantings belt (either sheep or beef)
+    """
+
+    cp_belt_lus = [settings.NON_AGRICULTURAL_LU_BASE_CODE + 5, settings.NON_AGRICULTURAL_LU_BASE_CODE + 6]
+    return np.nonzero(np.isin(lumap, cp_belt_lus))[0]
+
+
 def get_beccs_cells(lumap) -> np.ndarray:
     """
     Get an array with all cells being used for carbon plantings (block)
     """
-    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 5)[0]
+    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 7)[0]
 
 
 def get_ag_natural_lu_cells(data, lumap) -> np.ndarray:
@@ -208,6 +239,20 @@ def get_ag_and_non_ag_natural_lu_cells(data, lumap) -> np.ndarray:
     Gets all cells being used for natural land uses, both agricultural and non-agricultural.
     """
     return np.nonzero(np.isin(lumap, data.LU_NATURAL + data.NON_AG_LU_NATURAL))[0]
+
+
+def get_ag_cells(lumap) -> np.ndarray:
+    """
+    Get an array containing the index of all non-agricultural cells
+    """
+    return np.nonzero(lumap < settings.NON_AGRICULTURAL_LU_BASE_CODE)[0]
+
+
+def get_non_ag_cells(lumap) -> np.ndarray:
+    """
+    Get an array containing the index of all non-agricultural cells
+    """
+    return np.nonzero(lumap >= settings.NON_AGRICULTURAL_LU_BASE_CODE)[0]
 
 
 def timethis(function, *args, **kwargs):
@@ -380,6 +425,82 @@ def am_name_snake_case(am_name):
     """Get snake_case version of the AM name"""
     return am_name.lower().replace(' ', '_')
 
+
+def get_exclusions_for_excluding_all_natural_cells(data, lumap) -> np.ndarray:
+    """
+    A number of non-agricultural land uses can only be applied to cells that
+    don't already utilise a natural land use. This function gets the exclusion
+    matrix for all such non-ag land uses, returning an array valued 0 at the 
+    indices of cells that use natural land uses, and 1 everywhere else.
+
+    Parameters:
+    - data: The data object containing information about the cells.
+    - lumap: The land use map.
+
+    Returns:
+    - exclude: An array of shape (NCELLS,) with values 0 at the indices of cells
+               that use natural land uses, and 1 everywhere else.
+    """
+    exclude = np.ones(data.NCELLS)
+
+    natural_lu_cells = get_ag_and_non_ag_natural_lu_cells(data, lumap)
+    exclude[natural_lu_cells] = 0
+
+    return exclude
+
+
+def get_exclusions_agroforestry_base(data, lumap) -> np.ndarray:
+    """
+    Return a 1-D array indexed by r that represents how much agroforestry can possibly 
+    be done at each cell.
+
+    Parameters:
+    - data: The data object containing information about the landscape.
+    - lumap: The land use map.
+
+    Returns:
+    - exclude: A 1-D array.
+    """
+    exclude = (np.ones(data.NCELLS) * settings.AF_PROPORTION).astype(np.float32)
+
+    # Ensure cells being used for agroforestry may retain that LU
+    exclude[get_agroforestry_cells(lumap)] = settings.AF_PROPORTION
+
+    return exclude
+
+
+def get_exclusions_carbon_plantings_belt_base(data, lumap) -> np.ndarray:
+    """
+    Return a 1-D array indexed by r that represents how much carbon plantings (belt) can possibly 
+    be done at each cell.
+
+    Parameters:
+    - data: The data object containing information about the cells.
+    - lumap: The land use map.
+
+    Returns:
+    - exclude: A 1-D array
+    """
+    exclude = (np.ones(data.NCELLS) * settings.CP_BELT_PROPORTION).astype(np.float32)
+
+    # Ensure cells being used for carbon plantings (belt) may retain that LU
+    exclude[get_carbon_plantings_belt_cells(lumap)] = settings.CP_BELT_PROPORTION
+
+    return exclude
+
+
+def get_sheep_natural_land_code(data):
+    """
+    Get the land use code (j) for 'Sheep - natural land'
+    """
+    return data.DESC2AGLU['Sheep - natural land']
+
+
+def get_beef_natural_land_code(data):
+    """
+    Get the land use code (j) for 'Beef - natural land'
+    """
+    return data.DESC2AGLU['Beef - natural land']
 
 
 # function to create mapping table between lu_desc and dvar index
