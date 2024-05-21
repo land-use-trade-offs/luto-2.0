@@ -90,7 +90,7 @@ class LutoSolver:
         self.ag_management_constraints_r = defaultdict(list)
         self.adoption_limit_constraints = []
         self.demand_penalty_constraints = []
-        self.water_limit_constraints_r = defaultdict(list)
+        self.water_limit_constraints_r = None
         self.ghg_emissions_expr = None
         self.ghg_emissions_limit_constraint = None
         self.biodiversity_expr = None
@@ -534,11 +534,12 @@ class LutoSolver:
         If `cells` is provided, only adds constraints for regions containing at least one of the
         provided cells.
         """
-        print(f'  ...water constraints by {settings.WATER_REGION_DEF}...')
-
         if settings.WATER_USE_LIMITS != "on":
             return
+        
+        print(f'  ...water constraints by {settings.WATER_REGION_DEF}...')
 
+        self.water_limit_constraints_r = defaultdict(list)
         # print(f"Adding water constraints by {settings.WATER_REGION_DEF}...")
 
         # Returns region-specific water use limits
@@ -878,11 +879,13 @@ class LutoSolver:
         for r in updated_cells:
             self.gurobi_model.remove(self.cell_usage_constraint_r.pop(r, []))
             self.gurobi_model.remove(self.ag_management_constraints_r.pop(r, []))
-            self.gurobi_model.remove(self.water_limit_constraints_r.pop(r, []))
+            if self.water_limit_constraints_r is not None:
+                self.gurobi_model.remove(self.water_limit_constraints_r.pop(r, []))
         
         self.gurobi_model.remove(self.adoption_limit_constraints)
         self.gurobi_model.remove(self.demand_penalty_constraints)
-        self.gurobi_model.remove(self.biodiversity_limit_constraint)
+        if self.biodiversity_limit_constraint is not None:
+            self.gurobi_model.remove(self.biodiversity_limit_constraint)
         
         self.adoption_limit_constraints = []
         self.demand_penalty_constraints = []
@@ -1052,8 +1055,10 @@ class LutoSolver:
 
         # # Process production amount for each commodity
         prod_data["Production"] = [self.total_q_exprs_c[c].getValue() for c in range(self.ncms)]
-        prod_data["GHG Emissions"] = self.ghg_emissions_expr.getValue()
-        prod_data["Biodiversity"] = self.biodiversity_expr.getValue()
+        if self.ghg_emissions_expr:
+            prod_data["GHG Emissions"] = self.ghg_emissions_expr.getValue()
+        if self.biodiversity_expr:
+            prod_data["Biodiversity"] = self.biodiversity_expr.getValue()
 
         ag_X_mrj_processed[:, non_ag_bools_r, :] = False
         non_ag_X_rk_processed[~non_ag_bools_r, :] = False
