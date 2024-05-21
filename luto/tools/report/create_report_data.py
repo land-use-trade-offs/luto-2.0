@@ -735,332 +735,333 @@ def save_report_data(raw_data_dir:str):
     ####################################################
     #                       4) GHGs                    #
     ####################################################
-    GHG_files_onland = files.query('category == "GHG" and base_name.str.contains("GHG_emissions_separate") and year_types != "begin_end_year"').reset_index(drop=True)
-    GHG_files_onland = pd.concat([pd.read_csv(path) for path in GHG_files_onland['path']], ignore_index=True)
-    GHG_files_onland['CO2_type'] = GHG_files_onland['CO2_type'].replace(GHG_NAMES)
-    GHG_files_onland['Value (Mt CO2e)'] = GHG_files_onland['Value (t CO2e)'] / 1e6
-    GHG_files_onland = GHG_files_onland.replace(RENAME_AM_NON_AG)
-    
-    def get_landuse_type(x):
-        if x in LU_CROPS:
-            return 'Crop'
-        elif x in LVSTK_NATURAL:
-            return 'Livestock - natural land'
-        elif x in LVSTK_MODIFIED:
-            return 'Livestock - modified land'
-        else:
-            return 'Unallocated land'
+    if settings.GHG_EMISSIONS_LIMITS == 'on':
+        GHG_files_onland = files.query('category == "GHG" and base_name.str.contains("GHG_emissions_separate") and year_types != "begin_end_year"').reset_index(drop=True)
+        GHG_files_onland = pd.concat([pd.read_csv(path) for path in GHG_files_onland['path']], ignore_index=True)
+        GHG_files_onland['CO2_type'] = GHG_files_onland['CO2_type'].replace(GHG_NAMES)
+        GHG_files_onland['Value (Mt CO2e)'] = GHG_files_onland['Value (t CO2e)'] / 1e6
+        GHG_files_onland = GHG_files_onland.replace(RENAME_AM_NON_AG)
         
-    GHG_files_onland['Land-use type'] = GHG_files_onland['Land-use'].apply(get_landuse_type)
+        def get_landuse_type(x):
+            if x in LU_CROPS:
+                return 'Crop'
+            elif x in LVSTK_NATURAL:
+                return 'Livestock - natural land'
+            elif x in LVSTK_MODIFIED:
+                return 'Livestock - modified land'
+            else:
+                return 'Unallocated land'
+            
+        GHG_files_onland['Land-use type'] = GHG_files_onland['Land-use'].apply(get_landuse_type)
 
-    # Read the off-land GHG emissions
-    GHG_off_land = files.query('category == "GHG" and base_name == "GHG_emissions_offland_commodity" and year_types != "begin_end_year"').reset_index(drop=True)
-    GHG_off_land = pd.concat([pd.read_csv(path) for path in GHG_off_land['path']], ignore_index=True)
-    GHG_off_land['Value (Mt CO2e)'] = GHG_off_land['Total GHG Emissions (tCO2e)'] / 1e6
-    GHG_off_land['COMMODITY'] = GHG_off_land['COMMODITY'].apply(lambda x: x[0].capitalize() + x[1:])
-    GHG_off_land['Emission Source'] = GHG_off_land['Emission Source'].replace({'CO2': 'Carbon Dioxide (CO2)',
-                                                                               'CH4': 'Methane (CH4)',
-                                                                               'N2O': 'Nitrous Oxide (N2O)'})
-     
-    # Plot_4-1: GHG of cumulative emissions (Mt)
-    Emission_onland = GHG_files_onland.groupby('Year')['Value (Mt CO2e)'].sum(numeric_only = True).reset_index()
-    Emission_onland = Emission_onland[['Year','Value (Mt CO2e)']]
-    
-    Emission_offland = GHG_off_land.groupby('Year').sum(numeric_only=True).reset_index()
-    Emission_offland = Emission_offland[['Year','Value (Mt CO2e)']]
-    Emission_offland['Type'] = 'Off-land Commodity'
-    
-    Net_emission = pd.concat([Emission_onland,Emission_offland],axis=0)
-    Net_emission = Net_emission.groupby(['Year']).sum(numeric_only = True).reset_index()
-    
-    Cumsum_emissions = Net_emission.copy()
-    Cumsum_emissions['Cumulative GHG emissions (Mt)'] = Cumsum_emissions.cumsum()['Value (Mt CO2e)']
-    Cumsum_emissions = Cumsum_emissions[['Year','Cumulative GHG emissions (Mt)']]
-    
-    Cumsum_emissions_json = [{'data': list(map(list,zip(Cumsum_emissions['Year'],Cumsum_emissions['Cumulative GHG emissions (Mt)']))),
-                             'type' : 'column'}]
-    
-    with open(f'{SAVE_DIR}/GHG_1_cunsum_emission_Mt.json', 'w') as outfile:
-        json.dump(Cumsum_emissions_json, outfile)
-    
-
-    # Plot_4-2: GHG from individual emission sectors (Mt)
-    GHG_files_wide_onland = GHG_files_onland[['Year','Type','Value (Mt CO2e)']]
-    GHG_files_wide_offland = Emission_offland[['Year','Type','Value (Mt CO2e)']]
-    
-    GHG_files_wide = pd.concat([GHG_files_wide_onland,GHG_files_wide_offland],axis=0)
-    GHG_files_wide = GHG_files_wide.groupby(['Type','Year']).sum(numeric_only=True).reset_index()
-    
-    
-    GHG_files_wide = GHG_files_wide\
-        .groupby(['Type'])[['Year','Value (Mt CO2e)']]\
-        .apply(lambda x:list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
-        .reset_index()
+        # Read the off-land GHG emissions
+        GHG_off_land = files.query('category == "GHG" and base_name == "GHG_emissions_offland_commodity" and year_types != "begin_end_year"').reset_index(drop=True)
+        GHG_off_land = pd.concat([pd.read_csv(path) for path in GHG_off_land['path']], ignore_index=True)
+        GHG_off_land['Value (Mt CO2e)'] = GHG_off_land['Total GHG Emissions (tCO2e)'] / 1e6
+        GHG_off_land['COMMODITY'] = GHG_off_land['COMMODITY'].apply(lambda x: x[0].capitalize() + x[1:])
+        GHG_off_land['Emission Source'] = GHG_off_land['Emission Source'].replace({'CO2': 'Carbon Dioxide (CO2)',
+                                                                                'CH4': 'Methane (CH4)',
+                                                                                'N2O': 'Nitrous Oxide (N2O)'})
         
-    GHG_files_wide.columns = ['name','data'] 
-    GHG_files_wide['type'] = 'column'
-    
-    GHG_files_wide.loc[-1] = ['Net emissions', list(map(list,zip(Net_emission['Year'],Net_emission['Value (Mt CO2e)']))), 'line']
-    GHG_files_wide.to_json(f'{SAVE_DIR}/GHG_2_individual_emission_Mt.json',orient='records')
+        # Plot_4-1: GHG of cumulative emissions (Mt)
+        Emission_onland = GHG_files_onland.groupby('Year')['Value (Mt CO2e)'].sum(numeric_only = True).reset_index()
+        Emission_onland = Emission_onland[['Year','Value (Mt CO2e)']]
+        
+        Emission_offland = GHG_off_land.groupby('Year').sum(numeric_only=True).reset_index()
+        Emission_offland = Emission_offland[['Year','Value (Mt CO2e)']]
+        Emission_offland['Type'] = 'Off-land Commodity'
+        
+        Net_emission = pd.concat([Emission_onland,Emission_offland],axis=0)
+        Net_emission = Net_emission.groupby(['Year']).sum(numeric_only = True).reset_index()
+        
+        Cumsum_emissions = Net_emission.copy()
+        Cumsum_emissions['Cumulative GHG emissions (Mt)'] = Cumsum_emissions.cumsum()['Value (Mt CO2e)']
+        Cumsum_emissions = Cumsum_emissions[['Year','Cumulative GHG emissions (Mt)']]
+        
+        Cumsum_emissions_json = [{'data': list(map(list,zip(Cumsum_emissions['Year'],Cumsum_emissions['Cumulative GHG emissions (Mt)']))),
+                                'type' : 'column'}]
+        
+        with open(f'{SAVE_DIR}/GHG_1_cunsum_emission_Mt.json', 'w') as outfile:
+            json.dump(Cumsum_emissions_json, outfile)
+        
+
+        # Plot_4-2: GHG from individual emission sectors (Mt)
+        GHG_files_wide_onland = GHG_files_onland[['Year','Type','Value (Mt CO2e)']]
+        GHG_files_wide_offland = Emission_offland[['Year','Type','Value (Mt CO2e)']]
+        
+        GHG_files_wide = pd.concat([GHG_files_wide_onland,GHG_files_wide_offland],axis=0)
+        GHG_files_wide = GHG_files_wide.groupby(['Type','Year']).sum(numeric_only=True).reset_index()
+        
+        
+        GHG_files_wide = GHG_files_wide\
+            .groupby(['Type'])[['Year','Value (Mt CO2e)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
+            .reset_index()
+            
+        GHG_files_wide.columns = ['name','data'] 
+        GHG_files_wide['type'] = 'column'
+        
+        GHG_files_wide.loc[-1] = ['Net emissions', list(map(list,zip(Net_emission['Year'],Net_emission['Value (Mt CO2e)']))), 'line']
+        GHG_files_wide.to_json(f'{SAVE_DIR}/GHG_2_individual_emission_Mt.json',orient='records')
 
 
 
-    # Plot_4-3: GHG emission (Mt) for on-land
-    GHG_agricultural = GHG_files_onland.query('Type == "Agricultural Landuse"').copy()
-    
-    GHG_CO2 = GHG_agricultural.query('~CO2_type.isin(@GHG_CATEGORY.keys())').copy()
-    GHG_CO2['GHG Category'] = 'CO2'
+        # Plot_4-3: GHG emission (Mt) for on-land
+        GHG_agricultural = GHG_files_onland.query('Type == "Agricultural Landuse"').copy()
+        
+        GHG_CO2 = GHG_agricultural.query('~CO2_type.isin(@GHG_CATEGORY.keys())').copy()
+        GHG_CO2['GHG Category'] = 'CO2'
 
-    GHG_nonCO2 = GHG_agricultural.query('CO2_type.isin(@GHG_CATEGORY.keys())').copy()
-    GHG_nonCO2['GHG Category'] = GHG_nonCO2['CO2_type'].apply(lambda x: GHG_CATEGORY[x].keys())
-    GHG_nonCO2['Multiplier'] = GHG_nonCO2['CO2_type'].apply(lambda x: GHG_CATEGORY[x].values())
-    GHG_nonCO2 = GHG_nonCO2.explode(['GHG Category','Multiplier']).reset_index(drop=True)
-    GHG_nonCO2['Value (Mt CO2e)'] = GHG_nonCO2['Value (Mt CO2e)'] * GHG_nonCO2['Multiplier']
-    GHG_nonCO2 = GHG_nonCO2.drop(columns=['Multiplier'])
-    
-    dfs = [GHG_CO2.dropna(axis=1, how='all'),GHG_nonCO2.dropna(axis=1, how='all')]
-    GHG_ag_emissions_long = pd.concat(dfs,axis=0).reset_index(drop=True)
-    GHG_ag_emissions_long['Value (Mt CO2e)'] = GHG_ag_emissions_long['Value (t CO2e)'] / 1e6
-    GHG_ag_emissions_long['GHG Category'] = GHG_ag_emissions_long['GHG Category'].replace({'CH4': 'Methane (CH4)', 
-                                                                                     'N2O': 'Nitrous Oxide (N2O)', 
-                                                                                     'CO2': 'Carbon Dioxide (CO2)'})
-    
-    
+        GHG_nonCO2 = GHG_agricultural.query('CO2_type.isin(@GHG_CATEGORY.keys())').copy()
+        GHG_nonCO2['GHG Category'] = GHG_nonCO2['CO2_type'].apply(lambda x: GHG_CATEGORY[x].keys())
+        GHG_nonCO2['Multiplier'] = GHG_nonCO2['CO2_type'].apply(lambda x: GHG_CATEGORY[x].values())
+        GHG_nonCO2 = GHG_nonCO2.explode(['GHG Category','Multiplier']).reset_index(drop=True)
+        GHG_nonCO2['Value (Mt CO2e)'] = GHG_nonCO2['Value (Mt CO2e)'] * GHG_nonCO2['Multiplier']
+        GHG_nonCO2 = GHG_nonCO2.drop(columns=['Multiplier'])
+        
+        dfs = [GHG_CO2.dropna(axis=1, how='all'),GHG_nonCO2.dropna(axis=1, how='all')]
+        GHG_ag_emissions_long = pd.concat(dfs,axis=0).reset_index(drop=True)
+        GHG_ag_emissions_long['Value (Mt CO2e)'] = GHG_ag_emissions_long['Value (t CO2e)'] / 1e6
+        GHG_ag_emissions_long['GHG Category'] = GHG_ag_emissions_long['GHG Category'].replace({'CH4': 'Methane (CH4)', 
+                                                                                        'N2O': 'Nitrous Oxide (N2O)', 
+                                                                                        'CO2': 'Carbon Dioxide (CO2)'})
+        
+        
 
 
-    # Plot_4-3-1: Agricultural Emission (on-land) by crop/lvstk sectors (Mt)
-    GHG_crop_lvstk_total = GHG_ag_emissions_long\
-                                    .groupby(['Year','Type','Land-use type'])\
-                                    .sum(numeric_only=True)[['Value (Mt CO2e)']]\
+        # Plot_4-3-1: Agricultural Emission (on-land) by crop/lvstk sectors (Mt)
+        GHG_crop_lvstk_total = GHG_ag_emissions_long\
+                                        .groupby(['Year','Type','Land-use type'])\
+                                        .sum(numeric_only=True)[['Value (Mt CO2e)']]\
+                                        .reset_index()
+                                        
+
+        GHG_Ag_emission_total_crop_lvstk_wide = GHG_crop_lvstk_total\
+                                                    .groupby(['Land-use type'])[['Year','Value (Mt CO2e)']]\
+                                                    .apply(lambda x: list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
+                                                    .reset_index()
+                                                    
+        GHG_Ag_emission_total_crop_lvstk_wide.columns = ['name','data']
+        GHG_Ag_emission_total_crop_lvstk_wide['type'] = 'column'
+        GHG_Ag_emission_total_crop_lvstk_wide.to_json(f'{SAVE_DIR}/GHG_4_3_1_crop_lvstk_emission_Mt.json',orient='records')
+
+
+
+        # Plot_4-3-2: Agricultural Emission (on-land) by dry/Water_supply  (Mt)
+        GHG_Ag_emission_total_dry_irr = GHG_ag_emissions_long.groupby(['Year','Water_supply']).sum()['Value (Mt CO2e)'].reset_index()
+        
+        GHG_Ag_emission_total_dry_irr_wide = GHG_Ag_emission_total_dry_irr\
+                                                .groupby(['Water_supply'])[['Year','Value (Mt CO2e)']]\
+                                                .apply(lambda x: list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
+                                                .reset_index()
+                                                
+        GHG_Ag_emission_total_dry_irr_wide.columns = ['name','data']
+        GHG_Ag_emission_total_dry_irr_wide['type'] = 'column'
+        GHG_Ag_emission_total_dry_irr_wide.to_json(f'{SAVE_DIR}/GHG_4_3_2_dry_irr_emission_Mt.json',orient='records')
+        
+        
+
+
+        # Plot_4-3-3: Agricultural Emission (on-land) by GHG type sectors (Mt)
+        GHG_Ag_emission_total_GHG_type = GHG_ag_emissions_long.groupby(['Year','GHG Category']).sum()['Value (Mt CO2e)'].reset_index()
+        
+        GHG_Ag_emission_total_GHG_type_wide = GHG_Ag_emission_total_GHG_type\
+                                                .groupby(['GHG Category'])[['Year','Value (Mt CO2e)']]\
+                                                .apply(lambda x: list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
+                                                .reset_index()
+                                                
+        GHG_Ag_emission_total_GHG_type_wide.columns = ['name','data']
+        GHG_Ag_emission_total_GHG_type_wide['type'] = 'column'
+        GHG_Ag_emission_total_GHG_type_wide.to_json(f'{SAVE_DIR}/GHG_4_3_3_category_emission_Mt.json',orient='records')
+
+
+        # Plot_4-3-4: Agricultural Emission (on-land) by Sources (Mt)
+        GHG_Ag_emission_total_Source = GHG_ag_emissions_long.groupby(['Year','CO2_type']).sum()['Value (Mt CO2e)'].reset_index()
+        
+        GHG_Ag_emission_total_Source_wide = GHG_Ag_emission_total_Source\
+                                                .groupby(['CO2_type'])[['Year','Value (Mt CO2e)']]\
+                                                .apply(lambda x: list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
+                                                .reset_index()
+                                                
+        GHG_Ag_emission_total_Source_wide.columns = ['name','data']
+        GHG_Ag_emission_total_Source_wide['type'] = 'column'
+        GHG_Ag_emission_total_Source_wide.to_json(f'{SAVE_DIR}/GHG_4_3_4_sources_emission_Mt.json',orient='records')
+        
+
+        # Plot_4-3-5: GHG emission (on-land) in start and end years (Mt)
+        start_year,end_year = GHG_ag_emissions_long['Year'].min(),GHG_ag_emissions_long['Year'].max() 
+
+        GHG_lu_lm = GHG_ag_emissions_long\
+                .groupby(['Year','Type','Land-use','Water_supply'])\
+                .sum()['Value (Mt CO2e)']\
+                .reset_index()
+                
+        GHG_lu_lm_df_start = GHG_lu_lm.query('Year == @start_year').reset_index(drop=True)
+        GHG_lu_lm_df_end = GHG_lu_lm.query('Year == @end_year').reset_index(drop=True)
+
+        GHG_lu_lm_df_begin_end = pd.concat([GHG_lu_lm_df_start,GHG_lu_lm_df_end],axis=0)
+        GHG_lu_lm_df_begin_end = GHG_lu_lm_df_begin_end.sort_values(['Water_supply','Land-use','Year'])
+        
+        GHG_lu_lm_df_begin_end_category = GHG_lu_lm_df_begin_end.query('Water_supply == "Dryland"')\
+                                            .groupby('Land-use')[['Year','Land-use']]\
+                                            .apply(lambda x: x['Year'].tolist())\
+                                            .reset_index()                                   
+        GHG_lu_lm_df_begin_end_category.columns = ['name','categories']
+        
+        GHG_lu_lm_df_begin_end_series = GHG_lu_lm_df_begin_end[['Water_supply','Value (Mt CO2e)']]\
+                                            .groupby('Water_supply')[['Water_supply','Value (Mt CO2e)']]\
+                                            .apply(lambda x: list(map(list,zip(x['Water_supply'], x['Value (Mt CO2e)']))))\
+                                            .reset_index()
+        GHG_lu_lm_df_begin_end_series.columns = ['name','data']
+        GHG_lu_lm_df_begin_end_series['type'] = 'column'
+        
+        
+        GHG_lu_lm_df_begin_end_json = {'categories': json.loads(GHG_lu_lm_df_begin_end_category.to_json(orient='records')),
+                                        'series': json.loads(GHG_lu_lm_df_begin_end_series.to_json(orient='records'))}
+        
+        with open(f'{SAVE_DIR}/GHG_4_3_5_lu_lm_emission_Mt_wide.json', 'w') as outfile:
+            json.dump(GHG_lu_lm_df_begin_end_json, outfile)
+        
+
+
+        # Plot_4-3-6: GHG emission (on-land) in the target year (Mt)
+        GHG_lu_source = GHG_ag_emissions_long\
+                        .groupby(['Year','Land-use','Water_supply','CO2_type'])\
+                        .sum()['Value (Mt CO2e)']\
+                        .reset_index()
+                
+        GHG_lu_source_target_yr = GHG_lu_source.query(f'Year == {end_year}')
+
+        GHG_lu_source_nest = GHG_lu_source_target_yr\
+                                .groupby(['CO2_type','Land-use'])\
+                                .sum(numeric_only=True)[['Value (Mt CO2e)']]\
+                                .reset_index()
+                                
+        GHG_lu_source_nest_dict = GHG_lu_source_nest\
+                                    .groupby('CO2_type')[['Land-use','Value (Mt CO2e)']]\
+                                    .apply(lambda x: x[['Land-use','Value (Mt CO2e)']].to_dict(orient='records'))\
                                     .reset_index()
                                     
+        GHG_lu_source_nest_dict.columns = ['name','data']
+        GHG_lu_source_nest_dict['data'] = GHG_lu_source_nest_dict['data']\
+            .apply(lambda x: [{'name': i['Land-use'], 'value': i['Value (Mt CO2e)']} for i in x])
+        
+        GHG_lu_source_nest_dict.to_json(f'{SAVE_DIR}/GHG_4_3_6_lu_source_emission_Mt.json',orient='records')
 
-    GHG_Ag_emission_total_crop_lvstk_wide = GHG_crop_lvstk_total\
+                
+            
+        # Plot_4-3-7: GHG emission (off-land) by commodity (Mt)
+        GHG_off_land_commodity = GHG_off_land\
+            .groupby(['Year','COMMODITY'])\
+            .sum(numeric_only=True)['Value (Mt CO2e)'].reset_index()
+            
+        GHG_off_land_commodity_json = GHG_off_land_commodity\
+            .groupby('COMMODITY')[['Year','Value (Mt CO2e)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
+            .reset_index()
+            
+        GHG_off_land_commodity_json.columns = ['name','data']
+        GHG_off_land_commodity_json['type'] = 'column'
+        GHG_off_land_commodity_json.to_json(f'{SAVE_DIR}/GHG_4_3_7_off_land_commodity_emission_Mt.json',orient='records')
+        
+        
+        
+        # Plot_4-3-8: GHG emission (off-land) by sources (Mt)
+        GHG_off_land_sources = GHG_off_land\
+            .groupby(['Year','Emission Source'])\
+            .sum(numeric_only=True)['Value (Mt CO2e)'].reset_index()
+            
+        GHG_off_land_sources_json = GHG_off_land_sources\
+            .groupby('Emission Source')[['Year','Value (Mt CO2e)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
+            .reset_index()
+            
+        GHG_off_land_sources_json.columns = ['name','data']
+        GHG_off_land_sources_json['type'] = 'column'
+        GHG_off_land_sources_json.to_json(f'{SAVE_DIR}/GHG_4_3_8_off_land_sources_emission_Mt.json',orient='records')
+        
+        
+        
+        
+        # Plot_4-3-9: GHG emission (off-land) by Emission Type
+        GHG_off_land_type = GHG_off_land\
+            .groupby(['Year','Emission Type'])\
+            .sum(numeric_only=True)['Value (Mt CO2e)'].reset_index()
+            
+        GHG_off_land_type_json = GHG_off_land_type\
+            .groupby('Emission Type')[['Year','Value (Mt CO2e)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
+            .reset_index()
+            
+        GHG_off_land_type_json.columns = ['name','data']
+        GHG_off_land_type_json['type'] = 'column'
+        
+        GHG_off_land_type_json.to_json(f'{SAVE_DIR}/GHG_4_3_9_off_land_type_emission_Mt.json',orient='records')
+
+
+
+        # Plot_4-4: GHG abatement by Non-Agrilcultural sector (Mt)
+        Non_ag_reduction_long = GHG_files_onland.query('Type == "Non-Agricultural land-use"').reset_index(drop=True)
+                                                    
+        Non_ag_reduction_source = Non_ag_reduction_long.groupby(['Year','Type','Land-use'])\
+            .sum(numeric_only=True)['Value (Mt CO2e)'].reset_index()
+        
+        # Fill the missing years with 0 values    
+        fill_years = set(years) - set(Non_ag_reduction_source['Year'].unique())
+        Non_ag_reduction_source = pd.concat([Non_ag_reduction_source, pd.DataFrame({'Year': list(fill_years), 'CO2_type':'Agroforestry','Value (Mt CO2e)': 0})], axis=0)
+            
+        Non_ag_reduction_source_wide = Non_ag_reduction_source\
+                                            .groupby(['Land-use'])[['Year','Value (Mt CO2e)']]\
+                                            .apply(lambda x: list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
+                                            .reset_index()
+                                            
+        Non_ag_reduction_source_wide.columns = ['name','data']
+        Non_ag_reduction_source_wide['type'] = 'column'
+        
+        Non_ag_reduction_source_wide.to_json(f'{SAVE_DIR}/GHG_4_4_ag_reduction_source_wide_Mt.json',orient='records')
+
+
+
+        # Plot_4-5: GHG reductions by Agricultural managements (Mt)
+        Ag_man_sequestration_long = GHG_files_onland.query('Type == "Agricultural Management"').reset_index(drop=True)
+
+        # Plot_4-5-1: GHG reductions by Agricultural managements in total (Mt)
+        Ag_man_sequestration_total = Ag_man_sequestration_long.groupby(['Year','Agricultural Management Type']).sum()['Value (Mt CO2e)'].reset_index()
+        
+        Ag_man_sequestration_total_wide = Ag_man_sequestration_total\
+                                            .groupby(['Agricultural Management Type'])[['Year','Value (Mt CO2e)']]\
+                                            .apply(lambda x: list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
+                                            .reset_index()
+                                            
+        Ag_man_sequestration_total_wide.columns = ['name','data']
+        Ag_man_sequestration_total_wide['type'] = 'column'
+        Ag_man_sequestration_total_wide.to_json(f'{SAVE_DIR}/GHG_4_5_1_GHG_ag_man_df_wide_Mt.json',orient='records')
+
+
+        # Plot_4-5-2: GHG reductions by Agricultural managements in subsector (Mt)
+        Ag_man_sequestration_crop_lvstk_wide = Ag_man_sequestration_long.groupby(['Year','Type','Land-use type']).sum()['Value (Mt CO2e)'].reset_index()
+        
+        Ag_man_sequestration_crop_lvstk_wide = Ag_man_sequestration_crop_lvstk_wide\
                                                 .groupby(['Land-use type'])[['Year','Value (Mt CO2e)']]\
                                                 .apply(lambda x: list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
                                                 .reset_index()
                                                 
-    GHG_Ag_emission_total_crop_lvstk_wide.columns = ['name','data']
-    GHG_Ag_emission_total_crop_lvstk_wide['type'] = 'column'
-    GHG_Ag_emission_total_crop_lvstk_wide.to_json(f'{SAVE_DIR}/GHG_4_3_1_crop_lvstk_emission_Mt.json',orient='records')
+        Ag_man_sequestration_crop_lvstk_wide.columns = ['name','data']
+        Ag_man_sequestration_crop_lvstk_wide['type'] = 'column'
+        Ag_man_sequestration_crop_lvstk_wide.to_json(f'{SAVE_DIR}/GHG_4_5_2_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt.json',orient='records')
+        
 
 
-
-    # Plot_4-3-2: Agricultural Emission (on-land) by dry/Water_supply  (Mt)
-    GHG_Ag_emission_total_dry_irr = GHG_ag_emissions_long.groupby(['Year','Water_supply']).sum()['Value (Mt CO2e)'].reset_index()
-    
-    GHG_Ag_emission_total_dry_irr_wide = GHG_Ag_emission_total_dry_irr\
+        # Plot_4-5-3: GHG reductions by Agricultural managements in subsector (Mt)
+        Ag_man_sequestration_dry_irr_total = Ag_man_sequestration_long.groupby(['Year','Water_supply']).sum()['Value (Mt CO2e)'].reset_index()
+        
+        Ag_man_sequestration_dry_irr_wide = Ag_man_sequestration_dry_irr_total\
                                             .groupby(['Water_supply'])[['Year','Value (Mt CO2e)']]\
-                                            .apply(lambda x: list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
+                                            .apply(lambda x: list(map(list,zip(x['Year'], x['Value (Mt CO2e)']))))\
                                             .reset_index()
-                                            
-    GHG_Ag_emission_total_dry_irr_wide.columns = ['name','data']
-    GHG_Ag_emission_total_dry_irr_wide['type'] = 'column'
-    GHG_Ag_emission_total_dry_irr_wide.to_json(f'{SAVE_DIR}/GHG_4_3_2_dry_irr_emission_Mt.json',orient='records')
-    
-    
-
-
-    # Plot_4-3-3: Agricultural Emission (on-land) by GHG type sectors (Mt)
-    GHG_Ag_emission_total_GHG_type = GHG_ag_emissions_long.groupby(['Year','GHG Category']).sum()['Value (Mt CO2e)'].reset_index()
-    
-    GHG_Ag_emission_total_GHG_type_wide = GHG_Ag_emission_total_GHG_type\
-                                            .groupby(['GHG Category'])[['Year','Value (Mt CO2e)']]\
-                                            .apply(lambda x: list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
-                                            .reset_index()
-                                            
-    GHG_Ag_emission_total_GHG_type_wide.columns = ['name','data']
-    GHG_Ag_emission_total_GHG_type_wide['type'] = 'column'
-    GHG_Ag_emission_total_GHG_type_wide.to_json(f'{SAVE_DIR}/GHG_4_3_3_category_emission_Mt.json',orient='records')
-
-
-    # Plot_4-3-4: Agricultural Emission (on-land) by Sources (Mt)
-    GHG_Ag_emission_total_Source = GHG_ag_emissions_long.groupby(['Year','CO2_type']).sum()['Value (Mt CO2e)'].reset_index()
-    
-    GHG_Ag_emission_total_Source_wide = GHG_Ag_emission_total_Source\
-                                            .groupby(['CO2_type'])[['Year','Value (Mt CO2e)']]\
-                                            .apply(lambda x: list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
-                                            .reset_index()
-                                            
-    GHG_Ag_emission_total_Source_wide.columns = ['name','data']
-    GHG_Ag_emission_total_Source_wide['type'] = 'column'
-    GHG_Ag_emission_total_Source_wide.to_json(f'{SAVE_DIR}/GHG_4_3_4_sources_emission_Mt.json',orient='records')
-    
-
-    # Plot_4-3-5: GHG emission (on-land) in start and end years (Mt)
-    start_year,end_year = GHG_ag_emissions_long['Year'].min(),GHG_ag_emissions_long['Year'].max() 
-
-    GHG_lu_lm = GHG_ag_emissions_long\
-            .groupby(['Year','Type','Land-use','Water_supply'])\
-            .sum()['Value (Mt CO2e)']\
-            .reset_index()
-            
-    GHG_lu_lm_df_start = GHG_lu_lm.query('Year == @start_year').reset_index(drop=True)
-    GHG_lu_lm_df_end = GHG_lu_lm.query('Year == @end_year').reset_index(drop=True)
-
-    GHG_lu_lm_df_begin_end = pd.concat([GHG_lu_lm_df_start,GHG_lu_lm_df_end],axis=0)
-    GHG_lu_lm_df_begin_end = GHG_lu_lm_df_begin_end.sort_values(['Water_supply','Land-use','Year'])
-    
-    GHG_lu_lm_df_begin_end_category = GHG_lu_lm_df_begin_end.query('Water_supply == "Dryland"')\
-                                        .groupby('Land-use')[['Year','Land-use']]\
-                                        .apply(lambda x: x['Year'].tolist())\
-                                        .reset_index()                                   
-    GHG_lu_lm_df_begin_end_category.columns = ['name','categories']
-    
-    GHG_lu_lm_df_begin_end_series = GHG_lu_lm_df_begin_end[['Water_supply','Value (Mt CO2e)']]\
-                                        .groupby('Water_supply')[['Water_supply','Value (Mt CO2e)']]\
-                                        .apply(lambda x: list(map(list,zip(x['Water_supply'], x['Value (Mt CO2e)']))))\
-                                        .reset_index()
-    GHG_lu_lm_df_begin_end_series.columns = ['name','data']
-    GHG_lu_lm_df_begin_end_series['type'] = 'column'
-    
-    
-    GHG_lu_lm_df_begin_end_json = {'categories': json.loads(GHG_lu_lm_df_begin_end_category.to_json(orient='records')),
-                                    'series': json.loads(GHG_lu_lm_df_begin_end_series.to_json(orient='records'))}
-    
-    with open(f'{SAVE_DIR}/GHG_4_3_5_lu_lm_emission_Mt_wide.json', 'w') as outfile:
-        json.dump(GHG_lu_lm_df_begin_end_json, outfile)
-    
-
-
-    # Plot_4-3-6: GHG emission (on-land) in the target year (Mt)
-    GHG_lu_source = GHG_ag_emissions_long\
-                    .groupby(['Year','Land-use','Water_supply','CO2_type'])\
-                    .sum()['Value (Mt CO2e)']\
-                    .reset_index()
-            
-    GHG_lu_source_target_yr = GHG_lu_source.query(f'Year == {end_year}')
-
-    GHG_lu_source_nest = GHG_lu_source_target_yr\
-                            .groupby(['CO2_type','Land-use'])\
-                            .sum(numeric_only=True)[['Value (Mt CO2e)']]\
-                            .reset_index()
-                            
-    GHG_lu_source_nest_dict = GHG_lu_source_nest\
-                                .groupby('CO2_type')[['Land-use','Value (Mt CO2e)']]\
-                                .apply(lambda x: x[['Land-use','Value (Mt CO2e)']].to_dict(orient='records'))\
-                                .reset_index()
-                                
-    GHG_lu_source_nest_dict.columns = ['name','data']
-    GHG_lu_source_nest_dict['data'] = GHG_lu_source_nest_dict['data']\
-        .apply(lambda x: [{'name': i['Land-use'], 'value': i['Value (Mt CO2e)']} for i in x])
-    
-    GHG_lu_source_nest_dict.to_json(f'{SAVE_DIR}/GHG_4_3_6_lu_source_emission_Mt.json',orient='records')
-
-            
-        
-    # Plot_4-3-7: GHG emission (off-land) by commodity (Mt)
-    GHG_off_land_commodity = GHG_off_land\
-        .groupby(['Year','COMMODITY'])\
-        .sum(numeric_only=True)['Value (Mt CO2e)'].reset_index()
-        
-    GHG_off_land_commodity_json = GHG_off_land_commodity\
-        .groupby('COMMODITY')[['Year','Value (Mt CO2e)']]\
-        .apply(lambda x:list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
-        .reset_index()
-        
-    GHG_off_land_commodity_json.columns = ['name','data']
-    GHG_off_land_commodity_json['type'] = 'column'
-    GHG_off_land_commodity_json.to_json(f'{SAVE_DIR}/GHG_4_3_7_off_land_commodity_emission_Mt.json',orient='records')
-    
-    
-    
-    # Plot_4-3-8: GHG emission (off-land) by sources (Mt)
-    GHG_off_land_sources = GHG_off_land\
-        .groupby(['Year','Emission Source'])\
-        .sum(numeric_only=True)['Value (Mt CO2e)'].reset_index()
-        
-    GHG_off_land_sources_json = GHG_off_land_sources\
-        .groupby('Emission Source')[['Year','Value (Mt CO2e)']]\
-        .apply(lambda x:list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
-        .reset_index()
-        
-    GHG_off_land_sources_json.columns = ['name','data']
-    GHG_off_land_sources_json['type'] = 'column'
-    GHG_off_land_sources_json.to_json(f'{SAVE_DIR}/GHG_4_3_8_off_land_sources_emission_Mt.json',orient='records')
-    
-    
-    
-    
-    # Plot_4-3-9: GHG emission (off-land) by Emission Type
-    GHG_off_land_type = GHG_off_land\
-        .groupby(['Year','Emission Type'])\
-        .sum(numeric_only=True)['Value (Mt CO2e)'].reset_index()
-        
-    GHG_off_land_type_json = GHG_off_land_type\
-        .groupby('Emission Type')[['Year','Value (Mt CO2e)']]\
-        .apply(lambda x:list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
-        .reset_index()
-        
-    GHG_off_land_type_json.columns = ['name','data']
-    GHG_off_land_type_json['type'] = 'column'
-    
-    GHG_off_land_type_json.to_json(f'{SAVE_DIR}/GHG_4_3_9_off_land_type_emission_Mt.json',orient='records')
-
-
-
-    # Plot_4-4: GHG abatement by Non-Agrilcultural sector (Mt)
-    Non_ag_reduction_long = GHG_files_onland.query('Type == "Non-Agricultural land-use"').reset_index(drop=True)
-                                                
-    Non_ag_reduction_source = Non_ag_reduction_long.groupby(['Year','Type','Land-use'])\
-        .sum(numeric_only=True)['Value (Mt CO2e)'].reset_index()
-    
-    # Fill the missing years with 0 values    
-    fill_years = set(years) - set(Non_ag_reduction_source['Year'].unique())
-    Non_ag_reduction_source = pd.concat([Non_ag_reduction_source, pd.DataFrame({'Year': list(fill_years), 'CO2_type':'Agroforestry','Value (Mt CO2e)': 0})], axis=0)
-        
-    Non_ag_reduction_source_wide = Non_ag_reduction_source\
-                                        .groupby(['Land-use'])[['Year','Value (Mt CO2e)']]\
-                                        .apply(lambda x: list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
-                                        .reset_index()
-                                        
-    Non_ag_reduction_source_wide.columns = ['name','data']
-    Non_ag_reduction_source_wide['type'] = 'column'
-    
-    Non_ag_reduction_source_wide.to_json(f'{SAVE_DIR}/GHG_4_4_ag_reduction_source_wide_Mt.json',orient='records')
-
-
-
-    # Plot_4-5: GHG reductions by Agricultural managements (Mt)
-    Ag_man_sequestration_long = GHG_files_onland.query('Type == "Agricultural Management"').reset_index(drop=True)
-
-    # Plot_4-5-1: GHG reductions by Agricultural managements in total (Mt)
-    Ag_man_sequestration_total = Ag_man_sequestration_long.groupby(['Year','Agricultural Management Type']).sum()['Value (Mt CO2e)'].reset_index()
-    
-    Ag_man_sequestration_total_wide = Ag_man_sequestration_total\
-                                        .groupby(['Agricultural Management Type'])[['Year','Value (Mt CO2e)']]\
-                                        .apply(lambda x: list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
-                                        .reset_index()
-                                        
-    Ag_man_sequestration_total_wide.columns = ['name','data']
-    Ag_man_sequestration_total_wide['type'] = 'column'
-    Ag_man_sequestration_total_wide.to_json(f'{SAVE_DIR}/GHG_4_5_1_GHG_ag_man_df_wide_Mt.json',orient='records')
-
-
-    # Plot_4-5-2: GHG reductions by Agricultural managements in subsector (Mt)
-    Ag_man_sequestration_crop_lvstk_wide = Ag_man_sequestration_long.groupby(['Year','Type','Land-use type']).sum()['Value (Mt CO2e)'].reset_index()
-    
-    Ag_man_sequestration_crop_lvstk_wide = Ag_man_sequestration_crop_lvstk_wide\
-                                            .groupby(['Land-use type'])[['Year','Value (Mt CO2e)']]\
-                                            .apply(lambda x: list(map(list,zip(x['Year'],x['Value (Mt CO2e)']))))\
-                                            .reset_index()
-                                            
-    Ag_man_sequestration_crop_lvstk_wide.columns = ['name','data']
-    Ag_man_sequestration_crop_lvstk_wide['type'] = 'column'
-    Ag_man_sequestration_crop_lvstk_wide.to_json(f'{SAVE_DIR}/GHG_4_5_2_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt.json',orient='records')
-    
-
-
-    # Plot_4-5-3: GHG reductions by Agricultural managements in subsector (Mt)
-    Ag_man_sequestration_dry_irr_total = Ag_man_sequestration_long.groupby(['Year','Water_supply']).sum()['Value (Mt CO2e)'].reset_index()
-    
-    Ag_man_sequestration_dry_irr_wide = Ag_man_sequestration_dry_irr_total\
-                                        .groupby(['Water_supply'])[['Year','Value (Mt CO2e)']]\
-                                        .apply(lambda x: list(map(list,zip(x['Year'], x['Value (Mt CO2e)']))))\
-                                        .reset_index()
-    Ag_man_sequestration_dry_irr_wide.columns = ['name','data']
-    Ag_man_sequestration_dry_irr_wide['type'] = 'column'
-    Ag_man_sequestration_dry_irr_wide.to_json(f'{SAVE_DIR}/GHG_4_5_3_GHG_ag_man_dry_irr_df_wide_Mt.json',orient='records')
+        Ag_man_sequestration_dry_irr_wide.columns = ['name','data']
+        Ag_man_sequestration_dry_irr_wide['type'] = 'column'
+        Ag_man_sequestration_dry_irr_wide.to_json(f'{SAVE_DIR}/GHG_4_5_3_GHG_ag_man_dry_irr_df_wide_Mt.json',orient='records')
     
     
     
@@ -1071,83 +1072,84 @@ def save_report_data(raw_data_dir:str):
     #                     5) Water                     #
     ####################################################
     
-    water_df_total = files.query('category == "water" and year_types == "single_year" and ~base_name.str.contains("separate")').reset_index(drop=True)
-    water_df_total = pd.concat([pd.read_csv(path) for path in water_df_total['path']], ignore_index=True)
-    
-    water_df_separate = files.query('category == "water" and year_types == "single_year" and base_name.str.contains("separate")').reset_index(drop=True)
-    water_df_separate = pd.concat([pd.read_csv(path) for path in water_df_separate['path']], ignore_index=True)
-    water_df_separate = water_df_separate.replace(RENAME_AM_NON_AG)
-    
-
-    # Plot_5-1: Water use compared to limite (%)
-    water_df_total_pct = water_df_total.query('Variable == "PROPORTION_ALL_%" ')
-    water_df_total_pct_wide = water_df_total_pct\
-                                .groupby(['REGION_NAME'])[['Year','Value (ML)']]\
-                                .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
-                                .reset_index()
-                                
-    water_df_total_pct_wide.columns = ['name','data']
-    water_df_total_pct_wide['type'] = 'spline'
-    water_df_total_pct_wide.to_json(f'{SAVE_DIR}/water_1_percent_to_limit.json',orient='records')
-
-
-    # Plot_5-2: Water use compared to limite (ML)
-    water_df_total_vol = water_df_total.query('Variable == "TOT_WATER_REQ_ML" ')
-    water_df_total_vol_wide = water_df_total_vol\
-                                .groupby(['REGION_NAME'])[['Year','Value (ML)']]\
-                                .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
-                                .reset_index()
-    water_df_total_vol_wide.columns = ['name','data']
-    water_df_total_vol_wide['type'] = 'spline'
-    water_df_total_vol_wide.to_json(f'{SAVE_DIR}/water_2_volume_to_limit.json',orient='records')                        
-    
-    
-    
-    # Plot_5-3: Water use by sector (ML)
-    water_df_separate_lu_type = water_df_separate.groupby(['Year','Landuse Type']).sum(numeric_only=True)[['Water Use (ML)']].reset_index()
-    water_df_net = water_df_separate.groupby('Year').sum(numeric_only=True).reset_index()
-
-    water_df_separate_lu_type = water_df_separate_lu_type\
-        .groupby(['Landuse Type'])[['Landuse Type','Year','Water Use (ML)']]\
-        .apply(lambda x:list(map(list,zip(x['Year'],x['Water Use (ML)']))))\
-        .reset_index()
+    if settings.WATER_USE_LIMITS == 'on':
+        water_df_total = files.query('category == "water" and year_types == "single_year" and ~base_name.str.contains("separate")').reset_index(drop=True)
+        water_df_total = pd.concat([pd.read_csv(path) for path in water_df_total['path']], ignore_index=True)
         
-    water_df_separate_lu_type.columns = ['name','data']
-    water_df_separate_lu_type['type'] = 'column'
+        water_df_separate = files.query('category == "water" and year_types == "single_year" and base_name.str.contains("separate")').reset_index(drop=True)
+        water_df_separate = pd.concat([pd.read_csv(path) for path in water_df_separate['path']], ignore_index=True)
+        water_df_separate = water_df_separate.replace(RENAME_AM_NON_AG)
+        
 
-    water_df_separate_lu_type.loc[len(water_df_separate_lu_type)] = ['Net Volume', list(map(list,zip(water_df_net['Year'],water_df_net['Water Use (ML)']))), 'line']
-
-    water_df_separate_lu_type.to_json(f'{SAVE_DIR}/water_3_volume_by_sector.json',orient='records')
-
-
-
-    # Plot_5-4: Water use by landuse (ML)
-    water_df_seperate_lu = water_df_separate.groupby(['Year','Landuse']).sum()[['Water Use (ML)']].reset_index()
-    
-    water_df_seperate_lu_wide = water_df_seperate_lu\
-                                    .groupby(['Landuse'])[['Year','Water Use (ML)']]\
-                                    .apply(lambda x: list(map(list,zip(x['Year'],x['Water Use (ML)']))))\
+        # Plot_5-1: Water use compared to limite (%)
+        water_df_total_pct = water_df_total.query('Variable == "PROPORTION_ALL_%" ')
+        water_df_total_pct_wide = water_df_total_pct\
+                                    .groupby(['REGION_NAME'])[['Year','Value (ML)']]\
+                                    .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
                                     .reset_index()
                                     
-    water_df_seperate_lu_wide.columns = ['name','data']
-    water_df_seperate_lu_wide['type'] = 'column'
-    water_df_seperate_lu_wide = water_df_seperate_lu_wide.set_index('name').reindex(LANDUSE_ALL).reset_index()
-    
-    
-    water_df_seperate_lu_wide.to_json(f'{SAVE_DIR}/water_4_volume_by_landuse.json',orient='records')
-    
-    
-    # Plot_5-5: Water use by Water_supply (ML)
-    water_df_seperate_irr = water_df_separate.groupby(['Year','Water_supply']).sum()[['Water Use (ML)']].reset_index()
-    
-    water_df_seperate_irr_wide = water_df_seperate_irr\
-                                    .groupby(['Water_supply'])[['Year','Water Use (ML)']]\
-                                    .apply(lambda x: list(map(list,zip(x['Year'],x['Water Use (ML)']))))\
+        water_df_total_pct_wide.columns = ['name','data']
+        water_df_total_pct_wide['type'] = 'spline'
+        water_df_total_pct_wide.to_json(f'{SAVE_DIR}/water_1_percent_to_limit.json',orient='records')
+
+
+        # Plot_5-2: Water use compared to limite (ML)
+        water_df_total_vol = water_df_total.query('Variable == "TOT_WATER_REQ_ML" ')
+        water_df_total_vol_wide = water_df_total_vol\
+                                    .groupby(['REGION_NAME'])[['Year','Value (ML)']]\
+                                    .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
                                     .reset_index()
-                                    
-    water_df_seperate_irr_wide.columns = ['name','data']
-    water_df_seperate_irr_wide['type'] = 'column'
-    water_df_seperate_irr_wide.to_json(f'{SAVE_DIR}/water_5_volume_by_Water_supply.json',orient='records')
+        water_df_total_vol_wide.columns = ['name','data']
+        water_df_total_vol_wide['type'] = 'spline'
+        water_df_total_vol_wide.to_json(f'{SAVE_DIR}/water_2_volume_to_limit.json',orient='records')                        
+        
+        
+        
+        # Plot_5-3: Water use by sector (ML)
+        water_df_separate_lu_type = water_df_separate.groupby(['Year','Landuse Type']).sum(numeric_only=True)[['Water Use (ML)']].reset_index()
+        water_df_net = water_df_separate.groupby('Year').sum(numeric_only=True).reset_index()
+
+        water_df_separate_lu_type = water_df_separate_lu_type\
+            .groupby(['Landuse Type'])[['Landuse Type','Year','Water Use (ML)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Water Use (ML)']))))\
+            .reset_index()
+            
+        water_df_separate_lu_type.columns = ['name','data']
+        water_df_separate_lu_type['type'] = 'column'
+
+        water_df_separate_lu_type.loc[len(water_df_separate_lu_type)] = ['Net Volume', list(map(list,zip(water_df_net['Year'],water_df_net['Water Use (ML)']))), 'line']
+
+        water_df_separate_lu_type.to_json(f'{SAVE_DIR}/water_3_volume_by_sector.json',orient='records')
+
+
+
+        # Plot_5-4: Water use by landuse (ML)
+        water_df_seperate_lu = water_df_separate.groupby(['Year','Landuse']).sum()[['Water Use (ML)']].reset_index()
+        
+        water_df_seperate_lu_wide = water_df_seperate_lu\
+                                        .groupby(['Landuse'])[['Year','Water Use (ML)']]\
+                                        .apply(lambda x: list(map(list,zip(x['Year'],x['Water Use (ML)']))))\
+                                        .reset_index()
+                                        
+        water_df_seperate_lu_wide.columns = ['name','data']
+        water_df_seperate_lu_wide['type'] = 'column'
+        water_df_seperate_lu_wide = water_df_seperate_lu_wide.set_index('name').reindex(LANDUSE_ALL).reset_index()
+        
+        
+        water_df_seperate_lu_wide.to_json(f'{SAVE_DIR}/water_4_volume_by_landuse.json',orient='records')
+        
+        
+        # Plot_5-5: Water use by Water_supply (ML)
+        water_df_seperate_irr = water_df_separate.groupby(['Year','Water_supply']).sum()[['Water Use (ML)']].reset_index()
+        
+        water_df_seperate_irr_wide = water_df_seperate_irr\
+                                        .groupby(['Water_supply'])[['Year','Water Use (ML)']]\
+                                        .apply(lambda x: list(map(list,zip(x['Year'],x['Water Use (ML)']))))\
+                                        .reset_index()
+                                        
+        water_df_seperate_irr_wide.columns = ['name','data']
+        water_df_seperate_irr_wide['type'] = 'column'
+        water_df_seperate_irr_wide.to_json(f'{SAVE_DIR}/water_5_volume_by_Water_supply.json',orient='records')
     
 
 
@@ -1156,73 +1158,74 @@ def save_report_data(raw_data_dir:str):
     #                   6) Biodiversity                     #
     #########################################################
 
-    # get biodiversity dataframe
-    bio_paths = files.query('category == "biodiversity" and year_types == "single_year" and base_name == "biodiversity_separate"').reset_index(drop=True)
-    bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
-    bio_df['Biodiversity score (million)'] = bio_df['Biodiversity score'] / 1e6
-    bio_df = bio_df.replace(RENAME_AM_NON_AG)
+    if settings.BIODIVERSITY_LIMITS == 'on':
+        # get biodiversity dataframe
+        bio_paths = files.query('category == "biodiversity" and year_types == "single_year" and base_name == "biodiversity_separate"').reset_index(drop=True)
+        bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
+        bio_df['Biodiversity score (million)'] = bio_df['Biodiversity score'] / 1e6
+        bio_df = bio_df.replace(RENAME_AM_NON_AG)
 
-    # Filter out landuse that are reated to biodiversity
-    bio_lucc = LU_NATURAL + NON_AG_LANDUSE
-
-
-    # Plot_6-1: Biodiversity total by category
-    bio_df_category = bio_df.groupby(['Year','Landuse type']).sum(numeric_only=True).reset_index()
-    bio_df_category = bio_df_category\
-        .groupby('Landuse type')[['Year','Biodiversity score (million)']]\
-        .apply(lambda x:list(map(list,zip(x['Year'],x['Biodiversity score (million)']))))\
-        .reset_index()
-        
-    bio_df_category.columns = ['name','data']
-    bio_df_category['type'] = 'column'
-    bio_df_category.to_json(f'{SAVE_DIR}/biodiversity_1_total_score_by_category.json',orient='records')
+        # Filter out landuse that are reated to biodiversity
+        bio_lucc = LU_NATURAL + NON_AG_LANDUSE
 
 
-    # Plot_6-2: Biodiversity total by Water_supply
-    bio_df_Water_supply = bio_df.groupby(['Year','Land management']).sum(numeric_only=True).reset_index()
-    bio_df_Water_supply = bio_df_Water_supply\
-        .groupby('Land management')[['Year','Biodiversity score (million)']]\
-        .apply(lambda x:list(map(list,zip(x['Year'],x['Biodiversity score (million)']))))\
-        .reset_index()
-        
-    bio_df_Water_supply.columns = ['name','data']
-    bio_df_Water_supply['type'] = 'column'
-    bio_df_Water_supply.to_json(f'{SAVE_DIR}/biodiversity_2_total_score_by_Water_supply.json',orient='records')
+        # Plot_6-1: Biodiversity total by category
+        bio_df_category = bio_df.groupby(['Year','Landuse type']).sum(numeric_only=True).reset_index()
+        bio_df_category = bio_df_category\
+            .groupby('Landuse type')[['Year','Biodiversity score (million)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Biodiversity score (million)']))))\
+            .reset_index()
+            
+        bio_df_category.columns = ['name','data']
+        bio_df_category['type'] = 'column'
+        bio_df_category.to_json(f'{SAVE_DIR}/biodiversity_1_total_score_by_category.json',orient='records')
 
 
-    # Plot_6-3: Biodiversity total by landuse
-    bio_df_landuse = bio_df.groupby(['Year','Landuse']).sum(numeric_only=True).reset_index()
-    bio_df_landuse = bio_df_landuse.query('Landuse in @bio_lucc')
+        # Plot_6-2: Biodiversity total by Water_supply
+        bio_df_Water_supply = bio_df.groupby(['Year','Land management']).sum(numeric_only=True).reset_index()
+        bio_df_Water_supply = bio_df_Water_supply\
+            .groupby('Land management')[['Year','Biodiversity score (million)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Biodiversity score (million)']))))\
+            .reset_index()
+            
+        bio_df_Water_supply.columns = ['name','data']
+        bio_df_Water_supply['type'] = 'column'
+        bio_df_Water_supply.to_json(f'{SAVE_DIR}/biodiversity_2_total_score_by_Water_supply.json',orient='records')
 
-    bio_df_landuse = bio_df_landuse\
-        .groupby('Landuse')[['Year','Biodiversity score (million)']]\
-        .apply(lambda x:list(map(list,zip(x['Year'],x['Biodiversity score (million)']))))\
-        .reset_index()
-        
-    bio_df_landuse['sort_index'] = bio_df_landuse['Landuse'].apply(lambda x: bio_lucc.index(x))
-    bio_df_landuse = bio_df_landuse.sort_values('sort_index').drop('sort_index',axis=1)
 
-    bio_df_landuse.columns = ['name','data']
-    bio_df_landuse['type'] = 'column'
-    bio_df_landuse.to_json(f'{SAVE_DIR}/biodiversity_3_total_score_by_landuse.json',orient='records')
+        # Plot_6-3: Biodiversity total by landuse
+        bio_df_landuse = bio_df.groupby(['Year','Landuse']).sum(numeric_only=True).reset_index()
+        bio_df_landuse = bio_df_landuse.query('Landuse in @bio_lucc')
 
-    # Plot_6-4: Natural landuse area (million)
-    natural_land_area = area_dvar.groupby(['Year','Land-use']).sum(numeric_only=True).reset_index()
-    natural_land_area = natural_land_area.query('`Land-use` in @bio_lucc').copy()
+        bio_df_landuse = bio_df_landuse\
+            .groupby('Landuse')[['Year','Biodiversity score (million)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Biodiversity score (million)']))))\
+            .reset_index()
+            
+        bio_df_landuse['sort_index'] = bio_df_landuse['Landuse'].apply(lambda x: bio_lucc.index(x))
+        bio_df_landuse = bio_df_landuse.sort_values('sort_index').drop('sort_index',axis=1)
 
-    # million km2 to million ha
-    natural_land_area.loc[:,'Area (million ha)'] = natural_land_area['Area (ha)'] / 1e6
-    natural_land_area = natural_land_area\
-        .groupby('Land-use')[['Year','Area (million ha)']]\
-        .apply(lambda x:list(map(list,zip(x['Year'],x['Area (million ha)']))))\
-        .reset_index()
-        
-    natural_land_area['sort_index'] = natural_land_area['Land-use'].apply(lambda x: bio_lucc.index(x))
-    natural_land_area = natural_land_area.sort_values(['sort_index']).drop('sort_index',axis=1)
+        bio_df_landuse.columns = ['name','data']
+        bio_df_landuse['type'] = 'column'
+        bio_df_landuse.to_json(f'{SAVE_DIR}/biodiversity_3_total_score_by_landuse.json',orient='records')
 
-    natural_land_area.columns = ['name','data']
-    natural_land_area['type'] = 'column'
-    natural_land_area.to_json(f'{SAVE_DIR}/biodiversity_4_natural_land_area.json',orient='records')
+        # Plot_6-4: Natural landuse area (million)
+        natural_land_area = area_dvar.groupby(['Year','Land-use']).sum(numeric_only=True).reset_index()
+        natural_land_area = natural_land_area.query('`Land-use` in @bio_lucc').copy()
+
+        # million km2 to million ha
+        natural_land_area.loc[:,'Area (million ha)'] = natural_land_area['Area (ha)'] / 1e6
+        natural_land_area = natural_land_area\
+            .groupby('Land-use')[['Year','Area (million ha)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Area (million ha)']))))\
+            .reset_index()
+            
+        natural_land_area['sort_index'] = natural_land_area['Land-use'].apply(lambda x: bio_lucc.index(x))
+        natural_land_area = natural_land_area.sort_values(['sort_index']).drop('sort_index',axis=1)
+
+        natural_land_area.columns = ['name','data']
+        natural_land_area['type'] = 'column'
+        natural_land_area.to_json(f'{SAVE_DIR}/biodiversity_4_natural_land_area.json',orient='records')
     
     
     #########################################################
