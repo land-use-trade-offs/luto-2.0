@@ -44,11 +44,19 @@ def create_2d_map(data: Data, map_:np.ndarray=None, filler:int=-1, nodata:int=-9
         map_ = get_coarse2D_map(data, map_, filler, nodata)
         if settings.WRITE_FULL_RES_MAPS:
             # Fill the "Non-Agriculture land" with nearst "Ag land"
-            map_ = np.where(map_ == -9999, -1, map_)    # Replace the nodata with filler
-            map_ = replace_with_nearest(map_, filler)   # Replace the filler with the nearest non-filler value
+            map_ = np.where(map_ == -9999, -1, map_)            # Replace the nodata with filler
+            map_ = replace_with_nearest(map_, filler)           # Replace the filler with the nearest non-filler value
             map_ = upsample_array(data, map_, factor=settings.RESFACTOR, filler=filler, nodata=nodata)
-            
-    return map_
+        return map_    
+    else: 
+        LUMAP_FullRes_2D = np.full(data.NLUM_MASK.shape, -9999).astype(np.float32) 
+        # Get the full resolution LUMAP_2D at the begining year, with -1 as Non-Agricultural Land, and -9999 as NoData
+        np.place(LUMAP_FullRes_2D, data.NLUM_MASK, data.LUMAP_NO_RESFACTOR) 
+        # Fill the LUMAP_FullRes_2D with map_ sequencialy by the row-col order of 1s in (LUMAP_FullRes_2D >=0) 
+        np.place(LUMAP_FullRes_2D, LUMAP_FullRes_2D >=0, map_)
+        return LUMAP_FullRes_2D                       
+                
+    
 
 
 
@@ -152,7 +160,7 @@ def write_gtiff(map_:np.ndarray, fname:str, nodata=-9999):
 
     # Open the file, distill the NLUM study area mask and get the meta data.
     fpath_src = os.path.join(settings.INPUT_DIR, 'NLUM_2010-11_mask.tif')
-    
+
     # Get the meta data from the source file.
     with rasterio.open(fpath_src) as src:
         meta = src.meta.copy()

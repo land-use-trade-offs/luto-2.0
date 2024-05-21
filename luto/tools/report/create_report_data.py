@@ -27,7 +27,6 @@ from luto.tools.report.data_tools.parameters import (AG_LANDUSE,
                                                      RENAME_AM_NON_AG)
 
 
-
 def save_report_data(raw_data_dir:str):
     """
     Saves the report data in the specified directory.
@@ -1238,8 +1237,6 @@ def save_report_data(raw_data_dir:str):
     
     # Function to move a file from one location to another if the file exists
     def move_html(path_from, path_to):
-        if os.path.exists(path_to):
-            os.remove(path_to)
         if os.path.exists(path_from):
             shutil.move(path_from, path_to)
     

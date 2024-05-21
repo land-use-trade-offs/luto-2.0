@@ -86,7 +86,7 @@ def write_data(data: Data):
     ###############################################################
 
     # Write the area transition between base-year and target-year 
-    write_area_transition_start_end(data,f'{data.path}/out_{years[-1]}')
+    write_area_transition_start_end(data, f'{data.path}/out_{years[-1]}')
 
     # Write outputs for each year
     jobs = [delayed(write_output_single_year)(data, yr, path_yr, None) for (yr, path_yr) in zip(years, paths)]
@@ -233,14 +233,14 @@ def write_files(data: Data, yr_cal, path):
     ag_man_dvar = np.stack([np.einsum('mrj -> r', v) for _,v in data.ag_man_dvars[yr_cal].items()]).T   # (r, am)
     ag_man_dvar_mask = ag_man_dvar.sum(1) > 0.01            # Meaning that they have at least 1% of agricultural management applied
     ag_man_dvar = np.argmax(ag_man_dvar, axis=1) + 1        # Start from 1
-    ag_man_dvar_argmax = np.where(ag_man_dvar_mask, ag_man_dvar, 0)
+    ag_man_dvar_argmax = np.where(ag_man_dvar_mask, ag_man_dvar, 0).astype(np.float32)
 
 
     # Get the non-agricultural landuse for each pixel
     non_ag_dvar = data.non_ag_dvars[yr_cal]                 # (r, k)
     non_ag_dvar_mask = non_ag_dvar.sum(1) > 0.01            # Meaning that they have at least 1% of non-agricultural landuse applied
     non_ag_dvar = np.argmax(non_ag_dvar, axis=1) + settings.NON_AGRICULTURAL_LU_BASE_CODE    # Start from 100
-    non_ag_dvar_argmax = np.where(non_ag_dvar_mask, non_ag_dvar, 0)
+    non_ag_dvar_argmax = np.where(non_ag_dvar_mask, non_ag_dvar, 0).astype(np.float32)
 
     # Put the excluded land-use and land management types back in the array.
     lumap = create_2d_map(data, data.lumaps[yr_cal], filler=data.MASK_LU_CODE)
@@ -295,7 +295,7 @@ def write_files_separate(data: Data, yr_cal, path, ammap_separate=False):
         category = row['Category']
         dvar_idx = row['dvar_idx']
         desc = row['lu_desc']
-        dvar = create_2d_map(data, row['dvar'], filler=data.MASK_LU_CODE)
+        dvar = create_2d_map(data, row['dvar'].astype(np.float32), filler=data.MASK_LU_CODE)
         fname = f'{category}_{dvar_idx:02}_{desc}_{yr_cal}.tiff'
         lucc_separate_path = os.path.join(lucc_separate_dir, fname)
         write_gtiff(dvar, lucc_separate_path)

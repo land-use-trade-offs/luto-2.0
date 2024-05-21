@@ -90,7 +90,7 @@ def get_all_files(data_root):
     file_paths = []
 
     # Walk through the folder and its subfolders
-    for foldername, subfolders, filenames in os.walk(data_root):
+    for foldername, _, filenames in os.walk(data_root):
         for filename in filenames:
             # Create the full path to the file by joining the foldername and filename
             file_path = os.path.join(foldername, filename)
