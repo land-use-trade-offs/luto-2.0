@@ -96,7 +96,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 9 x 9 cell block
-RESFACTOR = 1         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
+RESFACTOR = 5         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
 MODE = 'snapshot'   # Runs for target year only
@@ -120,7 +120,7 @@ PENALTY = 1e5
 # ---------------------------------------------------------------------------- #
 
 WRITE_OUTPUT_GEOTIFFS = True    # Write GeoTiffs to output directory: True or False
-WRITE_FULL_RES_MAPS = False      # Write GeoTiffs all full or resfactored resolution: True or False
+WRITE_FULL_RES_MAPS = False      # Write GeoTiffs all full or resfactored resolution for coarsified maps: True or False
 PARALLEL_WRITE = True           # If use parallel processing to write GeoTiffs: True or False
 WRITE_THREADS = 50              # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
