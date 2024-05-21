@@ -51,15 +51,16 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     legend: {
+      itemStyle: {
+        fontSize: "11px",
+      },
       align: "right",
       layout: "vertical",
-      x: 0,
+      x: -30,
+      y: -10,
       verticalAlign: "middle",
-      itemStyle: {
-        fontSize: '12px'
-      },
-      itemMarginTop: 0,    // Reduce the top margin
-      itemMarginBottom: 1, // Reduce the bottom margin
+      itemMarginTop: 0,
+      itemMarginBottom: 1,
     },
 
     tooltip: {

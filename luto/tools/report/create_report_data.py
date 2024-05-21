@@ -27,7 +27,6 @@ from luto.tools.report.data_tools.parameters import (AG_LANDUSE,
                                                      RENAME_AM_NON_AG)
 
 
-
 def save_report_data(raw_data_dir:str):
     """
     Saves the report data in the specified directory.
@@ -374,6 +373,7 @@ def save_report_data(raw_data_dir:str):
     # Get the revenue and cost data
     revenue_ag_df = files.query('category == "revenue" and base_name == "revenue_agricultural_commodity" and year_types != "begin_end_year"').reset_index(drop=True)
     revenue_ag_df = pd.concat([pd.read_csv(path) for path in revenue_ag_df['path']], ignore_index=True)
+    revenue_ag_df = revenue_ag_df.replace({'Revenue':'Crop'})
     revenue_ag_df['Value (billion)'] = revenue_ag_df['Value ($)'] / 1e9
     revenue_ag_df = revenue_ag_df.replace(RENAME_AM_NON_AG)
     

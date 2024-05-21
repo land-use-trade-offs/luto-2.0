@@ -51,22 +51,24 @@ def amortise(cost, rate=settings.DISCOUNT_RATE, horizon=settings.AMORTISATION_PE
 #     plotmap(lumaps[yr_cal], labels=bdata.AGLU2DESC)
 
 
-def report_on_path(path:str):
+def report_on_path(path:str, remake_map=True, remake_csv=True):
     
     if not os.path.exists(path):
         raise FileNotFoundError(f"Path '{path}' does not exist.")
     
-    # Remove old reporting data files, keep the folder
-    if os.path.exists(f"{path}/DATA_REPORT/data"):
-        for file in os.listdir(f"{path}/DATA_REPORT/data"):
-            fpath = f"{path}/DATA_REPORT/data/{file}"
-            os.remove(fpath) if os.path.isfile(fpath) else None
+    
 
     
-    if settings.WRITE_OUTPUT_GEOTIFFS and os.path.exists(f"{path}/data/Map_data"):
-        TIF2MAP(path) 
+    if settings.WRITE_OUTPUT_GEOTIFFS and os.path.exists(f"{path}/DATA_REPORT/data/Map_data"):
+        if remake_map:
+            [os.remove(i) for i in os.listdir(f"{path}/DATA_REPORT/data/Map_data")]
+            TIF2MAP(path) 
         
-    save_report_data(path)
+    if remake_csv and os.path.exists(f"{path}/DATA_REPORT/data"):
+        [os.remove(f"{path}/DATA_REPORT/data/{i}") for i in os.listdir(f"{path}/DATA_REPORT/data") if os.path.isfile(f"{path}/DATA_REPORT/data/{i}")]
+        save_report_data(path)
+    
+    
     data2html(path)
 
 

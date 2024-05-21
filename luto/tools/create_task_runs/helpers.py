@@ -94,23 +94,11 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
 # Grid search to set grid search parameters
 def create_grid_search_template(num_runs:int = 10):
     # Gird parameters for {AG_MANAGEMENTS} and {AG_MANAGEMENTS_REVERSIBLE}
-    grid_am = {
-        'Asparagopsis taxiformis': [True, False],
-        'Precision Agriculture': [True, False],
-        'Ecological Grazing': [True, False],
-        'Savanna Burning': [True, False],
-        'AgTech EI': [True, False],
-    }
+    grid_am = {k:[True, False ] for k in settings.AG_MANAGEMENTS}
+
 
     # Grid parameters for {NON_AG_LAND_USES} and {NON_AG_LAND_USES_REVERSIBLE}
-    grid_non_ag = {
-        'Environmental Plantings': [True, False],
-        'Riparian Plantings': [True, False],
-        'Agroforestry': [True, False],
-        'Carbon Plantings (Block)': [True, False],
-        'Carbon Plantings (Belt)': [True, False],
-        'BECCS': [True, False],
-    }
+    grid_non_ag = {k:[True, False] for k in settings.NON_AG_LAND_USES}
 
     # Grid parameters for {MODE}
     grid_mode = ['timeseries', 'snapshot']

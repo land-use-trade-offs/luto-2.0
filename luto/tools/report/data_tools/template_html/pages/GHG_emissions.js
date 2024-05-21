@@ -309,7 +309,6 @@ document.addEventListener("DOMContentLoaded", function () {
     chart: {
       type: "column",
       marginRight: 380,
-      marginBottom: 200,
     },
 
     title: {
