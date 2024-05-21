@@ -828,6 +828,9 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 def write_water(data: Data, yr_cal, path):
     """Calculate water use totals. Takes a simulation object, a numeric
        target calendar year (e.g., 2030), and an output path as input."""
+    
+    if not WATER_USE_LIMITS == 'on':
+        return
 
     print(f'Writing water outputs for {yr_cal}')
 
@@ -975,6 +978,9 @@ def write_ghg(data: Data, yr_cal, path):
     """Calculate total GHG emissions from on-land agricultural sector. 
         Takes a simulation object, a target calendar year (e.g., 2030), 
         and an output path as input."""
+    
+    if not settings.GHG_EMISSIONS_LIMITS == 'on':
+        return
 
     print(f'Writing GHG outputs for {yr_cal}')
     
@@ -1007,6 +1013,9 @@ def write_biodiversity(data: Data, yr_cal, path):
     and output path ('path').
     """
 
+    if not settings.BIODIVERSITY_LIMITS == 'on':
+        return
+
     print(f'Writing biodiversity outputs for {yr_cal}')
 
     # Get limits used as constraints in model
@@ -1034,6 +1043,9 @@ def write_biodiversity(data: Data, yr_cal, path):
     
     
 def write_biodiversity_separate(data: Data, yr_cal, path):
+
+    if not settings.BIODIVERSITY_LIMITS == 'on':
+        return
     
     print(f'Writing biodiversity_separate outputs for {yr_cal}')
 
@@ -1105,6 +1117,9 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
     
   
 def write_ghg_separate(data: Data, yr_cal, path):
+
+    if not settings.GHG_EMISSIONS_LIMITS == 'on':
+        return
 
     print(f'Writing GHG emissions_Separate for {yr_cal}')
 
@@ -1262,6 +1277,9 @@ def write_ghg_separate(data: Data, yr_cal, path):
 
 def write_ghg_offland_commodity(data: Data, yr_cal, path):
     """Write out offland commodity GHG emissions"""
+
+    if not settings.GHG_EMISSIONS_LIMITS == 'on':
+        return
     
     print(f'Writing offland commodity GHG emissions for {yr_cal}')
 
