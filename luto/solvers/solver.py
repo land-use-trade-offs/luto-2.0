@@ -534,10 +534,10 @@ class LutoSolver:
         If `cells` is provided, only adds constraints for regions containing at least one of the
         provided cells.
         """
-        print(f'  ...water constraints by {settings.WATER_REGION_DEF}...')
-
         if settings.WATER_USE_LIMITS != "on":
             return
+        
+        print(f'  ...water constraints by {settings.WATER_REGION_DEF}...')
 
         self.water_limit_constraints_r = defaultdict(list)
         # print(f"Adding water constraints by {settings.WATER_REGION_DEF}...")

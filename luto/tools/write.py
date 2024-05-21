@@ -829,7 +829,7 @@ def write_water(data: Data, yr_cal, path):
     """Calculate water use totals. Takes a simulation object, a numeric
        target calendar year (e.g., 2030), and an output path as input."""
     
-    if not WATER_USE_LIMITS == 'on':
+    if not settings.WATER_USE_LIMITS == 'on':
         return
 
     print(f'Writing water outputs for {yr_cal}')
