@@ -15,4 +15,4 @@ mamba activate luto
 mamba install -n luto -c conda-forge -y $(cat requirements_conda.txt)
 
 # Install packages using pip in the "luto" environment
-pip install --target=~/miniforge3/envs/luto/lib/${py_ver_}/site-packages $(cat requirements_pip.txt)
+pip install --target=$HOME/miniforge3/envs/luto/lib/${py_ver_}/site-packages $(cat requirements_pip.txt)

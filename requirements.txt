@@ -17,3 +17,7 @@ ipython
 gurobipy==10.0.3
 numpy_financial==1.0.0
 tables==3.9.2
+# Not decidec to include in the requirement
+rioxarray
+xarray
+dask
