@@ -17,14 +17,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
     let lucc_names = {
-        "Ag_LU": ['Apples', 'Beef - modified land', 'Beef - natural land', 'Citrus', 'Cotton', 'Dairy - modified land', 'Dairy - natural land',
-            'Grapes', 'Hay', 'Nuts', 'Other non-cereal crops', 'Pears', 'Plantation fruit', 'Rice', 'Sheep - modified land',
-            'Sheep - natural land', 'Stone fruit', 'Sugar', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
-            'Unallocated - modified land', 'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes', 'Winter oilseeds'],
-        "Ag_Mgt": ['AgTech EI', 'Asparagopsis taxiformis', 'Ecological Grazing', 'Precision Agriculture', 'Savanna Burning'],
-        "Land_Mgt": ['dry', 'irr'],
+        "Ag_LU":     ['Apples', 'Beef - modified land', 'Beef - natural land', 'Citrus', 'Cotton', 'Dairy - modified land', 'Dairy - natural land',
+                      'Grapes', 'Hay', 'Nuts', 'Other non-cereal crops', 'Pears', 'Plantation fruit', 'Rice', 'Sheep - modified land',
+                      'Sheep - natural land', 'Stone fruit', 'Sugar', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
+                      'Unallocated - modified land', 'Unallocated - natural land', 'Vegetables', 'Winter cereals', 'Winter legumes', 'Winter oilseeds'],
+        "Ag_Mgt":    ['AgTech EI', 'Asparagopsis taxiformis', 'Ecological Grazing', 'Precision Agriculture', 'Savanna Burning'],
+        "Land_Mgt":  ['dry', 'irr'],
         'Non-Ag_LU': ['Environmental Plantings', 'Riparian Plantings', 'Agroforestry', 'Carbon Plantings (Block)', 'Carbon Plantings (Belt)', 'BECCS'],
-        "lumap": ['Land-use All']
+        "lumap":     ['Land-use All']
     }
 
     // Get the formal names for the maps

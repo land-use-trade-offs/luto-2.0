@@ -1,9 +1,11 @@
 lu_code,lu_desc,lu_color_HEX
 -1,Non-Agricultural Land,#e1e1e1
 0,Other Agricultural Land,#cccccc
-100,Environmental plantings (mixed species),#73b2ff
-101,Riparian buffer restoration (mixed species),#ffebbe
-102,Agroforestry (food + nature),#38a800
-103,Carbon plantings (monoculture),#01e6a9
-104,Farm forestry (food + timber),#98e601
-105,BECCS (Bioenergy with Carbon Capture and Storage),#ff5500
+100,Environmental plantings,#73b2ff
+101,Riparian Plantings,#ffebbe
+102,Sheep Agroforestry,#38a800
+103,Beef Agroforestry,#01e6a9
+104,Carbon Plantings (Block),#98e601
+105,Sheep Carbon Plantings (Belt),#ff5500
+106,Beef Carbon Plantings (Belt),#06e601
+107,BECCS,#061701

@@ -1,8 +1,8 @@
 lu_code,lu_desc,lu_color_HEX
 -1,Non-Agricultural Land,#e1e1e1
 0,No management,#cccccc
-1,Methane reduction (livestock),#ffebaf
-2,Agricultural technology (fertiliser),#00a884
-3,Regenerative agriculture (livestock),#f57a7a
-4,Early dry-season savanna burning,#7a8ef5
-5,Agricultural technology (energy),#017a53
+1,Asparagopsis taxiformis,#ffebaf
+2,Precision Agriculture,#00a884
+3,Ecological Grazing,#f57a7a
+4,Savanna Burning,#7a8ef5
+5,AgTech EI,#017a53

@@ -55,11 +55,11 @@ AG_LANDUSE_MERGE_LANDTYPE = ['Apples', 'Beef', 'Citrus', 'Cotton', 'Dairy', 'Gra
 # Define the renaming of the Agricultural-Managment and Non-Agricultural 
 RENAME_AM_NON_AG = {
     # Agricultural Management
-    "AgTech EI": "Agricultural technology (energy)",
-    "Asparagopsis taxiformis": "Methane reduction (livestock)", 
-    "Ecological Grazing": "Regenerative agriculture (livestock)", 
+    "Asparagopsis taxiformis": "Methane reduction (livestock)",
     "Precision Agriculture": "Agricultural technology (fertiliser)", 
+    "Ecological Grazing": "Regenerative agriculture (livestock)", 
     "Savanna Burning": "Early dry-season savanna burning",
+    "AgTech EI": "Agricultural technology (energy)",
     # Non-Agricultural Landuse
     "Environmental Plantings": "Environmental plantings (mixed species)",
     "Riparian Plantings": "Riparian buffer restoration (mixed species)",
