@@ -29,8 +29,12 @@ def TIF2MAP(raw_data_dir:str):
                                         right_on='map_type')
     
     # Loop through the tif files and create the maps (PNG and HTML)
-    Parallel(n_jobs=settings.THREADS)(delayed(create_maps)(row, model_run_scenario) 
-                                      for _, row in tif_files_with_meta.iterrows())
+    tasks = (delayed(create_maps)(row, model_run_scenario) for _, row in tif_files_with_meta.iterrows())
+    parel_obj = Parallel(n_jobs=settings.THREADS, prefer='threads', return_as='generator')(tasks)
+    for msg in parel_obj:
+        print(msg)
+    
+    
         
      
 def create_maps(row, model_run_scenario):
@@ -51,8 +55,6 @@ def create_maps(row, model_run_scenario):
     data_type = row['data_type']
     year = row['Year']
     legend_params = row['legend_params']
-    
-    print(f'Making map for {row["base_name"]} in {year}...')
     
     # Process the raster, and get the necessary variables
     (center,                # center of the map (lat, lon)
@@ -84,6 +86,8 @@ def create_maps(row, model_run_scenario):
                      center, 
                      bounds_for_folium,
                      color_desc_dict)
+    
+    return f'Map for {row["base_name"]} in {year} successfully created.'
     
     
 

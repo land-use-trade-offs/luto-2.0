@@ -166,10 +166,10 @@ class Data:
             self.MASK = self.LUMASK * resmask
             
             # Below are the coordinates ((row, ...), (col, ...)) for each valid cell in the original 2D array
-            self.MASK_IDX_2D_DENSE = nonzeroes[0], nonzeroes[1]
+            self.MASK_2D_COORD_DENSE = nonzeroes[0], nonzeroes[1]
             
             # Suppose we have a 2D resfactored array, below is the coordinates ((row, ....), (col, ...)) for each valid cell
-            self.MASK_IDX_2D_SPARSE = nonzeroes[0][self.MASK]//settings.RESFACTOR, nonzeroes[1][self.MASK]//settings.RESFACTOR
+            self.MASK_2D_COORD_SPARSE = nonzeroes[0][self.MASK]//settings.RESFACTOR, nonzeroes[1][self.MASK]//settings.RESFACTOR
             
         elif settings.RESFACTOR == 1:
             self.MASK = self.LUMASK

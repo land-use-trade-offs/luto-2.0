@@ -81,7 +81,7 @@ def get_coarse2D_map(data, map_:np.ndarray, filler:int, nodata:int)-> np.ndarray
 
     # Create the coarse 2D map.
     coarse_2d_map = np.zeros((coarse_2d_height,coarse_2d_width)) + filler
-    coarse_2d_map[data.MASK_IDX_2D_SPARSE[0], data.MASK_IDX_2D_SPARSE[1]] = map_
+    coarse_2d_map[data.MASK_2D_COORD_SPARSE[0], data.MASK_2D_COORD_SPARSE[1]] = map_
 
     # Pad the NLUM_MASK to the right/bottom so that it is divisible by the RESFACTOR.
     nlum_mask_pad = data.NLUM_MASK.copy()
