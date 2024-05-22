@@ -99,8 +99,8 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 10         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
-MODE = 'snapshot'   # Runs for target year only
-# MODE = 'timeseries'   # Runs each year from base year to target year
+# MODE = 'snapshot'   # Runs for target year only
+MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -334,7 +334,7 @@ SOC_AMORTISATION = 15
 
 # Water use limits and parameters *******************************
 
-WATER_USE_LIMITS = 'on'               # 'on' or 'off'
+WATER_USE_LIMITS = 'off'               # 'on' or 'off'
 WATER_LIMITS_TYPE = 'water_stress'    # 'water_stress' or 'pct_ag'
 
 # If WATER_LIMITS_TYPE = 'pct_ag'...       
@@ -367,7 +367,7 @@ BIODIV_LIVESTOCK_IMPACT = 0.3
 LDS_BIODIVERSITY_VALUE = 0.8  # For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value.
 
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
-BIODIVERSITY_LIMITS = 'off'             # 'on' or 'off'
+BIODIVERSITY_LIMITS = 'on'             # 'on' or 'off'
 
 """ Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
     Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
