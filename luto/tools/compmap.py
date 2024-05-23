@@ -147,8 +147,8 @@ def crossmap_irrstat( lumap_old
 
     # Rearrange crosstab to long format
     crosstab = crosstab.stack().reset_index().rename(columns={0: 'Area (km2)'})
-    crosstab[['From land-use','From water_supply','tmp' ]] = crosstab['level_0'].str.split('\((dry|irr)', expand=True)
-    crosstab[['To land-use', 'To water_supply', 'tmp']] = crosstab['level_1'].str.split('\((dry|irr)', expand=True)
+    crosstab[['From land-use','From water_supply','tmp' ]] = crosstab['level_0'].str.split(r'\((dry|irr)', expand=True)
+    crosstab[['To land-use', 'To water_supply', 'tmp']] = crosstab['level_1'].str.split(r'\((dry|irr)', expand=True)
     crosstab = crosstab.replace('irr', 'Irrigated').replace('dry', 'Dryland').drop(['level_0','level_1', 'tmp' ], axis=1)
 
     return crosstab, df
@@ -218,8 +218,8 @@ def crossmap_amstat( am
     
     # Rearrange crosstab to long format
     crosstab = crosstab.stack().reset_index().rename(columns={0: 'Area (km2)'})
-    crosstab[['From land-use','From am','tmp']] = crosstab['level_0'].str.split(' \(', expand=True)
-    crosstab[['To land-use', 'To am', 'tmp']] = crosstab['level_1'].str.split(' \(', expand=True)
+    crosstab[['From land-use','From am','tmp']] = crosstab['level_0'].str.split(r' \(', expand=True)
+    crosstab[['To land-use', 'To am', 'tmp']] = crosstab['level_1'].str.split(r' \(', expand=True)
     crosstab['From am'] = crosstab['From am'].str.replace(')', '', regex=False)
     crosstab['To am'] = crosstab['To am'].str.replace(')', '', regex=False)
     crosstab = crosstab.drop(['level_0','level_1','tmp'], axis=1)

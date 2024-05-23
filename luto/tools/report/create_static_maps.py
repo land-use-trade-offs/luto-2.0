@@ -2,9 +2,9 @@ import luto.settings as settings
 from joblib import Parallel, delayed
 
 from luto.tools.report.data_tools import  get_all_files
+from luto.tools.report.data_tools.parameters import RENAME_AM_NON_AG
 from luto.tools.report.map_tools import process_raster, save_map_to_html
 from luto.tools.report.map_tools.map_making import create_png_map
-from luto.tools.report.map_tools.parameters import lucc_rename
 from luto.tools.report.map_tools.helper import (get_map_meta, 
                                                 get_map_fullname,
                                                 get_scenario)
@@ -29,8 +29,12 @@ def TIF2MAP(raw_data_dir:str):
                                         right_on='map_type')
     
     # Loop through the tif files and create the maps (PNG and HTML)
-    Parallel(n_jobs=settings.THREADS)(delayed(create_maps)(row, model_run_scenario) 
-                                      for _, row in tif_files_with_meta.iterrows())
+    tasks = (delayed(create_maps)(row, model_run_scenario) for _, row in tif_files_with_meta.iterrows())
+    parel_obj = Parallel(n_jobs=settings.THREADS, return_as='generator')(tasks)
+    for msg in parel_obj:
+        print(msg)
+    
+    
         
      
 def create_maps(row, model_run_scenario):
@@ -52,8 +56,6 @@ def create_maps(row, model_run_scenario):
     year = row['Year']
     legend_params = row['legend_params']
     
-    print(f'Making map for {row["base_name"]} in {year}...')
-    
     # Process the raster, and get the necessary variables
     (center,                # center of the map (lat, lon)
     bounds_for_folium,      # bounds for folium (lat, lon)
@@ -61,8 +63,8 @@ def create_maps(row, model_run_scenario):
     color_desc_dict         # color description dictionary ((R,G,B,A) <0-255>: description <str>)
     ) = process_raster(tif_path, color_csv, data_type)
     
-    # Update the lucc description in the color_desc_dict with the lucc_rename
-    color_desc_dict = {k:lucc_rename.get(v,v) for k, v in color_desc_dict.items()}
+    # Update the lucc description in the color_desc_dict with the RENAME_AM_NON_AG
+    color_desc_dict = {k:RENAME_AM_NON_AG.get(v,v) for k, v in color_desc_dict.items()}
 
     # Create the annotation text for the map
     map_fullname = get_map_fullname(tif_path)
@@ -84,6 +86,8 @@ def create_maps(row, model_run_scenario):
                      center, 
                      bounds_for_folium,
                      color_desc_dict)
+    
+    return f'Map for {row["base_name"]} in {year} successfully created.'
     
     
 

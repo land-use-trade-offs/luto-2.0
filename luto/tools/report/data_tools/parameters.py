@@ -55,25 +55,35 @@ AG_LANDUSE_MERGE_LANDTYPE = ['Apples', 'Beef', 'Citrus', 'Cotton', 'Dairy', 'Gra
 # Define the renaming of the Agricultural-Managment and Non-Agricultural 
 RENAME_AM_NON_AG = {
     # Agricultural Management
-    "AgTech EI": "Agricultural technology (energy)",
-    "Asparagopsis taxiformis": "Methane reduction (livestock)", 
-    "Ecological Grazing": "Regenerative agriculture (livestock)", 
+    "Asparagopsis taxiformis": "Methane reduction (livestock)",
     "Precision Agriculture": "Agricultural technology (fertiliser)", 
+    "Ecological Grazing": "Regenerative agriculture (livestock)", 
     "Savanna Burning": "Early dry-season savanna burning",
+    "AgTech EI": "Agricultural technology (energy)",
     # Non-Agricultural Landuse
     "Environmental Plantings": "Environmental plantings (mixed species)",
     "Riparian Plantings": "Riparian buffer restoration (mixed species)",
-    "Sheep Agroforestry": "Sheep Agroforestry (food + biodiversity)",
-    "Beef Agroforestry": "Beef Agroforestry (food + biodiversity)",
+    "Sheep Agroforestry": "Agroforestry (mixed species + sheep)",
+    "Beef Agroforestry": "Agroforestry (mixed species + beef)",
     "Carbon Plantings (Block)": "Carbon plantings (monoculture)",
-    "Sheep Carbon Plantings (Belt)": "Sheep farm forestry (food + timber)",
-    "Beef Carbon Plantings (Belt)": "Beef farm forestry (food + timber)",
+    "Sheep Carbon Plantings (Belt)": "Farm forestry (hardwood timber + sheep)",
+    "Beef Carbon Plantings (Belt)": "Farm forestry (hardwood timber + beef)",
     "BECCS": "BECCS (Bioenergy with Carbon Capture and Storage)"
 }
 
 # Read the land uses from the file
 with open(f'{settings.INPUT_DIR}/ag_landuses.csv') as f:
     AG_LANDUSE = [line.strip() for line in f]
+    
+    
+# This will be used in the HTML of reporting spatial maps
+SPATIAL_MAP_DICT = {
+    'Int_Map': ['lumap', 'non_ag', 'ammap', 'lmmap'],       # Each cell is an integer, representing a land-use for [AG, AM, Non-AG]
+    'Ag_LU': AG_LANDUSE,                                    # Percentage of Agricultural Landuse to a cell
+    'Ag_Mgt': list(settings.AG_MANAGEMENTS.keys()),         # Percentage of Agricultural Management to a cell                 
+    'Non-Ag_LU': list(settings.NON_AG_LAND_USES.keys())     # Percentage of Non-Agricultural Landuse to a cell
+}
+
 
 NON_AG_LANDUSE = list(settings.NON_AG_LAND_USES.keys())
 
@@ -82,6 +92,7 @@ NON_AG_LANDUSE = [RENAME_AM_NON_AG.get(item, item) for item in NON_AG_LANDUSE]
 
 # Merge the land uses
 LANDUSE_ALL = AG_LANDUSE + NON_AG_LANDUSE
+
 
 
 

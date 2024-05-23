@@ -1,9 +1,11 @@
-lu_code,lu_desc,lu_color_HEX
--1,Non-Agricultural Land,#e1e1e1
-0,Other Agricultural Land,#cccccc
-100,Environmental plantings (mixed species),#73b2ff
-101,Riparian buffer restoration (mixed species),#ffebbe
-102,Agroforestry (food + nature),#38a800
-103,Carbon plantings (monoculture),#01e6a9
-104,Farm forestry (food + timber),#98e601
-105,BECCS (Bioenergy with Carbon Capture and Storage),#ff5500
+lu_code,lu_desc,lu_color_HEX,Note
+-1,Non-Agricultural Land,#e1e1e1,
+0,Other Agricultural Land,#ffebbe,
+100,Environmental plantings,#abcd66,
+101,Riparian Plantings,#005ce6,
+102,Sheep Agroforestry,#c500ff,
+103,Beef Agroforestry,#ff0000,
+104,Carbon Plantings (Block),#267300,
+105,Carbon Plantings (Block),#267300,"105 is ""Sheep Carbon Plantings (Belt)"", which occupiying 1/3 of the cell and will  be ignored in an intergerized map. So here just make it the same as 104"
+106,Carbon Plantings (Block),#267300,"106 is ""Beef Carbon Plantings (Belt)"", which occupiying 1/3 of the cell and will  be ignored in an intergerized map. So here just make it the same as 104"
+107,BECCS,#686868,
