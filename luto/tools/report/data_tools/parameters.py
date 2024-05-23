@@ -74,6 +74,16 @@ RENAME_AM_NON_AG = {
 # Read the land uses from the file
 with open(f'{settings.INPUT_DIR}/ag_landuses.csv') as f:
     AG_LANDUSE = [line.strip() for line in f]
+    
+    
+# This will be used in the HTML of reporting spatial maps
+SPATIAL_MAP_DICT = {
+    'Int_Map': ['lumap', 'non_ag', 'ammap', 'lmmap'],       # Each cell is an integer, representing a land-use for [AG, AM, Non-AG]
+    'Ag_LU': AG_LANDUSE,                                    # Percentage of Agricultural Landuse to a cell
+    'Ag_Mgt': list(settings.AG_MANAGEMENTS.keys()),         # Percentage of Agricultural Management to a cell                 
+    'Non-Ag_LU': list(settings.NON_AG_LAND_USES.keys())     # Percentage of Non-Agricultural Landuse to a cell
+}
+
 
 NON_AG_LANDUSE = list(settings.NON_AG_LAND_USES.keys())
 
@@ -82,6 +92,7 @@ NON_AG_LANDUSE = [RENAME_AM_NON_AG.get(item, item) for item in NON_AG_LANDUSE]
 
 # Merge the land uses
 LANDUSE_ALL = AG_LANDUSE + NON_AG_LANDUSE
+
 
 
 

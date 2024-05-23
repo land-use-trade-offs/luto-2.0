@@ -274,7 +274,7 @@ def write_files_separate(data: Data, yr_cal, path, ammap_separate=False):
     # Get the desc2dvar table. 
     ag_dvar_map = tools.map_desc_to_dvar_index('Ag_LU', data.DESC2AGLU, ag_dvar_rj)
     non_ag_dvar_map = tools.map_desc_to_dvar_index('Non-Ag_LU', {v:k for k,v in enumerate(NON_AG_LAND_USES.keys())}, non_ag_rk)
-    lm_dvar_map = tools.map_desc_to_dvar_index('Land_Mgt', {v:k for k,v in enumerate(data.LANDMANS)},ag_dvar_rm)
+    lm_dvar_map = tools.map_desc_to_dvar_index('Land_Mgt', {v:k for k,v in enumerate(data.LANDMANS)}, ag_dvar_rm)
     
     # Get the desc2dvar table for agricultural management
     ag_man_maps = [
