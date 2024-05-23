@@ -147,7 +147,10 @@ class Data:
 
         # NLUM mask.
         with rasterio.open(os.path.join(INPUT_DIR, "NLUM_2010-11_mask.tif")) as rst:
-            self.NLUM_MASK = rst.read(1)
+            self.NLUM_MASK = rst.read(1).astype(np.int8)
+            
+            self.LUMAP_2D = np.full_like(self.NLUM_MASK, -9999)
+            np.place(self.LUMAP_2D, self.NLUM_MASK == 1, self.LUMAP_NO_RESFACTOR)
 
         # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap (True means included cells. Boolean dtype.)
         self.MASK_LU_CODE = -1
@@ -177,8 +180,6 @@ class Data:
         else:
             raise KeyError("Resfactor setting invalid")
 
-        # # Create a mask indices array for subsetting arrays
-        # self.MINDICES = np.where(self.MASK)[0].astype(np.int32)
 
 
 

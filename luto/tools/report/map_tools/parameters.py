@@ -6,10 +6,6 @@ ag_management = ['Asparagopsis taxiformis',
                  'Precision Agriculture', 
                  'Ecological Grazing']
 
-# lucc reanaming
-lucc_rename = {'Asparagopsis taxiformis' : 'Methane Inhibitors',
-               'Precision Agriculture' : 'AgTech Non-Energy'}
-
 # The figure size and DPI for PNG map
 FIG_SIZE = (11.2, 13.6)
 DPI = 300
