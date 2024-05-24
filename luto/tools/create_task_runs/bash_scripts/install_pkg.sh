@@ -3,7 +3,7 @@
 # Add the Conda binaries to the PATH
 source ~/.bashrc
 
-py_ver='python=3.11'
+py_ver='python=3.12'
 py_ver_=$(echo $py_ver | sed 's/=//g')
 
 # Create a new Conda environment, and install the required packages

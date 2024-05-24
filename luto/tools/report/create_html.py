@@ -20,7 +20,8 @@ def data2html(raw_data_dir):
     report_dir = f'{raw_data_dir}/DATA_REPORT'
     
     # Check if the report directory exists
-    if not os.path.exists(report_dir): raise f"Report directory not found: {report_dir}"
+    if not os.path.exists(os.path.normpath(report_dir)):
+        raise FileNotFoundError(f"Report directory not found: {report_dir}") 
     
     # Get the avaliable years for the model
     files = get_all_files(raw_data_dir)

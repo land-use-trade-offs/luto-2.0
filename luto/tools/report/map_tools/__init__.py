@@ -231,6 +231,7 @@ def process_int_raster( initial_tif:str=None,
     # Process the raster entirely in memory
     f = convert_1band_to_4band_in_memory(initial_tif, band, color_dict)
     f = reproject_raster_in_memory(f)
+
     
     # Infer the save path (no extension) from the initial path
     save_base = os.path.splitext(initial_tif)[0]
