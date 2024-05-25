@@ -7,7 +7,7 @@ def get_sheep_q_cr(data, ag_q_mrp: np.ndarray) -> np.ndarray:
     """
     Gets the matrix containing the commodities produced by sheep (natural land) 
     """
-    sheep_j = tools.get_sheep_natural_land_code(data)
+    sheep_j = tools.get_sheep_code(data)
 
     sheep_p = []
     for p in range(data.NPRS):
@@ -27,7 +27,7 @@ def get_beef_q_cr(data, ag_q_mrp: np.ndarray) -> np.ndarray:
     """
     Gets the matrix containing the commodities produced by beef (natural land) 
     """
-    beef_j = tools.get_beef_natural_land_code(data)
+    beef_j = tools.get_beef_code(data)
 
     beef_p = []
     for p in range(data.NPRS):

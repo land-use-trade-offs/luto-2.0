@@ -64,9 +64,9 @@ def get_cost_sheep_agroforestry(
     ------
     Numpy array indexed by r
     """
-    sheep_j = tools.get_sheep_natural_land_code(data)
+    sheep_j = tools.get_sheep_code(data)
 
-    # Only use the dryland version of natural land sheep
+    # Only use the dryland version of sheep
     sheep_cost = ag_c_mrj[0, :, sheep_j]
     base_agroforestry_cost = get_cost_agroforestry_base(data)
 
@@ -92,9 +92,9 @@ def get_cost_beef_agroforestry(
     ------
     Numpy array indexed by r
     """
-    beef_j = tools.get_beef_natural_land_code(data)
+    beef_j = tools.get_beef_code(data)
 
-    # Only use the dryland version of natural land sheep
+    # Only use the dryland version of beef
     beef_cost = ag_c_mrj[0, :, beef_j]
     base_agroforestry_cost = get_cost_agroforestry_base(data)
 
@@ -149,9 +149,9 @@ def get_cost_sheep_carbon_plantings_belt(
     ------
     Numpy array indexed by r
     """
-    sheep_j = tools.get_sheep_natural_land_code(data)
+    sheep_j = tools.get_sheep_code(data)
 
-    # Only use the dryland version of natural land sheep
+    # Only use the dryland version of sheep
     sheep_cost = ag_c_mrj[0, :, sheep_j]
     base_cp_cost = get_cost_carbon_plantings_belt_base(data)
 
@@ -177,9 +177,9 @@ def get_cost_beef_carbon_plantings_belt(
     ------
     Numpy array indexed by r
     """
-    beef_j = tools.get_beef_natural_land_code(data)
+    beef_j = tools.get_beef_code(data)
 
-    # Only use the dryland version of natural land sheep
+    # Only use the dryland version of beef
     beef_cost = ag_c_mrj[0, :, beef_j]
     base_cp_cost = get_cost_carbon_plantings_belt_base(data)
 
