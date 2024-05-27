@@ -321,8 +321,8 @@ GHG_LIMITS_TYPE = 'file' # 'dict' or 'file'
 # Set emissions limits in dictionary below (i.e., year: tonnes)
 GHG_LIMITS = {                     
               2010: 90 * 1e6,    # Agricultural emissions in 2010 in tonnes CO2e
-              2050: -337 * 1e6,  # GHG emissions target and year (can add more years/targets)
-              2100: -337 * 1e6   # GHG emissions target and year (can add more years/targets)
+              2050: -100 * 1e6,  # GHG emissions target and year (can add more years/targets)
+              2100: -100 * 1e6   # GHG emissions target and year (can add more years/targets)
              }
 
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
@@ -334,7 +334,7 @@ SOC_AMORTISATION = 15
 
 # Water use limits and parameters *******************************
 
-WATER_USE_LIMITS = 'off'               # 'on' or 'off'
+WATER_USE_LIMITS = 'on'               # 'on' or 'off'
 WATER_LIMITS_TYPE = 'water_stress'    # 'water_stress' or 'pct_ag'
 
 # If WATER_LIMITS_TYPE = 'pct_ag'...       

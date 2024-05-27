@@ -498,18 +498,18 @@ def get_exclusions_carbon_plantings_belt_base(data, lumap) -> np.ndarray:
     return exclude
 
 
-def get_sheep_natural_land_code(data):
+def get_sheep_code(data):
     """
-    Get the land use code (j) for 'Sheep - natural land'
+    Get the land use code (j) for 'Sheep - modified land'
     """
-    return data.DESC2AGLU['Sheep - natural land']
+    return data.DESC2AGLU['Sheep - modified land']
 
 
-def get_beef_natural_land_code(data):
+def get_beef_code(data):
     """
-    Get the land use code (j) for 'Beef - natural land'
+    Get the land use code (j) for 'Beef - modified land'
     """
-    return data.DESC2AGLU['Beef - natural land']
+    return data.DESC2AGLU['Beef - modified land']
 
 
 # function to create mapping table between lu_desc and dvar index

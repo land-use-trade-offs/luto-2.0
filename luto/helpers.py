@@ -55,7 +55,7 @@ write_outputs(data)
 
 # Generating report on existing output folder
 from luto.tools import report_on_path
-data_path = r'N:\LUF-Modelling\LUTO2_BB\LUTO_2.0.2\output\2024_05_16__22_03_16_hard_maxprofit_RF1_P1e5_2010-2050_snapshot_-269Mt'
+data_path = r'N:\LUF-Modelling\LUTO2_BB\LUTO_2.0.2\output\2024_05_23__17_52_34_soft_maxprofit_RF10_P1e5_2010-2050_snapshot_-269Mt'
 report_on_path(data_path, remake_map=True, remake_csv=True)  
 
 
