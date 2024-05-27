@@ -231,6 +231,7 @@ def process_int_raster( initial_tif:str=None,
     # Process the raster entirely in memory
     f = convert_1band_to_4band_in_memory(initial_tif, band, color_dict)
     f = reproject_raster_in_memory(f)
+
     
     # Infer the save path (no extension) from the initial path
     save_base = os.path.splitext(initial_tif)[0]
@@ -288,47 +289,6 @@ def float_img_to_int(tif_path: str,
         return memfile
     
 
-def mask_invalid_data(memfile: MemoryFile, 
-                      mask_path: str):
-    """
-    Masks the invalid data in the input memory file using the provided mask.
-
-    Args:
-        memfile (MemoryFile): The input memory file containing the data to be masked.
-        mask_path (str): The path to the mask file (1-band file, 0 as the nodata value).
-
-    Returns:
-        MemoryFile: The memory file with the invalid data masked.
-    """
-
-    with rasterio.open(mask_path) as mask, memfile.open() as src:
-        
-        
-        mask_arr = mask.read(1)
-        mask_arr = mask_arr.astype(np.int16)
-        
-        # Apply the resefactor if not working with the full resolution
-        if settings.RESFACTOR > 1 and not settings.WRITE_FULL_RES_MAPS:
-            mask_arr = mask_arr[::settings.RESFACTOR, ::settings.RESFACTOR]
-        
-        # read the 4-band array
-        out_arr = src.read() # CHW
-        out_arr = out_arr.transpose(1, 2, 0) # CHW -> HWC
-        
-        # Mask the invalid data
-        out_arr[mask_arr == 0] = (0, 0, 0, 0)
-        out_arr = out_arr.transpose(2, 0, 1) # HWC -> CHW
-        
-        meta = src.meta.copy()
-        meta.update(compress='lzw', dtype=np.uint8, count=out_arr.shape[0])
-        
-    # Create a new in-memory file for the 4-band array
-    memfile = MemoryFile()
-    with memfile.open(**meta) as dst:
-        dst.write(out_arr)
-        
-    return memfile
-
 
 
 # Function to intify -> colorfy -> reproject -> toPNG
@@ -364,7 +324,6 @@ def process_float_raster(initial_tif:str=None,
     
     f = float_img_to_int(initial_tif, band)
     f = convert_1band_to_4band_in_memory(f, band, color_dict)
-    f = mask_invalid_data(f, mask_path)
     f = reproject_raster_in_memory(f)
     
 

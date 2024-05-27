@@ -4,9 +4,6 @@ import pandas as pd
 
 from luto.tools.report.data_tools.parameters import YR_BASE
 
-# Set up working directory to the root of the report folder
-if __name__ == '__main__':
-    os.chdir('..')
 
 def extract_dtype_from_path(path):
     """
