@@ -99,8 +99,8 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 10         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
-MODE = 'snapshot'   # Runs for target year only
-# MODE = 'timeseries'   # Runs each year from base year to target year
+# MODE = 'snapshot'   # Runs for target year only
+MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -185,14 +185,14 @@ and the corresponding value in this dictionary is False, all cells using EP must
 years.
 """
 NON_AG_LAND_USES_REVERSIBLE = {
-    'Environmental Plantings': True,
-    'Riparian Plantings': True,
-    'Sheep Agroforestry': True,
-    'Beef Agroforestry': True,
-    'Carbon Plantings (Block)': True,
-    'Sheep Carbon Plantings (Belt)': True,
-    'Beef Carbon Plantings (Belt)': True,
-    'BECCS': True,
+    'Environmental Plantings': False,
+    'Riparian Plantings': False,
+    'Sheep Agroforestry': False,
+    'Beef Agroforestry': False,
+    'Carbon Plantings (Block)': False,
+    'Sheep Carbon Plantings (Belt)': False,
+    'Beef Carbon Plantings (Belt)': False,
+    'BECCS': False,
 }
 
 # Price of carbon per tonne - determines revenue from carbon sequestration (used when maximising revenue only)
@@ -367,7 +367,7 @@ BIODIV_LIVESTOCK_IMPACT = 0.3
 LDS_BIODIVERSITY_VALUE = 0.8  # For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value.
 
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
-BIODIVERSITY_LIMITS = 'on'             # 'on' or 'off'
+BIODIVERSITY_LIMITS = 'off'             # 'on' or 'off'
 
 """ Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
     Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.

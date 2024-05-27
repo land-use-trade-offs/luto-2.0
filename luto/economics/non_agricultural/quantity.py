@@ -5,7 +5,7 @@ from luto import tools
 
 def get_sheep_q_cr(data, ag_q_mrp: np.ndarray) -> np.ndarray:
     """
-    Gets the matrix containing the commodities produced by sheep (natural land) 
+    Gets the matrix containing the commodities produced by sheep (modified land) 
     """
     sheep_j = tools.get_sheep_code(data)
 
@@ -25,7 +25,7 @@ def get_sheep_q_cr(data, ag_q_mrp: np.ndarray) -> np.ndarray:
 
 def get_beef_q_cr(data, ag_q_mrp: np.ndarray) -> np.ndarray:
     """
-    Gets the matrix containing the commodities produced by beef (natural land) 
+    Gets the matrix containing the commodities produced by beef (modified land) 
     """
     beef_j = tools.get_beef_code(data)
 
