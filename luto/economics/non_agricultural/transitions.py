@@ -129,7 +129,7 @@ def get_sheep_agroforestry_transitions_from_ag(
         return combined_costs
 
     else:
-        sheep_j = tools.get_sheep_natural_land_code(data)
+        sheep_j = tools.get_sheep_code(data)
         sheep_costs_r = ag_t_costs[0, :, sheep_j]        
     
         sheep_contr = sheep_costs_r * (1 - agroforestry_x_r)
@@ -180,7 +180,7 @@ def get_beef_agroforestry_transitions_from_ag(
         return combined_costs
 
     else:
-        beef_j = tools.get_beef_natural_land_code(data)
+        beef_j = tools.get_beef_code(data)
         beef_costs_r = ag_t_costs[0, :, beef_j]        
     
         beef_contr = beef_costs_r * (1 - agroforestry_x_r)
@@ -290,7 +290,7 @@ def get_sheep_carbon_plantings_belt_from_ag(
         return combined_costs
 
     else:
-        sheep_j = tools.get_sheep_natural_land_code(data)
+        sheep_j = tools.get_sheep_code(data)
         sheep_costs_r = ag_t_costs[0, :, sheep_j]        
     
         sheep_contr = sheep_costs_r * (1 - cp_belt_x_r)
@@ -339,7 +339,7 @@ def get_beef_carbon_plantings_belt_from_ag(
         return combined_costs
 
     else:
-        beef_j = tools.get_beef_natural_land_code(data)
+        beef_j = tools.get_beef_code(data)
         beef_costs_r = ag_t_costs[0, :, beef_j]
     
         beef_contr = beef_costs_r * (1 - cp_belt_x_r)
@@ -523,7 +523,7 @@ def get_sheep_to_ag_base(data: Data, yr_idx, lumap, separate=False) -> np.ndarra
         Dictionary of separated out transition costs.
     ------
     """
-    sheep_j = tools.get_sheep_natural_land_code(data)
+    sheep_j = tools.get_sheep_code(data)
 
     all_sheep_lumap = (np.ones(data.NCELLS) * sheep_j).astype(np.int8)
     all_dry_lmmap = np.zeros(data.NCELLS)
@@ -580,7 +580,7 @@ def get_beef_to_ag_base(data: Data, yr_idx, lumap, separate) -> np.ndarray|dict:
     dict (separate = True)
         Dictionary of separated out transition costs.
     """
-    beef_j = tools.get_beef_natural_land_code(data)
+    beef_j = tools.get_beef_code(data)
 
     all_beef_lumap = (np.ones(data.NCELLS) * beef_j).astype(np.int8)
     all_dry_lmmap = np.zeros(data.NCELLS)
@@ -988,7 +988,7 @@ def get_exclusions_riparian_plantings(data: Data, lumap) -> np.ndarray:
 def get_exclusions_sheep_agroforestry(
     data: Data, ag_x_mrj: np.ndarray, lumap: np.ndarray
 ) -> np.ndarray:
-    sheep_j = tools.get_sheep_natural_land_code(data)
+    sheep_j = tools.get_sheep_code(data)
     sheep_x_r = ag_x_mrj[0, :, sheep_j]
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
 
@@ -1003,7 +1003,7 @@ def get_exclusions_sheep_agroforestry(
 def get_exclusions_beef_agroforestry(
     data: Data, ag_x_mrj: np.ndarray, lumap: np.ndarray
 ) -> np.ndarray:
-    beef_j = tools.get_beef_natural_land_code(data)
+    beef_j = tools.get_beef_code(data)
     beef_x_r = ag_x_mrj[0, :, beef_j]
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
 
@@ -1039,7 +1039,7 @@ def get_exclusions_carbon_plantings_block(data, lumap) -> np.ndarray:
 def get_exclusions_sheep_carbon_plantings_belt(
     data: Data, ag_x_mrj: np.ndarray, lumap: np.ndarray
 ) -> np.ndarray:
-    sheep_j = tools.get_sheep_natural_land_code(data)
+    sheep_j = tools.get_sheep_code(data)
     sheep_x_r = ag_x_mrj[0, :, sheep_j]
     cp_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
 
@@ -1054,7 +1054,7 @@ def get_exclusions_sheep_carbon_plantings_belt(
 def get_exclusions_beef_carbon_plantings_belt(
     data: Data, ag_x_mrj: np.ndarray, lumap: np.ndarray
 ) -> np.ndarray:
-    beef_j = tools.get_beef_natural_land_code(data)
+    beef_j = tools.get_beef_code(data)
     beef_x_r = ag_x_mrj[0, :, beef_j]
     cp_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
 
