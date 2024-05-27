@@ -25,19 +25,22 @@ import time
 import os.path
 import traceback
 import functools
-from typing import Tuple
-from datetime import datetime
+import shutil
 
 import pandas as pd
 import numpy as np
 import numpy_financial as npf
 import luto.settings as settings
 
+from typing import Tuple
+from datetime import datetime
+from joblib import Parallel, delayed
+
 from luto.tools.report.create_html import data2html
 from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_static_maps import TIF2MAP
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.settings import NON_AG_LAND_USES
+from luto.tools.report.data_tools import get_all_files
 
 
 def amortise(cost, rate=settings.DISCOUNT_RATE, horizon=settings.AMORTISATION_PERIOD):
@@ -46,9 +49,9 @@ def amortise(cost, rate=settings.DISCOUNT_RATE, horizon=settings.AMORTISATION_PE
     else: return cost
 
 
-# def show_map(yr_cal):
-#     """Show a plot of the lumap of `yr_cal`."""
-#     plotmap(lumaps[yr_cal], labels=bdata.AGLU2DESC)
+def move_html(path_from, path_to):
+    if os.path.exists(path_from):
+        shutil.move(path_from, path_to)
 
 
 def report_on_path(path:str, remake_map=True, remake_csv=True):
@@ -58,13 +61,21 @@ def report_on_path(path:str, remake_map=True, remake_csv=True):
             [os.remove(f"{path}/DATA_REPORT/data/{i}") for i in os.listdir(f"{path}/DATA_REPORT/data") if os.path.isfile(f"{path}/DATA_REPORT/data/{i}")]
         save_report_data(path)
 
-    if settings.WRITE_OUTPUT_GEOTIFFS and os.path.exists(f"{path}/DATA_REPORT/data/Map_data"):
-        if remake_map:
-            [os.remove(f'{path}/DATA_REPORT/data/Map_data/{i}') for i in os.listdir(f"{path}/DATA_REPORT/data/Map_data")]
-            TIF2MAP(path) 
-        
-    
-    
+    if remake_map:
+        map_dir = f"{path}/DATA_REPORT/data/Map_data"
+        if os.path.exists(map_dir):
+            [os.remove(f'{map_dir}/{i}') for i in os.listdir(map_dir) if len(os.listdir(map_dir)) > 0]
+        else:
+            os.mkdir(map_dir)
+            
+        # Make the maps
+        TIF2MAP(path)
+        map_html = get_all_files(path).query('base_ext == ".html" and year_types != "begin_end_year"')
+        tasks = [delayed(move_html)(row['path'], map_dir) for _,row in map_html.iterrows()]
+        worker = min(settings.WRITE_THREADS, len(tasks)) if len(tasks) > 0 else 1
+        Parallel(n_jobs=worker)(tasks)
+            
+    # Copy the html files to the the report index HTML
     data2html(path)
 
 
