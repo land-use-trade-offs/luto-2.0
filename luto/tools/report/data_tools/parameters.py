@@ -76,7 +76,7 @@ with open(f'{settings.INPUT_DIR}/ag_landuses.csv') as f:
     AG_LANDUSE = [line.strip() for line in f]
     
     
-# This will be used in the HTML of reporting spatial maps
+# This will be used in the HTML for reporting spatial maps
 SPATIAL_MAP_DICT = {
     'Int_Map': ['lumap', 'non_ag', 'ammap', 'lmmap'],       # Each cell is an integer, representing a land-use for [AG, AM, Non-AG]
     'Ag_LU': AG_LANDUSE,                                    # Percentage of Agricultural Landuse to a cell

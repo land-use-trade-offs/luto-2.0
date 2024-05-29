@@ -149,7 +149,7 @@ def is_float(s):
  
 def is_valid_variable_name(name):
     if name in keyword.kwlist:
-        print(f"{name} is a keyword")
+        print(f"{name} is a keyword in Python, please choose another name")
         return False
     if not name:  # Check if the name is not empty
         print("Column name is empty")
@@ -286,6 +286,10 @@ def check_settings_name(settings:dict, col:str):
     # Check if the column name is valid
     if not is_valid_variable_name(col):  
         raise ValueError(f'"{col}" is not a valid column name!')
+    
+    # If the column name is not in the settings, do nothing
+    if 'Default_run' not in settings.columns:
+        return
     
     # Report the changed settings
     changed_params = 0

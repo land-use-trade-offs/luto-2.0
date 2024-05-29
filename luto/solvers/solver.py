@@ -85,7 +85,7 @@ class LutoSolver:
         self.X_ag_man_irr_vars_jr = None
         self.V = None
 
-        # initialise constraint lookups
+        # Initialise constraint lookups
         self.cell_usage_constraint_r = {}
         self.ag_management_constraints_r = defaultdict(list)
         self.adoption_limit_constraints = []
@@ -106,16 +106,28 @@ class LutoSolver:
         print("Adding the decision variables...\n")
         self._setup_vars()
         
-        print(f"Adding the objective function - {settings.OBJECTIVE}...\n", flush=True)
-        self._setup_objective()
-        
         print("Adding the constraints...\n")
         self._setup_constraints()
+        
+        print(f"Adding the objective function - {settings.OBJECTIVE}...\n", flush=True)
+        self._setup_objective()
+
+
 
     def _setup_vars(self):
         self._setup_x_vars()
         self._setup_ag_management_variables()
         self._setup_decision_variables()
+        
+    def _setup_constraints(self):
+        self._add_cell_usage_constraints()
+        self._add_agricultural_management_constraints()
+        self._add_agricultural_management_adoption_limit_constraints()
+        self._add_demand_penalty_constraints()
+        self._add_water_usage_limit_constraints()
+        self._add_ghg_emissions_limit_constraints()
+        self._add_biodiversity_limit_constraints()
+
 
     def _setup_x_vars(self):
         """
@@ -695,14 +707,6 @@ class LutoSolver:
             self.biodiversity_expr >= biodiversity_limits
         )
 
-    def _setup_constraints(self):
-        self._add_cell_usage_constraints()
-        self._add_agricultural_management_constraints()
-        self._add_agricultural_management_adoption_limit_constraints()
-        self._add_demand_penalty_constraints()
-        self._add_water_usage_limit_constraints()
-        self._add_ghg_emissions_limit_constraints()
-        self._add_biodiversity_limit_constraints()
 
     def update_formulation(
         self,

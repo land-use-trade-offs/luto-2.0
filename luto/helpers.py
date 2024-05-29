@@ -65,6 +65,13 @@ from luto.tools.report.write_input_data.array2tif import write_input2tiff
 write_input2tiff(data, 2050)
 
 
+# Generating the scenario runs template to feed HPC
+from luto.tools.create_task_runs.helpers import create_settings_template, create_grid_search_template
+create_settings_template()      # This will create a "Custom_run" folder next to the root folder (luto-2.0) and a "settings_template.csv" in it
+# create_grid_search_template()   # This will generate 20 runs in the "settings_template.csv" by ramdomly turning on/off the AM and Non-ag switches/reversibility
+
+
+
 
 
 

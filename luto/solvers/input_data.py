@@ -32,45 +32,45 @@ class SolverInputData:
     An object that collects and stores all relevant data for solver.py.
     """
 
-    ag_t_mrj: np.ndarray  # Agricultural transition cost matrices.
-    ag_c_mrj: np.ndarray  # Agricultural production cost matrices.
-    ag_r_mrj: np.ndarray  # Agricultural production revenue matrices.
-    ag_g_mrj: np.ndarray  # Agricultural greenhouse gas emissions matrices.
-    ag_w_mrj: np.ndarray  # Agricultural water requirements matrices.
-    ag_b_mrj: np.ndarray  # Agricultural biodiversity matrices.
-    ag_x_mrj: np.ndarray  # Agricultural exclude matrices.
-    ag_q_mrp: np.ndarray  # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
-    ag_ghg_t_mrj: np.ndarray  # GHG emissions released during transitions between agricultural land uses.
-    ag_to_non_ag_t_rk: np.ndarray  # Agricultural to non-agricultural transition cost matrix.
+    ag_t_mrj: np.ndarray            # Agricultural transition cost matrices.
+    ag_c_mrj: np.ndarray            # Agricultural production cost matrices.
+    ag_r_mrj: np.ndarray            # Agricultural production revenue matrices.
+    ag_g_mrj: np.ndarray            # Agricultural greenhouse gas emissions matrices.
+    ag_w_mrj: np.ndarray            # Agricultural water requirements matrices.
+    ag_b_mrj: np.ndarray            # Agricultural biodiversity matrices.
+    ag_x_mrj: np.ndarray            # Agricultural exclude matrices.
+    ag_q_mrp: np.ndarray            # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
+    ag_ghg_t_mrj: np.ndarray        # GHG emissions released during transitions between agricultural land uses.
+    ag_to_non_ag_t_rk: np.ndarray   # Agricultural to non-agricultural transition cost matrix.
     
     non_ag_to_ag_t_mrj: np.ndarray  # Non-agricultural to agricultural transition cost matrices.
-    non_ag_t_rk: np.ndarray  # Non-agricultural transition costs matrix
-    non_ag_c_rk: np.ndarray  # Non-agricultural production cost matrix.
-    non_ag_r_rk: np.ndarray  # Non-agricultural revenue matrix.
-    non_ag_g_rk: np.ndarray  # Non-agricultural greenhouse gas emissions matrix.
-    non_ag_w_rk: np.ndarray  # Non-agricultural water requirements matrix.
-    non_ag_b_rk: np.ndarray  # Non-agricultural biodiversity matrix.
-    non_ag_x_rk: np.ndarray  # Non-agricultural exclude matrices.
-    non_ag_q_crk: np.ndarray  # Non-agricultural yield matrix.
-    non_ag_lb_rk: np.ndarray # Non-agricultural lower bound matrices.
+    non_ag_t_rk: np.ndarray         # Non-agricultural transition costs matrix
+    non_ag_c_rk: np.ndarray         # Non-agricultural production cost matrix.
+    non_ag_r_rk: np.ndarray         # Non-agricultural revenue matrix.
+    non_ag_g_rk: np.ndarray         # Non-agricultural greenhouse gas emissions matrix.
+    non_ag_w_rk: np.ndarray         # Non-agricultural water requirements matrix.
+    non_ag_b_rk: np.ndarray         # Non-agricultural biodiversity matrix.
+    non_ag_x_rk: np.ndarray         # Non-agricultural exclude matrices.
+    non_ag_q_crk: np.ndarray        # Non-agricultural yield matrix.
+    non_ag_lb_rk: np.ndarray        # Non-agricultural lower bound matrices.
 
-    ag_man_c_mrj: dict  # Agricultural management options' cost effects.
-    ag_man_g_mrj: dict  # Agricultural management options' GHG emission effects.
-    ag_man_q_mrp: dict  # Agricultural management options' quantity effects.
-    ag_man_r_mrj: dict  # Agricultural management options' revenue effects.
-    ag_man_t_mrj: dict  # Agricultural management options' transition cost effects.
-    ag_man_w_mrj: dict  # Agricultural management options' water requirement effects.
-    ag_man_b_mrj: dict  # Agricultural management options' biodiversity effects.
-    ag_man_limits: dict  # Agricultural management options' adoption limits.
-    ag_man_lb_mrj: dict  # Agricultural management options' lower bounds.
+    ag_man_c_mrj: dict              # Agricultural management options' cost effects.
+    ag_man_g_mrj: dict              # Agricultural management options' GHG emission effects.
+    ag_man_q_mrp: dict              # Agricultural management options' quantity effects.
+    ag_man_r_mrj: dict              # Agricultural management options' revenue effects.
+    ag_man_t_mrj: dict              # Agricultural management options' transition cost effects.
+    ag_man_w_mrj: dict              # Agricultural management options' water requirement effects.
+    ag_man_b_mrj: dict              # Agricultural management options' biodiversity effects.
+    ag_man_limits: dict             # Agricultural management options' adoption limits.
+    ag_man_lb_mrj: dict             # Agricultural management options' lower bounds.
 
-    offland_ghg: np.ndarray  # GHG emissions from off-land commodities.
+    offland_ghg: np.ndarray         # GHG emissions from off-land commodities.
 
-    lu2pr_pj: np.ndarray  # Conversion matrix: land-use to product(s).
-    pr2cm_cp: np.ndarray  # Conversion matrix: product(s) to commodity.
-    limits: dict  # Targets to use.
-    desc2aglu: dict  # Map of agricultural land use descriptions to codes.
-    resmult: float  # Resolution factor multiplier from data.RESMULT
+    lu2pr_pj: np.ndarray            # Conversion matrix: land-use to product(s).
+    pr2cm_cp: np.ndarray            # Conversion matrix: product(s) to commodity.
+    limits: dict                    # Targets to use.
+    desc2aglu: dict                 # Map of agricultural land use descriptions to codes.
+    resmult: float                  # Resolution factor multiplier from data.RESMULT
 
     @property
     def n_ag_lms(self):
