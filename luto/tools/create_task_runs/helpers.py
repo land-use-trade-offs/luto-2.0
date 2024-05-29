@@ -153,23 +153,7 @@ def is_float(s):
  
  
 def format_name(name):
-    name = name.strip().replace(' ', '_').replace('-', '_')
-    if name in keyword.kwlist:
-        print(f"{name} is a keyword in Python, please choose another name")
-        return False
-    if not name:  # Check if the name is not empty
-        print("Column name is empty")
-        return False
-    if not name[0].isalpha() and name[0] != '_':  # Must start with a letter or underscore
-        print(f"{name} must start with a letter or underscore")
-        return False
-    if all((char.isalnum() or char == '_') for char in name):
-        return True
-    print(f"{name} must contain only letters, numbers, or underscores")
-    return False
-
-
-
+    return name.strip().replace(' ', '_').replace('-', '_')
 
 
 def copy_folder_custom(source, destination, ignore_dirs=None):
