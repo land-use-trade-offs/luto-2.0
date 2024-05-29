@@ -66,6 +66,11 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
      
     # Read the custom settings file
     custom_settings = pd.read_csv(from_path, index_col=0)
+    
+    # Change the column names to be valid python variable names
+    custom_settings.columns = [format_name(col) for col in custom_settings.columns]
+    
+    # Evaluate the parameters that need to be evaluated
     custom_settings = custom_settings.replace({'TRUE': 'True', 'FALSE': 'False'})
     custom_settings.loc[PARAMS_TO_EVAL] = custom_settings.loc[PARAMS_TO_EVAL].map(eval)
 
@@ -147,7 +152,8 @@ def is_float(s):
  
  
  
-def is_valid_variable_name(name):
+def format_name(name):
+    name = name.strip().replace(' ', '_').replace('-', '_')
     if name in keyword.kwlist:
         print(f"{name} is a keyword in Python, please choose another name")
         return False
@@ -283,9 +289,6 @@ def update_settings(settings_dict:dict, n_tasks:int, col:str):
 
 
 def check_settings_name(settings:dict, col:str):
-    # Check if the column name is valid
-    if not is_valid_variable_name(col):  
-        raise ValueError(f'"{col}" is not a valid column name!')
     
     # If the column name is not in the settings, do nothing
     if 'Default_run' not in settings.columns:
