@@ -185,14 +185,14 @@ and the corresponding value in this dictionary is False, all cells using EP must
 years.
 """
 NON_AG_LAND_USES_REVERSIBLE = {
-    'Environmental Plantings': True,
-    'Riparian Plantings': True,
-    'Sheep Agroforestry': True,
-    'Beef Agroforestry': True,
-    'Carbon Plantings (Block)': True,
-    'Sheep Carbon Plantings (Belt)': True,
-    'Beef Carbon Plantings (Belt)': True,
-    'BECCS': True,
+    'Environmental Plantings': False,
+    'Riparian Plantings': False,
+    'Sheep Agroforestry': False,
+    'Beef Agroforestry': False,
+    'Carbon Plantings (Block)': False,
+    'Sheep Carbon Plantings (Belt)': False,
+    'Beef Carbon Plantings (Belt)': False,
+    'BECCS': False,
 }
 
 # Price of carbon per tonne - determines revenue from carbon sequestration (used when maximising revenue only)
