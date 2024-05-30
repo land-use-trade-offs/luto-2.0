@@ -31,7 +31,7 @@ PARAMS_TO_EVAL = [
     'AG_MANAGEMENTS',
     'AG_MANAGEMENTS_REVERSIBLE',
     'NON_AG_LAND_USES',
-    'NON_AG_LAND_USES_REVERSIBLE'
+    'NON_AG_LAND_USES_REVERSIBLE',
     # Dicts to be evaluated from str to dict
     'OFF_LAND_COMMODITIES',
     'GHG_LIMITS',
