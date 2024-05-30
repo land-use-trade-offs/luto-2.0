@@ -1,10 +1,9 @@
 
-import itertools
 import os
-import random
 import re
 import shutil
-import keyword
+import random
+import itertools
 import multiprocessing
 import pandas as pd
 
@@ -22,6 +21,7 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
     # Save the settings template to the root task folder
     None if os.path.exists(to_path) else os.makedirs(to_path)
     
+    # # Write the requirements to the task folder
     # conda_pkgs, pip_pkgs = get_requirements()
     # with open(f'{to_path}/requirements_conda.txt', 'w') as conda_f, \
     #         open(f'{to_path}/requirements_pip.txt', 'w') as pip_f:
@@ -150,11 +150,9 @@ def is_float(s):
     except ValueError:
         return False
  
- 
- 
-def format_name(name):
-    return name.strip().replace(' ', '_').replace('-', '_')
 
+def format_name(name):
+    return re.sub(r'\W+', '_', name.strip())
 
 def copy_folder_custom(source, destination, ignore_dirs=None):
     
