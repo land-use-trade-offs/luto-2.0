@@ -79,7 +79,7 @@ def create_new_dataset():
     shutil.copyfile(luto_2D_inpath + 'cell_biophysical_df.h5', raw_data + 'cell_biophysical_df.h5')
     shutil.copyfile(luto_2D_inpath + 'SA2_climate_damage_mult.h5', raw_data + 'SA2_climate_damage_mult.h5')
     
-    shutil.copyfile('N:/LUF-Modelling/Food_demand_AU/au.food.demand/Outputs/All_LUTO_demand_scenarios_with_convergences.csv',  raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
+    shutil.copyfile('N:/LUF-Modelling/Food_demand_AU/au.food.demand/Outputs/All_LUTO_demand_scenarios_with_convergences_2024-05-28.csv',  raw_data + 'All_LUTO_demand_scenarios_with_convergences_2024-05-28.csv')
 
     # Read raw BECCS data from CSIRO and save as HDF5
     BECCS_raw = pd.read_pickle(BECCS_inpath + 'df_info_best_grid_20211116.pkl')
@@ -162,7 +162,7 @@ def create_new_dataset():
     cci_raw = pd.read_hdf(raw_data + 'SA2_climate_damage_mult.h5')
     
     # Read in demand data
-    demand = pd.read_csv(raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
+    demand = pd.read_csv(raw_data + 'All_LUTO_demand_scenarios_with_convergences_2024-05-28.csv')
     
     
     
