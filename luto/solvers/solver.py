@@ -18,19 +18,18 @@
 Provides minimalist Solver class and pure helper functions.
 """
 
+import numpy as np
+import gurobipy as gp
+import luto.settings as settings
 
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional
 from collections import defaultdict
 from dataclasses import dataclass
-from itertools import combinations
 
-import numpy as np
-import gurobipy as gp
 from gurobipy import GRB
 
-import luto.settings as settings
 from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_REVERSIBLE
 from luto import tools
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES

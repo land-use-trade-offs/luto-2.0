@@ -229,14 +229,15 @@ def update_settings(settings_dict:dict, n_tasks:int, col:str):
     settings_dict['INPUT_DIR'] = os.path.abspath(settings_dict['INPUT_DIR']).replace('\\','/')
     settings_dict['DATA_DIR'] = settings_dict['INPUT_DIR']
 
-    # The THREADS setting will be set to the number of CPU cores divided by the number of tasks
-    CPU_COUNT = multiprocessing.cpu_count()
-    CPU_PER_TASK = CPU_COUNT // n_tasks - 2
-    CPU_PER_TASK = max(CPU_PER_TASK, 1)
-    CPU_PER_TASK = min(CPU_PER_TASK, int(settings_dict['THREADS']))
-    
-    settings_dict['THREADS'] = CPU_PER_TASK 
-    settings_dict['WRITE_THREADS'] = CPU_PER_TASK
+    # Update the running threads base on CPU_PER_TASK
+    if settings_dict['CPU_PER_TASK'] == 'auto':
+        CPU_COUNT = multiprocessing.cpu_count()
+        CPU_PER_TASK = CPU_COUNT // n_tasks - 2
+        CPU_PER_TASK = max(CPU_PER_TASK, 1)
+        CPU_PER_TASK = min(CPU_PER_TASK, int(settings_dict['THREADS']))
+        
+        settings_dict['THREADS'] = CPU_PER_TASK 
+        settings_dict['WRITE_THREADS'] = CPU_PER_TASK
     
 
     # Set the memory and time based on the resolution factor
