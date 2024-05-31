@@ -66,6 +66,7 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
      
     # Read the custom settings file
     custom_settings = pd.read_csv(from_path, index_col=0)
+    custom_settings = custom_settings.dropna(how='all', axis=1)
     
     # Change the column names to be valid python variable names
     custom_settings.columns = [format_name(col) for col in custom_settings.columns]
