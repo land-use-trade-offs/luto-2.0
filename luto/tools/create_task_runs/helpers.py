@@ -47,7 +47,7 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
             # Add the NODE parameters
             settings_dict['NODE'] = 'Please specify the node name'
             settings_dict['MEM'] = 'auto'
-            settings_dict['CPU_PER_TASK'] = 'auto'
+            settings_dict['CPU_PER_TASK'] = settings_dict['Threads']
             settings_dict['TIME'] = 'auto'
             settings_dict['JOB_NAME'] = 'auto'
 
