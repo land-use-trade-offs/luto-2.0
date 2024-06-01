@@ -242,12 +242,12 @@ def update_settings(settings_dict:dict, n_tasks:int, col:str):
 
     # Set the memory and time based on the resolution factor
     if int(settings_dict['RESFACTOR']) == 1:
-        MEM = "200G"
+        MEM = "250G"
         TIME = "30-0:00:00"
     elif int(settings_dict['RESFACTOR']) == 2:
         MEM = "150G" 
         TIME = "10-0:00:00"
-    elif int(settings_dict['RESFACTOR']) == 3:
+    elif int(settings_dict['RESFACTOR']) <= 5:
         MEM = "100G"
         TIME = "5-0:00:00"
     else:
