@@ -228,16 +228,6 @@ def update_settings(settings_dict:dict, n_tasks:int, col:str):
     # The input dir for each task will point to the absolute path of the input dir
     settings_dict['INPUT_DIR'] = os.path.abspath(settings_dict['INPUT_DIR']).replace('\\','/')
     settings_dict['DATA_DIR'] = settings_dict['INPUT_DIR']
-
-    # Update the running threads base on CPU_PER_TASK
-    if settings_dict['CPU_PER_TASK'] == 'auto':
-        CPU_COUNT = multiprocessing.cpu_count()
-        CPU_PER_TASK = CPU_COUNT // n_tasks - 2
-        CPU_PER_TASK = max(CPU_PER_TASK, 1)
-        CPU_PER_TASK = min(CPU_PER_TASK, int(settings_dict['THREADS']))
-        
-        settings_dict['THREADS'] = CPU_PER_TASK 
-        settings_dict['WRITE_THREADS'] = CPU_PER_TASK
     
 
     # Set the memory and time based on the resolution factor
@@ -257,14 +247,12 @@ def update_settings(settings_dict:dict, n_tasks:int, col:str):
     # If the MEM and TIME are not set to auto, set them to the custom values
     MEM = settings_dict['MEM'] if settings_dict['MEM'] != 'auto' else MEM
     TIME = settings_dict['TIME'] if settings_dict['TIME'] != 'auto' else TIME
-    CPU_PER_TASK = settings_dict['CPU_PER_TASK'] if settings_dict['CPU_PER_TASK'] != 'auto' else CPU_PER_TASK
     JOB_NAME = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
    
     # Update the settings dictionary
     settings_dict['MEM'] = MEM
     settings_dict['TIME'] = TIME
     settings_dict['JOB_NAME'] = JOB_NAME
-    settings_dict['CPU_PER_TASK'] = CPU_PER_TASK
     
     return settings_dict
 
