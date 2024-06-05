@@ -1163,7 +1163,7 @@ def get_exclude_matrices(data: Data, ag_x_mrj, lumap) -> np.ndarray:
     """
     non_ag_x_matrices = {lu: np.zeros(data.NCELLS) for lu in NON_AG_LAND_USES}
 
-    # Environmental plantings exclusions
+    # Environmental plantings exclusions. Note: the order must be consistent with the NON_AG_LAND_USES order.
     if NON_AG_LAND_USES['Environmental Plantings']:
         non_ag_x_matrices['Environmental Plantings'] = get_exclusions_environmental_plantings(data, lumap)
     if NON_AG_LAND_USES['Riparian Plantings']:

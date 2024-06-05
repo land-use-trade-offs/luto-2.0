@@ -1,4 +1,5 @@
 
+from math import e
 import os
 import re
 import shutil
@@ -47,7 +48,7 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
             # Add the NODE parameters
             settings_dict['NODE'] = 'Please specify the node name'
             settings_dict['MEM'] = 'auto'
-            settings_dict['CPU_PER_TASK'] = settings_dict['Threads']
+            settings_dict['CPU_PER_TASK'] = settings_dict['THREADS']
             settings_dict['TIME'] = 'auto'
             settings_dict['JOB_NAME'] = 'auto'
 
@@ -102,7 +103,6 @@ def create_grid_search_template(num_runs:int = 10):
     # Gird parameters for {AG_MANAGEMENTS} and {AG_MANAGEMENTS_REVERSIBLE}
     grid_am = {k:[True, False ] for k in settings.AG_MANAGEMENTS}
 
-
     # Grid parameters for {NON_AG_LAND_USES} and {NON_AG_LAND_USES_REVERSIBLE}
     grid_non_ag = {k:[True, False] for k in settings.NON_AG_LAND_USES}
 
@@ -151,9 +151,10 @@ def is_float(s):
     except ValueError:
         return False
  
-
+ 
 def format_name(name):
     return re.sub(r'\W+', '_', name.strip())
+
 
 def copy_folder_custom(source, destination, ignore_dirs=None):
     
@@ -223,11 +224,17 @@ def write_custom_settings(task_dir:str, settings_dict:dict):
 def update_settings(settings_dict:dict, n_tasks:int, col:str):
     
     if settings_dict['NODE'] == 'Please specify the node name':
-        raise ValueError('NODE must be specified!')
+        if os.name == 'nt':         
+            # If the os is windows, do nothing
+            print('This will only create task folders, and not submit job to run!')
+        elif os.name == 'posix':    
+            # If the os is linux, submit the job
+            raise ValueError('NODE must be specified!')
 
     # The input dir for each task will point to the absolute path of the input dir
     settings_dict['INPUT_DIR'] = os.path.abspath(settings_dict['INPUT_DIR']).replace('\\','/')
     settings_dict['DATA_DIR'] = settings_dict['INPUT_DIR']
+    settings_dict['WRITE_THREADS'] = 10 # 10 threads for writing is a safe number to avoid out-of-memory issues
     
 
     # Set the memory and time based on the resolution factor
