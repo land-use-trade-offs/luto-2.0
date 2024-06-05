@@ -30,10 +30,8 @@ def TIF2MAP(raw_data_dir:str):
     
     # Loop through the tif files and create the maps (PNG and HTML)
     tasks = (delayed(create_maps)(row, model_run_scenario) for _, row in tif_files_with_meta.iterrows())
-    parel_obj = Parallel(n_jobs=settings.THREADS, return_as='generator')(tasks)
-    for msg in parel_obj:
-        print(msg)
-    
+    for out in Parallel(n_jobs=settings.THREADS, return_as='generator')(tasks):
+        print(out)
     
         
      
@@ -87,7 +85,8 @@ def create_maps(row, model_run_scenario):
                      bounds_for_folium,
                      color_desc_dict)
     
-    return f'Map for {row["base_name"]} in {year} successfully created.'
+    
+    return f'{map_fullname} of year {year} has created.'
     
     
 

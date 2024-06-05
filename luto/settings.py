@@ -99,8 +99,8 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 10         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
-# MODE = 'snapshot'   # Runs for target year only
-MODE = 'timeseries'   # Runs each year from base year to target year
+MODE = 'snapshot'   # Runs for target year only
+# MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -120,8 +120,8 @@ PENALTY = 1e5
 # ---------------------------------------------------------------------------- #
 
 WRITE_OUTPUT_GEOTIFFS = True    # Write GeoTiffs to output directory: True or False
-WRITE_FULL_RES_MAPS = False      # Write GeoTiffs all full or resfactored resolution for coarsified maps: True or False
-PARALLEL_WRITE = True           # If use parallel processing to write GeoTiffs: True or False
+WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resolution: True or False
+PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
 WRITE_THREADS = 50              # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 
@@ -367,7 +367,8 @@ BIODIV_LIVESTOCK_IMPACT = 0.3
 LDS_BIODIVERSITY_VALUE = 0.8  # For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value.
 
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
-BIODIVERSITY_LIMITS = 'on'             # 'on' or 'off'
+BIODIVERSITY_LIMITS = 'off'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
+BIODIVERSITY_REPORT = True             # True or False, report biodiversity regardless of BIODIVERSITY_LIMITS setting.
 
 """ Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
     Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.

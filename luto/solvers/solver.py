@@ -18,24 +18,21 @@
 Provides minimalist Solver class and pure helper functions.
 """
 
+import numpy as np
+import gurobipy as gp
+import luto.settings as settings
 
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional
-from collections import defaultdict
-from dataclasses import dataclass
-from itertools import combinations
-
-import numpy as np
-import gurobipy as gp
 from gurobipy import GRB
 
-import luto.settings as settings
-from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_REVERSIBLE
 from luto import tools
+from luto.solvers.input_data import SolverInputData
+from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_REVERSIBLE
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.settings import NON_AG_LAND_USES, NON_AG_LAND_USES_REVERSIBLE
-from luto.solvers.input_data import SolverInputData
+
 
 
 # Set Gurobi environment.
@@ -85,7 +82,7 @@ class LutoSolver:
         self.X_ag_man_irr_vars_jr = None
         self.V = None
 
-        # initialise constraint lookups
+        # Initialise constraint lookups
         self.cell_usage_constraint_r = {}
         self.ag_management_constraints_r = defaultdict(list)
         self.adoption_limit_constraints = []
@@ -106,16 +103,28 @@ class LutoSolver:
         print("Adding the decision variables...\n")
         self._setup_vars()
         
-        print(f"Adding the objective function - {settings.OBJECTIVE}...\n", flush=True)
-        self._setup_objective()
-        
         print("Adding the constraints...\n")
         self._setup_constraints()
+        
+        print(f"Adding the objective function - {settings.OBJECTIVE}...\n", flush=True)
+        self._setup_objective()
+
+
 
     def _setup_vars(self):
         self._setup_x_vars()
         self._setup_ag_management_variables()
         self._setup_decision_variables()
+        
+    def _setup_constraints(self):
+        self._add_cell_usage_constraints()
+        self._add_agricultural_management_constraints()
+        self._add_agricultural_management_adoption_limit_constraints()
+        self._add_demand_penalty_constraints()
+        self._add_water_usage_limit_constraints()
+        self._add_ghg_emissions_limit_constraints()
+        self._add_biodiversity_limit_constraints()
+
 
     def _setup_x_vars(self):
         """
@@ -650,12 +659,12 @@ class LutoSolver:
         )
 
     def _add_biodiversity_limit_constraints(self):
-        if settings.BIODIVERSITY_LIMITS != "on":
+        if settings.BIODIVERSITY_LIMITS != "on" and not settings.BIODIVERSITY_REPORT:
             return
         
         print('  ...biodiversity constraints...')
 
-        # Returns biodiversity limits
+        # Returns biodiversity limits. Note that the biodiversity limits is 0 if not set BIODIVERSITY_LIMITS = "on".
         biodiversity_limits = self._input_data.limits["biodiversity"]
 
         ag_contr = gp.quicksum(
@@ -695,14 +704,6 @@ class LutoSolver:
             self.biodiversity_expr >= biodiversity_limits
         )
 
-    def _setup_constraints(self):
-        self._add_cell_usage_constraints()
-        self._add_agricultural_management_constraints()
-        self._add_agricultural_management_adoption_limit_constraints()
-        self._add_demand_penalty_constraints()
-        self._add_water_usage_limit_constraints()
-        self._add_ghg_emissions_limit_constraints()
-        self._add_biodiversity_limit_constraints()
 
     def update_formulation(
         self,

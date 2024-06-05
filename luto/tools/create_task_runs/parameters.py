@@ -23,17 +23,21 @@ SETTING_IN_USE = [
 
 
 PARAMS_TO_EVAL = [
-    'AMORTISE_UPFRONT_COSTS',
+    # Write settings
     'WRITE_OUTPUT_GEOTIFFS',
+    'WRITE_FULL_RES_MAPS',
     'PARALLEL_WRITE',
-    'OFF_LAND_COMMODITIES',
-    'GHG_LIMITS',
-    'BIODIV_GBF_TARGET_2_DICT',
+    # Switches and reversibliity for Non-Ag / Ag-Mamagement
     'AG_MANAGEMENTS',
     'AG_MANAGEMENTS_REVERSIBLE',
     'NON_AG_LAND_USES',
-    'NON_AG_LAND_USES_REVERSIBLE'
-
+    'NON_AG_LAND_USES_REVERSIBLE',
+    # Dicts to be evaluated from str to dict
+    'OFF_LAND_COMMODITIES',
+    'GHG_LIMITS',
+    'BIODIV_GBF_TARGET_2_DICT',
+    # Bools to be evaluated from str to bool
+    'AMORTISE_UPFRONT_COSTS',
 ]
 
 EXCLUDE_DIRS = ['input', 'output', '.git', '.vscode', '__pycache__', 'jinzhu_inspect_code']

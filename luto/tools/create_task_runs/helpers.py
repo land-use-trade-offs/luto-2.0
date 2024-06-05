@@ -1,10 +1,10 @@
 
-import itertools
+from math import e
 import os
-import random
 import re
 import shutil
-import keyword
+import random
+import itertools
 import multiprocessing
 import pandas as pd
 
@@ -22,6 +22,7 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
     # Save the settings template to the root task folder
     None if os.path.exists(to_path) else os.makedirs(to_path)
     
+    # # Write the requirements to the task folder
     # conda_pkgs, pip_pkgs = get_requirements()
     # with open(f'{to_path}/requirements_conda.txt', 'w') as conda_f, \
     #         open(f'{to_path}/requirements_pip.txt', 'w') as pip_f:
@@ -47,7 +48,7 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
             # Add the NODE parameters
             settings_dict['NODE'] = 'Please specify the node name'
             settings_dict['MEM'] = 'auto'
-            settings_dict['CPU_PER_TASK'] = 'auto'
+            settings_dict['CPU_PER_TASK'] = settings_dict['THREADS']
             settings_dict['TIME'] = 'auto'
             settings_dict['JOB_NAME'] = 'auto'
 
@@ -66,6 +67,12 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
      
     # Read the custom settings file
     custom_settings = pd.read_csv(from_path, index_col=0)
+    custom_settings = custom_settings.dropna(how='all', axis=1)
+    
+    # Change the column names to be valid python variable names
+    custom_settings.columns = [format_name(col) for col in custom_settings.columns]
+    
+    # Evaluate the parameters that need to be evaluated
     custom_settings = custom_settings.replace({'TRUE': 'True', 'FALSE': 'False'})
     custom_settings.loc[PARAMS_TO_EVAL] = custom_settings.loc[PARAMS_TO_EVAL].map(eval)
 
@@ -95,7 +102,6 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
 def create_grid_search_template(num_runs:int = 10):
     # Gird parameters for {AG_MANAGEMENTS} and {AG_MANAGEMENTS_REVERSIBLE}
     grid_am = {k:[True, False ] for k in settings.AG_MANAGEMENTS}
-
 
     # Grid parameters for {NON_AG_LAND_USES} and {NON_AG_LAND_USES_REVERSIBLE}
     grid_non_ag = {k:[True, False] for k in settings.NON_AG_LAND_USES}
@@ -146,24 +152,8 @@ def is_float(s):
         return False
  
  
- 
-def is_valid_variable_name(name):
-    if name in keyword.kwlist:
-        print(f"{name} is a keyword")
-        return False
-    if not name:  # Check if the name is not empty
-        print("Column name is empty")
-        return False
-    if not name[0].isalpha() and name[0] != '_':  # Must start with a letter or underscore
-        print(f"{name} must start with a letter or underscore")
-        return False
-    if all((char.isalnum() or char == '_') for char in name):
-        return True
-    print(f"{name} must contain only letters, numbers, or underscores")
-    return False
-
-
-
+def format_name(name):
+    return re.sub(r'\W+', '_', name.strip())
 
 
 def copy_folder_custom(source, destination, ignore_dirs=None):
@@ -234,30 +224,27 @@ def write_custom_settings(task_dir:str, settings_dict:dict):
 def update_settings(settings_dict:dict, n_tasks:int, col:str):
     
     if settings_dict['NODE'] == 'Please specify the node name':
-        raise ValueError('NODE must be specified!')
+        if os.name == 'nt':         
+            # If the os is windows, do nothing
+            print('This will only create task folders, and not submit job to run!')
+        elif os.name == 'posix':    
+            # If the os is linux, submit the job
+            raise ValueError('NODE must be specified!')
 
     # The input dir for each task will point to the absolute path of the input dir
     settings_dict['INPUT_DIR'] = os.path.abspath(settings_dict['INPUT_DIR']).replace('\\','/')
     settings_dict['DATA_DIR'] = settings_dict['INPUT_DIR']
-
-    # The THREADS setting will be set to the number of CPU cores divided by the number of tasks
-    CPU_COUNT = multiprocessing.cpu_count()
-    CPU_PER_TASK = CPU_COUNT // n_tasks - 2
-    CPU_PER_TASK = max(CPU_PER_TASK, 1)
-    CPU_PER_TASK = min(CPU_PER_TASK, int(settings_dict['THREADS']))
-    
-    settings_dict['THREADS'] = CPU_PER_TASK 
-    settings_dict['WRITE_THREADS'] = CPU_PER_TASK
+    settings_dict['WRITE_THREADS'] = 10 # 10 threads for writing is a safe number to avoid out-of-memory issues
     
 
     # Set the memory and time based on the resolution factor
     if int(settings_dict['RESFACTOR']) == 1:
-        MEM = "200G"
+        MEM = "250G"
         TIME = "30-0:00:00"
     elif int(settings_dict['RESFACTOR']) == 2:
         MEM = "150G" 
         TIME = "10-0:00:00"
-    elif int(settings_dict['RESFACTOR']) == 3:
+    elif int(settings_dict['RESFACTOR']) <= 5:
         MEM = "100G"
         TIME = "5-0:00:00"
     else:
@@ -267,14 +254,12 @@ def update_settings(settings_dict:dict, n_tasks:int, col:str):
     # If the MEM and TIME are not set to auto, set them to the custom values
     MEM = settings_dict['MEM'] if settings_dict['MEM'] != 'auto' else MEM
     TIME = settings_dict['TIME'] if settings_dict['TIME'] != 'auto' else TIME
-    CPU_PER_TASK = settings_dict['CPU_PER_TASK'] if settings_dict['CPU_PER_TASK'] != 'auto' else CPU_PER_TASK
     JOB_NAME = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
    
     # Update the settings dictionary
     settings_dict['MEM'] = MEM
     settings_dict['TIME'] = TIME
     settings_dict['JOB_NAME'] = JOB_NAME
-    settings_dict['CPU_PER_TASK'] = CPU_PER_TASK
     
     return settings_dict
 
@@ -283,9 +268,10 @@ def update_settings(settings_dict:dict, n_tasks:int, col:str):
 
 
 def check_settings_name(settings:dict, col:str):
-    # Check if the column name is valid
-    if not is_valid_variable_name(col):  
-        raise ValueError(f'"{col}" is not a valid column name!')
+    
+    # If the column name is not in the settings, do nothing
+    if 'Default_run' not in settings.columns:
+        return
     
     # Report the changed settings
     changed_params = 0

@@ -1013,13 +1013,14 @@ def write_biodiversity(data: Data, yr_cal, path):
     and output path ('path').
     """
 
-    if not settings.BIODIVERSITY_LIMITS == 'on':
+    # Do nothing if biodiversity limits are off and no need to report
+    if not settings.BIODIVERSITY_LIMITS == 'on' and not settings.BIODIVERSITY_REPORT:
         return
-
+    
+    # Check biodiversity limits and report
+    biodiv_limit = ag_biodiversity.get_biodiversity_limits(data, yr_cal) if settings.BIODIVERSITY_LIMITS == 'on' else 0
+           
     print(f'Writing biodiversity outputs for {yr_cal}')
-
-    # Get limits used as constraints in model
-    biodiv_limit = ag_biodiversity.get_biodiversity_limits(data, yr_cal)
 
     # Get biodiversity score from model
     if yr_cal >= data.YR_CAL_BASE + 1:
@@ -1044,7 +1045,8 @@ def write_biodiversity(data: Data, yr_cal, path):
     
 def write_biodiversity_separate(data: Data, yr_cal, path):
 
-    if not settings.BIODIVERSITY_LIMITS == 'on':
+    # Do nothing if biodiversity limits are off and no need to report
+    if not settings.BIODIVERSITY_LIMITS == 'on' and not settings.BIODIVERSITY_REPORT:
         return
     
     print(f'Writing biodiversity_separate outputs for {yr_cal}')
