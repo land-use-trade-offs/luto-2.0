@@ -74,26 +74,34 @@ def get_coarse2D_map(data, map_:np.ndarray, filler:int, nodata:int)-> np.ndarray
         The generated coarse 2D map.
 
     """
-    # Get the dimensions of the full-res 2D map and the coarse 2D map.
-    dense_2d_height, dense_2d_width = data.NLUM_MASK.shape
-    coarse_2d_height = dense_2d_height // settings.RESFACTOR if (dense_2d_height % settings.RESFACTOR == 0) else dense_2d_height // settings.RESFACTOR + 1
-    coarse_2d_width = dense_2d_width // settings.RESFACTOR if (dense_2d_width % settings.RESFACTOR == 0) else dense_2d_width // settings.RESFACTOR + 1
+    # # Get the dimensions of the full-res 2D map and the coarse 2D map.
+    # dense_2d_height, dense_2d_width = data.NLUM_MASK.shape
+    # coarse_2d_height = dense_2d_height // settings.RESFACTOR if (dense_2d_height % settings.RESFACTOR == 0) else dense_2d_height // settings.RESFACTOR + 1
+    # coarse_2d_width = dense_2d_width // settings.RESFACTOR if (dense_2d_width % settings.RESFACTOR == 0) else dense_2d_width // settings.RESFACTOR + 1
 
-    # Create the coarse 2D map.
-    coarse_2d_map = np.zeros((coarse_2d_height,coarse_2d_width)) + filler
-    coarse_2d_map[data.MASK_2D_COORD_SPARSE[0], data.MASK_2D_COORD_SPARSE[1]] = map_
+    # # Create the coarse 2D map.
+    # coarse_2d_map = np.zeros((coarse_2d_height,coarse_2d_width)) + filler
+    # coarse_2d_map[data.MASK_2D_COORD_SPARSE[0], data.MASK_2D_COORD_SPARSE[1]] = map_
 
-    # Pad the NLUM_MASK to the right/bottom so that it is divisible by the RESFACTOR.
-    nlum_mask_pad = data.NLUM_MASK.copy()
-    reminder_right = settings.RESFACTOR - (dense_2d_width % settings.RESFACTOR)         # How many cols to be paded in the right 
-    reminder_bottom = settings.RESFACTOR - (dense_2d_height % settings.RESFACTOR)       # How many rows to be paded in the bottom 
-    nlum_mask_pad = np.pad(nlum_mask_pad, ((0, reminder_bottom), (0, reminder_right)), mode='edge')
+    # # Pad the NLUM_MASK to the right/bottom so that it is divisible by the RESFACTOR.
+    # nlum_mask_pad = data.NLUM_MASK.copy()
+    # reminder_right = settings.RESFACTOR - (dense_2d_width % settings.RESFACTOR)         # How many cols to be paded in the right 
+    # reminder_bottom = settings.RESFACTOR - (dense_2d_height % settings.RESFACTOR)       # How many rows to be paded in the bottom 
+    # nlum_mask_pad = np.pad(nlum_mask_pad, ((0, reminder_bottom), (0, reminder_right)), mode='edge')
 
-    # Apply the padded NLUM_MASK to the coarse 2D map.
-    coarse_2d_NLUM_MASK = nlum_mask_pad[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR]
-    coarse_2d_map = np.where(coarse_2d_NLUM_MASK, coarse_2d_map, nodata)
+    # # Apply the padded NLUM_MASK to the coarse 2D map.
+    # coarse_2d_NLUM_MASK = nlum_mask_pad[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR]
+    # coarse_2d_map = np.where(coarse_2d_NLUM_MASK, coarse_2d_map, nodata)
     
-    return coarse_2d_map
+    # return coarse_2d_map
+
+    
+    # Fill the 1D map to the 2D map_resfactored.
+    map_resfactored = data.LUMAP_2D_RESFACTORED.copy().astype(np.float32)
+    np.place(map_resfactored, map_resfactored >=0, map_)    
+
+    return map_resfactored
+    
 
 
 
