@@ -96,7 +96,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 9 x 9 cell block
-RESFACTOR = 3         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
+RESFACTOR = 5         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
 MODE = 'snapshot'   # Runs for target year only
@@ -326,7 +326,7 @@ GHG_LIMITS = {
              }
 
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'    
+GHG_LIMITS_FIELD = '1.8C (67%) excl. avoided emis'    
 
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
 SOC_AMORTISATION = 15    
@@ -370,6 +370,7 @@ LDS_BIODIVERSITY_VALUE = 0.8  # For example, 0.8 means that all areas in the are
 BIODIVERSITY_LIMITS = 'off'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
 BIODIVERSITY_REPORT = True             # True or False, report biodiversity regardless of BIODIVERSITY_LIMITS setting.
 
+
 """ Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
     Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
 """
@@ -377,8 +378,8 @@ BIODIVERSITY_REPORT = True             # True or False, report biodiversity rega
 BIODIV_GBF_TARGET_2_DICT = {                     
               2010: 0,    # Proportion of degraded land restored in year 2010
               2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
-              2050: 0.5,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
-              2100: 0.5   # Stays at 2050 level
+              2050: 0.3,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
+              2100: 0.3   # Stays at 2050 level
              }            # (can add more years/targets)\
 
     
