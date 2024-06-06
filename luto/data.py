@@ -157,7 +157,6 @@ class Data:
 
         # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap (True means included cells. Boolean dtype.)
         self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                # 1D,  `True` for land uses; `False` for desert, urban, water, etc
-        # self.LUMASK_2D = (self.LUMAP_2D != self.MASK_LU_CODE) & (self.LUMAP_2D != self.NODATA)    # 2D,  `True` for land uses; `False` for desert, urban, water, etc  
 
         # Return combined land-use and resfactor mask
         if settings.RESFACTOR > 1:
@@ -170,19 +169,9 @@ class Data:
 
             # Superimpose resfactor mask upon land-use map mask (Boolean).
             self.MASK = self.LUMASK * resmask
-            
-            
+
             # Get the resfactor applied 2D lumap
             self.LUMAP_2D_RESFACTORED = self.LUMAP_2D[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR]
-            
-            # Get the resfactor applied 2D arrays
-            # self.LUMASK_2D_RESFACTORED = self.LUMASK_2D[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR]
-            
-            # # Below are the coordinates ((row, ...), (col, ...)) for each valid cell in the original 2D array
-            # self.MASK_2D_COORD_DENSE = nonzeroes[0], nonzeroes[1]
-            
-            # # Below is the coordinates ((row, ....), (col, ...)) for each valid cell in the coarse-grained 2D array
-            # self.MASK_2D_COORD_SPARSE = nonzeroes[0][self.MASK]//settings.RESFACTOR, nonzeroes[1][self.MASK]//settings.RESFACTOR
             
         elif settings.RESFACTOR == 1:
             self.MASK = self.LUMASK
