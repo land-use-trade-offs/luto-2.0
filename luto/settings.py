@@ -342,7 +342,6 @@ WATER_LIMITS_TYPE = 'water_stress'    # 'water_stress' or 'pct_ag'
 WATER_USE_REDUCTION_PERCENTAGE = 0  
 
 # If WATER_LIMITS_TYPE = 'water_stress'...                                           
-# (0.25 follows Aqueduct classification of 0.4 but leaving 0.15 for urban/industrial/indigenous use).
 # Safe and just Earth system boundaries says 0.2 inclusive of domestic/industrial https://www.nature.com/articles/s41586-023-06083-8  
 WATER_STRESS_FRACTION = 0.2          
 
