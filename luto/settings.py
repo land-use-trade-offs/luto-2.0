@@ -366,7 +366,7 @@ BIODIV_LIVESTOCK_IMPACT = 0.3
 LDS_BIODIVERSITY_VALUE = 0.8  # For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value.
 
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
-BIODIVERSITY_LIMITS = 'off'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
+BIODIVERSITY_LIMITS = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
 BIODIVERSITY_REPORT = True             # True or False, report biodiversity regardless of BIODIVERSITY_LIMITS setting.
 
 
