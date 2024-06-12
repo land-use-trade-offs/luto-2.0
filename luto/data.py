@@ -147,16 +147,20 @@ class Data:
         self.MASK_LU_CODE = -1
 
         # Load LUMAP without resfactor
-        self.LUMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lumap.h5")).to_numpy()
+        self.LUMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lumap.h5")).to_numpy()                   # 1D (ij flattend),  0-27 for land uses; -1 for non-agricultural land uses; All cells in Australia (land only)
 
         # NLUM mask.
         with rasterio.open(os.path.join(INPUT_DIR, "NLUM_2010-11_mask.tif")) as rst:
-            self.NLUM_MASK = rst.read(1).astype(np.int8)                                # 2D,  0 for ocean, 1 for land
-            self.LUMAP_2D = np.full_like(self.NLUM_MASK, self.NODATA, dtype=np.int16)   # 2D,  full of nodata
-            np.place(self.LUMAP_2D, self.NLUM_MASK == 1, self.LUMAP_NO_RESFACTOR)       # 2D,  -9999 for ocean; -1 for desert, urban, water, etc; 0-27 for land uses
+            self.NLUM_MASK = rst.read(1).astype(np.int8)                                                        # 2D map,  0 for ocean, 1 for land
+            self.LUMAP_2D = np.full_like(self.NLUM_MASK, self.NODATA, dtype=np.int16)                           # 2D map,  full of nodata (-9999)
+            np.place(self.LUMAP_2D, self.NLUM_MASK == 1, self.LUMAP_NO_RESFACTOR)                               # 2D map,  -9999 for ocean; -1 for desert, urban, water, etc; 0-27 for land uses
+            self.GEO_TRANSFORM = rst.transform                                                                  # 1D,  affine transformation matrix
 
         # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap (True means included cells. Boolean dtype.)
-        self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                # 1D,  `True` for land uses; `False` for desert, urban, water, etc
+        self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                              # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
+        
+        # Get the lon/lat coordinates.
+        self.COORD_LON_LAT = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_TRANSFORM)                     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
 
         # Return combined land-use and resfactor mask
         if settings.RESFACTOR > 1:
@@ -170,8 +174,12 @@ class Data:
             # Superimpose resfactor mask upon land-use map mask (Boolean).
             self.MASK = self.LUMASK * resmask
 
-            # Get the resfactor applied 2D lumap
+            # Get the resfactored 2D lumap and x/y coordinates.
             self.LUMAP_2D_RESFACTORED = self.LUMAP_2D[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR]
+            
+            # Get the resfactored lon/lat coordinates.
+            self.COORD_LON_LAT = self.COORD_LON_LAT[0][self.MASK], self.COORD_LON_LAT[1][self.MASK]
+
             
         elif settings.RESFACTOR == 1:
             self.MASK = self.LUMASK
@@ -975,6 +983,23 @@ class Data:
         self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = self.get_array_resfactor_applied(self.BIODIV_SCORE_WEIGHTED_LDS_BURNING)
 
         print("Data loading complete\n")
+        
+    def get_coord(self, index_ij: np.ndarray, trans):
+        """
+        Calculate the coordinates [[lon,...],[lat,...]] based on 
+        the given index [[row,...],[col,...]] and transformation matrix.
+
+        Parameters:
+        index_ij (np.ndarray): A numpy array containing the row and column indices.
+        trans (affin): An instance of the Transformation class.
+        resfactor (int, optional): The resolution factor. Defaults to 1.
+
+        Returns:
+        tuple: A tuple containing the x and y coordinates.
+        """
+        coord_x = trans.c + trans.a * (index_ij[1] + 0.5)    # Move to the center of the cell
+        coord_y = trans.f + trans.e * (index_ij[0] + 0.5)    # Move to the center of the cell
+        return coord_x, coord_y
 
     def get_array_resfactor_applied(self, array: np.ndarray):
         """
