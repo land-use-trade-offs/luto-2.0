@@ -132,7 +132,7 @@ def replace_with_nearest(map_: np.ndarray, filler: int) -> np.ndarray:
 
 
 
-def write_gtiff(map_:np.ndarray, fname:str, nodata=-9999, data=Data):
+def write_gtiff(map_:np.ndarray, fname:str, nodata=-9999, data:Data=Data):
     """
     Write a GeoTiff file with the given map data.
 
