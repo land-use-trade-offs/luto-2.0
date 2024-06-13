@@ -22,6 +22,7 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
+from affine import Affine
 import numpy as np
 import pandas as pd
 import rasterio
@@ -154,13 +155,13 @@ class Data:
             self.NLUM_MASK = rst.read(1).astype(np.int8)                                                        # 2D map,  0 for ocean, 1 for land
             self.LUMAP_2D = np.full_like(self.NLUM_MASK, self.NODATA, dtype=np.int16)                           # 2D map,  full of nodata (-9999)
             np.place(self.LUMAP_2D, self.NLUM_MASK == 1, self.LUMAP_NO_RESFACTOR)                               # 2D map,  -9999 for ocean; -1 for desert, urban, water, etc; 0-27 for land uses
-            self.GEO_TRANSFORM = rst.transform                                                                  # 1D,  affine transformation matrix
+            self.GEO_META = rst.meta                                                                            # dict,  key-value pairs of geospatial metadata
 
         # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap (True means included cells. Boolean dtype.)
         self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                              # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
         
         # Get the lon/lat coordinates.
-        self.COORD_LON_LAT = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_TRANSFORM)                     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
+        self.COORD_LON_LAT = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META['transform'])             # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
 
         # Return combined land-use and resfactor mask
         if settings.RESFACTOR > 1:
@@ -179,6 +180,9 @@ class Data:
             
             # Get the resfactored lon/lat coordinates.
             self.COORD_LON_LAT = self.COORD_LON_LAT[0][self.MASK], self.COORD_LON_LAT[1][self.MASK]
+            
+            # Update the geospatial metadata.
+            self.GEO_META = self.update_geo_meta()
 
             
         elif settings.RESFACTOR == 1:
@@ -1000,6 +1004,27 @@ class Data:
         coord_x = trans.c + trans.a * (index_ij[1] + 0.5)    # Move to the center of the cell
         coord_y = trans.f + trans.e * (index_ij[0] + 0.5)    # Move to the center of the cell
         return coord_x, coord_y
+    
+    
+    def update_geo_meta(self):
+        """
+        Update the geographic metadata based on the current settings.
+        
+        Note: When this function is called, the RESFACTOR is assumend to be > 1, 
+        because there is no need to update the metadata if the RESFACTOR is 1.
+
+        Returns:
+            dict: The updated geographic metadata.
+        """
+        meta = self.GEO_META.copy()
+        height, width = (self.GEO_META['height'], self.GEO_META['width'])  if settings.WRITE_FULL_RES_MAPS else self.LUMAP_2D_RESFACTORED.shape
+        trans = list(self.GEO_META['transform'])
+        trans[0] = trans[0] if settings.WRITE_FULL_RES_MAPS else trans[0] * settings.RESFACTOR    # Adjust the X resolution
+        trans[4] = trans[4] if settings.WRITE_FULL_RES_MAPS else trans[4] * settings.RESFACTOR    # Adjust the Y resolution
+        trans = Affine(*trans)
+        meta.update(width=width, height=height, compress='lzw', driver='GTiff', transform=trans, nodata=self.NODATA, dtype='float32')
+        
+        return meta
 
     def get_array_resfactor_applied(self, array: np.ndarray):
         """

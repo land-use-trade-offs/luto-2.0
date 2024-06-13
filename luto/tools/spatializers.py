@@ -132,7 +132,7 @@ def replace_with_nearest(map_: np.ndarray, filler: int) -> np.ndarray:
 
 
 
-def write_gtiff(map_:np.ndarray, fname:str, nodata=-9999):
+def write_gtiff(map_:np.ndarray, fname:str, nodata=-9999, data=Data):
     """
     Write a GeoTiff file with the given map data.
 
@@ -140,26 +140,14 @@ def write_gtiff(map_:np.ndarray, fname:str, nodata=-9999):
     map_ (np.ndarray, 2D): The map data to be written as a GeoTiff.
     fname (str): The file name (including path) of the output GeoTiff file.
     nodata (int, optional): The nodata value to be used in the GeoTiff file. Default is -9999.
+    data (Data): The data object containing the GeoTiff metadata. Default is Data.
 
     Returns:
     None
     """
-
-    # Open the file, distill the NLUM study area mask and get the meta data.
-    fpath_src = os.path.join(settings.INPUT_DIR, 'NLUM_2010-11_mask.tif')
-
-    # Get the meta data from the source file.
-    with rasterio.open(fpath_src) as src:
-        meta = src.meta.copy()
-        height, width = map_.shape
-        trans = list(src.transform)
-        trans[0] = trans[0] if settings.WRITE_FULL_RES_MAPS else trans[0] * settings.RESFACTOR    # Adjust the X resolution
-        trans[4] = trans[4] if settings.WRITE_FULL_RES_MAPS else trans[4] * settings.RESFACTOR    # Adjust the Y resolution
-        trans = Affine(*trans)
-        meta.update(width=width, height=height, compress='lzw', driver='GTiff', transform=trans, nodata=nodata, dtype='float32')
     
     # Write the GeoTiff.
-    with rasterio.open(fname, 'w+', **meta) as dst:
+    with rasterio.open(fname, 'w+', **data.GEO_META) as dst:
         dst.write_band(1, map_)
 
 
