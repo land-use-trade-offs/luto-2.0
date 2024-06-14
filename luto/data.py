@@ -840,6 +840,9 @@ class Data:
 
         # Get the GHG constraints for luto, shape is (91, 1)
         self.OFF_LAND_GHG_EMISSION_C = self.OFF_LAND_GHG_EMISSION.groupby(['YEAR']).sum(numeric_only=True).values
+        
+        # Read the carbon price per tonne over the years (indexed by the relevant year)
+        self.CARBON_PRICES: dict[int, float] = pd.read_excel(os.path.join(INPUT_DIR, 'carbon_prices.xlsx'), index_col='Year')["Carbon_price_$_tCO2e"].to_dict()
 
 
         ###############################################################
@@ -1181,3 +1184,22 @@ class Data:
         total_q_c = [ag_q_c[c] + non_ag_q_c[c] + ag_man_q_c[c]
                     for c in range(self.NCMS)]
         return np.array(total_q_c)
+
+    def get_carbon_price_by_yr_idx(self, yr_idx: int) -> float:
+        """
+        Return the price of carbon per tonne for a given year index (since 2010). 
+        The resulting year should be between 2010 - 2100
+        """
+        yr_cal = yr_idx + self.YR_CAL_BASE
+        return self.get_carbon_price_by_year(yr_cal)
+    
+    def get_carbon_price_by_year(self, yr_cal: int) -> float:
+        """
+        Return the price of carbon per tonne for a given year. 
+        The resulting year should be between 2010 - 2100
+        """
+        if yr_cal < 2010 or yr_cal > 2100:
+            raise ValueError(f"Year must be between 2010 and 2100, was {yr_cal}")
+        if yr_cal not in self.CARBON_PRICES:
+            raise ValueError(f"Carbon price data not given for the given year: {yr_cal}")
+        return self.CARBON_PRICES[yr_cal]

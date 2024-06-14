@@ -273,7 +273,7 @@ def get_ecological_grazing_effect_r_mrj(data: Data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_savanna_burning_effect_r_mrj(data):
+def get_savanna_burning_effect_r_mrj(data: Data, yr_idx: int):
     """
     Applies the effects of using EDS savanna burning to the revenue data
     for all relevant agr. land uses.
@@ -281,10 +281,10 @@ def get_savanna_burning_effect_r_mrj(data):
     Since EDSSB has no effect on revenue, return an array of zeros.
     """
     ghg_effect = get_savanna_burning_effect_g_mrj(data)
-    return ghg_effect * settings.CARBON_PRICE_PER_TONNE
+    return ghg_effect * data.get_carbon_price_by_yr_idx(yr_idx)
 
 
-def get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx):
+def get_agtech_ei_effect_r_mrj(data: Data, r_mrj, yr_idx):
     """
     Applies the effects of using AgTech EI to the revenue data
     for all relevant agr. land uses.
@@ -326,7 +326,7 @@ def get_agricultural_management_revenue_matrices(data: Data, r_mrj, yr_idx) -> D
     asparagopsis_data = get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['Asparagopsis taxiformis'] else 0
     precision_agriculture_data = get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['Precision Agriculture'] else 0
     eco_grazing_data = get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['Ecological Grazing'] else 0
-    sav_burning_data = get_savanna_burning_effect_r_mrj(data) if AG_MANAGEMENTS['Savanna Burning'] else 0
+    sav_burning_data = get_savanna_burning_effect_r_mrj(data, yr_idx) if AG_MANAGEMENTS['Savanna Burning'] else 0
     agtech_ei_data = get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['AgTech EI'] else 0
 
     return {
