@@ -46,10 +46,16 @@ def get_rev_crop( data: Data   # Data object.
         rev_t = np.zeros((data.NCELLS))
         
     else:
+        rev_multiplier = 1
+        if lu in data.ag_price_multipliers.columns:
+            rev_multiplier = data.ag_price_multipliers.loc[data.YR_CAL_BASE + yr_idx, lu]
+        else:
+            print(f'\tPrice multiplier for {lu} not found in ag_price_multipliers. Defaulting to 1...', flush=True)
+            
         # Revenue in $ per cell (includes REAL_AREA via get_quantity)
         rev_t = ( data.AGEC_CROPS['P1', lm, lu]
                 * get_quantity( data, lu.upper(), lm, yr_idx )  # lu.upper() only for crops as needs to be in product format in get_quantity().
-                * data.ag_price_multipliers.loc[data.YR_CAL_BASE + yr_idx, lu]
+                * rev_multiplier
                 ).values
     
     # Return revenue as MultiIndexed DataFrame.
