@@ -20,7 +20,7 @@ def get_wreq_matrix_env_planting(data: Data) -> np.ndarray:
     -------
     1-D array, indexed by cell.
     """
-    return (data.WATER_YIELD_BASE_SR - data.WATER_YIELD_BASE) * data.REAL_AREA
+    return (data.WATER_YIELD_HIST_SR - data.WATER_YIELD_BASE) * data.REAL_AREA
 
 
 def get_wreq_matrix_carbon_plantings_block(data) -> np.ndarray:
@@ -30,7 +30,7 @@ def get_wreq_matrix_carbon_plantings_block(data) -> np.ndarray:
     To get the water requirements of carbon plantings, subtract the deep-rooted 
     water yields from the shallow-rooted water yields in the data. This represents
     how much water would be used if modified (i.e., cleared) land area was reforested
-    with wall-to-wall deep-rooted tree species (WATER_YIELD_BASE_DR). The assumption 
+    with wall-to-wall deep-rooted tree species (WATER_YIELD_HIST_DR). The assumption 
     here is that plantations are all deep-rooted and hence use more water.
     
     Returns
@@ -38,7 +38,7 @@ def get_wreq_matrix_carbon_plantings_block(data) -> np.ndarray:
     1-D array, indexed by cell.
     """
     # return get_wreq_matrix_env_planting(data)
-    return (data.WATER_YIELD_BASE_SR - data.WATER_YIELD_BASE_DR) * data.REAL_AREA
+    return (data.WATER_YIELD_HIST_SR - data.WATER_YIELD_HIST_DR) * data.REAL_AREA
 
 
 def get_wreq_matrix_rip_planting(data: Data) -> np.ndarray:

@@ -40,7 +40,9 @@ def get_wreq_matrices(data: Data, yr_idx):
         numpy.ndarray: The w_mrj <unit: ML/cell> water requirement matrices .
     """
     
-    # Stack water requirements data
+    # Stack water requirements data    ************ Fix water - needs to be framed in terms of net water yield instead of use
+    # Water targets need to be framed as a minimum net water yield (i.e., >= 80% of historical catchment yields)
+    # Yield for each cell = water yield under climate change minus use
     w_mrj = np.stack(( data.WREQ_DRY_RJ, data.WREQ_IRR_RJ ))    # <unit: ML/head|ha>
     
     # Covert water requirements units from ML/head to ML/ha
