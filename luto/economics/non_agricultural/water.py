@@ -12,7 +12,7 @@ def get_wreq_matrix_env_planting(data: Data) -> np.ndarray:
     To get the water requirements of environmental plantings, subtract the baseline 
     water yields from the shallow-rooted water yields in the data. This represents
     how much water would be used if modified (i.e., cleared) land area was reforested
-    with native pre-European vegetation communities (WATER_YIELD_BASE). Pre-European 
+    with native pre-European vegetation communities (WATER_YIELD_HIST_NL). Pre-European 
     communities include both deep-rooted (i.e., forests/woodlands) and shallow-rooted 
     communities - natural vegetation is not all deep-rooted.
 
@@ -20,7 +20,7 @@ def get_wreq_matrix_env_planting(data: Data) -> np.ndarray:
     -------
     1-D array, indexed by cell.
     """
-    return (data.WATER_YIELD_HIST_SR - data.WATER_YIELD_BASE) * data.REAL_AREA
+    return (data.WATER_YIELD_HIST_SR - data.WATER_YIELD_HIST_NL) * data.REAL_AREA
 
 
 def get_wreq_matrix_carbon_plantings_block(data) -> np.ndarray:
