@@ -1198,8 +1198,9 @@ class Data:
         Return the price of carbon per tonne for a given year. 
         The resulting year should be between 2010 - 2100
         """
-        if yr_cal < 2010 or yr_cal > 2100:
-            raise ValueError(f"Year must be between 2010 and 2100, was {yr_cal}")
         if yr_cal not in self.CARBON_PRICES:
-            raise ValueError(f"Carbon price data not given for the given year: {yr_cal}")
+            raise ValueError(
+                f"Carbon price data not given for the given year: {yr_cal}. "
+                f"Year should be between {self.YR_CAL_BASE} and 2100."
+            )
         return self.CARBON_PRICES[yr_cal]
