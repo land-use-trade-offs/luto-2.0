@@ -96,7 +96,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 9 x 9 cell block
-RESFACTOR = 5         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
+RESFACTOR = 10         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
 MODE = 'snapshot'   # Runs for target year only
@@ -196,7 +196,7 @@ NON_AG_LAND_USES_REVERSIBLE = {
 }
 
 # Cost of fencing per linear metre
-FENCING_COST_PER_M = 0
+FENCING_COST_PER_M = 5
 
 # Environmental Plantings Parameters
 ep_annual_maintennance_cost_per_ha_per_year = 100

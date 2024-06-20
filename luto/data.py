@@ -740,17 +740,23 @@ class Data:
         self.DRAINDIV_LIMITS = dict(
             zip(dd.HR_DRAINDIV_ID, dd.WATER_YIELD_HIST_BASELINE_ML)
         )  # Drainage div ID and water use limits
-
-        # Water yields -- run off from a cell into catchment by deep-rooted, shallow-rooted, and natural vegetation types
-        water_yield_base = pd.read_hdf(os.path.join(INPUT_DIR, "water_yield_baselines.h5"))
-        self.WATER_YIELD_BASE_DR = self.get_array_resfactor_applied(
-            water_yield_base['WATER_YIELD_HIST_DR_ML_HA'].to_numpy(dtype = np.float32)
+        
+                
+        # Water yields -- run off from a cell into catchment by deep-rooted, shallow-rooted, and natural land
+        water_yield_baselines = pd.read_hdf(os.path.join(INPUT_DIR, "water_yield_baselines.h5"))
+        self.WATER_YIELD_HIST_DR = self.get_array_resfactor_applied(
+            water_yield_baselines['WATER_YIELD_HIST_DR_ML_HA'].to_numpy(dtype = np.float32)
         )
-        self.WATER_YIELD_BASE_SR = self.get_array_resfactor_applied(
-            water_yield_base["WATER_YIELD_HIST_SR_ML_HA"].to_numpy(dtype = np.float32)
+        self.WATER_YIELD_HIST_SR = self.get_array_resfactor_applied(
+            water_yield_baselines["WATER_YIELD_HIST_SR_ML_HA"].to_numpy(dtype = np.float32)
         )
-        self.WATER_YIELD_BASE = self.get_array_resfactor_applied(
-            water_yield_base["WATER_YIELD_HIST_BASELINE_ML_HA"].to_numpy(dtype = np.float32)
+        # self.WATER_YIELD_BASE = self.get_array_resfactor_applied(
+        #     water_yield_baselines["WATER_YIELD_HIST_BASELINE_ML_HA"].to_numpy(dtype = np.float32)
+        # )
+        self.WATER_YIELD_HIST_NL = self.get_array_resfactor_applied(
+            water_yield_baselines.eval('WATER_YIELD_HIST_DR_ML_HA * DEEP_ROOTED_PROPORTION + \
+                                        WATER_YIELD_HIST_SR_ML_HA * (1 - DEEP_ROOTED_PROPORTION)'
+                                      ).to_numpy(dtype = np.float32)
         )
 
         # fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_dr_ml_ha.h5')
