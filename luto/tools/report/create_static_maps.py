@@ -86,7 +86,7 @@ def create_maps(row, model_run_scenario):
                      color_desc_dict)
     
     
-    return f'{map_fullname} of year {year} has created.'
+    return f'{map_fullname} of year {year} has been created.'
     
     
 
