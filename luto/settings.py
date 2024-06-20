@@ -372,7 +372,8 @@ BIODIVERSITY_REPORT = True             # True or False, report biodiversity rega
 
 
 """ Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-    Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
+    Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
+    in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
 """
 # Set biodiversity targets in dictionary below (i.e., year: proportion of degraded land restored)
 BIODIV_GBF_TARGET_2_DICT = {                     

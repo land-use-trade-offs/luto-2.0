@@ -910,7 +910,8 @@ class Data:
         print("\tLoading biodiversity data...", flush=True)
         """
         Kunming-Montreal Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-        Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
+        Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, 
+        in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
         """
         # Load biodiversity data
         biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5') )
@@ -929,10 +930,12 @@ class Data:
         self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = biodiv_score_raw * np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)
 
         # Calculate the quality-weighted sum of biodiv raw score over the study area. 
-        # Quality weighting includes connectivity score, land-use (i.e., livestock impacts), and land management (LDS burning impacts in area eligible for savanna burning). Note BIODIV_SCORE_RAW = BIODIV_SCORE_WEIGHTED on natural land
-        biodiv_value_current = ( np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED_LDS_BURNING -   # Biodiversity value of Unallocated - natural land and livestock on natural land considering LDS burning impacts
-                                 np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15]) * self.BIODIV_SCORE_WEIGHTED * settings.BIODIV_LIVESTOCK_IMPACT     # Biodiversity impact of livestock on natural land 
-                               ) * self.REAL_AREA_NO_RESFACTOR                                                             # Modified land assumed to have zero biodiversity value  
+        # Quality weighting includes connectivity score, land-use (i.e., livestock impacts), 
+        # and land management (LDS burning impacts in area eligible for savanna burning). 
+        # Note BIODIV_SCORE_RAW = BIODIV_SCORE_WEIGHTED on natural land
+        biodiv_value_current = ( np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED_LDS_BURNING -                     # Biodiversity value of Unallocated - natural land and livestock on natural land considering LDS burning impacts
+                                 np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15]) * self.BIODIV_SCORE_WEIGHTED * settings.BIODIV_LIVESTOCK_IMPACT    # Biodiversity impact of livestock on natural land 
+                               ) * self.REAL_AREA_NO_RESFACTOR                                                                                   # Modified land assumed to have zero biodiversity value  
         
         # Calculate the sum of biodiversity score lost to land degradation (i.e., raw score minus current score with current score on cropland being zero)
         biodiv_value_degraded_land = ( ( np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED * self.REAL_AREA_NO_RESFACTOR - biodiv_value_current ) +   # On natural land calculate the difference between the raw biodiversity score and the current score
