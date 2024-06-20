@@ -199,7 +199,7 @@ NON_AG_LAND_USES_REVERSIBLE = {
 CARBON_PRICE_PER_TONNE = 100
 
 # Cost of fencing per linear metre
-FENCING_COST_PER_M = 0
+FENCING_COST_PER_M = 5
 
 # Environmental Plantings Parameters
 ep_annual_maintennance_cost_per_ha_per_year = 100
@@ -342,7 +342,6 @@ WATER_LIMITS_TYPE = 'water_stress'    # 'water_stress' or 'pct_ag'
 WATER_USE_REDUCTION_PERCENTAGE = 0  
 
 # If WATER_LIMITS_TYPE = 'water_stress'...                                           
-# (0.25 follows Aqueduct classification of 0.4 but leaving 0.15 for urban/industrial/indigenous use).
 # Safe and just Earth system boundaries says 0.2 inclusive of domestic/industrial https://www.nature.com/articles/s41586-023-06083-8  
 WATER_STRESS_FRACTION = 0.2          
 
@@ -367,7 +366,7 @@ BIODIV_LIVESTOCK_IMPACT = 0.3
 LDS_BIODIVERSITY_VALUE = 0.8  # For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value.
 
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
-BIODIVERSITY_LIMITS = 'off'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
+BIODIVERSITY_LIMITS = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
 BIODIVERSITY_REPORT = True             # True or False, report biodiversity regardless of BIODIVERSITY_LIMITS setting.
 
 
