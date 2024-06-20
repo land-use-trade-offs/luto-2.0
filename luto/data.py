@@ -842,7 +842,20 @@ class Data:
         self.OFF_LAND_GHG_EMISSION_C = self.OFF_LAND_GHG_EMISSION.groupby(['YEAR']).sum(numeric_only=True).values
         
         # Read the carbon price per tonne over the years (indexed by the relevant year)
-        self.CARBON_PRICES: dict[int, float] = pd.read_excel(os.path.join(INPUT_DIR, 'carbon_prices.xlsx'), index_col='Year')["Carbon_price_$_tCO2e"].to_dict()
+        carbon_price_sheet = settings.CARBON_PRICES_FIELD or "Default"
+        carbon_price_usecols = "A,B"
+        carbon_price_col_names = ["Year", "Carbon_price_$_tCO2e"]
+        carbon_price_sheet_index_col = "Year" if carbon_price_sheet is not "Default" else 0
+        carbon_price_sheet_header = 0 if carbon_price_sheet is not "Default" else None        
+
+        self.CARBON_PRICES: dict[int, float] = pd.read_excel(
+            os.path.join(INPUT_DIR, 'carbon_prices.xlsx'),
+            sheet_name=carbon_price_sheet,
+            usecols=carbon_price_usecols,
+            names=carbon_price_col_names,
+            header=carbon_price_sheet_header,
+            index_col=carbon_price_sheet_index_col,
+        )["Carbon_price_$_tCO2e"].to_dict()
 
 
         ###############################################################
