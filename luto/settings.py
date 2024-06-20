@@ -195,9 +195,6 @@ NON_AG_LAND_USES_REVERSIBLE = {
     'BECCS': False,
 }
 
-# Price of carbon per tonne - determines revenue from carbon sequestration (used when maximising revenue only)
-CARBON_PRICE_PER_TONNE = 100
-
 # Cost of fencing per linear metre
 FENCING_COST_PER_M = 0
 
@@ -333,7 +330,6 @@ SOC_AMORTISATION = 15
 
 
 # Water use limits and parameters *******************************
-
 WATER_USE_LIMITS = 'on'               # 'on' or 'off'
 WATER_LIMITS_TYPE = 'water_stress'    # 'water_stress' or 'pct_ag'
 

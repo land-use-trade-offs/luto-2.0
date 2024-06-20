@@ -101,7 +101,6 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
     """    
     lumap = lumaps[base_year]
     lmmap = lmmaps[base_year]
-
     # Return l_mrj (Boolean) for current land-use and land management
     l_mrj = lumap2ag_l_mrj(lumap, lmmap)
     l_mrj_not = np.logical_not(l_mrj)
@@ -150,7 +149,7 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
 
     # apply the cost of carbon released by transitioning modified land to natural land
     ghg_t_mrj = ag_ghg.get_ghg_transition_penalties(data, lumap)               # <unit: t/ha>      
-    ghg_t_mrj_cost = tools.amortise(ghg_t_mrj * settings.CARBON_PRICE_PER_TONNE)     
+    ghg_t_mrj_cost = tools.amortise(ghg_t_mrj * data.get_carbon_price_by_yr_idx(yr_idx))     
     ghg_t_mrj_cost = np.einsum('mrj,mrj,mrj->mrj', ghg_t_mrj_cost, x_mrj, l_mrj_not)
 
     # -------------------------------------------------------------- #
@@ -314,12 +313,12 @@ def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str,
     return ag_management_data
 
 
-def get_lower_bound_agricultural_management_matrices(data: Data, yr) -> Dict[str, dict]:
+def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> Dict[str, dict]:
     """
     Gets the lower bound for the agricultural land use of the current years optimisation.
     """
 
-    if yr == data.YR_CAL_BASE or yr not in data.non_ag_dvars:
+    if base_year == data.YR_CAL_BASE or base_year not in data.non_ag_dvars:
         return {
             am: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32) 
             for am in AG_MANAGEMENTS_TO_LAND_USES
@@ -327,7 +326,7 @@ def get_lower_bound_agricultural_management_matrices(data: Data, yr) -> Dict[str
     
     return {
         am: np.divide(
-            np.floor(data.ag_man_dvars[yr][am].astype(np.float32) * 10 ** settings.LB_ROUND_DECMIALS)
+            np.floor(data.ag_man_dvars[base_year][am].astype(np.float32) * 10 ** settings.LB_ROUND_DECMIALS)
             , 10 ** settings.LB_ROUND_DECMIALS
         )
         for am in AG_MANAGEMENTS_TO_LAND_USES

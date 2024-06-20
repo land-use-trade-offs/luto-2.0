@@ -510,7 +510,7 @@ def get_agroforestry_to_ag_base(data: Data, yr_idx, lumap, lmmap, separate) -> n
         return get_env_plantings_to_ag(data, yr_idx, lumap, lmmap)
 
 
-def get_sheep_to_ag_base(data: Data, yr_idx, lumap, separate=False) -> np.ndarray|dict:
+def get_sheep_to_ag_base(data: Data, yr_idx: int, lumap, separate=False) -> np.ndarray|dict:
     """
     Get sheep contribution to transition costs to agricultural land uses.
     Used for getting transition costs for Sheep Agroforestry and CP (Belt).
@@ -553,7 +553,7 @@ def get_sheep_to_ag_base(data: Data, yr_idx, lumap, separate=False) -> np.ndarra
 
     # Carbon costs
     ghg_t_mrj = ag_ghg.get_ghg_transition_penalties(data, all_sheep_lumap)               # <unit: t/ha>      
-    ghg_t_mrj_cost = tools.amortise(ghg_t_mrj * settings.CARBON_PRICE_PER_TONNE)     
+    ghg_t_mrj_cost = tools.amortise(ghg_t_mrj * data.get_carbon_price_by_yr_idx(yr_idx))     
     ghg_t_mrj_cost = np.einsum('mrj,mrj,mrj->mrj', ghg_t_mrj_cost, x_mrj, l_mrj_not)
 
     # Ensure transition costs are zero for all agricultural cells 
@@ -608,7 +608,7 @@ def get_beef_to_ag_base(data: Data, yr_idx, lumap, separate) -> np.ndarray|dict:
 
     # Carbon costs
     ghg_t_mrj = ag_ghg.get_ghg_transition_penalties(data, all_beef_lumap)               # <unit: t/ha>      
-    ghg_t_mrj_cost = tools.amortise(ghg_t_mrj * settings.CARBON_PRICE_PER_TONNE)     
+    ghg_t_mrj_cost = tools.amortise(ghg_t_mrj * data.get_carbon_price_by_yr_idx(yr_idx))     
     ghg_t_mrj_cost = np.einsum('mrj,mrj,mrj->mrj', ghg_t_mrj_cost, x_mrj, l_mrj_not)
 
     beef_af_cells = tools.get_beef_agroforestry_cells(lumap)
@@ -915,16 +915,13 @@ def get_to_ag_transition_matrix(data: Data, yr_idx, lumap, lmmap, separate=False
     return np.add.reduce(non_ag_to_agr_t_matrices)
 
 
-def get_non_ag_transition_matrix(data: Data, yr_idx, lumap, lmmap) -> np.ndarray:
+def get_non_ag_transition_matrix(data: Data) -> np.ndarray:
     """
     Get the matrix that contains transition costs for non-agricultural land uses. 
     There are no transition costs for non-agricultural land uses, therefore the matrix is filled with zeros.
     
     Parameters:
         data (object): The data object containing information about the model.
-        yr_idx (int): The index of the year for which to calculate the transition costs.
-        lumap (dict): A dictionary mapping land use codes to land use names.
-        lmmap (dict): A dictionary mapping land market codes to land market names.
     
     Returns:
         np.ndarray: The transition cost matrix, filled with zeros.
@@ -1186,7 +1183,7 @@ def get_exclude_matrices(data: Data, ag_x_mrj, lumap) -> np.ndarray:
     return np.concatenate(non_ag_x_matrices, axis=1).astype(np.float32)
 
 
-def get_lower_bound_non_agricultural_matrices(data: Data, yr) -> np.ndarray:
+def get_lower_bound_non_agricultural_matrices(data: Data, base_year) -> np.ndarray:
     """
     Get the non-agricultural lower bound matrix.
 
@@ -1195,10 +1192,10 @@ def get_lower_bound_non_agricultural_matrices(data: Data, yr) -> np.ndarray:
     2-D array, indexed by (r,k) where r is the cell and k is the non-agricultural land usage.
     """
 
-    if yr == data.YR_CAL_BASE or yr not in data.non_ag_dvars:
+    if base_year == data.YR_CAL_BASE or base_year not in data.non_ag_dvars:
         return np.zeros((data.NCELLS, len(NON_AG_LAND_USES)))
         
     return np.divide(
-        np.floor(data.non_ag_dvars[yr].astype(np.float32) * 10 ** settings.LB_ROUND_DECMIALS),
+        np.floor(data.non_ag_dvars[base_year].astype(np.float32) * 10 ** settings.LB_ROUND_DECMIALS),
         10 ** settings.LB_ROUND_DECMIALS,
     )
