@@ -363,7 +363,19 @@ CONNECTIVITY_WEIGHTING = 0.7
 BIODIV_LIVESTOCK_IMPACT = 0.3
 
 # Biodiversity value under default late dry season savanna fire regime
-LDS_BIODIVERSITY_VALUE = 0.8  # For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value.
+''' For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value 
+    (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value.'''
+LDS_BIODIVERSITY_VALUE = 0.8
+
+# Biodiversity impact of non-agricultural lands
+NON_AG_BIO_IMPACT = {
+    '1 Conservation and natural environments':0,
+    '2 Production from relatively natural environments':0.1,
+    '3 Production from dryland agriculture and plantations':0.1,
+    '4 Production from irrigated agriculture and plantations':0.1,
+    '5 Intensive uses':1, 
+    '6 Water':0, 
+    'No data':0}
 
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 BIODIVERSITY_LIMITS = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.

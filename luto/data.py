@@ -18,21 +18,22 @@
 import os
 import time
 import math
-
-from dataclasses import dataclass
-from typing import Any
-
-from affine import Affine
+import xarray as xr
 import numpy as np
 import pandas as pd
 import rasterio
-from scipy.interpolate import interp1d
 
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 import luto.settings as settings
-from luto.settings import INPUT_DIR, OUTPUT_DIR
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
+
+from dataclasses import dataclass
+from typing import Any
+from affine import Affine
+from scipy.interpolate import interp1d
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import INPUT_DIR, OUTPUT_DIR
+
 
 
 def dict2matrix(d, fromlist, tolist):
@@ -934,19 +935,36 @@ class Data:
         # Calculate biodiversity score adjusted for landscape connectivity. Note BIODIV_SCORE_WEIGHTED = biodiv_score_raw on natural land
         self.BIODIV_SCORE_WEIGHTED = biodiv_score_raw * conn_score
         self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = biodiv_score_raw * np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)
-
+        
+        # Calculate the total biodiversity value assuming all natural land is pristine
+        biodiv_value_pristine_natural_land = np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED * self.REAL_AREA_NO_RESFACTOR   
+        
         # Calculate the quality-weighted sum of biodiv raw score over the study area. 
         # Quality weighting includes connectivity score, land-use (i.e., livestock impacts), 
         # and land management (LDS burning impacts in area eligible for savanna burning). 
         # Note BIODIV_SCORE_RAW = BIODIV_SCORE_WEIGHTED on natural land
-        biodiv_value_current = ( np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED_LDS_BURNING -                     # Biodiversity value of Unallocated - natural land and livestock on natural land considering LDS burning impacts
-                                 np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15]) * self.BIODIV_SCORE_WEIGHTED * settings.BIODIV_LIVESTOCK_IMPACT    # Biodiversity impact of livestock on natural land 
-                               ) * self.REAL_AREA_NO_RESFACTOR                                                                                   # Modified land assumed to have zero biodiversity value  
+        biodiv_value_current_natural_land = ( 
+            np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED_LDS_BURNING -                     # Biodiversity value after LDS burning
+            np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15]) * self.BIODIV_SCORE_WEIGHTED * settings.BIODIV_LIVESTOCK_IMPACT    # Biodiversity value lost due to livestocking on natural land 
+        ) * self.REAL_AREA_NO_RESFACTOR                                                                                     
+        
+        
+        # Calculate the biodiversity score loss on non-agricultural land
+        non_ag_xr = xr.open_dataarray(f'{INPUT_DIR}/lumap_2d_all_lucc_5km_non_ag.nc', chunks='auto')                                # Load the `non-LUTO-zone` land use map
+        bio_map_area_ha = xr.open_dataarray(f'{INPUT_DIR}/bio_area_ha.nc', chunks='auto').reindex_like(non_ag_xr, method='nearest') # Load the biodiversity map's area in hectares
+        non_ag_bio_effects_land = xr.DataArray(                                                                                     # Load the biodiversity impact values for non-agricultural land
+            list(settings.NON_AG_BIO_IMPACT.values()),
+            dims=['PRIMARY_V7'],
+            coords={'PRIMARY_V7': list(settings.NON_AG_BIO_IMPACT.keys())}
+        )
+        biodiv_value_degraded_non_ag_land = non_ag_xr * non_ag_bio_effects_land * bio_map_area_ha
+        
         
         # Calculate the sum of biodiversity score lost to land degradation (i.e., raw score minus current score with current score on cropland being zero)
-        biodiv_value_degraded_land = ( ( np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED * self.REAL_AREA_NO_RESFACTOR - biodiv_value_current ) +   # On natural land calculate the difference between the raw biodiversity score and the current score
-                                       ( np.isin(self.LUMAP_NO_RESFACTOR, self.LU_MODIFIED_LAND) * biodiv_score_raw * self.REAL_AREA_NO_RESFACTOR )                     # Calculate raw biodiversity score of modified land
-                                     )                                                                                       
+        biodiv_value_degraded_ag_land = ( 
+            (biodiv_value_pristine_natural_land - biodiv_value_current_natural_land) +                                      # Biodiversity value lost on `natural land`
+            (np.isin(self.LUMAP_NO_RESFACTOR, self.LU_MODIFIED_LAND) * biodiv_score_raw * self.REAL_AREA_NO_RESFACTOR)      # Biodiversity value lost on `modified land`, which assumed to have zero biodiversity value
+        )                                                                                       
 
         # Create a dictionary to hold the annual biodiversity target proportion data for GBF Target 2
         biodiv_GBF_target_2_proportions_2010_2100 = {}
@@ -962,8 +980,8 @@ class Data:
             biodiv_GBF_target_2_proportions_2010_2100[yr] = f(yr).item()
         
         # Sum the current biodiversity score and the biodiversity score of degraded land
-        biodiv_value_current_total = biodiv_value_current.sum()
-        biodiv_value_degraded_total = biodiv_value_degraded_land.sum()
+        biodiv_value_current_total = biodiv_value_current_natural_land.sum()
+        biodiv_value_degraded_total = biodiv_value_degraded_ag_land.sum() + biodiv_value_degraded_non_ag_land.sum().compute()
 
         # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
         self.BIODIV_GBF_TARGET_2 = {}
