@@ -23,7 +23,7 @@ def get_env_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
     Returns:
         np.ndarray|dict: The transition costs as either a numpy array or a dictionary, depending on the value of `separate`.
     """
-    
+    yr_cal = data.YR_CAL_BASE = yr_idx
     base_ag_to_ep_t = data.AG2EP_TRANSITION_COSTS_HA
     l_mrj = lumap2ag_l_mrj(lumap, lmmap)
     base_ag_to_ep_t_mrj = np.broadcast_to(base_ag_to_ep_t, (data.NLMS, data.NCELLS, base_ag_to_ep_t.shape[0]))
@@ -33,14 +33,14 @@ def get_env_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
 
     # Add cost of water license and cost of installing/removing irrigation where relevant (pre-amortised)
     w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
-    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data)
+    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)
     ag_to_ep_t_mrj = base_ag_to_ep_t_mrj + w_delta_mrj
 
     # Get raw transition costs for each cell to transition to environmental plantings
     ag2ep_transitions_r = np.nansum(l_mrj * ag_to_ep_t_mrj, axis=(0, 2))   # Here multiply by l_mrj to force the ag-env transition can only happen on ag cells
 
     # Add establishment costs for each cell
-    est_costs_r = data.EP_EST_COST_HA
+    est_costs_r = data.EP_EST_COST_HA * data.EST_COST_MULTS[yr_cal]
 
     # Amortise establishment costs  to be annualised
     est_costs_r = tools.amortise(est_costs_r)
@@ -65,7 +65,12 @@ def get_rip_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
         1-D array, indexed by cell.
     """
     base_costs = get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate)
-    fencing_cost = data.RP_FENCING_LENGTH * data.REAL_AREA * settings.FENCING_COST_PER_M
+    fencing_cost = (
+        data.RP_FENCING_LENGTH 
+        * settings.FENCING_COST_PER_M
+        * data.FENCE_COST_MULTS[data.YR_CAL_BASE + yr_idx]
+        * data.REAL_AREA
+    )
     
     if separate:
         l_mrj = lumap2ag_l_mrj(lumap, lmmap)
@@ -85,7 +90,12 @@ def get_agroforestry_transitions_from_ag_base(data: Data, yr_idx, lumap, lmmap, 
         1-D array, indexed by cell.
     """
     base_costs = get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate)
-    fencing_cost = settings.AF_FENCING_LENGTH * data.REAL_AREA * settings.FENCING_COST_PER_M
+    fencing_cost = (
+        settings.AF_FENCING_LENGTH
+        * settings.FENCING_COST_PER_M
+        * data.FENCE_COST_MULTS[data.YR_CAL_BASE + yr_idx]
+        * data.REAL_AREA 
+    )
     
     if separate:
         l_mrj = lumap2ag_l_mrj(lumap, lmmap)
@@ -194,7 +204,7 @@ def get_beef_agroforestry_transitions_from_ag(
         return t_r
 
 
-def get_carbon_plantings_block_from_ag(data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
+def get_carbon_plantings_block_from_ag(data: Data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
     """
     Get transition costs from agricultural land uses to carbon plantings (block) for each cell.
 
@@ -203,6 +213,7 @@ def get_carbon_plantings_block_from_ag(data, yr_idx, lumap, lmmap, separate=Fals
     np.ndarray
         1-D array, indexed by cell.
     """
+    yr_cal = data.YR_CAL_BASE + yr_idx
     base_ag_to_cp_t = data.AG2EP_TRANSITION_COSTS_HA
     l_mrj = lumap2ag_l_mrj(lumap, lmmap)
     base_ag_to_cp_t_mrj = np.broadcast_to(base_ag_to_cp_t, (2, data.NCELLS, base_ag_to_cp_t.shape[0]))
@@ -212,14 +223,14 @@ def get_carbon_plantings_block_from_ag(data, yr_idx, lumap, lmmap, separate=Fals
 
     # Add cost of water license and cost of installing/removing irrigation where relevant (pre-amortised)
     w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
-    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data)
+    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)
     ag_to_cp_t_mrj = base_ag_to_cp_t_mrj + w_delta_mrj
 
     # Get raw transition costs for each cell to transition to carbon plantings
     ag2cp_transitions_r = np.nansum(l_mrj * ag_to_cp_t_mrj, axis=(0, 2))
 
     # Add establishment costs for each cell
-    est_costs_r = data.CP_EST_COST_HA
+    est_costs_r = data.CP_EST_COST_HA * data.EST_COST_MULTS[yr_cal]
 
     # Amortise establishment costs  to be annualised
     est_costs_r = tools.amortise(est_costs_r)
@@ -245,7 +256,12 @@ def get_carbon_plantings_belt_from_ag_base(data, yr_idx, lumap, lmmap, separate)
         (separate = True) Dict of separated transition costs.
     """
     base_costs = get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate)
-    fencing_cost = settings.CP_BELT_FENCING_LENGTH * data.REAL_AREA * settings.FENCING_COST_PER_M
+    fencing_cost = (
+        settings.CP_BELT_FENCING_LENGTH
+        * settings.FENCING_COST_PER_M
+        * data.FENCE_COST_MULTS[data.YR_CAL_BASE + yr_idx]
+        * data.REAL_AREA
+    )
     
     if separate:
         l_mrj = lumap2ag_l_mrj(lumap, lmmap)
@@ -459,7 +475,7 @@ def get_env_plantings_to_ag(data: Data, yr_idx, lumap, lmmap, separate=False) ->
     # Get water license price and costs of installing/removing irrigation where appropriate
     w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
     l_mrj = lumap2ag_l_mrj(lumap, lmmap)
-    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data)
+    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)
     w_delta_mrj[:, ag_cells, :] = 0
 
     # Reshape and amortise upfront costs to annualised costs
@@ -523,6 +539,7 @@ def get_sheep_to_ag_base(data: Data, yr_idx: int, lumap, separate=False) -> np.n
         Dictionary of separated out transition costs.
     ------
     """
+    yr_cal = data.YR_CAL_BASE + yr_idx
     sheep_j = tools.get_sheep_code(data)
 
     all_sheep_lumap = (np.ones(data.NCELLS) * sheep_j).astype(np.int8)
@@ -538,7 +555,7 @@ def get_sheep_to_ag_base(data: Data, yr_idx: int, lumap, separate=False) -> np.n
     ag_cells = tools.get_ag_cells(lumap)
 
     e_rj = np.zeros((data.NCELLS, data.N_AG_LUS))
-    e_rj[ag_cells, :] = t_ij[all_sheep_lumap[ag_cells]]
+    e_rj[ag_cells, :] = t_ij[all_sheep_lumap[ag_cells]] * data.EST_COST_MULTS[yr_cal]
 
     e_rj = tools.amortise(e_rj) * data.REAL_AREA[:, np.newaxis]
     e_rj_dry = np.einsum('rj,r->rj', e_rj, all_sheep_lumap == 0)
@@ -548,7 +565,7 @@ def get_sheep_to_ag_base(data: Data, yr_idx: int, lumap, separate=False) -> np.n
 
     # Water license cost
     w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
-    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data)
+    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)
     w_delta_mrj = np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not)
 
     # Carbon costs
@@ -603,7 +620,7 @@ def get_beef_to_ag_base(data: Data, yr_idx, lumap, separate) -> np.ndarray|dict:
 
     # Water license cost
     w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
-    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data)
+    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)
     w_delta_mrj = np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not)
 
     # Carbon costs

@@ -6,7 +6,7 @@ from luto.settings import NON_AG_LAND_USES
 from luto import tools
 
 
-def get_cost_env_plantings(data: Data) -> np.ndarray:
+def get_cost_env_plantings(data: Data, yr_cal: int) -> np.ndarray:
     """
     Parameters
     ----------
@@ -17,10 +17,13 @@ def get_cost_env_plantings(data: Data) -> np.ndarray:
     np.ndarray
         Cost of environmental plantings for each cell. 1-D array Indexed by cell.
     """
-    return settings.ENV_PLANTING_COST_PER_HA_PER_YEAR * data.REAL_AREA
+    return (
+        settings.EP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR * data.MAINT_COST_MULTS[yr_cal]
+        - settings.EP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR
+    )
 
 
-def get_cost_rip_plantings(data: Data) -> np.ndarray:
+def get_cost_rip_plantings(data: Data, yr_cal: int) -> np.ndarray:
     """
     Parameters
     ----------
@@ -31,10 +34,13 @@ def get_cost_rip_plantings(data: Data) -> np.ndarray:
     np.ndarray
         Cost of riparian plantings for each cell. 1-D array Indexed by cell.
     """
-    return settings.RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR * data.REAL_AREA
+    return (
+        settings.RP_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR * data.MAINT_COST_MULTS[yr_cal]
+        - settings.RP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR
+    )
 
 
-def get_cost_agroforestry_base(data: Data) -> np.ndarray:
+def get_cost_agroforestry_base(data: Data, yr_cal: int) -> np.ndarray:
     """
     Parameters
     ----------
@@ -45,11 +51,15 @@ def get_cost_agroforestry_base(data: Data) -> np.ndarray:
     np.ndarray
         Cost of agroforestry for each cell. 1-D array Indexed by cell.
     """
-    return settings.AGROFORESTRY_COST_PER_HA_PER_YEAR * data.REAL_AREA
+    return (
+        settings.AF_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR * data.MAINT_COST_MULTS[yr_cal]
+        - settings.AF_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR
+    )
 
 
 def get_cost_sheep_agroforestry(
-    data: Data, 
+    data: Data,
+    yr_cal: int,
     ag_c_mrj: np.ndarray, 
     agroforestry_x_r: np.ndarray
 ) -> np.ndarray:
@@ -68,7 +78,7 @@ def get_cost_sheep_agroforestry(
 
     # Only use the dryland version of sheep
     sheep_cost = ag_c_mrj[0, :, sheep_j]
-    base_agroforestry_cost = get_cost_agroforestry_base(data)
+    base_agroforestry_cost = get_cost_agroforestry_base(data, yr_cal)
 
     # Calculate contributions and return the sum
     agroforestry_contr = base_agroforestry_cost * agroforestry_x_r
@@ -77,7 +87,8 @@ def get_cost_sheep_agroforestry(
 
 
 def get_cost_beef_agroforestry(
-    data: Data, 
+    data: Data,
+    yr_cal: int,
     ag_c_mrj: np.ndarray, 
     agroforestry_x_r: np.ndarray
 ) -> np.ndarray:
@@ -96,7 +107,7 @@ def get_cost_beef_agroforestry(
 
     # Only use the dryland version of beef
     beef_cost = ag_c_mrj[0, :, beef_j]
-    base_agroforestry_cost = get_cost_agroforestry_base(data)
+    base_agroforestry_cost = get_cost_agroforestry_base(data, yr_cal)
 
     # Calculate contributions and return the sum
     agroforestry_contr = base_agroforestry_cost * agroforestry_x_r
@@ -104,7 +115,7 @@ def get_cost_beef_agroforestry(
     return agroforestry_contr + beef_contr
 
 
-def get_cost_carbon_plantings_block(data) -> np.ndarray:
+def get_cost_carbon_plantings_block(data: Data, yr_cal: int) -> np.ndarray:
     """
     Parameters
     ----------
@@ -116,10 +127,13 @@ def get_cost_carbon_plantings_block(data) -> np.ndarray:
     np.ndarray
         Cost of carbon plantings (block arrangement) for each cell. 1-D array Indexed by cell.
     """
-    return settings.CARBON_PLANTING_BLOCK_COST_PER_HA_PER_YEAR * data.REAL_AREA
+    return (
+        settings.CP_BLOCK_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR * data.MAINT_COST_MULTS[yr_cal]
+        - settings.CP_BLOCK_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR
+    )
 
 
-def get_cost_carbon_plantings_belt_base(data) -> np.ndarray:
+def get_cost_carbon_plantings_belt_base(data: Data, yr_cal) -> np.ndarray:
     """
     Parameters
     ----------
@@ -130,11 +144,15 @@ def get_cost_carbon_plantings_belt_base(data) -> np.ndarray:
     np.ndarray
         Cost of carbon plantings (belt arrangement) for each cell. 1-D array Indexed by cell.
     """
-    return settings.CARBON_PLANTING_BELT_COST_PER_HA_PER_YEAR * data.REAL_AREA
+    return (
+        settings.CP_BELT_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR * data.MAINT_COST_MULTS[yr_cal]
+        - settings.CP_BELT_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR
+    )
 
 
 def get_cost_sheep_carbon_plantings_belt(
-    data: Data, 
+    data: Data,
+    yr_cal: int,
     ag_c_mrj: np.ndarray, 
     cp_belt_x_r: np.ndarray
 ) -> np.ndarray:
@@ -153,7 +171,7 @@ def get_cost_sheep_carbon_plantings_belt(
 
     # Only use the dryland version of sheep
     sheep_cost = ag_c_mrj[0, :, sheep_j]
-    base_cp_cost = get_cost_carbon_plantings_belt_base(data)
+    base_cp_cost = get_cost_carbon_plantings_belt_base(data, yr_cal)
 
     # Calculate contributions and return the sum
     cp_contr = base_cp_cost * cp_belt_x_r
@@ -162,7 +180,8 @@ def get_cost_sheep_carbon_plantings_belt(
 
 
 def get_cost_beef_carbon_plantings_belt(
-    data: Data, 
+    data: Data,
+    yr_cal: int,
     ag_c_mrj: np.ndarray, 
     cp_belt_x_r: np.ndarray
 ) -> np.ndarray:
@@ -181,7 +200,7 @@ def get_cost_beef_carbon_plantings_belt(
 
     # Only use the dryland version of beef
     beef_cost = ag_c_mrj[0, :, beef_j]
-    base_cp_cost = get_cost_carbon_plantings_belt_base(data)
+    base_cp_cost = get_cost_carbon_plantings_belt_base(data, yr_cal)
 
     # Calculate contributions and return the sum
     cp_contr = base_cp_cost * cp_belt_x_r
@@ -189,7 +208,7 @@ def get_cost_beef_carbon_plantings_belt(
     return cp_contr + beef_contr
 
 
-def get_cost_beccs(data: Data) -> np.ndarray:
+def get_cost_beccs(data: Data, yr_cal: int) -> np.ndarray:
     """
     Parameters
     ----------
@@ -200,10 +219,10 @@ def get_cost_beccs(data: Data) -> np.ndarray:
     np.ndarray
         Cost of BECCS for each cell. 1-D array Indexed by cell.
     """
-    return np.nan_to_num(data.BECCS_COSTS_AUD_HA_YR) * data.REAL_AREA
+    return np.nan_to_num(data.BECCS_COSTS_AUD_HA_YR) * data.BECCS_COST_MULTS[yr_cal] * data.REAL_AREA
 
 
-def get_cost_matrix(data: Data, ag_c_mrj: np.ndarray, lumap):
+def get_cost_matrix(data: Data, ag_c_mrj: np.ndarray, lumap, yr_cal):
     """
     Returns non-agricultural c_rk matrix of costs per cell and land use.
 
@@ -220,28 +239,28 @@ def get_cost_matrix(data: Data, ag_c_mrj: np.ndarray, lumap):
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     if NON_AG_LAND_USES['Environmental Plantings']:
-        non_agr_c_matrices['Environmental Plantings'] = get_cost_env_plantings(data).reshape((data.NCELLS, 1))
+        non_agr_c_matrices['Environmental Plantings'] = get_cost_env_plantings(data, yr_cal).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['Riparian Plantings']:
-        non_agr_c_matrices['Riparian Plantings'] = get_cost_rip_plantings(data).reshape((data.NCELLS, 1))
+        non_agr_c_matrices['Riparian Plantings'] = get_cost_rip_plantings(data, yr_cal).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['Sheep Agroforestry']:
-        non_agr_c_matrices['Sheep Agroforestry'] = get_cost_sheep_agroforestry(data, ag_c_mrj, agroforestry_x_r).reshape((data.NCELLS, 1))
+        non_agr_c_matrices['Sheep Agroforestry'] = get_cost_sheep_agroforestry(data, yr_cal, ag_c_mrj, agroforestry_x_r).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['Beef Agroforestry']:
-        non_agr_c_matrices['Beef Agroforestry'] = get_cost_beef_agroforestry(data, ag_c_mrj, agroforestry_x_r).reshape((data.NCELLS, 1))
+        non_agr_c_matrices['Beef Agroforestry'] = get_cost_beef_agroforestry(data, yr_cal, ag_c_mrj, agroforestry_x_r).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['Carbon Plantings (Block)']:
-        non_agr_c_matrices['Carbon Plantings (Block)'] = get_cost_carbon_plantings_block(data).reshape((data.NCELLS, 1))
+        non_agr_c_matrices['Carbon Plantings (Block)'] = get_cost_carbon_plantings_block(data, yr_cal).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['Sheep Carbon Plantings (Belt)']:
-        non_agr_c_matrices['Sheep Carbon Plantings (Belt)'] = get_cost_sheep_carbon_plantings_belt(data, ag_c_mrj, cp_belt_x_r).reshape((data.NCELLS, 1))
+        non_agr_c_matrices['Sheep Carbon Plantings (Belt)'] = get_cost_sheep_carbon_plantings_belt(data, yr_cal, ag_c_mrj, cp_belt_x_r).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['Beef Carbon Plantings (Belt)']:
-        non_agr_c_matrices['Beef Carbon Plantings (Belt)'] = get_cost_beef_carbon_plantings_belt(data, ag_c_mrj, cp_belt_x_r).reshape((data.NCELLS, 1))
+        non_agr_c_matrices['Beef Carbon Plantings (Belt)'] = get_cost_beef_carbon_plantings_belt(data, yr_cal, ag_c_mrj, cp_belt_x_r).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['BECCS']:
-        non_agr_c_matrices['BECCS'] = get_cost_beccs(data).reshape((data.NCELLS, 1))
+        non_agr_c_matrices['BECCS'] = get_cost_beccs(data, yr_cal).reshape((data.NCELLS, 1))
 
     non_agr_c_matrices = list(non_agr_c_matrices.values())
     return np.concatenate(non_agr_c_matrices, axis=1)

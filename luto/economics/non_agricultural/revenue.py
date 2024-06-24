@@ -212,7 +212,7 @@ def get_rev_beccs(data: Data, yr_cal: int) -> np.ndarray:
     -------
     np.ndarray
     """
-    base_rev = np.nan_to_num(data.BECCS_REV_AUD_HA_YR) * data.REAL_AREA
+    base_rev = np.nan_to_num(data.BECCS_REV_AUD_HA_YR) * data.BECCS_REV_MULTS[yr_cal] * data.REAL_AREA
     return base_rev + np.nan_to_num(data.BECCS_TCO2E_HA_YR) * data.REAL_AREA * data.get_carbon_price_by_year(yr_cal)
 
 
