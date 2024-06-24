@@ -190,8 +190,8 @@ class Data:
         self.AGEC_CROPS = pd.read_hdf(os.path.join(INPUT_DIR, "agec_crops.h5"))
         self.AGEC_LVSTK = pd.read_hdf(os.path.join(INPUT_DIR, "agec_lvstk.h5"))
         # Price multipliers for livestock and crops over the years.
-        self.ag_price_multipliers = pd.read_excel(os.path.join(INPUT_DIR, "ag_price_multipliers.xlsx"), sheet_name="AGEC_CROPS", index_col="Year")
-        self.lvstk_price_multipliers = pd.read_excel(os.path.join(INPUT_DIR, "ag_price_multipliers.xlsx"), sheet_name="AGEC_LVSTK", index_col="Year")
+        self.CROP_PRICE_MULTIPLIERS = pd.read_excel(os.path.join(INPUT_DIR, "ag_price_multipliers.xlsx"), sheet_name="AGEC_CROPS", index_col="Year")
+        self.LVSTK_PRICE_MULTIPLIERS = pd.read_excel(os.path.join(INPUT_DIR, "ag_price_multipliers.xlsx"), sheet_name="AGEC_LVSTK", index_col="Year")
 
 
 
