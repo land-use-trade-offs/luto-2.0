@@ -402,7 +402,7 @@ def create_new_dataset():
     
     # LUMAP == -1 is areas outside LUTO study area
     
-    # # Calculate water use for natural land under climate change (ensemble model)  **** NOT USED *** Calculated on the fly in LUTO instead
+    # # Calculate water use for natural land under climate change (ensemble model)  
     # luto_4D_inpath = 'N:/Data-Master/LUTO_2.0_input_data/Input_data/4D_Spatial_SSP_Timeseries/'
 
     # for ssp in ['126']: #, '245', '370', '585']:
