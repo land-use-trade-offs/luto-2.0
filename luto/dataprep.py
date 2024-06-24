@@ -22,13 +22,14 @@ and Brett Bryan, Deakin University
 
 
 # Load libraries
-from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
 import shutil, os, time
+import h5py
+
+from joblib import Parallel, delayed
 from luto.settings import INPUT_DIR, RAW_DATA
-# import csv
-# from scipy.interpolate import interp1d
+
 
     
 def create_new_dataset():
@@ -421,7 +422,61 @@ def create_new_dataset():
     #     with h5py.File(luto_4D_inpath + fn + '.h5', 'w') as h5f:
     #         h5f.create_dataset(fn, data = base_arr, chunks = True)
     
-    
+    # Get the mask indicating the cells outside the LUTO study area
+    LUTO_outside_cells = zones.query('COMMODITIES_DESC == "Non-agricultural land or no data"')  # shape = 2737674, this equals to LUMAP == -1
+    LUTO_outside_cells_index = LUTO_outside_cells.index
+    water_outside_LUTO = water_yield_baselines.iloc[LUTO_outside_cells_index]             # shape = (2737674, 3)
+
+        
+    # Calculate water use for natural land under climate change (ensemble model)
+    def calculate_water_yield(ssp: str):
+
+        fn = 'Water_yield_GCM-Ensemble_ssp' + ssp + '_2010-2100_DR_ML_HA_mean'
+        with h5py.File(luto_4D_inpath + fn + '.h5', 'r') as h5:
+            dr_arr = h5[fn][:][:, LUTO_outside_cells_index]  # shape = (91, 2737674)
+        fn = 'Water_yield_GCM-Ensemble_ssp' + ssp + '_2010-2100_SR_ML_HA_mean'
+        with h5py.File(luto_4D_inpath + fn + '.h5', 'r') as h5:
+            sr_arr = h5[fn][:][:, LUTO_outside_cells_index]  # shape = (91, 2737674)
+            
+        # Calculate the water yield for the cells outside the LUTO study area
+        base_arr =  dr_arr * np.array(water_outside_LUTO.DEEP_ROOTED_PROPORTION) + sr_arr * np.array(1 - water_outside_LUTO.DEEP_ROOTED_PROPORTION)
+        base_arr = base_arr * zones.iloc[LUTO_outside_cells_index]['CELL_HA'].values[np.newaxis,:]     # Convert from ML/HA to ML
+
+        base_arr_df = pd.DataFrame(
+            base_arr.T, 
+            columns = range(2010, 2101),
+        )
+
+        # Warp the df to long format to link each cells with its river regions and drainage divisions
+        base_arr_df[['HR_DRAINDIV_NAME', 'HR_RIVREG_NAME']] = LUTO_outside_cells[['HR_DRAINDIV_NAME', 'HR_RIVREG_NAME']]
+        base_arr_df = base_arr_df.melt(id_vars = ['HR_DRAINDIV_NAME', 'HR_RIVREG_NAME'], var_name = 'Year', value_name = 'Water_yield_ML')
+
+        # Get the total water yield for each drainage division and river region
+        water_yield_dd = base_arr_df.groupby(['HR_DRAINDIV_NAME', 'Year'], as_index = False, observed = True).agg(Water_yield_ML = ('Water_yield_ML', 'sum'))
+        water_yield_rr = base_arr_df.groupby(['HR_RIVREG_NAME', 'Year'], as_index = False, observed = True).agg(Water_yield_ML = ('Water_yield_ML', 'sum'))
+
+        # Append the region and ssp info
+        water_yield_dd['ssp'] = ssp
+        water_yield_rr['ssp'] = ssp 
+        water_yield_dd['Region_type'] = 'Drainage division' 
+        water_yield_rr['Region_type'] = 'River region' 
+
+        dd_map = dict(draindiv_lut[['HR_DRAINDIV_NAME', 'HR_DRAINDIV_ID']].values.tolist())
+        rr_map = dict(rivreg_lut[['HR_RIVREG_NAME', 'HR_RIVREG_ID']].values.tolist())
+        water_yield_dd['Region_ID'] = [dd_map[k] for k in  water_yield_dd['HR_DRAINDIV_NAME']]
+        water_yield_rr['Region_ID'] = [rr_map[k] for k in  water_yield_rr['HR_RIVREG_NAME']]
+        water_yield_dd = water_yield_dd.rename(columns = {'HR_DRAINDIV_NAME': 'Region_name'})
+        water_yield_rr = water_yield_rr.rename(columns = {'HR_RIVREG_NAME': 'Region_name'})
+
+        return pd.concat([water_yield_dd, water_yield_rr], ignore_index=True)
+
+    # Run the function in parallel
+    tasks = [delayed(calculate_water_yield)(ssp) for ssp in ['126', '245', '370', '585']]
+    results = Parallel(n_jobs = 4)(tasks)
+
+    # Save to disk
+    water_yield_outside_LUTO = pd.concat(results, ignore_index = True)
+    water_yield_outside_LUTO.to_csv(os.path.join(outpath, 'water_yield_2010_2100_nl_ml_ha.csv'))
     
     
     
