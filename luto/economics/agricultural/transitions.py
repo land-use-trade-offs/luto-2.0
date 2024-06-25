@@ -123,7 +123,7 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
     # Non-irrigation related transition costs for cell r to change to land-use j calculated based on lumap (in $/ha).
     # Only consider for cells currently being used for agriculture.
     e_rj = np.zeros((ncells, n_ag_lus))
-    e_rj[ag_cells, :] = t_ij[lumap[ag_cells]] * data.EST_COST_MULTS[yr_cal]
+    e_rj[ag_cells, :] = t_ij[lumap[ag_cells]] * data.TRANS_COST_MULTS[yr_cal]
 
     # Amortise upfront costs to annualised costs and converted to $ per cell via REAL_AREA
     e_rj = tools.amortise(e_rj) * data.REAL_AREA[:, np.newaxis]
