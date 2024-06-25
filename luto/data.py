@@ -22,6 +22,7 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
+from affine import Affine
 import numpy as np
 import pandas as pd
 import rasterio
@@ -141,20 +142,26 @@ class Data:
 
         # Set resfactor multiplier
         self.RESMULT = settings.RESFACTOR ** 2
+        
+        # Set the nodata and non-ag code
+        self.NODATA = -9999
+        self.MASK_LU_CODE = -1
 
-        # Load LUMAP wih no resfactor
-        self.LUMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lumap.h5")).to_numpy()
+        # Load LUMAP without resfactor
+        self.LUMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lumap.h5")).to_numpy()                   # 1D (ij flattend),  0-27 for land uses; -1 for non-agricultural land uses; All cells in Australia (land only)
 
         # NLUM mask.
         with rasterio.open(os.path.join(INPUT_DIR, "NLUM_2010-11_mask.tif")) as rst:
-            self.NLUM_MASK = rst.read(1).astype(np.int8)
-            
-            self.LUMAP_2D = np.full_like(self.NLUM_MASK, -9999)
-            np.place(self.LUMAP_2D, self.NLUM_MASK == 1, self.LUMAP_NO_RESFACTOR)
+            self.NLUM_MASK = rst.read(1).astype(np.int8)                                                        # 2D map,  0 for ocean, 1 for land
+            self.LUMAP_2D = np.full_like(self.NLUM_MASK, self.NODATA, dtype=np.int16)                           # 2D map,  full of nodata (-9999)
+            np.place(self.LUMAP_2D, self.NLUM_MASK == 1, self.LUMAP_NO_RESFACTOR)                               # 2D map,  -9999 for ocean; -1 for desert, urban, water, etc; 0-27 for land uses
+            self.GEO_META = rst.meta                                                                            # dict,  key-value pairs of geospatial metadata
 
         # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap (True means included cells. Boolean dtype.)
-        self.MASK_LU_CODE = -1
-        self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE
+        self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                              # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
+        
+        # Get the lon/lat coordinates.
+        self.COORD_LON_LAT = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META['transform'])             # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
 
         # Return combined land-use and resfactor mask
         if settings.RESFACTOR > 1:
@@ -167,12 +174,16 @@ class Data:
 
             # Superimpose resfactor mask upon land-use map mask (Boolean).
             self.MASK = self.LUMASK * resmask
+
+            # Get the resfactored 2D lumap and x/y coordinates.
+            self.LUMAP_2D_RESFACTORED = self.LUMAP_2D[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR]
             
-            # Below are the coordinates ((row, ...), (col, ...)) for each valid cell in the original 2D array
-            self.MASK_2D_COORD_DENSE = nonzeroes[0], nonzeroes[1]
+            # Get the resfactored lon/lat coordinates.
+            self.COORD_LON_LAT = self.COORD_LON_LAT[0][self.MASK], self.COORD_LON_LAT[1][self.MASK]
             
-            # Suppose we have a 2D resfactored array, below is the coordinates ((row, ....), (col, ...)) for each valid cell
-            self.MASK_2D_COORD_SPARSE = nonzeroes[0][self.MASK]//settings.RESFACTOR, nonzeroes[1][self.MASK]//settings.RESFACTOR
+            # Update the geospatial metadata.
+            self.GEO_META = self.update_geo_meta()
+
             
         elif settings.RESFACTOR == 1:
             self.MASK = self.LUMASK
@@ -924,7 +935,8 @@ class Data:
         print("\tLoading biodiversity data...", flush=True)
         """
         Kunming-Montreal Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-        Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
+        Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, 
+        in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
         """
         # Load biodiversity data
         biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5') )
@@ -943,10 +955,12 @@ class Data:
         self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = biodiv_score_raw * np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)
 
         # Calculate the quality-weighted sum of biodiv raw score over the study area. 
-        # Quality weighting includes connectivity score, land-use (i.e., livestock impacts), and land management (LDS burning impacts in area eligible for savanna burning). Note BIODIV_SCORE_RAW = BIODIV_SCORE_WEIGHTED on natural land
-        biodiv_value_current = ( np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED_LDS_BURNING -   # Biodiversity value of Unallocated - natural land and livestock on natural land considering LDS burning impacts
-                                 np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15]) * self.BIODIV_SCORE_WEIGHTED * settings.BIODIV_LIVESTOCK_IMPACT     # Biodiversity impact of livestock on natural land 
-                               ) * self.REAL_AREA_NO_RESFACTOR                                                             # Modified land assumed to have zero biodiversity value  
+        # Quality weighting includes connectivity score, land-use (i.e., livestock impacts), 
+        # and land management (LDS burning impacts in area eligible for savanna burning). 
+        # Note BIODIV_SCORE_RAW = BIODIV_SCORE_WEIGHTED on natural land
+        biodiv_value_current = ( np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED_LDS_BURNING -                     # Biodiversity value of Unallocated - natural land and livestock on natural land considering LDS burning impacts
+                                 np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15]) * self.BIODIV_SCORE_WEIGHTED * settings.BIODIV_LIVESTOCK_IMPACT    # Biodiversity impact of livestock on natural land 
+                               ) * self.REAL_AREA_NO_RESFACTOR                                                                                   # Modified land assumed to have zero biodiversity value  
         
         # Calculate the sum of biodiversity score lost to land degradation (i.e., raw score minus current score with current score on cropland being zero)
         biodiv_value_degraded_land = ( ( np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED * self.REAL_AREA_NO_RESFACTOR - biodiv_value_current ) +   # On natural land calculate the difference between the raw biodiversity score and the current score
@@ -1001,6 +1015,44 @@ class Data:
         self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = self.get_array_resfactor_applied(self.BIODIV_SCORE_WEIGHTED_LDS_BURNING)
 
         print("Data loading complete\n")
+        
+    def get_coord(self, index_ij: np.ndarray, trans):
+        """
+        Calculate the coordinates [[lon,...],[lat,...]] based on 
+        the given index [[row,...],[col,...]] and transformation matrix.
+
+        Parameters:
+        index_ij (np.ndarray): A numpy array containing the row and column indices.
+        trans (affin): An instance of the Transformation class.
+        resfactor (int, optional): The resolution factor. Defaults to 1.
+
+        Returns:
+        tuple: A tuple containing the x and y coordinates.
+        """
+        coord_x = trans.c + trans.a * (index_ij[1] + 0.5)    # Move to the center of the cell
+        coord_y = trans.f + trans.e * (index_ij[0] + 0.5)    # Move to the center of the cell
+        return coord_x, coord_y
+    
+    
+    def update_geo_meta(self):
+        """
+        Update the geographic metadata based on the current settings.
+        
+        Note: When this function is called, the RESFACTOR is assumend to be > 1, 
+        because there is no need to update the metadata if the RESFACTOR is 1.
+
+        Returns:
+            dict: The updated geographic metadata.
+        """
+        meta = self.GEO_META.copy()
+        height, width = (self.GEO_META['height'], self.GEO_META['width'])  if settings.WRITE_FULL_RES_MAPS else self.LUMAP_2D_RESFACTORED.shape
+        trans = list(self.GEO_META['transform'])
+        trans[0] = trans[0] if settings.WRITE_FULL_RES_MAPS else trans[0] * settings.RESFACTOR    # Adjust the X resolution
+        trans[4] = trans[4] if settings.WRITE_FULL_RES_MAPS else trans[4] * settings.RESFACTOR    # Adjust the Y resolution
+        trans = Affine(*trans)
+        meta.update(width=width, height=height, compress='lzw', driver='GTiff', transform=trans, nodata=self.NODATA, dtype='float32')
+        
+        return meta
 
     def get_array_resfactor_applied(self, array: np.ndarray):
         """

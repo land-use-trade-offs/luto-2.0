@@ -83,7 +83,7 @@ def write_ag_arr2tif(data: Data, in_data, in_attr, lm_idx, lu_idx, out_dir):
     in_arry = get_arry(in_data, in_attr)
     arr_lu_lm = slice_lu_lm(in_arry, lm_idx, slice(None), lu_idx)
     arr_lu_lm = create_2d_map(data, arr_lu_lm, -1)
-    write_gtiff(arr_lu_lm,out_file)
+    write_gtiff(arr_lu_lm, out_file, data=data)
 
     
 # rk -> tif    
@@ -93,7 +93,7 @@ def write_non_ag_arr2tif(data: Data, in_data, in_attr, lu_idx, out_dir):
     in_arry = get_arry(in_data, in_attr)
     arr_lu = slice_lu_lm(in_arry, slice(None), lu_idx)
     arr_lu = create_2d_map(data, arr_lu, -1)
-    write_gtiff(arr_lu, out_file)
+    write_gtiff(arr_lu, out_file, data=data)
 
     
  # {am} mrj -> tif   
@@ -103,7 +103,7 @@ def write_am_arr2tif(data: Data, in_data, in_attr, am, lm_idx, lu_idx, out_dir):
     in_arry = get_arry(in_data, in_attr, am)
     arr_lu_lm = slice_lu_lm(in_arry, lm_idx, slice(None), lu_idx)
     arr_lu_lm = create_2d_map(data, arr_lu_lm, -1)
-    write_gtiff(arr_lu_lm,out_file)
+    write_gtiff(arr_lu_lm,out_file, data=data)
 
     
 # {ag} mrp -> tif    
@@ -114,7 +114,7 @@ def write_ag_product_arr2tif(data: Data, in_data, in_attr,lm_idx, product_code, 
     in_arry = get_arry(in_data, in_attr)
     arr_p = slice_lu_lm(in_arry, lm_idx, slice(None), product_code)
     arr_p = create_2d_map(data, arr_p, -1) 
-    write_gtiff(arr_p, out_file)
+    write_gtiff(arr_p, out_file, data=data)
 
     
 # {am} mrp -> tif   
@@ -124,7 +124,7 @@ def write_am_product_arr2tif(data: Data, in_data, in_attr, am, lm_idx, product_i
     in_arry = get_arry(in_data, in_attr, am=am)
     arr_p = slice_lu_lm(in_arry, lm_idx, slice(None), product_idx)
     arr_p = create_2d_map(data, arr_p, -1) 
-    write_gtiff(arr_p, out_file)
+    write_gtiff(arr_p, out_file, data=data)
 
     
 # {non_ag} crk -> tif
@@ -134,7 +134,7 @@ def write_non_ag_commodity_arr2tif(data: Data, in_data, in_attr, commodity_idx, 
     in_arry = get_arry(in_data, in_attr)
     arr_c = slice_lu_lm(in_arry, commodity_idx, slice(None), non_ag_idx)
     arr_c = create_2d_map(data, arr_c, -1) 
-    write_gtiff(arr_c, out_file)
+    write_gtiff(arr_c, out_file, data=data)
     
     
 

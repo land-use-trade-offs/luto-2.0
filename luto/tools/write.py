@@ -253,10 +253,10 @@ def write_files(data: Data, yr_cal, path):
     ammap_fname = f'ammap_{yr_cal}.tiff'
     non_ag_fname = f'non_ag_{yr_cal}.tiff'
 
-    write_gtiff(lumap, os.path.join(path, lumap_fname))
-    write_gtiff(lmmap, os.path.join(path, lmmap_fname))
-    write_gtiff(ammap, os.path.join(path, ammap_fname))
-    write_gtiff(non_ag, os.path.join(path, non_ag_fname))
+    write_gtiff(lumap, os.path.join(path, lumap_fname), data=data)
+    write_gtiff(lmmap, os.path.join(path, lmmap_fname), data=data)
+    write_gtiff(ammap, os.path.join(path, ammap_fname), data=data)
+    write_gtiff(non_ag, os.path.join(path, non_ag_fname), data=data)
 
 
 
@@ -298,7 +298,7 @@ def write_files_separate(data: Data, yr_cal, path, ammap_separate=False):
         dvar = create_2d_map(data, row['dvar'].astype(np.float32), filler=data.MASK_LU_CODE)
         fname = f'{category}_{dvar_idx:02}_{desc}_{yr_cal}.tiff'
         lucc_separate_path = os.path.join(lucc_separate_dir, fname)
-        write_gtiff(dvar, lucc_separate_path)
+        write_gtiff(dvar, lucc_separate_path, data=data)
 
 
 

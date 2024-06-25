@@ -157,7 +157,7 @@ def reproject_raster_in_memory(src_memfile,
 def save_colored_raster_as_png(src_memfile: MemoryFile, 
                                out_path: str, 
                                src_crs: str = 'EPSG:3857', 
-                               dst_crs: str = 'EPSG:4326'):
+                               dst_crs: str = 'EPSG:4283'):
     """
     Save a colored raster image as a PNG file.
 
@@ -168,10 +168,10 @@ def save_colored_raster_as_png(src_memfile: MemoryFile,
             The path to save the PNG file.
         src_crs (str, optional): 
             The source coordinate reference system (CRS) of the raster image. 
-            Defaults to 'EPSG:3857'.
+            Defaults to 'EPSG:3857' (WGS 84 / Pseudo-Mercator).
         dst_crs (str, optional): 
             The destination CRS for transforming the bounding box. 
-            Defaults to 'EPSG:4326'.
+            Defaults to 'EPSG:4283' (GDA 1994).
 
     Returns:
         Tuple[List[float], List[List[float]]]:
@@ -209,7 +209,7 @@ def process_int_raster( initial_tif:str=None,
                         band=1,
                         color_dict:dict=None,
                         src_crs='EPSG:3857', 
-                        dst_crs='EPSG:4326'):
+                        dst_crs='EPSG:4283'):
     """
     Process a raster file by reclassifying, coloring, and reprojecting it entirely in memory.
     
@@ -223,7 +223,7 @@ def process_int_raster( initial_tif:str=None,
         src_crs (str):
             Source coordinate reference system (default is 'EPSG:3857').
         dst_crs (str):
-            Destination coordinate reference system (default is 'EPSG:4326').
+            Destination coordinate reference system (default is 'EPSG:4283' (GDA 1994)).
     
     Returns:
         tuple: A tuple containing the center, bounds for folium, and mercator bounding box.
@@ -297,7 +297,7 @@ def process_float_raster(initial_tif:str=None,
                    color_dict:dict=None,
                    mask_path:str='luto/tools/report/Assets/NLUM_2010-11_mask.tif', 
                    src_crs='EPSG:3857', 
-                   dst_crs='EPSG:4326'):
+                   dst_crs='EPSG:4283'):
     """
     Process a float raster image by converting it to an integer, 
     converting it to a 4-band image, masking invalid data, and 
@@ -315,7 +315,7 @@ def process_float_raster(initial_tif:str=None,
         Path to the mask file for invalid data.
     src_crs (str, default='EPSG:3857'): 
         Source CRS (Coordinate Reference System) of the raster image.
-    dst_crs (str, default='EPSG:4326'): 
+    dst_crs (str, default='EPSG:4283' (GDA 1994)): 
         Destination CRS for reprojecting the raster image.
 
     Returns:
@@ -431,7 +431,7 @@ def save_map_to_html(tif_path:str = None,
         ).add_to(m)
     
     # Add the Shapefile
-    gdf = gpd.read_file(shapefile_path).to_crs(epsg=4326)
+    gdf = gpd.read_file(shapefile_path).to_crs(epsg=4283)   # Read the shapefile and convert to GDA 1994
     geojson_data = json.loads(gdf.to_json())
     shp = folium.GeoJson(
         geojson_data,

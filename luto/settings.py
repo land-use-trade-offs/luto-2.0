@@ -99,8 +99,8 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 10         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
-MODE = 'snapshot'   # Runs for target year only
-# MODE = 'timeseries'   # Runs each year from base year to target year
+# MODE = 'snapshot'   # Runs for target year only
+MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -367,7 +367,8 @@ BIODIVERSITY_REPORT = True             # True or False, report biodiversity rega
 
 
 """ Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-    Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
+    Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
+    in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
 """
 # Set biodiversity targets in dictionary below (i.e., year: proportion of degraded land restored)
 BIODIV_GBF_TARGET_2_DICT = {                     
