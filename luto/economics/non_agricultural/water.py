@@ -20,8 +20,7 @@ def get_wreq_matrix_env_planting(data: Data) -> np.ndarray:
     -------
     1-D array, indexed by cell.
     """
-    # return (data.WATER_YIELD_HIST_SR - data.WATER_YIELD_HIST_NL) * data.REAL_AREA
-    return (data.WATER_YIELD_HIST_SR - data.WATER_YIELD_HIST_DR) * data.REAL_AREA
+    return (data.WATER_YIELD_HIST_SR - data.WATER_YIELD_HIST_NL) * data.REAL_AREA
 
 
 def get_wreq_matrix_carbon_plantings_block(data) -> np.ndarray:
