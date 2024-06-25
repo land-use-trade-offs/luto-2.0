@@ -23,7 +23,7 @@ def get_env_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
     Returns:
         np.ndarray|dict: The transition costs as either a numpy array or a dictionary, depending on the value of `separate`.
     """
-    yr_cal = data.YR_CAL_BASE = yr_idx
+    yr_cal = data.YR_CAL_BASE + yr_idx
     base_ag_to_ep_t = data.AG2EP_TRANSITION_COSTS_HA
     l_mrj = lumap2ag_l_mrj(lumap, lmmap)
     base_ag_to_ep_t_mrj = np.broadcast_to(base_ag_to_ep_t, (data.NLMS, data.NCELLS, base_ag_to_ep_t.shape[0]))
@@ -467,7 +467,7 @@ def get_env_plantings_to_ag(data: Data, yr_idx, lumap, lmmap, separate=False) ->
         3-D array, indexed by (m, r, j).
     """
     yr_cal = data.YR_CAL_BASE + yr_idx
-    
+
     # Get base transition costs: add cost of installing irrigation
     base_ep_to_ag_t = data.EP2AG_TRANSITION_COSTS_HA * data.TRANS_COST_MULTS[yr_cal]
 

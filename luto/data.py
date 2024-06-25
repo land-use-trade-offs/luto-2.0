@@ -767,11 +767,11 @@ class Data:
         # self.WATER_YIELD_BASE = self.get_array_resfactor_applied(
         #     water_yield_baselines["WATER_YIELD_HIST_BASELINE_ML_HA"].to_numpy(dtype = np.float32)
         # )
-        self.WATER_YIELD_HIST_NL = self.get_array_resfactor_applied(
-            water_yield_baselines.eval('WATER_YIELD_HIST_DR_ML_HA * DEEP_ROOTED_PROPORTION + \
-                                        WATER_YIELD_HIST_SR_ML_HA * (1 - DEEP_ROOTED_PROPORTION)'
-                                      ).to_numpy(dtype = np.float32)
-        )
+        # self.WATER_YIELD_HIST_NL = self.get_array_resfactor_applied(
+        #     water_yield_baselines.eval('WATER_YIELD_HIST_DR_ML_HA * DEEP_ROOTED_PROPORTION + \
+        #                                 WATER_YIELD_HIST_SR_ML_HA * (1 - DEEP_ROOTED_PROPORTION)'
+        #                               ).to_numpy(dtype = np.float32)
+        # )
 
         # fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_dr_ml_ha.h5')
         # fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_sr_ml_ha.h5')

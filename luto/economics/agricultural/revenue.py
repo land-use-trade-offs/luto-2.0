@@ -50,7 +50,7 @@ def get_rev_crop( data: Data   # Data object.
         if lu in data.CROP_PRICE_MULTIPLIERS.columns:
             rev_multiplier = data.CROP_PRICE_MULTIPLIERS.loc[data.YR_CAL_BASE + yr_idx, lu]
         else:
-            print(f'\tPrice multiplier for {lu} not found in ag_price_multipliers. Defaulting to 1...', flush=True)
+            print(f"WARNING: Multiplier for {lu} not found in 'ag_price_multipliers.xlsx'. Defaulting to 1.", flush=True)
             
         # Revenue in $ per cell (includes REAL_AREA via get_quantity)
         rev_t = ( data.AGEC_CROPS['P1', lm, lu]

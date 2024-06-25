@@ -17,10 +17,11 @@ def get_cost_env_plantings(data: Data, yr_cal: int) -> np.ndarray:
     np.ndarray
         Cost of environmental plantings for each cell. 1-D array Indexed by cell.
     """
-    return (
+    cost_per_ha_per_year = (
         settings.EP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR * data.MAINT_COST_MULTS[yr_cal]
         - settings.EP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR
     )
+    return cost_per_ha_per_year * data.REAL_AREA
 
 
 def get_cost_rip_plantings(data: Data, yr_cal: int) -> np.ndarray:
@@ -34,10 +35,11 @@ def get_cost_rip_plantings(data: Data, yr_cal: int) -> np.ndarray:
     np.ndarray
         Cost of riparian plantings for each cell. 1-D array Indexed by cell.
     """
-    return (
+    cost_per_ha_per_year = (
         settings.RP_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR * data.MAINT_COST_MULTS[yr_cal]
         - settings.RP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR
     )
+    return cost_per_ha_per_year * data.REAL_AREA 
 
 
 def get_cost_agroforestry_base(data: Data, yr_cal: int) -> np.ndarray:
@@ -51,10 +53,11 @@ def get_cost_agroforestry_base(data: Data, yr_cal: int) -> np.ndarray:
     np.ndarray
         Cost of agroforestry for each cell. 1-D array Indexed by cell.
     """
-    return (
+    cost_per_ha_per_year = (
         settings.AF_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR * data.MAINT_COST_MULTS[yr_cal]
         - settings.AF_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR
     )
+    return cost_per_ha_per_year * data.REAL_AREA
 
 
 def get_cost_sheep_agroforestry(
@@ -127,10 +130,11 @@ def get_cost_carbon_plantings_block(data: Data, yr_cal: int) -> np.ndarray:
     np.ndarray
         Cost of carbon plantings (block arrangement) for each cell. 1-D array Indexed by cell.
     """
-    return (
+    cost_per_ha_per_year = (
         settings.CP_BLOCK_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR * data.MAINT_COST_MULTS[yr_cal]
         - settings.CP_BLOCK_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR
     )
+    return cost_per_ha_per_year * data.REAL_AREA
 
 
 def get_cost_carbon_plantings_belt_base(data: Data, yr_cal) -> np.ndarray:
@@ -144,10 +148,11 @@ def get_cost_carbon_plantings_belt_base(data: Data, yr_cal) -> np.ndarray:
     np.ndarray
         Cost of carbon plantings (belt arrangement) for each cell. 1-D array Indexed by cell.
     """
-    return (
+    cost_per_ha_per_year = (
         settings.CP_BELT_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR * data.MAINT_COST_MULTS[yr_cal]
         - settings.CP_BELT_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR
     )
+    return cost_per_ha_per_year * data.REAL_AREA
 
 
 def get_cost_sheep_carbon_plantings_belt(

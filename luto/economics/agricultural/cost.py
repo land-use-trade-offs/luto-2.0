@@ -62,17 +62,56 @@ def get_cost_crop(data: Data, lu, lm, yr_idx):
         yr_cal = data.YR_CAL_BASE + yr_idx
         # Variable costs (quantity costs and area costs)        
         # Quantity costs (calculated as cost per tonne x tonne per cell x resfactor)
+        qc_multiplier = 1
+        if lu in data.QC_COST_MULTS.columns:
+            qc_multiplier = data.QC_COST_MULTS.loc[yr_cal, lu]
+        else:
+            print(
+                f"WARNING: Multiplier for {lu} not found in the 'QC_multiplier' sheet of "
+                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
+        
         costs_q = ( data.AGEC_CROPS['QC', lm, lu]
-                  * data.QC_COST_MULTS.loc[data.YR_CAL_BASE + yr_idx, lu]
+                  * qc_multiplier
                   * get_quantity(data, lu.upper(), lm, yr_idx) )  # lu.upper() only for crops as needs to be in product format in get_quantity().  
 
         # Area costs.
-        costs_a = data.AGEC_CROPS['AC', lm, lu] * data.AC_COST_MULTS.loc[data.YR_CAL_BASE + yr_idx, lu]
+        ac_multiplier = 1
+        if lu in data.AC_COST_MULTS.columns:
+            ac_multiplier = data.AC_COST_MULTS.loc[yr_cal, lu]
+        else:
+            print(
+                f"WARNING: Multiplier for {lu} not found in the 'AC_multiplier' sheet of "
+                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
+        costs_a = data.AGEC_CROPS['AC', lm, lu] * ac_multiplier
 
         # Fixed costs
-        costs_f = ( data.AGEC_CROPS['FLC', lm, lu] * data.FLC_COST_MULTS.loc[yr_cal, lu]    # Fixed labour costs.
-                  + data.AGEC_CROPS['FOC', lm, lu] * data.FOC_COST_MULTS.loc[yr_cal, lu]    # Fixed operating costs.
-                  + data.AGEC_CROPS['FDC', lm, lu] * data.FDC_COST_MULTS.loc[yr_cal, lu] )  # Fixed depreciation costs.
+        flc_multiplier = 1
+        if lu in data.FLC_COST_MULTS.columns:
+            flc_multiplier = data.FLC_COST_MULTS.loc[yr_cal, lu]
+        else:
+            print(
+                f"WARNING: Multiplier for {lu} not found in the 'FLC_multiplier' sheet of "
+                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
+            
+        foc_multiplier = 1
+        if lu in data.FOC_COST_MULTS.columns:
+            foc_multiplier = data.FOC_COST_MULTS.loc[yr_cal, lu]
+        else:
+            print(
+                f"WARNING: Multiplier for {lu} not found in the 'FOC_multiplier' sheet of "
+                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
+            
+        fdc_multiplier = 1
+        if lu in data.FDC_COST_MULTS.columns:
+            fdc_multiplier = data.FDC_COST_MULTS.loc[yr_cal, lu]
+        else:
+            print(
+                f"WARNING: Multiplier for {lu} not found in the 'FDC_multiplier' sheet of "
+                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
+            
+        costs_f = ( data.AGEC_CROPS['FLC', lm, lu] * flc_multiplier    # Fixed labour costs.
+                  + data.AGEC_CROPS['FOC', lm, lu] * foc_multiplier    # Fixed operating costs.
+                  + data.AGEC_CROPS['FDC', lm, lu] * fdc_multiplier )  # Fixed depreciation costs.
 
         # Water costs as water required in ML per hectare x delivery price per ML.
         if lm == 'irr':
