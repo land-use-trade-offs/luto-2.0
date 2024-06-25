@@ -244,7 +244,7 @@ def get_carbon_plantings_block_from_ag(data: Data, yr_idx, lumap, lmmap, separat
         return ag2cp_transitions_r * data.REAL_AREA
 
 
-def get_carbon_plantings_belt_from_ag_base(data, yr_idx, lumap, lmmap, separate) -> np.ndarray|dict:
+def get_carbon_plantings_belt_from_ag_base(data: Data, yr_idx, lumap, lmmap, separate) -> np.ndarray|dict:
     """
     Get the base transition costs from agricultural land uses to carbon plantings (belt) for each cell.
 
@@ -549,7 +549,7 @@ def get_sheep_to_ag_base(data: Data, yr_idx: int, lumap, separate=False) -> np.n
     l_mrj = lumap2ag_l_mrj(all_sheep_lumap, all_dry_lmmap)
     l_mrj_not = np.logical_not(l_mrj)
 
-    t_ij = data.AG_TMATRIX
+    t_ij = data.AG_TMATRIX * data.TRANS_COST_MULTS[yr_cal]
     x_mrj = ag_transitions.get_exclude_matrices(data, all_sheep_lumap)
 
     # Calculate sheep contribution to transition costs
@@ -557,7 +557,7 @@ def get_sheep_to_ag_base(data: Data, yr_idx: int, lumap, separate=False) -> np.n
     ag_cells = tools.get_ag_cells(lumap)
 
     e_rj = np.zeros((data.NCELLS, data.N_AG_LUS))
-    e_rj[ag_cells, :] = t_ij[all_sheep_lumap[ag_cells]] * data.TRANS_COST_MULTS[yr_cal]
+    e_rj[ag_cells, :] = t_ij[all_sheep_lumap[ag_cells]]
 
     e_rj = tools.amortise(e_rj) * data.REAL_AREA[:, np.newaxis]
     e_rj_dry = np.einsum('rj,r->rj', e_rj, all_sheep_lumap == 0)
@@ -607,7 +607,7 @@ def get_beef_to_ag_base(data: Data, yr_idx, lumap, separate) -> np.ndarray|dict:
     l_mrj = lumap2ag_l_mrj(all_beef_lumap, all_dry_lmmap)
     l_mrj_not = np.logical_not(l_mrj)
 
-    t_ij = data.AG_TMATRIX
+    t_ij = data.AG_TMATRIX * data.TRANS_COST_MULTS[yr_cal]
     x_mrj = ag_transitions.get_exclude_matrices(data, all_beef_lumap)
 
     # Calculate sheep contribution to transition costs
@@ -615,7 +615,7 @@ def get_beef_to_ag_base(data: Data, yr_idx, lumap, separate) -> np.ndarray|dict:
     ag_cells = tools.get_ag_cells(lumap)
 
     e_rj = np.zeros((data.NCELLS, data.N_AG_LUS))
-    e_rj[ag_cells, :] = t_ij[all_beef_lumap[ag_cells]] * data.TRANS_COST_MULTS[yr_cal]
+    e_rj[ag_cells, :] = t_ij[all_beef_lumap[ag_cells]]
 
     e_rj = tools.amortise(e_rj) * data.REAL_AREA[:, np.newaxis]
     e_mrj = np.stack([e_rj] * 2, axis=0)
