@@ -400,6 +400,28 @@ def create_new_dataset():
     zones['HR_DRAINDIV_ID'].to_hdf(outpath + 'draindiv_id.h5', key = 'draindiv_id', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
     
+    # LUMAP == -1 is areas outside LUTO study area
+    
+    # # Calculate water use for natural land under climate change (ensemble model)  
+    # luto_4D_inpath = 'N:/Data-Master/LUTO_2.0_input_data/Input_data/4D_Spatial_SSP_Timeseries/'
+
+    # for ssp in ['126']: #, '245', '370', '585']:
+        
+    #     fn = 'Water_yield_GCM-Ensemble_ssp' + ssp + '_2010-2100_DR_ML_HA_mean'
+    #     with h5py.File(luto_4D_inpath + fn + '.h5', 'r') as h5:
+    #         dr_arr = h5[fn][:]  # shape = (91, 6956407)
+    #     fn = 'Water_yield_GCM-Ensemble_ssp' + ssp + '_2010-2100_SR_ML_HA_mean'
+    #     with h5py.File(luto_4D_inpath + fn + '.h5', 'r') as h5:
+    #         sr_arr = h5[fn][:]  # shape = (91, 6956407)
+            
+    #     base_arr =  dr_arr * np.array(cell_df.DEEP_ROOTED_PROPORTION) + sr_arr * np.array(1 - cell_df.DEEP_ROOTED_PROPORTION)
+        
+    #     # Save water yield data to HDF5 
+    #     fn = 'water_yield_ssp' + ssp + '_2010-2100_nl_ml_ha'
+    #     with h5py.File(luto_4D_inpath + fn + '.h5', 'w') as h5f:
+    #         h5f.create_dataset(fn, data = base_arr, chunks = True)
+    
+    
     
     
     
