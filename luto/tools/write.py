@@ -56,6 +56,11 @@ from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_html import data2html
 from luto.tools.report.create_static_maps import TIF2MAP
 
+from luto.tools.xarray_tools import ag_dvar_to_bio_map, non_ag_dvar_to_bio_map, am_dvar_to_bio_map, non_ag_to_xr, ag_to_xr, am_to_xr
+
+
+
+ag_dvar_to_bio_map
 
 timestamp_write = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
@@ -1114,8 +1119,26 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
     biodiv_df.insert(0, 'Year', yr_cal)
 
     # Write to file
-    biodiv_df.to_csv(os.path.join(path, f'biodiversity_separate_{yr_cal}.csv'), index=False)    
-      
+    biodiv_df.to_csv(os.path.join(path, f'biodiversity_separate_{yr_cal}.csv'), index=False) 
+    
+
+def write_biodiversity_species(data: Data, yr_cal, path):
+    ag_dvar = np.load(f'data/dvars/res{res_factor}/ag_X_mrj_{year}.npy')         
+    am_dvar = {k: np.load(f'data/dvars/res{res_factor}/ag_man_X_mrj_{k.lower().replace(' ', '_')}_{year}.npy')  
+            for k in AG_MANAGEMENTS_TO_LAND_USES.keys()}
+    non_ag_dvar = np.load(f'data/dvars/res{res_factor}/non_ag_X_rk_{year}.npy')
+
+
+    # dvar to xarray 
+    ag_dvar = ag_to_xr(data, ag_dvar)
+    am_dvar = am_to_xr(data, am_dvar)
+    non_ag_dvar = non_ag_to_xr(data, non_ag_dvar) 
+    
+    # Reproject and match dvars to the bio map
+    ag_dvar_map_reprojected = ag_dvar_to_bio_map(data, ag_dvar, res_factor, max_workers)
+    am_dvar_map_reprojected = am_dvar_to_bio_map(data, am_dvar, res_factor, max_workers)
+    non_ag_dvar_map_reprojected = non_ag_dvar_to_bio_map(data, non_ag_dvar, res_factor, max_workers)
+            
     
   
 def write_ghg_separate(data: Data, yr_cal, path):
