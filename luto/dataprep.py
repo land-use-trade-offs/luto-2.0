@@ -22,13 +22,14 @@ and Brett Bryan, Deakin University
 
 
 # Load libraries
-from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
 import shutil, os, time
+import h5py
+
+from joblib import Parallel, delayed
 from luto.settings import INPUT_DIR, RAW_DATA
-# import csv
-# from scipy.interpolate import interp1d
+
 
     
 def create_new_dataset():
@@ -369,6 +370,13 @@ def create_new_dataset():
     np.save(outpath + 'x_mrj.npy', x_mrj)
     
     
+    ############### Get water yield historical baseline data 
+    
+    # Select historical (1970 - 2000) water yield under deep rooted and shallow rooted vegetation
+    water_yield_baselines = bioph[['WATER_YIELD_HIST_SR_ML_HA', 'WATER_YIELD_HIST_DR_ML_HA', 'DEEP_ROOTED_PROPORTION']]
+    
+    # Save to file
+    water_yield_baselines.to_hdf(outpath + 'water_yield_baselines.h5', key = 'water_yield_baselines', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
     
     
@@ -421,17 +429,63 @@ def create_new_dataset():
     #     with h5py.File(luto_4D_inpath + fn + '.h5', 'w') as h5f:
     #         h5f.create_dataset(fn, data = base_arr, chunks = True)
     
+
+    # Get the mask indicating the cells outside the LUTO study area
+    LUTO_outside_cells_index = (lumap == -1).values                                             # shape = (6956407,), sum = 2737674
+    water_outside_LUTO = water_yield_baselines.iloc[LUTO_outside_cells_index]                   # shape = (2737674, 3)
+    cells_attrs_outside_LUTO = zones.iloc[LUTO_outside_cells_index]                             # shape = (2737674, 71)
+
+        
+    # Calculate water use for natural land under climate change (ensemble model)
+    def calculate_water_yield(ssp: str):
+
+        fn = 'Water_yield_GCM-Ensemble_ssp' + ssp + '_2010-2100_DR_ML_HA_mean'
+        with h5py.File(luto_4D_inpath + fn + '.h5', 'r') as h5:
+            dr_arr = h5[fn][:][:, LUTO_outside_cells_index]  # shape = (91, 2737674)
+        fn = 'Water_yield_GCM-Ensemble_ssp' + ssp + '_2010-2100_SR_ML_HA_mean'
+        with h5py.File(luto_4D_inpath + fn + '.h5', 'r') as h5:
+            sr_arr = h5[fn][:][:, LUTO_outside_cells_index]  # shape = (91, 2737674)
+            
+        # Calculate the water yield for the cells outside the LUTO study area
+        base_arr =  dr_arr * np.array(water_outside_LUTO.DEEP_ROOTED_PROPORTION) + sr_arr * np.array(1 - water_outside_LUTO.DEEP_ROOTED_PROPORTION)
+        base_arr = base_arr * cells_attrs_outside_LUTO['CELL_HA'].values[np.newaxis,:]     # Convert from ML/HA to ML
+        base_arr_df = pd.DataFrame(base_arr.T, columns = range(2010, 2101))
+
+        # Warp the df to long format to link each cells with its river regions and drainage divisions
+        base_arr_df[['HR_DRAINDIV_NAME', 'HR_DRAINDIV_ID', 'HR_RIVREG_NAME', 'HR_RIVREG_ID']] = cells_attrs_outside_LUTO[['HR_DRAINDIV_NAME', 'HR_DRAINDIV_ID', 'HR_RIVREG_NAME', 'HR_RIVREG_ID']].values.tolist()
+        base_arr_df = base_arr_df.melt(id_vars = ['HR_DRAINDIV_NAME', 'HR_DRAINDIV_ID', 'HR_RIVREG_NAME', 'HR_RIVREG_ID'], var_name = 'Year', value_name = 'Water_yield_ML')
+
+        # Get the total water yield for each drainage division and river region
+        water_yield_dd = base_arr_df.groupby(['HR_DRAINDIV_NAME', 'HR_DRAINDIV_ID', 'Year'], as_index = False, observed = True).agg(Water_yield_ML = ('Water_yield_ML', 'sum'))
+        water_yield_rr = base_arr_df.groupby(['HR_RIVREG_NAME', 'HR_RIVREG_ID', 'Year'], as_index = False, observed = True).agg(Water_yield_ML = ('Water_yield_ML', 'sum'))
+        water_yield_dd = water_yield_dd.rename(columns = {'HR_DRAINDIV_NAME': 'Region_name', 'HR_DRAINDIV_ID': 'Region_ID'})
+        water_yield_rr = water_yield_rr.rename(columns = {'HR_RIVREG_NAME': 'Region_name', 'HR_RIVREG_ID': 'Region_ID'})
+
+        # Append the region and ssp info
+        water_yield_dd['ssp'] = ssp
+        water_yield_rr['ssp'] = ssp 
+        water_yield_dd['Region_type'] = 'Drainage division' 
+        water_yield_rr['Region_type'] = 'River region' 
+        
+        return pd.concat([water_yield_dd, water_yield_rr], ignore_index=True)
+
+    # Run the function in parallel
+    tasks = [delayed(calculate_water_yield)(ssp) for ssp in ['126', '245', '370', '585']]
+    results = Parallel(n_jobs = 4)(tasks)
+
+    # Save to disk
+    water_yield_outside_LUTO = pd.concat(results, ignore_index=True)
+    water_yield_outside_LUTO = water_yield_outside_LUTO.pivot(
+        index=['Year'], 
+        columns=['Region_type','Region_name','Region_ID','ssp'], 
+        values='Water_yield_ML'
+    )
+    water_yield_outside_LUTO = water_yield_outside_LUTO.sort_index(axis=1, level=2)
     
-    
-    
-    
-    ############### Get water yield historical baseline data 
-    
-    # Select historical (1970 - 2000) water yield under deep rooted and shallow rooted vegetation
-    water_yield_baselines = bioph[['WATER_YIELD_HIST_SR_ML_HA', 'WATER_YIELD_HIST_DR_ML_HA', 'DEEP_ROOTED_PROPORTION']]
-    
-    # Save to file
-    water_yield_baselines.to_hdf(outpath + 'water_yield_baselines.h5', key = 'water_yield_baselines', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    water_yield_2010_2100_cc_dd_ml = water_yield_outside_LUTO['Drainage division']
+    water_yield_2010_2100_cc_rr_ml = water_yield_outside_LUTO['River region']
+    water_yield_2010_2100_cc_dd_ml.to_hdf(os.path.join(outpath, 'water_yield_2010_2100_cc_dd_ml.h5'), key='water_yield_2010_2100_cc_dd_ml', mode='w', format='table', complevel=9)
+    water_yield_2010_2100_cc_rr_ml.to_hdf(os.path.join(outpath, 'water_yield_2010_2100_cc_rr_ml.h5'), key='water_yield_2010_2100_cc_rr_ml', mode='w', format='table', complevel=9)
     
     
     
@@ -565,13 +619,13 @@ def create_new_dataset():
         cci.sort_index(axis = 1, inplace = True)
         
         # Write to HDF5 file.
-        fname = outpath + 'climate_change_impacts_' + rcp + '_' + CO2F_dict[i] + '.h5'
+        fname = outpath + 'climate_change_impacts_' + rcp + '_' + co2_on_off + '.h5'
         kname = 'climate_change_impacts_' + rcp 
         cci.to_hdf(fname, key = kname, mode = 'w', format = 'fixed', index = False, complevel = 9)
 
     # Parallelise the process
     jobs = ([delayed(process_climate_impacts)(on_off, rcp, cci_raw, concordance, luid_desc, outpath ) for on_off in CO2F_dict for rcp in rcps])
-    Parallel(n_jobs=len(CO2F_dict) * len(rcps), prefer='processes')(jobs) # Reduce processing time from ~25 min to ~3 min
+    Parallel(n_jobs=min(50, len(CO2F_dict) * len(rcps)), prefer='processes')(jobs) # Reduce processing time from ~25 min to ~3 min
         
         
         
