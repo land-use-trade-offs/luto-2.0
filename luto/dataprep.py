@@ -481,6 +481,7 @@ def create_new_dataset():
         columns=['Region_type','Region_name','Region_ID','ssp'], 
         values='Water_yield_ML'
     )
+    water_yield_outside_LUTO = water_yield_outside_LUTO.sort_index(axis=1, level=2)
     water_yield_outside_LUTO.to_hdf(os.path.join(outpath, f'{fn}.h5'), key=fn, mode='w', format='table', complevel=9)
     
     
