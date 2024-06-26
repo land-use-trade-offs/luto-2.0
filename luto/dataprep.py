@@ -474,7 +474,6 @@ def create_new_dataset():
     results = Parallel(n_jobs = 4)(tasks)
 
     # Save to disk
-    fn = 'water_yield_2010_2100_nl_ml'
     water_yield_outside_LUTO = pd.concat(results, ignore_index=True)
     water_yield_outside_LUTO = water_yield_outside_LUTO.pivot(
         index=['Year'], 
@@ -482,7 +481,11 @@ def create_new_dataset():
         values='Water_yield_ML'
     )
     water_yield_outside_LUTO = water_yield_outside_LUTO.sort_index(axis=1, level=2)
-    water_yield_outside_LUTO.to_hdf(os.path.join(outpath, f'{fn}.h5'), key=fn, mode='w', format='table', complevel=9)
+    
+    water_yield_2010_2100_cc_dd_ml = water_yield_outside_LUTO['Drainage division']
+    water_yield_2010_2100_cc_rr_ml = water_yield_outside_LUTO['River region']
+    water_yield_2010_2100_cc_dd_ml.to_hdf(os.path.join(outpath, 'water_yield_2010_2100_cc_dd_ml.h5'), key='water_yield_2010_2100_cc_dd_ml', mode='w', format='table', complevel=9)
+    water_yield_2010_2100_cc_rr_ml.to_hdf(os.path.join(outpath, 'water_yield_2010_2100_cc_rr_ml.h5'), key='water_yield_2010_2100_cc_rr_ml', mode='w', format='table', complevel=9)
     
     
     
