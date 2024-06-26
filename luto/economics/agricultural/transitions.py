@@ -98,7 +98,8 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
                                If `separate` is False, returns a numpy array representing the total costs.
                                If `separate` is True, returns a dictionary with separate cost matrices for
                                establishment costs, Water license cost, and carbon releasing costs.
-    """    
+    """
+    yr_cal = data.YR_CAL_BASE + yr_idx
     lumap = lumaps[base_year]
     lmmap = lmmaps[base_year]
     # Return l_mrj (Boolean) for current land-use and land management
@@ -117,7 +118,7 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
     # -------------------------------------------------------------- #
 
     # Raw transition-cost matrix is in $/ha and lexigraphically ordered (shape: land-use x land-use).
-    t_ij = data.AG_TMATRIX
+    t_ij = data.AG_TMATRIX * data.TRANS_COST_MULTS[yr_cal]
 
     # Non-irrigation related transition costs for cell r to change to land-use j calculated based on lumap (in $/ha).
     # Only consider for cells currently being used for agriculture.
@@ -140,12 +141,12 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
     # -------------------------------------------------------------- #
 
     w_mrj = get_wreq_matrices(data, yr_idx)                                     # <unit: ML/cell>                                     
-    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data)                  
+    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)                  
     w_delta_mrj = np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not)       
 
     # -------------------------------------------------------------- #
     # Carbon costs of transitioning cells.                          #
-    # -------------------------------------------------------------- #
+    # -------------------------------------------------------------- #S
 
     # apply the cost of carbon released by transitioning modified land to natural land
     ghg_t_mrj = ag_ghg.get_ghg_transition_penalties(data, lumap)               # <unit: t/ha>      

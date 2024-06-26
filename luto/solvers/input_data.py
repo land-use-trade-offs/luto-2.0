@@ -162,9 +162,9 @@ def get_ag_c_mrj(data: Data, target_index):
     return output.astype(np.float32)
 
 
-def get_non_ag_c_rk(data: Data, ag_c_mrj: np.ndarray, lumap: np.ndarray):
+def get_non_ag_c_rk(data: Data, ag_c_mrj: np.ndarray, lumap: np.ndarray, target_year):
     print('Getting non-agricultural production cost matrices...', flush = True)
-    output = non_ag_cost.get_cost_matrix(data, ag_c_mrj, lumap)
+    output = non_ag_cost.get_cost_matrix(data, ag_c_mrj, lumap, target_year)
     return output.astype(np.float32)
 
 
@@ -382,7 +382,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_to_non_ag_t_rk=get_ag_to_non_ag_t_rk(data, target_index, base_year),
         non_ag_to_ag_t_mrj=get_non_ag_to_ag_t_mrj(data, base_year, target_index),
         non_ag_t_rk=get_non_ag_t_rk(data, base_year),
-        non_ag_c_rk=get_non_ag_c_rk(data, ag_c_mrj, base_year),
+        non_ag_c_rk=get_non_ag_c_rk(data, ag_c_mrj, base_year, target_year),
         non_ag_r_rk=get_non_ag_r_rk(data, ag_r_mrj, base_year, target_year),
         non_ag_g_rk=get_non_ag_g_rk(data, ag_g_mrj, base_year),
         non_ag_w_rk=get_non_ag_w_rk(data, ag_w_mrj, base_year),

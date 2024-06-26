@@ -124,7 +124,6 @@ WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resoluti
 PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
 WRITE_THREADS = 50              # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
-
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
 # ---------------------------------------------------------------------------- #
@@ -195,27 +194,28 @@ NON_AG_LAND_USES_REVERSIBLE = {
     'BECCS': False,
 }
 
+# Carbon price scenario: either '1.8C 67%', '1.5C 50%', '1.5C 67%', 'Default' or None. 
+# Setting to None falls back to the 'Default' scenario.
+CARBON_PRICES_FIELD = '1.8C 67%'
+
 # Cost of fencing per linear metre
 FENCING_COST_PER_M = 5
 
 # Environmental Plantings Parameters
-ep_annual_maintennance_cost_per_ha_per_year = 100
-ep_annual_ecosystem_services_benefit_per_ha_per_year = 0
-ENV_PLANTING_COST_PER_HA_PER_YEAR = ep_annual_maintennance_cost_per_ha_per_year - ep_annual_ecosystem_services_benefit_per_ha_per_year   # Yearly cost of maintaining one hectare of environmental plantings
+EP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
+EP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
 ENV_PLANTING_BIODIVERSITY_BENEFIT = 0.8    # Set benefit level of EP, AF, and RP (0 = none, 1 = full)
 
 # Carbon Plantings Block Parameters
-cp_block_annual_maintennance_cost_per_ha_per_year = 100
-cp_block_annual_ecosystem_services_benefit_per_ha_per_year = 0
-CARBON_PLANTING_BLOCK_COST_PER_HA_PER_YEAR = cp_block_annual_maintennance_cost_per_ha_per_year - cp_block_annual_ecosystem_services_benefit_per_ha_per_year   # Yearly cost of maintaining one hectare of carbon plantings (block)
+CP_BLOCK_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
+CP_BLOCK_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
 CARBON_PLANTING_BLOCK_BIODIV_BENEFIT = 0.1
 
 # Carbon Plantings Belt Parameters
-cp_belt_annual_maintennance_cost_per_ha_per_year = 100
-cp_belt_annual_ecosystem_services_benefit_per_ha_per_year = 0
-CARBON_PLANTING_BELT_COST_PER_HA_PER_YEAR = cp_belt_annual_maintennance_cost_per_ha_per_year - cp_belt_annual_ecosystem_services_benefit_per_ha_per_year      # Yearly cost of maintaining one hectare of carbon plantings (belt)
+CP_BELT_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
+CP_BELT_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
 CP_BELT_ROW_WIDTH = 20
 CP_BELT_ROW_SPACING = 40
@@ -226,9 +226,8 @@ CP_BELT_FENCING_LENGTH = 100 * cp_no_alleys_per_ha * 2     # Length (average) of
 CARBON_PLANTING_BELT_BIODIV_BENEFIT = 0.1
 
 # Riparian Planting Parameters
-rp_annual_maintennance_cost_per_ha_per_year = 100
-rp_annual_ecosystem_services_benefit_per_ha_per_year = 0
-RIPARIAN_PLANTING_COST_PER_HA_PER_YEAR = rp_annual_maintennance_cost_per_ha_per_year - rp_annual_ecosystem_services_benefit_per_ha_per_year
+RP_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
+RP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
 RIPARIAN_PLANTING_BUFFER_WIDTH = 30
 RIPARIAN_PLANTING_TORTUOSITY_FACTOR = 0.5
@@ -236,9 +235,8 @@ RIPARIAN_PLANTING_TORTUOSITY_FACTOR = 0.5
 RIPARIAN_PLANTING_BIODIV_BENEFIT = 1
 
 # Agroforestry Parameters
-af_annual_maintennance_cost_per_ha_per_year = 100
-af_annual_ecosystem_services_benefit_per_ha_per_year = 0
-AGROFORESTRY_COST_PER_HA_PER_YEAR = af_annual_maintennance_cost_per_ha_per_year - af_annual_ecosystem_services_benefit_per_ha_per_year
+AF_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
+AF_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
 AGROFORESTRY_ROW_WIDTH = 20
 AGROFORESTRY_ROW_SPACING = 40

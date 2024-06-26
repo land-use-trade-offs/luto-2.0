@@ -59,23 +59,67 @@ def get_cost_crop(data: Data, lu, lm, yr_idx):
                             columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost']]))
 
     else: # Calculate the total costs 
-            
+        yr_cal = data.YR_CAL_BASE + yr_idx
         # Variable costs (quantity costs and area costs)        
         # Quantity costs (calculated as cost per tonne x tonne per cell x resfactor)
+        qc_multiplier = 1
+        if lu in data.QC_COST_MULTS.columns:
+            qc_multiplier = data.QC_COST_MULTS.loc[yr_cal, lu]
+        else:
+            print(
+                f"WARNING: Multiplier for {lu} not found in the 'QC_multiplier' sheet of "
+                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
+        
         costs_q = ( data.AGEC_CROPS['QC', lm, lu]
+                  * qc_multiplier
                   * get_quantity(data, lu.upper(), lm, yr_idx) )  # lu.upper() only for crops as needs to be in product format in get_quantity().  
 
         # Area costs.
-        costs_a = data.AGEC_CROPS['AC', lm, lu]
+        ac_multiplier = 1
+        if lu in data.AC_COST_MULTS.columns:
+            ac_multiplier = data.AC_COST_MULTS.loc[yr_cal, lu]
+        else:
+            print(
+                f"WARNING: Multiplier for {lu} not found in the 'AC_multiplier' sheet of "
+                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
+        costs_a = data.AGEC_CROPS['AC', lm, lu] * ac_multiplier
 
         # Fixed costs
-        costs_f = ( data.AGEC_CROPS['FLC', lm, lu]    # Fixed labour costs.
-                  + data.AGEC_CROPS['FOC', lm, lu]    # Fixed operating costs.
-                  + data.AGEC_CROPS['FDC', lm, lu] )  # Fixed depreciation costs.
+        flc_multiplier = 1
+        if lu in data.FLC_COST_MULTS.columns:
+            flc_multiplier = data.FLC_COST_MULTS.loc[yr_cal, lu]
+        else:
+            print(
+                f"WARNING: Multiplier for {lu} not found in the 'FLC_multiplier' sheet of "
+                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
+            
+        foc_multiplier = 1
+        if lu in data.FOC_COST_MULTS.columns:
+            foc_multiplier = data.FOC_COST_MULTS.loc[yr_cal, lu]
+        else:
+            print(
+                f"WARNING: Multiplier for {lu} not found in the 'FOC_multiplier' sheet of "
+                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
+            
+        fdc_multiplier = 1
+        if lu in data.FDC_COST_MULTS.columns:
+            fdc_multiplier = data.FDC_COST_MULTS.loc[yr_cal, lu]
+        else:
+            print(
+                f"WARNING: Multiplier for {lu} not found in the 'FDC_multiplier' sheet of "
+                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
+            
+        costs_f = ( data.AGEC_CROPS['FLC', lm, lu] * flc_multiplier    # Fixed labour costs.
+                  + data.AGEC_CROPS['FOC', lm, lu] * foc_multiplier    # Fixed operating costs.
+                  + data.AGEC_CROPS['FDC', lm, lu] * fdc_multiplier )  # Fixed depreciation costs.
 
         # Water costs as water required in ML per hectare x delivery price per ML.
         if lm == 'irr':
-            costs_w = data.AGEC_CROPS['WR', lm, lu] * data.AGEC_CROPS['WP', lm, lu]
+            costs_w = (
+                data.AGEC_CROPS['WR', lm, lu] 
+                * data.AGEC_CROPS['WP', lm, lu] 
+                * data.WP_COST_MULTS[yr_cal]
+            )
         elif lm == 'dry':
             costs_w = 0
         else: # Passed lm is neither `dry` nor `irr`.
@@ -109,22 +153,25 @@ def get_cost_lvstk(data: Data, lu, lm, yr_idx):
         KeyError: If the passed `lm` is neither 'dry' nor 'irr'.
 
     """
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
     # Get livestock and vegetation type.
     lvstype, vegtype = lvs_veg_types(lu)
+    lvstype_capital = lvstype.capitalize()
 
     # Get the yield potential, i.e. the total number of head per hectare.
     yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
 
     # Variable costs - quantity-dependent costs as costs per head x heads per hectare.
-    costs_q = data.AGEC_LVSTK['QC', lvstype] * yield_pot
+    costs_q = data.AGEC_LVSTK['QC', lvstype] * yield_pot * data.QC_COST_MULTS.loc[yr_cal, lvstype_capital]
 
     # Variable costs - area-dependent costs per hectare.
-    costs_a = data.AGEC_LVSTK['AC', lvstype]
+    costs_a = data.AGEC_LVSTK['AC', lvstype] * data.AC_COST_MULTS.loc[yr_cal, lvstype_capital]
 
     # Fixed costs
-    costs_f = ( data.AGEC_LVSTK['FOC', lvstype]   # Fixed operating costs.
-              + data.AGEC_LVSTK['FLC', lvstype]   # Fixed labour costs.
-              + data.AGEC_LVSTK['FDC', lvstype] ) # Fixed depreciation costs.
+    costs_f = ( data.AGEC_LVSTK['FOC', lvstype] * data.FOC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed operating costs.
+              + data.AGEC_LVSTK['FLC', lvstype] * data.FLC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed labour costs.
+              + data.AGEC_LVSTK['FDC', lvstype] * data.FDC_COST_MULTS.loc[yr_cal, lvstype_capital] ) # Fixed depreciation costs.
 
     # Water costs in $/ha calculated as water requirements (ML/head) x heads per hectare x delivery price ($/ML)
     if lm == 'irr': # Irrigation water if required.
@@ -136,7 +183,8 @@ def get_cost_lvstk(data: Data, lu, lm, yr_idx):
 
     # Water delivery costs equal drinking water plus irrigation water req per head * yield (head/ha)
     costs_w = (data.AGEC_LVSTK['WR_DRN', lvstype] + WR_IRR) * yield_pot
-    costs_w *= data.WATER_DELIVERY_PRICE  # $/ha
+    # TODO: check that the WP cost multiplier is applicable here.
+    costs_w *= data.WATER_DELIVERY_PRICE * data.WP_COST_MULTS[yr_cal]  # $/ha
 
     # Convert costs to $ per cell including resfactor.
     cost_a, cost_f, cost_w, cost_q = costs_a*data.REAL_AREA, costs_f*data.REAL_AREA,\
@@ -342,7 +390,7 @@ def get_ecological_grazing_effect_c_mrj(data: Data, yr_idx):
     return new_c_mrj
 
 
-def get_savanna_burning_effect_c_mrj(data: Data):
+def get_savanna_burning_effect_c_mrj(data: Data, yr_idx: int):
     """
     Applies the effects of using LDS Savanna Burning to the cost data
     for all relevant agr. land uses.
@@ -359,7 +407,11 @@ def get_savanna_burning_effect_c_mrj(data: Data):
     if not AG_MANAGEMENTS['Savanna Burning']:
         return new_c_mrj
 
-    sav_burning_effect = data.SAVBURN_COST_HA * data.REAL_AREA
+    sav_burning_effect = (
+        data.SAVBURN_COST_HA
+        * data.SAVBURN_COST_MULTS[data.YR_CAL_BASE + yr_idx]
+        * data.REAL_AREA
+    )
 
     big_number = 999999999999
     savburn_ineligible_cells = np.where(data.SAVBURN_ELIGIBLE == 0)[0]
@@ -419,7 +471,7 @@ def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
     asparagopsis_data = get_asparagopsis_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Asparagopsis taxiformis'] else 0
     precision_agriculture_data = get_precision_agriculture_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Precision Agriculture'] else 0
     eco_grazing_data = get_ecological_grazing_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Ecological Grazing'] else 0
-    sav_burning_data = get_savanna_burning_effect_c_mrj(data) if AG_MANAGEMENTS['Savanna Burning'] else 0
+    sav_burning_data = get_savanna_burning_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Savanna Burning'] else 0
     agtech_ei_data = get_agtech_ei_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['AgTech EI'] else 0
 
     return {
