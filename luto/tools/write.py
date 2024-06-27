@@ -632,9 +632,9 @@ def write_revenue_cost_non_ag(data: Data, yr_cal, path):
 
     # Get the non-agricultural revenue/cost matrices
     ag_r_mrj = ag_revenue.get_rev_matrices(data, yr_idx)
-    non_ag_rev_mat = non_ag_revenue.get_rev_matrix(data, ag_r_mrj, data.lumaps[yr_cal])    # rk
+    non_ag_rev_mat = non_ag_revenue.get_rev_matrix(data, yr_cal, ag_r_mrj, data.lumaps[yr_cal])    # rk
     ag_c_mrj = ag_cost.get_cost_matrices(data, yr_idx)
-    non_ag_cost_mat = non_ag_cost.get_cost_matrix(data, ag_c_mrj, data.lumaps[yr_cal])     # rk
+    non_ag_cost_mat = non_ag_cost.get_cost_matrix(data, ag_c_mrj, data.lumaps[yr_cal], yr_cal)     # rk
 
     # Replace nan with 0
     non_ag_rev_mat = np.nan_to_num(non_ag_rev_mat)

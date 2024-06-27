@@ -41,15 +41,21 @@ def get_rev_crop( data: Data   # Data object.
     `lm`: land management (e.g. 'dry', 'irr').
     `yr_idx`: number of years from base year, counting from zero.
     """
-    
     # Check if land-use exists in AGEC_CROPS (e.g., dryland Pears/Rice do not occur), if not return zeros
     if lu not in data.AGEC_CROPS['P1', lm].columns:
         rev_t = np.zeros((data.NCELLS))
         
     else:
+        rev_multiplier = 1
+        if lu in data.CROP_PRICE_MULTIPLIERS.columns:
+            rev_multiplier = data.CROP_PRICE_MULTIPLIERS.loc[data.YR_CAL_BASE + yr_idx, lu]
+        else:
+            print(f"WARNING: Multiplier for {lu} not found in 'ag_price_multipliers.xlsx'. Defaulting to 1.", flush=True)
+            
         # Revenue in $ per cell (includes REAL_AREA via get_quantity)
         rev_t = ( data.AGEC_CROPS['P1', lm, lu]
                 * get_quantity( data, lu.upper(), lm, yr_idx )  # lu.upper() only for crops as needs to be in product format in get_quantity().
+                * rev_multiplier
                 ).values
     
     # Return revenue as MultiIndexed DataFrame.
@@ -67,6 +73,7 @@ def get_rev_lvstk( data: Data   # Data object.
     `lm`: land management (e.g. 'dry', 'irr').
     `yr_idx`: number of years from base year, counting from zero."""
     
+    yr_cal = data.YR_CAL_BASE + yr_idx
     # Get livestock and vegetation type.
     lvstype, vegtype = lvs_veg_types(lu)
 
@@ -81,12 +88,14 @@ def get_rev_lvstk( data: Data   # Data object.
                             ( data.AGEC_LVSTK['F1', lvstype]   # Fraction of herd producing (0 - 1)
                             * data.AGEC_LVSTK['Q1', lvstype]   # Quantity produced per head (meat tonnes/head)
                             * data.AGEC_LVSTK['P1', lvstype] ) # Price per unit quantity ($/tonne of meat)
+                            * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, "BEEF P1"] # Multiplier for commodity price
                             )
 
         rev_lexp = yield_pot * (  
                             ( data.AGEC_LVSTK['F3', lvstype]   # Fraction of herd producing (0 - 1)
                             * data.AGEC_LVSTK['Q3', lvstype]   # Quantity produced per head (animal weight tonnes/head)
                             * data.AGEC_LVSTK['P3', lvstype] ) # Price per unit quantity ($/tonne of animal)
+                            * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, "BEEF P3"] # Multiplier for commodity price
                             )  
 
         # Set Wool and Milk to zero as they are not produced by beef cattle
@@ -99,17 +108,20 @@ def get_rev_lvstk( data: Data   # Data object.
                                 ( data.AGEC_LVSTK['F1', lvstype]   # Fraction of herd producing (0 - 1)
                                 * data.AGEC_LVSTK['Q1', lvstype]   # Quantity produced per head (meat tonnes/head)
                                 * data.AGEC_LVSTK['P1', lvstype] ) # Price per unit quantity ($/tonne of meat)
+                                * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, "SHEEP P1"] # Multiplier for commodity price
                                 )
         rev_wool = yield_pot * (  # Wool                           # Stocking density (head/ha) 
                                 ( data.AGEC_LVSTK['F2', lvstype]   # Fraction of herd producing (0 - 1) 
                                 * data.AGEC_LVSTK['Q2', lvstype]   # Quantity produced per head (wool tonnes/head)
                                 * data.AGEC_LVSTK['P2', lvstype] ) # Price per unit quantity ($/tonne wool)
+                                * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, "SHEEP P2"] # Multiplier for commodity price
                                 )   
 
         rev_lexp = yield_pot * (  # Live exports                   # Stocking density (head/ha)
                                 ( data.AGEC_LVSTK['F3', lvstype]   # Fraction of herd producing (0 - 1) 
                                 * data.AGEC_LVSTK['Q3', lvstype]   # Quantity produced per head (animal weight tonnes/head)
                                 * data.AGEC_LVSTK['P3', lvstype] ) # Price per unit quantity ($/tonne of whole animal)
+                                * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, "SHEEP P3"] # Multiplier for commodity price
                                 )
 
         # Set Milk to zero as it is not produced by sheep
@@ -123,6 +135,7 @@ def get_rev_lvstk( data: Data   # Data object.
                                 ( data.AGEC_LVSTK['F1', lvstype]   # Fraction of herd producing (0 - 1) 
                                 * data.AGEC_LVSTK['Q1', lvstype]   # Quantity produced per head (milk litres/head)
                                 * data.AGEC_LVSTK['P1', lvstype] ) # Price per unit quantity ($/litre milk)
+                                * data.LVSTK_PRICE_MULTIPLIERS.loc[yr_cal, "DAIRY P1"] # Multiplier for commodity price
                                 )
 
         # Set Meat, Wool and Live exports to zero
@@ -273,7 +286,7 @@ def get_ecological_grazing_effect_r_mrj(data: Data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_savanna_burning_effect_r_mrj(data):
+def get_savanna_burning_effect_r_mrj(data: Data, yr_idx: int):
     """
     Applies the effects of using EDS savanna burning to the revenue data
     for all relevant agr. land uses.
@@ -281,10 +294,10 @@ def get_savanna_burning_effect_r_mrj(data):
     Since EDSSB has no effect on revenue, return an array of zeros.
     """
     ghg_effect = get_savanna_burning_effect_g_mrj(data)
-    return ghg_effect * settings.CARBON_PRICE_PER_TONNE
+    return ghg_effect * data.get_carbon_price_by_yr_idx(yr_idx)
 
 
-def get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx):
+def get_agtech_ei_effect_r_mrj(data: Data, r_mrj, yr_idx):
     """
     Applies the effects of using AgTech EI to the revenue data
     for all relevant agr. land uses.
@@ -326,7 +339,7 @@ def get_agricultural_management_revenue_matrices(data: Data, r_mrj, yr_idx) -> D
     asparagopsis_data = get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['Asparagopsis taxiformis'] else 0
     precision_agriculture_data = get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['Precision Agriculture'] else 0
     eco_grazing_data = get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['Ecological Grazing'] else 0
-    sav_burning_data = get_savanna_burning_effect_r_mrj(data) if AG_MANAGEMENTS['Savanna Burning'] else 0
+    sav_burning_data = get_savanna_burning_effect_r_mrj(data, yr_idx) if AG_MANAGEMENTS['Savanna Burning'] else 0
     agtech_ei_data = get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['AgTech EI'] else 0
 
     return {
