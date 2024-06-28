@@ -30,32 +30,116 @@ from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
 
 def get_wreq_matrices(data: Data, yr_idx):
     """
-    Return w_mrj water requirement matrices by land management, cell, and land-use type.
+    Return water requirement matrices by land management, cell, and land-use type.
     
     Parameters:
         data (object): The data object containing the required data.
         yr_idx (int): The index of the year.
     
     Returns:
-        numpy.ndarray: The w_mrj <unit: ML/cell> water requirement matrices .
+        numpy.ndarray: The w_mrj <unit: ML/cell> water requirement matrices, indexed (m, r, j).
     """
     
     # Stack water requirements data    ************ Fix water - needs to be framed in terms of net water yield instead of use
     # Water targets need to be framed as a minimum net water yield (i.e., >= 80% of historical catchment yields)
     # Yield for each cell = water yield under climate change minus use
-    w_mrj = np.stack(( data.WREQ_DRY_RJ, data.WREQ_IRR_RJ ))    # <unit: ML/head|ha>
+    w_req_mrj = np.stack(( data.WREQ_DRY_RJ, data.WREQ_IRR_RJ ))    # <unit: ML/head|ha>
     
     # Covert water requirements units from ML/head to ML/ha
     for j, lu in enumerate(data.AGRICULTURAL_LANDUSES):
         if lu in data.LU_LVSTK:
             lvs, veg = lvs_veg_types(lu)
-            w_mrj[0, :, j] = w_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', yr_idx)  # Water reqs depend on current stocking rate for drinking water
-            w_mrj[1, :, j] = w_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)       # Water reqs depend on initial stocking rate for irrigation
+            w_req_mrj[0, :, j] = w_req_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', yr_idx)  # Water reqs depend on current stocking rate for drinking water
+            w_req_mrj[1, :, j] = w_req_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)       # Water reqs depend on initial stocking rate for irrigation
     
     # Convert to ML per cell via REAL_AREA
-    w_mrj *= data.REAL_AREA[:, np.newaxis]                      # <unit: ML/head|ha> * <unit: head|ha/cell> -> <unit: ML/cell>
+    w_req_mrj *= data.REAL_AREA[:, np.newaxis]                      # <unit: ML/head|ha> * <unit: head|ha/cell> -> <unit: ML/cell>
 
-    return w_mrj
+    return w_req_mrj
+
+
+def get_wyield_matrices(data: Data, yr_idx):
+    """
+    Return water yield matrices by land management, cell, and land-use type.
+    
+    Parameters:
+        data (object): The data object containing the required data.
+        yr_idx (int): The index of the year.
+    
+    Returns:
+        numpy.ndarray: The w_mrj <unit: ML/cell> water yield matrices, indexed (m, r, j).
+    """
+    w_yield_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+
+    w_yield_dr = data.get_water_dr_yield_for_yr_idx(yr_idx)
+    w_yield_sr = data.get_water_sr_yield_for_yr_idx(yr_idx)
+    w_yield_nl = data.get_water_nl_yield_for_yr_idx(yr_idx, w_yield_dr, w_yield_sr)
+
+    
+    for j in range(data.N_AG_LUS):
+        if j in data.LU_SHALLOW_ROOTED:
+            for m in range(data.NLMS):
+                w_yield_mrj[m, :, j] = w_yield_sr
+
+        elif j in data.LU_DEEP_ROOTED:
+            for m in range(data.NLMS):
+                w_yield_mrj[m, :, j] = w_yield_dr
+
+        elif j in data.LU_NATURAL:
+            for m in range(data.NLMS):
+                w_yield_mrj[m, :, j] = w_yield_nl
+
+        else:
+            raise ValueError(
+                f"Land use {j} ({data.AGLU2DESC[j]}) missing from all of "
+                f"data.LU_SHALLOW_ROOTED, data.LU_DEEP_ROOTED, data.LU_NATURAL "
+                f"(requires root definition)."
+            )
+
+    return w_yield_mrj
+
+
+def get_water_ccimpact(data: Data, yr_idx) -> dict[int, float]:
+    """
+    Return water climate change (CC) impact matrices by land management, cell, and land-use type.
+    
+    Parameters:
+        data (object): The data object containing the required data.
+        yr_idx (int): The index of the year.
+    
+    Returns:
+        dict[int, float]: <unit: ML/cell> dictionary of water CC impact amounts, keys being region IDs
+    """
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    if settings.WATER_REGION_DEF == 'River Region':
+        ccimpact_array = data.RR_CCIMPACT
+
+    elif settings.WATER_REGION_DEF == 'Drainage Division':
+        ccimpact_array = data.DD_CCIMPACT
+
+    else:
+        raise ValueError(
+            f"Invalid value for setting WATER_REGION_DEF: '{settings.WATER_REGION_DEF}' "
+            f"(must be either 'River Region' or 'Drainage Division')."
+        )
+    
+    return ccimpact_array.loc[yr_cal, :].to_dict()
+
+
+def get_water_net_yield_matrices(data: Data, yr_idx):
+    """
+    Return water net yield matrices by land management, cell, and land-use type.
+    The resulting array is used as the net yield w_mrj array in the input data of the solver.
+    
+    Parameters:
+        data (object): The data object containing the required data.
+        yr_idx (int): The index of the year.
+    
+    Returns:
+        numpy.ndarray: The w_mrj <unit: ML/cell> water net yield matrices, indexed (m, r, j).
+    """
+    return get_wyield_matrices(data, yr_idx) - get_wreq_matrices(data, yr_idx)
 
 
 def get_asparagopsis_effect_w_mrj(data: Data, w_mrj, yr_idx):
@@ -240,82 +324,58 @@ def get_agricultural_management_water_matrices(data: Data, w_mrj, yr_idx) -> Dic
     }
 
 
-def get_wuse_limits(data: Data):
+def get_water_net_yield_limits(data: Data) -> dict[int, tuple[str, float, float, np.ndarray]]:
     """
-    Return water use limits for regions (River Regions or Drainage Divisions as specified in luto.settings.py).
-    Currently set such that water limits are set at 2010 agricultural water requirements.
+    Return water net yield limits for regions (River Regions or Drainage Divisions as specified in luto.settings.py).
+    Currently set such that water limits are based on 2010 agricultural water requirements.
 
     Parameters:
     - data: The data object containing the necessary input data.
 
     Returns:
-    - wuse_limits: A list of tuples containing the water use limits for each region
+    - water_net_yield_limits: A list of tuples containing the water use limits for each region
       (region index, region name, water use limit, water all, indices of cells in the region).
 
     Raises:
     - None
 
     """
-
-    # Set up data for river regions or drainage divisions
+    # Baseline water use
+    baseline_reg_water_use: dict[int, str] = {}
     if settings.WATER_REGION_DEF == 'River Region':
-        region_name = data.RIVREG_DICT
-        region_limits = data.RIVREG_LIMITS
+        baseline_reg_water_use = data.RIVREG_LIMITS
         region_id = data.RIVREG_ID
-        
+        region_names = data.RIVREG_DICT
+
     elif settings.WATER_REGION_DEF == 'Drainage Division':
-        region_name = data.DRAINDIV_DICT
-        region_limits = data.DRAINDIV_LIMITS
+        baseline_reg_water_use = data.DRAINDIV_LIMITS
         region_id = data.DRAINDIV_ID
-        
+        region_names = data.DRAINDIV_DICT
+
     else:
-        print('Incorrect option for WATER_REGION_DEF in settings')
+        raise ValueError(
+            f"Invalid value for setting WATER_REGION_DEF: '{settings.WATER_REGION_DEF}' "
+            f"(must be either 'River Region' or 'Drainage Division')."
+        )
+    
+    # Net baseline water yield
+    net_baseline_reg_water_yield = {}
+    for reg in baseline_reg_water_use.keys():
+        # Get indices of cells in region
+        ind = np.flatnonzero(region_id == reg).astype(np.int32)
+        baseline_yield = data.WATER_YIELD_HIST_NL[ind].sum()
+        baseline_use = baseline_reg_water_use[reg]
 
+        reg_baseline_net_yield = baseline_yield - baseline_use
+            # TODO ^ check where the water stress fraction should apply.
 
-    # Set up empty list to hold water use limits data
-    wuse_limits = []
-    
-    # Calculate water use limits (ML) depending on which type of limits specified in settings
-    if settings.WATER_LIMITS_TYPE == 'pct_ag':
-        
-        # Get water requirements of 2010 agriculture in ML per cell in mrj format for 2010.
-        w_mrj = get_wreq_matrices(data, 0)  # 0 gets water requirements from base year (i.e., 2010)
-        
-        # Multiply by agricultural land use and management map in mrj format and sum for each grid cell
-        w_lim_r = np.sum( w_mrj * data.AG_L_MRJ, axis = (0, 2) )
-    
-        # Loop through specified water regions
-        for region in region_limits.keys():
-            
-            # Get indices of cells in region
-            ind = np.flatnonzero(region_id == region).astype(np.int32)
-    
-            # Calculate the 2010 water requirements by agriculture for region.
-            wuse_reg_limit = np.sum( w_lim_r[ind] )
-    
-            # Append to list
-            wuse_limits.append( (region, region_name[region], wuse_reg_limit, ind) )
-            
-    
-    elif settings.WATER_LIMITS_TYPE == 'water_stress':
-        
-        # Loop through specified water regions
-        for region in region_limits.keys():
-            
-            # Get indices of cells in region
-            ind = np.flatnonzero(region_id == region).astype(np.int32)
-    
-            # Retrieve the pre-calculated 2010 water use limit (ML) for each region.
-            water_all = region_limits[region]
-            wuse_reg_limit =  water_all * settings.WATER_STRESS_FRACTION   # np.sum( w_lim_r[ind] )
-    
-            # Append to list
-            wuse_limits.append( (region, region_name[region], water_all, wuse_reg_limit, ind) )
-            
+        reg_net_yield_target = baseline_yield - baseline_use * (1 - settings.WATER_STRESS_FRACTION)
 
-    return wuse_limits
+        net_baseline_reg_water_yield[reg] = (
+            region_names[reg], reg_baseline_net_yield, reg_net_yield_target, ind
+        )
 
-
+    return net_baseline_reg_water_yield
 
 
  

@@ -18,6 +18,7 @@
 import os
 import time
 import math
+import h5py
 import xarray as xr
 import numpy as np
 import pandas as pd
@@ -28,7 +29,7 @@ import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
@@ -262,6 +263,21 @@ class Data:
             self.DESC2NONAGLU["Sheep Carbon Plantings (Belt)"],
             self.DESC2NONAGLU["Beef Carbon Plantings (Belt)"],
             self.DESC2NONAGLU["BECCS"],
+        ]
+
+        # Define which land uses correspond to deep/shallow rooted water yield.
+        self.LU_SHALLOW_ROOTED = [
+            self.DESC2AGLU["Hay"], self.DESC2AGLU["Summer cereals"], self.DESC2AGLU["Summer legumes"], 
+            self.DESC2AGLU["Summer oilseeds"], self.DESC2AGLU["Winter cereals"], self.DESC2AGLU["Winter legumes"], 
+            self.DESC2AGLU["Winter oilseeds"], self.DESC2AGLU["Cotton"], self.DESC2AGLU["Other non-cereal crops"], 
+            self.DESC2AGLU["Rice"], self.DESC2AGLU["Vegetables"], self.DESC2AGLU["Dairy - modified land"],
+            self.DESC2AGLU["Beef - modified land"], self.DESC2AGLU["Sheep - modified land"], 
+            self.DESC2AGLU["Unallocated - modified land"],
+        ]
+        self.LU_DEEP_ROOTED = [
+            self.DESC2AGLU["Apples"], self.DESC2AGLU["Citrus"], self.DESC2AGLU["Grapes"], self.DESC2AGLU["Nuts"],
+            self.DESC2AGLU["Pears"], self.DESC2AGLU["Plantation fruit"], self.DESC2AGLU["Stone fruit"], 
+            self.DESC2AGLU["Sugar"], self.DESC2AGLU["Tropical stone fruit"],
         ]
 
         # Derive land management types from AGEC.
@@ -765,24 +781,36 @@ class Data:
         self.WATER_YIELD_HIST_SR = self.get_array_resfactor_applied(
             water_yield_baselines["WATER_YIELD_HIST_SR_ML_HA"].to_numpy(dtype = np.float32)
         )
-        # self.WATER_YIELD_BASE = self.get_array_resfactor_applied(
-        #     water_yield_baselines["WATER_YIELD_HIST_BASELINE_ML_HA"].to_numpy(dtype = np.float32)
-        # )
+        self.DEEP_ROOTED_PROPORTION = self.get_array_resfactor_applied(
+            water_yield_baselines['DEEP_ROOTED_PROPORTION'].to_numpy(dtype = np.float32)
+        )
         self.WATER_YIELD_HIST_NL = self.get_array_resfactor_applied(
             water_yield_baselines.eval('WATER_YIELD_HIST_DR_ML_HA * DEEP_ROOTED_PROPORTION + \
                                         WATER_YIELD_HIST_SR_ML_HA * (1 - DEEP_ROOTED_PROPORTION)'
                                       ).to_numpy(dtype = np.float32)
         )
+        wyield_fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_dr_ml_ha.h5')
+        wyield_fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_sr_ml_ha.h5')
+        self.WATER_YIELD_DR_FILE = h5py.File(wyield_fname_dr, 'r')
+        self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')
 
-        # fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_dr_ml_ha.h5')
-        # fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_sr_ml_ha.h5')
+        self.RR_CCIMPACT = None
+        self.DD_CCIMPACT = None
 
-        # wy_dr_file = h5py.File(fname_dr, 'r')
-        # wy_sr_file = h5py.File(fname_sr, 'r')
+        if settings.WATER_REGION_DEF == 'River Region':
+            rr_ccimpact_df = pd.read_hdf(os.path.join(INPUT_DIR, 'water_yield_2010_2100_cc_rr_ml.h5'))
+            rr_ccimpact_df.columns = rr_ccimpact_df.columns.droplevel("Region_name")
+            rr_ccimpact_df = rr_ccimpact_df.loc[:, pd.IndexSlice[:, settings.SSP]]
+            rr_ccimpact_df.columns = rr_ccimpact_df.columns.droplevel('ssp')
+            self.RR_CCIMPACT = rr_ccimpact_df
 
-        # Water yields for current year -- placeholder slice for year zero. ############### Better to slice off a year as the file is >2 GB  TODO
-        # WATER_YIELD_NUNC_DR = wy_dr_file[list(wy_dr_file.keys())[0]][0]                   # This might go in the simulation module where year is specified to save loading into memory
-        # WATER_YIELD_NUNC_SR = wy_sr_file[list(wy_sr_file.keys())[0]][0]
+        if settings.WATER_REGION_DEF == 'Drainage Division':
+            dd_ccimpact_df = pd.read_hdf(os.path.join(INPUT_DIR, 'water_yield_2010_2100_cc_dd_ml.h5'))
+            dd_ccimpact_df.columns = dd_ccimpact_df.columns.droplevel("Region_name")
+            dd_ccimpact_df = dd_ccimpact_df.loc[:, pd.IndexSlice[:, settings.SSP]]
+            dd_ccimpact_df.columns = dd_ccimpact_df.columns.droplevel('ssp')
+            self.DD_CCIMPACT = dd_ccimpact_df
+
 
 
         ###############################################################
@@ -1317,3 +1345,72 @@ class Data:
                 f"Year should be between {self.YR_CAL_BASE} and 2100."
             )
         return self.CARBON_PRICES[yr_cal]
+
+    def get_water_dr_yield_for_yr_idx(self, yr_idx: int) -> np.ndarray:
+        """
+        Get the DR water yield array, inclusive of all cells that LUTO does not look at.
+
+        Returns
+        -------
+        np.ndarray: shape (NCELLS,)
+        """
+        dr_key = list(self.WATER_YIELD_DR_FILE.keys())[0]
+        return self.get_array_resfactor_applied(self.WATER_YIELD_DR_FILE[dr_key][yr_idx][self.LUMASK])
+    
+    def get_water_dr_yield_for_year(self, yr_cal: int) -> np.ndarray:
+        """
+        Get the DR water yield array, inclusive of all cells that LUTO does not look at.
+
+        Returns
+        -------
+        np.ndarray: shape (NCELLS,)
+        """
+        yr_idx = yr_cal - self.YR_CAL_BASE
+        return self.get_water_dr_yield_for_yr_idx(yr_idx)
+    
+    def get_water_sr_yield_for_yr_idx(self, yr_idx: int) -> np.ndarray:
+        """
+        Get the SR water yield array, inclusive of all cells that LUTO does not look at.
+
+        Returns
+        -------
+        np.ndarray: shape (NCELLS,)
+        """
+        sr_key = list(self.WATER_YIELD_SR_FILE.keys())[0]
+        return self.get_array_resfactor_applied(self.WATER_YIELD_SR_FILE[sr_key][yr_idx][self.LUMASK])
+    
+    def get_water_sr_yield_for_year(self, yr_cal: int) -> np.ndarray:
+        """
+        Get the SR water yield array, inclusive of all cells that LUTO does not look at.
+
+        Returns
+        -------
+        np.ndarray: shape (NCELLS,)
+        """
+        yr_idx = yr_cal - self.YR_CAL_BASE
+        return self.get_water_sr_yield_for_yr_idx(yr_idx)
+    
+    def get_water_nl_yield_for_yr_idx(
+        self,
+        yr_idx: int,
+        water_dr_yield: Optional[np.ndarray] = None, 
+        water_sr_yield: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
+        """
+        Get the natural land water yield array, inclusive of all cells that LUTO does not look at.
+
+        Returns
+        -------
+        np.ndarray: shape (NCELLS,)
+        """
+        water_dr_yield = (
+            water_dr_yield if water_dr_yield is not None 
+            else self.get_water_dr_yield_for_yr_idx(yr_idx)
+        )
+        water_sr_yield = (
+            water_sr_yield if water_sr_yield is not None 
+            else self.get_water_dr_yield_for_yr_idx(yr_idx)
+        )
+        dr_prop = self.DEEP_ROOTED_PROPORTION
+        
+        return (dr_prop * water_dr_yield + (1 - dr_prop) * water_sr_yield)

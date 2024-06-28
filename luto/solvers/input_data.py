@@ -64,6 +64,8 @@ class SolverInputData:
     ag_man_limits: dict             # Agricultural management options' adoption limits.
     ag_man_lb_mrj: dict             # Agricultural management options' lower bounds.
 
+    w_ccimpact: dict[int, float]    # Climate change impacts of water dict.
+
     offland_ghg: np.ndarray         # GHG emissions from off-land commodities.
 
     lu2pr_pj: np.ndarray            # Conversion matrix: land-use to product(s).
@@ -193,9 +195,14 @@ def get_non_ag_g_rk(data: Data, ag_g_mrj, base_year):
 
 
 def get_ag_w_mrj(data: Data, target_index):
-    print('Getting agricultural water requirement matrices...', flush = True)
-    output = ag_water.get_wreq_matrices(data, target_index)
+    print('Getting agricultural water net yield matrices...', flush = True)
+    output = ag_water.get_water_net_yield_matrices(data, target_index)
     return output.astype(np.float32)
+
+
+def get_w_ccimpact(data: Data, target_index):
+    print('Getting water climate change impact figures...', flush = True)
+    return ag_water.get_water_ccimpact(data, target_index)
 
 
 def get_ag_b_mrj(data: Data):
@@ -341,7 +348,7 @@ def get_limits(data: Data, target: int):
     # Limits is a dictionary with heterogeneous value sets.
     limits = {}
     
-    if settings.WATER_USE_LIMITS == 'on': limits['water'] = ag_water.get_wuse_limits(data)
+    if settings.WATER_NET_YIELD_LIMITS == 'on': limits['water'] = ag_water.get_water_net_yield_limits(data)
     if settings.GHG_EMISSIONS_LIMITS == 'on':  limits['ghg'] = ag_ghg.get_ghg_limits(data, target)
     
     # If biodiversity limits are not turned on, set the limit to 0.
@@ -399,6 +406,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_b_mrj=get_ag_man_biodiversity(data),
         ag_man_limits=get_ag_man_limits(data, target_index),
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
+        w_ccimpact=get_w_ccimpact(data, target_index),
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,

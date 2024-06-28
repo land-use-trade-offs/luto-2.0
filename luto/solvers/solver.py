@@ -537,27 +537,22 @@ class LutoSolver:
                 'DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"'
             )
 
-    def _add_water_usage_limit_constraints(self, cells: Optional[list[int]] = None):
+    def _add_water_usage_limit_constraints(self):
         """
         Adds constraints to handle water usage limits.
         If `cells` is provided, only adds constraints for regions containing at least one of the
         provided cells.
         """
-        if settings.WATER_USE_LIMITS != "on":
+        if settings.WATER_NET_YIELD_LIMITS != "on":
             return
         
-        print(f'  ...water constraints by {settings.WATER_REGION_DEF}...')
+        print(f'  ...water net yield constraints by {settings.WATER_REGION_DEF}...')
 
         self.water_limit_constraints_r = defaultdict(list)
-        # print(f"Adding water constraints by {settings.WATER_REGION_DEF}...")
-
-        # Returns region-specific water use limits
-        w_limits = self._input_data.limits["water"]
 
         # Ensure water use remains below limit for each region
-        for region, name, water_all, wreq_reg_limit, ind in w_limits:
-            if cells is not None and np.intersect1d(cells, ind).size == 0:
-                continue
+        for region, (reg_name, w_net_yield_total, w_net_yield_limit, ind) in self._input_data.limits["water"].items():
+            reg_ccimpact = self._input_data.w_ccimpact[region]
 
             ag_contr = gp.quicksum(
                 gp.quicksum(
@@ -589,17 +584,17 @@ class LutoSolver:
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            wreq_region = ag_contr + ag_man_contr + non_ag_contr
+            w_net_yield_region = ag_contr + ag_man_contr + non_ag_contr + reg_ccimpact
 
             # Check that the contributions are not all zero, and add constraint if so.
             # Must check the type because 'Gurobi expression == 0' returns another expression 
-            if not type(wreq_region) == int:
-                constr = self.gurobi_model.addConstr(wreq_region <= wreq_reg_limit)
+            if not type(w_net_yield_region) == int:
+                constr = self.gurobi_model.addConstr(w_net_yield_region >= w_net_yield_limit)
                 for r in ind:
                     self.water_limit_constraints_r[r].append(constr)
 
             if settings.VERBOSE == 1:
-                print(f"    ...water use in {name} <= {wreq_reg_limit:.2f} ML")
+                print(f"    ...net water yield in {reg_name} >= {w_net_yield_limit:.2f} ML")
         print('')
 
     def _add_ghg_emissions_limit_constraints(self):
@@ -899,7 +894,7 @@ class LutoSolver:
         self._add_agricultural_management_constraints(updated_cells)
         self._add_agricultural_management_adoption_limit_constraints()
         self._add_demand_penalty_constraints()
-        self._add_water_usage_limit_constraints(updated_cells)
+        self._add_water_usage_limit_constraints()
         self._add_ghg_emissions_limit_constraints()
         self._add_biodiversity_limit_constraints()
 

@@ -328,15 +328,8 @@ SOC_AMORTISATION = 15
 
 
 # Water use limits and parameters *******************************
-WATER_USE_LIMITS = 'on'               # 'on' or 'off'
-WATER_LIMITS_TYPE = 'water_stress'    # 'water_stress' or 'pct_ag'
+WATER_NET_YIELD_LIMITS = 'on'               # 'on' or 'off'
 
-# If WATER_LIMITS_TYPE = 'pct_ag'...       
-# Set reduction in water use as percentage of 2010 irrigation water use
-WATER_USE_REDUCTION_PERCENTAGE = 0  
-
-# If WATER_LIMITS_TYPE = 'water_stress'...                                           
-# Safe and just Earth system boundaries says 0.2 inclusive of domestic/industrial https://www.nature.com/articles/s41586-023-06083-8  
 WATER_STRESS_FRACTION = 0.2          
 
 # Regionalisation to enforce water use limits by

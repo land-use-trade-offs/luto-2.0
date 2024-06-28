@@ -1072,7 +1072,7 @@ def save_report_data(raw_data_dir:str):
     #                     5) Water                     #
     ####################################################
     
-    if settings.WATER_USE_LIMITS == 'on':
+    if settings.WATER_NET_YIELD_LIMITS == 'on':
         water_df_total = files.query('category == "water" and year_types == "single_year" and ~base_name.str.contains("separate")').reset_index(drop=True)
         water_df_total = pd.concat([pd.read_csv(path) for path in water_df_total['path']], ignore_index=True)
         
@@ -1106,29 +1106,29 @@ def save_report_data(raw_data_dir:str):
         
         
         # Plot_5-3: Water use by sector (ML)
-        water_df_separate_lu_type = water_df_separate.groupby(['Year','Landuse Type']).sum(numeric_only=True)[['Water Use (ML)']].reset_index()
+        water_df_separate_lu_type = water_df_separate.groupby(['Year','Landuse Type']).sum(numeric_only=True)[['Water Net Yield (ML)']].reset_index()
         water_df_net = water_df_separate.groupby('Year').sum(numeric_only=True).reset_index()
 
         water_df_separate_lu_type = water_df_separate_lu_type\
-            .groupby(['Landuse Type'])[['Landuse Type','Year','Water Use (ML)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Water Use (ML)']))))\
+            .groupby(['Landuse Type'])[['Landuse Type','Year','Water Net Yield (ML)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Water Net Yield (ML)']))))\
             .reset_index()
             
         water_df_separate_lu_type.columns = ['name','data']
         water_df_separate_lu_type['type'] = 'column'
 
-        water_df_separate_lu_type.loc[len(water_df_separate_lu_type)] = ['Net Volume', list(map(list,zip(water_df_net['Year'],water_df_net['Water Use (ML)']))), 'line']
+        water_df_separate_lu_type.loc[len(water_df_separate_lu_type)] = ['Net Volume', list(map(list,zip(water_df_net['Year'],water_df_net['Water Net Yield (ML)']))), 'line']
 
         water_df_separate_lu_type.to_json(f'{SAVE_DIR}/water_3_volume_by_sector.json',orient='records')
 
 
 
         # Plot_5-4: Water use by landuse (ML)
-        water_df_seperate_lu = water_df_separate.groupby(['Year','Landuse']).sum()[['Water Use (ML)']].reset_index()
+        water_df_seperate_lu = water_df_separate.groupby(['Year','Landuse']).sum()[['Water Net Yield (ML)']].reset_index()
         
         water_df_seperate_lu_wide = water_df_seperate_lu\
-                                        .groupby(['Landuse'])[['Year','Water Use (ML)']]\
-                                        .apply(lambda x: list(map(list,zip(x['Year'],x['Water Use (ML)']))))\
+                                        .groupby(['Landuse'])[['Year','Water Net Yield (ML)']]\
+                                        .apply(lambda x: list(map(list,zip(x['Year'],x['Water Net Yield (ML)']))))\
                                         .reset_index()
                                         
         water_df_seperate_lu_wide.columns = ['name','data']
@@ -1140,11 +1140,11 @@ def save_report_data(raw_data_dir:str):
         
         
         # Plot_5-5: Water use by Water_supply (ML)
-        water_df_seperate_irr = water_df_separate.groupby(['Year','Water_supply']).sum()[['Water Use (ML)']].reset_index()
+        water_df_seperate_irr = water_df_separate.groupby(['Year','Water_supply']).sum()[['Water Net Yield (ML)']].reset_index()
         
         water_df_seperate_irr_wide = water_df_seperate_irr\
-                                        .groupby(['Water_supply'])[['Year','Water Use (ML)']]\
-                                        .apply(lambda x: list(map(list,zip(x['Year'],x['Water Use (ML)']))))\
+                                        .groupby(['Water_supply'])[['Year','Water Net Yield (ML)']]\
+                                        .apply(lambda x: list(map(list,zip(x['Year'],x['Water Net Yield (ML)']))))\
                                         .reset_index()
                                         
         water_df_seperate_irr_wide.columns = ['name','data']
