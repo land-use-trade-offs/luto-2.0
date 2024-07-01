@@ -842,8 +842,8 @@ def write_water(data: Data, yr_cal, path):
     # Prepare a data frame.
     df = pd.DataFrame( columns=[ 'REGION_ID'
                                 , 'REGION_NAME'
-                                , 'WATER_USE_LIMIT_ML'
-                                , 'TOT_WATER_REQ_ML'
+                                , 'NET_YIELD_LOWER_BOUND_ML'
+                                , 'TOT_WATER_NET_YIELD_ML'
                                 , 'ABS_DIFF_ML'
                                 , 'PROPORTION_LIMIT_%'
                                 , 'PROPORTION_ALL_%'] )
@@ -869,7 +869,11 @@ def write_water(data: Data, yr_cal, path):
 
     # Loop through specified water regions
     df_water_seperate_dfs = []
+
+    climate_change_impacts = ag_water.get_water_ccimpact(data, yr_idx)
+
     for i, region in enumerate(region_limits.keys()):
+        reg_cc_impact = climate_change_impacts[region]
         
         # Get indices of cells in region
         ind = np.flatnonzero(region_id == region).astype(np.int32)
@@ -940,14 +944,14 @@ def write_water(data: Data, yr_cal, path):
 
 
         # Calculate water use limits and actual water use
-        baseline_net_yield_all =  w_net_yield_limits[region][1]                  # Baseline water net yield
-        net_yield_lb = w_net_yield_limits[region][2]                             # Water net yield lower bound
-        w_net_yield_reg = df_region['Water Net Yield (ML)'].sum()                # Solved water net yield of the region
-
+        baseline_net_yield_all =  w_net_yield_limits[region][1]                    # Baseline water net yield
+        net_yield_lb = w_net_yield_limits[region][2]                               # Water net yield lower bound
+        w_net_yield_reg = df_region['Water Net Yield (ML)'].sum() + reg_cc_impact  # Solved water net yield of the region plus climate change impacts
         # Calculate absolute and proportional difference between water use target and actual water use
         abs_diff = w_net_yield_reg - net_yield_lb
-        prop_diff = (w_net_yield_reg / net_yield_lb) * 100 if net_yield_lb > 0 else np.nan
-        prop_all = (w_net_yield_reg / baseline_net_yield_all) * 100 if baseline_net_yield_all > 0 else np.nan
+        prop_diff = (w_net_yield_reg / net_yield_lb) * 100 # if net_yield_lb > 0 else np.nan
+        prop_all = (w_net_yield_reg / baseline_net_yield_all) * 100 # if baseline_net_yield_all > 0 else np.nan
+            # TODO ^ figure out if the above if statements should be included
         # Add to dataframe
         df.loc[i] = ( region
                     , region_dict[region]
@@ -956,6 +960,8 @@ def write_water(data: Data, yr_cal, path):
                     , abs_diff
                     , prop_diff
                     , prop_all)
+
+    breakpoint()
 
     # Write to CSV with 2 DP
     df = df.drop(columns=['REGION_ID']).set_index('REGION_NAME').stack().reset_index()
