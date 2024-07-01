@@ -1355,7 +1355,7 @@ class Data:
         np.ndarray: shape (NCELLS,)
         """
         dr_key = list(self.WATER_YIELD_DR_FILE.keys())[0]
-        return self.get_array_resfactor_applied(self.WATER_YIELD_DR_FILE[dr_key][yr_idx][self.LUMASK])
+        return self.get_array_resfactor_applied(self.WATER_YIELD_DR_FILE[dr_key][yr_idx])
     
     def get_water_dr_yield_for_year(self, yr_cal: int) -> np.ndarray:
         """
@@ -1377,7 +1377,7 @@ class Data:
         np.ndarray: shape (NCELLS,)
         """
         sr_key = list(self.WATER_YIELD_SR_FILE.keys())[0]
-        return self.get_array_resfactor_applied(self.WATER_YIELD_SR_FILE[sr_key][yr_idx][self.LUMASK])
+        return self.get_array_resfactor_applied(self.WATER_YIELD_SR_FILE[sr_key][yr_idx])
     
     def get_water_sr_yield_for_year(self, yr_cal: int) -> np.ndarray:
         """
