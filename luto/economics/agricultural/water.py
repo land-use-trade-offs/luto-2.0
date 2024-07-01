@@ -19,13 +19,15 @@ Pure functions to calculate water use by lm, lu.
 """
 
 
-from typing import Dict
+from typing import Optional
 import numpy as np
+from collections import defaultdict
 
 import luto.settings as settings
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
+import luto.economics.non_agricultural.water as non_ag_water
 
 
 def get_wreq_matrices(data: Data, yr_idx):
@@ -308,7 +310,7 @@ def get_agtech_ei_effect_w_mrj(data, w_mrj, yr_idx):
     return new_w_mrj
 
 
-def get_agricultural_management_water_matrices(data: Data, w_mrj, yr_idx) -> Dict[str, np.ndarray]:
+def get_agricultural_management_water_matrices(data: Data, w_mrj, yr_idx) -> dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_w_mrj(data, w_mrj, yr_idx) if settings.AG_MANAGEMENTS['Asparagopsis taxiformis'] else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
     precision_agriculture_data = get_precision_agriculture_effect_w_mrj(data, w_mrj, yr_idx) if settings.AG_MANAGEMENTS['Precision Agriculture'] else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
     eco_grazing_data = get_ecological_grazing_effect_w_mrj(data, w_mrj, yr_idx) if settings.AG_MANAGEMENTS['Ecological Grazing'] else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))

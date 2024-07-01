@@ -213,7 +213,7 @@ def get_ag_b_mrj(data: Data):
 
 def get_non_ag_w_rk(data: Data, ag_w_mrj: np.ndarray, base_year):
     print('Getting non-agricultural water requirement matrices...', flush = True)
-    output = non_ag_water.get_wreq_matrix(data, ag_w_mrj, data.lumaps[base_year])
+    output = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[base_year])
     return output.astype(np.float32)
 
 

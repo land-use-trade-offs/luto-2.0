@@ -700,6 +700,10 @@ class Data:
         ###############################################################
         print("\tLoading water data...", flush=True)
 
+        # Initialise container for water usage limits to avoid re-calculating the figures
+        # during timeseries solves.
+        self.WATER_LIMITS_BY_YEAR = {}
+
         # Water requirements by land use -- LVSTK.
         wreq_lvstk_dry = pd.DataFrame()
         wreq_lvstk_irr = pd.DataFrame()
