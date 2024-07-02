@@ -1081,8 +1081,8 @@ def save_report_data(raw_data_dir:str):
         water_df_separate = water_df_separate.replace(RENAME_AM_NON_AG)
         
 
-        # Plot_5-1: Water use compared to limite (%)
-        water_df_total_pct = water_df_total.query('Variable == "PROPORTION_ALL_%" ')
+        # Plot_5-1: Water net yield compared to limite (%)
+        water_df_total_pct = water_df_total.query('Variable == "PROPORTION_LIMIT_%" ')
         water_df_total_pct_wide = water_df_total_pct\
                                     .groupby(['REGION_NAME'])[['Year','Value (ML)']]\
                                     .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
@@ -1090,10 +1090,10 @@ def save_report_data(raw_data_dir:str):
                                     
         water_df_total_pct_wide.columns = ['name','data']
         water_df_total_pct_wide['type'] = 'spline'
-        water_df_total_pct_wide.to_json(f'{SAVE_DIR}/water_1_percent_to_limit.json',orient='records')
+        water_df_total_pct_wide.to_json(f'{SAVE_DIR}/water_1_percent_of_limit.json',orient='records')
 
 
-        # Plot_5-2: Water use compared to limite (ML)
+        # Plot_5-2: Water net yield compared to limite (ML)
         water_df_total_yield = water_df_total.query('Variable == "TOT_WATER_NET_YIELD_ML" ')
         water_df_total_yield_wide = water_df_total_yield\
                                     .groupby(['REGION_NAME'])[['Year','Value (ML)']]\

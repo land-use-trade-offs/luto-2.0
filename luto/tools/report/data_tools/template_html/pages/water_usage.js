@@ -24,15 +24,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 
-  // Chart:water_1_percent_to_limit
-  Highcharts.chart("water_1_percent_to_limit", {
+  // Chart:water_1_percent_of_limit
+  Highcharts.chart("water_1_percent_of_limit", {
     chart: {
       type: "spline",
       marginRight: 380,
     },
 
     title: {
-      text: "Water Use as Percentage to Avaliable Water Resources",
+      text: "Water Net Yield as Percentage of Lower Bound",
     },
 
     credits: {
@@ -40,7 +40,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("water_1_percent_to_limit_csv").innerHTML
+      document.getElementById("water_1_percent_of_limit_csv").innerHTML
     ),
     xAxis: {
       tickPositions: year_ticks,
@@ -94,7 +94,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Water Use (ML)",
+        text: "Water Net Yield (ML)",
       },
     },
 
@@ -141,7 +141,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Water Use (ML)",
+        text: "Water Net Yield (ML)",
       },
     },
 
@@ -197,7 +197,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Water Use (ML)",
+        text: "Water Net Yield (ML)",
       },
     },
 
@@ -259,7 +259,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Water Use (ML)",
+        text: "Water Net Yield (ML)",
       },
     },
 
