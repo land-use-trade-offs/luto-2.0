@@ -330,6 +330,8 @@ SOC_AMORTISATION = 15
 # Water use limits and parameters *******************************
 WATER_NET_YIELD_LIMITS = 'on'               # 'on' or 'off'
 
+WATER_LIMITS_TARGET_YEAR = 2030
+
 WATER_STRESS_FRACTION = 0.2          
 
 # Regionalisation to enforce water use limits by

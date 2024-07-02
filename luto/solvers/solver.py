@@ -551,7 +551,7 @@ class LutoSolver:
         self.water_limit_constraints_r = defaultdict(list)
 
         # Ensure water use remains below limit for each region
-        for region, (reg_name, w_net_yield_total, w_net_yield_limit, ind) in self._input_data.limits["water"].items():
+        for region, (reg_name, _, w_net_yield_limit, ind) in self._input_data.limits["water"].items():
             reg_ccimpact = self._input_data.w_ccimpact[region]
 
             ag_contr = gp.quicksum(

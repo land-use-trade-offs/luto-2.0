@@ -1094,18 +1094,19 @@ def save_report_data(raw_data_dir:str):
 
 
         # Plot_5-2: Water use compared to limite (ML)
-        water_df_total_vol = water_df_total.query('Variable == "TOT_WATER_REQ_ML" ')
-        water_df_total_vol_wide = water_df_total_vol\
+        water_df_total_yield = water_df_total.query('Variable == "TOT_WATER_NET_YIELD_ML" ')
+        water_df_total_yield_wide = water_df_total_yield\
                                     .groupby(['REGION_NAME'])[['Year','Value (ML)']]\
                                     .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
                                     .reset_index()
-        water_df_total_vol_wide.columns = ['name','data']
-        water_df_total_vol_wide['type'] = 'spline'
-        water_df_total_vol_wide.to_json(f'{SAVE_DIR}/water_2_volume_to_limit.json',orient='records')                        
+
+        water_df_total_yield_wide.columns = ['name','data']
+        water_df_total_yield_wide['type'] = 'spline'
+        water_df_total_yield_wide.to_json(f'{SAVE_DIR}/water_2_yield_to_limit.json',orient='records')                        
         
         
         
-        # Plot_5-3: Water use by sector (ML)
+        # Plot_5-3: Water net yield by sector (ML)
         water_df_separate_lu_type = water_df_separate.groupby(['Year','Landuse Type']).sum(numeric_only=True)[['Water Net Yield (ML)']].reset_index()
         water_df_net = water_df_separate.groupby('Year').sum(numeric_only=True).reset_index()
 
@@ -1119,11 +1120,11 @@ def save_report_data(raw_data_dir:str):
 
         water_df_separate_lu_type.loc[len(water_df_separate_lu_type)] = ['Net Volume', list(map(list,zip(water_df_net['Year'],water_df_net['Water Net Yield (ML)']))), 'line']
 
-        water_df_separate_lu_type.to_json(f'{SAVE_DIR}/water_3_volume_by_sector.json',orient='records')
+        water_df_separate_lu_type.to_json(f'{SAVE_DIR}/water_3_net_yield_by_sector.json',orient='records')
 
 
 
-        # Plot_5-4: Water use by landuse (ML)
+        # Plot_5-4: Water net yield by landuse (ML)
         water_df_seperate_lu = water_df_separate.groupby(['Year','Landuse']).sum()[['Water Net Yield (ML)']].reset_index()
         
         water_df_seperate_lu_wide = water_df_seperate_lu\
@@ -1136,10 +1137,10 @@ def save_report_data(raw_data_dir:str):
         water_df_seperate_lu_wide = water_df_seperate_lu_wide.set_index('name').reindex(LANDUSE_ALL).reset_index()
         
         
-        water_df_seperate_lu_wide.to_json(f'{SAVE_DIR}/water_4_volume_by_landuse.json',orient='records')
+        water_df_seperate_lu_wide.to_json(f'{SAVE_DIR}/water_4_net_yield_by_landuse.json',orient='records')
         
         
-        # Plot_5-5: Water use by Water_supply (ML)
+        # Plot_5-5: Water net yield by Water_supply (ML)
         water_df_seperate_irr = water_df_separate.groupby(['Year','Water_supply']).sum()[['Water Net Yield (ML)']].reset_index()
         
         water_df_seperate_irr_wide = water_df_seperate_irr\
@@ -1149,7 +1150,7 @@ def save_report_data(raw_data_dir:str):
                                         
         water_df_seperate_irr_wide.columns = ['name','data']
         water_df_seperate_irr_wide['type'] = 'column'
-        water_df_seperate_irr_wide.to_json(f'{SAVE_DIR}/water_5_volume_by_Water_supply.json',orient='records')
+        water_df_seperate_irr_wide.to_json(f'{SAVE_DIR}/water_5_net_yield_by_Water_supply.json',orient='records')
     
 
 

@@ -71,15 +71,15 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:water_2_volume_to_limit
-  Highcharts.chart("water_2_volume_to_limit", {
+  // Chart:water_2_yield_to_limit
+  Highcharts.chart("water_2_yield_to_limit", {
     chart: {
       type: "spline",
       marginRight: 380,
     },
 
     title: {
-      text: "Water Use by Drainage Division/River Region",
+      text: "Water Net Yield by Drainage Division/River Region",
     },
 
     credits: {
@@ -87,7 +87,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("water_2_volume_to_limit_csv").innerHTML
+      document.getElementById("water_2_yield_to_limit_csv").innerHTML
     ),
     xAxis: {
       tickPositions: year_ticks,
@@ -118,15 +118,15 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:water_3_volume_by_sector
-  Highcharts.chart("water_3_volume_by_sector", {
+  // Chart:water_3_net_yield_by_sector
+  Highcharts.chart("water_3_net_yield_by_sector", {
     chart: {
       type: "column",
       marginRight: 380,
     },
 
     title: {
-      text: "Water Use by Broad Land-use and Management Type",
+      text: "Water Net Yield by Broad Land-use and Management Type",
     },
 
     credits: {
@@ -134,7 +134,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("water_3_volume_by_sector_csv").innerHTML
+      document.getElementById("water_3_net_yield_by_sector_csv").innerHTML
     ),
     xAxis: {
       tickPositions: year_ticks,
@@ -174,15 +174,15 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:water_4_volume_by_landuse
-  Highcharts.chart("water_4_volume_by_landuse", {
+  // Chart:water_4_net_yield_by_landuse
+  Highcharts.chart("water_4_net_yield_by_landuse", {
     chart: {
       type: "column",
       marginRight: 380,
     },
 
     title: {
-      text: "Water Use by Land-use and Agricultural Commodity",
+      text: "Water Net Yield by Land-use and Agricultural Commodity",
     },
 
     credits: {
@@ -190,7 +190,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("water_4_volume_by_landuse_csv").innerHTML
+      document.getElementById("water_4_net_yield_by_landuse_csv").innerHTML
     ),
     xAxis: {
       tickPositions: year_ticks,
@@ -236,15 +236,15 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:water_5_volume_by_Water_supply
-  Highcharts.chart("water_5_volume_by_Water_supply", {
+  // Chart:water_5_net_yield_by_Water_supply
+  Highcharts.chart("water_5_net_yield_by_Water_supply", {
     chart: {
       type: "column",
       marginRight: 380,
     },
 
     title: {
-      text: "Water Use by Irrigation Type",
+      text: "Water Net Yield by Irrigation Type",
     },
 
     credits: {
@@ -252,7 +252,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("water_5_volume_by_Water_supply_csv").innerHTML
+      document.getElementById("water_5_net_yield_by_Water_supply_csv").innerHTML
     ),
     xAxis: {
       tickPositions: year_ticks,

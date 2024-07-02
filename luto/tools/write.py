@@ -849,7 +849,7 @@ def write_water(data: Data, yr_cal, path):
                                 , 'PROPORTION_ALL_%'] )
 
     # Get 2010 water use limits used as constraints in model
-    w_net_yield_limits = ag_water.get_water_net_yield_limits(data)
+    w_net_yield_limits = ag_water.get_water_net_yield_limits(data, yr_cal)
 
     # Set up data for river regions or drainage divisions
     if settings.WATER_REGION_DEF == 'Drainage Division':
@@ -865,7 +865,10 @@ def write_water(data: Data, yr_cal, path):
         region_dict = data.RIVREG_DICT
 
     else:
-        print('Incorrect option for WATER_REGION_DEF in settings')
+        raise ValueError(
+            f"Incorrect option for WATER_REGION_DEF in settings: {settings.WATER_REGION_DEF} "
+            f"(must be either 'Drainage Division' or 'River Region')."
+        )
 
     # Loop through specified water regions
     df_water_seperate_dfs = []
@@ -960,8 +963,6 @@ def write_water(data: Data, yr_cal, path):
                     , abs_diff
                     , prop_diff
                     , prop_all)
-
-    breakpoint()
 
     # Write to CSV with 2 DP
     df = df.drop(columns=['REGION_ID']).set_index('REGION_NAME').stack().reset_index()

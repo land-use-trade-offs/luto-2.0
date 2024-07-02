@@ -702,7 +702,7 @@ class Data:
 
         # Initialise container for water usage limits to avoid re-calculating the figures
         # during timeseries solves.
-        self.WATER_LIMITS_BY_YEAR = {}
+        self.WATER_LIMITS_BY_YEAR = None
 
         # Water requirements by land use -- LVSTK.
         wreq_lvstk_dry = pd.DataFrame()
