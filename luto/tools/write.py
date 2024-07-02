@@ -837,7 +837,7 @@ def write_water(data: Data, yr_cal, path):
     # Get water use for year in mrj format
     ag_w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
     non_ag_w_rk = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[yr_cal])
-    ag_man_w_mrj = ag_water.get_agricultural_management_water_matrices(data, ag_w_mrj, yr_idx)
+    ag_man_w_mrj = ag_water.get_agricultural_management_water_matrices(data, yr_idx)
 
     # Prepare a data frame.
     df = pd.DataFrame( columns=[ 'REGION_ID'

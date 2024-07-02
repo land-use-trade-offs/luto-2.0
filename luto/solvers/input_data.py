@@ -326,9 +326,9 @@ def get_ag_man_transitions(data: Data, target_index, ag_t_mrj):
     return output
 
 
-def get_ag_man_water(data: Data, target_index, ag_w_mrj):
+def get_ag_man_water(data: Data, target_index):
     print('Getting agricultural management options\' water requirement effects...', flush = True)
-    output = ag_water.get_agricultural_management_water_matrices(data, ag_w_mrj, target_index)
+    output = ag_water.get_agricultural_management_water_matrices(data, target_index)
     return output
 
 
@@ -399,7 +399,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     )
 
     non_ag_w_rk = get_non_ag_w_rk(data, ag_w_mrj, base_year)
-    ag_man_w_mrj = get_ag_man_water(data, target_index, ag_w_mrj)
+    ag_man_w_mrj = get_ag_man_water(data, target_index)
     w_ccimpact = get_w_ccimpact(data, target_index)
 
     return SolverInputData(

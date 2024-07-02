@@ -144,18 +144,18 @@ def get_water_net_yield_matrices(data: Data, yr_idx):
     return get_wyield_matrices(data, yr_idx) - get_wreq_matrices(data, yr_idx)
 
 
-def get_asparagopsis_effect_w_mrj(data: Data, w_mrj, yr_idx):
+def get_asparagopsis_effect_w_mrj(data: Data, yr_idx):
     """
-    Applies the effects of using asparagopsis to the water requirements data
+    Applies the effects of using asparagopsis to the water net yield data
     for all relevant agr. land uses.
 
     Args:
         data (object): The data object containing relevant information.
-        w_mrj (ndarray, <unit:ML/cell>): The water requirements data for all land uses.
+        w_mrj (ndarray, <unit:ML/cell>): The water net yield data for all land uses.
         yr_idx (int): The index of the year.
 
     Returns:
-        ndarray <unit:ML/cell>: The updated water requirements data with the effects of using asparagopsis.
+        ndarray <unit:ML/cell>: The updated water net yield data with the effects of using asparagopsis.
 
     Notes:
         Asparagopsis taxiformis has no effect on the water required.
@@ -167,8 +167,10 @@ def get_asparagopsis_effect_w_mrj(data: Data, w_mrj, yr_idx):
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
 
+    wreq_mrj = get_wreq_matrices(data, yr_idx)
+
     # Set up the effects matrix
-    new_w_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+    w_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
@@ -177,23 +179,23 @@ def get_asparagopsis_effect_w_mrj(data: Data, w_mrj, yr_idx):
             j = lu_codes[lu_idx]
             # The effect is: new value = old value * multiplier - old value
             # E.g. a multiplier of .95 means a 5% reduction in quantity produced
-            new_w_mrj[:, :, lu_idx] = w_mrj[:, :, j] * (multiplier - 1)
+            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (multiplier - 1)
 
-    return new_w_mrj
+    return w_mrj_effect
 
 
-def get_precision_agriculture_effect_w_mrj(data: Data, w_mrj, yr_idx):
+def get_precision_agriculture_effect_w_mrj(data: Data, yr_idx):
     """
-    Applies the effects of using precision agriculture to the water requirements data
+    Applies the effects of using precision agriculture to the water net yield data
     for all relevant agricultural land uses.
 
     Parameters:
     - data: The data object containing relevant information for the calculation.
-    - w_mrj <unit:ML/cell>: The original water requirements data for different land uses.
+    - w_mrj <unit:ML/cell>: The original water net yield data for different land uses.
     - yr_idx: The index representing the year for which the calculation is performed.
 
     Returns:
-    - new_w_mrj <unit:ML/cell>: The updated water requirements data after applying precision agriculture effects.
+    - w_mrj_effect <unit:ML/cell>: The updated water net yield data after applying precision agriculture effects.
     """
     if not settings.AG_MANAGEMENTS['Precision Agriculture']:
         return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
@@ -202,8 +204,10 @@ def get_precision_agriculture_effect_w_mrj(data: Data, w_mrj, yr_idx):
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
 
+    wreq_mrj = get_wreq_matrices(data, yr_idx)
+
     # Set up the effects matrix
-    new_w_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+    w_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
     # Update values in the new matrix using the correct multiplier for each land use
     for lu_idx, lu in enumerate(land_uses):
@@ -212,23 +216,23 @@ def get_precision_agriculture_effect_w_mrj(data: Data, w_mrj, yr_idx):
             j = lu_codes[lu_idx]
             # The effect is: new value = old value * multiplier - old value
             # E.g. a multiplier of .95 means a 5% reduction in quantity produced
-            new_w_mrj[:, :, lu_idx] = w_mrj[:, :, j] * (multiplier - 1)
+            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (multiplier - 1)
 
-    return new_w_mrj
+    return w_mrj_effect
 
 
-def get_ecological_grazing_effect_w_mrj(data: Data, w_mrj, yr_idx):
+def get_ecological_grazing_effect_w_mrj(data: Data, yr_idx):
     """
-    Applies the effects of using ecological grazing to the water requirements data
+    Applies the effects of using ecological grazing to the water net yield data
     for all relevant agricultural land uses.
 
     Parameters:
     - data: The data object containing relevant information.
-    - w_mrj <unit:ML/cell>: The water requirements data for different land uses.
+    - w_mrj <unit:ML/cell>: The water net yield data for different land uses.
     - yr_idx: The index of the year.
 
     Returns:
-    - new_w_mrj <unit:ML/cell>: The updated water requirements data after applying ecological grazing effects.
+    - w_mrj_effect <unit:ML/cell>: The updated water net yield data after applying ecological grazing effects.
     """
     if not settings.AG_MANAGEMENTS['Ecological Grazing']:
         return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
@@ -237,8 +241,10 @@ def get_ecological_grazing_effect_w_mrj(data: Data, w_mrj, yr_idx):
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
 
+    wreq_mrj = get_wreq_matrices(data, yr_idx)
+
     # Set up the effects matrix
-    new_w_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+    w_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
     # Update values in the new matrix using the correct multiplier for each land use
     for lu_idx, lu in enumerate(land_uses):
@@ -247,46 +253,46 @@ def get_ecological_grazing_effect_w_mrj(data: Data, w_mrj, yr_idx):
             j = lu_codes[lu_idx]
             # The effect is: new value = old value * multiplier - old value
             # E.g. a multiplier of .95 means a 5% reduction in quantity produced
-            new_w_mrj[:, :, lu_idx] = w_mrj[:, :, j] * (multiplier - 1)
+            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (multiplier - 1)
 
-    return new_w_mrj
+    return w_mrj_effect
 
 
 def get_savanna_burning_effect_w_mrj(data):
-        """
-        Applies the effects of using savanna burning to the water requirements data
-        for all relevant agr. land uses.
-
-        Savanna burning does not affect water usage, so return an array of zeros.
-
-        Parameters:
-        - data: The input data object containing information about land uses and water requirements.
-
-        Returns:
-        - An array of zeros with dimensions (NLMS, NCELLS, nlus), where:
-            - NLMS: Number of land management systems
-            - NCELLS: Number of cells
-            - nlus: Number of land uses affected by savanna burning
-        """
-        if not settings.AG_MANAGEMENTS['Savanna Burning']:
-            return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
-
-        nlus = len(AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
-        return np.zeros((data.NLMS, data.NCELLS, nlus))
-
-
-def get_agtech_ei_effect_w_mrj(data, w_mrj, yr_idx):
     """
-    Applies the effects of using AgTech EI to the water requirements data
+    Applies the effects of using savanna burning to the water net yield data
+    for all relevant agr. land uses.
+
+    Savanna burning does not affect water usage, so return an array of zeros.
+
+    Parameters:
+    - data: The input data object containing information about land uses and water net yield.
+
+    Returns:
+    - An array of zeros with dimensions (NLMS, NCELLS, nlus), where:
+        - NLMS: Number of land management systems
+        - NCELLS: Number of cells
+        - nlus: Number of land uses affected by savanna burning
+    """
+    if not settings.AG_MANAGEMENTS['Savanna Burning']:
+        return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+
+    nlus = len(AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
+    return np.zeros((data.NLMS, data.NCELLS, nlus))
+
+
+def get_agtech_ei_effect_w_mrj(data, yr_idx):
+    """
+    Applies the effects of using AgTech EI to the water net yield data
     for all relevant agr. land uses.
 
     Parameters:
     - data: The data object containing relevant information.
-    - w_mrj <unit:ML/cell>: The water requirements data for all land uses.
+    - w_mrj <unit:ML/cell>: The water net yield data for all land uses.
     - yr_idx: The index of the year.
 
     Returns:
-    - new_w_mrj <unit:ML/cell>: The updated water requirements data with AgTech EI effects applied.
+    - w_mrj_effect <unit:ML/cell>: The updated water net yield data with AgTech EI effects applied.
     """
     if not settings.AG_MANAGEMENTS['AgTech EI']:
         return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
@@ -295,8 +301,10 @@ def get_agtech_ei_effect_w_mrj(data, w_mrj, yr_idx):
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
 
+    wreq_mrj = get_wreq_matrices(data, yr_idx)
+
     # Set up the effects matrix
-    new_w_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+    w_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
@@ -305,17 +313,37 @@ def get_agtech_ei_effect_w_mrj(data, w_mrj, yr_idx):
             j = lu_codes[lu_idx]
             # The effect is: new value = old value * multiplier - old value
             # E.g. a multiplier of .95 means a 5% reduction in quantity produced
-            new_w_mrj[:, :, lu_idx] = w_mrj[:, :, j] * (multiplier - 1)
+            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (multiplier - 1)
 
-    return new_w_mrj
+    return w_mrj_effect
 
 
-def get_agricultural_management_water_matrices(data: Data, w_mrj, yr_idx) -> dict[str, np.ndarray]:
-    asparagopsis_data = get_asparagopsis_effect_w_mrj(data, w_mrj, yr_idx) if settings.AG_MANAGEMENTS['Asparagopsis taxiformis'] else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
-    precision_agriculture_data = get_precision_agriculture_effect_w_mrj(data, w_mrj, yr_idx) if settings.AG_MANAGEMENTS['Precision Agriculture'] else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
-    eco_grazing_data = get_ecological_grazing_effect_w_mrj(data, w_mrj, yr_idx) if settings.AG_MANAGEMENTS['Ecological Grazing'] else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
-    sav_burning_data = get_savanna_burning_effect_w_mrj(data) if settings.AG_MANAGEMENTS['Savanna Burning'] else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
-    agtech_ei_data = get_agtech_ei_effect_w_mrj(data, w_mrj, yr_idx) if settings.AG_MANAGEMENTS['AgTech EI'] else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+def get_agricultural_management_water_matrices(data: Data, yr_idx) -> dict[str, np.ndarray]:
+    asparagopsis_data = (
+        get_asparagopsis_effect_w_mrj(data, yr_idx) 
+        if settings.AG_MANAGEMENTS['Asparagopsis taxiformis'] 
+        else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+    )
+    precision_agriculture_data = (
+        get_precision_agriculture_effect_w_mrj(data, yr_idx) 
+        if settings.AG_MANAGEMENTS['Precision Agriculture'] 
+        else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+    )
+    eco_grazing_data = (
+        get_ecological_grazing_effect_w_mrj(data, yr_idx) 
+        if settings.AG_MANAGEMENTS['Ecological Grazing'] 
+        else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+    )
+    sav_burning_data = (
+        get_savanna_burning_effect_w_mrj(data) 
+        if settings.AG_MANAGEMENTS['Savanna Burning'] 
+        else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+    )
+    agtech_ei_data = (
+        get_agtech_ei_effect_w_mrj(data, yr_idx) 
+        if settings.AG_MANAGEMENTS['AgTech EI'] 
+        else np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+    )
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -372,7 +400,7 @@ def calc_water_net_yield_by_region_in_year(
     yr_idx = yr_cal - data.YR_CAL_BASE
     ag_w_mrj = ag_w_mrj if ag_w_mrj is not None else get_water_net_yield_matrices(data, yr_idx)
     non_ag_w_rk = non_ag_w_rk if non_ag_w_rk is not None else non_ag_water.get_w_net_yield_matrix(data, yr_idx)
-    ag_man_w_mrj = ag_man_w_mrj if ag_man_w_mrj is not None else get_agricultural_management_water_matrices(data, ag_w_mrj, yr_idx)
+    ag_man_w_mrj = ag_man_w_mrj if ag_man_w_mrj is not None else get_agricultural_management_water_matrices(data, yr_idx)
     w_cc_impact = w_cc_impact if w_cc_impact is not None else get_water_ccimpact(data, yr_idx)
     
     # Calculate net yields
