@@ -333,15 +333,16 @@ def ag_dvar_to_bio_map(data, ag_dvar, res_factor, para_obj):
         map_ = ag_dvar.sel(lm=lm, lu=lu)
         map_ = match_lumap_biomap(data, map_, res_factor)
         map_ = map_.expand_dims({'lm': [lm], 'lu': [lu]})
+        map_.values = sparse.COO.from_numpy(map_.values)
         return map_
 
     tasks = [delayed(reproject_match_dvar)(ag_dvar, lm, lu, res_factor) 
              for lm,lu in product(ag_dvar['lm'].values, ag_dvar['lu'].values)]
-    out_arr = xr.combine_by_coords([i for i in para_obj(tasks)])
-    # Convert to sparse array to save memory
-    out_arr.values = sparse.COO.from_numpy(out_arr.values)
+    # out_arr = xr.combine_by_coords([i for i in para_obj(tasks)])
+    # # Convert to sparse array to save memory
+    # out_arr.values = sparse.COO.from_numpy(out_arr.values)
     
-    return out_arr
+    return tasks
 
 
 def am_dvar_to_bio_map(data, am_dvar, res_factor, para_obj):
@@ -363,15 +364,16 @@ def am_dvar_to_bio_map(data, am_dvar, res_factor, para_obj):
         map_ = am_dvar.sel(lm=lm, lu=lu)
         map_ = match_lumap_biomap(data, map_, res_factor)
         map_ = map_.expand_dims({'am':[am], 'lm': [lm], 'lu': [lu]})
+        map_.values = sparse.COO.from_numpy(map_.values)
         return map_
 
     tasks = [delayed(reproject_match_dvar)(am_dvar, am, lm, lu, res_factor) 
             for am,lm,lu in product(am_dvar['am'].values, am_dvar['lm'].values, am_dvar['lu'].values)]
-    out_arr = xr.combine_by_coords([i for i in para_obj(tasks)])
-    # Convert to sparse array to save memory
-    out_arr.values = sparse.COO.from_numpy(out_arr.values)
+    # out_arr = xr.combine_by_coords([i for i in para_obj(tasks)])
+    # # Convert to sparse array to save memory
+    # out_arr.values = sparse.COO.from_numpy(out_arr.values)
     
-    return out_arr
+    return tasks
 
 
 
@@ -394,15 +396,16 @@ def non_ag_dvar_to_bio_map(data, non_ag_dvar, res_factor, para_obj):
         map_ = non_ag_dvar.sel(lu=lu)
         map_ = match_lumap_biomap(data, map_, res_factor)
         map_ = map_.expand_dims({'lu': [lu]})
+        map_.values = sparse.COO.from_numpy(map_.values)
         return map_
 
     tasks = [delayed(reproject_match_dvar)(non_ag_dvar, lu, res_factor) 
             for lu in non_ag_dvar['lu'].values]
-    out_arr = xr.combine_by_coords([i for i in para_obj(tasks)])
-    # Convert to sparse array to save memory
-    out_arr.values = sparse.COO.from_numpy(out_arr.values)
+    # out_arr = xr.combine_by_coords([i for i in para_obj(tasks)])
+    # # Convert to sparse array to save memory
+    # out_arr.values = sparse.COO.from_numpy(out_arr.values)
     
-    return out_arr
+    return tasks
 
 
 # Calculate the biodiversity condition
@@ -481,16 +484,21 @@ def interp_bio_group_to_shards(bio_contribution_group, interp_year):
     return [delayed(interp_by_year)(bio_contribution_group, [year]) for year in interp_year]
 
 
+# Function to get value from a delayed object
+def get_val(job:tuple):
+    return job[0](*job[1])
+
+
 # Helper functions to calculate the biodiversity contribution scores
-def xr_to_df(shard, dvar_ag:xr.DataArray, dvar_am:xr.DataArray, dvar_non_ag:xr.DataArray):
+def xr_to_df(shard, job_ag:tuple, lu_type:str):
     """
     Convert an xarray DataArray to a pandas DataFrame with biodiversity contribution scores.
 
     Parameters:
     - shard: An xarray DataArray or a tuple of delayed function and arguments.
-    - dvar_ag: An xarray DataArray representing the biodiversity contribution scores for agriculture land use.
-    - dvar_am: An xarray DataArray representing the biodiversity contribution scores for amenity land use.
-    - dvar_non_ag: An xarray DataArray representing the biodiversity contribution scores for non-agriculture land use.
+    - job_ag: A tuple of (delayed<function>, arguments) to compute dvar_ag.
+    - lu_type: The land use type. One of 'ag', 'am', or 'non_ag'.
+
 
     Returns:
     - A pandas DataFrame containing the biodiversity contribution scores for different land use types.
@@ -501,51 +509,37 @@ def xr_to_df(shard, dvar_ag:xr.DataArray, dvar_am:xr.DataArray, dvar_non_ag:xr.D
 
     # Get the values to avoid duplicate computation
     if isinstance(shard, tuple):            # This means shard is a tuple of delayed function and arguments
-        f, args = shard[0], shard[1]
-        shard_xr = f(*args)
+        shard_xr = get_val(shard)
     elif isinstance(shard, xr.DataArray):   # This means shard is an xr.DataArray
         shard_xr = shard.compute()
     else:
         raise ValueError('Invalid shard type! Should be either tuple (delayed(function), args) or xr.DataArray.')
 
     # Calculate the biodiversity contribution scores
-    tmp_ag = (shard_xr * dvar_ag).compute().sum(['x', 'y'])
-    tmp_am = (shard_xr * dvar_am).compute().sum(['x', 'y'])
-    tmp_non_ag = (shard_xr * dvar_non_ag).compute().sum(['x', 'y'])
-    
-    # Convert to dense array
+    tmp_ag = (shard_xr * get_val(job_ag))
     tmp_ag.data = tmp_ag.data.todense()
-    tmp_am.data = tmp_am.data.todense()
-    tmp_non_ag.data = tmp_non_ag.data.todense()
-    
-    # Convert to dataframe
-    tmp_ag_df = tmp_ag.to_dataframe(name='contribution_%').reset_index()
-    tmp_am_df = tmp_am.to_dataframe(name='contribution_%').reset_index()
-    tmp_non_ag_df = tmp_non_ag.to_dataframe(name='contribution_%').reset_index()
-    
-    # Add land use type
-    tmp_ag_df['lu_type'] = 'ag'
-    tmp_am_df['lu_type'] = 'am'
-    tmp_non_ag_df['lu_type'] = 'non_ag'
-    
-    return pd.concat([tmp_ag_df, tmp_am_df, tmp_non_ag_df], ignore_index=True)
+    tmp_ag_df = tmp_ag.sum(['x', 'y']).to_dataframe(name='contribution_%').reset_index()
+    tmp_ag_df['lu_type'] = lu_type
+
+    return tmp_ag_df
 
 
-def calc_bio_score_by_yr(ag_dvar:xr.DataArray, am_dvar:xr.DataArray, non_ag_dvar:xr.DataArray, bio_shards, para_obj:joblib.Parallel):
+def calc_bio_score_by_yr(ag_dvar:list, am_dvar:list, non_ag_dvar:list, bio_shards):
     """
     Calculate the bio score by year.
 
     Parameters:
-    - ag_dvar (xr.DataArray): Data array for agricultural variables.
-    - am_dvar (xr.DataArray): Data array for ambient variables.
-    - non_ag_dvar (xr.DataArray): Data array for non-agricultural variables.
-    - bio_shards: List of bio shards. Each shard is an xarray DataArray or a tuple of delayed function and arguments.
-    - para_obj (joblib.Parallel): Parallel object for parallel processing.
+    - job_ag: A list of delayed ag_dvar jobs.
+    - job_am: A list of delayed am_dvar jobs.
+    - job_non_ag: A list of delayed non_ag_dvar jobs.
+    - bio_shards: List of bio shards. Each shard is an xarray DataArray or a tuple of (delayed<function>, arguments).
 
     Returns:
     - out (pd.DataFrame): Concatenated dataframe with bio scores, excluding the 'spatial_ref' column.
     """
     
-    tasks = [delayed(xr_to_df)(bio_score, ag_dvar, am_dvar, non_ag_dvar) for bio_score in bio_shards]
-    out = pd.concat([out for out in para_obj(tasks)], ignore_index=True)
-    return out.drop(columns=['spatial_ref'])
+    tasks_ag = [delayed(xr_to_df)(shard, job, 'ag') for job in ag_dvar for shard in bio_shards]
+    tasks_am = [delayed(xr_to_df)(shard, job, 'am') for job in am_dvar for shard in bio_shards]
+    tasks_non_ag = [delayed(xr_to_df)(shard, job, 'non_ag') for job in non_ag_dvar for shard in bio_shards]
+    
+    return tasks_ag + tasks_am + tasks_non_ag

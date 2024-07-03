@@ -59,7 +59,7 @@ from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_html import data2html
 from luto.tools.report.create_static_maps import TIF2MAP
 
-from luto.tools.xarray_tools import (ag_to_xr, non_ag_to_xr, am_to_xr,
+from luto.tools.xarray_tools import (ag_to_xr, get_val, non_ag_to_xr, am_to_xr,
                                      ag_dvar_to_bio_map, non_ag_dvar_to_bio_map, am_dvar_to_bio_map,
                                      calc_bio_hist_sum, calc_bio_score_species, interp_bio_species_to_shards, 
                                      calc_bio_score_by_yr)
@@ -108,16 +108,23 @@ def write_data(data: Data):
 
     # Parallel write the outputs for each year
     num_jobs = min(len(jobs), settings.WRITE_THREADS) if settings.PARALLEL_WRITE else 1   # Use the minimum between jobs_num and threads for parallel writing
-    print('changes......................................')
-    Parallel(n_jobs=num_jobs)(jobs)
+    Parallel(n_jobs=num_jobs, prefer='threads')(jobs)
+    
+    # Compute and save the biodiversity contribution data
+    para_obj = Parallel(n_jobs=30)      # 30 workers is a good balance between parallelism-overhead and overall speed
+    for (yr, path_yr) in zip(years, paths):
+        print(f'Writing biodiversity contribution outputs for {yr}')
+        dfs_delayed = write_biodiversity_contribution(data, yr, path_yr)
+        dfs_val = pd.concat(para_obj(dfs_delayed)).reset_index(drop=True)
+        dfs_val.to_csv(f"{path_yr}/biodiversity_contribution_{yr}.csv", index=False)
     
     # Copy the base-year outputs to the path_begin_end_compare
     shutil.copytree(f"{data.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True) if settings.MODE == 'timeseries' else None
-
+    
     # Create the report HTML and png maps
-    TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
-    save_report_data(data.path)
-    data2html(data.path)
+    # TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
+    # save_report_data(data.path)
+    # data2html(data.path)
     
     
 
@@ -166,7 +173,6 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_ghg_separate(data, yr_cal, path_yr)
     write_ghg_offland_commodity(data, yr_cal, path_yr)
     write_biodiversity(data, yr_cal, path_yr)
-    write_biodiversity_contribution(data, yr_cal, path_yr)
     write_biodiversity_separate(data, yr_cal, path_yr)
     
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
@@ -312,6 +318,7 @@ def write_files_separate(data: Data, yr_cal, path, ammap_separate=False):
         fname = f'{category}_{dvar_idx:02}_{desc}_{yr_cal}.tiff'
         lucc_separate_path = os.path.join(lucc_separate_dir, fname)
         write_gtiff(dvar, lucc_separate_path, data=data)
+        
 
 
 
@@ -364,6 +371,7 @@ def write_quantity(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     # NOTE:Non-agricultural production are all zeros, therefore skip the calculation
     # --------------------------------------------------------------------------------------------
         
+    
 
 
 def write_revenue_cost_ag(data: Data, yr_cal, path):
@@ -1141,16 +1149,17 @@ def write_biodiversity_contribution(data: Data, yr_cal, path, workers=15):
     non_ag_dvar = non_ag_to_xr(data, yr_cal)  
     
     # Reproject and match dvars (~1km) to the bio map (~5km)
-    ag_dvar = ag_dvar_to_bio_map(data, ag_dvar, settings.RESFACTOR, para_obj).chunk('auto').compute()
-    am_dvar = am_dvar_to_bio_map(data, am_dvar, settings.RESFACTOR, para_obj).chunk('auto').compute()
-    non_ag_dvar = non_ag_dvar_to_bio_map(data, non_ag_dvar, settings.RESFACTOR, para_obj).chunk('auto').compute()
+    ag_dvar = ag_dvar_to_bio_map(data, ag_dvar, settings.RESFACTOR, para_obj)
+    am_dvar = am_dvar_to_bio_map(data, am_dvar, settings.RESFACTOR, para_obj)
+    non_ag_dvar = non_ag_dvar_to_bio_map(data, non_ag_dvar, settings.RESFACTOR, para_obj)
+
         
     # Calculate the biodiversity contribution scores
     if settings.BIO_CALC_LEVEL == 'group':
         bio_score_group = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_Condition_group.nc', chunks='auto')
         bio_score_all_species_mean = bio_score_group.mean('group').expand_dims({'group': ['all_species']})                          # Calculate the mean score of all species
         bio_score_group = xr.combine_by_coords([bio_score_group, bio_score_all_species_mean])['data']                               # Add the mean score to the group dimension
-        bio_contribution_shards = [bio_score_group.sel(year=yr_cal, group=group) for group in bio_score_group['group'].values] 
+        bio_contribution_shards = [bio_score_group.sel(year=yr_cal)]
     elif settings.BIO_CALC_LEVEL == 'species':
         bio_raw_path = f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_EnviroSuit.nc'
         bio_his_score_sum = calc_bio_hist_sum(bio_raw_path)
@@ -1159,11 +1168,11 @@ def write_biodiversity_contribution(data: Data, yr_cal, path, workers=15):
     else:
         raise ValueError('Invalid settings.BIO_CALC_LEVEL! Must be either "group" or "species".')
     
-    # Save the biodiversity contribution scores
-    bio_df = calc_bio_score_by_yr(ag_dvar, am_dvar, non_ag_dvar, bio_contribution_shards, para_obj)
-    bio_df.to_csv(os.path.join(path, f'biodiversity_contribution_{yr_cal}.csv'), index=False)
+    # Return the delayed objects
+    bio_df_tasks = calc_bio_score_by_yr(ag_dvar, am_dvar, non_ag_dvar, bio_contribution_shards)
+    return bio_df_tasks
     
-
+    
 
   
 def write_ghg_separate(data: Data, yr_cal, path):
