@@ -111,20 +111,19 @@ def write_data(data: Data):
     Parallel(n_jobs=num_jobs, prefer='threads')(jobs)
     
     # Compute and save the biodiversity contribution data
-    para_obj = Parallel(n_jobs=30)      # 30 workers is a good balance between parallelism-overhead and overall speed
     for (yr, path_yr) in zip(years, paths):
-        print(f'Writing biodiversity contribution outputs for {yr}')
+        para_obj = Parallel(n_jobs=30, return_as="generator_unordered")      # 30 workers is a good balance between parallelism-overhead (~2 min the first yr) and overall speed (~40s per yr)
         dfs_delayed = write_biodiversity_contribution(data, yr, path_yr)
-        dfs_val = pd.concat(para_obj(dfs_delayed)).reset_index(drop=True)
+        dfs_val = pd.concat([out for out in para_obj(dfs_delayed)]).reset_index(drop=True)
         dfs_val.to_csv(f"{path_yr}/biodiversity_contribution_{yr}.csv", index=False)
     
     # Copy the base-year outputs to the path_begin_end_compare
     shutil.copytree(f"{data.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True) if settings.MODE == 'timeseries' else None
     
     # Create the report HTML and png maps
-    # TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
-    # save_report_data(data.path)
-    # data2html(data.path)
+    TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
+    save_report_data(data.path)
+    data2html(data.path)
     
     
 

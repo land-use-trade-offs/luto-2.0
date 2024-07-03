@@ -564,7 +564,7 @@ def create_new_dataset():
     
     
     
-    #!!!!!!!!!! This will take ~2.5 hours to finish !!!!!!!!!! 
+    #!!!!!!!!!! This will take ~3 hours to finish !!!!!!!!!! 
     # Calculate the average biodiversity contribution for each group of species
     max_workers = 30        # ~70% utilization for a 256-core CPU
     encoding = {'data': {"compression": "gzip", "compression_opts": 9,  "dtype": 'float32'}}
