@@ -314,20 +314,19 @@ def match_lumap_biomap(
     return map_
 
 
-def ag_dvar_to_bio_map(data, ag_dvar, res_factor, para_obj):
+def ag_dvar_to_bio_map(data, ag_dvar, res_factor):
     """
-    Reprojects and matches agricultural land cover variables to biodiversity maps.
+    Reprojects and matches agricultural data variable (ag_dvar) to a biophysical map.
 
     Parameters:
-    - data (Data object): The Data class object of LUTO.
-    - ag_dvar (xarray.Dataset): The agricultural land cover variables.
-    - res_factor (int): The resolution factor for matching.
-    - para_obj (object): The parallel processing object.
+    - data (xarray.Dataset): The biophysical map data.
+    - ag_dvar (xarray.DataArray): The agricultural data variable to be reprojected and matched.
+    - res_factor (float): The resolution factor for matching the maps.
 
     Returns:
-    - xarray.Dataset: The combined dataset of reprojected and matched variables.
-    """
+    - tasks (list): A list of delayed tasks for parallel processing.
 
+    """
     # wrapper function for parallel processing
     def reproject_match_dvar(ag_dvar, lm, lu, res_factor):
         map_ = ag_dvar.sel(lm=lm, lu=lu)
@@ -338,27 +337,22 @@ def ag_dvar_to_bio_map(data, ag_dvar, res_factor, para_obj):
 
     tasks = [delayed(reproject_match_dvar)(ag_dvar, lm, lu, res_factor) 
              for lm,lu in product(ag_dvar['lm'].values, ag_dvar['lu'].values)]
-    # out_arr = xr.combine_by_coords([i for i in para_obj(tasks)])
-    # # Convert to sparse array to save memory
-    # out_arr.values = sparse.COO.from_numpy(out_arr.values)
     
     return tasks
 
 
-def am_dvar_to_bio_map(data, am_dvar, res_factor, para_obj):
+def am_dvar_to_bio_map(data, am_dvar, res_factor):
     """
-    Reprojects and matches agricultural land cover variables to biodiversity maps.
+    Reprojects and matches the am_dvar to the biomap.
 
     Parameters:
-    - data (Data object): The Data class object of LUTO.
-    - am_dvar (xarray.Dataset): The agricultural land cover variables.
-    - res_factor (int): The resolution factor for matching.
-    - para_obj (object): The parallel processing object.
+    - data: The biomap data.
+    - am_dvar: The am_dvar data.
+    - res_factor: The resolution factor.
 
     Returns:
-    - xarray.Dataset: The combined dataset of reprojected and matched variables.
+    - tasks: A list of delayed tasks for parallel processing.
     """
-
     # wrapper function for parallel processing
     def reproject_match_dvar(am_dvar, am, lm, lu, res_factor):
         map_ = am_dvar.sel(lm=lm, lu=lu)
@@ -369,28 +363,23 @@ def am_dvar_to_bio_map(data, am_dvar, res_factor, para_obj):
 
     tasks = [delayed(reproject_match_dvar)(am_dvar, am, lm, lu, res_factor) 
             for am,lm,lu in product(am_dvar['am'].values, am_dvar['lm'].values, am_dvar['lu'].values)]
-    # out_arr = xr.combine_by_coords([i for i in para_obj(tasks)])
-    # # Convert to sparse array to save memory
-    # out_arr.values = sparse.COO.from_numpy(out_arr.values)
     
     return tasks
 
 
 
-def non_ag_dvar_to_bio_map(data, non_ag_dvar, res_factor, para_obj):
+def non_ag_dvar_to_bio_map(data, non_ag_dvar, res_factor):
     """
-    Reprojects and matches agricultural land cover variables to biodiversity maps.
+    Reprojects and matches non-agricultural dynamic variables to a biophysical map.
 
     Parameters:
-    - data (Data object): The Data class object of LUTO.
-    - non_ag_dvar (xarray.Dataset): The agricultural land cover variables.
-    - res_factor (int): The resolution factor for matching.
-    - para_obj (object): The parallel processing object.
+    - data (xarray.Dataset): The dataset containing the biophysical map.
+    - non_ag_dvar (xarray.DataArray): The non-agricultural dynamic variables.
+    - res_factor (float): The resolution factor for matching the variables.
 
     Returns:
-    - xarray.Dataset: The combined dataset of reprojected and matched variables.
+    - tasks (list): A list of delayed tasks for parallel processing.
     """
-
     # wrapper function for parallel processing
     def reproject_match_dvar(non_ag_dvar, lu, res_factor):
         map_ = non_ag_dvar.sel(lu=lu)
@@ -401,9 +390,6 @@ def non_ag_dvar_to_bio_map(data, non_ag_dvar, res_factor, para_obj):
 
     tasks = [delayed(reproject_match_dvar)(non_ag_dvar, lu, res_factor) 
             for lu in non_ag_dvar['lu'].values]
-    # out_arr = xr.combine_by_coords([i for i in para_obj(tasks)])
-    # # Convert to sparse array to save memory
-    # out_arr.values = sparse.COO.from_numpy(out_arr.values)
     
     return tasks
 
@@ -485,26 +471,35 @@ def interp_bio_group_to_shards(bio_contribution_group, interp_year):
 
 
 # Function to get value from a delayed object
-def get_val(job:tuple):
+def get_val(job: tuple):
+    """
+    Unpack a delayed job and return the result by calling the function with the provided arguments.
+
+    Args:
+        job (tuple): A tuple containing a function and its arguments.
+
+    Returns:
+        The result of calling the function with the provided arguments.
+    """
     return job[0](*job[1])
 
 
 # Helper functions to calculate the biodiversity contribution scores
 def xr_to_df(shard, job_ag:tuple, lu_type:str):
     """
-    Convert an xarray DataArray to a pandas DataFrame with biodiversity contribution scores.
+    Convert an xarray DataArray or delayed function with arguments to a pandas DataFrame.
 
     Parameters:
     - shard: An xarray DataArray or a tuple of delayed function and arguments.
-    - job_ag: A tuple of (delayed<function>, arguments) to compute dvar_ag.
-    - lu_type: The land use type. One of 'ag', 'am', or 'non_ag'.
-
+    - job_ag: A tuple of delayed function and arguments for the agricultural data.
+    - lu_type: A string representing the land use type.
 
     Returns:
-    - A pandas DataFrame containing the biodiversity contribution scores for different land use types.
+    - tmp_ag_df: A pandas DataFrame containing the converted data.
 
     Raises:
-    - ValueError: If the shard parameter is not a valid type (either tuple or xarray DataArray).
+    - ValueError: If the shard type is invalid.
+
     """
 
     # Get the values to avoid duplicate computation
@@ -529,15 +524,15 @@ def calc_bio_score_by_yr(ag_dvar:list, am_dvar:list, non_ag_dvar:list, bio_shard
     Calculate the bio score by year.
 
     Parameters:
-    - job_ag: A list of delayed ag_dvar jobs.
-    - job_am: A list of delayed am_dvar jobs.
-    - job_non_ag: A list of delayed non_ag_dvar jobs.
-    - bio_shards: List of bio shards. Each shard is an xarray DataArray or a tuple of (delayed<function>, arguments).
+    - ag_dvar (list): List of agricultural variables.
+    - am_dvar (list): List of agricultural management variables.
+    - non_ag_dvar (list): List of non-agricultural variables.
+    - bio_shards: List of bio shards.
 
     Returns:
-    - out (pd.DataFrame): Concatenated dataframe with bio scores, excluding the 'spatial_ref' column.
+    - List of tasks (real value is DataFrame) for calculating bio scores for agricultural, 
+    agricultural management, and non-agricultural variables.
     """
-    
     tasks_ag = [delayed(xr_to_df)(shard, job, 'ag') for job in ag_dvar for shard in bio_shards]
     tasks_am = [delayed(xr_to_df)(shard, job, 'am') for job in am_dvar for shard in bio_shards]
     tasks_non_ag = [delayed(xr_to_df)(shard, job, 'non_ag') for job in non_ag_dvar for shard in bio_shards]

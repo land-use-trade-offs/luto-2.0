@@ -1141,7 +1141,6 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
 def write_biodiversity_contribution(data: Data, yr_cal, path, workers=15):
     
     print(f'Writing biodiversity contribution outputs for {yr_cal}')
-    para_obj = Parallel(n_jobs=workers, return_as='generator')
 
     # Get the decision variables for the year and convert them to xarray
     ag_dvar = ag_to_xr(data, yr_cal)
@@ -1149,9 +1148,9 @@ def write_biodiversity_contribution(data: Data, yr_cal, path, workers=15):
     non_ag_dvar = non_ag_to_xr(data, yr_cal)  
     
     # Reproject and match dvars (~1km) to the bio map (~5km)
-    ag_dvar = ag_dvar_to_bio_map(data, ag_dvar, settings.RESFACTOR, para_obj)
-    am_dvar = am_dvar_to_bio_map(data, am_dvar, settings.RESFACTOR, para_obj)
-    non_ag_dvar = non_ag_dvar_to_bio_map(data, non_ag_dvar, settings.RESFACTOR, para_obj)
+    ag_dvar = ag_dvar_to_bio_map(data, ag_dvar, settings.RESFACTOR)
+    am_dvar = am_dvar_to_bio_map(data, am_dvar, settings.RESFACTOR)
+    non_ag_dvar = non_ag_dvar_to_bio_map(data, non_ag_dvar, settings.RESFACTOR)
 
         
     # Calculate the biodiversity contribution scores
