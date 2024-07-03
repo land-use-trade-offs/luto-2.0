@@ -19,6 +19,7 @@ xarray==2024.5.0
 dask==2024.5.1
 h5netcdf==1.3.0
 ipykernel==6.29.4
+sparse==0.15.4
 # Below can only be installed with pip
 gurobipy==11.0.2
 numpy_financial==1.0.0

@@ -24,6 +24,9 @@ import os, re
 import shutil
 import numpy as np
 import pandas as pd
+import xarray as xr
+import geopandas as gpd
+
 from datetime import datetime
 from joblib import Parallel, delayed
 
@@ -56,11 +59,12 @@ from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_html import data2html
 from luto.tools.report.create_static_maps import TIF2MAP
 
-from luto.tools.xarray_tools import ag_dvar_to_bio_map, non_ag_dvar_to_bio_map, am_dvar_to_bio_map, non_ag_to_xr, ag_to_xr, am_to_xr
+from luto.tools.xarray_tools import (ag_dvar_to_bio_map, cal_bio_score_by_yr, calc_bio_hist_sum, calc_bio_score_species, interp_bio_species_to_shards, non_ag_dvar_to_bio_map, am_dvar_to_bio_map, 
+                                     ag_to_xr, non_ag_to_xr, am_to_xr)
 
 
 
-ag_dvar_to_bio_map
+
 
 timestamp_write = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
@@ -1122,24 +1126,44 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
     biodiv_df.to_csv(os.path.join(path, f'biodiversity_separate_{yr_cal}.csv'), index=False) 
     
 
-def write_biodiversity_species(data: Data, yr_cal, path):
-    ag_dvar = np.load(f'data/dvars/res{res_factor}/ag_X_mrj_{year}.npy')         
-    am_dvar = {k: np.load(f'data/dvars/res{res_factor}/ag_man_X_mrj_{k.lower().replace(' ', '_')}_{year}.npy')  
-            for k in AG_MANAGEMENTS_TO_LAND_USES.keys()}
-    non_ag_dvar = np.load(f'data/dvars/res{res_factor}/non_ag_X_rk_{year}.npy')
-
-
+def write_biodiversity_contribution(data: Data, yr_cal, path, workers = 15):
+    
+    print(f'Writing biodiversity contribution outputs for {yr_cal}')
+    para_obj = Parallel(n_jobs=workers, return_as='generator')
+    
     # dvar to xarray 
-    ag_dvar = ag_to_xr(data, ag_dvar)
-    am_dvar = am_to_xr(data, am_dvar)
-    non_ag_dvar = non_ag_to_xr(data, non_ag_dvar) 
+    ag_dvar = ag_to_xr(data.ag_dvars[yr_cal], ag_dvar)
+    am_dvar = am_to_xr(data.ag_man_dvars[yr_cal], am_dvar)
+    non_ag_dvar = non_ag_to_xr(data.non_ag_dvars[yr_cal], non_ag_dvar) 
     
-    # Reproject and match dvars to the bio map
-    ag_dvar_map_reprojected = ag_dvar_to_bio_map(data, ag_dvar, res_factor, max_workers)
-    am_dvar_map_reprojected = am_dvar_to_bio_map(data, am_dvar, res_factor, max_workers)
-    non_ag_dvar_map_reprojected = non_ag_dvar_to_bio_map(data, non_ag_dvar, res_factor, max_workers)
-            
+    # Reproject and match dvars (~1km) to the bio map (~5km)
+    ag_dvar = ag_dvar_to_bio_map(data, ag_dvar, settings.RESFACTOR, settings.THREADS).chunk('auto').compute()
+    am_dvar = am_dvar_to_bio_map(data, am_dvar, settings.RESFACTOR, settings.THREADS).chunk('auto').compute()
+    non_ag_dvar = non_ag_dvar_to_bio_map(data, non_ag_dvar, settings.RESFACTOR, settings.THREADS).chunk('auto').compute()
     
+    # Get the biodiversity scores
+    bio_score_raw = xr.open_dataset(f'{settings.INPUT_DIR}/masked_ssp245_EnviroSuit.nc', chunks='auto')['data']             # Raw scores between 0 and 1
+    bio_score_ctr = xr.open_dataset(f'{settings.INPUT_DIR}/masked_ssp245_EnviroConditionRatio.nc', chunks='auto')['data']   # Contribution to whole continent (sums to 1)
+    bio_cells_df = gpd.read_file(f'{settings.INPUT_DIR}/bio_valid_cells.geojson').set_crs('EPSG:4283', allow_override=True) # Reading from geojson will lose crs, so we need to set it again
+        
+    # Calculate the biodiversity contribution scores
+    if settings.BIO_CALC_LEVEL == 'group':
+        bio_score_group = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_Condition_group.nc', chunks='auto')
+        bio_score_all_species_mean = bio_score_group.mean('group').expand_dims({'group': ['all_species']})  # Calculate the mean score of all species
+        bio_score_group = xr.combine_by_coords([bio_score_group, bio_score_all_species_mean])['data']       # Combine the mean score with the original score
+        bio_contribution_shards = [bio_score_group.sel(year=yr_cal, group=group) for group in bio_score_group['group'].values] 
+    elif settings.BIO_CALC_LEVEL == 'species':
+        bio_raw_path = f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_EnviroSuit.nc'
+        bio_his_score_sum = calc_bio_hist_sum(bio_raw_path)
+        bio_contribution_species = calc_bio_score_species(bio_raw_path, bio_his_score_sum)
+        bio_contribution_shards = interp_bio_species_to_shards(bio_contribution_species, yr_cal)
+    else:
+        raise ValueError('Invalid settings.BIO_CALC_LEVEL! Must be either "group" or "species".')
+    
+    # Save the biodiversity contribution scores
+    bio_df = cal_bio_score_by_yr(ag_dvar, am_dvar, non_ag_dvar, bio_contribution_shards, para_obj)
+
+
   
 def write_ghg_separate(data: Data, yr_cal, path):
 

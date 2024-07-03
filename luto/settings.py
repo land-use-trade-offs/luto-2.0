@@ -393,6 +393,9 @@ BIODIV_GBF_TARGET_2_DICT = {
               2050: 0.3,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
               2100: 0.3   # Stays at 2050 level
              }            # (can add more years/targets)\
+                 
+                 
+BIO_CALC_LEVEL = 'group'  # 'group' or 'species' - determines whether to calculate biodiversity scores at the group or species level
 
     
 
