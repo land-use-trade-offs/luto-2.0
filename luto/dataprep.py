@@ -31,10 +31,12 @@ import xarray as xr
 
 from joblib import Parallel, delayed
 from tqdm.auto import tqdm
+from glob import glob
+from itertools import product
 from luto.settings import INPUT_DIR, RAW_DATA
 from luto.tools import get_all_path
 from luto.tools.spatializers import replace_with_nearest
-from luto.tools.xarray_tools import calc_bio_hist_sum
+from luto.tools.xarray_tools import calc_bio_hist_sum, calc_bio_score_group, interp_bio_group_to_shards
 
 
     
@@ -515,21 +517,21 @@ def create_new_dataset():
 
 
     # Helper functions to convert tif to nc
-    def process_row(row):
+    def process_row(row, template_xr=bio_mask):
         ds = rxr.open_rasterio(row['path']).sel(band=1).drop_vars('band')
         ds.values = replace_with_nearest(ds.values, ds.rio.nodata).astype('uint8')
         ds = ds.expand_dims({'year':[row['year']], 'species':[row['species']]})
         ds = ds.assign_coords(group=('species', [row['group']]))    # Add group as a coordinate, which attatchs to the species dim
-        ds['x'] = bio_mask['x']
-        ds['y'] = bio_mask['y']
+        ds['x'] = template_xr['x']  # Make sure the x and y coordinates are the same as the template
+        ds['y'] = template_xr['y']
         return ds  
-    
+
     def tif_to_nc(df, ssp, mode):
         # Multi-threading to read TIF and expand dims
         in_df = df.query(f'ssp == "{ssp}" and mode == "{mode}"')
         tasks = (delayed(process_row)(row) for _,row in in_df.iterrows())
-        para_obj = Parallel(n_jobs=-1, return_as='generator')       # Use all available cores  
-        print(f'Processing bio_{ssp}_{mode}.nc')
+        para_obj = Parallel(n_jobs=-1, return_as='generator')
+        print(f'Converting bio data of {ssp}_{mode} to NetCDF')
         return [result for result in tqdm(para_obj(tasks), total=len(in_df))]
 
 
@@ -576,7 +578,7 @@ def create_new_dataset():
             bio_xr_interp_group.to_netcdf(f'{INPUT_DIR}/{fname}_group.nc', mode='w', encoding=encoding, engine='h5netcdf')
 
 
-    
+
     
     
     ############### Get stream length 

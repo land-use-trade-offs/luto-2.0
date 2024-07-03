@@ -526,7 +526,7 @@ def xr_to_df(shard, dvar_ag, dvar_am, dvar_non_ag):
     return pd.concat([tmp_ag_df, tmp_am_df, tmp_non_ag_df], ignore_index=True)
 
 
-def cal_bio_score_by_yr(ag_dvar, am_dvar, non_ag_dvar, bio_shards, para_obj):
+def calc_bio_score_by_yr(ag_dvar, am_dvar, non_ag_dvar, bio_shards, para_obj):
     """
     Calculate biodiversity score by year.
 

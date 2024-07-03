@@ -59,8 +59,10 @@ from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_html import data2html
 from luto.tools.report.create_static_maps import TIF2MAP
 
-from luto.tools.xarray_tools import (ag_dvar_to_bio_map, cal_bio_score_by_yr, calc_bio_hist_sum, calc_bio_score_species, interp_bio_species_to_shards, non_ag_dvar_to_bio_map, am_dvar_to_bio_map, 
-                                     ag_to_xr, non_ag_to_xr, am_to_xr)
+from luto.tools.xarray_tools import (ag_to_xr, non_ag_to_xr, am_to_xr,
+                                     ag_dvar_to_bio_map, non_ag_dvar_to_bio_map, am_dvar_to_bio_map,
+                                     calc_bio_hist_sum, calc_bio_score_species, interp_bio_species_to_shards, 
+                                     calc_bio_score_by_yr)
 
 
 
@@ -1126,10 +1128,10 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
     biodiv_df.to_csv(os.path.join(path, f'biodiversity_separate_{yr_cal}.csv'), index=False) 
     
 
-def write_biodiversity_contribution(data: Data, yr_cal, path, workers = 15):
+def write_biodiversity_contribution(data: Data, yr_cal, path, workers=15):
     
     print(f'Writing biodiversity contribution outputs for {yr_cal}')
-    para_obj = Parallel(n_jobs=workers, return_as='generator')
+    para_obj = Parallel(n_jobs=workers, return_as='generator')      # The default 15 workers will consume ~70% of the CPU usage
     
     # dvar to xarray 
     ag_dvar = ag_to_xr(data.ag_dvars[yr_cal], ag_dvar)
@@ -1140,17 +1142,12 @@ def write_biodiversity_contribution(data: Data, yr_cal, path, workers = 15):
     ag_dvar = ag_dvar_to_bio_map(data, ag_dvar, settings.RESFACTOR, settings.THREADS).chunk('auto').compute()
     am_dvar = am_dvar_to_bio_map(data, am_dvar, settings.RESFACTOR, settings.THREADS).chunk('auto').compute()
     non_ag_dvar = non_ag_dvar_to_bio_map(data, non_ag_dvar, settings.RESFACTOR, settings.THREADS).chunk('auto').compute()
-    
-    # Get the biodiversity scores
-    bio_score_raw = xr.open_dataset(f'{settings.INPUT_DIR}/masked_ssp245_EnviroSuit.nc', chunks='auto')['data']             # Raw scores between 0 and 1
-    bio_score_ctr = xr.open_dataset(f'{settings.INPUT_DIR}/masked_ssp245_EnviroConditionRatio.nc', chunks='auto')['data']   # Contribution to whole continent (sums to 1)
-    bio_cells_df = gpd.read_file(f'{settings.INPUT_DIR}/bio_valid_cells.geojson').set_crs('EPSG:4283', allow_override=True) # Reading from geojson will lose crs, so we need to set it again
         
     # Calculate the biodiversity contribution scores
     if settings.BIO_CALC_LEVEL == 'group':
         bio_score_group = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_Condition_group.nc', chunks='auto')
-        bio_score_all_species_mean = bio_score_group.mean('group').expand_dims({'group': ['all_species']})  # Calculate the mean score of all species
-        bio_score_group = xr.combine_by_coords([bio_score_group, bio_score_all_species_mean])['data']       # Combine the mean score with the original score
+        bio_score_all_species_mean = bio_score_group.mean('group').expand_dims({'group': ['all_species']})                          # Calculate the mean score of all species
+        bio_score_group = xr.combine_by_coords([bio_score_group, bio_score_all_species_mean])['data']                               # Add the mean score to the group dimension
         bio_contribution_shards = [bio_score_group.sel(year=yr_cal, group=group) for group in bio_score_group['group'].values] 
     elif settings.BIO_CALC_LEVEL == 'species':
         bio_raw_path = f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_EnviroSuit.nc'
@@ -1161,7 +1158,9 @@ def write_biodiversity_contribution(data: Data, yr_cal, path, workers = 15):
         raise ValueError('Invalid settings.BIO_CALC_LEVEL! Must be either "group" or "species".')
     
     # Save the biodiversity contribution scores
-    bio_df = cal_bio_score_by_yr(ag_dvar, am_dvar, non_ag_dvar, bio_contribution_shards, para_obj)
+    bio_df = calc_bio_score_by_yr(ag_dvar, am_dvar, non_ag_dvar, bio_contribution_shards, para_obj)
+    bio_df.to_csv(os.path.join(path, f'biodiversity_contribution_{yr_cal}.csv'), index=False)
+    
 
 
   
