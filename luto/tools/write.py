@@ -108,7 +108,8 @@ def write_data(data: Data):
 
     # Parallel write the outputs for each year
     num_jobs = min(len(jobs), settings.WRITE_THREADS) if settings.PARALLEL_WRITE else 1   # Use the minimum between jobs_num and threads for parallel writing
-    Parallel(n_jobs=num_jobs, prefer='threads')(jobs)
+    print('changes......................................')
+    Parallel(n_jobs=num_jobs)(jobs)
     
     # Copy the base-year outputs to the path_begin_end_compare
     shutil.copytree(f"{data.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True) if settings.MODE == 'timeseries' else None
@@ -165,6 +166,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_ghg_separate(data, yr_cal, path_yr)
     write_ghg_offland_commodity(data, yr_cal, path_yr)
     write_biodiversity(data, yr_cal, path_yr)
+    write_biodiversity_contribution(data, yr_cal, path_yr)
     write_biodiversity_separate(data, yr_cal, path_yr)
     
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
@@ -1131,17 +1133,17 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
 def write_biodiversity_contribution(data: Data, yr_cal, path, workers=15):
     
     print(f'Writing biodiversity contribution outputs for {yr_cal}')
-    para_obj = Parallel(n_jobs=workers, return_as='generator')      # The default 15 workers will consume ~70% of the CPU usage
-    
-    # dvar to xarray 
-    ag_dvar = ag_to_xr(data.ag_dvars[yr_cal], ag_dvar)
-    am_dvar = am_to_xr(data.ag_man_dvars[yr_cal], am_dvar)
-    non_ag_dvar = non_ag_to_xr(data.non_ag_dvars[yr_cal], non_ag_dvar) 
+    para_obj = Parallel(n_jobs=workers, return_as='generator')
+
+    # Get the decision variables for the year and convert them to xarray
+    ag_dvar = ag_to_xr(data, yr_cal)
+    am_dvar = am_to_xr(data, yr_cal)
+    non_ag_dvar = non_ag_to_xr(data, yr_cal)  
     
     # Reproject and match dvars (~1km) to the bio map (~5km)
-    ag_dvar = ag_dvar_to_bio_map(data, ag_dvar, settings.RESFACTOR, settings.THREADS).chunk('auto').compute()
-    am_dvar = am_dvar_to_bio_map(data, am_dvar, settings.RESFACTOR, settings.THREADS).chunk('auto').compute()
-    non_ag_dvar = non_ag_dvar_to_bio_map(data, non_ag_dvar, settings.RESFACTOR, settings.THREADS).chunk('auto').compute()
+    ag_dvar = ag_dvar_to_bio_map(data, ag_dvar, settings.RESFACTOR, para_obj).chunk('auto').compute()
+    am_dvar = am_dvar_to_bio_map(data, am_dvar, settings.RESFACTOR, para_obj).chunk('auto').compute()
+    non_ag_dvar = non_ag_dvar_to_bio_map(data, non_ag_dvar, settings.RESFACTOR, para_obj).chunk('auto').compute()
         
     # Calculate the biodiversity contribution scores
     if settings.BIO_CALC_LEVEL == 'group':

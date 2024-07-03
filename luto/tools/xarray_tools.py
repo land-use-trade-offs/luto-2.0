@@ -20,18 +20,19 @@ from luto.data import Data
 from luto.tools.spatializers import get_coarse2D_map, upsample_array
 
 
-def ag_to_xr(data:Data, dvar:np.ndarray):
+def ag_to_xr(data:Data, yr_cal:int):
     """
     Convert agricultural data to xarray DataArray.
 
     Parameters:
-    - data (Data): The data object containing the necessary information.
-    - dvar (np.ndarray): The agricultural data to be converted.
+        data (Data): The input data object.
+        yr_cal (int): The year calendar.
 
     Returns:
-    - ag_dvar_xr (xr.DataArray): The converted xarray DataArray.
-
+        xr.DataArray: The converted xarray DataArray.
     """
+
+    dvar = data.ag_dvars[yr_cal]
     ag_dvar_xr = xr.DataArray(
         dvar, 
         dims=('lm', 'cell', 'lu'),
@@ -44,18 +45,20 @@ def ag_to_xr(data:Data, dvar:np.ndarray):
     return ag_dvar_xr.reindex(lu=data.AGRICULTURAL_LANDUSES)
 
 
-def am_to_xr(data:Data, am_dvar:dict[str, np.ndarray]):
+def am_to_xr(data:Data, yr_cal:int):
     """
-    Convert a dictionary of numpy arrays to an xarray DataArray.
+    Convert agricultural management data to xarray format.
 
     Parameters:
-        data (Data): The data object containing LANDMANS and AGRICULTURAL_LANDUSES attributes.
-        am_dvar (dict[str, np.ndarray]): A dictionary of numpy arrays, where the keys represent the array names and the values are the arrays.
+        data (Data): The input data object.
+        yr_cal (int): The year calendar.
 
     Returns:
-        xr.DataArray: The combined xarray DataArray.
-
+        xr.Dataset: The xarray dataset containing the converted data.
     """
+
+    am_dvar = data.ag_man_dvars[yr_cal]
+    
     am_dvars = []
     for am in am_dvar.keys():  
         am_dvar_xr = xr.DataArray(
@@ -74,24 +77,24 @@ def am_to_xr(data:Data, am_dvar:dict[str, np.ndarray]):
 
 
 
-def non_ag_to_xr(data:Data, dvar:np.ndarray):
+def non_ag_to_xr(data:Data, yr_cal:int):
     """
-    Convert a numpy array to an xarray DataArray for non-agricultural land uses.
+    Convert non-agricultural land use data to xarray DataArray.
 
-    Parameters:
-        data (Data): The data object containing non-agricultural land use information.
-        dvar (np.ndarray): The numpy array to be converted.
+    Args:
+        data (Data): The data object containing non-agricultural land use data.
+        yr_cal (int): The year calendar.
 
     Returns:
-        xr.DataArray: The converted xarray DataArray.
-
+        xr.DataArray: The xarray DataArray representing the non-agricultural land use data.
     """
+    dvar = data.non_ag_dvars[yr_cal]
     non_ag_dvar_xr = xr.DataArray(
         dvar, 
         dims=('cell', 'lu'),
         coords={
-                'cell': np.arange(dvar.shape[0]),
-                'lu': data.NON_AGRICULTURAL_LANDUSES}   
+            'cell': np.arange(dvar.shape[0]),
+            'lu': data.NON_AGRICULTURAL_LANDUSES}   
     )
     return non_ag_dvar_xr.reindex(lu=data.NON_AGRICULTURAL_LANDUSES)
 
@@ -99,7 +102,7 @@ def non_ag_to_xr(data:Data, dvar:np.ndarray):
 
 def get_bio_cells(bio_map:xr.open_dataarray, crs:str='epsg:4283') -> gpd.GeoDataFrame:
     """
-    Vectorize a biodiversity map to individual cells.
+    Vectorize a biodiversity map to a GeoDataFrame of individual cells.
 
     Parameters:
     bio_map (xr.open_dataarray): The biodiversity map as an xarray DataArray.
@@ -217,7 +220,7 @@ def get_id_map_by_upsample_reproject(low_res_map, high_res_map):
     
 
 
-def bincount_avg(mask_arr, weight_arr, low_res_xr: xr.DataArray=None):
+def bincount_avg(mask_arr:xr.DataArray, weight_arr:xr.DataArray, low_res_xr:xr.DataArray=None):
     """
     Calculate the average of weighted values based on bin counts.
 
@@ -311,19 +314,20 @@ def match_lumap_biomap(
     return map_
 
 
-def ag_dvar_to_bio_map(data:Data, ag_dvar:xr.DataArray, res_factor:int, para_obj:joblib.Parallel):
+def ag_dvar_to_bio_map(data, ag_dvar, res_factor, para_obj):
     """
-    Reprojects and matches agricultural data variable to a biophysical map.
+    Reprojects and matches agricultural land cover variables to biodiversity maps.
 
     Parameters:
-    - data (Data): The data object containing the biophysical map.
-    - ag_dvar (xr.DataArray): The agricultural data variable to be reprojected and matched.
-    - res_factor (int): The resolution factor for matching the maps.
-    - para_obj (joblib.Parallel): The parallel processing object.
+    - data (Data object): The Data class object of LUTO.
+    - ag_dvar (xarray.Dataset): The agricultural land cover variables.
+    - res_factor (int): The resolution factor for matching.
+    - para_obj (object): The parallel processing object.
 
     Returns:
-    - out_arr (xr.DataArray): The reprojected and matched agricultural data variable as a biophysical map.
+    - xarray.Dataset: The combined dataset of reprojected and matched variables.
     """
+
     # wrapper function for parallel processing
     def reproject_match_dvar(ag_dvar, lm, lu, res_factor):
         map_ = ag_dvar.sel(lm=lm, lu=lu)
@@ -340,20 +344,20 @@ def ag_dvar_to_bio_map(data:Data, ag_dvar:xr.DataArray, res_factor:int, para_obj
     return out_arr
 
 
-def am_dvar_to_bio_map(data:Data, am_dvar, res_factor:int, para_obj:joblib.Parallel):
+def am_dvar_to_bio_map(data, am_dvar, res_factor, para_obj):
     """
-    Reprojects and matches an array of land use variables to a reference dataset.
+    Reprojects and matches agricultural land cover variables to biodiversity maps.
 
     Parameters:
-        data (Data): The reference dataset.
-        am_dvar (xarray.DataArray): The array of land use variables.
-        res_factor (int): The resolution factor.
-        para_obj (joblib.Parallel): The parallel processing object.
+    - data (Data object): The Data class object of LUTO.
+    - am_dvar (xarray.Dataset): The agricultural land cover variables.
+    - res_factor (int): The resolution factor for matching.
+    - para_obj (object): The parallel processing object.
 
     Returns:
-        xarray.DataArray: The reprojected and matched array of land use variables.
+    - xarray.Dataset: The combined dataset of reprojected and matched variables.
     """
-  
+
     # wrapper function for parallel processing
     def reproject_match_dvar(am_dvar, am, lm, lu, res_factor):
         map_ = am_dvar.sel(lm=lm, lu=lu)
@@ -371,19 +375,20 @@ def am_dvar_to_bio_map(data:Data, am_dvar, res_factor:int, para_obj:joblib.Paral
 
 
 
-def non_ag_dvar_to_bio_map(data:Data, non_ag_dvar, res_factor:int, para_obj:joblib.Parallel):
+def non_ag_dvar_to_bio_map(data, non_ag_dvar, res_factor, para_obj):
     """
-    Reprojects and matches non-agricultural data variable to a biophysical map.
+    Reprojects and matches agricultural land cover variables to biodiversity maps.
 
     Parameters:
-    - data (Data): The data object containing the biophysical map.
-    - non_ag_dvar (xarray.DataArray): The non-agricultural data variable to be reprojected and matched.
-    - res_factor (int): The resolution factor for matching the data variable.
-    - para_obj (joblib.Parallel): The parallel processing object for executing the reprojecting and matching tasks.
+    - data (Data object): The Data class object of LUTO.
+    - non_ag_dvar (xarray.Dataset): The agricultural land cover variables.
+    - res_factor (int): The resolution factor for matching.
+    - para_obj (object): The parallel processing object.
 
     Returns:
-    - out_arr (xarray.DataArray): The reprojected and matched non-agricultural data variable as a biophysical map.
+    - xarray.Dataset: The combined dataset of reprojected and matched variables.
     """
+
     # wrapper function for parallel processing
     def reproject_match_dvar(non_ag_dvar, lu, res_factor):
         map_ = non_ag_dvar.sel(lu=lu)
@@ -477,7 +482,7 @@ def interp_bio_group_to_shards(bio_contribution_group, interp_year):
 
 
 # Helper functions to calculate the biodiversity contribution scores
-def xr_to_df(shard, dvar_ag, dvar_am, dvar_non_ag):
+def xr_to_df(shard, dvar_ag:xr.DataArray, dvar_am:xr.DataArray, dvar_non_ag:xr.DataArray):
     """
     Convert an xarray DataArray to a pandas DataFrame with biodiversity contribution scores.
 
@@ -526,21 +531,21 @@ def xr_to_df(shard, dvar_ag, dvar_am, dvar_non_ag):
     return pd.concat([tmp_ag_df, tmp_am_df, tmp_non_ag_df], ignore_index=True)
 
 
-def calc_bio_score_by_yr(ag_dvar, am_dvar, non_ag_dvar, bio_shards, para_obj):
+def calc_bio_score_by_yr(ag_dvar:xr.DataArray, am_dvar:xr.DataArray, non_ag_dvar:xr.DataArray, bio_shards, para_obj:joblib.Parallel):
     """
-    Calculate biodiversity score by year.
+    Calculate the bio score by year.
 
     Parameters:
-    - ag_dvar: The agricultural variable.
-    - am_dvar: The agricultural management variable.
-    - non_ag_dvar: The non-agricultural variable.
-    - bio_shards: The biodiversity shards.
-    - para_obj: The parallelization object.
+    - ag_dvar (xr.DataArray): Data array for agricultural variables.
+    - am_dvar (xr.DataArray): Data array for ambient variables.
+    - non_ag_dvar (xr.DataArray): Data array for non-agricultural variables.
+    - bio_shards: List of bio shards. Each shard is an xarray DataArray or a tuple of delayed function and arguments.
+    - para_obj (joblib.Parallel): Parallel object for parallel processing.
 
     Returns:
-    - The calculated biodiversity score by year, excluding the 'spatial_ref' column.
+    - out (pd.DataFrame): Concatenated dataframe with bio scores, excluding the 'spatial_ref' column.
     """
     
     tasks = [delayed(xr_to_df)(bio_score, ag_dvar, am_dvar, non_ag_dvar) for bio_score in bio_shards]
-    out = pd.concat([out for out in tqdm(para_obj(tasks), total=len(tasks))], ignore_index=True)
+    out = pd.concat([out for out in para_obj(tasks)], ignore_index=True)
     return out.drop(columns=['spatial_ref'])

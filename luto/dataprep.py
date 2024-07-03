@@ -498,7 +498,16 @@ def create_new_dataset():
 
 
     # Create an tempalate nc file for biodiversity data
-    NLUM = rxr.open_rasterio(f'{INPUT_DIR}/NLUM_2010-11_mask.tif').squeeze('band').drop_vars('band').astype('uint8')
+    NLUM = rxr.open_rasterio(f'{INPUT_DIR}/NLUM_2010-11_mask.tif').squeeze('band').drop_vars('band')
+    NLUM.rio.write_nodata(None, inplace=True)
+    NLUM.name = 'data'
+    NLUM.to_netcdf(
+        f'{INPUT_DIR}/NLUM_2010-11_mask.nc', 
+        mode='w', 
+        encoding={'data': {"compression": "gzip", "compression_opts": 9,  "dtype": 'uint8'}},
+        engine='h5netcdf')
+    
+    
     bio_mask = rxr.open_rasterio(df.iloc[0]['path']).squeeze('band').drop_vars('band').astype('uint8')
     bio_mask = xr.where(bio_mask != bio_mask.rio.nodata, 1, 0).astype('uint8').chunk('auto')
     bio_mask = bio_mask.rio.write_crs(NLUM.rio.crs)

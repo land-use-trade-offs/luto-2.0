@@ -147,7 +147,7 @@ class Data:
         # Set the nodata and non-ag code
         self.NODATA = -9999
         self.MASK_LU_CODE = -1
-
+        
         # Load LUMAP without resfactor
         self.LUMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lumap.h5")).to_numpy()                   # 1D (ij flattend),  0-27 for land uses; -1 for non-agricultural land uses; All cells in Australia (land only)
 
