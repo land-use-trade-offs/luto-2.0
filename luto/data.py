@@ -147,7 +147,7 @@ class Data:
         # Set the nodata and non-ag code
         self.NODATA = -9999
         self.MASK_LU_CODE = -1
-
+        
         # Load LUMAP without resfactor
         self.LUMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lumap.h5")).to_numpy()                   # 1D (ij flattend),  0-27 for land uses; -1 for non-agricultural land uses; All cells in Australia (land only)
 
@@ -968,17 +968,6 @@ class Data:
         ) * self.REAL_AREA_NO_RESFACTOR                                                                                     
         
         
-        # # Calculate the biodiversity score loss on non-agricultural land (UNDER CONSTRUCTION)
-        # non_ag_xr = xr.open_dataarray(f'{INPUT_DIR}/lumap_2d_all_lucc_5km_non_ag.nc', chunks='auto')                                # Load the `non-LUTO-zone` land use map
-        # bio_map_area_ha = xr.open_dataarray(f'{INPUT_DIR}/bio_area_ha.nc', chunks='auto').reindex_like(non_ag_xr, method='nearest') # Load the biodiversity map's area in hectares
-        # non_ag_bio_effects_land = xr.DataArray(                                                                                     # Load the biodiversity impact values for non-agricultural land
-        #     list(settings.NON_AG_BIO_IMPACT.values()),
-        #     dims=['PRIMARY_V7'],
-        #     coords={'PRIMARY_V7': list(settings.NON_AG_BIO_IMPACT.keys())}
-        # )
-        # biodiv_value_degraded_non_ag_land = non_ag_xr * non_ag_bio_effects_land * bio_map_area_ha
-        
-        
         # Calculate the sum of biodiversity score lost to land degradation (i.e., raw score minus current score with current score on cropland being zero)
         biodiv_value_degraded_ag_land = ( 
             (biodiv_value_pristine_natural_land - biodiv_value_current_natural_land) +                                      # Biodiversity value lost on `natural land`
@@ -1000,7 +989,7 @@ class Data:
         
         # Sum the current biodiversity score and the biodiversity score of degraded land
         biodiv_value_current_total = biodiv_value_current_natural_land.sum()
-        biodiv_value_degraded_total = biodiv_value_degraded_ag_land.sum() # + biodiv_value_degraded_non_ag_land.sum().compute()
+        biodiv_value_degraded_total = biodiv_value_degraded_ag_land.sum()
 
         # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
         self.BIODIV_GBF_TARGET_2 = {}

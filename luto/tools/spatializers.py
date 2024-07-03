@@ -116,7 +116,7 @@ def upsample_array(data, map_:np.ndarray, factor:int) -> np.ndarray:
 
 def replace_with_nearest(map_: np.ndarray, filler: int) -> np.ndarray:
     """
-    Replaces invalid values in the input array with the nearest non-filler values.
+    Replaces filler values in the input array with the nearest non-filler values.
 
     Parameters:
         map_ (np.ndarray, 2D): The input array.

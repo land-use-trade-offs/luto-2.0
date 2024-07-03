@@ -96,7 +96,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 9 x 9 cell block
-RESFACTOR = 10         # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
+RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
 # MODE = 'snapshot'   # Runs for target year only
@@ -387,6 +387,9 @@ BIODIV_GBF_TARGET_2_DICT = {
               2050: 0.3,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
               2100: 0.3   # Stays at 2050 level
              }            # (can add more years/targets)\
+                 
+                 
+BIO_CALC_LEVEL = 'group'  # 'group' or 'species' - determines whether to calculate biodiversity scores at the group or species level
 
     
 
