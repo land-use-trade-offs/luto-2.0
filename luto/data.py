@@ -201,6 +201,9 @@ class Data:
         print("\tLoading agricultural crop and livestock data...", flush=True)
         self.AGEC_CROPS = pd.read_hdf(os.path.join(INPUT_DIR, "agec_crops.h5"))
         self.AGEC_LVSTK = pd.read_hdf(os.path.join(INPUT_DIR, "agec_lvstk.h5"))
+        # Price multipliers for livestock and crops over the years.
+        self.CROP_PRICE_MULTIPLIERS = pd.read_excel(os.path.join(INPUT_DIR, "ag_price_multipliers.xlsx"), sheet_name="AGEC_CROPS", index_col="Year")
+        self.LVSTK_PRICE_MULTIPLIERS = pd.read_excel(os.path.join(INPUT_DIR, "ag_price_multipliers.xlsx"), sheet_name="AGEC_LVSTK", index_col="Year")
 
 
 
@@ -858,6 +861,22 @@ class Data:
 
         # Get the GHG constraints for luto, shape is (91, 1)
         self.OFF_LAND_GHG_EMISSION_C = self.OFF_LAND_GHG_EMISSION.groupby(['YEAR']).sum(numeric_only=True).values
+        
+        # Read the carbon price per tonne over the years (indexed by the relevant year)
+        carbon_price_sheet = settings.CARBON_PRICES_FIELD or "Default"
+        carbon_price_usecols = "A,B"
+        carbon_price_col_names = ["Year", "Carbon_price_$_tCO2e"]
+        carbon_price_sheet_index_col = "Year" if carbon_price_sheet is not "Default" else 0
+        carbon_price_sheet_header = 0 if carbon_price_sheet is not "Default" else None        
+
+        self.CARBON_PRICES: dict[int, float] = pd.read_excel(
+            os.path.join(INPUT_DIR, 'carbon_prices.xlsx'),
+            sheet_name=carbon_price_sheet,
+            usecols=carbon_price_usecols,
+            names=carbon_price_col_names,
+            header=carbon_price_sheet_header,
+            index_col=carbon_price_sheet_index_col,
+        )["Carbon_price_$_tCO2e"].to_dict()
 
 
         ###############################################################
@@ -1004,7 +1023,28 @@ class Data:
         self.BECCS_REV_AUD_HA_YR = self.get_array_resfactor_applied(beccs_df['BECCS_REV_AUD_HA_YR'].to_numpy())
         self.BECCS_TCO2E_HA_YR = self.get_array_resfactor_applied(beccs_df['BECCS_TCO2E_HA_YR'].to_numpy())
         self.BECCS_MWH_HA_YR = self.get_array_resfactor_applied(beccs_df['BECCS_MWH_HA_YR'].to_numpy())
-        
+
+
+        ###############################################################
+        # Cost multiplier data.
+        ###############################################################
+        cost_mult_excel = pd.ExcelFile(os.path.join(INPUT_DIR, 'cost_multipliers.xlsx'))
+        self.AC_COST_MULTS = pd.read_excel(cost_mult_excel, "AC_multiplier", index_col="Year")
+        self.QC_COST_MULTS = pd.read_excel(cost_mult_excel, "QC_multiplier", index_col="Year")
+        self.FOC_COST_MULTS = pd.read_excel(cost_mult_excel, "FOC_multiplier", index_col="Year")
+        self.FLC_COST_MULTS = pd.read_excel(cost_mult_excel, "FLC_multiplier", index_col="Year")
+        self.FDC_COST_MULTS = pd.read_excel(cost_mult_excel, "FDC_multiplier", index_col="Year")
+        self.WP_COST_MULTS = pd.read_excel(cost_mult_excel, "WP_multiplier", index_col="Year")["Water_delivery_price_multiplier"].to_dict()
+        self.WATER_LICENSE_COST_MULTS = pd.read_excel(cost_mult_excel, "Water License Cost multiplier", index_col="Year")["Water_license_cost_multiplier"].to_dict()
+        self.EST_COST_MULTS = pd.read_excel(cost_mult_excel, "Establishment cost multiplier", index_col="Year")["Establishment_cost_multiplier"].to_dict()
+        self.MAINT_COST_MULTS = pd.read_excel(cost_mult_excel, "Maintennance cost multiplier", index_col="Year")["Maintennance_cost_multiplier"].to_dict()
+        self.TRANS_COST_MULTS = pd.read_excel(cost_mult_excel, "Transitions cost multiplier", index_col="Year")["Transitions_cost_multiplier"].to_dict()
+        self.SAVBURN_COST_MULTS = pd.read_excel(cost_mult_excel, "Savanna burning cost multiplier", index_col="Year")["Savanna_burning_cost_multiplier"].to_dict()
+        self.IRRIG_COST_MULTS = pd.read_excel(cost_mult_excel, "Irrigation cost multiplier", index_col="Year")["Irrigation_cost_multiplier"].to_dict()
+        self.BECCS_COST_MULTS = pd.read_excel(cost_mult_excel, "BECCS cost multiplier", index_col="Year")["BECCS_cost_multiplier"].to_dict()
+        self.BECCS_REV_MULTS = pd.read_excel(cost_mult_excel, "BECCS revenue multiplier", index_col="Year")["BECCS_revenue_multiplier"].to_dict()
+        self.FENCE_COST_MULTS = pd.read_excel(cost_mult_excel, "Fencing cost multiplier", index_col="Year")["Fencing_cost_multiplier"].to_dict()
+       
 
         ###############################################################
         # Apply resfactor to various arrays required for data loading.
@@ -1257,3 +1297,23 @@ class Data:
         total_q_c = [ag_q_c[c] + non_ag_q_c[c] + ag_man_q_c[c]
                     for c in range(self.NCMS)]
         return np.array(total_q_c)
+
+    def get_carbon_price_by_yr_idx(self, yr_idx: int) -> float:
+        """
+        Return the price of carbon per tonne for a given year index (since 2010). 
+        The resulting year should be between 2010 - 2100
+        """
+        yr_cal = yr_idx + self.YR_CAL_BASE
+        return self.get_carbon_price_by_year(yr_cal)
+    
+    def get_carbon_price_by_year(self, yr_cal: int) -> float:
+        """
+        Return the price of carbon per tonne for a given year. 
+        The resulting year should be between 2010 - 2100
+        """
+        if yr_cal not in self.CARBON_PRICES:
+            raise ValueError(
+                f"Carbon price data not given for the given year: {yr_cal}. "
+                f"Year should be between {self.YR_CAL_BASE} and 2100."
+            )
+        return self.CARBON_PRICES[yr_cal]

@@ -395,7 +395,7 @@ def inspect(lumap, highpos, d_j, q_rj, c_rj, landuses):
     return df
 
 
-def get_water_delta_matrix(w_mrj, l_mrj, data):
+def get_water_delta_matrix(w_mrj, l_mrj, data, yr_idx):
     """
     Gets the water delta matrix ($/cell) that applies the cost of installing/removing irrigation to
     base transition costs. Includes the costs of water license fees.
@@ -408,6 +408,8 @@ def get_water_delta_matrix(w_mrj, l_mrj, data):
     Returns:
     - w_delta_mrj (numpy.ndarray, <unit:$/cell>).
     """
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    
     # Get water requirements from current agriculture, converting water requirements for LVSTK from ML per head to ML per cell (inc. REAL_AREA).
     # Sum total water requirements of current land-use and land management
     w_r = (w_mrj * l_mrj).sum(axis=0).sum(axis=1)
@@ -416,14 +418,22 @@ def get_water_delta_matrix(w_mrj, l_mrj, data):
     w_net_mrj = w_mrj - w_r[:, np.newaxis]
 
     # Water license cost calculated as net water requirements (ML/cell) x licence price ($/ML).
-    w_delta_mrj = w_net_mrj * data.WATER_LICENCE_PRICE[:, np.newaxis]
+    w_delta_mrj = w_net_mrj * data.WATER_LICENCE_PRICE[:, np.newaxis] * data.WATER_LICENSE_COST_MULTS[yr_cal]
 
     # When land-use changes from dryland to irrigated add <settings.REMOVE_IRRIG_COST> per hectare for establishing irrigation infrastructure
-    remove_irrig = settings.REMOVE_IRRIG_COST * data.REAL_AREA[:, np.newaxis]      # <unit:$/cell>
+    remove_irrig = (
+        settings.REMOVE_IRRIG_COST
+        * data.IRRIG_COST_MULTS[yr_cal]
+        * data.REAL_AREA[:, np.newaxis]  # <unit:$/cell>
+    )
     w_delta_mrj[1] = np.where(l_mrj[0], w_delta_mrj[1] + remove_irrig, w_delta_mrj[1])
 
     # When land-use changes from irrigated to dryland add <settings.NEW_IRRIG_COST> per hectare for removing irrigation infrastructure
-    new_irrig = settings.NEW_IRRIG_COST * data.REAL_AREA[:, np.newaxis]            # <unit:$/cell>
+    new_irrig = (
+        settings.NEW_IRRIG_COST
+        * data.IRRIG_COST_MULTS[yr_cal]
+        * data.REAL_AREA[:, np.newaxis]  # <unit:$/cell>
+    )
     w_delta_mrj[0] = np.where(l_mrj[1], w_delta_mrj[0] + new_irrig, w_delta_mrj[0])
     
 
