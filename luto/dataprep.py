@@ -30,7 +30,6 @@ import rioxarray as rxr
 import xarray as xr
 
 from joblib import Parallel, delayed
-from tqdm.auto import tqdm
 from glob import glob
 from itertools import product
 from luto.settings import INPUT_DIR, RAW_DATA
@@ -541,7 +540,7 @@ def create_new_dataset():
         tasks = (delayed(process_row)(row) for _,row in in_df.iterrows())
         para_obj = Parallel(n_jobs=-1, return_as='generator')
         print(f'Converting bio data of {ssp}_{mode} to NetCDF')
-        return [result for result in tqdm(para_obj(tasks), total=len(in_df))]
+        return [result for result in para_obj(tasks)]
 
 
     #!!!!!!!!!! This will take ~8 hours to finish !!!!!!!!!!            
@@ -583,7 +582,7 @@ def create_new_dataset():
             bio_xr_contribution_group = calc_bio_score_group(nc, bio_his_score_sum)
             bio_xr_interp_group = interp_bio_group_to_shards(bio_xr_contribution_group, range(2010,2101))
             print(f'Saving {fname}_group.nc')
-            bio_xr_interp_group = xr.combine_by_coords([out for out in tqdm(para_obj(bio_xr_interp_group), total=len(bio_xr_interp_group))])['data']
+            bio_xr_interp_group = xr.combine_by_coords([out for out in para_obj(bio_xr_interp_group)])['data']
             bio_xr_interp_group.to_netcdf(f'{INPUT_DIR}/{fname}_group.nc', mode='w', encoding=encoding, engine='h5netcdf')
 
 

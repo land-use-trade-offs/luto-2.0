@@ -1,8 +1,8 @@
 import os
 import concurrent
-from tqdm.auto import tqdm
 
-from luto.settings import OUTPUT_DIR,WRITE_THREADS, MODE
+from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import NON_AG_LAND_USES, OUTPUT_DIR,WRITE_THREADS, MODE
 from luto.data import Data
 from luto.tools.spatializers import create_2d_map, write_gtiff
 from luto.tools.report.write_input_data import ag_in_data, ag_mam_in_data, non_ag_in_data
@@ -44,7 +44,7 @@ def write_input2tiff(data: Data, year):
         raise ValueError("MODE setting not valid. Must be either 'snapshot' or 'timeseries'. Please check settings.py.")
 
     input_data = get_input_data(data, base_year, year)
-    # Global the {index: desc} dictionary. The <index> is the position of the array, and the <desc> in the description of the array
+    # Global the {index: desc} dictionary. The <index> is the position of the array, and the <desc> is the description of the array
     get_idx2desc(data)
     # Write the input data to TIFF files
     input2tiff(data, input_data, out_dir)
@@ -58,7 +58,11 @@ def get_idx2desc(data: Data):
 
     lm_code2desc = dict(enumerate(data.LANDMANS))
     ag_idx2desc  = {v:k for k,v in data.DESC2AGLU.items()}
-    am_idx2desc  = {k:dict(enumerate(v)) for k,v in data.AG_MANAGEMENTS_TO_LAND_USES.items()}
+    
+    am_idx2desc = {}
+    for k,v in AG_MANAGEMENTS_TO_LAND_USES.items():
+        am_idx2desc[k] = {data.DESC2AGLU.index(lu):lu for lu in v}
+
     non_ag_idx2desc = dict(enumerate(NON_AG_LAND_USES.keys()))
     commodity_idx2desc = dict(enumerate(data.COMMODITIES))
     products_idx2desc = dict(enumerate(data.PRODUCTS))
@@ -232,7 +236,7 @@ def input2tiff(data: Data, input_data, out_dir):
                 for non_ag_idx in non_ag_idx2desc
             )
         # Execute the futures as they are completed, report the process
-        for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)):
+        for future in concurrent.futures.as_completed(futures):
             try:
                 future.result()
             except Exception as exc:
