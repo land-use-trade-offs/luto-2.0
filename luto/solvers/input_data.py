@@ -345,12 +345,7 @@ def get_ag_man_limits(data: Data, target_index):
 
 
 def get_limits(
-    data: Data,
-    yr_cal: int,
-    ag_w_mrj: Optional[np.ndarray] = None,
-    non_ag_w_rk: Optional[np.ndarray] = None,
-    ag_man_w_mrj: Optional[dict[str, np.ndarray]] = None,
-    w_cc_impact: Optional[dict[int, float]] = None,
+    data: Data, yr_cal: int,
 ) -> dict[str, Any]:
     """
     Gets the following limits for the solve:
@@ -363,9 +358,8 @@ def get_limits(
     limits = {}
     
     if settings.WATER_NET_YIELD_LIMITS == 'on':
-        limits['water'] = ag_water.get_water_net_yield_limits(
-            data, yr_cal, ag_w_mrj, non_ag_w_rk, ag_man_w_mrj, w_cc_impact,
-        )
+        limits['water'] = ag_water.get_water_net_yield_limits(data, yr_cal)
+    
     if settings.GHG_EMISSIONS_LIMITS == 'on':
         limits['ghg'] = ag_ghg.get_ghg_limits(data, yr_cal)
     
@@ -398,10 +392,6 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_x_mrj, ag_c_mrj, ag_t_mrj, ag_r_mrj
     )
 
-    non_ag_w_rk = get_non_ag_w_rk(data, ag_w_mrj, base_year)
-    ag_man_w_mrj = get_ag_man_water(data, target_index)
-    w_ccimpact = get_w_ccimpact(data, target_index)
-
     return SolverInputData(
         ag_t_mrj=ag_t_mrj,
         ag_c_mrj=ag_c_mrj,
@@ -418,7 +408,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         non_ag_c_rk=get_non_ag_c_rk(data, ag_c_mrj, base_year, target_year),
         non_ag_r_rk=get_non_ag_r_rk(data, ag_r_mrj, base_year, target_year),
         non_ag_g_rk=get_non_ag_g_rk(data, ag_g_mrj, base_year),
-        non_ag_w_rk=non_ag_w_rk,
+        non_ag_w_rk=get_non_ag_w_rk(data, ag_w_mrj, base_year),
         non_ag_b_rk=get_non_ag_b_rk(data, ag_b_mrj, base_year),
         non_ag_x_rk=get_non_ag_x_rk(data, ag_x_mrj, base_year),
         non_ag_q_crk=get_non_ag_q_crk(data, ag_q_mrp, base_year),
@@ -428,15 +418,15 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_q_mrp=get_ag_man_quantity(data, target_index, ag_q_mrp),
         ag_man_r_mrj=get_ag_man_revenue(data, target_index, ag_r_mrj),
         ag_man_t_mrj=get_ag_man_transitions(data, target_index, ag_t_mrj),
-        ag_man_w_mrj=ag_man_w_mrj,
+        ag_man_w_mrj=get_ag_man_water(data, target_index),
         ag_man_b_mrj=get_ag_man_biodiversity(data),
         ag_man_limits=get_ag_man_limits(data, target_index),
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
-        w_ccimpact=w_ccimpact,
+        w_ccimpact=get_w_ccimpact(data, target_index),
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,
-        limits=get_limits(data, target_year, ag_w_mrj, non_ag_w_rk, ag_man_w_mrj, w_ccimpact),
+        limits=get_limits(data, target_year),
         desc2aglu=data.DESC2AGLU,
         resmult=data.RESMULT,
     )

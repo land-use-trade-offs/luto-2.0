@@ -60,7 +60,7 @@ def get_wreq_matrices(data: Data, yr_idx):
     return w_req_mrj
 
 
-def get_wyield_matrices(data: Data, yr_idx):
+def get_wyield_matrices(data: Data, yr_idx) -> np.ndarray:
     """
     Return water yield matrices by land management, cell, and land-use type.
     
@@ -178,8 +178,9 @@ def get_asparagopsis_effect_w_mrj(data: Data, yr_idx):
         if multiplier != 1:
             j = lu_codes[lu_idx]
             # The effect is: new value = old value * multiplier - old value
-            # E.g. a multiplier of .95 means a 5% reduction in quantity produced
-            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (multiplier - 1)
+            # E.g. a multiplier of .95 means a 5% reduction in water used.
+            # Since the effect applies to water use, it effects the net yield negatively.
+            w_mrj_effect[:, :, lu_idx] = -wreq_mrj[:, :, j] * (multiplier - 1)
 
     return w_mrj_effect
 
@@ -215,8 +216,9 @@ def get_precision_agriculture_effect_w_mrj(data: Data, yr_idx):
         if multiplier != 1:
             j = lu_codes[lu_idx]
             # The effect is: new value = old value * multiplier - old value
-            # E.g. a multiplier of .95 means a 5% reduction in quantity produced
-            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (multiplier - 1)
+            # E.g. a multiplier of .95 means a 5% reduction in water used.
+            # Since the effect applies to water use, it effects the net yield negatively.
+            w_mrj_effect[:, :, lu_idx] = -wreq_mrj[:, :, j] * (multiplier - 1)
 
     return w_mrj_effect
 
@@ -252,8 +254,9 @@ def get_ecological_grazing_effect_w_mrj(data: Data, yr_idx):
         if multiplier != 1:
             j = lu_codes[lu_idx]
             # The effect is: new value = old value * multiplier - old value
-            # E.g. a multiplier of .95 means a 5% reduction in quantity produced
-            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (multiplier - 1)
+            # E.g. a multiplier of .95 means a 5% reduction in water used.
+            # Since the effect applies to water use, it effects the net yield negatively.
+            w_mrj_effect[:, :, lu_idx] = -wreq_mrj[:, :, j] * (multiplier - 1)
 
     return w_mrj_effect
 
@@ -312,8 +315,9 @@ def get_agtech_ei_effect_w_mrj(data, yr_idx):
         if multiplier != 1:
             j = lu_codes[lu_idx]
             # The effect is: new value = old value * multiplier - old value
-            # E.g. a multiplier of .95 means a 5% reduction in quantity produced
-            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (multiplier - 1)
+            # E.g. a multiplier of .95 means a 5% reduction in water used.
+            # Since the effect applies to water use, it effects the net yield negatively.
+            w_mrj_effect[:, :, lu_idx] = -wreq_mrj[:, :, j] * (multiplier - 1)
 
     return w_mrj_effect
 
@@ -365,9 +369,6 @@ def calc_water_net_yield_by_region_in_year(
     """
     Gets net water yield in a given year if the year has a solution.
     """
-    if not settings.WATER_NET_YIELD_LIMITS == 'on':
-        return
-    
     # Data for river regions or drainage divisions
     if settings.WATER_REGION_DEF == 'Drainage Division':
         region_limits = data.DRAINDIV_LIMITS
@@ -399,7 +400,7 @@ def calc_water_net_yield_by_region_in_year(
     # Prepare water matrices for calculation
     yr_idx = yr_cal - data.YR_CAL_BASE
     ag_w_mrj = ag_w_mrj if ag_w_mrj is not None else get_water_net_yield_matrices(data, yr_idx)
-    non_ag_w_rk = non_ag_w_rk if non_ag_w_rk is not None else non_ag_water.get_w_net_yield_matrix(data, yr_idx)
+    non_ag_w_rk = non_ag_w_rk if non_ag_w_rk is not None else non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[yr_cal])
     ag_man_w_mrj = ag_man_w_mrj if ag_man_w_mrj is not None else get_agricultural_management_water_matrices(data, yr_idx)
     w_cc_impact = w_cc_impact if w_cc_impact is not None else get_water_ccimpact(data, yr_idx)
     
@@ -412,10 +413,11 @@ def calc_water_net_yield_by_region_in_year(
         ag_contr = (ag_w_mrj[:, ind, :] * data.ag_dvars[yr_cal][:, ind, :]).sum()
         non_ag_contr = (non_ag_w_rk[ind, :] * data.non_ag_dvars[yr_cal][ind, :]).sum()
         ag_man_contr = sum(
-            (ag_man_w_mrj[am][:, ind, j_idx] * data.ag_man_dvars[yr_cal][am][:, ind, j_idx]).sum()
+            (ag_man_w_mrj[am][:, ind, j_idx] * data.ag_man_dvars[yr_cal][am][:, ind, j]).sum()
             for am, am_j_list in am2j.items()
-            for j_idx in range(len(am_j_list))
+            for j_idx, j in enumerate(am_j_list)
         )
+        print(f"region: {region}, ag_contr: {ag_contr}, non_ag_contr: {non_ag_contr}, ag_man_contr: {ag_man_contr}, w_cc_impact: {w_cc_impact[region]}")
         net_yield_by_region[region] = ag_contr + non_ag_contr + ag_man_contr + w_cc_impact[region]
 
     return net_yield_by_region
@@ -474,12 +476,7 @@ def get_long_term_water_net_yield_limits(
 
 
 def get_water_net_yield_limits(
-    data: Data,
-    yr_cal: int,
-    ag_w_mrj: Optional[np.ndarray] = None,
-    non_ag_w_rk: Optional[np.ndarray] = None,
-    ag_man_w_mrj: Optional[dict[str, np.ndarray]] = None,
-    w_cc_impact: Optional[dict[int, float]] = None,
+    data: Data, yr_cal: int,
 ) -> dict[int, tuple[str, float, float, np.ndarray]]:
     """
     Return water net yield limits for regions (River Regions or Drainage Divisions as specified in luto.settings.py).
@@ -514,15 +511,12 @@ def get_water_net_yield_limits(
         )
     
     long_term_limits = get_long_term_water_net_yield_limits(data)
-    base_year_water_net_yield_by_reg = calc_water_net_yield_by_region_in_year(
-        data, base_year, ag_w_mrj, non_ag_w_rk, ag_man_w_mrj, w_cc_impact,
-    )
+    base_year_water_net_yield_by_reg = calc_water_net_yield_by_region_in_year(data, base_year)
 
     limits_by_region_year = defaultdict(dict)
 
     n_years_cal = limits_target_year - base_year + 1
     calc_years = np.linspace(base_year, limits_target_year, n_years_cal).astype(int)
-    assert calc_years[1] == base_year + 1  # TODO for debugging, remove.
 
     for region, (name, water_all, wreq_reg_target, ind) in long_term_limits.items():
         wreq_reg_base_yr = min(base_year_water_net_yield_by_reg[region], wreq_reg_target)
@@ -531,11 +525,13 @@ def get_water_net_yield_limits(
         for yr, limit in zip(calc_years, yrs_targets):
             limits_by_region_year[yr][region] = (name, water_all, limit, ind)
 
-    assert limits_by_region_year[limits_target_year] == long_term_limits  # TODO for debugging, remove.
-
+    # Save to data object to avoid re-calculating in the future.
     data.WATER_LIMITS_BY_YEAR = dict(limits_by_region_year)
 
-    return limits_by_region_year[yr_cal]
+    return (
+        data.WATER_LIMITS_BY_YEAR[limits_target_year] if yr_cal >= limits_target_year
+        else data.WATER_LIMITS_BY_YEAR[yr_cal]
+    )
  
 
 

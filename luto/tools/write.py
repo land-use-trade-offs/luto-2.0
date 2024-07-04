@@ -835,7 +835,7 @@ def write_water(data: Data, yr_cal, path):
     yr_idx = yr_cal - data.YR_CAL_BASE
 
     # Get water use for year in mrj format
-    ag_w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
+    ag_w_mrj = ag_water.get_water_net_yield_matrices(data, yr_idx)
     non_ag_w_rk = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[yr_cal])
     ag_man_w_mrj = ag_water.get_agricultural_management_water_matrices(data, yr_idx)
 
@@ -848,7 +848,7 @@ def write_water(data: Data, yr_cal, path):
                                 , 'PROPORTION_LIMIT_%'
                                 , 'PROPORTION_ALL_%'] )
 
-    # Get 2010 water use limits used as constraints in model
+    # Get water use limits used as constraints in model
     w_net_yield_limits = ag_water.get_water_net_yield_limits(data, yr_cal)
 
     # Set up data for river regions or drainage divisions
@@ -950,11 +950,12 @@ def write_water(data: Data, yr_cal, path):
         baseline_net_yield_all =  w_net_yield_limits[region][1]                    # Baseline water net yield
         net_yield_lb = w_net_yield_limits[region][2]                               # Water net yield lower bound
         w_net_yield_reg = df_region['Water Net Yield (ML)'].sum() + reg_cc_impact  # Solved water net yield of the region plus climate change impacts
+
         # Calculate absolute and proportional difference between water use target and actual water use
         abs_diff = w_net_yield_reg - net_yield_lb
-        prop_diff = (w_net_yield_reg / net_yield_lb) * 100 # if net_yield_lb > 0 else np.nan
-        prop_all = (w_net_yield_reg / baseline_net_yield_all) * 100 # if baseline_net_yield_all > 0 else np.nan
-            # TODO ^ figure out if the above if statements should be included
+        prop_diff = (w_net_yield_reg / net_yield_lb) * 100
+        prop_all = (w_net_yield_reg / baseline_net_yield_all) * 100
+
         # Add to dataframe
         df.loc[i] = ( region
                     , region_dict[region]
