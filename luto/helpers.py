@@ -32,7 +32,7 @@ create_new_dataset()
 %load_ext memory_profiler
 import luto.simulation as sim
 data = sim.load_data()
-%memit sim.run(data=data, base=2010, target=2050 )
+%memit sim.run(data=data, base=2010, target=2050)
 
 # 3. Write the ouputs to file
 from luto.tools.write import write_outputs
@@ -46,7 +46,7 @@ create_new_dataset()
 
 import luto.simulation as sim
 data = sim.load_data()
-sim.run(data=data, base=2010, target=2050 )
+sim.run(data=data, base=2010, target=2050)
 
 from luto.tools.write import write_outputs
 write_outputs(data)
@@ -75,7 +75,7 @@ create_task_runs()              # This will create seperate folders in "Custom_r
 
 # Write input arrays to tiff files
 from luto.tools.report.write_input_data.array2tif import write_input2tiff
-write_input2tiff(data, 2050)
+write_input2tiff(data, 2010)
 
 
 

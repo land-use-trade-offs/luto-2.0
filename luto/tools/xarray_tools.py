@@ -13,7 +13,6 @@ from itertools import product
 from joblib import Parallel, delayed
 from rasterio.enums import Resampling
 from rasterio.features import shapes
-from tqdm.auto import tqdm
 
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data

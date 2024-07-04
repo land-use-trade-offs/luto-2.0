@@ -36,7 +36,7 @@ import luto.settings as settings
 from typing import Tuple
 from datetime import datetime
 from joblib import Parallel, delayed
-from tqdm.auto import tqdm
+
 
 from luto.tools.report.create_html import data2html
 from luto.tools.report.create_report_data import save_report_data
@@ -583,7 +583,7 @@ def get_all_path(root_dir:str, save_path:str='data/all_suitability_tifs.csv'):
     None
     """
     records = []
-    for dirpath, _, filenames in tqdm(os.walk(root_dir)):
+    for dirpath, _, filenames in os.walk(root_dir):
         for f in filenames:
             if f.endswith('.tif'):
                 group, species = os.path.normpath(dirpath).split('\\')[-2:]
