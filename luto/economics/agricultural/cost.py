@@ -183,7 +183,6 @@ def get_cost_lvstk(data: Data, lu, lm, yr_idx):
 
     # Water delivery costs equal drinking water plus irrigation water req per head * yield (head/ha)
     costs_w = (data.AGEC_LVSTK['WR_DRN', lvstype] + WR_IRR) * yield_pot
-    # TODO: check that the WP cost multiplier is applicable here.
     costs_w *= data.WATER_DELIVERY_PRICE * data.WP_COST_MULTS[yr_cal]  # $/ha
 
     # Convert costs to $ per cell including resfactor.

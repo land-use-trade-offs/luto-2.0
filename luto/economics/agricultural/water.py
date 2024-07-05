@@ -365,7 +365,7 @@ def calc_water_net_yield_by_region_in_year(
     non_ag_w_rk: Optional[np.ndarray] = None,
     ag_man_w_mrj: Optional[dict[str, np.ndarray]] = None,
     w_cc_impact: Optional[dict[int, float]] = None,
-) -> Optional[dict[int, float]]:  # TODO: check return typing
+) -> Optional[dict[int, float]]:
     """
     Gets net water yield in a given year if the year has a solution.
     """
@@ -417,27 +417,20 @@ def calc_water_net_yield_by_region_in_year(
             for am, am_j_list in am2j.items()
             for j_idx, j in enumerate(am_j_list)
         )
-        print(f"region: {region}, ag_contr: {ag_contr}, non_ag_contr: {non_ag_contr}, ag_man_contr: {ag_man_contr}, w_cc_impact: {w_cc_impact[region]}")
         net_yield_by_region[region] = ag_contr + non_ag_contr + ag_man_contr + w_cc_impact[region]
 
     return net_yield_by_region
 
 
-def get_long_term_water_net_yield_limits(
-    data: Data,
-) -> dict[int, tuple[str, float, float, np.ndarray]]:
+def _get_historical_water_usage_by_regions(data: Data) -> dict[int, tuple[str, float, np.ndarray]]:
     """
-    Gets long term net yield targets for water regions. The net yield targets are based on
-    historical yields:
-
-    Water usage should not exceed 'settings.WATER_STRESS_FRACTION' of the historical yields,
-    so the net yield target is given by the historical yield multiplied by 
-    (1 - settings.WATER_STRESS_FRACTION).
+    Gets historical water usage figures, split by regions.
+    These figures are the basis for the net yield targets.
 
     Returns
     -------
     dict[int, ...]: A dictionary where the keys are region IDs and the values are tuples 
-        containing (region name, total water yield, net yield target, cells in region)
+        containing (region name, historical yield, cells in region)
 
     """
     # Get historical yields of regions, stored in data.RIVREG_LIMITS and data.DRAINDIV_LIMITS
@@ -465,11 +458,10 @@ def get_long_term_water_net_yield_limits(
         ind = np.flatnonzero(region_id == reg).astype(np.int32)
 
         # Base the net yield target on the historical yield
-        all_historical_yield = baseline_reg_water_use_limits[reg]
-        net_yield_target = all_historical_yield * (1 - settings.WATER_STRESS_FRACTION)
+        historical_yield = baseline_reg_water_use_limits[reg]
 
         net_baseline_reg_water_yield[reg] = (
-            region_names[reg], all_historical_yield, net_yield_target, ind
+            region_names[reg], historical_yield, ind
         )
 
     return net_baseline_reg_water_yield
@@ -495,41 +487,62 @@ def get_water_net_yield_limits(
     - None
 
     """
-    base_year = data.YR_CAL_BASE
-    limits_target_year = settings.WATER_LIMITS_TARGET_YEAR
-
-    if limits_target_year <= base_year:
+    if any([not data.YR_CAL_BASE <= yr <= 2100 for yr in settings.WATER_YIELD_TARGETS]):
         raise ValueError(
-            f"Setting WATER_LIMITS_TARGET_YEAR ({limits_target_year}) must be strictly " 
-            f"greater than the simulation base year ({base_year})."
+            f"Setting WATER_YIELD_TARGETS must be defined for years between " 
+            f"{data.YR_CAL_BASE} and 2100."
         )
 
+    latest_target_year = max(settings.WATER_YIELD_TARGETS)
     if data.WATER_LIMITS_BY_YEAR: 
         return (
-            data.WATER_LIMITS_BY_YEAR[limits_target_year] if yr_cal >= limits_target_year
+            data.WATER_LIMITS_BY_YEAR[latest_target_year] 
+            if yr_cal >= latest_target_year
             else data.WATER_LIMITS_BY_YEAR[yr_cal]
         )
     
-    long_term_limits = get_long_term_water_net_yield_limits(data)
-    base_year_water_net_yield_by_reg = calc_water_net_yield_by_region_in_year(data, base_year)
+    # Limits do not yet exist and must be calculated
+    historical_yields_dict = _get_historical_water_usage_by_regions(data)
+    base_yr_net_yield_by_reg = calc_water_net_yield_by_region_in_year(data, data.YR_CAL_BASE)
 
     limits_by_region_year = defaultdict(dict)
 
-    n_years_cal = limits_target_year - base_year + 1
-    calc_years = np.linspace(base_year, limits_target_year, n_years_cal).astype(int)
+    # Get the intervals for which gradients must be calculated
+    if len(settings.WATER_YIELD_TARGETS) > 1:
+        gradients_start_ends = [
+            (y1, y2) for y1, y2 
+            in zip(
+                list(settings.WATER_YIELD_TARGETS.keys())[: -1],
+                list(settings.WATER_YIELD_TARGETS.keys())[1: ],
+            )
+        ]
+        first_target_year = gradients_start_ends[0][0]
+        if first_target_year != data.YR_CAL_BASE:
+            gradients_start_ends = [(data.YR_CAL_BASE, first_target_year)] + gradients_start_ends
+    else:
+        gradients_start_ends = [(data.YR_CAL_BASE, list(settings.WATER_YIELD_TARGETS.keys())[0])]
 
-    for region, (name, water_all, wreq_reg_target, ind) in long_term_limits.items():
-        wreq_reg_base_yr = min(base_year_water_net_yield_by_reg[region], wreq_reg_target)
-        yrs_targets = np.linspace(wreq_reg_base_yr, wreq_reg_target, n_years_cal)
+    for yr_start, yr_end in gradients_start_ends:
+        n_years_cal = yr_end - yr_start + 1
+        calc_years = np.linspace(yr_start, yr_end, n_years_cal).astype(int)
 
-        for yr, limit in zip(calc_years, yrs_targets):
-            limits_by_region_year[yr][region] = (name, water_all, limit, ind)
+        for region, (name, hist_yield, ind) in historical_yields_dict.items():
+            reg_target_yr_end = hist_yield * settings.WATER_YIELD_TARGETS[yr_end]
+            if yr_start == data.YR_CAL_BASE:
+                reg_target_yr_start = min(base_yr_net_yield_by_reg[region], reg_target_yr_end)
+            else:
+                saved_limit = limits_by_region_year[yr_start][region][2]
+                reg_target_yr_start = min(saved_limit, reg_target_yr_end)
 
+            yrs_targets = np.linspace(reg_target_yr_start, reg_target_yr_end, n_years_cal)
+            for yr, limit in zip(calc_years, yrs_targets):
+                limits_by_region_year[yr][region] = (name, hist_yield, limit, ind)
+    
     # Save to data object to avoid re-calculating in the future.
     data.WATER_LIMITS_BY_YEAR = dict(limits_by_region_year)
 
     return (
-        data.WATER_LIMITS_BY_YEAR[limits_target_year] if yr_cal >= limits_target_year
+        data.WATER_LIMITS_BY_YEAR[latest_target_year] if yr_cal >= latest_target_year
         else data.WATER_LIMITS_BY_YEAR[yr_cal]
     )
  

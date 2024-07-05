@@ -992,7 +992,7 @@ def get_exclusions_riparian_plantings(data: Data, lumap) -> np.ndarray:
 
     # Exclude all cells used for natural land uses
     # TODO - this means natural LU cells cannot transition to agriculture/RP splits, even though
-    # they may transition to agriculture without the RP portion. Think about this before merging.
+    # they may transition to agriculture without the RP portion.
     exclude *= tools.get_exclusions_for_excluding_all_natural_cells(data, lumap)
 
     # Ensure cells being used for riparian plantings may retain that LU
