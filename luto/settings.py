@@ -334,14 +334,13 @@ WATER_NET_YIELD_LIMITS = 'on'               # 'on' or 'off'
 WATER_REGION_DEF = 'Drainage Division'                 # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
 
 # Water net yield targets: the value represents the proportion of the historical water yields 
-# that the net yield must exceed in a given year. Base year (2010) uses base year net yields as targets
-# (unless otherwise specified). Everything past the latest year specified uses the target figure 
-# for the latest year.
+# that the net yield must exceed in a given year. Base year (2010) uses base year net yields as targets. 
+# Everything past the latest year specified uses the target figure for the latest year.
 # Safe and just Earth system boundaries says water stress of 0.2 (yield target of 0.8) is inclusive of 
 # domestic/industrial: https://www.nature.com/articles/s41586-023-06083-8
 WATER_YIELD_TARGETS = {
                         2030: 0.8,
-                        2100: 1,
+                        2100: 0.8,
                       }
 
 
