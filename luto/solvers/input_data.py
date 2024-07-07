@@ -1,6 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
+from typing import Optional, Any
 import numpy as np
 
 from luto import settings
@@ -63,6 +64,8 @@ class SolverInputData:
     ag_man_b_mrj: dict              # Agricultural management options' biodiversity effects.
     ag_man_limits: dict             # Agricultural management options' adoption limits.
     ag_man_lb_mrj: dict             # Agricultural management options' lower bounds.
+
+    w_ccimpact: dict[int, float]    # Climate change impacts of water dict.
 
     offland_ghg: np.ndarray         # GHG emissions from off-land commodities.
 
@@ -193,9 +196,14 @@ def get_non_ag_g_rk(data: Data, ag_g_mrj, base_year):
 
 
 def get_ag_w_mrj(data: Data, target_index):
-    print('Getting agricultural water requirement matrices...', flush = True)
-    output = ag_water.get_wreq_matrices(data, target_index)
+    print('Getting agricultural water net yield matrices...', flush = True)
+    output = ag_water.get_water_net_yield_matrices(data, target_index)
     return output.astype(np.float32)
+
+
+def get_w_ccimpact(data: Data, target_index):
+    print('Getting water climate change impact figures...', flush = True)
+    return ag_water.get_water_ccimpact(data, target_index)
 
 
 def get_ag_b_mrj(data: Data):
@@ -206,7 +214,7 @@ def get_ag_b_mrj(data: Data):
 
 def get_non_ag_w_rk(data: Data, ag_w_mrj: np.ndarray, base_year):
     print('Getting non-agricultural water requirement matrices...', flush = True)
-    output = non_ag_water.get_wreq_matrix(data, ag_w_mrj, data.lumaps[base_year])
+    output = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[base_year])
     return output.astype(np.float32)
 
 
@@ -318,9 +326,9 @@ def get_ag_man_transitions(data: Data, target_index, ag_t_mrj):
     return output
 
 
-def get_ag_man_water(data: Data, target_index, ag_w_mrj):
+def get_ag_man_water(data: Data, target_index):
     print('Getting agricultural management options\' water requirement effects...', flush = True)
-    output = ag_water.get_agricultural_management_water_matrices(data, ag_w_mrj, target_index)
+    output = ag_water.get_agricultural_management_water_matrices(data, target_index)
     return output
 
 
@@ -336,16 +344,31 @@ def get_ag_man_limits(data: Data, target_index):
     return output
 
 
-def get_limits(data: Data, target: int):
+def get_limits(
+    data: Data, yr_cal: int,
+) -> dict[str, Any]:
+    """
+    Gets the following limits for the solve:
+    - Water net yield limits
+    - GHG limits
+    - Biodiversity limits
+    """
     print('Getting environmental limits...', flush = True)
     # Limits is a dictionary with heterogeneous value sets.
     limits = {}
     
-    if settings.WATER_USE_LIMITS == 'on': limits['water'] = ag_water.get_wuse_limits(data)
-    if settings.GHG_EMISSIONS_LIMITS == 'on':  limits['ghg'] = ag_ghg.get_ghg_limits(data, target)
+    if settings.WATER_NET_YIELD_LIMITS == 'on':
+        limits['water'] = ag_water.get_water_net_yield_limits(data, yr_cal)
+    
+    if settings.GHG_EMISSIONS_LIMITS == 'on':
+        limits['ghg'] = ag_ghg.get_ghg_limits(data, yr_cal)
     
     # If biodiversity limits are not turned on, set the limit to 0.
-    limits['biodiversity'] = ag_biodiversity.get_biodiversity_limits(data, target) if settings.BIODIVERSITY_LIMITS == 'on' else 0 
+    limits['biodiversity'] = (
+        ag_biodiversity.get_biodiversity_limits(data, yr_cal)
+        if settings.BIODIVERSITY_LIMITS == 'on'
+        else 0
+    )
     
     return limits
 
@@ -395,10 +418,11 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_q_mrp=get_ag_man_quantity(data, target_index, ag_q_mrp),
         ag_man_r_mrj=get_ag_man_revenue(data, target_index, ag_r_mrj),
         ag_man_t_mrj=get_ag_man_transitions(data, target_index, ag_t_mrj),
-        ag_man_w_mrj=get_ag_man_water(data, target_index, ag_w_mrj),
+        ag_man_w_mrj=get_ag_man_water(data, target_index),
         ag_man_b_mrj=get_ag_man_biodiversity(data),
         ag_man_limits=get_ag_man_limits(data, target_index),
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
+        w_ccimpact=get_w_ccimpact(data, target_index),
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,
