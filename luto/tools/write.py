@@ -197,9 +197,6 @@ def get_settings(setting_path:str):
 
         settings_dict['LAND_USAGE_CULL_PERCENTAGE'] = 'None' if settings.CULL_MODE in ['absolute', 'none'] else settings_dict['LAND_USAGE_CULL_PERCENTAGE']
         settings_dict['MAX_LAND_USES_PER_CELL'] = 'None' if settings.CULL_MODE in ['percentage', 'none'] else settings_dict['MAX_LAND_USES_PER_CELL']
-
-        settings_dict['WATER_STRESS_FRACTION'] = 'None' if settings.WATER_USE_LIMITS == 'on' and settings.WATER_LIMITS_TYPE == 'pct_ag' else settings_dict['WATER_STRESS_FRACTION']
-        settings_dict['WATER_USE_REDUCTION_PERCENTAGE'] = 'None' if settings.WATER_USE_LIMITS == 'on' and settings.WATER_LIMITS_TYPE == 'water_stress' else settings_dict['WATER_USE_REDUCTION_PERCENTAGE']
         
     return settings_dict
     
@@ -849,7 +846,7 @@ def write_water(data: Data, yr_cal, path):
     """Calculate water use totals. Takes a simulation object, a numeric
        target calendar year (e.g., 2030), and an output path as input."""
     
-    if not settings.WATER_USE_LIMITS == 'on':
+    if not settings.WATER_NET_YIELD_LIMITS == 'on':
         return
 
     print(f'Writing water outputs for {yr_cal}')
@@ -858,21 +855,21 @@ def write_water(data: Data, yr_cal, path):
     yr_idx = yr_cal - data.YR_CAL_BASE
 
     # Get water use for year in mrj format
-    ag_w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
-    non_ag_w_rk = non_ag_water.get_wreq_matrix(data, ag_w_mrj, data.lumaps[yr_cal])
-    ag_man_w_mrj = ag_water.get_agricultural_management_water_matrices(data, ag_w_mrj, yr_idx)
+    ag_w_mrj = ag_water.get_water_net_yield_matrices(data, yr_idx)
+    non_ag_w_rk = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[yr_cal])
+    ag_man_w_mrj = ag_water.get_agricultural_management_water_matrices(data, yr_idx)
 
     # Prepare a data frame.
     df = pd.DataFrame( columns=[ 'REGION_ID'
                                 , 'REGION_NAME'
-                                , 'WATER_USE_LIMIT_ML'
-                                , 'TOT_WATER_REQ_ML'
+                                , 'NET_YIELD_LOWER_BOUND_ML'
+                                , 'TOT_WATER_NET_YIELD_ML'
                                 , 'ABS_DIFF_ML'
                                 , 'PROPORTION_LIMIT_%'
                                 , 'PROPORTION_ALL_%'] )
 
-    # Get 2010 water use limits used as constraints in model
-    wuse_limits = ag_water.get_wuse_limits(data)
+    # Get water use limits used as constraints in model
+    w_net_yield_limits = ag_water.get_water_net_yield_limits(data, yr_cal)
 
     # Set up data for river regions or drainage divisions
     if settings.WATER_REGION_DEF == 'Drainage Division':
@@ -888,17 +885,24 @@ def write_water(data: Data, yr_cal, path):
         region_dict = data.RIVREG_DICT
 
     else:
-        print('Incorrect option for WATER_REGION_DEF in settings')
+        raise ValueError(
+            f"Incorrect option for WATER_REGION_DEF in settings: {settings.WATER_REGION_DEF} "
+            f"(must be either 'Drainage Division' or 'River Region')."
+        )
 
     # Loop through specified water regions
     df_water_seperate_dfs = []
+
+    climate_change_impacts = ag_water.get_water_ccimpact(data, yr_idx)
+
     for i, region in enumerate(region_limits.keys()):
+        reg_cc_impact = climate_change_impacts[region]
         
         # Get indices of cells in region
         ind = np.flatnonzero(region_id == region).astype(np.int32)
 
         # Calculate water requirements by agriculture for year and region.
-        index_levels = ['Landuse Type', 'Landuse', 'Water_supply',  'Water Use (ML)']
+        index_levels = ['Landuse Type', 'Landuse', 'Water_supply',  'Water Net Yield (ML)']
 
         # Agricultural water use
         ag_mrj = ag_w_mrj[:, ind, :] * data.ag_dvars[yr_cal][:, ind, :]   
@@ -963,19 +967,20 @@ def write_water(data: Data, yr_cal, path):
 
 
         # Calculate water use limits and actual water use
-        water_all =  wuse_limits[i][2]                  # Total available water
-        wul = wuse_limits[i][3]                         # Water use limit
-        wreq_reg = df_region['Water Use (ML)'].sum()
+        baseline_net_yield_all =  w_net_yield_limits[region][1]                    # Baseline water net yield
+        net_yield_lb = w_net_yield_limits[region][2]                               # Water net yield lower bound
+        w_net_yield_reg = df_region['Water Net Yield (ML)'].sum() + reg_cc_impact  # Solved water net yield of the region plus climate change impacts
 
         # Calculate absolute and proportional difference between water use target and actual water use
-        abs_diff = wreq_reg - wul
-        prop_diff = (wreq_reg / wul) * 100 if wul > 0 else np.nan
-        prop_all = (wreq_reg / water_all) * 100 if water_all > 0 else np.nan
+        abs_diff = w_net_yield_reg - net_yield_lb
+        prop_diff = (w_net_yield_reg / net_yield_lb) * 100
+        prop_all = (w_net_yield_reg / baseline_net_yield_all) * 100
+
         # Add to dataframe
         df.loc[i] = ( region
                     , region_dict[region]
-                    , wul
-                    , wreq_reg 
+                    , net_yield_lb
+                    , w_net_yield_reg 
                     , abs_diff
                     , prop_diff
                     , prop_all)
