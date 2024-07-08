@@ -95,21 +95,26 @@ def upsample_array(data, map_:np.ndarray, factor:int) -> np.ndarray:
     """
     dense_2D_shape = data.NLUM_MASK.shape
     dense_2D_map = np.repeat(np.repeat(map_, factor, axis=0), factor, axis=1)       # Simply repeate each cell by `factor` times at every row/col direction  
+    
+    
+    # Adjust the dense_2D_map size if it exceeds the original shape
+    if dense_2D_map.shape[0] > dense_2D_shape[0] or dense_2D_map.shape[1] > dense_2D_shape[1]:
+        dense_2D_map = dense_2D_map[:dense_2D_shape[0], :dense_2D_shape[1]]
+    
+    # Pad the array if necessary
+    if dense_2D_map.shape[0] < dense_2D_shape[0] or dense_2D_map.shape[1] < dense_2D_shape[1]:
+        pad_height = dense_2D_shape[0] - dense_2D_map.shape[0]
+        pad_width = dense_2D_shape[1] - dense_2D_map.shape[1]
+        dense_2D_map = np.pad(
+            dense_2D_map, 
+            pad_width=((0, pad_height), (0, pad_width)), 
+            mode='edge'
+        )
 
-    # Make sure it has the same shape as the original full-res 2D map
-    dense_2D_map = dense_2D_map[0:dense_2D_shape[0], 0:dense_2D_shape[1]] 
-    
-    # Pad the array
-    pad_height = dense_2D_shape[0] - dense_2D_map.shape[0]
-    pad_width = dense_2D_shape[1] - dense_2D_map.shape[1]
-    dense_2D_map = np.pad(
-        dense_2D_map, 
-        pad_width=((0, pad_height), (0, pad_width)), 
-        mode='edge')        
-    
+    # Apply the masks
     filler_mask = data.LUMAP_2D != data.MASK_LU_CODE
-    dense_2D_map = np.where(filler_mask, dense_2D_map, data.MASK_LU_CODE)           # Apply the LU mask to the dense 2D map.
-    dense_2D_map = np.where(data.NLUM_MASK, dense_2D_map, data.NODATA)              # Apply the NLUM mask to the dense 2D map.
+    dense_2D_map = np.where(filler_mask, dense_2D_map, data.MASK_LU_CODE)
+    dense_2D_map = np.where(data.NLUM_MASK, dense_2D_map, data.NODATA)
     return dense_2D_map
 
 

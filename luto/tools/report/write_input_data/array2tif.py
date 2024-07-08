@@ -1,6 +1,8 @@
 import os
 import concurrent
 
+import numpy as np
+
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.settings import NON_AG_LAND_USES, OUTPUT_DIR,WRITE_THREADS, MODE
 from luto.data import Data
@@ -24,6 +26,12 @@ def write_input2tiff(data: Data, year):
     Returns:
         None
     """
+    
+    # Update the Geo metadata before writing the input data to TIFF files
+    data.GEO_META['nodata'] = data.NODATA
+    data.GEO_META['dtype'] = 'float32'
+    data.GEO_META['compress'] = 'lzw'
+    
 
     # Check if the year is valid
     if year not in data.lumaps.keys():
@@ -58,11 +66,7 @@ def get_idx2desc(data: Data):
 
     lm_code2desc = dict(enumerate(data.LANDMANS))
     ag_idx2desc  = {v:k for k,v in data.DESC2AGLU.items()}
-    
-    am_idx2desc = {}
-    for k,v in AG_MANAGEMENTS_TO_LAND_USES.items():
-        am_idx2desc[k] = {data.DESC2AGLU.index(lu):lu for lu in v}
-
+    am_idx2desc = {k:dict(enumerate(v)) for k,v in AG_MANAGEMENTS_TO_LAND_USES.items()}
     non_ag_idx2desc = dict(enumerate(NON_AG_LAND_USES.keys()))
     commodity_idx2desc = dict(enumerate(data.COMMODITIES))
     products_idx2desc = dict(enumerate(data.PRODUCTS))
@@ -97,6 +101,7 @@ def write_non_ag_arr2tif(data: Data, in_data, in_attr, lu_idx, out_dir):
     in_arry = get_arry(in_data, in_attr)
     arr_lu = slice_lu_lm(in_arry, slice(None), lu_idx)
     arr_lu = create_2d_map(data, arr_lu, -1)
+    arr_lu = arr_lu.astype(np.float32, casting='unsafe')
     write_gtiff(arr_lu, out_file, data=data)
 
     
@@ -107,6 +112,7 @@ def write_am_arr2tif(data: Data, in_data, in_attr, am, lm_idx, lu_idx, out_dir):
     in_arry = get_arry(in_data, in_attr, am)
     arr_lu_lm = slice_lu_lm(in_arry, lm_idx, slice(None), lu_idx)
     arr_lu_lm = create_2d_map(data, arr_lu_lm, -1)
+    arr_lu_lm = arr_lu_lm.astype(np.float32, casting='unsafe')
     write_gtiff(arr_lu_lm,out_file, data=data)
 
     
@@ -118,6 +124,7 @@ def write_ag_product_arr2tif(data: Data, in_data, in_attr,lm_idx, product_code, 
     in_arry = get_arry(in_data, in_attr)
     arr_p = slice_lu_lm(in_arry, lm_idx, slice(None), product_code)
     arr_p = create_2d_map(data, arr_p, -1) 
+    arr_p = arr_p.astype(np.float32, casting='unsafe')
     write_gtiff(arr_p, out_file, data=data)
 
     
@@ -128,6 +135,7 @@ def write_am_product_arr2tif(data: Data, in_data, in_attr, am, lm_idx, product_i
     in_arry = get_arry(in_data, in_attr, am=am)
     arr_p = slice_lu_lm(in_arry, lm_idx, slice(None), product_idx)
     arr_p = create_2d_map(data, arr_p, -1) 
+    arr_p = arr_p.astype(np.float32, casting='unsafe')
     write_gtiff(arr_p, out_file, data=data)
 
     
@@ -138,6 +146,7 @@ def write_non_ag_commodity_arr2tif(data: Data, in_data, in_attr, commodity_idx, 
     in_arry = get_arry(in_data, in_attr)
     arr_c = slice_lu_lm(in_arry, commodity_idx, slice(None), non_ag_idx)
     arr_c = create_2d_map(data, arr_c, -1) 
+    arr_c = arr_c.astype(np.float32, casting='unsafe')
     write_gtiff(arr_c, out_file, data=data)
     
     

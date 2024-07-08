@@ -24,18 +24,11 @@ and Brett Bryan, Deakin University
 # Load libraries
 import numpy as np
 import pandas as pd
-import shutil, os, time
-import h5py
-import rioxarray as rxr
-import xarray as xr
+import shutil, os, time, h5py
 
-from joblib import Parallel, delayed
 from glob import glob
-from itertools import product
+from joblib import Parallel, delayed
 from luto.settings import INPUT_DIR, RAW_DATA
-from luto.tools import get_all_path
-from luto.tools.spatializers import replace_with_nearest
-from luto.tools.xarray_tools import calc_bio_hist_sum, calc_bio_score_group, interp_bio_group_to_shards
 
 
     
@@ -59,6 +52,7 @@ def create_new_dataset():
     nlum_inpath = 'N:/Data-Master/National_Landuse_Map/'
     BECCS_inpath = 'N:/Data-Master/BECCS/From_CSIRO/20211124_as_submitted/'
     GHG_off_land_inpath = 'N:/LUF-Modelling/Food_demand_AU/au.food.demand/Inputs/Off_land_GHG_emissions'
+    bio_contributions_inpath = 'N:/Data-Master/Biodiversity/biodiversity_contribution/data'
     
     # Set data output paths
     raw_data = RAW_DATA + '/' # '../raw_data/'
@@ -488,107 +482,28 @@ def create_new_dataset():
     
     
     ############### Get biodiversity contribution layers for each species (total ~10k species)
+    '''
+    The actual data processing was done in  `N:/Data-Master/Biodiversity/biodiversity_contribution`.
     
-    # Search for all tif files and save to their paths to a csv file
-    bio_path_raw = 'N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km'
-    if not os.path.exists(f'{INPUT_DIR}/bio_file_paths_raw.csv'):
-        get_all_path(bio_path_raw, f'{INPUT_DIR}/bio_file_paths_raw.csv')
-    df = pd.read_csv(f'{INPUT_DIR}/bio_file_paths_raw.csv' )
-
-
-    # Create an tempalate nc file for biodiversity data
-    NLUM = rxr.open_rasterio(f'{INPUT_DIR}/NLUM_2010-11_mask.tif').squeeze('band').drop_vars('band')
-    NLUM.rio.write_nodata(None, inplace=True)
-    NLUM.name = 'data'
-    NLUM.to_netcdf(
-        f'{INPUT_DIR}/NLUM_2010-11_mask.nc', 
-        mode='w', 
-        encoding={'data': {"compression": "gzip", "compression_opts": 9,  "dtype": 'uint8'}},
-        engine='h5netcdf')
+    The biodiversity contribution were calculated following below steps:
+        - For each species, we have a `Raw_suitability` raster layer (~5 km resolution) that shows the species' suitability (ranges betwen 0 adn 100) across Australia. 
+        - For each species, we summed the suitability values across all the cells to get the `Total_suitability_val`.
+        - For each species, the `Contribution` =  `Raw_suitability` / `Total_suitability_val`.
+        
+    Because there are ~10k species, we grouped them into broader catogories for reporting. 
+    For each category, the `Contribution` is the average of all species's `Contribution` within.
+        - `group` level: ['amphibians', 'birds', 'mammals', 'plants', 'reptiles'].
+        - `endanger` level: ['']  !!! Under development !!!
+    '''
     
+    # Copy biodiversity contribution files
+    bio_ncs = glob(f'{bio_contributions_inpath}/*.nc')
+    for nc in bio_ncs:
+        shutil.copy(nc, outpath)
     
-    bio_mask = rxr.open_rasterio(df.iloc[0]['path']).squeeze('band').drop_vars('band').astype('uint8')
-    bio_mask = xr.where(bio_mask != bio_mask.rio.nodata, 1, 0).astype('uint8').chunk('auto')
-    bio_mask = bio_mask.rio.write_crs(NLUM.rio.crs)
-    bio_mask.name = 'data'
-    bio_mask.to_netcdf(
-        f'{INPUT_DIR}/bio_mask.nc', 
-        mode='w', 
-        encoding={'data': {"compression": "gzip", "compression_opts": 9,  "dtype": 'uint8'}},
-        engine='h5netcdf')
-
-
-    # Filter out the ensemble data
-    ensemble_df = df.query('model == "GCM-Ensembles" & mode == "EnviroSuit"').drop(columns=['model'])
-    valid_species = ensemble_df['species'].unique()                  
-    historic_df = df.query('model == "historic" and species.isin(@valid_species) and ~path.str.contains("5x5")')
-
-
-    # Helper functions to convert tif to nc
-    def process_row(row, template_xr=bio_mask):
-        ds = rxr.open_rasterio(row['path']).sel(band=1).drop_vars('band')
-        ds.values = replace_with_nearest(ds.values, ds.rio.nodata).astype('uint8')
-        ds = ds.expand_dims({'year':[row['year']], 'species':[row['species']]})
-        ds = ds.assign_coords(group=('species', [row['group']]))    # Add group as a coordinate, which attatchs to the species dim
-        ds['x'] = template_xr['x']  # Make sure the x and y coordinates are the same as the template
-        ds['y'] = template_xr['y']
-        return ds  
-
-    def tif_to_nc(df, ssp, mode):
-        # Multi-threading to read TIF and expand dims
-        in_df = df.query(f'ssp == "{ssp}" and mode == "{mode}"')
-        tasks = (delayed(process_row)(row) for _,row in in_df.iterrows())
-        para_obj = Parallel(n_jobs=-1, return_as='generator')
-        print(f'Converting bio data of {ssp}_{mode} to NetCDF')
-        return [result for result in para_obj(tasks)]
-
-
-    #!!!!!!!!!! This will take ~8 hours to finish !!!!!!!!!!            
-    # Save ensemble data to nc   
-    historic_xr = tif_to_nc(historic_df, 'historic', 'historic')
-    for ssp, mode in product(ensemble_df['ssp'].unique(), ensemble_df['mode'].unique()):
-        # Pass if the file already exists
-        if os.path.exists(f'{INPUT_DIR}/bio_{ssp}_{mode}.nc'):
-            print(f'{ssp}_{mode}.nc already exists')
-            continue
-
-        # get the data
-        ensemble_arrs = tif_to_nc(ensemble_df, ssp, mode)
-        ensemble_arrs = xr.combine_by_coords(historic_xr + ensemble_arrs, fill_value=0, combine_attrs='drop')
-
-        # Save to nc
-        encoding = {'data': {"compression": "gzip", "compression_opts": 9,  "dtype": 'uint8'}} 
-        ensemble_arrs.name = 'data'
-        ensemble_arrs.to_netcdf(f'{INPUT_DIR}/bio_{ssp}_{mode}.nc', mode='w', encoding=encoding, engine='h5netcdf')
-    
-    
-    
-    #!!!!!!!!!! This will take ~3 hours to finish !!!!!!!!!! 
-    # Calculate the average biodiversity contribution for each group of species
-    max_workers = 30        # ~70% utilization for a 256-core CPU
-    encoding = {'data': {"compression": "gzip", "compression_opts": 9,  "dtype": 'float32'}}
-    para_obj = Parallel(n_jobs=max_workers, return_as='generator')
-    bio_raw_ncs = glob(f'{INPUT_DIR}/*EnviroSuit.nc')
-
-    for nc in bio_raw_ncs:
-        fname = os.path.basename(nc).replace('EnviroSuit', 'Condition').replace('.nc', '')
-        # Calculate the historical biodiversity score sum for each species
-        bio_his_score_sum = calc_bio_hist_sum(nc)
-        # Calculate the biodiversity contribution scores for each group between 2010 and 2100
-        if os.path.exists(f'{INPUT_DIR}/{fname}_group.nc'):
-            print(f'{fname}_group.nc already exists.')
-            continue
-        else:
-            bio_xr_contribution_group = calc_bio_score_group(nc, bio_his_score_sum)
-            bio_xr_interp_group = interp_bio_group_to_shards(bio_xr_contribution_group, range(2010,2101))
-            print(f'Saving {fname}_group.nc')
-            bio_xr_interp_group = xr.combine_by_coords([out for out in para_obj(bio_xr_interp_group)])['data']
-            bio_xr_interp_group.to_netcdf(f'{INPUT_DIR}/{fname}_group.nc', mode='w', encoding=encoding, engine='h5netcdf')
 
 
 
-    
-    
     ############### Get stream length 
     
     # Get stream lenght per cell

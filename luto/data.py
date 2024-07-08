@@ -998,6 +998,9 @@ class Data:
         for yr in range(2010, 2101):
             self.BIODIV_GBF_TARGET_2[yr] = biodiv_value_current_total + (biodiv_value_degraded_total * biodiv_GBF_target_2_proportions_2010_2100[yr]) 
         
+        
+       
+        
 
         ###############################################################
         # BECCS data.

@@ -59,7 +59,7 @@ from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_html import data2html
 from luto.tools.report.create_static_maps import TIF2MAP
 
-from luto.tools.xarray_tools import (ag_to_xr, get_val, non_ag_to_xr, am_to_xr,
+from luto.tools.xarray_tools import (ag_to_xr, non_ag_to_xr, am_to_xr,
                                      ag_dvar_to_bio_map, non_ag_dvar_to_bio_map, am_dvar_to_bio_map,
                                      calc_bio_hist_sum, calc_bio_score_species, interp_bio_species_to_shards, 
                                      calc_bio_score_by_yr)
@@ -71,6 +71,7 @@ from luto.tools.xarray_tools import (ag_to_xr, get_val, non_ag_to_xr, am_to_xr,
 timestamp_write = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
 def write_outputs(data: Data):
+    print('changes ............................................')
     # Write the model outputs to file
     write_data(data)
     # Move the log files to the output directory
@@ -98,6 +99,12 @@ def write_data(data: Data):
 
     # Write the area transition between base-year and target-year 
     write_area_transition_start_end(data, f'{data.path}/out_{years[-1]}')
+    
+    # Write biodiversity contribution from each land-use type
+    print(f"Writing biodiversity contribution from each land-use type")
+    bio_tasks = [delayed(write_biodiversity_contribution)(data, yr, path_yr) for (yr, path_yr) in zip(years, paths)]
+    para_obj = Parallel(n_jobs=len(data.lumaps.keys()), return_as='generator_unordered')
+    [print(msg) for msg in para_obj(bio_tasks)]
 
     # Write outputs for each year
     jobs = [delayed(write_output_single_year)(data, yr, path_yr, None) for (yr, path_yr) in zip(years, paths)]
@@ -110,16 +117,9 @@ def write_data(data: Data):
     num_jobs = min(len(jobs), settings.WRITE_THREADS) if settings.PARALLEL_WRITE else 1   # Use the minimum between jobs_num and threads for parallel writing
     Parallel(n_jobs=num_jobs, prefer='threads')(jobs)
     
-    # Compute and save the biodiversity contribution data
-    for (yr, path_yr) in zip(years, paths):
-        para_obj = Parallel(n_jobs=30, return_as="generator_unordered")      # 30 workers is a good balance between parallelism-overhead (~2 min the first yr) and overall speed (~40s per yr)
-        dfs_delayed = write_biodiversity_contribution(data, yr, path_yr)
-        dfs_val = pd.concat([out for out in para_obj(dfs_delayed)]).reset_index(drop=True)
-        dfs_val.to_csv(f"{path_yr}/biodiversity_contribution_{yr}.csv", index=False)
-    
     # Copy the base-year outputs to the path_begin_end_compare
     shutil.copytree(f"{data.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True) if settings.MODE == 'timeseries' else None
-    
+     
     # Create the report HTML and png maps
     TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
     save_report_data(data.path)
@@ -1137,27 +1137,31 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
     biodiv_df.to_csv(os.path.join(path, f'biodiversity_separate_{yr_cal}.csv'), index=False) 
     
 
-def write_biodiversity_contribution(data: Data, yr_cal, path, workers=15):
+def write_biodiversity_contribution(data: Data, yr_cal, path):
     
-    print(f'Writing biodiversity contribution outputs for {yr_cal}')
-
+    t_path = 'N:/LUF-Modelling/LUTO2_JZ/luto-2.0/output/2024_07_08__10_14_48_soft_maxprofit_RF10_P1e5_2010-2050_timeseries_-55Mt'
+    
+    ag_dvar = np.load(f'{t_path}/out_{yr_cal}/ag_X_mrj_{yr_cal}.npy')         
+    non_ag_dvar = np.load(f'{t_path}/out_{yr_cal}/non_ag_X_rk_{yr_cal}.npy')
+    am_dvar = {k: np.load(f'{t_path}/out_{yr_cal}/ag_man_X_mrj_{k.lower().replace(' ', '_')}_{yr_cal}.npy')  
+            for k in AG_MANAGEMENTS_TO_LAND_USES.keys()}
+    
     # Get the decision variables for the year and convert them to xarray
     ag_dvar = ag_to_xr(data, yr_cal)
     am_dvar = am_to_xr(data, yr_cal)
     non_ag_dvar = non_ag_to_xr(data, yr_cal)  
     
-    # Reproject and match dvars (~1km) to the bio map (~5km)
-    ag_dvar = ag_dvar_to_bio_map(data, ag_dvar, settings.RESFACTOR)
-    am_dvar = am_dvar_to_bio_map(data, am_dvar, settings.RESFACTOR)
-    non_ag_dvar = non_ag_dvar_to_bio_map(data, non_ag_dvar, settings.RESFACTOR)
-
-        
+    # Reproject and match dvars (1D vector) to the bio map (2D, ~5km). NOTE: The dvars are sparsed array at ~5km resolution.
+    ag_dvar = ag_dvar_to_bio_map(data, ag_dvar, settings.RESFACTOR).chunk('auto').compute()
+    am_dvar = am_dvar_to_bio_map(data, am_dvar, settings.RESFACTOR).chunk('auto').compute()
+    non_ag_dvar = non_ag_dvar_to_bio_map(data, non_ag_dvar, settings.RESFACTOR).chunk('auto').compute()
+            
     # Calculate the biodiversity contribution scores
     if settings.BIO_CALC_LEVEL == 'group':
         bio_score_group = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_Condition_group.nc', chunks='auto')
-        bio_score_all_species_mean = bio_score_group.mean('group').expand_dims({'group': ['all_species']})                          # Calculate the mean score of all species
-        bio_score_group = xr.combine_by_coords([bio_score_group, bio_score_all_species_mean])['data']                               # Add the mean score to the group dimension
-        bio_contribution_shards = [bio_score_group.sel(year=yr_cal)]
+        bio_score_all_species_mean = bio_score_group.mean('group').expand_dims({'group': ['all_species']})  # Calculate the mean score of all species
+        bio_score_group = xr.combine_by_coords([bio_score_group, bio_score_all_species_mean])['data']       # Combine the mean score with the original score
+        bio_contribution_shards = [bio_score_group.sel(year=yr_cal, group=group) for group in bio_score_group['group'].values] 
     elif settings.BIO_CALC_LEVEL == 'species':
         bio_raw_path = f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_EnviroSuit.nc'
         bio_his_score_sum = calc_bio_hist_sum(bio_raw_path)
@@ -1166,9 +1170,12 @@ def write_biodiversity_contribution(data: Data, yr_cal, path, workers=15):
     else:
         raise ValueError('Invalid settings.BIO_CALC_LEVEL! Must be either "group" or "species".')
     
-    # Return the delayed objects
-    bio_df_tasks = calc_bio_score_by_yr(ag_dvar, am_dvar, non_ag_dvar, bio_contribution_shards)
-    return bio_df_tasks
+    # Write the biodiversity contribution to csv
+    bio_df = calc_bio_score_by_yr(ag_dvar, am_dvar, non_ag_dvar, bio_contribution_shards)
+    bio_df.to_csv(os.path.join(path, f'biodiversity_contribution_{yr_cal}.csv'), index=False)
+    
+    # Return a message 
+    return f'Writing biodiversity contribution outputs for {yr_cal} finished!'
     
     
 

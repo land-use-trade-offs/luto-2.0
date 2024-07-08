@@ -19,6 +19,7 @@ from luto.data import Data
 from luto.tools.spatializers import get_coarse2D_map, upsample_array
 
 
+
 def ag_to_xr(data:Data, yr_cal:int):
     """
     Convert agricultural data to xarray DataArray.
@@ -98,7 +99,6 @@ def non_ag_to_xr(data:Data, yr_cal:int):
     return non_ag_dvar_xr.reindex(lu=data.NON_AGRICULTURAL_LANDUSES)
 
 
-
 def get_bio_cells(bio_map:xr.open_dataarray, crs:str='epsg:4283') -> gpd.GeoDataFrame:
     """
     Vectorize a biodiversity map to a GeoDataFrame of individual cells.
@@ -141,14 +141,20 @@ def coord_to_points(coord_path:str, crs:str='epsg:4283') -> gpd.GeoDataFrame:
 
 def sjoin_cell_point(cell_df:gpd.GeoDataFrame, points_gdf:gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """
-    Spatially joins a GeoDataFrame of cells with a GeoDataFrame of points.
+    Spatially joins a GeoDataFrame of rectangle cells with a GeoDataFrame of points. Only the rectangle cells that
+    have at least one point inside are kept. The rows of `cell_df` will be duplicated if they have multiple points inside.
+    E.g., if a cell has 3 points inside, then the cell will be duplicated 3 times in the output GeoDataFrame. However,
+    These duplicated cells will have the same `cell_id` but different `point_id`.
 
     Parameters:
-    - cell_df (gpd.GeoDataFrame): The GeoDataFrame of cells.
+    - cell_df (gpd.GeoDataFrame): The GeoDataFrame of rectangel cells.
     - points_gdf (gpd.GeoDataFrame): The GeoDataFrame of points.
 
     Returns:
-    - joined_gdf (gpd.GeoDataFrame): The joined GeoDataFrame with the cells and points.
+    joined_gdf (gpd.GeoDataFrame): The joined GeoDataFrame with the cells and points. The columns are:
+    - geometry: The centroid of the cell.
+    - cell_id: The unique cell index.
+    - point_id: The unique point index.
 
     """
     joined_gdf = gpd.sjoin(cell_df, points_gdf, how='left').dropna(subset=['index_right'])
@@ -219,12 +225,12 @@ def get_id_map_by_upsample_reproject(low_res_map, high_res_map):
     
 
 
-def bincount_avg(mask_arr:xr.DataArray, weight_arr:xr.DataArray, low_res_xr:xr.DataArray=None):
+def bincount_avg(bin_arr, weight_arr, low_res_xr: xr.DataArray=None):
     """
     Calculate the average of weighted values based on bin counts.
 
     Parameters:
-    - mask_arr (2D, xarray.DataArray): Array containing the mask values. 
+    - bin_arr (2D, xarray.DataArray): Array containing the mask values. 
     - weight_arr (2D, xarray.DataArray, >0 values are valid): Array containing the weight values.
     - low_res_xr (2D, xarray.DataArray): Low-resolution array containing 
         `y`, `x`, `CRS`, and `transform` to restore the bincount stats.
@@ -232,9 +238,16 @@ def bincount_avg(mask_arr:xr.DataArray, weight_arr:xr.DataArray, low_res_xr:xr.D
     Returns:
     - bin_avg (xarray.DataArray): Array containing the average values based on bin counts.
     """
-    bin_sum = np.bincount(mask_arr.values.flatten(), weights=weight_arr.values.flatten(), minlength=low_res_xr.size)
-    bin_occ = np.bincount(mask_arr.values.flatten(), minlength=low_res_xr.size)
-
+    # Get the valide cells
+    valid_mask = weight_arr > 0
+    
+    # Flatten arries
+    bin_flatten = bin_arr.values[valid_mask]
+    weights_flatten = weight_arr.values[valid_mask]
+    
+    bin_occ = np.bincount(bin_flatten, minlength=low_res_xr.size)
+    bin_sum = np.bincount(bin_flatten, weights=weights_flatten, minlength=low_res_xr.size)
+    
     # Take values up to the last valid index, because the index of `low_res_xr.size + 1` indicates `NODATA`
     bin_sum = bin_sum[:low_res_xr.size + 1]     
     bin_occ = bin_occ[:low_res_xr.size + 1]     
@@ -266,32 +279,29 @@ def match_lumap_biomap(
     data:Data, 
     map_:np.ndarray, 
     res_factor:int, 
+    bio_id_path:str=f'{settings.INPUT_DIR}/bio_id_map.nc',
     lumap_tempelate:str=f'{settings.INPUT_DIR}/NLUM_2010-11_mask.tif', 
     biomap_tempelate:str=f'{settings.INPUT_DIR}/bio_mask.nc')-> xr.DataArray:
     """
-    Matches the map_ to the same projection and resolution as of biomap templates.
-    
-    If the map_ is not in the same resolution as the biomap, it will be upsampled to (1km x 1km) first.
-    
-    The resampling method is set to average, because the map_ is assumed to be the decision variables (float), 
-    representing the percentage of a given land-use within the cell.
+    Matches the lumap and biomap data based on the given parameters.
 
-    Parameters:
-    - data (Data): The data object containing necessary information.
-    - map_ (1D, np.ndarray): The map to be matched.
-    - res_factor (int): The resolution factor.
-    - lumap_tempelate (str): The path to the lumap template file. Default is f'{settings.INPUT_DIR}/NLUM_2010-11_mask.tif'.
-    - biomap_tempelate (str): The path to the biomap template file. Default is f'{settings.INPUT_DIR}/bio_mask.nc'.
+    Args:
+        data (Data): The data object.
+        map_ (np.ndarray): The map array.
+        res_factor (int): The resolution factor.
+        bio_id_path (str, optional): The path to the bio id map. Defaults to f'{settings.INPUT_DIR}/bio_id_map.nc'.
+        lumap_tempelate (str, optional): The path to the lumap template. Defaults to f'{settings.INPUT_DIR}/NLUM_2010-11_mask.tif'.
+        biomap_tempelate (str, optional): The path to the biomap template. Defaults to f'{settings.INPUT_DIR}/bio_mask.nc'.
 
     Returns:
-    - xr.DataArray: The matched map.
-
+        xr.DataArray: The matched map array.
     """
-    
+    # Read lumap, bio_map, and bio_id_map
     NLUM = rxr.open_rasterio(lumap_tempelate, chunks='auto').squeeze('band').drop_vars('band')
     bio_mask_ds = xr.open_dataset(f'{settings.INPUT_DIR}/bio_mask.nc', decode_coords="all")
     bio_map = bio_mask_ds['data']
     bio_map['spatial_ref'] = bio_mask_ds['spatial_ref']
+    bio_id_map = xr.open_dataset(bio_id_path, chunks='auto')['data']
         
     if res_factor > 1:   
         map_ = get_coarse2D_map(data, map_)
@@ -299,98 +309,108 @@ def match_lumap_biomap(
     else:
         empty_map = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32) 
         np.place(empty_map, data.NLUM_MASK, data.LUMAP_NO_RESFACTOR) 
-        np.place(empty_map, empty_map >=0, map_)
+        np.place(empty_map, empty_map >=0, map_.data.todense())
         map_ = empty_map
         
     map_ = xr.DataArray(map_, dims=('y','x'), coords={'y': NLUM['y'], 'x': NLUM['x']})
     map_ = map_.where(map_>=0, 0)
     map_ = map_.rio.write_crs(NLUM.rio.crs)
     map_ = map_.rio.write_transform(NLUM.rio.transform())  
-    
-    bio_id_map = get_id_map_by_upsample_reproject(bio_map, NLUM, )
     map_ = bincount_avg(bio_id_map, map_,  bio_map)
     map_ = map_.where(map_ != map_.rio.nodata, 0)
     return map_
 
 
+
 def ag_dvar_to_bio_map(data, ag_dvar, res_factor):
     """
-    Reprojects and matches agricultural data variable (ag_dvar) to a biophysical map.
+    Reprojects and matches agricultural land cover variables to biodiversity maps.
 
     Parameters:
-    - data (xarray.Dataset): The biophysical map data.
-    - ag_dvar (xarray.DataArray): The agricultural data variable to be reprojected and matched.
-    - res_factor (float): The resolution factor for matching the maps.
+    - data (Data object): The Data class object of LUTO.
+    - ag_dvar (xarray.Dataset): The agricultural land cover variables.
+    - res_factor (int): The resolution factor for matching.
 
     Returns:
-    - tasks (list): A list of delayed tasks for parallel processing.
-
+    - xarray.Dataset: The combined dataset of reprojected and matched variables.
     """
+
     # wrapper function for parallel processing
     def reproject_match_dvar(ag_dvar, lm, lu, res_factor):
         map_ = ag_dvar.sel(lm=lm, lu=lu)
         map_ = match_lumap_biomap(data, map_, res_factor)
         map_ = map_.expand_dims({'lm': [lm], 'lu': [lu]})
-        map_.values = sparse.COO.from_numpy(map_.values)
         return map_
 
-    tasks = [delayed(reproject_match_dvar)(ag_dvar, lm, lu, res_factor) 
-             for lm,lu in product(ag_dvar['lm'].values, ag_dvar['lu'].values)]
+    out_arr = [reproject_match_dvar(ag_dvar, lm, lu, res_factor) 
+                for lm,lu in product(ag_dvar['lm'].values, ag_dvar['lu'].values)]
+    out_arr = xr.combine_by_coords(out_arr)
     
-    return tasks
+    # Convert to sparse array to save memory
+    out_arr.values = sparse.COO.from_numpy(out_arr.values)
+    
+    return out_arr
 
 
 def am_dvar_to_bio_map(data, am_dvar, res_factor):
     """
-    Reprojects and matches the am_dvar to the biomap.
+    Reprojects and matches agricultural land cover variables to biodiversity maps.
 
     Parameters:
-    - data: The biomap data.
-    - am_dvar: The am_dvar data.
-    - res_factor: The resolution factor.
+    - data (Data object): The Data class object of LUTO.
+    - am_dvar (xarray.Dataset): The agricultural land cover variables.
+    - res_factor (int): The resolution factor for matching.
 
     Returns:
-    - tasks: A list of delayed tasks for parallel processing.
+    - xarray.Dataset: The combined dataset of reprojected and matched variables.
     """
+
     # wrapper function for parallel processing
     def reproject_match_dvar(am_dvar, am, lm, lu, res_factor):
         map_ = am_dvar.sel(lm=lm, lu=lu)
         map_ = match_lumap_biomap(data, map_, res_factor)
         map_ = map_.expand_dims({'am':[am], 'lm': [lm], 'lu': [lu]})
-        map_.values = sparse.COO.from_numpy(map_.values)
         return map_
 
-    tasks = [delayed(reproject_match_dvar)(am_dvar, am, lm, lu, res_factor) 
-            for am,lm,lu in product(am_dvar['am'].values, am_dvar['lm'].values, am_dvar['lu'].values)]
+    out_arr = [reproject_match_dvar(am_dvar, am, lm, lu, res_factor) 
+                for am,lm,lu in product(am_dvar['am'].values, am_dvar['lm'].values, am_dvar['lu'].values)]
+    out_arr = xr.combine_by_coords(out_arr)
     
-    return tasks
+    # Convert to sparse array to save memory
+    out_arr.values = sparse.COO.from_numpy(out_arr.values)
+    
+    return out_arr
 
 
 
 def non_ag_dvar_to_bio_map(data, non_ag_dvar, res_factor):
     """
-    Reprojects and matches non-agricultural dynamic variables to a biophysical map.
+    Reprojects and matches agricultural land cover variables to biodiversity maps.
 
     Parameters:
-    - data (xarray.Dataset): The dataset containing the biophysical map.
-    - non_ag_dvar (xarray.DataArray): The non-agricultural dynamic variables.
-    - res_factor (float): The resolution factor for matching the variables.
+    - data (Data object): The Data class object of LUTO.
+    - non_ag_dvar (xarray.Dataset): The agricultural land cover variables.
+    - res_factor (int): The resolution factor for matching.
 
     Returns:
-    - tasks (list): A list of delayed tasks for parallel processing.
+    - xarray.Dataset: The combined dataset of reprojected and matched variables.
     """
+
     # wrapper function for parallel processing
     def reproject_match_dvar(non_ag_dvar, lu, res_factor):
         map_ = non_ag_dvar.sel(lu=lu)
         map_ = match_lumap_biomap(data, map_, res_factor)
         map_ = map_.expand_dims({'lu': [lu]})
-        map_.values = sparse.COO.from_numpy(map_.values)
         return map_
 
-    tasks = [delayed(reproject_match_dvar)(non_ag_dvar, lu, res_factor) 
-            for lu in non_ag_dvar['lu'].values]
+    out_arr = [reproject_match_dvar(non_ag_dvar, lu, res_factor) 
+                for lu in non_ag_dvar['lu'].values]
+    out_arr = xr.combine_by_coords(out_arr)
     
-    return tasks
+    # Convert to sparse array to save memory
+    out_arr.values = sparse.COO.from_numpy(out_arr.values)
+    
+    return out_arr
 
 
 # Calculate the biodiversity condition
@@ -461,12 +481,31 @@ def interp_by_year(ds, year:list[int]):
     return ds.interp(year=year, method='linear', kwargs={'fill_value': 'extrapolate'}).astype(np.float32).compute()
 
 def interp_bio_species_to_shards(bio_contribution_species, interp_year, max_workers=settings.THREADS):
+    """
+    Interpolates biodiversity data for different species to shards.
+
+    Parameters:
+    - bio_contribution_species: xarray.Dataset
+        The biodiversity data for different species.
+    - interp_year: list
+        The years for which the data needs to be interpolated.
+
+    """
     chunks_species = np.array_split(range(bio_contribution_species['species'].size), max_workers)
     bio_xr_chunks = [bio_contribution_species.isel(species=idx) for idx in chunks_species]
-    return [delayed(interp_by_year)(chunk, [yr]) for chunk in bio_xr_chunks for yr in interp_year]
+    return [interp_by_year(chunk, [yr]) for chunk in bio_xr_chunks for yr in interp_year]
+
 
 def interp_bio_group_to_shards(bio_contribution_group, interp_year):
-    return [delayed(interp_by_year)(bio_contribution_group, [year]) for year in interp_year]
+    """
+    Interpolates the biodiversity contribution group to shards for the given interpolation years.
+
+    Parameters:
+    - bio_contribution_group (list): List of biodiversity contribution values for a group.
+    - interp_year (list): List of years for interpolation.
+
+    """
+    return [interp_by_year(bio_contribution_group, [year]) for year in interp_year]
 
 
 # Function to get value from a delayed object
@@ -484,56 +523,69 @@ def get_val(job: tuple):
 
 
 # Helper functions to calculate the biodiversity contribution scores
-def xr_to_df(shard, job_ag:tuple, lu_type:str):
+def xr_to_df(shard, dvar_ag, dvar_am, dvar_non_ag):
     """
-    Convert an xarray DataArray or delayed function with arguments to a pandas DataFrame.
+    Convert an xarray DataArray to a pandas DataFrame with biodiversity contribution scores.
 
     Parameters:
     - shard: An xarray DataArray or a tuple of delayed function and arguments.
-    - job_ag: A tuple of delayed function and arguments for the agricultural data.
-    - lu_type: A string representing the land use type.
+    - dvar_ag: An xarray DataArray representing the biodiversity contribution scores for agriculture land use.
+    - dvar_am: An xarray DataArray representing the biodiversity contribution scores for amenity land use.
+    - dvar_non_ag: An xarray DataArray representing the biodiversity contribution scores for non-agriculture land use.
 
     Returns:
-    - tmp_ag_df: A pandas DataFrame containing the converted data.
+    - A pandas DataFrame containing the biodiversity contribution scores for different land use types.
 
     Raises:
-    - ValueError: If the shard type is invalid.
-
+    - ValueError: If the shard parameter is not a valid type (either tuple or xarray DataArray).
     """
 
     # Get the values to avoid duplicate computation
     if isinstance(shard, tuple):            # This means shard is a tuple of delayed function and arguments
-        shard_xr = get_val(shard)
+        f, args = shard[0], shard[1]
+        shard_xr = f(*args)
     elif isinstance(shard, xr.DataArray):   # This means shard is an xr.DataArray
         shard_xr = shard.compute()
     else:
         raise ValueError('Invalid shard type! Should be either tuple (delayed(function), args) or xr.DataArray.')
 
     # Calculate the biodiversity contribution scores
-    tmp_ag = (shard_xr * get_val(job_ag))
+    tmp_ag = (shard_xr * dvar_ag).compute().sum(['x', 'y'])
+    tmp_am = (shard_xr * dvar_am).compute().sum(['x', 'y'])
+    tmp_non_ag = (shard_xr * dvar_non_ag).compute().sum(['x', 'y'])
+    
+    # Convert to dense array
     tmp_ag.data = tmp_ag.data.todense()
-    tmp_ag_df = tmp_ag.sum(['x', 'y']).to_dataframe(name='contribution_%').reset_index()
-    tmp_ag_df['lu_type'] = lu_type
+    tmp_am.data = tmp_am.data.todense()
+    tmp_non_ag.data = tmp_non_ag.data.todense()
+    
+    # Convert to dataframe
+    tmp_ag_df = tmp_ag.to_dataframe(name='contribution_%').reset_index()
+    tmp_am_df = tmp_am.to_dataframe(name='contribution_%').reset_index()
+    tmp_non_ag_df = tmp_non_ag.to_dataframe(name='contribution_%').reset_index()
+    
+    # Add land use type
+    tmp_ag_df['lu_type'] = 'ag'
+    tmp_am_df['lu_type'] = 'am'
+    tmp_non_ag_df['lu_type'] = 'non_ag'
+    
+    return pd.concat([tmp_ag_df, tmp_am_df, tmp_non_ag_df], ignore_index=True)
 
-    return tmp_ag_df
 
-
-def calc_bio_score_by_yr(ag_dvar:list, am_dvar:list, non_ag_dvar:list, bio_shards):
+def calc_bio_score_by_yr(ag_dvar, am_dvar, non_ag_dvar, bio_shards):
     """
-    Calculate the bio score by year.
+    Calculate biodiversity score by year.
 
     Parameters:
-    - ag_dvar (list): List of agricultural variables.
-    - am_dvar (list): List of agricultural management variables.
-    - non_ag_dvar (list): List of non-agricultural variables.
-    - bio_shards: List of bio shards.
+    - ag_dvar: The agricultural variable.
+    - am_dvar: The agricultural management variable.
+    - non_ag_dvar: The non-agricultural variable.
+    - bio_shards: The biodiversity shards.
 
     Returns:
-    - List of tasks (real value is DataFrame) for calculating bio scores for agricultural, 
-    agricultural management, and non-agricultural variables.
+    - The calculated biodiversity score by year, excluding the 'spatial_ref' column.
     """
-    tasks_ag = [delayed(xr_to_df)(shard, job, 'ag') for job in ag_dvar for shard in bio_shards]
-    tasks_am = [delayed(xr_to_df)(shard, job, 'am') for job in am_dvar for shard in bio_shards]
-    tasks_non_ag = [delayed(xr_to_df)(shard, job, 'non_ag') for job in non_ag_dvar for shard in bio_shards]
     
-    return tasks_ag + tasks_am + tasks_non_ag
+    out = [xr_to_df(bio_score, ag_dvar, am_dvar, non_ag_dvar) for bio_score in bio_shards]
+    out = pd.concat(out, ignore_index=True)
+    return out.drop(columns=['spatial_ref'])
