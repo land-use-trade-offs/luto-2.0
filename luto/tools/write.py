@@ -22,6 +22,7 @@ Writes model output and statistics to files.
 
 import os, re
 import shutil
+from matplotlib.pylab import f
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -33,8 +34,8 @@ from joblib import Parallel, delayed
 from luto import settings
 from luto import tools
 from luto.data import Data
-from luto.tools.spatializers import *
-from luto.tools.compmap import *
+from luto.tools.spatializers import create_2d_map, write_gtiff
+from luto.tools.compmap import lumap_crossmap, lmmap_crossmap, crossmap_irrstat, crossmap_amstat
 
 import luto.economics.agricultural.quantity as ag_quantity                      # ag_quantity has already been calculated and stored in <sim.prod_data>
 import luto.economics.agricultural.revenue as ag_revenue
@@ -71,7 +72,6 @@ from luto.tools.xarray_tools import (ag_to_xr, non_ag_to_xr, am_to_xr,
 timestamp_write = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
 def write_outputs(data: Data):
-    print('changes ............................................')
     # Write the model outputs to file
     write_data(data)
     # Move the log files to the output directory
@@ -99,12 +99,6 @@ def write_data(data: Data):
 
     # Write the area transition between base-year and target-year 
     write_area_transition_start_end(data, f'{data.path}/out_{years[-1]}')
-    
-    # Write biodiversity contribution from each land-use type
-    print(f"Writing biodiversity contribution from each land-use type")
-    bio_tasks = [delayed(write_biodiversity_contribution)(data, yr, path_yr) for (yr, path_yr) in zip(years, paths)]
-    para_obj = Parallel(n_jobs=len(data.lumaps.keys()), return_as='generator_unordered')
-    [print(msg) for msg in para_obj(bio_tasks)]
 
     # Write outputs for each year
     jobs = [delayed(write_output_single_year)(data, yr, path_yr, None) for (yr, path_yr) in zip(years, paths)]
@@ -119,7 +113,10 @@ def write_data(data: Data):
     
     # Copy the base-year outputs to the path_begin_end_compare
     shutil.copytree(f"{data.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True) if settings.MODE == 'timeseries' else None
-     
+
+    # Write biodiversity contribution from each land-use type
+    [write_biodiversity_contribution(data, yr, path_yr) for (yr, path_yr) in zip(years, paths)]
+    
     # Create the report HTML and png maps
     TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
     save_report_data(data.path)
@@ -173,6 +170,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_ghg_offland_commodity(data, yr_cal, path_yr)
     write_biodiversity(data, yr_cal, path_yr)
     write_biodiversity_separate(data, yr_cal, path_yr)
+
     
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
     
@@ -1144,13 +1142,8 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
 
 def write_biodiversity_contribution(data: Data, yr_cal, path):
     
-    t_path = 'N:/LUF-Modelling/LUTO2_JZ/luto-2.0/output/2024_07_08__10_14_48_soft_maxprofit_RF10_P1e5_2010-2050_timeseries_-55Mt'
-    
-    ag_dvar = np.load(f'{t_path}/out_{yr_cal}/ag_X_mrj_{yr_cal}.npy')         
-    non_ag_dvar = np.load(f'{t_path}/out_{yr_cal}/non_ag_X_rk_{yr_cal}.npy')
-    am_dvar = {k: np.load(f'{t_path}/out_{yr_cal}/ag_man_X_mrj_{k.lower().replace(' ', '_')}_{yr_cal}.npy')  
-            for k in AG_MANAGEMENTS_TO_LAND_USES.keys()}
-    
+    print(f'Writing biodiversity contribution score for {yr_cal}')
+
     # Get the decision variables for the year and convert them to xarray
     ag_dvar = ag_to_xr(data, yr_cal)
     am_dvar = am_to_xr(data, yr_cal)
@@ -1179,8 +1172,6 @@ def write_biodiversity_contribution(data: Data, yr_cal, path):
     bio_df = calc_bio_score_by_yr(ag_dvar, am_dvar, non_ag_dvar, bio_contribution_shards)
     bio_df.to_csv(os.path.join(path, f'biodiversity_contribution_{yr_cal}.csv'), index=False)
     
-    # Return a message 
-    return f'Writing biodiversity contribution outputs for {yr_cal} finished!'
     
     
 

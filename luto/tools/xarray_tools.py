@@ -1,4 +1,5 @@
 import os
+from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
 import sparse
@@ -195,7 +196,7 @@ def match_lumap_biomap(
 
 
 
-def ag_dvar_to_bio_map(data:Data, ag_dvar:xr.DataArray, res_factor:int):
+def ag_dvar_to_bio_map(data, ag_dvar, res_factor, workers=5):
     """
     Reprojects and matches agricultural land cover variables to biodiversity maps.
 
@@ -203,6 +204,7 @@ def ag_dvar_to_bio_map(data:Data, ag_dvar:xr.DataArray, res_factor:int):
     - data (Data object): The Data class object of LUTO.
     - ag_dvar (xarray.Dataset): The agricultural land cover variables.
     - res_factor (int): The resolution factor for matching.
+    - workers (int, optional): The number of parallel workers to use for processing. Default is 5.
 
     Returns:
     - xarray.Dataset: The combined dataset of reprojected and matched variables.
@@ -214,10 +216,11 @@ def ag_dvar_to_bio_map(data:Data, ag_dvar:xr.DataArray, res_factor:int):
         map_ = match_lumap_biomap(data, map_, res_factor)
         map_ = map_.expand_dims({'lm': [lm], 'lu': [lu]})
         return map_
-
-    out_arr = [reproject_match_dvar(ag_dvar, lm, lu, res_factor) 
-                for lm,lu in product(ag_dvar['lm'].values, ag_dvar['lu'].values)]
-    out_arr = xr.combine_by_coords(out_arr)
+    
+    tasks = [delayed(reproject_match_dvar)(ag_dvar, lm, lu, res_factor) 
+             for lm,lu in product(ag_dvar['lm'].values, ag_dvar['lu'].values)]
+    para_obj = Parallel(n_jobs=workers, return_as='generator')
+    out_arr = xr.combine_by_coords([i for i in para_obj(tasks)])
     
     # Convert to sparse array to save memory
     out_arr.values = sparse.COO.from_numpy(out_arr.values)
@@ -225,7 +228,7 @@ def ag_dvar_to_bio_map(data:Data, ag_dvar:xr.DataArray, res_factor:int):
     return out_arr
 
 
-def am_dvar_to_bio_map(data:Data, am_dvar:xr.DataArray, res_factor:int):
+def am_dvar_to_bio_map(data, am_dvar, res_factor, workers=5):
     """
     Reprojects and matches agricultural land cover variables to biodiversity maps.
 
@@ -233,6 +236,7 @@ def am_dvar_to_bio_map(data:Data, am_dvar:xr.DataArray, res_factor:int):
     - data (Data object): The Data class object of LUTO.
     - am_dvar (xarray.Dataset): The agricultural land cover variables.
     - res_factor (int): The resolution factor for matching.
+    - workers (int, optional): The number of parallel workers to use for processing. Default is 5.
 
     Returns:
     - xarray.Dataset: The combined dataset of reprojected and matched variables.
@@ -245,9 +249,10 @@ def am_dvar_to_bio_map(data:Data, am_dvar:xr.DataArray, res_factor:int):
         map_ = map_.expand_dims({'am':[am], 'lm': [lm], 'lu': [lu]})
         return map_
 
-    out_arr = [reproject_match_dvar(am_dvar, am, lm, lu, res_factor) 
-                for am,lm,lu in product(am_dvar['am'].values, am_dvar['lm'].values, am_dvar['lu'].values)]
-    out_arr = xr.combine_by_coords(out_arr)
+    tasks = [delayed(reproject_match_dvar)(am_dvar, am, lm, lu, res_factor) 
+            for am,lm,lu in product(am_dvar['am'].values, am_dvar['lm'].values, am_dvar['lu'].values)]
+    para_obj = Parallel(n_jobs=workers, return_as='generator')
+    out_arr = xr.combine_by_coords([i for i in para_obj(tasks)])
     
     # Convert to sparse array to save memory
     out_arr.values = sparse.COO.from_numpy(out_arr.values)
@@ -256,7 +261,7 @@ def am_dvar_to_bio_map(data:Data, am_dvar:xr.DataArray, res_factor:int):
 
 
 
-def non_ag_dvar_to_bio_map(data:Data, non_ag_dvar:xr.DataArray, res_factor:int):
+def non_ag_dvar_to_bio_map(data, non_ag_dvar, res_factor, workers=5):
     """
     Reprojects and matches agricultural land cover variables to biodiversity maps.
 
@@ -264,6 +269,7 @@ def non_ag_dvar_to_bio_map(data:Data, non_ag_dvar:xr.DataArray, res_factor:int):
     - data (Data object): The Data class object of LUTO.
     - non_ag_dvar (xarray.Dataset): The agricultural land cover variables.
     - res_factor (int): The resolution factor for matching.
+    - workers (int, optional): The number of parallel workers to use for processing. Default is 5.
 
     Returns:
     - xarray.Dataset: The combined dataset of reprojected and matched variables.
@@ -276,9 +282,10 @@ def non_ag_dvar_to_bio_map(data:Data, non_ag_dvar:xr.DataArray, res_factor:int):
         map_ = map_.expand_dims({'lu': [lu]})
         return map_
 
-    out_arr = [reproject_match_dvar(non_ag_dvar, lu, res_factor) 
-                for lu in non_ag_dvar['lu'].values]
-    out_arr = xr.combine_by_coords(out_arr)
+    tasks = [delayed(reproject_match_dvar)(non_ag_dvar, lu, res_factor) 
+            for lu in non_ag_dvar['lu'].values]
+    para_obj = Parallel(n_jobs=workers, return_as='generator')
+    out_arr = xr.combine_by_coords([i for i in para_obj(tasks)])
     
     # Convert to sparse array to save memory
     out_arr.values = sparse.COO.from_numpy(out_arr.values)

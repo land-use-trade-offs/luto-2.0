@@ -161,6 +161,130 @@ document.addEventListener("DOMContentLoaded", function () {
         },
     });
 
+    // biodiversity_5_contribution_score_by_group
+    Highcharts.chart("biodiversity_5_contribution_score_by_group", {
+        chart: {
+            type: "column",
+            marginRight: 380,
+        },
+        title: {
+            text: "Biodiversity Contribution by Group",
+        },
+        series: JSON.parse(
+            document.getElementById("biodiversity_5_contribution_score_by_group_csv").innerHTML
+        ),
+        xAxis: {
+            tickPositions: year_ticks,
+        },
+        yAxis: {
+            title: {
+                text: "Contribution Score (%)",
+            },
+        },
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                    }:</b>${this.y.toFixed(2)}<br/>`;
+            },
+        },
+        legend: {
+            align: "right",
+            verticalalign: "left",
+            layout: "vertical",
+            x: 0,
+            verticalAlign: "middle",
+        },
+        credits: {
+            enabled: false,
+        },
+    });
+
+    // biodiversity_6_contribution_score_by_landuse_type_broad
+    Highcharts.chart("biodiversity_6_contribution_score_by_landuse_type_broad", {
+        chart: {
+            type: "column",
+            marginRight: 380,
+        },
+        title: {
+            text: "Biodiversity Contribution by Land-use Type (Broad)",
+        },
+        series: JSON.parse(
+            document.getElementById("biodiversity_6_contribution_score_by_landuse_type_broad_csv").innerHTML
+        ),
+        xAxis: {
+            tickPositions: year_ticks,
+        },
+        yAxis: {
+            title: {
+                text: "Contribution Score (%)",
+            },
+        },
+        plotOptions: {
+            column: {
+                stacking: "normal",
+            },
+        },
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                    }:</b>${this.y.toFixed(2)}<br/>`;
+            },
+        },
+        legend: {
+            align: "right",
+            verticalalign: "left",
+            layout: "vertical",
+            x: 0,
+            verticalAlign: "middle",
+        },
+        credits: {
+            enabled: false,
+        },
+    });
+
+
+    // biodiversity_7_contribution_score_by_landuse_type_specific
+    Highcharts.chart("biodiversity_7_contribution_score_by_landuse_type_specific", {
+        chart: {
+            type: "column",
+            marginRight: 380,
+        },
+        title: {
+            text: "Biodiversity Contribution by Land-use Type (Specific)",
+        },
+        series: JSON.parse(
+            document.getElementById("biodiversity_7_contribution_score_by_landuse_type_specific_csv").innerHTML
+        ),
+        xAxis: {
+            tickPositions: year_ticks,
+        },
+        yAxis: {
+            title: {
+                text: "Contribution Score (%)",
+            },
+        },
+        plotOptions: {
+            column: {
+                stacking: "normal",
+            },
+        },
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                    }:</b>${this.y.toFixed(2)}<br/>`;
+            },
+        },
+        legend: {
+            align: "right",
+            verticalalign: "left",
+            layout: "vertical",
+            x: 0,
+            verticalAlign: "middle",
+        },
+        credits: {
+            enabled: false,
+        },
+    });
 
 });
 
