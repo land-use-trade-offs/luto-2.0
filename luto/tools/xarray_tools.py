@@ -1,5 +1,4 @@
 import os
-import joblib
 import numpy as np
 import pandas as pd
 import sparse
@@ -10,7 +9,6 @@ import geopandas as gpd
 import luto.settings as settings
 
 from itertools import product
-from joblib import Parallel, delayed
 from rasterio.enums import Resampling
 from rasterio.features import shapes
 
@@ -98,131 +96,6 @@ def non_ag_to_xr(data:Data, yr_cal:int):
     )
     return non_ag_dvar_xr.reindex(lu=data.NON_AGRICULTURAL_LANDUSES)
 
-
-def get_bio_cells(bio_map:xr.open_dataarray, crs:str='epsg:4283') -> gpd.GeoDataFrame:
-    """
-    Vectorize a biodiversity map to a GeoDataFrame of individual cells.
-
-    Parameters:
-    bio_map (xr.open_dataarray): The biodiversity map as an xarray DataArray.
-    crs (str, optional): The coordinate reference system of the output GeoDataFrame. Defaults to 'epsg:4283' (GDA 1994).
-
-    Returns:
-    tuple: A tuple containing the cell map array and its vectorized GeoDataFrame of each cell.
-    """
-
-    # Load a biodiversity map template to retrieve the geo-information
-    transform = bio_map.rio.transform()
-    src_arr = bio_map.values
-    
-    # Vectorize the map, each cell will have a unique id as the value    
-    cell_map_arr = np.arange(src_arr.size).reshape(src_arr.shape)
-    cells = ({'properties': {'cell_id': v}, 'geometry': s} for s, v in shapes(cell_map_arr, transform=transform))
-    return cell_map_arr, gpd.GeoDataFrame.from_features(list(cells)).set_crs(crs)
-
-
-
-def coord_to_points(coord_path:str, crs:str='epsg:4283') -> gpd.GeoDataFrame:
-    """
-    Convert coordinate data to a GeoDataFrame of points.
-
-    Parameters:
-    coord_path (str): The file path to the coordinate data.
-    crs (str): The coordinate reference system (CRS) of the points. Default is 'epsg:4283' (GDA 1994).
-
-    Returns:
-    gpd.GeoDataFrame: A GeoDataFrame containing the points.
-
-    """
-    coord_lon_lat = np.load(coord_path)
-    return gpd.GeoDataFrame(geometry=gpd.points_from_xy(coord_lon_lat[0], coord_lon_lat[1])).set_crs(crs)
-
-
-
-def sjoin_cell_point(cell_df:gpd.GeoDataFrame, points_gdf:gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """
-    Spatially joins a GeoDataFrame of rectangle cells with a GeoDataFrame of points. Only the rectangle cells that
-    have at least one point inside are kept. The rows of `cell_df` will be duplicated if they have multiple points inside.
-    E.g., if a cell has 3 points inside, then the cell will be duplicated 3 times in the output GeoDataFrame. However,
-    These duplicated cells will have the same `cell_id` but different `point_id`.
-
-    Parameters:
-    - cell_df (gpd.GeoDataFrame): The GeoDataFrame of rectangel cells.
-    - points_gdf (gpd.GeoDataFrame): The GeoDataFrame of points.
-
-    Returns:
-    joined_gdf (gpd.GeoDataFrame): The joined GeoDataFrame with the cells and points. The columns are:
-    - geometry: The centroid of the cell.
-    - cell_id: The unique cell index.
-    - point_id: The unique point index.
-
-    """
-    joined_gdf = gpd.sjoin(cell_df, points_gdf, how='left').dropna(subset=['index_right'])
-    joined_gdf = joined_gdf.sort_values('index_right').reset_index(drop=True)
-    joined_gdf = joined_gdf.rename(columns={'index_right': 'point_id'})
-    joined_gdf[['cell_id', 'point_id']] = joined_gdf[['cell_id', 'point_id']].astype(np.int64)
-    return joined_gdf
-
-
-def mask_cells(ds: xr.Dataset, cell_arr: np.ndarray, joined_gdf: gpd.GeoDataFrame) -> xr.Dataset:
-    """
-    Masks the cells in a dataset based on a given array of cell indices.
-
-    Parameters:
-        ds (xr.Dataset): The input dataset.
-        cell_arr (np.ndarray): Array of cell indices.
-        joined_gdf (gpd.GeoDataFrame): GeoDataFrame containing cell IDs.
-
-    Returns:
-        xr.Dataset: The masked dataset with cells filtered based on the given indices.
-    """
-    indices_cell = joined_gdf['cell_id'].unique()
-
-    # Get the 2D mask array where True values indicate the cell indices to keep
-    mask = np.isin(cell_arr, indices_cell)
-    
-    # Flatten the 2D mask array to 1D and keep the x/y coordinates coordinates under the dimension 'cell'
-    mask_da = xr.DataArray(mask, dims=['y', 'x'], coords={'y': ds.coords['y'], 'x': ds.coords['x']})
-    mask_da = mask_da.stack(cell=('y', 'x'))
-
-    # Flatten the dataset to 1D and keep the xy coordinates under the dimension 'cell'
-    stacked_data = ds.stack(cell=('y', 'x'))
-    
-    # Apply the mask to the flattened dataset
-    flattened_data = stacked_data.where(mask_da, drop=True).astype(ds.dtype)
-    flattened_data = flattened_data.drop_vars(['cell', 'y', 'x'])
-    flattened_data['cell'] = range(mask.sum())
-    return flattened_data
-
-
-
-def get_id_map_by_upsample_reproject(low_res_map, high_res_map):
-    """
-    Upsamples and reprojects a low-resolution map to match the resolution and 
-    coordinate reference system (CRS) of a high-resolution map.
-    
-    Parameters:
-        low_res_map (2D xarray.DataArray): The low-resolution map to upsample and reproject. Should have CRS and affine transformation.
-        high_res_map (2D xarray.DataArray): The high-resolution map to match the resolution and CRS to. Should have CRS and affine transformation.
-    
-    Returns:
-        xarray.DataArray: The upsampled and reprojected map with the same CRS and resolution as the high-resolution map.
-    """
-    low_res_id_map = np.arange(low_res_map.size).reshape(low_res_map.shape)
-    low_res_id_map = xr.DataArray(
-        low_res_id_map, 
-        dims=['y', 'x'], 
-        coords={'y': low_res_map.coords['y'], 'x': low_res_map.coords['x']})
-    
-    low_res_id_map = low_res_id_map.rio.write_crs(low_res_map.rio.crs)
-    low_res_id_map = low_res_id_map.rio.write_transform(low_res_map.rio.transform())
-    low_res_id_map = low_res_id_map.rio.reproject_match(
-        high_res_map, 
-        Resampling = Resampling.nearest, 
-        nodata=low_res_map.size + 1).chunk('auto')
-    
-    return low_res_id_map
-    
 
 
 def bincount_avg(bin_arr, weight_arr, low_res_xr: xr.DataArray=None):
@@ -322,7 +195,7 @@ def match_lumap_biomap(
 
 
 
-def ag_dvar_to_bio_map(data, ag_dvar, res_factor):
+def ag_dvar_to_bio_map(data:Data, ag_dvar:xr.DataArray, res_factor:int):
     """
     Reprojects and matches agricultural land cover variables to biodiversity maps.
 
@@ -352,7 +225,7 @@ def ag_dvar_to_bio_map(data, ag_dvar, res_factor):
     return out_arr
 
 
-def am_dvar_to_bio_map(data, am_dvar, res_factor):
+def am_dvar_to_bio_map(data:Data, am_dvar:xr.DataArray, res_factor:int):
     """
     Reprojects and matches agricultural land cover variables to biodiversity maps.
 
@@ -383,7 +256,7 @@ def am_dvar_to_bio_map(data, am_dvar, res_factor):
 
 
 
-def non_ag_dvar_to_bio_map(data, non_ag_dvar, res_factor):
+def non_ag_dvar_to_bio_map(data:Data, non_ag_dvar:xr.DataArray, res_factor:int):
     """
     Reprojects and matches agricultural land cover variables to biodiversity maps.
 
@@ -457,41 +330,26 @@ def calc_bio_score_species(bio_nc_path:str, bio_xr_hist_sum_species: xr.DataArra
     return bio_xr_contribution_species
 
 
-# Calculate the biodiversity contribution of each group (amphibians, mammals, etc.)
-def calc_bio_score_group(bio_nc_path:str, bio_xr_hist_sum_species: xr.DataArray):
-    """
-    Calculate the contribution of each cell to the total biodiversity score for a given group (ampibians, mammals, etc.).
-
-    Parameters:
-    - bio_nc_path (str): The file path to the biodiversity data in NetCDF format.
-    - bio_xr_hist_sum_species (xr.DataArray): The historical sum of bio-score for each group.
-
-    Returns:
-    - bio_xr_contribution_group (xr.DataArray): The biodiversity score for each group.
-
-    """
-    bio_contribution_species = calc_bio_score_species(bio_nc_path, bio_xr_hist_sum_species)
-    groups = list(set(bio_contribution_species['group'].values))
-    bio_contribution_group = bio_contribution_species.groupby('group').mean(dim='species').astype(np.float32)
-    return bio_contribution_group
-
-
 # Helper functions to interpolate biodiversity scores to given years
 def interp_by_year(ds, year:list[int]):
     return ds.interp(year=year, method='linear', kwargs={'fill_value': 'extrapolate'}).astype(np.float32).compute()
 
-def interp_bio_species_to_shards(bio_contribution_species, interp_year, max_workers=settings.THREADS):
+def interp_bio_species_to_shards(bio_contribution_species:xr.DataArray, interp_year:list[int], n_shards=settings.THREADS):
     """
-    Interpolates biodiversity data for different species to shards.
+    Interpolates the bio_contribution_species data to shards based on the given interpolation years.
+    Each shard is a subset from `bio_contribution_species` by spliting the species dimension into `n_shards` parts.
+    
+    By splitting the data into shards, we can reduce the memory use.
 
     Parameters:
-    - bio_contribution_species: xarray.Dataset
-        The biodiversity data for different species.
-    - interp_year: list
-        The years for which the data needs to be interpolated.
+    - bio_contribution_species (xr.DataArray): The input data array containing bio contribution species.
+    - interp_year (list[int]): The list of years to interpolate the data to.
+    - n_shards (int): The number of shards to split the data into.
 
+    Returns:
+    - list[xr.DataArray]: A list of interpolated data arrays for each shard and year combination.
     """
-    chunks_species = np.array_split(range(bio_contribution_species['species'].size), max_workers)
+    chunks_species = np.array_split(range(bio_contribution_species['species'].size), n_shards)
     bio_xr_chunks = [bio_contribution_species.isel(species=idx) for idx in chunks_species]
     return [interp_by_year(chunk, [yr]) for chunk in bio_xr_chunks for yr in interp_year]
 
@@ -508,46 +366,23 @@ def interp_bio_group_to_shards(bio_contribution_group, interp_year):
     return [interp_by_year(bio_contribution_group, [year]) for year in interp_year]
 
 
-# Function to get value from a delayed object
-def get_val(job: tuple):
-    """
-    Unpack a delayed job and return the result by calling the function with the provided arguments.
-
-    Args:
-        job (tuple): A tuple containing a function and its arguments.
-
-    Returns:
-        The result of calling the function with the provided arguments.
-    """
-    return job[0](*job[1])
-
-
 # Helper functions to calculate the biodiversity contribution scores
-def xr_to_df(shard, dvar_ag, dvar_am, dvar_non_ag):
+def xr_to_df(shard:xr.DataArray, dvar_ag:xr.DataArray, dvar_am:xr.DataArray, dvar_non_ag:xr.DataArray):
     """
-    Convert an xarray DataArray to a pandas DataFrame with biodiversity contribution scores.
+    Convert xarray DataArrays to a pandas DataFrame.
 
     Parameters:
-    - shard: An xarray DataArray or a tuple of delayed function and arguments.
-    - dvar_ag: An xarray DataArray representing the biodiversity contribution scores for agriculture land use.
-    - dvar_am: An xarray DataArray representing the biodiversity contribution scores for amenity land use.
-    - dvar_non_ag: An xarray DataArray representing the biodiversity contribution scores for non-agriculture land use.
+    - shard (xr.DataArray): The input data to be converted. It can be either a list of xarray DataArrays or a single xarray DataArray.
+    - dvar_ag (xr.DataArray): The xarray DataArray representing the agricultural variable.
+    - dvar_am (xr.DataArray): The xarray DataArray representing the agricultural margin variable.
+    - dvar_non_ag (xr.DataArray): The xarray DataArray representing the non-agricultural variable.
 
     Returns:
-    - A pandas DataFrame containing the biodiversity contribution scores for different land use types.
-
-    Raises:
-    - ValueError: If the shard parameter is not a valid type (either tuple or xarray DataArray).
+    - pd.DataFrame: The converted pandas DataFrame containing the contribution scores for each land use type.
     """
 
-    # Get the values to avoid duplicate computation
-    if isinstance(shard, tuple):            # This means shard is a tuple of delayed function and arguments
-        f, args = shard[0], shard[1]
-        shard_xr = f(*args)
-    elif isinstance(shard, xr.DataArray):   # This means shard is an xr.DataArray
-        shard_xr = shard.compute()
-    else:
-        raise ValueError('Invalid shard type! Should be either tuple (delayed(function), args) or xr.DataArray.')
+    # Compute the shard first to avoid duplicate computation
+    shard_xr = shard.compute()
 
     # Calculate the biodiversity contribution scores
     tmp_ag = (shard_xr * dvar_ag).compute().sum(['x', 'y'])
@@ -572,18 +407,20 @@ def xr_to_df(shard, dvar_ag, dvar_am, dvar_non_ag):
     return pd.concat([tmp_ag_df, tmp_am_df, tmp_non_ag_df], ignore_index=True)
 
 
-def calc_bio_score_by_yr(ag_dvar, am_dvar, non_ag_dvar, bio_shards):
+def calc_bio_score_by_yr(ag_dvar:xr.DataArray, am_dvar:xr.DataArray, non_ag_dvar:xr.DataArray, bio_shards:list[xr.DataArray]):
     """
-    Calculate biodiversity score by year.
+    Calculate the bio score by multipling `dvar` with `bio_contribution`. 
+    The `dvar` is a 2D land-use map, indicating the percentage of each land use type in each cell.
+    The `bio_contribution` is a 3D array (group * y * x), indicating the contribution of each cell to the total biodiversity score for each species.
 
     Parameters:
-    - ag_dvar: The agricultural variable.
-    - am_dvar: The agricultural management variable.
-    - non_ag_dvar: The non-agricultural variable.
-    - bio_shards: The biodiversity shards.
+    - ag_dvar (xr.DataArray): The agricultural data variable.
+    - am_dvar (xr.DataArray): The agricultural management data variable.
+    - non_ag_dvar (xr.DataArray): The non-agricultural data variable.
+    - bio_shards (list[xr.DataArray]): The list of bio shards.
 
     Returns:
-    - The calculated biodiversity score by year, excluding the 'spatial_ref' column.
+    - out (pd.DataFrame): The concatenated DataFrame with bio scores, excluding the 'spatial_ref' column.
     """
     
     out = [xr_to_df(bio_score, ag_dvar, am_dvar, non_ag_dvar) for bio_score in bio_shards]
