@@ -46,7 +46,7 @@ create_new_dataset()
 
 import luto.simulation as sim
 data = sim.load_data()
-sim.run(data=data, base=2010, target=2050)
+sim.run(data=data, base=2010, target=2025)
 
 from luto.tools.write import write_outputs
 write_outputs(data)
