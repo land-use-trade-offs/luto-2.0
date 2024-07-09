@@ -191,7 +191,7 @@ document.addEventListener("DOMContentLoaded", function () {
             align: "right",
             verticalalign: "left",
             layout: "vertical",
-            x: 0,
+            x: -250,
             verticalAlign: "middle",
         },
         credits: {
@@ -234,7 +234,7 @@ document.addEventListener("DOMContentLoaded", function () {
             align: "right",
             verticalalign: "left",
             layout: "vertical",
-            x: 0,
+            x: -150,
             verticalAlign: "middle",
         },
         credits: {
@@ -275,12 +275,17 @@ document.addEventListener("DOMContentLoaded", function () {
             },
         },
         legend: {
+            itemStyle: {
+              fontSize: "11px",
+            },
             align: "right",
-            verticalalign: "left",
             layout: "vertical",
-            x: 0,
+            x: -30,
+            y: -10,
             verticalAlign: "middle",
-        },
+            itemMarginTop: 0,
+            itemMarginBottom: 1,
+          },
         credits: {
             enabled: false,
         },
