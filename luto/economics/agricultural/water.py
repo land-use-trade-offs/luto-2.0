@@ -180,7 +180,7 @@ def get_asparagopsis_effect_w_mrj(data: Data, yr_idx):
             # The effect is: new value = old value * multiplier - old value
             # E.g. a multiplier of .95 means a 5% reduction in water used.
             # Since the effect applies to water use, it effects the net yield negatively.
-            w_mrj_effect[:, :, lu_idx] = -wreq_mrj[:, :, j] * (multiplier - 1)
+            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (1- multiplier)
 
     return w_mrj_effect
 
@@ -218,7 +218,7 @@ def get_precision_agriculture_effect_w_mrj(data: Data, yr_idx):
             # The effect is: new value = old value * multiplier - old value
             # E.g. a multiplier of .95 means a 5% reduction in water used.
             # Since the effect applies to water use, it effects the net yield negatively.
-            w_mrj_effect[:, :, lu_idx] = -wreq_mrj[:, :, j] * (multiplier - 1)
+            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (1- multiplier)
 
     return w_mrj_effect
 
@@ -256,7 +256,7 @@ def get_ecological_grazing_effect_w_mrj(data: Data, yr_idx):
             # The effect is: new value = old value * multiplier - old value
             # E.g. a multiplier of .95 means a 5% reduction in water used.
             # Since the effect applies to water use, it effects the net yield negatively.
-            w_mrj_effect[:, :, lu_idx] = -wreq_mrj[:, :, j] * (multiplier - 1)
+            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (1- multiplier)
 
     return w_mrj_effect
 
@@ -317,7 +317,8 @@ def get_agtech_ei_effect_w_mrj(data, yr_idx):
             # The effect is: new value = old value * multiplier - old value
             # E.g. a multiplier of .95 means a 5% reduction in water used.
             # Since the effect applies to water use, it effects the net yield negatively.
-            w_mrj_effect[:, :, lu_idx] = -wreq_mrj[:, :, j] * (multiplier - 1)
+            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (1- multiplier)
+            
 
     return w_mrj_effect
 

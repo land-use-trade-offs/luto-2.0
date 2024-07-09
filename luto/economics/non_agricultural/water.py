@@ -20,11 +20,9 @@ def get_w_net_yield_matrix_env_planting(data: Data) -> np.ndarray:
     -------
     1-D array, indexed by cell.
     """
-    # Water requirements
-    wreq = (data.WATER_YIELD_HIST_SR - data.WATER_YIELD_HIST_NL) * data.REAL_AREA
     # Water yield
     wyield = data.WATER_YIELD_HIST_NL * data.REAL_AREA
-    return wyield - wreq
+    return wyield
 
 
 def get_w_net_yield_matrix_carbon_plantings_block(data: Data) -> np.ndarray:
@@ -41,11 +39,9 @@ def get_w_net_yield_matrix_carbon_plantings_block(data: Data) -> np.ndarray:
     -------
     1-D array, indexed by cell.
     """
-    # Water requirements
-    wreq = (data.WATER_YIELD_HIST_SR - data.WATER_YIELD_HIST_DR) * data.REAL_AREA
     # Water yield
-    wyield = data.WATER_YIELD_HIST_NL * data.REAL_AREA
-    return wyield - wreq
+    wyield = data.WATER_YIELD_HIST_DR * data.REAL_AREA
+    return wyield
 
 
 def get_w_net_yield_matrix_rip_planting(data: Data) -> np.ndarray:
