@@ -62,7 +62,7 @@ def data2html(raw_data_dir):
         html_path = row['path']
         data_pathes  = row['data_path']
         # Add data to html
-        add_data_2_html(html_path,data_pathes)
+        add_data_2_html(html_path, data_pathes)
         
 
     
