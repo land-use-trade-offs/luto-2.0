@@ -1148,7 +1148,7 @@ def write_biodiversity_contribution(data: Data, yr_cal, path):
     ag_dvar = ag_to_xr(data, yr_cal)
     am_dvar = am_to_xr(data, yr_cal)
     non_ag_dvar = non_ag_to_xr(data, yr_cal)  
-    
+        
     # Reproject and match dvars (1D vector) to the bio map (2D, ~5km). NOTE: The dvars are sparsed array at ~5km resolution.
     ag_dvar = ag_dvar_to_bio_map(data, ag_dvar, settings.RESFACTOR).chunk('auto').compute()
     am_dvar = am_dvar_to_bio_map(data, am_dvar, settings.RESFACTOR).chunk('auto').compute()

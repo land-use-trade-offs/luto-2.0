@@ -196,7 +196,7 @@ def match_lumap_biomap(
 
 
 
-def ag_dvar_to_bio_map(data, ag_dvar, res_factor, workers=5):
+def ag_dvar_to_bio_map(data, ag_dvar, res_factor):
     """
     Reprojects and matches agricultural land cover variables to biodiversity maps.
 
@@ -217,10 +217,9 @@ def ag_dvar_to_bio_map(data, ag_dvar, res_factor, workers=5):
         map_ = map_.expand_dims({'lm': [lm], 'lu': [lu]})
         return map_
     
-    tasks = [delayed(reproject_match_dvar)(ag_dvar, lm, lu, res_factor) 
+    out_arr = [reproject_match_dvar(ag_dvar, lm, lu, res_factor) 
              for lm,lu in product(ag_dvar['lm'].values, ag_dvar['lu'].values)]
-    para_obj = Parallel(n_jobs=workers, return_as='generator')
-    out_arr = xr.combine_by_coords([i for i in para_obj(tasks)])
+    out_arr = xr.combine_by_coords(out_arr)
     
     # Convert to sparse array to save memory
     out_arr.values = sparse.COO.from_numpy(out_arr.values)
@@ -228,7 +227,7 @@ def ag_dvar_to_bio_map(data, ag_dvar, res_factor, workers=5):
     return out_arr
 
 
-def am_dvar_to_bio_map(data, am_dvar, res_factor, workers=5):
+def am_dvar_to_bio_map(data, am_dvar, res_factor):
     """
     Reprojects and matches agricultural land cover variables to biodiversity maps.
 
@@ -249,10 +248,9 @@ def am_dvar_to_bio_map(data, am_dvar, res_factor, workers=5):
         map_ = map_.expand_dims({'am':[am], 'lm': [lm], 'lu': [lu]})
         return map_
 
-    tasks = [delayed(reproject_match_dvar)(am_dvar, am, lm, lu, res_factor) 
+    out_arr = [reproject_match_dvar(am_dvar, am, lm, lu, res_factor) 
             for am,lm,lu in product(am_dvar['am'].values, am_dvar['lm'].values, am_dvar['lu'].values)]
-    para_obj = Parallel(n_jobs=workers, return_as='generator')
-    out_arr = xr.combine_by_coords([i for i in para_obj(tasks)])
+    out_arr = xr.combine_by_coords(out_arr)
     
     # Convert to sparse array to save memory
     out_arr.values = sparse.COO.from_numpy(out_arr.values)
@@ -261,7 +259,7 @@ def am_dvar_to_bio_map(data, am_dvar, res_factor, workers=5):
 
 
 
-def non_ag_dvar_to_bio_map(data, non_ag_dvar, res_factor, workers=5):
+def non_ag_dvar_to_bio_map(data, non_ag_dvar, res_factor):
     """
     Reprojects and matches agricultural land cover variables to biodiversity maps.
 
@@ -282,10 +280,9 @@ def non_ag_dvar_to_bio_map(data, non_ag_dvar, res_factor, workers=5):
         map_ = map_.expand_dims({'lu': [lu]})
         return map_
 
-    tasks = [delayed(reproject_match_dvar)(non_ag_dvar, lu, res_factor) 
+    out_arr = [reproject_match_dvar(non_ag_dvar, lu, res_factor) 
             for lu in non_ag_dvar['lu'].values]
-    para_obj = Parallel(n_jobs=workers, return_as='generator')
-    out_arr = xr.combine_by_coords([i for i in para_obj(tasks)])
+    out_arr = xr.combine_by_coords(out_arr)
     
     # Convert to sparse array to save memory
     out_arr.values = sparse.COO.from_numpy(out_arr.values)
