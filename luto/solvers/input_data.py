@@ -212,9 +212,10 @@ def get_ag_b_mrj(data: Data):
     return output.astype(np.float32)
 
 
-def get_non_ag_w_rk(data: Data, ag_w_mrj: np.ndarray, base_year):
+def get_non_ag_w_rk(data: Data, ag_w_mrj: np.ndarray, base_year, target_year):
     print('Getting non-agricultural water requirement matrices...', flush = True)
-    output = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[base_year])
+    yr_idx = data.YR_CAL_BASE - target_year
+    output = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[base_year], yr_idx)
     return output.astype(np.float32)
 
 
@@ -408,7 +409,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         non_ag_c_rk=get_non_ag_c_rk(data, ag_c_mrj, base_year, target_year),
         non_ag_r_rk=get_non_ag_r_rk(data, ag_r_mrj, base_year, target_year),
         non_ag_g_rk=get_non_ag_g_rk(data, ag_g_mrj, base_year),
-        non_ag_w_rk=get_non_ag_w_rk(data, ag_w_mrj, base_year),
+        non_ag_w_rk=get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year),
         non_ag_b_rk=get_non_ag_b_rk(data, ag_b_mrj, base_year),
         non_ag_x_rk=get_non_ag_x_rk(data, ag_x_mrj, base_year),
         non_ag_q_crk=get_non_ag_q_crk(data, ag_q_mrp, base_year),
