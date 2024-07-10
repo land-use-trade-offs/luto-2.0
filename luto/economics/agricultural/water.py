@@ -133,13 +133,6 @@ def get_water_net_yield_matrices(data: Data, yr_idx):
     """
     Return water net yield matrices by land management, cell, and land-use type.
     The resulting array is used as the net yield w_mrj array in the input data of the solver.
-    
-    Parameters:
-        data (object): The data object containing the required data.
-        yr_idx (int): The index of the year.
-    
-    Returns:
-        numpy.ndarray: The w_mrj <unit: ML/cell> water net yield matrices, indexed (m, r, j).
     """
     return get_wyield_matrices(data, yr_idx) - get_wreq_matrices(data, yr_idx)
 
@@ -401,7 +394,9 @@ def calc_water_net_yield_by_region_in_year(
     # Prepare water matrices for calculation
     yr_idx = yr_cal - data.YR_CAL_BASE
     ag_w_mrj = ag_w_mrj if ag_w_mrj is not None else get_water_net_yield_matrices(data, yr_idx)
-    non_ag_w_rk = non_ag_w_rk if non_ag_w_rk is not None else non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[yr_cal])
+    non_ag_w_rk = non_ag_w_rk if non_ag_w_rk is not None else non_ag_water.get_w_net_yield_matrix(
+        data, ag_w_mrj, data.lumaps[yr_cal], yr_idx
+    )
     ag_man_w_mrj = ag_man_w_mrj if ag_man_w_mrj is not None else get_agricultural_management_water_matrices(data, yr_idx)
     w_cc_impact = w_cc_impact if w_cc_impact is not None else get_water_ccimpact(data, yr_idx)
     
