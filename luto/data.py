@@ -898,8 +898,8 @@ class Data:
         carbon_price_sheet = settings.CARBON_PRICES_FIELD or "Default"
         carbon_price_usecols = "A,B"
         carbon_price_col_names = ["Year", "Carbon_price_$_tCO2e"]
-        carbon_price_sheet_index_col = "Year" if carbon_price_sheet != "Default" else 0
-        carbon_price_sheet_header = 0 if carbon_price_sheet != "Default" else None        
+        carbon_price_sheet_index_col = "Year" # if carbon_price_sheet != "Default" else 0
+        carbon_price_sheet_header = 0         # if carbon_price_sheet != "Default" else None        
 
         self.CARBON_PRICES: dict[int, float] = pd.read_excel(
             os.path.join(INPUT_DIR, 'carbon_prices.xlsx'),

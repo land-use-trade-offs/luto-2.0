@@ -543,7 +543,7 @@ class LutoSolver:
         If `cells` is provided, only adds constraints for regions containing at least one of the
         provided cells.
         """
-        if settings.WATER_NET_YIELD_LIMITS != "on":
+        if settings.WATER_LIMITS != "on":
             return
         
         print(f'  ...water net yield constraints by {settings.WATER_REGION_DEF}...')

@@ -194,9 +194,9 @@ NON_AG_LAND_USES_REVERSIBLE = {
     'BECCS': False,
 }
 
-# Carbon price scenario: either '1.8C 67%', '1.5C 50%', '1.5C 67%', 'Default' or None. 
+# Carbon price scenario: either '1.8C 67%', '1.5C 50%', '1.5C 67%', 'Default', '100', or None. 
 # Setting to None falls back to the 'Default' scenario.
-CARBON_PRICES_FIELD = '1.8C 67%'
+CARBON_PRICES_FIELD = '100'
 
 # Cost of fencing per linear metre
 FENCING_COST_PER_M = 5
@@ -286,8 +286,8 @@ AG_MANAGEMENTS_REVERSIBLE = {
 }
 
 # The cost for removing and establishing irrigation infrastructure ($ per hectare)
-REMOVE_IRRIG_COST = 3000
-NEW_IRRIG_COST = 7500
+REMOVE_IRRIG_COST = 5000
+NEW_IRRIG_COST = 10000
 
 # Savanna burning cost per hectare per year ($/ha/yr)
 SAVBURN_COST_HA_YR = 100
@@ -328,13 +328,12 @@ SOC_AMORTISATION = 15
 
 
 # Water use yield and parameters *******************************
-''''on' or 'off'. No matter on/off, the water report will always be produced. 
-    But 'off' will turn off water constraints in the solver.'''
+WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
     
-WATER_NET_YIELD_LIMITS = 'off'              
+            
 
 # Regionalisation to enforce water use limits by
-WATER_REGION_DEF = 'Drainage Division'                 # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
+WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
 
 # Water net yield targets: the value represents the proportion of the historical water yields 
 # that the net yield must exceed in a given year. Base year (2010) uses base year net yields as targets. 
