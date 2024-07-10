@@ -114,7 +114,7 @@ def write_data(data: Data):
     # Copy the base-year outputs to the path_begin_end_compare
     shutil.copytree(f"{data.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True) if settings.MODE == 'timeseries' else None
 
-    Write biodiversity contribution from each land-use type
+    # Write biodiversity contribution from each land-use type
     [write_biodiversity_contribution(data, yr, path_yr) for (yr, path_yr) in zip(years, paths)]
     
     # Create the report HTML and png maps
