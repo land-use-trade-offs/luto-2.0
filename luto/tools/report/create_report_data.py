@@ -1256,70 +1256,71 @@ def save_report_data(raw_data_dir:str):
     
     
     # ---------------- Biodiversity contribution score  ----------------
-    bio_paths = files.query('category == "biodiversity" and year_types == "single_year" and base_name == "biodiversity_contribution"').reset_index(drop=True)
-    bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
-    bio_df = bio_df.replace(RENAME_AM_NON_AG)                   # Rename the landuse
-    
-    bio_df['lm'] = bio_df['lm'].replace({
-        'dry':'Dryland', 
-        'irr':'Irrigated',
-        np.nan: 'Dryland'})    # Replace `nan` to 'Dryland'
-    
-    bio_df['lu_type'] = bio_df['lu_type'].replace({
-        'ag': 'Agricultural Landuse',
-        'non_ag': 'Non-Agricultural Landuse',
-        'am': 'Agricultural Management'})   
-    
-    bio_df['group'] = bio_df['group'].replace({
-        'all_species': 'All species', 
-        'amphibians': 'Amphibians',
-        'birds': 'Birds',
-        'mammals': 'Mammals',
-        'plants': 'Plants',
-        'reptiles': 'Reptiles'})
- 
-    
-    # Plot_6-5: Biodiversity contribution score by group
-    bio_df_species_group = bio_df.groupby(['group','year']).sum(numeric_only=True).reset_index()
-    
-    bio_df_species_group = bio_df_species_group\
-        .groupby('group')[['year','contribution_%']]\
-        .apply(lambda x:list(map(list,zip(x['year'],x['contribution_%']))))\
-        .reset_index()
+    if  settings.BIODIVERSITY_CONTRIBUTION_REPORT:
+        bio_paths = files.query('category == "biodiversity" and year_types == "single_year" and base_name == "biodiversity_contribution"').reset_index(drop=True)
+        bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
+        bio_df = bio_df.replace(RENAME_AM_NON_AG)                   # Rename the landuse
         
-    bio_df_species_group.columns = ['name','data']
-    bio_df_species_group['type'] = 'spline'
-    bio_df_species_group.to_json(f'{SAVE_DIR}/biodiversity_5_contribution_score_by_group.json', orient='records')
-
-
-
-
-    # Plot_6-6: Biodiversity contribution score by landuse broader type
-    bio_df_landuse_type_broad = bio_df.query('group == "All species"').groupby(['lu_type','year']).sum(numeric_only=True).reset_index()
-    bio_df_landuse_type_broad = bio_df_landuse_type_broad\
-        .groupby('lu_type')[['year','contribution_%']]\
-        .apply(lambda x:list(map(list,zip(x['year'],x['contribution_%']))))\
-        .reset_index()
+        bio_df['lm'] = bio_df['lm'].replace({
+            'dry':'Dryland', 
+            'irr':'Irrigated',
+            np.nan: 'Dryland'})    # Replace `nan` to 'Dryland'
         
-    bio_df_landuse_type_broad.columns = ['name','data']
-    bio_df_landuse_type_broad['type'] = 'column'
-    bio_df_landuse_type_broad.to_json(f'{SAVE_DIR}/biodiversity_6_contribution_score_by_landuse_type_broad.json', orient='records')
-    
-    
-    # Plot_6-7: Biodiversity contribution score by specific landuse type
-    bio_df_landuse_type_specific = bio_df.query('group == "All species"').groupby(['lu','year']).sum(numeric_only=True).reset_index()
-    bio_df_landuse_type_specific = bio_df_landuse_type_specific\
-        .groupby('lu')[['year','contribution_%']]\
-        .apply(lambda x:list(map(list,zip(x['year'],x['contribution_%']))))\
-        .reset_index()
+        bio_df['lu_type'] = bio_df['lu_type'].replace({
+            'ag': 'Agricultural Landuse',
+            'non_ag': 'Non-Agricultural Landuse',
+            'am': 'Agricultural Management'})   
         
-    bio_df_landuse_type_specific.columns = ['name','data']
-    bio_df_landuse_type_specific['type'] = 'column'
-    bio_df_landuse_type_specific['sort_index'] = bio_df_landuse_type_specific['name'].apply(lambda x: LANDUSE_ALL.index(x))
-    bio_df_landuse_type_specific = bio_df_landuse_type_specific.sort_values(['sort_index']).drop('sort_index',axis=1)
-    bio_df_landuse_type_specific.to_json(f'{SAVE_DIR}/biodiversity_7_contribution_score_by_landuse_type_specific.json', orient='records')
+        bio_df['group'] = bio_df['group'].replace({
+            'all_species': 'All species', 
+            'amphibians': 'Amphibians',
+            'birds': 'Birds',
+            'mammals': 'Mammals',
+            'plants': 'Plants',
+            'reptiles': 'Reptiles'})
     
-    
+        
+        # Plot_6-5: Biodiversity contribution score by group
+        bio_df_species_group = bio_df.groupby(['group','year']).sum(numeric_only=True).reset_index()
+        
+        bio_df_species_group = bio_df_species_group\
+            .groupby('group')[['year','contribution_%']]\
+            .apply(lambda x:list(map(list,zip(x['year'],x['contribution_%']))))\
+            .reset_index()
+            
+        bio_df_species_group.columns = ['name','data']
+        bio_df_species_group['type'] = 'spline'
+        bio_df_species_group.to_json(f'{SAVE_DIR}/biodiversity_5_contribution_score_by_group.json', orient='records')
+
+
+
+
+        # Plot_6-6: Biodiversity contribution score by landuse broader type
+        bio_df_landuse_type_broad = bio_df.query('group == "All species"').groupby(['lu_type','year']).sum(numeric_only=True).reset_index()
+        bio_df_landuse_type_broad = bio_df_landuse_type_broad\
+            .groupby('lu_type')[['year','contribution_%']]\
+            .apply(lambda x:list(map(list,zip(x['year'],x['contribution_%']))))\
+            .reset_index()
+            
+        bio_df_landuse_type_broad.columns = ['name','data']
+        bio_df_landuse_type_broad['type'] = 'column'
+        bio_df_landuse_type_broad.to_json(f'{SAVE_DIR}/biodiversity_6_contribution_score_by_landuse_type_broad.json', orient='records')
+        
+        
+        # Plot_6-7: Biodiversity contribution score by specific landuse type
+        bio_df_landuse_type_specific = bio_df.query('group == "All species"').groupby(['lu','year']).sum(numeric_only=True).reset_index()
+        bio_df_landuse_type_specific = bio_df_landuse_type_specific\
+            .groupby('lu')[['year','contribution_%']]\
+            .apply(lambda x:list(map(list,zip(x['year'],x['contribution_%']))))\
+            .reset_index()
+            
+        bio_df_landuse_type_specific.columns = ['name','data']
+        bio_df_landuse_type_specific['type'] = 'column'
+        bio_df_landuse_type_specific['sort_index'] = bio_df_landuse_type_specific['name'].apply(lambda x: LANDUSE_ALL.index(x))
+        bio_df_landuse_type_specific = bio_df_landuse_type_specific.sort_values(['sort_index']).drop('sort_index',axis=1)
+        bio_df_landuse_type_specific.to_json(f'{SAVE_DIR}/biodiversity_7_contribution_score_by_landuse_type_specific.json', orient='records')
+        
+        
 
     
     

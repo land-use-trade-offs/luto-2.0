@@ -60,8 +60,7 @@ from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_html import data2html
 from luto.tools.report.create_static_maps import TIF2MAP
 
-from luto.tools.xarray_tools import (ag_to_xr, non_ag_to_xr, am_to_xr,
-                                     ag_dvar_to_bio_map, non_ag_dvar_to_bio_map, am_dvar_to_bio_map,
+from luto.tools.xarray_tools import (ag_to_xr, match_lumap_biomap, non_ag_to_xr, am_to_xr,
                                      calc_bio_hist_sum, calc_bio_score_species, interp_bio_species_to_shards, 
                                      calc_bio_score_by_yr)
 
@@ -115,7 +114,8 @@ def write_data(data: Data):
     shutil.copytree(f"{data.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True) if settings.MODE == 'timeseries' else None
 
     # Write biodiversity contribution from each land-use type
-    [write_biodiversity_contribution(data, yr, path_yr) for (yr, path_yr) in zip(years, paths)]
+    if  settings.BIODIVERSITY_CONTRIBUTION_REPORT:
+        [write_biodiversity_contribution(data, yr, path_yr) for (yr, path_yr) in zip(years, paths)]
     
     # Create the report HTML and png maps
     TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
@@ -1147,9 +1147,9 @@ def write_biodiversity_contribution(data: Data, yr_cal, path):
     non_ag_dvar = non_ag_to_xr(data, yr_cal)  
         
     # Reproject and match dvars (1D vector) to the bio map (2D, ~5km). NOTE: The dvars are sparsed array at ~5km resolution.
-    ag_dvar = ag_dvar_to_bio_map(data, ag_dvar, settings.RESFACTOR).chunk('auto').compute()
-    am_dvar = am_dvar_to_bio_map(data, am_dvar, settings.RESFACTOR).chunk('auto').compute()
-    non_ag_dvar = non_ag_dvar_to_bio_map(data, non_ag_dvar, settings.RESFACTOR).chunk('auto').compute()
+    ag_dvar = match_lumap_biomap(data, ag_dvar)
+    am_dvar = match_lumap_biomap(data, am_dvar)
+    non_ag_dvar = match_lumap_biomap(data, non_ag_dvar)
             
     # Calculate the biodiversity contribution scores
     if settings.BIO_CALC_LEVEL == 'group':
