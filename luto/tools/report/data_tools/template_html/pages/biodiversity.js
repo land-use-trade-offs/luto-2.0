@@ -211,13 +211,13 @@ document.addEventListener("DOMContentLoaded", function () {
         series: JSON.parse(
             document.getElementById("biodiversity_6_contribution_score_by_landuse_type_broad_csv").innerHTML
         ),
-        xAxis: {
-            tickPositions: year_ticks,
-        },
         yAxis: {
             title: {
                 text: "Contribution Score (%)",
             },
+        },
+        xAxis: {
+            tickPositions: year_ticks,
         },
         plotOptions: {
             column: {

@@ -90,7 +90,7 @@ def save_report_data(raw_data_dir:str):
     lu_area_dvar = lu_area_dvar.sort_values('sort_index').drop('sort_index',axis=1)
     lu_area_dvar['color'] = lu_area_dvar['name'].apply(lambda x: LANDUSE_ALL_COLORS[x])
     
-    lu_area_dvar.to_json(f'{SAVE_DIR}/area_1_total_area_wide.json',orient='records')
+    lu_area_dvar.to_json(f'{SAVE_DIR}/area_1_total_area_wide.json', orient='records')
 
 
 
@@ -106,7 +106,7 @@ def save_report_data(raw_data_dir:str):
         
     lm_dvar_area.columns = ['name','data']
     lm_dvar_area['type'] = 'column'
-    lm_dvar_area.to_json(f'{SAVE_DIR}/area_2_Water_supply_area_wide.json',orient='records')
+    lm_dvar_area.to_json(f'{SAVE_DIR}/area_2_Water_supply_area_wide.json', orient='records')
 
 
 
@@ -120,7 +120,7 @@ def save_report_data(raw_data_dir:str):
         
     non_ag_dvar_area.columns = ['name','data']
     non_ag_dvar_area['type'] = 'column'
-    non_ag_dvar_area.to_json(f'{SAVE_DIR}/area_3_non_ag_lu_area_wide.json',orient='records')
+    non_ag_dvar_area.to_json(f'{SAVE_DIR}/area_3_non_ag_lu_area_wide.json', orient='records')
 
 
 
@@ -139,7 +139,7 @@ def save_report_data(raw_data_dir:str):
         
     am_dvar_area_type.columns = ['name','data']
     am_dvar_area_type['type'] = 'column'
-    am_dvar_area_type.to_json(f'{SAVE_DIR}/area_4_am_total_area_wide.json',orient='records')
+    am_dvar_area_type.to_json(f'{SAVE_DIR}/area_4_am_total_area_wide.json', orient='records')
 
 
 
@@ -154,7 +154,7 @@ def save_report_data(raw_data_dir:str):
     am_dvar_area_lu.columns = ['name','data']
     am_dvar_area_lu['type'] = 'column'
     am_dvar_area_lu['color'] = am_dvar_area_lu['name'].apply(lambda x: LANDUSE_ALL_COLORS[x])
-    am_dvar_area_lu.to_json(f'{SAVE_DIR}/area_5_am_lu_area_wide.json',orient='records')
+    am_dvar_area_lu.to_json(f'{SAVE_DIR}/area_5_am_lu_area_wide.json', orient='records')
 
 
     # Plot_1-6/7: Area (km2) Transition by Land use
@@ -802,7 +802,7 @@ def save_report_data(raw_data_dir:str):
         GHG_files_wide['type'] = 'column'
         
         GHG_files_wide.loc[-1] = ['Net emissions', list(map(list,zip(Net_emission['Year'],Net_emission['Value (Mt CO2e)']))), 'line']
-        GHG_files_wide.to_json(f'{SAVE_DIR}/GHG_2_individual_emission_Mt.json',orient='records')
+        GHG_files_wide.to_json(f'{SAVE_DIR}/GHG_2_individual_emission_Mt.json', orient='records')
 
 
 
@@ -843,7 +843,7 @@ def save_report_data(raw_data_dir:str):
                                                     
         GHG_Ag_emission_total_crop_lvstk_wide.columns = ['name','data']
         GHG_Ag_emission_total_crop_lvstk_wide['type'] = 'column'
-        GHG_Ag_emission_total_crop_lvstk_wide.to_json(f'{SAVE_DIR}/GHG_4_3_1_crop_lvstk_emission_Mt.json',orient='records')
+        GHG_Ag_emission_total_crop_lvstk_wide.to_json(f'{SAVE_DIR}/GHG_4_3_1_crop_lvstk_emission_Mt.json', orient='records')
 
 
 
@@ -857,7 +857,7 @@ def save_report_data(raw_data_dir:str):
                                                 
         GHG_Ag_emission_total_dry_irr_wide.columns = ['name','data']
         GHG_Ag_emission_total_dry_irr_wide['type'] = 'column'
-        GHG_Ag_emission_total_dry_irr_wide.to_json(f'{SAVE_DIR}/GHG_4_3_2_dry_irr_emission_Mt.json',orient='records')
+        GHG_Ag_emission_total_dry_irr_wide.to_json(f'{SAVE_DIR}/GHG_4_3_2_dry_irr_emission_Mt.json', orient='records')
         
         
 
@@ -872,7 +872,7 @@ def save_report_data(raw_data_dir:str):
                                                 
         GHG_Ag_emission_total_GHG_type_wide.columns = ['name','data']
         GHG_Ag_emission_total_GHG_type_wide['type'] = 'column'
-        GHG_Ag_emission_total_GHG_type_wide.to_json(f'{SAVE_DIR}/GHG_4_3_3_category_emission_Mt.json',orient='records')
+        GHG_Ag_emission_total_GHG_type_wide.to_json(f'{SAVE_DIR}/GHG_4_3_3_category_emission_Mt.json', orient='records')
 
 
         # Plot_4-3-4: Agricultural Emission (on-land) by Sources (Mt)
@@ -885,7 +885,7 @@ def save_report_data(raw_data_dir:str):
                                                 
         GHG_Ag_emission_total_Source_wide.columns = ['name','data']
         GHG_Ag_emission_total_Source_wide['type'] = 'column'
-        GHG_Ag_emission_total_Source_wide.to_json(f'{SAVE_DIR}/GHG_4_3_4_sources_emission_Mt.json',orient='records')
+        GHG_Ag_emission_total_Source_wide.to_json(f'{SAVE_DIR}/GHG_4_3_4_sources_emission_Mt.json', orient='records')
         
 
         # Plot_4-3-5: GHG emission (on-land) in start and end years (Mt)
@@ -946,7 +946,7 @@ def save_report_data(raw_data_dir:str):
         GHG_lu_source_nest_dict['data'] = GHG_lu_source_nest_dict['data']\
             .apply(lambda x: [{'name': i['Land-use'], 'value': i['Value (Mt CO2e)']} for i in x])
         
-        GHG_lu_source_nest_dict.to_json(f'{SAVE_DIR}/GHG_4_3_6_lu_source_emission_Mt.json',orient='records')
+        GHG_lu_source_nest_dict.to_json(f'{SAVE_DIR}/GHG_4_3_6_lu_source_emission_Mt.json', orient='records')
 
                 
             
@@ -962,7 +962,7 @@ def save_report_data(raw_data_dir:str):
             
         GHG_off_land_commodity_json.columns = ['name','data']
         GHG_off_land_commodity_json['type'] = 'column'
-        GHG_off_land_commodity_json.to_json(f'{SAVE_DIR}/GHG_4_3_7_off_land_commodity_emission_Mt.json',orient='records')
+        GHG_off_land_commodity_json.to_json(f'{SAVE_DIR}/GHG_4_3_7_off_land_commodity_emission_Mt.json', orient='records')
         
         
         
@@ -978,7 +978,7 @@ def save_report_data(raw_data_dir:str):
             
         GHG_off_land_sources_json.columns = ['name','data']
         GHG_off_land_sources_json['type'] = 'column'
-        GHG_off_land_sources_json.to_json(f'{SAVE_DIR}/GHG_4_3_8_off_land_sources_emission_Mt.json',orient='records')
+        GHG_off_land_sources_json.to_json(f'{SAVE_DIR}/GHG_4_3_8_off_land_sources_emission_Mt.json', orient='records')
         
         
         
@@ -996,7 +996,7 @@ def save_report_data(raw_data_dir:str):
         GHG_off_land_type_json.columns = ['name','data']
         GHG_off_land_type_json['type'] = 'column'
         
-        GHG_off_land_type_json.to_json(f'{SAVE_DIR}/GHG_4_3_9_off_land_type_emission_Mt.json',orient='records')
+        GHG_off_land_type_json.to_json(f'{SAVE_DIR}/GHG_4_3_9_off_land_type_emission_Mt.json', orient='records')
 
 
 
@@ -1018,7 +1018,7 @@ def save_report_data(raw_data_dir:str):
         Non_ag_reduction_source_wide.columns = ['name','data']
         Non_ag_reduction_source_wide['type'] = 'column'
         
-        Non_ag_reduction_source_wide.to_json(f'{SAVE_DIR}/GHG_4_4_ag_reduction_source_wide_Mt.json',orient='records')
+        Non_ag_reduction_source_wide.to_json(f'{SAVE_DIR}/GHG_4_4_ag_reduction_source_wide_Mt.json', orient='records')
 
 
 
@@ -1035,7 +1035,7 @@ def save_report_data(raw_data_dir:str):
                                             
         Ag_man_sequestration_total_wide.columns = ['name','data']
         Ag_man_sequestration_total_wide['type'] = 'column'
-        Ag_man_sequestration_total_wide.to_json(f'{SAVE_DIR}/GHG_4_5_1_GHG_ag_man_df_wide_Mt.json',orient='records')
+        Ag_man_sequestration_total_wide.to_json(f'{SAVE_DIR}/GHG_4_5_1_GHG_ag_man_df_wide_Mt.json', orient='records')
 
 
         # Plot_4-5-2: GHG reductions by Agricultural managements in subsector (Mt)
@@ -1048,7 +1048,7 @@ def save_report_data(raw_data_dir:str):
                                                 
         Ag_man_sequestration_crop_lvstk_wide.columns = ['name','data']
         Ag_man_sequestration_crop_lvstk_wide['type'] = 'column'
-        Ag_man_sequestration_crop_lvstk_wide.to_json(f'{SAVE_DIR}/GHG_4_5_2_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt.json',orient='records')
+        Ag_man_sequestration_crop_lvstk_wide.to_json(f'{SAVE_DIR}/GHG_4_5_2_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt.json', orient='records')
         
 
 
@@ -1061,7 +1061,7 @@ def save_report_data(raw_data_dir:str):
                                             .reset_index()
         Ag_man_sequestration_dry_irr_wide.columns = ['name','data']
         Ag_man_sequestration_dry_irr_wide['type'] = 'column'
-        Ag_man_sequestration_dry_irr_wide.to_json(f'{SAVE_DIR}/GHG_4_5_3_GHG_ag_man_dry_irr_df_wide_Mt.json',orient='records')
+        Ag_man_sequestration_dry_irr_wide.to_json(f'{SAVE_DIR}/GHG_4_5_3_GHG_ag_man_dry_irr_df_wide_Mt.json', orient='records')
     
     
     
@@ -1072,85 +1072,111 @@ def save_report_data(raw_data_dir:str):
     #                     5) Water                     #
     ####################################################
     
-    if settings.WATER_NET_YIELD_LIMITS == 'on':
-        water_df_total = files.query('category == "water" and year_types == "single_year" and ~base_name.str.contains("separate")').reset_index(drop=True)
-        water_df_total = pd.concat([pd.read_csv(path) for path in water_df_total['path']], ignore_index=True)
-        
-        water_df_separate = files.query('category == "water" and year_types == "single_year" and base_name.str.contains("separate")').reset_index(drop=True)
-        water_df_separate = pd.concat([pd.read_csv(path) for path in water_df_separate['path']], ignore_index=True)
-        water_df_separate = water_df_separate.replace(RENAME_AM_NON_AG)
-        
 
-        # Plot_5-1: Water net yield compared to limite (%)
-        water_df_total_pct = water_df_total.query('Variable == "PROPORTION_LIMIT_%" ')
-        water_df_total_pct_wide = water_df_total_pct\
-                                    .groupby(['REGION_NAME'])[['Year','Value (ML)']]\
-                                    .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
+    water_df_total = files.query('category == "water" \
+        and year_types == "single_year" \
+        and ~base_name.str.contains("separate") \
+        and ~base_name.str.contains("outside_LUTO")').reset_index(drop=True)
+    water_df_total = pd.concat([pd.read_csv(path) for path in water_df_total['path']], ignore_index=True)
+    
+    water_df_separate = files.query('category == "water" and year_types == "single_year" and base_name.str.contains("separate")').reset_index(drop=True)
+    water_df_separate = pd.concat([pd.read_csv(path) for path in water_df_separate['path']], ignore_index=True)
+    water_df_separate = water_df_separate.replace(RENAME_AM_NON_AG)
+    
+    water_df_outside_LUTO = files.query('category == "water" \
+        and year_types == "single_year" \
+        and base_name.str.contains("outside_LUTO")').reset_index(drop=True)
+    water_df_outside_LUTO = pd.concat([pd.read_csv(path) for path in water_df_outside_LUTO['path']], ignore_index=True)
+
+
+    # Plot_5-1: Water net yield compared to limit (%)
+    water_df_total_pct = water_df_total.query('Variable == "PROPORTION_ALL_%"')
+    water_df_total_pct_wide = water_df_total_pct\
+                                .groupby(['REGION_NAME'])[['Year','Value (ML)']]\
+                                .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
+                                .reset_index()
+                                
+    water_df_total_pct_wide.columns = ['name','data']
+    water_df_total_pct_wide['type'] = 'spline'
+    water_df_total_pct_wide.to_json(f'{SAVE_DIR}/water_1_percent_of_limit.json', orient='records')
+
+
+
+
+    # Plot_5-2: Water net yield compared to limite (ML)
+    water_df_total_yield = water_df_total.query('Variable == "TOT_WATER_NET_YIELD_ML"')
+    water_df_total_yield_wide = water_df_total_yield\
+                                .groupby(['REGION_NAME'])[['Year','Value (ML)']]\
+                                .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
+                                .reset_index()
+
+    water_df_total_yield_wide.columns = ['name','data']
+    water_df_total_yield_wide['type'] = 'spline'
+    water_df_total_yield_wide.to_json(f'{SAVE_DIR}/water_2_yield_to_limit.json', orient='records')                        
+    
+    
+    
+    # Plot_5-3: Water net yield by sector (ML)
+    water_df_separate_lu_type = water_df_separate\
+        .groupby(['Year','Landuse Type'])\
+        .sum(numeric_only=True)[['Water Net Yield (ML)']].reset_index()
+        
+    water_df_outside_LUTO_total = water_df_outside_LUTO.groupby('Year').sum(numeric_only=True).reset_index()
+        
+    water_df_net = water_df_total\
+        .query('Variable == "TOT_WATER_NET_YIELD_ML"')\
+        .groupby('Year').sum(numeric_only=True).reset_index()
+
+    water_df_separate_lu_type = water_df_separate_lu_type\
+        .groupby(['Landuse Type'])[['Landuse Type','Year','Water Net Yield (ML)']]\
+        .apply(lambda x:list(map(list,zip(x['Year'],x['Water Net Yield (ML)']))))\
+        .reset_index()
+        
+    water_df_separate_lu_type.columns = ['name','data']
+    water_df_separate_lu_type['type'] = 'column'
+
+    water_df_separate_lu_type.loc[len(water_df_separate_lu_type)] = [
+        'Public Landuse', 
+        list(map(list,zip(water_df_outside_LUTO_total['Year'], water_df_outside_LUTO_total['Climate Change Impact (ML)']))), 
+        'column']
+    
+    water_df_separate_lu_type.loc[len(water_df_separate_lu_type)] = [
+        'Net Volume', 
+        list(map(list,zip(water_df_net['Year'], water_df_net['Value (ML)']))), 
+        'line']
+    
+    water_df_separate_lu_type.to_json(f'{SAVE_DIR}/water_3_net_yield_by_sector.json', orient='records')
+
+
+
+
+    # Plot_5-4: Water net yield by landuse (ML)
+    water_df_seperate_lu = water_df_separate.groupby(['Year','Landuse']).sum()[['Water Net Yield (ML)']].reset_index()
+    
+    water_df_seperate_lu_wide = water_df_seperate_lu\
+                                    .groupby(['Landuse'])[['Year','Water Net Yield (ML)']]\
+                                    .apply(lambda x: list(map(list,zip(x['Year'],x['Water Net Yield (ML)']))))\
                                     .reset_index()
                                     
-        water_df_total_pct_wide.columns = ['name','data']
-        water_df_total_pct_wide['type'] = 'spline'
-        water_df_total_pct_wide.to_json(f'{SAVE_DIR}/water_1_percent_of_limit.json',orient='records')
-
-
-        # Plot_5-2: Water net yield compared to limite (ML)
-        water_df_total_yield = water_df_total.query('Variable == "TOT_WATER_NET_YIELD_ML" ')
-        water_df_total_yield_wide = water_df_total_yield\
-                                    .groupby(['REGION_NAME'])[['Year','Value (ML)']]\
-                                    .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
+    water_df_seperate_lu_wide.columns = ['name','data']
+    water_df_seperate_lu_wide['type'] = 'column'
+    water_df_seperate_lu_wide = water_df_seperate_lu_wide.set_index('name').reindex(LANDUSE_ALL).reset_index()
+    
+    
+    water_df_seperate_lu_wide.to_json(f'{SAVE_DIR}/water_4_net_yield_by_landuse.json', orient='records')
+    
+    
+    # Plot_5-5: Water net yield by Water_supply (ML)
+    water_df_seperate_irr = water_df_separate.groupby(['Year','Water_supply']).sum()[['Water Net Yield (ML)']].reset_index()
+    
+    water_df_seperate_irr_wide = water_df_seperate_irr\
+                                    .groupby(['Water_supply'])[['Year','Water Net Yield (ML)']]\
+                                    .apply(lambda x: list(map(list,zip(x['Year'],x['Water Net Yield (ML)']))))\
                                     .reset_index()
-
-        water_df_total_yield_wide.columns = ['name','data']
-        water_df_total_yield_wide['type'] = 'spline'
-        water_df_total_yield_wide.to_json(f'{SAVE_DIR}/water_2_yield_to_limit.json',orient='records')                        
-        
-        
-        
-        # Plot_5-3: Water net yield by sector (ML)
-        water_df_separate_lu_type = water_df_separate.groupby(['Year','Landuse Type']).sum(numeric_only=True)[['Water Net Yield (ML)']].reset_index()
-        water_df_net = water_df_separate.groupby('Year').sum(numeric_only=True).reset_index()
-
-        water_df_separate_lu_type = water_df_separate_lu_type\
-            .groupby(['Landuse Type'])[['Landuse Type','Year','Water Net Yield (ML)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Water Net Yield (ML)']))))\
-            .reset_index()
-            
-        water_df_separate_lu_type.columns = ['name','data']
-        water_df_separate_lu_type['type'] = 'column'
-
-        water_df_separate_lu_type.loc[len(water_df_separate_lu_type)] = ['Net Volume', list(map(list,zip(water_df_net['Year'],water_df_net['Water Net Yield (ML)']))), 'line']
-
-        water_df_separate_lu_type.to_json(f'{SAVE_DIR}/water_3_net_yield_by_sector.json',orient='records')
-
-
-
-        # Plot_5-4: Water net yield by landuse (ML)
-        water_df_seperate_lu = water_df_separate.groupby(['Year','Landuse']).sum()[['Water Net Yield (ML)']].reset_index()
-        
-        water_df_seperate_lu_wide = water_df_seperate_lu\
-                                        .groupby(['Landuse'])[['Year','Water Net Yield (ML)']]\
-                                        .apply(lambda x: list(map(list,zip(x['Year'],x['Water Net Yield (ML)']))))\
-                                        .reset_index()
-                                        
-        water_df_seperate_lu_wide.columns = ['name','data']
-        water_df_seperate_lu_wide['type'] = 'column'
-        water_df_seperate_lu_wide = water_df_seperate_lu_wide.set_index('name').reindex(LANDUSE_ALL).reset_index()
-        
-        
-        water_df_seperate_lu_wide.to_json(f'{SAVE_DIR}/water_4_net_yield_by_landuse.json',orient='records')
-        
-        
-        # Plot_5-5: Water net yield by Water_supply (ML)
-        water_df_seperate_irr = water_df_separate.groupby(['Year','Water_supply']).sum()[['Water Net Yield (ML)']].reset_index()
-        
-        water_df_seperate_irr_wide = water_df_seperate_irr\
-                                        .groupby(['Water_supply'])[['Year','Water Net Yield (ML)']]\
-                                        .apply(lambda x: list(map(list,zip(x['Year'],x['Water Net Yield (ML)']))))\
-                                        .reset_index()
-                                        
-        water_df_seperate_irr_wide.columns = ['name','data']
-        water_df_seperate_irr_wide['type'] = 'column'
-        water_df_seperate_irr_wide.to_json(f'{SAVE_DIR}/water_5_net_yield_by_Water_supply.json',orient='records')
+                                    
+    water_df_seperate_irr_wide.columns = ['name','data']
+    water_df_seperate_irr_wide['type'] = 'column'
+    water_df_seperate_irr_wide.to_json(f'{SAVE_DIR}/water_5_net_yield_by_Water_supply.json', orient='records')
     
 
 
@@ -1179,7 +1205,7 @@ def save_report_data(raw_data_dir:str):
         
     bio_df_category.columns = ['name','data']
     bio_df_category['type'] = 'column'
-    bio_df_category.to_json(f'{SAVE_DIR}/biodiversity_1_total_score_by_category.json',orient='records')
+    bio_df_category.to_json(f'{SAVE_DIR}/biodiversity_1_total_score_by_category.json', orient='records')
 
 
     # Plot_6-2: Biodiversity total by Water_supply
@@ -1191,7 +1217,7 @@ def save_report_data(raw_data_dir:str):
         
     bio_df_Water_supply.columns = ['name','data']
     bio_df_Water_supply['type'] = 'column'
-    bio_df_Water_supply.to_json(f'{SAVE_DIR}/biodiversity_2_total_score_by_Water_supply.json',orient='records')
+    bio_df_Water_supply.to_json(f'{SAVE_DIR}/biodiversity_2_total_score_by_Water_supply.json', orient='records')
 
 
     # Plot_6-3: Biodiversity total by landuse
@@ -1208,7 +1234,7 @@ def save_report_data(raw_data_dir:str):
 
     bio_df_landuse.columns = ['name','data']
     bio_df_landuse['type'] = 'column'
-    bio_df_landuse.to_json(f'{SAVE_DIR}/biodiversity_3_total_score_by_landuse.json',orient='records')
+    bio_df_landuse.to_json(f'{SAVE_DIR}/biodiversity_3_total_score_by_landuse.json', orient='records')
 
     # Plot_6-4: Natural landuse area (million)
     natural_land_area = area_dvar.groupby(['Year','Land-use']).sum(numeric_only=True).reset_index()
@@ -1226,7 +1252,7 @@ def save_report_data(raw_data_dir:str):
 
     natural_land_area.columns = ['name','data']
     natural_land_area['type'] = 'column'
-    natural_land_area.to_json(f'{SAVE_DIR}/biodiversity_4_natural_land_area.json',orient='records')
+    natural_land_area.to_json(f'{SAVE_DIR}/biodiversity_4_natural_land_area.json', orient='records')
     
     
     # ---------------- Biodiversity contribution score  ----------------
@@ -1263,7 +1289,7 @@ def save_report_data(raw_data_dir:str):
         
     bio_df_species_group.columns = ['name','data']
     bio_df_species_group['type'] = 'spline'
-    bio_df_species_group.to_json(f'{SAVE_DIR}/biodiversity_5_contribution_score_by_group.json',orient='records')
+    bio_df_species_group.to_json(f'{SAVE_DIR}/biodiversity_5_contribution_score_by_group.json', orient='records')
 
 
 
@@ -1277,7 +1303,7 @@ def save_report_data(raw_data_dir:str):
         
     bio_df_landuse_type_broad.columns = ['name','data']
     bio_df_landuse_type_broad['type'] = 'column'
-    bio_df_landuse_type_broad.to_json(f'{SAVE_DIR}/biodiversity_6_contribution_score_by_landuse_type_broad.json',orient='records')
+    bio_df_landuse_type_broad.to_json(f'{SAVE_DIR}/biodiversity_6_contribution_score_by_landuse_type_broad.json', orient='records')
     
     
     # Plot_6-7: Biodiversity contribution score by specific landuse type
@@ -1291,7 +1317,7 @@ def save_report_data(raw_data_dir:str):
     bio_df_landuse_type_specific['type'] = 'column'
     bio_df_landuse_type_specific['sort_index'] = bio_df_landuse_type_specific['name'].apply(lambda x: LANDUSE_ALL.index(x))
     bio_df_landuse_type_specific = bio_df_landuse_type_specific.sort_values(['sort_index']).drop('sort_index',axis=1)
-    bio_df_landuse_type_specific.to_json(f'{SAVE_DIR}/biodiversity_7_contribution_score_by_landuse_type_specific.json',orient='records')
+    bio_df_landuse_type_specific.to_json(f'{SAVE_DIR}/biodiversity_7_contribution_score_by_landuse_type_specific.json', orient='records')
     
     
 

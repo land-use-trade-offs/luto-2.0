@@ -327,8 +327,11 @@ GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'
 SOC_AMORTISATION = 15    
 
 
-# Water use limits and parameters *******************************
-WATER_NET_YIELD_LIMITS = 'on'               # 'on' or 'off'
+# Water use yield and parameters *******************************
+''''on' or 'off'. No matter on/off, the water report will always be produced. 
+    But 'off' will turn off water constraints in the solver.'''
+    
+WATER_NET_YIELD_LIMITS = 'off'              
 
 # Regionalisation to enforce water use limits by
 WATER_REGION_DEF = 'Drainage Division'                 # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
