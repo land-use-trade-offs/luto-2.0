@@ -426,7 +426,7 @@ def create_new_dataset():
             sr_arr = h5[fn][:][:, LUTO_outside_cells_index]  # shape = (91, 2737674)
             
         # Calculate the water yield for the cells outside the LUTO study area
-        base_arr =  dr_arr * np.array(water_outside_LUTO.DEEP_ROOTED_PROPORTION) + sr_arr * np.array(1 - water_outside_LUTO.DEEP_ROOTED_PROPORTION)
+        base_arr = dr_arr * np.array(water_outside_LUTO.DEEP_ROOTED_PROPORTION) + sr_arr * np.array(1 - water_outside_LUTO.DEEP_ROOTED_PROPORTION)
         base_arr = base_arr * cells_attrs_outside_LUTO['CELL_HA'].values[np.newaxis,:]     # Convert from ML/HA to ML
         base_arr_df = pd.DataFrame(base_arr.T, columns = range(2010, 2101))
 

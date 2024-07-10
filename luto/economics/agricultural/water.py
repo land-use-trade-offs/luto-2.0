@@ -482,8 +482,13 @@ def get_water_net_yield_limits(
     - data: The data object containing the necessary input data.
 
     Returns:
-    - water_net_yield_limits: A list of tuples containing the water use limits for each region
-      (region index, region name, water use limit, water all, indices of cells in the region).
+    water_net_yield_limits: A dictionary of tuples containing the water use limits for each region\n
+      region index:(
+      - region name 
+      - histircal water yield
+      - lowest water yield allowed 
+      - indices of cells in the region
+      )
 
     Raises:
     - None

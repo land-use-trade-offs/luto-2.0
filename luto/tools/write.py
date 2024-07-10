@@ -841,12 +841,8 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
 
 def write_water(data: Data, yr_cal, path):
-    """Calculate water use totals. Takes a simulation object, a numeric
-       target calendar year (e.g., 2030), and an output path as input."""
+    """Calculate water yield totals. Takes a Data Object, a calendar year (e.g., 2030), and an output path as input."""
     
-    if not settings.WATER_NET_YIELD_LIMITS == 'on':
-        return
-
     print(f'Writing water outputs for {yr_cal}')
 
     # Convert calendar year to year index.
@@ -856,6 +852,7 @@ def write_water(data: Data, yr_cal, path):
     ag_w_mrj = ag_water.get_water_net_yield_matrices(data, yr_idx)
     non_ag_w_rk = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[yr_cal], yr_idx)
     ag_man_w_mrj = ag_water.get_agricultural_management_water_matrices(data, yr_idx)
+    w_cc_impact = ag_water.get_water_ccimpact(data, yr_idx)
 
     # Prepare a data frame.
     df = pd.DataFrame( columns=[ 'REGION_ID'
@@ -902,53 +899,47 @@ def write_water(data: Data, yr_cal, path):
         # Calculate water requirements by agriculture for year and region.
         index_levels = ['Landuse Type', 'Landuse', 'Water_supply',  'Water Net Yield (ML)']
 
-        # Agricultural water use
+        # Agricultural water yield
         ag_mrj = ag_w_mrj[:, ind, :] * data.ag_dvars[yr_cal][:, ind, :]   
         ag_jm = np.einsum('mrj->jm', ag_mrj)                             
-
-        ag_df = pd.DataFrame(ag_jm.reshape(-1).tolist(),
-                            index=pd.MultiIndex.from_product([['Agricultural Landuse'],
-                                                            data.AGRICULTURAL_LANDUSES,
-                                                            data.LANDMANS
-                                                            ])).reset_index()
+        ag_df = pd.DataFrame(
+            ag_jm.reshape(-1).tolist(),
+            index=pd.MultiIndex.from_product(
+                [['Agricultural Landuse'],
+                 data.AGRICULTURAL_LANDUSES,
+                 data.LANDMANS])).reset_index()
 
         ag_df.columns = index_levels
 
 
         # Non-agricultural water use
         non_ag_rk = non_ag_w_rk[ind, :] * data.non_ag_dvars[yr_cal][ind, :]  # Non-agricultural contribution
-        non_ag_k = np.einsum('rk->k', non_ag_rk)                            # Sum over cells
-
-        non_ag_df = pd.DataFrame(non_ag_k, 
-                                index= pd.MultiIndex.from_product([['Non-agricultural Landuse'],
-                                                                    NON_AG_LAND_USES.keys() ,
-                                                                    ['dry']  # non-agricultural land is always dry
-                                                                    ])).reset_index()
-
+        non_ag_k = np.einsum('rk->k', non_ag_rk)                             # Sum over cells
+        non_ag_df = pd.DataFrame(
+            non_ag_k, 
+            index= pd.MultiIndex.from_product([
+                 ['Non-agricultural Landuse'],
+                 NON_AG_LAND_USES.keys() ,
+                 ['dry']  # non-agricultural land is always dry
+        ])).reset_index()
         non_ag_df.columns = index_levels
-
 
 
         # Agricultural management water use
         AM_dfs = []
         for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
-
             am_j = np.array([data.DESC2AGLU[lu] for lu in am_lus])
-
-            # Water requirements for each agricultural management in array format
-            am_mrj = ag_man_w_mrj[am][:, ind, :]\
-                            * data.ag_man_dvars[yr_cal][am][:, ind[:,np.newaxis], am_j] 
-
+            am_mrj = ag_man_w_mrj[am][:, ind, :] * data.ag_man_dvars[yr_cal][am][:, ind, :][:, :, am_j] 
             am_jm = np.einsum('mrj->jm', am_mrj)
-
             # Water requirements for each agricultural management in long dataframe format
-            df_am = pd.DataFrame(am_jm.reshape(-1).tolist(),
-                                index=pd.MultiIndex.from_product([['Agricultural Management'],
-                                                                am_lus,
-                                                                data.LANDMANS
-                                                                ])).reset_index()
+            df_am = pd.DataFrame(
+                am_jm.reshape(-1).tolist(),
+                index=pd.MultiIndex.from_product([
+                    ['Agricultural Management'],
+                    am_lus,
+                    data.LANDMANS
+                    ])).reset_index()
             df_am.columns = index_levels
-
             # Add to list of dataframes
             AM_dfs.append(df_am)
 
@@ -964,7 +955,7 @@ def write_water(data: Data, yr_cal, path):
         df_water_seperate_dfs.append(df_region)
 
 
-        # Calculate water use limits and actual water use
+        # Get historical water yield and calculate water net yield
         baseline_net_yield_all =  w_net_yield_limits[region][1]                    # Baseline water net yield
         net_yield_lb = w_net_yield_limits[region][2]                               # Water net yield lower bound
         w_net_yield_reg = df_region['Water Net Yield (ML)'].sum() + reg_cc_impact  # Solved water net yield of the region plus climate change impacts
@@ -982,17 +973,23 @@ def write_water(data: Data, yr_cal, path):
                     , abs_diff
                     , prop_diff
                     , prop_all)
+        
+    # Write climate change impacts on water yiled of "outside LUTO area"
+    w_cc_impact_df = pd.DataFrame({region_dict[k]:[v] for k,v in w_cc_impact.items()}).T.reset_index()
+    w_cc_impact_df.columns = ['REGION_NAME', 'Climate Change Impact (ML)']
+    w_cc_impact_df['Year'] = yr_cal
+    w_cc_impact_df.to_csv(os.path.join(path, f'water_yield_of_climate_change_impacts_outside_LUTO_{yr_cal}.csv'), index=False)
 
     # Write to CSV with 2 DP
     df = df.drop(columns=['REGION_ID']).set_index('REGION_NAME').stack().reset_index()
     df.columns = ['REGION_NAME', 'Variable', 'Value (ML)']
     df['Year'] = yr_cal
-    df.to_csv( os.path.join(path, f'water_demand_vs_use_{yr_cal}.csv'), index=False)
+    df.to_csv( os.path.join(path, f'water_yiled_vs_hiotorical_baseline_{yr_cal}.csv'), index=False)
 
     # Write the separate water use to CSV
     df_water_seperate = pd.concat(df_water_seperate_dfs)
     df_water_seperate['Water_supply'] = df_water_seperate['Water_supply'].replace({'dry':'Dryland', 'irr':'Irrigated'})
-    df_water_seperate.to_csv( os.path.join(path, f'water_demand_vs_use_separate_{yr_cal}.csv'), index=False)
+    df_water_seperate.to_csv( os.path.join(path, f'water_yield_separate_{yr_cal}.csv'), index=False)
     
     
     
@@ -1171,7 +1168,6 @@ def write_biodiversity_contribution(data: Data, yr_cal, path):
     # Write the biodiversity contribution to csv
     bio_df = calc_bio_score_by_yr(ag_dvar, am_dvar, non_ag_dvar, bio_contribution_shards)
     bio_df.to_csv(os.path.join(path, f'biodiversity_contribution_{yr_cal}.csv'), index=False)
-    
     
     
 

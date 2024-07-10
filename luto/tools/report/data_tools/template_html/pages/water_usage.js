@@ -32,7 +32,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     title: {
-      text: "Water Net Yield as Percentage of Lower Bound",
+      text: "Water Net Yield as Percentage of Historical Yield Baseline",
     },
 
     credits: {
@@ -47,7 +47,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Water stress (water use as % of yield)",
+        text: "Water yield to baseline (%)",
       },
     },
 

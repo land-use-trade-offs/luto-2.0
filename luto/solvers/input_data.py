@@ -357,9 +357,8 @@ def get_limits(
     print('Getting environmental limits...', flush = True)
     # Limits is a dictionary with heterogeneous value sets.
     limits = {}
-    
-    if settings.WATER_NET_YIELD_LIMITS == 'on':
-        limits['water'] = ag_water.get_water_net_yield_limits(data, yr_cal)
+
+    limits['water'] = ag_water.get_water_net_yield_limits(data, yr_cal)
     
     if settings.GHG_EMISSIONS_LIMITS == 'on':
         limits['ghg'] = ag_ghg.get_ghg_limits(data, yr_cal)
