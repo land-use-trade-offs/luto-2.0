@@ -16,7 +16,7 @@ COLORS = [
 ]
 
 LANDUSE_CATEGORIES_COLORS = dict(zip(['Agricultural Landse', 'Agricultural Management','Non-Agricultural Landuse'], itertools.cycle(COLORS)))
-LANDUSE_ALL_RAW_COLORS = dict(zip(LANDUSE_ALL_RAW, itertools.cycle(COLORS)))
+LANDUSE_ALL_COLORS = dict(zip(LANDUSE_ALL_RAW, itertools.cycle(COLORS)))
 COMMODITIES_ALL_COLORS = dict(zip(COMMODITIES_ALL, itertools.cycle(COLORS)))
 GHG_NAMES_COLORS = dict(zip(GHG_NAMES.values(), itertools.cycle(COLORS)))
 AG_MANAGEMENTS_COLORS = dict(zip(AG_MANAGEMENTS_TO_LAND_USES.keys(), itertools.cycle(COLORS)))
