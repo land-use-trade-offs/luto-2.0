@@ -53,14 +53,15 @@ AG_LANDUSE_MERGE_LANDTYPE = ['Apples', 'Beef', 'Citrus', 'Cotton', 'Dairy', 'Gra
 
 
 # Define the renaming of the Agricultural-Managment and Non-Agricultural 
-RENAME_AM_NON_AG = {
-    # Agricultural Management
+RENAME_AM = {
     "Asparagopsis taxiformis": "Methane reduction (livestock)",
     "Precision Agriculture": "Agricultural technology (fertiliser)", 
     "Ecological Grazing": "Regenerative agriculture (livestock)", 
     "Savanna Burning": "Early dry-season savanna burning",
     "AgTech EI": "Agricultural technology (energy)",
-    # Non-Agricultural Landuse
+}
+
+RENAME_NON_AG = {
     "Environmental Plantings": "Environmental plantings (mixed species)",
     "Riparian Plantings": "Riparian buffer restoration (mixed species)",
     "Sheep Agroforestry": "Agroforestry (mixed species + sheep)",
@@ -70,6 +71,8 @@ RENAME_AM_NON_AG = {
     "Beef Carbon Plantings (Belt)": "Farm forestry (hardwood timber + beef)",
     "BECCS": "BECCS (Bioenergy with Carbon Capture and Storage)"
 }
+
+RENAME_AM_NON_AG = {**RENAME_AM, **RENAME_NON_AG}
 
 # Read the land uses from the file
 with open(f'{settings.INPUT_DIR}/ag_landuses.csv') as f:
@@ -85,10 +88,12 @@ SPATIAL_MAP_DICT = {
 }
 
 
-NON_AG_LANDUSE = list(settings.NON_AG_LAND_USES.keys())
+# Get the non-agricultural land uses raw names
+NON_AG_LANDUSE_RAW = list(settings.NON_AG_LAND_USES.keys())
+
 
 # Merge the land uses
-LANDUSE_ALL = AG_LANDUSE + NON_AG_LANDUSE
+LANDUSE_ALL = AG_LANDUSE + list(RENAME_NON_AG.values()) 
 
 
 

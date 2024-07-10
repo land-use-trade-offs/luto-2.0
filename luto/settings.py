@@ -377,7 +377,6 @@ NON_AG_BIO_IMPACT = {
 
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 BIODIVERSITY_LIMITS = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
-BIODIVERSITY_REPORT = True             # True or False, report biodiversity regardless of BIODIVERSITY_LIMITS setting.
 BIODIVERSITY_CONTRIBUTION_REPORT = False  # True or False, report biodiversity contribution 
 
 """ Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
