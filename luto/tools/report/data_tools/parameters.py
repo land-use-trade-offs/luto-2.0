@@ -93,7 +93,8 @@ NON_AG_LANDUSE_RAW = list(settings.NON_AG_LAND_USES.keys())
 
 
 # Merge the land uses
-LANDUSE_ALL = AG_LANDUSE + list(RENAME_NON_AG.values()) 
+LANDUSE_ALL_RAW = AG_LANDUSE + NON_AG_LANDUSE_RAW
+LANDUSE_ALL_RENAMED = AG_LANDUSE + list(RENAME_NON_AG.values()) 
 
 
 
