@@ -133,6 +133,13 @@ def get_water_net_yield_matrices(data: Data, yr_idx):
     """
     Return water net yield matrices by land management, cell, and land-use type.
     The resulting array is used as the net yield w_mrj array in the input data of the solver.
+
+    Parameters:
+        data (object): The data object containing the required data.
+        yr_idx (int): The index of the year.
+    
+    Returns:
+        numpy.ndarray: The w_mrj <unit: ML/cell> water net yield matrices, indexed (m, r, j).
     """
     return get_wyield_matrices(data, yr_idx) - get_wreq_matrices(data, yr_idx)
 
