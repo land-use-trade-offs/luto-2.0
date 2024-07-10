@@ -87,9 +87,6 @@ SPATIAL_MAP_DICT = {
 
 NON_AG_LANDUSE = list(settings.NON_AG_LAND_USES.keys())
 
-# Rename the land uses
-NON_AG_LANDUSE = [RENAME_AM_NON_AG.get(item, item) for item in NON_AG_LANDUSE]
-
 # Merge the land uses
 LANDUSE_ALL = AG_LANDUSE + NON_AG_LANDUSE
 
