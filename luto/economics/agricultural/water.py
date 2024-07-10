@@ -32,7 +32,8 @@ import luto.economics.non_agricultural.water as non_ag_water
 
 def get_wreq_matrices(data: Data, yr_idx):
     """
-    Return water requirement matrices by land management, cell, and land-use type.
+    Return water requirement (water use by irrigation and livestock drinking water) matrices 
+    by land management, cell, and land-use type.
     
     Parameters:
         data (object): The data object containing the required data.
@@ -42,9 +43,7 @@ def get_wreq_matrices(data: Data, yr_idx):
         numpy.ndarray: The w_mrj <unit: ML/cell> water requirement matrices, indexed (m, r, j).
     """
     
-    # Stack water requirements data    ************ Fix water - needs to be framed in terms of net water yield instead of use
-    # Water targets need to be framed as a minimum net water yield (i.e., >= 80% of historical catchment yields)
-    # Yield for each cell = water yield under climate change minus use
+    # Stack water requirements data
     w_req_mrj = np.stack(( data.WREQ_DRY_RJ, data.WREQ_IRR_RJ ))    # <unit: ML/head|ha>
     
     # Covert water requirements units from ML/head to ML/ha
@@ -133,7 +132,7 @@ def get_water_net_yield_matrices(data: Data, yr_idx):
     """
     Return water net yield matrices by land management, cell, and land-use type.
     The resulting array is used as the net yield w_mrj array in the input data of the solver.
-    
+
     Parameters:
         data (object): The data object containing the required data.
         yr_idx (int): The index of the year.
@@ -180,7 +179,7 @@ def get_asparagopsis_effect_w_mrj(data: Data, yr_idx):
             # The effect is: new value = old value * multiplier - old value
             # E.g. a multiplier of .95 means a 5% reduction in water used.
             # Since the effect applies to water use, it effects the net yield negatively.
-            w_mrj_effect[:, :, lu_idx] = -wreq_mrj[:, :, j] * (multiplier - 1)
+            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (1- multiplier)
 
     return w_mrj_effect
 
@@ -218,7 +217,7 @@ def get_precision_agriculture_effect_w_mrj(data: Data, yr_idx):
             # The effect is: new value = old value * multiplier - old value
             # E.g. a multiplier of .95 means a 5% reduction in water used.
             # Since the effect applies to water use, it effects the net yield negatively.
-            w_mrj_effect[:, :, lu_idx] = -wreq_mrj[:, :, j] * (multiplier - 1)
+            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (1- multiplier)
 
     return w_mrj_effect
 
@@ -256,7 +255,7 @@ def get_ecological_grazing_effect_w_mrj(data: Data, yr_idx):
             # The effect is: new value = old value * multiplier - old value
             # E.g. a multiplier of .95 means a 5% reduction in water used.
             # Since the effect applies to water use, it effects the net yield negatively.
-            w_mrj_effect[:, :, lu_idx] = -wreq_mrj[:, :, j] * (multiplier - 1)
+            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (1- multiplier)
 
     return w_mrj_effect
 
@@ -317,7 +316,8 @@ def get_agtech_ei_effect_w_mrj(data, yr_idx):
             # The effect is: new value = old value * multiplier - old value
             # E.g. a multiplier of .95 means a 5% reduction in water used.
             # Since the effect applies to water use, it effects the net yield negatively.
-            w_mrj_effect[:, :, lu_idx] = -wreq_mrj[:, :, j] * (multiplier - 1)
+            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (1- multiplier)
+            
 
     return w_mrj_effect
 
@@ -400,7 +400,9 @@ def calc_water_net_yield_by_region_in_year(
     # Prepare water matrices for calculation
     yr_idx = yr_cal - data.YR_CAL_BASE
     ag_w_mrj = ag_w_mrj if ag_w_mrj is not None else get_water_net_yield_matrices(data, yr_idx)
-    non_ag_w_rk = non_ag_w_rk if non_ag_w_rk is not None else non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[yr_cal])
+    non_ag_w_rk = non_ag_w_rk if non_ag_w_rk is not None else non_ag_water.get_w_net_yield_matrix(
+        data, ag_w_mrj, data.lumaps[yr_cal], yr_idx
+    )
     ag_man_w_mrj = ag_man_w_mrj if ag_man_w_mrj is not None else get_agricultural_management_water_matrices(data, yr_idx)
     w_cc_impact = w_cc_impact if w_cc_impact is not None else get_water_ccimpact(data, yr_idx)
     
