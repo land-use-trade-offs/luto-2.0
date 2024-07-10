@@ -98,196 +98,125 @@ def non_ag_to_xr(data:Data, yr_cal:int):
     return non_ag_dvar_xr.reindex(lu=data.NON_AGRICULTURAL_LANDUSES)
 
 
+def match_lumap_biomap(data, dvar, bio_id_path:str=f'{settings.INPUT_DIR}/bio_id_map.nc'):
 
-def bincount_avg(bin_arr, weight_arr, low_res_xr: xr.DataArray=None):
+    # Read the bio id map
+    bio_id_map = xr.open_dataset(bio_id_path)['data']
+    
+    # Rechunk the dvar, where the 'cell' dimension keeps as its raw size
+    dim_size = {k: 1 for k in dvar.dims}
+    dim_size['cell'] = -1
+    dvar = dvar.chunk(dim_size)
+    
+    # Get the template for the upsampled dvar and bincount_avg
+    coords = dict(dvar.coords)
+
+    # Remove the 'cell' dimension
+    del coords['cell']
+    del dim_size['cell']
+    upsample_template = get_upsample_template(coords, dim_size)
+    bin_template = get_bincount_template(coords, dim_size)
+
+    # Apply the function using map_blocks
+    dvar = dvar.map_blocks(
+        upsample_dvar, 
+        kwargs={'data':data, 'res_factor':settings.RESFACTOR, 'x':upsample_template['x'], 'y':upsample_template['y']},
+        template=upsample_template)
+
+    dvar = dvar.map_blocks(
+        bincount_avg,
+        kwargs={'bin_arr':bio_id_map, 'y':bin_template.y, 'x':bin_template.x},
+        template=bin_template)
+    
+    return dvar.compute()
+  
+  
+    
+def get_upsample_template(coords, dim_size, lumap_tempelate:str=f'{settings.INPUT_DIR}/NLUM_2010-11_mask.tif'):
+    # Read reference maps
+    NLUM = rxr.open_rasterio(lumap_tempelate, chunks='auto').squeeze('band').drop_vars('band')
+    NLUM = NLUM.drop_vars('spatial_ref') 
+    NLUM.attrs = {}
+    return NLUM.expand_dims(coords).chunk(dim_size)
+
+
+
+def get_bincount_template(coords, dim_size, biomap_tempelate:str=f'{settings.INPUT_DIR}/bio_mask.nc'):
+    bio_map = xr.open_dataset(biomap_tempelate, chunks='auto')['data']
+    return bio_map.expand_dims(coords).chunk(dim_size)
+
+
+def bincount_avg(weight_arr, bin_arr, y, x):
     """
-    Calculate the average of weighted values based on bin counts.
+    Calculate the average value of each bin based on the weighted values.
 
     Parameters:
-    - bin_arr (2D, xarray.DataArray): Array containing the mask values. 
-    - weight_arr (2D, xarray.DataArray, >0 values are valid): Array containing the weight values.
-    - low_res_xr (2D, xarray.DataArray): Low-resolution array containing 
-        `y`, `x`, `CRS`, and `transform` to restore the bincount stats.
+    - weight_arr (xarray.DataArray): Array of weighted values.
+    - bin_arr (xarray.DataArray): Array of bin values.
+    - y (numpy.ndarray): Array of y coordinates.
+    - x (numpy.ndarray): Array of x coordinates.
 
     Returns:
-    - bin_avg (xarray.DataArray): Array containing the average values based on bin counts.
+    - xarray.DataArray: Array of average values for each bin.
+
     """
+    # Get the coords of the map_ except for 'x' and 'y'
+    coords = dict(weight_arr.coords)
+    del coords['x']
+    del coords['y']
+    
     # Get the valide cells
     valid_mask = weight_arr > 0
+    out_shape = (y.size, x.size)
+    bin_size = int(y.size * x.size)
     
     # Flatten arries
-    bin_flatten = bin_arr.values[valid_mask]
+    bin_flatten = bin_arr.values[valid_mask.squeeze(coords.keys())]
     weights_flatten = weight_arr.values[valid_mask]
     
-    bin_occ = np.bincount(bin_flatten, minlength=low_res_xr.size)
-    bin_sum = np.bincount(bin_flatten, weights=weights_flatten, minlength=low_res_xr.size)
-    
-    # Take values up to the last valid index, because the index of `low_res_xr.size + 1` indicates `NODATA`
-    bin_sum = bin_sum[:low_res_xr.size + 1]     
-    bin_occ = bin_occ[:low_res_xr.size + 1]     
+    bin_occ = np.bincount(bin_flatten, minlength=bin_size)
+    bin_sum = np.bincount(bin_flatten, weights=weights_flatten, minlength=bin_size)
+  
 
     # Calculate the average value of each bin, ignoring division by zero (which will be nan)
     with np.errstate(divide='ignore', invalid='ignore'):
-        bin_avg = (bin_sum / bin_occ).reshape(low_res_xr.shape).astype(np.float32)
+        bin_avg = (bin_sum / bin_occ).reshape(out_shape).astype(np.float32)
         bin_avg = np.nan_to_num(bin_avg)
         
-    # Restore the bincount stats to the low-resolution array    
-    bin_avg = xr.DataArray(
-        bin_avg, 
-        dims=low_res_xr.dims, 
-        coords=low_res_xr.coords)
 
     # Expand the dimensions of the bin_avg array to match the original weight_arr
-    append_dims = {dim: weight_arr[dim] for dim in weight_arr.dims if dim not in bin_avg.dims}
-    bin_avg = bin_avg.expand_dims(append_dims)
-    
-    # Write the CRS and transform to the output array
-    bin_avg = bin_avg.rio.write_crs(low_res_xr.rio.crs)
-    bin_avg = bin_avg.rio.write_transform(low_res_xr.rio.transform())
+    bin_avg = xr.DataArray(bin_avg, dims=('y', 'x'), coords={'y': y, 'x': x})
+    bin_avg = bin_avg.expand_dims(coords)
     
     return bin_avg
 
 
-
-def match_lumap_biomap(
+def upsample_dvar(
+    map_:np.ndarray,
     data:Data, 
-    map_:np.ndarray, 
-    res_factor:int, 
-    bio_id_path:str=f'{settings.INPUT_DIR}/bio_id_map.nc',
-    lumap_tempelate:str=f'{settings.INPUT_DIR}/NLUM_2010-11_mask.tif', 
-    biomap_tempelate:str=f'{settings.INPUT_DIR}/bio_mask.nc')-> xr.DataArray:
-    """
-    Matches the lumap and biomap data based on the given parameters.
+    res_factor:int,
+    x:np.ndarray,
+    y:np.ndarray)-> xr.DataArray:
 
-    Args:
-        data (Data): The data object.
-        map_ (np.ndarray): The map array.
-        res_factor (int): The resolution factor.
-        bio_id_path (str, optional): The path to the bio id map. Defaults to f'{settings.INPUT_DIR}/bio_id_map.nc'.
-        lumap_tempelate (str, optional): The path to the lumap template. Defaults to f'{settings.INPUT_DIR}/NLUM_2010-11_mask.tif'.
-        biomap_tempelate (str, optional): The path to the biomap template. Defaults to f'{settings.INPUT_DIR}/bio_mask.nc'.
-
-    Returns:
-        xr.DataArray: The matched map array.
-    """
-    # Read lumap, bio_map, and bio_id_map
-    NLUM = rxr.open_rasterio(lumap_tempelate, chunks='auto').squeeze('band').drop_vars('band')
-    bio_mask_ds = xr.open_dataset(f'{settings.INPUT_DIR}/bio_mask.nc', decode_coords="all")
-    bio_map = bio_mask_ds['data']
-    bio_map['spatial_ref'] = bio_mask_ds['spatial_ref']
-    bio_id_map = xr.open_dataset(bio_id_path, chunks='auto')['data']
-        
+    # Get the coords of the map_
+    coords = dict(map_.coords)
+    del coords['cell']
+    
+    # Up sample the arr as RESFACTOR=1
     if res_factor > 1:   
         map_ = get_coarse2D_map(data, map_)
         map_ = upsample_array(data, map_, res_factor)
     else:
         empty_map = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32) 
         np.place(empty_map, data.NLUM_MASK, data.LUMAP_NO_RESFACTOR) 
-        np.place(empty_map, empty_map >=0, map_.data.todense())
+        np.place(empty_map, empty_map >=0, map_)
         map_ = empty_map
-        
-    map_ = xr.DataArray(map_, dims=('y','x'), coords={'y': NLUM['y'], 'x': NLUM['x']})
-    map_ = map_.where(map_>=0, 0)
-    map_ = map_.rio.write_crs(NLUM.rio.crs)
-    map_ = map_.rio.write_transform(NLUM.rio.transform())  
-    map_ = bincount_avg(bio_id_map, map_,  bio_map)
-    map_ = map_.where(map_ != map_.rio.nodata, 0)
+    
+    # Convert to xarray
+    map_ = xr.DataArray(map_, dims=('y','x'), coords={'y': y, 'x': x})
+    map_ = map_.expand_dims(coords)
     return map_
 
-
-
-def ag_dvar_to_bio_map(data, ag_dvar, res_factor):
-    """
-    Reprojects and matches agricultural land cover variables to biodiversity maps.
-
-    Parameters:
-    - data (Data object): The Data class object of LUTO.
-    - ag_dvar (xarray.Dataset): The agricultural land cover variables.
-    - res_factor (int): The resolution factor for matching.
-    - workers (int, optional): The number of parallel workers to use for processing. Default is 5.
-
-    Returns:
-    - xarray.Dataset: The combined dataset of reprojected and matched variables.
-    """
-
-    # wrapper function for parallel processing
-    def reproject_match_dvar(ag_dvar, lm, lu, res_factor):
-        map_ = ag_dvar.sel(lm=lm, lu=lu)
-        map_ = match_lumap_biomap(data, map_, res_factor)
-        map_ = map_.expand_dims({'lm': [lm], 'lu': [lu]})
-        return map_
-    
-    out_arr = [reproject_match_dvar(ag_dvar, lm, lu, res_factor) 
-             for lm,lu in product(ag_dvar['lm'].values, ag_dvar['lu'].values)]
-    out_arr = xr.combine_by_coords(out_arr)
-    
-    # Convert to sparse array to save memory
-    out_arr.values = sparse.COO.from_numpy(out_arr.values)
-    
-    return out_arr
-
-
-def am_dvar_to_bio_map(data, am_dvar, res_factor):
-    """
-    Reprojects and matches agricultural land cover variables to biodiversity maps.
-
-    Parameters:
-    - data (Data object): The Data class object of LUTO.
-    - am_dvar (xarray.Dataset): The agricultural land cover variables.
-    - res_factor (int): The resolution factor for matching.
-    - workers (int, optional): The number of parallel workers to use for processing. Default is 5.
-
-    Returns:
-    - xarray.Dataset: The combined dataset of reprojected and matched variables.
-    """
-
-    # wrapper function for parallel processing
-    def reproject_match_dvar(am_dvar, am, lm, lu, res_factor):
-        map_ = am_dvar.sel(lm=lm, lu=lu)
-        map_ = match_lumap_biomap(data, map_, res_factor)
-        map_ = map_.expand_dims({'am':[am], 'lm': [lm], 'lu': [lu]})
-        return map_
-
-    out_arr = [reproject_match_dvar(am_dvar, am, lm, lu, res_factor) 
-            for am,lm,lu in product(am_dvar['am'].values, am_dvar['lm'].values, am_dvar['lu'].values)]
-    out_arr = xr.combine_by_coords(out_arr)
-    
-    # Convert to sparse array to save memory
-    out_arr.values = sparse.COO.from_numpy(out_arr.values)
-    
-    return out_arr
-
-
-
-def non_ag_dvar_to_bio_map(data, non_ag_dvar, res_factor):
-    """
-    Reprojects and matches agricultural land cover variables to biodiversity maps.
-
-    Parameters:
-    - data (Data object): The Data class object of LUTO.
-    - non_ag_dvar (xarray.Dataset): The agricultural land cover variables.
-    - res_factor (int): The resolution factor for matching.
-    - workers (int, optional): The number of parallel workers to use for processing. Default is 5.
-
-    Returns:
-    - xarray.Dataset: The combined dataset of reprojected and matched variables.
-    """
-
-    # wrapper function for parallel processing
-    def reproject_match_dvar(non_ag_dvar, lu, res_factor):
-        map_ = non_ag_dvar.sel(lu=lu)
-        map_ = match_lumap_biomap(data, map_, res_factor)
-        map_ = map_.expand_dims({'lu': [lu]})
-        return map_
-
-    out_arr = [reproject_match_dvar(non_ag_dvar, lu, res_factor) 
-            for lu in non_ag_dvar['lu'].values]
-    out_arr = xr.combine_by_coords(out_arr)
-    
-    # Convert to sparse array to save memory
-    out_arr.values = sparse.COO.from_numpy(out_arr.values)
-    
-    return out_arr
 
 
 # Calculate the biodiversity condition
