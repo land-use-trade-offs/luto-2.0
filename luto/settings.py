@@ -141,7 +141,7 @@ VERBOSE = 1
 # Relax the tolerances for feasibility and optimality
 FEASIBILITY_TOLERANCE = 1e-2              # Primal feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2
 OPTIMALITY_TOLERANCE = 1e-2               # Dual feasility tolerance - Default: 1e-6, Min: 1e-9, Max: 1e-2
-BARRIER_CONVERGENCE_TOLERANCE = 1e-6      # Range from 1e-2 to 1e-8 (default), that larger the number the faster but the less exact the solve. 1e-5 is a good compromise between optimality and speed.
+BARRIER_CONVERGENCE_TOLERANCE = 1e-5      # Range from 1e-2 to 1e-8 (default), that larger the number the faster but the less exact the solve. 1e-5 is a good compromise between optimality and speed.
 
 # Whether to use crossover in barrier solve. 0 = off, -1 = automatic. Auto cleans up sub-optimal termination errors without much additional compute time (apart from 2050 when it sometimes never finishes).
 CROSSOVER = 0
@@ -149,7 +149,7 @@ CROSSOVER = 0
 # Parameters for dealing with numerical issues. NUMERIC_FOCUS = 2 fixes most things but roughly doubles solve time.
 SCALE_FLAG = -1     # Scales the rows and columns of the model to improve the numerical properties of the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each row to make its largest nonzero entry to be magnitude one, then scale each column to max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing revealed that 1 tripled solve time, 3 led to numerical problems.
 NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect and manage numerical issues. Default (0) makes an automatic choice, with a slight preference for speed. Settings 1-3 increasingly shift the focus towards being more careful in numerical computations. NUMERIC_FOCUS = 1 is ok, but 2 increases solve time by ~4x
-BARHOMOGENOUS = -1  # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
+BARHOMOGENOUS = 1  # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
 THREADS = 50
@@ -184,14 +184,14 @@ and the corresponding value in this dictionary is False, all cells using EP must
 years.
 """
 NON_AG_LAND_USES_REVERSIBLE = {
-    'Environmental Plantings': False,
-    'Riparian Plantings': False,
-    'Sheep Agroforestry': False,
-    'Beef Agroforestry': False,
-    'Carbon Plantings (Block)': False,
-    'Sheep Carbon Plantings (Belt)': False,
-    'Beef Carbon Plantings (Belt)': False,
-    'BECCS': False,
+    'Environmental Plantings': True,
+    'Riparian Plantings': True,
+    'Sheep Agroforestry': True,
+    'Beef Agroforestry': True,
+    'Carbon Plantings (Block)': True,
+    'Sheep Carbon Plantings (Belt)': True,
+    'Beef Carbon Plantings (Belt)': True,
+    'BECCS': True,
 }
 
 # Carbon price scenario: either '1.8C 67%', '1.5C 50%', '1.5C 67%', 'Default', '100', or None. 
