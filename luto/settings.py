@@ -377,7 +377,7 @@ NON_AG_BIO_IMPACT = {
 
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 BIODIVERSITY_LIMITS = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
-BIODIVERSITY_CONTRIBUTION_REPORT = False  # True or False, report biodiversity contribution 
+BIODIVERSITY_CONTRIBUTION_REPORT = True  # True or False, report biodiversity contribution 
 
 """ Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
     Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,

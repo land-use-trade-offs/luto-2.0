@@ -1,4 +1,4 @@
-from luto.tools.report.data_tools.parameters import AG_LANDUSE, NON_AG_LANDUSE, RENAME_AM_NON_AG
+from luto.tools.report.data_tools.parameters import AG_LANDUSE, LANDUSE_ALL_RAW, RENAME_AM_NON_AG
 
 
 # The ag management names
@@ -35,7 +35,7 @@ map_multiple_lucc = {
              'irr': 'Irrigated Land',
              }
 
-map_single_lucc = AG_LANDUSE + ag_management + NON_AG_LANDUSE
+map_single_lucc = AG_LANDUSE + ag_management + LANDUSE_ALL_RAW
 map_single_lucc = {k:k for k in map_single_lucc}
 
 # Dictionary {k:v} for renaming the map names
