@@ -18,207 +18,6 @@ from luto.data import Data
 from luto.tools.spatializers import get_coarse2D_map, upsample_array
 
 
-
-def ag_to_xr(data:Data, yr_cal:int):
-    """
-    Convert agricultural data to xarray DataArray.
-
-    Parameters:
-        data (Data): The input data object.
-        yr_cal (int): The year calendar.
-
-    Returns:
-        xr.DataArray: The converted xarray DataArray.
-    """
-
-    dvar = data.ag_dvars[yr_cal]
-    ag_dvar_xr = xr.DataArray(
-        dvar, 
-        dims=('lm', 'cell', 'lu'),
-        coords={
-            'lm': data.LANDMANS,
-            'cell': np.arange(dvar.shape[1]),
-            'lu': data.AGRICULTURAL_LANDUSES
-        }   
-    )
-    return ag_dvar_xr.reindex(lu=data.AGRICULTURAL_LANDUSES)
-
-
-def am_to_xr(data:Data, yr_cal:int):
-    """
-    Convert agricultural management data to xarray format.
-
-    Parameters:
-        data (Data): The input data object.
-        yr_cal (int): The year calendar.
-
-    Returns:
-        xr.Dataset: The xarray dataset containing the converted data.
-    """
-
-    am_dvar = data.ag_man_dvars[yr_cal]
-    
-    am_dvars = []
-    for am in am_dvar.keys():  
-        am_dvar_xr = xr.DataArray(
-            am_dvar[am], 
-            dims=('lm', 'cell', 'lu'),
-            coords={
-                'lm': data.LANDMANS,
-                'cell': np.arange(am_dvar[am].shape[1]),
-                'lu': data.AGRICULTURAL_LANDUSES
-            }   
-        )
-        am_dvar_xr = am_dvar_xr.expand_dims({'am':[am]})
-        am_dvars.append(am_dvar_xr)
-            
-    return xr.combine_by_coords(am_dvars).reindex(am=AG_MANAGEMENTS_TO_LAND_USES.keys(), lu=data.AGRICULTURAL_LANDUSES, lm=data.LANDMANS)
-
-
-
-def non_ag_to_xr(data:Data, yr_cal:int):
-    """
-    Convert non-agricultural land use data to xarray DataArray.
-
-    Args:
-        data (Data): The data object containing non-agricultural land use data.
-        yr_cal (int): The year calendar.
-
-    Returns:
-        xr.DataArray: The xarray DataArray representing the non-agricultural land use data.
-    """
-    dvar = data.non_ag_dvars[yr_cal]
-    non_ag_dvar_xr = xr.DataArray(
-        dvar, 
-        dims=('cell', 'lu'),
-        coords={
-            'cell': np.arange(dvar.shape[0]),
-            'lu': data.NON_AGRICULTURAL_LANDUSES}   
-    )
-    return non_ag_dvar_xr.reindex(lu=data.NON_AGRICULTURAL_LANDUSES)
-
-
-def match_lumap_biomap(data, dvar, bio_id_path:str=f'{settings.INPUT_DIR}/bio_id_map.nc'):
-
-    # Read the bio id map
-    bio_id_map = xr.open_dataset(bio_id_path)['data']
-    
-    # Rechunk the dvar, where the 'cell' dimension keeps as its raw size
-    dim_size = {k: 1 for k in dvar.dims}
-    dim_size['cell'] = -1
-    dvar = dvar.chunk(dim_size)
-    
-    # Get the template for the upsampled dvar and bincount_avg
-    coords = dict(dvar.coords)
-
-    # Remove the 'cell' dimension
-    del coords['cell']
-    del dim_size['cell']
-    upsample_template = get_upsample_template(coords, dim_size)
-    bin_template = get_bincount_template(coords, dim_size)
-
-    # Apply the function using map_blocks
-    dvar = dvar.map_blocks(
-        upsample_dvar, 
-        kwargs={'data':data, 'res_factor':settings.RESFACTOR, 'x':upsample_template['x'], 'y':upsample_template['y']},
-        template=upsample_template)
-
-    dvar = dvar.map_blocks(
-        bincount_avg,
-        kwargs={'bin_arr':bio_id_map, 'y':bin_template.y, 'x':bin_template.x},
-        template=bin_template)
-    
-    return dvar.compute()
-  
-  
-    
-def get_upsample_template(coords, dim_size, lumap_tempelate:str=f'{settings.INPUT_DIR}/NLUM_2010-11_mask.tif'):
-    # Read reference maps
-    NLUM = rxr.open_rasterio(lumap_tempelate, chunks='auto').squeeze('band').drop_vars('band')
-    NLUM = NLUM.drop_vars('spatial_ref') 
-    NLUM.attrs = {}
-    return NLUM.expand_dims(coords).chunk(dim_size)
-
-
-
-def get_bincount_template(coords, dim_size, biomap_tempelate:str=f'{settings.INPUT_DIR}/bio_mask.nc'):
-    bio_map = xr.open_dataset(biomap_tempelate, chunks='auto')['data']
-    return bio_map.expand_dims(coords).chunk(dim_size)
-
-
-def bincount_avg(weight_arr, bin_arr, y, x):
-    """
-    Calculate the average value of each bin based on the weighted values.
-
-    Parameters:
-    - weight_arr (xarray.DataArray): Array of weighted values.
-    - bin_arr (xarray.DataArray): Array of bin values.
-    - y (numpy.ndarray): Array of y coordinates.
-    - x (numpy.ndarray): Array of x coordinates.
-
-    Returns:
-    - xarray.DataArray: Array of average values for each bin.
-
-    """
-    # Get the coords of the map_ except for 'x' and 'y'
-    coords = dict(weight_arr.coords)
-    del coords['x']
-    del coords['y']
-    
-    # Get the valide cells
-    valid_mask = weight_arr > 0
-    out_shape = (y.size, x.size)
-    bin_size = int(y.size * x.size)
-    
-    # Flatten arries
-    bin_flatten = bin_arr.values[valid_mask.squeeze(coords.keys())]
-    weights_flatten = weight_arr.values[valid_mask]
-    
-    bin_occ = np.bincount(bin_flatten, minlength=bin_size)
-    bin_sum = np.bincount(bin_flatten, weights=weights_flatten, minlength=bin_size)
-  
-
-    # Calculate the average value of each bin, ignoring division by zero (which will be nan)
-    with np.errstate(divide='ignore', invalid='ignore'):
-        bin_avg = (bin_sum / bin_occ).reshape(out_shape).astype(np.float32)
-        bin_avg = np.nan_to_num(bin_avg)
-        
-
-    # Expand the dimensions of the bin_avg array to match the original weight_arr
-    bin_avg = xr.DataArray(bin_avg, dims=('y', 'x'), coords={'y': y, 'x': x})
-    bin_avg = bin_avg.expand_dims(coords)
-    
-    return bin_avg
-
-
-def upsample_dvar(
-    map_:np.ndarray,
-    data:Data, 
-    res_factor:int,
-    x:np.ndarray,
-    y:np.ndarray)-> xr.DataArray:
-
-    # Get the coords of the map_
-    coords = dict(map_.coords)
-    del coords['cell']
-    
-    # Up sample the arr as RESFACTOR=1
-    if res_factor > 1:   
-        map_ = get_coarse2D_map(data, map_)
-        map_ = upsample_array(data, map_, res_factor)
-    else:
-        empty_map = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32) 
-        np.place(empty_map, data.NLUM_MASK, data.LUMAP_NO_RESFACTOR) 
-        np.place(empty_map, empty_map >=0, map_)
-        map_ = empty_map
-    
-    # Convert to xarray
-    map_ = xr.DataArray(map_, dims=('y','x'), coords={'y': y, 'x': x})
-    map_ = map_.expand_dims(coords)
-    return map_
-
-
-
 # Calculate the biodiversity condition
 def calc_bio_hist_sum(bio_nc_path:str, base_yr:int=1990):
     """
@@ -322,10 +121,10 @@ def xr_to_df(shard:xr.DataArray, dvar_ag:xr.DataArray, dvar_am:xr.DataArray, dva
     tmp_am = (shard_xr * dvar_am).compute().sum(['x', 'y'])
     tmp_non_ag = (shard_xr * dvar_non_ag).compute().sum(['x', 'y'])
     
-    # Convert to dense array
-    tmp_ag.data = tmp_ag.data.todense()
-    tmp_am.data = tmp_am.data.todense()
-    tmp_non_ag.data = tmp_non_ag.data.todense()
+    # # Convert to dense array
+    # tmp_ag.data = tmp_ag.data.todense()
+    # tmp_am.data = tmp_am.data.todense()
+    # tmp_non_ag.data = tmp_non_ag.data.todense()
     
     # Convert to dataframe
     tmp_ag_df = tmp_ag.to_dataframe(name='contribution_%').reset_index()
@@ -353,9 +152,8 @@ def calc_bio_score_by_yr(ag_dvar:xr.DataArray, am_dvar:xr.DataArray, non_ag_dvar
     - bio_shards (list[xr.DataArray]): The list of bio shards.
 
     Returns:
-    - out (pd.DataFrame): The concatenated DataFrame with bio scores, excluding the 'spatial_ref' column.
+    - out (pd.DataFrame): The concatenated DataFrame with bio scores.
     """
     
     out = [xr_to_df(bio_score, ag_dvar, am_dvar, non_ag_dvar) for bio_score in bio_shards]
-    out = pd.concat(out, ignore_index=True)
-    return out.drop(columns=['spatial_ref'])
+    return pd.concat(out, ignore_index=True)

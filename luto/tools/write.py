@@ -20,6 +20,7 @@ Writes model output and statistics to files.
 
 
 
+from itertools import product
 import os, re
 import shutil
 from matplotlib.pylab import f
@@ -60,10 +61,7 @@ from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_html import data2html
 from luto.tools.report.create_static_maps import TIF2MAP
 
-from luto.tools.xarray_tools import (ag_to_xr, match_lumap_biomap, non_ag_to_xr, am_to_xr,
-                                     calc_bio_hist_sum, calc_bio_score_species, interp_bio_species_to_shards, 
-                                     calc_bio_score_by_yr)
-
+from luto.tools.xarray_tools import calc_bio_hist_sum, calc_bio_score_species, interp_bio_species_to_shards, calc_bio_score_by_yr
 
 
 
@@ -113,10 +111,6 @@ def write_data(data: Data):
     # Copy the base-year outputs to the path_begin_end_compare
     shutil.copytree(f"{data.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True) if settings.MODE == 'timeseries' else None
 
-    # Write biodiversity contribution from each land-use type
-    if  settings.BIODIVERSITY_CONTRIBUTION_REPORT:
-        [write_biodiversity_contribution(data, yr, path_yr) for (yr, path_yr) in zip(years, paths)]
-    
     # Create the report HTML and png maps
     TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
     save_report_data(data.path)
@@ -150,13 +144,11 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
         write_files(data, yr_cal, path_yr)
         write_files_separate(data, yr_cal, path_yr)
 
-
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CAUTION !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     # The area here was calculated from lumap/lmmap, which {maby not accurate !!!} 
     # compared to the area calculated from dvars
     write_crosstab(data, yr_cal, path_yr, yr_cal_sim_pre)
     
-
     # Write the reset outputs
     write_dvar_area(data, yr_cal, path_yr)
     write_quantity(data, yr_cal, path_yr, yr_cal_sim_pre)
@@ -170,7 +162,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_ghg_offland_commodity(data, yr_cal, path_yr)
     write_biodiversity(data, yr_cal, path_yr)
     write_biodiversity_separate(data, yr_cal, path_yr)
-
+    write_biodiversity_contribution(data, yr_cal, path_yr)
     
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
     
@@ -1032,10 +1024,6 @@ def write_biodiversity(data: Data, yr_cal, path):
     Write biodiversity info for a given year ('yr_cal'), simulation ('sim')
     and output path ('path').
     """
-
-    # Do nothing if biodiversity limits are off and no need to report
-    if not settings.BIODIVERSITY_LIMITS == 'on' and not settings.BIODIVERSITY_REPORT:
-        return
     
     # Check biodiversity limits and report
     biodiv_limit = ag_biodiversity.get_biodiversity_limits(data, yr_cal) if settings.BIODIVERSITY_LIMITS == 'on' else 0
@@ -1142,15 +1130,10 @@ def write_biodiversity_contribution(data: Data, yr_cal, path):
     print(f'Writing biodiversity contribution score for {yr_cal}')
 
     # Get the decision variables for the year and convert them to xarray
-    ag_dvar = ag_to_xr(data, yr_cal)
-    am_dvar = am_to_xr(data, yr_cal)
-    non_ag_dvar = non_ag_to_xr(data, yr_cal)  
-        
-    # Reproject and match dvars (1D vector) to the bio map (2D, ~5km). NOTE: The dvars are sparsed array at ~5km resolution.
-    ag_dvar = match_lumap_biomap(data, ag_dvar)
-    am_dvar = match_lumap_biomap(data, am_dvar)
-    non_ag_dvar = match_lumap_biomap(data, non_ag_dvar)
-            
+    ag_dvar_reprj_to_bio = data.ag_dvars_2D_reproj_match[yr_cal]
+    am_dvar_reprj_to_bio = data.ag_man_dvars_2D_reproj_match[yr_cal]
+    non_ag_dvar_reprj_to_bio = data.non_ag_dvars_2D_reproj_match[yr_cal]
+                
     # Calculate the biodiversity contribution scores
     if settings.BIO_CALC_LEVEL == 'group':
         bio_score_group = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_Condition_group.nc', chunks='auto')
@@ -1166,7 +1149,12 @@ def write_biodiversity_contribution(data: Data, yr_cal, path):
         raise ValueError('Invalid settings.BIO_CALC_LEVEL! Must be either "group" or "species".')
     
     # Write the biodiversity contribution to csv
-    bio_df = calc_bio_score_by_yr(ag_dvar, am_dvar, non_ag_dvar, bio_contribution_shards)
+    bio_df = calc_bio_score_by_yr(
+        ag_dvar_reprj_to_bio, 
+        am_dvar_reprj_to_bio, 
+        non_ag_dvar_reprj_to_bio, 
+        bio_contribution_shards)
+    
     bio_df.to_csv(os.path.join(path, f'biodiversity_contribution_{yr_cal}.csv'), index=False)
     
     

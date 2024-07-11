@@ -18,12 +18,12 @@ from luto.tools.report.data_tools.parameters import (AG_LANDUSE,
                                                      COMMODITIES_OFF_LAND, 
                                                      GHG_CATEGORY, 
                                                      GHG_NAMES, 
-                                                     LANDUSE_ALL,
+                                                     LANDUSE_ALL_RENAMED,
                                                      LU_CROPS, 
                                                      LU_NATURAL,
                                                      LVSTK_MODIFIED, 
                                                      LVSTK_NATURAL, 
-                                                     NON_AG_LANDUSE, 
+                                                     NON_AG_LANDUSE_RAW, 
                                                      RENAME_AM_NON_AG)
 
 
@@ -86,7 +86,7 @@ def save_report_data(raw_data_dir:str):
         
     lu_area_dvar.columns = ['name','data']
     lu_area_dvar['type'] = 'column'
-    lu_area_dvar['sort_index'] = lu_area_dvar['name'].apply(lambda x: LANDUSE_ALL.index(x))
+    lu_area_dvar['sort_index'] = lu_area_dvar['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
     lu_area_dvar = lu_area_dvar.sort_values('sort_index').drop('sort_index',axis=1)
     lu_area_dvar['color'] = lu_area_dvar['name'].apply(lambda x: LANDUSE_ALL_COLORS[x])
     
@@ -165,7 +165,7 @@ def save_report_data(raw_data_dir:str):
 
     # Get the total area of each land use
     transition_mat = transition_df_area.pivot(index='From land-use', columns='To land-use', values='Area (km2)')
-    transition_mat = transition_mat.reindex(columns=LANDUSE_ALL, fill_value=0)
+    transition_mat = transition_mat.reindex(columns=LANDUSE_ALL_RENAMED, fill_value=0)
     total_area_from = transition_mat.sum(axis=1).values.reshape(-1, 1)
     
     # Calculate the percentage of each land use
@@ -686,13 +686,13 @@ def save_report_data(raw_data_dir:str):
                                             
     cost_transition_ag2non_ag_trans_mat = cost_transition_ag2non_ag_trans_mat\
                                            .set_index(['Year','From land-use', 'To land-use'])\
-                                           .reindex(index = pd.MultiIndex.from_product([years, AG_LANDUSE, NON_AG_LANDUSE],
+                                           .reindex(index = pd.MultiIndex.from_product([years, AG_LANDUSE, NON_AG_LANDUSE_RAW],
                                                     names = ['Year','From land-use', 'To land-use'])).reset_index()
                                            
     cost_transition_ag2non_ag_trans_mat['idx_from'] = cost_transition_ag2non_ag_trans_mat['From land-use']\
                                                     .apply(lambda x: AG_LANDUSE.index(x))
     cost_transition_ag2non_ag_trans_mat['idx_to']  = cost_transition_ag2non_ag_trans_mat['To land-use']\
-                                                    .apply(lambda x: NON_AG_LANDUSE.index(x))
+                                                    .apply(lambda x: NON_AG_LANDUSE_RAW.index(x))
                                                     
 
     cost_transition_ag2non_ag_trans_mat_data = cost_transition_ag2non_ag_trans_mat\
@@ -703,7 +703,7 @@ def save_report_data(raw_data_dir:str):
     
     
     cost_transition_ag2non_ag_trans_mat_json = {'categories_from': AG_LANDUSE,
-                                                'categories_to': NON_AG_LANDUSE,
+                                                'categories_to': NON_AG_LANDUSE_RAW,
                                                 'series': json.loads(cost_transition_ag2non_ag_trans_mat_data.to_json(orient='records'))}
     
     
@@ -1160,7 +1160,7 @@ def save_report_data(raw_data_dir:str):
                                     
     water_df_seperate_lu_wide.columns = ['name','data']
     water_df_seperate_lu_wide['type'] = 'column'
-    water_df_seperate_lu_wide = water_df_seperate_lu_wide.set_index('name').reindex(LANDUSE_ALL).reset_index()
+    water_df_seperate_lu_wide = water_df_seperate_lu_wide.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index()
     
     
     water_df_seperate_lu_wide.to_json(f'{SAVE_DIR}/water_4_net_yield_by_landuse.json', orient='records')
@@ -1193,7 +1193,7 @@ def save_report_data(raw_data_dir:str):
     bio_df = bio_df.replace(RENAME_AM_NON_AG)
 
     # Filter out landuse that are related to biodiversity
-    bio_lucc = LU_NATURAL + NON_AG_LANDUSE
+    bio_lucc = LU_NATURAL + NON_AG_LANDUSE_RAW
 
 
     # Plot_6-1: Biodiversity total by category
@@ -1316,7 +1316,7 @@ def save_report_data(raw_data_dir:str):
             
         bio_df_landuse_type_specific.columns = ['name','data']
         bio_df_landuse_type_specific['type'] = 'column'
-        bio_df_landuse_type_specific['sort_index'] = bio_df_landuse_type_specific['name'].apply(lambda x: LANDUSE_ALL.index(x))
+        bio_df_landuse_type_specific['sort_index'] = bio_df_landuse_type_specific['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
         bio_df_landuse_type_specific = bio_df_landuse_type_specific.sort_values(['sort_index']).drop('sort_index',axis=1)
         bio_df_landuse_type_specific.to_json(f'{SAVE_DIR}/biodiversity_7_contribution_score_by_landuse_type_specific.json', orient='records')
         

@@ -15,10 +15,12 @@
 # LUTO 2.0. If not, see <https://www.gnu.org/licenses/>.
 
 
+
 import os
 import time
 import math
 import h5py
+
 import xarray as xr
 import numpy as np
 import pandas as pd
@@ -27,6 +29,9 @@ import rasterio
 import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
+
+from itertools import product
+from joblib import Parallel, delayed
 
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -130,6 +135,11 @@ class Data:
         self.prod_data = {}
         self.obj_vals = {}
         
+        # Containers for reprojected dvar data
+        self.ag_dvars_2D_reproj_match = {}
+        self.non_ag_dvars_2D_reproj_match = {}
+        self.ag_man_dvars_2D_reproj_match = {}
+        
         print('')
         print('Beginning data initialisation...')
 
@@ -148,6 +158,24 @@ class Data:
         # Set the nodata and non-ag code
         self.NODATA = -9999
         self.MASK_LU_CODE = -1
+        
+        # The ID map (2D xarray) to reproject decision variables to. This xarray has the same shape as the `NLUM_MASK`, but each cell has a unique index value coprepsonding to the flattend position in target map.
+        ''' The ID map was created using script of `N:/Data-Master/Biodiversity/biodiversity_contribution/Step_3_Match_lumap_to_biomap.py`.
+            This ID map makes it possible to overlay LUTO dvars with maps of different geospatial format. 
+            
+            If LUTO was runing with RESFACTOR=1, we can overlay the ID map with the LUTO dvars to calculate the occurances 
+            and sum of dvar cells given the same ID in the target map (bin_count). 
+            
+            If LUTO was not runing with RESFACTOR=1, we will upsample the dvars to the same shape as RESFACTOR=1, then do the overlaying.
+        '''
+        self.REPROJECT_TARGET_ID_MAP = f'{settings.INPUT_DIR}/bio_id_map.nc' 
+        
+        
+        # The reference map (2D xarray) to reproject decision variables to
+        '''This is the reference map for reprojecting the dvars to. It contains the x,y coordinates of the target map,
+           So that after reprojecting the dvars to the same geospatial format of target map, we can get set x,y coordinates to the reprojected dvars. 
+        '''                             
+        self.REPROJECT_REFERENCE_MAP = f'{settings.INPUT_DIR}/bio_mask.nc'                                      
         
         # Load LUMAP without resfactor
         self.LUMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lumap.h5")).to_numpy()                   # 1D (ij flattend),  0-27 for land uses; -1 for non-agricultural land uses; All cells in Australia (land only)
@@ -393,7 +421,6 @@ class Data:
         self.add_non_ag_dvars(self.YR_CAL_BASE, self.NON_AG_L_RK)
 
 
-
         ###############################################################
         # Climate change impact data.
         ###############################################################
@@ -590,6 +617,12 @@ class Data:
         self.RP_FENCING_LENGTH = self.get_array_resfactor_applied(
             ((2 * settings.RIPARIAN_PLANTING_TORTUOSITY_FACTOR * self.STREAM_LENGTH) / self.REAL_AREA_NO_RESFACTOR).astype(np.float32)
         )
+        
+        
+        # Initial reprojected dvars data (2D xarray, ). 
+        self.add_ag_dvars_xr(self.YR_CAL_BASE, self.AG_L_MRJ)
+        self.add_am_dvars_xr(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
+        self.add_non_ag_dvars_xr(self.YR_CAL_BASE, self.NON_AG_L_RK)
 
 
         ###############################################################
@@ -1114,7 +1147,6 @@ class Data:
         trans[4] = trans[4] if settings.WRITE_FULL_RES_MAPS else trans[4] * settings.RESFACTOR    # Adjust the Y resolution
         trans = Affine(*trans)
         meta.update(width=width, height=height, compress='lzw', driver='GTiff', transform=trans, nodata=self.NODATA, dtype='float32')
-        
         return meta
 
     def get_array_resfactor_applied(self, array: np.ndarray):
@@ -1164,6 +1196,228 @@ class Data:
         Safely adds agricultural management decision variables' values to the Data object.
         """
         self.ag_man_dvars[yr] = ag_man_dvars
+ 
+        
+    # Functions to add reprojected dvars to the output containers
+    def add_ag_dvars_xr(self, yr: int, ag_dvar: np.ndarray):
+        self.ag_dvars_2D_reproj_match[yr] = self.reproj_match_ag_dvar(ag_dvar, self.REPROJECT_TARGET_ID_MAP, self.REPROJECT_REFERENCE_MAP)
+        
+    def add_am_dvars_xr(self, yr: int, am_dvar: np.ndarray):
+        self.ag_man_dvars_2D_reproj_match[yr] = self.reproj_match_am_dvar(am_dvar, self.REPROJECT_TARGET_ID_MAP, self.REPROJECT_REFERENCE_MAP)
+        
+    def add_non_ag_dvars_xr(self, yr: int, non_ag_dvar: np.ndarray):
+        self.non_ag_dvars_2D_reproj_match[yr] = self.reproj_match_non_ag_dvar(non_ag_dvar, self.REPROJECT_TARGET_ID_MAP, self.REPROJECT_REFERENCE_MAP)
+        
+        
+    # Functions to reproject and match the dvars to the target map
+    def reproj_match_ag_dvar(self, ag_dvars:np.ndarray, reprj_id:str, reproj_ref:str):
+        
+        target_id_map = xr.open_dataset(reprj_id)['data']
+        target_ref_map = xr.open_dataset(reproj_ref)['data']
+        ag_dvars = self.ag_dvars_to_xr(ag_dvars)                # Convert the dvars to xarray
+        
+        # Parallelize the reprojection and matching
+        def reproj_match(dvar, lm, lu):
+            dvar = self.dvar_to_2D(dvar)                        # Convert the dvar to its 2D representation
+            dvar = self.dvar_to_full_res(dvar)                  # Convert the 2D dvar to full resolution
+            dvar = self.bincount_avg(target_id_map, dvar)       # Calculate the average of the dvar values in each target id cell. 
+            dvar = dvar.reshape(target_ref_map.shape)           # Reshape the dvar to match the target reference map
+            dvar = xr.DataArray(dvar, dims=('y', 'x'), coords={'y': target_ref_map['y'], 'x': target_ref_map['x']})
+            return dvar.expand_dims({'lm':[lm], 'lu':[lu]})
+        
+        tasks = [delayed(reproj_match)(ag_dvars.sel(lm=lm, lu=lu), lm, lu) 
+                 for lm,lu in product(self.LANDMANS, self.AGRICULTURAL_LANDUSES)]
+        
+        return  xr.combine_by_coords( [i for i in Parallel(n_jobs=10, backend='threading', return_as='generator')(tasks)])
+    
+
+    def reproj_match_am_dvar(self, am_dvars, reprj_id:str=f'{settings.INPUT_DIR}/bio_id_map.nc', reproj_ref:str=f'{settings.INPUT_DIR}/bio_mask.nc'):
+        target_id_map = xr.open_dataset(reprj_id)['data']
+        target_ref_map = xr.open_dataset(reproj_ref)['data']
+        am_dvars = self.am_dvars_to_xr(am_dvars)
+        
+        # Parallelize the reprojection and matching
+        def reproj_match(dvar, am, lm, lu):
+            dvar = self.dvar_to_2D(dvar)
+            dvar = self.dvar_to_full_res(dvar)
+            dvar = self.bincount_avg(target_id_map, dvar)
+            dvar = dvar.reshape(target_ref_map.shape)
+            dvar = xr.DataArray(dvar, dims=('y', 'x'), coords={'y': target_ref_map['y'], 'x': target_ref_map['x']})
+            return dvar.expand_dims({'am':[am], 'lm':[lm], 'lu':[lu]})
+        
+        # Parallelize the reprojection and matching
+        tasks = [delayed(reproj_match)(am_dvars.sel(am=am, lm=lm, lu=lu), am, lm, lu) 
+                 for am,lm,lu in product(AG_MANAGEMENTS_TO_LAND_USES, self.LANDMANS, self.AGRICULTURAL_LANDUSES)]
+        
+        return xr.combine_by_coords([i for i in Parallel(n_jobs=10, backend='threading', return_as='generator')(tasks)])
+    
+    
+    
+    def reproj_match_non_ag_dvar(self, non_ag_dvars, reprj_id:str=f'{settings.INPUT_DIR}/bio_id_map.nc', reproj_ref:str=f'{settings.INPUT_DIR}/bio_mask.nc'):
+        target_id_map = xr.open_dataset(reprj_id)['data']
+        target_ref_map = xr.open_dataset(reproj_ref)['data']
+        non_ag_dvars = self.non_ag_dvars_to_xr(non_ag_dvars)
+        
+        # Parallelize the reprojection and matching
+        def reproj_match(dvar, lu):
+            dvar = self.dvar_to_2D(dvar)
+            dvar = self.dvar_to_full_res(dvar)
+            dvar = self.bincount_avg(target_id_map, dvar)
+            dvar = dvar.reshape(target_ref_map.shape)
+            dvar = xr.DataArray(dvar, dims=('y', 'x'), coords={'y': target_ref_map['y'], 'x': target_ref_map['x']})
+            return dvar.expand_dims({'lu':[lu]})
+        
+        tasks = [delayed(reproj_match)(non_ag_dvars.sel(lu=lu),  lu) for lu in self.NON_AGRICULTURAL_LANDUSES]
+        
+        return xr.combine_by_coords([i for i in Parallel(n_jobs=10, backend='threading', return_as='generator')(tasks)])
+        
+    
+    # Functions to convert dvars to xarray
+    def ag_dvars_to_xr(self, ag_dvars: np.ndarray):
+        ag_dvar_xr = xr.DataArray(
+            ag_dvars, 
+            dims=('lm', 'cell', 'lu'),
+            coords={
+                'lm': self.LANDMANS,
+                'cell': np.arange(ag_dvars.shape[1]),
+                'lu': self.AGRICULTURAL_LANDUSES
+            }   
+        ).reindex(lu=self.AGRICULTURAL_LANDUSES) # Reorder the dimensions to match the LUTO variable array indexing
+        
+        return ag_dvar_xr
+    
+    
+    def am_dvars_to_xr(self, am_dvars: np.ndarray):
+        am_dvar_l = []
+        for am in am_dvars.keys(): 
+            am_dvar_xr = xr.DataArray(
+                am_dvars[am], 
+                dims=('lm', 'cell', 'lu'),
+                coords={
+                    'lm': self.LANDMANS,
+                    'cell': np.arange(am_dvars[am].shape[1]),
+                    'lu': self.AGRICULTURAL_LANDUSES})
+            
+            # Expand the am dimension, the dvar is a 4D array [am, lu, cell, lu]
+            am_dvar_xr = am_dvar_xr.expand_dims({'am':[am]})   
+            am_dvar_l.append(am_dvar_xr)
+                
+        return xr.combine_by_coords(am_dvar_l).reindex(
+            am=AG_MANAGEMENTS_TO_LAND_USES.keys(), 
+            lu=self.AGRICULTURAL_LANDUSES, 
+            lm=self.LANDMANS)   # Reorder the dimensions to match the LUTO variable array indexing
+
+        
+    def non_ag_dvars_to_xr(self, non_ag_dvars: np.ndarray):
+        non_ag_dvar_xr = xr.DataArray(
+            non_ag_dvars, 
+            dims=('cell', 'lu'),
+            coords={
+                'cell': np.arange(non_ag_dvars.shape[0]),
+                'lu': self.NON_AGRICULTURAL_LANDUSES})
+        
+        return non_ag_dvar_xr.reindex(
+            lu=self.NON_AGRICULTURAL_LANDUSES) # Reorder the dimensions to match the LUTO variable array indexing
+            
+    
+    # Convert dvar to its 2D representation
+    def dvar_to_2D(self, map_:np.ndarray)-> np.ndarray:
+        '''
+        Convert the dvar from 1D vector to 2D array.
+        '''
+        map_resfactored = self.LUMAP_2D_RESFACTORED.copy().astype(np.float32)
+        np.place(map_resfactored, (map_resfactored != self.MASK_LU_CODE) & (map_resfactored != self.NODATA), map_) 
+        return map_resfactored
+    
+    
+    # Upsample dvar to its full resolution representation
+    def dvar_to_full_res(self, dvar_2D:np.ndarray) -> np.ndarray:
+        '''
+        Upsample the dvar to its full resolution (RESFACTOR=1) representation.
+        '''
+        dense_2D_shape = self.NLUM_MASK.shape
+        dense_2D_map = np.repeat(np.repeat(dvar_2D, settings.RESFACTOR, axis=0), settings.RESFACTOR, axis=1)       
+
+        # Adjust the dense_2D_map size if it differs from the NLUM_MASK
+        if dense_2D_map.shape[0] > dense_2D_shape[0] or dense_2D_map.shape[1] > dense_2D_shape[1]:
+            dense_2D_map = dense_2D_map[:dense_2D_shape[0], :dense_2D_shape[1]]
+            
+        if dense_2D_map.shape[0] < dense_2D_shape[0] or dense_2D_map.shape[1] < dense_2D_shape[1]:
+            pad_height = dense_2D_shape[0] - dense_2D_map.shape[0]
+            pad_width = dense_2D_shape[1] - dense_2D_map.shape[1]
+            dense_2D_map = np.pad(
+                dense_2D_map, 
+                pad_width=((0, pad_height), (0, pad_width)), 
+                mode='edge')
+
+        # Apply the masks
+        filler_mask = self.LUMAP_2D != self.MASK_LU_CODE
+        dense_2D_map = np.where(filler_mask, dense_2D_map, self.MASK_LU_CODE)
+        dense_2D_map = np.where(self.NLUM_MASK, dense_2D_map, self.NODATA)
+        return dense_2D_map
+    
+    
+    # Upsample dvar to its full resolution representation
+    def upsample_dvar(self, map_:np.ndarray, x:np.ndarray, y:np.ndarray)-> xr.DataArray:
+        # Get the coords of the map_
+        coords = dict(map_.coords)
+        del coords['cell']
+        
+        # Up sample the arr as RESFACTOR=1
+        if settings.RESFACTOR > 1:   
+            map_ = self.dvar_to_2D(map_)
+            map_ = self.dvar_to_full_res(map_)
+        else:
+            empty_map = np.full_like(self.NLUM_MASK, fill_value=self.NODATA, dtype=np.float32)
+            np.place(empty_map, self.NLUM_MASK, self.LUMAP_NO_RESFACTOR) 
+            np.place(empty_map, (empty_map != self.MASK_LU_CODE) & (empty_map != self.NODATA), map_)
+            map_ = empty_map
+        
+        # Convert to xarray
+        map_ = xr.DataArray(map_, dims=('y','x'), coords={'y': y, 'x': x})
+        map_ = map_.expand_dims(coords)
+        return map_
+
+
+    # Calculate the average value of dvars within the target bin       
+    def bincount_avg(self, target_id_map:xr.DataArray, dvar:np.ndarray) -> np.ndarray:
+        """
+        Calculate the average value of each bin based on the target_id_map and dvar arrays. 
+        Here is where we reproject and match dvars to the target map. Essentially, we 
+        created an ID map for the target map, where each pixcel has the  index of the
+        flattend target map but the same shape of the `NLUM_MASK` (see `N:/Data-Master/Biodiversity/biodiversity_contribution/Step_3_Match_lumap_to_biomap.py`). 
+        
+        We use `bincount` to get the occurence of dvar cells with the same target ID, 
+        and get the sum of dvar values with the same target ID. At last, the average
+        of dvar cells within each target cell is calculated as `occurance / sum`.
+
+        Parameters:
+        - target_id_map (xr.DataArray): Array containing the bin indices.
+        - dvar (np.ndarray): Array containing the values corresponding to each bin.
+
+        Returns:
+        - np.ndarray: Array (1D) containing the average value of each bin.
+
+        Note:
+        - The average value is calculated by dividing the sum of values in each bin by the number of occurrences in that bin.
+        - Division by zero will result in a nan value, which is handled by replacing it with zero.
+
+        """
+        # Only dvar > 0 are necessary for the calculation
+        valid_mask = dvar > 0
+
+        # Flatten arrays
+        bin_flatten = target_id_map.values[valid_mask]
+        weights_flatten = dvar[valid_mask]
+        bin_occ = np.bincount(bin_flatten, minlength=target_id_map.max().values + 1)
+        bin_sum = np.bincount(bin_flatten, weights=weights_flatten, minlength=target_id_map.max().values + 1)
+
+        # Calculate the average value of each bin, ignoring division by zero (which will be nan)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            bin_avg = (bin_sum / bin_occ).astype(np.float32)
+            bin_avg = np.nan_to_num(bin_avg)
+
+        return bin_avg
 
     def add_production_data(self, yr: int, data_type: str, prod_data: Any):
         """
