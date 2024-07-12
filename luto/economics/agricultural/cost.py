@@ -24,6 +24,7 @@ import itertools
 import numpy as np
 import pandas as pd
 
+import luto.settings as settings
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
 from luto.settings import AG_MANAGEMENTS
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
