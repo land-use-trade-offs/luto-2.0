@@ -182,7 +182,7 @@ def get_cost_lvstk(data: Data, lu, lm, yr_idx):
         raise KeyError(f"Unknown {lm} land management. Check `lm` key.")
 
     # Water delivery costs equal drinking water plus irrigation water req per head * yield (head/ha)
-    costs_w = (data.AGEC_LVSTK['WR_DRN', lvstype] + WR_IRR) * yield_pot
+    costs_w = (data.AGEC_LVSTK['WR_DRN', lvstype] * settings.LIVESTOCK_DRINKING_WATER + WR_IRR) * yield_pot
     costs_w *= data.WATER_DELIVERY_PRICE * data.WP_COST_MULTS[yr_cal]  # $/ha
 
     # Convert costs to $ per cell including resfactor.

@@ -182,6 +182,12 @@ If settings.MODE == 'timeseries', the values of the below dictionary determine w
 land uses on cells in the years after it chooses to utilise them. For example, if a cell has is using 'Environmental Plantings'
 and the corresponding value in this dictionary is False, all cells using EP must also utilise this land use in all subsequent 
 years.
+
+CAUTION: Setting reversibility == True can cause infeasibility issues in timeseries runs due to not being able to meet the water constraints. 
+With the net water yield limit set to say 80%, some catchments could be close to that yield then they experience some land use change to meet 
+GHG and biodiversity targets. This pushes the catchment close to the net yield constraint. Over time, climate change may reduce the amount of 
+water yield and if non-ag land uses are not reversible then a catchment may not be able to meet the net yield constraint. 
+This is expected behaviour and the user must choose how to deal with it.
 """
 NON_AG_LAND_USES_REVERSIBLE = {
     'Environmental Plantings': True,
@@ -196,7 +202,7 @@ NON_AG_LAND_USES_REVERSIBLE = {
 
 # Carbon price scenario: either '1.8C 67%', '1.5C 50%', '1.5C 67%', 'Default', '100', or None. 
 # Setting to None falls back to the 'Default' scenario.
-CARBON_PRICES_FIELD = '100'
+CARBON_PRICES_FIELD = '1.8C 67%'
 
 # Cost of fencing per linear metre
 FENCING_COST_PER_M = 5
@@ -338,12 +344,30 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
 # Water net yield targets: the value represents the proportion of the historical water yields 
 # that the net yield must exceed in a given year. Base year (2010) uses base year net yields as targets. 
 # Everything past the latest year specified uses the target figure for the latest year.
-# Safe and just Earth system boundaries says water stress of 0.2 (yield target of 0.8) is inclusive of 
-# domestic/industrial: https://www.nature.com/articles/s41586-023-06083-8
+
+# Safe and just Earth system boundaries suggests a water stress of 0.2 (yield of 0.8). This is inclusive of 
+# domestic/industrial: https://www.nature.com/articles/s41586-023-06083-8, Approximately 70% of the total water use 
+# is used for agricultural purposes. This includes water used for irrigation, livestock, and domestic purposes on farms, 
+# with the rest used for domestic/industrial  https://soe.dcceew.gov.au/inland-water/pressures/population
+# Hence, assuming that this proportion is uniform over all catchments and remains constant over time then if water 
+# stress is 0.2 then agriculture can use up 70% of this, leaving 30% for domestic/industrial. The water yield target for ag
+# should then be historical net yield * (1 - water stress * agricultural share)
+
+water_stress = 0.2
+ag_share_of_water_use = 1 # 0.7
+water_yield_target_ag_share = 1 - water_stress * ag_share_of_water_use
+
+# Set a dictionary of water yield targets (i.e., the proportion of historical net annual water yield). LUTO will ensure that 
+# net annual water yield is >= this proportion of historical net annual water yield is met by the given date, leaving sufficient water 
+# for domestic and industrial use. The water yield target grades linearly from net water yield in 2010 to achieve the target by the target date
+# for each catchment (river region or drainage division)
 WATER_YIELD_TARGETS = {
-                        2030: 0.8,
-                        2100: 0.8,
+                        2030: water_yield_target_ag_share,
+                        2100: water_yield_target_ag_share,
                       }
+
+# Consider livestock drinking water (0 or 1) ***** Livestock drinking water turned off due to infeasibility issues with water constraint in Pilbara
+LIVESTOCK_DRINKING_WATER = 0
 
 
 # Biodiversity limits and parameters *******************************

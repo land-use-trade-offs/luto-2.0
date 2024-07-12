@@ -747,9 +747,9 @@ class Data:
                 # First find out which animal is involved.
                 animal, _ = ag_quantity.lvs_veg_types(lu)
                 # Water requirements per head are for drinking and irrigation.
-                wreq_lvstk_dry[lu] = self.AGEC_LVSTK["WR_DRN", animal]
+                wreq_lvstk_dry[lu] = self.AGEC_LVSTK["WR_DRN", animal] * settings.LIVESTOCK_DRINKING_WATER
                 wreq_lvstk_irr[lu] = (
-                    self.AGEC_LVSTK["WR_DRN", animal] + self.AGEC_LVSTK["WR_IRR", animal]
+                    self.AGEC_LVSTK["WR_IRR", animal] + self.AGEC_LVSTK["WR_DRN", animal] * settings.LIVESTOCK_DRINKING_WATER
                 )
             else:
                 wreq_lvstk_dry[lu] = 0.0
