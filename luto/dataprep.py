@@ -415,7 +415,7 @@ def create_new_dataset():
     cells_attrs_outside_LUTO = zones.iloc[LUTO_outside_cells_index]                             # shape = (2737674, 71)
 
         
-    # Calculate water use for natural land under climate change (ensemble model)
+    # Calculate water yield outside LUTO study area under climate change (ensemble model)
     def calculate_water_yield(ssp: str):
 
         fn = 'Water_yield_GCM-Ensemble_ssp' + ssp + '_2010-2100_DR_ML_HA_mean'
