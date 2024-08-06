@@ -469,6 +469,22 @@ def _get_historical_water_usage_by_regions(data: Data) -> dict[int, tuple[str, f
     return net_baseline_reg_water_yield
 
 
+def _get_water_net_yield_limit_under_climate_change(
+    data: Data, yr_cal: int,
+) -> tuple[str, float, float, np.ndarray]:
+    """
+    Calculate water net yield limit as previously done, however use land use/mgt decision variables
+    for year t-1 and the water yield layers for year t
+
+    TODO: not sure if this is required or not, just leave here for now incase
+    """
+
+    hist_yield = 0
+    limit = 0
+
+    return (hist_yield, limit)
+
+
 def _get_standard_water_net_yield_limits(data: Data) -> None:
     historical_yields_dict = _get_historical_water_usage_by_regions(data)
     base_yr_net_yield_by_reg = calc_water_net_yield_by_region_in_year(data, data.YR_CAL_BASE)
@@ -510,18 +526,6 @@ def _get_standard_water_net_yield_limits(data: Data) -> None:
     data.STANDARD_WATER_LIMITS_BY_YEAR = dict(limits_by_region_year)
 
 
-
-def _get_water_net_yield_limit_under_climate_change(
-    data: Data, yr_cal: int,
-) -> tuple[str, float, float, np.ndarray]:
-    """
-    Calculate water net yield limit as previously done, however use land use/mgt decision variables
-    for year t-1 and the water yield layers for year t
-    """
-
-    return ()
-
-
 def get_water_net_yield_limits(
     data: Data, yr_cal: int,
 ) -> dict[int, tuple[str, float, float, np.ndarray]]:
@@ -557,17 +561,9 @@ def get_water_net_yield_limits(
 
     if not data.STANDARD_WATER_LIMITS_BY_YEAR:
         data.STANDARD_WATER_LIMITS_BY_YEAR = _get_standard_water_net_yield_limits(data)
-
-    water_limit_under_climate_change = _get_water_net_yield_limit_under_climate_change(data, yr_cal)
-
     limit_year = min(yr_cal, latest_target_year)
 
-    return (
-        data.STANDARD_WATER_LIMITS_BY_YEAR[limit_year][0],
-        min(data.STANDARD_WATER_LIMITS_BY_YEAR[limit_year][1], water_limit_under_climate_change[1]),
-        min(data.STANDARD_WATER_LIMITS_BY_YEAR[limit_year][2], water_limit_under_climate_change[2]),
-        data.STANDARD_WATER_LIMITS_BY_YEAR[limit_year][-1],
-    )
+    return data.STANDARD_WATER_LIMITS_BY_YEAR[limit_year][0]
 
 
 """

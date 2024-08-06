@@ -537,7 +537,7 @@ class LutoSolver:
                 'DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"'
             )
 
-    def _add_water_usage_limit_constraints(self):
+    def _add_water_usage_limit_constraints(self, old_ag_x_mrj: np.ndarray):
         """
         Adds constraints to handle water usage limits.
         If `cells` is provided, only adds constraints for regions containing at least one of the
@@ -550,6 +550,10 @@ class LutoSolver:
 
         # Ensure water use remains below limit for each region
         for region, (reg_name, _, w_net_yield_limit, ind) in self._input_data.limits["water"].items():
+
+            # TODO: take new limit to be the Calculate water net yield limit using old_ag_x_mrj
+            # and current years water yield layers.
+
             reg_ccimpact = self._input_data.w_ccimpact[region]
 
             ag_contr = gp.quicksum(
@@ -729,7 +733,7 @@ class LutoSolver:
             current_lmmap,
         )
         print('Updating constraints...\n', flush=True)
-        self._update_constraints(updated_cells)
+        self._update_constraints(updated_cells, old_ag_x_mrj)
         
         print('Updating objective function...\n', flush=True)
         self._setup_objective()
@@ -864,7 +868,7 @@ class LutoSolver:
         print(f"    ...skipped {num_cells_skipped} cells, updated {len(updated_cells)} cells.\n")
         return updated_cells
 
-    def _update_constraints(self, updated_cells: np.array):
+    def _update_constraints(self, updated_cells: np.array, old_ag_x_mrj: np.ndarray):
         if len(updated_cells) == 0:
             print("No constraints need updating.")
             return
@@ -893,7 +897,7 @@ class LutoSolver:
         self._add_agricultural_management_constraints(updated_cells)
         self._add_agricultural_management_adoption_limit_constraints()
         self._add_demand_penalty_constraints()
-        self._add_water_usage_limit_constraints()
+        self._add_water_usage_limit_constraints(old_ag_x_mrj)
         self._add_ghg_emissions_limit_constraints()
         self._add_biodiversity_limit_constraints()
 
