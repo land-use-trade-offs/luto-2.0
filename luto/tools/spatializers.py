@@ -49,14 +49,27 @@ def create_2d_map(data: Data, map_:np.ndarray=None, filler:int=-1, nodata:int=-9
             map_ = upsample_array(data, map_, factor=settings.RESFACTOR)
         return map_    
     else: 
-        LUMAP_FullRes_2D = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32) 
-        # Get the full resolution LUMAP_2D at the begining year, with -1 as Non-Agricultural Land, and -9999 as NoData
-        np.place(LUMAP_FullRes_2D, data.NLUM_MASK, data.LUMAP_NO_RESFACTOR) 
-        # Fill the LUMAP_FullRes_2D with map_ sequencialy by the row-col order of 1s in (LUMAP_FullRes_2D >=0) 
-        np.place(LUMAP_FullRes_2D, LUMAP_FullRes_2D >=0, map_)
-        return LUMAP_FullRes_2D                       
+        return get_fullres2D_map(data, map_)                       
                 
-    
+
+
+def get_fullres2D_map(data:Data, map_:np.ndarray)-> np.ndarray:
+    """
+    Returns the full resolution 2D map by filling the 1D `map_` to the 2D `NLUM_MASK`.
+
+    Args:
+        `data`(Data): The data object containing the NLUM_MASK and LUMAP_NO_RESFACTOR arrays.
+        `map_`(np.ndarray): The 1D np.ndarray to be filled into the `NLUM_MASK` array.
+
+    Returns:
+        np.ndarray : The restored 2D full resolution land-use map.
+    """
+    LUMAP_FullRes_2D = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32) 
+    # Get the full resolution LUMAP_2D at the begining year, with -1 as Non-Agricultural Land, and -9999 as NoData
+    np.place(LUMAP_FullRes_2D, data.NLUM_MASK, data.LUMAP_NO_RESFACTOR) 
+    # Fill the LUMAP_FullRes_2D with map_ sequencialy by the row-col order of 1s in (LUMAP_FullRes_2D >=0) 
+    np.place(LUMAP_FullRes_2D, LUMAP_FullRes_2D >=0, map_)
+    return LUMAP_FullRes_2D
 
 
 
@@ -65,8 +78,8 @@ def get_coarse2D_map(data, map_:np.ndarray)-> np.ndarray:
     Generate a coarse 2D map based on the input data.
 
     Args:
-        data (Data): The input data used to create the map.
-        map_ (np.ndarray): The initial 1D map used to create a 2D map.
+        `data` (Data): The input data used to create the map.
+        `map_` (np.ndarray): The initial 1D map used to create a 2D map.
         
     Returns:
         np.ndarray: The generated coarse 2D map.

@@ -159,9 +159,9 @@ class Data:
         self.NODATA = -9999
         self.MASK_LU_CODE = -1
         
-        # The ID map (2D xarray) to reproject decision variables to. This xarray has the same shape as the `NLUM_MASK`, but each cell has a unique index value coprepsonding to the flattend position in target map.
+        # The ID map (2D xarray) to reproject decision variables to. This xarray has the same shape as the `NLUM_MASK`, but each cell has a unique index value coprepsonding its flattend position in the array.
         ''' The ID map was created using script of `N:/Data-Master/Biodiversity/biodiversity_contribution/Step_3_Match_lumap_to_biomap.py`.
-            This ID map makes it possible to overlay LUTO dvars with maps of different geospatial format. 
+            This ID map makes it possible to overlay LUTO dvars with other maps that have different geospatial extent/resolution. 
             
             If LUTO was runing with RESFACTOR=1, we can overlay the ID map with the LUTO dvars to calculate the occurances 
             and sum of dvar cells given the same ID in the target map (bin_count). 
@@ -172,8 +172,8 @@ class Data:
         
         
         # The reference map (2D xarray) to reproject decision variables to
-        '''This is the reference map for reprojecting the dvars to. It contains the x,y coordinates of the target map,
-           So that after reprojecting the dvars to the same geospatial format of target map, we can get set x,y coordinates to the reprojected dvars. 
+        '''This is the reference map for reprojecting the dvars to. It contains the x,y coordinates for each cell,
+           So that after reprojecting the dvars to the same geospatial format of the reference map, we can set x,y coordinates to the reprojected dvars.
         '''                             
         self.REPROJECT_REFERENCE_MAP = f'{settings.INPUT_DIR}/bio_mask.nc'                                      
         

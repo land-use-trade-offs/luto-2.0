@@ -72,7 +72,7 @@ AG_MANAGEMENTS_TO_LAND_USES = {
     ]
 }
 
-# Remove the am if it is set False in the settings
+# Remove the am if it is set False (i.e., not a valid solution) in the settings
 AG_MANAGEMENTS_TO_LAND_USES = {
     k:v  for k,v in AG_MANAGEMENTS_TO_LAND_USES.items() 
     if settings.AG_MANAGEMENTS[k]

@@ -54,7 +54,7 @@ def get_wreq_matrices(data: Data, yr_idx):
             w_req_mrj[1, :, j] = w_req_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)       # Water reqs depend on initial stocking rate for irrigation
     
     # Convert to ML per cell via REAL_AREA
-    w_req_mrj *= data.REAL_AREA[:, np.newaxis]                      # <unit: ML/head|ha> * <unit: head|ha/cell> -> <unit: ML/cell>
+    w_req_mrj *= data.REAL_AREA[:, np.newaxis]                      # <unit: ML/ha> * <unit: ha/cell> -> <unit: ML/cell>
 
     return w_req_mrj
 
@@ -102,7 +102,8 @@ def get_wyield_matrices(data: Data, yr_idx) -> np.ndarray:
 
 def get_water_ccimpact(data: Data, yr_idx) -> dict[int, float]:
     """
-    Return water climate change (CC) impact matrices by land management, cell, and land-use type.
+    Return water climate change (CC) impact matrices by land management, cell, and land-use type. 
+    Note the impact comes from cells that LUTO does not look at.
     
     Parameters:
         data (object): The data object containing the required data.
@@ -482,18 +483,15 @@ def get_water_net_yield_limits(
     - data: The data object containing the necessary input data.
 
     Returns:
-    water_net_yield_limits: A dictionary of tuples containing the water use limits for each region\n
-      region index:(
-      - region name 
-      - histircal water yield
-      - lowest water yield allowed 
-      - indices of cells in the region
-      )
-
-    Raises:
-    - None
-
+    A dictionary of tuples containing the water use limits for each region\n
+      - region index:(
+        - region name 
+        - histircal water yield
+        - lowest water yield allowed 
+        - indices of cells in the region
+        )
     """
+    
     if any([not data.YR_CAL_BASE <= yr <= 2100 for yr in settings.WATER_YIELD_TARGETS]):
         raise ValueError(
             f"Setting WATER_YIELD_TARGETS must be defined for years between " 
