@@ -86,7 +86,6 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
     Calculate the transition matrices for land-use and land management transitions.
     Args:
         data (Data object): The data object containing the necessary input data.
-        data (Data object): The data object containing the necessary input data.
         yr_idx (int): The index of the current year.
         base_year (int): The base year for the transition calculations.
         lumaps (dict): A dictionary of land-use maps for each year.

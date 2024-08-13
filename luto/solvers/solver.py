@@ -25,7 +25,6 @@ import luto.settings as settings
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional
-from gurobipy import GRB
 
 from luto import tools
 from luto.solvers.input_data import SolverInputData
@@ -331,7 +330,7 @@ class LutoSolver:
         else:
             raise ValueError('DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"')
 
-        self.gurobi_model.setObjective(objective, GRB.MINIMIZE)
+        self.gurobi_model.setObjective(objective, gp.MINIMIZE)
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
         """
