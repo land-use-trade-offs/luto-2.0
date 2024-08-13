@@ -367,7 +367,7 @@ WATER_YIELD_TARGETS = {
                       }
 
 # Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water turned off due to infeasibility issues with water constraint in Pilbara
-LIVESTOCK_DRINKING_WATER = 0
+LIVESTOCK_DRINKING_WATER = 1
 
 
 # Biodiversity limits and parameters *******************************
