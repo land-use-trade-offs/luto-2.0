@@ -29,6 +29,7 @@ from gurobipy import GRB
 
 from luto import tools
 from luto.solvers.input_data import SolverInputData
+from luto.economics.agricultural.water import calc_water_net_yield_for_region
 from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_REVERSIBLE
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.settings import NON_AG_LAND_USES, NON_AG_LAND_USES_REVERSIBLE
@@ -536,6 +537,34 @@ class LutoSolver:
             raise ValueError(
                 'DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"'
             )
+        
+    def _get_water_net_yield_base_year_vars_current_year_layers(
+        self, region: int, region_ind: np.ndarray
+    ) -> float:
+        """
+        
+        """
+        if any(
+            self._input_data.base_year_ag_sol is None,
+            self._input_data.base_year_non_ag_sol is None,
+            self._input_data.base_year_ag_man_sol is None,
+        ):
+            raise ValueError(
+                "Base year solutions must be provided to calculate water "
+                "net yield of the base year with current year layers."
+            )
+
+        return calc_water_net_yield_for_region(
+            region_ind,
+            self._input_data.am2j,
+            self._input_data.base_year_ag_sol,
+            self._input_data.base_year_non_ag_sol,
+            self._input_data.base_year_ag_man_sol,
+            self._input_data.ag_w_mrj,
+            self._input_data.non_ag_w_rk,
+            self._input_data.ag_man_w_mrj,
+            self._input_data.w_ccimpact[region],
+        )
 
     def _add_water_usage_limit_constraints(self):
         """
@@ -583,6 +612,11 @@ class LutoSolver:
             )
 
             w_net_yield_region = ag_contr + ag_man_contr + non_ag_contr + reg_ccimpact
+
+            # Update the net yield limit to be lower based on last year's solution if at risk of infeasibility
+            if self._input_data.base_year_ag_sol is not None:
+                base_year_water_yield_with_current_layers = self._get_water_net_yield_base_year_vars_current_year_layers(region, ind)
+                w_net_yield_limit = min(w_net_yield_limit, base_year_water_yield_with_current_layers)
 
             # Check that the contributions are not all zero, and add constraint if so.
             # Must check the type because 'Gurobi expression == 0' returns another expression 
