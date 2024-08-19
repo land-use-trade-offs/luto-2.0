@@ -545,9 +545,11 @@ class LutoSolver:
         
         """
         if any(
-            self._input_data.base_year_ag_sol is None,
-            self._input_data.base_year_non_ag_sol is None,
-            self._input_data.base_year_ag_man_sol is None,
+            [
+                self._input_data.base_year_ag_sol is None,
+                self._input_data.base_year_non_ag_sol is None,
+                self._input_data.base_year_ag_man_sol is None,
+            ]
         ):
             raise ValueError(
                 "Base year solutions must be provided to calculate water "
@@ -613,8 +615,10 @@ class LutoSolver:
 
             w_net_yield_region = ag_contr + ag_man_contr + non_ag_contr + reg_ccimpact
 
+            base_year_water_yield_with_current_layers = None
+
             # Update the net yield limit to be lower based on last year's solution if at risk of infeasibility
-            if self._input_data.base_year_ag_sol is not None:
+            if self._input_data.base_year_ag_sol is not None and settings.RELAXED_WATER_LIMITS_FOR_INFEASIBILITY == 'on':
                 base_year_water_yield_with_current_layers = self._get_water_net_yield_base_year_vars_current_year_layers(region, ind)
                 w_net_yield_limit = min(w_net_yield_limit, base_year_water_yield_with_current_layers)
 
@@ -627,6 +631,15 @@ class LutoSolver:
 
             if settings.VERBOSE == 1:
                 print(f"    ...net water yield in {reg_name} >= {w_net_yield_limit:.2f} ML")
+                
+                if (
+                    base_year_water_yield_with_current_layers is not None 
+                    and base_year_water_yield_with_current_layers < w_net_yield_limit
+                ):
+                    print(
+                        f"        ...net water yield in {reg_name} lowered from {w_net_yield_limit:.2f} ML "
+                        f"to {base_year_water_yield_with_current_layers:.2f} ML to avoid infeasibility"
+                    )
         print('')
 
     def _add_ghg_emissions_limit_constraints(self):

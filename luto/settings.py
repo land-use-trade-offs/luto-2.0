@@ -335,6 +335,8 @@ SOC_AMORTISATION = 15
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
+
+RELAXED_WATER_LIMITS_FOR_INFEASIBILITY = 'on'
     
             
 
