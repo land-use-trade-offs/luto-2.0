@@ -358,7 +358,28 @@ def get_agricultural_management_water_matrices(data: Data, yr_idx) -> dict[str, 
     }
 
 
-def calc_water_net_yield_by_region_in_year(
+def calc_water_net_yield_for_region(
+    region_ind: np.ndarray,
+    am2j: dict[str, list[int]],
+    ag_dvars: np.ndarray,
+    non_ag_dvars: np.ndarray,
+    ag_man_dvars: dict[str, np.ndarray],
+    ag_w_mrj: np.ndarray,
+    non_ag_w_rk: np.ndarray,
+    ag_man_w_mrj: dict[str, np.ndarray],
+    w_cc_impact_reg: float,
+) -> float:
+    ag_contr = (ag_w_mrj[:, region_ind, :] * ag_dvars[:, region_ind, :]).sum()
+    non_ag_contr = (non_ag_w_rk[region_ind, :] * non_ag_dvars[region_ind, :]).sum()
+    ag_man_contr = sum(
+        (ag_man_w_mrj[am][:, region_ind, j_idx] * ag_man_dvars[am][:, region_ind, j]).sum()
+        for am, am_j_list in am2j.items()
+        for j_idx, j in enumerate(am_j_list)
+    )
+    return ag_contr + non_ag_contr + ag_man_contr + w_cc_impact_reg
+    
+
+def calc_water_net_yield_by_region_in_year_from_data(
     data: Data,
     yr_cal: int,
     ag_w_mrj: Optional[np.ndarray] = None,
@@ -412,14 +433,17 @@ def calc_water_net_yield_by_region_in_year(
         # Get indices of cells in region
         ind = np.flatnonzero(region_id == region).astype(np.int32)
 
-        ag_contr = (ag_w_mrj[:, ind, :] * data.ag_dvars[yr_cal][:, ind, :]).sum()
-        non_ag_contr = (non_ag_w_rk[ind, :] * data.non_ag_dvars[yr_cal][ind, :]).sum()
-        ag_man_contr = sum(
-            (ag_man_w_mrj[am][:, ind, j_idx] * data.ag_man_dvars[yr_cal][am][:, ind, j]).sum()
-            for am, am_j_list in am2j.items()
-            for j_idx, j in enumerate(am_j_list)
+        net_yield_by_region[region] = calc_water_net_yield_for_region(
+            ind,
+            am2j,
+            data.ag_dvars[yr_cal],
+            data.non_ag_dvars[yr_cal],
+            data.ag_man_dvars[yr_cal],
+            ag_w_mrj,
+            non_ag_w_rk,
+            ag_man_w_mrj,
+            w_cc_impact[region],
         )
-        net_yield_by_region[region] = ag_contr + non_ag_contr + ag_man_contr + w_cc_impact[region]
 
     return net_yield_by_region
 
@@ -469,25 +493,48 @@ def _get_historical_water_usage_by_regions(data: Data) -> dict[int, tuple[str, f
     return net_baseline_reg_water_yield
 
 
-def _get_water_net_yield_limit_under_climate_change(
+def get_water_net_yield_limit_values(
     data: Data, yr_cal: int,
-) -> tuple[str, float, float, np.ndarray]:
+) -> dict[int, tuple[str, float, float, np.ndarray]]:
     """
-    Calculate water net yield limit as previously done, however use land use/mgt decision variables
-    for year t-1 and the water yield layers for year t
+    Return water net yield limits for regions (River Regions or Drainage Divisions as specified in luto.settings.py).
+    
+    Limits are year-specific, beginning at the 2010 net water yields and decreasing to the defined limits
+    in the year given by settings.WATER_LIMITS_TARGET_YEAR.
 
-    TODO: not sure if this is required or not, just leave here for now incase
+    Parameters:
+    - data: The data object containing the necessary input data.
+
+    Returns:
+    water_net_yield_limits: A dictionary of tuples containing the water use limits for each region\n
+      region index:(
+      - region name 
+      - histircal water yield
+      - lowest water yield allowed 
+      - indices of cells in the region
+      )
+
+    Raises:
+    - None
+
     """
+    if any([not data.YR_CAL_BASE <= yr <= 2100 for yr in settings.WATER_YIELD_TARGETS]):
+        raise ValueError(
+            f"Setting WATER_YIELD_TARGETS must be defined for years between " 
+            f"{data.YR_CAL_BASE} and 2100."
+        )
 
-    hist_yield = 0
-    limit = 0
-
-    return (hist_yield, limit)
-
-
-def _get_standard_water_net_yield_limits(data: Data) -> None:
+    latest_target_year = max(settings.WATER_YIELD_TARGETS)
+    if data.WATER_LIMITS_BY_YEAR: 
+        return (
+            data.WATER_LIMITS_BY_YEAR[latest_target_year] 
+            if yr_cal >= latest_target_year
+            else data.WATER_LIMITS_BY_YEAR[yr_cal]
+        )
+    
+    # Limits do not yet exist and must be calculated
     historical_yields_dict = _get_historical_water_usage_by_regions(data)
-    base_yr_net_yield_by_reg = calc_water_net_yield_by_region_in_year(data, data.YR_CAL_BASE)
+    base_yr_net_yield_by_reg = calc_water_net_yield_by_region_in_year_from_data(data, data.YR_CAL_BASE)
 
     limits_by_region_year = defaultdict(dict)
 
@@ -522,48 +569,14 @@ def _get_standard_water_net_yield_limits(data: Data) -> None:
             for yr, limit in zip(calc_years, yrs_targets):
                 limits_by_region_year[yr][region] = (name, hist_yield, limit, ind)
     
-    # Save to data object
-    data.STANDARD_WATER_LIMITS_BY_YEAR = dict(limits_by_region_year)
+    # Save to data object to avoid re-calculating in the future.
+    data.WATER_LIMITS_BY_YEAR = dict(limits_by_region_year)
 
-
-def get_water_net_yield_limits(
-    data: Data, yr_cal: int,
-) -> dict[int, tuple[str, float, float, np.ndarray]]:
-    """
-    Return water net yield limits for regions (River Regions or Drainage Divisions as specified in luto.settings.py).
-    
-    Limits are year-specific, beginning at the 2010 net water yields and decreasing to the defined limits
-    in the year given by settings.WATER_LIMITS_TARGET_YEAR.
-
-    Parameters:
-    - data: The data object containing the necessary input data.
-
-    Returns:
-    water_net_yield_limits: A dictionary of tuples containing the water use limits for each region\n
-      region index:(
-      - region name 
-      - histircal water yield
-      - lowest water yield allowed 
-      - indices of cells in the region
-      )
-
-    Raises:
-    - None
-
-    """
-    if any([not data.YR_CAL_BASE <= yr <= 2100 for yr in settings.WATER_YIELD_TARGETS]):
-        raise ValueError(
-            f"Setting WATER_YIELD_TARGETS must be defined for years between " 
-            f"{data.YR_CAL_BASE} and 2100."
-        )
-
-    latest_target_year = max(settings.WATER_YIELD_TARGETS)
-
-    if not data.STANDARD_WATER_LIMITS_BY_YEAR:
-        data.STANDARD_WATER_LIMITS_BY_YEAR = _get_standard_water_net_yield_limits(data)
-    limit_year = min(yr_cal, latest_target_year)
-
-    return data.STANDARD_WATER_LIMITS_BY_YEAR[limit_year][0]
+    return (
+        data.WATER_LIMITS_BY_YEAR[latest_target_year] if yr_cal >= latest_target_year
+        else data.WATER_LIMITS_BY_YEAR[yr_cal]
+    )
+ 
 
 
 """
