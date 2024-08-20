@@ -538,11 +538,15 @@ class LutoSolver:
                 'DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"'
             )
         
-    def _get_water_net_yield_base_year_vars_current_year_layers(
+    def _get_water_nyield_base_year_vars_current_year_layers(
         self, region: int, region_ind: np.ndarray
     ) -> float:
         """
-        
+        Calculates the water net yield using the base year's (previous year's) variable 
+        solutions and this year's water net yield matrices.
+
+        This helps the edge case where, over time, irreversible non-ag land uses make
+        water constraints infeasible. 
         """
         if any(
             [
@@ -618,27 +622,26 @@ class LutoSolver:
             base_year_water_yield_with_current_layers = None
 
             # Update the net yield limit to be lower based on last year's solution if at risk of infeasibility
+            constr_wny_limit = w_net_yield_limit
+            wny_limit_updated = False
             if self._input_data.base_year_ag_sol is not None and settings.RELAXED_WATER_LIMITS_FOR_INFEASIBILITY == 'on':
-                base_year_water_yield_with_current_layers = self._get_water_net_yield_base_year_vars_current_year_layers(region, ind)
-                w_net_yield_limit = min(w_net_yield_limit, base_year_water_yield_with_current_layers)
+                base_year_water_yield_with_current_layers = self._get_water_nyield_base_year_vars_current_year_layers(region, ind)
+                if base_year_water_yield_with_current_layers < w_net_yield_limit:
+                    constr_wny_limit = base_year_water_yield_with_current_layers
+                    wny_limit_updated = True
 
             # Check that the contributions are not all zero, and add constraint if so.
             # Must check the type because 'Gurobi expression == 0' returns another expression 
             if not type(w_net_yield_region) == int:
-                constr = self.gurobi_model.addConstr(w_net_yield_region >= w_net_yield_limit)
-                for r in ind:
-                    self.water_limit_constraints.append(constr)
+                constr = self.gurobi_model.addConstr(w_net_yield_region >= constr_wny_limit)
+                self.water_limit_constraints.append(constr)
 
             if settings.VERBOSE == 1:
                 print(f"    ...net water yield in {reg_name} >= {w_net_yield_limit:.2f} ML")
-                
-                if (
-                    base_year_water_yield_with_current_layers is not None 
-                    and base_year_water_yield_with_current_layers < w_net_yield_limit
-                ):
+                if wny_limit_updated:
                     print(
                         f"        ...net water yield in {reg_name} lowered from {w_net_yield_limit:.2f} ML "
-                        f"to {base_year_water_yield_with_current_layers:.2f} ML to avoid infeasibility"
+                        f"to {constr_wny_limit:.2f} ML to avoid infeasibility"
                     )
         print('')
 
