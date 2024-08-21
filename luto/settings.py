@@ -355,17 +355,17 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
 # stress is 0.2 then agriculture can use up 70% of this, leaving 30% for domestic/industrial. The water yield target for ag
 # should then be historical net yield * (1 - water stress * agricultural share)
 
-water_stress = 0.2
-ag_share_of_water_use = 0.7
-water_yield_target_ag_share = 1 - water_stress * ag_share_of_water_use
+WATER_STRESS = 0.2
+AG_SHARE_OF_WATER_USE = 0.7
+WATER_YIELD_TARGET_AG_SHARE = 1 - WATER_STRESS * AG_SHARE_OF_WATER_USE
 
 # Set a dictionary of water yield targets (i.e., the proportion of historical net annual water yield). LUTO will ensure that 
 # net annual water yield is >= this proportion of historical net annual water yield is met by the given date, leaving sufficient water 
 # for domestic and industrial use. The water yield target grades linearly from net water yield in 2010 to achieve the target by the target date
 # for each catchment (river region or drainage division)
 WATER_YIELD_TARGETS = {
-                        2030: water_yield_target_ag_share,
-                        2100: water_yield_target_ag_share,
+                        2030: WATER_YIELD_TARGET_AG_SHARE,
+                        2100: WATER_YIELD_TARGET_AG_SHARE,
                       }
 
 # Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water turned off due to infeasibility issues with water constraint in Pilbara
