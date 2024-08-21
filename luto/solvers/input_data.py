@@ -75,6 +75,10 @@ class SolverInputData:
     desc2aglu: dict                 # Map of agricultural land use descriptions to codes.
     resmult: float                  # Resolution factor multiplier from data.RESMULT
 
+    base_year_ag_sol: np.ndarray = None                 # Base year's agricultural variables solution.
+    base_year_non_ag_sol: np.ndarray = None             # Base year's non-agricultural variables solution.
+    base_year_ag_man_sol: dict[str, np.ndarray] = None  # Base year's agricultural management variables solution.
+
     @property
     def n_ag_lms(self):
         # Number of agricultural landmans
@@ -358,7 +362,7 @@ def get_limits(
     # Limits is a dictionary with heterogeneous value sets.
     limits = {}
 
-    limits['water'] = ag_water.get_water_net_yield_limits(data, yr_cal)
+    limits['water'] = ag_water.get_water_net_yield_limit_values(data, yr_cal)
     
     if settings.GHG_EMISSIONS_LIMITS == 'on':
         limits['ghg'] = ag_ghg.get_ghg_limits(data, yr_cal)
@@ -429,4 +433,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         limits=get_limits(data, target_year),
         desc2aglu=data.DESC2AGLU,
         resmult=data.RESMULT,
+        base_year_ag_sol=data.ag_dvars.get(base_year),
+        base_year_non_ag_sol=data.non_ag_dvars.get(base_year),
+        base_year_ag_man_sol=data.ag_man_dvars.get(base_year),
     )

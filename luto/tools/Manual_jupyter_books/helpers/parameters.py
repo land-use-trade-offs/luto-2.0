@@ -8,5 +8,12 @@ legend_params = {
     'framealpha': 0.3,
     'columnspacing': 10}
 
+# The dictionary to add meta to notebooks
+NOTEBOOK_META_DICT = {
+    "# HIDDEN": "hide-cell",            # Hide the cell and output
+    "# HIDE CODE": "remove-input",      # Remove the input and keep the output
+    "# REMOVE": "remove-cell"           # Remove the cell and output
+}
+    
 
 

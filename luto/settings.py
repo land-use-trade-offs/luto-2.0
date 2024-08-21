@@ -31,8 +31,8 @@ VERSION = '2.3'
 # ---------------------------------------------------------------------------- #
 
 pd.set_option('display.width', 470)
-pd.set_option('display.max_columns', 200)
-pd.set_option('display.max_rows', 5000)
+pd.set_option('display.max_columns', 100)
+pd.set_option('display.max_rows', 100)
 pd.set_option('display.float_format', '{:,.4f}'.format)
 
 
@@ -122,7 +122,7 @@ PENALTY = 1e5
 WRITE_OUTPUT_GEOTIFFS = True    # Write GeoTiffs to output directory: True or False
 WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resolution: True or False
 PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = 8              # The Threads to use for map making, only work with PARALLEL_WRITE = True
+WRITE_THREADS = 50              # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
@@ -152,7 +152,7 @@ NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect a
 BARHOMOGENOUS = 1  # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 8
+THREADS = 50
 
 
 # ---------------------------------------------------------------------------- #
@@ -190,14 +190,14 @@ water yield and if non-ag land uses are not reversible then a catchment may not 
 This is expected behaviour and the user must choose how to deal with it.
 """
 NON_AG_LAND_USES_REVERSIBLE = {
-    'Environmental Plantings': True,
-    'Riparian Plantings': True,
-    'Sheep Agroforestry': True,
-    'Beef Agroforestry': True,
-    'Carbon Plantings (Block)': True,
-    'Sheep Carbon Plantings (Belt)': True,
-    'Beef Carbon Plantings (Belt)': True,
-    'BECCS': True,
+    'Environmental Plantings': False,
+    'Riparian Plantings': False,
+    'Sheep Agroforestry': False,
+    'Beef Agroforestry': False,
+    'Carbon Plantings (Block)': False,
+    'Sheep Carbon Plantings (Belt)': False,
+    'Beef Carbon Plantings (Belt)': False,
+    'BECCS': False,
 }
 
 # Carbon price scenario: either '1.8C 67%', '1.5C 50%', '1.5C 67%', 'Default', '100', or None. 
@@ -335,6 +335,8 @@ SOC_AMORTISATION = 15
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
+
+RELAXED_WATER_LIMITS_FOR_INFEASIBILITY = 'on'
     
             
 
@@ -353,21 +355,25 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
 # stress is 0.2 then agriculture can use up 70% of this, leaving 30% for domestic/industrial. The water yield target for ag
 # should then be historical net yield * (1 - water stress * agricultural share)
 
-water_stress = 0.2
-ag_share_of_water_use = 1 # 0.7
-water_yield_target_ag_share = 1 - water_stress * ag_share_of_water_use
+WATER_STRESS = 0.2
+AG_SHARE_OF_WATER_USE = 0.7
+WATER_YIELD_TARGET_AG_SHARE = 1 - WATER_STRESS * AG_SHARE_OF_WATER_USE
 
 # Set a dictionary of water yield targets (i.e., the proportion of historical net annual water yield). LUTO will ensure that 
 # net annual water yield is >= this proportion of historical net annual water yield is met by the given date, leaving sufficient water 
 # for domestic and industrial use. The water yield target grades linearly from net water yield in 2010 to achieve the target by the target date
 # for each catchment (river region or drainage division)
 WATER_YIELD_TARGETS = {
-                        2030: water_yield_target_ag_share,
-                        2100: water_yield_target_ag_share,
+                        2030: WATER_YIELD_TARGET_AG_SHARE,
+                        2100: WATER_YIELD_TARGET_AG_SHARE,
                       }
 
 # Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water turned off due to infeasibility issues with water constraint in Pilbara
 LIVESTOCK_DRINKING_WATER = 1
+
+# Consider water license costs (0 [off] or 1 [on]) of land-use transition ***** If on then there is a noticeable water sell-off by irrigators in the MDB when maximising profit
+INCLUDE_WATER_LICENSE_COSTS = 0
+
 
 
 # Biodiversity limits and parameters *******************************

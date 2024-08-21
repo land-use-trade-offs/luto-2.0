@@ -18,8 +18,6 @@
 Provides minimalist Solver class and pure helper functions.
 """
 
-from copy import deepcopy
-
 import numpy as np
 import gurobipy as gp
 import luto.settings as settings
@@ -30,6 +28,7 @@ from typing import Optional
 
 from luto import tools
 from luto.solvers.input_data import SolverInputData
+from luto.economics.agricultural.water import calc_water_net_yield_for_region
 from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_REVERSIBLE
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.settings import NON_AG_LAND_USES, NON_AG_LAND_USES_REVERSIBLE
@@ -82,13 +81,6 @@ class LutoSolver:
         self.X_ag_man_dry_vars_jr = None
         self.X_ag_man_irr_vars_jr = None
         self.V = None
-
-        # Initialise previous variable stores (only relevant for time series runs)
-        self.prev_X_ag_dry_vars_jr: np.ndarray = None
-        self.prev_X_ag_irr_vars_jr: np.ndarray = None
-        self.prev_X_ag_man_dry_vars_jr: dict[str, np.ndarray] = None
-        self.prev_X_ag_man_irr_vars_jr: dict[str, np.ndarray] = None
-        self.prev_X_non_ag_vars_kr: np.ndarray = None
 
         # Initialise constraint lookups
         self.cell_usage_constraint_r = {}
@@ -544,6 +536,40 @@ class LutoSolver:
             raise ValueError(
                 'DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"'
             )
+        
+    def _get_water_nyield_base_year_vars_current_year_layers(
+        self, region: int, region_ind: np.ndarray
+    ) -> float:
+        """
+        Calculates the water net yield using the base year's (previous year's) variable 
+        solutions and this year's water net yield matrices.
+
+        This helps the edge case where, over time, irreversible non-ag land uses make
+        water constraints infeasible. 
+        """
+        if any(
+            [
+                self._input_data.base_year_ag_sol is None,
+                self._input_data.base_year_non_ag_sol is None,
+                self._input_data.base_year_ag_man_sol is None,
+            ]
+        ):
+            raise ValueError(
+                "Base year solutions must be provided to calculate water "
+                "net yield of the base year with current year layers."
+            )
+
+        return calc_water_net_yield_for_region(
+            region_ind,
+            self._input_data.am2j,
+            self._input_data.base_year_ag_sol,
+            self._input_data.base_year_non_ag_sol,
+            self._input_data.base_year_ag_man_sol,
+            self._input_data.ag_w_mrj,
+            self._input_data.non_ag_w_rk,
+            self._input_data.ag_man_w_mrj,
+            self._input_data.w_ccimpact[region],
+        )
 
     def _add_water_usage_limit_constraints(self):
         """
@@ -551,29 +577,23 @@ class LutoSolver:
         If `cells` is provided, only adds constraints for regions containing at least one of the
         provided cells.
         """
-        
-        # Do nothing if water limits are not enabled
-        if settings.WATER_LIMITS == "off":
+        if settings.WATER_LIMITS != "on":
             return
-        elif settings.WATER_LIMITS != "on":
-            raise ValueError('`settings.WATER_LIMITS` must be "on" or "off"')
+        
         print(f'  ...water net yield constraints by {settings.WATER_REGION_DEF}...')
 
         min_var = lambda var, prev_var: var if prev_var.x > 1e-3 else prev_var.x
         
         # Ensure water use remains below limit for each region
         for region, (reg_name, _, w_net_yield_limit, ind) in self._input_data.limits["water"].items():
-
             reg_ccimpact = self._input_data.w_ccimpact[region]
 
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.ag_w_mrj[0, ind, j] 
-                    * min_var(self.X_ag_dry_vars_jr[j, ind], self.prev_X_ag_dry_vars_jr[j, ind])
+                    self._input_data.ag_w_mrj[0, ind, j] * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
-                    self._input_data.ag_w_mrj[1, ind, j] 
-                    * min_var(self.X_ag_irr_vars_jr[j, ind], self.prev_X_ag_irr_vars_jr[j, ind])
+                    self._input_data.ag_w_mrj[1, ind, j] * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
                 for j in range(self._input_data.n_ag_lus)
             )
@@ -581,11 +601,11 @@ class LutoSolver:
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
                     self._input_data.ag_man_w_mrj[am][0, ind, j_idx]
-                    * min_var(self.X_ag_man_dry_vars_jr[am][j_idx, ind], self.prev_X_ag_man_dry_vars_jr[am][j_idx, ind])
+                    * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
                 )  # Dryland alt. ag. management contributions
                 + gp.quicksum(
                     self._input_data.ag_man_w_mrj[am][1, ind, j_idx]
-                    * min_var(self.X_ag_man_irr_vars_jr[am][j_idx, ind], self.prev_X_ag_man_irr_vars_jr[am][j_idx, ind])
+                    * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
                 )  # Irrigated alt. ag. management contributions
                 for am, am_j_list in self._input_data.am2j.items()
                 for j_idx in range(len(am_j_list))
@@ -593,23 +613,37 @@ class LutoSolver:
 
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.non_ag_w_rk[ind, k] 
-                    * min_var(self.X_non_ag_vars_kr[k, ind], self.prev_X_non_ag_vars_kr[k, ind])
+                    self._input_data.non_ag_w_rk[ind, k] * self.X_non_ag_vars_kr[k, ind]
                 )  # Non-agricultural contribution
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
             w_net_yield_region = ag_contr + ag_man_contr + non_ag_contr + reg_ccimpact
 
+            base_year_water_yield_with_current_layers = None
+
+            # Update the net yield limit to be lower based on last year's solution if at risk of infeasibility
+            constr_wny_limit = w_net_yield_limit
+            wny_limit_updated = False
+            if self._input_data.base_year_ag_sol is not None and settings.RELAXED_WATER_LIMITS_FOR_INFEASIBILITY == 'on':
+                base_year_water_yield_with_current_layers = self._get_water_nyield_base_year_vars_current_year_layers(region, ind)
+                if base_year_water_yield_with_current_layers < w_net_yield_limit:
+                    constr_wny_limit = base_year_water_yield_with_current_layers
+                    wny_limit_updated = True
+
             # Check that the contributions are not all zero, and add constraint if so.
             # Must check the type because 'Gurobi expression == 0' returns another expression 
             if not type(w_net_yield_region) == int:
-                constr = self.gurobi_model.addConstr(w_net_yield_region >= w_net_yield_limit)
-                for r in ind:
-                    self.water_limit_constraints.append(constr)
+                constr = self.gurobi_model.addConstr(w_net_yield_region >= constr_wny_limit)
+                self.water_limit_constraints.append(constr)
 
             if settings.VERBOSE == 1:
                 print(f"    ...net water yield in {reg_name} >= {w_net_yield_limit:.2f} ML")
+                if wny_limit_updated:
+                    print(
+                        f"        ...net water yield in {reg_name} lowered from {w_net_yield_limit:.2f} ML "
+                        f"to {constr_wny_limit:.2f} ML to avoid infeasibility"
+                    )
         print('')
 
     def _add_ghg_emissions_limit_constraints(self):

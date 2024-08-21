@@ -1,5 +1,6 @@
 
 import numpy as np
+import nbformat as nbf
 import xarray as xr
 import rioxarray as rxr
 import rasterio
@@ -9,6 +10,7 @@ import matplotlib.patches as mpatches
 from itertools import product
 
 from luto.data import Data
+from luto.tools.Manual_jupyter_books.helpers.parameters import NOTEBOOK_META_DICT
 from luto.tools.spatializers import get_coarse2D_map
 
 
@@ -190,3 +192,20 @@ def map_to_plot(_map, colors, cell_names, legend_params, ax=None):
 
     # Plot the 4-band map
     plot_4band_map(arr_4band, color_desc_dict, legend_params, ax)
+    
+    
+    
+def add_meta_to_nb(ipath):
+
+    # Search through each notebook and look for the text, add a tag if necessary
+    ntbk = nbf.read(ipath, nbf.NO_CONVERT)
+
+    for cell in ntbk.cells:
+        cell_tags = cell.get('metadata', {}).get('tags', [])
+        for key, val in NOTEBOOK_META_DICT.items():
+            if key in cell['source']:
+                cell_tags = [val]
+        if len(cell_tags) > 0:
+            cell['metadata']['tags'] = cell_tags
+
+    nbf.write(ntbk, ipath)

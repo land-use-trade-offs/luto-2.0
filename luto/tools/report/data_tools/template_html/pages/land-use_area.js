@@ -25,6 +25,59 @@ document.addEventListener("DOMContentLoaded", function () {
   var year_ticks = years.length == 2 ? years : null;
 
 
+  // Chart:area_0_grouped_lu_area_wide
+  Highcharts.chart("area_0_grouped_lu_area_wide", {
+    chart: {
+      type: "column",
+      marginRight: 380,
+    },
+    title: {
+      text: "Total Area in Each Land-use Group",
+    },
+    series: JSON.parse(
+      document.getElementById("area_0_grouped_lu_area_wide_csv").innerHTML
+    ),
+    credits: {
+      enabled: false,
+    },
+    xAxis: {
+      tickPositions: year_ticks,
+    },
+    yAxis: {
+      title: {
+        text: "Area (million km2)",
+      },
+    },
+
+    legend: {
+      align: "right",
+      layout: "vertical",
+      x: -120,
+      y: -10,
+      verticalAlign: "middle",
+      itemMarginTop: 0,
+      itemMarginBottom: 1,
+    },
+
+    tooltip: {
+      formatter: function () {
+        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+          }:</b>${this.y.toFixed(2)}<br/>`;
+      },
+    },
+
+    plotOptions: {
+      column: {
+        stacking: "normal",
+      },
+    },
+
+    exporting: {
+      sourceWidth: 1200,
+      sourceHeight: 600,
+    },
+  });
+
   
   // Chart:area_1_total_area_wide
   Highcharts.chart("area_1_total_area_wide", {

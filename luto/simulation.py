@@ -64,12 +64,6 @@ def solve_timeseries(data: Data, steps: int, base: int, target: int):
             old_non_ag_x_rk = luto_solver._input_data.non_ag_x_rk.copy()
             old_non_ag_lb_rk = luto_solver._input_data.non_ag_lb_rk.copy()
 
-            luto_solver.prev_X_ag_dry_vars_jr = luto_solver.X_ag_dry_vars_jr.copy()
-            luto_solver.prev_X_ag_irr_vars_jr = luto_solver.X_ag_irr_vars_jr.copy()
-            luto_solver.prev_X_ag_man_dry_vars_jr = luto_solver.X_non_ag_vars_kr.copy()
-            luto_solver.prev_X_ag_man_irr_vars_jr = luto_solver.X_ag_man_dry_vars_jr.copy()
-            luto_solver.prev_X_non_ag_vars_kr = luto_solver.X_ag_man_irr_vars_jr.copy()
-
             luto_solver.update_formulation(
                 input_data=input_data,
                 d_c=d_c,
