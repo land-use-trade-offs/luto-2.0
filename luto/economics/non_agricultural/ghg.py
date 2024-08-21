@@ -25,7 +25,7 @@ def get_ghg_env_plantings(data: Data, aggregate) -> np.ndarray|pd.DataFrame:
     if aggregate==True:
         return -data.EP_BLOCK_AVG_T_CO2_HA * data.REAL_AREA
     elif aggregate==False:
-        return pd.DataFrame(-data.EP_BLOCK_AVG_T_CO2_HA * data.REAL_AREA,columns=['ENV_PLANTINGS'])
+        return pd.DataFrame(-data.EP_BLOCK_AVG_T_CO2_HA * data.REAL_AREA, columns=['ENV_PLANTINGS'])
     else:
     # If the aggregate arguments is not in [True,False]. That must be someting wrong
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
@@ -105,7 +105,7 @@ def get_ghg_sheep_agroforestry(
     if aggregate==True:
         return ghg_total
     elif aggregate==False:
-        return pd.DataFrame(ghg_total,columns=['SHEEP_CARBON_PLANTINGS_BELT'])
+        return pd.DataFrame(ghg_total, columns=['SHEEP_AGROFORESTRY'])
     else:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
     
@@ -142,7 +142,7 @@ def get_ghg_beef_agroforestry(
     if aggregate==True:
         return ghg_total
     elif aggregate==False:
-        return pd.DataFrame(ghg_total,columns=['SHEEP_CARBON_PLANTINGS_BELT'])
+        return pd.DataFrame(ghg_total, columns=['BEEF_AGROFORESTRY'])
     else:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
@@ -266,6 +266,8 @@ def get_ghg_beef_carbon_plantings_belt(
 
 def get_ghg_beccs(data, aggregate) -> np.ndarray|pd.DataFrame:
     """
+    Calculate the greenhouse gas emissions of BECCS for each cell.
+    
     Parameters
     ----------
     data: object/module
@@ -275,9 +277,6 @@ def get_ghg_beccs(data, aggregate) -> np.ndarray|pd.DataFrame:
     -------
     if aggregate == True (default)  -> np.ndarray
        aggregate == False           -> pd.DataFrame
-    
-    Greenhouse gas emissions of agroforestry for each cell.
-    Since agroforestry reduces carbon in the air, each value will be <= 0.
     """
 
     # Tonnes of CO2e per ha, adjusted for resfactor

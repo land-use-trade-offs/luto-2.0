@@ -17,13 +17,14 @@ from luto.tools.report.data_tools.parameters import (AG_LANDUSE,
                                                      COMMODITIES_ALL,
                                                      COMMODITIES_OFF_LAND, 
                                                      GHG_CATEGORY, 
-                                                     GHG_NAMES, 
+                                                     GHG_NAMES,
                                                      LANDUSE_ALL_RENAMED,
                                                      LU_CROPS, 
                                                      LU_NATURAL,
                                                      LVSTK_MODIFIED, 
                                                      LVSTK_NATURAL, 
                                                      NON_AG_LANDUSE_RAW, 
+                                                     RENAME_NON_AG,
                                                      RENAME_AM_NON_AG)
 
 
@@ -686,13 +687,13 @@ def save_report_data(raw_data_dir:str):
                                             
     cost_transition_ag2non_ag_trans_mat = cost_transition_ag2non_ag_trans_mat\
                                            .set_index(['Year','From land-use', 'To land-use'])\
-                                           .reindex(index = pd.MultiIndex.from_product([years, AG_LANDUSE, NON_AG_LANDUSE_RAW],
+                                           .reindex(index = pd.MultiIndex.from_product([years, AG_LANDUSE, RENAME_NON_AG.values()],
                                                     names = ['Year','From land-use', 'To land-use'])).reset_index()
                                            
     cost_transition_ag2non_ag_trans_mat['idx_from'] = cost_transition_ag2non_ag_trans_mat['From land-use']\
                                                     .apply(lambda x: AG_LANDUSE.index(x))
     cost_transition_ag2non_ag_trans_mat['idx_to']  = cost_transition_ag2non_ag_trans_mat['To land-use']\
-                                                    .apply(lambda x: NON_AG_LANDUSE_RAW.index(x))
+                                                    .apply(lambda x: list(RENAME_NON_AG.values()).index(x))
                                                     
 
     cost_transition_ag2non_ag_trans_mat_data = cost_transition_ag2non_ag_trans_mat\
@@ -703,7 +704,7 @@ def save_report_data(raw_data_dir:str):
     
     
     cost_transition_ag2non_ag_trans_mat_json = {'categories_from': AG_LANDUSE,
-                                                'categories_to': NON_AG_LANDUSE_RAW,
+                                                'categories_to': list(RENAME_NON_AG.values()),
                                                 'series': json.loads(cost_transition_ag2non_ag_trans_mat_data.to_json(orient='records'))}
     
     

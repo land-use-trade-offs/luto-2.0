@@ -204,8 +204,7 @@ def add_meta_to_nb(ipath):
         cell_tags = cell.get('metadata', {}).get('tags', [])
         for key, val in NOTEBOOK_META_DICT.items():
             if key in cell['source']:
-                if val not in cell_tags:
-                    cell_tags.append(val)
+                cell_tags = [val]
         if len(cell_tags) > 0:
             cell['metadata']['tags'] = cell_tags
 

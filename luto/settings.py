@@ -31,8 +31,8 @@ VERSION = '2.3'
 # ---------------------------------------------------------------------------- #
 
 pd.set_option('display.width', 470)
-pd.set_option('display.max_columns', 200)
-pd.set_option('display.max_rows', 5000)
+pd.set_option('display.max_columns', 100)
+pd.set_option('display.max_rows', 100)
 pd.set_option('display.float_format', '{:,.4f}'.format)
 
 

@@ -10,8 +10,9 @@ legend_params = {
 
 # The dictionary to add meta to notebooks
 NOTEBOOK_META_DICT = {
-    "# HIDDEN": "hide-cell",        # Hide the cell and output
-    "# HIDE CODE": "hide-input"     # Remove the input and keep the output
+    "# HIDDEN": "hide-cell",            # Hide the cell and output
+    "# HIDE CODE": "remove-input",      # Remove the input and keep the output
+    "# REMOVE": "remove-cell"           # Remove the cell and output
 }
     
 
