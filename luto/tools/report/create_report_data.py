@@ -17,13 +17,14 @@ from luto.tools.report.data_tools.parameters import (AG_LANDUSE,
                                                      COMMODITIES_ALL,
                                                      COMMODITIES_OFF_LAND, 
                                                      GHG_CATEGORY, 
-                                                     GHG_NAMES, 
+                                                     GHG_NAMES,
                                                      LANDUSE_ALL_RENAMED,
                                                      LU_CROPS, 
                                                      LU_NATURAL,
                                                      LVSTK_MODIFIED, 
                                                      LVSTK_NATURAL, 
                                                      NON_AG_LANDUSE_RAW, 
+                                                     RENAME_NON_AG,
                                                      RENAME_AM_NON_AG)
 
 
@@ -48,11 +49,14 @@ def save_report_data(raw_data_dir:str):
     # Get all LUTO output files and store them in a dataframe
     files = get_all_files(raw_data_dir)
     
+    # The land-use groupings to combine the land-use into a single category
+    lu_group = pd.read_csv('luto/tools/report/Assets/lu_group.csv')
+    lu_group_expand = lu_group.set_index(['Category', 'color_HEX']).apply(lambda x: x.str.split(', ').explode()).reset_index()
+    
     # Set the years to be int
     files['Year'] = files['Year'].astype(int)
     
-    # Select the years to reduce the column number to 
-    # avoid cluttering in the multi-level axis graphing
+    # Select the years to reduce the column number to avoid cluttering in the multi-level axis graphing
     years = sorted(files['Year'].unique().tolist())
     years_select = select_years(years)
     
@@ -76,18 +80,37 @@ def save_report_data(raw_data_dir:str):
 
     area_dvar = pd.concat([ag_dvar_area, non_ag_dvar_area], ignore_index=True)
     area_dvar = area_dvar.replace(RENAME_AM_NON_AG)
+    
+    # Add the category and color
+    area_dvar = area_dvar.merge(lu_group_expand, left_on='Land-use', right_on='Land-use', how='left')
+    area_dvar = area_dvar.rename(columns={
+        'Category': 'category_name',
+        'color_HEX': 'category_HEX_color'
+    })
+    
+    # Plot_1-0: Total Area (km2) in grouped land-use
+    lu_group_area = area_dvar.groupby(['Year','category_name', 'category_HEX_color']).sum(numeric_only=True).reset_index()
+    lu_group_area = lu_group_area\
+        .groupby(['category_name', 'category_HEX_color'])[['Year','Area (million km2)']]\
+        .apply(lambda x:list(map(list,zip(x['Year'], x['Area (million km2)']))))\
+        .reset_index()
+        
+    lu_group_area.columns = ['name','color','data']
+    lu_group_area['type'] = 'column'
+    lu_group_area.to_json(f'{SAVE_DIR}/area_0_grouped_lu_area_wide.json', orient='records')
+    
 
     # Plot_1-1: Total Area (km2)
     lu_area_dvar = area_dvar.groupby(['Year','Land-use']).sum(numeric_only=True).reset_index()
     lu_area_dvar = lu_area_dvar\
         .groupby('Land-use')[['Year','Area (million km2)']]\
-        .apply(lambda x:list(map(list,zip(x['Year'],x['Area (million km2)']))))\
+        .apply(lambda x:list(map(list,zip(x['Year'], x['Area (million km2)']))))\
         .reset_index()
         
     lu_area_dvar.columns = ['name','data']
     lu_area_dvar['type'] = 'column'
     lu_area_dvar['sort_index'] = lu_area_dvar['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-    lu_area_dvar = lu_area_dvar.sort_values('sort_index').drop('sort_index',axis=1)
+    lu_area_dvar = lu_area_dvar.sort_values('sort_index').drop('sort_index', axis=1)
     lu_area_dvar['color'] = lu_area_dvar['name'].apply(lambda x: LANDUSE_ALL_COLORS[x])
     
     lu_area_dvar.to_json(f'{SAVE_DIR}/area_1_total_area_wide.json', orient='records')
@@ -686,13 +709,13 @@ def save_report_data(raw_data_dir:str):
                                             
     cost_transition_ag2non_ag_trans_mat = cost_transition_ag2non_ag_trans_mat\
                                            .set_index(['Year','From land-use', 'To land-use'])\
-                                           .reindex(index = pd.MultiIndex.from_product([years, AG_LANDUSE, NON_AG_LANDUSE_RAW],
+                                           .reindex(index = pd.MultiIndex.from_product([years, AG_LANDUSE, RENAME_NON_AG.values()],
                                                     names = ['Year','From land-use', 'To land-use'])).reset_index()
                                            
     cost_transition_ag2non_ag_trans_mat['idx_from'] = cost_transition_ag2non_ag_trans_mat['From land-use']\
                                                     .apply(lambda x: AG_LANDUSE.index(x))
     cost_transition_ag2non_ag_trans_mat['idx_to']  = cost_transition_ag2non_ag_trans_mat['To land-use']\
-                                                    .apply(lambda x: NON_AG_LANDUSE_RAW.index(x))
+                                                    .apply(lambda x: list(RENAME_NON_AG.values()).index(x))
                                                     
 
     cost_transition_ag2non_ag_trans_mat_data = cost_transition_ag2non_ag_trans_mat\
@@ -703,7 +726,7 @@ def save_report_data(raw_data_dir:str):
     
     
     cost_transition_ag2non_ag_trans_mat_json = {'categories_from': AG_LANDUSE,
-                                                'categories_to': NON_AG_LANDUSE_RAW,
+                                                'categories_to': list(RENAME_NON_AG.values()),
                                                 'series': json.loads(cost_transition_ag2non_ag_trans_mat_data.to_json(orient='records'))}
     
     

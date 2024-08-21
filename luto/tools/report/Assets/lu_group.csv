@@ -1,0 +1,13 @@
+﻿Category,Land-use,color_HEX
+Beef,"Beef - natural land, Beef - modified land",#8b2205
+Carbon-focussed sequestration,"Carbon plantings (monoculture), BECCS (Bioenergy with Carbon Capture and Storage), Farm forestry (hardwood timber + sheep), Farm forestry (hardwood timber + beef)",#73ff73
+Cereals,"Summer cereals, Winter cereals",#f5c13d
+Dairy,"Dairy - natural land, Dairy - modified land",#ff99cc
+"Fruit, vegetables, nuts, legumes","Apples, Citrus, Grapes, Nuts, Pears, Plantation fruit, Stone fruit, Summer legumes, Tropical stone fruit, Vegetables, Winter legumes",#9f2cb6
+Hay,Hay,#fbeabf
+Nature positive sequestration,"Environmental plantings (mixed species), Riparian buffer restoration (mixed species), Agroforestry (mixed species + sheep), Agroforestry (mixed species + beef)",#006f53
+Oilseeds,"Summer oilseeds, Winter oilseeds",#e0d47a
+Other crops,"Cotton, Other non-cereal crops, Rice, Sugar",#d9abe1
+Sheep,"Sheep - natural land, Sheep - modified land",#00b0e0
+Unallocated - modified land,Unallocated - modified land,#dcdcdc
+Unallocated - natural land,Unallocated - natural land,#767171
