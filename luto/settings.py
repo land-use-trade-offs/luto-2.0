@@ -190,14 +190,14 @@ water yield and if non-ag land uses are not reversible then a catchment may not 
 This is expected behaviour and the user must choose how to deal with it.
 """
 NON_AG_LAND_USES_REVERSIBLE = {
-    'Environmental Plantings': True,
-    'Riparian Plantings': True,
-    'Sheep Agroforestry': True,
-    'Beef Agroforestry': True,
-    'Carbon Plantings (Block)': True,
-    'Sheep Carbon Plantings (Belt)': True,
-    'Beef Carbon Plantings (Belt)': True,
-    'BECCS': True,
+    'Environmental Plantings': False,
+    'Riparian Plantings': False,
+    'Sheep Agroforestry': False,
+    'Beef Agroforestry': False,
+    'Carbon Plantings (Block)': False,
+    'Sheep Carbon Plantings (Belt)': False,
+    'Beef Carbon Plantings (Belt)': False,
+    'BECCS': False,
 }
 
 # Carbon price scenario: either '1.8C 67%', '1.5C 50%', '1.5C 67%', 'Default', '100', or None. 
@@ -335,6 +335,8 @@ SOC_AMORTISATION = 15
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
+
+RELAXED_WATER_LIMITS_FOR_INFEASIBILITY = 'on'
     
             
 
@@ -354,7 +356,7 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
 # should then be historical net yield * (1 - water stress * agricultural share)
 
 water_stress = 0.2
-ag_share_of_water_use = 1 # 0.7
+ag_share_of_water_use = 0.7
 water_yield_target_ag_share = 1 - water_stress * ag_share_of_water_use
 
 # Set a dictionary of water yield targets (i.e., the proportion of historical net annual water yield). LUTO will ensure that 
@@ -367,7 +369,11 @@ WATER_YIELD_TARGETS = {
                       }
 
 # Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water turned off due to infeasibility issues with water constraint in Pilbara
-LIVESTOCK_DRINKING_WATER = 0
+LIVESTOCK_DRINKING_WATER = 1
+
+# Consider water license costs (0 [off] or 1 [on]) of land-use transition ***** If on then there is a noticeable water sell-off by irrigators in the MDB when maximising profit
+INCLUDE_WATER_LICENSE_COSTS = 0
+
 
 
 # Biodiversity limits and parameters *******************************

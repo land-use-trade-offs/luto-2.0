@@ -856,7 +856,7 @@ def write_water(data: Data, yr_cal, path):
                                 , 'PROPORTION_ALL_%'] )
 
     # Get water use limits used as constraints in model
-    w_net_yield_limits = ag_water.get_water_net_yield_limits(data, yr_cal)
+    w_net_yield_limits = ag_water.get_water_net_yield_limit_values(data, yr_cal)
 
     # Set up data for river regions or drainage divisions
     if settings.WATER_REGION_DEF == 'Drainage Division':

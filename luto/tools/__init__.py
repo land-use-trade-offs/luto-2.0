@@ -418,7 +418,7 @@ def get_water_delta_matrix(w_mrj, l_mrj, data, yr_idx):
     w_net_mrj = w_mrj - w_r[:, np.newaxis]
 
     # Water license cost calculated as net water requirements (ML/cell) x licence price ($/ML).
-    w_delta_mrj = w_net_mrj * data.WATER_LICENCE_PRICE[:, np.newaxis] * data.WATER_LICENSE_COST_MULTS[yr_cal]
+    w_delta_mrj = w_net_mrj * data.WATER_LICENCE_PRICE[:, np.newaxis] * data.WATER_LICENSE_COST_MULTS[yr_cal] * settings.INCLUDE_WATER_LICENSE_COSTS
 
     # When land-use changes from dryland to irrigated add <settings.NEW_IRRIG_COST> per hectare for establishing irrigation infrastructure
     new_irrig = (
