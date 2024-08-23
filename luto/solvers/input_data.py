@@ -206,8 +206,8 @@ def get_ag_w_mrj(data: Data, target_index):
 
 
 def get_w_ccimpact(data: Data, target_index):
-    print('Getting water climate change impact figures...', flush = True)
-    return ag_water.get_water_ccimpact(data, target_index)
+    print('Getting water yield from puclic land...', flush = True)
+    return ag_water.get_water_public_land(data, target_index)
 
 
 def get_ag_b_mrj(data: Data):

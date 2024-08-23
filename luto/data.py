@@ -1647,7 +1647,7 @@ class Data:
         water_sr_yield: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         """
-        Get the natural land water yield array, inclusive of all cells that LUTO does not look at.
+        Get the net land water yield array, inclusive of all cells that LUTO does not look at.
 
         Returns
         -------
