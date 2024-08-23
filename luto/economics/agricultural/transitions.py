@@ -86,7 +86,6 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
     Calculate the transition matrices for land-use and land management transitions.
     Args:
         data (Data object): The data object containing the necessary input data.
-        data (Data object): The data object containing the necessary input data.
         yr_idx (int): The index of the current year.
         base_year (int): The base year for the transition calculations.
         lumaps (dict): A dictionary of land-use maps for each year.
@@ -148,7 +147,7 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
     # Carbon costs of transitioning cells.                          #
     # -------------------------------------------------------------- #S
 
-    # apply the cost of carbon released by transitioning modified land to natural land
+    # Apply the cost of carbon released by transitioning natural land to modified land
     ghg_t_mrj = ag_ghg.get_ghg_transition_penalties(data, lumap)               # <unit: t/ha>      
     ghg_t_mrj_cost = tools.amortise(ghg_t_mrj * data.get_carbon_price_by_yr_idx(yr_idx))     
     ghg_t_mrj_cost = np.einsum('mrj,mrj,mrj->mrj', ghg_t_mrj_cost, x_mrj, l_mrj_not)

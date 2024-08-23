@@ -74,11 +74,11 @@ def convert_1band_to_4band_in_memory(initial_tif:str,
 
     Args:
         initial_tif (str): 
-                The path for input tif.
+            The path for input tif.
         band (int, optional):
-                The band number of the input tif to process (default is 1).
+            The band number of the input tif to process (default is 1).
         color_dict (dict): 
-                A dictionary of color values for each class.
+            A dictionary of color values for each class.
 
     Returns:
         MemoryFile: The new MemoryFile containing the 4-band (RGBA) array.

@@ -54,7 +54,7 @@ def get_wreq_matrices(data: Data, yr_idx):
             w_req_mrj[1, :, j] = w_req_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)       # Water reqs depend on initial stocking rate for irrigation
     
     # Convert to ML per cell via REAL_AREA
-    w_req_mrj *= data.REAL_AREA[:, np.newaxis]                      # <unit: ML/head|ha> * <unit: head|ha/cell> -> <unit: ML/cell>
+    w_req_mrj *= data.REAL_AREA[:, np.newaxis]                      # <unit: ML/ha> * <unit: ha/cell> -> <unit: ML/cell>
 
     return w_req_mrj
 
@@ -100,9 +100,10 @@ def get_wyield_matrices(data: Data, yr_idx) -> np.ndarray:
     return w_yield_mrj
 
 
-def get_water_ccimpact(data: Data, yr_idx) -> dict[int, float]:
+def get_water_public_land(data: Data, yr_idx) -> dict[int, float]:
     """
-    Return water climate change (CC) impact matrices by land management, cell, and land-use type.
+    Return water climate change (CC) impact matrices by land management, cell, and land-use type. 
+    Note the impact comes from cells that LUTO does not look at (Urban, Public services, etc.).
     
     Parameters:
         data (object): The data object containing the required data.
@@ -425,7 +426,7 @@ def calc_water_net_yield_by_region_in_year_from_data(
         data, ag_w_mrj, data.lumaps[yr_cal], yr_idx
     )
     ag_man_w_mrj = ag_man_w_mrj if ag_man_w_mrj is not None else get_agricultural_management_water_matrices(data, yr_idx)
-    w_cc_impact = w_cc_impact if w_cc_impact is not None else get_water_ccimpact(data, yr_idx)
+    w_cc_impact = w_cc_impact if w_cc_impact is not None else get_water_public_land(data, yr_idx)
     
     # Calculate net yields
     net_yield_by_region = {}

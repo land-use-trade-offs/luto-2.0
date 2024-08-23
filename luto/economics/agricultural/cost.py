@@ -62,7 +62,7 @@ def get_cost_crop(data: Data, lu, lm, yr_idx):
     else: # Calculate the total costs 
         yr_cal = data.YR_CAL_BASE + yr_idx
         # Variable costs (quantity costs and area costs)        
-        # Quantity costs (calculated as cost per tonne x tonne per cell x resfactor)
+        
         qc_multiplier = 1
         if lu in data.QC_COST_MULTS.columns:
             qc_multiplier = data.QC_COST_MULTS.loc[yr_cal, lu]
@@ -70,7 +70,8 @@ def get_cost_crop(data: Data, lu, lm, yr_idx):
             print(
                 f"WARNING: Multiplier for {lu} not found in the 'QC_multiplier' sheet of "
                 f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
-        
+            
+        # Quantity costs (calculated as cost per tonne x tonne per cell x resfactor)
         costs_q = ( data.AGEC_CROPS['QC', lm, lu]
                   * qc_multiplier
                   * get_quantity(data, lu.upper(), lm, yr_idx) )  # lu.upper() only for crops as needs to be in product format in get_quantity().  

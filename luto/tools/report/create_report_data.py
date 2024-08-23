@@ -1,4 +1,3 @@
-
 import os
 import json
 import re
@@ -493,7 +492,7 @@ def save_report_data(raw_data_dir:str):
     rev_cost_net_wide.columns = ['name','data']
     rev_cost_net_wide['type'] = 'spline'
     
-    rev_cost_wide_json = pd.concat([rev_cost_all_wide,rev_cost_net_wide],axis=0)
+    rev_cost_wide_json = pd.concat([rev_cost_all_wide, rev_cost_net_wide],axis=0)
     
     # Define the specific order
     order = ['Agricultural land-use (revenue)', 
@@ -1095,35 +1094,38 @@ def save_report_data(raw_data_dir:str):
     #                     5) Water                     #
     ####################################################
     
-
     water_df_total = files.query('category == "water" \
         and year_types == "single_year" \
-        and ~base_name.str.contains("separate") \
+        and ~base_name.str.contains("separate_") \
         and ~base_name.str.contains("outside_LUTO")').reset_index(drop=True)
     water_df_total = pd.concat([pd.read_csv(path) for path in water_df_total['path']], ignore_index=True)
     
-    water_df_separate = files.query('category == "water" and year_types == "single_year" and base_name.str.contains("separate")').reset_index(drop=True)
-    water_df_separate = pd.concat([pd.read_csv(path) for path in water_df_separate['path']], ignore_index=True)
-    water_df_separate = water_df_separate.replace(RENAME_AM_NON_AG)
-    
+
     water_df_outside_LUTO = files.query('category == "water" \
         and year_types == "single_year" \
         and base_name.str.contains("outside_LUTO")').reset_index(drop=True)
     water_df_outside_LUTO = pd.concat([pd.read_csv(path) for path in water_df_outside_LUTO['path']], ignore_index=True)
 
 
+    water_df_separate = files.query('category == "water" and year_types == "single_year" and base_name.str.contains("separate")').reset_index(drop=True)
+    water_df_separate = pd.concat([pd.read_csv(path) for path in water_df_separate['path']], ignore_index=True)
+    water_df_separate = water_df_separate.replace(RENAME_AM_NON_AG)
+
     # Plot_5-1: Water net yield compared to limit (%)
-    water_df_total_pct = water_df_total.query('Variable == "PROPORTION_ALL_%"')
-    water_df_total_pct_wide = water_df_total_pct\
-                                .groupby(['REGION_NAME'])[['Year','Value (ML)']]\
-                                .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
-                                .reset_index()
-                                
-    water_df_total_pct_wide.columns = ['name','data']
-    water_df_total_pct_wide['type'] = 'spline'
-    water_df_total_pct_wide.to_json(f'{SAVE_DIR}/water_1_percent_of_limit.json', orient='records')
-
-
+    for i, var in enumerate(["PROPORTION_ALL_%", "PROPORTION_ALL_%_CC", "PROPORTION_ALL_%_LU"]):
+        water_df_total_pct = water_df_total.query('Variable == @var')
+        water_df_total_pct_wide = water_df_total_pct\
+                                    .groupby(['REGION_NAME'])[['Year','Value (ML)']]\
+                                    .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
+                                    .reset_index()
+                                    
+        water_df_total_pct_wide.columns = ['name','data']
+        water_df_total_pct_wide['type'] = 'spline'
+        water_df_total_pct_wide.loc[len(water_df_total_pct_wide)] = ['', [[2010, 0], [2011, 0]], 'column']
+        water_df_total_pct_wide.to_json(f'{SAVE_DIR}/water_1_{i+1}_percent_of_limit.json', orient='records')
+        
+        
+        
 
 
     # Plot_5-2: Water net yield compared to limite (ML)
@@ -1135,6 +1137,7 @@ def save_report_data(raw_data_dir:str):
 
     water_df_total_yield_wide.columns = ['name','data']
     water_df_total_yield_wide['type'] = 'spline'
+    water_df_total_yield_wide.loc[len(water_df_total_yield_wide)] = ['', [[2010, 0], [2011, 0]], 'column']
     water_df_total_yield_wide.to_json(f'{SAVE_DIR}/water_2_yield_to_limit.json', orient='records')                        
     
     
@@ -1189,6 +1192,7 @@ def save_report_data(raw_data_dir:str):
     water_df_seperate_lu_wide.to_json(f'{SAVE_DIR}/water_4_net_yield_by_landuse.json', orient='records')
     
     
+    
     # Plot_5-5: Water net yield by Water_supply (ML)
     water_df_seperate_irr = water_df_separate.groupby(['Year','Water_supply']).sum()[['Water Net Yield (ML)']].reset_index()
     
@@ -1200,6 +1204,9 @@ def save_report_data(raw_data_dir:str):
     water_df_seperate_irr_wide.columns = ['name','data']
     water_df_seperate_irr_wide['type'] = 'column'
     water_df_seperate_irr_wide.to_json(f'{SAVE_DIR}/water_5_net_yield_by_Water_supply.json', orient='records')
+    
+    
+    # Plot_5-6: Water net yield by Water_supply (ML)
     
 
 
@@ -1313,6 +1320,7 @@ def save_report_data(raw_data_dir:str):
             
         bio_df_species_group.columns = ['name','data']
         bio_df_species_group['type'] = 'spline'
+        bio_df_species_group.loc[len(bio_df_species_group)] = ['', [[2010, 0], [2011, 0]], 'column']
         bio_df_species_group.to_json(f'{SAVE_DIR}/biodiversity_5_contribution_score_by_group.json', orient='records')
 
 

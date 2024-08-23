@@ -593,7 +593,72 @@ def get_all_path(root_dir:str, save_path:str='data/all_suitability_tifs.csv'):
     df = pd.DataFrame(records)            
     df[['model', 'ssp', 'year', 'mode']] = df.apply(lambda x: pd.Series(find_str(x)), axis=1) 
     df.to_csv(save_path, index=False)
+    
+    
+def calc_water(
+    data, 
+    ind:np.ndarray, 
+    ag_w_mrj:np.ndarray, 
+    non_ag_w_rk:np.ndarray, 
+    ag_man_w_mrj:np.ndarray, 
+    ag_dvar:np.ndarray, 
+    non_ag_dvar:np.ndarray, 
+    am_dvar:np.ndarray):
+    
+    '''
+    Note:
+        This function is only used for the `write_water` in the `luto.tools.write` module.
+        Calculate water yields for year given the index. 
+    
+    Return:
+    - pd.DataFrame, the water yields for year and region.
+    '''
+    
+    # Calculate water yields for year and region.
+    index_levels = ['Landuse Type', 'Landuse', 'Water_supply',  'Water Net Yield (ML)']
 
+    # Agricultural contribution
+    ag_mrj = ag_w_mrj[:, ind, :] * ag_dvar[:, ind, :]   
+    ag_jm = np.einsum('mrj->jm', ag_mrj)                             
+    ag_df = pd.DataFrame(
+        ag_jm.reshape(-1).tolist(),
+        index=pd.MultiIndex.from_product(
+            [['Agricultural Landuse'],
+                data.AGRICULTURAL_LANDUSES,
+                data.LANDMANS])).reset_index()
+    ag_df.columns = index_levels
+
+    # Non-agricultural contribution
+    non_ag_rk = non_ag_w_rk[ind, :] * non_ag_dvar[ind, :]  # Non-agricultural contribution
+    non_ag_k = np.einsum('rk->k', non_ag_rk)                             # Sum over cells
+    non_ag_df = pd.DataFrame(
+        non_ag_k, 
+        index= pd.MultiIndex.from_product([
+                ['Non-agricultural Landuse'],
+                settings.NON_AG_LAND_USES.keys() ,
+                ['dry']  # non-agricultural land is always dry
+    ])).reset_index()
+    non_ag_df.columns = index_levels
+
+    # Agricultural managements contribution
+    AM_dfs = []
+    for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
+        am_j = np.array([data.DESC2AGLU[lu] for lu in am_lus])
+        am_mrj = ag_man_w_mrj[am][:, ind, :] * am_dvar[am][:, ind, :][:, :, am_j] 
+        am_jm = np.einsum('mrj->jm', am_mrj)
+        # water yields for each agricultural management in long dataframe format
+        df_am = pd.DataFrame(
+            am_jm.reshape(-1).tolist(),
+            index=pd.MultiIndex.from_product([
+                ['Agricultural Management'],
+                am_lus,
+                data.LANDMANS
+                ])).reset_index()
+        df_am.columns = index_levels
+        AM_dfs.append(df_am)
+    AM_df = pd.concat(AM_dfs)
+    
+    return pd.concat([ag_df, non_ag_df, AM_df])
 
 
 class LogToFile:

@@ -583,6 +583,8 @@ class LutoSolver:
         
         print(f'  ...water net yield constraints by {settings.WATER_REGION_DEF}...')
 
+        min_var = lambda var, prev_var: var if prev_var.x > 1e-3 else prev_var.x
+        
         # Ensure water use remains below limit for each region
         for region, (reg_name, _, w_net_yield_limit, ind) in self._input_data.limits["water"].items():
             reg_ccimpact = self._input_data.w_ccimpact[region]

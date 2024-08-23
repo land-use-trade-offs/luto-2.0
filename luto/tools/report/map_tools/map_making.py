@@ -119,7 +119,7 @@ def create_png_map(tif_path: str,
 
 
 def decorate_float_plot(color_desc_dict, legend_params, fig):
-        # Add a legend
+    # Add a legend
     legend_val = {
         extra_desc_float_tif[v]: tuple(value / 255 for value in k)
         for k, v in color_desc_dict.items()

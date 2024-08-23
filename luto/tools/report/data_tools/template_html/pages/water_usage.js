@@ -24,8 +24,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 
-  // Chart:water_1_percent_of_limit
-  Highcharts.chart("water_1_percent_of_limit", {
+  // Chart:water_1_1_percent_of_limit
+  Highcharts.chart("water_1_1_percent_of_limit", {
     chart: {
       type: "spline",
       marginRight: 380,
@@ -40,7 +40,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("water_1_percent_of_limit_csv").innerHTML
+      document.getElementById("water_1_1_percent_of_limit_csv").innerHTML
     ),
     xAxis: {
       tickPositions: year_ticks,
@@ -70,6 +70,103 @@ document.addEventListener("DOMContentLoaded", function () {
       sourceHeight: 600,
     },
   });
+
+
+  // Chart:water_1_2_percent_of_limit
+  Highcharts.chart("water_1_2_percent_of_limit", {
+    chart: {
+      type: "spline",
+      marginRight: 380,
+    },
+
+    title: {
+      text: "Climate Change Impact on Water Net Yield",
+    },
+
+    credits: {
+      enabled: false,
+    },
+
+    series: JSON.parse(
+      document.getElementById("water_1_2_percent_of_limit_csv").innerHTML
+    ),
+    xAxis: {
+      tickPositions: year_ticks,
+    },
+    yAxis: {
+      title: {
+        text: "Water yield to baseline (%)",
+      },
+    },
+
+    legend: {
+      align: "right",
+      layout: "vertical",
+      x: -80,
+      verticalAlign: "middle",
+    },
+
+    tooltip: {
+      formatter: function () {
+        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+          }:</b>${this.y.toFixed(2)}<br/>`;
+      },
+    },
+
+    exporting: {
+      sourceWidth: 1200,
+      sourceHeight: 600,
+    },
+  });
+
+  // Chart:water_1_3_percent_of_limit
+  Highcharts.chart("water_1_3_percent_of_limit", {
+    chart: {
+      type: "spline",
+      marginRight: 380,
+    },
+
+    title: {
+      text: "Land-use Change Impact on Water Net Yield",
+    },
+
+    credits: {
+      enabled: false,
+    },
+
+    series: JSON.parse(
+      document.getElementById("water_1_3_percent_of_limit_csv").innerHTML
+    ),
+    xAxis: {
+      tickPositions: year_ticks,
+    },
+    yAxis: {
+      title: {
+        text: "Water yield to baseline (%)",
+      },
+    },
+
+    legend: {
+      align: "right",
+      layout: "vertical",
+      x: -80,
+      verticalAlign: "middle",
+    },
+
+    tooltip: {
+      formatter: function () {
+        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+          }:</b>${this.y.toFixed(2)}<br/>`;
+      },
+    },
+
+    exporting: {
+      sourceWidth: 1200,
+      sourceHeight: 600,
+    },
+  });
+
+
 
   // Chart:water_2_yield_to_limit
   Highcharts.chart("water_2_yield_to_limit", {
