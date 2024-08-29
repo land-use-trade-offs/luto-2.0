@@ -100,7 +100,7 @@ def get_wyield_matrices(data: Data, yr_idx) -> np.ndarray:
     return w_yield_mrj
 
 
-def get_water_public_land(data: Data, yr_idx) -> dict[int, float]:
+def get_water_public_land(data: Data) -> dict[int, dict[int, float]]:
     """
     Return water climate change (CC) impact matrices by land management, cell, and land-use type. 
     Note the impact comes from cells that LUTO does not look at (Urban, Public services, etc.).
@@ -110,10 +110,9 @@ def get_water_public_land(data: Data, yr_idx) -> dict[int, float]:
         yr_idx (int): The index of the year.
     
     Returns:
-        dict[int, float]: <unit: ML/cell> dictionary of water CC impact amounts, keys being region IDs
+        dict[int, dict[int, float]]: <unit: ML/cell> dictionary of water CC impact amounts.
+            The first key is year and the second key is region ID.
     """
-    yr_cal = data.YR_CAL_BASE + yr_idx
-
     if settings.WATER_REGION_DEF == 'River Region':
         ccimpact_array = data.RR_CCIMPACT
 
@@ -126,7 +125,7 @@ def get_water_public_land(data: Data, yr_idx) -> dict[int, float]:
             f"(must be either 'River Region' or 'Drainage Division')."
         )
     
-    return ccimpact_array.loc[yr_cal, :].to_dict()
+    return {yr: ccimpact_array.loc[yr, :].to_dict() for yr in ccimpact_array.index}
 
 
 def get_water_net_yield_matrices(data: Data, yr_idx):
@@ -426,7 +425,7 @@ def calc_water_net_yield_by_region_in_year_from_data(
         data, ag_w_mrj, data.lumaps[yr_cal], yr_idx
     )
     ag_man_w_mrj = ag_man_w_mrj if ag_man_w_mrj is not None else get_agricultural_management_water_matrices(data, yr_idx)
-    w_cc_impact = w_cc_impact if w_cc_impact is not None else get_water_public_land(data, yr_idx)
+    w_cc_impact = w_cc_impact if w_cc_impact is not None else get_water_public_land(data)[yr_cal]
     
     # Calculate net yields
     net_yield_by_region = {}
