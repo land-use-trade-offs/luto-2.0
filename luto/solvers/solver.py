@@ -626,8 +626,8 @@ class LutoSolver:
 
             # Update the net yield limit to be lower based on last year's solution if at risk of infeasibility
             cc_impact_yield_delta = (
-                self._input_data.w_ccimpact[self.final_target_year]
-                - self._input_data.w_ccimpact[self._input_data.target_year]
+                self._input_data.w_ccimpact[self.final_target_year][region]
+                - self._input_data.w_ccimpact[self._input_data.target_year][region]
             )
             constr_wny_limit = w_net_yield_limit + cc_impact_yield_delta
             wny_limit_updated = False
