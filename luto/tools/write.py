@@ -844,7 +844,7 @@ def write_water(data: Data, yr_cal, path):
     ag_w_mrj = ag_water.get_water_net_yield_matrices(data, yr_idx)
     non_ag_w_rk = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[yr_cal], yr_idx)
     ag_man_w_mrj = ag_water.get_agricultural_management_water_matrices(data, yr_idx)
-    w_pub_impact = ag_water.get_water_public_land(data, yr_idx)
+    w_pub_impact = ag_water.get_water_public_land(data)[yr_cal]
 
     # Prepare a data frame.
     df = pd.DataFrame( columns=[  'REGION_ID'
@@ -884,7 +884,7 @@ def write_water(data: Data, yr_cal, path):
     df_water_seperate_dfs_cc = []
     df_water_seperate_dfs_lu = []
 
-    water_public_land = ag_water.get_water_public_land(data, yr_idx)
+    water_public_land = ag_water.get_water_public_land(data)[yr_cal]
 
     for i, region in enumerate(region_limits.keys()):
 
