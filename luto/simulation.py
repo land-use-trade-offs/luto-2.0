@@ -55,7 +55,7 @@ def solve_timeseries(data: Data, steps: int, base: int, target: int):
         d_c = data.D_CY[s]
         
         if s == 0:
-            luto_solver = LutoSolver(input_data, d_c)
+            luto_solver = LutoSolver(input_data, d_c, target)
             luto_solver.formulate()
 
         if s > 0:
@@ -112,7 +112,7 @@ def solve_snapshot(data: Data, base: int, target: int):
 
     start_time = time.time()
     input_data = get_input_data(data, base, target)
-    luto_solver = LutoSolver(input_data, d_c)
+    luto_solver = LutoSolver(input_data, d_c, target)
     luto_solver.formulate()
 
     solution = luto_solver.solve()
