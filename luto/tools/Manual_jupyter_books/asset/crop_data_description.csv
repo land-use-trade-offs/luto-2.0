@@ -1,0 +1,10 @@
+﻿Data type,Abbreviation,Description
+Cost,AC,Area cost ($/ha)
+Cost,FDC,Fixed depreciation cost ($/ha)
+Cost,FLC,Fixed labour cost ($/ha)
+Cost,FOC,Fixed operating cost ($/ha)
+Cost,QC,Quantity cost ($/t)
+Revenue,P1,Price of output 1 ($/t)
+Water,WR,Water requirement (t/ha)
+Water,WP,Water price ($/t)
+Yield,Yield,The yield of crop (t/ha)
