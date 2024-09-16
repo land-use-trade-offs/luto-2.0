@@ -96,7 +96,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 9 x 9 cell block
-RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
+RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
 MODE = 'snapshot'   # Runs for target year only
@@ -356,7 +356,7 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
 # should then be historical net yield * (1 - water stress * agricultural share)
 
 WATER_STRESS = 0.2
-AG_SHARE_OF_WATER_USE = 0.7
+AG_SHARE_OF_WATER_USE = 1.0
 WATER_YIELD_TARGET_AG_SHARE = 1 - WATER_STRESS * AG_SHARE_OF_WATER_USE
 
 # Set a dictionary of water yield targets (i.e., the proportion of historical net annual water yield). LUTO will ensure that 
