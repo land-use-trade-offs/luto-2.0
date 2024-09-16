@@ -378,6 +378,15 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 # Biodiversity limits and parameters *******************************
 
+# Proportion of the Habitat Condition Assessment System (HCAS) biodiversity priority 
+# applied to weight the biodiversity raw observation data
+''' '
+A fraction between 0 and 1. Idicates the proportion of the HCAS biodiversity priority applied to weight the biodiversity raw observation data.
+If set to 0, then the biodiversity limits will be set to 'RCP' based biodiversity data.
+If set to (0,1], then the biodiversity limits will be set to a weighted average of the HCAS biodiversity data and 'RCP' based biodiversity data.
+'''
+HCAS_BIODIVERSITY_PROPORTION = 0.5  
+
 # Set the influence of landscape connectivity on biodiversity value in modified land
 """ Applies to modified land only. The most distant cell receives this biodiversity score multiplier. Creates a
     gradient of scores from 1 (natural land and modified land cells adjacent to natural land and water) to the most 
