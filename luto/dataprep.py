@@ -473,7 +473,7 @@ def create_new_dataset():
     ############### Get biodiversity priority layers 
     
     # Biodiversity priorities under the four SSPs
-    biodiv_priorities = bioph[['BIODIV_PRIORITY_SSP126', 'BIODIV_PRIORITY_SSP245', 'BIODIV_PRIORITY_SSP370', 'BIODIV_PRIORITY_SSP585', 'NATURAL_AREA_CONNECTIVITY']].copy()
+    biodiv_priorities = bioph[['BIODIV_PRIORITY_SSP126', 'BIODIV_PRIORITY_SSP245', 'BIODIV_PRIORITY_SSP370', 'BIODIV_PRIORITY_SSP585', 'BIODIV_PRIORITY_HCAS', 'NATURAL_AREA_CONNECTIVITY']].copy()
     
     # Save to file
     biodiv_priorities.to_hdf(outpath + 'biodiv_priorities.h5', key = 'biodiv_priorities', mode = 'w', format = 'fixed', index = False, complevel = 9)

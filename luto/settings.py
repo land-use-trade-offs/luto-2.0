@@ -50,7 +50,7 @@ RAW_DATA = '../raw_data'
 # Scenario parameters.                                                                  #
 # ---------------------------------------------------------------------------- #
 
-# Climate change assumptions. Options include '126', '245', '370', '585'
+# Climate change assumptions. Options include '126', '245', '360', '585'
 SSP = '245'
 RCP = 'rcp' + SSP[1] + 'p' + SSP[2] # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
@@ -99,8 +99,8 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
-# MODE = 'snapshot'   # Runs for target year only
-MODE = 'timeseries'   # Runs each year from base year to target year
+MODE = 'snapshot'   # Runs for target year only
+# MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -377,6 +377,15 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 # Biodiversity limits and parameters *******************************
+
+# Proportion of the Habitat Condition Assessment System (HCAS) biodiversity priority 
+# applied to weight the biodiversity raw observation data
+''' '
+A fraction between 0 and 1. Idicates the proportion of the HCAS biodiversity priority applied to weight the biodiversity raw observation data.
+If set to 0, then the biodiversity limits will be set to 'RCP' based biodiversity data.
+If set to (0,1], then the biodiversity limits will be set to a weighted average of the HCAS biodiversity data and 'RCP' based biodiversity data.
+'''
+HCAS_BIODIVERSITY_PROPORTION = 0.5  
 
 # Set the influence of landscape connectivity on biodiversity value in modified land
 """ Applies to modified land only. The most distant cell receives this biodiversity score multiplier. Creates a

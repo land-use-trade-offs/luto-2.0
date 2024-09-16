@@ -1,0 +1,10 @@
+﻿Data type,Abbreviation,Description,Note
+Avaliable proportion,F1,Fraction of herd to produce meat or milk,"Meat for beef and sheep,  or milk for diary land"
+Avaliable proportion,F2,Fraction of herd to produce wool,Wool only produced from sheep land
+Avaliable proportion,F3,Fraction of herd as Live export ,Live export only happends on sheep land beef land
+Yield,Q1,Quantity of output 1 (tonnes/head) or (ML/head),Same as F1
+Yield,Q2,Quantity of output 2 (tonnes/head),Same as F2
+Yield,Q3,Quantity of output 3 (tonnes/head),Same as F3
+Revenue,P1,Price of output 1 ($/t) or ($/ML),Same as F1
+Revenue,P2,Price of output 2 ($/t),Same as F2
+Revenue,P3,Price of output 3 ($/t),Same as F3

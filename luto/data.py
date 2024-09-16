@@ -1016,8 +1016,13 @@ class Data:
         # Linearly rescale distance to natural areas to a multiplier score and invert (1 being natural areas and modified land adjacent to natural areas, grading to settings.CONNECTIVITY_WEIGHTING score for the most distant cell)
         conn_score = 1 - np.interp(dist_to_natural, (dist_to_natural.min(), dist_to_natural.max()), (0, 1)).astype('float32')
         
+        # Get the weighted average of the biodiversity weight score based on "HCAS" and "conn_score"
+        bio_HCAS_weights = biodiv_priorities['BIODIV_PRIORITY_HCAS'].to_numpy(dtype = np.float32)
+        bio_weights = bio_HCAS_weights * settings.HCAS_BIODIVERSITY_PROPORTION * \
+                      conn_score * (1 - settings.HCAS_BIODIVERSITY_PROPORTION)
+        
         # Calculate biodiversity score adjusted for landscape connectivity. Note BIODIV_SCORE_WEIGHTED = biodiv_score_raw on natural land
-        self.BIODIV_SCORE_WEIGHTED = biodiv_score_raw * conn_score
+        self.BIODIV_SCORE_WEIGHTED = biodiv_score_raw * bio_weights
         self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = biodiv_score_raw * np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)
         
         # Calculate the total biodiversity value assuming all natural land is pristine
