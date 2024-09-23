@@ -211,13 +211,10 @@ FENCING_COST_PER_M = 5
 EP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 EP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
-ENV_PLANTING_BIODIVERSITY_BENEFIT = 0.8    # Set benefit level of EP, AF, and RP (0 = none, 1 = full)
-
 # Carbon Plantings Block Parameters
 CP_BLOCK_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
 CP_BLOCK_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
-CARBON_PLANTING_BLOCK_BIODIV_BENEFIT = 0.1
 
 # Carbon Plantings Belt Parameters
 CP_BELT_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
@@ -229,16 +226,12 @@ CP_BELT_PROPORTION = CP_BELT_ROW_WIDTH / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACIN
 cp_no_alleys_per_ha = 100 / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
 CP_BELT_FENCING_LENGTH = 100 * cp_no_alleys_per_ha * 2     # Length (average) of fencing required per ha in metres
 
-CARBON_PLANTING_BELT_BIODIV_BENEFIT = 0.1
-
 # Riparian Planting Parameters
 RP_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
 RP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
 RIPARIAN_PLANTING_BUFFER_WIDTH = 30
 RIPARIAN_PLANTING_TORTUOSITY_FACTOR = 0.5
-
-RIPARIAN_PLANTING_BIODIV_BENEFIT = 1
 
 # Agroforestry Parameters
 AF_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
@@ -250,10 +243,6 @@ AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_
 no_belts_per_ha = 100 / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
 AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per ha in metres
 
-AGROFORESTRY_BIODIV_BENEFIT = 0.75
-
-# BECCS Parameters
-BECCS_BIODIVERSITY_BENEFIT = 0
 
 
 # ---------------------------------------------------------------------------- #
@@ -378,7 +367,10 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 # Biodiversity limits and parameters *******************************
 
-# Set the percentile of aggregating HCAS to each agricultural land-use class
+
+# ------------------- Agricultural biodiversity parameters -------------------
+
+# HCAS percentile for each land-use type
 ''' Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the 
     suitability for wild animals ranging between 0-1) for each land-use type.
 
@@ -390,30 +382,40 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 '''
 HCAS_PERCENTILE = 50
 
-
 # Biodiversity value under default late dry season savanna fire regime
 ''' For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value 
     (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value.'''
 LDS_BIODIVERSITY_VALUE = 0.8
 
 
-# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
-BIODIVERSITY_LIMITS = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
-BIODIVERSITY_CONTRIBUTION_REPORT = True  # True or False, report biodiversity contribution 
+# ------------------- Non-agricultural biodiversity parameters -------------------
+''' The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
+    For example, if the raw biodiversity priority value is 0.5 and the benefit of a land use is 0.8, then the biodiversity value
+'''
+ENV_PLANTING_BIODIVERSITY_BENEFIT = 0.8    
+CARBON_PLANTING_BLOCK_BIODIV_BENEFIT = 0.1
+CARBON_PLANTING_BELT_BIODIV_BENEFIT = 0.1
+RIPARIAN_PLANTING_BIODIV_BENEFIT = 1
+AGROFORESTRY_BIODIV_BENEFIT = 0.75
+BECCS_BIODIVERSITY_BENEFIT = 0
 
+
+# ------------------- Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 """ Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
     Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
     in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
 """
-# Set biodiversity targets in dictionary below (i.e., year: proportion of degraded land restored)
 BIODIV_GBF_TARGET_2_DICT = {                     
               2010: 0,    # Proportion of degraded land restored in year 2010
               2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
               2050: 0.3,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
               2100: 0.3   # Stays at 2050 level
              }            # (can add more years/targets)\
-                 
-                 
+
+
+# ------------------- Biodiversity contribution reporting -------------------            
+BIODIVERSITY_LIMITS = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
+BIODIVERSITY_CONTRIBUTION_REPORT = True  # True or False, report biodiversity contribution    
 BIO_CALC_LEVEL = 'group'  # 'group' or 'species' - determines whether to calculate biodiversity scores at the group or species level
 
     
