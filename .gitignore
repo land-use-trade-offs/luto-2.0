@@ -23,6 +23,8 @@ gurobi.log
 # Some potential temporary files
 *.zip
 *.dat
+debug.log
 
 # The mannual build files
 /docs/manual/*
+

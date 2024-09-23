@@ -145,7 +145,7 @@ def run( data: Data, base: int, target: int) -> None:
     # Set Data object's path and create output directories
     data.set_path(base, target)
 
-    # Run the simulation up to `year` sequentially.         *** Not sure that timeseries mode is working ***
+    # Run the simulation up to `year` sequentially.
     if settings.MODE == 'timeseries':
         if len(data.D_CY.shape) != 2:
             raise ValueError( "Demands need to be a time series array of shape (years, commodities) and years > 0." )

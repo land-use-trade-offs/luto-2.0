@@ -11,34 +11,6 @@ from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data
 
 
-def get_non_penalty_land_uses(data: Data) -> list[int]:
-    """
-    Return a list of land uses that contribute to biodiversity output without penalty.
-
-    Parameters:
-    - data: The input data containing land use information.
-
-    Returns:
-    - A list of land use indices.
-    """
-    return list(set(data.LU_NATURAL) - set(data.LU_LVSTK_INDICES))  # returns [23], the index of Unallocated - natural land index
-
-
-def get_livestock_natural_land_land_uses(data: Data) -> list[int]:
-    """
-    Return a list of land uses that contribute to biodiversity but are penalised as per the 
-    BIODIV_LIVESTOCK_IMPACT setting (i.e., livestock on natural land).
-
-    Parameters:
-    - data: The input data containing land use information.
-
-    Returns:
-    - A list of land use codes.
-    """
-
-    return list(set(data.LU_NATURAL) & set(data.LU_LVSTK_INDICES)) # returns [2, 6, 15], Beef, Dairy, Sheep on natural land
-
-
 def get_breq_matrices(data):
     """
     Return b_mrj biodiversity score matrices by land management, cell, and land-use type.
@@ -51,18 +23,9 @@ def get_breq_matrices(data):
     """
     b_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
 
-    biodiv_non_penalty_lus = get_non_penalty_land_uses(data)
-    livestock_nat_land_lus = get_livestock_natural_land_land_uses(data)
+    for j in range(data.N_AG_LUS):
+        b_mrj[:, :, j] = data.BIODIV_SCORE_RAW * data.BIODIV_DEGRADE_HCAS[j] * data.REAL_AREA
 
-    for j in biodiv_non_penalty_lus:
-        b_mrj[:, :, j] = data.BIODIV_SCORE_WEIGHTED_LDS_BURNING * data.REAL_AREA
-
-    # if settings.BIODIV_LIVESTOCK_IMPACT > 0:
-    for j in livestock_nat_land_lus:
-        b_mrj[:, :, j] = ( data.BIODIV_SCORE_WEIGHTED_LDS_BURNING -                       # Base biodiversity score considering assumed late-dry season burning
-                          (data.BIODIV_SCORE_WEIGHTED * settings.BIODIV_LIVESTOCK_IMPACT) # Minus impact of livestock on biodiversity value
-                         ) * data.REAL_AREA
-    
     return b_mrj
 
 

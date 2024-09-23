@@ -185,13 +185,15 @@ class Data:
             self.NLUM_MASK = rst.read(1).astype(np.int8)                                                        # 2D map,  0 for ocean, 1 for land
             self.LUMAP_2D = np.full_like(self.NLUM_MASK, self.NODATA, dtype=np.int16)                           # 2D map,  full of nodata (-9999)
             np.place(self.LUMAP_2D, self.NLUM_MASK == 1, self.LUMAP_NO_RESFACTOR)                               # 2D map,  -9999 for ocean; -1 for desert, urban, water, etc; 0-27 for land uses
-            self.GEO_META = rst.meta                                                                            # dict,  key-value pairs of geospatial metadata
+            self.GEO_META_FULLRES = rst.meta                                                                    # dict,  key-value pairs of geospatial metadata for the full resolution land-use map
+            self.GEO_META_FULLRES['dtype'] = 'float32'                                                          # Set the data type to float32
+            self.GEO_META_FULLRES['nodata'] = self.NODATA                                                       # Set the nodata value to -9999
 
         # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap (True means included cells. Boolean dtype.)
         self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                              # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
         
         # Get the lon/lat coordinates.
-        self.COORD_LON_LAT = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META['transform'])             # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
+        self.COORD_LON_LAT = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META_FULLRES['transform'])             # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
 
         # Return combined land-use and resfactor mask
         if settings.RESFACTOR > 1:
@@ -1008,69 +1010,57 @@ class Data:
         biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5') )
 
         # Get the Zonation output score between 0 and 1. BIODIV_SCORE_RAW.sum() = 153 million
-        biodiv_score_raw = biodiv_priorities['BIODIV_PRIORITY_SSP' + str(settings.SSP)].to_numpy(dtype = np.float32)
-
-        # Get the distance (km) of modified grid cells to nearest natural cell (natural areas have a distance of 0).
-        dist_to_natural = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.float32)
+        self.BIODIV_SCORE_RAW = biodiv_priorities['BIODIV_PRIORITY_SSP' + str(settings.SSP)].to_numpy(dtype = np.float32)
         
-        # Linearly rescale distance to natural areas to a multiplier score and invert (1 being natural areas and modified land adjacent to natural areas, grading to settings.CONNECTIVITY_WEIGHTING score for the most distant cell)
-        conn_score = 1 - np.interp(dist_to_natural, (dist_to_natural.min(), dist_to_natural.max()), (0, 1)).astype('float32')
-        
-        # Get the weighted average of the biodiversity weight score based on "HCAS" and "conn_score"
-        bio_HCAS_weights = biodiv_priorities['BIODIV_PRIORITY_HCAS'].to_numpy(dtype = np.float32)
-        bio_weights = bio_HCAS_weights * settings.HCAS_BIODIVERSITY_PROPORTION * \
-                      conn_score * (1 - settings.HCAS_BIODIVERSITY_PROPORTION)
-        
-        # Calculate biodiversity score adjusted for landscape connectivity. Note BIODIV_SCORE_WEIGHTED = biodiv_score_raw on natural land
-        self.BIODIV_SCORE_WEIGHTED = biodiv_score_raw * bio_weights
-        self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = biodiv_score_raw * np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)
-        
-        # Calculate the total biodiversity value assuming all natural land is pristine
-        biodiv_value_pristine_natural_land = np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED * self.REAL_AREA_NO_RESFACTOR   
-        
-        # Calculate the quality-weighted sum of biodiv raw score over the study area. 
-        # Quality weighting includes connectivity score, land-use (i.e., livestock impacts), 
-        # and land management (LDS burning impacts in area eligible for savanna burning). 
-        # Note BIODIV_SCORE_RAW = BIODIV_SCORE_WEIGHTED on natural land
-        biodiv_value_current_natural_land = ( 
-            np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15, 23]) * self.BIODIV_SCORE_WEIGHTED_LDS_BURNING -                     # Biodiversity value after LDS burning
-            np.isin(self.LUMAP_NO_RESFACTOR, [2, 6, 15]) * self.BIODIV_SCORE_WEIGHTED * settings.BIODIV_LIVESTOCK_IMPACT    # Biodiversity value lost due to livestocking on natural land 
-        ) * self.REAL_AREA_NO_RESFACTOR                                                                                     
-        
-        
-        # Calculate the sum of biodiversity score lost to land degradation (i.e., raw score minus current score with current score on cropland being zero)
-        biodiv_value_degraded_ag_land = ( 
-            (biodiv_value_pristine_natural_land - biodiv_value_current_natural_land) +                                      # Biodiversity value lost on `natural land`
-            (np.isin(self.LUMAP_NO_RESFACTOR, self.LU_MODIFIED_LAND) * biodiv_score_raw * self.REAL_AREA_NO_RESFACTOR)      # Biodiversity value lost on `modified land`, which assumed to have zero biodiversity value
-        )                                                                                       
-
         # Create a dictionary to hold the annual biodiversity target proportion data for GBF Target 2
-        biodiv_GBF_target_2_proportions_2010_2100 = {}
-        
-        # Create linear function f and interpolate annual biodiversity target proportions from target dictionary specified in settings
         f = interp1d(
             list(settings.BIODIV_GBF_TARGET_2_DICT.keys()),
             list(settings.BIODIV_GBF_TARGET_2_DICT.values()),
             kind = "linear",
             fill_value = "extrapolate",
         )
-        for yr in range(2010, 2101):
-            biodiv_GBF_target_2_proportions_2010_2100[yr] = f(yr).item()
+        biodiv_GBF_target_2_proportions_2010_2100 = {yr: f(yr).item() for yr in range(2010, 2101)}
         
-        # Sum the current biodiversity score and the biodiversity score of degraded land
-        biodiv_value_current_total = biodiv_value_current_natural_land.sum()
-        biodiv_value_degraded_total = biodiv_value_degraded_ag_land.sum()
+        
+        
+        # Biodiversity degradation scale for agricultural land-use
+        ''' 
+        The degradation weight score of "HCAS" are float values range between 0-1 indicating the suitability for wild animals survival. 
+        Here we average this dataset in year 2009, 2010, and 2011, then calculate the percentile of the average score for each land-use type. 
+        '''
+        biodiv_degrade_HCAS = pd.read_csv(os.path.join(INPUT_DIR, 'HCAS_LUMAP_PERCENTILE.csv'))                     # Load the HCAS percentile data (pd.DataFrame)
+        biodiv_degrade_HCAS = biodiv_degrade_HCAS[['lu', f'PERCENTILE_{settings.HCAS_PERCENTILE}']]                 # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
+        
+        self.BIODIV_DEGRADE_HCAS = {int(k):v for k,v in dict(biodiv_degrade_HCAS.values).items()}                        # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
+        self.UN_ALLOW_NAT_BIO_SCORE = self.BIODIV_DEGRADE_HCAS[self.DESC2AGLU['Unallocated - natural land']]                  # Get the biodiversity degradation score for unallocated natural land (float)
+        
+        biodiv_degrade_HCAS_map = np.vectorize(self.BIODIV_DEGRADE_HCAS.get)(self.LUMAP_NO_RESFACTOR).astype(np.float32)     # Get the biodiversity degradation score for each cell (1D numpy array)
+        self.BIODIV_SCORE_WEIGHTED = self.BIODIV_SCORE_RAW * biodiv_degrade_HCAS_map
+        
+    
+        
+        # Biodiversity degradation scale for LES burning
+        self.biodiv_score_weighted_LES_burning = self.BIODIV_SCORE_WEIGHTED * np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)
+
+
+        # Biodiversity values need to be restored
+        '''
+        The biodiversity value to be restored is calculated as the difference between the 'Unallocated - natural land' 
+        and 'current land-use' regarding their biodiversity degradation scale.
+        '''                                                                                 
+        biodiv_value_to_restore = (
+            np.isin(self.LUMAP_NO_RESFACTOR, list(self.DESC2AGLU.values())) * 
+            (self.UN_ALLOW_NAT_BIO_SCORE - self.biodiv_score_weighted_LES_burning)
+        ) * self.REAL_AREA_NO_RESFACTOR  
+
 
         # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
-        self.BIODIV_GBF_TARGET_2 = {}
+        self.BIODIV_GBF_TARGET_2 = {
+            yr: np.nansum(biodiv_value_to_restore) * biodiv_GBF_target_2_proportions_2010_2100[yr]
+            for yr in range(2010, 2101)
+        }
         
-        # For each year add current biodiversity score total and X% of degraded land which must be restored under GBF target 2
-        for yr in range(2010, 2101):
-            self.BIODIV_GBF_TARGET_2[yr] = biodiv_value_current_total + (biodiv_value_degraded_total * biodiv_GBF_target_2_proportions_2010_2100[yr]) 
-        
-        
-       
-        
+  
 
         ###############################################################
         # BECCS data.
@@ -1113,7 +1103,8 @@ class Data:
         ###############################################################        
         self.SAVBURN_ELIGIBLE = self.get_array_resfactor_applied(self.SAVBURN_ELIGIBLE)
         self.BIODIV_SCORE_WEIGHTED = self.get_array_resfactor_applied(self.BIODIV_SCORE_WEIGHTED)
-        self.BIODIV_SCORE_WEIGHTED_LDS_BURNING = self.get_array_resfactor_applied(self.BIODIV_SCORE_WEIGHTED_LDS_BURNING)
+        self.BIODIV_SCORE_RAW = self.get_array_resfactor_applied(self.BIODIV_SCORE_RAW)
+        
 
         print("Data loading complete\n")
         
@@ -1145,9 +1136,9 @@ class Data:
         Returns:
             dict: The updated geographic metadata.
         """
-        meta = self.GEO_META.copy()
-        height, width = (self.GEO_META['height'], self.GEO_META['width'])  if settings.WRITE_FULL_RES_MAPS else self.LUMAP_2D_RESFACTORED.shape
-        trans = list(self.GEO_META['transform'])
+        meta = self.GEO_META_FULLRES.copy()
+        height, width = (self.GEO_META_FULLRES['height'], self.GEO_META_FULLRES['width'])  if settings.WRITE_FULL_RES_MAPS else self.LUMAP_2D_RESFACTORED.shape
+        trans = list(self.GEO_META_FULLRES['transform'])
         trans[0] = trans[0] if settings.WRITE_FULL_RES_MAPS else trans[0] * settings.RESFACTOR    # Adjust the X resolution
         trans[4] = trans[4] if settings.WRITE_FULL_RES_MAPS else trans[4] * settings.RESFACTOR    # Adjust the Y resolution
         trans = Affine(*trans)
