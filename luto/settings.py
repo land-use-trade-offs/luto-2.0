@@ -378,40 +378,24 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 # Biodiversity limits and parameters *******************************
 
-# Proportion of the Habitat Condition Assessment System (HCAS) biodiversity priority 
-# applied to weight the biodiversity raw observation data
-''' '
-A fraction between 0 and 1. Idicates the proportion of the HCAS biodiversity priority applied to weight the biodiversity raw observation data.
-If set to 0, then the biodiversity limits will be set to 'RCP' based biodiversity data.
-If set to (0,1], then the biodiversity limits will be set to a weighted average of the HCAS biodiversity data and 'RCP' based biodiversity data.
+# Set the percentile of aggregating HCAS to each agricultural land-use class
+''' Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the 
+    suitability for wild animals ranging between 0-1) for each land-use type.
+
+    Here is the parameter defining the percentile used to represent each land-use's degradation scale to biodiversity. Avaliable percentiles
+    is one of [10, 25, 50, 75, 90]. 
+    
+    For example, the 50th percentile for 'Beef - Modified land' is 0.22, meaning this land has 22% biodiversity compared to if it was restored 
+    to a perfect natural land.
 '''
-HCAS_BIODIVERSITY_PROPORTION = 0.5  
+HCAS_PERCENTILE = 50
 
-# Set the influence of landscape connectivity on biodiversity value in modified land
-""" Applies to modified land only. The most distant cell receives this biodiversity score multiplier. Creates a
-    gradient of scores from 1 (natural land and modified land cells adjacent to natural land and water) to the most 
-    distant cell which received the score specified under CONNECTIVITY_WEIGHTING. The scores are linearly rescaled 
-    Euclidean distance to natural areas. Setting CONNECTIVITY_WEIGHTING = 1.0 means no effect of connectivity on biodiversity score. 
-"""
-CONNECTIVITY_WEIGHTING = 0.7
-
-# Set livestock impact on biodiversity (0 = no impact, 1 = total annihilation)
-BIODIV_LIVESTOCK_IMPACT = 0.3
 
 # Biodiversity value under default late dry season savanna fire regime
 ''' For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value 
     (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value.'''
 LDS_BIODIVERSITY_VALUE = 0.8
 
-# Biodiversity impact of non-agricultural lands
-NON_AG_BIO_IMPACT = {
-    '1 Conservation and natural environments':0,
-    '2 Production from relatively natural environments':0.1,
-    '3 Production from dryland agriculture and plantations':0.1,
-    '4 Production from irrigated agriculture and plantations':0.1,
-    '5 Intensive uses':1, 
-    '6 Water':0, 
-    'No data':0}
 
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 BIODIVERSITY_LIMITS = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.

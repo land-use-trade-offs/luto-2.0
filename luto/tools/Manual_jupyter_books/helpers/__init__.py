@@ -1,4 +1,5 @@
 
+import re
 import numpy as np
 import nbformat as nbf
 import xarray as xr
@@ -13,6 +14,27 @@ from luto.data import Data
 from luto.tools.Manual_jupyter_books.helpers.parameters import NOTEBOOK_META_DICT
 from luto.tools.spatializers import get_coarse2D_map
 
+
+
+def full_res_raw_raw_to_2d(data:Data, arr:np.ndarray) -> np.ndarray:
+    '''
+    This function converts a 1D numpy array to an 2D array with the same shape as `NLUM_MASK`.
+    
+    Inputs
+    ------
+    data: Data
+        The Data object that contains the metadata of the 2D array.
+    arr: np.ndarray
+    The 1D array that will be converted to an 2D array.
+    
+    Returns
+    -------
+    The 2D array that has the same shape as `NLUM_MASK`.
+    '''
+    LUMAP_FullRes_2D = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32) 
+    np.place(LUMAP_FullRes_2D, data.NLUM_MASK, arr)
+    return LUMAP_FullRes_2D
+    
 
 
 
@@ -32,11 +54,18 @@ def arr_to_xr(data:Data, arr:np.ndarray) -> xr.DataArray:
         The xarray DataArray that contains the 2D array.
     '''
     
-    arr_2d = get_coarse2D_map(data, arr)
+    # Check if the array is full resolution raw
+    full_res_raw = arr.size == data.LUMAP_NO_RESFACTOR.size
+    
+    # Get the geo metadata of the array
+    geo_meta = data.GEO_META_FULLRES if full_res_raw else data.GEO_META
+    
+    # Warp the 1D array to 2D
+    arr_2d = full_res_raw_raw_to_2d(data, arr) if full_res_raw else get_coarse2D_map(data, arr)
     arr_2d = np.where(arr_2d == data.NODATA, np.nan, arr_2d)   # Mask the nodata values to nan
 
     with rasterio.io.MemoryFile() as memfile:
-        with memfile.open(**data.GEO_META) as dataset:
+        with memfile.open(**geo_meta) as dataset:
             # Write the array data to the virtual dataset
             dataset.write(arr_2d, 1)
             # Read the virtual dataset into an xarray DataArray
@@ -70,7 +99,7 @@ def mrj_to_xr(data:Data, in_mrj:np.ndarray) -> xr.DataArray:
         The Data object that contains the metadata of the 2D array.
     in_mrj: np.ndarray
         The 3D array that will be converted to an xarray DataArray.
-        
+
     Returns
     -------
         The xarray DataArray that is georeferenced and have valid dimension names.
