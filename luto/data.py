@@ -1022,25 +1022,23 @@ class Data:
         biodiv_GBF_target_2_proportions_2010_2100 = {yr: f(yr).item() for yr in range(2010, 2101)}
         
         
-        
         # Biodiversity degradation scale for agricultural land-use
         ''' 
         The degradation weight score of "HCAS" are float values range between 0-1 indicating the suitability for wild animals survival. 
-        Here we average this dataset in year 2009, 2010, and 2011, then calculate the percentile of the average score for each land-use type. 
+        Here we average this dataset in year 2009, 2010, and 2011, then calculate the percentiles of the average score under each land-use type. 
         '''
-        biodiv_degrade_HCAS = pd.read_csv(os.path.join(INPUT_DIR, 'HCAS_LUMAP_PERCENTILE.csv'))                     # Load the HCAS percentile data (pd.DataFrame)
-        biodiv_degrade_HCAS = biodiv_degrade_HCAS[['lu', f'PERCENTILE_{settings.HCAS_PERCENTILE}']]                 # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
+        biodiv_degrade_HCAS = pd.read_csv(os.path.join(INPUT_DIR, 'HCAS_LUMAP_PERCENTILE.csv'))                           # Load the HCAS percentile data (pd.DataFrame)
+        biodiv_degrade_HCAS = biodiv_degrade_HCAS[['lu', f'PERCENTILE_{settings.HCAS_PERCENTILE}']]                       # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
         
-        self.BIODIV_DEGRADE_HCAS = {int(k):v for k,v in dict(biodiv_degrade_HCAS.values).items()}                        # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
-        self.UN_ALLOW_NAT_BIO_SCORE = self.BIODIV_DEGRADE_HCAS[self.DESC2AGLU['Unallocated - natural land']]                  # Get the biodiversity degradation score for unallocated natural land (float)
+        self.BIODIV_DEGRADE_HCAS = {int(k):v for k,v in dict(biodiv_degrade_HCAS.values).items()}                         # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
+        self.UN_ALLOW_NAT_BIO_SCORE = self.BIODIV_DEGRADE_HCAS[self.DESC2AGLU['Unallocated - natural land']]              # Get the biodiversity degradation score for unallocated natural land (float)
         
-        biodiv_degrade_HCAS_map = np.vectorize(self.BIODIV_DEGRADE_HCAS.get)(self.LUMAP_NO_RESFACTOR).astype(np.float32)     # Get the biodiversity degradation score for each cell (1D numpy array)
+        biodiv_degrade_HCAS_map = np.vectorize(self.BIODIV_DEGRADE_HCAS.get)(self.LUMAP_NO_RESFACTOR).astype(np.float32)  # Get the biodiversity degradation score for each cell (1D numpy array)
         self.BIODIV_SCORE_WEIGHTED = self.BIODIV_SCORE_RAW * biodiv_degrade_HCAS_map
         
-    
         
-        # Biodiversity degradation scale for LES burning
-        self.biodiv_score_weighted_LES_burning = self.BIODIV_SCORE_WEIGHTED * np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)
+        # Biodiversity degradation scale for LDS burning
+        self.biodiv_score_weighted_LDS_burning = self.BIODIV_SCORE_WEIGHTED * np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)
 
 
         # Biodiversity values need to be restored
@@ -1048,15 +1046,15 @@ class Data:
         The biodiversity value to be restored is calculated as the difference between the 'Unallocated - natural land' 
         and 'current land-use' regarding their biodiversity degradation scale.
         '''                                                                                 
-        biodiv_value_to_restore = (
+        biodiv_degradation_val = (
             np.isin(self.LUMAP_NO_RESFACTOR, list(self.DESC2AGLU.values())) * 
-            (self.UN_ALLOW_NAT_BIO_SCORE - self.biodiv_score_weighted_LES_burning)
+            (self.UN_ALLOW_NAT_BIO_SCORE * self.BIODIV_SCORE_RAW   - self.biodiv_score_weighted_LDS_burning)  
         ) * self.REAL_AREA_NO_RESFACTOR  
 
 
         # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
         self.BIODIV_GBF_TARGET_2 = {
-            yr: np.nansum(biodiv_value_to_restore) * biodiv_GBF_target_2_proportions_2010_2100[yr]
+            yr: np.nansum(biodiv_degradation_val) * biodiv_GBF_target_2_proportions_2010_2100[yr]
             for yr in range(2010, 2101)
         }
         
@@ -1075,6 +1073,7 @@ class Data:
         self.BECCS_REV_AUD_HA_YR = self.get_array_resfactor_applied(beccs_df['BECCS_REV_AUD_HA_YR'].to_numpy())
         self.BECCS_TCO2E_HA_YR = self.get_array_resfactor_applied(beccs_df['BECCS_TCO2E_HA_YR'].to_numpy())
         self.BECCS_MWH_HA_YR = self.get_array_resfactor_applied(beccs_df['BECCS_MWH_HA_YR'].to_numpy())
+        self.biodiv_score_weighted_LDS_burning = self.get_array_resfactor_applied(self.biodiv_score_weighted_LDS_burning)
 
 
         ###############################################################
