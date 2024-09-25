@@ -390,7 +390,8 @@ LDS_BIODIVERSITY_VALUE = 0.8
 
 # ------------------- Non-agricultural biodiversity parameters -------------------
 ''' The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
-    For example, if the raw biodiversity priority value is 0.5 and the benefit of a land use is 0.8, then the biodiversity value
+    For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value
+    will be 0.6 * 0.8 = 0.48.
 '''
 ENV_PLANTING_BIODIVERSITY_BENEFIT = 0.8    
 CARBON_PLANTING_BLOCK_BIODIV_BENEFIT = 0.1

@@ -24,7 +24,10 @@ def get_breq_matrices(data):
     b_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
 
     for j in range(data.N_AG_LUS):
-        b_mrj[:, :, j] = data.BIODIV_SCORE_RAW * data.BIODIV_DEGRADE_HCAS[j] * data.REAL_AREA
+        b_mrj[:, :, j] = (
+            data.BIODIV_RAW_UNDER_LDS -                                     # Biodiversity score after Late Dry Season (LDS) burning
+            (data.BIODIV_SCORE_RAW * (1 - data.BIODIV_DEGRADE_HCAS[j]))     # Biodiversity degradation for land-use j according to HCAS
+        ) * data.REAL_AREA                                          
 
     return b_mrj
 
