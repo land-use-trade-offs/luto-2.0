@@ -1032,7 +1032,7 @@ class Data:
         
         self.BIODIV_DEGRADE_HCAS = {int(k):v for k,v in dict(biodiv_degrade_HCAS.values).items()}                           # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
         unalloc_nat_land_bio_score = self.BIODIV_DEGRADE_HCAS[self.DESC2AGLU['Unallocated - natural land']]                 # Get the biodiversity degradation score for unallocated natural land (float)
-        self.BIODIV_DEGRADE_HCAS = {k:v*(1/unalloc_nat_land_bio_score) for k,v in self.BIODIV_DEGRADE_HCAS.items()}       # Normalise the biodiversity degradation score to the unallocated natural land score
+        self.BIODIV_DEGRADE_HCAS = {k:v*(1/unalloc_nat_land_bio_score) for k,v in self.BIODIV_DEGRADE_HCAS.items()}         # Normalise the biodiversity degradation score to the unallocated natural land score
         
         # Get the biodiversity degradation score (0-1) for each cell
         '''
@@ -1050,7 +1050,7 @@ class Data:
         
         # Get the biodiversity value at the beginning of the simulation
         biodiv_current_val = self.BIODIV_RAW_UNDER_LDS - biodiv_degradation_raw_HCAS                                        # Biodiversity value at the beginning year (1D numpy array)
-        biodiv_current_val = np.nansum(biodiv_current_val * self.REAL_AREA_NO_RESFACTOR)                                    # Sum the biodiversity value at current year (float)
+        biodiv_current_val = np.nansum(biodiv_current_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK])                                    # Sum the biodiversity value at current year (float)
 
         # Biodiversity values need to be restored under the GBF Target 2
         '''
@@ -1062,7 +1062,7 @@ class Data:
             biodiv_degradation_raw_HCAS                                                                                     # Biodiversity degradation from LDS burning
         ) * self.REAL_AREA_NO_RESFACTOR
         
-        biodiv_degradation_val = np.nansum(biodiv_degradation_val)                                                          # Sum the biodiversity degradation value
+        biodiv_degradation_val = np.nansum(biodiv_degradation_val[self.LUMASK])                                                          # Sum the biodiversity degradation value
 
         # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
         self.BIODIV_GBF_TARGET_2 = {

@@ -13,15 +13,15 @@ from luto.settings import (
 
 
 def get_biodiv_environmental_plantings(data: Data) -> np.ndarray:
-    return data.BIODIV_RAW_UNDER_LDS * data.REAL_AREA * ENV_PLANTING_BIODIVERSITY_BENEFIT
+    return data.BIODIV_SCORE_RAW * data.REAL_AREA * ENV_PLANTING_BIODIVERSITY_BENEFIT
 
 
 def get_biodiv_riparian_plantings(data: Data) -> np.ndarray:
-    return data.BIODIV_RAW_UNDER_LDS * data.REAL_AREA * RIPARIAN_PLANTING_BIODIV_BENEFIT
+    return data.BIODIV_SCORE_RAW * data.REAL_AREA * RIPARIAN_PLANTING_BIODIV_BENEFIT
 
 
 def get_biodiv_agroforestry_base(data: Data) -> np.ndarray:
-    return data.BIODIV_RAW_UNDER_LDS * data.REAL_AREA * AGROFORESTRY_BIODIV_BENEFIT
+    return data.BIODIV_SCORE_RAW * data.REAL_AREA * AGROFORESTRY_BIODIV_BENEFIT
 
 
 def get_biodiv_sheep_agroforestry(
@@ -81,11 +81,11 @@ def get_biodiv_beef_agroforestry(
 
 
 def get_biodiv_carbon_plantings_block(data: Data) -> np.ndarray:
-    return data.BIODIV_RAW_UNDER_LDS * data.REAL_AREA * CARBON_PLANTING_BLOCK_BIODIV_BENEFIT
+    return data.BIODIV_SCORE_RAW * data.REAL_AREA * CARBON_PLANTING_BLOCK_BIODIV_BENEFIT
 
 
 def get_biodiv_carbon_plantings_belt_base(data: Data) -> np.ndarray:
-    return data.BIODIV_RAW_UNDER_LDS * data.REAL_AREA * CARBON_PLANTING_BELT_BIODIV_BENEFIT
+    return data.BIODIV_SCORE_RAW * data.REAL_AREA * CARBON_PLANTING_BELT_BIODIV_BENEFIT
 
 
 def get_biodiv_sheep_carbon_plantings_belt(
@@ -145,7 +145,7 @@ def get_biodiv_beef_carbon_plantings_belt(
 
 
 def get_biodiv_beccs(data: Data):
-    return data.BIODIV_RAW_UNDER_LDS * data.REAL_AREA * BECCS_BIODIVERSITY_BENEFIT
+    return data.BIODIV_SCORE_RAW * data.REAL_AREA * BECCS_BIODIVERSITY_BENEFIT
 
 
 def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
