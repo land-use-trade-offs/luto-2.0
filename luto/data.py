@@ -1124,6 +1124,7 @@ class Data:
         self.SAVBURN_ELIGIBLE = self.get_array_resfactor_applied(self.SAVBURN_ELIGIBLE)
         self.BIODIV_SCORE_RAW = self.get_array_resfactor_applied(self.BIODIV_SCORE_RAW)
         self.BIODIV_SCORE_RAW_LDS_BURNING = self.get_array_resfactor_applied(self.BIODIV_SCORE_RAW_LDS_BURNING)
+        self.BIODIV_RAW_UNDER_LDS = self.get_array_resfactor_applied(self.BIODIV_RAW_UNDER_LDS)
         
 
         print("Data loading complete\n")
