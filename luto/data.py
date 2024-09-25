@@ -1032,7 +1032,7 @@ class Data:
         
         self.BIODIV_DEGRADE_HCAS = {int(k):v for k,v in dict(biodiv_degrade_HCAS.values).items()}                           # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
         unalloc_nat_land_bio_score = self.BIODIV_DEGRADE_HCAS[self.DESC2AGLU['Unallocated - natural land']]                 # Get the biodiversity degradation score for unallocated natural land (float)
-        self.BIODIV_DEGRADE_HCAS = {k:v * (1/unalloc_nat_land_bio_score) for k,v in self.BIODIV_DEGRADE_HCAS.items()}       # Normalise the biodiversity degradation score to the unallocated natural land score
+        self.BIODIV_DEGRADE_HCAS = {k:v*(1/unalloc_nat_land_bio_score) for k,v in self.BIODIV_DEGRADE_HCAS.items()}       # Normalise the biodiversity degradation score to the unallocated natural land score
         
         # Get the biodiversity degradation score (0-1) for each cell
         '''
@@ -1042,22 +1042,14 @@ class Data:
         biodiv_degrade_HCAS = np.vectorize(self.BIODIV_DEGRADE_HCAS.get)(self.LUMAP_NO_RESFACTOR).astype(np.float32)        # Get the biodiversity degradation score for each cell (1D numpy array)        
         biodiv_degrade_LDS = np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)                            # Get the biodiversity degradation score for LDS burning (1D numpy array)
         
-        # Biodiversity values at the beginning of the simulation
-        self.BIODIV_SCORE_RAW_LDS_BURNING = self.BIODIV_SCORE_RAW * np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)     # Biodiversity score under LDS burning (1D numpy array)
-        biodiv_current_val = self.BIODIV_SCORE_RAW_LDS_BURNING * biodiv_degrade_HCAS                                                        # Biodiversity score under both HCAS and LDS burning (1D numpy array)
-        biodiv_current_val = np.nansum(self.BIODIV_SCORE_RAW_LDS_BURNING) * self.REAL_AREA_NO_RESFACTOR                                     # Sum the biodiversity value at current year (float)
-        
         # Get the biodiversity damage under LDS burning (0-1) for each cell
-        '''
-        
-        '''
         biodiv_degradation_raw_LDS_burning = self.BIODIV_SCORE_RAW * (1 - biodiv_degrade_LDS)                               # Biodiversity damage under LDS burning (1D numpy array)
-        biodiv_degradation_raw_HCAS = self.BIODIV_SCORE_RAW *  (1 - biodiv_degrade_HCAS)                                    # Biodiversity damage under under HCAS (1D numpy array)
+        biodiv_degradation_raw_HCAS = self.BIODIV_SCORE_RAW * (1 - biodiv_degrade_HCAS)                                     # Biodiversity damage under under HCAS (1D numpy array)
 
         self.BIODIV_RAW_UNDER_LDS = self.BIODIV_SCORE_RAW - biodiv_degradation_raw_LDS_burning                              # Biodiversity value under LDS burning (1D numpy array); will be used as base score for calculating ag/non-ag stratagies impacts on biodiversity
         
         # Get the biodiversity value at the beginning of the simulation
-        biodiv_current_val = self.BIODIV_SCORE_RAW - biodiv_degradation_raw_LDS_burning - biodiv_degradation_raw_HCAS       # Biodiversity value at the beginning year (1D numpy array)
+        biodiv_current_val = self.BIODIV_RAW_UNDER_LDS - biodiv_degradation_raw_HCAS                                        # Biodiversity value at the beginning year (1D numpy array)
         biodiv_current_val = np.nansum(biodiv_current_val * self.REAL_AREA_NO_RESFACTOR)                                    # Sum the biodiversity value at current year (float)
 
         # Biodiversity values need to be restored under the GBF Target 2
@@ -1066,12 +1058,10 @@ class Data:
         and 'current land-use' regarding their biodiversity degradation scale.
         '''                                                                                
         biodiv_degradation_val = (
-            self.BIODIV_SCORE_RAW -                                                                                         # Biodiversity value without any degradation
-            (self.BIODIV_SCORE_RAW * (1 - biodiv_degrade_HCAS)) -                                                           # Biodiversity degradation from HCAS
-            (self.BIODIV_SCORE_RAW * (1 - biodiv_degrade_LDS))                                                              # Biodiversity degradation from LDS burning
+            biodiv_degradation_raw_LDS_burning +                                                                            # Biodiversity degradation from HCAS
+            biodiv_degradation_raw_HCAS                                                                                     # Biodiversity degradation from LDS burning
         ) * self.REAL_AREA_NO_RESFACTOR
         
-        biodiv_degradation_val = np.where(biodiv_degradation_val < 0, 0, biodiv_degradation_val)                            # Set negative values to 0; Because the biodiversity value cannot be negative
         biodiv_degradation_val = np.nansum(biodiv_degradation_val)                                                          # Sum the biodiversity degradation value
 
         # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
@@ -1123,7 +1113,6 @@ class Data:
         ###############################################################        
         self.SAVBURN_ELIGIBLE = self.get_array_resfactor_applied(self.SAVBURN_ELIGIBLE)
         self.BIODIV_SCORE_RAW = self.get_array_resfactor_applied(self.BIODIV_SCORE_RAW)
-        self.BIODIV_SCORE_RAW_LDS_BURNING = self.get_array_resfactor_applied(self.BIODIV_SCORE_RAW_LDS_BURNING)
         self.BIODIV_RAW_UNDER_LDS = self.get_array_resfactor_applied(self.BIODIV_RAW_UNDER_LDS)
         
 
