@@ -19,6 +19,7 @@
 import os
 import time
 import math
+from debugpy import connect
 import h5py
 
 import xarray as xr
@@ -1008,9 +1009,22 @@ class Data:
         """
         # Load biodiversity data
         biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5') )
-
+        
+        # Get the connectivity score between 0 and 1
+        if settings.CONNECT_SOURCE == 'DCCEEW':
+            connectivity_score = np.load(os.path.join(INPUT_DIR, 'DCCEEW_NCI.npy'))
+        elif settings.CONNECT_SOURCE == 'NLUM':
+            connectivity_score = biodiv_priorities['CONNECTIVITY_SSP' + str(settings.SSP)].to_numpy(dtype = np.float32)
+            connectivity_score = np.interp(connectivity_score, (connectivity_score.min(), connectivity_score.max()), (1, 0)).astype('float32')
+        else:
+            raise ValueError(f"Invalid connectivity source: {settings.CONNECT_SOURCE}, must be 'DCCEEW' or 'NLUM'")
+        
         # Get the Zonation output score between 0 and 1. BIODIV_SCORE_RAW.sum() = 153 million
         self.BIODIV_SCORE_RAW = biodiv_priorities['BIODIV_PRIORITY_SSP' + str(settings.SSP)].to_numpy(dtype = np.float32)
+        
+        # Weight the biodiversity score by the connectivity score
+        biodiv_score_raw_weighted = self.BIODIV_SCORE_RAW * connectivity_score
+        
         
         # Create a dictionary to hold the annual biodiversity target proportion data for GBF Target 2
         f = interp1d(
@@ -1043,14 +1057,14 @@ class Data:
         biodiv_degrade_LDS = np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)                            # Get the biodiversity degradation score for LDS burning (1D numpy array)
         
         # Get the biodiversity damage under LDS burning (0-1) for each cell
-        biodiv_degradation_raw_LDS_burning = self.BIODIV_SCORE_RAW * (1 - biodiv_degrade_LDS)                               # Biodiversity damage under LDS burning (1D numpy array)
-        biodiv_degradation_raw_HCAS = self.BIODIV_SCORE_RAW * (1 - biodiv_degrade_HCAS)                                     # Biodiversity damage under under HCAS (1D numpy array)
+        biodiv_degradation_raw_LDS_burning = biodiv_score_raw_weighted * (1 - biodiv_degrade_LDS)                           # Biodiversity damage under LDS burning (1D numpy array)
+        biodiv_degradation_raw_HCAS = biodiv_score_raw_weighted * (1 - biodiv_degrade_HCAS)                                 # Biodiversity damage under under HCAS (1D numpy array)
 
-        self.BIODIV_RAW_UNDER_LDS = self.BIODIV_SCORE_RAW - biodiv_degradation_raw_LDS_burning                              # Biodiversity value under LDS burning (1D numpy array); will be used as base score for calculating ag/non-ag stratagies impacts on biodiversity
+        self.BIODIV_RAW_UNDER_LDS = biodiv_score_raw_weighted - biodiv_degradation_raw_LDS_burning                          # Biodiversity value under LDS burning (1D numpy array); will be used as base score for calculating ag/non-ag stratagies impacts on biodiversity
         
         # Get the biodiversity value at the beginning of the simulation
         biodiv_current_val = self.BIODIV_RAW_UNDER_LDS - biodiv_degradation_raw_HCAS                                        # Biodiversity value at the beginning year (1D numpy array)
-        biodiv_current_val = np.nansum(biodiv_current_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK])                                    # Sum the biodiversity value at current year (float)
+        biodiv_current_val = np.nansum(biodiv_current_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK])          # Sum the biodiversity value at current year (float)
 
         # Biodiversity values need to be restored under the GBF Target 2
         '''
@@ -1062,7 +1076,7 @@ class Data:
             biodiv_degradation_raw_HCAS                                                                                     # Biodiversity degradation from LDS burning
         ) * self.REAL_AREA_NO_RESFACTOR
         
-        biodiv_degradation_val = np.nansum(biodiv_degradation_val[self.LUMASK])                                                          # Sum the biodiversity degradation value
+        biodiv_degradation_val = np.nansum(biodiv_degradation_val[self.LUMASK])                                             # Sum the biodiversity degradation value
 
         # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
         self.BIODIV_GBF_TARGET_2 = {

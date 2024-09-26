@@ -96,7 +96,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
+RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
 # MODE = 'snapshot'   # Runs for target year only
@@ -205,7 +205,7 @@ NON_AG_LAND_USES_REVERSIBLE = {
 CARBON_PRICES_FIELD = '1.8C 67%'
 
 # Cost of fencing per linear metre
-FENCING_COST_PER_M = 5
+FENCING_COST_PER_M = 10
 
 # Environmental Plantings Parameters
 EP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
@@ -369,6 +369,17 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 # ------------------- Agricultural biodiversity parameters -------------------
+
+# Connectivity source source
+'''
+    The connectivity source is the source of the connectivity score used to weigh the raw biodiversity priority score.
+    Can be either 'DCCEEW' or 'NLUM'.
+        - if 'DCCEEW' is selected, the connectivity score is sourced from the DCCEEW's National Connectivity Index.
+        - if 'NLUM' is selected, the connectivity score is calculated as distance to the nearest area of natural land as mapped 
+          by the National Land Use Map of Australia. This score is then normalised between 0 (fartherst) and 1 (closest).
+'''
+CONNECT_SOURCE = 'DCCEEW'       # 'DCCEEW' or 'NLUM'
+
 
 # HCAS percentile for each land-use type
 ''' Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the 
