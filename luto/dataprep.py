@@ -53,7 +53,7 @@ def create_new_dataset():
     BECCS_inpath = 'N:/Data-Master/BECCS/From_CSIRO/20211124_as_submitted/'
     GHG_off_land_inpath = 'N:/LUF-Modelling/Food_demand_AU/au.food.demand/Inputs/Off_land_GHG_emissions'
     bio_contributions_inpath = 'N:/Data-Master/Biodiversity/biodiversity_contribution/data'
-    HACS_inpath = 'N:/Data-Master/Habitat_condition_assessment_system/Data/Processed'
+    HACS_inpath = 'N:/Data-Master/Habitat_condition_assessment_system/Data/Processed/'
     
     # Set data output paths
     raw_data = RAW_DATA + '/' # '../raw_data/'
@@ -115,8 +115,9 @@ def create_new_dataset():
     shutil.copyfile(luto_1D_inpath + '20231107_ECOGRAZE_Bundle.xlsx', outpath + '20231107_ECOGRAZE_Bundle.xlsx')
     shutil.copyfile(luto_1D_inpath + '20231107_Bundle_AgTech_EI.xlsx', outpath + '20231107_Bundle_AgTech_EI.xlsx')
     
-    # Copy HACS (Habitat Condition Assessment System) data
-    shutil.copyfile(HACS_inpath + '/HCAS_LUMAP_PERCENTILE.csv', outpath + 'HCAS_LUMAP_PERCENTILE.csv')
+    # Copy HACS and NCI data from DCCEEW
+    shutil.copyfile(HACS_inpath + 'DCCEEW_HCAS_LUMAP_PERCENTILE.csv', outpath + 'DCCEEW_HCAS_LUMAP_PERCENTILE.csv')
+    shutil.copyfile(HACS_inpath + 'DCCEEW_NCI.npy', outpath + 'DCCEEW_NCI.npy')
     
     
     # Copy biodiversity contribution layers for each species (total ~10k species)

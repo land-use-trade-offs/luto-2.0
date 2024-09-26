@@ -95,12 +95,12 @@ AMORTISATION_PERIOD = 30 # years
 # Model parameters
 # ---------------------------------------------------------------------------- #
 
-# Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 9 x 9 cell block
-RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
+# Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
+RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
-MODE = 'snapshot'   # Runs for target year only
-# MODE = 'timeseries'   # Runs each year from base year to target year
+# MODE = 'snapshot'   # Runs for target year only
+MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -205,7 +205,7 @@ NON_AG_LAND_USES_REVERSIBLE = {
 CARBON_PRICES_FIELD = '1.8C 67%'
 
 # Cost of fencing per linear metre
-FENCING_COST_PER_M = 5
+FENCING_COST_PER_M = 10
 
 # Environmental Plantings Parameters
 EP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
@@ -370,6 +370,17 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 # ------------------- Agricultural biodiversity parameters -------------------
 
+# Connectivity source source
+'''
+    The connectivity source is the source of the connectivity score used to weigh the raw biodiversity priority score.
+    Can be either 'DCCEEW' or 'NLUM'.
+        - if 'DCCEEW' is selected, the connectivity score is sourced from the DCCEEW's National Connectivity Index.
+        - if 'NLUM' is selected, the connectivity score is calculated as distance to the nearest area of natural land as mapped 
+          by the National Land Use Map of Australia. This score is then normalised between 0 (fartherst) and 1 (closest).
+'''
+CONNECT_SOURCE = 'DCCEEW'       # 'DCCEEW' or 'NLUM'
+
+
 # HCAS percentile for each land-use type
 ''' Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the 
     suitability for wild animals ranging between 0-1) for each land-use type.
@@ -390,7 +401,8 @@ LDS_BIODIVERSITY_VALUE = 0.8
 
 # ------------------- Non-agricultural biodiversity parameters -------------------
 ''' The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
-    For example, if the raw biodiversity priority value is 0.5 and the benefit of a land use is 0.8, then the biodiversity value
+    For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value
+    will be 0.6 * 0.8 = 0.48.
 '''
 ENV_PLANTING_BIODIVERSITY_BENEFIT = 0.8    
 CARBON_PLANTING_BLOCK_BIODIV_BENEFIT = 0.1
