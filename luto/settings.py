@@ -96,7 +96,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
+RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
 # MODE = 'snapshot'   # Runs for target year only
@@ -378,17 +378,28 @@ INCLUDE_WATER_LICENSE_COSTS = 0
         - if 'NCI' is selected, the connectivity score is sourced from the DCCEEW's National Connectivity Index (v3.0).
         - if 'DWI' is selected, the connectivity score is calculated as distance to the nearest area of natural land as mapped 
           by the National Land Use Map of Australia. 
+        - if 'NONE' is selected, the connectivity score is not used in the biodiversity calculation.
 '''
-CONNECT_SOURCE = 'NCI'       # 'NCI' or 'DWI'
+CONNECT_SOURCE = 'NCI'                      # 'NCI', 'DWI' or 'NONE'
 
 
-# Habitat Condition 
-HABITAT_CONDITION = 'HCAS'    # 'HCAS', 'USER_DEFINED', or 'None'
+# Connectivity score importance
+'''
+    !!!!!   ONLY WORKS IF CONNECT_SOURCE IS NOT 'NONE'   !!!!!
+    The relative importance of the connectivity score in the biodiversity calculation.
+    I.e., the lower bound of the connectivity score for weighting the raw biodiversity priority score is CONNECT_WEIGHT.
+'''
+connect_importance = 0.3                 
+CONNECT_WEIGHT = 1 - connect_importance     # Weighting of connectivity score in biodiversity calculation (0 - 1)
+
+
+
+# Habitat condition data source
+HABITAT_CONDITION = 'HCAS'                  # 'HCAS', 'USER_DEFINED', or 'NONE'
 '''
     It is used to calculate the biodiversity benifits for aricultural landuses.
-    If 'HCAS' is selected, the habitat condition is calculated using the Habitat Condition Assessment System (HCAS)
-    If 'USER_DEFINED' is selected, the habitat condition is calculated using the user defined values in the 'HCAS_USER_DEFINED' dictionary.
-    If 'None' then the biodiversity benefit will be set to 1 for all land uses
+    - If 'HCAS' is selected, the habitat condition is calculated using the Habitat Condition Assessment System (HCAS)
+    - If 'USER_DEFINED' is selected, the habitat condition is calculated using the user defined values in the 'HCAS_USER_DEFINED' dictionary.
 '''
 
 

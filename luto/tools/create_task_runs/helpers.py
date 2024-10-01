@@ -63,7 +63,7 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
 
 
 
-def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
+def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv', run:bool=True):
      
     # Read the custom settings file
     custom_settings = pd.read_csv(from_path, index_col=0)
@@ -93,7 +93,7 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
         create_run_folders(col)    
         # Write the custom settings to the task folder
         write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)  
-        # Submit the task
+        # Submit the task if the os is linux
         submit_task(cwd, col)
         
 
@@ -226,7 +226,7 @@ def update_settings(settings_dict:dict, n_tasks:int, col:str):
     if settings_dict['NODE'] == 'Please specify the node name':
         if os.name == 'nt':         
             # If the os is windows, do nothing
-            print('This will only create task folders, and not submit job to run!')
+            print('This will only create task folders, and NOT submit job to run!')
         elif os.name == 'posix':    
             # If the os is linux, submit the job
             raise ValueError('NODE must be specified!')
