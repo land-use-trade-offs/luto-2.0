@@ -10,7 +10,7 @@ import pandas as pd
 
 from joblib import delayed, Parallel
 
-from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, PARAMS_TO_EVAL, TASK_ROOT_DIR
+from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, PARAMS_NUM_AS_STR, PARAMS_TO_EVAL, TASK_ROOT_DIR
 from luto import settings
 
 
@@ -207,8 +207,8 @@ def write_custom_settings(task_dir:str, settings_dict:dict):
                     bash_file.write(f'{k}_{key}={value}\n')
             # If the value is a number, write it as number
             elif str(v).isdigit() or is_float(v):
-                file.write(f'{k}={v}\n')
-                bash_file.write(f'{k}={v}\n')
+                file.write(f'{k}="{v}"\n') if k in PARAMS_NUM_AS_STR else file.write(f'{k}={v}\n')
+                bash_file.write(f'{k}="{v}"\n') if k in PARAMS_NUM_AS_STR else bash_file.write(f'{k}={v}\n')
             # If the value is a string, write it as a string
             elif isinstance(v, str):
                 file.write(f'{k}="{v}"\n')

@@ -1022,17 +1022,17 @@ class Data:
         # Get the connectivity score between 0 and 1, where 1 is the highest connectivity
         biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5'))
         
-        if settings.CONNECT_SOURCE == 'NCI':
+        if settings.CONNECTIVITY_SOURCE == 'NCI':
             connectivity_score = np.load(os.path.join(INPUT_DIR, 'DCCEEW_NCI.npy'))
             connectivity_score = np.where(self.LUMASK, connectivity_score, 1)               # Set the connectivity score to 1 for cells outside the LUMASK
-            connectivity_score = np.interp(connectivity_score, (connectivity_score.min(), connectivity_score.max()), (settings.CONNECT_WEIGHT, 1)).astype('float32')
-        elif settings.CONNECT_SOURCE == 'DWI':
+            connectivity_score = np.interp(connectivity_score, (connectivity_score.min(), connectivity_score.max()), (settings.CONNECTIVITY_LB, 1)).astype('float32')
+        elif settings.CONNECTIVITY_SOURCE == 'DWI':
             connectivity_score = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.float32)
-            connectivity_score = np.interp(connectivity_score, (connectivity_score.min(), connectivity_score.max()), (1, settings.CONNECT_WEIGHT)).astype('float32')
-        elif settings.CONNECT_SOURCE == 'NONE':
+            connectivity_score = np.interp(connectivity_score, (connectivity_score.min(), connectivity_score.max()), (1, settings.CONNECTIVITY_LB)).astype('float32')
+        elif settings.CONNECTIVITY_SOURCE == 'NONE':
             connectivity_score = 1
         else:
-            raise ValueError(f"Invalid connectivity source: {settings.CONNECT_SOURCE}, must be 'NCI', 'DWI' or 'NONE'")
+            raise ValueError(f"Invalid connectivity source: {settings.CONNECTIVITY_SOURCE}, must be 'NCI', 'DWI' or 'NONE'")
                 
         
         
@@ -1044,21 +1044,21 @@ class Data:
         
         
         # Habitat degradation scale for agricultural land-use
-        biodiv_degrade_df = pd.read_csv(os.path.join(INPUT_DIR, 'HABITAT_CONDITION.csv'))                                   # Load the HCAS percentile data (pd.DataFrame)
+        biodiv_degrade_df = pd.read_csv(os.path.join(INPUT_DIR, 'HABITAT_CONDITION.csv'))                                                               # Load the HCAS percentile data (pd.DataFrame)
         
         if settings.HABITAT_CONDITION == 'HCAS':
             ''' 
             The degradation weight score of "HCAS" are float values range between 0-1 indicating the suitability for wild animals survival. 
             Here we average this dataset in year 2009, 2010, and 2011, then calculate the percentiles of the average score under each land-use type. 
             '''
-            biodiv_degrade_lookup = biodiv_degrade_df[['lu', f'PERCENTILE_{settings.HCAS_PERCENTILE}']]                     # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
-            biodiv_degrade_lookup = {int(k):v for k,v in dict(biodiv_degrade_lookup.values).items()}                        # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
-            unalloc_nat_land_bio_score = biodiv_degrade_lookup[self.DESC2AGLU['Unallocated - natural land']]                # Get the biodiversity degradation score for unallocated natural land (float)
-            biodiv_degrade_lookup = {k:v*(1/unalloc_nat_land_bio_score) for k,v in biodiv_degrade_lookup.items()}           # Normalise the biodiversity degradation score to the unallocated natural land score
+            self.BIODIV_HABITAT_DEGRADE_LOOK_UP = biodiv_degrade_df[['lu', f'PERCENTILE_{settings.HCAS_PERCENTILE}']]                                   # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
+            self.BIODIV_HABITAT_DEGRADE_LOOK_UP = {int(k):v for k,v in dict(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.values).items()}                        # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
+            unalloc_nat_land_bio_score = self.BIODIV_HABITAT_DEGRADE_LOOK_UP[self.DESC2AGLU['Unallocated - natural land']]                              # Get the biodiversity degradation score for unallocated natural land (float)
+            self.BIODIV_HABITAT_DEGRADE_LOOK_UP = {k:v*(1/unalloc_nat_land_bio_score) for k,v in self.BIODIV_HABITAT_DEGRADE_LOOK_UP.items()}           # Normalise the biodiversity degradation score to the unallocated natural land score
 
         elif settings.HABITAT_CONDITION == 'USER_DEFINED':
-            biodiv_degrade_lookup = biodiv_degrade_df[['lu', 'USER_DEFINED']] 
-            biodiv_degrade_lookup = {int(k):v for k,v in dict(biodiv_degrade_lookup.values).items()}                        # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
+            self.BIODIV_HABITAT_DEGRADE_LOOK_UP = biodiv_degrade_df[['lu', 'USER_DEFINED']] 
+            self.BIODIV_HABITAT_DEGRADE_LOOK_UP = {int(k):v for k,v in dict(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.values).items()}                        # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
         
         else:
             raise ValueError(f"Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
@@ -1070,16 +1070,16 @@ class Data:
         The degradation scores are float values range between 0-1 indicating the discount of biodiversity value for each cell.
         E.g., 0.8 means the biodiversity value of the cell is 80% of the original raw biodiversity value.
         '''
-        biodiv_degrade_LDS = np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)                            # Get the biodiversity degradation score for LDS burning (1D numpy array)
-        biodiv_degrade_habitat = np.vectorize(biodiv_degrade_lookup.get)(self.LUMAP_NO_RESFACTOR).astype(np.float32)        # Get the biodiversity degradation score for each cell (1D numpy array)        
+        biodiv_degrade_LDS = np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)                                            # Get the biodiversity degradation score for LDS burning (1D numpy array)
+        biodiv_degrade_habitat = np.vectorize(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.get)(self.LUMAP_NO_RESFACTOR).astype(np.float32)          # Get the biodiversity degradation score for each cell (1D numpy array)        
         
         # Get the biodiversity damage under LDS burning (0-1) for each cell
         biodiv_degradation_raw_weighted_LDS = self.BIODIV_SCORE_RAW_WEIGHTED * (1 - biodiv_degrade_LDS)                     # Biodiversity damage under LDS burning (1D numpy array)
-        biodiv_degradation_raw_weighted_HCAS = self.BIODIV_SCORE_RAW_WEIGHTED * (1 - biodiv_degrade_habitat)                # Biodiversity damage under under HCAS (1D numpy array)
+        biodiv_degradation_raw_weighted_habitat = self.BIODIV_SCORE_RAW_WEIGHTED * (1 - biodiv_degrade_habitat)             # Biodiversity damage under under HCAS (1D numpy array)
         
         # Get the biodiversity value at the beginning of the simulation
         self.BIODIV_RAW_WEIGHTED_LDS = self.BIODIV_SCORE_RAW_WEIGHTED - biodiv_degradation_raw_weighted_LDS                 # Biodiversity value under LDS burning (1D numpy array); will be used as base score for calculating ag/non-ag stratagies impacts on biodiversity
-        biodiv_current_val = self.BIODIV_RAW_WEIGHTED_LDS - biodiv_degradation_raw_weighted_HCAS                            # Biodiversity value at the beginning year (1D numpy array)   
+        biodiv_current_val = self.BIODIV_RAW_WEIGHTED_LDS - biodiv_degradation_raw_weighted_habitat                         # Biodiversity value at the beginning year (1D numpy array)   
         biodiv_current_val = np.where(biodiv_current_val < 0, 0, biodiv_current_val)                                        # Set the negative biodiversity value to 0
         biodiv_current_val = np.nansum(biodiv_current_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK])          # Sum the biodiversity value within the LUMASK 
         
@@ -1090,7 +1090,7 @@ class Data:
         '''                                                                                
         biodiv_degradation_val = (
             biodiv_degradation_raw_weighted_LDS +                                                                           # Biodiversity degradation from HCAS
-            biodiv_degradation_raw_weighted_HCAS                                                                            # Biodiversity degradation from LDS burning
+            biodiv_degradation_raw_weighted_habitat                                                                         # Biodiversity degradation from LDS burning
         ) 
         biodiv_degradation_val = np.where(                                                                              
             biodiv_degradation_val > self.BIODIV_SCORE_RAW_WEIGHTED, 

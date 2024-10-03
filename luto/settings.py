@@ -96,11 +96,11 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
+RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
-# MODE = 'snapshot'   # Runs for target year only
-MODE = 'timeseries'   # Runs each year from base year to target year
+MODE = 'snapshot'   # Runs for target year only
+# MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -380,17 +380,17 @@ INCLUDE_WATER_LICENSE_COSTS = 0
           by the National Land Use Map of Australia. 
         - if 'NONE' is selected, the connectivity score is not used in the biodiversity calculation.
 '''
-CONNECT_SOURCE = 'NCI'                      # 'NCI', 'DWI' or 'NONE'
+CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
 
 
 # Connectivity score importance
 '''
-    !!!!!   ONLY WORKS IF CONNECT_SOURCE IS NOT 'NONE'   !!!!!
+    !!!!!   ONLY WORKS IF CONNECTIVITY_SOURCE IS NOT 'NONE'   !!!!!
     The relative importance of the connectivity score in the biodiversity calculation.
-    I.e., the lower bound of the connectivity score for weighting the raw biodiversity priority score is CONNECT_WEIGHT.
+    I.e., the lower bound of the connectivity score for weighting the raw biodiversity priority score is CONNECTIVITY_LB.
 '''
 connect_importance = 0.3                 
-CONNECT_WEIGHT = 1 - connect_importance     # Weighting of connectivity score in biodiversity calculation (0 - 1)
+CONNECTIVITY_LB = 1 - connect_importance    # Weighting of connectivity score in biodiversity calculation (0 - 1)
 
 
 

@@ -36,8 +36,14 @@ PARAMS_TO_EVAL = [
     'OFF_LAND_COMMODITIES',
     'GHG_LIMITS',
     'BIODIV_GBF_TARGET_2_DICT',
+    'WATER_YIELD_TARGETS',
     # Bools to be evaluated from str to bool
     'AMORTISE_UPFRONT_COSTS',
+]
+
+# Parameters that are numbers but are stored as strings in the settings
+PARAMS_NUM_AS_STR = [
+    'SSP',
 ]
 
 EXCLUDE_DIRS = ['input', 'output', '.git', '.vscode', '__pycache__', 'jinzhu_inspect_code']
