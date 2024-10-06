@@ -1701,7 +1701,7 @@ class Data:
         )
         water_sr_yield = (
             water_sr_yield if water_sr_yield is not None 
-            else self.get_water_dr_yield_for_yr_idx(yr_idx)
+            else self.get_water_sr_yield_for_yr_idx(yr_idx)
         )
         dr_prop = self.DEEP_ROOTED_PROPORTION
         
