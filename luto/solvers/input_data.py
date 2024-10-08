@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Any
+from typing import Any
 import numpy as np
 
 from luto import settings

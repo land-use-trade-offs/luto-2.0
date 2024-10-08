@@ -116,7 +116,7 @@ def create_new_dataset():
     shutil.copyfile(luto_1D_inpath + '20231107_Bundle_AgTech_EI.xlsx', outpath + '20231107_Bundle_AgTech_EI.xlsx')
     
     # Copy HACS and NCI data from DCCEEW
-    shutil.copyfile(HACS_inpath + 'DCCEEW_HCAS_LUMAP_PERCENTILE.csv', outpath + 'DCCEEW_HCAS_LUMAP_PERCENTILE.csv')
+    shutil.copyfile(HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'HABITAT_CONDITION.csv')
     shutil.copyfile(HACS_inpath + 'DCCEEW_NCI.npy', outpath + 'DCCEEW_NCI.npy')
     
     

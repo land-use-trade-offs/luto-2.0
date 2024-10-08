@@ -96,11 +96,11 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
+RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
 
 # How does the model run over time 
-# MODE = 'snapshot'   # Runs for target year only
-MODE = 'timeseries'   # Runs each year from base year to target year
+MODE = 'snapshot'   # Runs for target year only
+# MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -373,12 +373,34 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 # Connectivity source source
 '''
     The connectivity source is the source of the connectivity score used to weigh the raw biodiversity priority score.
-    Can be either 'DCCEEW' or 'NLUM'.
-        - if 'DCCEEW' is selected, the connectivity score is sourced from the DCCEEW's National Connectivity Index.
-        - if 'NLUM' is selected, the connectivity score is calculated as distance to the nearest area of natural land as mapped 
-          by the National Land Use Map of Australia. This score is then normalised between 0 (fartherst) and 1 (closest).
+    This score is normalised between 0 (fartherst) and 1 (closest).
+    Can be either 'NCI' or 'DWI'.
+        - if 'NCI' is selected, the connectivity score is sourced from the DCCEEW's National Connectivity Index (v3.0).
+        - if 'DWI' is selected, the connectivity score is calculated as distance to the nearest area of natural land as mapped 
+          by the National Land Use Map of Australia. 
+        - if 'NONE' is selected, the connectivity score is not used in the biodiversity calculation.
 '''
-CONNECT_SOURCE = 'DCCEEW'       # 'DCCEEW' or 'NLUM'
+CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
+
+
+# Connectivity score importance
+'''
+    !!!!!   ONLY WORKS IF CONNECTIVITY_SOURCE IS NOT 'NONE'   !!!!!
+    The relative importance of the connectivity score in the biodiversity calculation.
+    I.e., the lower bound of the connectivity score for weighting the raw biodiversity priority score is CONNECTIVITY_LB.
+'''
+connect_importance = 0.3                 
+CONNECTIVITY_LB = 1 - connect_importance    # Weighting of connectivity score in biodiversity calculation (0 - 1)
+
+
+
+# Habitat condition data source
+HABITAT_CONDITION = 'HCAS'                  # 'HCAS', 'USER_DEFINED', or 'NONE'
+'''
+    It is used to calculate the biodiversity benifits for aricultural landuses.
+    - If 'HCAS' is selected, the habitat condition is calculated using the Habitat Condition Assessment System (HCAS)
+    - If 'USER_DEFINED' is selected, the habitat condition is calculated using the user defined values in the 'HCAS_USER_DEFINED' dictionary.
+'''
 
 
 # HCAS percentile for each land-use type
