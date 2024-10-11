@@ -11,7 +11,7 @@ from luto.economics.off_land_commodity import get_demand_df
 from luto.tools.report.data_tools import   get_all_files, get_quantity_df        
 from luto.tools.report.data_tools.helper_func import select_years
 
-from luto.tools.report.data_tools.colors import LANDUSE_ALL_COLORS, COMMODITIES_ALL_COLORS                                                                             
+from luto.tools.report.data_tools.colors import LANDUSE_ALL_COLORS, COMMODITIES_ALL_COLORS 
 from luto.tools.report.data_tools.parameters import (AG_LANDUSE, 
                                                      COMMODITIES_ALL,
                                                      COMMODITIES_OFF_LAND, 
@@ -211,7 +211,7 @@ def save_report_data(raw_data_dir:str):
     heat_area_html = heat_area.to_html()
     heat_pct_html = heat_pct.to_html()
 
-    # Replace 0.00 with - in the html
+    # Replace '0.00' with '-' in the html
     heat_area_html = re.sub(r'(?<!\d)0(?!\d)', '-', heat_area_html)
     heat_pct_html = re.sub(r'(?<!\d)0.00(?!\d)', '-', heat_pct_html)
 
@@ -363,6 +363,8 @@ def save_report_data(raw_data_dir:str):
         DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity_wide.dropna()
         
         DEMAND_DATA_commodity_wide.to_json(f'{SAVE_DIR}/production_5_{idx+1}_demand_{Type}_commodity.json', orient='records')
+        
+        
         
     # Plot_2-5-6: Production (LUTO outputs, Million Tonnes)
     quantity_csv_paths = files.query('category == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)

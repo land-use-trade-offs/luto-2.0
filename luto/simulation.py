@@ -40,6 +40,34 @@ def load_data() -> Data:
     """
     return Data(timestamp=timestamp)
 
+@tools.LogToFile(f"{settings.OUTPUT_DIR}/run_{timestamp}", 'a')
+def run( data: Data, base: int, target: int) -> None:
+    """
+    Run the simulation.
+    Parameters:
+        'data' is a Data object, and 'base' and 'target' are the base and target years.
+    """
+    
+    # Set Data object's path and create output directories
+    data.set_path(base, target)
+
+    # Run the simulation up to `year` sequentially.
+    if settings.MODE == 'timeseries':
+        if len(data.D_CY.shape) != 2:
+            raise ValueError( "Demands need to be a time series array of shape (years, commodities) and years > 0." )
+        if target - base > data.D_CY.shape[0]:
+            raise ValueError( "Not enough years in demands time series.")
+
+        steps = target - base
+        solve_timeseries(data, steps, base, target)
+
+    elif settings.MODE == 'snapshot':
+        # If demands is a time series, choose the appropriate entry.
+        solve_snapshot(data, base, target)
+
+    else:
+        raise ValueError(f"Unkown MODE: {settings.MODE}.")
+
 
 def solve_timeseries(data: Data, steps: int, base: int, target: int):
     print('\n')
@@ -52,7 +80,7 @@ def solve_timeseries(data: Data, steps: int, base: int, target: int):
         start_time = time.time()
 
         input_data = get_input_data(data, base + s, base + s + 1)
-        d_c = data.D_CY[s]
+        d_c = data.D_CY[s + 1]
         
         if s == 0:
             luto_solver = LutoSolver(input_data, d_c, target)
@@ -134,30 +162,3 @@ def solve_snapshot(data: Data, base: int, target: int):
     
     print(f'Processing for {target} completed in {round(time.time() - start_time)} seconds\n\n')
 
-@tools.LogToFile(f"{settings.OUTPUT_DIR}/run_{timestamp}", 'a')
-def run( data: Data, base: int, target: int) -> None:
-    """
-    Run the simulation.
-    Parameters:
-        'data' is a Data object, and 'base' and 'target' are the base and target years.
-    """
-    
-    # Set Data object's path and create output directories
-    data.set_path(base, target)
-
-    # Run the simulation up to `year` sequentially.
-    if settings.MODE == 'timeseries':
-        if len(data.D_CY.shape) != 2:
-            raise ValueError( "Demands need to be a time series array of shape (years, commodities) and years > 0." )
-        if target - base > data.D_CY.shape[0]:
-            raise ValueError( "Not enough years in demands time series.")
-
-        steps = target - base
-        solve_timeseries(data, steps, base, target)
-
-    elif settings.MODE == 'snapshot':
-        # If demands is a time series, choose the appropriate entry.
-        solve_snapshot(data, base, target)
-
-    else:
-        raise ValueError(f"Unkown MODE: {settings.MODE}.")
