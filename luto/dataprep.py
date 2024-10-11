@@ -115,9 +115,8 @@ def create_new_dataset():
     shutil.copyfile(luto_1D_inpath + '20231107_ECOGRAZE_Bundle.xlsx', outpath + '20231107_ECOGRAZE_Bundle.xlsx')
     shutil.copyfile(luto_1D_inpath + '20231107_Bundle_AgTech_EI.xlsx', outpath + '20231107_Bundle_AgTech_EI.xlsx')
     
-    # Copy HACS and NCI data from DCCEEW
+    # Copy HACS data from DCCEEW
     shutil.copyfile(HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'HABITAT_CONDITION.csv')
-    shutil.copyfile(HACS_inpath + 'DCCEEW_NCI.npy', outpath + 'DCCEEW_NCI.npy')
     
     
     # Copy biodiversity contribution layers for each species (total ~10k species)
@@ -501,7 +500,13 @@ def create_new_dataset():
     ############### Get biodiversity priority layers 
     
     # Biodiversity priorities under the four SSPs
-    biodiv_priorities = bioph[['BIODIV_PRIORITY_SSP126', 'BIODIV_PRIORITY_SSP245', 'BIODIV_PRIORITY_SSP370', 'BIODIV_PRIORITY_SSP585', 'BIODIV_PRIORITY_HCAS', 'NATURAL_AREA_CONNECTIVITY']].copy()
+    biodiv_priorities = bioph[[
+        'BIODIV_PRIORITY_SSP126', 
+        'BIODIV_PRIORITY_SSP245', 
+        'BIODIV_PRIORITY_SSP370', 
+        'BIODIV_PRIORITY_SSP585', 
+        'NATURAL_AREA_CONNECTIVITY',
+        'DCCEEW_NCI']].copy()
     
     # Save to file
     biodiv_priorities.to_hdf(outpath + 'biodiv_priorities.h5', key = 'biodiv_priorities', mode = 'w', format = 'fixed', index = False, complevel = 9)
@@ -886,14 +891,8 @@ def create_new_dataset():
     
     # Save to HDF5
     demand.to_hdf(outpath + 'demand_projections.h5', key = 'demand_projections', mode = 'w', format = 'fixed', index = False, complevel = 9)
-    
-
-    
-    # Complete processing and report back
-    t = round(time.time() - start_time)
-    print('Completed input data refresh at', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), ', taking', t, 'seconds')
-    
-    
+     
+   
     
     ############## BECCS data 
     # from Lei Gao at CSIRO (N:\Data-Master\BECCS\From_CSIRO\20211124_as_submitted)
@@ -945,4 +944,14 @@ def create_new_dataset():
     cell_xy.to_hdf(outpath + 'cell_BECCS_df.h5', key = 'cell_BECCS_df', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
     
-
+    
+    
+    
+    
+    
+    # Complete processing and report back
+    laps_time = round(time.time() - start_time)
+    print('Completed input data refresh at', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), ', taking', laps_time, 'seconds')
+    
+    
+    

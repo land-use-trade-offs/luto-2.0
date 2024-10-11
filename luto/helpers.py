@@ -85,7 +85,6 @@ import luto.simulation as sim
 import luto.economics.agricultural.transitions as ag_transition
 import luto.economics.agricultural.cost as ag_cost
 import luto.economics.agricultural.revenue as ag_revenue
-from luto.economics.production import get_production
 from luto.economics.agricultural.ghg import get_ghg_transition_penalties
 from luto import settings
 import random as rand

@@ -1023,7 +1023,7 @@ class Data:
         biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5'))
         
         if settings.CONNECTIVITY_SOURCE == 'NCI':
-            connectivity_score = np.load(os.path.join(INPUT_DIR, 'DCCEEW_NCI.npy'))
+            connectivity_score = biodiv_priorities['DCCEEW_NCI'].to_numpy(dtype = np.float32)
             connectivity_score = np.where(self.LUMASK, connectivity_score, 1)               # Set the connectivity score to 1 for cells outside the LUMASK
             connectivity_score = np.interp(connectivity_score, (connectivity_score.min(), connectivity_score.max()), (settings.CONNECTIVITY_LB, 1)).astype('float32')
         elif settings.CONNECTIVITY_SOURCE == 'DWI':
