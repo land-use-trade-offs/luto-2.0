@@ -27,8 +27,8 @@ def get_breq_matrices(data):
         b_mrj[:, :, j] = (
             data.BIODIV_RAW_WEIGHTED_LDS -                                                      # Biodiversity score after Late Dry Season (LDS) burning
             (data.BIODIV_SCORE_RAW_WEIGHTED * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[j]))     # Biodiversity degradation for land-use j
-        ) * data.REAL_AREA                                        
-
+        ) * data.REAL_AREA    
+    
     return b_mrj
 
 

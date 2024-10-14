@@ -88,7 +88,7 @@ def get_coarse2D_map(data, map_:np.ndarray)-> np.ndarray:
     
     # Fill the 1D map to the 2D map_resfactored.
     map_resfactored = data.LUMAP_2D_RESFACTORED.copy().astype(np.float32)
-    np.place(map_resfactored, (map_resfactored != data.MASK_LU_CODE) & (map_resfactored != data.NODATA), map_)                    
+    np.place(map_resfactored, (map_resfactored != data.MASK_LU_CODE) & (map_resfactored != data.NODATA), map_.astype(np.float32))                    
     return map_resfactored
     
 
