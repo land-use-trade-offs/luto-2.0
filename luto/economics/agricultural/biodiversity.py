@@ -28,8 +28,6 @@ def get_breq_matrices(data):
             data.BIODIV_RAW_WEIGHTED_LDS -                                                      # Biodiversity score after Late Dry Season (LDS) burning
             (data.BIODIV_SCORE_RAW_WEIGHTED * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[j]))     # Biodiversity degradation for land-use j
         ) * data.REAL_AREA    
-        
-    b_mrj = np.where(b_mrj < 0, 0, b_mrj)                                                       # Set negative values to zero, because biodiversity cannot be negative                               
     
     return b_mrj
 

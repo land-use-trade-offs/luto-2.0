@@ -1080,7 +1080,6 @@ class Data:
         # Get the biodiversity value at the beginning of the simulation
         self.BIODIV_RAW_WEIGHTED_LDS = self.BIODIV_SCORE_RAW_WEIGHTED - biodiv_degradation_raw_weighted_LDS                 # Biodiversity value under LDS burning (1D numpy array); will be used as base score for calculating ag/non-ag stratagies impacts on biodiversity
         biodiv_current_val = self.BIODIV_RAW_WEIGHTED_LDS - biodiv_degradation_raw_weighted_habitat                         # Biodiversity value at the beginning year (1D numpy array)   
-        biodiv_current_val = np.where(biodiv_current_val < 0, 0, biodiv_current_val)                                        # Set the negative biodiversity value to 0
         biodiv_current_val = np.nansum(biodiv_current_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK])          # Sum the biodiversity value within the LUMASK 
         
         # Biodiversity values need to be restored under the GBF Target 2
@@ -1091,12 +1090,7 @@ class Data:
         biodiv_degradation_val = (
             biodiv_degradation_raw_weighted_LDS +                                                                           # Biodiversity degradation from HCAS
             biodiv_degradation_raw_weighted_habitat                                                                         # Biodiversity degradation from LDS burning
-        ) 
-        biodiv_degradation_val = np.where(                                                                              
-            biodiv_degradation_val > self.BIODIV_SCORE_RAW_WEIGHTED, 
-            self.BIODIV_SCORE_RAW_WEIGHTED, 
-            biodiv_degradation_val
-        )                                                                                                                   # Set the biodiversity degradation value to the maximum of the raw weighted biodiversity value                      
+        )                                                                                                               # Set the biodiversity degradation value to the maximum of the raw weighted biodiversity value                      
         biodiv_degradation_val = np.nansum(biodiv_degradation_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK])  # Sum the biodiversity degradation value within the LUMASK 
 
         # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
