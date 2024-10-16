@@ -92,7 +92,7 @@ def get_savanna_burning_effect_b_mrj(data):
     new_b_mrj = np.zeros((data.NLMS, data.NCELLS, nlus))
 
     eds_sav_burning_biodiv_benefits = np.where( data.SAVBURN_ELIGIBLE, 
-                                                (1 - settings.LDS_BIODIVERSITY_VALUE) * data.BIODIV_SCORE_RAW * data.REAL_AREA, 
+                                                (1 - settings.LDS_BIODIVERSITY_VALUE) * data.BIODIV_SCORE_RAW_WEIGHTED * data.REAL_AREA, 
                                                 0
                                               )
     

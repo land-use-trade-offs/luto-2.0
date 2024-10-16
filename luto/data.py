@@ -220,6 +220,7 @@ class Data:
             
         elif settings.RESFACTOR == 1:
             self.MASK = self.LUMASK
+            self.GEO_META = self.GEO_META_FULLRES
 
         else:
             raise KeyError("Resfactor setting invalid")
@@ -1036,10 +1037,10 @@ class Data:
                 
         
         
-        # Get the Zonation output score between 0 and 1. BIODIV_SCORE_RAW.sum() = 153 million
-        self.BIODIV_SCORE_RAW = biodiv_priorities['BIODIV_PRIORITY_SSP' + str(settings.SSP)].to_numpy(dtype = np.float32)
+        # Get the Zonation output score between 0 and 1. biodiv_score_raw.sum() = 153 million
+        biodiv_score_raw = biodiv_priorities['BIODIV_PRIORITY_SSP' + str(settings.SSP)].to_numpy(dtype = np.float32)
         # Weight the biodiversity score by the connectivity score
-        self.BIODIV_SCORE_RAW_WEIGHTED = self.BIODIV_SCORE_RAW * connectivity_score
+        self.BIODIV_SCORE_RAW_WEIGHTED = biodiv_score_raw * connectivity_score
         
         
         
@@ -1090,7 +1091,7 @@ class Data:
         biodiv_degradation_val = (
             biodiv_degradation_raw_weighted_LDS +                                                                           # Biodiversity degradation from HCAS
             biodiv_degradation_raw_weighted_habitat                                                                         # Biodiversity degradation from LDS burning
-        )                                                                                                               # Set the biodiversity degradation value to the maximum of the raw weighted biodiversity value                      
+        ) 
         biodiv_degradation_val = np.nansum(biodiv_degradation_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK])  # Sum the biodiversity degradation value within the LUMASK 
 
         # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
@@ -1141,7 +1142,6 @@ class Data:
         # Apply resfactor to various arrays required for data loading.
         ###############################################################        
         self.SAVBURN_ELIGIBLE = self.get_array_resfactor_applied(self.SAVBURN_ELIGIBLE)
-        self.BIODIV_SCORE_RAW = self.get_array_resfactor_applied(self.BIODIV_SCORE_RAW)
         self.BIODIV_SCORE_RAW_WEIGHTED = self.get_array_resfactor_applied(self.BIODIV_SCORE_RAW_WEIGHTED)
         self.BIODIV_RAW_WEIGHTED_LDS = self.get_array_resfactor_applied(self.BIODIV_RAW_WEIGHTED_LDS)
         
@@ -1297,7 +1297,7 @@ class Data:
         # Parallelize the reprojection and matching
         def reproj_match(dvar, lu):
             dvar = self.dvar_to_2D(dvar)
-            dvar = self.dvar_to_full_res(dvar)
+            dvar = self.dvar_to_full_res(dvar) if settings.RESFACTOR > 1 else dvar
             dvar = self.bincount_avg(target_id_map, dvar)
             dvar = dvar.reshape(target_ref_map.shape)
             dvar = xr.DataArray(dvar, dims=('y', 'x'), coords={'y': target_ref_map['y'], 'x': target_ref_map['x']})
@@ -1361,9 +1361,9 @@ class Data:
         '''
         Convert the dvar from 1D vector to 2D array.
         '''
-        map_resfactored = self.LUMAP_2D_RESFACTORED.copy().astype(np.float32)
-        np.place(map_resfactored, (map_resfactored != self.MASK_LU_CODE) & (map_resfactored != self.NODATA), map_) 
-        return map_resfactored
+        map_1D = self.LUMAP_2D_RESFACTORED.copy().astype(np.float32) if settings.RESFACTOR > 1 else self.LUMAP_2D.copy().astype(np.float32)
+        np.place(map_1D, (map_1D != self.MASK_LU_CODE) & (map_1D != self.NODATA), map_) 
+        return map_1D
     
     
     # Upsample dvar to its full resolution representation
