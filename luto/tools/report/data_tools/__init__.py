@@ -18,7 +18,6 @@ def extract_dtype_from_path(path):
     # Define the output categories and its corresponding file patterns
     f_cat = {
             # decision variables (npy files)
-            'dvar':['npy'],
             'ag_X_mrj':['ag_X_mrj'],
             'ag_man_X_mrj':['ag_man_X_mrj_asparagopsis_taxiformis',
                             'ag_man_X_mrj_ecological_grazing',
@@ -36,7 +35,7 @@ def extract_dtype_from_path(path):
             'revenue':['revenue'],
             'cost':['cost'],
             'biodiversity':['biodiversity'],
-            # Maps
+            # Maps (GeoTIFFs)
             'ammap':['ammap'],
             'lumap':['lumap'],
             'lmmap':['lmmap'],
