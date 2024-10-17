@@ -1113,7 +1113,7 @@ class LutoSolver:
         # Process agricultural management usage info
 
         # Make ammaps (agricultural management maps) using the lumap and lmmap. There is a
-        # separate ammap for each for each agricultural management option, because they can be stacked.
+        # separate ammap for each agricultural management option, because they can be stacked.
         ammaps = {am: np.zeros(self._input_data.ncells, dtype=np.int8) for am in AG_MANAGEMENTS_TO_LAND_USES}
         for r in range(self._input_data.ncells):
             cell_j = lumap[r]

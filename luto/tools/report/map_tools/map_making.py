@@ -110,7 +110,6 @@ def create_png_map(tif_path: str,
     # Optionally remove axis
     ax.set_axis_off()
     plt.savefig(png_out_path, dpi=DPI, bbox_inches='tight', pad_inches=0)
-
     plt.close(fig)
 
     # Delete the input raster

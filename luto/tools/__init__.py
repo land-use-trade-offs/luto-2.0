@@ -37,7 +37,6 @@ from typing import Tuple
 from datetime import datetime
 from joblib import Parallel, delayed
 
-
 from luto.tools.report.create_html import data2html
 from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_static_maps import TIF2MAP
@@ -545,7 +544,45 @@ def map_desc_to_dvar_index(category: str,
 
     return df.reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
 
+
+def get_out_resfactor(dvar_path:str):
+    # Get the number of pixels in the output decision variable
+    dvar = np.load(dvar_path)
+    dvar_size = dvar.shape[1]
+
+    # Get the number of pixels in full resolution LUMASK
+    full_lumap = pd.read_hdf(os.path.join(settings.INPUT_DIR, "lumap.h5")).to_numpy() 
+    full_size = (full_lumap > 0).sum()
+
+    # Return the resfactor
+    return round((full_size/dvar_size)**0.5)
+
+
+def read_dvars(yr, df_yr: pd.DataFrame) -> tuple:
+    '''Read the dvars and maps from the dataframe containing the paths to the files in a given year.'''
     
+    # Agricultrual management dvars/maps need to be read separately as dictionary
+    am_dvars = {}
+    ammaps ={}
+    for am in AG_MANAGEMENTS_TO_LAND_USES:
+        am_fname =  am.split(' ')
+        am_fname = '_'.join([s.lower() for s in am_fname])
+        am_fname = f"ag_man_X_mrj_{am_fname}"
+        
+        am_dvar = np.load(df_yr.query('base_name == @am_fname')['path'].iloc[0])
+        ammap = am_dvar.sum(0).sum(1)               # mrj to r
+        ammap = ammap >= settings.AGRICULTURAL_MANAGEMENT_USE_THRESHOLD
+        
+        am_dvars[am] = am_dvar
+        ammaps[am] = ammap
+    
+    return int(yr),(np.load(df_yr.query('base_name == "lumap"')['path'].iloc[0]),
+                    np.load(df_yr.query('base_name == "lmmap"')['path'].iloc[0]),
+                    ammaps,
+                    np.load(df_yr.query('base_name == "ag_X_mrj"')['path'].iloc[0]),
+                    np.load(df_yr.query('base_name == "non_ag_X_rk"')['path'].iloc[0]),
+                    am_dvars)
+
     
 def calc_water(
     data, 

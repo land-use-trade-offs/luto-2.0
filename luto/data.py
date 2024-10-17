@@ -17,9 +17,7 @@
 
 
 import os
-import time
 import math
-from gurobipy import max_
 import h5py
 
 import xarray as xr
@@ -1563,54 +1561,40 @@ class Data:
         yr_idx = yr_cal - self.YR_CAL_BASE
 
         # Get the quantity of each commodity produced by agricultural land uses
-        # Get the quantity matrices. Quantity array of shape m, r, p
         ag_q_mrp = ag_quantity.get_quantity_matrices(self, yr_idx)
 
-        # Convert map of land-use in mrj format to mrp format
-        ag_X_mrp = np.stack([ag_X_mrj[:, :, j] for p in range(self.NPRS)
-                            for j in range(self.N_AG_LUS)
-                            if self.LU2PR[p, j]
-                            ], axis=2)
+        # Convert map of land-use in mrj format to mrp format using vectorization
+        ag_X_mrp = np.einsum('mrj,pj->mrp', ag_X_mrj, self.LU2PR.astype(bool))
 
         # Sum quantities in product (PR/p) representation.
-        ag_q_p = np.sum(ag_q_mrp * ag_X_mrp, axis=(0, 1), keepdims=False)
+        ag_q_p = np.einsum('mrp,mrp->p', ag_q_mrp, ag_X_mrp)
 
         # Transform quantities to commodity (CM/c) representation.
-        ag_q_c = [sum(ag_q_p[p] for p in range(self.NPRS) if self.PR2CM[c, p])
-                for c in range(self.NCMS)]
+        ag_q_c = np.einsum('cp,p->c', self.PR2CM.astype(bool), ag_q_p)
 
         # Get the quantity of each commodity produced by non-agricultural land uses
-        # Quantity matrix in the shape of c, r, k
         q_crk = non_ag_quantity.get_quantity_matrix(self, ag_q_mrp, lumap)
-        non_ag_q_c = [(q_crk[c, :, :] * non_ag_X_rk).sum()
-                    for c in range(self.NCMS)]
+        non_ag_q_c = np.einsum('crk,rk->c', q_crk, non_ag_X_rk)
 
         # Get quantities produced by agricultural management options
-        j2p = {j: [p for p in range(self.NPRS) if self.LU2PR[p, j]]
-            for j in range(self.N_AG_LUS)}
-        ag_man_q_mrp = ag_quantity.get_agricultural_management_quantity_matrices(
-            self, ag_q_mrp, yr_idx)
+        ag_man_q_mrp = ag_quantity.get_agricultural_management_quantity_matrices(self, ag_q_mrp, yr_idx)
         ag_man_q_c = np.zeros(self.NCMS)
 
+        j2p = {j: [p for p in range(self.NPRS) if self.LU2PR[p, j]]
+                        for j in range(self.N_AG_LUS)}
         for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():
             am_j_list = [self.DESC2AGLU[lu] for lu in am_lus]
             current_ag_man_X_mrp = np.zeros(ag_q_mrp.shape, dtype=np.float32)
-
             for j in am_j_list:
                 for p in j2p[j]:
                     current_ag_man_X_mrp[:, :, p] = ag_man_X_mrj[am][:, :, j]
 
-            ag_man_q_p = np.sum(
-                ag_man_q_mrp[am] * current_ag_man_X_mrp, axis=(0, 1), keepdims=False)
-
-            for c in range(self.NCMS):
-                ag_man_q_c[c] += sum(ag_man_q_p[p]
-                                    for p in range(self.NPRS) if self.PR2CM[c, p])
+            ag_man_q_p = np.einsum('mrp,mrp->p', ag_man_q_mrp[am], current_ag_man_X_mrp)
+            ag_man_q_c += np.einsum('cp,p->c', self.PR2CM.astype(bool), ag_man_q_p)
 
         # Return total commodity production as numpy array.
-        total_q_c = [ag_q_c[c] + non_ag_q_c[c] + ag_man_q_c[c]
-                    for c in range(self.NCMS)]
-        return np.array(total_q_c)
+        total_q_c = ag_q_c + non_ag_q_c + ag_man_q_c
+        return total_q_c
 
     def get_carbon_price_by_yr_idx(self, yr_idx: int) -> float:
         """
