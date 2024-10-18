@@ -156,26 +156,8 @@ class Data:
         
         # Set the nodata and non-ag code
         self.NODATA = -9999
-        self.MASK_LU_CODE = -1
-        
-        # The ID map (2D xarray) to reproject decision variables to. This xarray has the same shape as the `NLUM_MASK`, but each cell has a unique index value coprepsonding its flattend position in the array.
-        ''' The ID map was created using script of `N:/Data-Master/Biodiversity/biodiversity_contribution/Step_3_Match_lumap_to_biomap.py`.
-            This ID map makes it possible to overlay LUTO dvars with other maps that have different geospatial extent/resolution. 
-            
-            If LUTO was runing with RESFACTOR=1, we can overlay the ID map with the LUTO dvars to calculate the occurances 
-            and sum of dvar cells given the same ID in the target map (bin_count). 
-            
-            If LUTO was not runing with RESFACTOR=1, we will upsample the dvars to the same shape as RESFACTOR=1, then do the overlaying.
-        '''
-        self.REPROJECT_TARGET_ID_MAP = f'{settings.INPUT_DIR}/bio_id_map.nc' 
-        
-        
-        # The reference map (2D xarray) to reproject decision variables to
-        '''This is the reference map for reprojecting the dvars to. It contains the x,y coordinates for each cell,
-           So that after reprojecting the dvars to the same geospatial format of the reference map, we can set x,y coordinates to the reprojected dvars.
-        '''                             
-        self.REPROJECT_REFERENCE_MAP = f'{settings.INPUT_DIR}/bio_mask.nc'                                      
-        
+        self.MASK_LU_CODE = -1    
+                                           
         # Load LUMAP without resfactor
         self.LUMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lumap.h5")).to_numpy()                   # 1D (ij flattend),  0-27 for land uses; -1 for non-agricultural land uses; All cells in Australia (land only)
 
@@ -222,7 +204,15 @@ class Data:
 
         else:
             raise KeyError("Resfactor setting invalid")
-
+        
+        
+        
+        ###############################################################
+        # Load Xarray reference data.
+        ###############################################################
+        print("\tLoading reference Xarray for reproject decision variables...", flush=True)
+        self.REPROJECT_TARGET_ID_MAP = xr.load_dataset(f'{settings.INPUT_DIR}/bio_id_map.nc')['data'].compute()
+        self.REPROJECT_REFERENCE_MAP = xr.load_dataset(f'{settings.INPUT_DIR}/bio_mask.nc')['data'].compute()
 
 
 
@@ -830,8 +820,8 @@ class Data:
         )
         wyield_fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_dr_ml_ha.h5')
         wyield_fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_sr_ml_ha.h5')
-        self.WATER_YIELD_DR_FILE = h5py.File(wyield_fname_dr, 'r')
-        self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')
+        self.WATER_YIELD_DR_FILE = h5py.File(wyield_fname_dr, 'r')['Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean'][...]
+        self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')['Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean'][...]
 
         self.RR_CCIMPACT = None
         self.DD_CCIMPACT = None
@@ -1244,10 +1234,8 @@ class Data:
         
         
     # Functions to reproject and match the dvars to the target map
-    def reproj_match_ag_dvar(self, ag_dvars:np.ndarray, reprj_id:str, reproj_ref:str):
+    def reproj_match_ag_dvar(self, ag_dvars:np.ndarray, target_id_map:xr.DataArray, target_ref_map:xr.DataArray):
         
-        target_id_map = xr.open_dataset(reprj_id)['data']
-        target_ref_map = xr.open_dataset(reproj_ref)['data']
         ag_dvars = self.ag_dvars_to_xr(ag_dvars)                # Convert the dvars to xarray
         
         # Parallelize the reprojection and matching
@@ -1265,9 +1253,8 @@ class Data:
         return  xr.combine_by_coords( [i for i in Parallel(n_jobs=10, backend='threading', return_as='generator')(tasks)])
     
 
-    def reproj_match_am_dvar(self, am_dvars, reprj_id:str=f'{settings.INPUT_DIR}/bio_id_map.nc', reproj_ref:str=f'{settings.INPUT_DIR}/bio_mask.nc'):
-        target_id_map = xr.open_dataset(reprj_id)['data']
-        target_ref_map = xr.open_dataset(reproj_ref)['data']
+    def reproj_match_am_dvar(self, am_dvars, target_id_map:xr.DataArray, target_ref_map:xr.DataArray):
+
         am_dvars = self.am_dvars_to_xr(am_dvars)
         
         # Parallelize the reprojection and matching
@@ -1287,9 +1274,8 @@ class Data:
     
     
     
-    def reproj_match_non_ag_dvar(self, non_ag_dvars, reprj_id:str=f'{settings.INPUT_DIR}/bio_id_map.nc', reproj_ref:str=f'{settings.INPUT_DIR}/bio_mask.nc'):
-        target_id_map = xr.open_dataset(reprj_id)['data']
-        target_ref_map = xr.open_dataset(reproj_ref)['data']
+    def reproj_match_non_ag_dvar(self, non_ag_dvars, target_id_map:xr.DataArray, target_ref_map:xr.DataArray):
+        
         non_ag_dvars = self.non_ag_dvars_to_xr(non_ag_dvars)
         
         # Parallelize the reprojection and matching
@@ -1624,8 +1610,8 @@ class Data:
         -------
         np.ndarray: shape (NCELLS,)
         """
-        dr_key = list(self.WATER_YIELD_DR_FILE.keys())[0]
-        return self.get_array_resfactor_applied(self.WATER_YIELD_DR_FILE[dr_key][yr_idx])
+        
+        return self.get_array_resfactor_applied(self.WATER_YIELD_DR_FILE[yr_idx])
     
     def get_water_dr_yield_for_year(self, yr_cal: int) -> np.ndarray:
         """
@@ -1636,7 +1622,7 @@ class Data:
         np.ndarray: shape (NCELLS,)
         """
         yr_idx = yr_cal - self.YR_CAL_BASE
-        return self.get_water_dr_yield_for_yr_idx(yr_idx)
+        return self.get_array_resfactor_applied(self.get_water_dr_yield_for_yr_idx(yr_idx))
     
     def get_water_sr_yield_for_yr_idx(self, yr_idx: int) -> np.ndarray:
         """
@@ -1646,8 +1632,7 @@ class Data:
         -------
         np.ndarray: shape (NCELLS,)
         """
-        sr_key = list(self.WATER_YIELD_SR_FILE.keys())[0]
-        return self.get_array_resfactor_applied(self.WATER_YIELD_SR_FILE[sr_key][yr_idx])
+        return self.get_array_resfactor_applied(self.WATER_YIELD_SR_FILE[yr_idx])
     
     def get_water_sr_yield_for_year(self, yr_cal: int) -> np.ndarray:
         """
@@ -1658,7 +1643,7 @@ class Data:
         np.ndarray: shape (NCELLS,)
         """
         yr_idx = yr_cal - self.YR_CAL_BASE
-        return self.get_water_sr_yield_for_yr_idx(yr_idx)
+        return self.get_array_resfactor_applied(self.WATER_YIELD_SR_FILE(yr_idx))
     
     def get_water_nl_yield_for_yr_idx(
         self,
