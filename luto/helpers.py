@@ -39,8 +39,9 @@ from luto.tools.write import write_outputs
 write_outputs(data)
 
 
-
+#############################################################
 # Minimalist run code
+#############################################################
 from luto.dataprep import create_new_dataset
 create_new_dataset()
 
@@ -51,14 +52,47 @@ sim.run(data=data, base=2010, target=2050)
 from luto.tools.write import write_outputs
 write_outputs(data)
 
-
-
-
-
-# Generating report on existing output folder
 from luto.tools import report_on_path
-data_path = 'N:/LUF-Modelling/LUTO2_BB/LUTO_2.0.2/output/2024_05_23__17_52_34_soft_maxprofit_RF10_P1e5_2010-2050_snapshot_-269Mt'
-report_on_path(data_path, remake_map=True, remake_csv=True)  
+report_on_path(data.path, remake_map=True, remake_csv=True)  
+
+
+
+#############################################################
+# Save data object to disk
+#############################################################
+import dill
+import luto.simulation as sim
+data = sim.load_data()
+with open('output/data_without_solution.pkl', 'wb') as f: dill.dump(data, f)    # Save data to disk
+
+sim.run(data=data, base=2010, target=2050)
+with open('output/data_with_solution.pkl', 'wb') as f: dill.dump(data, f)       # Save data and solution to disk
+
+
+
+#############################################################
+# Faster data loading (6min -> 10s)
+#############################################################
+import dill
+import luto.simulation as sim
+with open('output/data_without_solution.pkl', 'rb') as f: data = dill.load(f)  
+sim.run(data=data, base=2010, target=2050)
+
+
+
+#############################################################
+# Load data object from previous output directory
+#############################################################
+import luto.simulation as sim
+data = sim.read_dvars('path/to/previous/output/dir')
+sim.run(data=data, base=2010, target=2050)
+
+
+
+
+
+
+
 
 
 

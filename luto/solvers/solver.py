@@ -18,6 +18,7 @@
 Provides minimalist Solver class and pure helper functions.
 """
 
+from math import e
 import numpy as np
 import gurobipy as gp
 import luto.settings as settings
@@ -70,7 +71,24 @@ class LutoSolver:
     Class responsible for grouping the Gurobi model, relevant input data, and its variables.
     """
 
-    def __init__(self, input_data: SolverInputData, d_c: np.array, final_target_year: int):
+    def __init__(
+        self, input_data: SolverInputData, 
+        d_c: np.array, 
+        final_target_year: int,
+         
+        _switch_cell_usage: bool = True,                 # Debug switch, turn on/off for cell usage constraints
+        _switch_ag_man: bool = True,                     # Debug switch, turn on/off for agricultural management constraints
+        _switch_ag_mam_adoption_limits: bool = True,     # Debug switch, turn on/off for agricultural management adoption limit constraints
+        _switch_demand_penalty: bool = True,             # Debug switch, turn on/off for demand penalty constraints
+        _switch_water_limits: bool = True,               # Debug switch, turn on/off for water limit constraints
+        _switch_ghg_emissions: bool = True,              # Debug switch, turn on/off for GHG emissions
+        _switch_biodiversity: bool = True                # Debug switch, turn on/off for biodiversity constraints
+        ):
+        
+        
+        
+        
+        
         self.final_target_year = final_target_year
         self._input_data = input_data
         self.d_c = d_c
@@ -94,6 +112,16 @@ class LutoSolver:
         self.ghg_emissions_limit_constraint = None
         self.biodiversity_expr = None
         self.biodiversity_limit_constraint = None
+        
+        # Debug switches; Only used for testing purposes
+        self._switch_cell_usage = _switch_cell_usage
+        self._switch_ag_man = _switch_ag_man
+        self._switch_ag_mam_adoption_limits = _switch_ag_mam_adoption_limits
+        self._switch_demand_penalty = _switch_demand_penalty
+        self._switch_water_limits = _switch_water_limits
+        self._switch_ghg_emissions = _switch_ghg_emissions
+        self._switch_biodiversity = _switch_biodiversity
+        
 
     def formulate(self):
         """
@@ -119,13 +147,13 @@ class LutoSolver:
         self._setup_decision_variables()
         
     def _setup_constraints(self):
-        self._add_cell_usage_constraints()
-        self._add_agricultural_management_constraints()
-        self._add_agricultural_management_adoption_limit_constraints()
-        self._add_demand_penalty_constraints()
-        self._add_water_usage_limit_constraints()
-        self._add_ghg_emissions_limit_constraints()
-        self._add_biodiversity_limit_constraints()
+        self._add_cell_usage_constraints()                              if self._switch_cell_usage else print('  ...TURNING OFF cell usage constraints ...')
+        self._add_agricultural_management_constraints()                 if self._switch_ag_man else print('  ...TURNING OFF agricultural management constraints ...')
+        self._add_agricultural_management_adoption_limit_constraints()  if self._switch_ag_mam_adoption_limits else print('  ...TURNING OFF agricultural management adoption limit constraints ...')
+        self._add_demand_penalty_constraints()                          if self._switch_demand_penalty else print('  ...TURNING OFF demand penalty constraints ...')
+        self._add_water_usage_limit_constraints()                       if (self._switch_water_limits and settings.WATER_LIMITS == 'on') else print('  ...TURNING OFF water usage constraints ...')
+        self._add_ghg_emissions_limit_constraints()                     if self._switch_ghg_emissions else print('  ...TURNING OFF GHG emissions constraints ...')
+        self._add_biodiversity_limit_constraints()                      if self._switch_biodiversity else print('  ...TURNING OFF biodiversity constraints ...')
 
 
     def _setup_x_vars(self):
@@ -579,8 +607,6 @@ class LutoSolver:
         If `cells` is provided, only adds constraints for regions containing at least one of the
         provided cells.
         """
-        if settings.WATER_LIMITS != "on":
-            return
         
         print(f'  ...water net yield constraints by {settings.WATER_REGION_DEF}...')
 
@@ -710,6 +736,7 @@ class LutoSolver:
 
     def _add_biodiversity_limit_constraints(self):
         if settings.BIODIVERSITY_LIMITS != "on":
+            print('  ...biodiversity constraints TURNED OFF ...')
             return
         
         print('  ...biodiversity constraints...')
@@ -946,13 +973,13 @@ class LutoSolver:
             self.gurobi_model.remove(self.ghg_emissions_limit_constraint)
             self.ghg_emissions_limit_constraint = None
                 
-        self._add_cell_usage_constraints(updated_cells)
-        self._add_agricultural_management_constraints(updated_cells)
-        self._add_agricultural_management_adoption_limit_constraints()
-        self._add_demand_penalty_constraints()
-        self._add_water_usage_limit_constraints()
-        self._add_ghg_emissions_limit_constraints()
-        self._add_biodiversity_limit_constraints()
+        self._add_cell_usage_constraints(updated_cells)                 if self._switch_cell_usage else print('  ...TURNING OFF cell usage constraints...')
+        self._add_agricultural_management_constraints(updated_cells)    if self._switch_ag_man else print('  ...TURNING OFF agricultural management constraints...')
+        self._add_agricultural_management_adoption_limit_constraints()  if self._switch_ag_mam_adoption_limits else print('  ...TURNING OFF agricultural management adoption constraints...')
+        self._add_demand_penalty_constraints()                          if self._switch_demand_penalty else print('  ...TURNING OFF demand constraints...')
+        self._add_water_usage_limit_constraints()                       if (self._switch_water_limits and settings.WATER_LIMITS == 'on') else print('  ...TURNING OFF water constraints...')
+        self._add_ghg_emissions_limit_constraints()                     if self._switch_ghg_emissions else print('  ...TURNING OFF GHG emissions constraints...')
+        self._add_biodiversity_limit_constraints()                      if self._switch_biodiversity  else print('  ...TURNING OFF biodiversity constraints...')
 
     def solve(self) -> SolverSolution:
         print("Starting solve...\n")
@@ -1086,7 +1113,7 @@ class LutoSolver:
         # Process agricultural management usage info
 
         # Make ammaps (agricultural management maps) using the lumap and lmmap. There is a
-        # separate ammap for each for each agricultural management option, because they can be stacked.
+        # separate ammap for each agricultural management option, because they can be stacked.
         ammaps = {am: np.zeros(self._input_data.ncells, dtype=np.int8) for am in AG_MANAGEMENTS_TO_LAND_USES}
         for r in range(self._input_data.ncells):
             cell_j = lumap[r]

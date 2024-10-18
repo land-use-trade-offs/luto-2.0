@@ -17,9 +17,7 @@
 
 
 import os
-import time
 import math
-from gurobipy import max_
 import h5py
 
 import xarray as xr
@@ -158,26 +156,8 @@ class Data:
         
         # Set the nodata and non-ag code
         self.NODATA = -9999
-        self.MASK_LU_CODE = -1
-        
-        # The ID map (2D xarray) to reproject decision variables to. This xarray has the same shape as the `NLUM_MASK`, but each cell has a unique index value coprepsonding its flattend position in the array.
-        ''' The ID map was created using script of `N:/Data-Master/Biodiversity/biodiversity_contribution/Step_3_Match_lumap_to_biomap.py`.
-            This ID map makes it possible to overlay LUTO dvars with other maps that have different geospatial extent/resolution. 
-            
-            If LUTO was runing with RESFACTOR=1, we can overlay the ID map with the LUTO dvars to calculate the occurances 
-            and sum of dvar cells given the same ID in the target map (bin_count). 
-            
-            If LUTO was not runing with RESFACTOR=1, we will upsample the dvars to the same shape as RESFACTOR=1, then do the overlaying.
-        '''
-        self.REPROJECT_TARGET_ID_MAP = f'{settings.INPUT_DIR}/bio_id_map.nc' 
-        
-        
-        # The reference map (2D xarray) to reproject decision variables to
-        '''This is the reference map for reprojecting the dvars to. It contains the x,y coordinates for each cell,
-           So that after reprojecting the dvars to the same geospatial format of the reference map, we can set x,y coordinates to the reprojected dvars.
-        '''                             
-        self.REPROJECT_REFERENCE_MAP = f'{settings.INPUT_DIR}/bio_mask.nc'                                      
-        
+        self.MASK_LU_CODE = -1    
+                                           
         # Load LUMAP without resfactor
         self.LUMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lumap.h5")).to_numpy()                   # 1D (ij flattend),  0-27 for land uses; -1 for non-agricultural land uses; All cells in Australia (land only)
 
@@ -220,10 +200,19 @@ class Data:
             
         elif settings.RESFACTOR == 1:
             self.MASK = self.LUMASK
+            self.GEO_META = self.GEO_META_FULLRES
 
         else:
             raise KeyError("Resfactor setting invalid")
-
+        
+        
+        
+        ###############################################################
+        # Load Xarray reference data.
+        ###############################################################
+        print("\tLoading reference Xarray for reproject decision variables...", flush=True)
+        self.REPROJECT_TARGET_ID_MAP = xr.load_dataset(f'{settings.INPUT_DIR}/bio_id_map.nc')['data'].compute()
+        self.REPROJECT_REFERENCE_MAP = xr.load_dataset(f'{settings.INPUT_DIR}/bio_mask.nc')['data'].compute()
 
 
 
@@ -831,8 +820,8 @@ class Data:
         )
         wyield_fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_dr_ml_ha.h5')
         wyield_fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_sr_ml_ha.h5')
-        self.WATER_YIELD_DR_FILE = h5py.File(wyield_fname_dr, 'r')
-        self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')
+        self.WATER_YIELD_DR_FILE = h5py.File(wyield_fname_dr, 'r')['Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean'][...]
+        self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')['Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean'][...]
 
         self.RR_CCIMPACT = None
         self.DD_CCIMPACT = None
@@ -1036,10 +1025,10 @@ class Data:
                 
         
         
-        # Get the Zonation output score between 0 and 1. BIODIV_SCORE_RAW.sum() = 153 million
-        self.BIODIV_SCORE_RAW = biodiv_priorities['BIODIV_PRIORITY_SSP' + str(settings.SSP)].to_numpy(dtype = np.float32)
+        # Get the Zonation output score between 0 and 1. biodiv_score_raw.sum() = 153 million
+        biodiv_score_raw = biodiv_priorities['BIODIV_PRIORITY_SSP' + str(settings.SSP)].to_numpy(dtype = np.float32)
         # Weight the biodiversity score by the connectivity score
-        self.BIODIV_SCORE_RAW_WEIGHTED = self.BIODIV_SCORE_RAW * connectivity_score
+        self.BIODIV_SCORE_RAW_WEIGHTED = biodiv_score_raw * connectivity_score
         
         
         
@@ -1090,7 +1079,7 @@ class Data:
         biodiv_degradation_val = (
             biodiv_degradation_raw_weighted_LDS +                                                                           # Biodiversity degradation from HCAS
             biodiv_degradation_raw_weighted_habitat                                                                         # Biodiversity degradation from LDS burning
-        )                                                                                                               # Set the biodiversity degradation value to the maximum of the raw weighted biodiversity value                      
+        ) 
         biodiv_degradation_val = np.nansum(biodiv_degradation_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK])  # Sum the biodiversity degradation value within the LUMASK 
 
         # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
@@ -1141,7 +1130,6 @@ class Data:
         # Apply resfactor to various arrays required for data loading.
         ###############################################################        
         self.SAVBURN_ELIGIBLE = self.get_array_resfactor_applied(self.SAVBURN_ELIGIBLE)
-        self.BIODIV_SCORE_RAW = self.get_array_resfactor_applied(self.BIODIV_SCORE_RAW)
         self.BIODIV_SCORE_RAW_WEIGHTED = self.get_array_resfactor_applied(self.BIODIV_SCORE_RAW_WEIGHTED)
         self.BIODIV_RAW_WEIGHTED_LDS = self.get_array_resfactor_applied(self.BIODIV_RAW_WEIGHTED_LDS)
         
@@ -1246,10 +1234,8 @@ class Data:
         
         
     # Functions to reproject and match the dvars to the target map
-    def reproj_match_ag_dvar(self, ag_dvars:np.ndarray, reprj_id:str, reproj_ref:str):
+    def reproj_match_ag_dvar(self, ag_dvars:np.ndarray, target_id_map:xr.DataArray, target_ref_map:xr.DataArray):
         
-        target_id_map = xr.open_dataset(reprj_id)['data']
-        target_ref_map = xr.open_dataset(reproj_ref)['data']
         ag_dvars = self.ag_dvars_to_xr(ag_dvars)                # Convert the dvars to xarray
         
         # Parallelize the reprojection and matching
@@ -1267,9 +1253,8 @@ class Data:
         return  xr.combine_by_coords( [i for i in Parallel(n_jobs=10, backend='threading', return_as='generator')(tasks)])
     
 
-    def reproj_match_am_dvar(self, am_dvars, reprj_id:str=f'{settings.INPUT_DIR}/bio_id_map.nc', reproj_ref:str=f'{settings.INPUT_DIR}/bio_mask.nc'):
-        target_id_map = xr.open_dataset(reprj_id)['data']
-        target_ref_map = xr.open_dataset(reproj_ref)['data']
+    def reproj_match_am_dvar(self, am_dvars, target_id_map:xr.DataArray, target_ref_map:xr.DataArray):
+
         am_dvars = self.am_dvars_to_xr(am_dvars)
         
         # Parallelize the reprojection and matching
@@ -1289,15 +1274,14 @@ class Data:
     
     
     
-    def reproj_match_non_ag_dvar(self, non_ag_dvars, reprj_id:str=f'{settings.INPUT_DIR}/bio_id_map.nc', reproj_ref:str=f'{settings.INPUT_DIR}/bio_mask.nc'):
-        target_id_map = xr.open_dataset(reprj_id)['data']
-        target_ref_map = xr.open_dataset(reproj_ref)['data']
+    def reproj_match_non_ag_dvar(self, non_ag_dvars, target_id_map:xr.DataArray, target_ref_map:xr.DataArray):
+        
         non_ag_dvars = self.non_ag_dvars_to_xr(non_ag_dvars)
         
         # Parallelize the reprojection and matching
         def reproj_match(dvar, lu):
             dvar = self.dvar_to_2D(dvar)
-            dvar = self.dvar_to_full_res(dvar)
+            dvar = self.dvar_to_full_res(dvar) if settings.RESFACTOR > 1 else dvar
             dvar = self.bincount_avg(target_id_map, dvar)
             dvar = dvar.reshape(target_ref_map.shape)
             dvar = xr.DataArray(dvar, dims=('y', 'x'), coords={'y': target_ref_map['y'], 'x': target_ref_map['x']})
@@ -1361,9 +1345,9 @@ class Data:
         '''
         Convert the dvar from 1D vector to 2D array.
         '''
-        map_resfactored = self.LUMAP_2D_RESFACTORED.copy().astype(np.float32)
-        np.place(map_resfactored, (map_resfactored != self.MASK_LU_CODE) & (map_resfactored != self.NODATA), map_) 
-        return map_resfactored
+        map_1D = self.LUMAP_2D_RESFACTORED.copy().astype(np.float32) if settings.RESFACTOR > 1 else self.LUMAP_2D.copy().astype(np.float32)
+        np.place(map_1D, (map_1D != self.MASK_LU_CODE) & (map_1D != self.NODATA), map_) 
+        return map_1D
     
     
     # Upsample dvar to its full resolution representation
@@ -1563,54 +1547,40 @@ class Data:
         yr_idx = yr_cal - self.YR_CAL_BASE
 
         # Get the quantity of each commodity produced by agricultural land uses
-        # Get the quantity matrices. Quantity array of shape m, r, p
         ag_q_mrp = ag_quantity.get_quantity_matrices(self, yr_idx)
 
-        # Convert map of land-use in mrj format to mrp format
-        ag_X_mrp = np.stack([ag_X_mrj[:, :, j] for p in range(self.NPRS)
-                            for j in range(self.N_AG_LUS)
-                            if self.LU2PR[p, j]
-                            ], axis=2)
+        # Convert map of land-use in mrj format to mrp format using vectorization
+        ag_X_mrp = np.einsum('mrj,pj->mrp', ag_X_mrj, self.LU2PR.astype(bool))
 
         # Sum quantities in product (PR/p) representation.
-        ag_q_p = np.sum(ag_q_mrp * ag_X_mrp, axis=(0, 1), keepdims=False)
+        ag_q_p = np.einsum('mrp,mrp->p', ag_q_mrp, ag_X_mrp)
 
         # Transform quantities to commodity (CM/c) representation.
-        ag_q_c = [sum(ag_q_p[p] for p in range(self.NPRS) if self.PR2CM[c, p])
-                for c in range(self.NCMS)]
+        ag_q_c = np.einsum('cp,p->c', self.PR2CM.astype(bool), ag_q_p)
 
         # Get the quantity of each commodity produced by non-agricultural land uses
-        # Quantity matrix in the shape of c, r, k
         q_crk = non_ag_quantity.get_quantity_matrix(self, ag_q_mrp, lumap)
-        non_ag_q_c = [(q_crk[c, :, :] * non_ag_X_rk).sum()
-                    for c in range(self.NCMS)]
+        non_ag_q_c = np.einsum('crk,rk->c', q_crk, non_ag_X_rk)
 
         # Get quantities produced by agricultural management options
-        j2p = {j: [p for p in range(self.NPRS) if self.LU2PR[p, j]]
-            for j in range(self.N_AG_LUS)}
-        ag_man_q_mrp = ag_quantity.get_agricultural_management_quantity_matrices(
-            self, ag_q_mrp, yr_idx)
+        ag_man_q_mrp = ag_quantity.get_agricultural_management_quantity_matrices(self, ag_q_mrp, yr_idx)
         ag_man_q_c = np.zeros(self.NCMS)
 
+        j2p = {j: [p for p in range(self.NPRS) if self.LU2PR[p, j]]
+                        for j in range(self.N_AG_LUS)}
         for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():
             am_j_list = [self.DESC2AGLU[lu] for lu in am_lus]
             current_ag_man_X_mrp = np.zeros(ag_q_mrp.shape, dtype=np.float32)
-
             for j in am_j_list:
                 for p in j2p[j]:
                     current_ag_man_X_mrp[:, :, p] = ag_man_X_mrj[am][:, :, j]
 
-            ag_man_q_p = np.sum(
-                ag_man_q_mrp[am] * current_ag_man_X_mrp, axis=(0, 1), keepdims=False)
-
-            for c in range(self.NCMS):
-                ag_man_q_c[c] += sum(ag_man_q_p[p]
-                                    for p in range(self.NPRS) if self.PR2CM[c, p])
+            ag_man_q_p = np.einsum('mrp,mrp->p', ag_man_q_mrp[am], current_ag_man_X_mrp)
+            ag_man_q_c += np.einsum('cp,p->c', self.PR2CM.astype(bool), ag_man_q_p)
 
         # Return total commodity production as numpy array.
-        total_q_c = [ag_q_c[c] + non_ag_q_c[c] + ag_man_q_c[c]
-                    for c in range(self.NCMS)]
-        return np.array(total_q_c)
+        total_q_c = ag_q_c + non_ag_q_c + ag_man_q_c
+        return total_q_c
 
     def get_carbon_price_by_yr_idx(self, yr_idx: int) -> float:
         """
@@ -1640,8 +1610,8 @@ class Data:
         -------
         np.ndarray: shape (NCELLS,)
         """
-        dr_key = list(self.WATER_YIELD_DR_FILE.keys())[0]
-        return self.get_array_resfactor_applied(self.WATER_YIELD_DR_FILE[dr_key][yr_idx])
+        
+        return self.get_array_resfactor_applied(self.WATER_YIELD_DR_FILE[yr_idx])
     
     def get_water_dr_yield_for_year(self, yr_cal: int) -> np.ndarray:
         """
@@ -1652,7 +1622,7 @@ class Data:
         np.ndarray: shape (NCELLS,)
         """
         yr_idx = yr_cal - self.YR_CAL_BASE
-        return self.get_water_dr_yield_for_yr_idx(yr_idx)
+        return self.get_array_resfactor_applied(self.get_water_dr_yield_for_yr_idx(yr_idx))
     
     def get_water_sr_yield_for_yr_idx(self, yr_idx: int) -> np.ndarray:
         """
@@ -1662,8 +1632,7 @@ class Data:
         -------
         np.ndarray: shape (NCELLS,)
         """
-        sr_key = list(self.WATER_YIELD_SR_FILE.keys())[0]
-        return self.get_array_resfactor_applied(self.WATER_YIELD_SR_FILE[sr_key][yr_idx])
+        return self.get_array_resfactor_applied(self.WATER_YIELD_SR_FILE[yr_idx])
     
     def get_water_sr_yield_for_year(self, yr_cal: int) -> np.ndarray:
         """
@@ -1674,7 +1643,7 @@ class Data:
         np.ndarray: shape (NCELLS,)
         """
         yr_idx = yr_cal - self.YR_CAL_BASE
-        return self.get_water_sr_yield_for_yr_idx(yr_idx)
+        return self.get_array_resfactor_applied(self.WATER_YIELD_SR_FILE(yr_idx))
     
     def get_water_nl_yield_for_yr_idx(
         self,
