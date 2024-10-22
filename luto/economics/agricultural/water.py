@@ -448,7 +448,7 @@ def calc_water_net_yield_by_region_in_year_from_data(
     return net_yield_by_region
 
 
-def _get_historical_water_usage_by_regions(data: Data) -> dict[int, tuple[str, float, np.ndarray]]:
+def _get_historical_water_yield_by_regions(data: Data) -> dict[int, tuple[str, float, np.ndarray]]:
     """
     Gets historical water usage figures, split by regions.
     These figures are the basis for the net yield targets.
@@ -533,7 +533,7 @@ def get_water_net_yield_limit_values(
         )
     
     # Limits do not yet exist and must be calculated
-    historical_yields_dict = _get_historical_water_usage_by_regions(data)
+    historical_yields_dict = _get_historical_water_yield_by_regions(data)
     base_yr_net_yield_by_reg = calc_water_net_yield_by_region_in_year_from_data(data, data.YR_CAL_BASE)
 
     limits_by_region_year = defaultdict(dict)

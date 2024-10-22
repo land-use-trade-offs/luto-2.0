@@ -67,7 +67,7 @@ class SolverInputData:
     ag_man_limits: dict             # Agricultural management options' adoption limits.
     ag_man_lb_mrj: dict             # Agricultural management options' lower bounds.
 
-    w_ccimpact: dict[int, dict[int, float]]    # Climate change impacts of water dict. Keys: year, region.
+    w_outside_study_area: dict[int, dict[int, float]]    # Climate change impacts of water dict. Keys: year, region.
 
     offland_ghg: np.ndarray         # GHG emissions from off-land commodities.
 
@@ -207,7 +207,7 @@ def get_ag_w_mrj(data: Data, target_index):
     return output.astype(np.float32)
 
 
-def get_w_ccimpact(data: Data):
+def get_w_outside_study_area(data: Data):
     print('Getting water yield from puclic land...', flush = True)
     return ag_water.get_water_public_land(data)
 
@@ -430,7 +430,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_b_mrj=get_ag_man_biodiversity(data),
         ag_man_limits=get_ag_man_limits(data, target_index),
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
-        w_ccimpact=get_w_ccimpact(data),
+        w_outside_study_area=get_w_outside_study_area(data),
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,

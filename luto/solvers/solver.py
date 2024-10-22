@@ -18,7 +18,6 @@
 Provides minimalist Solver class and pure helper functions.
 """
 
-from math import e
 import numpy as np
 import gurobipy as gp
 import luto.settings as settings
@@ -72,7 +71,8 @@ class LutoSolver:
     """
 
     def __init__(
-        self, input_data: SolverInputData, 
+        self, 
+        input_data: SolverInputData, 
         d_c: np.array, 
         final_target_year: int,
          
@@ -598,7 +598,7 @@ class LutoSolver:
             self._input_data.ag_w_mrj,
             self._input_data.non_ag_w_rk,
             self._input_data.ag_man_w_mrj,
-            self._input_data.w_ccimpact[self._input_data.target_year][region],
+            self._input_data.w_outside_study_area[self._input_data.target_year][region],
         )
 
     def _add_water_usage_limit_constraints(self):
@@ -614,7 +614,6 @@ class LutoSolver:
         
         # Ensure water use remains below limit for each region
         for region, (reg_name, _, w_net_yield_limit, ind) in self._input_data.limits["water"].items():
-            reg_ccimpact_base_yr = self._input_data.w_ccimpact[self._input_data.base_year][region]
 
             ag_contr = gp.quicksum(
                 gp.quicksum(
@@ -645,15 +644,18 @@ class LutoSolver:
                 )  # Non-agricultural contribution
                 for k in range(self._input_data.n_non_ag_lus)
             )
+            
+            outside_luto_study_contr = self._input_data.w_outside_study_area[self._input_data.base_year][region]
 
-            w_net_yield_region = ag_contr + ag_man_contr + non_ag_contr + reg_ccimpact_base_yr
-
-            base_year_water_yield_with_current_layers = None
+            # Sum of all water yield contributions
+            w_net_yield_region = ag_contr + ag_man_contr + non_ag_contr + outside_luto_study_contr      
 
             # Update the net yield limit to be lower based on last year's solution if at risk of infeasibility
+            base_year_water_yield_with_current_layers = None
+            
             cc_impact_yield_delta = (
-                self._input_data.w_ccimpact[self.final_target_year][region]
-                - self._input_data.w_ccimpact[self._input_data.target_year][region]
+                self._input_data.w_outside_study_area[self._input_data.target_year][region] - 
+                self._input_data.w_outside_study_area[self.final_target_year][region]
             )
             constr_wny_limit = w_net_yield_limit + cc_impact_yield_delta
             wny_limit_updated = False
