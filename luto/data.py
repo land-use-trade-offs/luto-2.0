@@ -54,7 +54,7 @@ def dict2matrix(d, fromlist, tolist):
 def get_base_am_vars(ncells, ncms, n_ag_lus):
     """
     Get the 2010 agricultural management option vars.
-    It is assumed that no agricultural management options were used in 2010, 
+    It is assumed that no agricultural management options were used in 2010,
     so get zero arrays in the correct format.
     """
     am_vars = {}
@@ -133,12 +133,12 @@ class Data:
         self.ag_man_dvars = {}
         self.prod_data = {}
         self.obj_vals = {}
-        
+
         # Containers for reprojected dvar data
         self.ag_dvars_2D_reproj_match = {}
         self.non_ag_dvars_2D_reproj_match = {}
         self.ag_man_dvars_2D_reproj_match = {}
-        
+
         print('')
         print('Beginning data initialisation...')
 
@@ -153,11 +153,11 @@ class Data:
 
         # Set resfactor multiplier
         self.RESMULT = settings.RESFACTOR ** 2
-        
+
         # Set the nodata and non-ag code
         self.NODATA = -9999
-        self.MASK_LU_CODE = -1    
-                                           
+        self.MASK_LU_CODE = -1
+
         # Load LUMAP without resfactor
         self.LUMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lumap.h5")).to_numpy()                   # 1D (ij flattend),  0-27 for land uses; -1 for non-agricultural land uses; All cells in Australia (land only)
 
@@ -172,7 +172,7 @@ class Data:
 
         # Mask out non-agricultural, non-environmental plantings land (i.e., -1) from lumap (True means included cells. Boolean dtype.)
         self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                              # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
-        
+
         # Get the lon/lat coordinates.
         self.COORD_LON_LAT = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META_FULLRES['transform'])             # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
 
@@ -190,23 +190,23 @@ class Data:
 
             # Get the resfactored 2D lumap and x/y coordinates.
             self.LUMAP_2D_RESFACTORED = self.LUMAP_2D[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR]
-            
+
             # Get the resfactored lon/lat coordinates.
             self.COORD_LON_LAT = self.COORD_LON_LAT[0][self.MASK], self.COORD_LON_LAT[1][self.MASK]
-            
+
             # Update the geospatial metadata.
             self.GEO_META = self.update_geo_meta()
 
-            
+
         elif settings.RESFACTOR == 1:
             self.MASK = self.LUMASK
             self.GEO_META = self.GEO_META_FULLRES
 
         else:
             raise KeyError("Resfactor setting invalid")
-        
-        
-        
+
+
+
         ###############################################################
         # Load Xarray reference data.
         ###############################################################
@@ -237,7 +237,7 @@ class Data:
         self.AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(INPUT_DIR, 'ag_landuses.csv')), header = None)[0].to_list()
         self.NON_AGRICULTURAL_LANDUSES = list(settings.NON_AG_LAND_USES.keys())
 
-        self.NONAGLU2DESC = dict(zip(range(settings.NON_AGRICULTURAL_LU_BASE_CODE, 
+        self.NONAGLU2DESC = dict(zip(range(settings.NON_AGRICULTURAL_LU_BASE_CODE,
                                     settings.NON_AGRICULTURAL_LU_BASE_CODE + len(self.NON_AGRICULTURAL_LANDUSES)),
                             self.NON_AGRICULTURAL_LANDUSES))
 
@@ -274,7 +274,7 @@ class Data:
         self.LU_LVSTK_INDICES = [self.AGRICULTURAL_LANDUSES.index(lu) for lu in self.AGRICULTURAL_LANDUSES if lu in self.LU_LVSTK]
         self.LU_UNALL_INDICES = [self.AGRICULTURAL_LANDUSES.index(lu) for lu in self.AGRICULTURAL_LANDUSES if lu in self.LU_UNALL]
 
-        self.NON_AG_LU_NATURAL = [ 
+        self.NON_AG_LU_NATURAL = [
             self.DESC2NONAGLU["Environmental Plantings"],
             self.DESC2NONAGLU["Riparian Plantings"],
             self.DESC2NONAGLU["Sheep Agroforestry"],
@@ -287,16 +287,16 @@ class Data:
 
         # Define which land uses correspond to deep/shallow rooted water yield.
         self.LU_SHALLOW_ROOTED = [
-            self.DESC2AGLU["Hay"], self.DESC2AGLU["Summer cereals"], self.DESC2AGLU["Summer legumes"], 
-            self.DESC2AGLU["Summer oilseeds"], self.DESC2AGLU["Winter cereals"], self.DESC2AGLU["Winter legumes"], 
-            self.DESC2AGLU["Winter oilseeds"], self.DESC2AGLU["Cotton"], self.DESC2AGLU["Other non-cereal crops"], 
+            self.DESC2AGLU["Hay"], self.DESC2AGLU["Summer cereals"], self.DESC2AGLU["Summer legumes"],
+            self.DESC2AGLU["Summer oilseeds"], self.DESC2AGLU["Winter cereals"], self.DESC2AGLU["Winter legumes"],
+            self.DESC2AGLU["Winter oilseeds"], self.DESC2AGLU["Cotton"], self.DESC2AGLU["Other non-cereal crops"],
             self.DESC2AGLU["Rice"], self.DESC2AGLU["Vegetables"], self.DESC2AGLU["Dairy - modified land"],
-            self.DESC2AGLU["Beef - modified land"], self.DESC2AGLU["Sheep - modified land"], 
+            self.DESC2AGLU["Beef - modified land"], self.DESC2AGLU["Sheep - modified land"],
             self.DESC2AGLU["Unallocated - modified land"],
         ]
         self.LU_DEEP_ROOTED = [
             self.DESC2AGLU["Apples"], self.DESC2AGLU["Citrus"], self.DESC2AGLU["Grapes"], self.DESC2AGLU["Nuts"],
-            self.DESC2AGLU["Pears"], self.DESC2AGLU["Plantation fruit"], self.DESC2AGLU["Stone fruit"], 
+            self.DESC2AGLU["Pears"], self.DESC2AGLU["Plantation fruit"], self.DESC2AGLU["Stone fruit"],
             self.DESC2AGLU["Sugar"], self.DESC2AGLU["Tropical stone fruit"],
         ]
 
@@ -399,7 +399,7 @@ class Data:
             am: np.zeros(self.NCELLS).astype("int8") for am in AG_MANAGEMENTS_TO_LAND_USES
         }
         self.AMMAP_DICT = {
-            am: self.get_array_resfactor_applied(array) 
+            am: self.get_array_resfactor_applied(array)
             for am, array in self.AMMAP_DICT_NO_RESFACTOR.items()
         }
         self.add_ammaps(self.YR_CAL_BASE, self.AMMAP_DICT)
@@ -545,7 +545,7 @@ class Data:
             # Intensive Cropping land uses
             self.AGTECH_EI_DATA[lu] = int_cropping_data
 
-        for lu in ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 
+        for lu in ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears',
                 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit']:
             # Horticulture land uses
             self.AGTECH_EI_DATA[lu] = horticulture_data
@@ -572,7 +572,7 @@ class Data:
             self.YR_CAL_BASE, self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR
         )
         self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
-        
+
         self.CLIMATE_CHANGE_IMPACT = self.get_df_resfactor_applied(self.CLIMATE_CHANGE_IMPACT)
         self.REAL_AREA_NO_RESFACTOR = self.REAL_AREA.copy()
         self.REAL_AREA = self.get_array_resfactor_applied(self.REAL_AREA) * self.RESMULT
@@ -591,7 +591,7 @@ class Data:
 
 
         ###############################################################
-        # Auxiliary Spatial Layers 
+        # Auxiliary Spatial Layers
         # (spatial layers not required for production calculation)
         ###############################################################
         print("\tLoading auxiliary spatial layers data...", flush=True)
@@ -609,9 +609,9 @@ class Data:
         self.RP_FENCING_LENGTH = self.get_array_resfactor_applied(
             ((2 * settings.RIPARIAN_PLANTING_TORTUOSITY_FACTOR * self.STREAM_LENGTH) / self.REAL_AREA_NO_RESFACTOR).astype(np.float32)
         )
-        
-        
-        # Initial reprojected dvars data (2D xarray, ). 
+
+
+        # Initial reprojected dvars data (2D xarray, ).
         self.add_ag_dvars_xr(self.YR_CAL_BASE, self.AG_L_MRJ)
         self.add_am_dvars_xr(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
         self.add_non_ag_dvars_xr(self.YR_CAL_BASE, self.NON_AG_L_RK)
@@ -800,8 +800,8 @@ class Data:
         self.DRAINDIV_LIMITS = dict(
             zip(dd.HR_DRAINDIV_ID, dd.WATER_YIELD_HIST_BASELINE_ML)
         )  # Drainage div ID and water use limits
-        
-                
+
+
         # Water yields -- run off from a cell into catchment by deep-rooted, shallow-rooted, and natural land
         water_yield_baselines = pd.read_hdf(os.path.join(INPUT_DIR, "water_yield_baselines.h5"))
         self.WATER_YIELD_HIST_DR = self.get_array_resfactor_applied(
@@ -823,24 +823,31 @@ class Data:
         self.WATER_YIELD_DR_FILE = h5py.File(wyield_fname_dr, 'r')['Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean'][...]
         self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')['Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean'][...]
 
-        self.RR_CCIMPACT = None
-        self.DD_CCIMPACT = None
 
         if settings.WATER_REGION_DEF == 'River Region':
-            rr_ccimpact_df = pd.read_hdf(os.path.join(INPUT_DIR, 'water_yield_outside_LUTO_study_area_2010_2100_rr_ml.h5'))
-            rr_ccimpact_df.columns = rr_ccimpact_df.columns.droplevel("Region_name")
-            rr_ccimpact_df = rr_ccimpact_df.loc[:, pd.IndexSlice[:, settings.SSP]]
-            rr_ccimpact_df.columns = rr_ccimpact_df.columns.droplevel('ssp')
-            self.RR_CCIMPACT = rr_ccimpact_df
+            rr_outside_luto = pd.read_hdf(os.path.join(INPUT_DIR, 'water_yield_outside_LUTO_study_area_2010_2100_rr_ml.h5'))
+            rr_outside_luto = rr_outside_luto.loc[:, pd.IndexSlice[:, settings.SSP]]
+            rr_outside_luto.columns = rr_outside_luto.columns.droplevel('ssp')
+
+            rr_natural_land = pd.read_hdf(os.path.join(INPUT_DIR, 'water_yield_natural_land_2010_2100_rr_ml.h5'))
+            rr_natural_land = rr_natural_land.loc[:, pd.IndexSlice[:, settings.SSP]]
+            rr_natural_land.columns = rr_natural_land.columns.droplevel('ssp')
+
+            self.WATER_OUTSIDE_LUTO_RR = rr_outside_luto
+            self.WATER_UNDER_NATURAL_LAND_RR = rr_natural_land
 
         if settings.WATER_REGION_DEF == 'Drainage Division':
-            dd_ccimpact_df = pd.read_hdf(os.path.join(INPUT_DIR, 'water_yield_outside_LUTO_study_area_2010_2100_dd_ml.h5'))
-            dd_ccimpact_df.columns = dd_ccimpact_df.columns.droplevel("Region_name")
-            dd_ccimpact_df = dd_ccimpact_df.loc[:, pd.IndexSlice[:, settings.SSP]]
-            dd_ccimpact_df.columns = dd_ccimpact_df.columns.droplevel('ssp')
-            self.DD_CCIMPACT = dd_ccimpact_df
+            dd_outside_luto = pd.read_hdf(os.path.join(INPUT_DIR, 'water_yield_outside_LUTO_study_area_2010_2100_dd_ml.h5'))
+            dd_outside_luto = dd_outside_luto.loc[:, pd.IndexSlice[:, settings.SSP]]
+            dd_outside_luto.columns = dd_outside_luto.columns.droplevel('ssp')
 
+            dd_natural_land = pd.read_hdf(os.path.join(INPUT_DIR, 'water_yield_natural_land_2010_2100_dd_ml.h5'))
+            dd_natural_land = dd_natural_land.loc[:, pd.IndexSlice[:, settings.SSP]]
+            dd_natural_land.columns = dd_natural_land.columns.droplevel('ssp')
 
+            self.WATER_OUTSIDE_LUTO_DD = dd_outside_luto
+            self.WATER_UNDER_NATURAL_LAND_DD = dd_natural_land
+            
 
         ###############################################################
         # Carbon sequestration by trees data.
@@ -865,16 +872,16 @@ class Data:
         ###############################################################
         print("\tLoading demand data...", flush=True)
 
-        # Load demand data (actual production (tonnes, ML) by commodity) - from demand model     
+        # Load demand data (actual production (tonnes, ML) by commodity) - from demand model
         dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
 
         # Select the demand data under the running scenario
-        self.DEMAND_DATA = dd.loc[(settings.SCENARIO, 
-                                   settings.DIET_DOM, 
-                                   settings.DIET_GLOB, 
+        self.DEMAND_DATA = dd.loc[(settings.SCENARIO,
+                                   settings.DIET_DOM,
+                                   settings.DIET_GLOB,
                                    settings.CONVERGENCE,
-                                   settings.IMPORT_TREND, 
-                                   settings.WASTE, 
+                                   settings.IMPORT_TREND,
+                                   settings.WASTE,
                                    settings.FEED_EFFICIENCY)].copy()
 
         # Convert eggs from count to tonnes
@@ -889,7 +896,7 @@ class Data:
         # Convert to numpy array of shape (91, 26)
         self.DEMAND_C = self.DEMAND_C.to_numpy(dtype = np.float32).T
         self.D_CY = self.DEMAND_C # new demand is in tonnes rather than deltas
-       
+
 
         ###############################################################
         # Carbon emissions from off-land commodities.
@@ -912,19 +919,19 @@ class Data:
         # Keep only the relevant columns
         self.OFF_LAND_GHG_EMISSION = off_land_ghg_emissions[['YEAR',
                                                              'COMMODITY',
-                                                             'Emission Type', 
+                                                             'Emission Type',
                                                              'Emission Source',
                                                              'Total GHG Emissions (tCO2e)']]
 
         # Get the GHG constraints for luto, shape is (91, 1)
         self.OFF_LAND_GHG_EMISSION_C = self.OFF_LAND_GHG_EMISSION.groupby(['YEAR']).sum(numeric_only=True).values
-        
+
         # Read the carbon price per tonne over the years (indexed by the relevant year)
         carbon_price_sheet = settings.CARBON_PRICES_FIELD or "Default"
         carbon_price_usecols = "A,B"
         carbon_price_col_names = ["Year", "Carbon_price_$_tCO2e"]
         carbon_price_sheet_index_col = "Year" # if carbon_price_sheet != "Default" else 0
-        carbon_price_sheet_header = 0         # if carbon_price_sheet != "Default" else None        
+        carbon_price_sheet_header = 0         # if carbon_price_sheet != "Default" else None
 
         self.CARBON_PRICES: dict[int, float] = pd.read_excel(
             os.path.join(INPUT_DIR, 'carbon_prices.xlsx'),
@@ -993,10 +1000,10 @@ class Data:
         print("\tLoading biodiversity data...", flush=True)
         """
         Kunming-Montreal Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-        Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration, 
+        Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
         in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
         """
-        
+
         # Create a dictionary to hold the annual biodiversity target proportion data for GBF Target 2
         f = interp1d(
             list(settings.BIODIV_GBF_TARGET_2_DICT.keys()),
@@ -1005,12 +1012,12 @@ class Data:
             fill_value = "extrapolate",
         )
         biodiv_GBF_target_2_proportions_2010_2100 = {yr: f(yr).item() for yr in range(2010, 2101)}
-        
-        
-        
+
+
+
         # Get the connectivity score between 0 and 1, where 1 is the highest connectivity
         biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5'))
-        
+
         if settings.CONNECTIVITY_SOURCE == 'NCI':
             connectivity_score = biodiv_priorities['DCCEEW_NCI'].to_numpy(dtype = np.float32)
             connectivity_score = np.where(self.LUMASK, connectivity_score, 1)               # Set the connectivity score to 1 for cells outside the LUMASK
@@ -1022,23 +1029,23 @@ class Data:
             connectivity_score = 1
         else:
             raise ValueError(f"Invalid connectivity source: {settings.CONNECTIVITY_SOURCE}, must be 'NCI', 'DWI' or 'NONE'")
-                
-        
-        
+
+
+
         # Get the Zonation output score between 0 and 1. biodiv_score_raw.sum() = 153 million
         biodiv_score_raw = biodiv_priorities['BIODIV_PRIORITY_SSP' + str(settings.SSP)].to_numpy(dtype = np.float32)
         # Weight the biodiversity score by the connectivity score
         self.BIODIV_SCORE_RAW_WEIGHTED = biodiv_score_raw * connectivity_score
-        
-        
-        
+
+
+
         # Habitat degradation scale for agricultural land-use
         biodiv_degrade_df = pd.read_csv(os.path.join(INPUT_DIR, 'HABITAT_CONDITION.csv'))                                                               # Load the HCAS percentile data (pd.DataFrame)
-        
+
         if settings.HABITAT_CONDITION == 'HCAS':
-            ''' 
-            The degradation weight score of "HCAS" are float values range between 0-1 indicating the suitability for wild animals survival. 
-            Here we average this dataset in year 2009, 2010, and 2011, then calculate the percentiles of the average score under each land-use type. 
+            '''
+            The degradation weight score of "HCAS" are float values range between 0-1 indicating the suitability for wild animals survival.
+            Here we average this dataset in year 2009, 2010, and 2011, then calculate the percentiles of the average score under each land-use type.
             '''
             self.BIODIV_HABITAT_DEGRADE_LOOK_UP = biodiv_degrade_df[['lu', f'PERCENTILE_{settings.HCAS_PERCENTILE}']]                                   # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
             self.BIODIV_HABITAT_DEGRADE_LOOK_UP = {int(k):v for k,v in dict(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.values).items()}                        # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
@@ -1046,49 +1053,49 @@ class Data:
             self.BIODIV_HABITAT_DEGRADE_LOOK_UP = {k:v*(1/unalloc_nat_land_bio_score) for k,v in self.BIODIV_HABITAT_DEGRADE_LOOK_UP.items()}           # Normalise the biodiversity degradation score to the unallocated natural land score
 
         elif settings.HABITAT_CONDITION == 'USER_DEFINED':
-            self.BIODIV_HABITAT_DEGRADE_LOOK_UP = biodiv_degrade_df[['lu', 'USER_DEFINED']] 
+            self.BIODIV_HABITAT_DEGRADE_LOOK_UP = biodiv_degrade_df[['lu', 'USER_DEFINED']]
             self.BIODIV_HABITAT_DEGRADE_LOOK_UP = {int(k):v for k,v in dict(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.values).items()}                        # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
-        
+
         else:
             raise ValueError(f"Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
-        
- 
- 
+
+
+
         # Get the biodiversity degradation score (0-1) for each cell
         '''
         The degradation scores are float values range between 0-1 indicating the discount of biodiversity value for each cell.
         E.g., 0.8 means the biodiversity value of the cell is 80% of the original raw biodiversity value.
         '''
         biodiv_degrade_LDS = np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)                                            # Get the biodiversity degradation score for LDS burning (1D numpy array)
-        biodiv_degrade_habitat = np.vectorize(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.get)(self.LUMAP_NO_RESFACTOR).astype(np.float32)          # Get the biodiversity degradation score for each cell (1D numpy array)        
-        
+        biodiv_degrade_habitat = np.vectorize(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.get)(self.LUMAP_NO_RESFACTOR).astype(np.float32)          # Get the biodiversity degradation score for each cell (1D numpy array)
+
         # Get the biodiversity damage under LDS burning (0-1) for each cell
         biodiv_degradation_raw_weighted_LDS = self.BIODIV_SCORE_RAW_WEIGHTED * (1 - biodiv_degrade_LDS)                     # Biodiversity damage under LDS burning (1D numpy array)
         biodiv_degradation_raw_weighted_habitat = self.BIODIV_SCORE_RAW_WEIGHTED * (1 - biodiv_degrade_habitat)             # Biodiversity damage under under HCAS (1D numpy array)
-        
+
         # Get the biodiversity value at the beginning of the simulation
         self.BIODIV_RAW_WEIGHTED_LDS = self.BIODIV_SCORE_RAW_WEIGHTED - biodiv_degradation_raw_weighted_LDS                 # Biodiversity value under LDS burning (1D numpy array); will be used as base score for calculating ag/non-ag stratagies impacts on biodiversity
-        biodiv_current_val = self.BIODIV_RAW_WEIGHTED_LDS - biodiv_degradation_raw_weighted_habitat                         # Biodiversity value at the beginning year (1D numpy array)   
-        biodiv_current_val = np.nansum(biodiv_current_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK])          # Sum the biodiversity value within the LUMASK 
-        
+        biodiv_current_val = self.BIODIV_RAW_WEIGHTED_LDS - biodiv_degradation_raw_weighted_habitat                         # Biodiversity value at the beginning year (1D numpy array)
+        biodiv_current_val = np.nansum(biodiv_current_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK])          # Sum the biodiversity value within the LUMASK
+
         # Biodiversity values need to be restored under the GBF Target 2
         '''
-        The biodiversity value to be restored is calculated as the difference between the 'Unallocated - natural land' 
+        The biodiversity value to be restored is calculated as the difference between the 'Unallocated - natural land'
         and 'current land-use' regarding their biodiversity degradation scale.
-        '''                                                                                
+        '''
         biodiv_degradation_val = (
             biodiv_degradation_raw_weighted_LDS +                                                                           # Biodiversity degradation from HCAS
             biodiv_degradation_raw_weighted_habitat                                                                         # Biodiversity degradation from LDS burning
-        ) 
-        biodiv_degradation_val = np.nansum(biodiv_degradation_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK])  # Sum the biodiversity degradation value within the LUMASK 
+        )
+        biodiv_degradation_val = np.nansum(biodiv_degradation_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK])  # Sum the biodiversity degradation value within the LUMASK
 
         # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
         self.BIODIV_GBF_TARGET_2 = {
             yr: biodiv_current_val + biodiv_degradation_val * biodiv_GBF_target_2_proportions_2010_2100[yr]
             for yr in range(2010, 2101)
         }
-        
-  
+
+
 
         ###############################################################
         # BECCS data.
@@ -1124,21 +1131,21 @@ class Data:
         self.BECCS_COST_MULTS = pd.read_excel(cost_mult_excel, "BECCS cost multiplier", index_col="Year")["BECCS_cost_multiplier"].to_dict()
         self.BECCS_REV_MULTS = pd.read_excel(cost_mult_excel, "BECCS revenue multiplier", index_col="Year")["BECCS_revenue_multiplier"].to_dict()
         self.FENCE_COST_MULTS = pd.read_excel(cost_mult_excel, "Fencing cost multiplier", index_col="Year")["Fencing_cost_multiplier"].to_dict()
-       
+
 
         ###############################################################
         # Apply resfactor to various arrays required for data loading.
-        ###############################################################        
+        ###############################################################
         self.SAVBURN_ELIGIBLE = self.get_array_resfactor_applied(self.SAVBURN_ELIGIBLE)
         self.BIODIV_SCORE_RAW_WEIGHTED = self.get_array_resfactor_applied(self.BIODIV_SCORE_RAW_WEIGHTED)
         self.BIODIV_RAW_WEIGHTED_LDS = self.get_array_resfactor_applied(self.BIODIV_RAW_WEIGHTED_LDS)
-        
+
 
         print("Data loading complete\n")
-        
+
     def get_coord(self, index_ij: np.ndarray, trans):
         """
-        Calculate the coordinates [[lon,...],[lat,...]] based on 
+        Calculate the coordinates [[lon,...],[lat,...]] based on
         the given index [[row,...],[col,...]] and transformation matrix.
 
         Parameters:
@@ -1152,13 +1159,13 @@ class Data:
         coord_x = trans.c + trans.a * (index_ij[1] + 0.5)    # Move to the center of the cell
         coord_y = trans.f + trans.e * (index_ij[0] + 0.5)    # Move to the center of the cell
         return coord_x, coord_y
-    
-    
+
+
     def update_geo_meta(self):
         """
         Update the geographic metadata based on the current settings.
-        
-        Note: When this function is called, the RESFACTOR is assumend to be > 1, 
+
+        Note: When this function is called, the RESFACTOR is assumend to be > 1,
         because there is no need to update the metadata if the RESFACTOR is 1.
 
         Returns:
@@ -1220,43 +1227,43 @@ class Data:
         Safely adds agricultural management decision variables' values to the Data object.
         """
         self.ag_man_dvars[yr] = ag_man_dvars
- 
-        
+
+
     # Functions to add reprojected dvars to the output containers
     def add_ag_dvars_xr(self, yr: int, ag_dvar: np.ndarray):
         self.ag_dvars_2D_reproj_match[yr] = self.reproj_match_ag_dvar(ag_dvar, self.REPROJECT_TARGET_ID_MAP, self.REPROJECT_REFERENCE_MAP)
-        
+
     def add_am_dvars_xr(self, yr: int, am_dvar: np.ndarray):
         self.ag_man_dvars_2D_reproj_match[yr] = self.reproj_match_am_dvar(am_dvar, self.REPROJECT_TARGET_ID_MAP, self.REPROJECT_REFERENCE_MAP)
-        
+
     def add_non_ag_dvars_xr(self, yr: int, non_ag_dvar: np.ndarray):
         self.non_ag_dvars_2D_reproj_match[yr] = self.reproj_match_non_ag_dvar(non_ag_dvar, self.REPROJECT_TARGET_ID_MAP, self.REPROJECT_REFERENCE_MAP)
-        
-        
+
+
     # Functions to reproject and match the dvars to the target map
     def reproj_match_ag_dvar(self, ag_dvars:np.ndarray, target_id_map:xr.DataArray, target_ref_map:xr.DataArray):
-        
+
         ag_dvars = self.ag_dvars_to_xr(ag_dvars)                # Convert the dvars to xarray
-        
+
         # Parallelize the reprojection and matching
         def reproj_match(dvar, lm, lu):
             dvar = self.dvar_to_2D(dvar)                        # Convert the dvar to its 2D representation
             dvar = self.dvar_to_full_res(dvar)                  # Convert the 2D dvar to full resolution
-            dvar = self.bincount_avg(target_id_map, dvar)       # Calculate the average of the dvar values in each target id cell. 
+            dvar = self.bincount_avg(target_id_map, dvar)       # Calculate the average of the dvar values in each target id cell.
             dvar = dvar.reshape(target_ref_map.shape)           # Reshape the dvar to match the target reference map
             dvar = xr.DataArray(dvar, dims=('y', 'x'), coords={'y': target_ref_map['y'], 'x': target_ref_map['x']})
             return dvar.expand_dims({'lm':[lm], 'lu':[lu]})
-        
-        tasks = [delayed(reproj_match)(ag_dvars.sel(lm=lm, lu=lu), lm, lu) 
+
+        tasks = [delayed(reproj_match)(ag_dvars.sel(lm=lm, lu=lu), lm, lu)
                  for lm,lu in product(self.LANDMANS, self.AGRICULTURAL_LANDUSES)]
-        
+
         return  xr.combine_by_coords( [i for i in Parallel(n_jobs=10, backend='threading', return_as='generator')(tasks)])
-    
+
 
     def reproj_match_am_dvar(self, am_dvars, target_id_map:xr.DataArray, target_ref_map:xr.DataArray):
 
         am_dvars = self.am_dvars_to_xr(am_dvars)
-        
+
         # Parallelize the reprojection and matching
         def reproj_match(dvar, am, lm, lu):
             dvar = self.dvar_to_2D(dvar)
@@ -1265,19 +1272,19 @@ class Data:
             dvar = dvar.reshape(target_ref_map.shape)
             dvar = xr.DataArray(dvar, dims=('y', 'x'), coords={'y': target_ref_map['y'], 'x': target_ref_map['x']})
             return dvar.expand_dims({'am':[am], 'lm':[lm], 'lu':[lu]})
-        
+
         # Parallelize the reprojection and matching
-        tasks = [delayed(reproj_match)(am_dvars.sel(am=am, lm=lm, lu=lu), am, lm, lu) 
+        tasks = [delayed(reproj_match)(am_dvars.sel(am=am, lm=lm, lu=lu), am, lm, lu)
                  for am,lm,lu in product(AG_MANAGEMENTS_TO_LAND_USES, self.LANDMANS, self.AGRICULTURAL_LANDUSES)]
-        
+
         return xr.combine_by_coords([i for i in Parallel(n_jobs=10, backend='threading', return_as='generator')(tasks)])
-    
-    
-    
+
+
+
     def reproj_match_non_ag_dvar(self, non_ag_dvars, target_id_map:xr.DataArray, target_ref_map:xr.DataArray):
-        
+
         non_ag_dvars = self.non_ag_dvars_to_xr(non_ag_dvars)
-        
+
         # Parallelize the reprojection and matching
         def reproj_match(dvar, lu):
             dvar = self.dvar_to_2D(dvar)
@@ -1286,88 +1293,88 @@ class Data:
             dvar = dvar.reshape(target_ref_map.shape)
             dvar = xr.DataArray(dvar, dims=('y', 'x'), coords={'y': target_ref_map['y'], 'x': target_ref_map['x']})
             return dvar.expand_dims({'lu':[lu]})
-        
+
         tasks = [delayed(reproj_match)(non_ag_dvars.sel(lu=lu),  lu) for lu in self.NON_AGRICULTURAL_LANDUSES]
-        
+
         return xr.combine_by_coords([i for i in Parallel(n_jobs=10, backend='threading', return_as='generator')(tasks)])
-        
-    
+
+
     # Functions to convert dvars to xarray
     def ag_dvars_to_xr(self, ag_dvars: np.ndarray):
         ag_dvar_xr = xr.DataArray(
-            ag_dvars, 
+            ag_dvars,
             dims=('lm', 'cell', 'lu'),
             coords={
                 'lm': self.LANDMANS,
                 'cell': np.arange(ag_dvars.shape[1]),
                 'lu': self.AGRICULTURAL_LANDUSES
-            }   
+            }
         ).reindex(lu=self.AGRICULTURAL_LANDUSES) # Reorder the dimensions to match the LUTO variable array indexing
-        
+
         return ag_dvar_xr
-    
-    
+
+
     def am_dvars_to_xr(self, am_dvars: np.ndarray):
         am_dvar_l = []
-        for am in am_dvars.keys(): 
+        for am in am_dvars.keys():
             am_dvar_xr = xr.DataArray(
-                am_dvars[am], 
+                am_dvars[am],
                 dims=('lm', 'cell', 'lu'),
                 coords={
                     'lm': self.LANDMANS,
                     'cell': np.arange(am_dvars[am].shape[1]),
                     'lu': self.AGRICULTURAL_LANDUSES})
-            
+
             # Expand the am dimension, the dvar is a 4D array [am, lu, cell, lu]
-            am_dvar_xr = am_dvar_xr.expand_dims({'am':[am]})   
+            am_dvar_xr = am_dvar_xr.expand_dims({'am':[am]})
             am_dvar_l.append(am_dvar_xr)
-                
+
         return xr.combine_by_coords(am_dvar_l).reindex(
-            am=AG_MANAGEMENTS_TO_LAND_USES.keys(), 
-            lu=self.AGRICULTURAL_LANDUSES, 
+            am=AG_MANAGEMENTS_TO_LAND_USES.keys(),
+            lu=self.AGRICULTURAL_LANDUSES,
             lm=self.LANDMANS)   # Reorder the dimensions to match the LUTO variable array indexing
 
-        
+
     def non_ag_dvars_to_xr(self, non_ag_dvars: np.ndarray):
         non_ag_dvar_xr = xr.DataArray(
-            non_ag_dvars, 
+            non_ag_dvars,
             dims=('cell', 'lu'),
             coords={
                 'cell': np.arange(non_ag_dvars.shape[0]),
                 'lu': self.NON_AGRICULTURAL_LANDUSES})
-        
+
         return non_ag_dvar_xr.reindex(
             lu=self.NON_AGRICULTURAL_LANDUSES) # Reorder the dimensions to match the LUTO variable array indexing
-            
-    
+
+
     # Convert dvar to its 2D representation
     def dvar_to_2D(self, map_:np.ndarray)-> np.ndarray:
         '''
         Convert the dvar from 1D vector to 2D array.
         '''
         map_1D = self.LUMAP_2D_RESFACTORED.copy().astype(np.float32) if settings.RESFACTOR > 1 else self.LUMAP_2D.copy().astype(np.float32)
-        np.place(map_1D, (map_1D != self.MASK_LU_CODE) & (map_1D != self.NODATA), map_) 
+        np.place(map_1D, (map_1D != self.MASK_LU_CODE) & (map_1D != self.NODATA), map_)
         return map_1D
-    
-    
+
+
     # Upsample dvar to its full resolution representation
     def dvar_to_full_res(self, dvar_2D:np.ndarray) -> np.ndarray:
         '''
         Upsample the dvar to its full resolution (RESFACTOR=1) representation.
         '''
         dense_2D_shape = self.NLUM_MASK.shape
-        dense_2D_map = np.repeat(np.repeat(dvar_2D, settings.RESFACTOR, axis=0), settings.RESFACTOR, axis=1)       
+        dense_2D_map = np.repeat(np.repeat(dvar_2D, settings.RESFACTOR, axis=0), settings.RESFACTOR, axis=1)
 
         # Adjust the dense_2D_map size if it differs from the NLUM_MASK
         if dense_2D_map.shape[0] > dense_2D_shape[0] or dense_2D_map.shape[1] > dense_2D_shape[1]:
             dense_2D_map = dense_2D_map[:dense_2D_shape[0], :dense_2D_shape[1]]
-            
+
         if dense_2D_map.shape[0] < dense_2D_shape[0] or dense_2D_map.shape[1] < dense_2D_shape[1]:
             pad_height = dense_2D_shape[0] - dense_2D_map.shape[0]
             pad_width = dense_2D_shape[1] - dense_2D_map.shape[1]
             dense_2D_map = np.pad(
-                dense_2D_map, 
-                pad_width=((0, pad_height), (0, pad_width)), 
+                dense_2D_map,
+                pad_width=((0, pad_height), (0, pad_width)),
                 mode='edge')
 
         # Apply the masks
@@ -1375,39 +1382,39 @@ class Data:
         dense_2D_map = np.where(filler_mask, dense_2D_map, self.MASK_LU_CODE)
         dense_2D_map = np.where(self.NLUM_MASK, dense_2D_map, self.NODATA)
         return dense_2D_map
-    
-    
+
+
     # Upsample dvar to its full resolution representation
     def upsample_dvar(self, map_:np.ndarray, x:np.ndarray, y:np.ndarray)-> xr.DataArray:
         # Get the coords of the map_
         coords = dict(map_.coords)
         del coords['cell']
-        
+
         # Up sample the arr as RESFACTOR=1
-        if settings.RESFACTOR > 1:   
+        if settings.RESFACTOR > 1:
             map_ = self.dvar_to_2D(map_)
             map_ = self.dvar_to_full_res(map_)
         else:
             empty_map = np.full_like(self.NLUM_MASK, fill_value=self.NODATA, dtype=np.float32)
-            np.place(empty_map, self.NLUM_MASK, self.LUMAP_NO_RESFACTOR) 
+            np.place(empty_map, self.NLUM_MASK, self.LUMAP_NO_RESFACTOR)
             np.place(empty_map, (empty_map != self.MASK_LU_CODE) & (empty_map != self.NODATA), map_)
             map_ = empty_map
-        
+
         # Convert to xarray
         map_ = xr.DataArray(map_, dims=('y','x'), coords={'y': y, 'x': x})
         map_ = map_.expand_dims(coords)
         return map_
 
 
-    # Calculate the average value of dvars within the target bin       
+    # Calculate the average value of dvars within the target bin
     def bincount_avg(self, target_id_map:xr.DataArray, dvar:np.ndarray) -> np.ndarray:
         """
-        Calculate the average value of each bin based on the target_id_map and dvar arrays. 
-        Here is where we reproject and match dvars to the target map. Essentially, we 
+        Calculate the average value of each bin based on the target_id_map and dvar arrays.
+        Here is where we reproject and match dvars to the target map. Essentially, we
         created an ID map for the target map, where each pixcel has the  index of the
-        flattend target map but the same shape of the `NLUM_MASK` (see `N:/Data-Master/Biodiversity/biodiversity_contribution/Step_3_Match_lumap_to_biomap.py`). 
-        
-        We use `bincount` to get the occurence of dvar cells with the same target ID, 
+        flattend target map but the same shape of the `NLUM_MASK` (see `N:/Data-Master/Biodiversity/biodiversity_contribution/Step_3_Match_lumap_to_biomap.py`).
+
+        We use `bincount` to get the occurence of dvar cells with the same target ID,
         and get the sum of dvar values with the same target ID. At last, the average
         of dvar cells within each target cell is calculated as `occurance / sum`.
 
@@ -1521,7 +1528,7 @@ class Data:
                 os.mkdir(p)
 
         return self.path
-    
+
     def get_production(
         self,
         yr_cal: int,
@@ -1533,10 +1540,10 @@ class Data:
 
         'yr_cal' is calendar year
 
-        Can return base year production (e.g., year = 2010) or can return production for 
+        Can return base year production (e.g., year = 2010) or can return production for
         a simulated year if one exists (i.e., year = 2030).
 
-        Includes the impacts of land-use change, productivity increases, and 
+        Includes the impacts of land-use change, productivity increases, and
         climate change on yield.
         """
         ag_X_mrj = lumap2ag_l_mrj(lumap, lmmap)
@@ -1584,15 +1591,15 @@ class Data:
 
     def get_carbon_price_by_yr_idx(self, yr_idx: int) -> float:
         """
-        Return the price of carbon per tonne for a given year index (since 2010). 
+        Return the price of carbon per tonne for a given year index (since 2010).
         The resulting year should be between 2010 - 2100
         """
         yr_cal = yr_idx + self.YR_CAL_BASE
         return self.get_carbon_price_by_year(yr_cal)
-    
+
     def get_carbon_price_by_year(self, yr_cal: int) -> float:
         """
-        Return the price of carbon per tonne for a given year. 
+        Return the price of carbon per tonne for a given year.
         The resulting year should be between 2010 - 2100
         """
         if yr_cal not in self.CARBON_PRICES:
@@ -1610,9 +1617,9 @@ class Data:
         -------
         np.ndarray: shape (NCELLS,)
         """
-        
+
         return self.get_array_resfactor_applied(self.WATER_YIELD_DR_FILE[yr_idx])
-    
+
     def get_water_dr_yield_for_year(self, yr_cal: int) -> np.ndarray:
         """
         Get the DR water yield array, inclusive of all cells that LUTO does not look at.
@@ -1623,7 +1630,7 @@ class Data:
         """
         yr_idx = yr_cal - self.YR_CAL_BASE
         return self.get_array_resfactor_applied(self.get_water_dr_yield_for_yr_idx(yr_idx))
-    
+
     def get_water_sr_yield_for_yr_idx(self, yr_idx: int) -> np.ndarray:
         """
         Get the SR water yield array, inclusive of all cells that LUTO does not look at.
@@ -1633,7 +1640,7 @@ class Data:
         np.ndarray: shape (NCELLS,)
         """
         return self.get_array_resfactor_applied(self.WATER_YIELD_SR_FILE[yr_idx])
-    
+
     def get_water_sr_yield_for_year(self, yr_cal: int) -> np.ndarray:
         """
         Get the SR water yield array, inclusive of all cells that LUTO does not look at.
@@ -1644,11 +1651,11 @@ class Data:
         """
         yr_idx = yr_cal - self.YR_CAL_BASE
         return self.get_array_resfactor_applied(self.WATER_YIELD_SR_FILE(yr_idx))
-    
+
     def get_water_nl_yield_for_yr_idx(
         self,
         yr_idx: int,
-        water_dr_yield: Optional[np.ndarray] = None, 
+        water_dr_yield: Optional[np.ndarray] = None,
         water_sr_yield: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         """
@@ -1659,13 +1666,13 @@ class Data:
         np.ndarray: shape (NCELLS,)
         """
         water_dr_yield = (
-            water_dr_yield if water_dr_yield is not None 
+            water_dr_yield if water_dr_yield is not None
             else self.get_water_dr_yield_for_yr_idx(yr_idx)
         )
         water_sr_yield = (
-            water_sr_yield if water_sr_yield is not None 
+            water_sr_yield if water_sr_yield is not None
             else self.get_water_sr_yield_for_yr_idx(yr_idx)
         )
         dr_prop = self.DEEP_ROOTED_PROPORTION
-        
+
         return (dr_prop * water_dr_yield + (1 - dr_prop) * water_sr_yield)

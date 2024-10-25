@@ -1,3 +1,10 @@
+# Append the LUTO directory to the system path, so that the modules can be imported and parallel processing can be done.
+import os
+import sys
+LUTO_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+sys.path.append(LUTO_dir)
+
+
 import luto.settings as settings
 from joblib import Parallel, delayed
 
@@ -89,12 +96,3 @@ def create_maps(row, model_run_scenario):
     return f'{map_fullname} of year {year} has been created.'
     
     
-
-
-
-
-
-
-
-
-
