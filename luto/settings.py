@@ -60,10 +60,10 @@ DIET_DOM = 'BAU'                    # 'BAU', 'FLX', 'VEG', 'VGN' - domestic diet
 DIET_GLOB = 'BAU'                   # 'BAU', 'FLX', 'VEG', 'VGN' - global diets
 CONVERGENCE = 2050                  # 2050 or 2100 - date at which dietary transformation is completed (velocity of transformation)
 IMPORT_TREND = 'Static'             # 'Static' (assumes 2010 shares of imports for each commodity) or 'Trend' (follows historical rate of change in shares of imports for each commodity)
-WASTE = 1                           # 1 for full waste, 0.5 for half waste 
+WASTE = 1                           # 1 for full waste, 0.5 for half waste
 FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 
-# Add CO2 fertilisation effects on agricultural production from GAEZ v4 
+# Add CO2 fertilisation effects on agricultural production from GAEZ v4
 CO2_FERT = 'on'   # or 'off'
 
 # Fire impacts on carbon sequestration
@@ -80,7 +80,7 @@ FIRE_RISK = 'med'   # Options are 'low', 'med', 'high'. Determines whether to ta
 # Economic parameters
 # ---------------------------------------------------------------------------- #
 
-# Amortise upfront (i.e., establishment and transitions) costs 
+# Amortise upfront (i.e., establishment and transitions) costs
 AMORTISE_UPFRONT_COSTS = False
 
 # Discount rate for amortisation
@@ -96,9 +96,9 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution. 
+RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
-# How does the model run over time 
+# How does the model run over time
 # MODE = 'snapshot'   # Runs for target year only
 MODE = 'timeseries'   # Runs each year from base year to target year
 
@@ -128,7 +128,7 @@ WRITE_THREADS = 50              # The Threads to use for map making, only work w
 # Gurobi parameters
 # ---------------------------------------------------------------------------- #
 
-# Select Gurobi algorithm used to solve continuous models or the initial root relaxation of a MIP model. Default is automatic. 
+# Select Gurobi algorithm used to solve continuous models or the initial root relaxation of a MIP model. Default is automatic.
 SOLVE_METHOD = 2  # 'automatic: -1, primal simplex: 0, dual simplex: 0, barrier: 2, concurrent: 3, deterministic concurrent: 4, deterministic concurrent simplex: 5
 
 # Presolve parameters (switching both to 0 solves numerical problems)
@@ -161,7 +161,7 @@ THREADS = 50
 
 """
 The dictionary below is the master list of all of the non agricultural land uses
-and whether they are currently enabled in the solver (True/False). 
+and whether they are currently enabled in the solver (True/False).
 
 To disable a non-agricultural land use, change the correpsonding value of the
 NON_AG_LAND_USES dictionary to false.
@@ -180,13 +180,13 @@ NON_AG_LAND_USES = {
 """
 If settings.MODE == 'timeseries', the values of the below dictionary determine whether the model is allowed to abandon non-agr.
 land uses on cells in the years after it chooses to utilise them. For example, if a cell has is using 'Environmental Plantings'
-and the corresponding value in this dictionary is False, all cells using EP must also utilise this land use in all subsequent 
+and the corresponding value in this dictionary is False, all cells using EP must also utilise this land use in all subsequent
 years.
 
-CAUTION: Setting reversibility == True can cause infeasibility issues in timeseries runs due to not being able to meet the water constraints. 
-With the net water yield limit set to say 80%, some catchments could be close to that yield then they experience some land use change to meet 
-GHG and biodiversity targets. This pushes the catchment close to the net yield constraint. Over time, climate change may reduce the amount of 
-water yield and if non-ag land uses are not reversible then a catchment may not be able to meet the net yield constraint. 
+CAUTION: Setting reversibility == True can cause infeasibility issues in timeseries runs due to not being able to meet the water constraints.
+With the net water yield limit set to say 80%, some catchments could be close to that yield then they experience some land use change to meet
+GHG and biodiversity targets. This pushes the catchment close to the net yield constraint. Over time, climate change may reduce the amount of
+water yield and if non-ag land uses are not reversible then a catchment may not be able to meet the net yield constraint.
 This is expected behaviour and the user must choose how to deal with it.
 """
 NON_AG_LAND_USES_REVERSIBLE = {
@@ -200,7 +200,7 @@ NON_AG_LAND_USES_REVERSIBLE = {
     'BECCS': False,
 }
 
-# Carbon price scenario: either '1.8C 67%', '1.5C 50%', '1.5C 67%', 'Default', '100', or None. 
+# Carbon price scenario: either '1.8C 67%', '1.5C 50%', '1.5C 67%', 'Default', '100', or None.
 # Setting to None falls back to the 'Default' scenario.
 CARBON_PRICES_FIELD = '1.8C 67%'
 
@@ -251,7 +251,7 @@ AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per h
 
 """
 The dictionary below contains a master list of all agricultural management options and
-which land uses they correspond to. 
+which land uses they correspond to.
 
 To disable an ag-mangement option, change the corresponding value in the AG_MANAGEMENTS dictionary to False.
 """
@@ -269,7 +269,7 @@ management options on cells in the years after it chooses to utilise them. For e
 and the corresponding value in this dictionary is False, all cells using Asparagopsis taxiformis must also utilise this land use
 and agricultural management combination in all subsequent years.
 
-WARNING: changing to False will result in 'locking in' land uses on cells that utilise the agricultural management option for 
+WARNING: changing to False will result in 'locking in' land uses on cells that utilise the agricultural management option for
 the rest of the simulation. This may be an unintended side effect.
 """
 AG_MANAGEMENTS_REVERSIBLE = {
@@ -288,8 +288,8 @@ NEW_IRRIG_COST = 10000
 SAVBURN_COST_HA_YR = 100
 
 # The minimum value an agricultural management variable must take for the write_output function to consider it being used on a cell
-AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1  
-                                             
+AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1
+
 
 # ---------------------------------------------------------------------------- #
 # Off-land commodity parameters
@@ -309,38 +309,38 @@ GHG_EMISSIONS_LIMITS = 'on'        # 'on' or 'off'
 GHG_LIMITS_TYPE = 'file' # 'dict' or 'file'
 
 # Set emissions limits in dictionary below (i.e., year: tonnes)
-GHG_LIMITS = {                     
+GHG_LIMITS = {
               2010: 90 * 1e6,    # Agricultural emissions in 2010 in tonnes CO2e
               2050: -100 * 1e6,  # GHG emissions target and year (can add more years/targets)
               2100: -100 * 1e6   # GHG emissions target and year (can add more years/targets)
              }
 
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'    
+GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'
 
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
-SOC_AMORTISATION = 15    
+SOC_AMORTISATION = 15
 
 
 # Water use yield and parameters *******************************
-WATER_LIMITS = 'off'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
+WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 
 RELAXED_WATER_LIMITS_FOR_INFEASIBILITY = 'on'
-    
-            
+
+
 
 # Regionalisation to enforce water use limits by
 WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
 
-# Water net yield targets: the value represents the proportion of the historical water yields 
-# that the net yield must exceed in a given year. Base year (2010) uses base year net yields as targets. 
+# Water net yield targets: the value represents the proportion of the historical water yields
+# that the net yield must exceed in a given year. Base year (2010) uses base year net yields as targets.
 # Everything past the latest year specified uses the target figure for the latest year.
 
-# Safe and just Earth system boundaries suggests a water stress of 0.2 (yield of 0.8). This is inclusive of 
-# domestic/industrial: https://www.nature.com/articles/s41586-023-06083-8, Approximately 70% of the total water use 
-# is used for agricultural purposes. This includes water used for irrigation, livestock, and domestic purposes on farms, 
+# Safe and just Earth system boundaries suggests a water stress of 0.2 (yield of 0.8). This is inclusive of
+# domestic/industrial: https://www.nature.com/articles/s41586-023-06083-8, Approximately 70% of the total water use
+# is used for agricultural purposes. This includes water used for irrigation, livestock, and domestic purposes on farms,
 # with the rest used for domestic/industrial  https://soe.dcceew.gov.au/inland-water/pressures/population
-# Hence, assuming that this proportion is uniform over all catchments and remains constant over time then if water 
+# Hence, assuming that this proportion is uniform over all catchments and remains constant over time then if water
 # stress is 0.2 then agriculture can use up 70% of this, leaving 30% for domestic/industrial. The water yield target for ag
 # should then be historical net yield * (1 - water stress * agricultural share)
 
@@ -348,8 +348,8 @@ WATER_STRESS = 0.2
 AG_SHARE_OF_WATER_USE = 1.0
 WATER_YIELD_TARGET_AG_SHARE = 1 - WATER_STRESS * AG_SHARE_OF_WATER_USE
 
-# Set a dictionary of water yield targets (i.e., the proportion of historical net annual water yield). LUTO will ensure that 
-# net annual water yield is >= this proportion of historical net annual water yield is met by the given date, leaving sufficient water 
+# Set a dictionary of water yield targets (i.e., the proportion of historical net annual water yield). LUTO will ensure that
+# net annual water yield is >= this proportion of historical net annual water yield is met by the given date, leaving sufficient water
 # for domestic and industrial use. The water yield target grades linearly from net water yield in 2010 to achieve the target by the target date
 # for each catchment (river region or drainage division)
 WATER_YIELD_TARGETS = {
@@ -376,8 +376,8 @@ INCLUDE_WATER_LICENSE_COSTS = 0
     This score is normalised between 0 (fartherst) and 1 (closest).
     Can be either 'NCI' or 'DWI'.
         - if 'NCI' is selected, the connectivity score is sourced from the DCCEEW's National Connectivity Index (v3.0).
-        - if 'DWI' is selected, the connectivity score is calculated as distance to the nearest area of natural land as mapped 
-          by the National Land Use Map of Australia. 
+        - if 'DWI' is selected, the connectivity score is calculated as distance to the nearest area of natural land as mapped
+          by the National Land Use Map of Australia.
         - if 'NONE' is selected, the connectivity score is not used in the biodiversity calculation.
 '''
 CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
@@ -389,7 +389,7 @@ CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
     The relative importance of the connectivity score in the biodiversity calculation.
     I.e., the lower bound of the connectivity score for weighting the raw biodiversity priority score is CONNECTIVITY_LB.
 '''
-connect_importance = 0.3                 
+connect_importance = 0.3
 CONNECTIVITY_LB = 1 - connect_importance    # Weighting of connectivity score in biodiversity calculation (0 - 1)
 
 
@@ -404,19 +404,19 @@ HABITAT_CONDITION = 'HCAS'                  # 'HCAS', 'USER_DEFINED', or 'NONE'
 
 
 # HCAS percentile for each land-use type
-''' Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the 
+''' Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the
     suitability for wild animals ranging between 0-1) for each land-use type.
 
     Here is the parameter defining the percentile used to represent each land-use's degradation scale to biodiversity. Avaliable percentiles
-    is one of [10, 25, 50, 75, 90]. 
-    
-    For example, the 50th percentile for 'Beef - Modified land' is 0.22, meaning this land has 22% biodiversity compared to if it was restored 
+    is one of [10, 25, 50, 75, 90].
+
+    For example, the 50th percentile for 'Beef - Modified land' is 0.22, meaning this land has 22% biodiversity compared to if it was restored
     to a perfect natural land.
 '''
 HCAS_PERCENTILE = 50
 
 # Biodiversity value under default late dry season savanna fire regime
-''' For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value 
+''' For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value
     (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value.'''
 LDS_BIODIVERSITY_VALUE = 0.8
 
@@ -426,7 +426,7 @@ LDS_BIODIVERSITY_VALUE = 0.8
     For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value
     will be 0.6 * 0.8 = 0.48.
 '''
-ENV_PLANTING_BIODIVERSITY_BENEFIT = 0.8    
+ENV_PLANTING_BIODIVERSITY_BENEFIT = 0.8
 CARBON_PLANTING_BLOCK_BIODIV_BENEFIT = 0.1
 CARBON_PLANTING_BELT_BIODIV_BENEFIT = 0.1
 RIPARIAN_PLANTING_BIODIV_BENEFIT = 1
@@ -439,7 +439,7 @@ BECCS_BIODIVERSITY_BENEFIT = 0
     Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
     in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
 """
-BIODIV_GBF_TARGET_2_DICT = {                     
+BIODIV_GBF_TARGET_2_DICT = {
               2010: 0,    # Proportion of degraded land restored in year 2010
               2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
               2050: 0.3,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
@@ -447,12 +447,12 @@ BIODIV_GBF_TARGET_2_DICT = {
              }            # (can add more years/targets)\
 
 
-# ------------------- Biodiversity contribution reporting -------------------            
+# ------------------- Biodiversity contribution reporting -------------------
 BIODIVERSITY_LIMITS = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
-BIODIVERSITY_CONTRIBUTION_REPORT = True  # True or False, report biodiversity contribution    
+BIODIVERSITY_CONTRIBUTION_REPORT = True  # True or False, report biodiversity contribution
 BIO_CALC_LEVEL = 'group'  # 'group' or 'species' - determines whether to calculate biodiversity scores at the group or species level
 
-    
+
 
 # ---------------------------------------------------------------------------- #
 # Other parameters
@@ -463,11 +463,11 @@ CULL_MODE = 'absolute'      # cull to include at most MAX_LAND_USES_PER_CELL
 # CULL_MODE = 'percentage'    # cull the LAND_USAGE_THRESHOLD_PERCENTAGE % most expensive options
 # CULL_MODE = 'none'          # do no culling
 
-MAX_LAND_USES_PER_CELL = 12 
+MAX_LAND_USES_PER_CELL = 12
 LAND_USAGE_CULL_PERCENTAGE = 0.15
 
 # Non-ag output coding. Non-agricultural land uses will appear on the land use map offset by this amount (e.g. land use 0 will appear as 100)
-NON_AGRICULTURAL_LU_BASE_CODE = 100         
+NON_AGRICULTURAL_LU_BASE_CODE = 100
 
 # Number of decimals to round the lower bound matrices to for non-agricultural land uses and agricultural management options.
 LB_ROUND_DECMIALS = 6
@@ -476,10 +476,12 @@ LB_ROUND_DECMIALS = 6
 """ NON-AGRICULTURAL LAND USES (indexed by k)
 0: 'Environmental Plantings'
 1: 'Riparian Plantings'
-2: 'Agroforestry'
-3: 'Carbon Plantings (Block Arrangement)'
-4: 'Carbon Plantings (Belt Arrangement)'
-5: 'BECCS'
+2: 'Sheep Agroforestry'
+3: 'Beef Agroforestry'
+4: 'Carbon Plantings (Block)'
+5: 'Sheep Carbon Plantings (Belt)'
+6: 'Beef Carbon Plantings (Belt)'
+7: 'BECCS'
 
 
 AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)
