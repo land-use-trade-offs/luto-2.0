@@ -541,19 +541,15 @@ def get_climate_change_impact_on_water_yield(data: Data) -> np.ndarray:
             f"Incorrect option '{settings.WATER_REGION_DEF}' for WATER_REGION_DEF in settings "
             f"(Must be either 'Drainage Division' or 'River Region')."
         )
-        
-    water_yield_natural_land = data.WATER_UNDER_NATURAL_LAND_DD
-    water_cci_delta = water_yield_natural_land.diff()  # Calculate the difference between this and the next year
-    water_cci_delta = water_cci_delta * (-1)           # Decreased water yield due to climate change means an additional water yield delta in the water yield target
+
     
-    
-    # water_yield_cci_delta = pd.DataFrame()
-    # for col_name, col_data in water_yield_natural_land.items():
-    #     min_gap = col_data - col_data.min()                 # Climate change impact is the difference between the minimum water yield and the current value
-    #     before_min = col_data.index < col_data.idxmin()     # The impact is only applied to years before the minimum value
-    #     min_gap = min_gap * before_min                      # Apply the impact only to years before the minimum value
-    #     min_gap_df = pd.DataFrame({col_name: min_gap})
-    #     water_cci_impact = pd.concat([water_cci_impact, min_gap_df ], axis=1)
+    water_cci_delta = pd.DataFrame()
+    for col_name, col_data in water_yield_natural_land.items():
+        min_gap = col_data - col_data.min()                 # Climate change impact is the difference between the minimum water yield and the current value
+        before_min = col_data.index < col_data.idxmin()     # The impact is only applied to years before the minimum value
+        min_gap = min_gap * before_min                      # Apply the impact only to years before the minimum value
+        min_gap_df = pd.DataFrame({col_name: min_gap})
+        water_cci_delta = pd.concat([water_cci_delta, min_gap_df ], axis=1)
             
     return water_cci_delta
 

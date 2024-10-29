@@ -155,68 +155,6 @@ def get_quantity_beef_agroforestry(
     return agroforestry_contr + beef_contr
 
 
-def get_quantity_sheep_agroforestry(
-    data, 
-    ag_q_mrp: np.ndarray, 
-    agroforestry_x_r: np.ndarray
-) -> np.ndarray:
-    """
-    Parameters
-    ------
-    data: Data object.
-    ag_c_mrj: agricultural cost matrix.
-    agroforestry_x_r: Agroforestry exclude matrix.
-
-    Returns
-    ------
-    Numpy array indexed by (c, r)
-    """
-    sheep_quantity_cr = get_sheep_q_cr(data, ag_q_mrp)    
-    base_agroforestry_quantity_cr = get_quantity_agroforestry_base(data)
-
-    # Calculate contributions and return the sum
-    agroforestry_contr = base_agroforestry_quantity_cr
-    for c in range(data.NCMS):
-        agroforestry_contr[c, :] *= agroforestry_x_r
-
-    sheep_contr = sheep_quantity_cr
-    for c in range(data.NCMS):
-        sheep_contr[c, :] *= (1 - agroforestry_x_r)
-
-    return agroforestry_contr + sheep_contr
-
-
-def get_quantity_beef_agroforestry(
-    data, 
-    ag_q_mrp: np.ndarray, 
-    agroforestry_x_r: np.ndarray
-) -> np.ndarray:
-    """
-    Parameters
-    ------
-    data: Data object.
-    ag_c_mrj: agricultural cost matrix.
-    agroforestry_x_r: Agroforestry exclude matrix.
-
-    Returns
-    ------
-    Numpy array indexed by (c, r)
-    """
-    beef_quantity_cr = get_beef_q_cr(data, ag_q_mrp)    
-    base_agroforestry_quantity_cr = get_quantity_agroforestry_base(data)
-
-    # Calculate contributions and return the sum
-    agroforestry_contr = base_agroforestry_quantity_cr
-    for c in range(data.NCMS):
-        agroforestry_contr[c, :] *= agroforestry_x_r
-
-    beef_contr = beef_quantity_cr
-    for c in range(data.NCMS):
-        beef_contr[c, :] *= (1 - agroforestry_x_r)
-
-    return agroforestry_contr + beef_contr
-
-
 def get_quantity_carbon_plantings_block(data) -> np.ndarray:
     """
     Parameters

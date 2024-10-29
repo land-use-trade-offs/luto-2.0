@@ -1,4 +1,5 @@
-# Append the LUTO directory to the system path, so that the modules can be imported and parallel processing can be done.
+# Append the LUTO directory to the system path, 
+# so that the modules can be imported as individual process and parallel processed.
 import os
 import sys
 LUTO_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
