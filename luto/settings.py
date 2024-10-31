@@ -321,8 +321,8 @@ GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
 SOC_AMORTISATION = 15    
 
-# GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
-GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
+GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
+# GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
 # Penalty for deviating from the GHG constraints when GHG_CONSTRAINT_TYPE is soft
 GHG_PENALTY = 1000
