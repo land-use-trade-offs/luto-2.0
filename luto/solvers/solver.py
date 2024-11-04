@@ -753,7 +753,7 @@ class LutoSolver:
         Links the GHG emissions decision var self.E to be >= the absolute difference
         between desired emissions and modelled emissions.
         """
-        print('  ...GHG emissions constraints (soft)...')
+        print(f'  ...GHG emissions constraints (soft, penalty = {settings.GHG_PENALTY})...')
 
         ghg_limit = self._ghg_emissions_target()
 

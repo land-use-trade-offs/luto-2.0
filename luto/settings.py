@@ -325,7 +325,7 @@ GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (l
 # GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
 # Penalty for deviating from the GHG constraints when GHG_CONSTRAINT_TYPE is soft
-GHG_PENALTY = 1000
+GHG_PENALTY = 10e-3
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'off'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
