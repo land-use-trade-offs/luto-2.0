@@ -472,17 +472,61 @@ def calc_water_net_yield_by_region_in_year_from_data(
     return net_yield_by_region
 
 
-def get_yr_cal_base_net_wyield_by_region(data: Data) -> dict[int, float]:
+def get_climate_change_impact_on_water_yield(data: Data) -> np.ndarray:
+    """
+    Return the impact of climate change on water yield for each region.
+    Rows: years
+    Columns: region IDs
+
+    Parameters:
+    - data: The data object containing the necessary input data.
+
+    Returns:
+    - pd.DataFrame : The impact of climate change on water yield for each cell.
+
+    Raises:
+    - None
+
+    """
+    # Data for river regions or drainage divisions
+    if settings.WATER_REGION_DEF == 'Drainage Division':
+        water_yield_natural_land = data.WATER_UNDER_NATURAL_LAND_DD
+    elif settings.WATER_REGION_DEF == 'River Region':
+        water_yield_natural_land = data.WATER_UNDER_NATURAL_LAND_RR
+    else:
+        print(
+            f"Incorrect option '{settings.WATER_REGION_DEF}' for WATER_REGION_DEF in settings "
+            f"(Must be either 'Drainage Division' or 'River Region')."
+        )
+
+    
+    water_cci_delta = pd.DataFrame()
+    for col_name, col_data in water_yield_natural_land.items():
+        min_gap = col_data - col_data.min()                 # Climate change impact is the difference between the minimum water yield and the current value
+        before_min = col_data.index < col_data.idxmin()     # The impact is only applied to years before the minimum value
+        min_gap = min_gap * before_min                      # Apply the impact only to years before the minimum value
+        min_gap_df = pd.DataFrame({col_name: min_gap})
+        water_cci_delta = pd.concat([water_cci_delta, min_gap_df ], axis=1)
+            
+    return water_cci_delta
+
+
+def get_yr_cal_net_wyield_including_cc_impacts(data: Data) -> dict[int, float]:
+    """
+    Returns a dictionary containing the YR_CAL_BASE (2010) net water yields inclusive
+    of climate change impacts.
+    
+    Key: region ID
+    """
     if data.YR_CAL_BASE_NET_WYIELD is None:
-        data.YR_CAL_BASE_NET_WYIELD = calc_water_net_yield_by_region_in_year_from_data(data, data.YR_CAL_BASE)
+        net_yields = calc_water_net_yield_by_region_in_year_from_data(data, data.YR_CAL_BASE)
+        cc_impacts = get_climate_change_impact_on_water_yield(data)
 
-    return data.YR_CAL_BASE_NET_WYIELD
+        for reg in net_yields:
+            net_yields[reg] += cc_impacts.loc[data.YR_CAL_BASE, reg]
 
-
-def get_yr_cal_base_net_wyield_by_region(data: Data) -> dict[int, float]:
-    if data.YR_CAL_BASE_NET_WYIELD is None:
-        data.YR_CAL_BASE_NET_WYIELD = calc_water_net_yield_by_region_in_year_from_data(data, data.YR_CAL_BASE)
-
+        data.YR_CAL_BASE_NET_WYIELD = net_yields
+            
     return data.YR_CAL_BASE_NET_WYIELD
 
 
@@ -529,43 +573,6 @@ def _get_historical_water_yield_by_regions(data: Data) -> dict[int, tuple[str, f
         )
 
     return net_baseline_reg_water_yield
-
-
-def get_climate_change_impact_on_water_yield(data: Data) -> np.ndarray:
-    """
-    Return the impact of climate change on water yield for each region.
-
-    Parameters:
-    - data: The data object containing the necessary input data.
-
-    Returns:
-    - pd.DataFrame : The impact of climate change on water yield for each cell.
-
-    Raises:
-    - None
-
-    """
-    # Data for river regions or drainage divisions
-    if settings.WATER_REGION_DEF == 'Drainage Division':
-        water_yield_natural_land = data.WATER_UNDER_NATURAL_LAND_DD
-    elif settings.WATER_REGION_DEF == 'River Region':
-        water_yield_natural_land = data.WATER_UNDER_NATURAL_LAND_RR
-    else:
-        print(
-            f"Incorrect option '{settings.WATER_REGION_DEF}' for WATER_REGION_DEF in settings "
-            f"(Must be either 'Drainage Division' or 'River Region')."
-        )
-
-    
-    water_cci_delta = pd.DataFrame()
-    for col_name, col_data in water_yield_natural_land.items():
-        min_gap = col_data - col_data.min()                 # Climate change impact is the difference between the minimum water yield and the current value
-        before_min = col_data.index < col_data.idxmin()     # The impact is only applied to years before the minimum value
-        min_gap = min_gap * before_min                      # Apply the impact only to years before the minimum value
-        min_gap_df = pd.DataFrame({col_name: min_gap})
-        water_cci_delta = pd.concat([water_cci_delta, min_gap_df ], axis=1)
-            
-    return water_cci_delta
 
 
 def get_water_net_yield_limit_values(

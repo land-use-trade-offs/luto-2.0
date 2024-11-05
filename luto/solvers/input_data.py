@@ -442,5 +442,5 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         limits=get_limits(data, target_year),
         desc2aglu=data.DESC2AGLU,
         resmult=data.RESMULT,
-        sim_base_year_net_wyield=ag_water.get_yr_cal_base_net_wyield_by_region(data),
+        sim_base_year_net_wyield=ag_water.get_yr_cal_net_wyield_including_cc_impacts(data),
     )
