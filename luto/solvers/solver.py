@@ -621,7 +621,7 @@ class LutoSolver:
                 print(f"    ...net water yield in {reg_name} >= {constr_wny_limit:.2f} ML")
                 if wny_limit_updated:
                     print(
-                        f"        ...water yield limit in {reg_name} ({overall_wyield_limit:.2f} ML) exceeds 2010 net "
+                        f"        ...limit in {reg_name} ({overall_wyield_limit:.2f} ML) exceeds 2010 net "
                         f"water yield ({constr_wny_limit:.2f} ML) and was lowered to avoid infeasibility."
                     )
                     
