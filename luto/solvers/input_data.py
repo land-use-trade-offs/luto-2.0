@@ -76,10 +76,7 @@ class SolverInputData:
     limits: dict                    # Targets to use.
     desc2aglu: dict                 # Map of agricultural land use descriptions to codes.
     resmult: float                  # Resolution factor multiplier from data.RESMULT
-
-    base_year_ag_sol: np.ndarray = None                 # Base year's agricultural variables solution.
-    base_year_non_ag_sol: np.ndarray = None             # Base year's non-agricultural variables solution.
-    base_year_ag_man_sol: dict[str, np.ndarray] = None  # Base year's agricultural management variables solution.
+    sim_base_year_net_wyield: dict[int, float]   # Net water yields in the base year of the simulation (2010). Key: region.
 
     @property
     def n_ag_lms(self):
@@ -437,7 +434,5 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         limits=get_limits(data, target_year),
         desc2aglu=data.DESC2AGLU,
         resmult=data.RESMULT,
-        base_year_ag_sol=data.ag_dvars.get(base_year),
-        base_year_non_ag_sol=data.non_ag_dvars.get(base_year),
-        base_year_ag_man_sol=data.ag_man_dvars.get(base_year),
+        sim_base_year_net_wyield=ag_water.get_yr_cal_base_net_wyield_by_region(data),
     )

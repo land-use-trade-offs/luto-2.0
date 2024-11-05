@@ -729,6 +729,9 @@ class Data:
         # during timeseries solves.
         self.WATER_LIMITS_BY_YEAR = None
 
+        # Initialise container for simulation base year wyields
+        self.YR_CAL_BASE_NET_WYIELD = None
+
         # Water requirements by land use -- LVSTK.
         wreq_lvstk_dry = pd.DataFrame()
         wreq_lvstk_irr = pd.DataFrame()

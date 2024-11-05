@@ -107,7 +107,6 @@ def get_water_public_land(data: Data) -> dict[int, dict[int, float]]:
     
     Parameters:
         data (object): The data object containing the required data.
-        yr_idx (int): The index of the year.
     
     Returns:
         dict[int, dict[int, float]]: <unit: ML/cell> dictionary of water CC impact amounts.
@@ -377,7 +376,7 @@ def calc_water_net_yield_for_region(
         for j_idx, j in enumerate(am_j_list)
     )
     return ag_contr + non_ag_contr + ag_man_contr + w_cc_impact_reg
-    
+
 
 def calc_water_net_yield_by_region_in_year_from_data(
     data: Data,
@@ -446,6 +445,13 @@ def calc_water_net_yield_by_region_in_year_from_data(
         )
 
     return net_yield_by_region
+
+
+def get_yr_cal_base_net_wyield_by_region(data: Data) -> dict[int, float]:
+    if data.YR_CAL_BASE_NET_WYIELD is None:
+        data.YR_CAL_BASE_NET_WYIELD = calc_water_net_yield_by_region_in_year_from_data(data, data.YR_CAL_BASE)
+
+    return data.YR_CAL_BASE_NET_WYIELD
 
 
 def _get_historical_water_usage_by_regions(data: Data) -> dict[int, tuple[str, float, np.ndarray]]:
