@@ -54,14 +54,14 @@ def read_dvars(output_dir:str)-> None:
     output_res = tools.get_out_resfactor(dvar_path)
     if output_res != settings.RESFACTOR:
         raise ValueError(f'Please change the `settings.RESFACTOR` ({settings.RESFACTOR}) to to be the same as output files ({output_res}).')
-    
-    # Loading data from 
+
+    # Loading data from
     data = load_data()
-    
+
     # Save reading dvars as a delayed task
-    tasks = [delayed(tools.read_dvars)(yr, files.query('base_ext == ".npy" and Year == @yr and year_types == "single_year"')) 
+    tasks = [delayed(tools.read_dvars)(yr, files.query('base_ext == ".npy" and Year == @yr and year_types == "single_year"'))
             for yr in sorted(files['Year'].unique())]
-    
+
     # Run the tasks in parallel to add the dvars to the data object
     print(f'Reading decision variables from existing output directory...\n   {output_dir}')
     for yr,dvar in Parallel(n_jobs=min(len(tasks), 10), return_as='generator')(tasks):
@@ -71,12 +71,12 @@ def read_dvars(output_dir:str)-> None:
         data.add_ag_dvars(yr, dvar[3])
         data.add_non_ag_dvars(yr, dvar[4])
         data.add_ag_man_dvars(yr, dvar[5])
-        
+
     # Remove the log file, because we only read the dvars
     os.remove(f"{settings.OUTPUT_DIR}/run_{timestamp}_stderr.log")
     os.remove(f"{settings.OUTPUT_DIR}/run_{timestamp}_stdout.log")
-        
-    return data  
+
+    return data
 
 
 @tools.LogToFile(f"{settings.OUTPUT_DIR}/run_{timestamp}", 'a')
@@ -86,7 +86,7 @@ def run( data: Data, base: int, target: int) -> None:
     Parameters:
         'data' is a Data object, and 'base' and 'target' are the base and target years.
     """
-    
+
     # Set Data object's path and create output directories
     data.set_path(base, target)
 
@@ -120,7 +120,7 @@ def solve_timeseries(data: Data, steps: int, base: int, target: int):
 
         input_data = get_input_data(data, base + s, base + s + 1)
         d_c = data.D_CY[s + 1]
-        
+
         if s == 0:
             luto_solver = LutoSolver(input_data, d_c, target)
             luto_solver.formulate()
@@ -143,8 +143,9 @@ def solve_timeseries(data: Data, steps: int, base: int, target: int):
                 old_lmmap=data.lmmaps[base + s - 1],
                 current_lmmap=data.lmmaps[base + s],
             )
-        
+
         solution = luto_solver.solve()
+
         yr = base + s + 1
         data.add_lumap(yr, solution.lumap)
         data.add_lmmap(yr, solution.lmmap)
@@ -153,7 +154,7 @@ def solve_timeseries(data: Data, steps: int, base: int, target: int):
         data.add_non_ag_dvars(yr, solution.non_ag_X_rk)
         data.add_ag_man_dvars(yr, solution.ag_man_X_mrj)
         data.add_obj_vals(yr, solution.obj_val)
-        
+
         print(f'Reproject decision variables...')
         data.add_ag_dvars_xr(yr, solution.ag_X_mrj)
         data.add_am_dvars_xr(yr, solution.ag_man_X_mrj)
@@ -190,7 +191,7 @@ def solve_snapshot(data: Data, base: int, target: int):
     data.add_non_ag_dvars(target, solution.non_ag_X_rk)
     data.add_ag_man_dvars(target, solution.ag_man_X_mrj)
     data.add_obj_vals(target, solution.obj_val)
-    
+
     print(f'Reproject decision variables...')
     data.add_ag_dvars_xr(target, solution.ag_X_mrj)
     data.add_am_dvars_xr(target, solution.ag_man_X_mrj)
@@ -198,6 +199,6 @@ def solve_snapshot(data: Data, base: int, target: int):
 
     for data_type, prod_data in solution.prod_data.items():
         data.add_production_data(target, data_type, prod_data)
-    
+
     print(f'Processing for {target} completed in {round(time.time() - start_time)} seconds\n\n')
 

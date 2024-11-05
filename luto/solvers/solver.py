@@ -18,7 +18,6 @@
 Provides minimalist Solver class and pure helper functions.
 """
 
-from math import e
 import numpy as np
 import gurobipy as gp
 import luto.settings as settings
@@ -72,23 +71,17 @@ class LutoSolver:
     """
 
     def __init__(
-        self, input_data: SolverInputData, 
-        d_c: np.array, 
+        self,
+        input_data: SolverInputData,
+        d_c: np.array,
         final_target_year: int,
-         
-        _switch_cell_usage: bool = True,                 # Debug switch, turn on/off for cell usage constraints
-        _switch_ag_man: bool = True,                     # Debug switch, turn on/off for agricultural management constraints
-        _switch_ag_mam_adoption_limits: bool = True,     # Debug switch, turn on/off for agricultural management adoption limit constraints
-        _switch_demand_penalty: bool = True,             # Debug switch, turn on/off for demand penalty constraints
-        _switch_water_limits: bool = True,               # Debug switch, turn on/off for water limit constraints
-        _switch_ghg_emissions: bool = True,              # Debug switch, turn on/off for GHG emissions
-        _switch_biodiversity: bool = True                # Debug switch, turn on/off for biodiversity constraints
+
         ):
-        
-        
-        
-        
-        
+
+
+
+
+
         self.final_target_year = final_target_year
         self._input_data = input_data
         self.d_c = d_c
@@ -113,31 +106,22 @@ class LutoSolver:
         self.ghg_emissions_limit_constraint = None
         self.biodiversity_expr = None
         self.biodiversity_limit_constraint = None
-        
-        # Debug switches; Only used for testing purposes
-        self._switch_cell_usage = _switch_cell_usage
-        self._switch_ag_man = _switch_ag_man
-        self._switch_ag_mam_adoption_limits = _switch_ag_mam_adoption_limits
-        self._switch_demand_penalty = _switch_demand_penalty
-        self._switch_water_limits = _switch_water_limits
-        self._switch_ghg_emissions = _switch_ghg_emissions
-        self._switch_biodiversity = _switch_biodiversity
-        
+
 
     def formulate(self):
         """
-        Performs the initial formulation of the model - setting up decision variables, 
+        Performs the initial formulation of the model - setting up decision variables,
         constraints, and the objective.
         """
-        print("Setting up the model...\n")
+        print("Setting up the model...")
 
-        print("Adding the decision variables...\n")
+        print("Adding the decision variables...")
         self._setup_vars()
-        
-        print("Adding the constraints...\n")
+
+        print("Adding the constraints...")
         self._setup_constraints()
-        
-        print(f"Adding the objective function - {settings.OBJECTIVE}...\n", flush=True)
+
+        print(f"Adding the objective function - {settings.OBJECTIVE}...", flush=True)
         self._setup_objective()
 
 
@@ -147,15 +131,15 @@ class LutoSolver:
         self._setup_ag_management_variables()
         self._setup_decision_variables()
         self._setup_ghg_emissions_decision_variable()
-        
+
     def _setup_constraints(self):
-        self._add_cell_usage_constraints()                              if self._switch_cell_usage else print('  ...TURNING OFF cell usage constraints ...')
-        self._add_agricultural_management_constraints()                 if self._switch_ag_man else print('  ...TURNING OFF agricultural management constraints ...')
-        self._add_agricultural_management_adoption_limit_constraints()  if self._switch_ag_mam_adoption_limits else print('  ...TURNING OFF agricultural management adoption limit constraints ...')
-        self._add_demand_penalty_constraints()                          if self._switch_demand_penalty else print('  ...TURNING OFF demand penalty constraints ...')
-        self._add_water_usage_limit_constraints()                       if (self._switch_water_limits and settings.WATER_LIMITS == 'on') else print('  ...TURNING OFF water usage constraints ...')
-        self._add_ghg_emissions_limit_constraints()                     if self._switch_ghg_emissions else print('  ...TURNING OFF GHG emissions constraints ...')
-        self._add_biodiversity_limit_constraints()                      if self._switch_biodiversity else print('  ...TURNING OFF biodiversity constraints ...')
+        self._add_cell_usage_constraints()                              
+        self._add_agricultural_management_constraints()                 
+        self._add_agricultural_management_adoption_limit_constraints()  
+        self._add_demand_penalty_constraints()                          
+        self._add_water_usage_limit_constraints() if settings.WATER_LIMITS == 'on' else print('  ...TURNING OFF water usage constraints ...')
+        self._add_ghg_emissions_limit_constraints()                     
+        self._add_biodiversity_limit_constraints()
 
 
     def _setup_x_vars(self):
@@ -192,7 +176,7 @@ class LutoSolver:
             lu_cells = self._input_data.non_ag_lu2cells[k]
             for r in lu_cells:
                 x_lb = (
-                    0 if NON_AG_LAND_USES_REVERSIBLE[non_ag_lu_desc] 
+                    0 if NON_AG_LAND_USES_REVERSIBLE[non_ag_lu_desc]
                     else self._input_data.non_ag_lb_rk[r, k]
                 )
                 self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
@@ -236,7 +220,7 @@ class LutoSolver:
                 for r in irr_lu_cells:
                     irr_x_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][1, r, j]
                     irr_var_name = f"X_ag_man_irr_{am_name}_{j}_{r}"
-                    
+
                     self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                         lb=irr_x_lb, ub=1, name=irr_var_name,
                     )
@@ -260,7 +244,7 @@ class LutoSolver:
         """
         Formulate the objective based on settings.OBJECTIVE
         """
-        # print(f"Setting objective function to {settings.OBJECTIVE}...\n", flush=True)
+        print(f"Setting objective function to {settings.OBJECTIVE}...", flush=True)
 
         if settings.OBJECTIVE == "maxprofit":
 
@@ -374,7 +358,7 @@ class LutoSolver:
         Constraint that all of every cell is used for some land use.
         If `cells` is provided, only adds constraints for the given cells
         """
-        print('  ...cell usage constraints...\n')
+        print('  ...cell usage constraints...')
 
         if cells is None:
             cells = np.array(range(self._input_data.ncells))
@@ -400,7 +384,7 @@ class LutoSolver:
         Constraint handling alternative agricultural management options:
         Ag. man. variables cannot exceed the value of the agricultural variable.
         """
-        print('  ...agricultural management constraints...\n')
+        print('  ...agricultural management constraints...')
 
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx, j in enumerate(am_j_list):
@@ -426,7 +410,7 @@ class LutoSolver:
         """
         Add adoption limits constraints for agricultural management options.
         """
-        print('  ...agricultural management adoption constraints...\n')
+        print('  ...agricultural management adoption constraints...')
 
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx, j in enumerate(am_j_list):
@@ -450,7 +434,7 @@ class LutoSolver:
         """
         Constraints to penalise under and over production compared to demand.
         """
-        print('  ...demand constraints...\n')
+        print('  ...demand constraints...')
 
         # Quantities in PR/p representation by land-management (dry/irr).
         ag_q_dry_p = [
@@ -572,16 +556,16 @@ class LutoSolver:
             raise ValueError(
                 'DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"'
             )
-        
+
     def _get_water_nyield_base_year_vars_current_year_layers(
         self, region: int, region_ind: np.ndarray
     ) -> float:
         """
-        Calculates the water net yield using the base year's (previous year's) variable 
+        Calculates the water net yield using the base year's (previous year's) variable
         solutions and this year's water net yield matrices.
 
         This helps the edge case where, over time, irreversible non-ag land uses make
-        water constraints infeasible. 
+        water constraints infeasible.
         """
         if any(
             [
@@ -604,7 +588,7 @@ class LutoSolver:
             self._input_data.ag_w_mrj,
             self._input_data.non_ag_w_rk,
             self._input_data.ag_man_w_mrj,
-            self._input_data.w_ccimpact[self._input_data.target_year][region],
+            self._input_data.water_yield_outside_study_area[self._input_data.target_year][region],
         )
 
     def _add_water_usage_limit_constraints(self):
@@ -613,14 +597,13 @@ class LutoSolver:
         If `cells` is provided, only adds constraints for regions containing at least one of the
         provided cells.
         """
-        
+
         print(f'  ...water net yield constraints by {settings.WATER_REGION_DEF}...')
 
         min_var = lambda var, prev_var: var if prev_var.x > 1e-3 else prev_var.x
-        
+
         # Ensure water use remains below limit for each region
-        for region, (reg_name, _, w_net_yield_limit, ind) in self._input_data.limits["water"].items():
-            reg_ccimpact_base_yr = self._input_data.w_ccimpact[self._input_data.base_year][region]
+        for region, (reg_name, _, w_hist_yield_limit, ind) in self._input_data.limits["water"].items():
 
             ag_contr = gp.quicksum(
                 gp.quicksum(
@@ -652,20 +635,22 @@ class LutoSolver:
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            w_net_yield_region = ag_contr + ag_man_contr + non_ag_contr + reg_ccimpact_base_yr
+            outside_luto_study_contr = self._input_data.water_yield_outside_study_area[self._input_data.target_year][region]
 
-            base_year_water_yield_with_current_layers = None
-
+            # Sum of all water yield contributions
+            w_net_yield_region = ag_contr + ag_man_contr + non_ag_contr + outside_luto_study_contr
+            
+            
             # Update the net yield limit to be lower based on last year's solution if at risk of infeasibility
-            cc_impact_yield_delta = (
-                self._input_data.w_ccimpact[self.final_target_year][region]
-                - self._input_data.w_ccimpact[self._input_data.target_year][region]
-            )
-            constr_wny_limit = w_net_yield_limit + cc_impact_yield_delta
+            base_year_water_yield_with_current_layers = None
+            
+            cc_impact_yield_delta = self._input_data.water_yield_natural_land_cc_impact_delta.loc[self._input_data.target_year, region]
+            constr_wny_limit = w_hist_yield_limit + cc_impact_yield_delta
+            
             wny_limit_updated = False
             if self._input_data.base_year_ag_sol is not None and settings.RELAXED_WATER_LIMITS_FOR_INFEASIBILITY == 'on':
                 base_year_water_yield_with_current_layers = self._get_water_nyield_base_year_vars_current_year_layers(region, ind)
-                if base_year_water_yield_with_current_layers < w_net_yield_limit:
+                if base_year_water_yield_with_current_layers < w_hist_yield_limit:
                     constr_wny_limit = base_year_water_yield_with_current_layers
                     wny_limit_updated = True
 
@@ -676,13 +661,14 @@ class LutoSolver:
                 self.water_limit_constraints.append(constr)
 
             if settings.VERBOSE == 1:
-                print(f"    ...net water yield in {reg_name} >= {w_net_yield_limit:.2f} ML")
+                print(f"    ...net water yield in {reg_name} >= {w_hist_yield_limit:.2f} ML")
                 if wny_limit_updated:
                     print(
-                        f"        ...net water yield in {reg_name} lowered from {w_net_yield_limit:.2f} ML "
+                        f"        ...net water yield in {reg_name} lowered from {w_hist_yield_limit:.2f} ML "
                         f"to {constr_wny_limit:.2f} ML to avoid infeasibility"
                     )
-        print('')
+                    
+                    
 
     def _get_ag_ghg_contr(self):
         g_dry_coeff = (
@@ -743,7 +729,7 @@ class LutoSolver:
         # Returns GHG emissions limits
         ghg_limit = self._ghg_emissions_target()
 
-        print(f"    ...GHG emissions reduction target: {ghg_limit:,.0f} tCO2e\n")
+        print(f"    ...GHG emissions reduction target: {ghg_limit:,.0f} tCO2e")
         self.ghg_emissions_limit_constraint = self.gurobi_model.addConstr(
             self.ghg_emissions_expr <= ghg_limit
         )
@@ -781,7 +767,7 @@ class LutoSolver:
         if settings.BIODIVERSITY_LIMITS != "on":
             print('  ...biodiversity constraints TURNED OFF ...')
             return
-        
+
         print('  ...biodiversity constraints...')
 
         # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSITY_LIMITS != "on".
@@ -819,7 +805,7 @@ class LutoSolver:
 
         self.biodiversity_expr = ag_contr + ag_man_contr + non_ag_contr
 
-        print(f"    ...biodiversity target score: {biodiversity_limits:,.0f}\n")
+        print(f"    ...biodiversity target score: {biodiversity_limits:,.0f}")
         self.biodiversity_limit_constraint = self.gurobi_model.addConstr(
             self.biodiversity_expr >= biodiversity_limits
         )
@@ -855,10 +841,10 @@ class LutoSolver:
             old_lmmap,
             current_lmmap,
         )
-        print('Updating constraints...\n', flush=True)
+        print('Updating constraints...', flush=True)
         self._update_constraints(updated_cells)
-        
-        print('Updating objective function...\n', flush=True)
+
+        print('Updating objective function...', flush=True)
         self._setup_objective()
 
     def _update_variables(
@@ -935,7 +921,7 @@ class LutoSolver:
 
                 if self._input_data.non_ag_x_rk[r, k]:
                     x_lb = (
-                        0 if NON_AG_LAND_USES_REVERSIBLE[non_ag_lu_desc] 
+                        0 if NON_AG_LAND_USES_REVERSIBLE[non_ag_lu_desc]
                         else self._input_data.non_ag_lb_rk[r, k]
                     )
                     self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
@@ -967,10 +953,10 @@ class LutoSolver:
                 for am in self._input_data.j2am[j]:
                     if not AG_MANAGEMENTS[am]:
                         continue
-                    
+
                     # Get snake_case version of the AM name for the variable name
                     am_name = am.lower().replace(" ", "_")
-                    
+
                     x_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][m, r, j]
                     m_str = 'dry' if m == 0 else 'irr'
                     var_name = f"X_ag_man_{m_str}_{am_name}_{j}_{r}"
@@ -1000,14 +986,14 @@ class LutoSolver:
         for r in updated_cells:
             self.gurobi_model.remove(self.cell_usage_constraint_r.pop(r, []))
             self.gurobi_model.remove(self.ag_management_constraints_r.pop(r, []))
-        
+
         self.gurobi_model.remove(self.adoption_limit_constraints)
         self.gurobi_model.remove(self.demand_penalty_constraints)
         if self.biodiversity_limit_constraint is not None:
             self.gurobi_model.remove(self.biodiversity_limit_constraint)
         if self.water_limit_constraints:
             self.gurobi_model.remove(self.water_limit_constraints)
-        
+
         self.adoption_limit_constraints = []
         self.demand_penalty_constraints = []
         self.water_limit_constraints = []
@@ -1015,14 +1001,14 @@ class LutoSolver:
         if self.ghg_emissions_limit_constraint is not None:
             self.gurobi_model.remove(self.ghg_emissions_limit_constraint)
             self.ghg_emissions_limit_constraint = None
-                
-        self._add_cell_usage_constraints(updated_cells)                 if self._switch_cell_usage else print('  ...TURNING OFF cell usage constraints...')
-        self._add_agricultural_management_constraints(updated_cells)    if self._switch_ag_man else print('  ...TURNING OFF agricultural management constraints...')
-        self._add_agricultural_management_adoption_limit_constraints()  if self._switch_ag_mam_adoption_limits else print('  ...TURNING OFF agricultural management adoption constraints...')
-        self._add_demand_penalty_constraints()                          if self._switch_demand_penalty else print('  ...TURNING OFF demand constraints...')
-        self._add_water_usage_limit_constraints()                       if (self._switch_water_limits and settings.WATER_LIMITS == 'on') else print('  ...TURNING OFF water constraints...')
-        self._add_ghg_emissions_limit_constraints()                     if self._switch_ghg_emissions else print('  ...TURNING OFF GHG emissions constraints...')
-        self._add_biodiversity_limit_constraints()                      if self._switch_biodiversity  else print('  ...TURNING OFF biodiversity constraints...')
+
+        self._add_cell_usage_constraints(updated_cells)                 
+        self._add_agricultural_management_constraints(updated_cells)    
+        self._add_agricultural_management_adoption_limit_constraints()  
+        self._add_demand_penalty_constraints()                          
+        self._add_water_usage_limit_constraints() if settings.WATER_LIMITS == 'on' else print('  ...TURNING OFF water constraints...')
+        self._add_ghg_emissions_limit_constraints()                    
+        self._add_biodiversity_limit_constraints()                      
 
     def solve(self) -> SolverSolution:
         print("Starting solve...\n")
@@ -1077,7 +1063,7 @@ class LutoSolver:
                 for r in self._input_data.ag_lu2cells[1, j]:
                     am_X_irr_sol_rj[am][r, j] = self.X_ag_man_irr_vars_jr[am][j_idx, r].X
 
-        """Note that output decision variables are mostly 0 or 1 but in some cases they are somewhere in between which creates issues 
+        """Note that output decision variables are mostly 0 or 1 but in some cases they are somewhere in between which creates issues
             when converting to maps etc. as individual cells can have non-zero values for multiple land-uses and land management type.
             This code creates a boolean X_mrj output matrix and ensure that each cell has one and only one land-use and land management"""
 
@@ -1184,7 +1170,7 @@ class LutoSolver:
 
         ag_X_mrj_processed[:, non_ag_bools_r, :] = False
         non_ag_X_rk_processed[~non_ag_bools_r, :] = False
-            
+
         return SolverSolution(
             lumap=lumap,
             lmmap=lmmap,

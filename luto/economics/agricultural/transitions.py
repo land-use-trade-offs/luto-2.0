@@ -33,9 +33,9 @@ import luto.tools as tools
 def get_exclude_matrices(data: Data, lumap: np.ndarray):
     """Return x_mrj exclude matrices.
 
-    An exclude matrix indicates whether switching land-use for a certain cell r 
-    with land-use i to all other land-uses j under all land management types 
-    (i.e., dryland, irrigated) m is possible. 
+    An exclude matrix indicates whether switching land-use for a certain cell r
+    with land-use i to all other land-uses j under all land management types
+    (i.e., dryland, irrigated) m is possible.
 
     Parameters
     ----------
@@ -46,7 +46,7 @@ def get_exclude_matrices(data: Data, lumap: np.ndarray):
     lumaps: dict[str, numpy.ndarray]
         All previously generated land-use maps (shape = ncells, dtype=int).
 
-        
+
     Returns
     -------
 
@@ -54,7 +54,7 @@ def get_exclude_matrices(data: Data, lumap: np.ndarray):
         x_mrj exclude matrix. The m-slices correspond to the
         different land-management versions of the land-use `j` to switch _to_.
         With m==0 conventional dryland, m==1 conventional irrigated.
-    """    
+    """
     # Boolean exclusion matrix based on SA2/NLUM agricultural land-use data (in mrj structure).
     # Effectively, this ensures that in any SA2 region the only combinations of land-use and land management
     # that can occur in the future are those that occur in 2010 (i.e., YR_CAL_BASE)
@@ -90,7 +90,7 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
         base_year (int): The base year for the transition calculations.
         lumaps (dict): A dictionary of land-use maps for each year.
         lmmaps (dict): A dictionary of land management maps for each year.
-        separate (bool, optional): Whether to return separate cost matrices for each cost component. 
+        separate (bool, optional): Whether to return separate cost matrices for each cost component.
                                    Defaults to False.
     Returns:
         numpy.ndarray or dict: The transition matrices for land-use and land management transitions.
@@ -130,26 +130,26 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
     # Separate the establishment costs into dryland and irrigated land management types
     e_rj_dry = np.einsum('rj,r->rj', e_rj, lmmap == 0)
     e_rj_irr = np.einsum('rj,r->rj', e_rj, lmmap == 1)
-    e_mrj = np.stack([e_rj_dry, e_rj_irr], axis=0)                                  
+    e_mrj = np.stack([e_rj_dry, e_rj_irr], axis=0)
 
     # Update the cost matrix with exclude matrices; the transition cost for a cell that remain the same is 0.
-    e_mrj = np.einsum('mrj,mrj,mrj->mrj', e_mrj, x_mrj, l_mrj_not)                   
+    e_mrj = np.einsum('mrj,mrj,mrj->mrj', e_mrj, x_mrj, l_mrj_not)
 
     # -------------------------------------------------------------- #
     # Water license cost (upfront, amortised to annual, per cell).   #
     # -------------------------------------------------------------- #
 
-    w_mrj = get_wreq_matrices(data, yr_idx)                                     # <unit: ML/cell>                                     
-    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)                  
-    w_delta_mrj = np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not)       
+    w_mrj = get_wreq_matrices(data, yr_idx)                                     # <unit: ML/cell>
+    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)
+    w_delta_mrj = np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not)
 
     # -------------------------------------------------------------- #
     # Carbon costs of transitioning cells.                          #
     # -------------------------------------------------------------- #S
 
     # Apply the cost of carbon released by transitioning natural land to modified land
-    ghg_t_mrj = ag_ghg.get_ghg_transition_penalties(data, lumap)               # <unit: t/ha>      
-    ghg_t_mrj_cost = tools.amortise(ghg_t_mrj * data.get_carbon_price_by_yr_idx(yr_idx))     
+    ghg_t_mrj = ag_ghg.get_ghg_transition_penalties(data, lumap)               # <unit: t/ha>
+    ghg_t_mrj_cost = tools.amortise(ghg_t_mrj * data.get_carbon_price_by_yr_idx(yr_idx))
     ghg_t_mrj_cost = np.einsum('mrj,mrj,mrj->mrj', ghg_t_mrj_cost, x_mrj, l_mrj_not)
 
     # -------------------------------------------------------------- #
@@ -157,7 +157,7 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
     # -------------------------------------------------------------- #
 
     if separate:
-        return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, 'GHG emissions cost': ghg_t_mrj_cost}  
+        return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, 'GHG emissions cost': ghg_t_mrj_cost}
     else:
         return e_mrj + w_delta_mrj + ghg_t_mrj_cost
 
@@ -320,10 +320,10 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> D
 
     if base_year == data.YR_CAL_BASE or base_year not in data.non_ag_dvars:
         return {
-            am: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32) 
+            am: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
             for am in AG_MANAGEMENTS_TO_LAND_USES
         }
-    
+
     return {
         am: np.divide(
             np.floor(data.ag_man_dvars[base_year][am].astype(np.float32) * 10 ** settings.LB_ROUND_DECMIALS)

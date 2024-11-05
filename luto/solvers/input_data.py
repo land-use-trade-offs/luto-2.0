@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Any
 import numpy as np
+import pandas as pd
 
 from luto import settings
 from luto.economics import land_use_culling
@@ -45,7 +46,7 @@ class SolverInputData:
     ag_q_mrp: np.ndarray            # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
     ag_ghg_t_mrj: np.ndarray        # GHG emissions released during transitions between agricultural land uses.
     ag_to_non_ag_t_rk: np.ndarray   # Agricultural to non-agricultural transition cost matrix.
-    
+
     non_ag_to_ag_t_mrj: np.ndarray  # Non-agricultural to agricultural transition cost matrices.
     non_ag_t_rk: np.ndarray         # Non-agricultural transition costs matrix
     non_ag_c_rk: np.ndarray         # Non-agricultural production cost matrix.
@@ -67,7 +68,8 @@ class SolverInputData:
     ag_man_limits: dict             # Agricultural management options' adoption limits.
     ag_man_lb_mrj: dict             # Agricultural management options' lower bounds.
 
-    w_ccimpact: dict[int, dict[int, float]]    # Climate change impacts of water dict. Keys: year, region.
+    water_yield_outside_study_area: dict[int, dict[int, float]]       # Water yield from outside LUTO study area -> dict. Keys: year, region.
+    water_yield_natural_land_cc_impact_delta: pd.DataFrame      # The climate change impact delta on water yield.
 
     offland_ghg: np.ndarray         # GHG emissions from off-land commodities.
 
@@ -139,7 +141,7 @@ class SolverInputData:
             for j in range(self.n_ag_lus)
             for m in range(self.n_ag_lms)
         }
-    
+
     @cached_property
     def cells2ag_lu(self) -> dict[int, list[tuple[int, int]]]:
         ag_lu2cells = self.ag_lu2cells
@@ -153,7 +155,7 @@ class SolverInputData:
     @cached_property
     def non_ag_lu2cells(self) -> dict[int, np.ndarray]:
         return {k: np.where(self.non_ag_x_rk[:, k])[0] for k in range(self.n_non_ag_lus)}
-    
+
     @cached_property
     def cells2non_ag_lu(self) -> dict[int, list[int]]:
         non_ag_lu2cells = self.non_ag_lu2cells
@@ -161,9 +163,9 @@ class SolverInputData:
         for k, k_cells in non_ag_lu2cells.items():
             for r in k_cells:
                 cells2non_ag_lu[r].append(k)
-        
+
         return dict(cells2non_ag_lu)
-    
+
 
 def get_ag_c_mrj(data: Data, target_index):
     print('Getting agricultural production cost matrices...', flush = True)
@@ -207,9 +209,14 @@ def get_ag_w_mrj(data: Data, target_index):
     return output.astype(np.float32)
 
 
-def get_w_ccimpact(data: Data):
-    print('Getting water yield from puclic land...', flush = True)
-    return ag_water.get_water_public_land(data)
+def get_w_outside_luto(data: Data):
+    print('Getting water yield from outside LUTO study area...', flush = True)
+    return ag_water.get_water_outside_luto_study_area(data)
+
+
+def get_w_cci_impact_delta(data: Data):
+    print('Getting water yield delta due to climate change impact...', flush = True)
+    return ag_water.get_climate_change_impact_on_water_yield(data)
 
 
 def get_ag_b_mrj(data: Data):
@@ -365,17 +372,17 @@ def get_limits(
     limits = {}
 
     limits['water'] = ag_water.get_water_net_yield_limit_values(data, yr_cal)
-    
+
     if settings.GHG_EMISSIONS_LIMITS == 'on':
         limits['ghg'] = ag_ghg.get_ghg_limits(data, yr_cal)
-    
+
     # If biodiversity limits are not turned on, set the limit to 0.
     limits['biodiversity'] = (
         ag_biodiversity.get_biodiversity_limits(data, yr_cal)
         if settings.BIODIVERSITY_LIMITS == 'on'
         else 0
     )
-    
+
     return limits
 
 
@@ -430,7 +437,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_b_mrj=get_ag_man_biodiversity(data),
         ag_man_limits=get_ag_man_limits(data, target_index),
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
-        w_ccimpact=get_w_ccimpact(data),
+        water_yield_outside_study_area=get_w_outside_luto(data),
+        water_yield_natural_land_cc_impact_delta=get_w_cci_impact_delta(data),
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,
