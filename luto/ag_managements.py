@@ -69,6 +69,25 @@ AG_MANAGEMENTS_TO_LAND_USES = {
         'Plantation fruit',
         'Stone fruit',
         'Tropical stone fruit',
+    ],
+    'Biochar': [
+        # Cropping
+        'Hay',
+        'Summer cereals',
+        'Summer legumes',
+        'Summer oilseeds',
+        'Winter cereals',
+        'Winter legumes',
+        'Winter oilseeds',
+        # Horticulture:
+        'Apples',
+        'Citrus',
+        'Grapes',
+        'Nuts',
+        'Pears',
+        'Plantation fruit',
+        'Stone fruit',
+        'Tropical stone fruit',
     ]
 }
 

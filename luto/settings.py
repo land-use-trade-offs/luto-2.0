@@ -261,6 +261,7 @@ AG_MANAGEMENTS = {
     'Ecological Grazing': True,
     'Savanna Burning': True,
     'AgTech EI': True,
+    'Biochar': True,
 }
 
 """

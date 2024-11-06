@@ -1053,11 +1053,12 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
     if not settings.BIODIVERSITY_LIMITS == 'on' and not settings.BIODIVERSITY_REPORT:
         return
 
+    yr_idx = yr_cal - data.YR_CAL_BASE
     print(f'Writing biodiversity_separate outputs for {yr_cal}')
 
     # Get the biodiversity scores b_mrj
     ag_biodiv_mrj = ag_biodiversity.get_breq_matrices(data)
-    am_biodiv_mrj = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data)
+    am_biodiv_mrj = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data, yr_idx)
     ag_b_mrj = ag_biodiversity.get_breq_matrices(data)
     non_ag_biodiv_rk = non_ag_biodiversity.get_breq_matrix(data, ag_b_mrj, data.lumaps[yr_cal])
 

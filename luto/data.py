@@ -550,6 +550,22 @@ class Data:
             # Horticulture land uses
             self.AGTECH_EI_DATA[lu] = horticulture_data
 
+        # Load BioChar data
+        biochar_file = os.path.join(INPUT_DIR, '20240918_Bundle_BC.xlsx')
+        self.BIOCHAR_DATA = {}
+        cropping_data = pd.read_excel( prec_agr_file, sheet_name='Biochar (cropping)', index_col='Year' )
+        horticulture_data = pd.read_excel( prec_agr_file, sheet_name='Biochar (horticulture)', index_col='Year' )
+
+        for lu in ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds',
+                'Winter cereals', 'Winter legumes', 'Winter oilseeds']:
+            # Cropping land uses
+            self.BIOCHAR_DATA[lu] = cropping_data
+
+        for lu in ['Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears',
+                'Plantation fruit', 'Stone fruit', 'Tropical stone fruit']:
+            # Horticulture land uses
+            self.BIOCHAR_DATA[lu] = horticulture_data
+
 
 
         ###############################################################

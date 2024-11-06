@@ -456,6 +456,35 @@ def get_agtech_ei_effect_c_mrj(data: Data, yr_idx):
     return new_c_mrj
 
 
+def get_biochar_effect_c_mrj(data: Data, yr_idx: int):
+    """
+    Applies the effects of using Biochar to the cost data
+    for all relevant agr. land uses.
+
+    Parameters:
+    - data: The data object containing the necessary information.
+    - yr_idx: The index of the year.
+
+    Returns:
+    - new_c_mrj: The updated cost data <unit: $/cell>.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Biochar']
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Set up the effects matrix
+    new_c_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    if not AG_MANAGEMENTS['Biochar']:
+        return new_c_mrj
+
+    for m in range(data.NLMS):
+        for lu_idx, lu in enumerate(land_uses):
+            cost_per_ha = data.BIOCHAR_DATA[lu].loc[yr_cal, 'AnnCost_per_Ha']
+            new_c_mrj[m, :, lu_idx] = cost_per_ha * data.REAL_AREA
+
+    return new_c_mrj
+
+
 def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
     """
     Calculate the cost matrices for different agricultural management practices.
@@ -474,6 +503,7 @@ def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
     eco_grazing_data = get_ecological_grazing_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Ecological Grazing'] else 0
     sav_burning_data = get_savanna_burning_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Savanna Burning'] else 0
     agtech_ei_data = get_agtech_ei_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['AgTech EI'] else 0
+    biochar_data = get_biochar_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Biochar'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -481,4 +511,5 @@ def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
         'Ecological Grazing': eco_grazing_data,
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
+        'Biochar': biochar_data,
     }

@@ -207,12 +207,22 @@ def get_agtech_ei_effect_t_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
+def get_biochar_effect_t_mrj(data):
+    """
+    Gets the effects on transition costs of Biochar, which are none.
+    Transition/establishment costs are handled in the costs matrix.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Biochar']
+    return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+
 def get_agricultural_management_transition_matrices(data: Data, t_mrj, yr_idx) -> Dict[str, np.ndarray]:
     asparagopsis_data = get_asparagopsis_effect_t_mrj(data) if AG_MANAGEMENTS['Asparagopsis taxiformis'] else 0
     precision_agriculture_data = get_precision_agriculture_effect_t_mrj(data) if AG_MANAGEMENTS['Precision Agriculture'] else 0
     eco_grazing_data = get_ecological_grazing_effect_t_mrj(data) if AG_MANAGEMENTS['Ecological Grazing'] else 0
     sav_burning_data = get_savanna_burning_effect_t_mrj(data) if AG_MANAGEMENTS['Savanna Burning'] else 0
     agtech_ei_data = get_agtech_ei_effect_t_mrj(data) if AG_MANAGEMENTS['AgTech EI'] else 0
+    biochar_data = get_biochar_effect_t_mrj(data) if AG_MANAGEMENTS['Biochar'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -220,6 +230,7 @@ def get_agricultural_management_transition_matrices(data: Data, t_mrj, yr_idx) -
         'Ecological Grazing': eco_grazing_data,
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
+        'Biochar': biochar_data,
     }
 
 
@@ -287,6 +298,19 @@ def get_agtech_ei_adoption_limit(data, yr_idx):
     return agtech_ei_limits
 
 
+def get_biochar_adoption_limit(data, yr_idx):
+    """
+    Gets the adoption limit of Biochar for each possible land use.
+    """
+    biochar_limits = {}
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    for lu in AG_MANAGEMENTS_TO_LAND_USES['Biochar']:
+        j = data.DESC2AGLU[lu]
+        biochar_limits[j] = data.BIOCHAR_DATA[lu].loc[yr_cal, 'Technical_Adoption']
+
+    return biochar_limits
+
+
 def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str, dict]:
     """
     An adoption limit represents the maximum percentage of cells (for each land use) that can utilise
@@ -309,6 +333,8 @@ def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str,
         ag_management_data['Savanna Burning'] = get_savanna_burning_adoption_limit(data)
     if AG_MANAGEMENTS['AgTech EI']:
         ag_management_data['AgTech EI'] = get_agtech_ei_adoption_limit(data, yr_idx)
+    if AG_MANAGEMENTS['Biochar']:
+        ag_management_data['Biochar'] = get_biochar_adoption_limit(data, yr_idx)
 
     return ag_management_data
 
