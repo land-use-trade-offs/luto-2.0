@@ -235,7 +235,7 @@ class LutoSolver:
     def _setup_ghg_emissions_decision_variable(self):
         """
         A single variable equal to the difference between targetted GHG emissions and
-        actual GHG emissions when GHG emission constraints are 'soft'
+        actual GHG emissions when GHG emission constraint is 'soft'
         """
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             self.E = self.gurobi_model.addVar(name="E")
@@ -348,7 +348,7 @@ class LutoSolver:
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             objective += gp.quicksum(self.V[c] for c in range(self.ncms))
 
-        if settings.GHG_CONSTRAINT_TYPE == "soft" and self._switch_ghg_emissions:
+        if settings.GHG_CONSTRAINT_TYPE == "soft":
             objective += self.E * settings.GHG_PENALTY
 
         self.gurobi_model.setObjective(objective, GRB.MINIMIZE)
@@ -667,17 +667,17 @@ class LutoSolver:
                         f"        ...net water yield in {reg_name} lowered from {w_hist_yield_limit:.2f} ML "
                         f"to {constr_wny_limit:.2f} ML to avoid infeasibility"
                     )
-                    
-                    
 
-    def _get_ag_ghg_contr(self):
+    def _get_total_ghg_emissions_expr(self) -> gp.LinExpr:
+        # Pre-calculate the coefficients for each variable,
+        # both for regular culture and alternative agr. management options
         g_dry_coeff = (
             self._input_data.ag_g_mrj[0, :, :] + self._input_data.ag_ghg_t_mrj[0, :, :]
         )
         g_irr_coeff = (
             self._input_data.ag_g_mrj[1, :, :] + self._input_data.ag_ghg_t_mrj[1, :, :]
         )
-        return gp.quicksum(
+        ag_contr = gp.quicksum(
             gp.quicksum(
                 g_dry_coeff[:, j] * self.X_ag_dry_vars_jr[j, :]
             )  # Dryland agriculture contribution
@@ -686,9 +686,7 @@ class LutoSolver:
             )  # Irrigated agriculture contribution
             for j in range(self._input_data.n_ag_lus)
         )
-    
-    def _get_ghg_ag_man_contr(self):
-        return gp.quicksum(
+        ag_man_contr = gp.quicksum(
             gp.quicksum(
                 self._input_data.ag_man_g_mrj[am][0, :, j_idx]
                 * self.X_ag_man_dry_vars_jr[am][j_idx, :]
@@ -700,21 +698,12 @@ class LutoSolver:
             for am, am_j_list in self._input_data.am2j.items()
             for j_idx in range(len(am_j_list))
         )
-    
-    def _get_ghg_non_ag_contr(self):
-        return gp.quicksum(
+        non_ag_contr = gp.quicksum(
             gp.quicksum(
                 self._input_data.non_ag_g_rk[:, k] * self.X_non_ag_vars_kr[k, :]
             )  # Non-agricultural contribution
             for k in range(self._input_data.n_non_ag_lus)
         )
-    
-    def _get_total_ghg_emissions_expr(self) -> gp.LinExpr:
-        # Pre-calculate the coefficients for each variable,
-        # both for regular culture and alternative agr. management options
-        ag_contr = self._get_ag_ghg_contr()
-        ag_man_contr = self._get_ghg_ag_man_contr()
-        non_ag_contr = self._get_ghg_non_ag_contr()
         return ag_contr + ag_man_contr + non_ag_contr + self._input_data.offland_ghg
     
     def _ghg_emissions_target(self):
