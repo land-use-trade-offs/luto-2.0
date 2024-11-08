@@ -279,6 +279,7 @@ AG_MANAGEMENTS_REVERSIBLE = {
     'Ecological Grazing': True,
     'Savanna Burning': True,
     'AgTech EI': True,
+    'Biochar': True,
 }
 
 # The cost for removing and establishing irrigation infrastructure ($ per hectare)

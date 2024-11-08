@@ -11,7 +11,7 @@ from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data
 
 
-def get_breq_matrices(data):
+def get_breq_matrices(data: Data):
     """
     Return b_mrj biodiversity score matrices by land management, cell, and land-use type.
 
@@ -74,7 +74,7 @@ def get_ecological_grazing_effect_b_mrj(data: Data):
     return np.zeros((data.NLMS, data.NCELLS, nlus))
 
 
-def get_savanna_burning_effect_b_mrj(data):
+def get_savanna_burning_effect_b_mrj(data: Data):
     """
     Gets biodiversity impacts of using Savanna Burning.
 
@@ -103,7 +103,7 @@ def get_savanna_burning_effect_b_mrj(data):
     return new_b_mrj
 
 
-def get_agtech_ei_effect_b_mrj(data):
+def get_agtech_ei_effect_b_mrj(data: Data):
     """
     Gets biodiversity impacts of using AgTech EI (no effect)
 
@@ -117,7 +117,7 @@ def get_agtech_ei_effect_b_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, nlus))
 
 
-def get_biochar_effect_b_mrj(data, yr_idx):
+def get_biochar_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray, yr_idx):
     """
     Gets biodiversity impacts of using Biochar
 
@@ -128,23 +128,26 @@ def get_biochar_effect_b_mrj(data, yr_idx):
     - new_b_mrj: A numpy array representing the biodiversity impacts of using Biochar.
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Biochar']
+    lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
-    new_b_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+    b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
     if not settings.AG_MANAGEMENTS['Biochar']:
-        return new_b_mrj
+        return b_mrj_effect
 
-    for m in range(data.NLMS):
-        for lu_idx, lu in enumerate(land_uses):
-            biodiv_impact = data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact']
-            new_b_mrj[m, :, lu_idx] *= biodiv_impact
+    for lu_idx, lu in enumerate(land_uses):
+        biodiv_impact = data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact']
 
-    return new_b_mrj
+        if biodiv_impact != 1:
+            j = lu_codes[lu_idx]
+            b_mrj_effect[:, :, lu_idx] = ag_b_mrj[:, :, j] * (biodiv_impact - 1)
+
+    return b_mrj_effect
 
 
-def get_agricultural_management_biodiversity_matrices(data: Data, yr_idx: int):
+def get_agricultural_management_biodiversity_matrices(data: Data, ag_b_mrj: np.ndarray, yr_idx: int):
     """
     Calculate the biodiversity matrices for different agricultural management practices.
 
@@ -161,7 +164,7 @@ def get_agricultural_management_biodiversity_matrices(data: Data, yr_idx: int):
     eco_grazing_data = get_ecological_grazing_effect_b_mrj(data) if settings.AG_MANAGEMENTS['Ecological Grazing'] else 0
     sav_burning_data = get_savanna_burning_effect_b_mrj(data) if settings.AG_MANAGEMENTS['Savanna Burning'] else 0
     agtech_ei_data = get_agtech_ei_effect_b_mrj(data) if settings.AG_MANAGEMENTS['AgTech EI'] else 0
-    biochar_data = get_biochar_effect_b_mrj(data, yr_idx) if settings.AG_MANAGEMENTS['Biochar'] else 0
+    biochar_data = get_biochar_effect_b_mrj(data, ag_b_mrj, yr_idx) if settings.AG_MANAGEMENTS['Biochar'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
