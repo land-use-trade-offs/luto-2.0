@@ -553,8 +553,8 @@ class Data:
         # Load BioChar data
         biochar_file = os.path.join(INPUT_DIR, '20240918_Bundle_BC.xlsx')
         self.BIOCHAR_DATA = {}
-        cropping_data = pd.read_excel( prec_agr_file, sheet_name='Biochar (cropping)', index_col='Year' )
-        horticulture_data = pd.read_excel( prec_agr_file, sheet_name='Biochar (horticulture)', index_col='Year' )
+        cropping_data = pd.read_excel( biochar_file, sheet_name='Biochar (cropping)', index_col='Year' )
+        horticulture_data = pd.read_excel( biochar_file, sheet_name='Biochar (horticulture)', index_col='Year' )
 
         for lu in ['Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds',
                 'Winter cereals', 'Winter legumes', 'Winter oilseeds']:
