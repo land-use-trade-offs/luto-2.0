@@ -358,8 +358,8 @@ WATER_YIELD_TARGET_AG_SHARE = 1 - WATER_STRESS * AG_SHARE_OF_WATER_USE
 # for domestic and industrial use. The water yield target grades linearly from net water yield in 2010 to achieve the target by the target date
 # for each catchment (river region or drainage division)
 WATER_YIELD_TARGETS = {
-                        2030: WATER_YIELD_TARGET_AG_SHARE,
-                        2100: WATER_YIELD_TARGET_AG_SHARE,
+                        2011: WATER_YIELD_TARGET_AG_SHARE,
+                        # 2100: WATER_YIELD_TARGET_AG_SHARE,
                       }
 
 # Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water turned off due to infeasibility issues with water constraint in Pilbara

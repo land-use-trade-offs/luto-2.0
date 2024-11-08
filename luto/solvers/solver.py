@@ -605,7 +605,7 @@ class LutoSolver:
             cc_impact_yield_delta = self._input_data.water_yield_natural_land_cc_impact_delta.loc[self._input_data.target_year, region]
 
             # Sum of all water yield contributions
-            w_net_yield_region = ag_contr + ag_man_contr + non_ag_contr + outside_luto_study_contr + cc_impact_yield_delta
+            w_net_yield_region = ag_contr + ag_man_contr + non_ag_contr + outside_luto_study_contr
             overall_wyield_limit = base_w_net_yield_limit + cc_impact_yield_delta
 
             constr_wny_limit = overall_wyield_limit
