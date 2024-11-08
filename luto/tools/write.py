@@ -1057,9 +1057,9 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
     print(f'Writing biodiversity_separate outputs for {yr_cal}')
 
     # Get the biodiversity scores b_mrj
-    ag_biodiv_mrj = ag_biodiversity.get_breq_matrices(data)
-    am_biodiv_mrj = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data, yr_idx)
     ag_b_mrj = ag_biodiversity.get_breq_matrices(data)
+    ag_biodiv_mrj = ag_biodiversity.get_breq_matrices(data)
+    am_biodiv_mrj = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data, ag_b_mrj, yr_idx)
     non_ag_biodiv_rk = non_ag_biodiversity.get_breq_matrix(data, ag_b_mrj, data.lumaps[yr_cal])
 
     # Get the decision variables for the year
