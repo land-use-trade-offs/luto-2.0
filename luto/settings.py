@@ -202,7 +202,7 @@ NON_AG_LAND_USES_REVERSIBLE = {
 
 # Carbon price scenario: either '1.8C 67%', '1.5C 50%', '1.5C 67%', 'Default', '100', or None.
 # Setting to None falls back to the 'Default' scenario.
-CARBON_PRICES_FIELD = '1.8C 67%'
+CARBON_PRICES_FIELD = '1.5C 67%'
 
 # Cost of fencing per linear metre
 FENCING_COST_PER_M = 10
@@ -328,7 +328,7 @@ GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (l
 GHG_PENALTY = 10e-3
 
 # Water use yield and parameters *******************************
-WATER_LIMITS = 'off'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
+WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 
 RELAXED_WATER_LIMITS_FOR_INFEASIBILITY = 'on'
 
