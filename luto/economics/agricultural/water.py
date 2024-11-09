@@ -230,7 +230,7 @@ def get_ecological_grazing_effect_w_mrj(data: Data, yr_idx):
     return w_mrj_effect
 
 
-def get_savanna_burning_effect_w_mrj(data):
+def get_savanna_burning_effect_w_mrj(data: Data):
     """
     Applies the effects of using savanna burning to the water net yield data
     for all relevant agr. land uses.
@@ -251,7 +251,7 @@ def get_savanna_burning_effect_w_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, nlus))
 
 
-def get_agtech_ei_effect_w_mrj(data, yr_idx):
+def get_agtech_ei_effect_w_mrj(data: Data, yr_idx):
     """
     Applies the effects of using AgTech EI to the water net yield data
     for all relevant agr. land uses.
@@ -288,6 +288,39 @@ def get_agtech_ei_effect_w_mrj(data, yr_idx):
     return w_mrj_effect
 
 
+def get_biochar_effect_w_mrj(data: Data, yr_idx):
+    """
+    Applies the effects of using Biochar to the water net yield data
+    for all relevant agr. land uses.
+
+    Parameters:
+    - data: The data object containing relevant information.
+    - w_mrj <unit:ML/cell>: The water net yield data for all land uses.
+    - yr_idx: The index of the year.
+
+    Returns:
+    - w_mrj_effect <unit:ML/cell>: The updated water net yield data with Biochar applied.
+    """
+
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Biochar']
+    lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    wreq_mrj = get_wreq_matrices(data, yr_idx)
+
+    # Set up the effects matrix
+    w_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    # Update values in the new matrix using the correct multiplier for each LU
+    for lu_idx, lu in enumerate(land_uses):
+        multiplier = data.BIOCHAR_DATA[lu].loc[yr_cal, "Water_use"]
+        if multiplier != 1:
+            j = lu_codes[lu_idx]
+            w_mrj_effect[:, :, lu_idx] = wreq_mrj[:, :, j] * (1- multiplier)
+
+    return w_mrj_effect
+
+
 def get_agricultural_management_water_matrices(data: Data, yr_idx) -> dict[str, np.ndarray]:
     asparagopsis_data = (
         get_asparagopsis_effect_w_mrj(data, yr_idx)
@@ -314,6 +347,11 @@ def get_agricultural_management_water_matrices(data: Data, yr_idx) -> dict[str, 
         if settings.AG_MANAGEMENTS['AgTech EI']
         else np.zeros((data.NLMS, data.NCELLS, len(AG_MANAGEMENTS_TO_LAND_USES['AgTech EI'])))
     )
+    biochar_data = (
+        get_biochar_effect_w_mrj(data, yr_idx)
+        if settings.AG_MANAGEMENTS['Biochar']
+        else np.zeros((data.NLMS, data.NCELLS, len(AG_MANAGEMENTS_TO_LAND_USES['Biochar'])))
+    )
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -321,6 +359,7 @@ def get_agricultural_management_water_matrices(data: Data, yr_idx) -> dict[str, 
         'Ecological Grazing': eco_grazing_data,
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
+        'Biochar': biochar_data,
     }
 
 

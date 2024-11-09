@@ -481,6 +481,41 @@ def get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx):
     return new_q_mrp
 
 
+def get_biochar_effect_q_mrp(data, q_mrp, yr_idx):
+    """
+    Applies the effects of using Biochar to the quantity data
+    for all relevant agricultural land uses.
+
+    Parameters:
+    - data: The data object containing relevant information.
+    - q_mrp: The quantity data to be updated.
+    - yr_idx: The index of the year to be used for calculations.
+
+    Returns:
+    - new_q_mrp: The updated quantity data after applying Biochar effects.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Biochar']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Set up the effects matrix
+    new_q_mrp = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
+
+    if not AG_MANAGEMENTS['Biochar']:
+        return new_q_mrp
+
+    # Update values in the new matrix    
+    for lu, j in zip(land_uses, lu_codes):
+        multiplier = data.BIOCHAR_DATA[lu].loc[yr_cal, 'Productivity']
+        if multiplier != 1:
+            # Apply to all products associated with land use
+            for p in range(data.NPRS):
+                if data.LU2PR[p, j]:
+                    new_q_mrp[:, :, p] = q_mrp[:, :, p] * (multiplier - 1)
+
+    return new_q_mrp
+
+
 def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[str, np.ndarray]:
     """
     Calculates the quantity matrices for different agricultural management practices.
@@ -499,6 +534,7 @@ def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[s
     eco_grazing_data = get_ecological_grazing_effect_q_mrp(data, q_mrp, yr_idx) if AG_MANAGEMENTS['Ecological Grazing'] else 0
     sav_burning_data = get_savanna_burning_effect_q_mrp(data) if AG_MANAGEMENTS['Savanna Burning'] else 0
     agtech_ei_data = get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx) if AG_MANAGEMENTS['AgTech EI'] else 0
+    biochar_data = get_biochar_effect_q_mrp(data, q_mrp, yr_idx) if AG_MANAGEMENTS['Biochar'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -506,4 +542,5 @@ def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[s
         'Ecological Grazing': eco_grazing_data,
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
+        'Biochar': biochar_data,
     }

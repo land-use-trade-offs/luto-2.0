@@ -544,6 +544,68 @@ def get_agtech_ei_effect_g_mrj(data, yr_idx):
     return new_g_mrj
 
 
+def get_biochar_effect_g_mrj(data, yr_idx):
+    """
+    Applies the effects of using Biochar to the GHG data
+    for all relevant agr. land uses.
+
+    Parameters:
+    - data: The input data containing the necessary information.
+    - yr_idx: The index of the year to calculate the effects for.
+
+    Returns:
+    - new_g_mrj: The matrix <unit: t/cell> containing the updated GHG data after applying the Biochar effects.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Biochar']
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Set up the effects matrix
+    new_g_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    if not AG_MANAGEMENTS['Biochar']:
+        return new_g_mrj
+
+    # Update values in the new matrix
+    for lu_idx, lu in enumerate(land_uses):
+        lu_data = data.BIOCHAR_DATA[lu]
+
+        for lm in data.LANDMANS:
+            m = 0 if lm == 'dry' else 1
+            for co2e_type in [
+                'CO2E_KG_HA_CROP_MGT',
+                'CO2E_KG_HA_SOIL',  # TODO: the column in the data refers to CO2E_KG_HA_SOIL_N_SURP
+            ]:
+                # Check if land-use/land management combination exists (e.g., dryland Pears/Rice do not occur), if not use zeros
+                if lu not in data.AGGHG_CROPS[data.AGGHG_CROPS.columns[0][0], lm].columns:
+                    continue
+                
+                if co2e_type == 'CO2E_KG_HA_SOIL':
+                    reduction_perc = 1 - lu_data.loc[yr_cal, 'CO2E_KG_HA_SOIL_N_SURP']
+                else:
+                    reduction_perc = 1 - lu_data.loc[yr_cal, co2e_type]
+
+                if reduction_perc != 0:
+                    reduction_amnt = (
+                        np.nan_to_num(data.AGGHG_CROPS[co2e_type, lm, lu].to_numpy().copy(), 0) 
+                        * reduction_perc
+                        / 1000            # convert to tonnes
+                        * data.REAL_AREA  # adjust for resfactor
+                    )
+                    new_g_mrj[m, :, lu_idx] -= reduction_amnt
+
+            # Subtract soil carbon benefit
+            soil_multiplier = lu_data.loc[yr_cal, 'IMPACTS_soil_carbon'] - 1
+            if soil_multiplier != 0:
+                soil_reduction_amnt = (
+                    data.SOIL_CARBON_AVG_T_CO2_HA
+                    * soil_multiplier
+                    * data.REAL_AREA  # adjust for resfactor
+                )
+                new_g_mrj[m, :, lu_idx] -= soil_reduction_amnt
+
+    return new_g_mrj
+
+
 def get_agricultural_management_ghg_matrices(data: Data, g_mrj, yr_idx) -> dict[str, np.ndarray]:
     """
     Calculate the greenhouse gas (GHG) matrices for different agricultural management practices.
@@ -563,6 +625,7 @@ def get_agricultural_management_ghg_matrices(data: Data, g_mrj, yr_idx) -> dict[
     eco_grazing_data = get_ecological_grazing_effect_g_mrj(data, yr_idx) if AG_MANAGEMENTS['Ecological Grazing'] else 0
     sav_burning_ghg_impact = get_savanna_burning_effect_g_mrj(data) if AG_MANAGEMENTS['Savanna Burning'] else 0
     agtech_ei_ghg_impact = get_agtech_ei_effect_g_mrj(data, yr_idx) if AG_MANAGEMENTS['AgTech EI'] else 0
+    biochar_ghg_impact = get_biochar_effect_g_mrj(data, yr_idx) if AG_MANAGEMENTS['Biochar'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -570,4 +633,5 @@ def get_agricultural_management_ghg_matrices(data: Data, g_mrj, yr_idx) -> dict[
         'Ecological Grazing': eco_grazing_data,
         'Savanna Burning': sav_burning_ghg_impact,
         'AgTech EI': agtech_ei_ghg_impact,
+        'Biochar': biochar_ghg_impact,
     }
