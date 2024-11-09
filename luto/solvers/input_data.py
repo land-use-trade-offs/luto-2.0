@@ -346,9 +346,9 @@ def get_ag_man_water(data: Data, target_index):
     return output
 
 
-def get_ag_man_biodiversity(data: Data):
+def get_ag_man_biodiversity(data: Data, target_index, ag_b_mrj):
     print('Getting agricultural management options\' biodiversity effects...', flush = True)
-    output = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data)
+    output = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data, ag_b_mrj, target_index)
     return output
 
 
@@ -434,7 +434,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_r_mrj=get_ag_man_revenue(data, target_index, ag_r_mrj),
         ag_man_t_mrj=get_ag_man_transitions(data, target_index, ag_t_mrj),
         ag_man_w_mrj=get_ag_man_water(data, target_index),
-        ag_man_b_mrj=get_ag_man_biodiversity(data),
+        ag_man_b_mrj=get_ag_man_biodiversity(data, target_index, ag_b_mrj),
         ag_man_limits=get_ag_man_limits(data, target_index),
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
         water_yield_outside_study_area=get_w_outside_luto(data),

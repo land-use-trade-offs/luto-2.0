@@ -322,6 +322,31 @@ def get_agtech_ei_effect_r_mrj(data: Data, r_mrj, yr_idx):
     return new_r_mrj
 
 
+def get_biochar_effect_r_mrj(data: Data, r_mrj, yr_idx):
+    """
+    Applies the effects of using Biochar to the revenue data
+    for all relevant agr. land uses.
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Biochar']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+    yr_cal = data.YR_CAL_BASE + yr_idx
+
+    # Set up the effects matrix
+    new_r_mrj = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    if not AG_MANAGEMENTS['Biochar']:
+        return new_r_mrj
+
+    # Update values in the new matrix using the correct multiplier for each LU
+    for lu_idx, lu in enumerate(land_uses):
+        multiplier = data.BIOCHAR_DATA[lu].loc[yr_cal, 'Productivity']
+        if multiplier != 1:
+            j = lu_codes[lu_idx]
+            new_r_mrj[:, :, lu_idx] = r_mrj[:, :, j] * (multiplier - 1)
+
+    return new_r_mrj
+
+
 def get_agricultural_management_revenue_matrices(data: Data, r_mrj, yr_idx) -> Dict[str, np.ndarray]:
     """
     Calculate the revenue matrices for different agricultural management practices.
@@ -341,6 +366,7 @@ def get_agricultural_management_revenue_matrices(data: Data, r_mrj, yr_idx) -> D
     eco_grazing_data = get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['Ecological Grazing'] else 0
     sav_burning_data = get_savanna_burning_effect_r_mrj(data, yr_idx) if AG_MANAGEMENTS['Savanna Burning'] else 0
     agtech_ei_data = get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['AgTech EI'] else 0
+    biochar_data = get_biochar_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['Biochar'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -348,4 +374,5 @@ def get_agricultural_management_revenue_matrices(data: Data, r_mrj, yr_idx) -> D
         'Ecological Grazing': eco_grazing_data,
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
+        'Biochar': biochar_data,
     }
