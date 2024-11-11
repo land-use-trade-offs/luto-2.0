@@ -559,11 +559,6 @@ def get_yr_cal_net_wyield_including_cc_impacts(data: Data) -> dict[int, float]:
     """
     if data.YR_CAL_BASE_NET_WYIELD is None:
         net_yields = calc_water_net_yield_by_region_in_year_from_data(data, data.YR_CAL_BASE)
-        cc_impacts = get_climate_change_impact_on_water_yield(data)
-
-        for reg in net_yields:
-            net_yields[reg] += cc_impacts.loc[data.YR_CAL_BASE, reg]
-
         data.YR_CAL_BASE_NET_WYIELD = net_yields
             
     return data.YR_CAL_BASE_NET_WYIELD
