@@ -79,9 +79,6 @@ class LutoSolver:
         ):
 
 
-
-
-
         self.final_target_year = final_target_year
         self._input_data = input_data
         self.d_c = d_c
@@ -661,10 +658,11 @@ class LutoSolver:
                 self.water_limit_constraints.append(constr)
 
             if settings.VERBOSE == 1:
-                print(f"    ...net water yield in {reg_name} >= {w_hist_yield_limit:.2f} ML")
+                wny_hist_cc_limit = w_hist_yield_limit + cc_impact_yield_delta
+                print(f"    ...net water yield in {reg_name} >= {wny_hist_cc_limit:.2f} ML")
                 if wny_limit_updated:
                     print(
-                        f"        ...net water yield in {reg_name} lowered from {w_hist_yield_limit:.2f} ML "
+                        f"        ...net water yield in {reg_name} lowered from {wny_hist_cc_limit:.2f} ML "
                         f"to {constr_wny_limit:.2f} ML to avoid infeasibility"
                     )
 

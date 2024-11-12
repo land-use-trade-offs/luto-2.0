@@ -1494,29 +1494,8 @@ class Data:
         elif settings.MODE == "timeseries":
             yr_all = list(range(base_year, target_year + 1))
 
-        # Add some shorthand details about the model run
-        post = (
-            "_"
-            + settings.DEMAND_CONSTRAINT_TYPE
-            + "_"
-            + settings.OBJECTIVE
-            + "_RF"
-            + str(settings.RESFACTOR)
-            + "_P1e"
-            + str(int(math.log10(settings.PENALTY)))
-            + "_"
-            + str(yr_all[0])
-            + "-"
-            + str(yr_all[-1])
-            + "_"
-            + settings.MODE
-            + "_"
-            + str(int(self.GHG_TARGETS[yr_all[-1]] / 1e6))
-            + "Mt"
-        )
-
         # Create path name
-        self.path = f"{OUTPUT_DIR}/{self.timestamp_sim}{post}"
+        self.path = f"{OUTPUT_DIR}/{self.timestamp_sim}_RF{settings.RESFACTOR}_{yr_all[0]}-{yr_all[-1]}_{settings.MODE}"
 
         # Get all paths
         paths = (

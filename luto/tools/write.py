@@ -22,8 +22,6 @@ Writes model output and statistics to files.
 
 import os, re
 import shutil
-from tkinter import N
-from matplotlib.pylab import f
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -845,7 +843,7 @@ def write_water(data: Data, yr_cal, path):
     ag_w_mrj = ag_water.get_water_net_yield_matrices(data, yr_idx)
     non_ag_w_rk = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[yr_cal], yr_idx)
     ag_man_w_mrj = ag_water.get_agricultural_management_water_matrices(data, yr_idx)
-    water_outside_luto = ag_water.get_water_outside_luto_study_area(data)[yr_cal]
+    wny_outside_luto_study_area = ag_water.get_water_outside_luto_study_area(data)[yr_cal]
 
     # Prepare a data frame.
     df = pd.DataFrame( columns=[  'REGION_ID'
@@ -885,11 +883,9 @@ def write_water(data: Data, yr_cal, path):
     df_water_seperate_dfs_cc = []
     df_water_seperate_dfs_lu = []
 
-    water_public_land = ag_water.get_water_outside_luto_study_area(data)[yr_cal]
-
     for i, region in enumerate(region_limits.keys()):
 
-        reg_pub_yield = water_public_land[region] # Water yield from public land
+        region_wny_outside_luto = wny_outside_luto_study_area[region] # Water yield from outside luto sudy area
         ind = np.flatnonzero(region_id == region).astype(np.int32) # Get indices of cells in region
 
         # Calculate water yield for region and save to dataframe
@@ -933,11 +929,11 @@ def write_water(data: Data, yr_cal, path):
 
 
         # Get historical water yield and calculate water net yield
-        baseline_net_yield_all =  w_net_yield_limits[region][1]                          # Baseline water net yield
-        net_yield_lb = w_net_yield_limits[region][2]                                     # Water net yield lower bound
-        w_net_yield_reg = df_region['Water Net Yield (ML)'].sum() + reg_pub_yield        # Solved water net yield of the region plus public land water yield
-        w_net_yield_reg_cc = df_region_cc['Water Net Yield (ML)'].sum() + reg_pub_yield  # Water yield with fixed land-use to the base year
-        w_net_yield_reg_lu = df_region_lu['Water Net Yield (ML)'].sum() + reg_pub_yield  # Water yield with fixed climate change impact to the base year
+        baseline_net_yield_all =  w_net_yield_limits[region][1]                                     # Baseline water net yield
+        net_yield_lb = w_net_yield_limits[region][2]                                                # Water net yield lower bound
+        w_net_yield_reg = df_region['Water Net Yield (ML)'].sum() + region_wny_outside_luto         # Solved water net yield of the region plus outside luto sudy area water yield
+        w_net_yield_reg_cc = df_region_cc['Water Net Yield (ML)'].sum() + region_wny_outside_luto   # Water yield with fixed land-use to the base year
+        w_net_yield_reg_lu = df_region_lu['Water Net Yield (ML)'].sum() + region_wny_outside_luto   # Water yield with fixed climate change impact to the base year
 
         # Calculate absolute and proportional difference between water use target and actual water use
         abs_diff = w_net_yield_reg - net_yield_lb
@@ -957,12 +953,8 @@ def write_water(data: Data, yr_cal, path):
                     , prop_all_cc
                     , prop_all_lu)
 
-    # Write climate change impacts from public land
-    '''What is public land?
-    LUTO only process agricultural land-use in the base year, but water-yield is produced from both agriculatural and public land (e.g, urban).
-    Therefore, we has to consider the water-yield from public land as well, which are here called 'outside LUTO area'.
-    '''
-    water_outside_luto_df = pd.DataFrame({region_dict[k]:[v] for k,v in water_outside_luto.items()}).T.reset_index()
+    # Write water yiled outside luto study area
+    water_outside_luto_df = pd.DataFrame({region_dict[k]:[v] for k,v in wny_outside_luto_study_area.items()}).T.reset_index()
     water_outside_luto_df.columns = ['REGION_NAME', 'Climate Change Impact (ML)']
     water_outside_luto_df['Year'] = yr_cal
     water_outside_luto_df.to_csv(os.path.join(path, f'water_yield_of_climate_change_impacts_outside_LUTO_{yr_cal}.csv'), index=False)
@@ -1295,9 +1287,9 @@ def write_ghg_separate(data: Data, yr_cal, path):
 
         # Get the GHG emission from agricultural management, then reshape it to starte with row (r) dimension
         am_ghg_mrj = ag_man_g_mrj[am] * data.ag_man_dvars[yr_cal][am][:, :, am_j]
-        am_ghg_rm = np.einsum('mrj -> mj', am_ghg_mrj)
+        am_ghg_mj = np.einsum('mrj -> mj', am_ghg_mrj)
 
-        am_ghg_df = pd.DataFrame(am_ghg_rm.flatten(), index=pd.MultiIndex.from_product([data.LANDMANS, am_lus])).reset_index()
+        am_ghg_df = pd.DataFrame(am_ghg_mj.flatten(), index=pd.MultiIndex.from_product([data.LANDMANS, am_lus])).reset_index()
         am_ghg_df.columns = ['Water_supply', 'Land-use', 'Value (t CO2e)']
         am_ghg_df['Type'] = 'Agricultural Management'
         am_ghg_df['Agricultural Management Type'] = am
