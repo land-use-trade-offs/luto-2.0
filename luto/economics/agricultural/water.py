@@ -18,8 +18,6 @@
 Pure functions to calculate water net yield by lm, lu and water limits.
 """
 
-
-
 import numpy as np
 import pandas as pd
 from collections import defaultdict
@@ -582,15 +580,25 @@ def get_climate_change_impact_on_water_yield(data: Data) -> np.ndarray:
         )
 
     
-    water_cci_delta = pd.DataFrame()
-    for col_name, col_data in water_yield_natural_land.items():
-        min_gap = col_data - col_data.min()                 # Climate change impact is the difference between the minimum water yield and the current value
-        before_min = col_data.index < col_data.idxmin()     # The impact is only applied to years before the minimum value
-        min_gap = min_gap * before_min                      # Apply the impact only to years before the minimum value
-        min_gap_df = pd.DataFrame({col_name: min_gap})
-        water_cci_delta = pd.concat([water_cci_delta, min_gap_df ], axis=1)
-            
-    return water_cci_delta
+    # water_cci_delta = pd.DataFrame()
+    # for col_name, col_data in water_yield_natural_land.items():
+    #     min_gap = col_data - col_data.min()                 # Climate change impact is the difference between the minimum water yield and the current value
+    #     before_min = col_data.index < col_data.idxmin()     # The impact is only applied to years before the minimum value
+    #     min_gap = min_gap * before_min                      # Apply the impact only to years before the minimum value
+    #     min_gap_df = pd.DataFrame({col_name: min_gap})
+    #     water_cci_delta = pd.concat([water_cci_delta, min_gap_df ], axis=1)
+
+        
+    water_yield_natural_land = water_yield_natural_land.stack().reset_index(name='water yield (ML)')
+    water_cci_cumsum = pd.DataFrame()
+    for idx, df in water_yield_natural_land.groupby(['Region_ID']):
+        df = df.sort_values('Year')
+        df['cci_delta'] = df['water yield (ML)'].diff() * (-1) # Reverse the sign; if 2011_wy - 2010_wy is negative, we need to add this amount to the water constraint in the solver
+        df['Year'] = df['Year'] - 1                            # Shift the year by 1 to align with the year in the solver
+        df['CCI_cumsum'] = df['cci_delta'].cumsum()
+        water_cci_cumsum = pd.concat([water_cci_cumsum, df])
+          
+    return water_cci_cumsum.pivot(index='Year', columns='Region_ID', values=['cci_delta','CCI_cumsum'])
 
 
 def get_water_net_yield_limit_values(
@@ -625,12 +633,12 @@ def get_water_net_yield_limit_values(
         )
 
     latest_target_year = max(settings.WATER_YIELD_TARGETS)
-    if data.WATER_LIMITS_BY_YEAR:
-        return (
-            data.WATER_LIMITS_BY_YEAR[latest_target_year]
-            if yr_cal >= latest_target_year
-            else data.WATER_LIMITS_BY_YEAR[yr_cal]
-        )
+    # if data.WATER_LIMITS_BY_YEAR:
+    #     return (
+    #         data.WATER_LIMITS_BY_YEAR[latest_target_year]
+    #         if yr_cal >= latest_target_year
+    #         else data.WATER_LIMITS_BY_YEAR[yr_cal]
+    #     )
 
     # Limits do not yet exist and must be calculated
     historical_yields_dict = _get_historical_water_yield_by_regions(data)
@@ -659,9 +667,9 @@ def get_water_net_yield_limit_values(
                 saved_limit = limits_by_region_year[yr_start][region][2]
                 reg_target_yr_start = min(saved_limit, reg_target_yr_end)
 
-            yrs_targets = np.linspace(reg_target_yr_start, reg_target_yr_end, n_years_cal)
+            yrs_targets = np.linspace(reg_target_yr_end, reg_target_yr_end, n_years_cal)
             for yr, limit in zip(calc_years, yrs_targets):
-                limits_by_region_year[yr][region] = (name, hist_yield, limit, ind)
+                limits_by_region_year[yr][region] = (name, hist_yield, reg_target_yr_end, ind)
 
     # Save to data object to avoid re-calculating in the future.
     data.WATER_LIMITS_BY_YEAR = dict(limits_by_region_year)

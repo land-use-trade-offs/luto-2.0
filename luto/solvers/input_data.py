@@ -68,8 +68,10 @@ class SolverInputData:
     ag_man_limits: dict             # Agricultural management options' adoption limits.
     ag_man_lb_mrj: dict             # Agricultural management options' lower bounds.
 
+    water_nyield_feasible_reduce_potential: dict                             # Water net yield from base year.
+    water_nyield_total: dict[int, float]                              # Total water net yield from base year.
     water_yield_outside_study_area: dict[int, dict[int, float]]       # Water yield from outside LUTO study area -> dict. Keys: year, region.
-    water_yield_natural_land_cc_impact_delta: pd.DataFrame      # The climate change impact delta on water yield.
+    water_yield_natural_land_cc_impact_delta: pd.DataFrame            # The climate change impact delta on water yield.
 
     offland_ghg: np.ndarray         # GHG emissions from off-land commodities.
 
@@ -208,13 +210,38 @@ def get_ag_w_mrj(data: Data, target_index):
     output = ag_water.get_water_net_yield_matrices(data, target_index)
     return output.astype(np.float32)
 
+def get_wny_by_reg_base_yr(data: Data, base_idx):
+    print('Getting water net yield for each region in the base year...', flush = True)
+    # Get water irrigation requirement for each region
+    if settings.WATER_REGION_DEF == 'Drainage Division':
+        region_id = data.DRAINDIV_ID
+    elif settings.WATER_REGION_DEF == 'River Region':
+        region_id = data.RIVREG_ID
+    wny_mrj = ag_water.get_water_net_yield_matrices(data, base_idx)
+    dvar_mrj = data.ag_dvars[data.YR_CAL_BASE + base_idx]
+    wny_r = np.einsum('mrj,mrj->r', wny_mrj, dvar_mrj)
+    wny_by_reg = dict(enumerate(np.bincount(region_id.flatten(), wny_r.flatten())))
+    return wny_by_reg
+
+def get_wny_feasible_reduction_potential(data: Data, base_idx):
+    print('Getting water yield reduction potential (crop irrigation | livestock drinking) in the base year...', flush = True)
+    # Get water irrigation requirement for each region
+    if settings.WATER_REGION_DEF == 'Drainage Division':
+        region_id = data.DRAINDIV_ID
+    elif settings.WATER_REGION_DEF == 'River Region':
+        region_id = data.RIVREG_ID
+    w_req_mrj = ag_water.get_wreq_matrices(data, base_idx)
+    dvar_mrj = data.ag_dvars[data.YR_CAL_BASE + base_idx]
+    w_req_r = np.einsum('mrj,mrj->r', w_req_mrj, dvar_mrj)
+    w_req_by_reg = dict(enumerate(np.bincount(region_id.flatten(), w_req_r.flatten())))
+    return w_req_by_reg
 
 def get_w_outside_luto(data: Data):
     print('Getting water yield from outside LUTO study area...', flush = True)
     return ag_water.get_water_outside_luto_study_area(data)
 
 
-def get_w_cci_impact_delta(data: Data):
+def get_w_cci_impact(data: Data):
     print('Getting water yield delta due to climate change impact...', flush = True)
     return ag_water.get_climate_change_impact_on_water_yield(data)
 
@@ -390,6 +417,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     """
     Using the given Data object, prepare a SolverInputData object for the solver.
     """
+    base_index = base_year - data.YR_CAL_BASE
     target_index = target_year - data.YR_CAL_BASE
 
     ag_c_mrj = get_ag_c_mrj(data, target_index)
@@ -437,8 +465,10 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_b_mrj=get_ag_man_biodiversity(data, target_index, ag_b_mrj),
         ag_man_limits=get_ag_man_limits(data, target_index),
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
+        water_nyield_feasible_reduce_potential=get_wny_feasible_reduction_potential(data, base_index),
+        water_nyield_total=get_wny_by_reg_base_yr(data, base_index),
         water_yield_outside_study_area=get_w_outside_luto(data),
-        water_yield_natural_land_cc_impact_delta=get_w_cci_impact_delta(data),
+        water_yield_natural_land_cc_impact_delta=get_w_cci_impact(data),
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,

@@ -554,7 +554,7 @@ class LutoSolver:
                 'DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"'
             )
 
-    def _get_water_nyield_base_year_vars_current_year_layers(
+    def _get_water_nyield_current_year_dvar_next_year_water(
         self, region: int, region_ind: np.ndarray
     ) -> float:
         """
@@ -632,24 +632,35 @@ class LutoSolver:
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            outside_luto_study_contr = self._input_data.water_yield_outside_study_area[self._input_data.target_year][region]
+            outside_luto_study_contr = self._input_data.water_yield_outside_study_area[self._input_data.base_year][region]
 
             # Sum of all water yield contributions
             w_net_yield_region = ag_contr + ag_man_contr + non_ag_contr + outside_luto_study_contr
             
             
-            # Update the net yield limit to be lower based on last year's solution if at risk of infeasibility
-            base_year_water_yield_with_current_layers = None
-            
-            cc_impact_yield_delta = self._input_data.water_yield_natural_land_cc_impact_delta.loc[self._input_data.target_year, region]
-            constr_wny_limit = w_hist_yield_limit + cc_impact_yield_delta
+            # Update the net yield limit if at risk of infeasibility
+            wny_current_total = self._input_data.water_nyield_total[region] + outside_luto_study_contr
+            wny_current_reduce_potential = self._input_data.water_nyield_feasible_reduce_potential[region]
+            wny_next_yr_cci_delta = self._input_data.water_yield_natural_land_cc_impact_delta.loc[self._input_data.base_year, ('cci_delta', region)]
+            wny_next_yr_cci_cumsum = self._input_data.water_yield_natural_land_cc_impact_delta.loc[self._input_data.base_year, ('CCI_cumsum', region)]
             
             wny_limit_updated = False
-            if self._input_data.base_year_ag_sol is not None and settings.RELAXED_WATER_LIMITS_FOR_INFEASIBILITY == 'on':
-                base_year_water_yield_with_current_layers = self._get_water_nyield_base_year_vars_current_year_layers(region, ind)
-                if base_year_water_yield_with_current_layers < constr_wny_limit:
-                    constr_wny_limit = base_year_water_yield_with_current_layers
-                    wny_limit_updated = True
+            if wny_current_total + wny_current_reduce_potential > w_hist_yield_limit + wny_next_yr_cci_cumsum:
+                constr_wny_limit = w_hist_yield_limit + wny_next_yr_cci_cumsum
+            else:
+                constr_wny_limit = wny_current_total + wny_current_reduce_potential - wny_next_yr_cci_delta
+                wny_limit_updated = True
+            
+
+            # wny_limit_updated = False
+            # if self._input_data.base_year_ag_sol is not None and settings.RELAXED_WATER_LIMITS_FOR_INFEASIBILITY == 'on':
+            #     water_nyield_current_year_dvar_next_year_water = self._get_water_nyield_current_year_dvar_next_year_water(region, ind)
+            #     water_nyield_potential_by_removing_irrigation_BASE_YR = self._input_data.water_nyield_by_removing_irr_BASE_YR[region]
+                
+            #     if water_nyield_potential_by_removing_irrigation_BASE_YR < constr_wny_limit:
+            #         # water_nyield_current_year_dvar_next_year_water < constr_wny_limit:
+            #         constr_wny_limit = water_nyield_current_year_dvar_next_year_water
+            #         wny_limit_updated = True
 
             # Check that the contributions are not all zero, and add constraint if so.
             # Must check the type because 'Gurobi expression == 0' returns another expression 
@@ -658,8 +669,8 @@ class LutoSolver:
                 self.water_limit_constraints.append(constr)
 
             if settings.VERBOSE == 1:
-                wny_hist_cc_limit = w_hist_yield_limit + cc_impact_yield_delta
-                print(f"    ...net water yield in {reg_name} >= {wny_hist_cc_limit:.2f} ML")
+                wny_hist_cc_limit = w_hist_yield_limit + wny_next_yr_cci_delta
+                # print(f"    ...net water yield in {reg_name} >= {wny_hist_cc_limit:.2f} ML")
                 if wny_limit_updated:
                     print(
                         f"        ...net water yield in {reg_name} lowered from {wny_hist_cc_limit:.2f} ML "

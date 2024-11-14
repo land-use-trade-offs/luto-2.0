@@ -20,6 +20,7 @@ LUTO 2.0 temporary helper code.
 
 # Protect against accidental running of entire script and deleting input data
 import sys
+import datetime
 sys.exit()
 
 # # To run LUTO, execute steps 1-4 below...
@@ -60,22 +61,16 @@ report_on_path(data.path, remake_map=True, remake_csv=True)
 #############################################################
 # Save data object to disk
 #############################################################
-import dill
 import luto.simulation as sim
 data = sim.load_data()
-with open('output/data_without_solution.pkl', 'wb') as f: dill.dump(data, f)    # Save data to disk
-
-sim.run(data=data, base=2010, target=2050)
-with open('output/data_with_solution.pkl', 'wb') as f: dill.dump(data, f)       # Save data and solution to disk
-
+sim.save_data_to_disk(data, f'F:/jinzhu/TMP/Data_object/Data_{settings.RESFACTOR}_without_output_{datetime.date.today().isoformat()}.pkl')
 
 
 #############################################################
 # Faster data loading (6min -> 10s)
 #############################################################
-import dill
 import luto.simulation as sim
-with open('output/data_without_solution.pkl', 'rb') as f: data = dill.load(f)  
+data = sim.load_data_from_disk('F:/jinzhu/TMP/Data_object/Data_RES10_without_output_2024-11-10.pkl') 
 sim.run(data=data, base=2010, target=2050)
 
 
