@@ -30,6 +30,12 @@ document.addEventListener('DOMContentLoaded', function () {
     };
     init_select_2();
 
+    // Set the title alignment to left
+  Highcharts.setOptions({
+    title: {
+        align: 'left'
+    }
+  });
 
 
     // Listen for changes in the lucc dropdown

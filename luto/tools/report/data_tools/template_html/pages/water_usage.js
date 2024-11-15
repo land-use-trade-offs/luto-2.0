@@ -22,7 +22,12 @@ document.addEventListener("DOMContentLoaded", function () {
   // Get the year ticks and interval
   var year_ticks = years.length == 2 ? years : null;
 
-
+// Set the title alignment to left
+Highcharts.setOptions({
+  title: {
+      align: 'left'
+  }
+});
 
   // Chart:water_1_1_percent_of_limit
   Highcharts.chart("water_1_1_percent_of_limit", {

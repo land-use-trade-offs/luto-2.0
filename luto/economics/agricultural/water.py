@@ -580,25 +580,28 @@ def get_climate_change_impact_on_water_yield(data: Data) -> np.ndarray:
         )
 
     
-    # water_cci_delta = pd.DataFrame()
-    # for col_name, col_data in water_yield_natural_land.items():
-    #     min_gap = col_data - col_data.min()                 # Climate change impact is the difference between the minimum water yield and the current value
-    #     before_min = col_data.index < col_data.idxmin()     # The impact is only applied to years before the minimum value
-    #     min_gap = min_gap * before_min                      # Apply the impact only to years before the minimum value
-    #     min_gap_df = pd.DataFrame({col_name: min_gap})
-    #     water_cci_delta = pd.concat([water_cci_delta, min_gap_df ], axis=1)
-
+    water_cci_delta = pd.DataFrame()
+    for col_name, col_data in water_yield_natural_land.items():
+        min_gap = col_data - col_data.min()                 # Climate change impact is the difference between the minimum water yield and the current value
+        before_min = col_data.index < col_data.idxmin()     # The impact is only applied to years before the minimum value
+        min_gap = min_gap * before_min                      # Apply the impact only to years before the minimum value
+        min_gap_df = pd.DataFrame({col_name: min_gap})
+        water_cci_delta = pd.concat([water_cci_delta, min_gap_df ], axis=1)
         
-    water_yield_natural_land = water_yield_natural_land.stack().reset_index(name='water yield (ML)')
-    water_cci_cumsum = pd.DataFrame()
-    for idx, df in water_yield_natural_land.groupby(['Region_ID']):
-        df = df.sort_values('Year')
-        df['cci_delta'] = df['water yield (ML)'].diff() * (-1) # Reverse the sign; if 2011_wy - 2010_wy is negative, we need to add this amount to the water constraint in the solver
-        df['Year'] = df['Year'] - 1                            # Shift the year by 1 to align with the year in the solver
-        df['CCI_cumsum'] = df['cci_delta'].cumsum()
-        water_cci_cumsum = pd.concat([water_cci_cumsum, df])
+    return water_cci_delta
+        
+    # water_yield_natural_land = water_yield_natural_land.stack().reset_index(name='water yield (ML)')
+    # water_cci_cumsum = pd.DataFrame()
+    # for idx, df in water_yield_natural_land.groupby(['Region_ID']):
+    #     df = df.sort_values('Year')
+    #     df['cci_delta'] = df['water yield (ML)'].diff() * (-1) # Reverse the sign; if 2011_wy - 2010_wy is negative, we need to add this amount to the water constraint in the solver
+    #     df['Year'] = df['Year'] - 1                            # Shift the year by 1 to align with the year in the solver
+    #     df['CCI_cumsum'] = df['cci_delta'].cumsum()
+    #     water_cci_cumsum = pd.concat([water_cci_cumsum, df])
           
-    return water_cci_cumsum.pivot(index='Year', columns='Region_ID', values=['cci_delta','CCI_cumsum'])
+    # return water_cci_cumsum.pivot(index='Year', columns='Region_ID', values=['cci_delta','CCI_cumsum'])
+    
+    
 
 
 def get_water_net_yield_limit_values(

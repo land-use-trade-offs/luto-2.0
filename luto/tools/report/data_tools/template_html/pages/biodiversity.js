@@ -23,7 +23,12 @@ document.addEventListener("DOMContentLoaded", function () {
     var year_ticks = years.length == 2 ? years : null;
 
 
-
+    // Set the title alignment to left
+    Highcharts.setOptions({
+        title: {
+            align: 'left'
+        }
+    });
 
     // biodiversity_1_total_score_by_category
     Highcharts.chart("biodiversity_1_total_score_by_category", {

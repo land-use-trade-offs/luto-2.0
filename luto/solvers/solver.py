@@ -639,18 +639,20 @@ class LutoSolver:
             
             
             # Update the net yield limit if at risk of infeasibility
-            wny_current_total = self._input_data.water_nyield_total[region] + outside_luto_study_contr
-            wny_current_reduce_potential = self._input_data.water_nyield_feasible_reduce_potential[region]
-            wny_next_yr_cci_delta = self._input_data.water_yield_natural_land_cc_impact_delta.loc[self._input_data.base_year, ('cci_delta', region)]
-            wny_next_yr_cci_cumsum = self._input_data.water_yield_natural_land_cc_impact_delta.loc[self._input_data.base_year, ('CCI_cumsum', region)]
-            
+            wny_actual_potential = self._get_water_nyield_current_year_dvar_next_year_water(region, ind)
+            wny_increase_potential = self._input_data.water_nyield_feasible_reduce_potential[region]
+            wny_cci_buffer = self._input_data.water_yield_natural_land_cc_impact_delta.loc[self._input_data.base_year,  region]
+
             wny_limit_updated = False
-            if wny_current_total + wny_current_reduce_potential > w_hist_yield_limit + wny_next_yr_cci_cumsum:
-                constr_wny_limit = w_hist_yield_limit + wny_next_yr_cci_cumsum
+            if (wny_actual_potential + wny_increase_potential) > (w_hist_yield_limit + wny_cci_buffer):
+                constr_wny_limit = w_hist_yield_limit + wny_cci_buffer
             else:
-                constr_wny_limit = wny_current_total + wny_current_reduce_potential - wny_next_yr_cci_delta
+                constr_wny_limit = wny_actual_potential + wny_increase_potential
                 wny_limit_updated = True
-            
+
+            # Add constraint that the net yield must be greater than the limit
+            constr = self.gurobi_model.addConstr(w_net_yield_region >= constr_wny_limit)
+            self.water_limit_constraints.append(constr)
 
             # wny_limit_updated = False
             # if self._input_data.base_year_ag_sol is not None and settings.RELAXED_WATER_LIMITS_FOR_INFEASIBILITY == 'on':
@@ -662,15 +664,15 @@ class LutoSolver:
             #         constr_wny_limit = water_nyield_current_year_dvar_next_year_water
             #         wny_limit_updated = True
 
-            # Check that the contributions are not all zero, and add constraint if so.
-            # Must check the type because 'Gurobi expression == 0' returns another expression 
-            if not type(w_net_yield_region) == int:
-                constr = self.gurobi_model.addConstr(w_net_yield_region >= constr_wny_limit)
-                self.water_limit_constraints.append(constr)
+            # # Check that the contributions are not all zero, and add constraint if so.
+            # # Must check the type because 'Gurobi expression == 0' returns another expression 
+            # if not type(w_net_yield_region) == int:
+            #     constr = self.gurobi_model.addConstr(w_net_yield_region >= constr_wny_limit)
+            #     self.water_limit_constraints.append(constr)
 
             if settings.VERBOSE == 1:
-                wny_hist_cc_limit = w_hist_yield_limit + wny_next_yr_cci_delta
-                # print(f"    ...net water yield in {reg_name} >= {wny_hist_cc_limit:.2f} ML")
+                wny_hist_cc_limit = w_hist_yield_limit + wny_cci_buffer
+                print(f"    ...net water yield in {reg_name} >= {wny_hist_cc_limit:.2f} ML")
                 if wny_limit_updated:
                     print(
                         f"        ...net water yield in {reg_name} lowered from {wny_hist_cc_limit:.2f} ML "
