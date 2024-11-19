@@ -61,9 +61,9 @@ def get_wreq_matrices(data: Data, yr_idx):
     return w_req_mrj
 
 
-def get_wyield_matrices(data: Data, yr_idx) -> np.ndarray:
+def get_wyield_matrices(data: Data, yr_idx:int) -> np.ndarray:
     """
-    Return water yield matrices by land management, cell, and land-use type.
+    Return water yield matrices for YR_CAL_BASE (2010) by land management, cell, and land-use type.
 
     Parameters:
         data (object): The data object containing the required data.
@@ -361,12 +361,13 @@ def get_agricultural_management_water_matrices(data: Data, yr_idx) -> dict[str, 
     }
 
 
-def get_water_outside_luto_study_area(data: Data) -> dict[int, dict[int, float]]:
+def get_water_outside_luto_study_area(data: Data, yr_cal:int) ->  dict[int, float]:
     """
     Return water yield from the outside regions of LUTO study area.
 
     Parameters:
         data (object): The data object containing the required data.
+        yr_cal (int): The year for which the water yield is calculated.
 
     Returns:
         dict[int, dict[int, float]]: <unit: ML/cell> dictionary of water yield amounts.
@@ -384,34 +385,7 @@ def get_water_outside_luto_study_area(data: Data) -> dict[int, dict[int, float]]
             f"(must be either 'River Region' or 'Drainage Division')."
         )
 
-    return {yr: water_yield_arr.loc[yr, :].to_dict() for yr in water_yield_arr.index}
-
-
-def get_water_under_natural_condition(data: Data) -> dict[int, dict[int, float]]:
-    """
-    Return water yield across Australia for each region under natural condition by land management and cell.
-
-    Parameters:
-        data (object): The data object containing the required data.
-
-    Returns:
-        dict[int, dict[int, float]]: <unit: ML/cell> dictionary of water yield across Australia for each region.
-            The first key is year and the second key is region ID.
-    """
-    if settings.WATER_REGION_DEF == 'River Region':
-        water_yield_arr = data.WATER_UNDER_NATURAL_LAND_RR
-
-    elif settings.WATER_REGION_DEF == 'Drainage Division':
-        water_yield_arr = data.WATER_UNDER_NATURAL_LAND_DD
-
-    else:
-        raise ValueError(
-            f"Invalid value for setting WATER_REGION_DEF: '{settings.WATER_REGION_DEF}' "
-            f"(must be either 'River Region' or 'Drainage Division')."
-        )
-
-    return {yr: water_yield_arr.loc[yr, :].to_dict() for yr in water_yield_arr.index}
-
+    return data.WATER_OUTSIDE_LUTO_DD.loc[yr_cal].to_dict()
 
 
 def calc_water_net_yield_for_region(
@@ -440,178 +414,11 @@ def calc_water_net_yield_for_region(
     )
     return ag_contr + non_ag_contr + ag_man_contr + water_yield_outside_luto_study_area
 
-
-
-def calc_water_net_yield_by_region_in_year_from_data(
-    data: Data,
-    yr_cal: int,
-    ag_w_mrj: Optional[np.ndarray] = None,
-    non_ag_w_rk: Optional[np.ndarray] = None,
-    ag_man_w_mrj: Optional[dict[str, np.ndarray]] = None,
-    water_yield_outside_luto_study_area: Optional[dict[int, float]] = None,
-) -> Optional[dict[int, float]]:
-    """
-    Gets net water yield in a given year if the year has a solution.
-
-    `Water_yield` = `ag_contr` + `non_ag_contr` + `ag_mam_contr` + `water_yield_outside_luto_study_area`
-    
-    """
-    # Data for river regions or drainage divisions
-    if settings.WATER_REGION_DEF == 'Drainage Division':
-        region_limits = data.DRAINDIV_LIMITS
-        region_id = data.DRAINDIV_ID
-    elif settings.WATER_REGION_DEF == 'River Region':
-        region_limits = data.RIVREG_LIMITS
-        region_id = data.RIVREG_ID
-    else:
-        print(
-            f"Incorrect option '{settings.WATER_REGION_DEF}' for WATER_REGION_DEF in settings "
-            f"(Must be either 'Drainage Division' or 'River Region')."
-        )
-
-    # Ensure solution exists for the given yr_cal
-    if any(
-        [ yr_cal not in vars_array for vars_array in
-          [data.ag_dvars, data.non_ag_dvars, data.ag_man_dvars] ]
-    ):
-        raise ValueError(
-            f"Cannot calculate water usage for year {yr_cal}: "
-            f"no solution data available (has the simulation been run?)"
-        )
-
-    am2j = {am: [data.DESC2AGLU[lu] for lu in am_lus] for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items()}
-
-    # Prepare water matrices for calculation
-    yr_idx = yr_cal - data.YR_CAL_BASE
-    ag_w_mrj = ag_w_mrj if ag_w_mrj is not None else get_water_net_yield_matrices(data, yr_idx)
-    non_ag_w_rk = non_ag_w_rk if non_ag_w_rk is not None else non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[yr_cal], yr_idx)
-    ag_man_w_mrj = ag_man_w_mrj if ag_man_w_mrj is not None else get_agricultural_management_water_matrices(data, yr_idx)
-    water_yield_outside_luto_study_area = water_yield_outside_luto_study_area if water_yield_outside_luto_study_area is not None else get_water_outside_luto_study_area(data)[yr_cal]
-
-    # Calculate net yields
-    net_yield_by_region = {}
-    for region in region_limits:
-        # Get indices of cells in region
-        ind = np.flatnonzero(region_id == region).astype(np.int32)
-
-        net_yield_by_region[region] = calc_water_net_yield_for_region(
-            ind,
-            am2j,
-            data.ag_dvars[yr_cal],
-            data.non_ag_dvars[yr_cal],
-            data.ag_man_dvars[yr_cal],
-            ag_w_mrj,
-            non_ag_w_rk,
-            ag_man_w_mrj,
-            water_yield_outside_luto_study_area[region],
-        )
-
-    return net_yield_by_region
-
-
-def _get_historical_water_yield_by_regions(data: Data) -> dict[int, tuple[str, float, np.ndarray]]:
-    """
-    Gets historical water usage figures, split by regions.
-    These figures are the basis for the net yield targets.
-
-    Returns
-    -------
-    dict[int, ...]: A dictionary where the keys are region IDs and the values are tuples
-        containing (region name, historical yield, cells in region)
-
-    """
-    # Get historical yields of regions, stored in data.RIVREG_LIMITS and data.DRAINDIV_LIMITS
-    baseline_reg_water_use_limits: dict[int, str] = {}
-    if settings.WATER_REGION_DEF == 'River Region':
-        baseline_reg_water_use_limits = data.RIVREG_LIMITS
-        region_id = data.RIVREG_ID
-        region_names = data.RIVREG_DICT
-
-    elif settings.WATER_REGION_DEF == 'Drainage Division':
-        baseline_reg_water_use_limits = data.DRAINDIV_LIMITS
-        region_id = data.DRAINDIV_ID
-        region_names = data.DRAINDIV_DICT
-
-    else:
-        raise ValueError(
-            f"Invalid value for setting WATER_REGION_DEF: '{settings.WATER_REGION_DEF}' "
-            f"(must be either 'River Region' or 'Drainage Division')."
-        )
-
-    # Net baseline water yield
-    net_baseline_reg_water_yield = {}
-    for reg in baseline_reg_water_use_limits.keys():
-        # Get indices of cells in region
-        ind = np.flatnonzero(region_id == reg).astype(np.int32)
-
-        # Base the net yield target on the historical yield
-        historical_yield = baseline_reg_water_use_limits[reg]
-
-        net_baseline_reg_water_yield[reg] = (
-            region_names[reg], historical_yield, ind
-        )
-
-    return net_baseline_reg_water_yield
-
-
-def get_climate_change_impact_on_water_yield(data: Data) -> np.ndarray:
-    """
-    Return the impact of climate change on water yield for each region.
-
-    Parameters:
-    - data: The data object containing the necessary input data.
-
-    Returns:
-    - pd.DataFrame : The impact of climate change on water yield for each cell.
-
-    Raises:
-    - None
-
-    """
-    # Data for river regions or drainage divisions
-    if settings.WATER_REGION_DEF == 'Drainage Division':
-        water_yield_natural_land = data.WATER_UNDER_NATURAL_LAND_DD
-    elif settings.WATER_REGION_DEF == 'River Region':
-        water_yield_natural_land = data.WATER_UNDER_NATURAL_LAND_RR
-    else:
-        print(
-            f"Incorrect option '{settings.WATER_REGION_DEF}' for WATER_REGION_DEF in settings "
-            f"(Must be either 'Drainage Division' or 'River Region')."
-        )
-
-    
-    water_cci_delta = pd.DataFrame()
-    for col_name, col_data in water_yield_natural_land.items():
-        min_gap = col_data - col_data.min()                 # Climate change impact is the difference between the minimum water yield and the current value
-        before_min = col_data.index < col_data.idxmin()     # The impact is only applied to years before the minimum value
-        min_gap = min_gap * before_min                      # Apply the impact only to years before the minimum value
-        min_gap_df = pd.DataFrame({col_name: min_gap})
-        water_cci_delta = pd.concat([water_cci_delta, min_gap_df ], axis=1)
-        
-    return water_cci_delta
-        
-    # water_yield_natural_land = water_yield_natural_land.stack().reset_index(name='water yield (ML)')
-    # water_cci_cumsum = pd.DataFrame()
-    # for idx, df in water_yield_natural_land.groupby(['Region_ID']):
-    #     df = df.sort_values('Year')
-    #     df['cci_delta'] = df['water yield (ML)'].diff() * (-1) # Reverse the sign; if 2011_wy - 2010_wy is negative, we need to add this amount to the water constraint in the solver
-    #     df['Year'] = df['Year'] - 1                            # Shift the year by 1 to align with the year in the solver
-    #     df['CCI_cumsum'] = df['cci_delta'].cumsum()
-    #     water_cci_cumsum = pd.concat([water_cci_cumsum, df])
-          
-    # return water_cci_cumsum.pivot(index='Year', columns='Region_ID', values=['cci_delta','CCI_cumsum'])
-    
-    
-
-
 def get_water_net_yield_limit_values(
-    data: Data, yr_cal: int,
+    data: Data,
 ) -> dict[int, tuple[str, float, float, np.ndarray]]:
     """
     Return water net yield limits for regions (River Regions or Drainage Divisions as specified in luto.settings.py).
-
-    Limits are year-specific, beginning at the 2010 net water yields and decreasing to the defined limits
-    in the year given by settings.WATER_LIMITS_TARGET_YEAR.
 
     Parameters:
     - data: The data object containing the necessary input data.
@@ -629,58 +436,35 @@ def get_water_net_yield_limit_values(
     - None
 
     """
-    if any([not data.YR_CAL_BASE <= yr <= 2100 for yr in settings.WATER_YIELD_TARGETS]):
-        raise ValueError(
-            f"Setting WATER_YIELD_TARGETS must be defined for years between "
-            f"{data.YR_CAL_BASE} and 2100."
-        )
+    # Get the water limit from data to avoid recalculating
+    if data.WATER_YIELD_LIMITS is not None:
+        return data.WATER_YIELD_LIMITS
+    
+    # Get historical yields of regions, stored in data.RIVREG_LIMITS and data.DRAINDIV_LIMITS
+    if settings.WATER_REGION_DEF == 'River Region':
+        wny_region_hist = data.RIVREG_LIMITS
+        region_id = data.RIVREG_ID
+        region_names = data.RIVREG_DICT
 
-    latest_target_year = max(settings.WATER_YIELD_TARGETS)
-    # if data.WATER_LIMITS_BY_YEAR:
-    #     return (
-    #         data.WATER_LIMITS_BY_YEAR[latest_target_year]
-    #         if yr_cal >= latest_target_year
-    #         else data.WATER_LIMITS_BY_YEAR[yr_cal]
-    #     )
+    elif settings.WATER_REGION_DEF == 'Drainage Division':
+        wny_region_hist = data.DRAINDIV_LIMITS
+        region_id = data.DRAINDIV_ID
+        region_names = data.DRAINDIV_DICT
 
-    # Limits do not yet exist and must be calculated
-    historical_yields_dict = _get_historical_water_yield_by_regions(data)
-    base_yr_net_yield_by_reg = calc_water_net_yield_by_region_in_year_from_data(data, data.YR_CAL_BASE)
+    # Calculate the water yield limits for each region
+    limits_by_region = {}
+    for region, name in data.DRAINDIV_DICT.items():
+        hist_yield = wny_region_hist[region]
+        ind = np.flatnonzero(region_id == region).astype(np.int32)
+        limit_hist_level = hist_yield * settings.WATER_YIELD_TARGET_AG_SHARE    # Water yield limit calculated as a proportial of historical level based on planetary boundary theory
+        limit_CCI_buffer = hist_yield * settings.WATER_YIELD_CCI_BUFFER         # Water yield limit buffer calculated as specified in settings
+        limit_total = limit_hist_level + limit_CCI_buffer
+        limits_by_region[region] = (name, hist_yield, limit_total, ind)    
 
-    limits_by_region_year = defaultdict(dict)
-
-    # Get the intervals for which gradients must be calculated
-    target_years = list(settings.WATER_YIELD_TARGETS.keys())
-    gradients_start_ends = (
-        [(data.YR_CAL_BASE, target_years[0])] if len(target_years) == 1 else
-        [(data.YR_CAL_BASE, target_years[0])] + list(pairwise(target_years))
-        if target_years[0] != data.YR_CAL_BASE else
-        list(pairwise(target_years))
-    )
-
-    for yr_start, yr_end in gradients_start_ends:
-        n_years_cal = yr_end - yr_start + 1
-        calc_years = np.linspace(yr_start, yr_end, n_years_cal).astype(int)
-
-        for region, (name, hist_yield, ind) in historical_yields_dict.items():
-            reg_target_yr_end = hist_yield * settings.WATER_YIELD_TARGETS[yr_end]
-            if yr_start == data.YR_CAL_BASE:
-                reg_target_yr_start = min(base_yr_net_yield_by_reg[region], reg_target_yr_end)
-            else:
-                saved_limit = limits_by_region_year[yr_start][region][2]
-                reg_target_yr_start = min(saved_limit, reg_target_yr_end)
-
-            yrs_targets = np.linspace(reg_target_yr_end, reg_target_yr_end, n_years_cal)
-            for yr, limit in zip(calc_years, yrs_targets):
-                limits_by_region_year[yr][region] = (name, hist_yield, reg_target_yr_end, ind)
-
-    # Save to data object to avoid re-calculating in the future.
-    data.WATER_LIMITS_BY_YEAR = dict(limits_by_region_year)
-
-    return (
-        data.WATER_LIMITS_BY_YEAR[latest_target_year] if yr_cal >= latest_target_year
-        else data.WATER_LIMITS_BY_YEAR[yr_cal]
-    )
+    # Save the results in data to avoid recalculating
+    data.WATER_YIELD_LIMITS = limits_by_region
+    
+    return limits_by_region
     
 
 

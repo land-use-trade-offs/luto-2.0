@@ -740,10 +740,9 @@ class Data:
         # Water data.
         ###############################################################
         print("\tLoading water data...", flush=True)
-
-        # Initialise container for water usage limits to avoid re-calculating the figures
-        # during timeseries solves.
-        self.WATER_LIMITS_BY_YEAR = None
+        
+        # Initialize water constraints to avoid recalculating them every time.
+        self.WATER_YIELD_LIMITS = None
 
         # Water requirements by land use -- LVSTK.
         wreq_lvstk_dry = pd.DataFrame()
@@ -836,8 +835,8 @@ class Data:
         )
         wyield_fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_dr_ml_ha.h5')
         wyield_fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_sr_ml_ha.h5')
-        self.WATER_YIELD_DR_FILE = h5py.File(wyield_fname_dr, 'r')['Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean'][...]
-        self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')['Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean'][...]
+        self.WATER_YIELD_DR_FILE = h5py.File(wyield_fname_dr, 'r')['Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean'][...]  # [...] to read the data into memory, so that it can be pickled.
+        self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')['Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean'][...]  # [...] to read the data into memory, so that it can be pickled.
 
 
         if settings.WATER_REGION_DEF == 'River Region':

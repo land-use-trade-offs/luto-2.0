@@ -414,8 +414,9 @@ def create_new_dataset():
     zones['WATER_YIELD_HIST_BASELINE_ML'] = bioph['WATER_YIELD_HIST_BASELINE_ML_HA'] * zones['CELL_HA']
 
     # Create a LUT of river regions ID, name, and historical baseline water yield.
-    rivreg_lut = zones.groupby(['HR_RIVREG_ID'], as_index = False, observed = True).agg(HR_RIVREG_NAME = ('HR_RIVREG_NAME', 'first'),
-                                                                                        WATER_YIELD_HIST_BASELINE_ML = ('WATER_YIELD_HIST_BASELINE_ML', 'sum'))
+    rivreg_lut = zones.groupby(['HR_RIVREG_ID'], as_index = False, observed = True)\
+                      .agg(HR_RIVREG_NAME = ('HR_RIVREG_NAME', 'first'),
+                           WATER_YIELD_HIST_BASELINE_ML = ('WATER_YIELD_HIST_BASELINE_ML', 'sum'))
 
     # Save to HDF5 file.
     rivreg_lut.to_hdf(outpath + 'rivreg_lut.h5', key = 'rivreg_lut', mode = 'w', format = 'table', index = False, complevel = 9)
@@ -425,8 +426,9 @@ def create_new_dataset():
 
 
     # Create a LUT of drainage division ID, name, and historical baseline water yield.
-    draindiv_lut = zones.groupby(['HR_DRAINDIV_ID'], as_index = False, observed = True).agg(HR_DRAINDIV_NAME = ('HR_DRAINDIV_NAME', 'first'),
-                                                                                            WATER_YIELD_HIST_BASELINE_ML = ('WATER_YIELD_HIST_BASELINE_ML', 'sum'))
+    draindiv_lut = zones.groupby(['HR_DRAINDIV_ID'], as_index = False, observed = True)\
+        .agg(HR_DRAINDIV_NAME = ('HR_DRAINDIV_NAME', 'first'),
+             WATER_YIELD_HIST_BASELINE_ML = ('WATER_YIELD_HIST_BASELINE_ML', 'sum'))
 
     print(draindiv_lut)
 

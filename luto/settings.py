@@ -96,7 +96,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 17        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
 # MODE = 'snapshot'   # Runs for target year only
@@ -332,8 +332,6 @@ GHG_PENALTY = 10e-3
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 
-RELAXED_WATER_LIMITS_FOR_INFEASIBILITY = 'on'
-
 
 
 # Regionalisation to enforce water use limits by
@@ -355,14 +353,11 @@ WATER_STRESS = 0.2
 AG_SHARE_OF_WATER_USE = 1.0
 WATER_YIELD_TARGET_AG_SHARE = 1 - WATER_STRESS * AG_SHARE_OF_WATER_USE
 
-# Set a dictionary of water yield targets (i.e., the proportion of historical net annual water yield). LUTO will ensure that
-# net annual water yield is >= this proportion of historical net annual water yield is met by the given date, leaving sufficient water
-# for domestic and industrial use. The water yield target grades linearly from net water yield in 2010 to achieve the target by the target date
-# for each catchment (river region or drainage division)
-WATER_YIELD_TARGETS = {
-                        # 2011: WATER_YIELD_TARGET_AG_SHARE,
-                        2100: WATER_YIELD_TARGET_AG_SHARE,
-                      }
+# Buffer level to cancel out climate change impacts on water availability;
+# 0.05 = 5% of historical net yield, meaning that LUTO asks for an additional 5% of historical net yield to account for climate change impacts
+# This buffer may not be enough to account for climate change impacts in a given sim year, in that case LUTO will furthur relax the water constraint.
+WATER_YIELD_CCI_BUFFER = 0.05     # 5% of historical net yield
+
 
 # Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water turned off due to infeasibility issues with water constraint in Pilbara
 LIVESTOCK_DRINKING_WATER = 1

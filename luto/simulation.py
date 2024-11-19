@@ -50,7 +50,7 @@ def run( data: Data, base: int, target: int) -> None:
     """
     Run the simulation.
     Parameters:
-        'data' is a Data object, and 'base' and 'target' are the base and target years.
+        'data' is a Data object, and 'base' and 'target' are the base and target years for the whole simulation.
     """
 
     # Set Data object's path and create output directories
