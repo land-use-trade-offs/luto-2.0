@@ -61,21 +61,27 @@ def get_wreq_matrices(data: Data, yr_idx):
     return w_req_mrj
 
 
-def get_wyield_matrices(data: Data, yr_idx:int) -> np.ndarray:
+def get_wyield_matrices(
+    data: Data, yr_idx:int, 
+    water_dr_yield: Optional[np.ndarray] = None,
+    water_sr_yield: Optional[np.ndarray] = None
+) -> np.ndarray:
     """
     Return water yield matrices for YR_CAL_BASE (2010) by land management, cell, and land-use type.
 
     Parameters:
         data (object): The data object containing the required data.
         yr_idx (int): The index of the year.
+        water_dr_yield (ndarray, <unit:ML/cell>): The water yield for deep-rooted vegetation.
+        water_sr_yield (ndarray, <unit:ML/cell>): The water yield for shallow-rooted vegetation.
 
     Returns:
         numpy.ndarray: The w_mrj <unit: ML/cell> water yield matrices, indexed (m, r, j).
     """
     w_yield_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
 
-    w_yield_dr = data.get_water_dr_yield_for_yr_idx(yr_idx)
-    w_yield_sr = data.get_water_sr_yield_for_yr_idx(yr_idx)
+    w_yield_dr = data.get_water_dr_yield_for_yr_idx(yr_idx) if water_dr_yield is None else water_dr_yield
+    w_yield_sr = data.get_water_sr_yield_for_yr_idx(yr_idx) if water_sr_yield is None else water_sr_yield
     w_yield_nl = data.get_water_nl_yield_for_yr_idx(yr_idx, w_yield_dr, w_yield_sr)
 
 
@@ -102,7 +108,12 @@ def get_wyield_matrices(data: Data, yr_idx:int) -> np.ndarray:
     return w_yield_mrj
 
 
-def get_water_net_yield_matrices(data: Data, yr_idx):
+def get_water_net_yield_matrices(
+    data: Data, 
+    yr_idx, 
+    water_dr_yield: Optional[np.ndarray] = None,
+    water_sr_yield: Optional[np.ndarray] = None
+    ) -> np.ndarray:
     """
     Return water net yield matrices by land management, cell, and land-use type.
     The resulting array is used as the net yield w_mrj array in the input data of the solver.
@@ -110,11 +121,17 @@ def get_water_net_yield_matrices(data: Data, yr_idx):
     Parameters:
         data (object): The data object containing the required data.
         yr_idx (int): The index of the year.
+        water_dr_yield (ndarray, <unit:ML/cell>): The water yield for deep-rooted vegetation.
+        water_sr_yield (ndarray, <unit:ML/cell>): The water yield for shallow-rooted vegetation.
+        
+    Notes:
+        Provides the `water_dr_yield` or `water_sr_yield` will make the `yr_idx` useless because
+        the water net yield will be calculated based on the provided water yield data regardless of the year.
 
     Returns:
         numpy.ndarray: The w_mrj <unit: ML/cell> water net yield matrices, indexed (m, r, j).
     """
-    return get_wyield_matrices(data, yr_idx) - get_wreq_matrices(data, yr_idx)
+    return get_wyield_matrices(data, yr_idx, water_dr_yield, water_sr_yield) - get_wreq_matrices(data, yr_idx)
 
 
 def get_asparagopsis_effect_w_mrj(data: Data, yr_idx):
@@ -388,6 +405,31 @@ def get_water_outside_luto_study_area(data: Data, yr_cal:int) ->  dict[int, floa
     return data.WATER_OUTSIDE_LUTO_DD.loc[yr_cal].to_dict()
 
 
+def get_water_outside_luto_study_area_from_hist_level(data: Data) -> dict[int, float]:
+    """
+    Return water yield from the outside regions of LUTO study area based on historical levels.
+
+    Parameters:
+        data (object): The data object containing the required data.
+
+    Returns:
+        dict[int, float]: <unit: ML/cell> dictionary of water yield amounts.
+    """
+    if settings.WATER_REGION_DEF == 'River Region':
+        water_yield_arr = data.WATER_OUTSIDE_LUTO_RR_HIST
+
+    elif settings.WATER_REGION_DEF == 'Drainage Division':
+        water_yield_arr = data.WATER_OUTSIDE_LUTO_DD_HIST
+
+    else:
+        raise ValueError(
+            f"Invalid value for setting WATER_REGION_DEF: '{settings.WATER_REGION_DEF}' "
+            f"(must be either 'River Region' or 'Drainage Division')."
+        )
+
+    return water_yield_arr
+
+
 def calc_water_net_yield_for_region(
     region_ind: np.ndarray,
     am2j: dict[str, list[int]],
@@ -459,7 +501,7 @@ def get_water_net_yield_limit_values(
         limit_hist_level = hist_yield * settings.WATER_YIELD_TARGET_AG_SHARE    # Water yield limit calculated as a proportial of historical level based on planetary boundary theory
         limit_CCI_buffer = hist_yield * settings.WATER_YIELD_CCI_BUFFER         # Water yield limit buffer calculated as specified in settings
         limit_total = limit_hist_level + limit_CCI_buffer
-        limits_by_region[region] = (name, hist_yield, limit_total, ind)    
+        limits_by_region[region] = (name, limit_hist_level, limit_CCI_buffer, ind)    
 
     # Save the results in data to avoid recalculating
     data.WATER_YIELD_LIMITS = limits_by_region

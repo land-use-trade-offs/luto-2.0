@@ -466,7 +466,7 @@ def create_new_dataset():
 
         # Get the total water yield for each drainage division and river region
         water_yield_dd = base_arr_df.groupby(['HR_DRAINDIV_ID', 'Year'], as_index = False, observed = True).agg(Water_yield_ML = ('Water_yield_ML', 'sum'))
-        water_yield_rr = base_arr_df.groupby([ 'HR_RIVREG_ID', 'Year'], as_index = False, observed = True).agg(Water_yield_ML = ('Water_yield_ML', 'sum'))
+        water_yield_rr = base_arr_df.groupby(['HR_RIVREG_ID', 'Year'], as_index = False, observed = True).agg(Water_yield_ML = ('Water_yield_ML', 'sum'))
         water_yield_dd = water_yield_dd.rename(columns = {'HR_DRAINDIV_ID': 'Region_ID'})
         water_yield_rr = water_yield_rr.rename(columns = {'HR_RIVREG_ID': 'Region_ID'})
 
@@ -510,8 +510,33 @@ def create_new_dataset():
     water_yield_all_AUS_dd.to_hdf(os.path.join(outpath, 'water_yield_natural_land_2010_2100_dd_ml.h5'), key='water_yield_natural_land_2010_2100_dd_ml', mode='w', format='table', complevel=9)
     water_yield_all_AUS_rr.to_hdf(os.path.join(outpath, 'water_yield_natural_land_2010_2100_rr_ml.h5'), key='water_yield_natural_land_2010_2100_rr_ml', mode='w', format='table', complevel=9)
 
+    # Calculate water yield for each drainage division and river region based on historical baseline
+    water_yield_hist_baseline_ml_ha = water_yield_baselines.eval(
+    'WATER_YIELD_HIST_DR_ML_HA * DEEP_ROOTED_PROPORTION + WATER_YIELD_HIST_SR_ML_HA * (1 - DEEP_ROOTED_PROPORTION)'
+    ).to_numpy(dtype = np.float32)
+    
+    water_yield_hist_baseline_ml = water_yield_hist_baseline_ml_ha * zones['CELL_HA'].to_numpy(dtype = np.float32)
+    water_yield_hist_baseline_ml_outside_LUTO = water_yield_hist_baseline_ml[idx_outside_luto_study_area]
 
-
+    dd_id_outside_LUTO = zones[idx_outside_luto_study_area]['HR_DRAINDIV_ID'].values
+    rr_id_outside_LUTO = zones[idx_outside_luto_study_area]['HR_RIVREG_ID'].values
+    water_yield_outside_LUTO_hist_dd = dict(enumerate(np.bincount(dd_id_outside_LUTO, water_yield_hist_baseline_ml_outside_LUTO)))
+    water_yield_outside_LUTO_hist_rr = dict(enumerate(np.bincount(rr_id_outside_LUTO, water_yield_hist_baseline_ml_outside_LUTO)))
+    
+    water_yield_outside_LUTO_hist_dd_df = pd.DataFrame(water_yield_outside_LUTO_hist_dd, index=['Water Yield (ML)']).T.reset_index(names='Region_ID')
+    water_yield_outside_LUTO_hist_rr_df = pd.DataFrame(water_yield_outside_LUTO_hist_rr, index=['Water Yield (ML)']).T.reset_index(names='Region_ID')
+    water_yield_outside_LUTO_hist_rr_df.insert(0, 'Region_Type', 'River Region')
+    water_yield_outside_LUTO_hist_dd_df.insert(0, 'Region_Type', 'Drainage Division')
+    
+    water_yield_outside_LUTO_hist_df = pd.concat([water_yield_outside_LUTO_hist_dd_df, water_yield_outside_LUTO_hist_rr_df], ignore_index=True)
+    water_yield_outside_LUTO_hist_df = water_yield_outside_LUTO_hist_df.query('Region_ID != 0')
+    water_yield_outside_LUTO_hist_df.to_hdf(
+        os.path.join(outpath, 'water_yield_outside_LUTO_study_area_hist_1970_2000.h5'), 
+        key='water_yield_outside_LUTO_study_area_hist_1970_2000', 
+        mode='w', 
+        format='table', 
+        complevel=9
+    )
 
 
     ############### Get biodiversity priority layers

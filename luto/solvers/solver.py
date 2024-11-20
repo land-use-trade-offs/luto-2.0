@@ -568,7 +568,7 @@ class LutoSolver:
         min_var = lambda var, prev_var: var if prev_var.x > 1e-3 else prev_var.x
 
         # Ensure water use remains below limit for each region
-        for region, (reg_name, w_hist_base, w_limit_hist_CCI_buffer, ind) in self._input_data.limits["water"].items():
+        for region, (reg_name, limit_hist_level, limit_CCI_buffer, ind) in self._input_data.limits["water"].items():
 
             ag_contr = gp.quicksum(
                 gp.quicksum(
@@ -619,14 +619,13 @@ class LutoSolver:
                 outside_luto_study_contr
             )
             
-            w_limit_hist = w_hist_base * settings.WATER_YIELD_TARGET_AG_SHARE
             
             # Update the water yield limit if the net yield is below the sum of historical and CCI_buffer
             wny_limit_updated = False
-            if wny_current_yr >= w_limit_hist_CCI_buffer:
-                constr_wny_limit = w_limit_hist_CCI_buffer
+            if wny_current_yr >= (limit_hist_level + limit_CCI_buffer):
+                constr_wny_limit = limit_hist_level + limit_CCI_buffer
             else:
-                constr_wny_limit = w_limit_hist
+                constr_wny_limit = limit_hist_level
                 wny_limit_updated = True
 
             # Add constraint that the net yield must be greater than the limit
@@ -635,10 +634,10 @@ class LutoSolver:
 
             # Report on the water yield in the region
             if settings.VERBOSE == 1:
-                print(f"    ...net water yield in {reg_name} >= {w_limit_hist_CCI_buffer:.2f} ML")
+                print(f"    ...net water yield in {reg_name} >= {limit_hist_level + limit_CCI_buffer:.2f} ML")
                 if wny_limit_updated:
                     print(
-                        f"        ...net water yield in {reg_name} lowered from (`hist_level_limit` + `climate_change_buffer`) {w_limit_hist_CCI_buffer:.2f} ML "
+                        f"        ...net water yield in {reg_name} lowered from (`limit_hist_level` + `limit_CCI_buffer`) {limit_hist_level + limit_CCI_buffer:.2f} ML "
                         f"to `hist_level_limit` {constr_wny_limit:.2f} ML"
                     )
 

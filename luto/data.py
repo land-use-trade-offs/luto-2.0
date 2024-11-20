@@ -835,10 +835,14 @@ class Data:
         )
         wyield_fname_dr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_dr_ml_ha.h5')
         wyield_fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_sr_ml_ha.h5')
-        self.WATER_YIELD_DR_FILE = h5py.File(wyield_fname_dr, 'r')['Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean'][...]  # [...] to read the data into memory, so that it can be pickled.
-        self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')['Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean'][...]  # [...] to read the data into memory, so that it can be pickled.
+        
+        # Read the data into memory with [...], so that it can be pickled.
+        self.WATER_YIELD_DR_FILE = h5py.File(wyield_fname_dr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_DR_ML_HA_mean'][...]
+        self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_SR_ML_HA_mean'][...]
 
-
+        # Water yield from outside LUTO study area.
+        water_yield_oustide_luto_hist = pd.read_hdf(os.path.join(INPUT_DIR, 'water_yield_outside_LUTO_study_area_hist_1970_2000.h5'))
+        
         if settings.WATER_REGION_DEF == 'River Region':
             rr_outside_luto = pd.read_hdf(os.path.join(INPUT_DIR, 'water_yield_outside_LUTO_study_area_2010_2100_rr_ml.h5'))
             rr_outside_luto = rr_outside_luto.loc[:, pd.IndexSlice[:, settings.SSP]]
@@ -849,6 +853,7 @@ class Data:
             rr_natural_land.columns = rr_natural_land.columns.droplevel('ssp')
 
             self.WATER_OUTSIDE_LUTO_RR = rr_outside_luto
+            self.WATER_OUTSIDE_LUTO_RR_HIST = water_yield_oustide_luto_hist.query('Region_Type == "River Region"').set_index('Region_ID')['Water Yield (ML)'].to_dict()
             self.WATER_UNDER_NATURAL_LAND_RR = rr_natural_land
 
         if settings.WATER_REGION_DEF == 'Drainage Division':
@@ -861,6 +866,7 @@ class Data:
             dd_natural_land.columns = dd_natural_land.columns.droplevel('ssp')
 
             self.WATER_OUTSIDE_LUTO_DD = dd_outside_luto
+            self.WATER_OUTSIDE_LUTO_DD_HIST = water_yield_oustide_luto_hist.query('Region_Type == "Drainage Division"').set_index('Region_ID')['Water Yield (ML)'].to_dict()
             self.WATER_UNDER_NATURAL_LAND_DD = dd_natural_land
             
 

@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any
+from typing import Any, Optional
 import numpy as np
 import pandas as pd
 
@@ -68,7 +68,6 @@ class SolverInputData:
     ag_man_limits: dict             # Agricultural management options' adoption limits.
     ag_man_lb_mrj: dict             # Agricultural management options' lower bounds.
 
-    water_nyield_feasible_reduce_potential: dict                        # Water net yield from base year.
     water_yield_outside_study_area: dict[int, float]                    # Water yield from outside LUTO study area -> dict. Keys: year, region.
 
     offland_ghg: np.ndarray         # GHG emissions from off-land commodities.
@@ -202,28 +201,15 @@ def get_non_ag_g_rk(data: Data, ag_g_mrj, base_year):
     return output.astype(np.float32)
 
 
-def get_ag_w_mrj(data: Data, target_index):
-    print('Getting agricultural water net yield matrices...', flush = True)
-    output = ag_water.get_water_net_yield_matrices(data, target_index)
+def get_ag_w_mrj(data: Data, target_index, water_dr_yield: Optional[np.ndarray] = None, water_sr_yield: Optional[np.ndarray] = None):
+    print('Getting agricultural water net yield matrices based on historical water yield layers ...', flush = True)
+    output = ag_water.get_water_net_yield_matrices(data, target_index, water_dr_yield, water_sr_yield)
     return output.astype(np.float32)
 
 
-def get_wny_feasible_reduction_potential(data: Data, base_year, target_idx):
-    print('Getting water yield reduction potential (crop irrigation | livestock drinking) in the base year...', flush = True)
-    # Get water irrigation requirement for each region
-    if settings.WATER_REGION_DEF == 'Drainage Division':
-        region_id = data.DRAINDIV_ID
-    elif settings.WATER_REGION_DEF == 'River Region':
-        region_id = data.RIVREG_ID
-    w_req_mrj = ag_water.get_wreq_matrices(data, target_idx)
-    dvar_mrj = data.ag_dvars[base_year]
-    w_req_r = np.einsum('mrj,mrj->r', w_req_mrj, dvar_mrj)
-    w_req_by_reg = dict(enumerate(np.bincount(region_id.flatten(), w_req_r.flatten())))
-    return w_req_by_reg
-
 def get_w_outside_luto(data: Data, yr_cal: int):
     print('Getting water yield from outside LUTO study area...', flush = True)
-    return ag_water.get_water_outside_luto_study_area(data, yr_cal)
+    return ag_water.get_water_outside_luto_study_area_from_hist_level(data)
 
 
 def get_ag_b_mrj(data: Data):
@@ -232,10 +218,17 @@ def get_ag_b_mrj(data: Data):
     return output.astype(np.float32)
 
 
-def get_non_ag_w_rk(data: Data, ag_w_mrj: np.ndarray, base_year, target_year):
+def get_non_ag_w_rk(
+    data: Data, 
+    ag_w_mrj: np.ndarray, 
+    base_year, 
+    target_year, 
+    water_dr_yield: Optional[np.ndarray] = None, 
+    water_sr_yield: Optional[np.ndarray] = None
+    ):
     print('Getting non-agricultural water requirement matrices...', flush = True)
-    yr_idx = data.YR_CAL_BASE - target_year
-    output = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[base_year], yr_idx)
+    yr_idx = target_year - data.YR_CAL_BASE
+    output = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[base_year], yr_idx, water_dr_yield, water_sr_yield)
     return output.astype(np.float32)
 
 
@@ -406,7 +399,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     ag_q_mrp = get_ag_q_mrp(data, target_index)
     ag_r_mrj = get_ag_r_mrj(data, target_index)
     ag_t_mrj = get_ag_t_mrj(data, target_index, base_year)
-    ag_w_mrj = get_ag_w_mrj(data, 0)                            # Use the water net yield from the YR_CAL_BASE year
+    ag_w_mrj = get_ag_w_mrj(data, target_index, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)     # Calculate water net yield matrices based on historical water yield layers
     ag_b_mrj = get_ag_b_mrj(data)
     ag_x_mrj = get_ag_x_mrj(data, base_year)
 
@@ -432,7 +425,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         non_ag_c_rk=get_non_ag_c_rk(data, ag_c_mrj, base_year, target_year),
         non_ag_r_rk=get_non_ag_r_rk(data, ag_r_mrj, base_year, target_year),
         non_ag_g_rk=get_non_ag_g_rk(data, ag_g_mrj, base_year),
-        non_ag_w_rk=get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year),
+        non_ag_w_rk=get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR),  # Calculate non-ag water requirement matrices based on historical water yield layers
         non_ag_b_rk=get_non_ag_b_rk(data, ag_b_mrj, base_year),
         non_ag_x_rk=get_non_ag_x_rk(data, ag_x_mrj, base_year),
         non_ag_q_crk=get_non_ag_q_crk(data, ag_q_mrp, base_year),
@@ -444,9 +437,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_t_mrj=get_ag_man_transitions(data, target_index, ag_t_mrj),
         ag_man_w_mrj=get_ag_man_water(data, target_index),
         ag_man_b_mrj=get_ag_man_biodiversity(data, target_index, ag_b_mrj),
-        ag_man_limits=get_ag_man_limits(data, target_index),
+        ag_man_limits=get_ag_man_limits(data, target_index),                            
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
-        water_nyield_feasible_reduce_potential=get_wny_feasible_reduction_potential(data, base_year, target_index),
         water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Use the water net yield outside LUTO study area for the YR_CAL_BASE year
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
         lu2pr_pj=data.LU2PR,
