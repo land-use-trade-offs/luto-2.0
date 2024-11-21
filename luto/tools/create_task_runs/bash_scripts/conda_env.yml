@@ -30,6 +30,6 @@ dependencies:
   - dill==0.3.8
   - pip
   - pip:
-      - gurobipy==12.0.0
+      - gurobipy==11.0.2
       - numpy_financial==1.0.0
       - tables==3.9.2
