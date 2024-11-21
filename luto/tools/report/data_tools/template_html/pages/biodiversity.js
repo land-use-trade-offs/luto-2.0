@@ -169,8 +169,12 @@ document.addEventListener("DOMContentLoaded", function () {
     // biodiversity_5_contribution_score_by_group
     Highcharts.chart("biodiversity_5_contribution_score_by_group", {
         chart: {
-            type: "column",
             marginRight: 380,
+        },
+        plotOptions: {
+            column: {
+                showInLegend: false
+            },
         },
         title: {
             text: "Biodiversity Contribution by Group",
@@ -281,7 +285,7 @@ document.addEventListener("DOMContentLoaded", function () {
         },
         legend: {
             itemStyle: {
-              fontSize: "11px",
+                fontSize: "11px",
             },
             align: "right",
             layout: "vertical",
@@ -290,7 +294,7 @@ document.addEventListener("DOMContentLoaded", function () {
             verticalAlign: "middle",
             itemMarginTop: 0,
             itemMarginBottom: 1,
-          },
+        },
         credits: {
             enabled: false,
         },
