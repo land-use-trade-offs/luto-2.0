@@ -402,7 +402,7 @@ def get_water_outside_luto_study_area(data: Data, yr_cal:int) ->  dict[int, floa
             f"(must be either 'River Region' or 'Drainage Division')."
         )
 
-    return data.WATER_OUTSIDE_LUTO_DD.loc[yr_cal].to_dict()
+    return water_yield_arr
 
 
 def get_water_outside_luto_study_area_from_hist_level(data: Data) -> dict[int, float]:

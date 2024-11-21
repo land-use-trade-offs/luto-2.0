@@ -99,8 +99,8 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 17        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
-# MODE = 'snapshot'   # Runs for target year only
-MODE = 'timeseries'   # Runs each year from base year to target year
+MODE = 'snapshot'   # Runs for target year only
+# MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -202,7 +202,7 @@ NON_AG_LAND_USES_REVERSIBLE = {
 
 # Carbon price scenario: either '1.8C 67%', '1.5C 50%', '1.5C 67%', 'Default', '100', or None.
 # Setting to None falls back to the 'Default' scenario.
-CARBON_PRICES_FIELD = '1.5C 67%'
+CARBON_PRICES_FIELD = '100'
 
 # Cost of fencing per linear metre
 FENCING_COST_PER_M = 10

@@ -97,7 +97,7 @@ def write_data(data: Data):
     jobs = [delayed(write_output_single_year)(data, yr, path_yr, None) for (yr, path_yr) in zip(years, paths)]
 
     # Check if the simulation is complete by comparing the last year in the simulation with the target year
-    complete_simulation = max([int(i[-4:]) for i in os.listdir(data.path) if 'out' in i]) == max(years)
+    complete_simulation = max([int(i[-4:]) for i in os.listdir(data.path) if 'out_' in i]) == max(years)
     
     # Write the area/quantity comparison between base-year and target-year for the timeseries mode
     if complete_simulation:
@@ -866,9 +866,9 @@ def write_water(data: Data, yr_cal, path):
     non_ag_w_rk_CCI = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj_CCI, data.lumaps[yr_cal], yr_idx)
     wny_outside_luto_study_area_CCI = ag_water.get_water_outside_luto_study_area(data, yr_cal)
     
-    ag_w_mrj_base_yr = ag_water.get_water_net_yield_matrices(data, 0)
-    non_ag_w_rk_base_yr = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj_base_yr, data.lumaps[yr_cal], 0)
-    wny_outside_luto_study_area_base_yr = ag_water.get_water_outside_luto_study_area(data, data.YR_CAL_BASE)
+    ag_w_mrj_base_yr = ag_water.get_water_net_yield_matrices(data, yr_idx, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
+    non_ag_w_rk_base_yr = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj_base_yr, data.lumaps[yr_cal], yr_idx, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
+    wny_outside_luto_study_area_base_yr = ag_water.get_water_outside_luto_study_area_from_hist_level(data)
     
     # Water yield from agricultural management is a multiple of the area of the water requirement, 
     # so it is not affected by the climate change impact.
