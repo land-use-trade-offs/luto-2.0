@@ -22,22 +22,30 @@ document.addEventListener("DOMContentLoaded", function () {
   // Get the year ticks and interval
   var year_ticks = years.length == 2 ? years : null;
 
-// Set the title alignment to left
-Highcharts.setOptions({
-  title: {
-      align: 'left'
-  }
-});
+  // Global options
+  Highcharts.setOptions({
+    title: {
+      align: 'left' // Align the title to the left
+    },
+  });
 
-  // Chart:water_1_1_percent_of_limit
-  Highcharts.chart("water_1_1_percent_of_limit", {
+  // Chart:water_1_water_net_use_by_broader_category
+  Highcharts.chart("water_1_water_net_use_by_broader_category", {
     chart: {
-      type: "spline",
       marginRight: 380,
     },
 
+    plotOptions: {
+      column: {
+        stacking: "normal",
+        dataLabels: {
+          enabled: false,
+        }
+      },
+    },
+
     title: {
-      text: "Water Net Yield as Percentage of Historical Yield Baseline",
+      text: "Water Net Yield by Broader Land-use and Management Type",
     },
 
     credits: {
@@ -45,14 +53,14 @@ Highcharts.setOptions({
     },
 
     series: JSON.parse(
-      document.getElementById("water_1_1_percent_of_limit_csv").innerHTML
+      document.getElementById("water_1_water_net_use_by_broader_category_csv").innerHTML
     ),
     xAxis: {
       tickPositions: year_ticks,
     },
     yAxis: {
       title: {
-        text: "Water yield to baseline (%)",
+        text: "Water net yield (ML)",
       },
     },
 
@@ -77,188 +85,11 @@ Highcharts.setOptions({
   });
 
 
-  // Chart:water_1_2_percent_of_limit
-  Highcharts.chart("water_1_2_percent_of_limit", {
-    chart: {
-      type: "spline",
-      marginRight: 380,
-    },
-
-    title: {
-      text: "Climate Change Impact on Water Net Yield",
-    },
-
-    credits: {
-      enabled: false,
-    },
-
-    series: JSON.parse(
-      document.getElementById("water_1_2_percent_of_limit_csv").innerHTML
-    ),
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-    yAxis: {
-      title: {
-        text: "Water yield to baseline (%)",
-      },
-    },
-
-    legend: {
-      align: "right",
-      layout: "vertical",
-      x: -80,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-  // Chart:water_1_3_percent_of_limit
-  Highcharts.chart("water_1_3_percent_of_limit", {
-    chart: {
-      type: "spline",
-      marginRight: 380,
-    },
-
-    title: {
-      text: "Land-use Change Impact on Water Net Yield",
-    },
-
-    credits: {
-      enabled: false,
-    },
-
-    series: JSON.parse(
-      document.getElementById("water_1_3_percent_of_limit_csv").innerHTML
-    ),
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-    yAxis: {
-      title: {
-        text: "Water yield to baseline (%)",
-      },
-    },
-
-    legend: {
-      align: "right",
-      layout: "vertical",
-      x: -80,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-
-
-  // Chart:water_2_yield_to_limit
-  Highcharts.chart("water_2_yield_to_limit", {
-    chart: {
-      type: "spline",
-      marginRight: 380,
-    },
-
-    title: {
-      text: "Water Net Yield by Drainage Division/River Region",
-    },
-
-    credits: {
-      enabled: false,
-    },
-
-    series: JSON.parse(
-      document.getElementById("water_2_yield_to_limit_csv").innerHTML
-    ),
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-    yAxis: {
-      title: {
-        text: "Water Net Yield (ML)",
-      },
-    },
-
-    legend: {
-      align: "right",
-      layout: "vertical",
-      x: -80,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-  // Chart:water_3_net_yield_by_sector
-  Highcharts.chart("water_3_net_yield_by_sector", {
+  // Chart:water_2_water_net_yield_by_specific_landuse
+  Highcharts.chart("water_2_water_net_yield_by_specific_landuse", {
     chart: {
       type: "column",
       marginRight: 380,
-    },
-
-    title: {
-      text: "Water Net Yield by Broad Land-use and Management Type",
-    },
-
-    credits: {
-      enabled: false,
-    },
-
-    series: JSON.parse(
-      document.getElementById("water_3_net_yield_by_sector_csv").innerHTML
-    ),
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-    yAxis: {
-      title: {
-        text: "Water Net Yield (ML)",
-      },
-    },
-
-    legend: {
-      align: "right",
-      layout: "vertical",
-      x: -150,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
     },
 
     plotOptions: {
@@ -268,23 +99,13 @@ Highcharts.setOptions({
           enabled: false,
         },
       },
-    },
-
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-  // Chart:water_4_net_yield_by_landuse
-  Highcharts.chart("water_4_net_yield_by_landuse", {
-    chart: {
-      type: "column",
-      marginRight: 380,
+      spline: {
+        showInLegend: false
+      },
     },
 
     title: {
-      text: "Water Net Yield by Land-use and Agricultural Commodity",
+      text: "Water Net Yield by Broader Land-use and Management Type",
     },
 
     credits: {
@@ -292,14 +113,14 @@ Highcharts.setOptions({
     },
 
     series: JSON.parse(
-      document.getElementById("water_4_net_yield_by_landuse_csv").innerHTML
+      document.getElementById("water_2_water_net_yield_by_specific_landuse_csv").innerHTML
     ),
     xAxis: {
       tickPositions: year_ticks,
     },
     yAxis: {
       title: {
-        text: "Water Net Yield (ML)",
+        text: "Water net yield (ML)",
       },
     },
 
@@ -309,7 +130,7 @@ Highcharts.setOptions({
       },
       align: "right",
       layout: "vertical",
-      x: 0,
+      x: -30,
       y: -10,
       verticalAlign: "middle",
       itemMarginTop: 0,
@@ -323,74 +144,95 @@ Highcharts.setOptions({
       },
     },
 
-    plotOptions: {
-      column: {
-        stacking: "normal",
-        dataLabels: {
-          enabled: false,
-        },
-      },
-    },
-
     exporting: {
       sourceWidth: 1200,
       sourceHeight: 600,
     },
   });
 
-  // Chart:water_5_net_yield_by_Water_supply
-  Highcharts.chart("water_5_net_yield_by_Water_supply", {
-    chart: {
-      type: "column",
-      marginRight: 380,
-    },
+  // Chart:water_3_water_net_yield_by_region
+  const chartContainer = document.getElementById('water_3_water_net_yield_by_region');
+  chartData = JSON.parse(document.getElementById("water_3_water_net_yield_by_region_csv").innerHTML);
 
-    title: {
-      text: "Water Net Yield by Irrigation Type",
-    },
+  // Create blocks and render Highcharts in each block
+  chartData.forEach((chart, index) => {
+    // Create a new div for each chart
+    const chartBlock = document.createElement('div');
+    chartBlock.classList.add('chart-block');
+    chartBlock.id = `chart-${index + 1}`;
+    chartContainer.appendChild(chartBlock);
 
-    credits: {
-      enabled: false,
-    },
+    Highcharts.chart(chartBlock.id, {
 
-    series: JSON.parse(
-      document.getElementById("water_5_net_yield_by_Water_supply_csv").innerHTML
-    ),
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-    yAxis: {
+      plotOptions: {
+        showInLegend: false,
+        column: {
+          stacking: "normal",
+          dataLabels: {
+            enabled: false,
+          },
+          tooltip: {
+            formatter: function () {
+              return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                }:</b>${this.y.toFixed(2)}<br/>`;
+            },
+          },
+        },
+        arearange: {
+          lineWidth: 0,
+          marker: {
+            enabled: false,
+          },
+          tooltip: {
+            enabled: false, // Disable tooltip for arearange series
+          },
+          allowPointSelect: false, // Disable selection for arearange points
+          states: {
+            inactive: {
+              opacity: 1 // Prevent any dimming effect when another series is selected
+            }
+          },
+          enableMouseTracking: false, // Disable mouse tracking events for arearange
+          zIndex: 0, // Set the zIndex to 0 to prevent the arearange series from covering other series
+        },
+        spline: {
+          marker : {
+            enabled: false,
+          },
+        },
+      },
+
       title: {
-        text: "Water Net Yield (ML)",
+        text: chart.name,
+        align: 'center',
       },
-    },
 
-    legend: {
-      align: "right",
-      layout: "vertical",
-      x: -180,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+      credits: {
+        enabled: false,
       },
-    },
 
-    plotOptions: {
-      column: {
-        stacking: "normal",
-        dataLabels: {
-          enabled: false,
+      series: chart.data,
+
+      xAxis: {
+        tickPositions: year_ticks,
+      },
+      yAxis: {
+        title: {
+          text: "Water net yield (ML)",
         },
       },
-    },
 
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
+      legend: {
+        itemStyle: {
+          fontSize: "10px",
+        }
+      },
+
+      exporting: {
+        sourceWidth: 1200,
+        sourceHeight: 600,
+      },
+    });
   });
+
 });

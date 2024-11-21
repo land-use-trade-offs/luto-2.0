@@ -895,6 +895,7 @@ def write_water(data: Data, yr_cal, path):
         
         water_limit_pub.columns = ['Type','CCI Existence','REGION','Value (ML)']
         water_limit_pub = water_limit_pub[['REGION','Type','CCI Existence','Value (ML)']]
+        water_limit_pub.insert(0, 'Year', yr_cal)
     
         
         # Calculate water yield for region and save to dataframe
