@@ -402,7 +402,7 @@ def get_water_outside_luto_study_area(data: Data, yr_cal:int) ->  dict[int, floa
             f"(must be either 'River Region' or 'Drainage Division')."
         )
 
-    return water_yield_arr
+    return water_yield_arr.loc[yr_cal].to_dict()
 
 
 def get_water_outside_luto_study_area_from_hist_level(data: Data) -> dict[int, float]:
@@ -495,12 +495,11 @@ def get_water_net_yield_limit_values(
 
     # Calculate the water yield limits for each region
     limits_by_region = {}
-    for region, name in data.DRAINDIV_DICT.items():
+    for region, name in region_names.items():
         hist_yield = wny_region_hist[region]
         ind = np.flatnonzero(region_id == region).astype(np.int32)
         limit_hist_level = hist_yield * settings.WATER_YIELD_TARGET_AG_SHARE    # Water yield limit calculated as a proportial of historical level based on planetary boundary theory
         limit_CCI_buffer = hist_yield * settings.WATER_YIELD_CCI_BUFFER         # Water yield limit buffer calculated as specified in settings
-        limit_total = limit_hist_level + limit_CCI_buffer
         limits_by_region[region] = (name, limit_hist_level, limit_CCI_buffer, ind)    
 
     # Save the results in data to avoid recalculating

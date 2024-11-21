@@ -636,11 +636,11 @@ class LutoSolver:
             # Report on the water yield in the region
             if settings.VERBOSE == 1:
                 print(f"    ...net water yield in {reg_name} >= {limit_hist_level:.2f} ML")
-                if wny_limit_updated:
-                    print(
-                        f"        ...net water yield in {reg_name} lowered from (`limit_hist_level` + `limit_CCI_buffer`) {limit_hist_level + limit_CCI_buffer:.2f} ML "
-                        f"to `hist_level_limit` {constr_wny_limit:.2f} ML"
-                    )
+                # if wny_limit_updated:
+                #     print(
+                #         f"        ...net water yield in {reg_name} lowered from (`limit_hist_level` + `limit_CCI_buffer`) {limit_hist_level + limit_CCI_buffer:.2f} ML "
+                #         f"to `hist_level_limit` {constr_wny_limit:.2f} ML"
+                #     )
 
     def _get_total_ghg_emissions_expr(self) -> gp.LinExpr:
         # Pre-calculate the coefficients for each variable,

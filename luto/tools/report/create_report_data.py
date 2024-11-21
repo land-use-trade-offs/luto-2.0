@@ -1122,7 +1122,7 @@ def save_report_data(raw_data_dir:str):
         .groupby('Year')\
         .sum(numeric_only=True)\
         .reset_index()
-    water_outside_LUTO_total_wide = list(map(list,zip(water_outside_LUTO_total['Year'],water_outside_LUTO_total['Value (ML)'])))
+    water_outside_LUTO_total_wide = list(map(list,zip(water_outside_LUTO_total['Year'], water_outside_LUTO_total['Value (ML)'])))
   
     water_inside_LUTO_broad_cat_sum = water_df_separate\
         .query('`Climate Change existence` == "With CCI"')\

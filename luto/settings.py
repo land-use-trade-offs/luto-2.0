@@ -99,8 +99,8 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 17        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
-MODE = 'snapshot'   # Runs for target year only
-# MODE = 'timeseries'   # Runs each year from base year to target year
+# MODE = 'snapshot'   # Runs for target year only
+MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -199,10 +199,6 @@ NON_AG_LAND_USES_REVERSIBLE = {
     'Beef Carbon Plantings (Belt)': False,
     'BECCS': False,
 }
-
-# Carbon price scenario: either '1.8C 67%', '1.5C 50%', '1.5C 67%', 'Default', '100', or None.
-# Setting to None falls back to the 'Default' scenario.
-CARBON_PRICES_FIELD = '100'
 
 # Cost of fencing per linear metre
 FENCING_COST_PER_M = 10
@@ -319,6 +315,13 @@ GHG_LIMITS = {
 
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
 GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'
+
+# Carbon price scenario: either 'AS_GHG', 'Default', '100', or None.
+# Setting to None falls back to the 'Default' scenario.
+CARBON_PRICES_FIELD = 'AS_GHG'
+if CARBON_PRICES_FIELD == 'AS_GHG':
+    CARBON_PRICES_FIELD = GHG_LIMITS_FIELD[:8].replace('(','')  # '1.5C (67%) excl. avoided emis' -> '1.5C 67%'
+
 
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
 SOC_AMORTISATION = 15
