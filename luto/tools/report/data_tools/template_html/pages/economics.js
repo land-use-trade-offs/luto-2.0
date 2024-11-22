@@ -47,6 +47,13 @@ document.addEventListener("DOMContentLoaded", function () {
     draw_cost_ag2non_ag();
   }
 
+  // Set the title alignment to left
+  Highcharts.setOptions({
+    title: {
+        align: 'left'
+    }
+  });
+
   // Chart:economics_0_rev_cost_all_wide.json
   Highcharts.chart("economics_0_rev_cost_all_wide", {
     chart: {

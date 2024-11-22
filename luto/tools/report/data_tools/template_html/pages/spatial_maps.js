@@ -30,8 +30,6 @@ document.addEventListener('DOMContentLoaded', function () {
     };
     init_select_2();
 
-
-
     // Listen for changes in the lucc dropdown
     document.getElementById("select_1").addEventListener("change", function () {
         lucc = this.value;

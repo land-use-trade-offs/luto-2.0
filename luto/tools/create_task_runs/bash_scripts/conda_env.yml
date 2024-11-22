@@ -27,6 +27,7 @@ dependencies:
   - ipykernel==6.29.4
   - sparse==0.15.4
   - nbformat==5.10.4
+  - dill==0.3.8
   - pip
   - pip:
       - gurobipy==11.0.2

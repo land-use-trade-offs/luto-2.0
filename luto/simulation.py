@@ -22,6 +22,8 @@ model that has 'global' varying state.
 
 import os
 import time
+import dill
+
 from datetime import datetime
 from joblib import Parallel, delayed
 
@@ -43,48 +45,12 @@ def load_data() -> Data:
     """
     return Data(timestamp=timestamp)
 
-def read_dvars(output_dir:str)-> None:
-    '''
-    Read the output decision variables from the output directory and add them to the Data object.
-    '''
-    # Read all output files;
-    files = get_all_files(output_dir)
-    dvar_path = files.query('category == "ag_X_mrj"').iloc[0]['path']
-    # Check if the output resolution is the same as the settings.RESFACTOR
-    output_res = tools.get_out_resfactor(dvar_path)
-    if output_res != settings.RESFACTOR:
-        raise ValueError(f'Please change the `settings.RESFACTOR` ({settings.RESFACTOR}) to to be the same as output files ({output_res}).')
-
-    # Loading data from
-    data = load_data()
-
-    # Save reading dvars as a delayed task
-    tasks = [delayed(tools.read_dvars)(yr, files.query('base_ext == ".npy" and Year == @yr and year_types == "single_year"'))
-            for yr in sorted(files['Year'].unique())]
-
-    # Run the tasks in parallel to add the dvars to the data object
-    print(f'Reading decision variables from existing output directory...\n   {output_dir}')
-    for yr,dvar in Parallel(n_jobs=min(len(tasks), 10), return_as='generator')(tasks):
-        data.add_lumap(yr, dvar[0])
-        data.add_lmmap(yr, dvar[1])
-        data.add_ammaps(yr, dvar[2])
-        data.add_ag_dvars(yr, dvar[3])
-        data.add_non_ag_dvars(yr, dvar[4])
-        data.add_ag_man_dvars(yr, dvar[5])
-
-    # Remove the log file, because we only read the dvars
-    os.remove(f"{settings.OUTPUT_DIR}/run_{timestamp}_stderr.log")
-    os.remove(f"{settings.OUTPUT_DIR}/run_{timestamp}_stdout.log")
-
-    return data
-
-
 @tools.LogToFile(f"{settings.OUTPUT_DIR}/run_{timestamp}", 'a')
 def run( data: Data, base: int, target: int) -> None:
     """
     Run the simulation.
     Parameters:
-        'data' is a Data object, and 'base' and 'target' are the base and target years.
+        'data' is a Data object, and 'base' and 'target' are the base and target years for the whole simulation.
     """
 
     # Set Data object's path and create output directories
@@ -202,3 +168,74 @@ def solve_snapshot(data: Data, base: int, target: int):
 
     print(f'Processing for {target} completed in {round(time.time() - start_time)} seconds\n\n')
 
+
+def save_data_to_disk(data: Data, path:str) -> None:
+    """Save the Data object to disk.
+    Arguments:
+        data: `Data` object.
+        path: Path to save the Data object.
+    """
+    # Save
+    with open(path, 'wb') as f: dill.dump(data, f)
+    
+
+def load_data_from_disk(path:str) -> Data:
+    """Load the Data object from disk.
+    
+    Arguments:
+        path: Path to the Data object.
+
+    Raises:
+        ValueError: if the resolution factor from the data object does not match the settings.RESFACTOR.
+
+    Returns:
+        Data: `Data` object.
+    """
+    # Load the data object
+    with open(path, 'rb') as f: 
+        data = dill.load(f)
+    
+    # Check if the resolution factor from the data object matches the settings.RESFACTOR
+    if int(data.RESMULT ** 0.5) != settings.RESFACTOR: 
+        raise ValueError(f'Resolution factor from data loading ({int(data.RESMULT ** 0.5)}) does not match it of settings ({settings.RESFACTOR})!')
+
+    # Update the timestamp
+    data.timestamp_sim = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
+    
+    return data
+    
+
+def read_dvars(output_dir:str)-> None:
+    '''
+    Read the output decision variables from the output directory and add them to the Data object.
+    '''
+    # Read all output files;
+    files = get_all_files(output_dir)
+    dvar_path = files.query('category == "ag_X_mrj"').iloc[0]['path']
+    # Check if the output resolution is the same as the settings.RESFACTOR
+    output_res = tools.get_out_resfactor(dvar_path)
+    if output_res != settings.RESFACTOR:
+        raise ValueError(f'Please change the `settings.RESFACTOR` ({settings.RESFACTOR}) to to be the same as output files ({output_res}).')
+
+    # Loading data from
+    data = load_data()
+
+    # Save reading dvars as a delayed task
+    tasks = [delayed(tools.read_dvars)(yr, files.query('base_ext == ".npy" and Year == @yr and year_types == "single_year"'))
+            for yr in sorted(files['Year'].unique())]
+
+    # Run the tasks in parallel to add the dvars to the data object
+    print(f'Reading decision variables from existing output directory...\n   {output_dir}')
+    for yr,dvar in Parallel(n_jobs=min(len(tasks), 10), return_as='generator')(tasks):
+        data.add_lumap(yr, dvar[0])
+        data.add_lmmap(yr, dvar[1])
+        data.add_ammaps(yr, dvar[2])
+        data.add_ag_dvars(yr, dvar[3])
+        data.add_non_ag_dvars(yr, dvar[4])
+        data.add_ag_man_dvars(yr, dvar[5])
+
+    # Remove the log file, because we only read the dvars
+    os.remove(f"{settings.OUTPUT_DIR}/run_{timestamp}_stderr.log")
+    os.remove(f"{settings.OUTPUT_DIR}/run_{timestamp}_stdout.log")
+
+    return data

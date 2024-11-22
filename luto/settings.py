@@ -96,7 +96,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 5        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 15        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
 # MODE = 'snapshot'   # Runs for target year only
@@ -199,10 +199,6 @@ NON_AG_LAND_USES_REVERSIBLE = {
     'Beef Carbon Plantings (Belt)': False,
     'BECCS': False,
 }
-
-# Carbon price scenario: either '1.8C 67%', '1.5C 50%', '1.5C 67%', 'Default', '100', or None.
-# Setting to None falls back to the 'Default' scenario.
-CARBON_PRICES_FIELD = '1.5C 67%'
 
 # Cost of fencing per linear metre
 FENCING_COST_PER_M = 10
@@ -320,6 +316,13 @@ GHG_LIMITS = {
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
 GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'
 
+# Carbon price scenario: either 'AS_GHG', 'Default', '100', or None.
+# Setting to None falls back to the 'Default' scenario.
+CARBON_PRICES_FIELD = 'AS_GHG'
+if CARBON_PRICES_FIELD == 'AS_GHG':
+    CARBON_PRICES_FIELD = GHG_LIMITS_FIELD[:9].replace('(','')  # '1.5C (67%) excl. avoided emis' -> '1.5C 67%'
+
+
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
 SOC_AMORTISATION = 15
 
@@ -332,12 +335,10 @@ GHG_PENALTY = 10e-3
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 
-RELAXED_WATER_LIMITS_FOR_INFEASIBILITY = 'on'
-
 
 
 # Regionalisation to enforce water use limits by
-WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
+WATER_REGION_DEF = 'River Region'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
 
 # Water net yield targets: the value represents the proportion of the historical water yields
 # that the net yield must exceed in a given year. Base year (2010) uses base year net yields as targets.
@@ -351,18 +352,15 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
 # stress is 0.2 then agriculture can use up 70% of this, leaving 30% for domestic/industrial. The water yield target for ag
 # should then be historical net yield * (1 - water stress * agricultural share)
 
-WATER_STRESS = 0.2
+WATER_STRESS = 0.7
 AG_SHARE_OF_WATER_USE = 1.0
 WATER_YIELD_TARGET_AG_SHARE = 1 - WATER_STRESS * AG_SHARE_OF_WATER_USE
 
-# Set a dictionary of water yield targets (i.e., the proportion of historical net annual water yield). LUTO will ensure that
-# net annual water yield is >= this proportion of historical net annual water yield is met by the given date, leaving sufficient water
-# for domestic and industrial use. The water yield target grades linearly from net water yield in 2010 to achieve the target by the target date
-# for each catchment (river region or drainage division)
-WATER_YIELD_TARGETS = {
-                        2030: WATER_YIELD_TARGET_AG_SHARE,
-                        2100: WATER_YIELD_TARGET_AG_SHARE,
-                      }
+# Buffer level to cancel out climate change impacts on water availability;
+# 0.05 = 5% of historical net yield, meaning that LUTO asks for an additional 5% of historical net yield to account for climate change impacts
+# This buffer may not be enough to account for climate change impacts in a given sim year, in that case LUTO will furthur relax the water constraint.
+WATER_YIELD_CCI_BUFFER = 0.05     # 5% of historical net yield
+
 
 # Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water turned off due to infeasibility issues with water constraint in Pilbara
 LIVESTOCK_DRINKING_WATER = 1

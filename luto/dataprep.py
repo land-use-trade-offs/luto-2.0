@@ -114,6 +114,7 @@ def create_new_dataset():
     shutil.copyfile(luto_1D_inpath + '20231101_Bundle_AgTech_NE.xlsx', outpath + '20231101_Bundle_AgTech_NE.xlsx')
     shutil.copyfile(luto_1D_inpath + '20231107_ECOGRAZE_Bundle.xlsx', outpath + '20231107_ECOGRAZE_Bundle.xlsx')
     shutil.copyfile(luto_1D_inpath + '20231107_Bundle_AgTech_EI.xlsx', outpath + '20231107_Bundle_AgTech_EI.xlsx')
+    shutil.copyfile(luto_1D_inpath + '20240918_Bundle_BC.xlsx', outpath + '20240918_Bundle_BC.xlsx')
 
     # Copy HACS data from DCCEEW
     shutil.copyfile(HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'HABITAT_CONDITION.csv')
@@ -414,8 +415,9 @@ def create_new_dataset():
     zones['WATER_YIELD_HIST_BASELINE_ML'] = bioph['WATER_YIELD_HIST_BASELINE_ML_HA'] * zones['CELL_HA']
 
     # Create a LUT of river regions ID, name, and historical baseline water yield.
-    rivreg_lut = zones.groupby(['HR_RIVREG_ID'], as_index = False, observed = True).agg(HR_RIVREG_NAME = ('HR_RIVREG_NAME', 'first'),
-                                                                                        WATER_YIELD_HIST_BASELINE_ML = ('WATER_YIELD_HIST_BASELINE_ML', 'sum'))
+    rivreg_lut = zones.groupby(['HR_RIVREG_ID'], as_index = False, observed = True)\
+                      .agg(HR_RIVREG_NAME = ('HR_RIVREG_NAME', 'first'),
+                           WATER_YIELD_HIST_BASELINE_ML = ('WATER_YIELD_HIST_BASELINE_ML', 'sum'))
 
     # Save to HDF5 file.
     rivreg_lut.to_hdf(outpath + 'rivreg_lut.h5', key = 'rivreg_lut', mode = 'w', format = 'table', index = False, complevel = 9)
@@ -425,10 +427,10 @@ def create_new_dataset():
 
 
     # Create a LUT of drainage division ID, name, and historical baseline water yield.
-    draindiv_lut = zones.groupby(['HR_DRAINDIV_ID'], as_index = False, observed = True).agg(HR_DRAINDIV_NAME = ('HR_DRAINDIV_NAME', 'first'),
-                                                                                            WATER_YIELD_HIST_BASELINE_ML = ('WATER_YIELD_HIST_BASELINE_ML', 'sum'))
+    draindiv_lut = zones.groupby(['HR_DRAINDIV_ID'], as_index = False, observed = True)\
+        .agg(HR_DRAINDIV_NAME = ('HR_DRAINDIV_NAME', 'first'),
+             WATER_YIELD_HIST_BASELINE_ML = ('WATER_YIELD_HIST_BASELINE_ML', 'sum'))
 
-    print(draindiv_lut)
 
     draindiv_lut.to_hdf(outpath + 'draindiv_lut.h5', key = 'draindiv_lut', mode = 'w', format = 'table', index = False, complevel = 9)
 
@@ -464,7 +466,7 @@ def create_new_dataset():
 
         # Get the total water yield for each drainage division and river region
         water_yield_dd = base_arr_df.groupby(['HR_DRAINDIV_ID', 'Year'], as_index = False, observed = True).agg(Water_yield_ML = ('Water_yield_ML', 'sum'))
-        water_yield_rr = base_arr_df.groupby([ 'HR_RIVREG_ID', 'Year'], as_index = False, observed = True).agg(Water_yield_ML = ('Water_yield_ML', 'sum'))
+        water_yield_rr = base_arr_df.groupby(['HR_RIVREG_ID', 'Year'], as_index = False, observed = True).agg(Water_yield_ML = ('Water_yield_ML', 'sum'))
         water_yield_dd = water_yield_dd.rename(columns = {'HR_DRAINDIV_ID': 'Region_ID'})
         water_yield_rr = water_yield_rr.rename(columns = {'HR_RIVREG_ID': 'Region_ID'})
 
@@ -508,8 +510,33 @@ def create_new_dataset():
     water_yield_all_AUS_dd.to_hdf(os.path.join(outpath, 'water_yield_natural_land_2010_2100_dd_ml.h5'), key='water_yield_natural_land_2010_2100_dd_ml', mode='w', format='table', complevel=9)
     water_yield_all_AUS_rr.to_hdf(os.path.join(outpath, 'water_yield_natural_land_2010_2100_rr_ml.h5'), key='water_yield_natural_land_2010_2100_rr_ml', mode='w', format='table', complevel=9)
 
+    # Calculate water yield for each drainage division and river region based on historical baseline
+    water_yield_hist_baseline_ml_ha = water_yield_baselines.eval(
+    'WATER_YIELD_HIST_DR_ML_HA * DEEP_ROOTED_PROPORTION + WATER_YIELD_HIST_SR_ML_HA * (1 - DEEP_ROOTED_PROPORTION)'
+    ).to_numpy(dtype = np.float32)
+    
+    water_yield_hist_baseline_ml = water_yield_hist_baseline_ml_ha * zones['CELL_HA'].to_numpy(dtype = np.float32)
+    water_yield_hist_baseline_ml_outside_LUTO = water_yield_hist_baseline_ml[idx_outside_luto_study_area]
 
-
+    dd_id_outside_LUTO = zones[idx_outside_luto_study_area]['HR_DRAINDIV_ID'].values
+    rr_id_outside_LUTO = zones[idx_outside_luto_study_area]['HR_RIVREG_ID'].values
+    water_yield_outside_LUTO_hist_dd = dict(enumerate(np.bincount(dd_id_outside_LUTO, water_yield_hist_baseline_ml_outside_LUTO)))
+    water_yield_outside_LUTO_hist_rr = dict(enumerate(np.bincount(rr_id_outside_LUTO, water_yield_hist_baseline_ml_outside_LUTO)))
+    
+    water_yield_outside_LUTO_hist_dd_df = pd.DataFrame(water_yield_outside_LUTO_hist_dd, index=['Water Yield (ML)']).T.reset_index(names='Region_ID')
+    water_yield_outside_LUTO_hist_rr_df = pd.DataFrame(water_yield_outside_LUTO_hist_rr, index=['Water Yield (ML)']).T.reset_index(names='Region_ID')
+    water_yield_outside_LUTO_hist_rr_df.insert(0, 'Region_Type', 'River Region')
+    water_yield_outside_LUTO_hist_dd_df.insert(0, 'Region_Type', 'Drainage Division')
+    
+    water_yield_outside_LUTO_hist_df = pd.concat([water_yield_outside_LUTO_hist_dd_df, water_yield_outside_LUTO_hist_rr_df], ignore_index=True)
+    water_yield_outside_LUTO_hist_df = water_yield_outside_LUTO_hist_df.query('Region_ID != 0')
+    water_yield_outside_LUTO_hist_df.to_hdf(
+        os.path.join(outpath, 'water_yield_outside_LUTO_study_area_hist_1970_2000.h5'), 
+        key='water_yield_outside_LUTO_study_area_hist_1970_2000', 
+        mode='w', 
+        format='table', 
+        complevel=9
+    )
 
 
     ############### Get biodiversity priority layers
@@ -585,13 +612,16 @@ def create_new_dataset():
     s.to_hdf(outpath + 'fire_risk.h5', key = 'fire_risk', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
 
-
+    # Adjust the establishment costs using CPI; Source https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/consumer-price-index-australia/latest-release
+    # The original data is in 2021 AUD (CPI 118.8 in Jun-2021), need to convert to 2010 AUD (CPI 99.2 in Jun-2011)
+    bioph['EP_EST_COST_HA_CPI_ADJ'] = bioph['EP_EST_COST_HA'] * 99.2 / 118.8
+    bioph['CP_EST_COST_HA_CPI_ADJ'] = bioph['CP_EST_COST_HA'] * 99.2 / 118.8
 
     # Average establishment costs for Environmental Plantings ($/ha) and save to file
-    bioph['EP_EST_COST_HA'].to_hdf(outpath + 'ep_est_cost_ha.h5', key = 'ep_est_cost_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    bioph['EP_EST_COST_HA_CPI_ADJ'].to_hdf(outpath + 'ep_est_cost_ha.h5', key = 'ep_est_cost_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
     # Average establishment costs for Carbon Plantings ($/ha) and save to file
-    bioph['CP_EST_COST_HA'].to_hdf(outpath + 'cp_est_cost_ha.h5', key = 'cp_est_cost_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    bioph['CP_EST_COST_HA_CPI_ADJ'].to_hdf(outpath + 'cp_est_cost_ha.h5', key = 'cp_est_cost_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
 
 

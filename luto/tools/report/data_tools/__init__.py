@@ -20,10 +20,12 @@ def extract_dtype_from_path(path):
             # decision variables (npy files)
             'ag_X_mrj':['ag_X_mrj'],
             'ag_man_X_mrj':['ag_man_X_mrj_asparagopsis_taxiformis',
+                            'ag_man_X_mrj_agtech_ei',
+                            'ag_man_X_mrj_biochar',
                             'ag_man_X_mrj_ecological_grazing',
                             'ag_man_X_mrj_precision_agriculture',
                             'ag_man_X_mrj_savanna_burning',
-                            'ag_man_X_mrj_agtech_ei'],
+                            ],
             'non_ag_X_rk':['non_ag_X_rk'],
             # CSVs
             'GHG':['GHG'],
