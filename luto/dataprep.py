@@ -430,7 +430,6 @@ def create_new_dataset():
         .agg(HR_DRAINDIV_NAME = ('HR_DRAINDIV_NAME', 'first'),
              WATER_YIELD_HIST_BASELINE_ML = ('WATER_YIELD_HIST_BASELINE_ML', 'sum'))
 
-    print(draindiv_lut)
 
     draindiv_lut.to_hdf(outpath + 'draindiv_lut.h5', key = 'draindiv_lut', mode = 'w', format = 'table', index = False, complevel = 9)
 
@@ -612,13 +611,16 @@ def create_new_dataset():
     s.to_hdf(outpath + 'fire_risk.h5', key = 'fire_risk', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
 
-
+    # Adjust the establishment costs using CPI; Source https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/consumer-price-index-australia/latest-release
+    # The original data is in 2021 AUD (CPI 118.8 in Jun-2011), need to convert to 2010 AUD (CPI 99.2 in Jun-2011)
+    bioph['EP_EST_COST_HA_CPI_ADJ'] = bioph['EP_EST_COST_HA'] * 99.2 / 118.8
+    bioph['CP_EST_COST_HA_CPI_ADJ'] = bioph['CP_EST_COST_HA'] * 99.2 / 118.8
 
     # Average establishment costs for Environmental Plantings ($/ha) and save to file
-    bioph['EP_EST_COST_HA'].to_hdf(outpath + 'ep_est_cost_ha.h5', key = 'ep_est_cost_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    bioph['EP_EST_COST_HA_CPI_ADJ'].to_hdf(outpath + 'ep_est_cost_ha.h5', key = 'ep_est_cost_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
     # Average establishment costs for Carbon Plantings ($/ha) and save to file
-    bioph['CP_EST_COST_HA'].to_hdf(outpath + 'cp_est_cost_ha.h5', key = 'cp_est_cost_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    bioph['CP_EST_COST_HA_CPI_ADJ'].to_hdf(outpath + 'cp_est_cost_ha.h5', key = 'cp_est_cost_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
 
 
