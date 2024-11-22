@@ -114,6 +114,7 @@ def create_new_dataset():
     shutil.copyfile(luto_1D_inpath + '20231101_Bundle_AgTech_NE.xlsx', outpath + '20231101_Bundle_AgTech_NE.xlsx')
     shutil.copyfile(luto_1D_inpath + '20231107_ECOGRAZE_Bundle.xlsx', outpath + '20231107_ECOGRAZE_Bundle.xlsx')
     shutil.copyfile(luto_1D_inpath + '20231107_Bundle_AgTech_EI.xlsx', outpath + '20231107_Bundle_AgTech_EI.xlsx')
+    shutil.copyfile(luto_1D_inpath + '20240918_Bundle_BC.xlsx', outpath + '20240918_Bundle_BC.xlsx')
 
     # Copy HACS data from DCCEEW
     shutil.copyfile(HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'HABITAT_CONDITION.csv')
@@ -612,7 +613,7 @@ def create_new_dataset():
 
 
     # Adjust the establishment costs using CPI; Source https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/consumer-price-index-australia/latest-release
-    # The original data is in 2021 AUD (CPI 118.8 in Jun-2011), need to convert to 2010 AUD (CPI 99.2 in Jun-2011)
+    # The original data is in 2021 AUD (CPI 118.8 in Jun-2021), need to convert to 2010 AUD (CPI 99.2 in Jun-2011)
     bioph['EP_EST_COST_HA_CPI_ADJ'] = bioph['EP_EST_COST_HA'] * 99.2 / 118.8
     bioph['CP_EST_COST_HA_CPI_ADJ'] = bioph['CP_EST_COST_HA'] * 99.2 / 118.8
 
