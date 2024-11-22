@@ -320,7 +320,7 @@ GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'
 # Setting to None falls back to the 'Default' scenario.
 CARBON_PRICES_FIELD = 'AS_GHG'
 if CARBON_PRICES_FIELD == 'AS_GHG':
-    CARBON_PRICES_FIELD = GHG_LIMITS_FIELD[:8].replace('(','')  # '1.5C (67%) excl. avoided emis' -> '1.5C 67%'
+    CARBON_PRICES_FIELD = GHG_LIMITS_FIELD[:9].replace('(','')  # '1.5C (67%) excl. avoided emis' -> '1.5C 67%'
 
 
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
@@ -338,7 +338,7 @@ WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield lim
 
 
 # Regionalisation to enforce water use limits by
-WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
+WATER_REGION_DEF = 'River Region'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
 
 # Water net yield targets: the value represents the proportion of the historical water yields
 # that the net yield must exceed in a given year. Base year (2010) uses base year net yields as targets.
@@ -352,7 +352,7 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
 # stress is 0.2 then agriculture can use up 70% of this, leaving 30% for domestic/industrial. The water yield target for ag
 # should then be historical net yield * (1 - water stress * agricultural share)
 
-WATER_STRESS = 0.2
+WATER_STRESS = 0.7
 AG_SHARE_OF_WATER_USE = 1.0
 WATER_YIELD_TARGET_AG_SHARE = 1 - WATER_STRESS * AG_SHARE_OF_WATER_USE
 
