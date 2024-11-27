@@ -96,7 +96,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 15        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
 # MODE = 'snapshot'   # Runs for target year only
@@ -338,7 +338,7 @@ WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield lim
 
 
 # Regionalisation to enforce water use limits by
-WATER_REGION_DEF = 'River Region'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
+WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
 
 # Water net yield targets: the value represents the proportion of the historical water yields
 # that the net yield must exceed in a given year. Base year (2010) uses base year net yields as targets.
@@ -352,7 +352,7 @@ WATER_REGION_DEF = 'River Region'         # 'River Region' or 'Drainage Division
 # stress is 0.2 then agriculture can use up 70% of this, leaving 30% for domestic/industrial. The water yield target for ag
 # should then be historical net yield * (1 - water stress * agricultural share)
 
-WATER_STRESS = 0.7
+WATER_STRESS = 0.2
 AG_SHARE_OF_WATER_USE = 1.0
 WATER_YIELD_TARGET_AG_SHARE = 1 - WATER_STRESS * AG_SHARE_OF_WATER_USE
 

@@ -21,11 +21,10 @@ import numpy as np
 import luto.settings as settings
 
 from affine import Affine
-from luto.data import Data
 from scipy.ndimage import distance_transform_edt
 
 
-def create_2d_map(data: Data, map_:np.ndarray=None, filler:int=-1, nodata:int=-9999) -> np.ndarray:
+def create_2d_map(data, map_:np.ndarray=None, filler:int=-1, nodata:int=-9999) -> np.ndarray:
     """
     Create a 2D map based on the given data and map.
 
@@ -53,7 +52,7 @@ def create_2d_map(data: Data, map_:np.ndarray=None, filler:int=-1, nodata:int=-9
                 
 
 
-def get_fullres2D_map(data:Data, map_:np.ndarray)-> np.ndarray:
+def get_fullres2D_map(data, map_:np.ndarray)-> np.ndarray:
     """
     Returns the full resolution 2D map by filling the 1D `map_` to the 2D `NLUM_MASK`.
 
@@ -155,7 +154,7 @@ def replace_with_nearest(map_: np.ndarray, filler: int) -> np.ndarray:
 
 
 
-def write_gtiff(map_:np.ndarray, fname:str, data:Data=Data):
+def write_gtiff(map_:np.ndarray, fname:str, data):
     """
     Write a GeoTiff file with the given map data.
 

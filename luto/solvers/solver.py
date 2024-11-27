@@ -605,42 +605,16 @@ class LutoSolver:
 
             # Sum of all water yield contributions
             w_net_yield_region = ag_contr + ag_man_contr + non_ag_contr + outside_luto_study_contr
-            
-            # Get the actual water yield and historical limitation level in the region
-            wny_current_yr = calc_water_net_yield_for_region(
-                ind,
-                self._input_data.am2j,
-                self._input_data.base_year_ag_sol,
-                self._input_data.base_year_non_ag_sol,
-                self._input_data.base_year_ag_man_sol,
-                self._input_data.ag_w_mrj,
-                self._input_data.non_ag_w_rk,
-                self._input_data.ag_man_w_mrj,
-                outside_luto_study_contr
-            )
-            
-            
-            # # Update the water yield limit if the net yield is below the sum of historical and CCI_buffer
-            # wny_limit_updated = False
-            # if wny_current_yr >= (limit_hist_level + limit_CCI_buffer):
-            #     constr_wny_limit = limit_hist_level + limit_CCI_buffer
-            # else:
-            #     constr_wny_limit = limit_hist_level
-            #     wny_limit_updated = True
+        
 
             # Add the constraint that the water yield in the region must be greater than the limit
             constr = self.gurobi_model.addConstr(w_net_yield_region >= limit_hist_level)
             self.water_limit_constraints.append(constr)
-
-
+            
             # Report on the water yield in the region
             if settings.VERBOSE == 1:
                 print(f"    ...net water yield in {reg_name} >= {limit_hist_level:.2f} ML")
-                # if wny_limit_updated:
-                #     print(
-                #         f"        ...net water yield in {reg_name} lowered from (`limit_hist_level` + `limit_CCI_buffer`) {limit_hist_level + limit_CCI_buffer:.2f} ML "
-                #         f"to `hist_level_limit` {constr_wny_limit:.2f} ML"
-                #     )
+
 
     def _get_total_ghg_emissions_expr(self) -> gp.LinExpr:
         # Pre-calculate the coefficients for each variable,
