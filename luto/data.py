@@ -38,7 +38,7 @@ from affine import Affine
 from scipy.interpolate import interp1d
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.settings import INPUT_DIR, OUTPUT_DIR
-from luto.tools.spatializers import upsample_array
+from luto.tools.spatializers import upsample_and_fill_nodata, upsample_array
 
 
 
@@ -1248,39 +1248,36 @@ class Data:
         
         """
         # Create a 2D array of IDs for the LUMAP_2D_RESFACTORED
-        lumap_2d_id = np.arange(1, self.LUMAP_2D_RESFACTORED.size + 1).reshape(self.LUMAP_2D_RESFACTORED.shape)
-        lumap_2d_id = upsample_array(self, lumap_2d_id, settings.RESFACTOR)
-        
-        # Non data and outside-luto study area are set to 0
-        lumap_2d_id[lumap_2d_id <= 0] = 0           
-        
+        lumap_2d_id = np.arange(self.LUMAP_2D_RESFACTORED.size).reshape(self.LUMAP_2D_RESFACTORED.shape)
+        lumap_2d_id = upsample_array(self, lumap_2d_id, settings.RESFACTOR)        
+
         # Get the 2D water supply map at full resolution 
         lmmap_full_2d = np.full_like(self.NLUM_MASK, self.NODATA, dtype=np.int16)                           # 2D map,  full of nodata (-9999)
         np.place(lmmap_full_2d, self.NLUM_MASK == 1, self.LMMAP_NO_RESFACTOR)                               # 2D map,  -9999 for ocean; -1 for desert, urban, water, etc; 0-27 for land uses
-        
+
         # Calculate the number of cells with each resfactored ID cell
-        cell_count = np.bincount(lumap_2d_id.flatten(), minlength=self.LUMAP_2D_RESFACTORED.size + 1)
+        cell_count = np.bincount(lumap_2d_id.flatten(), minlength=self.LUMAP_2D_RESFACTORED.size)
         lumap_resample_avg = np.zeros((len(self.LANDMANS), self.NCELLS, self.N_AG_LUS), dtype=np.float32)
-        
+                
         for idx_lu in self.DESC2AGLU.values():
             for idx_w, _ in enumerate(self.LANDMANS):
-                
+                # Get the cells with the same ID and water supply
                 lumap_w = (self.LUMAP_2D == idx_lu) * (lmmap_full_2d == idx_w)
-                cell_sum = np.bincount(lumap_2d_id.flatten(), lumap_w.flatten(), minlength=self.LUMAP_2D_RESFACTORED.size + 1)
-                
+                cell_sum = np.bincount(lumap_2d_id.flatten(), lumap_w.flatten(), minlength=self.LUMAP_2D_RESFACTORED.size)
+
                 # Calculate the average value of each ID cell
                 with np.errstate(divide='ignore', invalid='ignore'):                    # Ignore the division by zero warning
                     cell_avg = cell_sum / cell_count
                     cell_avg[~np.isfinite(cell_avg)] = 0                                # Set the NaN and Inf to 0
                     
                 # Reshape the 1D avg array to 2D array
-                cell_avg_2d = cell_avg[1:].reshape(self.LUMAP_2D_RESFACTORED.shape)     # Skip the 0th element, which is the non-data/non_luto cells
+                cell_avg_2d = cell_avg.reshape(self.LUMAP_2D_RESFACTORED.shape)
                 # Upsample the 2D array from choarser resolution to finer resolution
                 cell_avg_2d = upsample_array(self, cell_avg_2d, settings.RESFACTOR).astype(np.float32)
                 # Only keep the cells within the luto study area
                 cell_avg_1d = cell_avg_2d[np.nonzero(self.NLUM_MASK)]
                 cell_avg_1d = cell_avg_1d[self.MASK]
-                
+
                 lumap_resample_avg[idx_w, :, idx_lu] = cell_avg_1d
                 
         return lumap_resample_avg

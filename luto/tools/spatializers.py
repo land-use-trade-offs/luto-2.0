@@ -45,7 +45,7 @@ def create_2d_map(data, map_:np.ndarray=None, filler:int=-1, nodata:int=-9999) -
             # Fill the "Non-Agriculture land" with nearst "Ag land"
             map_ = np.where(map_ == data.NODATA, data.MASK_LU_CODE, map_)               # Replace the nodata with filler
             map_ = replace_with_nearest(map_, data.MASK_LU_CODE)                        # Replace the filler with the nearest non-filler value
-            map_ = upsample_array(data, map_, factor=settings.RESFACTOR)
+            map_ = upsample_and_fill_nodata(data, map_, factor=settings.RESFACTOR)
         return map_    
     else: 
         return get_fullres2D_map(data, map_)                       
@@ -91,6 +91,25 @@ def get_coarse2D_map(data, map_:np.ndarray)-> np.ndarray:
     return map_resfactored
     
 
+def place_nodata(data, map_:np.ndarray) -> np.ndarray:
+    """
+    Places NoData values in the given map based on the NLUM_MASK.
+
+    Args:
+        data (Data): The input data used to create the map.
+        map_ (np.ndarray, 2D): The map to be modified.
+
+    Returns:
+        np.ndarray: The map with NoData values placed based on the NLUM_MASK.
+
+    """
+    
+    # Apply the masks
+    filler_mask = (data.LUMAP_2D != data.MASK_LU_CODE)
+    map_ = np.where(filler_mask, map_, data.MASK_LU_CODE)
+    map_ = np.where(data.NLUM_MASK, map_, data.NODATA)
+    
+    return map_
 
 
 def upsample_array(data, map_:np.ndarray, factor:int) -> np.ndarray:
@@ -108,7 +127,6 @@ def upsample_array(data, map_:np.ndarray, factor:int) -> np.ndarray:
     dense_2D_shape = data.NLUM_MASK.shape
     dense_2D_map = np.repeat(np.repeat(map_, factor, axis=0), factor, axis=1)       # Simply repeate each cell by `factor` times at every row/col direction  
     
-    
     # Adjust the dense_2D_map size if it exceeds the original shape
     if dense_2D_map.shape[0] > dense_2D_shape[0] or dense_2D_map.shape[1] > dense_2D_shape[1]:
         dense_2D_map = dense_2D_map[:dense_2D_shape[0], :dense_2D_shape[1]]
@@ -121,13 +139,18 @@ def upsample_array(data, map_:np.ndarray, factor:int) -> np.ndarray:
             dense_2D_map, 
             pad_width=((0, pad_height), (0, pad_width)), 
             mode='edge'
-        )
-
-    # Apply the masks
-    filler_mask = data.LUMAP_2D != data.MASK_LU_CODE
-    dense_2D_map = np.where(filler_mask, dense_2D_map, data.MASK_LU_CODE)
-    dense_2D_map = np.where(data.NLUM_MASK, dense_2D_map, data.NODATA)
+        )   
+        
     return dense_2D_map
+
+        
+def upsample_and_fill_nodata(data, map_:np.ndarray, factor:int) -> np.ndarray:
+    """
+    Upsamples the given array based on the provided map and factor.
+    """
+    dense_2D_map = upsample_array(data, map_, factor)
+    return place_nodata(data, dense_2D_map)
+
 
 
 
