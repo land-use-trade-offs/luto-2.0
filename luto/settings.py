@@ -111,9 +111,9 @@ OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires sof
 DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
 
 # Penalty in objective function to balance influence of demand versus cost when DEMAND_CONSTRAINT_TYPE = 'soft'
-# 1e5 works well (i.e., demand are met), demands not met with anything less (i.e., large deviations)
+# 1e-5 works well (i.e., demand are met), demands not met with anything less (i.e., large deviations)
 # Don't set too high though otherwise it meets demand exactly (minimises deviations) even if the cost is ridiculously high
-PENALTY = 1e5
+SOLVE_WEIGHT_ECONOMICS = 1e-5
 
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
@@ -330,7 +330,7 @@ GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (l
 # GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
 # Penalty for deviating from the GHG constraints when GHG_CONSTRAINT_TYPE is soft
-GHG_PENALTY = 10e-3
+SOLVE_WEIGHT_GHG_DEVITATION = 10e-3
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
@@ -338,7 +338,7 @@ WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield lim
 
 
 # Regionalisation to enforce water use limits by
-WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
+WATER_REGION_DEF = 'River Region'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
 
 # Water net yield targets: the value represents the proportion of the historical water yields
 # that the net yield must exceed in a given year. Base year (2010) uses base year net yields as targets.
@@ -355,11 +355,6 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
 WATER_STRESS = 0.2
 AG_SHARE_OF_WATER_USE = 1.0
 WATER_YIELD_TARGET_AG_SHARE = 1 - WATER_STRESS * AG_SHARE_OF_WATER_USE
-
-# Buffer level to cancel out climate change impacts on water availability;
-# 0.05 = 5% of historical net yield, meaning that LUTO asks for an additional 5% of historical net yield to account for climate change impacts
-# This buffer may not be enough to account for climate change impacts in a given sim year, in that case LUTO will furthur relax the water constraint.
-WATER_YIELD_CCI_BUFFER = 0.05     # 5% of historical net yield
 
 
 # Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water turned off due to infeasibility issues with water constraint in Pilbara

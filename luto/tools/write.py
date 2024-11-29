@@ -881,14 +881,12 @@ def write_water(data: Data, yr_cal, path):
     # Loop through specified water regions
     df_water_seperate_dfs = []
     df_water_limits_and_public_land_dfs = []
-    for region, (reg_name, limit_hist_level, limit_CCI_buffer, ind) in w_net_yield_limits.items():
+    for region, (reg_name, limit_hist_level, ind) in w_net_yield_limits.items():
         
 
         # Get the water yield limits and public land water yield
         water_limit_pub = pd.DataFrame({
-            # 'REGION':[reg_name],
             ('WNY LIMIT','HIST (ML)'):[limit_hist_level],
-            ('WNY LIMIT','HIST + CC_Buffer (ML)'):[limit_hist_level + limit_CCI_buffer],
             ('WNY Pubulic','HIST (ML)'):[wny_outside_luto_study_area_base_yr[region]],
             ('WNY Pubulic','HIST + CCI (ML)'):[wny_outside_luto_study_area_CCI[region]]},
             index=[reg_name]).unstack().reset_index()

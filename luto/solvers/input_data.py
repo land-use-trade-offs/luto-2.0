@@ -68,6 +68,7 @@ class SolverInputData:
     ag_man_limits: dict             # Agricultural management options' adoption limits.
     ag_man_lb_mrj: dict             # Agricultural management options' lower bounds.
 
+    water_yield_RR_BASE_YR: dict                                        # Water yield for the BASE_YR based on historical water yield layers .
     water_yield_outside_study_area: dict[int, float]                    # Water yield from outside LUTO study area -> dict. Keys: year, region.
 
     offland_ghg: np.ndarray         # GHG emissions from off-land commodities.
@@ -210,6 +211,10 @@ def get_ag_w_mrj(data: Data, target_index, water_dr_yield: Optional[np.ndarray] 
 def get_w_outside_luto(data: Data, yr_cal: int):
     print('Getting water yield from outside LUTO study area...', flush = True)
     return ag_water.get_water_outside_luto_study_area_from_hist_level(data)
+
+def get_w_RR_BASE_YR(data: Data):
+    print('Getting water yield for the BASE_YR based on historical water yield layers...', flush = True)
+    return ag_water.calc_water_net_yield_BASE_YR(data)
 
 
 def get_ag_b_mrj(data: Data):
@@ -440,6 +445,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_limits=get_ag_man_limits(data, target_index),                            
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
         water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Use the water net yield outside LUTO study area for the YR_CAL_BASE year
+        water_yield_RR_BASE_YR=get_w_RR_BASE_YR(data),                                  # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,

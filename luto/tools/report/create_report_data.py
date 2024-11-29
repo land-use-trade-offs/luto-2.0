@@ -788,6 +788,13 @@ def save_report_data(raw_data_dir:str):
                                                                                 'CH4': 'Methane (CH4)',
                                                                                 'N2O': 'Nitrous Oxide (N2O)'})
         
+        
+        GHG_limit = files.query('category == "GHG" and base_name == "GHG_emissions" and year_types != "begin_end_year"').reset_index(drop=True)
+        GHG_limit = pd.concat([pd.read_csv(path) for path in GHG_limit['path']], ignore_index=True).query('Variable == "GHG_EMISSIONS_LIMIT_TCO2e"')
+        GHG_limit['Value (Mt CO2e)'] = GHG_limit['Emissions (t CO2e)'] / 1e6
+        GHG_limit_wide = list(map(list,zip(GHG_limit['Year'],GHG_limit['Value (Mt CO2e)'])))
+        
+        
         # Plot_4-1: GHG of cumulative emissions (Mt)
         Emission_onland = GHG_files_onland.groupby('Year')['Value (Mt CO2e)'].sum(numeric_only = True).reset_index()
         Emission_onland = Emission_onland[['Year','Value (Mt CO2e)']]
@@ -826,7 +833,8 @@ def save_report_data(raw_data_dir:str):
         GHG_files_wide.columns = ['name','data'] 
         GHG_files_wide['type'] = 'column'
         
-        GHG_files_wide.loc[-1] = ['Net emissions', list(map(list,zip(Net_emission['Year'],Net_emission['Value (Mt CO2e)']))), 'line']
+        GHG_files_wide.loc[len(GHG_files_wide)] = ['Net emissions', list(map(list,zip(Net_emission['Year'],Net_emission['Value (Mt CO2e)']))), 'line']
+        GHG_files_wide.loc[len(GHG_files_wide)] = ['GHG emissions limit', GHG_limit_wide, 'line']
         GHG_files_wide.to_json(f'{SAVE_DIR}/GHG_2_individual_emission_Mt.json', orient='records')
 
 
@@ -1252,8 +1260,7 @@ def save_report_data(raw_data_dir:str):
         water_limit_region_wide = water_limit_region\
             .pivot(index=['Year'], columns='CCI Existence', values='Value (ML)')\
             .reset_index()
-        water_limit_region_hist = list(map(list,zip(water_limit_region_wide['Year'], itertools.repeat(0), water_limit_region_wide['HIST (ML)'])))
-        water_limit_region_CCI_buffer = list(map(list,zip(water_limit_region_wide['Year'], water_limit_region_wide['HIST (ML)'], water_limit_region_wide['HIST + CC_Buffer (ML)'])))
+        water_limit_region_hist = list(map(list,zip(water_limit_region_wide['Year'], water_limit_region_wide['HIST (ML)'])))
         
     
         water_inside_yield_wide.columns = ['name','data']
@@ -1264,8 +1271,7 @@ def save_report_data(raw_data_dir:str):
             ['Public land', water_outside_yiled_wide, 'column', None],
             ['Climate Change Impact', water_CCI_wide, 'column', None],
             ['Water Net Yield', water_yield_net_wide, 'spline', None],
-            ['Historical Limit', water_limit_region_hist, 'arearange', 'rgba(31, 31, 31, 0.15)'],
-            ['Climate Change Buffer', water_limit_region_CCI_buffer, 'arearange', 'rgba(31, 31, 31, 0.3)'],
+            ['Historical Limit', water_limit_region_hist, 'spline', 'black'],
             ],
             columns=['name','data','type','color']
         )
@@ -1281,17 +1287,6 @@ def save_report_data(raw_data_dir:str):
         json.dump(water_yield_region, outfile)
 
         
-
-
-
-
-
-
-
-
-
-
-
 
 
 

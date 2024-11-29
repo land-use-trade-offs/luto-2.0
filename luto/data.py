@@ -857,7 +857,10 @@ class Data:
             self.WATER_OUTSIDE_LUTO_DD_HIST = water_yield_oustide_luto_hist.query('Region_Type == "Drainage Division"').set_index('Region_ID')['Water Yield (ML)'].to_dict()
             self.WATER_UNDER_NATURAL_LAND_DD = dd_natural_land
             
-
+        # Place holder for Water Yield under River Region to avoid recalculating it every time.
+        self.WATER_YIELD_RR_BASE_YR = None
+        
+        
         ###############################################################
         # Carbon sequestration by trees data.
         ###############################################################
@@ -1249,14 +1252,15 @@ class Data:
         """
         # Create a 2D array of IDs for the LUMAP_2D_RESFACTORED
         lumap_2d_id = np.arange(self.LUMAP_2D_RESFACTORED.size).reshape(self.LUMAP_2D_RESFACTORED.shape)
-        lumap_2d_id = upsample_array(self, lumap_2d_id, settings.RESFACTOR)        
+        lumap_2d_id = upsample_array(self, lumap_2d_id, settings.RESFACTOR)    
+        lumask_2d_no_resfactor = (self.LUMAP_2D != self.NODATA) & (self.LUMAP_2D != self.MASK_LU_CODE)    
 
         # Get the 2D water supply map at full resolution 
         lmmap_full_2d = np.full_like(self.NLUM_MASK, self.NODATA, dtype=np.int16)                           # 2D map,  full of nodata (-9999)
         np.place(lmmap_full_2d, self.NLUM_MASK == 1, self.LMMAP_NO_RESFACTOR)                               # 2D map,  -9999 for ocean; -1 for desert, urban, water, etc; 0-27 for land uses
 
         # Calculate the number of cells with each resfactored ID cell
-        cell_count = np.bincount(lumap_2d_id.flatten(), minlength=self.LUMAP_2D_RESFACTORED.size)
+        cell_count = np.bincount(lumap_2d_id.flatten(), lumask_2d_no_resfactor.flatten(), minlength=self.LUMAP_2D_RESFACTORED.size)
         lumap_resample_avg = np.zeros((len(self.LANDMANS), self.NCELLS, self.N_AG_LUS), dtype=np.float32)
                 
         for idx_lu in self.DESC2AGLU.values():

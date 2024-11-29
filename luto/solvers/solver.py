@@ -75,7 +75,6 @@ class LutoSolver:
         input_data: SolverInputData,
         d_c: np.array,
         final_target_year: int,
-
         ):
 
 
@@ -126,8 +125,7 @@ class LutoSolver:
     def _setup_vars(self):
         self._setup_x_vars()
         self._setup_ag_management_variables()
-        self._setup_decision_variables()
-        self._setup_ghg_emissions_decision_variable()
+        self._setup_deviation_penalties()
 
     def _setup_constraints(self):
         self._add_cell_usage_constraints()                              
@@ -222,20 +220,19 @@ class LutoSolver:
                         lb=irr_x_lb, ub=1, name=irr_var_name,
                     )
 
-    def _setup_decision_variables(self):
+    def _setup_deviation_penalties(self):
         """
-        Decision variables, one for each commodity, to minimise the deviations from demand.
+        Decision variables, V and E, for soft constraints.
+        1) [V] Penalty vector for demand, each one conrespondes a commodity, that minimises the deviations from demand.
+        2) [E] A single penalty scalar for GHG emissions, minimises its deviation from the target.
         """
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             self.V = self.gurobi_model.addMVar(self.ncms, name="V")
-
-    def _setup_ghg_emissions_decision_variable(self):
-        """
-        A single variable equal to the difference between targetted GHG emissions and
-        actual GHG emissions when GHG emission constraint is 'soft'
-        """
+            
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             self.E = self.gurobi_model.addVar(name="E")
+
+        
 
     def _setup_objective(self):
         """
@@ -254,7 +251,7 @@ class LutoSolver:
                         + self._input_data.ag_t_mrj
                         + self._input_data.non_ag_to_ag_t_mrj
                     )
-                ) / settings.PENALTY
+                )
             )
 
             non_ag_obj_rk = (
@@ -265,7 +262,7 @@ class LutoSolver:
                         + self._input_data.non_ag_t_rk
                         + self._input_data.ag_to_non_ag_t_rk
                     )
-                ) / settings.PENALTY
+                )
             )
 
             # Get effects of alternative agr. management options (stored in a dict)
@@ -276,7 +273,7 @@ class LutoSolver:
                         self._input_data.ag_man_c_mrj[am]
                         + self._input_data.ag_man_t_mrj[am]
                     )
-                ) / settings.PENALTY
+                )
                 for am in self._input_data.am2j
             }
 
@@ -286,21 +283,20 @@ class LutoSolver:
                 self._input_data.ag_c_mrj
                 + self._input_data.ag_t_mrj
                 + self._input_data.non_ag_to_ag_t_mrj
-            ) / settings.PENALTY
+            )
 
             non_ag_obj_rk = (
                 self._input_data.non_ag_c_rk
                 + self._input_data.non_ag_t_rk
                 + self._input_data.ag_to_non_ag_t_rk
-            ) / settings.PENALTY
+            )
 
             # Store calculations for each agricultural management option in a dict
             ag_man_objs = {
                 am: (
                     self._input_data.ag_man_c_mrj[am]
                     + self._input_data.ag_man_t_mrj[am]
-                )
-                / settings.PENALTY
+                )          
                 for am in self._input_data.am2j
             }
 
@@ -336,17 +332,10 @@ class LutoSolver:
             for k in range(self._input_data.n_non_ag_lus)
         )
 
-        objective = (
-            ag_obj_contr 
-            + ag_man_obj_contr 
-            + non_ag_obj_contr
-        )
-
-        if settings.DEMAND_CONSTRAINT_TYPE == "soft":
-            objective += gp.quicksum(self.V[c] for c in range(self.ncms))
-
-        if settings.GHG_CONSTRAINT_TYPE == "soft":
-            objective += self.E * settings.GHG_PENALTY
+        # Adjust the objective function based on the constraints type
+        objective = (ag_obj_contr + ag_man_obj_contr  + non_ag_obj_contr) * settings.SOLVE_WEIGHT_ECONOMICS
+        objective += gp.quicksum(self.V[c] for c in range(self.ncms))       if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
+        objective += self.E * settings.SOLVE_WEIGHT_GHG_DEVITATION          if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
 
         self.gurobi_model.setObjective(objective, GRB.MINIMIZE)
 
@@ -568,7 +557,7 @@ class LutoSolver:
         min_var = lambda var, prev_var: var if prev_var.x > 1e-3 else prev_var.x
 
         # Ensure water use remains below limit for each region
-        for region, (reg_name, limit_hist_level, limit_CCI_buffer, ind) in self._input_data.limits["water"].items():
+        for region, (reg_name, limit_hist_level, ind) in self._input_data.limits["water"].items():
 
             ag_contr = gp.quicksum(
                 gp.quicksum(
@@ -605,15 +594,25 @@ class LutoSolver:
 
             # Sum of all water yield contributions
             w_net_yield_region = ag_contr + ag_man_contr + non_ag_contr + outside_luto_study_contr
+            
+            # Under River Regions, we need to update the water constraint when the wny_hist_level < wny_BASE_YR_level
+            if settings.WATER_REGION_DEF == 'Drainage Division':
+                water_yield_constraint =limit_hist_level
+            elif settings.WATER_REGION_DEF == 'River Region':
+                wny_BASE_YR_level = self._input_data.water_yield_RR_BASE_YR[region]
+                water_yield_constraint = min(limit_hist_level, wny_BASE_YR_level)
+            else:
+                raise ValueError(f"Unknown choice for `WATER_REGION_DEF` setting: must be either 'River Region' or 'Drainage Division'")
         
-
             # Add the constraint that the water yield in the region must be greater than the limit
-            constr = self.gurobi_model.addConstr(w_net_yield_region >= limit_hist_level)
+            constr = self.gurobi_model.addConstr(w_net_yield_region >= water_yield_constraint)
             self.water_limit_constraints.append(constr)
             
             # Report on the water yield in the region
             if settings.VERBOSE == 1:
                 print(f"    ...net water yield in {reg_name} >= {limit_hist_level:.2f} ML")
+            if water_yield_constraint != limit_hist_level:
+                print(f"        ... updating water constraint to >= {water_yield_constraint:.2f} ML")
 
 
     def _get_total_ghg_emissions_expr(self) -> gp.LinExpr:
@@ -653,52 +652,32 @@ class LutoSolver:
             for k in range(self._input_data.n_non_ag_lus)
         )
         return ag_contr + ag_man_contr + non_ag_contr + self._input_data.offland_ghg
-    
-    def _ghg_emissions_target(self):
-        return self._input_data.limits["ghg"]
 
-    def _add_hard_ghg_emissions_limit_constraints(self):
-        """
-        Adds hard GHG constraints, i.e. GHG emissions must be <= the limit
-        """
-        print('  ...GHG emissions constraints (hard)...')
-        
-        # Returns GHG emissions limits
-        ghg_limit = self._ghg_emissions_target()
-
-        print(f"    ...GHG emissions reduction target: {ghg_limit:,.0f} tCO2e")
-        self.ghg_emissions_limit_constraint = self.gurobi_model.addConstr(
-            self.ghg_emissions_expr <= ghg_limit
-        )
-
-    def _add_soft_ghg_emissions_limit_constraints(self):
-        """
-        Links the GHG emissions decision var self.E to be >= the absolute difference
-        between desired emissions and modelled emissions.
-        """
-        print(f'  ...GHG emissions constraints (soft, penalty = {settings.GHG_PENALTY})...')
-
-        ghg_limit = self._ghg_emissions_target()
-
-        self.gurobi_model.addConstr(self.ghg_emissions_expr - ghg_limit <= self.E)
-        self.gurobi_model.addConstr(ghg_limit - self.ghg_emissions_expr <= self.E)
-        
 
     def _add_ghg_emissions_limit_constraints(self):
         """
         Add either hard or soft GHG constraints depending on settings.GHG_CONSTRAINT_TYPE
         """
         if settings.GHG_EMISSIONS_LIMITS != "on":
+            print('...GHG emissions constraints TURNED OFF ...')
             return
         
+        ghg_limit = self._input_data.limits["ghg"]
         self.ghg_emissions_expr = self._get_total_ghg_emissions_expr()
         
         if settings.GHG_CONSTRAINT_TYPE == 'hard':
-            self._add_hard_ghg_emissions_limit_constraints()
+            print(f"...GHG emissions reduction target: {ghg_limit:,.0f} tCO2e")
+            self.ghg_emissions_limit_constraint = self.gurobi_model.addConstr(
+                self.ghg_emissions_expr <= ghg_limit
+            )
         elif settings.GHG_CONSTRAINT_TYPE == 'soft':
-            self._add_soft_ghg_emissions_limit_constraints()
+            print(f"...GHG emissions reduction target: {ghg_limit:,.0f} tCO2e")
+            print(f"    ...GHG emissions penalty: {settings.SOLVE_WEIGHT_GHG_DEVITATION}")
+            self.gurobi_model.addConstr(self.ghg_emissions_expr - ghg_limit <= self.E)
+            self.gurobi_model.addConstr(ghg_limit - self.ghg_emissions_expr <= self.E)
         else:
-            raise ValueError("Unknown choice for GHG_CONSTRAINT_TYPE setting: must be either 'hard' or 'soft'")
+            raise ValueError("Unknown choice for `GHG_CONSTRAINT_TYPE` setting: must be either 'hard' or 'soft'")
+
 
     def _add_biodiversity_limit_constraints(self):
         if settings.BIODIVERSITY_LIMITS != "on":
