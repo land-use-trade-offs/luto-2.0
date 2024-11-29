@@ -485,7 +485,7 @@ def calc_water_net_yield_BASE_YR(data: Data) -> np.ndarray:
     wny_inside_LUTO_regions = {region: wny for region, wny in enumerate(wny_inside_LUTO_regions) if region != 0}
     
     # Get water yield from outside the LUTO study area
-    wny_outside_LUTO_regions = data.WATER_OUTSIDE_LUTO_RR_HIST
+    wny_outside_LUTO_regions = get_water_outside_luto_study_area_from_hist_level(data)
     
     return {
         region: wny_inside_LUTO_regions[region]  + wny_outside_LUTO_regions[region] 

@@ -29,7 +29,6 @@ from gurobipy import GRB
 
 from luto import tools
 from luto.solvers.input_data import SolverInputData
-from luto.economics.agricultural.water import calc_water_net_yield_for_region
 from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_REVERSIBLE
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.settings import NON_AG_LAND_USES, NON_AG_LAND_USES_REVERSIBLE
@@ -333,7 +332,7 @@ class LutoSolver:
         )
 
         # Adjust the objective function based on the constraints type
-        objective = (ag_obj_contr + ag_man_obj_contr  + non_ag_obj_contr) * settings.SOLVE_WEIGHT_ECONOMICS
+        objective = (ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr) * settings.SOLVE_WEIGHT_ECONOMICS
         objective += gp.quicksum(self.V[c] for c in range(self.ncms))       if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
         objective += self.E * settings.SOLVE_WEIGHT_GHG_DEVITATION          if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
 

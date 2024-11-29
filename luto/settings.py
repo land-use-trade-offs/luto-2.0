@@ -113,7 +113,7 @@ DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in th
 # Penalty in objective function to balance influence of demand versus cost when DEMAND_CONSTRAINT_TYPE = 'soft'
 # 1e-5 works well (i.e., demand are met), demands not met with anything less (i.e., large deviations)
 # Don't set too high though otherwise it meets demand exactly (minimises deviations) even if the cost is ridiculously high
-SOLVE_WEIGHT_ECONOMICS = 1e-5
+SOLVE_WEIGHT_ECONOMICS = 1/30
 
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
@@ -326,11 +326,11 @@ if CARBON_PRICES_FIELD == 'AS_GHG':
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
 SOC_AMORTISATION = 15
 
-GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
-# GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
+# GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
+GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
 # Penalty for deviating from the GHG constraints when GHG_CONSTRAINT_TYPE is soft
-SOLVE_WEIGHT_GHG_DEVITATION = 10e-3
+SOLVE_WEIGHT_GHG_DEVITATION = 1
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
@@ -338,7 +338,7 @@ WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield lim
 
 
 # Regionalisation to enforce water use limits by
-WATER_REGION_DEF = 'River Region'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
+WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
 
 # Water net yield targets: the value represents the proportion of the historical water yields
 # that the net yield must exceed in a given year. Base year (2010) uses base year net yields as targets.
