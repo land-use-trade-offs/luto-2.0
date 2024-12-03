@@ -70,6 +70,9 @@ class SolverInputData:
 
     water_yield_RR_BASE_YR: dict                                        # Water yield for the BASE_YR based on historical water yield layers .
     water_yield_outside_study_area: dict[int, float]                    # Water yield from outside LUTO study area -> dict. Keys: year, region.
+    
+    BASE_YR_cost: float             # BASE_YR cost.
+    BASE_YR_revenue: float          # BASE_YR revenue.
 
     offland_ghg: np.ndarray         # GHG emissions from off-land commodities.
 
@@ -78,10 +81,6 @@ class SolverInputData:
     limits: dict                    # Targets to use.
     desc2aglu: dict                 # Map of agricultural land use descriptions to codes.
     resmult: float                  # Resolution factor multiplier from data.RESMULT
-
-    base_year_ag_sol: np.ndarray = None                 # Base year's agricultural variables solution.
-    base_year_non_ag_sol: np.ndarray = None             # Base year's non-agricultural variables solution.
-    base_year_ag_man_sol: dict[str, np.ndarray] = None  # Base year's agricultural management variables solution.
 
     @property
     def n_ag_lms(self):
@@ -363,6 +362,30 @@ def get_ag_man_limits(data: Data, target_index):
     return output
 
 
+def get_BASE_YR_cost(data: Data):
+    print('Getting BASE_YR cost...', flush = True)
+    
+    if data.BASE_YR_cost is not None:
+        return data.BASE_YR_cost
+    
+    base_c_mrj = get_ag_c_mrj(data, 0)
+    cost = np.einsum('mrj,mrj->', data.AG_L_MRJ, base_c_mrj)
+    data.BASE_YR_cost = cost
+    return cost
+
+
+def get_BASE_YR_revenue(data: Data):
+    print('Getting BASE_YR revenue...', flush = True)
+    
+    if data.BASE_YR_revenue is not None:
+        return data.BASE_YR_revenue
+    
+    base_r_mrj = get_ag_r_mrj(data, 0)
+    revenue = np.einsum('mrj,mrj->', data.AG_L_MRJ, base_r_mrj)
+    data.BASE_YR_revenue = revenue
+    return revenue
+
+
 def get_limits(
     data: Data, yr_cal: int,
 ) -> dict[str, Any]:
@@ -446,13 +469,12 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
         water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Use the water net yield outside LUTO study area for the YR_CAL_BASE year
         water_yield_RR_BASE_YR=get_w_RR_BASE_YR(data),                                  # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
+        BASE_YR_cost=get_BASE_YR_cost(data),
+        BASE_YR_revenue=get_BASE_YR_revenue(data),
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,
         limits=get_limits(data, target_year),
         desc2aglu=data.DESC2AGLU,
         resmult=data.RESMULT,
-        base_year_ag_sol=data.ag_dvars.get(base_year),
-        base_year_non_ag_sol=data.non_ag_dvars.get(base_year),
-        base_year_ag_man_sol=data.ag_man_dvars.get(base_year),
     )

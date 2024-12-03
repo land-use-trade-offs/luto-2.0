@@ -332,9 +332,11 @@ class LutoSolver:
         )
 
         # Adjust the objective function based on the constraints type
-        objective = (ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr) * settings.SOLVE_WEIGHT_ECONOMICS
-        objective += gp.quicksum(self.V[c] for c in range(self.ncms))       if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
-        objective += self.E * settings.SOLVE_WEIGHT_GHG_DEVITATION          if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
+        BASE_YR_economy = self._input_data.BASE_YR_cost if settings.OBJECTIVE == "mincost" else (self._input_data.BASE_YR_revenue - self._input_data.BASE_YR_cost)
+        
+        objective = (ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr) / BASE_YR_economy
+        objective += gp.quicksum(self.V/self.d_c) * settings.SOLVE_WEIGHT_DEVITATIONS           if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
+        objective += self.E/self._input_data.limits["ghg"] * settings.SOLVE_WEIGHT_DEVITATIONS  if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
 
         self.gurobi_model.setObjective(objective, GRB.MINIMIZE)
 
@@ -671,7 +673,7 @@ class LutoSolver:
             )
         elif settings.GHG_CONSTRAINT_TYPE == 'soft':
             print(f"...GHG emissions reduction target: {ghg_limit:,.0f} tCO2e")
-            print(f"    ...GHG emissions penalty: {settings.SOLVE_WEIGHT_GHG_DEVITATION}")
+            print(f"    ...GHG emissions penalty: {settings.SOLVE_WEIGHT_DEVITATIONS}")
             self.gurobi_model.addConstr(self.ghg_emissions_expr - ghg_limit <= self.E)
             self.gurobi_model.addConstr(ghg_limit - self.ghg_emissions_expr <= self.E)
         else:

@@ -628,7 +628,6 @@ class Data:
         ###############################################################
         print("\tLoading additional agricultural economic data...", flush=True)
 
-        
 
         # Load greenhouse gas emissions from agriculture
         self.AGGHG_CROPS = self.get_df_resfactor_applied(
@@ -647,6 +646,10 @@ class Data:
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
         self.EXCLUDE = np.load(os.path.join(INPUT_DIR, "x_mrj.npy"))
         self.EXCLUDE = self.EXCLUDE[:, self.MASK, :]  # Apply resfactor specially for the exclude matrix
+        
+        # BASE_YR cost and revenue; Initilized as None and will be added later in `luto.solvers.input_data.py` to avoid recalculating them
+        self.BASE_YR_cost = None
+        self.BASE_YR_revenue = None
 
 
 
