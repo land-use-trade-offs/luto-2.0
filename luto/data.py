@@ -827,8 +827,12 @@ class Data:
         wyield_fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_sr_ml_ha.h5')
         
         # Read the data into memory with [...], so that it can be pickled.
-        self.WATER_YIELD_DR_FILE = h5py.File(wyield_fname_dr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_DR_ML_HA_mean'][...]
-        self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_SR_ML_HA_mean'][...]
+        self.WATER_YIELD_DR_FILE = self.get_array_resfactor_applied(
+            h5py.File(wyield_fname_dr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_DR_ML_HA_mean'][...]
+        )
+        self.WATER_YIELD_SR_FILE = self.get_array_resfactor_applied(
+            h5py.File(wyield_fname_sr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_SR_ML_HA_mean'][...]
+        )
 
         # Water yield from outside LUTO study area.
         water_yield_oustide_luto_hist = pd.read_hdf(os.path.join(INPUT_DIR, 'water_yield_outside_LUTO_study_area_hist_1970_2000.h5'))
@@ -1634,49 +1638,6 @@ class Data:
             )
         return self.CARBON_PRICES[yr_cal]
 
-    def get_water_dr_yield_for_yr_idx(self, yr_idx: int) -> np.ndarray:
-        """
-        Get the DR water yield array, inclusive of all cells that LUTO does not look at.
-
-        Returns
-        -------
-        np.ndarray: shape (NCELLS,)
-        """
-
-        return self.get_array_resfactor_applied(self.WATER_YIELD_DR_FILE[yr_idx])
-
-    def get_water_dr_yield_for_year(self, yr_cal: int) -> np.ndarray:
-        """
-        Get the DR water yield array, inclusive of all cells that LUTO does not look at.
-
-        Returns
-        -------
-        np.ndarray: shape (NCELLS,)
-        """
-        yr_idx = yr_cal - self.YR_CAL_BASE
-        return self.get_array_resfactor_applied(self.get_water_dr_yield_for_yr_idx(yr_idx))
-
-    def get_water_sr_yield_for_yr_idx(self, yr_idx: int) -> np.ndarray:
-        """
-        Get the SR water yield array, inclusive of all cells that LUTO does not look at.
-
-        Returns
-        -------
-        np.ndarray: shape (NCELLS,)
-        """
-        return self.get_array_resfactor_applied(self.WATER_YIELD_SR_FILE[yr_idx])
-
-    def get_water_sr_yield_for_year(self, yr_cal: int) -> np.ndarray:
-        """
-        Get the SR water yield array, inclusive of all cells that LUTO does not look at.
-
-        Returns
-        -------
-        np.ndarray: shape (NCELLS,)
-        """
-        yr_idx = yr_cal - self.YR_CAL_BASE
-        return self.get_array_resfactor_applied(self.WATER_YIELD_SR_FILE(yr_idx))
-
     def get_water_nl_yield_for_yr_idx(
         self,
         yr_idx: int,
@@ -1692,11 +1653,11 @@ class Data:
         """
         water_dr_yield = (
             water_dr_yield if water_dr_yield is not None
-            else self.get_water_dr_yield_for_yr_idx(yr_idx)
+            else self.WATER_YIELD_DR_FILE[yr_idx]
         )
         water_sr_yield = (
             water_sr_yield if water_sr_yield is not None
-            else self.get_water_sr_yield_for_yr_idx(yr_idx)
+            else self.WATER_YIELD_SR_FILE[yr_idx]
         )
         dr_prop = self.DEEP_ROOTED_PROPORTION
 
