@@ -647,9 +647,8 @@ class Data:
         self.EXCLUDE = np.load(os.path.join(INPUT_DIR, "x_mrj.npy"))
         self.EXCLUDE = self.EXCLUDE[:, self.MASK, :]  # Apply resfactor specially for the exclude matrix
         
-        # BASE_YR cost and revenue; Initilized as None and will be added later in `luto.solvers.input_data.py` to avoid recalculating them
-        self.BASE_YR_cost = None
-        self.BASE_YR_revenue = None
+        # BASE_YR economic value; Initilized as None and will be added later in `luto.solvers.input_data.py` to avoid recalculating
+        self.BASE_YR_economic_val = None
 
 
 

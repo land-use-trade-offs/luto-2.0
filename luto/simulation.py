@@ -119,7 +119,7 @@ def solve_timeseries(data: Data, steps: int, base: int, target: int):
         data.add_ag_dvars(yr, solution.ag_X_mrj)
         data.add_non_ag_dvars(yr, solution.non_ag_X_rk)
         data.add_ag_man_dvars(yr, solution.ag_man_X_mrj)
-        data.add_obj_vals(yr, solution.obj_val)
+        data.add_obj_vals(yr, solution.obj_val_sum)
 
         if settings.CALC_BIODIVERSITY_CONTRIBUTION:
             print(f'Reproject decision variables...')
@@ -157,7 +157,7 @@ def solve_snapshot(data: Data, base: int, target: int):
     data.add_ag_dvars(target, solution.ag_X_mrj)
     data.add_non_ag_dvars(target, solution.non_ag_X_rk)
     data.add_ag_man_dvars(target, solution.ag_man_X_mrj)
-    data.add_obj_vals(target, solution.obj_val)
+    data.add_obj_vals(target, solution.obj_val_sum)
 
     if settings.CALC_BIODIVERSITY_CONTRIBUTION:
         print(f'Reproject decision variables...')

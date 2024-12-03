@@ -1,6 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
+from math import e
 from typing import Any, Optional
 import numpy as np
 import pandas as pd
@@ -71,8 +72,7 @@ class SolverInputData:
     water_yield_RR_BASE_YR: dict                                        # Water yield for the BASE_YR based on historical water yield layers .
     water_yield_outside_study_area: dict[int, float]                    # Water yield from outside LUTO study area -> dict. Keys: year, region.
     
-    BASE_YR_cost: float             # BASE_YR cost.
-    BASE_YR_revenue: float          # BASE_YR revenue.
+    BASE_YR_economic_val: float     # BASE_YR economic value.
 
     offland_ghg: np.ndarray         # GHG emissions from off-land commodities.
 
@@ -362,28 +362,26 @@ def get_ag_man_limits(data: Data, target_index):
     return output
 
 
-def get_BASE_YR_cost(data: Data):
-    print('Getting BASE_YR cost...', flush = True)
+def get_BASE_YR_economic_val(data: Data):
+    print('Getting BASE_YR economic value...', flush = True)
     
-    if data.BASE_YR_cost is not None:
-        return data.BASE_YR_cost
+    if data.BASE_YR_economic_val is not None:
+        return data.BASE_YR_economic_val
     
     base_c_mrj = get_ag_c_mrj(data, 0)
-    cost = np.einsum('mrj,mrj->', data.AG_L_MRJ, base_c_mrj)
-    data.BASE_YR_cost = cost
-    return cost
-
-
-def get_BASE_YR_revenue(data: Data):
-    print('Getting BASE_YR revenue...', flush = True)
-    
-    if data.BASE_YR_revenue is not None:
-        return data.BASE_YR_revenue
-    
     base_r_mrj = get_ag_r_mrj(data, 0)
+    cost = np.einsum('mrj,mrj->', data.AG_L_MRJ, base_c_mrj)
     revenue = np.einsum('mrj,mrj->', data.AG_L_MRJ, base_r_mrj)
-    data.BASE_YR_revenue = revenue
-    return revenue
+    
+    if settings.OBJECTIVE == "mincost":
+        economic_val = cost
+    elif settings.OBJECTIVE == "maxprofit":
+        economic_val = revenue - cost
+    else:
+        raise ValueError(f"Unknown objective: {settings.OBJECTIVE}")
+    data.BASE_YR_economic_val = economic_val
+    return economic_val
+
 
 
 def get_limits(
@@ -469,8 +467,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
         water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Use the water net yield outside LUTO study area for the YR_CAL_BASE year
         water_yield_RR_BASE_YR=get_w_RR_BASE_YR(data),                                  # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
-        BASE_YR_cost=get_BASE_YR_cost(data),
-        BASE_YR_revenue=get_BASE_YR_revenue(data),
+        BASE_YR_economic_val=get_BASE_YR_economic_val(data),
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,

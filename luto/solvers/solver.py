@@ -61,7 +61,8 @@ class SolverSolution:
     non_ag_X_rk: np.ndarray
     ag_man_X_mrj: dict[str, np.ndarray]
     prod_data: dict[str, float]
-    obj_val: float
+    obj_val_sum: float
+    obj_val_each: dict[str, float]
 
 
 class LutoSolver:
@@ -331,13 +332,14 @@ class LutoSolver:
             for k in range(self._input_data.n_non_ag_lus)
         )
 
-        # Adjust the objective function based on the constraints type
-        BASE_YR_economy = self._input_data.BASE_YR_cost if settings.OBJECTIVE == "mincost" else (self._input_data.BASE_YR_revenue - self._input_data.BASE_YR_cost)
         
-        objective = (ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr) / BASE_YR_economy
-        objective += gp.quicksum(self.V/self.d_c) * settings.SOLVE_WEIGHT_DEVITATIONS           if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
-        objective += self.E/self._input_data.limits["ghg"] * settings.SOLVE_WEIGHT_DEVITATIONS  if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
-
+        # Get the objective values for each sector
+        self.obj_economy = (ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr) / self._input_data.BASE_YR_economic_val
+        self.obj_demand = (self.V/self.d_c)                     if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
+        self.obj_ghg = self.E/self._input_data.limits["ghg"]    if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
+        
+        # Set the objective function
+        objective = self.obj_economy + (gp.quicksum(self.obj_demand) + self.obj_ghg) * settings.SOLVE_WEIGHT_DEVITATIONS 
         self.gurobi_model.setObjective(objective, GRB.MINIMIZE)
         
         
@@ -1098,7 +1100,11 @@ class LutoSolver:
             non_ag_X_rk=non_ag_X_sol_rk,
             ag_man_X_mrj=ag_man_X_mrj_processed,
             prod_data=prod_data,
-            obj_val=self.gurobi_model.ObjVal,
+            obj_val_sum=self.gurobi_model.ObjVal,
+            obj_val_each={
+                'Economy': self.obj_economy.getValue(),
+                'Demand': self.obj_demand.getValue().sum(),
+                'GHG': self.obj_ghg.getValue()}
         )
 
     @property
