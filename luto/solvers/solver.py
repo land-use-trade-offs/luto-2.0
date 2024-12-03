@@ -339,6 +339,8 @@ class LutoSolver:
         objective += self.E/self._input_data.limits["ghg"] * settings.SOLVE_WEIGHT_DEVITATIONS  if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
 
         self.gurobi_model.setObjective(objective, GRB.MINIMIZE)
+        
+        
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
         """

@@ -1365,7 +1365,7 @@ def save_report_data(raw_data_dir:str):
     
     
     # ---------------- Biodiversity contribution score  ----------------
-    if  settings.BIODIVERSITY_CONTRIBUTION_REPORT:
+    if  settings.CALC_BIODIVERSITY_CONTRIBUTION:
         bio_paths = files.query('category == "biodiversity" and year_types == "single_year" and base_name == "biodiversity_contribution"').reset_index(drop=True)
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)                   # Rename the landuse

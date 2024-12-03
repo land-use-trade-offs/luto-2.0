@@ -96,7 +96,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 30        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
 # MODE = 'snapshot'   # Runs for target year only
@@ -115,7 +115,7 @@ DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in th
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
 
-WRITE_OUTPUT_GEOTIFFS = True    # Write GeoTiffs to output directory: True or False
+WRITE_OUTPUT_GEOTIFFS = False    # Write GeoTiffs to output directory: True or False
 WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resolution: True or False
 PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
 WRITE_THREADS = 50              # The Threads to use for map making, only work with PARALLEL_WRITE = True
@@ -326,7 +326,7 @@ SOC_AMORTISATION = 15
 GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
 # Penalty for deviating from the GHG constraints when GHG_CONSTRAINT_TYPE is soft
-SOLVE_WEIGHT_DEVITATIONS = 1
+SOLVE_WEIGHT_DEVITATIONS = 0.5
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
@@ -445,7 +445,7 @@ BIODIV_GBF_TARGET_2_DICT = {
 
 # ------------------- Biodiversity contribution reporting -------------------
 BIODIVERSITY_LIMITS = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
-BIODIVERSITY_CONTRIBUTION_REPORT = True  # True or False, report biodiversity contribution
+CALC_BIODIVERSITY_CONTRIBUTION = False  # True or False, calculate/report biodiversity contribution
 BIO_CALC_LEVEL = 'group'  # 'group' or 'species' - determines whether to calculate biodiversity scores at the group or species level
 
 

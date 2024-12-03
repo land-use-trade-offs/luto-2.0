@@ -1092,6 +1092,10 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
 
 
 def write_biodiversity_contribution(data: Data, yr_cal, path):
+    
+    # Do nothing if no need to calculate biodiversity contribution
+    if not settings.CALC_BIODIVERSITY_CONTRIBUTION:
+        return
 
     print(f'Writing biodiversity contribution score for {yr_cal}')
 
