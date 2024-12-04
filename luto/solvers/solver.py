@@ -250,7 +250,7 @@ class LutoSolver:
                         self._input_data.ag_c_mrj
                         + self._input_data.ag_t_mrj
                         + self._input_data.non_ag_to_ag_t_mrj
-                    )
+                    ) 
                 )
             )
 
@@ -261,7 +261,7 @@ class LutoSolver:
                         self._input_data.non_ag_c_rk
                         + self._input_data.non_ag_t_rk
                         + self._input_data.ag_to_non_ag_t_rk
-                    )
+                    ) 
                 )
             )
 
@@ -272,7 +272,7 @@ class LutoSolver:
                     - (
                         self._input_data.ag_man_c_mrj[am]
                         + self._input_data.ag_man_t_mrj[am]
-                    )
+                    ) 
                 )
                 for am in self._input_data.am2j
             }
@@ -296,7 +296,7 @@ class LutoSolver:
                 am: (
                     self._input_data.ag_man_c_mrj[am]
                     + self._input_data.ag_man_t_mrj[am]
-                )          
+                )      
                 for am in self._input_data.am2j
             }
 
@@ -331,17 +331,15 @@ class LutoSolver:
             @ self.X_non_ag_vars_kr[k, self._input_data.non_ag_lu2cells[k]]
             for k in range(self._input_data.n_non_ag_lus)
         )
-
         
         # Get the objective values for each sector
-        self.obj_economy = (ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr) / self._input_data.BASE_YR_economic_val
-        self.obj_demand = (self.V/self.d_c)                     if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
-        self.obj_ghg = self.E/self._input_data.limits["ghg"]    if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
-        
+        self.obj_economy = (ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr) / abs(self._input_data.BASE_YR_economic_val)
+        self.obj_demand = self.V / abs(self.d_c)                       if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
+        self.obj_ghg = self.E / abs(self._input_data.limits["ghg"])    if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
+
         # Set the objective function
-        objective = self.obj_economy + (gp.quicksum(self.obj_demand) + self.obj_ghg) * settings.SOLVE_WEIGHT_DEVITATIONS 
-        self.gurobi_model.setObjective(objective, GRB.MINIMIZE)
-        
+        objective = self.obj_economy + (gp.quicksum(self.obj_demand) + self.obj_ghg) * settings.SOLVE_WEIGHT_DEVIATIONS
+        self.gurobi_model.setObjective(objective, GRB.MINIMIZE)  
         
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
@@ -676,8 +674,8 @@ class LutoSolver:
                 self.ghg_emissions_expr <= ghg_limit
             )
         elif settings.GHG_CONSTRAINT_TYPE == 'soft':
-            print(f"...GHG emissions reduction target: {ghg_limit:,.0f} tCO2e")
-            print(f"    ...GHG emissions penalty: {settings.SOLVE_WEIGHT_DEVITATIONS}")
+            print(f"  ...GHG emissions reduction target: {ghg_limit:,.0f} tCO2e")
+            print(f"    ...GHG emissions penalty: {settings.SOLVE_WEIGHT_DEVIATIONS}")
             self.gurobi_model.addConstr(self.ghg_emissions_expr - ghg_limit <= self.E)
             self.gurobi_model.addConstr(ghg_limit - self.ghg_emissions_expr <= self.E)
         else:

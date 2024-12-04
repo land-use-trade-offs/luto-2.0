@@ -365,9 +365,6 @@ def get_ag_man_limits(data: Data, target_index):
 def get_BASE_YR_economic_val(data: Data):
     print('Getting BASE_YR economic value...', flush = True)
     
-    if data.BASE_YR_economic_val is not None:
-        return data.BASE_YR_economic_val
-    
     base_c_mrj = get_ag_c_mrj(data, 0)
     base_r_mrj = get_ag_r_mrj(data, 0)
     cost = np.einsum('mrj,mrj->', data.AG_L_MRJ, base_c_mrj)
@@ -379,7 +376,7 @@ def get_BASE_YR_economic_val(data: Data):
         economic_val = revenue - cost
     else:
         raise ValueError(f"Unknown objective: {settings.OBJECTIVE}")
-    data.BASE_YR_economic_val = economic_val
+
     return economic_val
 
 

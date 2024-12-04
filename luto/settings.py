@@ -96,7 +96,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 30        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
 MODE = 'snapshot'   # Runs for target year only
@@ -325,8 +325,8 @@ SOC_AMORTISATION = 15
 # GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
 GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
-# Penalty for deviating from the GHG constraints when GHG_CONSTRAINT_TYPE is soft
-SOLVE_WEIGHT_DEVITATIONS = 0.5
+# Weight for the GHG/Demand deviation in the objective function
+SOLVE_WEIGHT_DEVIATIONS = 100
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
@@ -417,7 +417,7 @@ HCAS_PERCENTILE = 50
 LDS_BIODIVERSITY_VALUE = 0.8
 
 
-# ------------------- Non-agricultural biodiversity parameters -------------------
+# Non-agricultural biodiversity parameters 
 ''' The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
     For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value
     will be 0.6 * 0.8 = 0.48.
@@ -430,7 +430,7 @@ AGROFORESTRY_BIODIV_BENEFIT = 0.75
 BECCS_BIODIVERSITY_BENEFIT = 0
 
 
-# ------------------- Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
+# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 """ Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
     Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
     in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
@@ -443,10 +443,10 @@ BIODIV_GBF_TARGET_2_DICT = {
              }            # (can add more years/targets)\
 
 
-# ------------------- Biodiversity contribution reporting -------------------
-BIODIVERSITY_LIMITS = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
-CALC_BIODIVERSITY_CONTRIBUTION = False  # True or False, calculate/report biodiversity contribution
-BIO_CALC_LEVEL = 'group'  # 'group' or 'species' - determines whether to calculate biodiversity scores at the group or species level
+# Biodiversity contribution reporting 
+BIODIVERSITY_LIMITS = 'on'                 # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
+CALC_BIODIVERSITY_CONTRIBUTION = False      # True or False, calculate/report biodiversity contribution; False will urn off reprojecting decision variables to xarray so speed up the model run.
+BIO_CALC_LEVEL = 'group'                    # 'group' or 'species' - determines whether to calculate biodiversity scores at the group or species level
 
 
 

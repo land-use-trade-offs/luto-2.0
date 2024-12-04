@@ -989,9 +989,11 @@ def write_biodiversity(data: Data, yr_cal, path):
     Write biodiversity info for a given year ('yr_cal'), simulation ('sim')
     and output path ('path').
     """
+    if not settings.BIODIVERSITY_LIMITS == 'on':
+        return
 
     # Check biodiversity limits and report
-    biodiv_limit = ag_biodiversity.get_biodiversity_limits(data, yr_cal) if settings.BIODIVERSITY_LIMITS == 'on' else 0
+    biodiv_limit = ag_biodiversity.get_biodiversity_limits(data, yr_cal)
 
     print(f'Writing biodiversity outputs for {yr_cal}')
 
@@ -1019,7 +1021,7 @@ def write_biodiversity(data: Data, yr_cal, path):
 def write_biodiversity_separate(data: Data, yr_cal, path):
 
     # Do nothing if biodiversity limits are off and no need to report
-    if not settings.BIODIVERSITY_LIMITS == 'on' and not settings.BIODIVERSITY_REPORT:
+    if not settings.BIODIVERSITY_LIMITS == 'on':
         return
 
     yr_idx = yr_cal - data.YR_CAL_BASE

@@ -35,6 +35,7 @@ from luto.data import Data, get_base_am_vars, lumap2ag_l_mrj, lumap2non_ag_l_mk
 from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
 from luto.tools.report.data_tools import get_all_files
+from luto.tools.write import write_outputs
 
 # Get date and time
 timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
@@ -73,6 +74,9 @@ def run( data: Data, base: int, target: int) -> None:
 
     else:
         raise ValueError(f"Unkown MODE: {settings.MODE}.")
+    
+    # Save the Data object to disk
+    write_outputs(data)
 
 
 def solve_timeseries(data: Data, steps: int, base: int, target: int):

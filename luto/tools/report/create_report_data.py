@@ -1293,79 +1293,81 @@ def save_report_data(raw_data_dir:str):
     #########################################################
     #                   6) Biodiversity                     #
     #########################################################
-    
-    # ---------------- Biodiversity priority score  ----------------
-    # get biodiversity dataframe
-    bio_paths = files.query('category == "biodiversity" and year_types == "single_year" and base_name == "biodiversity_separate"').reset_index(drop=True)
-    bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
-    bio_df['Biodiversity score (million)'] = bio_df['Biodiversity score'] / 1e6
-    bio_df = bio_df.replace(RENAME_AM_NON_AG)
 
-    # Filter out landuse that are related to biodiversity
-    bio_lucc = LU_NATURAL + NON_AG_LANDUSE_RAW
-
-
-    # Plot_6-1: Biodiversity total by category
-    bio_df_category = bio_df.groupby(['Year','Landuse type']).sum(numeric_only=True).reset_index()
-    bio_df_category = bio_df_category\
-        .groupby('Landuse type')[['Year','Biodiversity score (million)']]\
-        .apply(lambda x:list(map(list,zip(x['Year'],x['Biodiversity score (million)']))))\
-        .reset_index()
+    if settings.BIODIVERSITY_LIMITS == 'on':
         
-    bio_df_category.columns = ['name','data']
-    bio_df_category['type'] = 'column'
-    bio_df_category.to_json(f'{SAVE_DIR}/biodiversity_1_total_score_by_category.json', orient='records')
+        # ---------------- Biodiversity priority score  ----------------
+        # get biodiversity dataframe
+        bio_paths = files.query('category == "biodiversity" and year_types == "single_year" and base_name == "biodiversity_separate"').reset_index(drop=True)
+        bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
+        bio_df['Biodiversity score (million)'] = bio_df['Biodiversity score'] / 1e6
+        bio_df = bio_df.replace(RENAME_AM_NON_AG)
+
+        # Filter out landuse that are related to biodiversity
+        bio_lucc = LU_NATURAL + NON_AG_LANDUSE_RAW
 
 
-    # Plot_6-2: Biodiversity total by Water_supply
-    bio_df_Water_supply = bio_df.groupby(['Year','Land management']).sum(numeric_only=True).reset_index()
-    bio_df_Water_supply = bio_df_Water_supply\
-        .groupby('Land management')[['Year','Biodiversity score (million)']]\
-        .apply(lambda x:list(map(list,zip(x['Year'],x['Biodiversity score (million)']))))\
-        .reset_index()
-        
-    bio_df_Water_supply.columns = ['name','data']
-    bio_df_Water_supply['type'] = 'column'
-    bio_df_Water_supply.to_json(f'{SAVE_DIR}/biodiversity_2_total_score_by_Water_supply.json', orient='records')
+        # Plot_6-1: Biodiversity total by category
+        bio_df_category = bio_df.groupby(['Year','Landuse type']).sum(numeric_only=True).reset_index()
+        bio_df_category = bio_df_category\
+            .groupby('Landuse type')[['Year','Biodiversity score (million)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Biodiversity score (million)']))))\
+            .reset_index()
+            
+        bio_df_category.columns = ['name','data']
+        bio_df_category['type'] = 'column'
+        bio_df_category.to_json(f'{SAVE_DIR}/biodiversity_1_total_score_by_category.json', orient='records')
 
 
-    # Plot_6-3: Biodiversity total by landuse
-    bio_df_landuse = bio_df.groupby(['Year','Landuse']).sum(numeric_only=True).reset_index()
-    bio_df_landuse = bio_df_landuse.query('Landuse in @bio_lucc')
+        # Plot_6-2: Biodiversity total by Water_supply
+        bio_df_Water_supply = bio_df.groupby(['Year','Land management']).sum(numeric_only=True).reset_index()
+        bio_df_Water_supply = bio_df_Water_supply\
+            .groupby('Land management')[['Year','Biodiversity score (million)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Biodiversity score (million)']))))\
+            .reset_index()
+            
+        bio_df_Water_supply.columns = ['name','data']
+        bio_df_Water_supply['type'] = 'column'
+        bio_df_Water_supply.to_json(f'{SAVE_DIR}/biodiversity_2_total_score_by_Water_supply.json', orient='records')
 
-    bio_df_landuse = bio_df_landuse\
-        .groupby('Landuse')[['Year','Biodiversity score (million)']]\
-        .apply(lambda x:list(map(list,zip(x['Year'],x['Biodiversity score (million)']))))\
-        .reset_index()
-        
-    bio_df_landuse['sort_index'] = bio_df_landuse['Landuse'].apply(lambda x: bio_lucc.index(x))
-    bio_df_landuse = bio_df_landuse.sort_values('sort_index').drop('sort_index',axis=1)
 
-    bio_df_landuse.columns = ['name','data']
-    bio_df_landuse['type'] = 'column'
-    bio_df_landuse.to_json(f'{SAVE_DIR}/biodiversity_3_total_score_by_landuse.json', orient='records')
+        # Plot_6-3: Biodiversity total by landuse
+        bio_df_landuse = bio_df.groupby(['Year','Landuse']).sum(numeric_only=True).reset_index()
+        bio_df_landuse = bio_df_landuse.query('Landuse in @bio_lucc')
 
-    # Plot_6-4: Natural landuse area (million)
-    natural_land_area = area_dvar.groupby(['Year','Land-use']).sum(numeric_only=True).reset_index()
-    natural_land_area = natural_land_area.query('`Land-use` in @bio_lucc').copy()
+        bio_df_landuse = bio_df_landuse\
+            .groupby('Landuse')[['Year','Biodiversity score (million)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Biodiversity score (million)']))))\
+            .reset_index()
+            
+        bio_df_landuse['sort_index'] = bio_df_landuse['Landuse'].apply(lambda x: bio_lucc.index(x))
+        bio_df_landuse = bio_df_landuse.sort_values('sort_index').drop('sort_index',axis=1)
 
-    # million km2 to million ha
-    natural_land_area.loc[:,'Area (million ha)'] = natural_land_area['Area (ha)'] / 1e6
-    natural_land_area = natural_land_area\
-        .groupby('Land-use')[['Year','Area (million ha)']]\
-        .apply(lambda x:list(map(list,zip(x['Year'],x['Area (million ha)']))))\
-        .reset_index()
-        
-    natural_land_area['sort_index'] = natural_land_area['Land-use'].apply(lambda x: bio_lucc.index(x))
-    natural_land_area = natural_land_area.sort_values(['sort_index']).drop('sort_index',axis=1)
+        bio_df_landuse.columns = ['name','data']
+        bio_df_landuse['type'] = 'column'
+        bio_df_landuse.to_json(f'{SAVE_DIR}/biodiversity_3_total_score_by_landuse.json', orient='records')
 
-    natural_land_area.columns = ['name','data']
-    natural_land_area['type'] = 'column'
-    natural_land_area.to_json(f'{SAVE_DIR}/biodiversity_4_natural_land_area.json', orient='records')
+        # Plot_6-4: Natural landuse area (million)
+        natural_land_area = area_dvar.groupby(['Year','Land-use']).sum(numeric_only=True).reset_index()
+        natural_land_area = natural_land_area.query('`Land-use` in @bio_lucc').copy()
+
+        # million km2 to million ha
+        natural_land_area.loc[:,'Area (million ha)'] = natural_land_area['Area (ha)'] / 1e6
+        natural_land_area = natural_land_area\
+            .groupby('Land-use')[['Year','Area (million ha)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Area (million ha)']))))\
+            .reset_index()
+            
+        natural_land_area['sort_index'] = natural_land_area['Land-use'].apply(lambda x: bio_lucc.index(x))
+        natural_land_area = natural_land_area.sort_values(['sort_index']).drop('sort_index',axis=1)
+
+        natural_land_area.columns = ['name','data']
+        natural_land_area['type'] = 'column'
+        natural_land_area.to_json(f'{SAVE_DIR}/biodiversity_4_natural_land_area.json', orient='records')
     
     
     # ---------------- Biodiversity contribution score  ----------------
-    if  settings.CALC_BIODIVERSITY_CONTRIBUTION:
+    
         bio_paths = files.query('category == "biodiversity" and year_types == "single_year" and base_name == "biodiversity_contribution"').reset_index(drop=True)
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)                   # Rename the landuse
