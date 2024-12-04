@@ -384,7 +384,11 @@ def save_report_data(raw_data_dir:str):
     quantity_df_wide = quantity_df_wide.set_index('name').reindex(COMMODITIES_ALL).reset_index()
     quantity_df_wide = quantity_df_wide.dropna()
     
-    quantity_df_wide.to_json(f'{SAVE_DIR}/production_5_6_demand_Production_commodity_from_LUTO.json', orient='records')    
+    quantity_df_wide.to_json(f'{SAVE_DIR}/production_5_6_demand_Production_commodity_from_LUTO.json', orient='records')
+    
+    
+    # Plot_2-7: Difference between demand and production in percentage (%)
+    files.query('category == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)
 
 
 
@@ -1367,7 +1371,7 @@ def save_report_data(raw_data_dir:str):
     
     
     # ---------------- Biodiversity contribution score  ----------------
-    
+    if settings.CALC_BIODIVERSITY_CONTRIBUTION:
         bio_paths = files.query('category == "biodiversity" and year_types == "single_year" and base_name == "biodiversity_contribution"').reset_index(drop=True)
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)                   # Rename the landuse

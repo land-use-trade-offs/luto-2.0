@@ -61,8 +61,7 @@ class SolverSolution:
     non_ag_X_rk: np.ndarray
     ag_man_X_mrj: dict[str, np.ndarray]
     prod_data: dict[str, float]
-    obj_val_sum: float
-    obj_val_each: dict[str, float]
+    obj_val: dict[str, float]
 
 
 class LutoSolver:
@@ -1098,8 +1097,8 @@ class LutoSolver:
             non_ag_X_rk=non_ag_X_sol_rk,
             ag_man_X_mrj=ag_man_X_mrj_processed,
             prod_data=prod_data,
-            obj_val_sum=self.gurobi_model.ObjVal,
-            obj_val_each={
+            obj_val ={
+                'SUM': self.gurobi_model.ObjVal,
                 'Economy': self.obj_economy.getValue(),
                 'Demand': self.obj_demand.getValue().sum(),
                 'GHG': self.obj_ghg.getValue()}
