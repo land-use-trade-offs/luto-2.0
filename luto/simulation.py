@@ -20,6 +20,7 @@ functions as a singleton class. It is intended to be the _only_ part of the
 model that has 'global' varying state.
 """
 
+import gzip
 import os
 import time
 import dill
@@ -171,17 +172,19 @@ def solve_snapshot(data: Data, base: int, target: int):
     print(f'Processing for {target} completed in {round(time.time() - start_time)} seconds\n\n')
 
 
-def save_data_to_disk(data: Data, path:str) -> None:
-    """Save the Data object to disk.
+def save_data_to_disk(data: Data, path: str, compress_level=9) -> None:
+    """Save the Data object to disk with gzip compression.
     Arguments:
         data: `Data` object.
         path: Path to save the Data object.
+        compress_level: Compression level for gzip compression.
     """
-    # Save
-    with open(path, 'wb') as f: dill.dump(data, f)
+    # Save with gzip compression
+    with gzip.open(path, 'wb', compresslevel=compress_level) as f:
+        dill.dump(data, f)
     
 
-def load_data_from_disk(path:str) -> Data:
+def load_data_from_disk(path: str) -> Data:
     """Load the Data object from disk.
     
     Arguments:
@@ -193,12 +196,12 @@ def load_data_from_disk(path:str) -> Data:
     Returns:
         Data: `Data` object.
     """
-    # Load the data object
-    with open(path, 'rb') as f: 
+    # Load the data object with gzip compression
+    with gzip.open(path, 'rb') as f:
         data = dill.load(f)
     
     # Check if the resolution factor from the data object matches the settings.RESFACTOR
-    if int(data.RESMULT ** 0.5) != settings.RESFACTOR: 
+    if int(data.RESMULT ** 0.5) != settings.RESFACTOR:
         raise ValueError(f'Resolution factor from data loading ({int(data.RESMULT ** 0.5)}) does not match it of settings ({settings.RESFACTOR})!')
 
     # Update the timestamp
