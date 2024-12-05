@@ -16,7 +16,7 @@ cat << OUTER_EOF > $SCRIPT_PBS
 #PBS -l ncpus=${NCPUS}
 #PBS -l mem=${MEM}
 #PBS -l jobfs=10GB
-#PBS -l walltime=720:00:00
+#PBS -l walltime=48:00:00
 
 # Change to the directory where this script is located
 cd "$(dirname "$0")"
