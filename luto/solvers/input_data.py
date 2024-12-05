@@ -1,10 +1,8 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from math import e
 from typing import Any, Optional
 import numpy as np
-import pandas as pd
 
 from luto import settings
 from luto.economics import land_use_culling

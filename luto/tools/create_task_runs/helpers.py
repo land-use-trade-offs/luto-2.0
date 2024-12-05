@@ -1,19 +1,11 @@
-
-from math import e
 import os
 import re
 import shutil
-import random
-import itertools
-import multiprocessing
 import pandas as pd
 
 from joblib import delayed, Parallel
-
-from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, PARAMS_NUM_AS_STR, PARAMS_TO_EVAL, TASK_ROOT_DIR
 from luto import settings
-
-
+from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, TASK_ROOT_DIR
 
 
 
@@ -22,19 +14,14 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
     # Save the settings template to the root task folder
     None if os.path.exists(to_path) else os.makedirs(to_path)
     
-    # # Write the requirements to the task folder
-    # conda_pkgs, pip_pkgs = get_requirements()
-    # with open(f'{to_path}/requirements_conda.txt', 'w') as conda_f, \
-    #         open(f'{to_path}/requirements_pip.txt', 'w') as pip_f:
-    #     conda_f.write(conda_pkgs)
-    #     pip_f.write(pip_pkgs)
-    
-        
+    # Check if the settings_template.csv already exists
     if os.path.exists(f'{to_path}/settings_template.csv'):
         print('settings_template.csv already exists! Skip creating a new one!')
     else:
         # Get the settings from luto.settings
-        with open('luto/settings.py', 'r') as file:
+        with open('luto/settings.py', 'r') as file, \
+             open(f'{to_path}/non_str_val.txt', 'w') as non_str_val_file:
+           
             lines = file.readlines()
 
             # Regex patterns that matches variable assignments from settings
@@ -52,6 +39,10 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
             settings_dict['WRITE_THREADS'] = 10 # 10 threads for writing is a safe number to avoid out-of-memory issues
             settings_dict['NCPUS'] = min(settings_dict['THREADS']//4*4, 48) # max 48 cores
 
+            # Write the non-string values to a file
+            for k, v in settings_dict.items():
+                if not isinstance(v, str):
+                    non_str_val_file.write(f'{k}\n')
 
         # Create a template for cutom settings
         settings_df = pd.DataFrame({k:[v] for k,v in settings_dict.items()}).T.reset_index()
@@ -61,24 +52,24 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
 
 
 
-
-
-def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv', run:bool=True):
+def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
      
     # Read the custom settings file
     custom_settings = pd.read_csv(from_path, index_col=0)
     custom_settings = custom_settings.dropna(how='all', axis=1)
     
     # Change the column names to be valid python variable names
-    custom_settings.columns = [format_name(col) for col in custom_settings.columns]
-    
-    # Evaluate the parameters that need to be evaluated
+    custom_settings.columns = [re.sub(r'\W+', '_', col.strip()) for col in custom_settings.columns]
+
+    # Replace TRUE and FALSE with True and False
     custom_settings = custom_settings.replace({'TRUE': 'True', 'FALSE': 'False'})
-    custom_settings.loc[PARAMS_TO_EVAL] = custom_settings.loc[PARAMS_TO_EVAL].map(eval)
+
+    # Evaluate the parameters that need to be evaluated
+    with open(f'{TASK_ROOT_DIR}/non_str_val.txt', 'r') as file: eval_vars = file.read().splitlines()
+    custom_settings.loc[eval_vars] = custom_settings.loc[eval_vars].map(eval)
 
     # Create a dictionary of custom settings
     custom_cols = [col for col in custom_settings.columns if col not in ['Default_run']]
-    num_task = len(custom_cols)
 
     if not custom_cols:
         raise ValueError('No custom settings found in the settings_template.csv file!')
@@ -86,7 +77,7 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv', run
     cwd = os.getcwd()
     for col in custom_cols:
         # Get the settings for the run
-        custom_dict = update_settings(custom_settings[col].to_dict(), num_task, col)
+        custom_dict = update_settings(custom_settings[col].to_dict(), col)
         # Check if the column name is valid, and report the changed settings
         check_settings_name(custom_settings, col)     
         # Create a folder for each run
@@ -96,18 +87,6 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv', run
         # Submit the task if the os is linux
         submit_task(cwd, col)
         
-
-    
-def is_float(s):
-    try:
-        float(s)
-        return True
-    except ValueError:
-        return False
- 
- 
-def format_name(name):
-    return re.sub(r'\W+', '_', name.strip())
 
 
 def copy_folder_custom(source, destination, ignore_dirs=None):
@@ -128,26 +107,12 @@ def copy_folder_custom(source, destination, ignore_dirs=None):
 
 
 
-def get_requirements():
-    with open('requirements.txt', 'r') as file:
-        requirements = file.read().splitlines()
-        
-    split_idx = requirements.index('# Below can only be installed with pip')
-    
-    conda_pkgs = " ".join(requirements[:split_idx])
-    pip_pkgs = " ".join(requirements[split_idx+1:])
-    
-    return conda_pkgs, pip_pkgs
-    
-  
-  
-    
 def write_custom_settings(task_dir:str, settings_dict:dict):
     # Write the custom settings to the settings.py of each task
     with open(f'{task_dir}/luto/settings.py', 'w') as file, \
-            open(f'{task_dir}/luto/settings_bash.py', 'w') as bash_file:
+         open(f'{task_dir}/luto/settings_bash.py', 'w') as bash_file:
+        
         for k, v in settings_dict.items():
-            k = k.replace(' ', '_').replace('(','').replace(')','')
             # List values need to be converted to bash arrays
             if isinstance(v, list):
                 bash_file.write(f'{k}=({ " ".join([str(elem) for elem in v])})\n')
@@ -158,28 +123,19 @@ def write_custom_settings(task_dir:str, settings_dict:dict):
                 bash_file.write(f'# {k} is a dictionary, which is not natively supported in bash\n')
                 for key, value in v.items():
                     key = str(key).replace(' ', '_').replace('(','').replace(')','')
-                    bash_file.write(f'{k}_{key}={value}\n')
-            # If the value is a number, write it as number
-            elif str(v).isdigit() or is_float(v):
-                file.write(f'{k}="{v}"\n') if k in PARAMS_NUM_AS_STR else file.write(f'{k}={v}\n')
-                bash_file.write(f'{k}="{v}"\n') if k in PARAMS_NUM_AS_STR else bash_file.write(f'{k}={v}\n')
+                    bash_file.write(f'{k}_{key}={value}\n') 
             # If the value is a string, write it as a string
             elif isinstance(v, str):
                 file.write(f'{k}="{v}"\n')
                 bash_file.write(f'{k}="{v}"\n')
-            # Write the rest as strings
+            # Write the rest as it is
             else:
                 file.write(f'{k}={v}\n')
-                bash_file.write(f'{k}={v}\n')  
-    
-    
+                bash_file.write(f'{k}={v}\n')
                 
-                
-def update_settings(settings_dict:dict, n_tasks:int, col:str):
-    
-    if os.name == 'nt':         
-        # If the os is windows, do nothing
-        print('This will only create task folders, and NOT submit job to run!')
+
+
+def update_settings(settings_dict:dict, col:str):
 
     # The input dir for each task will point to the absolute path of the input dir
     settings_dict['INPUT_DIR'] = os.path.abspath(settings_dict['INPUT_DIR']).replace('\\','/')
@@ -204,22 +160,25 @@ def update_settings(settings_dict:dict, n_tasks:int, col:str):
 
 
 
-
-
-def check_settings_name(settings:dict, col:str):
-    
+def check_settings_name(settings:pd.DataFrame, col:str):
+   
     # If the column name is not in the settings, do nothing
     if 'Default_run' not in settings.columns:
         return
     
-    # Report the changed settings
-    changed_params = 0
+    # Search for changed settings
+    changed_params = {}
     for idx,_ in settings.iterrows():
         if settings.loc[idx,col] != settings.loc[idx,'Default_run']:
-            changed_params = changed_params + 1
-            print(f'"{col}" has changed <{idx}>: "{settings.loc[idx,"Default_run"]}" ==> "{settings.loc[idx,col]}">')
+            changed_params[idx] = f'{settings.loc[idx,"Default_run"]} ==> {settings.loc[idx,col]}'
 
-    print(f'"{col}" has no changed parameters compared to "Default_run"') if changed_params == 0 else None
+    # Print the changed settings
+    if len(changed_params) > 0:
+        print(f'"{col}" has the following changed settings compared to "Default_run":')
+        for k,v in changed_params.items():
+            print(f'        {k}: \t {v}')
+    else:
+        print(f'"{col}" has no changed parameters compared to "Default_run"') 
     
     
     
@@ -238,6 +197,11 @@ def create_run_folders(col):
 def submit_task(cwd:str, col:str):
     # Copy the slurm script to the task folder
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{TASK_ROOT_DIR}/{col}/task_cmd.sh')
+    
+    if os.name == 'nt':         
+        # If the os is windows, do nothing
+        print('This will only create task folders, and NOT submit job to run!')
+    
     # Start the task if the os is linux
     if os.name == 'posix':
         os.chdir(f'{TASK_ROOT_DIR}/{col}')
