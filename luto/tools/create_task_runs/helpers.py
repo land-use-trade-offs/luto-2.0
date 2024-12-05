@@ -45,12 +45,10 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
             settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
             settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
             
-            # Add the NODE parameters
-            settings_dict['NODE'] = 'Please specify the node name'
+            # Add parameters
             settings_dict['MEM'] = 'auto'
-            settings_dict['CPU_PER_TASK'] = settings_dict['THREADS']
-            settings_dict['TIME'] = 'auto'
             settings_dict['JOB_NAME'] = 'auto'
+            settings_dict['QUEUE'] = 'normal'
 
 
         # Create a template for cutom settings
@@ -177,13 +175,9 @@ def write_custom_settings(task_dir:str, settings_dict:dict):
                 
 def update_settings(settings_dict:dict, n_tasks:int, col:str):
     
-    if settings_dict['NODE'] == 'Please specify the node name':
-        if os.name == 'nt':         
-            # If the os is windows, do nothing
-            print('This will only create task folders, and NOT submit job to run!')
-        elif os.name == 'posix':    
-            # If the os is linux, submit the job
-            raise ValueError('NODE must be specified!')
+    if os.name == 'nt':         
+        # If the os is windows, do nothing
+        print('This will only create task folders, and NOT submit job to run!')
 
     # The input dir for each task will point to the absolute path of the input dir
     settings_dict['INPUT_DIR'] = os.path.abspath(settings_dict['INPUT_DIR']).replace('\\','/')
@@ -194,25 +188,19 @@ def update_settings(settings_dict:dict, n_tasks:int, col:str):
     # Set the memory and time based on the resolution factor
     if int(settings_dict['RESFACTOR']) == 1:
         MEM = "250G"
-        TIME = "30-0:00:00"
     elif int(settings_dict['RESFACTOR']) == 2:
         MEM = "150G" 
-        TIME = "10-0:00:00"
     elif int(settings_dict['RESFACTOR']) <= 5:
         MEM = "100G"
-        TIME = "5-0:00:00"
     else:
         MEM = "80G"
-        TIME = "2-0:00:00"
         
     # If the MEM and TIME are not set to auto, set them to the custom values
     MEM = settings_dict['MEM'] if settings_dict['MEM'] != 'auto' else MEM
-    TIME = settings_dict['TIME'] if settings_dict['TIME'] != 'auto' else TIME
     JOB_NAME = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
    
     # Update the settings dictionary
     settings_dict['MEM'] = MEM
-    settings_dict['TIME'] = TIME
     settings_dict['JOB_NAME'] = JOB_NAME
     
     return settings_dict

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Read the settings_bash file ==> JOBNAME, MEM, TIME, THREADS, JOB_NAME, QUEUE 
+# Read the settings_bash file ==> JOBNAME, QUEUE, THREADS, MEM
 source luto/settings_bash.py
 
 # Create a temporary script file
@@ -11,7 +11,7 @@ SCRIPT_PBS=$(mktemp)
 cat << OUTER_EOF > $SCRIPT_PBS
 #!/bin/bash
 
-#PBS -N ${JOBNAME}
+#PBS -N ${JOB_NAME}
 #PBS -q ${QUEUE}
 #PBS -l ncpus=${THREADS}
 #PBS -l mem=${MEM}
