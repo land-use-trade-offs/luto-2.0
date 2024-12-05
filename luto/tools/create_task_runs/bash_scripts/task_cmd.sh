@@ -15,6 +15,7 @@ cat << OUTER_EOF > $SCRIPT_PBS
 cd "$(dirname "$0")"
 
 # Activate the Conda environment
+source ~/.bashrc
 conda activate luto
 
 # Run the simulation
