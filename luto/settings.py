@@ -326,7 +326,9 @@ SOC_AMORTISATION = 15
 GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
 # Weight for the GHG/Demand deviation in the objective function
-SOLVE_WEIGHT_DEVIATIONS = 100
+'''Range from 0 to 1, where 0 is only profit maximisation and 1 is only GHG and demand deviation minimisation.
+   A practicall range is between 0.8-0.9.'''
+SOLVE_WEIGHT_DEVIATIONS = 0.9  
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.

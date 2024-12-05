@@ -373,7 +373,7 @@ def get_BASE_YR_economic_val(data: Data):
     if settings.OBJECTIVE == "mincost":
         economic_val = cost
     elif settings.OBJECTIVE == "maxprofit":
-        economic_val = revenue - cost
+        economic_val = -(revenue - cost)  # The negative sign is because we want to maximize profit, not minimize cost.
     else:
         raise ValueError(f"Unknown objective: {settings.OBJECTIVE}")
 
