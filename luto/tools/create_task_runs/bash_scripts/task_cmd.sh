@@ -3,8 +3,14 @@
 # Read the settings_bash file ==> JOBNAME, QUEUE, NCPUS, MEM, NCPUS, QUEUE
 source luto/settings_bash.py
 
+# Activate the Conda environment and get the path to the Python executable
+source ~/.bashrc
+conda activate luto
+PYTHON=$(which python)
+
 # Create a temporary script file
 SCRIPT_PBS=$(mktemp)
+
 
 
 # Write the script content to the file
@@ -14,18 +20,15 @@ cat << OUTER_EOF > $SCRIPT_PBS
 # Change to the directory where this script is located
 cd "$(dirname "$0")"
 
-# Activate the Conda environment
-source ~/.bashrc
-conda activate luto
-
 # Run the simulation
-python <<-INNER_EOF
+$PYTHON <<-INNER_EOF
 import luto.simulation as sim
 import luto.settings as settings
 data = sim.load_data_from_disk('input/Data_RES{settings.RESFACTOR}.pkl')
 sim.run(data=data, base=2010, target=2050)
 INNER_EOF
 OUTER_EOF
+
 
 
 # Submit the job to PBS
