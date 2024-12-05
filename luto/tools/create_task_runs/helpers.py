@@ -252,10 +252,10 @@ def create_run_folders(col):
 
 def submit_task(cwd:str, col:str):
     # Copy the slurm script to the task folder
-    shutil.copyfile('luto/tools/create_task_runs/bash_scripts/slurm_cmd.sh', f'{TASK_ROOT_DIR}/{col}/slurm.sh')
+    shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{TASK_ROOT_DIR}/{col}/task_cmd.sh')
     # Start the task if the os is linux
     if os.name == 'posix':
         os.chdir(f'{TASK_ROOT_DIR}/{col}')
-        os.system('sbatch -p mem slurm.sh')
+        os.system('sh task_cmd.sh')
         os.chdir(cwd)    
     
