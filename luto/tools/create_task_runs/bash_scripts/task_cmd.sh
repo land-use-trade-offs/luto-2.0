@@ -11,34 +11,30 @@ PYTHON=$(which python)
 # Create a temporary script file
 SCRIPT_PBS=$(mktemp)
 
-
-
-# Write the script content to the file
-cat << OUTER_EOF > $SCRIPT_PBS
-#!/bin/bash
-
-# Change to the directory where this script is located
-cd "$(dirname "$0")"
-
-# Run the simulation
-$PYTHON <<-INNER_EOF
+echo '''
 import luto.simulation as sim
 import luto.settings as settings
-data = sim.load_data_from_disk('input/Data_RES{settings.RESFACTOR}.pkl')
+data = sim.load_data_from_disk(f"{settings.INPUT_DIR}/Data_RES{settings.RESFACTOR}.pkl")
 sim.run(data=data, base=2010, target=2050)
-INNER_EOF
-OUTER_EOF
+''' > python_script.py
 
 
+cat << EOF > $SCRIPT_PBS
+#!/bin/bash
+#PBS -N ${JOB_NAME}
+#PBS -q ${QUEUE}
+#PBS -l storage=scratch/${PROJECT}+gdata/${PROJECT}
+#PBS -l ncpus=${NCPUS}
+#PBS -l mem=${MEM}
+#PBS -l jobfs=10GB
+#PBS -l walltime=48:00:00
+#PBS -l wd="$(dirname "$0")"
+
+${PYTHON} python_script.py
+EOF
 
 # Submit the job to PBS
-qsub -N ${JOB_NAME} \
-     -q ${QUEUE} \
-     -l ncpus=${NCPUS} \
-     -l mem=${MEM} \
-     -l jobfs=10GB \
-     -l walltime=48:00:00 \
-     ${SCRIPT_PBS}
+qsub ${SCRIPT_PBS}
 
 # Remove the temporary script file
 rm $SCRIPT_PBS

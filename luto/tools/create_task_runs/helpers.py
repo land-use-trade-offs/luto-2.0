@@ -241,6 +241,6 @@ def submit_task(cwd:str, col:str):
     # Start the task if the os is linux
     if os.name == 'posix':
         os.chdir(f'{TASK_ROOT_DIR}/{col}')
-        os.system('sh task_cmd.sh')
+        os.system('bash task_cmd.sh')
         os.chdir(cwd)    
     
