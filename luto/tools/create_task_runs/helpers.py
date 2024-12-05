@@ -200,8 +200,11 @@ def update_settings(settings_dict:dict, n_tasks:int, col:str):
     JOB_NAME = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
    
     # Update the settings dictionary
-    settings_dict['MEM'] = MEM
     settings_dict['JOB_NAME'] = JOB_NAME
+    settings_dict['MEM'] = MEM
+    settings_dict['NCPUS'] = min(settings_dict['THREADS']//4*4, 48) # max 48 cores
+    settings_dict['QUEUE'] = 'normal'
+    
     
     return settings_dict
 
