@@ -46,9 +46,11 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
             settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
             
             # Add parameters
-            settings_dict['MEM'] = 'auto'
             settings_dict['JOB_NAME'] = 'auto'
+            settings_dict['MEM'] = 'auto'
             settings_dict['QUEUE'] = 'normal'
+            settings_dict['WRITE_THREADS'] = 10 # 10 threads for writing is a safe number to avoid out-of-memory issues
+            settings_dict['NCPUS'] = min(settings_dict['THREADS']//4*4, 48) # max 48 cores
 
 
         # Create a template for cutom settings
@@ -182,8 +184,6 @@ def update_settings(settings_dict:dict, n_tasks:int, col:str):
     # The input dir for each task will point to the absolute path of the input dir
     settings_dict['INPUT_DIR'] = os.path.abspath(settings_dict['INPUT_DIR']).replace('\\','/')
     settings_dict['DATA_DIR'] = settings_dict['INPUT_DIR']
-    settings_dict['WRITE_THREADS'] = 10 # 10 threads for writing is a safe number to avoid out-of-memory issues
-    
 
     # Set the memory and time based on the resolution factor
     if int(settings_dict['RESFACTOR']) == 1:
@@ -199,10 +199,7 @@ def update_settings(settings_dict:dict, n_tasks:int, col:str):
     # Update the settings dictionary
     settings_dict['JOB_NAME'] = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
     settings_dict['MEM'] = settings_dict['MEM'] if settings_dict['MEM'] != 'auto' else MEM
-    settings_dict['NCPUS'] = min(settings_dict['THREADS']//4*4, 48) # max 48 cores
-    settings_dict['QUEUE'] = 'normal'
-    
-    
+
     return settings_dict
 
 
