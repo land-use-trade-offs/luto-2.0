@@ -27,7 +27,8 @@ conda activate luto
 # Run the simulation
 python <<-INNER_EOF
 import luto.simulation as sim
-data = sim.load_data()
+import luto.settings as settings
+data = sim.load_data_from_disk('input/Data_RES{settings.RESFACTOR}.pkl')
 sim.run(data=data, base=2010, target=2050)
 INNER_EOF
 OUTER_EOF
