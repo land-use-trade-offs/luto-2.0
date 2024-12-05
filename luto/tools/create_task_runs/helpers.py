@@ -195,13 +195,10 @@ def update_settings(settings_dict:dict, n_tasks:int, col:str):
     else:
         MEM = "80G"
         
-    # If the MEM and TIME are not set to auto, set them to the custom values
-    MEM = settings_dict['MEM'] if settings_dict['MEM'] != 'auto' else MEM
-    JOB_NAME = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
    
     # Update the settings dictionary
-    settings_dict['JOB_NAME'] = JOB_NAME
-    settings_dict['MEM'] = MEM
+    settings_dict['JOB_NAME'] = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
+    settings_dict['MEM'] = settings_dict['MEM'] if settings_dict['MEM'] != 'auto' else MEM
     settings_dict['NCPUS'] = min(settings_dict['THREADS']//4*4, 48) # max 48 cores
     settings_dict['QUEUE'] = 'normal'
     
