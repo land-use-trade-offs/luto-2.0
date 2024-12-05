@@ -1,6 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
+from math import e
 from typing import Any, Optional
 import numpy as np
 import pandas as pd
@@ -68,7 +69,10 @@ class SolverInputData:
     ag_man_limits: dict             # Agricultural management options' adoption limits.
     ag_man_lb_mrj: dict             # Agricultural management options' lower bounds.
 
+    water_yield_RR_BASE_YR: dict                                        # Water yield for the BASE_YR based on historical water yield layers .
     water_yield_outside_study_area: dict[int, float]                    # Water yield from outside LUTO study area -> dict. Keys: year, region.
+    
+    BASE_YR_economic_val: float     # BASE_YR economic value.
 
     offland_ghg: np.ndarray         # GHG emissions from off-land commodities.
 
@@ -77,10 +81,6 @@ class SolverInputData:
     limits: dict                    # Targets to use.
     desc2aglu: dict                 # Map of agricultural land use descriptions to codes.
     resmult: float                  # Resolution factor multiplier from data.RESMULT
-
-    base_year_ag_sol: np.ndarray = None                 # Base year's agricultural variables solution.
-    base_year_non_ag_sol: np.ndarray = None             # Base year's non-agricultural variables solution.
-    base_year_ag_man_sol: dict[str, np.ndarray] = None  # Base year's agricultural management variables solution.
 
     @property
     def n_ag_lms(self):
@@ -210,6 +210,10 @@ def get_ag_w_mrj(data: Data, target_index, water_dr_yield: Optional[np.ndarray] 
 def get_w_outside_luto(data: Data, yr_cal: int):
     print('Getting water yield from outside LUTO study area...', flush = True)
     return ag_water.get_water_outside_luto_study_area_from_hist_level(data)
+
+def get_w_RR_BASE_YR(data: Data):
+    print('Getting water yield for the BASE_YR based on historical water yield layers...', flush = True)
+    return ag_water.calc_water_net_yield_BASE_YR(data)
 
 
 def get_ag_b_mrj(data: Data):
@@ -358,6 +362,25 @@ def get_ag_man_limits(data: Data, target_index):
     return output
 
 
+def get_BASE_YR_economic_val(data: Data):
+    print('Getting BASE_YR economic value...', flush = True)
+    
+    base_c_mrj = get_ag_c_mrj(data, 0)
+    base_r_mrj = get_ag_r_mrj(data, 0)
+    cost = np.einsum('mrj,mrj->', data.AG_L_MRJ, base_c_mrj)
+    revenue = np.einsum('mrj,mrj->', data.AG_L_MRJ, base_r_mrj)
+    
+    if settings.OBJECTIVE == "mincost":
+        economic_val = cost
+    elif settings.OBJECTIVE == "maxprofit":
+        economic_val = -(revenue - cost)  # The negative sign is because we want to maximize profit, not minimize cost.
+    else:
+        raise ValueError(f"Unknown objective: {settings.OBJECTIVE}")
+
+    return economic_val
+
+
+
 def get_limits(
     data: Data, yr_cal: int,
 ) -> dict[str, Any]:
@@ -440,13 +463,12 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_limits=get_ag_man_limits(data, target_index),                            
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
         water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Use the water net yield outside LUTO study area for the YR_CAL_BASE year
+        water_yield_RR_BASE_YR=get_w_RR_BASE_YR(data),                                  # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
+        BASE_YR_economic_val=get_BASE_YR_economic_val(data),
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,
         limits=get_limits(data, target_year),
         desc2aglu=data.DESC2AGLU,
         resmult=data.RESMULT,
-        base_year_ag_sol=data.ag_dvars.get(base_year),
-        base_year_non_ag_sol=data.non_ag_dvars.get(base_year),
-        base_year_ag_man_sol=data.ag_man_dvars.get(base_year),
     )

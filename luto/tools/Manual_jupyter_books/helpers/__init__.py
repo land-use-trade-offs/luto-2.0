@@ -16,7 +16,7 @@ from luto.tools.spatializers import get_coarse2D_map
 
 
 
-def full_res_raw_raw_to_2d(data:Data, arr:np.ndarray) -> np.ndarray:
+def full_res_1d_raw_to_2d(data:Data, arr:np.ndarray) -> np.ndarray:
     '''
     This function converts a 1D numpy array to an 2D array with the same shape as `NLUM_MASK`.
     
@@ -25,11 +25,11 @@ def full_res_raw_raw_to_2d(data:Data, arr:np.ndarray) -> np.ndarray:
     data: Data
         The Data object that contains the metadata of the 2D array.
     arr: np.ndarray
-    The 1D array that will be converted to an 2D array.
+        The 1D array that will be converted to an 2D array.
     
     Returns
     -------
-    The 2D array that has the same shape as `NLUM_MASK`.
+        The 2D array that has the same shape as `NLUM_MASK`.
     '''
     LUMAP_FullRes_2D = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32) 
     np.place(LUMAP_FullRes_2D, data.NLUM_MASK, arr)
@@ -61,7 +61,7 @@ def arr_to_xr(data:Data, arr:np.ndarray) -> xr.DataArray:
     geo_meta = data.GEO_META_FULLRES if full_res_raw else data.GEO_META
     
     # Warp the 1D array to 2D
-    arr_2d = full_res_raw_raw_to_2d(data, arr) if full_res_raw else get_coarse2D_map(data, arr)
+    arr_2d = full_res_1d_raw_to_2d(data, arr) if full_res_raw else get_coarse2D_map(data, arr)
     arr_2d = np.where(arr_2d == data.NODATA, np.nan, arr_2d)   # Mask the nodata values to nan
 
     with rasterio.io.MemoryFile() as memfile:

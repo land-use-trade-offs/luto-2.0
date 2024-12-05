@@ -94,9 +94,8 @@ sim.run(data=data, base=2010, target=2050)
 
 
 # Generating the scenario runs template to feed HPC
-from luto.tools.create_task_runs.helpers import create_settings_template, create_grid_search_template, create_task_runs
+from luto.tools.create_task_runs.helpers import create_settings_template, create_task_runs
 create_settings_template()      # This will create a "Custom_run" folder next to the root folder (luto-2.0) and a "settings_template.csv" in it
-# create_grid_search_template()   # This will generate 20 runs in the "settings_template.csv" by ramdomly turning on/off the AM and Non-ag switches/reversibility
 create_task_runs()              # This will create seperate folders in "Custom_run", and each folder coresponds to a columns in the "settings_template.csv" 
 
 

@@ -20,6 +20,7 @@ functions as a singleton class. It is intended to be the _only_ part of the
 model that has 'global' varying state.
 """
 
+import gzip
 import os
 import time
 import dill
@@ -34,6 +35,7 @@ from luto.data import Data, get_base_am_vars, lumap2ag_l_mrj, lumap2non_ag_l_mk
 from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
 from luto.tools.report.data_tools import get_all_files
+from luto.tools.write import write_outputs
 
 # Get date and time
 timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
@@ -72,6 +74,9 @@ def run( data: Data, base: int, target: int) -> None:
 
     else:
         raise ValueError(f"Unkown MODE: {settings.MODE}.")
+    
+    # Save the Data object to disk
+    write_outputs(data)
 
 
 def solve_timeseries(data: Data, steps: int, base: int, target: int):
@@ -121,10 +126,11 @@ def solve_timeseries(data: Data, steps: int, base: int, target: int):
         data.add_ag_man_dvars(yr, solution.ag_man_X_mrj)
         data.add_obj_vals(yr, solution.obj_val)
 
-        print(f'Reproject decision variables...')
-        data.add_ag_dvars_xr(yr, solution.ag_X_mrj)
-        data.add_am_dvars_xr(yr, solution.ag_man_X_mrj)
-        data.add_non_ag_dvars_xr(yr, solution.non_ag_X_rk)
+        if settings.CALC_BIODIVERSITY_CONTRIBUTION:
+            print(f'Reproject decision variables...')
+            data.add_ag_dvars_xr(yr, solution.ag_X_mrj)
+            data.add_am_dvars_xr(yr, solution.ag_man_X_mrj)
+            data.add_non_ag_dvars_xr(yr, solution.non_ag_X_rk)
 
         for data_type, prod_data in solution.prod_data.items():
             data.add_production_data(yr, data_type, prod_data)
@@ -158,10 +164,11 @@ def solve_snapshot(data: Data, base: int, target: int):
     data.add_ag_man_dvars(target, solution.ag_man_X_mrj)
     data.add_obj_vals(target, solution.obj_val)
 
-    print(f'Reproject decision variables...')
-    data.add_ag_dvars_xr(target, solution.ag_X_mrj)
-    data.add_am_dvars_xr(target, solution.ag_man_X_mrj)
-    data.add_non_ag_dvars_xr(target, solution.non_ag_X_rk)
+    if settings.CALC_BIODIVERSITY_CONTRIBUTION:
+        print(f'Reproject decision variables...')
+        data.add_ag_dvars_xr(target, solution.ag_X_mrj)
+        data.add_am_dvars_xr(target, solution.ag_man_X_mrj)
+        data.add_non_ag_dvars_xr(target, solution.non_ag_X_rk)
 
     for data_type, prod_data in solution.prod_data.items():
         data.add_production_data(target, data_type, prod_data)
@@ -169,17 +176,19 @@ def solve_snapshot(data: Data, base: int, target: int):
     print(f'Processing for {target} completed in {round(time.time() - start_time)} seconds\n\n')
 
 
-def save_data_to_disk(data: Data, path:str) -> None:
-    """Save the Data object to disk.
+def save_data_to_disk(data: Data, path: str, compress_level=9) -> None:
+    """Save the Data object to disk with gzip compression.
     Arguments:
         data: `Data` object.
         path: Path to save the Data object.
+        compress_level: Compression level for gzip compression.
     """
-    # Save
-    with open(path, 'wb') as f: dill.dump(data, f)
+    # Save with gzip compression
+    with gzip.open(path, 'wb', compresslevel=compress_level) as f:
+        dill.dump(data, f)
     
 
-def load_data_from_disk(path:str) -> Data:
+def load_data_from_disk(path: str) -> Data:
     """Load the Data object from disk.
     
     Arguments:
@@ -191,12 +200,12 @@ def load_data_from_disk(path:str) -> Data:
     Returns:
         Data: `Data` object.
     """
-    # Load the data object
-    with open(path, 'rb') as f: 
+    # Load the data object with gzip compression
+    with gzip.open(path, 'rb') as f:
         data = dill.load(f)
     
     # Check if the resolution factor from the data object matches the settings.RESFACTOR
-    if int(data.RESMULT ** 0.5) != settings.RESFACTOR: 
+    if int(data.RESMULT ** 0.5) != settings.RESFACTOR:
         raise ValueError(f'Resolution factor from data loading ({int(data.RESMULT ** 0.5)}) does not match it of settings ({settings.RESFACTOR})!')
 
     # Update the timestamp

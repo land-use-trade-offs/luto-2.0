@@ -96,11 +96,11 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 15        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
-# MODE = 'snapshot'   # Runs for target year only
-MODE = 'timeseries'   # Runs each year from base year to target year
+MODE = 'snapshot'   # Runs for target year only
+# MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -110,16 +110,12 @@ OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires sof
 # DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
 DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
 
-# Penalty in objective function to balance influence of demand versus cost when DEMAND_CONSTRAINT_TYPE = 'soft'
-# 1e5 works well (i.e., demand are met), demands not met with anything less (i.e., large deviations)
-# Don't set too high though otherwise it meets demand exactly (minimises deviations) even if the cost is ridiculously high
-PENALTY = 1e5
 
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
 
-WRITE_OUTPUT_GEOTIFFS = True    # Write GeoTiffs to output directory: True or False
+WRITE_OUTPUT_GEOTIFFS = False    # Write GeoTiffs to output directory: True or False
 WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resolution: True or False
 PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
 WRITE_THREADS = 50              # The Threads to use for map making, only work with PARALLEL_WRITE = True
@@ -326,11 +322,13 @@ if CARBON_PRICES_FIELD == 'AS_GHG':
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
 SOC_AMORTISATION = 15
 
-GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
-# GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
+# GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
+GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
-# Penalty for deviating from the GHG constraints when GHG_CONSTRAINT_TYPE is soft
-GHG_PENALTY = 10e-3
+# Weight for the GHG/Demand deviation in the objective function
+'''Range from 0 to 1, where 0 is only profit maximisation and 1 is only GHG and demand deviation minimisation.
+   A practicall range is between 0.8-0.9.'''
+SOLVE_WEIGHT_DEVIATIONS = 0.9  
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
@@ -338,7 +336,7 @@ WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield lim
 
 
 # Regionalisation to enforce water use limits by
-WATER_REGION_DEF = 'River Region'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
+WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
 
 # Water net yield targets: the value represents the proportion of the historical water yields
 # that the net yield must exceed in a given year. Base year (2010) uses base year net yields as targets.
@@ -352,14 +350,9 @@ WATER_REGION_DEF = 'River Region'         # 'River Region' or 'Drainage Division
 # stress is 0.2 then agriculture can use up 70% of this, leaving 30% for domestic/industrial. The water yield target for ag
 # should then be historical net yield * (1 - water stress * agricultural share)
 
-WATER_STRESS = 0.7
+WATER_STRESS = 0.2
 AG_SHARE_OF_WATER_USE = 1.0
 WATER_YIELD_TARGET_AG_SHARE = 1 - WATER_STRESS * AG_SHARE_OF_WATER_USE
-
-# Buffer level to cancel out climate change impacts on water availability;
-# 0.05 = 5% of historical net yield, meaning that LUTO asks for an additional 5% of historical net yield to account for climate change impacts
-# This buffer may not be enough to account for climate change impacts in a given sim year, in that case LUTO will furthur relax the water constraint.
-WATER_YIELD_CCI_BUFFER = 0.05     # 5% of historical net yield
 
 
 # Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water turned off due to infeasibility issues with water constraint in Pilbara
@@ -426,7 +419,7 @@ HCAS_PERCENTILE = 50
 LDS_BIODIVERSITY_VALUE = 0.8
 
 
-# ------------------- Non-agricultural biodiversity parameters -------------------
+# Non-agricultural biodiversity parameters 
 ''' The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
     For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value
     will be 0.6 * 0.8 = 0.48.
@@ -439,7 +432,7 @@ AGROFORESTRY_BIODIV_BENEFIT = 0.75
 BECCS_BIODIVERSITY_BENEFIT = 0
 
 
-# ------------------- Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
+# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 """ Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
     Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
     in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
@@ -452,10 +445,10 @@ BIODIV_GBF_TARGET_2_DICT = {
              }            # (can add more years/targets)\
 
 
-# ------------------- Biodiversity contribution reporting -------------------
-BIODIVERSITY_LIMITS = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
-BIODIVERSITY_CONTRIBUTION_REPORT = True  # True or False, report biodiversity contribution
-BIO_CALC_LEVEL = 'group'  # 'group' or 'species' - determines whether to calculate biodiversity scores at the group or species level
+# Biodiversity contribution reporting 
+BIODIVERSITY_LIMITS = 'on'                 # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
+CALC_BIODIVERSITY_CONTRIBUTION = False      # True or False, calculate/report biodiversity contribution; False will urn off reprojecting decision variables to xarray so speed up the model run.
+BIO_CALC_LEVEL = 'group'                    # 'group' or 'species' - determines whether to calculate biodiversity scores at the group or species level
 
 
 

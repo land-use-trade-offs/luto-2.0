@@ -18,6 +18,7 @@
 Pure functions to calculate water net yield by lm, lu and water limits.
 """
 
+import re
 import numpy as np
 import pandas as pd
 from collections import defaultdict
@@ -80,8 +81,8 @@ def get_wyield_matrices(
     """
     w_yield_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
 
-    w_yield_dr = data.get_water_dr_yield_for_yr_idx(yr_idx) if water_dr_yield is None else water_dr_yield
-    w_yield_sr = data.get_water_sr_yield_for_yr_idx(yr_idx) if water_sr_yield is None else water_sr_yield
+    w_yield_dr = data.WATER_YIELD_DR_FILE[yr_idx] if water_dr_yield is None else water_dr_yield
+    w_yield_sr = data.WATER_YIELD_SR_FILE[yr_idx] if water_sr_yield is None else water_sr_yield
     w_yield_nl = data.get_water_nl_yield_for_yr_idx(yr_idx, w_yield_dr, w_yield_sr)
 
 
@@ -456,9 +457,46 @@ def calc_water_net_yield_for_region(
     )
     return ag_contr + non_ag_contr + ag_man_contr + water_yield_outside_luto_study_area
 
+
+def calc_water_net_yield_BASE_YR(data: Data) -> np.ndarray:
+    """
+    Calculate the water net yield for the base year (2010) for all regions.
+
+    Parameters:
+    - data: The data object containing the necessary input data.
+
+    Returns:
+    - water_net_yield: The water net yield for all regions.
+    """
+    if data.WATER_YIELD_RR_BASE_YR is not None:
+        return data.WATER_YIELD_RR_BASE_YR
+    
+    # Get the water yield matrices
+    w_mrj = get_water_net_yield_matrices(data, 0)
+    
+    # Get the ag decision variables
+    ag_dvar_mrj = data.AG_L_MRJ
+
+    # Multiply the water yield by the decision variables
+    ag_w_r = np.einsum('mrj,mrj->r', w_mrj, ag_dvar_mrj)
+    
+    # Get water net yield for each region
+    wny_inside_LUTO_regions = np.bincount(data.RIVREG_ID, ag_w_r)
+    wny_inside_LUTO_regions = {region: wny for region, wny in enumerate(wny_inside_LUTO_regions) if region != 0}
+    
+    # Get water yield from outside the LUTO study area
+    wny_outside_LUTO_regions = get_water_outside_luto_study_area_from_hist_level(data)
+    
+    return {
+        region: wny_inside_LUTO_regions[region]  + wny_outside_LUTO_regions[region] 
+        for region in wny_outside_LUTO_regions
+    } 
+
+
+
 def get_water_net_yield_limit_values(
     data: Data,
-) -> dict[int, tuple[str, float, float, np.ndarray]]:
+) -> dict[int, tuple[str, float, np.ndarray]]:
     """
     Return water net yield limits for regions (River Regions or Drainage Divisions as specified in luto.settings.py).
 
@@ -469,8 +507,7 @@ def get_water_net_yield_limit_values(
     water_net_yield_limits: A dictionary of tuples containing the water use limits for each region\n
       region index:(
       - region name
-      - histircal water yield
-      - lowest water yield allowed
+      - water yield limit
       - indices of cells in the region
       )
 
@@ -499,8 +536,7 @@ def get_water_net_yield_limit_values(
         hist_yield = wny_region_hist[region]
         ind = np.flatnonzero(region_id == region).astype(np.int32)
         limit_hist_level = hist_yield * settings.WATER_YIELD_TARGET_AG_SHARE    # Water yield limit calculated as a proportial of historical level based on planetary boundary theory
-        limit_CCI_buffer = hist_yield * settings.WATER_YIELD_CCI_BUFFER         # Water yield limit buffer calculated as specified in settings
-        limits_by_region[region] = (name, limit_hist_level, limit_CCI_buffer, ind)    
+        limits_by_region[region] = (name, limit_hist_level, ind)    
 
     # Save the results in data to avoid recalculating
     data.WATER_YIELD_LIMITS = limits_by_region

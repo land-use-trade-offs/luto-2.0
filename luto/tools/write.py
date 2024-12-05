@@ -881,14 +881,12 @@ def write_water(data: Data, yr_cal, path):
     # Loop through specified water regions
     df_water_seperate_dfs = []
     df_water_limits_and_public_land_dfs = []
-    for region, (reg_name, limit_hist_level, limit_CCI_buffer, ind) in w_net_yield_limits.items():
+    for region, (reg_name, limit_hist_level, ind) in w_net_yield_limits.items():
         
 
         # Get the water yield limits and public land water yield
         water_limit_pub = pd.DataFrame({
-            # 'REGION':[reg_name],
             ('WNY LIMIT','HIST (ML)'):[limit_hist_level],
-            ('WNY LIMIT','HIST + CC_Buffer (ML)'):[limit_hist_level + limit_CCI_buffer],
             ('WNY Pubulic','HIST (ML)'):[wny_outside_luto_study_area_base_yr[region]],
             ('WNY Pubulic','HIST + CCI (ML)'):[wny_outside_luto_study_area_CCI[region]]},
             index=[reg_name]).unstack().reset_index()
@@ -991,9 +989,11 @@ def write_biodiversity(data: Data, yr_cal, path):
     Write biodiversity info for a given year ('yr_cal'), simulation ('sim')
     and output path ('path').
     """
+    if not settings.BIODIVERSITY_LIMITS == 'on':
+        return
 
     # Check biodiversity limits and report
-    biodiv_limit = ag_biodiversity.get_biodiversity_limits(data, yr_cal) if settings.BIODIVERSITY_LIMITS == 'on' else 0
+    biodiv_limit = ag_biodiversity.get_biodiversity_limits(data, yr_cal)
 
     print(f'Writing biodiversity outputs for {yr_cal}')
 
@@ -1021,7 +1021,7 @@ def write_biodiversity(data: Data, yr_cal, path):
 def write_biodiversity_separate(data: Data, yr_cal, path):
 
     # Do nothing if biodiversity limits are off and no need to report
-    if not settings.BIODIVERSITY_LIMITS == 'on' and not settings.BIODIVERSITY_REPORT:
+    if not settings.BIODIVERSITY_LIMITS == 'on':
         return
 
     yr_idx = yr_cal - data.YR_CAL_BASE
@@ -1094,6 +1094,10 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
 
 
 def write_biodiversity_contribution(data: Data, yr_cal, path):
+    
+    # Do nothing if no need to calculate biodiversity contribution
+    if not settings.CALC_BIODIVERSITY_CONTRIBUTION:
+        return
 
     print(f'Writing biodiversity contribution score for {yr_cal}')
 

@@ -45,12 +45,12 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
             settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
             settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
             
-            # Add the NODE parameters
-            settings_dict['NODE'] = 'Please specify the node name'
-            settings_dict['MEM'] = 'auto'
-            settings_dict['CPU_PER_TASK'] = settings_dict['THREADS']
-            settings_dict['TIME'] = 'auto'
+            # Add parameters
             settings_dict['JOB_NAME'] = 'auto'
+            settings_dict['MEM'] = 'auto'
+            settings_dict['QUEUE'] = 'normal'
+            settings_dict['WRITE_THREADS'] = 10 # 10 threads for writing is a safe number to avoid out-of-memory issues
+            settings_dict['NCPUS'] = min(settings_dict['THREADS']//4*4, 48) # max 48 cores
 
 
         # Create a template for cutom settings
@@ -96,52 +96,6 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv', run
         # Submit the task if the os is linux
         submit_task(cwd, col)
         
-
-
-# Grid search to set grid search parameters
-def create_grid_search_template(num_runs:int = 10):
-    # Gird parameters for {AG_MANAGEMENTS} and {AG_MANAGEMENTS_REVERSIBLE}
-    grid_am = {k:[True, False ] for k in settings.AG_MANAGEMENTS}
-
-    # Grid parameters for {NON_AG_LAND_USES} and {NON_AG_LAND_USES_REVERSIBLE}
-    grid_non_ag = {k:[True, False] for k in settings.NON_AG_LAND_USES}
-
-    # Grid parameters for {MODE}
-    grid_mode = ['timeseries', 'snapshot']
-
-
-    # Create grid search parameter space
-    custom_settings = pd.read_csv(f'{TASK_ROOT_DIR}/settings_template.csv')
-    custom_settings = custom_settings[['Name', 'Default_run']]
-
-
-    seen_am = set()
-    seen_non_ag = set()
-    random_choices = num_runs // len(grid_mode)
-
-    for idx, (mode, _) in enumerate(itertools.product(grid_mode, range(random_choices))):
-
-        select_am = {key: random.choice(value) for key, value in grid_am.items()}
-        select_non_ag = {key: random.choice(value) for key, value in grid_non_ag.items()}
-
-        if str(select_am) in seen_am and str(select_non_ag) in seen_non_ag:
-            continue
-
-        seen_am.add(str(select_am))
-        seen_non_ag.add(str(select_non_ag))
-
-        custom_settings[f'run_{idx:02}'] = custom_settings['Default_run']
-        custom_settings.loc[(custom_settings['Name'] == 'MODE'), f'run_{idx:02}'] = mode
-        custom_settings.loc[(custom_settings['Name'] == 'AG_MANAGEMENTS'), f'run_{idx:02}'] = str(select_am)
-        custom_settings.loc[(custom_settings['Name'] == 'AG_MANAGEMENTS_REVERSIBLE'), f'run_{idx:02}'] = str(select_am)
-        custom_settings.loc[(custom_settings['Name'] == 'NON_AG_LAND_USES'), f'run_{idx:02}'] = str(select_non_ag)
-        custom_settings.loc[(custom_settings['Name'] == 'NON_AG_LAND_USES_REVERSIBLE'), f'run_{idx:02}'] = str(select_non_ag)
-
-    custom_settings = custom_settings[['Name','Default_run'] + sorted(custom_settings.columns[2:])]
-    custom_settings.to_csv(f'{TASK_ROOT_DIR}/settings_template.csv', index=False)
-
-
-
 
     
 def is_float(s):
@@ -223,44 +177,29 @@ def write_custom_settings(task_dir:str, settings_dict:dict):
                 
 def update_settings(settings_dict:dict, n_tasks:int, col:str):
     
-    if settings_dict['NODE'] == 'Please specify the node name':
-        if os.name == 'nt':         
-            # If the os is windows, do nothing
-            print('This will only create task folders, and NOT submit job to run!')
-        elif os.name == 'posix':    
-            # If the os is linux, submit the job
-            raise ValueError('NODE must be specified!')
+    if os.name == 'nt':         
+        # If the os is windows, do nothing
+        print('This will only create task folders, and NOT submit job to run!')
 
     # The input dir for each task will point to the absolute path of the input dir
     settings_dict['INPUT_DIR'] = os.path.abspath(settings_dict['INPUT_DIR']).replace('\\','/')
     settings_dict['DATA_DIR'] = settings_dict['INPUT_DIR']
-    settings_dict['WRITE_THREADS'] = 10 # 10 threads for writing is a safe number to avoid out-of-memory issues
-    
 
     # Set the memory and time based on the resolution factor
     if int(settings_dict['RESFACTOR']) == 1:
         MEM = "250G"
-        TIME = "30-0:00:00"
     elif int(settings_dict['RESFACTOR']) == 2:
         MEM = "150G" 
-        TIME = "10-0:00:00"
     elif int(settings_dict['RESFACTOR']) <= 5:
         MEM = "100G"
-        TIME = "5-0:00:00"
     else:
         MEM = "80G"
-        TIME = "2-0:00:00"
         
-    # If the MEM and TIME are not set to auto, set them to the custom values
-    MEM = settings_dict['MEM'] if settings_dict['MEM'] != 'auto' else MEM
-    TIME = settings_dict['TIME'] if settings_dict['TIME'] != 'auto' else TIME
-    JOB_NAME = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
    
     # Update the settings dictionary
-    settings_dict['MEM'] = MEM
-    settings_dict['TIME'] = TIME
-    settings_dict['JOB_NAME'] = JOB_NAME
-    
+    settings_dict['JOB_NAME'] = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
+    settings_dict['MEM'] = settings_dict['MEM'] if settings_dict['MEM'] != 'auto' else MEM
+
     return settings_dict
 
 
@@ -298,28 +237,10 @@ def create_run_folders(col):
 
 def submit_task(cwd:str, col:str):
     # Copy the slurm script to the task folder
-    shutil.copyfile('luto/tools/create_task_runs/bash_scripts/slurm_cmd.sh', f'{TASK_ROOT_DIR}/{col}/slurm.sh')
+    shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{TASK_ROOT_DIR}/{col}/task_cmd.sh')
     # Start the task if the os is linux
     if os.name == 'posix':
         os.chdir(f'{TASK_ROOT_DIR}/{col}')
-        os.system('sbatch -p mem slurm.sh')
+        os.system('bash task_cmd.sh')
         os.chdir(cwd)    
     
-    
-    
-    
-
-        
-        
-
-
-
-
-
-
-
-
-
-
-
-

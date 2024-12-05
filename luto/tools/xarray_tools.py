@@ -1,21 +1,8 @@
 import os
-from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
-import sparse
 import xarray as xr
-import rioxarray as rxr
-import geopandas as gpd
-
 import luto.settings as settings
-
-from itertools import product
-from rasterio.enums import Resampling
-from rasterio.features import shapes
-
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.data import Data
-from luto.tools.spatializers import get_coarse2D_map, upsample_array
 
 
 # Calculate the biodiversity condition

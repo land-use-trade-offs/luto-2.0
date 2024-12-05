@@ -31,8 +31,8 @@ def get_w_net_yield_matrix_env_planting(
     If `water_dr_yield` and `water_sr_yield` are provided, the function will calculate
     the water yields regardless of the `yr_idx`.
     """
-    w_yield_dr = data.get_water_dr_yield_for_yr_idx(yr_idx) if water_dr_yield is None else water_dr_yield
-    w_yield_sr = data.get_water_sr_yield_for_yr_idx(yr_idx) if water_sr_yield is None else water_sr_yield
+    w_yield_dr = data.WATER_YIELD_DR_FILE[yr_idx] if water_dr_yield is None else water_dr_yield
+    w_yield_sr = data.WATER_YIELD_SR_FILE[yr_idx] if water_sr_yield is None else water_sr_yield
     w_yield_nl = data.get_water_nl_yield_for_yr_idx(yr_idx, w_yield_dr, w_yield_sr)
     wyield = w_yield_nl * data.REAL_AREA
     return wyield
@@ -56,7 +56,7 @@ def get_w_net_yield_matrix_carbon_plantings_block(
     -------
     1-D array, indexed by cell.
     """
-    w_yield_dr = data.get_water_dr_yield_for_yr_idx(yr_idx) if water_dr_yield is None else water_dr_yield
+    w_yield_dr = data.WATER_YIELD_DR_FILE[yr_idx] if water_dr_yield is None else water_dr_yield
     wyield = w_yield_dr * data.REAL_AREA
     return wyield
 

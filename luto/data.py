@@ -38,6 +38,7 @@ from affine import Affine
 from scipy.interpolate import interp1d
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.settings import INPUT_DIR, OUTPUT_DIR
+from luto.tools.spatializers import upsample_and_fill_nodata, upsample_array
 
 
 
@@ -220,8 +221,9 @@ class Data:
         # Load agricultural crop and livestock data.
         ###############################################################
         print("\tLoading agricultural crop and livestock data...", flush=True)
-        self.AGEC_CROPS = pd.read_hdf(os.path.join(INPUT_DIR, "agec_crops.h5"))
-        self.AGEC_LVSTK = pd.read_hdf(os.path.join(INPUT_DIR, "agec_lvstk.h5"))
+        self.AGEC_CROPS = self.get_df_resfactor_applied(pd.read_hdf(os.path.join(INPUT_DIR, "agec_crops.h5")))
+        self.AGEC_LVSTK = self.get_df_resfactor_applied(pd.read_hdf(os.path.join(INPUT_DIR, "agec_lvstk.h5")))
+        
         # Price multipliers for livestock and crops over the years.
         self.CROP_PRICE_MULTIPLIERS = pd.read_excel(os.path.join(INPUT_DIR, "ag_price_multipliers.xlsx"), sheet_name="AGEC_CROPS", index_col="Year")
         self.LVSTK_PRICE_MULTIPLIERS = pd.read_excel(os.path.join(INPUT_DIR, "ag_price_multipliers.xlsx"), sheet_name="AGEC_LVSTK", index_col="Year")
@@ -378,10 +380,10 @@ class Data:
         print("\tSetting up spatial layers data...", flush=True)
 
         # Actual hectares per cell, including projection corrections.
-        self.REAL_AREA = pd.read_hdf(os.path.join(INPUT_DIR, "real_area.h5")).to_numpy()
-        self.REAL_AREA_W_RESFACTOR = self.get_array_resfactor_applied(self.REAL_AREA) * self.RESMULT
+        self.REAL_AREA_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "real_area.h5")).to_numpy()
+        self.REAL_AREA = self.get_array_resfactor_applied(self.REAL_AREA_NO_RESFACTOR) * self.RESMULT
 
-        # Derive NCELLS (number of spatial cells) real area.
+        # Derive NCELLS (number of spatial cells) from the area array.
         self.NCELLS = self.REAL_AREA.shape[0]
 
         # Initial (2010) land-use map, mapped as lexicographic land-use class indices.
@@ -395,16 +397,12 @@ class Data:
 
         # Initial (2010) agricutural management maps - no cells are used for alternative agricultural management options.
         # Includes a separate AM map for each agricultural management option, because they can be stacked.
-        self.AMMAP_DICT_NO_RESFACTOR = {
-            am: np.zeros(self.NCELLS).astype("int8") for am in AG_MANAGEMENTS_TO_LAND_USES
-        }
         self.AMMAP_DICT = {
-            am: self.get_array_resfactor_applied(array)
-            for am, array in self.AMMAP_DICT_NO_RESFACTOR.items()
+            am: np.zeros(self.NCELLS).astype("int8") for am in AG_MANAGEMENTS_TO_LAND_USES
         }
         self.add_ammaps(self.YR_CAL_BASE, self.AMMAP_DICT)
 
-        self.AG_L_MRJ = lumap2ag_l_mrj(self.LUMAP, self.LMMAP)  # Boolean [2, 4218733, 28]
+        self.AG_L_MRJ = self.get_exact_resfactored_lumap_mrj() 
         self.add_ag_dvars(self.YR_CAL_BASE, self.AG_L_MRJ)
 
         self.NON_AG_L_RK = lumap2non_ag_l_mk(
@@ -580,29 +578,21 @@ class Data:
 
 
         ###############################################################
-        # Calculate base year production and apply resfactor to
-        # various required data arrays
+        # Apply resfactor to various required data arrays 
+        # and Calculate base year production 
         ###############################################################
-        print("\tCalculating base year productivity...", flush=True)
-        yr_cal_base_prod_data = self.get_production(
-            self.YR_CAL_BASE, self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR
-        )
-        self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
-
         self.CLIMATE_CHANGE_IMPACT = self.get_df_resfactor_applied(self.CLIMATE_CHANGE_IMPACT)
-        self.REAL_AREA_NO_RESFACTOR = self.REAL_AREA.copy()
-        self.REAL_AREA = self.get_array_resfactor_applied(self.REAL_AREA) * self.RESMULT
-        self.NCELLS = self.REAL_AREA.shape[0]
-
         self.FEED_REQ = self.get_array_resfactor_applied(self.FEED_REQ)
         self.PASTURE_KG_DM_HA = self.get_array_resfactor_applied(self.PASTURE_KG_DM_HA)
         self.SAFE_PUR_MODL = self.get_array_resfactor_applied(self.SAFE_PUR_MODL)
         self.SAFE_PUR_NATL = self.get_array_resfactor_applied(self.SAFE_PUR_NATL)
 
-        self.AG_MAN_L_MRJ_DICT = get_base_am_vars(
-            self.NCELLS, self.NLMS, self.N_AG_LUS               # Dictionary containing Int8 arrays
-        )
+        self.AG_MAN_L_MRJ_DICT = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
         self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
+        
+        print("\tCalculating base year productivity...", flush=True)
+        yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)
+        self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
 
 
 
@@ -638,9 +628,6 @@ class Data:
         ###############################################################
         print("\tLoading additional agricultural economic data...", flush=True)
 
-         # Load the agro-economic data (constructed using dataprep.py).
-        self.AGEC_CROPS = self.get_df_resfactor_applied(self.AGEC_CROPS)
-        self.AGEC_LVSTK = self.get_df_resfactor_applied(self.AGEC_LVSTK)
 
         # Load greenhouse gas emissions from agriculture
         self.AGGHG_CROPS = self.get_df_resfactor_applied(
@@ -659,6 +646,9 @@ class Data:
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
         self.EXCLUDE = np.load(os.path.join(INPUT_DIR, "x_mrj.npy"))
         self.EXCLUDE = self.EXCLUDE[:, self.MASK, :]  # Apply resfactor specially for the exclude matrix
+        
+        # BASE_YR economic value; Initilized as None and will be added later in `luto.solvers.input_data.py` to avoid recalculating
+        self.BASE_YR_economic_val = None
 
 
 
@@ -837,8 +827,10 @@ class Data:
         wyield_fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_sr_ml_ha.h5')
         
         # Read the data into memory with [...], so that it can be pickled.
-        self.WATER_YIELD_DR_FILE = h5py.File(wyield_fname_dr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_DR_ML_HA_mean'][...]
-        self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_SR_ML_HA_mean'][...]
+        self.WATER_YIELD_DR_FILE = h5py.File(wyield_fname_dr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_DR_ML_HA_mean'][:, self.MASK][...]
+        self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_SR_ML_HA_mean'][:, self.MASK][...]
+        
+        
 
         # Water yield from outside LUTO study area.
         water_yield_oustide_luto_hist = pd.read_hdf(os.path.join(INPUT_DIR, 'water_yield_outside_LUTO_study_area_hist_1970_2000.h5'))
@@ -869,7 +861,10 @@ class Data:
             self.WATER_OUTSIDE_LUTO_DD_HIST = water_yield_oustide_luto_hist.query('Region_Type == "Drainage Division"').set_index('Region_ID')['Water Yield (ML)'].to_dict()
             self.WATER_UNDER_NATURAL_LAND_DD = dd_natural_land
             
-
+        # Place holder for Water Yield under River Region to avoid recalculating it every time.
+        self.WATER_YIELD_RR_BASE_YR = None
+        
+        
         ###############################################################
         # Carbon sequestration by trees data.
         ###############################################################
@@ -1248,6 +1243,52 @@ class Data:
         Safely adds agricultural management decision variables' values to the Data object.
         """
         self.ag_man_dvars[yr] = ag_man_dvars
+        
+        
+    def get_exact_resfactored_lumap_mrj(self):
+        """
+        Rather than picking the center cell when resfactoring the lumap, this function
+        calculate the exact value of each land-use cell based from lumap to create dvars.
+        
+        E.g., given a resfactor of 5, then each resfactored dvar cell will cover a 5x5 area.
+        If there are 9 Apple cells in the 5x5 area, then the dvar cell will have a value of 9/25. 
+        
+        """
+        # Create a 2D array of IDs for the LUMAP_2D_RESFACTORED
+        lumap_2d_id = np.arange(self.LUMAP_2D_RESFACTORED.size).reshape(self.LUMAP_2D_RESFACTORED.shape)
+        lumap_2d_id = upsample_array(self, lumap_2d_id, settings.RESFACTOR)    
+        lumask_2d_no_resfactor = (self.LUMAP_2D != self.NODATA) & (self.LUMAP_2D != self.MASK_LU_CODE)    
+
+        # Get the 2D water supply map at full resolution 
+        lmmap_full_2d = np.full_like(self.NLUM_MASK, self.NODATA, dtype=np.int16)                           # 2D map,  full of nodata (-9999)
+        np.place(lmmap_full_2d, self.NLUM_MASK == 1, self.LMMAP_NO_RESFACTOR)                               # 2D map,  -9999 for ocean; -1 for desert, urban, water, etc; 0-27 for land uses
+
+        # Calculate the number of cells with each resfactored ID cell
+        cell_count = np.bincount(lumap_2d_id.flatten(), lumask_2d_no_resfactor.flatten(), minlength=self.LUMAP_2D_RESFACTORED.size)
+        lumap_resample_avg = np.zeros((len(self.LANDMANS), self.NCELLS, self.N_AG_LUS), dtype=np.float32)
+                
+        for idx_lu in self.DESC2AGLU.values():
+            for idx_w, _ in enumerate(self.LANDMANS):
+                # Get the cells with the same ID and water supply
+                lumap_w = (self.LUMAP_2D == idx_lu) * (lmmap_full_2d == idx_w)
+                cell_sum = np.bincount(lumap_2d_id.flatten(), lumap_w.flatten(), minlength=self.LUMAP_2D_RESFACTORED.size)
+
+                # Calculate the average value of each ID cell
+                with np.errstate(divide='ignore', invalid='ignore'):                    # Ignore the division by zero warning
+                    cell_avg = cell_sum / cell_count
+                    cell_avg[~np.isfinite(cell_avg)] = 0                                # Set the NaN and Inf to 0
+                    
+                # Reshape the 1D avg array to 2D array
+                cell_avg_2d = cell_avg.reshape(self.LUMAP_2D_RESFACTORED.shape)
+                # Upsample the 2D array from choarser resolution to finer resolution
+                cell_avg_2d = upsample_array(self, cell_avg_2d, settings.RESFACTOR).astype(np.float32)
+                # Only keep the cells within the luto study area
+                cell_avg_1d = cell_avg_2d[np.nonzero(self.NLUM_MASK)]
+                cell_avg_1d = cell_avg_1d[self.MASK]
+
+                lumap_resample_avg[idx_w, :, idx_lu] = cell_avg_1d
+                
+        return lumap_resample_avg
 
 
     # Functions to add reprojected dvars to the output containers
@@ -1405,28 +1446,6 @@ class Data:
         return dense_2D_map
 
 
-    # Upsample dvar to its full resolution representation
-    def upsample_dvar(self, map_:np.ndarray, x:np.ndarray, y:np.ndarray)-> xr.DataArray:
-        # Get the coords of the map_
-        coords = dict(map_.coords)
-        del coords['cell']
-
-        # Up sample the arr as RESFACTOR=1
-        if settings.RESFACTOR > 1:
-            map_ = self.dvar_to_2D(map_)
-            map_ = self.dvar_to_full_res(map_)
-        else:
-            empty_map = np.full_like(self.NLUM_MASK, fill_value=self.NODATA, dtype=np.float32)
-            np.place(empty_map, self.NLUM_MASK, self.LUMAP_NO_RESFACTOR)
-            np.place(empty_map, (empty_map != self.MASK_LU_CODE) & (empty_map != self.NODATA), map_)
-            map_ = empty_map
-
-        # Convert to xarray
-        map_ = xr.DataArray(map_, dims=('y','x'), coords={'y': y, 'x': x})
-        map_ = map_.expand_dims(coords)
-        return map_
-
-
     # Calculate the average value of dvars within the target bin
     def bincount_avg(self, target_id_map:xr.DataArray, dvar:np.ndarray) -> np.ndarray:
         """
@@ -1466,6 +1485,8 @@ class Data:
             bin_avg = np.nan_to_num(bin_avg)
 
         return bin_avg
+
+
 
     def add_production_data(self, yr: int, data_type: str, prod_data: Any):
         """
@@ -1546,9 +1567,15 @@ class Data:
         Includes the impacts of land-use change, productivity increases, and
         climate change on yield.
         """
-        ag_X_mrj = lumap2ag_l_mrj(lumap, lmmap)
-        non_ag_X_rk = lumap2non_ag_l_mk(lumap, len(settings.NON_AG_LAND_USES.keys()))
-        ag_man_X_mrj = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
+        if yr_cal == self.YR_CAL_BASE:
+            ag_X_mrj = self.AG_L_MRJ
+            non_ag_X_rk = self.NON_AG_L_RK
+            ag_man_X_mrj = self.AG_MAN_L_MRJ_DICT
+            
+        else:
+            ag_X_mrj = lumap2ag_l_mrj(lumap, lmmap)
+            non_ag_X_rk = lumap2non_ag_l_mk(lumap, len(settings.NON_AG_LAND_USES.keys()))
+            ag_man_X_mrj = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
 
         # Calculate year index (i.e., number of years since 2010)
         yr_idx = yr_cal - self.YR_CAL_BASE
@@ -1609,49 +1636,6 @@ class Data:
             )
         return self.CARBON_PRICES[yr_cal]
 
-    def get_water_dr_yield_for_yr_idx(self, yr_idx: int) -> np.ndarray:
-        """
-        Get the DR water yield array, inclusive of all cells that LUTO does not look at.
-
-        Returns
-        -------
-        np.ndarray: shape (NCELLS,)
-        """
-
-        return self.get_array_resfactor_applied(self.WATER_YIELD_DR_FILE[yr_idx])
-
-    def get_water_dr_yield_for_year(self, yr_cal: int) -> np.ndarray:
-        """
-        Get the DR water yield array, inclusive of all cells that LUTO does not look at.
-
-        Returns
-        -------
-        np.ndarray: shape (NCELLS,)
-        """
-        yr_idx = yr_cal - self.YR_CAL_BASE
-        return self.get_array_resfactor_applied(self.get_water_dr_yield_for_yr_idx(yr_idx))
-
-    def get_water_sr_yield_for_yr_idx(self, yr_idx: int) -> np.ndarray:
-        """
-        Get the SR water yield array, inclusive of all cells that LUTO does not look at.
-
-        Returns
-        -------
-        np.ndarray: shape (NCELLS,)
-        """
-        return self.get_array_resfactor_applied(self.WATER_YIELD_SR_FILE[yr_idx])
-
-    def get_water_sr_yield_for_year(self, yr_cal: int) -> np.ndarray:
-        """
-        Get the SR water yield array, inclusive of all cells that LUTO does not look at.
-
-        Returns
-        -------
-        np.ndarray: shape (NCELLS,)
-        """
-        yr_idx = yr_cal - self.YR_CAL_BASE
-        return self.get_array_resfactor_applied(self.WATER_YIELD_SR_FILE(yr_idx))
-
     def get_water_nl_yield_for_yr_idx(
         self,
         yr_idx: int,
@@ -1667,11 +1651,11 @@ class Data:
         """
         water_dr_yield = (
             water_dr_yield if water_dr_yield is not None
-            else self.get_water_dr_yield_for_yr_idx(yr_idx)
+            else self.WATER_YIELD_DR_FILE[yr_idx]
         )
         water_sr_yield = (
             water_sr_yield if water_sr_yield is not None
-            else self.get_water_sr_yield_for_yr_idx(yr_idx)
+            else self.WATER_YIELD_SR_FILE[yr_idx]
         )
         dr_prop = self.DEEP_ROOTED_PROPORTION
 
