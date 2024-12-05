@@ -1088,9 +1088,6 @@ class LutoSolver:
         if self.biodiversity_expr:
             prod_data["Biodiversity"] = self.biodiversity_expr.getValue()
 
-        ag_X_mrj_processed[:, non_ag_bools_r, :] = False
-        non_ag_X_rk_processed[~non_ag_bools_r, :] = False
-
         return SolverSolution(
             lumap=lumap,
             lmmap=lmmap,

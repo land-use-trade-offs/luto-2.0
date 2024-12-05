@@ -11,13 +11,6 @@ SCRIPT_PBS=$(mktemp)
 cat << OUTER_EOF > $SCRIPT_PBS
 #!/bin/bash
 
-#PBS -N ${JOB_NAME}
-#PBS -q ${QUEUE}
-#PBS -l ncpus=${NCPUS}
-#PBS -l mem=${MEM}
-#PBS -l jobfs=10GB
-#PBS -l walltime=48:00:00
-
 # Change to the directory where this script is located
 cd "$(dirname "$0")"
 
@@ -34,9 +27,14 @@ INNER_EOF
 OUTER_EOF
 
 
-
 # Submit the job to PBS
-qsub $SCRIPT_PBS
+qsub -N ${JOB_NAME} \
+     -q ${QUEUE} \
+     -l ncpus=${NCPUS} \
+     -l mem=${MEM} \
+     -l jobfs=10GB \
+     -l walltime=48:00:00 \
+     ${SCRIPT_PBS}
 
 # Remove the temporary script file
 rm $SCRIPT_PBS
