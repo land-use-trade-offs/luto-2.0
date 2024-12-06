@@ -32,7 +32,6 @@ grid_search = {
 }
 
 
-
 # Read the template for the custom settings
 template_df = create_settings_template()
 grid_search_df = create_grid_search_template(template_df, grid_search)
