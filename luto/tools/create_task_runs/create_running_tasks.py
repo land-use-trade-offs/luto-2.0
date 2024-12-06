@@ -7,10 +7,12 @@ from luto.tools.create_task_runs.helpers import create_grid_search_template, cre
 
 
 # Define the grid search
+''' Each value in the grid search has to be list iterable.'''
+
 grid_search = {
     # Computational settings, which are not relevant for LUTO itself
-    'MEM': '20GB',
-    'NCPUS':5,
+    'MEM': ['20GB'],
+    'NCPUS':[5],
     
     # 'MODE': [
     #     'snapshot', 
