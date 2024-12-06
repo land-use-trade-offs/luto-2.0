@@ -38,6 +38,7 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
             settings_dict['QUEUE'] = 'normal'
             settings_dict['WRITE_THREADS'] = 10 # 10 threads for writing is a safe number to avoid out-of-memory issues
             settings_dict['NCPUS'] = min(settings_dict['THREADS']//4*4, 48) # max 48 cores
+            settings_dict['TIME'] = '10:00:00'
 
             # Write the non-string values to a file
             for k, v in settings_dict.items():

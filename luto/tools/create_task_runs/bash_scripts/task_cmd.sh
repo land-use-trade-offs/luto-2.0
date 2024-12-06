@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Read the settings_bash file ==> JOBNAME, QUEUE, NCPUS, MEM, NCPUS, QUEUE
+# Read the settings_bash file ==> JOBNAME, QUEUE, NCPUS, MEM, NCPUS, QUEUE, TIME
 source luto/settings_bash.py
 
 # Activate the Conda environment and get the path to the Python executable
@@ -19,7 +19,7 @@ cat << EOF > $SCRIPT_PBS
 #PBS -l ncpus=${NCPUS}
 #PBS -l mem=${MEM}
 #PBS -l jobfs=10GB
-#PBS -l walltime=48:00:00
+#PBS -l walltime=${TIME}
 #PBS -l wd="$(dirname "$0")"
 
 ${PYTHON} python_script.py

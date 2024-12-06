@@ -1,7 +1,4 @@
-import itertools
 import numpy as np
-import pandas as pd
-from luto.tools.create_task_runs.parameters import TASK_ROOT_DIR
 from luto.tools.create_task_runs.helpers import create_grid_search_template, create_task_runs, create_settings_template
 
 
@@ -13,23 +10,25 @@ grid_search = {
     # Computational settings, which are not relevant to LUTO itself
     'MEM': ['80GB'],
     'NCPUS':[20],
+    'TIME': ['8:00:00'],
+
     
     'MODE': [
         # 'snapshot', 
         'timeseries'
     ],
     'SOLVE_WEIGHT_DEVIATIONS': 
-        np.linspace(0.8, 0.9, 30),
+        np.linspace(0.8, 0.9, 20),
         # [0.84],
-#     'GHG_LIMITS_FIELD': [
-#         '1.5C (67%) excl. avoided emis', 
-#         '1.5C (50%) excl. avoided emis', 
-#         '1.8C (67%) excl. avoided emis'
-#     ],
-#     'BIODIV_GBF_TARGET_2_DICT': [
-#         {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3 }, 
-#         {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5 }
-#     ]
+    # 'GHG_LIMITS_FIELD': [
+    #     '1.5C (67%) excl. avoided emis', 
+    #     '1.5C (50%) excl. avoided emis', 
+    #     '1.8C (67%) excl. avoided emis'
+    # ],
+    # 'BIODIV_GBF_TARGET_2_DICT': [
+    #     {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3 }, 
+    #     {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5 }
+    # ]
 }
 
 
