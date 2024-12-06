@@ -1,12 +1,12 @@
 import os
 import re
+import itertools
 import shutil
 import pandas as pd
 
 from joblib import delayed, Parallel
 from luto import settings
 from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, TASK_ROOT_DIR
-
 
 
 def create_settings_template(to_path:str=TASK_ROOT_DIR):
@@ -44,31 +44,62 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
                 if not isinstance(v, str):
                     non_str_val_file.write(f'{k}\n')
 
-        # Create a template for cutom settings
+        # Create a template for custom settings
         settings_df = pd.DataFrame({k:[v] for k,v in settings_dict.items()}).T.reset_index()
         settings_df.columns = ['Name','Default_run']
         settings_df = settings_df.map(str)    
-        settings_df.to_csv(f'{to_path}/settings_template.csv', index=False)
+         
+    return settings_df
 
 
+def create_grid_search_template(template_df:pd.DataFrame, grid_dict: dict) -> pd.DataFrame:
+    
+    # Collect new columns in a list
+    template_grid_search = template_df.copy()
+    
+    # Convert all values in the grid_dict to string representations
+    grid_dict = {k: [str(v) for v in v] for k, v in grid_dict.items()}
 
-def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
+    # Create a list of dictionaries with all possible permutations
+    keys, values = zip(*grid_dict.items())
+    permutations = [dict(zip(keys, v)) for v in itertools.product(*values)]
+
+    permutations_df = pd.DataFrame(permutations)
+    permutations_df.insert(0, 'run_idx', range(1, len(permutations_df) + 1))
+    
+    # Reporting the grid search template
+    print(f'Grid search template has been created with {len(permutations_df)} permutations!')
+    permutations_df.to_csv(f'{TASK_ROOT_DIR}/grid_search_parameters.csv', index=False)
+
+    # Loop through the permutations DataFrame and create new columns with updated settings
+    for _, row in permutations_df.iterrows():
+        # Copy the default settings
+        new_column = template_df['Default_run'].copy() 
+        
+        # Replace the settings using the key-value pairs in the permutation item
+        for k, v in row.items():
+            if k != 'run_idx':
+                new_column.loc[template_df['Name'] == k] = v
+                
+        # Rename the column and add it to the DataFrame
+        new_column.name = f'Run_{row["run_idx"]}'
+        template_grid_search = pd.concat([template_grid_search, new_column.rename(f'Run_{row["run_idx"]}')], axis=1)
+        
+    # Save the grid search template to the root task folder
+    template_grid_search.to_csv(f'{TASK_ROOT_DIR}/grid_search_template.csv', index=False)
+
+    return template_grid_search
+
+
+def create_task_runs(custom_settings:pd.DataFrame):
      
     # Read the custom settings file
-    custom_settings = pd.read_csv(from_path, index_col=0)
     custom_settings = custom_settings.dropna(how='all', axis=1)
+    custom_settings = custom_settings.set_index('Name')
     
-    # Change the column names to be valid python variable names
+    # Replace special characters to underscore, making the column names valid python variables
     custom_settings.columns = [re.sub(r'\W+', '_', col.strip()) for col in custom_settings.columns]
-
-    # Replace TRUE and FALSE with True and False
     custom_settings = custom_settings.replace({'TRUE': 'True', 'FALSE': 'False'})
-
-    # Evaluate the parameters that need to be evaluated
-    with open(f'{TASK_ROOT_DIR}/non_str_val.txt', 'r') as file: eval_vars = file.read().splitlines()
-    custom_settings.loc[eval_vars] = custom_settings.loc[eval_vars].map(eval)
-
-    # Create a dictionary of custom settings
     custom_cols = [col for col in custom_settings.columns if col not in ['Default_run']]
 
     if not custom_cols:
@@ -76,10 +107,11 @@ def create_task_runs(from_path:str=f'{TASK_ROOT_DIR}/settings_template.csv'):
 
     cwd = os.getcwd()
     for col in custom_cols:
+        # Evaluate the parameters that need to be evaluated
+        with open(f'{TASK_ROOT_DIR}/non_str_val.txt', 'r') as file: eval_vars = file.read().splitlines()
+        custom_settings.loc[eval_vars, col] = custom_settings.loc[eval_vars, col].map(eval)
         # Get the settings for the run
-        custom_dict = update_settings(custom_settings[col].to_dict(), col)
-        # Check if the column name is valid, and report the changed settings
-        check_settings_name(custom_settings, col)     
+        custom_dict = update_settings(custom_settings[col].to_dict(), col)    
         # Create a folder for each run
         create_run_folders(col)    
         # Write the custom settings to the task folder
@@ -158,27 +190,6 @@ def update_settings(settings_dict:dict, col:str):
 
     return settings_dict
 
-
-
-def check_settings_name(settings:pd.DataFrame, col:str):
-   
-    # If the column name is not in the settings, do nothing
-    if 'Default_run' not in settings.columns:
-        return
-    
-    # Search for changed settings
-    changed_params = {}
-    for idx,_ in settings.iterrows():
-        if settings.loc[idx,col] != settings.loc[idx,'Default_run']:
-            changed_params[idx] = f'{settings.loc[idx,"Default_run"]} ==> {settings.loc[idx,col]}'
-
-    # Print the changed settings
-    if len(changed_params) > 0:
-        print(f'"{col}" has the following changed settings compared to "Default_run":')
-        for k,v in changed_params.items():
-            print(f'        {k}: \t {v}')
-    else:
-        print(f'"{col}" has no changed parameters compared to "Default_run"') 
     
     
     
