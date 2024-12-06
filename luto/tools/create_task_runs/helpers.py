@@ -208,6 +208,7 @@ def create_run_folders(col):
 def submit_task(cwd:str, col:str):
     # Copy the slurm script to the task folder
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{TASK_ROOT_DIR}/{col}/task_cmd.sh')
+    shutil.copyfile('luto/tools/create_task_runs/bash_scripts/python_script.py', f'{TASK_ROOT_DIR}/{col}/python_script.py')
     
     if os.name == 'nt':         
         # If the os is windows, do nothing

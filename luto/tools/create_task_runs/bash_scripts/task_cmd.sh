@@ -11,17 +11,6 @@ PYTHON=$(which python)
 # Create a temporary script file
 SCRIPT_PBS=$(mktemp)
 
-echo '''
-import luto.simulation as sim
-import luto.settings as settings
-if os.path.exists(f"{settings.INPUT_DIR}/Data_RES{settings.RESFACTOR}.pkl"):
-    data = sim.load_data_from_disk(f"{settings.INPUT_DIR}/Data_RES{settings.RESFACTOR}.pkl")
-else:
-    data = sim.load_data()
-sim.run(data=data, base=2010, target=2050)
-''' > python_script.py
-
-
 cat << EOF > $SCRIPT_PBS
 #!/bin/bash
 #PBS -N ${JOB_NAME}
