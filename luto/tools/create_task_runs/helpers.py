@@ -58,7 +58,8 @@ def create_grid_search_template(template_df:pd.DataFrame, grid_dict: dict) -> pd
     template_grid_search = template_df.copy()
     
     # Convert all values in the grid_dict to string representations
-    grid_dict = {k: [str(v) for v in v] for k, v in grid_dict.items()}
+    grid_dict = {k:v if isinstance(v, list) else [v] for k,v in grid_dict.items()}
+    grid_dict = {k:[str(v) for v in v] for k, v in grid_dict.items()}
 
     # Create a list of dictionaries with all possible permutations
     keys, values = zip(*grid_dict.items())

@@ -8,6 +8,8 @@ from luto.tools.create_task_runs.helpers import create_grid_search_template, cre
 
 # Define the grid search
 grid_search = {
+    'MEM': '20GB',
+    'NCPUS':5,
     # 'MODE': [
     #     'snapshot', 
     #     'timeseries'
