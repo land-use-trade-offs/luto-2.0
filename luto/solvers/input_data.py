@@ -70,7 +70,7 @@ class SolverInputData:
     water_yield_RR_BASE_YR: dict                                        # Water yield for the BASE_YR based on historical water yield layers .
     water_yield_outside_study_area: dict[int, float]                    # Water yield from outside LUTO study area -> dict. Keys: year, region.
     
-    BASE_YR_economic_val: float     # BASE_YR economic value.
+    base_yr_economic_contr: float   # BASE_YR economic value.
 
     offland_ghg: np.ndarray         # GHG emissions from off-land commodities.
 
@@ -312,43 +312,43 @@ def get_non_ag_lb_rk(data: Data, base_year):
     return output
 
 
-def get_ag_man_costs(data: Data, target_index, ag_c_mrj: np.ndarray):
+def get_ag_man_c_mrj(data: Data, target_index, ag_c_mrj: np.ndarray):
     print('Getting agricultural management options\' cost effects...', flush = True)
     output = ag_cost.get_agricultural_management_cost_matrices(data, ag_c_mrj, target_index)
     return output
 
 
-def get_ag_man_ghg(data: Data, target_index, ag_g_mrj):
+def get_ag_man_g_mrj(data: Data, target_index, ag_g_mrj):
     print('Getting agricultural management options\' GHG emission effects...', flush = True)
     output = ag_ghg.get_agricultural_management_ghg_matrices(data, ag_g_mrj, target_index)
     return output
 
 
-def get_ag_man_quantity(data: Data, target_index, ag_q_mrp):
+def get_ag_man_q_mrj(data: Data, target_index, ag_q_mrp):
     print('Getting agricultural management options\' quantity effects...', flush = True)
     output = ag_quantity.get_agricultural_management_quantity_matrices(data, ag_q_mrp, target_index)
     return output
 
 
-def get_ag_man_revenue(data: Data, target_index, ag_r_mrj):
+def get_ag_man_r_mrj(data: Data, target_index, ag_r_mrj):
     print('Getting agricultural management options\' revenue effects...', flush = True)
     output = ag_revenue.get_agricultural_management_revenue_matrices(data, ag_r_mrj, target_index)
     return output
 
 
-def get_ag_man_transitions(data: Data, target_index, ag_t_mrj):
+def get_ag_man_t_mrj(data: Data, target_index, ag_t_mrj):
     print('Getting agricultural management options\' transition cost effects...', flush = True)
     output = ag_transition.get_agricultural_management_transition_matrices(data, ag_t_mrj, target_index)
     return output
 
 
-def get_ag_man_water(data: Data, target_index):
+def get_ag_man_w_mrj(data: Data, target_index):
     print('Getting agricultural management options\' water requirement effects...', flush = True)
     output = ag_water.get_agricultural_management_water_matrices(data, target_index)
     return output
 
 
-def get_ag_man_biodiversity(data: Data, target_index, ag_b_mrj):
+def get_ag_man_b_mrj(data: Data, target_index, ag_b_mrj):
     print('Getting agricultural management options\' biodiversity effects...', flush = True)
     output = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data, ag_b_mrj, target_index)
     return output
@@ -360,22 +360,74 @@ def get_ag_man_limits(data: Data, target_index):
     return output
 
 
-def get_BASE_YR_economic_val(data: Data):
-    print('Getting BASE_YR economic value...', flush = True)
+def get_economic_contribution(data: Data, base_year: int, target_year: int) -> dict[str, np.ndarray|dict[str, np.ndarray]]:
     
-    base_c_mrj = get_ag_c_mrj(data, 0)
-    base_r_mrj = get_ag_r_mrj(data, 0)
-    cost = np.einsum('mrj,mrj->', data.AG_L_MRJ, base_c_mrj)
-    revenue = np.einsum('mrj,mrj->', data.AG_L_MRJ, base_r_mrj)
+    print('Getting base year economic value...', flush = True)
+    base_index = base_year - data.YR_CAL_BASE
+    target_index = target_year - data.YR_CAL_BASE
     
-    if settings.OBJECTIVE == "mincost":
-        economic_val = cost
-    elif settings.OBJECTIVE == "maxprofit":
-        economic_val = -(revenue - cost)  # The negative sign is because we want to maximize profit, not minimize cost.
-    else:
-        raise ValueError(f"Unknown objective: {settings.OBJECTIVE}")
+    if settings.OBJECTIVE == "maxprofit":
+        # Pre-calculate profit (revenue minus cost) for each land use
+        ag_obj_mrj = (
+            get_ag_r_mrj(data, target_index)
+            - (
+                get_ag_c_mrj(data, target_index)
+                + get_ag_t_mrj(data, target_index, base_year)
+                + get_non_ag_to_ag_t_mrj(data, base_year, target_index)
+            )
+        )
 
-    return economic_val
+        non_ag_obj_rk = (
+            get_non_ag_r_rk(data, get_ag_r_mrj(data, target_index), base_year, target_year)
+            - (
+                get_non_ag_c_rk(data, get_ag_c_mrj(data, target_index), base_year, target_year)
+                + get_non_ag_t_rk(data, base_year)
+                + get_ag_to_non_ag_t_rk(data, target_index, base_year)
+            ) 
+        )
+
+        # Get effects of alternative agr. management options (stored in a dict)
+        ag_man_objs = {
+            am: get_ag_man_r_mrj(data, target_index, get_ag_r_mrj(data, target_index))[am]
+                - (
+                    get_ag_man_c_mrj(data, target_index, get_ag_c_mrj(data, target_index))[am]
+                    + get_ag_man_t_mrj(data, target_index, get_ag_c_mrj(data, target_index))[am]
+                ) 
+            
+            for am in AG_MANAGEMENTS_TO_LAND_USES
+        }
+
+    elif settings.OBJECTIVE == "mincost":
+        # Pre-calculate sum of production and transition costs
+        ag_obj_mrj = (
+            get_ag_c_mrj(data, target_index)
+            + get_ag_t_mrj(data, target_index, base_year)
+            + get_non_ag_to_ag_t_mrj(data, base_year, target_index)
+        )
+
+        non_ag_obj_rk = (
+            get_non_ag_c_rk(data, get_ag_c_mrj(data, target_index), base_year, target_year)
+            + get_non_ag_t_rk(data, base_year)
+            + get_ag_to_non_ag_t_rk(data, target_index, base_year)
+        )
+
+        # Store calculations for each agricultural management option in a dict
+        ag_man_objs = {
+            am: (
+                get_ag_man_c_mrj(data, target_index, get_ag_c_mrj(data, target_index))[am]
+                + get_ag_man_t_mrj(data, target_index, get_ag_c_mrj(data, target_index))[am]
+            )      
+            for am in AG_MANAGEMENTS_TO_LAND_USES
+        }
+
+    else:
+        print("Unknown objective")
+
+    ag_obj_mrj = np.nan_to_num(ag_obj_mrj)
+    non_ag_obj_rk = np.nan_to_num(non_ag_obj_rk)
+    ag_man_objs = {am: np.nan_to_num(arr) for am, arr in ag_man_objs.items()}
+
+    return [ag_obj_mrj, non_ag_obj_rk,  ag_man_objs]
 
 
 
@@ -451,18 +503,18 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         non_ag_x_rk=get_non_ag_x_rk(data, ag_x_mrj, base_year),
         non_ag_q_crk=get_non_ag_q_crk(data, ag_q_mrp, base_year),
         non_ag_lb_rk=get_non_ag_lb_rk(data, base_year),
-        ag_man_c_mrj=get_ag_man_costs(data, target_index, ag_c_mrj),
-        ag_man_g_mrj=get_ag_man_ghg(data, target_index, ag_g_mrj),
-        ag_man_q_mrp=get_ag_man_quantity(data, target_index, ag_q_mrp),
-        ag_man_r_mrj=get_ag_man_revenue(data, target_index, ag_r_mrj),
-        ag_man_t_mrj=get_ag_man_transitions(data, target_index, ag_t_mrj),
-        ag_man_w_mrj=get_ag_man_water(data, target_index),
-        ag_man_b_mrj=get_ag_man_biodiversity(data, target_index, ag_b_mrj),
+        ag_man_c_mrj=get_ag_man_c_mrj(data, target_index, ag_c_mrj),
+        ag_man_g_mrj=get_ag_man_g_mrj(data, target_index, ag_g_mrj),
+        ag_man_q_mrp=get_ag_man_q_mrj(data, target_index, ag_q_mrp),
+        ag_man_r_mrj=get_ag_man_r_mrj(data, target_index, ag_r_mrj),
+        ag_man_t_mrj=get_ag_man_t_mrj(data, target_index, ag_t_mrj),
+        ag_man_w_mrj=get_ag_man_w_mrj(data, target_index),
+        ag_man_b_mrj=get_ag_man_b_mrj(data, target_index, ag_b_mrj),
         ag_man_limits=get_ag_man_limits(data, target_index),                            
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
         water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Use the water net yield outside LUTO study area for the YR_CAL_BASE year
         water_yield_RR_BASE_YR=get_w_RR_BASE_YR(data),                                  # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
-        BASE_YR_economic_val=get_BASE_YR_economic_val(data),
+        base_yr_economic_contr=get_economic_contribution(data, base_year, target_year),
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,
