@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from functools import cached_property
+from functools import cached_property, lru_cache
 from typing import Any, Optional
 import numpy as np
 
@@ -59,7 +59,10 @@ class SolverInputData:
     water_yield_RR_BASE_YR: dict                                        # Water yield for the BASE_YR based on historical water yield layers .
     water_yield_outside_study_area: dict[int, float]                    # Water yield from outside LUTO study area -> dict. Keys: year, region.
     
-    base_yr_economic_contr: float   # BASE_YR economic value.
+    economic_contr_mrj: float                   # base year economic contribution matrix.
+    economic_base_yr_val: float                 # base year total profit (revnue - cost) or cost.
+    economic_target_yr_commodity_profit: float  # target year commodity profit.
+    economic_target_yr_carbon_price: float      # target year carbon price.
 
     offland_ghg: np.ndarray         # GHG emissions from off-land commodities.
 
@@ -153,25 +156,21 @@ class SolverInputData:
         return dict(cells2non_ag_lu)    
 
 def get_ag_c_mrj(data: Data, target_index):
-    print('Getting agricultural production cost matrices...', flush = True)
     output = ag_cost.get_cost_matrices(data, target_index)
     return output.astype(np.float32)
 
 
 def get_non_ag_c_rk(data: Data, ag_c_mrj: np.ndarray, lumap: np.ndarray, target_year):
-    print('Getting non-agricultural production cost matrices...', flush = True)
     output = non_ag_cost.get_cost_matrix(data, ag_c_mrj, lumap, target_year)
     return output.astype(np.float32)
 
 
 def get_ag_r_mrj(data: Data, target_index):
-    print('Getting agricultural production revenue matrices...', flush = True)
     output = ag_revenue.get_rev_matrices(data, target_index)
     return output.astype(np.float32)
 
 
 def get_non_ag_r_rk(data: Data, ag_r_mrj: np.ndarray, base_year: int, target_year: int):
-    print('Getting non-agricultural production revenue matrices...', flush = True)
     output = non_ag_revenue.get_rev_matrix(data, target_year, ag_r_mrj, data.lumaps[base_year])
     return output.astype(np.float32)
 
@@ -243,12 +242,15 @@ def get_non_ag_q_crk(data: Data, ag_q_mrp: np.ndarray, base_year: int):
 
 def get_ag_t_mrj(data: Data, target_index, base_year):
     print('Getting agricultural transition cost matrices...', flush = True)
-    output = ag_transition.get_transition_matrices( data
-                                                  , target_index
-                                                  , base_year
-                                                  , data.lumaps
-                                                  , data.lmmaps)
-    return output.astype(np.float32)
+    
+    ag_t_mrj = ag_transition.get_transition_matrices(
+        data, 
+        target_index, 
+        base_year, 
+        data.lumaps, 
+        data.lmmaps).astype(np.float32)
+    # Not transition costs occures if the base year is the target year
+    return ag_t_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(ag_t_mrj)
 
 
 def get_ag_ghg_t_mrj(data: Data, base_year):
@@ -257,18 +259,28 @@ def get_ag_ghg_t_mrj(data: Data, base_year):
     return output.astype(np.float32)
 
 
-def get_ag_to_non_ag_t_rk(data: Data, yr_idx, base_year):
+def get_ag_to_non_ag_t_rk(data: Data, target_index, base_year):
     print('Getting agricultural to non-agricultural transition cost matrices...', flush = True)
-    output = non_ag_transition.get_from_ag_transition_matrix(
-        data, yr_idx, base_year, data.lumaps[base_year], data.lmmaps[base_year]
-    )
-    return output.astype(np.float32)
+    non_ag_t_mrj = non_ag_transition.get_from_ag_transition_matrix( 
+        data, 
+        target_index, 
+        base_year, 
+        data.lumaps[base_year], 
+        data.lmmaps[base_year]).astype(np.float32)
+    # Not transition costs occures if the base year is the target year
+    return non_ag_t_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(non_ag_t_mrj)
 
 
 def get_non_ag_to_ag_t_mrj(data: Data, base_year:int, target_index: int):
     print('Getting non-agricultural to agricultural transition cost matrices...', flush = True)
-    output = non_ag_transition.get_to_ag_transition_matrix(data, target_index, data.lumaps[base_year], data.lmmaps[base_year])
-    return output.astype(np.float32)
+    
+    non_ag_to_ag_mrj = non_ag_transition.get_to_ag_transition_matrix(
+        data, 
+        target_index, 
+        data.lumaps[base_year], 
+        data.lmmaps[base_year]).astype(np.float32)
+    # Not transition costs occures if the base year is the target year
+    return non_ag_to_ag_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(non_ag_to_ag_mrj)
 
 
 def get_non_ag_t_rk(data: Data, base_year):
@@ -302,7 +314,6 @@ def get_non_ag_lb_rk(data: Data, base_year):
 
 
 def get_ag_man_c_mrj(data: Data, target_index, ag_c_mrj: np.ndarray):
-    print('Getting agricultural management options\' cost effects...', flush = True)
     output = ag_cost.get_agricultural_management_cost_matrices(data, ag_c_mrj, target_index)
     return output
 
@@ -320,13 +331,11 @@ def get_ag_man_q_mrj(data: Data, target_index, ag_q_mrp):
 
 
 def get_ag_man_r_mrj(data: Data, target_index, ag_r_mrj):
-    print('Getting agricultural management options\' revenue effects...', flush = True)
     output = ag_revenue.get_agricultural_management_revenue_matrices(data, ag_r_mrj, target_index)
     return output
 
 
 def get_ag_man_t_mrj(data: Data, target_index, ag_t_mrj):
-    print('Getting agricultural management options\' transition cost effects...', flush = True)
     output = ag_transition.get_agricultural_management_transition_matrices(data, ag_t_mrj, target_index)
     return output
 
@@ -349,16 +358,13 @@ def get_ag_man_limits(data: Data, target_index):
     return output
 
 
-def get_economic_contribution(data: Data, base_year: int, target_year: int) -> dict[str, np.ndarray|dict[str, np.ndarray]]:
-    
-    print('Getting base year economic value...', flush = True)
-    base_index = base_year - data.YR_CAL_BASE
+def get_economic_mrj(data: Data, base_year: int, target_year: int) -> dict[str, np.ndarray|dict[str, np.ndarray]]:
+    print('Getting base year economic matrix...', flush = True)
     target_index = target_year - data.YR_CAL_BASE
     
     if settings.OBJECTIVE == "maxprofit":
         # Pre-calculate profit (revenue minus cost) for each land use
-        ag_obj_mrj = (
-            get_ag_r_mrj(data, target_index)
+        ag_obj_mrj = (get_ag_r_mrj(data, target_index)
             - (
                 get_ag_c_mrj(data, target_index)
                 + get_ag_t_mrj(data, target_index, base_year)
@@ -410,13 +416,79 @@ def get_economic_contribution(data: Data, base_year: int, target_year: int) -> d
         }
 
     else:
-        print("Unknown objective")
+        raise ValueError("Unknown objective!")
 
     ag_obj_mrj = np.nan_to_num(ag_obj_mrj)
     non_ag_obj_rk = np.nan_to_num(non_ag_obj_rk)
     ag_man_objs = {am: np.nan_to_num(arr) for am, arr in ag_man_objs.items()}
 
     return [ag_obj_mrj, non_ag_obj_rk,  ag_man_objs]
+
+
+def get_base_yr_economic_value(data: Data, base_year: int) -> float:
+    print('Getting base year economic value...', flush = True)
+    
+    am2j = {
+        am: [data.DESC2AGLU[lu] for lu in am_lus]
+        for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items()
+        if AG_MANAGEMENTS[am]
+    }
+    
+    # Get the economic mrj matrix of the base year, note that the target year is the same as the base year
+    ag_obj_mrj, non_ag_obj_rk, ag_man_objs = get_economic_mrj(data, base_year, base_year)
+    
+    # Get the decision variables for the base year
+    dvar_ag_mrj = data.ag_dvars[base_year]
+    dvar_non_ag_rk = data.non_ag_dvars[base_year]   
+    dvar_am_obj = data.ag_man_dvars[base_year]   
+
+    # Calculate the economic value of the base year
+    economy_val_ag = (ag_obj_mrj * dvar_ag_mrj).sum()
+    economy_val_non_ag = (non_ag_obj_rk * dvar_non_ag_rk).sum()
+    economy_val_am = sum((ag_man_objs[am] * dvar_am_obj[am][:,:,j]).sum() for am,j in am2j.items())
+    
+    return economy_val_ag + economy_val_non_ag + economy_val_am
+
+
+def get_target_yr_commodity_profit(data: Data, target_year: int) -> np.ndarray:
+    print('Getting target year commodity prices...', flush = True)
+    target_index = target_year - data.YR_CAL_BASE
+    cost_mrj = get_ag_c_mrj(data, target_index)
+    cost_median = np.nanpercentile(cost_mrj[cost_mrj > 0], 0.5)
+    
+    if settings.OBJECTIVE == "mincost":
+        return cost_median
+    else:
+        revenue_mrj = get_ag_r_mrj(data, target_index)
+        revenue_median = np.nanpercentile(revenue_mrj[revenue_mrj > 0], 0.5)
+        return revenue_median - cost_median
+    
+    
+def get_target_yr_carbon_price(data: Data, target_year: int) -> float:
+    return data.CARBON_PRICES[target_year]
+
+
+def get_commodity_prices(data: Data, target_year: int) -> np.ndarray:
+    commodity_lookup = {
+        ('P1','BEEF'): 'beef meat',
+        ('P3','BEEF'): 'beef lexp',
+        ('P1','SHEEP'): 'sheep meat',
+        ('P2','SHEEP'): 'sheep wool',
+        ('P3','SHEEP'): 'sheep lexp',
+        ('P1','DAIRY'): 'dairy',
+    }
+
+    commodity_prices = {}
+
+    for names, commodity in commodity_lookup.items():
+        commodity_prices[commodity] = np.nanpercentile(data.AGEC_LVSTK[*names], 0.5)
+        
+    for name, col in data.AGEC_CROPS['P1','irr'].items():
+        commodity_prices[name.lower()] = np.nanpercentile(col, 0.5)
+        
+    commodity_prices = {k:commodity_prices[k] for k in data.COMMODITIES}
+    
+    return commodity_prices
 
 
 def get_limits(
@@ -492,7 +564,12 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
         water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Use the water net yield outside LUTO study area for the YR_CAL_BASE year
         water_yield_RR_BASE_YR=get_w_RR_BASE_YR(data),                                  # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
-        base_yr_economic_contr=get_economic_contribution(data, base_year, target_year),
+        
+        economic_contr_mrj=get_economic_mrj(data, base_year, target_year),
+        economic_base_yr_val=get_base_yr_economic_value(data, base_year, target_year),
+        economic_target_yr_commodity_profit=get_target_yr_commodity_profit(data, target_year),
+        economic_target_yr_carbon_price=get_target_yr_carbon_price(data, target_year), 
+        
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,
