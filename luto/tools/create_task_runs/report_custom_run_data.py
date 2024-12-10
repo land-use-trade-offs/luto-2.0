@@ -57,7 +57,7 @@ for _, row in grid_search_params.iterrows():
 
 
 # Pivot the data
-report_data_wide = report_data.pivot(index=['year', 'run_idx', 'SOLVE_WEIGHT_DEVIATIONS'], columns='name', values='val').reset_index()      
+report_data_wide = report_data.pivot(index=['year', 'run_idx', 'SOLVE_ECONOMY_WEIGHT'], columns='name', values='val').reset_index()      
 report_data_wide = report_data_wide.query('year != "2010"')
 
 
@@ -65,7 +65,7 @@ report_data_wide = report_data_wide.query('year != "2010"')
 p = (p9.ggplot(report_data_wide, 
                p9.aes(x='GHG deviation', 
                       y='Profit', 
-                      color='SOLVE_WEIGHT_DEVIATIONS')
+                      color='SOLVE_ECONOMY_WEIGHT')
                ) +
      p9.geom_point() +
      p9.theme_bw() +
