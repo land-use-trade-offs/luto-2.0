@@ -6,8 +6,11 @@ import luto.settings as settings
 
 # Load data 
 if os.path.exists(f"{settings.INPUT_DIR}/Data_RES{settings.RESFACTOR}.pkl"):
+    print(f"Loading data from existing PKL file")
+    print(f"    ...{settings.INPUT_DIR}/Data_RES{settings.RESFACTOR}.pkl")
     data = sim.load_data_from_disk(f"{settings.INPUT_DIR}/Data_RES{settings.RESFACTOR}.pkl")
 else:
+    print(f"Loading data from the raw data files in the input directory")
     data = sim.load_data()
 
 # Run simulation
