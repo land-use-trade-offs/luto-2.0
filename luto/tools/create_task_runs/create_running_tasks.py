@@ -17,7 +17,7 @@ grid_search = {
         # 'snapshot', 
         'timeseries'
     ],
-    'SOLVE_WEIGHT_DEVIATIONS': 
+    'SOLVE_ECONOMY_WEIGHT': 
         np.linspace(0.8, 0.9, 20),
         # [0.84],
     # 'GHG_LIMITS_FIELD': [

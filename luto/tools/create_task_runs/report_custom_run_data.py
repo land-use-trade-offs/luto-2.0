@@ -57,18 +57,8 @@ report_data.query('BIODIV_GBF_TARGET_2_DICT == "{2010: 0, 2030: 0.3, 2050: 0.3, 
 
 
 # Pivot the data
-report_data_wide = report_data.pivot(
-    index=['year', 'run_idx'] + list(grid_paras), 
-    columns='name', 
-    values='val').reset_index()
-      
-report_data_wide = report_data_wide.query('year != 2010')
-
-
-
-
-
-
+report_data_wide = report_data.pivot(index=['year', 'run_idx', 'SOLVE_ECONOMY_WEIGHT'], columns='name', values='val').reset_index()      
+report_data_wide = report_data_wide.query('year != "2010"')
 
 
 # Plot the data
@@ -78,7 +68,7 @@ p9.options.dpi = 150
 p = (p9.ggplot(report_data_wide, 
                p9.aes(x='GHG deviation', 
                       y='Profit', 
-                      color='SOLVE_WEIGHT_DEVIATIONS')
+                      color='SOLVE_ECONOMY_WEIGHT')
                ) +
      p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
      p9.geom_point() +
