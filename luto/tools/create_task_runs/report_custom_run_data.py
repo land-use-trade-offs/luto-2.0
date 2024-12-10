@@ -8,11 +8,10 @@ from luto.tools.create_task_runs.parameters import TASK_ROOT_DIR
 from luto.tools.report.data_tools import get_all_files
 
 
-TASK_ROOT_DIR = "N:/LUF-Modelling/LUTO2_JZ/Custom_runs"
+TASK_ROOT_DIR = "C:/Users/Jinzhu/Desktop/Snapshoot_multiple_scenarios"
+grid_search_params = pd.read_csv(f"{TASK_ROOT_DIR}/grid_search_parameters.csv")
 
-run_dirs = f"{TASK_ROOT_DIR}/20241206_Deviation_Profit_tradeoffs"
-
-grid_search_params = pd.read_csv(f"{run_dirs}/grid_search_parameters.csv")
+grid_paras = set(grid_search_params.columns.tolist()) - set(['run_idx', 'MEM', 'NCPUS', 'MODE'])
 
 
 
@@ -22,10 +21,7 @@ report_data = pd.DataFrame()
 for _, row in grid_search_params.iterrows():
     
     # Get the last run directory
-    run_dir = f"{run_dirs}/Run_{row['run_idx']}/output"
-    data_dir = [d for d in os.listdir(run_dir) if os.path.isdir(os.path.join(run_dir, d))][-1]
-    json_path = f"{run_dir}/{data_dir}/DATA_REPORT/data"
-    
+    json_path = f"{TASK_ROOT_DIR}/Run_{row['run_idx']}/DATA_REPORT/data"
     
     # Get the profit data
     with open(f"{json_path}/economics_0_rev_cost_all_wide.json") as f:
@@ -56,22 +52,39 @@ for _, row in grid_search_params.iterrows():
     ]).reset_index(drop=True)
 
 
+report_data.query('BIODIV_GBF_TARGET_2_DICT == "{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}" and year == 2050 and name == "Profit"')
+
+
+
 # Pivot the data
-report_data_wide = report_data.pivot(index=['year', 'run_idx', 'SOLVE_WEIGHT_DEVIATIONS'], columns='name', values='val').reset_index()      
-report_data_wide = report_data_wide.query('year != "2010"')
+report_data_wide = report_data.pivot(
+    index=['year', 'run_idx'] + list(grid_paras), 
+    columns='name', 
+    values='val').reset_index()
+      
+report_data_wide = report_data_wide.query('year != 2010')
+
+
+
+
+
+
 
 
 # Plot the data
+p9.options.figure_size = (15, 8)
+p9.options.dpi = 150
+
 p = (p9.ggplot(report_data_wide, 
                p9.aes(x='GHG deviation', 
                       y='Profit', 
                       color='SOLVE_WEIGHT_DEVIATIONS')
                ) +
+     p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
      p9.geom_point() +
-     p9.theme_bw() +
-     p9.theme(figure_size=(10, 5))
-    )              
-    
+     p9.theme_bw() 
+    )
+
 
 
 
