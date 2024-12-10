@@ -333,8 +333,8 @@ class LutoSolver:
         
         # Get the objective values for each sector
         self.obj_economy = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr
-        self.obj_demand = self.V *1000  if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
-        self.obj_ghg = self.E *1000     if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
+        self.obj_demand = self.V * 1000  if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
+        self.obj_ghg = self.E * 1000     if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
 
         # Set the objective function
         objective = self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT \
