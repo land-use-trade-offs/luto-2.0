@@ -239,71 +239,8 @@ class LutoSolver:
         """
         print(f"Setting objective function to {settings.OBJECTIVE}...", flush=True)
 
-        if settings.OBJECTIVE == "maxprofit":
-
-            # Pre-calculate revenue minus (production and transition) costs
-            ag_obj_mrj = (
-                -(
-                    self._input_data.ag_r_mrj
-                    - (
-                        self._input_data.ag_c_mrj
-                        + self._input_data.ag_t_mrj
-                        + self._input_data.non_ag_to_ag_t_mrj
-                    ) 
-                )
-            )
-
-            non_ag_obj_rk = (
-                -(
-                    self._input_data.non_ag_r_rk
-                    - (
-                        self._input_data.non_ag_c_rk
-                        + self._input_data.non_ag_t_rk
-                        + self._input_data.ag_to_non_ag_t_rk
-                    ) 
-                )
-            )
-
-            # Get effects of alternative agr. management options (stored in a dict)
-            ag_man_objs = {
-                am: -(
-                    self._input_data.ag_man_r_mrj[am]
-                    - (
-                        self._input_data.ag_man_c_mrj[am]
-                        + self._input_data.ag_man_t_mrj[am]
-                    ) 
-                )
-                for am in self._input_data.am2j
-            }
-
-        elif settings.OBJECTIVE == "mincost":
-            # Pre-calculate sum of production and transition costs
-            ag_obj_mrj = (
-                self._input_data.ag_c_mrj
-                + self._input_data.ag_t_mrj
-                + self._input_data.non_ag_to_ag_t_mrj
-            )
-
-            non_ag_obj_rk = (
-                self._input_data.non_ag_c_rk
-                + self._input_data.non_ag_t_rk
-                + self._input_data.ag_to_non_ag_t_rk
-            )
-
-            # Store calculations for each agricultural management option in a dict
-            ag_man_objs = {
-                am: (
-                    self._input_data.ag_man_c_mrj[am]
-                    + self._input_data.ag_man_t_mrj[am]
-                )      
-                for am in self._input_data.am2j
-            }
-
-        else:
-            print("Unknown objective")
-
-        ag_obj_mrj = np.nan_to_num(ag_obj_mrj)
-        non_ag_obj_rk = np.nan_to_num(non_ag_obj_rk)
+        # Get the objective values matrices for each sector
+        ag_obj_mrj, non_ag_obj_rk, ag_man_objs = self._input_data.economic_contr_mrj
 
         # Production costs + transition costs for all agricultural land uses.
         ag_obj_contr = gp.quicksum(
@@ -332,17 +269,16 @@ class LutoSolver:
         )
         
         # Get the objective values for each sector
-        self.obj_economy = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr
-        self.obj_demand = self.V * 1000  if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
-        self.obj_ghg = self.E * 1000     if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
+        self.obj_economy = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr - self._input_data.economic_base_yr_val
+        self.obj_demand = self.V / abs(self.d_c)                       if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
+        self.obj_ghg = self.E / abs(self._input_data.limits["ghg"])    if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
 
         # Set the objective function
-        objective = self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT \
-                    + (gp.quicksum(self.obj_demand) + self.obj_ghg) * (1 - settings.SOLVE_ECONOMY_WEIGHT)
-                    
-        self.gurobi_model.setObjective(objective, GRB.MINIMIZE)  
+        sense = GRB.MINIMIZE if settings.OBJECTIVE == "mincost" else GRB.MAXIMIZE
+        objective = self.obj_economy * (1 - settings.SOLVE_WEIGHT_DEVIATIONS) - (gp.quicksum(self.obj_demand) + self.obj_ghg) * settings.SOLVE_WEIGHT_DEVIATIONS         
+        self.gurobi_model.setObjective(objective, sense)  
         
-
+        
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
         """
         Constraint that all of every cell is used for some land use.
