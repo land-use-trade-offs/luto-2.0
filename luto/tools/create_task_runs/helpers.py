@@ -94,10 +94,8 @@ def create_grid_search_template(template_df:pd.DataFrame, grid_dict: dict) -> pd
 
 def create_task_runs(custom_settings:pd.DataFrame):
     
-    # Get current working directory and check if the custom settings are available
+    # Get current working directory
     cwd = os.getcwd()
-    if not custom_cols:
-        raise ValueError('No custom settings found in the settings_template.csv file!')
     
     # Read the custom settings file
     custom_settings = custom_settings.dropna(how='all', axis=1)
@@ -107,6 +105,10 @@ def create_task_runs(custom_settings:pd.DataFrame):
     custom_settings.columns = [re.sub(r'\W+', '_', col.strip()) for col in custom_settings.columns]
     custom_settings = custom_settings.replace({'TRUE': 'True', 'FALSE': 'False'})
     custom_cols = [col for col in custom_settings.columns if col not in ['Default_run']]
+    
+    # Check if there are any custom settings
+    if not custom_cols:
+        raise ValueError('No custom settings found in the settings_template.csv file!')
 
     def process_col(col):
         # Read the non-string values from the file
@@ -122,8 +124,9 @@ def create_task_runs(custom_settings:pd.DataFrame):
         write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
         submit_task(cwd, col)
         
-    # Submit the tasks in parallel
-    Parallel(n_jobs=settings.WRITE_THREADS)(delayed(process_col)(col) for col in custom_cols)
+    # Submit the tasks in parallel; Using 4 threads is a safe number because 
+    # we are submitting jobs in the login node, which has limited resources
+    Parallel(n_jobs=4)(delayed(process_col)(col) for col in custom_cols)
 
 
 def copy_folder_custom(source, destination, ignore_dirs=None):

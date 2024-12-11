@@ -2,16 +2,11 @@ import numpy as np
 from luto.tools.create_task_runs.helpers import create_grid_search_template, create_task_runs, create_settings_template
 
 
-
-# Define the grid search
-''' Each value in the grid search has to be list iterable.'''
-
 grid_search = {
     # Computational settings, which are not relevant to LUTO itself
     'MEM': ['40GB'],
     'NCPUS':[10],
     'TIME': ['0:30:00'],
-
     # LUTO settings to be grid searched
     'MODE': [
         'snapshot', 
@@ -19,8 +14,8 @@ grid_search = {
     ],
     'SOLVE_ECONOMY_WEIGHT': [
         10**(-i) * (1 - j/10) 
-        for i in range(5, 9)  # The range of the exponent: 1, 0.1, 0.01, ...
-        for j in range(10)    # The range of the decimal: 1, 0.9, 0.8, ...
+        for i in range(3, 6)  # The range of the exponent: 1, 0.1, 0.01, ...
+        for j in range(20)    # The range of the decimal: 1, 0.9, 0.8, ...
     ],
     'GHG_LIMITS_FIELD': [
         '1.5C (67%) excl. avoided emis', 
@@ -40,3 +35,5 @@ grid_search_df = create_grid_search_template(template_df, grid_search)
 
 # Create the task runs
 create_task_runs(grid_search_df)
+
+
