@@ -219,5 +219,5 @@ def submit_task(cwd:str, col:str):
     if os.name == 'posix':
         os.chdir(f'{TASK_ROOT_DIR}/{col}')
         os.system('bash task_cmd.sh')
-        os.chdir(cwd)    
+        os.chdir(cwd)
     

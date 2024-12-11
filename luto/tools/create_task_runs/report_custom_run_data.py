@@ -1,15 +1,13 @@
 import os
 import json
-import numpy as np
 import pandas as pd
 import plotnine as p9
 
 from luto.tools.create_task_runs.parameters import TASK_ROOT_DIR
-from luto.tools.report.data_tools import get_all_files
 
 
 # Get the grid search parameters
-TASK_ROOT_DIR = "C:/Users/Jinzhu/Desktop/Snapshoot_mult_scenarios"
+TASK_ROOT_DIR = "C:/Users/Jinzhu/Desktop/Snapshoot_mult_scenarios_10_15"
 grid_search_params = pd.read_csv(f"{TASK_ROOT_DIR}/grid_search_parameters.csv")
 grid_paras = set(grid_search_params.columns.tolist()) - set(['MEM', 'NCPUS', 'MODE'])
 
@@ -49,6 +47,7 @@ for dir in run_dirs:
         df_demand = pd.json_normalize(json.load(f_luto), 'data', ['name']).rename(columns={0: 'year', 1: 'val'})
         df_luto = pd.json_normalize(json.load(f_demand), 'data', ['name']).rename(columns={0: 'year', 1: 'val'})
         df_delta = df_demand.merge(df_luto, on=['year', 'name'], suffixes=('_luto', '_demand'))
+        df_delta['deviation_t'] = df_delta.eval('val_luto - val_demand')
         df_delta['deviation_%'] = df_delta.eval('(val_luto - val_demand ) / val_demand * 100')
     
     # Combine the data
@@ -72,6 +71,12 @@ report_data_wide = report_data\
     .reset_index() \
     .query('year != 2010')
 
+report_data_demand_filtered = report_data_demand \
+    .query('year != 2010') 
+
+
+
+
 
 # Plot the data
 p9.options.figure_size = (15, 8)
@@ -93,7 +98,8 @@ p = (p9.ggplot(report_data_wide,
                ) +
      p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
      p9.geom_point() +
-     p9.theme_bw() 
+     p9.theme_bw() +
+     p9.ylab('Profit (billion AUD)') 
     )
 
 
@@ -103,18 +109,21 @@ p = (p9.ggplot(report_data_wide,
                ) +
      p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
      p9.geom_point() +
-     p9.theme_bw() 
+     p9.theme_bw() +
+     p9.ylab('GHG deviation (Mt)')
     )
 
 
-p = (p9.ggplot(report_data_demand, 
+p = (p9.ggplot(report_data_demand_filtered, 
             p9.aes(x='SOLVE_ECONOMY_WEIGHT', 
-                    y='deviation_%',
+                    y='deviation_t',
                     fill='name')
             ) +
     p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
     p9.geom_col() +
     p9.theme_bw() +
-    p9.guides(fill=p9.guide_legend(ncol=1))
+    p9.guides(fill=p9.guide_legend(ncol=1)) +
+    p9.ylab('Demand deviation (Mt)')
     )
+
 
