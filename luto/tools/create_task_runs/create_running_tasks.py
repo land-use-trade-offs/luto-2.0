@@ -8,27 +8,26 @@ from luto.tools.create_task_runs.helpers import create_grid_search_template, cre
 
 grid_search = {
     # Computational settings, which are not relevant to LUTO itself
-    'MEM': ['80GB'],
-    'NCPUS':[20],
-    'TIME': ['8:00:00'],
+    'MEM': ['40GB'],
+    'NCPUS':[10],
+    'TIME': ['1:00:00'],
 
-    
+    # LUTO settings to be grid searched
     'MODE': [
-        # 'snapshot', 
-        'timeseries'
+        'snapshot', 
+        # 'timeseries'
     ],
     'SOLVE_ECONOMY_WEIGHT': 
-        np.linspace(0.8, 0.9, 20),
-        # [0.84],
-    # 'GHG_LIMITS_FIELD': [
-    #     '1.5C (67%) excl. avoided emis', 
-    #     '1.5C (50%) excl. avoided emis', 
-    #     '1.8C (67%) excl. avoided emis'
-    # ],
-    # 'BIODIV_GBF_TARGET_2_DICT': [
-    #     {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3 }, 
-    #     {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5 }
-    # ]
+        np.linspace(0.1, 0.15, 20),
+    'GHG_LIMITS_FIELD': [
+        '1.5C (67%) excl. avoided emis', 
+        '1.5C (50%) excl. avoided emis', 
+        '1.8C (67%) excl. avoided emis'
+    ],
+    'BIODIV_GBF_TARGET_2_DICT': [
+        {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3 }, 
+        {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5 }
+    ]
 }
 
 

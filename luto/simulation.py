@@ -209,7 +209,7 @@ def load_data_from_disk(path: str) -> Data:
         raise ValueError(f'Resolution factor from data loading ({int(data.RESMULT ** 0.5)}) does not match it of settings ({settings.RESFACTOR})!')
 
     # Update the timestamp
-    data.timestamp_sim = timestamp
+    data.timestamp_sim = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
     
     return data
     

@@ -16,6 +16,7 @@
 
 
 
+from collections import defaultdict
 import os
 import math
 import h5py
@@ -371,6 +372,14 @@ class Data:
                     ... # Do nothing, this should be a crop.
 
         self.PR2CM = dict2matrix(self.CM2PR_DICT, self.COMMODITIES, self.PRODUCTS).T # Note the transpose.
+        
+        
+        # Get the land-use indices for each commodity.
+        self.CM2LU_IDX = defaultdict(list)
+        for c in self.COMMODITIES:
+            for lu in self.AGRICULTURAL_LANDUSES:
+                if lu.split(' -')[0].lower() in c:
+                    self.CM2LU_IDX[c].append(self.AGRICULTURAL_LANDUSES.index(lu))
 
 
 
