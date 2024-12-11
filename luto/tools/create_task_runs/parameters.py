@@ -1,4 +1,4 @@
-TASK_ROOT_DIR = '../Custom_runs'
+TASK_ROOT_DIR = '../Snapshoot_mult_scenarios_real_price'
 
 EXCLUDE_DIRS = [
     'input', 

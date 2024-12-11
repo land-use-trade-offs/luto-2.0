@@ -9,7 +9,6 @@ from luto.tools.report.data_tools import get_all_files
 
 
 # Get the grid search parameters
-TASK_ROOT_DIR = "C:/Users/Jinzhu/Desktop/Snapshoot_mult_scenarios"
 grid_search_params = pd.read_csv(f"{TASK_ROOT_DIR}/grid_search_parameters.csv")
 grid_paras = set(grid_search_params.columns.tolist()) - set(['MEM', 'NCPUS', 'MODE'])
 
@@ -26,8 +25,12 @@ for dir in run_dirs:
     # Get the last run directory
     run_idx = int(dir.split('_')[-1])
     run_paras = grid_search_params.query(f'run_idx == {run_idx}').to_dict(orient='records')[0]
-    
     json_path = f"{TASK_ROOT_DIR}/{dir}/DATA_REPORT/data"
+    
+    # Continue if the json path does not exist
+    if not os.path.exists(json_path):
+        print(f"Path does not exist: {json_path}")
+        continue
     
     # Get the profit data
     with open(f"{json_path}/economics_0_rev_cost_all_wide.json") as f:
@@ -49,8 +52,9 @@ for dir in run_dirs:
         df_demand = pd.json_normalize(json.load(f_luto), 'data', ['name']).rename(columns={0: 'year', 1: 'val'})
         df_luto = pd.json_normalize(json.load(f_demand), 'data', ['name']).rename(columns={0: 'year', 1: 'val'})
         df_delta = df_demand.merge(df_luto, on=['year', 'name'], suffixes=('_luto', '_demand'))
+        df_delta['deviation_t'] = df_delta.eval('val_luto - val_demand')
         df_delta['deviation_%'] = df_delta.eval('(val_luto - val_demand ) / val_demand * 100')
-    
+        
     # Combine the data
     report_data = pd.concat([
         report_data,
@@ -70,7 +74,7 @@ for dir in run_dirs:
 report_data_wide = report_data\
     .pivot(index=['year'] + list(grid_paras), columns='name', values='val')\
     .reset_index() \
-    .query('year != 2010')
+    .query('year != 2010 and Profit > 0')
 
 
 # Plot the data
