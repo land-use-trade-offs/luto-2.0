@@ -93,7 +93,12 @@ def create_grid_search_template(template_df:pd.DataFrame, grid_dict: dict) -> pd
 
 
 def create_task_runs(custom_settings:pd.DataFrame):
-     
+    
+    # Get current working directory and check if the custom settings are available
+    cwd = os.getcwd()
+    if not custom_cols:
+        raise ValueError('No custom settings found in the settings_template.csv file!')
+    
     # Read the custom settings file
     custom_settings = custom_settings.dropna(how='all', axis=1)
     custom_settings = custom_settings.set_index('Name')
@@ -103,23 +108,22 @@ def create_task_runs(custom_settings:pd.DataFrame):
     custom_settings = custom_settings.replace({'TRUE': 'True', 'FALSE': 'False'})
     custom_cols = [col for col in custom_settings.columns if col not in ['Default_run']]
 
-    if not custom_cols:
-        raise ValueError('No custom settings found in the settings_template.csv file!')
-
-    cwd = os.getcwd()
-    for col in custom_cols:
-        # Evaluate the parameters that need to be evaluated
-        with open(f'{TASK_ROOT_DIR}/non_str_val.txt', 'r') as file: eval_vars = file.read().splitlines()
+    def process_col(col):
+        # Read the non-string values from the file
+        with open(f'{TASK_ROOT_DIR}/non_str_val.txt', 'r') as file:
+            eval_vars = file.read().splitlines()
+        # Evaluate the non-string values to their original types
         custom_settings.loc[eval_vars, col] = custom_settings.loc[eval_vars, col].map(eval)
-        # Get the settings for the run
-        custom_dict = update_settings(custom_settings[col].to_dict(), col)    
-        # Create a folder for each run
-        create_run_folders(col)    
-        # Write the custom settings to the task folder
-        write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)  
-        # Submit the task if the os is linux
+        # Update the settings dictionary
+        custom_dict = update_settings(custom_settings[col].to_dict(), col)
+        
+        # Submit the task
+        create_run_folders(col)
+        write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
         submit_task(cwd, col)
         
+    # Submit the tasks in parallel
+    Parallel(n_jobs=settings.WRITE_THREADS)(delayed(process_col)(col) for col in custom_cols)
 
 
 def copy_folder_custom(source, destination, ignore_dirs=None):
@@ -224,4 +228,4 @@ def submit_task(cwd:str, col:str):
         os.chdir(f'{TASK_ROOT_DIR}/{col}')
         os.system('bash task_cmd.sh')
         os.chdir(cwd)
-    
+

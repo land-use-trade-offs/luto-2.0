@@ -17,8 +17,11 @@ grid_search = {
         'snapshot', 
         # 'timeseries'
     ],
-    'SOLVE_ECONOMY_WEIGHT': 
-        np.linspace(1e-6, 0.1, 100),
+    'SOLVE_ECONOMY_WEIGHT': [
+        10**(-i) * (1 - j/10) 
+        for i in range(5, 9)  # The range of the exponent: 1, 0.1, 0.01, ...
+        for j in range(10)    # The range of the decimal: 1, 0.9, 0.8, ...
+    ],
     'GHG_LIMITS_FIELD': [
         '1.5C (67%) excl. avoided emis', 
         # '1.5C (50%) excl. avoided emis', 

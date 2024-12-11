@@ -15,8 +15,6 @@
 # LUTO 2.0. If not, see <https://www.gnu.org/licenses/>.
 
 
-
-from collections import defaultdict
 import os
 import math
 import h5py
@@ -31,6 +29,7 @@ import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 
 from itertools import product
+from collections import defaultdict
 from joblib import Parallel, delayed
 
 from dataclasses import dataclass

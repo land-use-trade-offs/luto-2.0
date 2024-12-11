@@ -5,7 +5,6 @@ import plotnine as p9
 
 from luto.tools.create_task_runs.parameters import TASK_ROOT_DIR
 
-
 # Get the grid search parameters
 grid_search_params = pd.read_csv(f"{TASK_ROOT_DIR}/grid_search_parameters.csv")
 grid_paras = set(grid_search_params.columns.tolist()) - set(['MEM', 'NCPUS', 'MODE'])
@@ -33,16 +32,16 @@ for dir in run_dirs:
     # Get the profit data
     with open(f"{json_path}/economics_0_rev_cost_all_wide.json") as f:
         df = pd.json_normalize(json.load(f) , 'data', ['name']).rename(columns={0: 'year', 1: 'val'})
-    df_profit = df.query('name == "Profit"')
+        df_profit = df.query('name == "Profit"')
     
     # Get the GHG deviation 
     with open(f"{json_path}/GHG_2_individual_emission_Mt.json") as f:
         df = pd.json_normalize(json.load(f), 'data', ['name']).rename(columns={0: 'year', 1: 'val'})   
-    df_target = df.query('name == "GHG emissions limit"')
-    df_actual = df.query('name == "Net emissions"')
-    df_deviation = df_target.merge(df_actual, on='year', suffixes=('_target', '_actual'))
-    df_deviation['name'] = 'GHG deviation'
-    df_deviation['val'] = df_deviation['val_actual'] - df_deviation['val_target']
+        df_target = df.query('name == "GHG emissions limit"')
+        df_actual = df.query('name == "Net emissions"')
+        df_deviation = df_target.merge(df_actual, on='year', suffixes=('_target', '_actual'))
+        df_deviation['name'] = 'GHG deviation'
+        df_deviation['val'] = df_deviation['val_actual'] - df_deviation['val_target']
     
     # Get the demand data
     with open(f"{json_path}/production_5_5_demand_Production_commodity.json") as f_demand, \
@@ -50,7 +49,6 @@ for dir in run_dirs:
         df_demand = pd.json_normalize(json.load(f_luto), 'data', ['name']).rename(columns={0: 'year', 1: 'val'})
         df_luto = pd.json_normalize(json.load(f_demand), 'data', ['name']).rename(columns={0: 'year', 1: 'val'})
         df_delta = df_demand.merge(df_luto, on=['year', 'name'], suffixes=('_luto', '_demand'))
-        df_delta['deviation_t'] = df_delta.eval('val_luto - val_demand')
         df_delta['deviation_t'] = df_delta.eval('val_luto - val_demand')
         df_delta['deviation_%'] = df_delta.eval('(val_luto - val_demand ) / val_demand * 100')
         
@@ -73,7 +71,8 @@ for dir in run_dirs:
 report_data_wide = report_data\
     .pivot(index=['year'] + list(grid_paras), columns='name', values='val')\
     .reset_index() \
-    .query('year != 2010 and Profit > 0')
+    .query('year != 2010')
+
 
 
 # Plot the data
@@ -112,7 +111,7 @@ p = (p9.ggplot(report_data_wide,
     )
 
 
-p = (p9.ggplot(report_data_demand_filtered, 
+p = (p9.ggplot(report_data_demand, 
             p9.aes(x='SOLVE_ECONOMY_WEIGHT', 
                     y='deviation_t',
                     fill='name')
@@ -120,8 +119,7 @@ p = (p9.ggplot(report_data_demand_filtered,
     p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
     p9.geom_col() +
     p9.theme_bw() +
-    p9.guides(fill=p9.guide_legend(ncol=1)) +
-    p9.ylab('Demand deviation (Mt)')
+    p9.guides(fill=p9.guide_legend(ncol=1))
     )
 
 
