@@ -10,7 +10,7 @@ grid_search = {
     # Computational settings, which are not relevant to LUTO itself
     'MEM': ['40GB'],
     'NCPUS':[10],
-    'TIME': ['1:00:00'],
+    'TIME': ['0:30:00'],
 
     # LUTO settings to be grid searched
     'MODE': [
@@ -18,15 +18,15 @@ grid_search = {
         # 'timeseries'
     ],
     'SOLVE_ECONOMY_WEIGHT': 
-        np.linspace(0.1, 0.15, 20),
+        np.linspace(1e-6, 0.1, 100),
     'GHG_LIMITS_FIELD': [
         '1.5C (67%) excl. avoided emis', 
-        '1.5C (50%) excl. avoided emis', 
-        '1.8C (67%) excl. avoided emis'
+        # '1.5C (50%) excl. avoided emis', 
+        # '1.8C (67%) excl. avoided emis'
     ],
     'BIODIV_GBF_TARGET_2_DICT': [
         {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3 }, 
-        {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5 }
+        # {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5 }
     ]
 }
 

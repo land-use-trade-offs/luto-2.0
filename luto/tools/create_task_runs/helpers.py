@@ -181,9 +181,13 @@ def update_settings(settings_dict:dict, col:str):
         MEM = "150G" 
     elif int(settings_dict['RESFACTOR']) <= 5:
         MEM = "100G"
-    else:
+    elif int(settings_dict['RESFACTOR']) <= 10:
         MEM = "80G"
-        
+    else:
+        MEM = "40G"
+    
+    # Set the carbon prices field based on the GHG limits field
+    settings_dict['CARBON_PRICES_FIELD'] = settings_dict['GHG_LIMITS_FIELD'][:9].replace('(','') 
    
     # Update the settings dictionary
     settings_dict['JOB_NAME'] = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
