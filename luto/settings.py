@@ -327,7 +327,7 @@ GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in th
 
 # Weight for the GHG/Demand deviation in the objective function
 ''' Range from 0 to 1, where 0 is fully minimising GHG and demand deviation, and 1 is only maximising profit. '''
-SOLVE_ECONOMY_WEIGHT = 1e-6  
+SOLVE_ECONOMY_WEIGHT = 1e-4  
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.

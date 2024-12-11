@@ -71,17 +71,22 @@ for dir in run_dirs:
 
 
 # Plot the data
-p9.options.figure_size = (15, 8)
-p9.options.dpi = 150
-
 report_data_wide = report_data\
     .pivot(index=['year'] + list(grid_paras), columns='name', values='val')\
     .reset_index()\
-    .query('year != 2010')
+    .query('year != 2010 and SOLVE_ECONOMY_WEIGHT > 0')
+
+report_data_demand_filterd = report_data_demand \
+    .query('year != 2010 and SOLVE_ECONOMY_WEIGHT > 0')
+    
+    
+    
+p9.options.figure_size = (15, 8)
+p9.options.dpi = 150
 
 
 p_ghg_vs_profit = (
-    p9.ggplot(report_data_wide, p9.aes(x='GHG deviation', y='Profit', color='SOLVE_ECONOMY_WEIGHT')) +
+    p9.ggplot(report_data_wide, p9.aes(x='GHG deviation', y='Profit')) +
     p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
     p9.geom_point() +
     p9.theme_bw()
@@ -92,7 +97,7 @@ p_weight_vs_profit = (
     p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
     p9.geom_point() +
     p9.theme_bw() +
-    p9.scale_x_log10() +
+    # p9.scale_x_log10() +
     p9.ylab('Profit (billion AUD)')
     )
 
@@ -106,7 +111,7 @@ p_weight_vs_ghg = (
     )
 
 p_weigth_vs_demand = (
-    p9.ggplot(report_data_demand, p9.aes(x='SOLVE_ECONOMY_WEIGHT', y='deviation_%', fill='name')) +
+    p9.ggplot(report_data_demand_filterd, p9.aes(x='SOLVE_ECONOMY_WEIGHT', y='deviation_%', fill='name')) +
     p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
     p9.geom_col() +
     p9.theme_bw() +
