@@ -59,10 +59,10 @@ class SolverInputData:
     water_yield_RR_BASE_YR: dict                                        # Water yield for the BASE_YR based on historical water yield layers .
     water_yield_outside_study_area: dict[int, float]                    # Water yield from outside LUTO study area -> dict. Keys: year, region.
     
-    economic_contr_mrj: float                   # base year economic contribution matrix.
-    economic_base_sum: float                 # base year total profit (revnue - cost) or cost.
-    economic_target_yr_commodity_val: float  # target year commodity profit.
-    economic_target_yr_carbon_price: float      # target year carbon price.
+    economic_contr_mrj: float               # base year economic contribution matrix.
+    economic_base_sum: float                # base year total profit (revnue - cost) or cost.
+    economic_BASE_YR_prices: np.ndarray     # target year commodity profit.
+    economic_target_yr_carbon_price: float  # target year carbon price.
 
     offland_ghg: np.ndarray         # GHG emissions from off-land commodities.
 
@@ -451,32 +451,34 @@ def get_base_yr_economy_sum(data: Data, base_year: int) -> float:
     return economy_val_ag + economy_val_non_ag + economy_val_am
 
 
-def get_target_yr_economy_each_commodity(data: Data, base_year:int, target_year:int) -> np.ndarray:
-    print('Getting profit/cost for each commodity...', flush = True)
+def get_commodity_prices(data: Data) -> np.ndarray:
+    '''
+    Get the prices of commodities in the base year. These prices will be used as multiplier
+    to weight deviatios of commodity production from the target.
+    '''
     
-    target_index = target_year - data.YR_CAL_BASE
-    
-    dvar = data.ag_dvars[base_year]
-    c_mrj = get_ag_c_mrj(data, target_index)
-    r_mrj = get_ag_r_mrj(data, target_index)
-    c_ha_mrj = c_mrj / data.REAL_AREA[:,None]
-    r_ha_mrj = r_mrj / data.REAL_AREA[:,None]
+    commodity_lookup = {
+        ('P1','BEEF'): 'beef meat',
+        ('P3','BEEF'): 'beef lexp',
+        ('P1','SHEEP'): 'sheep meat',
+        ('P2','SHEEP'): 'sheep wool',
+        ('P3','SHEEP'): 'sheep lexp',
+        ('P1','DAIRY'): 'dairy',
+    }
 
-    commodity_vals = []
-    for _,lu_idx in data.CM2LU_IDX.items():
-        # Get the cells where the commodity is produced
-        commodity_cells = dvar[:,:,lu_idx] > 0  
-        # Get the cost and price of the commodity 
-        commodity_cost = c_ha_mrj[:,:,lu_idx] 
-        commodity_price = r_ha_mrj[:,:,lu_idx]
-        # Calculate the median of the cost and price on the cells where the commodity is produced
-        cost_median = np.nanpercentile(commodity_cost[commodity_cells], 50)
-        price_median = np.nanpercentile(commodity_price[commodity_cells], 50)
-        # Append the median profit or cost to the dictionary based on the objective
-        median_val = price_median - cost_median if settings.OBJECTIVE == 'maxprofit' else cost_median
-        commodity_vals.append(median_val)
+    commodity_prices = {}
 
-    return np.array(commodity_vals, dtype=np.float32)
+    # Get the median price of each commodity
+    for names, commodity in commodity_lookup.items():
+        prices = np.nanpercentile(data.AGEC_LVSTK[*names], 50)
+        prices = prices * 1000 if commodity == 'dairy' else prices # convert to per tonne for dairy
+        commodity_prices[commodity] = prices
+
+    # Get the median price of each crop; here need to use 'irr' because dry-Rice does exist in the data
+    for name, col in data.AGEC_CROPS['P1','irr'].items():
+        commodity_prices[name.lower()] = np.nanpercentile(col, 50)
+
+    return np.array([commodity_prices[k] for k in data.COMMODITIES])
     
     
 def get_target_yr_carbon_price(data: Data, target_year: int) -> float:
@@ -559,7 +561,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         
         economic_contr_mrj=get_economic_mrj(data, base_year, target_year),
         economic_base_sum=get_base_yr_economy_sum(data, base_year),
-        economic_target_yr_commodity_val=get_target_yr_economy_each_commodity(data, base_year, target_year),
+        economic_BASE_YR_prices=get_commodity_prices(data),
         economic_target_yr_carbon_price=get_target_yr_carbon_price(data, target_year), 
         
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],

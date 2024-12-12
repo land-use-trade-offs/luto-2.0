@@ -72,9 +72,9 @@ def get_cost_crop(data: Data, lu, lm, yr_idx):
                 f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
             
         # Quantity costs (calculated as cost per tonne x tonne per cell x resfactor)
-        costs_q = ( data.AGEC_CROPS['QC', lm, lu]
-                  * qc_multiplier
-                  * get_quantity(data, lu.upper(), lm, yr_idx) )  # lu.upper() only for crops as needs to be in product format in get_quantity().  
+        costs_q = ( data.AGEC_CROPS['QC', lm, lu] 
+                    * qc_multiplier
+                    * get_quantity(data, lu.upper(), lm, yr_idx))  # lu.upper() only for crops as needs to be in product format in get_quantity().  
 
         # Area costs.
         ac_multiplier = 1
@@ -112,8 +112,8 @@ def get_cost_crop(data: Data, lu, lm, yr_idx):
                 f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
             
         costs_f = ( data.AGEC_CROPS['FLC', lm, lu] * flc_multiplier    # Fixed labour costs.
-                  + data.AGEC_CROPS['FOC', lm, lu] * foc_multiplier    # Fixed operating costs.
-                  + data.AGEC_CROPS['FDC', lm, lu] * fdc_multiplier )  # Fixed depreciation costs.
+                    + data.AGEC_CROPS['FOC', lm, lu] * foc_multiplier    # Fixed operating costs.
+                    + data.AGEC_CROPS['FDC', lm, lu] * fdc_multiplier )  # Fixed depreciation costs.
 
         # Water costs as water required in ML per hectare x delivery price per ML.
         if lm == 'irr':
@@ -266,19 +266,14 @@ def get_cost_matrices(data: Data, yr_idx, aggregate=True):
     
     # Concatenate the revenue from each land management into a single Multiindex DataFrame.
     cost_rjms = pd.concat([get_cost_matrix(data, lm, yr_idx) for lm in data.LANDMANS], axis=1)
-
-    # Reorder the columns to match the multi-level dimension of r*jms.
-    cost_rjms = cost_rjms.reindex(columns=pd.MultiIndex.from_product(cost_rjms.columns.levels), fill_value=0)
-
-    if aggregate == True:
-        j,m,s = cost_rjms.columns.levshape
-        c_rjms = cost_rjms.values.reshape(-1,j,m,s)
-        return np.einsum('rjms->mrj', c_rjms)
-    elif aggregate == False:
+    
+    if not aggregate:
         return cost_rjms
 
-    else:
-        raise ValueError("aggregate must be True or False")
+    df_jmr = cost_rjms.T.groupby(level=[0, 1]).sum()
+    arr_jmr = df_jmr.values.reshape(*(list(df_jmr.index.levshape) + [-1]))
+    return np.einsum('jmr->mrj', arr_jmr)
+
 
 
 def get_asparagopsis_effect_c_mrj(data: Data, yr_idx):
