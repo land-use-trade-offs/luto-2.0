@@ -53,7 +53,7 @@ def get_rev_crop( data: Data   # Data object.
             print(f"WARNING: Multiplier for {lu} not found in 'ag_price_multipliers.xlsx'. Defaulting to 1.", flush=True)
             
         # Revenue in $ per cell (includes REAL_AREA via get_quantity)
-        rev_t = ( data.AGEC_CROPS['P1', lm, lu]
+        rev_t = ( data.AGEC_CROPS['P1', lm, lu] 
                 * get_quantity( data, lu.upper(), lm, yr_idx )  # lu.upper() only for crops as needs to be in product format in get_quantity().
                 * rev_multiplier
                 ).values
@@ -197,16 +197,13 @@ def get_rev_matrices(data: Data, yr_idx, aggregate:bool = True):
     # Concatenate the revenue from each land management into a single Multiindex DataFrame.
     rev_rjms = pd.concat([get_rev_matrix(data, lm, yr_idx) for lm in data.LANDMANS], axis=1)
 
-    # Reorder the columns to match the multi-level dimension of r*jms.
-    rev_rjms = rev_rjms.reindex(columns=pd.MultiIndex.from_product(rev_rjms.columns.levels), fill_value=0)
-
     if not aggregate:
         # Concatenate the revenue from each land management into a single Multiindex DataFrame.
         return rev_rjms
     
-    j,m,s = rev_rjms.columns.levshape
-    r_rjms = rev_rjms.values.reshape(-1,j,m,s)
-    return np.einsum('rjms->mrj',r_rjms)
+    df_jmr = rev_rjms.T.groupby(level=[0, 1]).sum()
+    arr_jmr = df_jmr.values.reshape(*(list(df_jmr.index.levshape) + [-1]))
+    return np.einsum('jmr->mrj', arr_jmr)
 
 
 def get_asparagopsis_effect_r_mrj(data: Data, r_mrj, yr_idx):
