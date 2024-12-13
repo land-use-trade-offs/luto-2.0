@@ -20,8 +20,11 @@ Writes model output and statistics to files.
 
 import os, re
 import shutil
+import threading
+import time
 import numpy as np
 import pandas as pd
+import psutil
 import xarray as xr
 import geopandas as gpd
 
@@ -31,6 +34,7 @@ from joblib import Parallel, delayed
 from luto import settings
 from luto import tools
 from luto.data import Data
+from luto.tools.create_task_runs.helpers import log_memory_usage
 from luto.tools.spatializers import create_2d_map, write_gtiff
 from luto.tools.compmap import lumap_crossmap, lmmap_crossmap, crossmap_irrstat, crossmap_amstat
 
@@ -58,12 +62,15 @@ from luto.tools.report.create_html import data2html
 from luto.tools.report.create_static_maps import TIF2MAP
 
 from luto.tools.xarray_tools import calc_bio_hist_sum, calc_bio_score_species, interp_bio_species_to_shards, calc_bio_score_by_yr
-
-
+        
 
 timestamp_write = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
 def write_outputs(data: Data):
+    
+    memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
+    memory_thread.start()
+    
     # Write the model outputs to file
     write_data(data)
     # Move the log files to the output directory
