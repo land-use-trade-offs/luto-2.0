@@ -33,9 +33,9 @@ from datetime import datetime
 from joblib import Parallel, delayed
 
 import luto.settings as settings
+
+from luto.data import Data
 from luto import tools
-from luto.settings import NON_AG_LAND_USES
-from luto.data import Data, get_base_am_vars, lumap2ag_l_mrj, lumap2non_ag_l_mk
 from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
 from luto.tools.create_task_runs.helpers import log_memory_usage
@@ -51,8 +51,8 @@ def load_data() -> Data:
     """
     Load the Data object containing all required data to run a LUTO simulation.
     """
-    memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
-    memory_thread.start()
+    # memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
+    # memory_thread.start()
     
     return Data(timestamp=timestamp)
 
@@ -63,8 +63,8 @@ def run( data: Data, base: int, target: int) -> None:
     Parameters:
         'data' is a Data object, and 'base' and 'target' are the base and target years for the whole simulation.
     """
-    memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
-    memory_thread.start()
+    # memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
+    # memory_thread.start()
     
     # Set Data object's path and create output directories
     data.set_path(base, target)
