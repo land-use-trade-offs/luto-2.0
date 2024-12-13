@@ -192,13 +192,16 @@ def update_settings(settings_dict:dict, col:str):
         MEM = "80G"
     else:
         MEM = "40G"
-    
-    # Set the carbon prices field based on the GHG limits field
-    settings_dict['CARBON_PRICES_FIELD'] = settings_dict['GHG_LIMITS_FIELD'][:9].replace('(','') 
-   
+        
     # Update the settings dictionary
     settings_dict['JOB_NAME'] = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
     settings_dict['MEM'] = settings_dict['MEM'] if settings_dict['MEM'] != 'auto' else MEM
+    
+    # Set the carbon prices field based on the GHG limits field
+    settings_dict['CARBON_PRICES_FIELD'] = settings_dict['GHG_LIMITS_FIELD'][:9].replace('(','') 
+
+    # Update the threads based on the number of cpus
+    settings_dict['THREADS'] = settings_dict['NCPUS']
 
     return settings_dict
 

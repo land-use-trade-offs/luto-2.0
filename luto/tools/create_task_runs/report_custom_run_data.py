@@ -74,26 +74,19 @@ for dir in run_dirs:
 report_data_wide = report_data\
     .pivot(index=['year'] + list(grid_paras), columns='name', values='val')\
     .reset_index()\
-    .query('year != 2010 and SOLVE_ECONOMY_WEIGHT > 0')
+    .query('year != 2010 and SOLVE_ECONOMY_WEIGHT <= 1 and SOLVE_ECONOMY_WEIGHT >= 0')
 
 report_data_demand_filterd = report_data_demand \
-    .query('year != 2010 and SOLVE_ECONOMY_WEIGHT > 0')
-    
+    .query('year != 2010 and SOLVE_ECONOMY_WEIGHT <= 0.3 and SOLVE_ECONOMY_WEIGHT >= 0.2') \
+    .sort_values('deviation_%')
     
     
 p9.options.figure_size = (15, 8)
 p9.options.dpi = 150
 
 
-p_ghg_vs_profit = (
-    p9.ggplot(report_data_wide, p9.aes(x='GHG deviation', y='Profit')) +
-    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
-    p9.geom_point() +
-    p9.theme_bw()
-    )
-
 p_weight_vs_profit = (
-    p9.ggplot(report_data_wide, p9.aes(x='SOLVE_ECONOMY_WEIGHT', y='Profit')) +
+    p9.ggplot(report_data_wide, p9.aes(x='SOLVE_ECONOMY_WEIGHT', y='Profit', color='DIET_DOM')) +
     p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
     p9.geom_point() +
     p9.theme_bw() +
@@ -102,21 +95,38 @@ p_weight_vs_profit = (
     )
 
 p_weight_vs_ghg = (
-    p9.ggplot(report_data_wide, p9.aes(x='SOLVE_ECONOMY_WEIGHT', y='GHG deviation')) +
+    p9.ggplot(report_data_wide, p9.aes(x='SOLVE_ECONOMY_WEIGHT', y='GHG deviation', color='DIET_DOM')) +
     p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
     p9.geom_point() +
     p9.theme_bw() +
-    p9.scale_x_log10() +
+    # p9.scale_x_log10() +
     p9.ylab('GHG deviation (Mt)')
     )
 
-p_weigth_vs_demand = (
-    p9.ggplot(report_data_demand_filterd, p9.aes(x='SOLVE_ECONOMY_WEIGHT', y='deviation_%', fill='name')) +
+
+p_ghg_vs_profit = (
+    p9.ggplot(report_data_wide, p9.aes(x='GHG deviation', y='Profit', color='SOLVE_ECONOMY_WEIGHT')) +
     p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
-    p9.geom_col() +
-    p9.theme_bw() +
-    p9.scale_x_log10() +
-    p9.guides(fill=p9.guide_legend(ncol=1))
+    p9.geom_point() +
+    p9.scale_color_continuous(trans='log10') +
+    p9.theme_bw()
     )
 
 
+p_weigth_vs_demand = (
+    p9.ggplot(report_data_demand_filterd, p9.aes(x='SOLVE_ECONOMY_WEIGHT', y='deviation_%', fill='name', group='DIET_DOM')) +
+    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
+    p9.geom_col(position='dodge') +
+    p9.theme_bw() +
+    p9.scale_x_log10() +
+    p9.guides(fill=p9.guide_legend(ncol=1))
+)
+
+p_weigth_vs_demand = (
+    p9.ggplot(report_data_demand_filterd, p9.aes(x='SOLVE_ECONOMY_WEIGHT', y='deviation_%', fill='DIET_DOM', pattern='name')) +
+    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
+    p9.geom_col(position='dodge') +
+    p9.theme_bw() +
+    p9.scale_x_log10() +
+    p9.guides(fill=p9.guide_legend(ncol=1))
+)
