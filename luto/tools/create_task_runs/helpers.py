@@ -1,7 +1,10 @@
 import os
 import re
+import time
+import datetime
 import itertools
 import shutil
+import psutil
 import pandas as pd
 
 from joblib import delayed, Parallel
@@ -235,3 +238,25 @@ def submit_task(cwd:str, col:str):
         os.system('bash task_cmd.sh')
         os.chdir(cwd)
 
+
+def log_memory_usage(output_dir=settings.OUTPUT_DIR, interval=1):
+    '''
+    Log the memory usage of the current process to a file.
+    git 
+    Parameters:
+        output_dir (str): The directory to save the memory log file.
+        interval (int): The interval in seconds to log the memory usage.
+    '''
+    
+    with open(f'{output_dir}/RES_{settings.RESFACTOR}_{settings.MODE}_mem_log.txt', mode='a') as file:
+        while True:
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            process = psutil.Process(os.getpid())
+            memory_usage = process.memory_info().rss
+            children = process.children(recursive=True)
+            if children:
+                memory_usage += sum(child.memory_info().rss for child in children)
+            memory_usage /= (1024 * 1024 * 1024)
+            file.write(f'{timestamp}\t{memory_usage}\n')
+            file.flush()  # Ensure data is written to the file immediately
+            time.sleep(interval)
