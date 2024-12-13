@@ -16,7 +16,6 @@
 
 
 import os
-import math
 import h5py
 
 import xarray as xr
@@ -38,7 +37,7 @@ from affine import Affine
 from scipy.interpolate import interp1d
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.settings import INPUT_DIR, OUTPUT_DIR
-from luto.tools.spatializers import upsample_and_fill_nodata, upsample_array
+from luto.tools.spatializers import upsample_array
 
 
 
@@ -1262,6 +1261,9 @@ class Data:
         If there are 9 Apple cells in the 5x5 area, then the dvar cell will have a value of 9/25. 
         
         """
+        if settings.RESFACTOR == 1:
+            return lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)
+
         # Create a 2D array of IDs for the LUMAP_2D_RESFACTORED
         lumap_2d_id = np.arange(self.LUMAP_2D_RESFACTORED.size).reshape(self.LUMAP_2D_RESFACTORED.shape)
         lumap_2d_id = upsample_array(self, lumap_2d_id, settings.RESFACTOR)    

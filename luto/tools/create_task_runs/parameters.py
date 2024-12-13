@@ -1,4 +1,4 @@
-TASK_ROOT_DIR = '../Timeseries_mult_scenarios_all_scenarios/'
+TASK_ROOT_DIR = '../Timeseries_all_scenarios/'
 
 EXCLUDE_DIRS = [
     'input', 

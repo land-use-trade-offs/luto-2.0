@@ -1,7 +1,7 @@
 import os
 import re
 import time
-import datetime
+
 import itertools
 import shutil
 import psutil
@@ -10,6 +10,7 @@ import pandas as pd
 from joblib import delayed, Parallel
 from luto import settings
 from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, TASK_ROOT_DIR
+from datetime import datetime
 
 
 def create_settings_template(to_path:str=TASK_ROOT_DIR):
@@ -242,7 +243,6 @@ def submit_task(cwd:str, col:str):
 def log_memory_usage(output_dir=settings.OUTPUT_DIR, interval=1):
     '''
     Log the memory usage of the current process to a file.
-    git 
     Parameters:
         output_dir (str): The directory to save the memory log file.
         interval (int): The interval in seconds to log the memory usage.
