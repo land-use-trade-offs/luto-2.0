@@ -327,7 +327,7 @@ GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in th
 
 # Weight for the GHG/Demand deviation in the objective function
 ''' Range from 0 to 1, where 0 is fully minimising GHG and demand deviation, and 1 is only maximising profit. '''
-SOLVE_ECONOMY_WEIGHT = 1e-4  
+SOLVE_ECONOMY_WEIGHT = 0.25  
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
@@ -337,24 +337,34 @@ WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield lim
 # Regionalisation to enforce water use limits by
 WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
 
-# Water net yield targets: the value represents the proportion of the historical water yields
-# that the net yield must exceed in a given year. Base year (2010) uses base year net yields as targets.
-# Everything past the latest year specified uses the target figure for the latest year.
+"""
+    Water net yield targets: the value represents the proportion of the historical water yields
+    that the net yield must exceed in a given year. Base year (2010) uses base year net yields as targets.
+    Everything past the latest year specified uses the target figure for the latest year.
+    
+    Safe and just Earth system boundaries suggests a water stress of 0.2 (yield of 0.8). This is inclusive of
+    domestic/industrial: https://www.nature.com/articles/s41586-023-06083-8, Approximately 70% of the total water use
+    is used for agricultural purposes. This includes water used for irrigation, livestock, and domestic purposes on farms,
+    with the rest used for domestic/industrial  https://soe.dcceew.gov.au/inland-water/pressures/population
+    Hence, assuming that this proportion is uniform over all catchments and remains constant over time then if water
+    stress is 0.2 then agriculture can use up 70% of this, leaving 30% for domestic/industrial. The water yield target for ag
+    should then be historical net yield * (1 - water stress * agricultural share)
+    
+    Aqueduct water stress levels:
+    Low stress < 10% of the water available is withdrawn annually
+    Low to medium stress 10-20% of the water available is withdrawn annually
+    Medium to high stress 20-40% 10% of the water available is withdrawn annually
+    High stress 40-80% of the water available is withdrawn annually
+    Extremely high stress > 80% of the water available is withdrawn annually
+    
+    https://chinawaterrisk.org/resources/analysis-reviews/aqueduct-global-water-stress-rankings/ 
+"""
 
-# Safe and just Earth system boundaries suggests a water stress of 0.2 (yield of 0.8). This is inclusive of
-# domestic/industrial: https://www.nature.com/articles/s41586-023-06083-8, Approximately 70% of the total water use
-# is used for agricultural purposes. This includes water used for irrigation, livestock, and domestic purposes on farms,
-# with the rest used for domestic/industrial  https://soe.dcceew.gov.au/inland-water/pressures/population
-# Hence, assuming that this proportion is uniform over all catchments and remains constant over time then if water
-# stress is 0.2 then agriculture can use up 70% of this, leaving 30% for domestic/industrial. The water yield target for ag
-# should then be historical net yield * (1 - water stress * agricultural share)
-
-WATER_STRESS = 0.2
-AG_SHARE_OF_WATER_USE = 1.0
-WATER_YIELD_TARGET_AG_SHARE = 1 - WATER_STRESS * AG_SHARE_OF_WATER_USE
+WATER_STRESS = 0.4          # Aqueduct limit catchments not under high stress
+AG_SHARE_OF_WATER_USE = 0.7 # Ag share is 70% across all catchments, could be updated for each specific catchment based on actual data
 
 
-# Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water turned off due to infeasibility issues with water constraint in Pilbara
+# Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water can cause infeasibility issues with water constraint in Pilbara
 LIVESTOCK_DRINKING_WATER = 1
 
 # Consider water license costs (0 [off] or 1 [on]) of land-use transition ***** If on then there is a noticeable water sell-off by irrigators in the MDB when maximising profit
@@ -383,18 +393,17 @@ CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
 # Connectivity score importance
 '''
     !!!!!   ONLY WORKS IF CONNECTIVITY_SOURCE IS NOT 'NONE'   !!!!!
-    The relative importance of the connectivity score in the biodiversity calculation.
+    The relative importance of the connectivity score in the biodiversity calculation. Used to scale the raw biodiversity score.
     I.e., the lower bound of the connectivity score for weighting the raw biodiversity priority score is CONNECTIVITY_LB.
 '''
-connect_importance = 0.3
-CONNECTIVITY_LB = 1 - connect_importance    # Weighting of connectivity score in biodiversity calculation (0 - 1)
+connectivity_importance = 0.3                    # Weighting of connectivity score in biodiversity calculation (0 [not important] - 1 [very important])
+CONNECTIVITY_LB = 1 - connectivity_importance    # Sets the lower bound of the connectivity multiplier for bioidversity
 
 
 
 # Habitat condition data source
 HABITAT_CONDITION = 'HCAS'                  # 'HCAS', 'USER_DEFINED', or 'NONE'
-'''
-    It is used to calculate the biodiversity benifits for aricultural landuses.
+'''Used to calculate the level of degradation of biodiversity under agricultural land uses (i.e., multiplier of the impact of ag on biodiversity).
     - If 'HCAS' is selected, the habitat condition is calculated using the Habitat Condition Assessment System (HCAS)
     - If 'USER_DEFINED' is selected, the habitat condition is calculated using the user defined values in the 'HCAS_USER_DEFINED' dictionary.
 '''
@@ -407,14 +416,15 @@ HABITAT_CONDITION = 'HCAS'                  # 'HCAS', 'USER_DEFINED', or 'NONE'
     Here is the parameter defining the percentile used to represent each land-use's degradation scale to biodiversity. Avaliable percentiles
     is one of [10, 25, 50, 75, 90].
 
-    For example, the 50th percentile for 'Beef - Modified land' is 0.22, meaning this land has 22% biodiversity compared to if it was restored
-    to a perfect natural land.
+    For example, the 50th percentile for 'Beef - Modified land' is 0.22, meaning this land has 22% biodiversity score compared
+    to undisturbed natural land.
 '''
 HCAS_PERCENTILE = 50
 
 # Biodiversity value under default late dry season savanna fire regime
 ''' For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value
-    (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value.'''
+    (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value (i.e., 1.0).
+'''
 LDS_BIODIVERSITY_VALUE = 0.8
 
 
