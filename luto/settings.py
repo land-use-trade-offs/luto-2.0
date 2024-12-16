@@ -64,7 +64,7 @@ WASTE = 1                           # 1 for full waste, 0.5 for half waste
 FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4
-CO2_FERT = 'on'   # or 'off'
+CO2_FERT = 'off'   # or 'off'
 
 # Fire impacts on carbon sequestration
 RISK_OF_REVERSAL = 0.05  # Risk of reversal buffer under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
