@@ -31,8 +31,8 @@ def find_free_port():
 def start_app(
     mem_data_paths:list,
     output_image_paths:list,
-    res:list,
-    mode:list  
+    res_vals:list,
+    mode_vals:list  
 ):
     
     app = Dash(__name__)
@@ -51,7 +51,7 @@ def start_app(
     def update_graph_live(n):
         rows = ceil(len(mem_data_paths) / 2)
         fig = make_subplots(rows=rows, cols=2)
-        for i, (mem_data_path, output_image_path) in enumerate(zip(mem_data_paths, output_image_paths)):
+        for i, (mem_data_path, output_image_path, res, mode) in enumerate(zip(mem_data_paths, output_image_paths, res_vals, mode_vals)):
             data = read_data(mem_data_path)
             row = (i // 2) + 1
             col = (i % 2) + 1
@@ -67,7 +67,7 @@ def start_app(
                 )
                 fig.update_xaxes(title_text='Timestamp', row=row, col=col)
                 fig.update_yaxes(title_text='Memory Usage (GB)', row=row, col=col)
-                fig.update_layout(title=f'Memory Usage  (RES {res} / {mod})')
+                fig.update_layout(title=f'Memory Usage  (RES {res} / {mode})')
                 save_plot(fig, output_image_path)
             else:
                 fig.add_annotation(text=f'No data available for {mem_data_path}', xref='paper', yref='paper', showarrow=False, font=dict(size=20))

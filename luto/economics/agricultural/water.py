@@ -535,7 +535,7 @@ def get_water_net_yield_limit_values(
     for region, name in region_names.items():
         hist_yield = wny_region_hist[region]
         ind = np.flatnonzero(region_id == region).astype(np.int32)
-        limit_hist_level = hist_yield * settings.WATER_YIELD_TARGET_AG_SHARE    # Water yield limit calculated as a proportial of historical level based on planetary boundary theory
+        limit_hist_level = hist_yield * (1 - settings.WATER_STRESS * settings.AG_SHARE_OF_WATER_USE)   # Water yield limit calculated as a proportial of historical level based on planetary boundary theory
         limits_by_region[region] = (name, limit_hist_level, ind)    
 
     # Save the results in data to avoid recalculating
