@@ -44,6 +44,6 @@ template_df = create_settings_template()
 grid_search_df = create_grid_search_template(template_df, grid_search)
 
 # Create the task runs
-create_task_runs(grid_search_df)
+create_task_runs(grid_search_df, python_path='F:/jinzhu/conda_env/luto/python.exe')
 
 

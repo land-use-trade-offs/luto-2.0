@@ -96,7 +96,7 @@ def create_grid_search_template(template_df:pd.DataFrame, grid_dict: dict) -> pd
     return template_grid_search
 
 
-def create_task_runs(custom_settings:pd.DataFrame):
+def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, n_workers:int=4):
     
     # Get current working directory
     cwd = os.getcwd()
@@ -126,11 +126,12 @@ def create_task_runs(custom_settings:pd.DataFrame):
         # Submit the task
         create_run_folders(col)
         write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
-        submit_task(cwd, col)
+        submit_task(cwd, col, python_path)
         
-    # Submit the tasks in parallel; Using 4 threads is a safe number because 
-    # we are submitting jobs in the login node, which has limited resources
-    Parallel(n_jobs=4)(delayed(process_col)(col) for col in custom_cols)
+    # Submit the tasks in parallel; Using 4 threads is a safe number to submit
+    # tasks in login node. Or use the specified number of cpus if not in a linux system
+    workers = 4 if os.name == 'posix' else n_workers
+    Parallel(n_jobs=workers)(delayed(process_col)(col) for col in custom_cols)
 
 
 def copy_folder_custom(source, destination, ignore_dirs=None):
@@ -224,14 +225,16 @@ def create_run_folders(col):
 
 
 
-def submit_task(cwd:str, col:str):
+def submit_task(cwd:str, col:str, python_path:str=None):
     # Copy the slurm script to the task folder
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{TASK_ROOT_DIR}/{col}/task_cmd.sh')
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/python_script.py', f'{TASK_ROOT_DIR}/{col}/python_script.py')
     
     if os.name == 'nt':         
-        # If the os is windows, do nothing
-        print('This will only create task folders, and NOT submit job to run!')
+        os.chdir(f'{TASK_ROOT_DIR}/{col}')
+        os.system(f'{python_path} python_script.py')
+        os.chdir(cwd)
+        print(f'Task {col} has been submitted!')
     
     # Start the task if the os is linux
     if os.name == 'posix':
