@@ -2,8 +2,10 @@
 .spyproject/
 **/__pycache__/
 .vscode/**
+
 /jinzhu_inspect_code/*
 /jinzhu_inspect_code
+
 luto/.ipynb_checkpoints/*
 pyproject.toml
 
@@ -23,8 +25,9 @@ gurobi.log
 # Some potential temporary files
 *.zip
 *.dat
-debug.log
+*.log
 
 # The mannual build files
 /docs/manual/*
 
+*.tmp
