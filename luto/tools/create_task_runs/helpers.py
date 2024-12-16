@@ -10,6 +10,7 @@ import pandas as pd
 from joblib import delayed, Parallel
 from luto import settings
 from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, TASK_ROOT_DIR
+from datetime import datetime
 
 
 def create_settings_template(to_path:str=TASK_ROOT_DIR):
@@ -195,13 +196,16 @@ def update_settings(settings_dict:dict, col:str):
         MEM = "80G"
     else:
         MEM = "40G"
-    
-    # Set the carbon prices field based on the GHG limits field
-    settings_dict['CARBON_PRICES_FIELD'] = settings_dict['GHG_LIMITS_FIELD'][:9].replace('(','') 
-   
+        
     # Update the settings dictionary
     settings_dict['JOB_NAME'] = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
     settings_dict['MEM'] = settings_dict['MEM'] if settings_dict['MEM'] != 'auto' else MEM
+    
+    # Set the carbon prices field based on the GHG limits field
+    settings_dict['CARBON_PRICES_FIELD'] = settings_dict['GHG_LIMITS_FIELD'][:9].replace('(','') 
+
+    # Update the threads based on the number of cpus
+    settings_dict['THREADS'] = settings_dict['NCPUS']
 
     return settings_dict
 
@@ -239,7 +243,6 @@ def submit_task(cwd:str, col:str):
 def log_memory_usage(output_dir=settings.OUTPUT_DIR, interval=1):
     '''
     Log the memory usage of the current process to a file.
-    git 
     Parameters:
         output_dir (str): The directory to save the memory log file.
         interval (int): The interval in seconds to log the memory usage.

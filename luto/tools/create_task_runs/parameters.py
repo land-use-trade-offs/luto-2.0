@@ -1,4 +1,4 @@
-TASK_ROOT_DIR = '../Snapshoot_mult_scenarios_real_price_exponential_3_5'
+TASK_ROOT_DIR = '../Timeseries_RES10_GHG_Deforestration/'
 
 EXCLUDE_DIRS = [
     'input', 
