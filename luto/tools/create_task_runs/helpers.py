@@ -97,6 +97,14 @@ def create_grid_search_template(template_df:pd.DataFrame, grid_dict: dict) -> pd
 
 
 def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, n_workers:int=4):
+    '''
+    Submit the tasks to the cluster using the custom settings.\n
+    Parameters:
+        - custom_settings (pd.DataFrame): The custom settings DataFrame.
+        - Only works in a windows system.
+            - python_path (str): The path to the python executable.
+            - n_workers (int): The number of workers to use for parallel processing.
+    '''
     
     # Get current working directory
     cwd = os.getcwd()

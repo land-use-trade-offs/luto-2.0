@@ -94,10 +94,10 @@ report_data_demand['GHG_LIMITS_FIELD'] = pd.Categorical(report_data_demand['GHG_
 
 
 report_data_filter = report_data\
-    .query('year != 2010') 
+    .query('year != 2010 and SOLVE_ECONOMY_WEIGHT >= 0.1 and SOLVE_ECONOMY_WEIGHT <= 0.12') 
 
 report_data_demand_filterd = report_data_demand \
-    .query('year != 2010 and abs(`deviation_%`) > 1') 
+    .query('year != 2010 and abs(`deviation_%`) > 1 and SOLVE_ECONOMY_WEIGHT >= 0.1 and SOLVE_ECONOMY_WEIGHT <= 0.12') 
 
 
 
@@ -276,13 +276,13 @@ p_GHG_vs_profit = (
             x='GHG deviation', 
             y='Profit', 
             color='SOLVE_ECONOMY_WEIGHT', 
-            shape='DIET_GLOB',
-            group='interaction',
+            # shape='DIET_GLOB',
+            group='SOLVE_ECONOMY_WEIGHT',
         )
         
     ) +
     p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
-    p9.geom_point(size=0.1) +
+    p9.geom_point(size=0.3) +
     p9.theme_bw()
     )
 

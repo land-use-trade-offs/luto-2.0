@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from luto.tools.create_task_runs.helpers import create_grid_search_template, create_task_runs, create_settings_template
 
@@ -13,10 +14,7 @@ grid_search = {
     ###############################################################
     # Working settings for the model run
     ###############################################################
-    'MODE': [
-        'snapshot', 
-        # 'timeseries'
-    ],
+    'MODE': ['timeseries'],                 # 'snapshot' or 'timeseries'
     'RESFACTOR': [10],
     'WRITE_THREADS': [10],
     'WRITE_OUTPUT_GEOTIFFS': [False],
@@ -24,8 +22,8 @@ grid_search = {
     ###############################################################
     # Background settings for the model run
     ###############################################################
-    'CO2_FERT': [False],
-    'INCLUDE_WATER_LICENSE_COSTS': [0], # 0 [off] or 1 [on]
+    'CO2_FERT': ['off'],
+    'INCLUDE_WATER_LICENSE_COSTS': [0],     # 0 [off] or 1 [on]
     'WATER_STRESS': [0.4],
     'AG_SHARE_OF_WATER_USE': [0.7],
 
@@ -33,8 +31,8 @@ grid_search = {
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_ECONOMY_WEIGHT': 
-        # [0.20, 0.25, 0.30],
-        list(np.linspace(0.2, 0.4, 10)) ,
+        list(np.linspace(0.1, 0.12, 10)) + \
+        [0.001, 0.01, 0.05, 0.08, 0.2, 0.3, 0.4, 0.5,  0.7, 0.9],
         # [
         #     10**(-i) * (1 - j/10) 
         #     for i in range(3)     # The range of the exponent: 1, 0.1, 0.01, ...
@@ -49,9 +47,7 @@ grid_search = {
         {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3 }, 
         # {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5 }
     ],
-    # 'DIET_GLOB': [
-    #     'BAU', 'FLX', 'VEG', 'VGN'
-    # ],
+    # 'DIET_GLOB': ['BAU', 'FLX', 'VEG', 'VGN'],
 }
 
 
@@ -60,6 +56,9 @@ template_df = create_settings_template()
 grid_search_df = create_grid_search_template(template_df, grid_search)
 
 # Create the task runs
-create_task_runs(grid_search_df, python_path='F:/jinzhu/conda_env/luto/python.exe')
+if os.name == 'posix':
+    create_task_runs(grid_search_df)
+elif os.name == 'nt':
+    create_task_runs(grid_search_df, python_path='F:/jinzhu/conda_env/luto/python.exe', n_workers=10)
 
 
