@@ -84,7 +84,7 @@ def process_task_root_dirs(task_root_dirs):
 
 
 # Get the data
-task_root_dirs = [i for i in glob('../*') if "Timeseries_RES10_GHG_Deforestration" in i]
+task_root_dirs = [i for i in glob('../*') if "Timeseries_RES10_DIFF_C_PRICES" in i]
 report_data, report_data_demand = process_task_root_dirs(task_root_dirs)
 
 # Filter the data
@@ -93,29 +93,120 @@ report_data['GHG_LIMITS_FIELD'] = pd.Categorical(report_data['GHG_LIMITS_FIELD']
 report_data_demand['GHG_LIMITS_FIELD'] = pd.Categorical(report_data_demand['GHG_LIMITS_FIELD'], categories=ghg_order, ordered=True)
 
 
-report_data_filter = report_data\
-    .query('year != 2010 and SOLVE_ECONOMY_WEIGHT >= 0.1 and SOLVE_ECONOMY_WEIGHT <= 0.12') 
-
-report_data_demand_filterd = report_data_demand \
-    .query('year != 2010 and abs(`deviation_%`) > 1 and SOLVE_ECONOMY_WEIGHT >= 0.1 and SOLVE_ECONOMY_WEIGHT <= 0.12') 
-
-
-
 # report_data_filter = report_data\
-#     .assign(interaction=lambda df: df['SOLVE_ECONOMY_WEIGHT'].astype(str) + "_" + df['DIET_GLOB']) \
-#     .query('year != 2010 and DIET_GLOB == "BAU"') 
+#     .query('year != 2010 and SOLVE_ECONOMY_WEIGHT >= 0.1 and SOLVE_ECONOMY_WEIGHT <= 0.12') 
 
 # report_data_demand_filterd = report_data_demand \
-#     .assign(interaction=lambda df: df['SOLVE_ECONOMY_WEIGHT'].astype(str) + "_" + df['DIET_GLOB']) \
-#     .query('year != 2010 and abs(`deviation_%`) > 1 and DIET_GLOB == "BAU"') 
+#     .query('year != 2010 and abs(`deviation_%`) > 1 and SOLVE_ECONOMY_WEIGHT >= 0.1 and SOLVE_ECONOMY_WEIGHT <= 0.12') 
+
+
+report_data['SOLVE_CARBON_PRICE'] = report_data['SOLVE_CARBON_PRICE'].astype(str)
+report_data['SOLVE_ECONOMY_WEIGHT'] = report_data['SOLVE_ECONOMY_WEIGHT'].astype(str)
+
+
+report_data_filter = report_data\
+    .assign(interaction=lambda df: df['SOLVE_ECONOMY_WEIGHT'].astype(str) + "_" + str(df['SOLVE_CARBON_PRICE'])) \
+    .query('year != 2010') 
+
+report_data_demand_filterd = report_data_demand \
+    .assign(interaction=lambda df: df['SOLVE_ECONOMY_WEIGHT'].astype(str) + "_" + str(df['SOLVE_CARBON_PRICE'])) \
+    .query('year != 2010 and abs(`deviation_%`) > 1 and SOLVE_CARBON_PRICE == "10000"') 
 
 
 
+# Time series
+p_weight_vs_profit = (
+    p9.ggplot(
+        report_data_filter, 
+        p9.aes(
+            x='year', 
+            y='Profit', 
+            color='SOLVE_ECONOMY_WEIGHT', 
+            linetype='SOLVE_CARBON_PRICE',
+            group='interaction',
+        )
+    ) +
+    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
+    p9.geom_line(size=0.3) +
+    p9.theme_bw() +
+    # p9.scale_x_log10() +
+    p9.ylab('Profit (billion AUD)')
+    )
 
 
-# Plot the data   
-p9.options.figure_size = (15, 8)
-p9.options.dpi = 150
+p_weight_vs_GHG_deviation = (
+    p9.ggplot(
+        report_data_filter, 
+        p9.aes(
+            x='year', 
+            y='GHG deviation', 
+            color='SOLVE_ECONOMY_WEIGHT', 
+            linetype='SOLVE_CARBON_PRICE',
+            group='interaction',
+        )
+    ) +
+    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
+    p9.geom_line() +
+    p9.theme_bw() +
+    # p9.scale_x_log10() +
+    p9.ylab('GHG deviation (Mt)')
+    )
+
+p_weight_vs_GHG_deforestation = (
+    p9.ggplot(
+        report_data_filter, 
+        p9.aes(
+            x='year', 
+            y='Deforestation', 
+            color='SOLVE_ECONOMY_WEIGHT', 
+            # linetype='SOLVE_CARBON_PRICE',
+            group='interaction',
+        )
+    ) +
+    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
+    p9.geom_line() +
+    p9.theme_bw() +
+    # p9.scale_x_log10() +
+    p9.ylab('Deforestation (Mt)')
+    )
+
+
+p_GHG_vs_profit = (
+    p9.ggplot(report_data_filter, 
+        p9.aes(
+            x='GHG deviation', 
+            y='Profit', 
+            color='SOLVE_ECONOMY_WEIGHT', 
+            # shape='DIET_GLOB',
+            group='SOLVE_ECONOMY_WEIGHT',
+        )
+        
+    ) +
+    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
+    p9.geom_point(size=0.3) +
+    p9.theme_bw()
+    )
+
+
+p_weigth_vs_demand = (
+    p9.ggplot(
+        report_data_demand_filterd, 
+        p9.aes(
+            x='year', 
+            y='deviation_%', 
+            fill='name', 
+            group='SOLVE_ECONOMY_WEIGHT'
+        )
+    ) +
+    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
+    p9.geom_col(position='dodge') +
+    p9.theme_bw() +
+    # p9.scale_x_log10() +
+    p9.guides(fill=p9.guide_legend(ncol=1))
+)
+
+
+
 
 
 
@@ -206,100 +297,3 @@ p_weigth_vs_demand = (
 )
 
 
-
-
-
-
-
-
-
-# Time series
-p_weight_vs_profit = (
-    p9.ggplot(
-        report_data_filter, 
-        p9.aes(
-            x='year', 
-            y='Profit', 
-            color='SOLVE_ECONOMY_WEIGHT', 
-            # linetype='DIET_GLOB',
-            group='SOLVE_ECONOMY_WEIGHT',
-        )
-    ) +
-    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
-    p9.geom_line(size=0.3) +
-    p9.theme_bw() +
-    # p9.scale_x_log10() +
-    p9.ylab('Profit (billion AUD)')
-    )
-
-
-p_weight_vs_GHG_deviation = (
-    p9.ggplot(
-        report_data_filter, 
-        p9.aes(
-            x='year', 
-            y='GHG deviation', 
-            color='SOLVE_ECONOMY_WEIGHT', 
-            # linetype='DIET_GLOB',
-            group='SOLVE_ECONOMY_WEIGHT',
-        )
-    ) +
-    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
-    p9.geom_line() +
-    p9.theme_bw() +
-    # p9.scale_x_log10() +
-    p9.ylab('GHG deviation (Mt)')
-    )
-
-p_weight_vs_GHG_deforestation = (
-    p9.ggplot(
-        report_data_filter.query('SOLVE_ECONOMY_WEIGHT >= 0 and SOLVE_ECONOMY_WEIGHT <= 0.21'), 
-        p9.aes(
-            x='year', 
-            y='Deforestation', 
-            color='SOLVE_ECONOMY_WEIGHT', 
-            # linetype='DIET_GLOB',
-            group='SOLVE_ECONOMY_WEIGHT',
-        )
-    ) +
-    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
-    p9.geom_line() +
-    p9.theme_bw() +
-    # p9.scale_x_log10() +
-    p9.ylab('Deforestation (Mt)')
-    )
-
-
-p_GHG_vs_profit = (
-    p9.ggplot(report_data_filter, 
-        p9.aes(
-            x='GHG deviation', 
-            y='Profit', 
-            color='SOLVE_ECONOMY_WEIGHT', 
-            # shape='DIET_GLOB',
-            group='SOLVE_ECONOMY_WEIGHT',
-        )
-        
-    ) +
-    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
-    p9.geom_point(size=0.3) +
-    p9.theme_bw()
-    )
-
-
-p_weigth_vs_demand = (
-    p9.ggplot(
-        report_data_demand_filterd, 
-        p9.aes(
-            x='year', 
-            y='deviation_%', 
-            fill='name', 
-            group='SOLVE_ECONOMY_WEIGHT'
-        )
-    ) +
-    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
-    p9.geom_col(position='dodge') +
-    p9.theme_bw() +
-    # p9.scale_x_log10() +
-    p9.guides(fill=p9.guide_legend(ncol=1))
-)

@@ -98,7 +98,8 @@ class LutoSolver:
         self.demand_penalty_constraints = []
         self.water_limit_constraints = []
         self.ghg_emissions_expr = None
-        self.ghg_emissions_limit_constraint = None
+        self.ghg_emissions_limit_constraint_ub = None
+        self.ghg_emissions_limit_constraint_lb = None
         self.biodiversity_expr = None
         self.biodiversity_limit_constraint = None
 
@@ -605,18 +606,24 @@ class LutoSolver:
             print('...GHG emissions constraints TURNED OFF ...')
             return
         
-        ghg_limit = self._input_data.limits["ghg"]
+        ghg_limit_ub = self._input_data.limits["ghg_ub"]
+        ghg_limit_lb = self._input_data.limits["ghg_lb"]
         self.ghg_emissions_expr = self._get_total_ghg_emissions_expr()
         
         if settings.GHG_CONSTRAINT_TYPE == 'hard':
-            print(f"...GHG emissions reduction target: {ghg_limit:,.0f} tCO2e")
-            self.ghg_emissions_limit_constraint = self.gurobi_model.addConstr(
-                self.ghg_emissions_expr <= ghg_limit
+            print(f"...GHG emissions reduction target")
+            print(f'    ...GHG emissions reduction target UB: {ghg_limit_ub:,.0f} tCO2e')
+            self.ghg_emissions_limit_constraint_ub = self.gurobi_model.addConstr(
+                self.ghg_emissions_expr <= ghg_limit_ub
+            )
+            print(f'    ...GHG emissions reduction target LB: {ghg_limit_lb:,.0f} tCO2e')
+            self.ghg_emissions_limit_constraint_lb = self.gurobi_model.addConstr(
+                self.ghg_emissions_expr >= ghg_limit_lb
             )
         elif settings.GHG_CONSTRAINT_TYPE == 'soft':
-            print(f"  ...GHG emissions reduction target: {ghg_limit:,.0f} tCO2e")
-            self.gurobi_model.addConstr(self.ghg_emissions_expr - ghg_limit <= self.E)
-            self.gurobi_model.addConstr(ghg_limit - self.ghg_emissions_expr <= self.E)
+            print(f"  ...GHG emissions reduction target: {ghg_limit_ub:,.0f} tCO2e")
+            self.gurobi_model.addConstr(self.ghg_emissions_expr - ghg_limit_ub <= self.E)
+            self.gurobi_model.addConstr(ghg_limit_ub - self.ghg_emissions_expr <= self.E)
         else:
             raise ValueError("Unknown choice for `GHG_CONSTRAINT_TYPE` setting: must be either 'hard' or 'soft'")
 
@@ -856,9 +863,13 @@ class LutoSolver:
         self.demand_penalty_constraints = []
         self.water_limit_constraints = []
 
-        if self.ghg_emissions_limit_constraint is not None:
-            self.gurobi_model.remove(self.ghg_emissions_limit_constraint)
-            self.ghg_emissions_limit_constraint = None
+        if self.ghg_emissions_limit_constraint_ub is not None:
+            self.gurobi_model.remove(self.ghg_emissions_limit_constraint_ub)
+            self.ghg_emissions_limit_constraint_ub = None
+            
+        if self.ghg_emissions_limit_constraint_lb is not None:
+            self.gurobi_model.remove(self.ghg_emissions_limit_constraint_lb)
+            self.ghg_emissions_limit_constraint_lb = None
 
         self._add_cell_usage_constraints(updated_cells)                 
         self._add_agricultural_management_constraints(updated_cells)    

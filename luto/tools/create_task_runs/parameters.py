@@ -1,4 +1,4 @@
-TASK_ROOT_DIR = '../Snapshoot_RES10_20241216/'
+TASK_ROOT_DIR = '../Timeseries_RES10_DIFF_C_PRICES/'
 
 EXCLUDE_DIRS = [
     'input', 

@@ -322,8 +322,9 @@ if CARBON_PRICES_FIELD == 'AS_GHG':
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
 SOC_AMORTISATION = 15
 
-# GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
-GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
+GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
+# GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
+GHG_ALLOW_LB_DELTA_T = 5e6    # The amount of GHG emissions that can be lowered than the target in the objective function (in tonnes CO2e)
 
 # Weight for the GHG/Demand deviation in the objective function
 ''' Range from 0 to 1, where 0 is fully minimising GHG and demand deviation, and 1 is only maximising profit. '''

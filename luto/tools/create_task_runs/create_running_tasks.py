@@ -9,35 +9,32 @@ grid_search = {
     ###############################################################
     'MEM': ['40GB'],
     'NCPUS':[10],
-    'TIME': ['0:30:00'],
+    'TIME': ['5:30:00'],
     
     ###############################################################
     # Working settings for the model run
     ###############################################################
-    'MODE': ['timeseries'],                 # 'snapshot' or 'timeseries'
+    'MODE': ['timeseries'],                # 'snapshot' or 'timeseries'
     'RESFACTOR': [10],
     'WRITE_THREADS': [10],
     'WRITE_OUTPUT_GEOTIFFS': [False],
     
     ###############################################################
-    # Background settings for the model run
+    # Model run settings
     ###############################################################
-    'CO2_FERT': ['off'],
-    'INCLUDE_WATER_LICENSE_COSTS': [0],     # 0 [off] or 1 [on]
-    'WATER_STRESS': [0.4],
-    'AG_SHARE_OF_WATER_USE': [0.7],
+    'GHG_CONSTRAINT_TYPE': ['hard'],       # 'hard' or 'soft'
 
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_ECONOMY_WEIGHT': 
-        list(np.linspace(0.1, 0.12, 10)) + \
-        [0.001, 0.01, 0.05, 0.08, 0.2, 0.3, 0.4, 0.5,  0.7, 0.9],
-        # [
-        #     10**(-i) * (1 - j/10) 
-        #     for i in range(3)     # The range of the exponent: 1, 0.1, 0.01, ...
-        #     for j in range(9)     # The range of the decimal: 1, 0.9, 0.8, ...
-        # ],
+        # list(np.linspace(0.1, 0.12, 10)) + \
+        # [0.20, 0.25, 0.30],
+        [
+            round(10**(-i) * (1 - j/10))
+            for i in range(3)    
+            for j in range(9)     
+        ],
     'GHG_LIMITS_FIELD': [
         '1.5C (67%) excl. avoided emis', 
         # '1.5C (50%) excl. avoided emis', 
