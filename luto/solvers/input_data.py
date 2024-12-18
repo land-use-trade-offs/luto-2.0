@@ -502,7 +502,7 @@ def get_limits(
 
     if settings.GHG_EMISSIONS_LIMITS == 'on':
         limits['ghg_ub'] = ag_ghg.get_ghg_limits(data, yr_cal)
-        limits['ghg_lb'] = limits['ghg'] - settings.GHG_ALLOW_LB_DELTA_T 
+        limits['ghg_lb'] = ag_ghg.get_ghg_limits(data, yr_cal) - settings.GHG_ALLOW_LB_DELTA_T 
 
     # If biodiversity limits are not turned on, set the limit to 0.
     limits['biodiversity'] = (

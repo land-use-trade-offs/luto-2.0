@@ -1048,8 +1048,9 @@ class LutoSolver:
             obj_val ={
                 'SUM': self.gurobi_model.ObjVal,
                 'Economy': self.obj_economy.getValue(),
-                'Demand': self.obj_demand.getValue().sum(),
-                'GHG': self.obj_ghg.getValue()}
+                'Demand': self.obj_demand.getValue().sum()      if settings.DEMAND_CONSTRAINT_TYPE == 'soft' else 0,
+                'GHG': self.obj_ghg.getValue()                  if settings.GHG_CONSTRAINT_TYPE == 'soft' else 0
+            }
         )
 
     @property
