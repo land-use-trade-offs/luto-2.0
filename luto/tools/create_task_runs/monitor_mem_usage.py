@@ -11,7 +11,7 @@ from dash import Dash, dcc, html
 from dash.dependencies import Input, Output
 
 
-def read_data(log_path):
+def read_data(log_path, last_timestamp=None):
     if not os.path.exists(log_path):
         print(f"File {log_path} does not exist.")
         return pd.DataFrame(columns=['timestamp', 'memory_usage_GB'])
@@ -19,6 +19,8 @@ def read_data(log_path):
     data['timestamp'] = pd.to_datetime(data['timestamp'], format='%Y-%m-%d %H:%M:%S', errors='coerce')
     data['memory_usage_GB'] = pd.to_numeric(data['memory_usage_GB'], errors='coerce')
     data = data.dropna()
+    if last_timestamp:
+        data = data[data['timestamp'] > last_timestamp]
     return data
 
 def save_plot(fig, output_path):
@@ -44,19 +46,26 @@ def start_app():
         )
     ])
 
+    last_timestamp = None  # Initialize last_timestamp
+    all_data = pd.DataFrame(columns=['timestamp', 'memory_usage_GB'])  # Initialize all_data
+
     @app.callback(Output('live-update-graph', 'figure'), Input('interval-component', 'n_intervals'))
     def update_graph_live(n):
+        nonlocal last_timestamp, all_data  # Use nonlocal to modify the outer scope variables
         fig = go.Figure()
         res = settings.RESFACTOR
         mode = settings.MODE
         mem_data_path = f"{settings.OUTPUT_DIR}/RES_{res}_{mode}_mem_log.txt"
         output_image_path = f"{settings.OUTPUT_DIR}/RES_{res}_{mode}_mem_log.png"
-        data = read_data(mem_data_path)
-        if not data.empty:
+        new_data = read_data(mem_data_path, last_timestamp)
+        if not new_data.empty:
+            last_timestamp = new_data['timestamp'].max()  # Update last_timestamp
+            all_data = pd.concat([all_data, new_data])  # Append new data to all_data
+        if not all_data.empty:
             fig.add_trace(
                 go.Scatter(
-                    x=data['timestamp'], 
-                    y=data['memory_usage_GB'], 
+                    x=all_data['timestamp'], 
+                    y=all_data['memory_usage_GB'], 
                     mode='lines', 
                     name=f'Memory Usage ({mem_data_path})'
                 )
@@ -70,6 +79,6 @@ def start_app():
         return fig
         
     print(f"Starting app on port {port}")
-    app.run(debug=True, port=port)
+    app.run(debug=False, port=port, threaded=True)
 
 

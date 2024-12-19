@@ -92,7 +92,7 @@ def run( data: Data, base: int, target: int) -> None:
 
 def solve_timeseries(data: Data, steps: int, base: int, target: int):
     print('\n')
-    print(f"\nRunning LUTO {settings.VERSION} timeseries from {base} to {target} at resfactor {settings.RESFACTOR}, starting at {time.ctime()}.", flush=True)
+    print(f"Running LUTO {settings.VERSION} timeseries from {base} to {target} at resfactor {settings.RESFACTOR}.", flush=True)
 
     for s in range(steps):
         print( "-------------------------------------------------")
