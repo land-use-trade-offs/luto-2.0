@@ -9,32 +9,42 @@ grid_search = {
     ###############################################################
     'MEM': ['40GB'],
     'NCPUS':[10],
-    'TIME': ['5:30:00'],
+    'TIME': ['1:00:00'],
     
     ###############################################################
     # Working settings for the model run
     ###############################################################
     'MODE': ['timeseries'],                # 'snapshot' or 'timeseries'
-    'RESFACTOR': [10],
+    'RESFACTOR': [20],
     'WRITE_THREADS': [10],
     'WRITE_OUTPUT_GEOTIFFS': [False],
+    # 'NON_AG_LAND_USES_REVERSIBLE' : ['''{
+    #     'Environmental Plantings': True,
+    #     'Riparian Plantings': True,
+    #     'Sheep Agroforestry': True,
+    #     'Beef Agroforestry': True,
+    #     'Carbon Plantings (Block)': True,
+    #     'Sheep Carbon Plantings (Belt)': True,
+    #     'Beef Carbon Plantings (Belt)': True,
+    #     'BECCS': True}'''],
     
     ###############################################################
     # Model run settings
     ###############################################################
-    'GHG_CONSTRAINT_TYPE': ['hard'],       # 'hard' or 'soft'
+    'GHG_CONSTRAINT_TYPE': ['soft', 'hard'],       # 'hard' or 'soft'
+    'BIODIVERSITY_LIMITS': ['off','on'],
 
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_ECONOMY_WEIGHT': 
-        # list(np.linspace(0.1, 0.12, 10)) + \
-        # [0.20, 0.25, 0.30],
-        [
-            round(10**(-i) * (1 - j/10))
-            for i in range(3)    
-            for j in range(9)     
-        ],
+        # list(np.linspace(0.05, 0.5, 30)),
+        list(np.arange(5, 51, 2)/100),
+        # sorted([
+        #     round(10**(-i) * (j/20), 10)
+        #     for i in range(4)
+        #     for j in range(1,19)
+        # ]),
     'GHG_LIMITS_FIELD': [
         '1.5C (67%) excl. avoided emis', 
         # '1.5C (50%) excl. avoided emis', 

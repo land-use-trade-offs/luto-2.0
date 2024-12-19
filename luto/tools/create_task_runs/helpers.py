@@ -265,6 +265,7 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, interval=1):
             process = psutil.Process(os.getpid())
             memory_usage = process.memory_info().rss
             children = process.children(recursive=True)
+            # Include the memory usage of the child processes to get accurate memory usage under parallel processing
             if children:
                 memory_usage += sum(child.memory_info().rss for child in children)
             memory_usage /= (1024 * 1024 * 1024)

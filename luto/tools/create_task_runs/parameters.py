@@ -1,4 +1,4 @@
-TASK_ROOT_DIR = '../Timeseries_RES10_DIFF_C_PRICES/'
+TASK_ROOT_DIR = '../Timeseries_RES20_100K_TRAN_COST/'
 
 EXCLUDE_DIRS = [
     'input', 
