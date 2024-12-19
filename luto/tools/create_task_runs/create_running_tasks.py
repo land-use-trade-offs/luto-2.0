@@ -7,15 +7,15 @@ grid_search = {
     ###############################################################
     # Computational settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['40GB'],
-    'NCPUS':[10],
-    'TIME': ['1:00:00'],
+    'MEM': ['120GB'],
+    'NCPUS':[30],
+    'TIME': ['20:00:00'],
     
     ###############################################################
     # Working settings for the model run
     ###############################################################
     'MODE': ['timeseries'],                # 'snapshot' or 'timeseries'
-    'RESFACTOR': [20],
+    'RESFACTOR': [1],
     'WRITE_THREADS': [10],
     'WRITE_OUTPUT_GEOTIFFS': [False],
     # 'NON_AG_LAND_USES_REVERSIBLE' : ['''{
@@ -31,15 +31,16 @@ grid_search = {
     ###############################################################
     # Model run settings
     ###############################################################
-    'GHG_CONSTRAINT_TYPE': ['soft', 'hard'],       # 'hard' or 'soft'
-    'BIODIVERSITY_LIMITS': ['off','on'],
+    'GHG_CONSTRAINT_TYPE': ['soft'],       # 'hard' or 'soft'
+    'BIODIVERSITY_LIMITS': ['on'],
 
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_ECONOMY_WEIGHT': 
         # list(np.linspace(0.05, 0.5, 30)),
-        list(np.arange(5, 51, 2)/100),
+        # list(np.arange(5, 51, 2)/100),
+        [0.25],
         # sorted([
         #     round(10**(-i) * (j/20), 10)
         #     for i in range(4)
