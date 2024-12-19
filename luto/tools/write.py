@@ -68,8 +68,8 @@ timestamp_write = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
 def write_outputs(data: Data):
     
-    # memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
-    # memory_thread.start()
+    memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
+    memory_thread.start()
     
     # Write the model outputs to file
     write_data(data)

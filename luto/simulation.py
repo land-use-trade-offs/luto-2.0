@@ -51,8 +51,8 @@ def load_data() -> Data:
     """
     Load the Data object containing all required data to run a LUTO simulation.
     """
-    # memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
-    # memory_thread.start()
+    memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
+    memory_thread.start()
     
     return Data(timestamp=timestamp)
 
@@ -63,8 +63,8 @@ def run( data: Data, base: int, target: int) -> None:
     Parameters:
         'data' is a Data object, and 'base' and 'target' are the base and target years for the whole simulation.
     """
-    # memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
-    # memory_thread.start()
+    memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
+    memory_thread.start()
     
     # Set Data object's path and create output directories
     data.set_path(base, target)
