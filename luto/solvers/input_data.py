@@ -156,21 +156,25 @@ class SolverInputData:
         return dict(cells2non_ag_lu)    
 
 def get_ag_c_mrj(data: Data, target_index):
+    print('Getting agricultural cost matrices...', flush = True)
     output = ag_cost.get_cost_matrices(data, target_index)
     return output.astype(np.float32)
 
 
 def get_non_ag_c_rk(data: Data, ag_c_mrj: np.ndarray, lumap: np.ndarray, target_year):
+    print('Getting non-agricultural cost matrices...', flush = True)
     output = non_ag_cost.get_cost_matrix(data, ag_c_mrj, lumap, target_year)
     return output.astype(np.float32)
 
 
 def get_ag_r_mrj(data: Data, target_index):
+    print('Getting agricultural revenue matrices...', flush = True)
     output = ag_revenue.get_rev_matrices(data, target_index)
     return output.astype(np.float32)
 
 
 def get_non_ag_r_rk(data: Data, ag_r_mrj: np.ndarray, base_year: int, target_year: int):
+    print('Getting non-agricultural revenue matrices...', flush = True)
     output = non_ag_revenue.get_rev_matrix(data, target_year, ag_r_mrj, data.lumaps[base_year])
     return output.astype(np.float32)
 
@@ -362,57 +366,37 @@ def get_economic_mrj(data: Data, base_year: int, target_year: int) -> dict[str, 
     print('Getting base year economic matrix...', flush = True)
     target_index = target_year - data.YR_CAL_BASE
     
+    ag_c_mrj = get_ag_c_mrj(data, target_index)
+    ag_r_mrj = get_ag_r_mrj(data, target_index)
+    ag_t_mrj = get_ag_t_mrj(data, target_index, base_year)
+    non_ag_c_rk = get_non_ag_c_rk(data, ag_c_mrj, data.lumaps[base_year], target_year)
+    non_ag_t_rk = get_non_ag_t_rk(data, base_year)
+    non_ag_r_rk = get_non_ag_r_rk(data, ag_r_mrj, base_year, target_year)
+    non_ag_to_ag_t_mrj = get_non_ag_to_ag_t_mrj(data, base_year, target_index)
+    ag_to_non_ag_t_rk = get_ag_to_non_ag_t_rk(data, target_index, base_year)
+    ag_man_r_mrj = get_ag_man_r_mrj(data, target_index, ag_r_mrj)
+    ag_man_c_mrj = get_ag_man_c_mrj(data, target_index, ag_c_mrj)
+    ag_man_t_mrj = get_ag_man_t_mrj(data, target_index, ag_t_mrj)
+    
     if settings.OBJECTIVE == "maxprofit":
         # Pre-calculate profit (revenue minus cost) for each land use
-        ag_obj_mrj = (
-            get_ag_r_mrj(data, target_index) - 
-            (
-                get_ag_c_mrj(data, target_index) + 
-                get_ag_t_mrj(data, target_index, base_year) + 
-                get_non_ag_to_ag_t_mrj(data, base_year, target_index)
-            )
-        )
-
-        non_ag_obj_rk = (
-            get_non_ag_r_rk(data, get_ag_r_mrj(data, target_index), base_year, target_year) - 
-            (
-                get_non_ag_c_rk(data, get_ag_c_mrj(data, target_index), data.lumaps[base_year], target_year) + 
-                get_non_ag_t_rk(data, base_year) + 
-                get_ag_to_non_ag_t_rk(data, target_index, base_year)
-            ) 
-        )
+        ag_obj_mrj = ag_r_mrj - (ag_c_mrj + ag_t_mrj + non_ag_to_ag_t_mrj)
+        non_ag_obj_rk = non_ag_r_rk - (non_ag_c_rk + non_ag_t_rk + ag_to_non_ag_t_rk)
 
         # Get effects of alternative agr. management options (stored in a dict)
         ag_man_objs = {
-            am: get_ag_man_r_mrj(data, target_index, get_ag_r_mrj(data, target_index))[am] - 
-            (
-                get_ag_man_c_mrj(data, target_index, get_ag_c_mrj(data, target_index))[am] + 
-                get_ag_man_t_mrj(data, target_index, get_ag_c_mrj(data, target_index))[am]
-            ) 
-            
+            am: ag_man_r_mrj[am] - (ag_man_c_mrj[am] + ag_man_t_mrj[am]) 
             for am in AG_MANAGEMENTS_TO_LAND_USES
         }
 
     elif settings.OBJECTIVE == "mincost":
         # Pre-calculate sum of production and transition costs
-        ag_obj_mrj = (
-            get_ag_c_mrj(data, target_index) + 
-            get_ag_t_mrj(data, target_index, base_year) + 
-            get_non_ag_to_ag_t_mrj(data, base_year, target_index)
-        )
-
-        non_ag_obj_rk = (
-            get_non_ag_c_rk(data, get_ag_c_mrj(data, target_index), data.lumaps[base_year], target_year) + 
-            get_non_ag_t_rk(data, base_year) + 
-            get_ag_to_non_ag_t_rk(data, target_index, base_year)
-        )
+        ag_obj_mrj = ag_c_mrj + ag_t_mrj + non_ag_to_ag_t_mrj
+        non_ag_obj_rk = non_ag_c_rk + non_ag_t_rk + ag_to_non_ag_t_rk
 
         # Store calculations for each agricultural management option in a dict
         ag_man_objs = {
-            am: (
-                get_ag_man_c_mrj(data, target_index, get_ag_c_mrj(data, target_index))[am] + 
-                get_ag_man_t_mrj(data, target_index, get_ag_c_mrj(data, target_index))[am]
-            )      
+            am: (ag_man_c_mrj[am] + ag_man_t_mrj[am])      
             for am in AG_MANAGEMENTS_TO_LAND_USES
         }
 
