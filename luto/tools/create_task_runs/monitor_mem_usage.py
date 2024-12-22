@@ -1,12 +1,10 @@
-import os, sys
+import os
 import pandas as pd
 import plotly.graph_objects as go
 import socket
 
 import luto.settings as settings
 
-from math import ceil
-from plotly.subplots import make_subplots
 from dash import Dash, dcc, html
 from dash.dependencies import Input, Output
 

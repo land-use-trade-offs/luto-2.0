@@ -16,6 +16,8 @@ else:
 # Run simulation
 sim.run(data=data, base=2010, target=2050)
 
+# Save the data to a PKL file
+sim.save_data_to_disk(data, f"{data.path}/DATA_REPORT/Data_{settings.MODE}_RES{settings.RESFACTOR}.gz")
 
 
 # Remove all files except the report directory

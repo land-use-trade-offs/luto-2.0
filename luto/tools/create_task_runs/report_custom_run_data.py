@@ -84,7 +84,7 @@ def process_task_root_dirs(task_root_dirs):
 
 
 # Get the data
-task_root_dirs = [i for i in glob('../*') if "Timeseries_RES20_100K_TRAN_COST" in i]
+task_root_dirs = [i for i in glob('../*') if "Timeseries_RES20_Deforestation_cost_1e9" in i]
 report_data, report_data_demand = process_task_root_dirs(task_root_dirs)
 
 # Filter the data
@@ -95,8 +95,8 @@ report_data_demand['GHG_LIMITS_FIELD'] = pd.Categorical(report_data_demand['GHG_
 
 report_data_filter = report_data.loc[
     (report_data['year'] != 2010) &
-    (report_data['GHG_CONSTRAINT_TYPE'] == "soft") &
-    (report_data['BIODIVERSITY_LIMITS'] == "on") &
+    (report_data['GHG_CONSTRAINT_TYPE'] == "hard") &
+    (report_data['BIODIVERSITY_LIMITS'] == "off") &
     (report_data['SOLVE_ECONOMY_WEIGHT'] >=0) &
     (report_data['SOLVE_ECONOMY_WEIGHT'] <=0.5)
 ].copy()
@@ -104,8 +104,8 @@ report_data_filter = report_data.loc[
 report_data_demand_filterd = report_data_demand.loc[
     (report_data_demand['year'] != 2010) &
     # (report_data_demand['deviation_%'].abs() > 1) &
-    (report_data_demand['GHG_CONSTRAINT_TYPE'] == "soft") &
-    (report_data_demand['BIODIVERSITY_LIMITS'] == "on") &
+    (report_data_demand['GHG_CONSTRAINT_TYPE'] == "hard") &
+    (report_data_demand['BIODIVERSITY_LIMITS'] == "off") &
     (report_data['SOLVE_ECONOMY_WEIGHT'] >=0) &
     (report_data['SOLVE_ECONOMY_WEIGHT'] <=0.5)
 ].copy()

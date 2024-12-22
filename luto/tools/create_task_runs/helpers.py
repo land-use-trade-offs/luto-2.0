@@ -62,7 +62,7 @@ def create_grid_search_template(template_df:pd.DataFrame, grid_dict: dict) -> pd
     template_grid_search = template_df.copy()
     
     # Convert all values in the grid_dict to string representations
-    grid_dict = {k: [str(v) for v in v] for k, v in grid_dict.items()}
+    grid_dict = {k: [str(i) for i in v] for k, v in grid_dict.items()}
 
     # Create a list of dictionaries with all possible permutations
     keys, values = zip(*grid_dict.items())
@@ -113,7 +113,6 @@ def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, n_worke
     custom_settings = custom_settings.set_index('Name')
     
     # Replace special characters to underscore, making the column names valid python variables
-    custom_settings.columns = [re.sub(r'\W+', '_', col.strip()) for col in custom_settings.columns]
     custom_settings = custom_settings.replace({'TRUE': 'True', 'FALSE': 'False'})
     custom_cols = [col for col in custom_settings.columns if col not in ['Default_run']]
     
@@ -268,6 +267,6 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, interval=1):
             if children:
                 memory_usage += sum(child.memory_info().rss for child in children)
             memory_usage /= (1024 * 1024 * 1024)
-            file.write(f'{timestamp}\t{memory_usage}\n')
+            file.write(f'{timestamp}\t{memory_usage:.2f}\n')
             file.flush()  # Ensure data is written to the file immediately
             time.sleep(interval)
