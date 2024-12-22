@@ -7,10 +7,10 @@ grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['240GB'],
-    'NCPUS':[48],
+    'MEM': ['400GB'],
+    'NCPUS':[100],
     'TIME': ['30:00:00'],
-    'QUEUE': ['hugemem'],
+    'QUEUE': ['normalsr'],
     
     ###############################################################
     # Working settings for the model run
@@ -18,7 +18,7 @@ grid_search = {
     'MODE': ['snapshot'],                # 'snapshot' or 'timeseries'
     'RESFACTOR': [1],
     'WRITE_THREADS': [10],
-    'WRITE_OUTPUT_GEOTIFFS': [False],
+    'WRITE_OUTPUT_GEOTIFFS': [True],
     # 'NON_AG_LAND_USES_REVERSIBLE' : ['''{
     #     'Environmental Plantings': True,
     #     'Riparian Plantings': True,

@@ -526,13 +526,15 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     ag_c_mrj = get_ag_c_mrj(data, target_index)
     ag_r_mrj = get_ag_r_mrj(data, target_index)
     ag_t_mrj = get_ag_t_mrj(data, target_index, base_year)
+    ag_to_non_ag_t_rk = get_ag_to_non_ag_t_rk(data, target_index, base_year)
+    
     non_ag_c_rk = get_non_ag_c_rk(data, ag_c_mrj, data.lumaps[base_year], target_year)
     non_ag_t_rk = get_non_ag_t_rk(data, base_year)
     non_ag_r_rk = get_non_ag_r_rk(data, ag_r_mrj, base_year, target_year)
     non_ag_to_ag_t_mrj = get_non_ag_to_ag_t_mrj(data, base_year, target_index)
-    ag_to_non_ag_t_rk = get_ag_to_non_ag_t_rk(data, target_index, base_year)
-    ag_man_r_mrj = get_ag_man_r_mrj(data, target_index, ag_r_mrj)
+    
     ag_man_c_mrj = get_ag_man_c_mrj(data, target_index, ag_c_mrj)
+    ag_man_r_mrj = get_ag_man_r_mrj(data, target_index, ag_r_mrj)
     ag_man_t_mrj = get_ag_man_t_mrj(data, target_index, ag_t_mrj)
     
     ag_obj_mrj, non_ag_obj_rk,  ag_man_objs=get_economic_mrj(

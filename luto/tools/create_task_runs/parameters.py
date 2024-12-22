@@ -1,4 +1,4 @@
-TASK_ROOT_DIR = '../Snapshoot_RES1_Deforest_1e9_cost_SINGLE_RUNTEST/'
+TASK_ROOT_DIR = '../Snapshoot_RES1_SINGLE_RUNTEST/'
 
 EXCLUDE_DIRS = [
     'input', 
