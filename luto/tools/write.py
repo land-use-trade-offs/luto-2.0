@@ -742,7 +742,7 @@ def write_area_transition_start_end(data: Data, path):
     # Get the decision variables for the start year
     # NOTE: If settings.RESFACTPR != 1, then the `dvar_base` will be an approximation, because 
     #       we are selecting the centroids cell to represent the (RESFACTOR * RESFACTOR) neighboring cells.
-    dvar_base = data.lumap2ag_l_mrj(data.lumaps[data.YR_CAL_BASE], data.lmmaps[data.YR_CAL_BASE])
+    dvar_base = tools.lumap2ag_l_mrj(data.lumaps[data.YR_CAL_BASE], data.lmmaps[data.YR_CAL_BASE])
 
     # Calculate the transition matrix for agricultural land uses (start) to agricultural land uses (end)
     transitions_ag2ag = []

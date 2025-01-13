@@ -146,9 +146,6 @@
         <!-- Chart:economics_9_transition_ag2non_cost_5_transition_matrix -->
         <div class="fig" id="economics_9_transition_ag2non_cost_5_transition_matrix"></div>
 
-
-
-
         <!-- Chart:economics_9_transition_ag2non_cost_1_Cost type_wide -->
         <div class="fig" id="economics_9_transition_ag2non_cost_1_Cost type_wide"></div>
 
@@ -162,19 +159,31 @@
         <div class="fig" id="economics_9_transition_ag2non_cost_4_Water supply_wide"></div>
 
 
+        <!-- The dropdown to select the year of the map: -->
+        <div class="selection" style="text-align: center;">
+            <label for="year_non_ag2ag" class="label" style="font-size: 1.2em; color: rgb(51, 51, 51); font-weight: bold; fill: rgb(51, 51, 51);">
+                Transition Cost (Non-Agricultural to Agricultural) Matrix for
+                <output id="yearOutput_non_ag2ag">2010</output> (
+                <button id="decrement_non_ag2ag">-</button>
+                <input type="range" id="year_non_ag2ag" step="1" value="2010" oninput="yearOutput_non_ag2ag.value = year_non_ag2ag.value">
+                <button id="increment_non_ag2ag">+</button>)
+            </label>
+        </div>
 
+        <!-- Chart:economics_10_transition_non_ag2ag_cost_5_transition_matrix -->
+        <div class="fig" id="economics_10_transition_non_ag2ag_cost_5_transition_matrix"></div>
 
         <!-- Chart:economics_10_transition_non_ag2ag_cost_1_Cost type_wide -->
-        <!-- <div class="fig" id="economics_10_transition_non_ag2ag_cost_1_Cost type_wide"></div> -->
+        <div class="fig" id="economics_10_transition_non_ag2ag_cost_1_Cost type_wide"></div>
 
         <!-- Chart:economics_10_transition_non_ag2ag_cost_2_From land-use_wide -->
-        <!-- <div class="fig" id="economics_10_transition_non_ag2ag_cost_2_From land-use_wide"></div> -->
+        <div class="fig" id="economics_10_transition_non_ag2ag_cost_2_From land-use_wide"></div>
 
         <!-- Chart:economics_10_transition_non_ag2ag_cost_3_To land-use_wide -->
-        <!-- <div class="fig" id="economics_10_transition_non_ag2ag_cost_3_To land-use_wide"></div> -->
+        <div class="fig" id="economics_10_transition_non_ag2ag_cost_3_To land-use_wide"></div>
 
         <!-- Chart:economics_10_transition_non_ag2ag_cost_4_Water supply_wide -->
-        <!-- <div class="fig" id="economics_10_transition_non_ag2ag_cost_4_Water supply_wide"></div> -->
+        <div class="fig" id="economics_10_transition_non_ag2ag_cost_4_Water supply_wide"></div>
 
 
 

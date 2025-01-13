@@ -433,17 +433,17 @@ def save_report_data(raw_data_dir:str):
     
     cost_transition_ag2ag_df = files.query('category == "cost" and base_name == "cost_transition_ag2ag" and year_types != "begin_end_year"').reset_index(drop=True)
     cost_transition_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2ag_df['path']], ignore_index=True)
-    cost_transition_ag2ag_df['Value (billion)'] = cost_transition_ag2ag_df['Cost ($)'] * -1 / 1e9
+    cost_transition_ag2ag_df['Value (million)'] = cost_transition_ag2ag_df['Cost ($)'] * -1 / 1e6 
     cost_transition_ag2ag_df = cost_transition_ag2ag_df.replace(RENAME_AM_NON_AG)
     
     cost_transition_ag2non_ag_df = files.query('category == "cost" and base_name == "cost_transition_ag2non_ag" and year_types != "begin_end_year"').reset_index(drop=True)
     cost_transition_ag2non_ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2non_ag_df['path']], ignore_index=True)
-    cost_transition_ag2non_ag_df['Value (billion)'] = cost_transition_ag2non_ag_df['Cost ($)'] * -1 / 1e9
+    cost_transition_ag2non_ag_df['Value (million)'] = cost_transition_ag2non_ag_df['Cost ($)'] * -1 / 1e6
     cost_transition_ag2non_ag_df = cost_transition_ag2non_ag_df.replace(RENAME_AM_NON_AG)
     
     cost_transition_non_ag2ag_df = files.query('base_name == "cost_transition_non_ag2_ag" and year_types != "begin_end_year"')
     cost_transition_non_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_non_ag2ag_df['path']], ignore_index=True)
-    cost_transition_non_ag2ag_df['Value (billion)'] = cost_transition_non_ag2ag_df['Cost ($)'] * -1 / 1e9
+    cost_transition_non_ag2ag_df['Value (million)'] = cost_transition_non_ag2ag_df['Cost ($)'] * -1 / 1e6
     cost_transition_non_ag2ag_df = cost_transition_non_ag2ag_df.replace(RENAME_AM_NON_AG)
     
 
@@ -646,16 +646,16 @@ def save_report_data(raw_data_dir:str):
         df_wide.to_json(f'{SAVE_DIR}/economics_7_non_ag_cost_{idx+1}_{col}_wide.json', orient='records')
     
     
-    # Plot_3-8: Transition cost for Ag to Ag (Billion $)
-    keep_cols = ['Year', 'Value (billion)','Cost ($)']
+    # Plot_3-8: Transition cost for Ag to Ag (million $)
+    keep_cols = ['Year', 'Value (million)','Cost ($)']
     loop_cols = cost_transition_ag2ag_df.columns.difference(keep_cols)
     
     for idx,col in enumerate(loop_cols):
         take_cols = keep_cols + [col]
         df = cost_transition_ag2ag_df[take_cols].groupby(['Year', col]).sum(numeric_only=True).reset_index()
         # convert to wide format
-        df_wide = df.groupby(col)[['Year','Value (billion)']]\
-                    .apply(lambda x: list(map(list,zip(x['Year'],x['Value (billion)']))))\
+        df_wide = df.groupby(col)[['Year','Value (million)']]\
+                    .apply(lambda x: list(map(list,zip(x['Year'],x['Value (million)']))))\
                     .reset_index()
         df_wide.columns = ['name','data']
         df_wide['type'] = 'column'
@@ -676,8 +676,8 @@ def save_report_data(raw_data_dir:str):
                                                     .apply(lambda x: AG_LANDUSE.index(x))
                                                     
     cost_transition_ag2ag_trans_mat_data = cost_transition_ag2ag_trans_mat\
-                                    .groupby(['Year'])[['idx_from','idx_to', 'Value (billion)']]\
-                                    .apply(lambda x: list(map(list,zip(x['idx_from'],x['idx_to'],x['Value (billion)']))))\
+                                    .groupby(['Year'])[['idx_from','idx_to', 'Value (million)']]\
+                                    .apply(lambda x: list(map(list,zip(x['idx_from'],x['idx_to'],x['Value (million)']))))\
                                     .reset_index()                             
     cost_transition_ag2ag_trans_mat_data.columns = ['Year','data']
     
@@ -691,16 +691,16 @@ def save_report_data(raw_data_dir:str):
                                     
                                         
                                 
-    # Plot_3-9: Transition cost for Ag to Non-Ag (Billion $)
-    keep_cols = ['Year', 'Value (billion)','Cost ($)']
+    # Plot_3-9: Transition cost for Ag to Non-Ag (million $)
+    keep_cols = ['Year', 'Value (million)','Cost ($)']
     loop_cols = cost_transition_ag2non_ag_df.columns.difference(keep_cols)
     
     for idx,col in enumerate(loop_cols):
         take_cols = keep_cols + [col]
         df = cost_transition_ag2non_ag_df[take_cols].groupby(['Year', col]).sum(numeric_only=True).reset_index()
         # convert to wide format
-        df_wide = df.groupby(col)[['Year','Value (billion)']]\
-                    .apply(lambda x: list(map(list,zip(x['Year'],x['Value (billion)']))))\
+        df_wide = df.groupby(col)[['Year','Value (million)']]\
+                    .apply(lambda x: list(map(list,zip(x['Year'],x['Value (million)']))))\
                     .reset_index()
         df_wide.columns = ['name','data']
         df_wide['type'] = 'column'
@@ -725,8 +725,8 @@ def save_report_data(raw_data_dir:str):
                                                     
 
     cost_transition_ag2non_ag_trans_mat_data = cost_transition_ag2non_ag_trans_mat\
-                                    .groupby(['Year'])[['idx_from','idx_to', 'Value (billion)']]\
-                                    .apply(lambda x: list(map(list,zip(x['idx_from'],x['idx_to'],x['Value (billion)']))))\
+                                    .groupby(['Year'])[['idx_from','idx_to', 'Value (million)']]\
+                                    .apply(lambda x: list(map(list,zip(x['idx_from'],x['idx_to'],x['Value (million)']))))\
                                     .reset_index()                            
     cost_transition_ag2non_ag_trans_mat_data.columns = ['Year','data']
     
@@ -742,20 +742,51 @@ def save_report_data(raw_data_dir:str):
 
         
     # Plot_3-10: Transition cost for Non-Ag to Ag (Billion $)
-    keep_cols = ['Year', 'Value (billion)','Cost ($)']
+    keep_cols = ['Year', 'Value (million)','Cost ($)']
     loop_cols = cost_transition_non_ag2ag_df.columns.difference(keep_cols)
     
     for idx,col in enumerate(loop_cols):
         take_cols = keep_cols + [col]
         df = cost_transition_non_ag2ag_df[take_cols].groupby(['Year', col]).sum(numeric_only=True).reset_index()
         # convert to wide format
-        df_wide = df.groupby(col)[['Year','Value (billion)']]\
-                    .apply(lambda x: list(map(list,zip(x['Year'],x['Value (billion)']))))\
+        df_wide = df.groupby(col)[['Year','Value (million)']]\
+                    .apply(lambda x: list(map(list,zip(x['Year'],x['Value (million)']))))\
                     .reset_index()
         df_wide.columns = ['name','data']
         df_wide['type'] = 'column'
         # save to disk
         df_wide.to_json(f'{SAVE_DIR}/economics_10_transition_non_ag2ag_cost_{idx+1}_{col}_wide.json', orient='records')
+        
+    # Get the transition matrix cost
+    cost_transition_non_ag2ag_trans_mat = cost_transition_non_ag2ag_df\
+                                            .groupby(['Year','From land-use', 'To land-use'])\
+                                            .sum(numeric_only=True).reset_index()
+                                            
+    cost_transition_non_ag2ag_trans_mat = cost_transition_non_ag2ag_trans_mat\
+                                             .set_index(['Year','From land-use', 'To land-use'])\
+                                            .reindex(index = pd.MultiIndex.from_product([years, RENAME_NON_AG.values(), AG_LANDUSE],
+                                                     names = ['Year','From land-use', 'To land-use'])).reset_index()
+                                            
+    cost_transition_non_ag2ag_trans_mat['idx_from'] = cost_transition_non_ag2ag_trans_mat['From land-use']\
+                                                    .apply(lambda x: list(RENAME_NON_AG.values()).index(x))
+    cost_transition_non_ag2ag_trans_mat['idx_to'] = cost_transition_non_ag2ag_trans_mat['To land-use']\
+                                                    .apply(lambda x: AG_LANDUSE.index(x))
+                                                    
+    cost_transition_non_ag2ag_trans_mat_data = cost_transition_non_ag2ag_trans_mat\
+                                    .groupby(['Year'])[['idx_from','idx_to', 'Value (million)']]\
+                                    .apply(lambda x: list(map(list,zip(x['idx_from'],x['idx_to'],x['Value (million)']))))\
+                                    .reset_index()
+                                    
+    cost_transition_non_ag2ag_trans_mat_data.columns = ['Year','data']
+    
+    cost_transition_non_ag2ag_trans_mat_json = {
+        'categories_from': list(RENAME_NON_AG.values()),
+        'categories_to': AG_LANDUSE,
+        'series': json.loads(cost_transition_non_ag2ag_trans_mat_data.to_json(orient='records'))}  
+    
+    with open(f'{SAVE_DIR}/economics_10_transition_non_ag2ag_cost_5_transition_matrix.json', 'w') as outfile:
+        outfile.write(json.dumps(cost_transition_non_ag2ag_trans_mat_json))                                              
+                                                
 
 
 
