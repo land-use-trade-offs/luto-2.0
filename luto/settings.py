@@ -96,7 +96,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 1        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
 # MODE = 'snapshot'   # Runs for target year only
@@ -118,7 +118,7 @@ DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in th
 WRITE_OUTPUT_GEOTIFFS = False    # Write GeoTiffs to output directory: True or False
 WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resolution: True or False
 PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = 50              # The Threads to use for map making, only work with PARALLEL_WRITE = True
+WRITE_THREADS = 10              # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
@@ -471,8 +471,8 @@ CULL_MODE = 'absolute'      # cull to include at most MAX_LAND_USES_PER_CELL
 # CULL_MODE = 'percentage'    # cull the LAND_USAGE_THRESHOLD_PERCENTAGE % most expensive options
 # CULL_MODE = 'none'          # do no culling
 
-MAX_LAND_USES_PER_CELL = 12
-LAND_USAGE_CULL_PERCENTAGE = 0.15
+MAX_LAND_USES_PER_CELL = 12         if CULL_MODE == 'absolute' else 'Not used'
+LAND_USAGE_CULL_PERCENTAGE = 0.15   if CULL_MODE == 'percentage' else 'Not used'
 
 # Non-ag output coding. Non-agricultural land uses will appear on the land use map offset by this amount (e.g. land use 0 will appear as 100)
 NON_AGRICULTURAL_LU_BASE_CODE = 100
