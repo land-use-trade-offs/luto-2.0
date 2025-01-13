@@ -193,11 +193,8 @@ def get_settings(setting_path:str):
         settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
 
         # Set unused variables to None
-        settings_dict['GHG_LIMITS_FIELD'] = 'None' if settings.GHG_LIMITS_TYPE == 'dict' else settings_dict['GHG_LIMITS_FIELD']
-        settings_dict['GHG_LIMITS'] = 'None' if settings.GHG_LIMITS_TYPE == 'file' else settings_dict['GHG_LIMITS']
-
-        settings_dict['LAND_USAGE_CULL_PERCENTAGE'] = 'None' if settings.CULL_MODE in ['absolute', 'none'] else settings_dict['LAND_USAGE_CULL_PERCENTAGE']
-        settings_dict['MAX_LAND_USES_PER_CELL'] = 'None' if settings.CULL_MODE in ['percentage', 'none'] else settings_dict['MAX_LAND_USES_PER_CELL']
+        settings_dict['GHG_LIMITS_FIELD'] = 'None'              if settings.GHG_LIMITS_TYPE == 'dict' else settings_dict['GHG_LIMITS_FIELD']
+        settings_dict['GHG_LIMITS'] = 'None'                    if settings.GHG_LIMITS_TYPE == 'file' else settings_dict['GHG_LIMITS']
 
     return settings_dict
 
@@ -687,8 +684,10 @@ def write_dvar_area(data: Data, yr_cal, path):
     # and sum over the landuse dimension (j/k)
     ag_area = np.einsum('mrj,r -> mj', data.ag_dvars[yr_cal], data.REAL_AREA)
     non_ag_area = np.einsum('rk,r -> k', data.non_ag_dvars[yr_cal], data.REAL_AREA)
-    ag_man_area_dict = {am: np.einsum('mrj,r -> mj', ammap, data.REAL_AREA)
-                        for am, ammap in data.ag_man_dvars[yr_cal].items()}
+    ag_man_area_dict = {
+        am: np.einsum('mrj,r -> mj', ammap, data.REAL_AREA)
+        for am, ammap in data.ag_man_dvars[yr_cal].items()
+    }
 
     # Agricultural landuse
     df_ag_area = pd.DataFrame(ag_area.reshape(-1),
@@ -741,7 +740,9 @@ def write_area_transition_start_end(data: Data, path):
     yr_cal_end = years[-1]
 
     # Get the decision variables for the start year
-    dvar_base = data.ag_dvars[data.YR_CAL_BASE]
+    # NOTE: If settings.RESFACTPR != 1, then the `dvar_base` will be an approximation, because 
+    #       we are selecting the centroids cell to represent the (RESFACTOR * RESFACTOR) neighboring cells.
+    dvar_base = data.lumap2ag_l_mrj(data.lumaps[data.YR_CAL_BASE], data.lmmaps[data.YR_CAL_BASE])
 
     # Calculate the transition matrix for agricultural land uses (start) to agricultural land uses (end)
     transitions_ag2ag = []
