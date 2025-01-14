@@ -31,3 +31,8 @@ gurobi.log
 /docs/manual/*
 
 *.tmp
+
+# Xinhao files
+myCode/*
+.idea/
+temp*
