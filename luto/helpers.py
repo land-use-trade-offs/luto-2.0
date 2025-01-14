@@ -62,7 +62,7 @@ sim.save_data_to_disk(data, f'F:/jinzhu/TMP/Data_object/Data_{settings.RESFACTOR
 #############################################################
 # Faster data loading (6min -> 10s)
 #############################################################
-import luto.simulation as sim
+import luto.simulation as si m
 data = sim.load_data_from_disk('F:/jinzhu/TMP/Data_object/Data_RES10_without_output_2024-11-10.pkl') 
 sim.run(data=data, base=2010, target=2050)
 

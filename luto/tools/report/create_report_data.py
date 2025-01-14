@@ -48,7 +48,8 @@ def save_report_data(raw_data_dir:str):
 
     # Get all LUTO output files and store them in a dataframe
     files = get_all_files(raw_data_dir)
-    
+    files.drop(files[files['path'].str.contains('quantity_production_kt_separate')].index, inplace=True)
+
     # The land-use groupings to combine the land-use into a single category
     lu_group = pd.read_csv('luto/tools/report/Assets/lu_group.csv')
     lu_group_expand = lu_group.set_index(['Category', 'color_HEX']).apply(lambda x: x.str.split(', ').explode()).reset_index()
