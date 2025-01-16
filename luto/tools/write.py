@@ -18,6 +18,7 @@
 Writes model output and statistics to files.
 """
 
+from itertools import product
 import os, re
 import shutil
 import threading
@@ -733,42 +734,17 @@ def write_area_transition_start_end(data: Data, path):
 
     print(f'Save transition matrix between start and end year\n')
 
-    # Get all years from sim
+    # Get all years and all land uses
     years = sorted(data.ag_dvars.keys())
-
-    # Get the end year
+    yr_cal_start = years[0]
     yr_cal_end = years[-1]
+    all_lus = data.AGRICULTURAL_LANDUSES + list(data.NONAGLU2DESC.values())
 
-    # Get the decision variables for the start year
-    # NOTE: If settings.RESFACTPR != 1, then the `dvar_base` will be an approximation, because 
-    #       we are selecting the centroids cell to represent the (RESFACTOR * RESFACTOR) neighboring cells.
-    dvar_base = tools.lumap2ag_l_mrj(data.lumaps[data.YR_CAL_BASE], data.lmmaps[data.YR_CAL_BASE])
-
-    # Calculate the transition matrix for agricultural land uses (start) to agricultural land uses (end)
-    transitions_ag2ag = []
-    for lu_idx, lu in enumerate(data.AGRICULTURAL_LANDUSES):
-        dvar_target = data.ag_dvars[yr_cal_end][:,:,lu_idx]
-        trans = np.einsum('mrj, mr, r -> j', dvar_base, dvar_target, data.REAL_AREA)
-        trans_df = pd.DataFrame({lu:trans.flatten()}, index=data.AGRICULTURAL_LANDUSES)
-        transitions_ag2ag.append(trans_df)
-    transition_ag2ag = pd.concat(transitions_ag2ag, axis=1)
-
-    # Calculate the transition matrix for agricultural land uses (start) to non-agricultural land uses (end)
-    trainsitions_ag2non_ag = []
-    for lu_idx, lu in enumerate(NON_AG_LAND_USES.keys()):
-        dvar_target = data.non_ag_dvars[yr_cal_end][:,lu_idx]
-        trans = np.einsum('mrj, r, r -> j', dvar_base, dvar_target, data.REAL_AREA)
-        trans_df = pd.DataFrame({lu:trans.flatten()}, index=data.AGRICULTURAL_LANDUSES)
-        trainsitions_ag2non_ag.append(trans_df)
-    transition_ag2non_ag = pd.concat(trainsitions_ag2non_ag, axis=1)
-
-    # Concatenate the two transition matrices
-    transition = pd.concat([transition_ag2ag, transition_ag2non_ag], axis=1)
-    transition = transition.stack().reset_index()
-    transition.columns = ['From land-use','To land-use','Area (ha)']
+    # Get the area transition dataframe
+    area_tmat_df = tools.get_area_tmat_df(data, yr_cal_start, yr_cal_end) 
 
     # Write the transition matrix to a csv file
-    transition.to_csv(os.path.join(path, f'transition_matrix_{data.YR_CAL_BASE}_{yr_cal_end}.csv'), index=False)
+    area_tmat_df.to_csv(os.path.join(path, f'transition_matrix_{yr_cal_start}_{yr_cal_end}.csv'), index=False)
 
 
 

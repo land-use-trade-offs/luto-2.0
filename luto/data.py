@@ -36,7 +36,7 @@ from typing import Any, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.settings import INPUT_DIR, OUTPUT_DIR
+from luto.settings import INPUT_DIR, NON_AG_LAND_USES_REVERSIBLE, OUTPUT_DIR
 from luto.tools.spatializers import upsample_array
 
 
@@ -649,14 +649,10 @@ class Data:
 
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
         self.AG_TMATRIX = np.load(os.path.join(INPUT_DIR, "ag_tmatrix.npy"))
-
+        
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
         self.EXCLUDE = np.load(os.path.join(INPUT_DIR, "x_mrj.npy"))
         self.EXCLUDE = self.EXCLUDE[:, self.MASK, :]  # Apply resfactor specially for the exclude matrix
-        
-        # BASE_YR economic value; 
-        # Initilized as None and will be added later in `luto.solvers.input_data.py` to avoid recalculating
-        self.BASE_YR_economic_val = None
 
 
 
