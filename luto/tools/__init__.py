@@ -52,36 +52,6 @@ def amortise(cost, rate=settings.DISCOUNT_RATE, horizon=settings.AMORTISATION_PE
     else: return cost
 
 
-def move_html(path_from, path_to):
-    if os.path.exists(path_from):
-        shutil.move(path_from, path_to)
-
-
-def report_on_path(path:str, remake_map=True, remake_csv=True):
-    
-    if remake_csv:
-        if os.path.exists(f"{path}/DATA_REPORT/data"):
-            [os.remove(f"{path}/DATA_REPORT/data/{i}") for i in os.listdir(f"{path}/DATA_REPORT/data") if os.path.isfile(f"{path}/DATA_REPORT/data/{i}")]
-        save_report_data(path)
-
-    if remake_map:
-        map_dir = f"{path}/DATA_REPORT/data/Map_data"
-        if os.path.exists(map_dir):
-            [os.remove(f'{map_dir}/{i}') for i in os.listdir(map_dir) if len(os.listdir(map_dir)) > 0]
-        else:
-            os.mkdir(map_dir)
-            
-        # Make the maps
-        TIF2MAP(path)
-        map_html = get_all_files(path).query('base_ext == ".html" and year_types != "begin_end_year"')
-        tasks = [delayed(move_html)(row['path'], map_dir) for _,row in map_html.iterrows()]
-        worker = min(settings.WRITE_THREADS, len(tasks)) if len(tasks) > 0 else 1
-        Parallel(n_jobs=worker)(tasks)
-            
-    # Copy the html files to the the report index HTML
-    data2html(path)
-
-
 def lumap2ag_l_mrj(lumap, lmmap):
     """
     Return land-use maps in decision-variable (X_mrj) format.
@@ -123,18 +93,6 @@ def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
         x_rk[:, i] = kmap
 
     return x_rk.astype(bool)
-
-
-def get_base_am_vars(ncells, ncms, n_ag_lus):
-    """
-    Get the 2010 agricultural management option vars.
-    It is assumed that no agricultural management options were used in 2010, 
-    so get zero arrays in the correct format.
-    """
-    return {
-        am: np.zeros((ncms, ncells, n_ag_lus))
-        for am in AG_MANAGEMENTS_TO_LAND_USES
-    }
 
 
 def get_ag_and_non_ag_cells(lumap) -> Tuple[np.ndarray, np.ndarray]:
@@ -265,135 +223,6 @@ def get_non_ag_cells(lumap) -> np.ndarray:
     Get an array containing the index of all non-agricultural cells
     """
     return np.nonzero(lumap >= settings.NON_AGRICULTURAL_LU_BASE_CODE)[0]
-
-
-def timethis(function, *args, **kwargs):
-    """Generic wrapper to time functions."""
-
-    # Start the wall clock.
-    start = time.time()
-    start_time = time.localtime()
-    start_time_str = time.strftime("%Y-%m-%d %H:%M:%S", start_time)
-
-    # Call the function.
-    return_value = function(*args, **kwargs)
-
-    # Stop the wall clock.
-    stop = time.time()
-    stop_time = time.localtime()
-    stop_time_str = time.strftime("%Y-%m-%d %H:%M:%S", stop_time)
-
-    print()
-    print(f"Start time: {start_time_str}")
-    print(f"Stop time: {stop_time_str}")
-    print("Elapsed time: %d seconds." % (stop - start))
-
-    return return_value
-
-
-def mergeorderly(dict1, dict2):
-    """Return merged dictionary with keys in alphabetic order."""
-    list1 = list(dict1.keys())
-    list2 = list(dict2.keys())
-    lst = sorted(list1 + list2)
-    return {key: dict1[key] if key in list1 else dict2[key] for key in lst}
-
-
-def crosstabulate(before, after, labels):
-    """Return a cross-tabulation matrix as a Pandas DataFrame."""
-
-    # The base DataFrame
-    ct = pd.crosstab(before, after, margins=True)
-
-    # Replace the numbered row labels with corresponding entries in `labels`.
-    rows = [labels[int(i)] for i in ct.index if i != 'All']
-    # The sum row was excluded, now add it back.
-    rows.append('All')
-
-    # Replace the numbered column labels with corresponding entries in `labels`.
-    cols = [labels[int(i)] for i in ct.columns if i != 'All']
-    # The sum column was excluded, now add it back.
-    cols.append('All')
-
-    # Replace the row and column labels.
-    ct.index = rows
-    ct.columns = cols
-
-    return ct
-
-
-def ctabnpystocsv(before, after, labels):
-    """Write cross-tabulation of `before` and `after` from .npys to .csv."""
-
-    # Load the .npy arrays.
-    pre = np.load(before)
-    post = np.load(after)
-
-    # Get the file names as strings without extension.
-    prename = os.path.splitext(os.path.basename(before))[0]
-    postname = os.path.splitext(os.path.basename(after))[0]
-    dirname = os.path.dirname(before)
-
-    # Produce the cross tabulation and write the file to dir of first file.
-    ct = crosstabulate(pre, post, labels)
-    ct.to_csv(os.path.join(prename + str(2) + postname + ".csv"))
-
-
-def inspect(lumap, highpos, d_j, q_rj, c_rj, landuses):
-
-    # Prepare the pandas.DataFrame.
-    columns = ["Pre Cells [#]", "Pre Costs [AUD]", "Pre Deviation [units]", "Pre Deviation [%]", "Post Cells [#]", "Post Costs [AUD]", "Post Deviation [units]", "Post Deviation [%]",
-               "Delta Total Cells [#]", "Delta Total Cells [%]", "Delta Costs [AUD]", "Delta Costs [%]", "Delta Moved Cells [#]", "Delta Deviation [units]", "Delta Deviation [%]"]
-    index = landuses
-    df = pd.DataFrame(index=index, columns=columns)
-
-    precost = 0
-    postcost = 0
-
-    # Reduced land-use list with half of the land-uses.
-    lus = [lu for lu in landuses if '_dry' in lu]
-
-    for j, lu in enumerate(lus):
-        k = 2*j
-        prewhere_dry = np.where(lumap == k, 1, 0)
-        prewhere_irr = np.where(lumap == k+1, 1, 0)
-        precount_dry = prewhere_dry.sum()
-        precount_irr = prewhere_irr.sum()
-        prequantity_dry = prewhere_dry @ q_rj.T[k]
-        prequantity_irr = prewhere_irr @ q_rj.T[k+1]
-
-        precost_dry = prewhere_dry @ c_rj.T[k]
-        precost_irr = prewhere_irr @ c_rj.T[k+1]
-
-        postwhere_dry = np.where(highpos == k, 1, 0)
-        postwhere_irr = np.where(highpos == k+1, 1, 0)
-        postcount_dry = postwhere_dry.sum()
-        postcount_irr = postwhere_irr.sum()
-        postquantity_dry = postwhere_dry @ q_rj.T[k]
-        postquantity_irr = postwhere_irr @ q_rj.T[k+1]
-
-        postcost_dry = postwhere_dry @ c_rj.T[k]
-        postcost_irr = postwhere_irr @ c_rj.T[k+1]
-
-        predeviation = prequantity_dry + prequantity_irr - d_j[j]
-        predevfrac = predeviation / d_j[j]
-
-        postdeviation = postquantity_dry + postquantity_irr - d_j[j]
-        postdevfrac = postdeviation / d_j[j]
-
-        df.loc[lu] = [precount_dry, precost_dry, predeviation, 100 * predevfrac, postcount_dry, postcost_dry, postdeviation, 100 * postdevfrac, postcount_dry - precount_dry, 100 * (postcount_dry - precount_dry) / precount_dry, postcost_dry - precost_dry, 100 * (postcost_dry - precost_dry) / precost_dry, np.sum(postwhere_dry - (prewhere_dry*postwhere_dry)), np.abs(postdeviation) - np.abs(predeviation), 100 * (np.abs(postdeviation) - np.abs(predeviation)
-                                                                                                                                                                                                                                                                                                                                                                                                                            / predeviation)]
-
-        lu_irr = lu.replace('_dry', '_irr')
-        df.loc[lu_irr] = [precount_irr, precost_irr, predeviation, 100 * predevfrac, postcount_irr, postcost_irr, postdeviation, 100 * postdevfrac, postcount_irr - precount_irr, 100 * (postcount_irr - precount_irr) / precount_irr, postcost_irr - precost_irr, 100 * (postcost_irr - precost_irr) / precost_irr, np.sum(postwhere_irr - (prewhere_irr*postwhere_irr)), np.abs(postdeviation) - np.abs(predeviation), 100 * (np.abs(postdeviation) - np.abs(predeviation)
-                                                                                                                                                                                                                                                                                                                                                                                                                                / predeviation)]
-
-        precost += prewhere_dry @ c_rj.T[k] + prewhere_irr @ c_rj.T[k+1]
-        postcost += postwhere_dry @ c_rj.T[k] + postwhere_irr @ c_rj.T[k+1]
-
-    df.loc['total'] = [df[col].sum() for col in df.columns]
-
-    return df
 
 
 def get_water_delta_matrix(w_mrj, l_mrj, data, yr_idx):
@@ -586,194 +415,194 @@ def read_dvars(yr:int, df_yr: pd.DataFrame) -> tuple:
                     am_dvars)
     
     
-def get_area_tmat_df(data:Data, base_yr:int, target_yr:int) -> pd.DataFrame:
-    # Get agricultural and non-agricultural dvars for base and target years
-    ag_dvar_base = data.ag_dvars[base_yr].sum(0)             # (r, j)
-    ag_dvar_target = data.ag_dvars[target_yr].sum(0)  
+# def get_area_tmat_df(data:Data, base_yr:int, target_yr:int) -> pd.DataFrame:
+#     # Get agricultural and non-agricultural dvars for base and target years
+#     ag_dvar_base = data.ag_dvars[base_yr].sum(0)             # (r, j)
+#     ag_dvar_target = data.ag_dvars[target_yr].sum(0)  
 
-    non_ag_dvar_base = data.non_ag_dvars[base_yr]            # (r, k)
-    non_ag_dvar_target = data.non_ag_dvars[target_yr]
+#     non_ag_dvar_base = data.non_ag_dvars[base_yr]            # (r, k)
+#     non_ag_dvar_target = data.non_ag_dvars[target_yr]
 
-    # Concatenate agricultural and non-agricultural dvars
-    all_lu_names = data.AGRICULTURAL_LANDUSES + data.NON_AGRICULTURAL_LANDUSES
-    dvar_cat_base = np.concatenate([ag_dvar_base, non_ag_dvar_base], axis=1)                                    # (r, j+k)
-    dvar_cat_target = np.concatenate([ag_dvar_target, non_ag_dvar_target], axis=1)
+#     # Concatenate agricultural and non-agricultural dvars
+#     all_lu_names = data.AGRICULTURAL_LANDUSES + data.NON_AGRICULTURAL_LANDUSES
+#     dvar_cat_base = np.concatenate([ag_dvar_base, non_ag_dvar_base], axis=1)                                    # (r, j+k)
+#     dvar_cat_target = np.concatenate([ag_dvar_target, non_ag_dvar_target], axis=1)
 
-    # Get the area of the lu that stayed the same
-    area_tmat_same = np.minimum(dvar_cat_base, dvar_cat_target) * data.REAL_AREA[:, None]                       # (r, j+k)
-    area_tmat_same_df = pd.DataFrame({
-        'From land-use': all_lu_names, 
-        'To land-use': all_lu_names, 
-        'Area (ha)': area_tmat_same.sum(axis=0)
-    })
+#     # Get the area of the lu that stayed the same
+#     area_tmat_same = np.minimum(dvar_cat_base, dvar_cat_target) * data.REAL_AREA[:, None]                       # (r, j+k)
+#     area_tmat_same_df = pd.DataFrame({
+#         'From land-use': all_lu_names, 
+#         'To land-use': all_lu_names, 
+#         'Area (ha)': area_tmat_same.sum(axis=0)
+#     })
 
-    # Get the area of the lu that has been transformed
-    this2other_condition = (dvar_cat_base - dvar_cat_target) > 0      
-    dvar_diff_this2other = np.where(this2other_condition,  dvar_cat_base - dvar_cat_target, 0)                  # (r, j+k)
-    dvar_diff_other2this = np.where(np.logical_not(this2other_condition), dvar_cat_target - dvar_cat_base, 0)   # (r, j+k)
-    trans_ha_this2other = dvar_diff_this2other * data.REAL_AREA[:, None]                                        # (r, j+k)
-    trans_ha_other2this = dvar_diff_other2this * data.REAL_AREA[:, None]                                        # (r, j+k)
+#     # Get the area of the lu that has been transformed
+#     this2other_condition = (dvar_cat_base - dvar_cat_target) > 0      
+#     dvar_diff_this2other = np.where(this2other_condition,  dvar_cat_base - dvar_cat_target, 0)                  # (r, j+k)
+#     dvar_diff_other2this = np.where(np.logical_not(this2other_condition), dvar_cat_target - dvar_cat_base, 0)   # (r, j+k)
+#     trans_ha_this2other = dvar_diff_this2other * data.REAL_AREA[:, None]                                        # (r, j+k)
+#     trans_ha_other2this = dvar_diff_other2this * data.REAL_AREA[:, None]                                        # (r, j+k)
 
-    # Get the area of the lu that has been transformed to other lus
-    to_lu_codes = trans_ha_other2this.argmax(axis=1)
+#     # Get the area of the lu that has been transformed to other lus
+#     to_lu_codes = trans_ha_other2this.argmax(axis=1)
 
-    area_tmat_df = pd.DataFrame(product(range(data.NCELLS), all_lu_names), columns=['CELL_ID', 'From land-use'])
-    area_tmat_df['Area (ha)'] = trans_ha_this2other.flatten()
+#     area_tmat_df = pd.DataFrame(product(range(data.NCELLS), all_lu_names), columns=['CELL_ID', 'From land-use'])
+#     area_tmat_df['Area (ha)'] = trans_ha_this2other.flatten()
 
-    # Get the names of the land-uses that the area has been transformed to
-    to_lu_names = [data.AGRICULTURAL_LANDUSES[i] if i < data.N_AG_LUS else data.NON_AGRICULTURAL_LANDUSES[i%data.N_AG_LUS] for i in to_lu_codes]
-    area_tmat_df['To land-use'] = np.array(to_lu_names).repeat(len(all_lu_names))
+#     # Get the names of the land-uses that the area has been transformed to
+#     to_lu_names = [data.AGRICULTURAL_LANDUSES[i] if i < data.N_AG_LUS else data.NON_AGRICULTURAL_LANDUSES[i%data.N_AG_LUS] for i in to_lu_codes]
+#     area_tmat_df['To land-use'] = np.array(to_lu_names).repeat(len(all_lu_names))
 
-    # Summarize the area transformed from one land-use to another
-    area_tmat_df = area_tmat_df.query('`Area (ha)` > 0')
-    area_tmat_df = area_tmat_df.groupby(['From land-use', 'To land-use']).sum().drop(columns='CELL_ID').reset_index()
+#     # Summarize the area transformed from one land-use to another
+#     area_tmat_df = area_tmat_df.query('`Area (ha)` > 0')
+#     area_tmat_df = area_tmat_df.groupby(['From land-use', 'To land-use']).sum().drop(columns='CELL_ID').reset_index()
 
-    # Add the area that stayed the same
-    area_tmat_df = pd.concat([area_tmat_df, area_tmat_same_df], axis=0)
+#     # Add the area that stayed the same
+#     area_tmat_df = pd.concat([area_tmat_df, area_tmat_same_df], axis=0)
 
-    return area_tmat_df
+#     return area_tmat_df
 
 
 
-def get_unchanged_lu_area_with_water(
-    data:Data, 
-    dvar_base:np.ndarray, 
-    dvar_target:np.ndarray, 
-    lu_names:list[str]
-) -> pd.DataFrame:
+# def get_unchanged_lu_area_with_water(
+#     data:Data, 
+#     dvar_base:np.ndarray, 
+#     dvar_target:np.ndarray, 
+#     lu_names:list[str]
+# ) -> pd.DataFrame:
     
-    # Get the dvar under different water supply
-    dvar_cat_base_dry = dvar_base[0,:,:]                                # (r, j+k)
-    dvar_cat_base_irr = dvar_base[1,:,:]                                # (r, j+k)
-    dvar_cat_target_dry = dvar_target[0,:,:]                            # (r, j+k)
-    dvar_cat_target_irr = dvar_target[1,:,:]                            # (r, j+k)
+#     # Get the dvar under different water supply
+#     dvar_cat_base_dry = dvar_base[0,:,:]                                # (r, j+k)
+#     dvar_cat_base_irr = dvar_base[1,:,:]                                # (r, j+k)
+#     dvar_cat_target_dry = dvar_target[0,:,:]                            # (r, j+k)
+#     dvar_cat_target_irr = dvar_target[1,:,:]                            # (r, j+k)
 
-    # Get the area of the lu that stayed the same. 
-    area_tmat_same_lu_dry2dry = np.minimum(dvar_cat_base_dry, dvar_cat_target_dry) * data.REAL_AREA[:, None]     # (r, j+k)
-    area_tmat_same_lu_dry2irr = np.minimum(dvar_cat_base_dry, dvar_cat_target_irr) * data.REAL_AREA[:, None]     # (r, j+k)
-    area_tmat_same_lu_irr2dry = np.minimum(dvar_cat_base_irr, dvar_cat_target_dry) * data.REAL_AREA[:, None]     # (r, j+k)
-    area_tmat_same_lu_irr2irr = np.minimum(dvar_cat_base_irr, dvar_cat_target_irr) * data.REAL_AREA[:, None]     # (r, j+k)
+#     # Get the area of the lu that stayed the same. 
+#     area_tmat_same_lu_dry2dry = np.minimum(dvar_cat_base_dry, dvar_cat_target_dry) * data.REAL_AREA[:, None]     # (r, j+k)
+#     area_tmat_same_lu_dry2irr = np.minimum(dvar_cat_base_dry, dvar_cat_target_irr) * data.REAL_AREA[:, None]     # (r, j+k)
+#     area_tmat_same_lu_irr2dry = np.minimum(dvar_cat_base_irr, dvar_cat_target_dry) * data.REAL_AREA[:, None]     # (r, j+k)
+#     area_tmat_same_lu_irr2irr = np.minimum(dvar_cat_base_irr, dvar_cat_target_irr) * data.REAL_AREA[:, None]     # (r, j+k)
 
-    area_tmat_same = np.stack([
-        area_tmat_same_lu_dry2dry, 
-        area_tmat_same_lu_dry2irr, 
-        area_tmat_same_lu_irr2dry,
-        area_tmat_same_lu_irr2irr, 
-    ], axis=0) # (4, r, j+k)
+#     area_tmat_same = np.stack([
+#         area_tmat_same_lu_dry2dry, 
+#         area_tmat_same_lu_dry2irr, 
+#         area_tmat_same_lu_irr2dry,
+#         area_tmat_same_lu_irr2irr, 
+#     ], axis=0) # (4, r, j+k)
 
-    # Sum the area of the lu that stayed the as the same lu
-    area_tmat_same_df = pd.DataFrame(
-        product(data.LANDMANS, data.LANDMANS, range(data.NCELLS), lu_names),
-        columns = ['From_water', 'To_water', 'CELL_ID', 'From land-use']
-    )
-    area_tmat_same_df['Area (ha)'] = area_tmat_same.flatten()
-    area_tmat_same_df['To land-use'] = area_tmat_same_df['From land-use']
+#     # Sum the area of the lu that stayed the as the same lu
+#     area_tmat_same_df = pd.DataFrame(
+#         product(data.LANDMANS, data.LANDMANS, range(data.NCELLS), lu_names),
+#         columns = ['From_water', 'To_water', 'CELL_ID', 'From land-use']
+#     )
+#     area_tmat_same_df['Area (ha)'] = area_tmat_same.flatten()
+#     area_tmat_same_df['To land-use'] = area_tmat_same_df['From land-use']
 
-    # Sum the area of the lu that stayed the same
-    area_tmat_same_df = area_tmat_same_df\
-        .groupby(['From_water', 'To_water', 'From land-use', 'To land-use'])\
-        .sum(numeric_only=True)[['Area (ha)']]\
-        .reset_index()
+#     # Sum the area of the lu that stayed the same
+#     area_tmat_same_df = area_tmat_same_df\
+#         .groupby(['From_water', 'To_water', 'From land-use', 'To land-use'])\
+#         .sum(numeric_only=True)[['Area (ha)']]\
+#         .reset_index()
         
-    return area_tmat_same_df
+#     return area_tmat_same_df
 
 
-def get_changed_lu_area_with_water(
-    data:Data, 
-    dvar_base:np.ndarray, 
-    dvar_target:np.ndarray, 
-    lu_names:list[str]
-) -> pd.DataFrame:
+# def get_changed_lu_area_with_water(
+#     data:Data, 
+#     dvar_base:np.ndarray, 
+#     dvar_target:np.ndarray, 
+#     lu_names:list[str]
+# ) -> pd.DataFrame:
     
-    # Get the dvar under different water supply
-    dvar_cat_base_dry = dvar_base[0,:,:]                                    # (r, j+k)
-    dvar_cat_base_irr = dvar_base[1,:,:]                                    # (r, j+k)
-    dvar_cat_target_dry = dvar_target[0,:,:]                                # (r, j+k)
-    dvar_cat_target_irr = dvar_target[1,:,:]                                # (r, j+k)
+#     # Get the dvar under different water supply
+#     dvar_cat_base_dry = dvar_base[0,:,:]                                    # (r, j+k)
+#     dvar_cat_base_irr = dvar_base[1,:,:]                                    # (r, j+k)
+#     dvar_cat_target_dry = dvar_target[0,:,:]                                # (r, j+k)
+#     dvar_cat_target_irr = dvar_target[1,:,:]                                # (r, j+k)
     
-    # Get the dvar transformation matrix
-    this2other_dry2dry = dvar_cat_base_dry - dvar_cat_target_dry            # (r, j+k)
-    this2other_irr2irr = dvar_cat_base_irr - dvar_cat_target_irr            # (r, j+k)
-    dvar_trans_arr = np.stack([ 
-        this2other_dry2dry, 
-        this2other_irr2irr
-    ], axis=0)                                                              # (4, r, j+k)    
+#     # Get the dvar transformation matrix
+#     this2other_dry2dry = dvar_cat_base_dry - dvar_cat_target_dry            # (r, j+k)
+#     this2other_irr2irr = dvar_cat_base_irr - dvar_cat_target_irr            # (r, j+k)
+#     dvar_trans_arr = np.stack([ 
+#         this2other_dry2dry, 
+#         this2other_irr2irr
+#     ], axis=0)                                                              # (2, r, j+k)    
 
 
-    # Get the lu transformation without considering the water supply    
-    dvar_diff_without_water = dvar_base.sum(0) - dvar_target.sum(0)         # (r, j+k)
+#     # Get the lu transformation without considering the water supply    
+#     dvar_diff_without_water = dvar_base.sum(0) - dvar_target.sum(0)         # (r, j+k)
 
-    # Get the water supply index that is the closest to the dvar_diff_without_water
-    dvar_trans_diff = dvar_trans_arr - dvar_diff_without_water[None, :, :]  # (4, r, j+k)
-    dvar_trans_water_supply_idx = np.argmin(abs(dvar_trans_diff), axis=0)   # (r, j+k)
+#     # Get the water supply index that is the closest to the dvar_diff_without_water
+#     dvar_trans_diff = dvar_trans_arr - dvar_diff_without_water[None, :, :]  # (2, r, j+k)
+#     dvar_trans_water_supply_idx = np.argmin(abs(dvar_trans_diff), axis=0)   # (r, j+k)
     
-    # Get the area transition with water supply
-    dvar_diff_this2other_all = np.stack([
-        np.where(this2other_dry2dry > 0, this2other_dry2dry, 0),
-        np.where(this2other_irr2irr > 0, this2other_irr2irr, 0) 
-    ], axis=0)                                                              # (4, r, j+k)
+#     # Get the area transition with water supply
+#     dvar_diff_this2other_all = np.stack([
+#         np.where(this2other_dry2dry > 0, this2other_dry2dry, 0),
+#         np.where(this2other_irr2irr > 0, this2other_irr2irr, 0) 
+#     ], axis=0)                                                              # (2, r, j+k)
 
-    dvar_diff_other2this_all = np.stack([
-        np.where(this2other_dry2dry < 0, -this2other_dry2dry, 0),
-        np.where(this2other_irr2irr < 0, -this2other_irr2irr, 0)
-    ], axis=0)                                                              # (4, r, j+k)
+#     dvar_diff_other2this_all = np.stack([
+#         np.where(this2other_dry2dry < 0, -this2other_dry2dry, 0),
+#         np.where(this2other_irr2irr < 0, -this2other_irr2irr, 0)
+#     ], axis=0)                                                              # (2, r, j+k)
 
     
-    # Get the actual area transition with water supply
-    dvar_diff_this2other_actual = dvar_diff_this2other_all[
-        dvar_trans_water_supply_idx,
-        np.arange(dvar_trans_water_supply_idx.shape[0])[:, None],
-        np.arange(dvar_trans_water_supply_idx.shape[1])
-    ]
+#     # Get the actual area transition with water supply
+#     dvar_diff_this2other_actual = dvar_diff_this2other_all[
+#         dvar_trans_water_supply_idx,
+#         np.arange(dvar_trans_water_supply_idx.shape[0])[:, None],
+#         np.arange(dvar_trans_water_supply_idx.shape[1])
+#     ]
 
-    trans_ha_this2other = dvar_diff_this2other_actual * data.REAL_AREA[:, None]
+#     trans_ha_this2other = dvar_diff_this2other_actual * data.REAL_AREA[:, None]
 
-    # Get the land-use codes with water supply
-    area_tmat_df = pd.DataFrame(
-        product(range(data.NCELLS), lu_names), 
-        columns=['CELL_ID', 'From land-use']
-    )
-    area_tmat_df['Area (ha)'] = trans_ha_this2other.flatten()
-    area_tmat_df['From_water'] = dvar_trans_water_supply_idx.flatten()
-    area_tmat_df['To_water'] = dvar_diff_other2this_all.sum(2).argmax(0).repeat(len(lu_names))
-    area_tmat_df['To land-use'] = dvar_diff_other2this_all.sum(0).argmax(1).repeat(len(lu_names))
+#     # Get the land-use codes with water supply
+#     area_tmat_df = pd.DataFrame(
+#         product(range(data.NCELLS), lu_names), 
+#         columns=['CELL_ID', 'From land-use']
+#     )
+#     area_tmat_df['Area (ha)'] = trans_ha_this2other.flatten()
+#     area_tmat_df['From_water'] = dvar_trans_water_supply_idx.flatten()
+#     area_tmat_df['To_water'] = dvar_diff_other2this_all.sum(2).argmax(0).repeat(len(lu_names))
+#     area_tmat_df['To land-use'] = dvar_diff_other2this_all.sum(0).argmax(1).repeat(len(lu_names))
 
-    area_tmat_df['From_water'] = area_tmat_df['From_water'].replace(dict(enumerate(data.LANDMANS)))
-    area_tmat_df['To_water'] = area_tmat_df['To_water'].replace(dict(enumerate(data.LANDMANS)))
-    area_tmat_df['To land-use'] = area_tmat_df['To land-use'].apply(lambda x: dict(enumerate(lu_names))[x])
+#     area_tmat_df['From_water'] = area_tmat_df['From_water'].replace(dict(enumerate(data.LANDMANS)))
+#     area_tmat_df['To_water'] = area_tmat_df['To_water'].replace(dict(enumerate(data.LANDMANS)))
+#     area_tmat_df['To land-use'] = area_tmat_df['To land-use'].apply(lambda x: dict(enumerate(lu_names))[x])
 
-    area_tmat_df = area_tmat_df.query('`Area (ha)` > 0')
-    area_tmat_df = area_tmat_df\
-        .groupby(['From_water', 'To_water', 'From land-use', 'To land-use'])\
-        .sum(numeric_only=True)\
-        .drop(columns='CELL_ID')\
-        .reset_index()
+#     area_tmat_df = area_tmat_df.query('`Area (ha)` > 0')
+#     area_tmat_df = area_tmat_df\
+#         .groupby(['From_water', 'To_water', 'From land-use', 'To land-use'])\
+#         .sum(numeric_only=True)\
+#         .drop(columns='CELL_ID')\
+#         .reset_index()
         
-    return area_tmat_df
+#     return area_tmat_df
 
 
-def get_lu_area_change_with_water(data:Data, base_yr:int, target_yr:int) -> pd.DataFrame:
-    # Get agricultural dvars
-    ag_dvar_base = data.ag_dvars[base_yr]                                                                       # (m, r, j)
-    ag_dvar_target = data.ag_dvars[target_yr] 
+# def get_lu_area_change_with_water(data:Data, base_yr:int, target_yr:int) -> pd.DataFrame:
+#     # Get agricultural dvars
+#     ag_dvar_base = data.ag_dvars[base_yr]                                                                       # (m, r, j)
+#     ag_dvar_target = data.ag_dvars[target_yr] 
 
-    # Get non-agricultural dvars
-    non_ag_dvar_base = data.non_ag_dvars[base_yr]                                                               # (r, k)
-    non_ag_dvar_base = np.stack([non_ag_dvar_base, np.zeros_like(non_ag_dvar_base)], axis=0)                    # (m, r, k)
-    non_ag_dvar_target = data.non_ag_dvars[target_yr]                                                           # (r, k)
-    non_ag_dvar_target = np.stack([non_ag_dvar_target, np.zeros_like(non_ag_dvar_target)], axis=0)              # (m, r, k)
+#     # Get non-agricultural dvars
+#     non_ag_dvar_base = data.non_ag_dvars[base_yr]                                                               # (r, k)
+#     non_ag_dvar_base = np.stack([non_ag_dvar_base, np.zeros_like(non_ag_dvar_base)], axis=0)                    # (m, r, k)
+#     non_ag_dvar_target = data.non_ag_dvars[target_yr]                                                           # (r, k)
+#     non_ag_dvar_target = np.stack([non_ag_dvar_target, np.zeros_like(non_ag_dvar_target)], axis=0)              # (m, r, k)
 
-    # Concatenate agricultural and non-agricultural dvars
-    all_lu_names = data.AGRICULTURAL_LANDUSES + data.NON_AGRICULTURAL_LANDUSES
-    dvar_cat_base = np.concatenate([ag_dvar_base, non_ag_dvar_base], axis=2)                                    # (m, r, j+k)
-    dvar_cat_target = np.concatenate([ag_dvar_target, non_ag_dvar_target], axis=2)                              # (m, r, j+k)
+#     # Concatenate agricultural and non-agricultural dvars
+#     all_lu_names = data.AGRICULTURAL_LANDUSES + data.NON_AGRICULTURAL_LANDUSES
+#     dvar_cat_base = np.concatenate([ag_dvar_base, non_ag_dvar_base], axis=2)                                    # (m, r, j+k)
+#     dvar_cat_target = np.concatenate([ag_dvar_target, non_ag_dvar_target], axis=2)                              # (m, r, j+k)
 
-    # Get the land-use area change matrix
-    area_tmat_same_df = get_unchanged_lu_area_with_water(data, dvar_cat_base, dvar_cat_target, all_lu_names)
-    area_tmat_changed_df = get_changed_lu_area_with_water(data, dvar_cat_base, dvar_cat_target, all_lu_names)
-    area_tmat_df = pd.concat([area_tmat_same_df, area_tmat_changed_df], axis=0)
+#     # Get the land-use area change matrix
+#     area_tmat_same_df = get_unchanged_lu_area_with_water(data, dvar_cat_base, dvar_cat_target, all_lu_names)
+#     area_tmat_changed_df = get_changed_lu_area_with_water(data, dvar_cat_base, dvar_cat_target, all_lu_names)
+#     area_tmat_df = pd.concat([area_tmat_same_df, area_tmat_changed_df], axis=0)
     
-    return area_tmat_df
+#     return area_tmat_df
 
 
     

@@ -137,7 +137,11 @@ def write_logs(data: Data):
             f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stdout.log",
             f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stderr.log"]
 
-    [shutil.move(log, f"{data.path}/{os.path.basename(log)}") for log in logs if os.path.exists(log)]
+    for log in logs:
+        try:
+            shutil.move(log, f"{data.path}/{os.path.basename(log)}")
+        except:
+            print(f"Could not move {log} to {data.path}")
     
     return None
 
@@ -151,17 +155,14 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     if not os.path.isdir(path_yr):
         os.mkdir(path_yr)
 
-    # # Write the decision variables, land-use and land management maps
-    if settings.WRITE_OUTPUT_GEOTIFFS:
-        write_files(data, yr_cal, path_yr)
-        write_files_separate(data, yr_cal, path_yr)
-
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CAUTION !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    # The area here was calculated from lumap/lmmap, which {maby not accurate !!!}
+    # The area here was calculated from lumap/lmmap, which {are not accurate !!!}
     # compared to the area calculated from dvars
     write_crosstab(data, yr_cal, path_yr, yr_cal_sim_pre)
 
     # Write the reset outputs
+    write_files(data, yr_cal, path_yr)
+    write_files_separate(data, yr_cal, path_yr) if settings.WRITE_OUTPUT_GEOTIFFS else None
     write_dvar_area(data, yr_cal, path_yr)
     write_quantity(data, yr_cal, path_yr, yr_cal_sim_pre)
     write_revenue_cost_ag(data, yr_cal, path_yr)
@@ -520,12 +521,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         # Get the base_year mrj matirx
         base_mrj = tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre])
         # Get the transition cost matrices for agricultural land-use
-        ag_transitions_cost_mat = ag_transitions.get_transition_matrices(data,
-                                                                        yr_idx,
-                                                                        yr_cal_sim_pre,
-                                                                        data.lumaps,
-                                                                        data.lmmaps,
-                                                                        separate = True)
+        ag_transitions_cost_mat = ag_transitions.get_transition_matrices(data, yr_idx, yr_cal_sim_pre, separate = True)
 
     cost_dfs = []
     # Convert the transition cost matrices to a DataFrame
@@ -734,17 +730,40 @@ def write_area_transition_start_end(data: Data, path):
 
     print(f'Save transition matrix between start and end year\n')
 
-    # Get all years and all land uses
+    # Get all years from sim
     years = sorted(data.ag_dvars.keys())
-    yr_cal_start = years[0]
-    yr_cal_end = years[-1]
-    all_lus = data.AGRICULTURAL_LANDUSES + list(data.NONAGLU2DESC.values())
 
-    # Get the area transition dataframe
-    area_tmat_df = tools.get_area_tmat_df(data, yr_cal_start, yr_cal_end) 
+    # Get the end year
+    yr_cal_end = years[-1]
+
+    # Get the decision variables for the start year
+    dvar_base = data.ag_dvars[data.YR_CAL_BASE]
+
+    # Calculate the transition matrix for agricultural land uses (start) to agricultural land uses (end)
+    transitions_ag2ag = []
+    for lu_idx, lu in enumerate(data.AGRICULTURAL_LANDUSES):
+        dvar_target = data.ag_dvars[yr_cal_end][:,:,lu_idx]
+        trans = np.einsum('mrj, mr, r -> j', dvar_base, dvar_target, data.REAL_AREA)
+        trans_df = pd.DataFrame({lu:trans.flatten()}, index=data.AGRICULTURAL_LANDUSES)
+        transitions_ag2ag.append(trans_df)
+    transition_ag2ag = pd.concat(transitions_ag2ag, axis=1)
+
+    # Calculate the transition matrix for agricultural land uses (start) to non-agricultural land uses (end)
+    trainsitions_ag2non_ag = []
+    for lu_idx, lu in enumerate(NON_AG_LAND_USES.keys()):
+        dvar_target = data.non_ag_dvars[yr_cal_end][:,lu_idx]
+        trans = np.einsum('mrj, r, r -> j', dvar_base, dvar_target, data.REAL_AREA)
+        trans_df = pd.DataFrame({lu:trans.flatten()}, index=data.AGRICULTURAL_LANDUSES)
+        trainsitions_ag2non_ag.append(trans_df)
+    transition_ag2non_ag = pd.concat(trainsitions_ag2non_ag, axis=1)
+
+    # Concatenate the two transition matrices
+    transition = pd.concat([transition_ag2ag, transition_ag2non_ag], axis=1)
+    transition = transition.stack().reset_index()
+    transition.columns = ['From land-use','To land-use','Area (ha)']
 
     # Write the transition matrix to a csv file
-    area_tmat_df.to_csv(os.path.join(path, f'transition_matrix_{yr_cal_start}_{yr_cal_end}.csv'), index=False)
+    transition.to_csv(os.path.join(path, f'transition_matrix_{data.YR_CAL_BASE}_{yr_cal_end}.csv'), index=False)
 
 
 
@@ -765,7 +784,7 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         assert yr_cal_sim_pre >= data.YR_CAL_BASE and yr_cal_sim_pre < yr_cal,\
             f"yr_cal_sim_pre ({yr_cal_sim_pre}) must be >= {data.YR_CAL_BASE} and < {yr_cal}"
 
-        print(f'Writing production outputs for {yr_cal}')
+        print(f'Writing crosstab data for {yr_cal}')
 
         # LUS = ['Non-agricultural land'] + data.AGRICULTURAL_LANDUSES + NON_AG_LAND_USES.keys()
         ctlu, swlu = lumap_crossmap( data.lumaps[yr_cal_sim_pre]

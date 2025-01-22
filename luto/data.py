@@ -270,7 +270,7 @@ class Data:
             self.DESC2AGLU["Unallocated - natural land"],
         ]
         self.LU_MODIFIED_LAND = [self.DESC2AGLU[lu] for lu in self.AGRICULTURAL_LANDUSES if self.DESC2AGLU[lu] not in self.LU_NATURAL]
-
+        
         self.LU_CROPS_INDICES = [self.AGRICULTURAL_LANDUSES.index(lu) for lu in self.AGRICULTURAL_LANDUSES if lu in self.LU_CROPS]
         self.LU_LVSTK_INDICES = [self.AGRICULTURAL_LANDUSES.index(lu) for lu in self.AGRICULTURAL_LANDUSES if lu in self.LU_LVSTK]
         self.LU_UNALL_INDICES = [self.AGRICULTURAL_LANDUSES.index(lu) for lu in self.AGRICULTURAL_LANDUSES if lu in self.LU_UNALL]
@@ -392,13 +392,17 @@ class Data:
 
         # Derive NCELLS (number of spatial cells) from the area array.
         self.NCELLS = self.REAL_AREA.shape[0]
+        
+        # Initial (2010) ag decision variable (X_mrj).
+        self.LMMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lmmap.h5")).to_numpy()
+        self.AG_L_MRJ = self.get_exact_resfactored_lumap_mrj() 
+        self.add_ag_dvars(self.YR_CAL_BASE, self.AG_L_MRJ)
 
         # Initial (2010) land-use map, mapped as lexicographic land-use class indices.
-        self.LUMAP = self.get_array_resfactor_applied(self.LUMAP_NO_RESFACTOR)
+        self.LUMAP = self.AG_L_MRJ.sum(axis=0).argmax(axis=1).astype("int8")
         self.add_lumap(self.YR_CAL_BASE, self.LUMAP)
 
         # Initial (2010) land management map.
-        self.LMMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lmmap.h5")).to_numpy()
         self.LMMAP = self.get_array_resfactor_applied(self.LMMAP_NO_RESFACTOR)
         self.add_lmmap(self.YR_CAL_BASE, self.LMMAP)
 
@@ -409,8 +413,7 @@ class Data:
         }
         self.add_ammaps(self.YR_CAL_BASE, self.AMMAP_DICT)
 
-        self.AG_L_MRJ = self.get_exact_resfactored_lumap_mrj() 
-        self.add_ag_dvars(self.YR_CAL_BASE, self.AG_L_MRJ)
+        
 
         self.NON_AG_L_RK = lumap2non_ag_l_mk(
             self.LUMAP, len(self.NON_AGRICULTURAL_LANDUSES)     # Int8
@@ -649,6 +652,11 @@ class Data:
 
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
         self.AG_TMATRIX = np.load(os.path.join(INPUT_DIR, "ag_tmatrix.npy"))
+        
+        # Apply penalty if a transition was occur from natural to modified land.
+        for i,j in product(range(self.N_AG_LUS), range(self.N_AG_LUS)):
+            if (not i in self.LU_MODIFIED_LAND) and (j in self.LU_MODIFIED_LAND):
+                self.AG_TMATRIX[i,j] += settings.NATURAL_TO_MODIFIED_LAND_PENALTY
         
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
         self.EXCLUDE = np.load(os.path.join(INPUT_DIR, "x_mrj.npy"))

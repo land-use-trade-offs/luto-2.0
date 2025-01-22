@@ -32,45 +32,45 @@ class SolverInputData:
     """
     An object that collects and stores all relevant data for solver.py.
     """   
-    base_year: int                  # The base year of this solving process
-    target_year: int                # The target year of this solving process
+    base_year: int                          # The base year of this solving process
+    target_year: int                        # The target year of this solving process
 
-    ag_g_mrj: np.ndarray            # Agricultural greenhouse gas emissions matrices.
-    ag_w_mrj: np.ndarray            # Agricultural water requirements matrices.
-    ag_b_mrj: np.ndarray            # Agricultural biodiversity matrices.
-    ag_x_mrj: np.ndarray            # Agricultural exclude matrices.
-    ag_q_mrp: np.ndarray            # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
-    ag_ghg_t_mrj: np.ndarray        # GHG emissions released during transitions between agricultural land uses.
+    ag_g_mrj: np.ndarray                    # Agricultural greenhouse gas emissions matrices.
+    ag_w_mrj: np.ndarray                    # Agricultural water requirements matrices.
+    ag_b_mrj: np.ndarray                    # Agricultural biodiversity matrices.
+    ag_x_mrj: np.ndarray                    # Agricultural exclude matrices.
+    ag_q_mrp: np.ndarray                    # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
+    ag_ghg_t_mrj: np.ndarray                # GHG emissions released during transitions between agricultural land uses.
 
-    non_ag_g_rk: np.ndarray         # Non-agricultural greenhouse gas emissions matrix.
-    non_ag_w_rk: np.ndarray         # Non-agricultural water requirements matrix.
-    non_ag_b_rk: np.ndarray         # Non-agricultural biodiversity matrix.
-    non_ag_x_rk: np.ndarray         # Non-agricultural exclude matrices.
-    non_ag_q_crk: np.ndarray        # Non-agricultural yield matrix.
-    non_ag_lb_rk: np.ndarray        # Non-agricultural lower bound matrices.
+    non_ag_g_rk: np.ndarray                 # Non-agricultural greenhouse gas emissions matrix.
+    non_ag_w_rk: np.ndarray                 # Non-agricultural water requirements matrix.
+    non_ag_b_rk: np.ndarray                 # Non-agricultural biodiversity matrix.
+    non_ag_x_rk: np.ndarray                 # Non-agricultural exclude matrices.
+    non_ag_q_crk: np.ndarray                # Non-agricultural yield matrix.
+    non_ag_lb_rk: np.ndarray                # Non-agricultural lower bound matrices.
 
-    ag_man_g_mrj: dict              # Agricultural management options' GHG emission effects.
-    ag_man_q_mrp: dict              # Agricultural management options' quantity effects.
-    ag_man_w_mrj: dict              # Agricultural management options' water requirement effects.
-    ag_man_b_mrj: dict              # Agricultural management options' biodiversity effects.
-    ag_man_limits: dict             # Agricultural management options' adoption limits.
-    ag_man_lb_mrj: dict             # Agricultural management options' lower bounds.
+    ag_man_g_mrj: dict                      # Agricultural management options' GHG emission effects.
+    ag_man_q_mrp: dict                      # Agricultural management options' quantity effects.
+    ag_man_w_mrj: dict                      # Agricultural management options' water requirement effects.
+    ag_man_b_mrj: dict                      # Agricultural management options' biodiversity effects.
+    ag_man_limits: dict                     # Agricultural management options' adoption limits.
+    ag_man_lb_mrj: dict                     # Agricultural management options' lower bounds.
 
-    water_yield_RR_BASE_YR: dict                                        # Water yield for the BASE_YR based on historical water yield layers .
-    water_yield_outside_study_area: dict[int, float]                    # Water yield from outside LUTO study area -> dict. Keys: year, region.
+    water_yield_RR_BASE_YR: dict                           # Water yield for the BASE_YR based on historical water yield layers .
+    water_yield_outside_study_area: dict[int, float]       # Water yield from outside LUTO study area -> dict. Keys: year, region.
     
     economic_contr_mrj: float               # base year economic contribution matrix.
     economic_base_sum: float                # base year total profit (revnue - cost) or cost.
     economic_BASE_YR_prices: np.ndarray     # target year commodity profit.
     economic_target_yr_carbon_price: float  # target year carbon price.
 
-    offland_ghg: np.ndarray         # GHG emissions from off-land commodities.
+    offland_ghg: np.ndarray                 # GHG emissions from off-land commodities.
 
-    lu2pr_pj: np.ndarray            # Conversion matrix: land-use to product(s).
-    pr2cm_cp: np.ndarray            # Conversion matrix: product(s) to commodity.
-    limits: dict                    # Targets to use.
-    desc2aglu: dict                 # Map of agricultural land use descriptions to codes.
-    resmult: float                  # Resolution factor multiplier from data.RESMULT
+    lu2pr_pj: np.ndarray                    # Conversion matrix: land-use to product(s).
+    pr2cm_cp: np.ndarray                    # Conversion matrix: product(s) to commodity.
+    limits: dict                            # Targets to use.
+    desc2aglu: dict                         # Map of agricultural land use descriptions to codes.
+    resmult: float                          # Resolution factor multiplier from data.RESMULT
 
     @property
     def n_ag_lms(self):
@@ -153,8 +153,8 @@ class SolverInputData:
             for r in k_cells:
                 cells2non_ag_lu[r].append(k)
 
-        return dict(cells2non_ag_lu)    
-
+        return dict(cells2non_ag_lu) 
+    
 def get_ag_c_mrj(data: Data, target_index):
     print('Getting agricultural cost matrices...', flush = True)
     output = ag_cost.get_cost_matrices(data, target_index)
@@ -256,9 +256,8 @@ def get_ag_t_mrj(data: Data, target_index, base_year):
     ag_t_mrj = ag_transition.get_transition_matrices(
         data, 
         target_index, 
-        base_year, 
-        data.lumaps, 
-        data.lmmaps).astype(np.float32)
+        base_year
+    ).astype(np.float32)
     # Transition costs occures if the base year is not the target year
     return ag_t_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(ag_t_mrj)
 
@@ -517,8 +516,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     ag_to_non_ag_t_rk = get_ag_to_non_ag_t_rk(data, target_index, base_year)
     
     non_ag_c_rk = get_non_ag_c_rk(data, ag_c_mrj, data.lumaps[base_year], target_year)
-    non_ag_t_rk = get_non_ag_t_rk(data, base_year)
     non_ag_r_rk = get_non_ag_r_rk(data, ag_r_mrj, base_year, target_year)
+    non_ag_t_rk = get_non_ag_t_rk(data, base_year)
     non_ag_to_ag_t_mrj = get_non_ag_to_ag_t_mrj(data, base_year, target_index)
     
     ag_man_c_mrj = get_ag_man_c_mrj(data, target_index, ag_c_mrj)
@@ -539,7 +538,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_t_mrj
     )
     
-    economic_base_sum=get_base_yr_economy_sum(data, base_year, ag_obj_mrj, non_ag_obj_rk,  ag_man_objs)
+    economic_base_sum = get_base_yr_economy_sum(data, base_year, ag_obj_mrj, non_ag_obj_rk,  ag_man_objs)
 
     ag_g_mrj = get_ag_g_mrj(data, target_index)
     ag_q_mrp = get_ag_q_mrp(data, target_index)
@@ -554,11 +553,13 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     return SolverInputData(
         base_year=base_year,
         target_year=target_year,
+        
         ag_g_mrj=ag_g_mrj,
         ag_w_mrj=ag_w_mrj,
         ag_b_mrj=ag_b_mrj,
         ag_x_mrj=ag_x_mrj,
         ag_q_mrp=ag_q_mrp,
+        
         ag_ghg_t_mrj=get_ag_ghg_t_mrj(data, base_year),
         non_ag_g_rk=get_non_ag_g_rk(data, ag_g_mrj, base_year),
         non_ag_w_rk=get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR),  # Calculate non-ag water requirement matrices based on historical water yield layers
@@ -566,12 +567,14 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         non_ag_x_rk=get_non_ag_x_rk(data, ag_x_mrj, base_year),
         non_ag_q_crk=get_non_ag_q_crk(data, ag_q_mrp, base_year),
         non_ag_lb_rk=get_non_ag_lb_rk(data, base_year),
+        
         ag_man_g_mrj=get_ag_man_g_mrj(data, target_index, ag_g_mrj),
         ag_man_q_mrp=get_ag_man_q_mrj(data, target_index, ag_q_mrp),
         ag_man_w_mrj=get_ag_man_w_mrj(data, target_index),
         ag_man_b_mrj=get_ag_man_b_mrj(data, target_index, ag_b_mrj),
         ag_man_limits=get_ag_man_limits(data, target_index),                            
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
+        
         water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Use the water net yield outside LUTO study area for the YR_CAL_BASE year
         water_yield_RR_BASE_YR=get_w_RR_BASE_YR(data),                                  # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
         

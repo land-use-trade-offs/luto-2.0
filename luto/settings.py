@@ -89,6 +89,8 @@ DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 # Set amortisation period
 AMORTISATION_PERIOD = 30 # years
 
+# Penalty for converting natural land to modified land
+NATURAL_TO_MODIFIED_LAND_PENALTY = 1e9
 
 
 # ---------------------------------------------------------------------------- #

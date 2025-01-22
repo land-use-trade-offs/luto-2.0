@@ -188,7 +188,8 @@ def save_report_data(raw_data_dir:str):
 
     # Get the total area of each land use
     transition_mat = transition_df_area.pivot(index='From land-use', columns='To land-use', values='Area (km2)')
-    transition_mat = transition_mat.reindex(columns=LANDUSE_ALL_RENAMED, fill_value=0)
+    transition_mat = transition_mat.reindex(index=LANDUSE_ALL_RENAMED, columns=LANDUSE_ALL_RENAMED)
+    transition_mat = transition_mat.fillna(0)
     total_area_from = transition_mat.sum(axis=1).values.reshape(-1, 1)
     
     # Calculate the percentage of each land use
@@ -433,17 +434,20 @@ def save_report_data(raw_data_dir:str):
     
     cost_transition_ag2ag_df = files.query('category == "cost" and base_name == "cost_transition_ag2ag" and year_types != "begin_end_year"').reset_index(drop=True)
     cost_transition_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2ag_df['path']], ignore_index=True)
-    cost_transition_ag2ag_df['Value (million)'] = cost_transition_ag2ag_df['Cost ($)'] * -1 / 1e6 
+    cost_transition_ag2ag_df['Value (million)'] = cost_transition_ag2ag_df['Cost ($)'] * -1 / 1e6
+    cost_transition_ag2ag_df['Value (billion)'] = cost_transition_ag2ag_df['Value (million)'] / 1e3
     cost_transition_ag2ag_df = cost_transition_ag2ag_df.replace(RENAME_AM_NON_AG)
     
     cost_transition_ag2non_ag_df = files.query('category == "cost" and base_name == "cost_transition_ag2non_ag" and year_types != "begin_end_year"').reset_index(drop=True)
     cost_transition_ag2non_ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2non_ag_df['path']], ignore_index=True)
     cost_transition_ag2non_ag_df['Value (million)'] = cost_transition_ag2non_ag_df['Cost ($)'] * -1 / 1e6
+    cost_transition_ag2non_ag_df['Value (billion)'] = cost_transition_ag2non_ag_df['Value (million)'] / 1e3
     cost_transition_ag2non_ag_df = cost_transition_ag2non_ag_df.replace(RENAME_AM_NON_AG)
     
     cost_transition_non_ag2ag_df = files.query('base_name == "cost_transition_non_ag2_ag" and year_types != "begin_end_year"')
     cost_transition_non_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_non_ag2ag_df['path']], ignore_index=True)
     cost_transition_non_ag2ag_df['Value (million)'] = cost_transition_non_ag2ag_df['Cost ($)'] * -1 / 1e6
+    cost_transition_non_ag2ag_df['Value (billion)'] = cost_transition_non_ag2ag_df['Value (million)'] / 1e3
     cost_transition_non_ag2ag_df = cost_transition_non_ag2ag_df.replace(RENAME_AM_NON_AG)
     
 

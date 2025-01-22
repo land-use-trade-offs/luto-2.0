@@ -209,7 +209,7 @@ class LutoSolver:
 
                     self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                         lb=dry_x_lb, ub=1, name=dry_var_name,
-                    )
+                    )               
 
                 irr_lu_cells = self._input_data.ag_lu2cells[1, j]
                 for r in irr_lu_cells:
@@ -219,6 +219,7 @@ class LutoSolver:
                     self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                         lb=irr_x_lb, ub=1, name=irr_var_name,
                     )
+                 
 
     def _setup_deviation_penalties(self):
         """
