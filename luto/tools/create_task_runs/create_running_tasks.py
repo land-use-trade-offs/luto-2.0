@@ -7,16 +7,16 @@ grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['400GB'],
-    'NCPUS':[100],
-    'TIME': ['30:00:00'],
+    'MEM': ['80GB'],
+    'NCPUS':[20],
+    'TIME': ['20:00:00'],
     'QUEUE': ['normalsr'],
     
     ###############################################################
     # Working settings for the model run
     ###############################################################
-    'MODE': ['snapshot'],                # 'snapshot' or 'timeseries'
-    'RESFACTOR': [1],
+    'MODE': ['timeseries'],                # 'snapshot' or 'timeseries'
+    'RESFACTOR': [3,5,10],
     'WRITE_THREADS': [10],
     'WRITE_OUTPUT_GEOTIFFS': [True],
     # 'NON_AG_LAND_USES_REVERSIBLE' : ['''{
@@ -33,7 +33,7 @@ grid_search = {
     # Model run settings
     ###############################################################
     'GHG_CONSTRAINT_TYPE': ['soft'],        # 'hard' or 'soft'
-    'BIODIVERSITY_LIMITS': ['on'],           # 'on' or 'off'
+    'BIODIVERSITY_LIMITS': ['on','off'],           # 'on' or 'off'
 
     ###############################################################
     # Scenario settings for the model run
