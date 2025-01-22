@@ -1,4 +1,4 @@
-TASK_ROOT_DIR = '../Timeseries_RES20_Deforestation_cost_1e9/'
+TASK_ROOT_DIR = '../20250122_RES357_Timeseries/'
 
 EXCLUDE_DIRS = [
     'input', 
