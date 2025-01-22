@@ -31,7 +31,6 @@ import shutil
 import pandas as pd
 import numpy as np
 import numpy_financial as npf
-from luto.data import Data
 import luto.settings as settings
 
 from typing import Tuple
@@ -607,7 +606,7 @@ def read_dvars(yr:int, df_yr: pd.DataFrame) -> tuple:
 
     
 def calc_water(
-    data:Data, 
+    data, 
     ind:np.ndarray, 
     ag_w_mrj:np.ndarray, 
     non_ag_w_rk:np.ndarray, 
