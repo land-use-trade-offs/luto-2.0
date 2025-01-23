@@ -6,33 +6,24 @@ grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['80GB'],
-    'NCPUS':[20],
-    'TIME': ['20:00:00'],
+    'MEM': ['40GB'],
+    'NCPUS':[10],
+    'TIME': ['1:00:00'],
     'QUEUE': ['normalsr'],
     
     ###############################################################
     # Working settings for the model run
     ###############################################################
     'MODE': ['timeseries'],                # 'snapshot' or 'timeseries'
-    'RESFACTOR': [3,5,10],
+    'RESFACTOR': [30],
     'WRITE_THREADS': [10],
     'WRITE_OUTPUT_GEOTIFFS': [True],
-    # 'NON_AG_LAND_USES_REVERSIBLE' : ['''{
-    #     'Environmental Plantings': True,
-    #     'Riparian Plantings': True,
-    #     'Sheep Agroforestry': True,
-    #     'Beef Agroforestry': True,
-    #     'Carbon Plantings (Block)': True,
-    #     'Sheep Carbon Plantings (Belt)': True,
-    #     'Beef Carbon Plantings (Belt)': True,
-    #     'BECCS': True}'''],
     
     ###############################################################
     # Model run settings
     ###############################################################
     'GHG_CONSTRAINT_TYPE': ['soft'],        # 'hard' or 'soft'
-    'BIODIVERSITY_LIMITS': ['on','off'],           # 'on' or 'off'
+    'BIODIVERSITY_LIMITS': ['on'],           # 'on' or 'off'
 
     ###############################################################
     # Scenario settings for the model run
@@ -55,7 +46,10 @@ grid_search = {
         {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3 }, 
         # {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5 }
     ],
-    # 'DIET_GLOB': ['BAU', 'FLX', 'VEG', 'VGN'],
+    # 'DIET_DOM': ['BAU',],            # 'BAU' or 'FLX'
+    # 'DIET_GLOB': ['BAU',],           # 'BAU' or 'FLX'
+    # 'WASTE': [1],                    # 1 or 0.5
+    # 'FEED_EFFICIENCY': ['BAU'],      # 'BAU' or 'High'
 }
 
 

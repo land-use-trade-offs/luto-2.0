@@ -348,7 +348,7 @@ def get_quantity_matrix(data, ag_q_mrp: np.ndarray, lumap: np.ndarray) -> np.nda
     env_plantings_quantity_matrix = get_quantity_env_plantings(data)
     rip_plantings_quantity_matrix = get_quantity_rip_plantings(data)
     sheep_agroforestry_quantity_matrix = get_quantity_sheep_agroforestry(data, ag_q_mrp, agroforestry_x_r)
-    beef_agroforestry_quantity_matrix = get_quantity_sheep_agroforestry(data, ag_q_mrp, agroforestry_x_r)
+    beef_agroforestry_quantity_matrix = get_quantity_beef_agroforestry(data, ag_q_mrp, agroforestry_x_r)
     carbon_plantings_block_quantity_matrix = get_quantity_carbon_plantings_block(data)
     sheep_carbon_plantings_belt_quantity_matrix = get_quantity_sheep_carbon_plantings_belt(data, ag_q_mrp, cp_belt_x_r)
     beef_carbon_plantings_belt_quantity_matrix = get_quantity_beef_carbon_plantings_belt(data, ag_q_mrp, cp_belt_x_r)
