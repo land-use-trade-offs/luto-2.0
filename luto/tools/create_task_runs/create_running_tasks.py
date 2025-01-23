@@ -1,4 +1,5 @@
 import os
+import numpy as np
 from luto.tools.create_task_runs.helpers import create_grid_search_template, create_task_runs, create_settings_template
 
 
@@ -8,28 +9,28 @@ grid_search = {
     ###############################################################
     'MEM': ['40GB'],
     'NCPUS':[10],
-    'TIME': ['1:00:00'],
+    'TIME': ['5:00:00'],
     'QUEUE': ['normalsr'],
     
     ###############################################################
     # Working settings for the model run
     ###############################################################
     'MODE': ['timeseries'],                # 'snapshot' or 'timeseries'
-    'RESFACTOR': [30],
+    'RESFACTOR': [10],
     'WRITE_THREADS': [10],
     'WRITE_OUTPUT_GEOTIFFS': [True],
     
     ###############################################################
     # Model run settings
     ###############################################################
+    'DEMAND_CONSTRAINT_TYPE': ['soft'],     # 'hard' or 'soft'
     'GHG_CONSTRAINT_TYPE': ['soft'],        # 'hard' or 'soft'
     'BIODIVERSITY_LIMITS': ['on'],           # 'on' or 'off'
-
+    
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_ECONOMY_WEIGHT': 
-        # list(np.linspace(0.05, 0.5, 30)),
         # list(np.arange(5, 51, 2)/100),
         [0.25],
         # sorted([
@@ -56,6 +57,7 @@ grid_search = {
 # Read the template for the custom settings
 template_df = create_settings_template()
 grid_search_df = create_grid_search_template(template_df, grid_search)
+
 
 # Create the task runs
 if os.name == 'posix':

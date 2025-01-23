@@ -64,7 +64,7 @@ def create_grid_search_template(template_df:pd.DataFrame, grid_dict: dict) -> pd
     permutations = [dict(zip(keys, v)) for v in itertools.product(*values)]
 
     permutations_df = pd.DataFrame(permutations)
-    permutations_df.insert(0, 'run_idx', range(1, len(permutations_df) + 1))
+    permutations_df.insert(0, 'run_idx', [f'{i:03}' for i in range(1, len(permutations_df) + 1)])
     
     # Reporting the grid search template
     print(f'Grid search template has been created with {len(permutations_df)} permutations!')
