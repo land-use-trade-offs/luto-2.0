@@ -18,7 +18,6 @@
 Writes model output and statistics to files.
 """
 
-from itertools import product
 import os, re
 import shutil
 import threading
@@ -29,6 +28,7 @@ import psutil
 import xarray as xr
 import geopandas as gpd
 
+from itertools import product
 from datetime import datetime
 from joblib import Parallel, delayed
 
@@ -47,7 +47,7 @@ import luto.economics.agricultural.ghg as ag_ghg
 import luto.economics.agricultural.water as ag_water
 import luto.economics.agricultural.biodiversity as ag_biodiversity
 
-import luto.economics.non_agricultural.quantity as non_ag_quantity              # non_ag_quantity is all zeros, so skip the calculation here
+import luto.economics.non_agricultural.quantity as non_ag_quantity              # non_ag_quantity has already been calculated and stored in <sim.prod_data>
 import luto.economics.non_agricultural.revenue as non_ag_revenue
 import luto.economics.non_agricultural.cost as non_ag_cost
 import luto.economics.non_agricultural.transitions as non_ag_transitions
@@ -135,7 +135,8 @@ def write_logs(data: Data):
     logs = [f"{settings.OUTPUT_DIR}/run_{data.timestamp_sim}_stdout.log",
             f"{settings.OUTPUT_DIR}/run_{data.timestamp_sim}_stderr.log",
             f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stdout.log",
-            f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stderr.log"]
+            f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stderr.log",
+            f'{settings.OUTPUT_DIR}/RES_{settings.RESFACTOR}_{settings.MODE}_mem_log.txt']
 
     for log in logs:
         try:
@@ -737,7 +738,7 @@ def write_area_transition_start_end(data: Data, path):
     yr_cal_end = years[-1]
 
     # Get the decision variables for the start year
-    dvar_base = data.ag_dvars[data.YR_CAL_BASE]
+    dvar_base = tools.lumap2ag_l_mrj(data.lumaps[data.YR_CAL_BASE], data.lmmaps[data.YR_CAL_BASE])
 
     # Calculate the transition matrix for agricultural land uses (start) to agricultural land uses (end)
     transitions_ag2ag = []

@@ -89,8 +89,13 @@ DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 # Set amortisation period
 AMORTISATION_PERIOD = 30 # years
 
-# Penalty for converting natural land to modified land AUD/ha
-NATURAL_TO_MODIFIED_LAND_PENALTY = 1e9
+# Deforestation legislation; If 'on' then deforestation is penalised by introducing a huge-cost (1 billion AUD/ha) for converting natural to modified land
+DEFORESTATION_LEGISLATION = 'on'  # 'on' or 'off'
+
+if DEFORESTATION_LEGISLATION == 'on':
+    NATURAL_TO_MODIFIED_LAND_PENALTY = 1e9
+else:
+    NATURAL_TO_MODIFIED_LAND_PENALTY = 0
 
 
 # ---------------------------------------------------------------------------- #
@@ -334,8 +339,6 @@ SOLVE_ECONOMY_WEIGHT = 0.25
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
-
-
 
 # Regionalisation to enforce water use limits by
 WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition

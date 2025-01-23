@@ -131,7 +131,7 @@ def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, n_worke
         
     # Submit the tasks in parallel; Using 4 threads is a safe number to submit
     # tasks in login node. Or use the specified number of cpus if not in a linux system
-    workers = 4 if os.name == 'posix' else n_workers
+    workers = min(4, len(custom_cols)) if os.name == 'posix' else n_workers
     Parallel(n_jobs=workers)(delayed(process_col)(col) for col in custom_cols)
 
 
