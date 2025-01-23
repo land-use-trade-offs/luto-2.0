@@ -9,7 +9,7 @@ grid_search = {
     ###############################################################
     'MEM': ['40GB'],
     'NCPUS':[10],
-    'TIME': ['5:00:00'],
+    'TIME': ['8:00:00'],
     'QUEUE': ['normalsr'],
     
     ###############################################################
@@ -18,7 +18,7 @@ grid_search = {
     'MODE': ['timeseries'],                # 'snapshot' or 'timeseries'
     'RESFACTOR': [10],
     'WRITE_THREADS': [10],
-    'WRITE_OUTPUT_GEOTIFFS': [True],
+    'WRITE_OUTPUT_GEOTIFFS': [False],
     
     ###############################################################
     # Model run settings
@@ -57,7 +57,6 @@ grid_search = {
 # Read the template for the custom settings
 template_df = create_settings_template()
 grid_search_df = create_grid_search_template(template_df, grid_search)
-
 
 # Create the task runs
 if os.name == 'posix':
