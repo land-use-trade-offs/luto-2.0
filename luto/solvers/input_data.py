@@ -409,7 +409,7 @@ def get_economic_mrj(
     non_ag_obj_rk = np.nan_to_num(non_ag_obj_rk)
     ag_man_objs = {am: np.nan_to_num(arr) for am, arr in ag_man_objs.items()}
 
-    return [ag_obj_mrj, non_ag_obj_rk,  ag_man_objs]
+    return [ag_obj_mrj, non_ag_obj_rk, ag_man_objs]
 
 
 def get_base_yr_economy_sum(

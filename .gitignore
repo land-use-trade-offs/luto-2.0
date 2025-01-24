@@ -12,6 +12,10 @@ pyproject.toml
 # Virtual environments
 venv
 
+# Input/output data
+input/**
+output/**
+
 # Gurobi environment & logging
 gurobi.env
 gurobi.log

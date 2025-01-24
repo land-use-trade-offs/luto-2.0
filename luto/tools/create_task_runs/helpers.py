@@ -115,7 +115,7 @@ def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, n_worke
     if not custom_cols:
         raise ValueError('No custom settings found in the settings_template.csv file!')
 
-    def process_col(col):
+    def process_col(col_idx, col):
         # Read the non-string values from the file
         with open(f'{TASK_ROOT_DIR}/non_str_val.txt', 'r') as file:
             eval_vars = file.read().splitlines()
@@ -127,12 +127,20 @@ def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, n_worke
         # Submit the task
         create_run_folders(col)
         write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
-        submit_task(cwd, col, python_path)
+        
+        if os.name == 'posix':
+            submit_task(cwd, col, python_path)
+        else:
+            if col_idx < n_workers:
+                time.sleep(col_idx * 8 * 60)
+                submit_task(cwd, col, python_path)
+            else:
+                submit_task(cwd, col, python_path)   
         
     # Submit the tasks in parallel; Using 4 threads is a safe number to submit
     # tasks in login node. Or use the specified number of cpus if not in a linux system
     workers = min(4, len(custom_cols)) if os.name == 'posix' else n_workers
-    Parallel(n_jobs=workers)(delayed(process_col)(col) for col in custom_cols)
+    Parallel(n_jobs=workers)(delayed(process_col)(col_idx,col) for col_idx,col in enumerate(custom_cols))
 
 
 def copy_folder_custom(source, destination, ignore_dirs=None):
