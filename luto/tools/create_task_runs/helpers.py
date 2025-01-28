@@ -339,6 +339,7 @@ def process_task_root_dirs(task_root_dirs):
     for task_root_dir in task_root_dirs:
         grid_search_params = pd.read_csv(f"{task_root_dir}/grid_search_parameters.csv")
         run_dirs = [i for i in os.listdir(task_root_dir) if os.path.isdir(os.path.join(task_root_dir, i))]
+        run_dirs = [i for i in run_dirs if 'Run_' in i]
 
         for dir in run_dirs:
             run_idx = int(dir.split('_')[-1])

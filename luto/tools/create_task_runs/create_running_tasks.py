@@ -29,7 +29,7 @@ grid_search = {
     ###############################################################
     'DEMAND_CONSTRAINT_TYPE': ['soft'],     # 'hard' or 'soft'
     'GHG_CONSTRAINT_TYPE': ['soft'],        # 'hard' or 'soft'
-    'BIODIVERSITY_LIMITS': ['off'],           # 'on' or 'off'
+    'BIODIVERSITY_LIMITS': ['on'],           # 'on' or 'off'
     
     ###############################################################
     # Scenario settings for the model run
@@ -49,7 +49,7 @@ grid_search = {
     ],
     'BIODIV_GBF_TARGET_2_DICT': [
         {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}, 
-        # {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}
+        {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}
     ],
     
     #-------------------- Diet BAU --------------------
