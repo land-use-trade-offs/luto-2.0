@@ -1,6 +1,7 @@
 import os, re, time, json, shutil, psutil, itertools
 import pandas as pd
 
+from glob import glob
 from joblib import delayed, Parallel
 from luto import settings
 from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, TASK_ROOT_DIR
@@ -51,11 +52,9 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
     return settings_df
 
 
-def create_grid_search_template(template_df:pd.DataFrame, grid_dict: dict) -> pd.DataFrame:
-    
-    # Collect new columns in a list
-    template_grid_search = template_df.copy()
-    
+
+def create_grid_search_parameters(grid_dict:dict):
+
     # Convert all values in the grid_dict to string representations
     grid_dict = {k: [str(i) for i in v] for k, v in grid_dict.items()}
 
@@ -66,14 +65,36 @@ def create_grid_search_template(template_df:pd.DataFrame, grid_dict: dict) -> pd
     permutations_df = pd.DataFrame(permutations)
     permutations_df.insert(0, 'run_idx', [f'{i:03}' for i in range(1, len(permutations_df) + 1)])
     
+    # Save the grid search parameters to the root task folder
+    num_para_csv = len([i for i in glob(f'{TASK_ROOT_DIR}/*') if 'grid_search_parameters' in i])
+    permutations_df.to_csv(f'{TASK_ROOT_DIR}/grid_search_parameters_{num_para_csv}.csv', index=False)
+    
     # Reporting the grid search template
     print(f'Grid search template has been created with {len(permutations_df)} permutations!')
+    
+    
+
+def create_grid_search_template(
+    template_df:pd.DataFrame = create_settings_template(), 
+) -> pd.DataFrame:
+    
+    # Collect new columns in a list
+    template_grid_search = template_df.copy()
+    
+    # Concatenate the default settings with the grid search parameters
+    permutations_df = pd.concat(
+        [pd.read_csv(i) for i in glob(f'{TASK_ROOT_DIR}/grid_search_parameters_*.csv')], ignore_index=True
+    )
+    
+    permutations_df['run_idx'] = [f'{i:03}' for i in range(1, len(permutations_df) + 1)]
+    permutations_df = permutations_df.fillna(value='None')
     permutations_df.to_csv(f'{TASK_ROOT_DIR}/grid_search_parameters.csv', index=False)
+   
 
     # Loop through the permutations DataFrame and create new columns with updated settings
     for _, row in permutations_df.iterrows():
         # Copy the default settings
-        new_column = template_df['Default_run'].copy() 
+        new_column = template_grid_search['Default_run'].copy() 
         
         # Replace the settings using the key-value pairs in the permutation item
         for k, v in row.items():
@@ -120,7 +141,7 @@ def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, n_worke
         with open(f'{TASK_ROOT_DIR}/non_str_val.txt', 'r') as file:
             eval_vars = file.read().splitlines()
         # Evaluate the non-string values to their original types
-        custom_settings.loc[eval_vars, col] = custom_settings.loc[eval_vars, col].map(eval)
+        custom_settings.loc[eval_vars, col] = custom_settings.loc[eval_vars, col].map(str).map(eval)
         # Update the settings dictionary
         custom_dict = update_settings(custom_settings[col].to_dict(), col)
         

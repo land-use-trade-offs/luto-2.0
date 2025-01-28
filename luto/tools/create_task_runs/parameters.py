@@ -1,4 +1,4 @@
-TASK_ROOT_DIR = '../Custom_runs/20250124_1_HARD_GHG_RES10_Timeseries/'
+TASK_ROOT_DIR = '../Custom_runs/20250128_1_SOFE_GHG_RES10_Timeseries/'
 
 EXCLUDE_DIRS = [
     'input', 
