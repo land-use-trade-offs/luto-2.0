@@ -7,7 +7,6 @@ from luto import settings
 from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, TASK_ROOT_DIR
 from datetime import datetime
 
-
 def create_settings_template(to_path:str=TASK_ROOT_DIR):
 
     # Save the settings template to the root task folder
@@ -87,7 +86,6 @@ def create_grid_search_template(
     )
     
     permutations_df['run_idx'] = [f'{i:03}' for i in range(1, len(permutations_df) + 1)]
-    permutations_df = permutations_df.fillna(value='None')
     permutations_df.to_csv(f'{TASK_ROOT_DIR}/grid_search_parameters.csv', index=False)
    
 
@@ -111,7 +109,7 @@ def create_grid_search_template(
     return template_grid_search
 
 
-def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, n_workers:int=4):
+def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, n_workers:int=4, waite_mins:int=3):
     '''
     Submit the tasks to the cluster using the custom settings.\n
     Parameters:
@@ -119,11 +117,9 @@ def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, n_worke
         - Only works in a windows system.
             - python_path (str): The path to the python executable.
             - n_workers (int): The number of workers to use for parallel processing.
+            - waite_mins (int): The number of minutes to wait before excuting the next task in the queue.
     '''
-    
-    # Get current working directory
-    cwd = os.getcwd()
-    
+   
     # Read the custom settings file
     custom_settings = custom_settings.dropna(how='all', axis=1)
     custom_settings = custom_settings.set_index('Name')
@@ -150,14 +146,14 @@ def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, n_worke
         write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
         
         if os.name == 'posix':
-            submit_task(cwd, col, python_path)
+            submit_task(col, python_path)
         else:
             if col_idx < n_workers:
-                time.sleep(col_idx * 8 * 60)
-                submit_task(cwd, col, python_path)
+                time.sleep(col_idx * waite_mins * 60)
+                submit_task(col, python_path)
             else:
-                submit_task(cwd, col, python_path)   
-        
+                submit_task(col, python_path)   
+
     # Submit the tasks in parallel; Using 4 threads is a safe number to submit
     # tasks in login node. Or use the specified number of cpus if not in a linux system
     workers = min(4, len(custom_cols)) if os.name == 'posix' else n_workers
@@ -245,6 +241,9 @@ def update_settings(settings_dict:dict, col:str):
     
     
 def create_run_folders(col):
+    # Change the directory to the root of the project
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    os.chdir('../../..')
     # Copy codes to the each custom run folder, excluding {EXCLUDE_DIRS} directories
     from_to_files = copy_folder_custom(os.getcwd(), f'{TASK_ROOT_DIR}/{col}', EXCLUDE_DIRS)
     worker = min(settings.WRITE_THREADS, len(from_to_files))
@@ -255,22 +254,28 @@ def create_run_folders(col):
 
 
 
-def submit_task(cwd:str, col:str, python_path:str=None):
+def submit_task(col:str, python_path:str=None):
     # Copy the slurm script to the task folder
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{TASK_ROOT_DIR}/{col}/task_cmd.sh')
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/python_script.py', f'{TASK_ROOT_DIR}/{col}/python_script.py')
     
-    if os.name == 'nt':         
+    if os.name == 'nt': 
+        # Change the directory to the root of the project
+        os.chdir(os.path.dirname(os.path.abspath(__file__)))
+        os.chdir('../../..')
         os.chdir(f'{TASK_ROOT_DIR}/{col}')
+        # Submit the task 
         os.system(f'{python_path} python_script.py')
-        os.chdir(cwd)
         print(f'Task {col} has been submitted!')
     
     # Start the task if the os is linux
     if os.name == 'posix':
+        # Change the directory to the root of the project
+        os.chdir(os.path.dirname(os.path.abspath(__file__)))
+        os.chdir('../../..')
         os.chdir(f'{TASK_ROOT_DIR}/{col}')
-        os.system('bash task_cmd.sh')
-        os.chdir(cwd)
+        # Submit the task to the cluster
+        os.system(f'bash task_cmd.sh')
 
 
 def log_memory_usage(output_dir=settings.OUTPUT_DIR, interval=1):

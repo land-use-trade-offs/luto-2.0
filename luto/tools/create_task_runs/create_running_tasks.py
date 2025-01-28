@@ -20,7 +20,7 @@ grid_search = {
     # Working settings for the model run
     ###############################################################
     'MODE': ['timeseries'],                # 'snapshot' or 'timeseries'
-    'RESFACTOR': [10],
+    'RESFACTOR': [15],
     'WRITE_THREADS': [10],
     'WRITE_OUTPUT_GEOTIFFS': [True],
     
@@ -47,10 +47,10 @@ grid_search = {
         # '1.5C (50%) excl. avoided emis', 
         '1.8C (67%) excl. avoided emis'
     ],
-    # 'BIODIV_GBF_TARGET_2_DICT': [
-    #     '{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}', 
-    #     '{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}'
-    # ],
+    'BIODIV_GBF_TARGET_2_DICT': [
+        {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}, 
+        # {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}
+    ],
     
     #-------------------- Diet BAU --------------------
     'DIET_DOM': ['BAU',],            # 'BAU' or 'FLX'
@@ -75,6 +75,6 @@ grid_search_df = create_grid_search_template()
 if os.name == 'posix':
     create_task_runs(grid_search_df)
 elif os.name == 'nt':
-    create_task_runs(grid_search_df, python_path='F:/jinzhu/conda_env/luto/python.exe', n_workers=20)
+    create_task_runs(grid_search_df, python_path='F:/jinzhu/conda_env/luto/python.exe', n_workers=24)
 
 

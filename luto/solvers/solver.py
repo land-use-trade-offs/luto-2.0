@@ -499,8 +499,6 @@ class LutoSolver:
 
         print(f'  ...water net yield constraints by {settings.WATER_REGION_DEF}...')
 
-        min_var = lambda var, prev_var: var if prev_var.x > 1e-3 else prev_var.x
-
         # Ensure water use remains below limit for each region
         for region, (reg_name, limit_hist_level, ind) in self._input_data.limits["water"].items():
 
@@ -542,7 +540,7 @@ class LutoSolver:
             
             # Under River Regions, we need to update the water constraint when the wny_hist_level < wny_BASE_YR_level
             if settings.WATER_REGION_DEF == 'Drainage Division':
-                water_yield_constraint =limit_hist_level
+                water_yield_constraint = limit_hist_level
             elif settings.WATER_REGION_DEF == 'River Region':
                 wny_BASE_YR_level = self._input_data.water_yield_RR_BASE_YR[region]
                 water_yield_constraint = min(limit_hist_level, wny_BASE_YR_level)
