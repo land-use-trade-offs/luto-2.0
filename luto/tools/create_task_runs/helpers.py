@@ -1,13 +1,11 @@
-import os
-import re
-import itertools
-import shutil
+import os, re, time, json, shutil, psutil, itertools
 import pandas as pd
 
+from glob import glob
 from joblib import delayed, Parallel
 from luto import settings
 from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, TASK_ROOT_DIR
-
+from datetime import datetime
 
 def create_settings_template(to_path:str=TASK_ROOT_DIR):
 
@@ -53,29 +51,48 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
     return settings_df
 
 
-def create_grid_search_template(template_df:pd.DataFrame, grid_dict: dict) -> pd.DataFrame:
-    
-    # Collect new columns in a list
-    template_grid_search = template_df.copy()
-    
+
+def create_grid_search_parameters(grid_dict:dict):
+
     # Convert all values in the grid_dict to string representations
-    grid_dict = {k: [str(v) for v in v] for k, v in grid_dict.items()}
+    grid_dict = {k: [str(i) for i in v] for k, v in grid_dict.items()}
 
     # Create a list of dictionaries with all possible permutations
     keys, values = zip(*grid_dict.items())
     permutations = [dict(zip(keys, v)) for v in itertools.product(*values)]
 
     permutations_df = pd.DataFrame(permutations)
-    permutations_df.insert(0, 'run_idx', range(1, len(permutations_df) + 1))
+    permutations_df.insert(0, 'run_idx', [f'{i:03}' for i in range(1, len(permutations_df) + 1)])
+    
+    # Save the grid search parameters to the root task folder
+    num_para_csv = len([i for i in glob(f'{TASK_ROOT_DIR}/*') if 'grid_search_parameters' in i])
+    permutations_df.to_csv(f'{TASK_ROOT_DIR}/grid_search_parameters_{num_para_csv}.csv', index=False)
     
     # Reporting the grid search template
     print(f'Grid search template has been created with {len(permutations_df)} permutations!')
+    
+    
+
+def create_grid_search_template(
+    template_df:pd.DataFrame = create_settings_template(), 
+) -> pd.DataFrame:
+    
+    # Collect new columns in a list
+    template_grid_search = template_df.copy()
+    
+    # Concatenate the default settings with the grid search parameters
+    permutations_df = pd.concat(
+        [pd.read_csv(i) for i in glob(f'{TASK_ROOT_DIR}/grid_search_parameters_*.csv')], ignore_index=True
+    )
+    
+    permutations_df['run_idx'] = [f'{i:03}' for i in range(1, len(permutations_df) + 1)]
     permutations_df.to_csv(f'{TASK_ROOT_DIR}/grid_search_parameters.csv', index=False)
+   
 
     # Loop through the permutations DataFrame and create new columns with updated settings
     for _, row in permutations_df.iterrows():
         # Copy the default settings
-        new_column = template_df['Default_run'].copy() 
+        new_column = template_grid_search['Default_run'].copy() 
         
         # Replace the settings using the key-value pairs in the permutation item
         for k, v in row.items():
@@ -92,17 +109,22 @@ def create_grid_search_template(template_df:pd.DataFrame, grid_dict: dict) -> pd
     return template_grid_search
 
 
-def create_task_runs(custom_settings:pd.DataFrame):
-    
-    # Get current working directory
-    cwd = os.getcwd()
-    
+def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, n_workers:int=4, waite_mins:int=3):
+    '''
+    Submit the tasks to the cluster using the custom settings.\n
+    Parameters:
+        - custom_settings (pd.DataFrame): The custom settings DataFrame.
+        - Only works in a windows system.
+            - python_path (str): The path to the python executable.
+            - n_workers (int): The number of workers to use for parallel processing.
+            - waite_mins (int): The number of minutes to wait before excuting the next task in the queue.
+    '''
+   
     # Read the custom settings file
     custom_settings = custom_settings.dropna(how='all', axis=1)
     custom_settings = custom_settings.set_index('Name')
     
     # Replace special characters to underscore, making the column names valid python variables
-    custom_settings.columns = [re.sub(r'\W+', '_', col.strip()) for col in custom_settings.columns]
     custom_settings = custom_settings.replace({'TRUE': 'True', 'FALSE': 'False'})
     custom_cols = [col for col in custom_settings.columns if col not in ['Default_run']]
     
@@ -110,23 +132,32 @@ def create_task_runs(custom_settings:pd.DataFrame):
     if not custom_cols:
         raise ValueError('No custom settings found in the settings_template.csv file!')
 
-    def process_col(col):
+    def process_col(col_idx, col):
         # Read the non-string values from the file
         with open(f'{TASK_ROOT_DIR}/non_str_val.txt', 'r') as file:
             eval_vars = file.read().splitlines()
         # Evaluate the non-string values to their original types
-        custom_settings.loc[eval_vars, col] = custom_settings.loc[eval_vars, col].map(eval)
+        custom_settings.loc[eval_vars, col] = custom_settings.loc[eval_vars, col].map(str).map(eval)
         # Update the settings dictionary
         custom_dict = update_settings(custom_settings[col].to_dict(), col)
         
         # Submit the task
         create_run_folders(col)
         write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
-        submit_task(cwd, col)
         
-    # Submit the tasks in parallel; Using 4 threads is a safe number because 
-    # we are submitting jobs in the login node, which has limited resources
-    Parallel(n_jobs=4)(delayed(process_col)(col) for col in custom_cols)
+        if os.name == 'posix':
+            submit_task(col, python_path)
+        else:
+            if col_idx < n_workers:
+                time.sleep(col_idx * waite_mins * 60)
+                submit_task(col, python_path)
+            else:
+                submit_task(col, python_path)   
+
+    # Submit the tasks in parallel; Using 4 threads is a safe number to submit
+    # tasks in login node. Or use the specified number of cpus if not in a linux system
+    workers = min(4, len(custom_cols)) if os.name == 'posix' else n_workers
+    Parallel(n_jobs=workers)(delayed(process_col)(col_idx,col) for col_idx,col in enumerate(custom_cols))
 
 
 def copy_folder_custom(source, destination, ignore_dirs=None):
@@ -192,13 +223,16 @@ def update_settings(settings_dict:dict, col:str):
         MEM = "80G"
     else:
         MEM = "40G"
-    
-    # Set the carbon prices field based on the GHG limits field
-    settings_dict['CARBON_PRICES_FIELD'] = settings_dict['GHG_LIMITS_FIELD'][:9].replace('(','') 
-   
+        
     # Update the settings dictionary
     settings_dict['JOB_NAME'] = settings_dict['JOB_NAME'] if settings_dict['JOB_NAME'] != 'auto' else col
     settings_dict['MEM'] = settings_dict['MEM'] if settings_dict['MEM'] != 'auto' else MEM
+    
+    # Set the carbon prices field based on the GHG limits field
+    settings_dict['CARBON_PRICES_FIELD'] = settings_dict['GHG_LIMITS_FIELD'][:9].replace('(','') 
+
+    # Update the threads based on the number of cpus
+    settings_dict['THREADS'] = settings_dict['NCPUS']
 
     return settings_dict
 
@@ -207,6 +241,9 @@ def update_settings(settings_dict:dict, col:str):
     
     
 def create_run_folders(col):
+    # Change the directory to the root of the project
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    os.chdir('../../..')
     # Copy codes to the each custom run folder, excluding {EXCLUDE_DIRS} directories
     from_to_files = copy_folder_custom(os.getcwd(), f'{TASK_ROOT_DIR}/{col}', EXCLUDE_DIRS)
     worker = min(settings.WRITE_THREADS, len(from_to_files))
@@ -217,18 +254,125 @@ def create_run_folders(col):
 
 
 
-def submit_task(cwd:str, col:str):
+def submit_task(col:str, python_path:str=None):
     # Copy the slurm script to the task folder
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{TASK_ROOT_DIR}/{col}/task_cmd.sh')
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/python_script.py', f'{TASK_ROOT_DIR}/{col}/python_script.py')
     
-    if os.name == 'nt':         
-        # If the os is windows, do nothing
-        print('This will only create task folders, and NOT submit job to run!')
+    if os.name == 'nt': 
+        # Change the directory to the root of the project
+        os.chdir(os.path.dirname(os.path.abspath(__file__)))
+        os.chdir('../../..')
+        os.chdir(f'{TASK_ROOT_DIR}/{col}')
+        # Submit the task 
+        os.system(f'{python_path} python_script.py')
+        print(f'Task {col} has been submitted!')
     
     # Start the task if the os is linux
     if os.name == 'posix':
+        # Change the directory to the root of the project
+        os.chdir(os.path.dirname(os.path.abspath(__file__)))
+        os.chdir('../../..')
         os.chdir(f'{TASK_ROOT_DIR}/{col}')
-        os.system('bash task_cmd.sh')
-        os.chdir(cwd)
+        # Submit the task to the cluster
+        os.system(f'bash task_cmd.sh')
 
+
+def log_memory_usage(output_dir=settings.OUTPUT_DIR, interval=1):
+    '''
+    Log the memory usage of the current process to a file.
+    Parameters:
+        output_dir (str): The directory to save the memory log file.
+        interval (int): The interval in seconds to log the memory usage.
+    '''
+    
+    with open(f'{output_dir}/RES_{settings.RESFACTOR}_{settings.MODE}_mem_log.txt', mode='a') as file:
+        while True:
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            process = psutil.Process(os.getpid())
+            memory_usage = process.memory_info().rss
+            children = process.children(recursive=True)
+            # Include the memory usage of the child processes to get accurate memory usage under parallel processing
+            if children:
+                memory_usage += sum(child.memory_info().rss for child in children)
+            memory_usage /= (1024 * 1024 * 1024)
+            file.write(f'{timestamp}\t{memory_usage:.2f}\n')
+            file.flush()  # Ensure data is written to the file immediately
+            time.sleep(interval)
+            
+            
+
+def load_json_data(json_path, filename):
+    with open(os.path.join(json_path, filename)) as f:
+        return pd.json_normalize(json.load(f), 'data', ['name']).rename(columns={0: 'year', 1: 'val'})
+
+def process_profit_data(json_path):
+    df = load_json_data(json_path, 'economics_0_rev_cost_all_wide.json')
+    return df.query('name == "Profit"')
+
+def process_GHG_deviation_data(json_path):
+    df = load_json_data(json_path, 'GHG_2_individual_emission_Mt.json')
+    df_target = df.query('name == "GHG emissions limit"')
+    df_actual = df.query('name == "Net emissions"')
+    df_deviation = df_target.merge(df_actual, on='year', suffixes=('_target', '_actual'))
+    df_deviation['name'] = 'GHG deviation'
+    df_deviation['val'] = df_deviation['val_actual'] - df_deviation['val_target']
+    return df_deviation
+
+def process_GHG_deforestation_data(json_path):
+    df = load_json_data(json_path, 'GHG_2_individual_emission_Mt.json') 
+    return df.query('name == "Deforestation"')
+
+
+def process_demand_data(json_path):
+    df_demand = load_json_data(json_path, 'production_5_6_demand_Production_commodity_from_LUTO.json')
+    df_luto = load_json_data(json_path, 'production_5_5_demand_Production_commodity.json')
+    df_delta = df_demand.merge(df_luto, on=['year', 'name'], suffixes=('_luto', '_demand'))
+    df_delta['deviation_t'] = df_delta.eval('val_luto - val_demand')
+    df_delta['deviation_%'] = df_delta.eval('(val_luto - val_demand) / val_demand * 100')
+    return df_delta
+
+def process_task_root_dirs(task_root_dirs):
+    report_data = pd.DataFrame()
+    report_data_demand = pd.DataFrame()
+
+    for task_root_dir in task_root_dirs:
+        grid_search_params = pd.read_csv(f"{task_root_dir}/grid_search_parameters.csv")
+        run_dirs = [i for i in os.listdir(task_root_dir) if os.path.isdir(os.path.join(task_root_dir, i))]
+        run_dirs = [i for i in run_dirs if 'Run_' in i]
+
+        for dir in run_dirs:
+            run_idx = int(dir.split('_')[-1])
+            run_paras = grid_search_params.query(f'run_idx == {run_idx}').to_dict(orient='records')[0]
+            json_path = os.path.join(task_root_dir, dir, 'DATA_REPORT', 'data')
+
+            if not os.path.exists(json_path):
+                print(f"Path does not exist: {json_path}")
+                continue
+
+            df_profit = process_profit_data(json_path)
+            df_ghg_deviation = process_GHG_deviation_data(json_path)
+            df_ghg_deforestation = process_GHG_deforestation_data(json_path)
+            df_demand_deviation = process_demand_data(json_path)
+
+            report_data = pd.concat([
+                report_data,
+                df_profit[['year', 'name', 'val']].assign(**run_paras),
+                df_ghg_deviation[['year', 'name', 'val']].assign(**run_paras),
+                df_ghg_deforestation[['year', 'name', 'val']].assign(**run_paras)
+            ]).reset_index(drop=True)
+
+            report_data_demand = pd.concat([
+                report_data_demand,
+                df_demand_deviation.assign(**run_paras)
+            ]).reset_index(drop=True)
+            
+    # Pivot the report data so that the `name` columns is split into separate columns
+    report_data = report_data\
+        .pivot(
+            index=['year'] + grid_search_params.columns.tolist(), 
+            columns='name', 
+            values='val')\
+        .reset_index()
+
+    return report_data, report_data_demand

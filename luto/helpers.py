@@ -50,13 +50,6 @@ import luto.simulation as sim
 data = sim.load_data()
 sim.run(data=data, base=2010, target=2050)
 
-from luto.tools.write import write_outputs
-write_outputs(data)
-
-from luto.tools import report_on_path
-report_on_path(data.path, remake_map=True, remake_csv=True)  
-
-
 
 #############################################################
 # Save data object to disk
@@ -81,22 +74,6 @@ sim.run(data=data, base=2010, target=2050)
 import luto.simulation as sim
 data = sim.read_dvars('path/to/previous/output/dir')
 sim.run(data=data, base=2010, target=2050)
-
-
-
-
-
-
-
-
-
-
-
-
-# Generating the scenario runs template to feed HPC
-from luto.tools.create_task_runs.helpers import create_settings_template, create_task_runs
-create_settings_template()      # This will create a "Custom_run" folder next to the root folder (luto-2.0) and a "settings_template.csv" in it
-create_task_runs()              # This will create seperate folders in "Custom_run", and each folder coresponds to a columns in the "settings_template.csv" 
 
 
 
@@ -139,7 +116,7 @@ d = {0:'Dryland', 1:'Irrigated'}
 
 # Calculate the exclude, transistions costs, and cost of production matrices
 x_mrj = ag_transition.get_exclude_matrices(data, 2010, lumaps)
-t_mrj = ag_transition.get_transition_matrices(data, 20, 2010, lumaps, lmmaps)
+t_mrj = ag_transition.get_transition_matrices(data, 20, 2010)
 gct_mrj = get_ghg_transition_penalties(data, lumap) * data.get_carbon_price_by_yr_idx(0)
 c_mrj = ag_cost.get_cost_matrices(data, 0, lumap) - gct_mrj
 r_mrj = ag_revenue.get_rev_matrices(data, 0)

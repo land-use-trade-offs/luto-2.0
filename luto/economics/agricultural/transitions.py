@@ -81,15 +81,13 @@ def get_exclude_matrices(data: Data, lumap: np.ndarray):
     return (x_mrj * t_rj).astype(np.int8)
 
 
-def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separate=False):
+def get_transition_matrices(data: Data, yr_idx, base_year, separate=False):
     """
     Calculate the transition matrices for land-use and land management transitions.
     Args:
         data (Data object): The data object containing the necessary input data.
         yr_idx (int): The index of the current year.
         base_year (int): The base year for the transition calculations.
-        lumaps (dict): A dictionary of land-use maps for each year.
-        lmmaps (dict): A dictionary of land management maps for each year.
         separate (bool, optional): Whether to return separate cost matrices for each cost component.
                                    Defaults to False.
     Returns:
@@ -99,8 +97,8 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
                                establishment costs, Water license cost, and carbon releasing costs.
     """
     yr_cal = data.YR_CAL_BASE + yr_idx
-    lumap = lumaps[base_year]
-    lmmap = lmmaps[base_year]
+    lumap = data.lumaps[base_year]
+    lmmap = data.lmmaps[base_year]
     # Return l_mrj (Boolean) for current land-use and land management
     l_mrj = lumap2ag_l_mrj(lumap, lmmap)
     l_mrj_not = np.logical_not(l_mrj)
@@ -127,10 +125,8 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
     # Amortise upfront costs to annualised costs and converted to $ per cell via REAL_AREA
     e_rj = tools.amortise(e_rj) * data.REAL_AREA[:, np.newaxis]
 
-    # Separate the establishment costs into dryland and irrigated land management types
-    e_rj_dry = np.einsum('rj,r->rj', e_rj, lmmap == 0)
-    e_rj_irr = np.einsum('rj,r->rj', e_rj, lmmap == 1)
-    e_mrj = np.stack([e_rj_dry, e_rj_irr], axis=0)
+    # Repeat the establishment costs into dryland and irrigated land management types
+    e_mrj = np.stack([e_rj, e_rj], axis=0)
 
     # Update the cost matrix with exclude matrices; the transition cost for a cell that remain the same is 0.
     e_mrj = np.einsum('mrj,mrj,mrj->mrj', e_mrj, x_mrj, l_mrj_not)
@@ -144,13 +140,13 @@ def get_transition_matrices(data: Data, yr_idx, base_year, lumaps, lmmaps, separ
     w_delta_mrj = np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not)
 
     # -------------------------------------------------------------- #
-    # Carbon costs of transitioning cells.                          #
-    # -------------------------------------------------------------- #S
+    # Carbon costs of transitioning cells.                           #
+    # -------------------------------------------------------------- #
 
     # Apply the cost of carbon released by transitioning natural land to modified land
     ghg_t_mrj = ag_ghg.get_ghg_transition_penalties(data, lumap)               # <unit: t/ha>
-    ghg_t_mrj_cost = tools.amortise(ghg_t_mrj * data.get_carbon_price_by_yr_idx(yr_idx))
-    ghg_t_mrj_cost = np.einsum('mrj,mrj,mrj->mrj', ghg_t_mrj_cost, x_mrj, l_mrj_not)
+    ghg_t_mrj = tools.amortise(ghg_t_mrj * data.get_carbon_price_by_yr_idx(yr_idx))
+    ghg_t_mrj_cost = np.einsum('mrj,mrj,mrj->mrj', ghg_t_mrj, x_mrj, l_mrj_not)
 
     # -------------------------------------------------------------- #
     # Total costs.                                                   #

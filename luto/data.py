@@ -16,7 +16,6 @@
 
 
 import os
-import math
 import h5py
 
 import xarray as xr
@@ -37,8 +36,8 @@ from typing import Any, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.settings import INPUT_DIR, OUTPUT_DIR
-from luto.tools.spatializers import upsample_and_fill_nodata, upsample_array
+from luto.settings import INPUT_DIR, NON_AG_LAND_USES_REVERSIBLE, OUTPUT_DIR
+from luto.tools.spatializers import upsample_array
 
 
 
@@ -271,7 +270,7 @@ class Data:
             self.DESC2AGLU["Unallocated - natural land"],
         ]
         self.LU_MODIFIED_LAND = [self.DESC2AGLU[lu] for lu in self.AGRICULTURAL_LANDUSES if self.DESC2AGLU[lu] not in self.LU_NATURAL]
-
+        
         self.LU_CROPS_INDICES = [self.AGRICULTURAL_LANDUSES.index(lu) for lu in self.AGRICULTURAL_LANDUSES if lu in self.LU_CROPS]
         self.LU_LVSTK_INDICES = [self.AGRICULTURAL_LANDUSES.index(lu) for lu in self.AGRICULTURAL_LANDUSES if lu in self.LU_LVSTK]
         self.LU_UNALL_INDICES = [self.AGRICULTURAL_LANDUSES.index(lu) for lu in self.AGRICULTURAL_LANDUSES if lu in self.LU_UNALL]
@@ -393,13 +392,17 @@ class Data:
 
         # Derive NCELLS (number of spatial cells) from the area array.
         self.NCELLS = self.REAL_AREA.shape[0]
+        
+        # Initial (2010) ag decision variable (X_mrj).
+        self.LMMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lmmap.h5")).to_numpy()
+        self.AG_L_MRJ = self.get_exact_resfactored_lumap_mrj() 
+        self.add_ag_dvars(self.YR_CAL_BASE, self.AG_L_MRJ)
 
         # Initial (2010) land-use map, mapped as lexicographic land-use class indices.
-        self.LUMAP = self.get_array_resfactor_applied(self.LUMAP_NO_RESFACTOR)
+        self.LUMAP = self.AG_L_MRJ.sum(axis=0).argmax(axis=1).astype("int8")
         self.add_lumap(self.YR_CAL_BASE, self.LUMAP)
 
         # Initial (2010) land management map.
-        self.LMMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lmmap.h5")).to_numpy()
         self.LMMAP = self.get_array_resfactor_applied(self.LMMAP_NO_RESFACTOR)
         self.add_lmmap(self.YR_CAL_BASE, self.LMMAP)
 
@@ -410,8 +413,7 @@ class Data:
         }
         self.add_ammaps(self.YR_CAL_BASE, self.AMMAP_DICT)
 
-        self.AG_L_MRJ = self.get_exact_resfactored_lumap_mrj() 
-        self.add_ag_dvars(self.YR_CAL_BASE, self.AG_L_MRJ)
+        
 
         self.NON_AG_L_RK = lumap2non_ag_l_mk(
             self.LUMAP, len(self.NON_AGRICULTURAL_LANDUSES)     # Int8
@@ -650,13 +652,15 @@ class Data:
 
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
         self.AG_TMATRIX = np.load(os.path.join(INPUT_DIR, "ag_tmatrix.npy"))
-
+        
+        # Apply penalty if a transition was occur from natural to modified land.
+        for i,j in product(range(self.N_AG_LUS), range(self.N_AG_LUS)):
+            if (not i in self.LU_MODIFIED_LAND) and (j in self.LU_MODIFIED_LAND):
+                self.AG_TMATRIX[i,j] += settings.NATURAL_TO_MODIFIED_LAND_PENALTY
+        
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
         self.EXCLUDE = np.load(os.path.join(INPUT_DIR, "x_mrj.npy"))
         self.EXCLUDE = self.EXCLUDE[:, self.MASK, :]  # Apply resfactor specially for the exclude matrix
-        
-        # BASE_YR economic value; Initilized as None and will be added later in `luto.solvers.input_data.py` to avoid recalculating
-        self.BASE_YR_economic_val = None
 
 
 
@@ -835,9 +839,8 @@ class Data:
         wyield_fname_sr = os.path.join(INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_sr_ml_ha.h5')
         
         # Read the data into memory with [...], so that it can be pickled.
-        self.WATER_YIELD_DR_FILE = h5py.File(wyield_fname_dr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_DR_ML_HA_mean'][:, self.MASK][...]
-        self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_SR_ML_HA_mean'][:, self.MASK][...]
-        
+        self.WATER_YIELD_DR_FILE = h5py.File(wyield_fname_dr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_DR_ML_HA_mean'][...][:, self.MASK]
+        self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_SR_ML_HA_mean'][...][:, self.MASK] 
         
 
         # Water yield from outside LUTO study area.
@@ -1259,9 +1262,12 @@ class Data:
         calculate the exact value of each land-use cell based from lumap to create dvars.
         
         E.g., given a resfactor of 5, then each resfactored dvar cell will cover a 5x5 area.
-        If there are 9 Apple cells in the 5x5 area, then the dvar cell will have a value of 9/25. 
+        If there are 9 Apple cells in the 5x5 area, then the dvar cell for it will be 9/25. 
         
         """
+        if settings.RESFACTOR == 1:
+            return lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)[:, self.MASK, :]
+
         # Create a 2D array of IDs for the LUMAP_2D_RESFACTORED
         lumap_2d_id = np.arange(self.LUMAP_2D_RESFACTORED.size).reshape(self.LUMAP_2D_RESFACTORED.shape)
         lumap_2d_id = upsample_array(self, lumap_2d_id, settings.RESFACTOR)    

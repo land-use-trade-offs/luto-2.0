@@ -474,7 +474,7 @@ def calc_water_net_yield_BASE_YR(data: Data) -> np.ndarray:
     # Get the water yield matrices
     w_mrj = get_water_net_yield_matrices(data, 0)
     
-    # Get the ag decision variables
+    # Get the ag decision variables for the base year
     ag_dvar_mrj = data.AG_L_MRJ
 
     # Multiply the water yield by the decision variables
@@ -535,7 +535,8 @@ def get_water_net_yield_limit_values(
     for region, name in region_names.items():
         hist_yield = wny_region_hist[region]
         ind = np.flatnonzero(region_id == region).astype(np.int32)
-        limit_hist_level = hist_yield * (1 - settings.WATER_STRESS * settings.AG_SHARE_OF_WATER_USE)   # Water yield limit calculated as a proportial of historical level based on planetary boundary theory
+        # Water yield limit calculated as a proportial of historical level based on planetary boundary theory
+        limit_hist_level = hist_yield * (1 - settings.WATER_STRESS * settings.AG_SHARE_OF_WATER_USE)   
         limits_by_region[region] = (name, limit_hist_level, ind)    
 
     # Save the results in data to avoid recalculating

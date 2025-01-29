@@ -98,7 +98,8 @@ class LutoSolver:
         self.demand_penalty_constraints = []
         self.water_limit_constraints = []
         self.ghg_emissions_expr = None
-        self.ghg_emissions_limit_constraint = None
+        self.ghg_emissions_limit_constraint_ub = None
+        self.ghg_emissions_limit_constraint_lb = None
         self.biodiversity_expr = None
         self.biodiversity_limit_constraint = None
 
@@ -208,7 +209,7 @@ class LutoSolver:
 
                     self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                         lb=dry_x_lb, ub=1, name=dry_var_name,
-                    )
+                    )               
 
                 irr_lu_cells = self._input_data.ag_lu2cells[1, j]
                 for r in irr_lu_cells:
@@ -218,6 +219,7 @@ class LutoSolver:
                     self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                         lb=irr_x_lb, ub=1, name=irr_var_name,
                     )
+                 
 
     def _setup_deviation_penalties(self):
         """
@@ -497,8 +499,6 @@ class LutoSolver:
 
         print(f'  ...water net yield constraints by {settings.WATER_REGION_DEF}...')
 
-        min_var = lambda var, prev_var: var if prev_var.x > 1e-3 else prev_var.x
-
         # Ensure water use remains below limit for each region
         for region, (reg_name, limit_hist_level, ind) in self._input_data.limits["water"].items():
 
@@ -540,7 +540,7 @@ class LutoSolver:
             
             # Under River Regions, we need to update the water constraint when the wny_hist_level < wny_BASE_YR_level
             if settings.WATER_REGION_DEF == 'Drainage Division':
-                water_yield_constraint =limit_hist_level
+                water_yield_constraint = limit_hist_level
             elif settings.WATER_REGION_DEF == 'River Region':
                 wny_BASE_YR_level = self._input_data.water_yield_RR_BASE_YR[region]
                 water_yield_constraint = min(limit_hist_level, wny_BASE_YR_level)
@@ -605,18 +605,24 @@ class LutoSolver:
             print('...GHG emissions constraints TURNED OFF ...')
             return
         
-        ghg_limit = self._input_data.limits["ghg"]
+        ghg_limit_ub = self._input_data.limits["ghg_ub"]
+        ghg_limit_lb = self._input_data.limits["ghg_lb"]
         self.ghg_emissions_expr = self._get_total_ghg_emissions_expr()
         
         if settings.GHG_CONSTRAINT_TYPE == 'hard':
-            print(f"...GHG emissions reduction target: {ghg_limit:,.0f} tCO2e")
-            self.ghg_emissions_limit_constraint = self.gurobi_model.addConstr(
-                self.ghg_emissions_expr <= ghg_limit
+            print(f"...GHG emissions reduction target")
+            print(f'    ...GHG emissions reduction target UB: {ghg_limit_ub:,.0f} tCO2e')
+            self.ghg_emissions_limit_constraint_ub = self.gurobi_model.addConstr(
+                self.ghg_emissions_expr <= ghg_limit_ub
+            )
+            print(f'    ...GHG emissions reduction target LB: {ghg_limit_lb:,.0f} tCO2e')
+            self.ghg_emissions_limit_constraint_lb = self.gurobi_model.addConstr(
+                self.ghg_emissions_expr >= ghg_limit_lb
             )
         elif settings.GHG_CONSTRAINT_TYPE == 'soft':
-            print(f"  ...GHG emissions reduction target: {ghg_limit:,.0f} tCO2e")
-            self.gurobi_model.addConstr(self.ghg_emissions_expr - ghg_limit <= self.E)
-            self.gurobi_model.addConstr(ghg_limit - self.ghg_emissions_expr <= self.E)
+            print(f"  ...GHG emissions reduction target: {ghg_limit_ub:,.0f} tCO2e")
+            self.gurobi_model.addConstr(self.ghg_emissions_expr - ghg_limit_ub <= self.E)
+            self.gurobi_model.addConstr(ghg_limit_ub - self.ghg_emissions_expr <= self.E)
         else:
             raise ValueError("Unknown choice for `GHG_CONSTRAINT_TYPE` setting: must be either 'hard' or 'soft'")
 
@@ -856,9 +862,13 @@ class LutoSolver:
         self.demand_penalty_constraints = []
         self.water_limit_constraints = []
 
-        if self.ghg_emissions_limit_constraint is not None:
-            self.gurobi_model.remove(self.ghg_emissions_limit_constraint)
-            self.ghg_emissions_limit_constraint = None
+        if self.ghg_emissions_limit_constraint_ub is not None:
+            self.gurobi_model.remove(self.ghg_emissions_limit_constraint_ub)
+            self.ghg_emissions_limit_constraint_ub = None
+            
+        if self.ghg_emissions_limit_constraint_lb is not None:
+            self.gurobi_model.remove(self.ghg_emissions_limit_constraint_lb)
+            self.ghg_emissions_limit_constraint_lb = None
 
         self._add_cell_usage_constraints(updated_cells)                 
         self._add_agricultural_management_constraints(updated_cells)    
@@ -1037,8 +1047,9 @@ class LutoSolver:
             obj_val ={
                 'SUM': self.gurobi_model.ObjVal,
                 'Economy': self.obj_economy.getValue(),
-                'Demand': self.obj_demand.getValue().sum(),
-                'GHG': self.obj_ghg.getValue()}
+                'Demand': self.obj_demand.getValue().sum()      if settings.DEMAND_CONSTRAINT_TYPE == 'soft' else 0,
+                'GHG': self.obj_ghg.getValue()                  if settings.GHG_CONSTRAINT_TYPE == 'soft' else 0
+            }
         )
 
     @property
