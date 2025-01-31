@@ -1040,8 +1040,6 @@ class Data:
         )
         biodiv_GBF_target_2_proportions_2010_2100 = {yr: f(yr).item() for yr in range(2010, 2101)}
 
-
-
         # Get the connectivity score between 0 and 1, where 1 is the highest connectivity
         biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5'))
 
@@ -1058,13 +1056,11 @@ class Data:
             raise ValueError(f"Invalid connectivity source: {settings.CONNECTIVITY_SOURCE}, must be 'NCI', 'DWI' or 'NONE'")
 
 
-
         # Get the Zonation output score between 0 and 1. biodiv_score_raw.sum() = 153 million
         biodiv_score_raw = biodiv_priorities['BIODIV_PRIORITY_SSP' + str(settings.SSP)].to_numpy(dtype = np.float32)
         # Weight the biodiversity score by the connectivity score
         self.BIODIV_SCORE_RAW_WEIGHTED = biodiv_score_raw * connectivity_score
-
-
+        
 
         # Habitat degradation scale for agricultural land-use
         biodiv_degrade_df = pd.read_csv(os.path.join(INPUT_DIR, 'HABITAT_CONDITION.csv'))                                                               # Load the HCAS percentile data (pd.DataFrame)
@@ -1085,7 +1081,6 @@ class Data:
 
         else:
             raise ValueError(f"Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
-
 
 
         # Get the biodiversity degradation score (0-1) for each cell
@@ -1121,7 +1116,34 @@ class Data:
             yr: biodiv_current_val + biodiv_degradation_val * biodiv_GBF_target_2_proportions_2010_2100[yr]
             for yr in range(2010, 2101)
         }
+        
+        
+        ###############################################################
+        # Vegetation data.
+        ###############################################################
+        
+        # Get the pre-European vegetation data, which will be used as the target for restoration
+        NVIS_pre_mvg_area_ha = pd.read_csv(os.path.join(INPUT_DIR, 'NVIS7_0_AUST_PRE_MVG_ALB_group_area_ha.csv'))
+        NVIS_pre_mvs_area_ha = pd.read_csv(os.path.join(INPUT_DIR, 'NVIS7_0_AUST_PRE_MVS_ALB_group_area_ha.csv'))
+        
+        self.NVIS_PRE_MVG_AREA_g = NVIS_pre_mvg_area_ha['AREA_HA'].to_numpy()
+        self.NVIS_PRE_MVS_AREA_g = NVIS_pre_mvs_area_ha['AREA_HA'].to_numpy()
+        
+        # Get the group names
+        self.NVIS_MVG_names = NVIS_pre_mvg_area_ha['AREA_HA'].values.tolist()
+        self.NVIS_MVS_names = NVIS_pre_mvs_area_ha['AREA_HA'].values.tolist()
+        
+        # Load extant vegetation area data for each vegetation group
+        NVIS_ext_mvg_area_ha = pd.read_csv(os.path.join(INPUT_DIR, 'NVIS_ext_mvg_outside_LUTO_group_area_ha.csv'))
+        NVIS_ext_mvs_area_ha = pd.read_csv(os.path.join(INPUT_DIR, 'NVIS_ext_mvs_outside_LUTO_group_area_ha.csv'))
+        
+        # Load extant vegetation spatial data for each group
+        NVIS_ext_mvg_xr = xr.load_dataarray(os.path.join(INPUT_DIR, 'NVIS7_0_AUST_EXT_MVG_ALB_filter_group.nc'))
+        NVIS_ext_mvs_xr = xr.load_dataarray(os.path.join(INPUT_DIR, 'NVIS7_0_AUST_EXT_MVS_ALB_filter_group.nc'))
 
+        # Get the extant vegetation spatial data as numpy arrays
+        self.NVIS_EXT_MVG_gr = NVIS_ext_mvg_xr.values
+        self.NVIS_EXT_MVS_gr = NVIS_ext_mvs_xr.values
 
 
         ###############################################################

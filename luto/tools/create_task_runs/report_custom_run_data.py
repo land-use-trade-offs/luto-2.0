@@ -33,7 +33,8 @@ filter_rules = '''
     year != 2010 and
     DIET_DOM == "BAU" and
     GHG_CONSTRAINT_TYPE == "soft" and
-    BIODIVERSITY_LIMITS == "on"
+    BIODIVERSITY_LIMITS == "off" and
+    SOLVE_ECONOMY_WEIGHT == 0.05
 '''.strip().replace('\n', '')
 
 report_data_filter = report_data.query(filter_rules).copy()
