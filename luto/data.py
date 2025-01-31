@@ -174,7 +174,7 @@ class Data:
         self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                              # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
 
         # Get the lon/lat coordinates.
-        self.COORD_LON_LAT = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META_FULLRES['transform'])             # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
+        self.COORD_LON_LAT = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META_FULLRES['transform'])     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
 
         # Return combined land-use and resfactor mask
         if settings.RESFACTOR > 1:
@@ -1144,6 +1144,10 @@ class Data:
         # Get the extant vegetation spatial data as numpy arrays
         self.NVIS_EXT_MVG_gr = NVIS_ext_mvg_xr.values
         self.NVIS_EXT_MVS_gr = NVIS_ext_mvs_xr.values
+        
+        # Apply mask 
+        self.NVIS_EXT_MVG_gr = self.NVIS_EXT_MVG_gr[None, self.MASK]
+        self.NVIS_EXT_MVS_gr = self.NVIS_EXT_MVS_gr[None, self.MASK]
 
 
         ###############################################################
