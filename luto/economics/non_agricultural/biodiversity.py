@@ -183,3 +183,20 @@ def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
     ]
 
     return np.concatenate(non_agr_c_matrices, axis=1)
+
+
+def get_major_vegetation_matrices(data: Data) -> np.ndarray:
+    """
+    Get the matrix containing the contribution of each cell/non-ag. land use combination 
+    to each major vegetation group.
+
+    Returns:
+    - Array indexed by (r, k, v) containing the contributions.
+    """
+    mvg_rkv = np.zeros((data.NCELLS, data.N_NON_AG_LUS, data.N_MVG_CLASSES))
+    for k in data.NON_AG_LU_ENV_PLANTINGS:
+        mvg_rkv[:, k, :] = data.MAJOR_VEGETATION_GROUPS_RV
+        for v in range(data.N_MVG_CLASSES):
+            mvg_rkv[:, k, v] *= data.REAL_AREA  # Account for cells' proportional contributions based on cell size
+
+    return mvg_rkv

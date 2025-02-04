@@ -194,63 +194,56 @@ def get_biodiversity_limits(data: Data, yr_cal: int):
     return data.BIODIV_GBF_TARGET_2[yr_cal]
 
 
-def get_mvg_matrices(data: Data) -> np.ndarray:
-    mvg_vmrj = np.zeros((data.N_MVG_CLASSES, data.NLMS, data.NCELLS, data.N_AG_LUS))
-    for m in range(data.NLMS):
-        for j in data.LU_NATURAL:
-            mvg_vmrj[:, m, :, j] = data.MAJOR_VEGETATION_GROUPS_RV
-
-    return mvg_vmrj
-
-
-
-def get_mvs_matrices(data: Data) -> np.ndarray:
-    mvs_vmrj = np.zeros((data.N_MVS_CLASSES, data.NLMS, data.NCELLS, data.N_AG_LUS))
-    for m in range(data.NLMS):
-        for j in data.LU_NATURAL:
-            mvs_vmrj[:, m, :, j] = data.MAJOR_VEGETATION_SUBGROUPS_RV
-
-    return mvs_vmrj
-
-
 def get_major_vegetation_matrices(data: Data) -> np.ndarray:
     """
-    TODO docstring
+    Get the matrix containing the contribution of each cell/ag. land use combination 
+    to each major vegetation group.
+
+    Returns:
+    - Array indexed by (m, r, j, v) containing the contributions.
     """
-    if settings.MAJOR_VEG_GROUP_DEF == "Groups":
-        return get_mvg_matrices(data)
+    mvg_mrjv = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS, data.N_MVG_CLASSES))
+    for m in range(data.NLMS):
+        for j in data.LU_NATURAL:
+            mvg_mrjv[m, :, j, :] = data.MAJOR_VEGETATION_GROUPS_RV
+            for v in range(data.N_MVG_CLASSES):
+                mvg_mrjv[m, :, j, v] *= data.REAL_AREA  # Account for cells' proportional contributions based on cell size
+
+    return mvg_mrjv
+
+
+def get_major_vegetation_group_limits(data: Data, yr_cal: int) -> tuple[dict[int, float], dict[int, str]]:
+    """
+    Gets the correct major vegetation group targets for the given year (yr_cal).
+
+    Returns:
+    - dict[int, float]
+        A dictionary indexed by veg group (v) with the target for each group.
+    - dict[int, str]
+        A dictionary mapping of veg group index to name
+    """
+    if yr_cal >= settings.MAJOR_VEG_GROUP_TARGET_YEAR:
+        limits = data.MVG_PROP_FINAL_TARGETS
     
-    elif settings.MAJOR_VEG_GROUP_DEF == "Subgroups":
-        return get_mvs_matrices(data)
-    
+    elif yr_cal <= data.YR_CAL_BASE:
+        limits = data.MVG_PROP_TARGETS_BY_YEAR[data.YR_CAL_BASE]
+
     else:
-        raise ValueError(
-            f"Setting MAJOR_VEG_GROUP_DEF must be either 'Groups' or 'Subgroups'. " 
-            f"Unknown value for setting: {settings.MAJOR_VEG_GROUP_DEF}"
-        )
-    
+        limits = data.MVG_PROP_TARGETS_BY_YEAR[yr_cal]
 
-def get_mvg_limits(yr_cal: int, data: Data) -> dict[int, float]:
-    pass
+    ra_sum = data.REAL_AREA.sum()
+    for v in limits:
+        limits[v] *= ra_sum
 
-
-def get_mvs_limits(yr_cal: int, data: Data) -> dict[int, float]:
-    pass
+    return limits, data.MAJOR_VEG_GROUP_NAMES
 
 
-def get_major_vegetation_group_limit(yr_cal: int, data: Data) -> float:
+def get_major_vegetation_contrs_outside_study_area(data: Data) -> dict[int, float]:
     """
-    TODO
+    Gets a dictionary mapping each major vegetation group (v) the contribution of
+    land outside LUTO's study area that applies to it.
     """
-    if settings.MAJOR_VEG_GROUP_DEF == "Groups":
-        return get_mvg_limits(yr_cal, data)
-    
-    elif settings.MAJOR_VEG_GROUP_DEF == "Subgroups":
-        return get_mvs_limits(yr_cal, data)
-    
-    else:
-        raise ValueError(
-            f"Setting MAJOR_VEG_GROUP_DEF must be either 'Groups' or 'Subgroups'. " 
-            f"Unknown value for setting: {settings.MAJOR_VEG_GROUP_DEF}"
-        )
-
+    props = data.MVG_PROP_OUTSIDE_STUDY_AREA
+    for v in props:
+        props[v] *= data.REAL_AREA
+    return props

@@ -285,6 +285,12 @@ class Data:
             self.DESC2NONAGLU["Beef Carbon Plantings (Belt)"],
             self.DESC2NONAGLU["BECCS"],
         ]
+        self.NON_AG_LU_ENV_PLANTINGS = [
+            self.DESC2NONAGLU["Environmental Plantings"],
+            self.DESC2NONAGLU["Riparian Plantings"],
+            self.DESC2NONAGLU["Sheep Agroforestry"],
+            self.DESC2NONAGLU["Beef Agroforestry"],
+        ]
 
         # Define which land uses correspond to deep/shallow rooted water yield.
         self.LU_SHALLOW_ROOTED = [
@@ -1124,18 +1130,44 @@ class Data:
         }
 
         # Major vegetation groups and subgroups
-        # Indexed (r,v): r indexes cells, v indexes vegetation groups/subgroups 
-        self.MAJOR_VEGETATION_GROUPS_RV = self.get_array_resfactor_applied(
-            np.ones((self.NCELLS_NO_RESFACTOR, 25))  # TODO: load from data
-        )
-        self.MAJOR_VEGETATION_SUBGROUPS_RV = self.get_array_resfactor_applied(
-            np.ones((self.NCELLS_NO_RESFACTOR, 90))  # TODO: load from data
-        )
+        # Indexed (r,v): r indexes cells, v indexes vegetation groups/subgroups
+        if settings.MAJOR_VEG_GROUP_DEF == "Groups":
+            self.MAJOR_VEGETATION_GROUPS_RV = self.get_array_resfactor_applied(
+                np.ones((self.NCELLS_NO_RESFACTOR, 25))  # TODO: load from data
+            )
+            self.MAJOR_VEG_GROUP_NAMES = {i: f"group {i}" for i in range(25)}
+
+        elif settings.MAJOR_VEG_GROUP_DEF == "Subgroups":
+            self.MAJOR_VEGETATION_GROUPS_RV = self.get_array_resfactor_applied(
+                np.ones((self.NCELLS_NO_RESFACTOR, 90))  # TODO: load from data
+            )
+            self.MAJOR_VEG_GROUP_NAMES = {i: f"group {i}" for i in range(90)}
+
+        else:
+            raise ValueError(
+                f"Setting MAJOR_VEG_GROUP_DEF must be either 'Groups' or 'Subgroups'. " 
+                f"Unknown value for setting: {settings.MAJOR_VEG_GROUP_DEF}"
+            )
+
         self.N_MVG_CLASSES = self.MAJOR_VEGETATION_GROUPS_RV.shape[1]
-        self.N_MVS_CLASSES = self.MAJOR_VEGETATION_SUBGROUPS_RV.shape[1]
 
         self.MVG_PROP_FINAL_TARGETS = {v: 0 for v in range(self.N_MVG_CLASSES)}  # TODO: load from data
-        self.MVS_PROP_FINAL_TARGETS = {v: 0 for v in range(self.N_MVS_CLASSES)}  # TODO: load from data
+
+        self.MVG_PROP_TARGETS_BY_YEAR = {}
+        if settings.MAJOR_VEG_GROUP_TARGET_YEAR > self.YR_CAL_BASE:
+            yr_iter = range(self.YR_CAL_BASE, settings.MAJOR_VEG_GROUP_TARGET_YEAR + 1)
+            # Set up targets dicts for each year
+            for yr in yr_iter:
+                self.MVG_PROP_TARGETS_BY_YEAR[yr] = {v: 0 for v in range(self.N_MVG_CLASSES)}
+            
+            # Fill in targets dicts
+            for v in range(self.N_MVG_CLASSES):
+                n_years = settings.MAJOR_VEG_GROUP_TARGET_YEAR - self.YR_CAL_BASE + 1
+                v_targets = np.linspace(0, self.MVG_PROP_FINAL_TARGETS[v], n_years)
+                for yr, target in zip(yr_iter, v_targets):
+                    self.MVG_PROP_TARGETS_BY_YEAR[yr][v] = target
+
+        self.MVG_PROP_OUTSIDE_STUDY_AREA = {v: 0 for v in range(self.N_MVG_CLASSES)}
 
         
 

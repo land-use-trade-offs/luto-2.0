@@ -24,7 +24,7 @@ import luto.settings as settings
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Any
 from gurobipy import GRB
 
 from luto import tools
@@ -60,7 +60,7 @@ class SolverSolution:
     ag_X_mrj: np.ndarray
     non_ag_X_rk: np.ndarray
     ag_man_X_mrj: dict[str, np.ndarray]
-    prod_data: dict[str, float]
+    prod_data: dict[str, Any]
     obj_val: dict[str, float]
 
 
@@ -102,6 +102,8 @@ class LutoSolver:
         self.ghg_emissions_limit_constraint_lb = None
         self.biodiversity_expr = None
         self.biodiversity_limit_constraint = None
+        self.major_vegetation_exprs = {}
+        self.major_vegetation_limit_constraints = {}
 
 
     def formulate(self):
@@ -135,6 +137,7 @@ class LutoSolver:
         self._add_water_usage_limit_constraints() if settings.WATER_LIMITS == 'on' else print('  ...TURNING OFF water usage constraints ...')
         self._add_ghg_emissions_limit_constraints()                     
         self._add_biodiversity_limit_constraints()
+        self._add_major_vegetation_group_limit_constraints()
 
 
     def _setup_x_vars(self):
@@ -675,6 +678,42 @@ class LutoSolver:
         )
 
 
+    def _add_major_vegetation_group_limit_constraints(self) -> None:
+        if settings.MAJOR_VEG_GROUP_LIMITS != "on":
+            print('  ...major vegetation group constraints TURNED OFF ...')
+            return
+        
+        print('  ...major vegetation group constraints...')
+
+        v_limits, v_names = self._input_data.limits["major_vegetation_groups"]
+
+        for v, v_area_lb in v_limits.items():
+            ag_contr = gp.quicksum(
+                gp.quicksum(
+                    self._input_data.ag_mvg_mrjv[0, :, :, v][:, j] * self.X_ag_dry_vars_jr[j, :]
+                )  # Dryland agriculture contribution
+                + gp.quicksum(
+                    self._input_data.ag_mvg_mrjv[1, :, :, v][:, j] * self.X_ag_irr_vars_jr[j, :]
+                )  # Irrigated agriculture contribution
+                for j in range(self._input_data.n_ag_lus)
+            )
+
+            non_ag_contr = gp.quicksum(
+                gp.quicksum(
+                    self._input_data.non_ag_mvg_rkv[:, k, v] * self.X_non_ag_vars_kr[k, :]
+                )  # Non-agricultural contribution
+                for k in range(self._input_data.n_non_ag_lus)
+            )
+
+            outside_study_area_contr = self._input_data.major_veg_contr_outside_study_area[v]
+
+            self.major_vegetation_exprs[v] = ag_contr + non_ag_contr + outside_study_area_contr
+
+            print(f"        ...vegetation class {v_names[v]} target area: {v_area_lb:,.0f}")
+            self.major_vegetation_limit_constraints[v] = self.gurobi_model.addConstr(
+                self.major_vegetation_exprs[v] >= v_area_lb
+            )
+
     def update_formulation(
         self,
         input_data: SolverInputData,
@@ -857,10 +896,14 @@ class LutoSolver:
             self.gurobi_model.remove(self.biodiversity_limit_constraint)
         if self.water_limit_constraints:
             self.gurobi_model.remove(self.water_limit_constraints)
+        if self.major_vegetation_limit_constraints:
+            self.gurobi_model.remove(self.major_vegetation_limit_constraints.values())
 
         self.adoption_limit_constraints = []
         self.demand_penalty_constraints = []
         self.water_limit_constraints = []
+        self.major_vegetation_exprs = {}
+        self.major_vegetation_limit_constraints = {}
 
         if self.ghg_emissions_limit_constraint_ub is not None:
             self.gurobi_model.remove(self.ghg_emissions_limit_constraint_ub)
@@ -877,6 +920,7 @@ class LutoSolver:
         self._add_water_usage_limit_constraints() if settings.WATER_LIMITS == 'on' else print('  ...TURNING OFF water constraints...')
         self._add_ghg_emissions_limit_constraints()                    
         self._add_biodiversity_limit_constraints()                      
+        self._add_major_vegetation_group_limit_constraints()
 
     def solve(self) -> SolverSolution:
         print("Starting solve...\n")
@@ -1035,6 +1079,11 @@ class LutoSolver:
             prod_data["GHG Emissions"] = self.ghg_emissions_expr.getValue()
         if self.biodiversity_expr:
             prod_data["Biodiversity"] = self.biodiversity_expr.getValue()
+        if self.major_vegetation_exprs:
+            prod_data["Major Vegetation Groups"] = {
+                v: expr.getValue() / self._input_data.ncells  # Divide by cells to get the proportion of the country
+                for v, expr in self.major_vegetation_exprs.items()
+            }
 
         return SolverSolution(
             lumap=lumap,
