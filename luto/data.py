@@ -1121,6 +1121,8 @@ class Data:
         # Vegetation data.
         ###############################################################
         
+        print("\tLoading vegetation data...", flush=True)
+        
         # Determine the NVIS input status
         if NVIS_SPATIAL_DETAIL  == 'LOW':
             NVIS_posix = 'single_argmax_layer'
