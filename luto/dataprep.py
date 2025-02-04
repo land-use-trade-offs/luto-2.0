@@ -24,6 +24,7 @@ and Brett Bryan, Deakin University
 # Load libraries
 import numpy as np
 import pandas as pd
+import xarray as xr
 import shutil, os, time, h5py
 
 from glob import glob
@@ -52,8 +53,9 @@ def create_new_dataset():
     nlum_inpath = 'N:/Data-Master/National_Landuse_Map/'
     BECCS_inpath = 'N:/Data-Master/BECCS/From_CSIRO/20211124_as_submitted/'
     GHG_off_land_inpath = 'N:/LUF-Modelling/Food_demand_AU/au.food.demand/Inputs/Off_land_GHG_emissions'
-    bio_contributions_inpath = 'N:/Data-Master/Biodiversity/Processing_as_LUTO_input/biodiversity_contribution_Species_Occurrence_Records/data'
-    HACS_inpath = 'N:/Data-Master/Habitat_condition_assessment_system/Data/Processed/'
+    bio_contributions_inpath = 'N:/Data-Master/Biodiversity/Processing_as_LUTO_input/biodiversity_contribution_Species_Occurrence_Records/data/'
+    bio_NVIS_inpath = 'N:/Data-Master/NVIS/'
+    bio_HACS_inpath = 'N:/Data-Master/Habitat_condition_assessment_system/Data/Processed/'
 
     # Set data output paths
     raw_data = RAW_DATA + '/' # '../raw_data/'
@@ -116,33 +118,32 @@ def create_new_dataset():
     shutil.copyfile(luto_1D_inpath + '20231107_Bundle_AgTech_EI.xlsx', outpath + '20231107_Bundle_AgTech_EI.xlsx')
     shutil.copyfile(luto_1D_inpath + '20240918_Bundle_BC.xlsx', outpath + '20240918_Bundle_BC.xlsx')
 
-    # Copy HACS data from DCCEEW
-    shutil.copyfile(HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'HABITAT_CONDITION.csv')
-
-
-    # Copy biodiversity contribution layers for each species (total ~10k species)
-    '''
-    The actual data processing was done in  `N:/Data-Master/Biodiversity/biodiversity_contribution`.
-
-    The biodiversity contribution were calculated following below steps:
-        - For each species, we have a `Raw_suitability` raster layer (~5 km resolution) that shows the species' suitability (ranges betwen 0 adn 100) across Australia.
-        - For each species, we summed the suitability values across all the cells to get the `Total_suitability_val`.
-        - For each species, the `Contribution` =  `Raw_suitability` / `Total_suitability_val`.
-
-    Because there are ~10k species, we grouped them into broader catogories for reporting.
-    For each category, the `Contribution` is the average of all species's `Contribution` within.
-        - `group` level: ['amphibians', 'birds', 'mammals', 'plants', 'reptiles'].
-        - `endanger` level: ['']  !!! Under development !!!
-    '''
-
-    # Copy biodiversity contribution files
-    bio_ncs = glob(f'{bio_contributions_inpath}/*.nc')
-    for nc in bio_ncs:
-        shutil.copy(nc, outpath)
-
-
-
-
+    # Copy biodiversity suitability contribution files
+    shutil.copyfile(bio_contributions_inpath + 'bio_id_map.nc', outpath + 'bio_id_map.nc')
+    shutil.copyfile(bio_contributions_inpath + 'bio_mask.nc', outpath + 'bio_mask.nc')
+    shutil.copyfile(bio_contributions_inpath + 'bio_ssp126_Condition_group.nc', outpath + 'bio_ssp126_Condition_group.nc')
+    shutil.copyfile(bio_contributions_inpath + 'bio_ssp126_EnviroSuit.nc', outpath + 'bio_ssp126_EnviroSuit.nc')
+    shutil.copyfile(bio_contributions_inpath + 'bio_ssp245_Condition_group.nc', outpath + 'bio_ssp245_Condition_group.nc')
+    shutil.copyfile(bio_contributions_inpath + 'bio_ssp245_EnviroSuit.nc', outpath + 'bio_ssp245_EnviroSuit.nc')
+    shutil.copyfile(bio_contributions_inpath + 'bio_ssp370_Condition_group.nc', outpath + 'bio_ssp370_Condition_group.nc')
+    shutil.copyfile(bio_contributions_inpath + 'bio_ssp370_EnviroSuit.nc', outpath + 'bio_ssp370_EnviroSuit.nc')
+    shutil.copyfile(bio_contributions_inpath + 'bio_ssp585_Condition_group.nc', outpath + 'bio_ssp585_Condition_group.nc')
+    shutil.copyfile(bio_contributions_inpath + 'bio_ssp585_EnviroSuit.nc', outpath + 'bio_ssp585_EnviroSuit.nc')
+    shutil.copyfile(bio_contributions_inpath + 'bio_xr_hist_sum_species.nc', outpath + 'bio_xr_hist_sum_species.nc')
+    
+    # Copy biodiversity HACS data from DCCEEW
+    shutil.copyfile(bio_HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'HABITAT_CONDITION.csv')
+    
+    
+    # Copy biodiversity NVIS data
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVG_ALB_single_argmax_layer.nc', outpath + 'NVIS7_0_AUST_PRE_MVG_ALB_single_argmax_layer.nc')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVS_ALB_single_argmax_layer.nc', outpath + 'NVIS7_0_AUST_PRE_MVS_ALB_single_argmax_layer.nc')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVG_ALB_seperate_percent_layers.nc', outpath + 'NVIS7_0_AUST_PRE_MVG_ALB_seperate_percent_layers.nc')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVS_ALB_seperate_percent_layers.nc', outpath + 'NVIS7_0_AUST_PRE_MVS_ALB_seperate_percent_layers.nc')
+    
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS_MVG.csv', outpath + 'NVIS_MVG.csv')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS_MVS.csv', outpath + 'NVIS_MVS.csv')
+    
 
     ############### Read data
 
@@ -198,6 +199,10 @@ def create_new_dataset():
     demand = pd.read_csv(raw_data + 'All_LUTO_demand_scenarios_with_convergences.csv')
 
 
+    ############### Save the layer of states
+    state_id = lmap['SA2_ID'].astype(str).str[0].astype(np.int8).values
+    np.save(outpath + 'state_id.npy', state_id) # shape: (j,)
+    
 
     ############### Create the CELL_ID to SA2_ID concordance table
 
@@ -234,7 +239,11 @@ def create_new_dataset():
     lucode = [-1 if (r not in ag_landuses) else ag_landuses.index(r) for r in lmap['LU_DESC']]
 
     # Convert to series and downcast to int8
-    lumap = pd.to_numeric( pd.Series(lucode), downcast = 'integer' )
+    lumap = pd.to_numeric( pd.Series(lucode), downcast = 'integer')
+    
+    # Get the index indicating the cells outside the LUTO study area
+    idx_out_LUTO = (lumap == -1).values                                             # shape=6956407, sum=2737674
+    idx_inside_LUTO = (lumap != -1).values                                          # shape=6956407, sum=4218733
 
     # Save to file. HDF5 takes up way less disk space
     lumap.to_hdf(outpath + 'lumap.h5', key = 'lumap', mode = 'w', format = 'fixed', index = False, complevel = 9)
@@ -481,13 +490,13 @@ def create_new_dataset():
         return pd.concat([water_yield_dd, water_yield_rr], ignore_index=True)
 
     # Run the function in parallel
-    idx_outside_luto_study_area = (lumap == -1).values                                             # shape = (6956407,), sum = 2737674
-    idx_all_AUS_lands = range(len(lumap))                                                          # shape = (6956407,)
-
     tasks = [
         delayed(calculate_water_yield)(ssp, idx, zone)
         for ssp in ['126', '245', '370', '585']
-        for (idx, zone) in [(idx_outside_luto_study_area, 'outside_LUTO_study_area'), (idx_all_AUS_lands, 'all_AUS_lands')]
+        for (idx, zone) in [
+            (idx_out_LUTO, 'outside_LUTO_study_area'), 
+            (lmap['CELL_ID'], 'all_AUS_lands')
+        ]
     ]
     results = Parallel(n_jobs = len(tasks))(tasks)
 
@@ -516,10 +525,10 @@ def create_new_dataset():
     ).to_numpy(dtype = np.float32)
     
     water_yield_hist_baseline_ml = water_yield_hist_baseline_ml_ha * zones['CELL_HA'].to_numpy(dtype = np.float32)
-    water_yield_hist_baseline_ml_outside_LUTO = water_yield_hist_baseline_ml[idx_outside_luto_study_area]
+    water_yield_hist_baseline_ml_outside_LUTO = water_yield_hist_baseline_ml[idx_out_LUTO]
 
-    dd_id_outside_LUTO = zones[idx_outside_luto_study_area]['HR_DRAINDIV_ID'].values
-    rr_id_outside_LUTO = zones[idx_outside_luto_study_area]['HR_RIVREG_ID'].values
+    dd_id_outside_LUTO = zones[idx_out_LUTO]['HR_DRAINDIV_ID'].values
+    rr_id_outside_LUTO = zones[idx_out_LUTO]['HR_RIVREG_ID'].values
     water_yield_outside_LUTO_hist_dd = dict(enumerate(np.bincount(dd_id_outside_LUTO, water_yield_hist_baseline_ml_outside_LUTO)))
     water_yield_outside_LUTO_hist_rr = dict(enumerate(np.bincount(rr_id_outside_LUTO, water_yield_hist_baseline_ml_outside_LUTO)))
     
@@ -537,6 +546,7 @@ def create_new_dataset():
         format='table', 
         complevel=9
     )
+
 
 
     ############### Get biodiversity priority layers

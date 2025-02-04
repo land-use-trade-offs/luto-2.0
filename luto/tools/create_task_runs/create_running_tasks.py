@@ -29,7 +29,7 @@ grid_search = {
     ###############################################################
     'DEMAND_CONSTRAINT_TYPE': ['soft'],     # 'hard' or 'soft'
     'GHG_CONSTRAINT_TYPE': ['soft'],        # 'hard' or 'soft'
-    'BIODIVERSITY_LIMITS': ['on'],           # 'on' or 'off'
+    'BIODIVERSTIY_TARGET_GBF_2': ['on'],           # 'on' or 'off'
     
     ###############################################################
     # Scenario settings for the model run

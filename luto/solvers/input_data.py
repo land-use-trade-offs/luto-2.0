@@ -60,7 +60,6 @@ class SolverInputData:
     water_yield_outside_study_area: dict[int, float]       # Water yield from outside LUTO study area -> dict. Keys: year, region.
     
     economic_contr_mrj: float               # base year economic contribution matrix.
-    economic_base_sum: float                # base year total profit (revnue - cost) or cost.
     economic_BASE_YR_prices: np.ndarray     # target year commodity profit.
     economic_target_yr_carbon_price: float  # target year carbon price.
 
@@ -412,33 +411,6 @@ def get_economic_mrj(
     return [ag_obj_mrj, non_ag_obj_rk, ag_man_objs]
 
 
-def get_base_yr_economy_sum(
-    data: Data, 
-    base_year: int, 
-    ag_obj_mrj: np.ndarray, 
-    non_ag_obj_rk: np.ndarray, 
-    ag_man_objs: dict[str, np.ndarray]
-    ) -> float:
-    print('Getting base year economic value...', flush = True)
-    
-    am2j = {
-        am: [data.DESC2AGLU[lu] for lu in am_lus]
-        for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items()
-        if AG_MANAGEMENTS[am]
-    }
-    
-    # Get the decision variables for the base year
-    dvar_ag_mrj = data.ag_dvars[base_year]
-    dvar_non_ag_rk = data.non_ag_dvars[base_year]   
-    dvar_am_obj = data.ag_man_dvars[base_year]   
-
-    # Calculate the economic value of the base year
-    economy_val_ag = (ag_obj_mrj * dvar_ag_mrj).sum()
-    economy_val_non_ag = (non_ag_obj_rk * dvar_non_ag_rk).sum()
-    economy_val_am = sum((ag_man_objs[am] * dvar_am_obj[am][:,:,j]).sum() for am,j in am2j.items())
-    
-    return economy_val_ag + economy_val_non_ag + economy_val_am
-
 
 def get_commodity_prices(data: Data) -> np.ndarray:
     '''
@@ -496,7 +468,7 @@ def get_limits(
     # If biodiversity limits are not turned on, set the limit to 0.
     limits['biodiversity'] = (
         ag_biodiversity.get_biodiversity_limits(data, yr_cal)
-        if settings.BIODIVERSITY_LIMITS == 'on'
+        if settings.BIODIVERSTIY_TARGET_GBF_2 == 'on'
         else 0
     )
 
@@ -538,8 +510,6 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_t_mrj
     )
     
-    economic_base_sum = get_base_yr_economy_sum(data, base_year, ag_obj_mrj, non_ag_obj_rk,  ag_man_objs)
-
     ag_g_mrj = get_ag_g_mrj(data, target_index)
     ag_q_mrp = get_ag_q_mrp(data, target_index)
     ag_w_mrj = get_ag_w_mrj(data, target_index, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)     # Calculate water net yield matrices based on historical water yield layers
@@ -579,7 +549,6 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         water_yield_RR_BASE_YR=get_w_RR_BASE_YR(data),                                  # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
         
         economic_contr_mrj=(ag_obj_mrj, non_ag_obj_rk,  ag_man_objs),
-        economic_base_sum=economic_base_sum,
         economic_BASE_YR_prices=get_commodity_prices(data),
         economic_target_yr_carbon_price=get_target_yr_carbon_price(data, target_year), 
         

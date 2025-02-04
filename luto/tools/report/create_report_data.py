@@ -1333,7 +1333,7 @@ def save_report_data(raw_data_dir:str):
     #                   6) Biodiversity                     #
     #########################################################
 
-    if settings.BIODIVERSITY_LIMITS == 'on':
+    if settings.BIODIVERSTIY_TARGET_GBF_2 == 'on':
         
         # ---------------- Biodiversity priority score  ----------------
         # get biodiversity dataframe
