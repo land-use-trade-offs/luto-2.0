@@ -1121,6 +1121,8 @@ class Data:
         # Vegetation data.
         ###############################################################
         
+        print("\tLoading vegetation data...", flush=True)
+        
         # Determine the NVIS input status
         if NVIS_SPATIAL_DETAIL  == 'LOW':
             NVIS_posix = 'single_argmax_layer'
@@ -1131,21 +1133,20 @@ class Data:
         
 
         # Read in the pre-1750 vegetation statistics, and get NVIS class names and areas
-        NVIS_area_and_target = pd.read_csv(INPUT_DIR + f'/NVIS_{NVIS_CLASS_DETAIL}.csv', index_col=0, header=[0,1])
+        NVIS_area_and_target = pd.read_csv(INPUT_DIR + f'/NVIS_{NVIS_CLASS_DETAIL}_{NVIS_SPATIAL_DETAIL}_SPATIAL_DETAIL.csv')
         
-        self.NVIS_PRE_NAMES = NVIS_area_and_target.index.to_list()
-        self.NVIS_PRE_AREA_NATURAL_AUS = NVIS_area_and_target.loc[:, ('TOTAL_AREA_HA', f'NVIS_SPATIAL_DETAIL_{NVIS_SPATIAL_DETAIL}')].to_numpy()
-        self.NVIS_PRE_AREA_OUTSIDE_LUTO = NVIS_area_and_target.loc[:, ('OUTSIDE_LUTO_AREA_HA', f'NVIS_SPATIAL_DETAIL_{NVIS_SPATIAL_DETAIL}')].to_numpy()
+        self.NVIS_ID2DESC = dict(enumerate(NVIS_area_and_target['group']))
+        self.NVIS_TOTAL_AREA_HA = NVIS_area_and_target['TOTAL_AREA_HA'].to_numpy()
+        self.NVIS_OUTSIDE_LUTO_AREA_HA = NVIS_area_and_target['OUTSIDE_LUTO_AREA_HA'].to_numpy()
 
-        
         # Read in vegetation layer data
-        NVIS_pre_xr = xr.load_dataarray(INPUT_DIR + f'/NVIS7_0_AUST_PRE_{NVIS_CLASS_DETAIL}_ALB_{NVIS_posix}.nc').values
+        NVIS_pre_xr = xr.load_dataarray(INPUT_DIR + f'/NVIS_{NVIS_CLASS_DETAIL}_{NVIS_SPATIAL_DETAIL}_SPATIAL_DETAIL.nc').values
 
         # Apply mask
         if NVIS_SPATIAL_DETAIL == 'LOW':
-            self.NVIS_PRE_gr = NVIS_pre_xr[self.MASK]
+            self.NVIS_PRE_GR = NVIS_pre_xr[self.MASK]
         else:
-            self.NVIS_PRE_gr = NVIS_pre_xr[:, self.MASK]
+            self.NVIS_PRE_GR = NVIS_pre_xr[:, self.MASK]
 
 
         ###############################################################
