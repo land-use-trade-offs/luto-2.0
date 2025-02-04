@@ -470,6 +470,13 @@ BIODIVERSTIY_TARGET_GBF_3  = 'on'           # 'on' or 'off'.
     protect and manage 30% of the world's land, water, and coastal areas by 2030.
 '''
 
+NVIS_SPATIAL_DETAIL = 'HIGH'                 # 'LOW' or 'HIGH'
+'''
+- If 'LOW' is selected, the primary group layers will be used to represent the vegetation type. 
+- If 'HIGH' is selected, the sub group layers will be used to represent the vegetation type.
+'''
+
+
 NVIS_CLASS_DETAIL  = 'MVG'                  # 'MVG' or 'MVS'
 '''
 The National Vegetation Information System (NVIS) provides the 100m resolution information on
@@ -481,23 +488,6 @@ the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers
 - If 'MVS' is selected, the NVIS input layers will be be resampled to a single 1km resolution layer,
   and each cell has a group index who covers the most area within this cell.
 '''
-
-NVIS_SPATIAL_DETAIL = 'LOW'                 # 'LOW' or 'HIGH'
-'''
-- If 'LOW' is selected, the primary group layers will be used to represent the vegetation type. 
-- If 'HIGH' is selected, the sub group layers will be used to represent the vegetation type.
-'''
-
-
-VEGETATION_ALLOW_PERCENTAGE = 20            # Only effective when NVIS_SPATIAL_DETAIL is 'HIGH'. 
-''' The threshould percentage of allowing reforestation on a cell. 
-    E.g., if set to 20%, then a cell is allowed to be restored as shrubland if this cell
-    was >= 20% of shrub land in pre-European time.
-'''
-
-
-
-
 
 
 

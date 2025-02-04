@@ -142,7 +142,7 @@ def write_logs(data: Data):
         try:
             shutil.move(log, f"{data.path}/{os.path.basename(log)}")
         except:
-            print(f"Could not move {log} to {data.path}")
+            pass
     
     return None
 

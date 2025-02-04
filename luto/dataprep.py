@@ -136,13 +136,15 @@ def create_new_dataset():
     
     
     # Copy biodiversity NVIS data
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVG_ALB_single_argmax_layer.nc', outpath + 'NVIS7_0_AUST_PRE_MVG_ALB_single_argmax_layer.nc')
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVS_ALB_single_argmax_layer.nc', outpath + 'NVIS7_0_AUST_PRE_MVS_ALB_single_argmax_layer.nc')
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVG_ALB_seperate_percent_layers.nc', outpath + 'NVIS7_0_AUST_PRE_MVG_ALB_seperate_percent_layers.nc')
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVS_ALB_seperate_percent_layers.nc', outpath + 'NVIS7_0_AUST_PRE_MVS_ALB_seperate_percent_layers.nc')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVS_HIGH_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVS_HIGH_SPATIAL_DETAIL.nc')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVS_LOW_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVS_LOW_SPATIAL_DETAIL.nc')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVG_HIGH_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVG_HIGH_SPATIAL_DETAIL.nc')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVG_LOW_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVG_LOW_SPATIAL_DETAIL.nc')
     
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS_MVG.csv', outpath + 'NVIS_MVG.csv')
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS_MVS.csv', outpath + 'NVIS_MVS.csv')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS_MVG_HIGH_SPATIAL_DETAIL.csv', outpath + 'NVIS_MVG_HIGH_SPATIAL_DETAIL.csv')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS_MVG_LOW_SPATIAL_DETAIL.csv', outpath + 'NVIS_MVG_LOW_SPATIAL_DETAIL.csv')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS_MVS_HIGH_SPATIAL_DETAIL.csv', outpath + 'NVIS_MVS_HIGH_SPATIAL_DETAIL.csv')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS_MVS_LOW_SPATIAL_DETAIL.csv', outpath + 'NVIS_MVS_LOW_SPATIAL_DETAIL.csv')
     
 
     ############### Read data
