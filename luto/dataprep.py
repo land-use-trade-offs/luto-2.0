@@ -134,12 +134,15 @@ def create_new_dataset():
     # Copy biodiversity HACS data from DCCEEW
     shutil.copyfile(bio_HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'HABITAT_CONDITION.csv')
     
-    # Copy biodiversity NVIS data
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVG_ALB_group_area_ha.csv', outpath + 'NVIS7_0_AUST_PRE_MVG_ALB_group_area_ha.csv')
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVS_ALB_group_area_ha.csv', outpath + 'NVIS7_0_AUST_PRE_MVS_ALB_group_area_ha.csv')
     
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_EXT_ALL/NVIS7_0_AUST_EXT_MVG_ALB_filter_group.nc', outpath + 'NVIS7_0_AUST_EXT_MVG_ALB_filter_group.nc')
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_EXT_ALL/NVIS7_0_AUST_EXT_MVS_ALB_filter_group.nc', outpath + 'NVIS7_0_AUST_EXT_MVS_ALB_filter_group.nc')
+    # Copy biodiversity NVIS data
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVG_ALB_single_argmax_layer.nc', outpath + 'NVIS7_0_AUST_PRE_MVG_ALB_single_argmax_layer.nc')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVS_ALB_single_argmax_layer.nc', outpath + 'NVIS7_0_AUST_PRE_MVS_ALB_single_argmax_layer.nc')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVG_ALB_seperate_percent_layers.nc', outpath + 'NVIS7_0_AUST_PRE_MVG_ALB_seperate_percent_layers.nc')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVS_ALB_seperate_percent_layers.nc', outpath + 'NVIS7_0_AUST_PRE_MVS_ALB_seperate_percent_layers.nc')
+    
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS_MVG.csv', outpath + 'NVIS_MVG.csv')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS_MVS.csv', outpath + 'NVIS_MVS.csv')
     
 
     ############### Read data
@@ -543,26 +546,6 @@ def create_new_dataset():
         format='table', 
         complevel=9
     )
-
-
-
-    ############### Get vegetation data
-    
-    # Read in the vegetation data
-    NVIS_ext_mvg_xr = xr.load_dataarray(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_EXT_ALL/NVIS7_0_AUST_EXT_MVG_ALB_filter_group.nc')
-    NVIS_ext_mvs_xr = xr.load_dataarray(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_EXT_ALL/NVIS7_0_AUST_EXT_MVS_ALB_filter_group.nc')
-    
-    # Get cells that are 'outside' LUTO study area
-    NVIS_ext_mvg_xr_outside_LUTO_ha = NVIS_ext_mvg_xr.sel(cell=idx_out_LUTO) * zones['CELL_HA'].values[None, idx_out_LUTO]
-    NVIS_ext_mvs_xr_outside_LUTO_ha = NVIS_ext_mvs_xr.sel(cell=idx_out_LUTO) * zones['CELL_HA'].values[None, idx_out_LUTO]
-    
-    # Save the aggregated area of each vegetation group to file
-    NVIS_ext_mvg_outside_LUTO_group_area_ha = NVIS_ext_mvg_xr_outside_LUTO_ha.sum(dim='cell').to_dataframe('AREA_HA').reset_index()
-    NVIS_ext_mvs_outside_LUTO_group_area_ha = NVIS_ext_mvs_xr_outside_LUTO_ha.sum(dim='cell').to_dataframe('AREA_HA').reset_index()
-    
-    # Save to file
-    NVIS_ext_mvg_outside_LUTO_group_area_ha.to_csv(outpath + 'NVIS_ext_mvg_outside_LUTO_group_area_ha.csv', index = False)
-    NVIS_ext_mvs_outside_LUTO_group_area_ha.to_csv(outpath + 'NVIS_ext_mvs_outside_LUTO_group_area_ha.csv', index = False)
 
 
 

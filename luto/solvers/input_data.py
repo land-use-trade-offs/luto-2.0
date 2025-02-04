@@ -468,7 +468,7 @@ def get_limits(
     # If biodiversity limits are not turned on, set the limit to 0.
     limits['biodiversity'] = (
         ag_biodiversity.get_biodiversity_limits(data, yr_cal)
-        if settings.BIODIVERSITY_LIMITS == 'on'
+        if settings.BIODIVERSTIY_TARGET_GBF_2 == 'on'
         else 0
     )
 

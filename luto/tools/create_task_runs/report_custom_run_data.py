@@ -26,14 +26,14 @@ report_data_demand['GHG_LIMITS_FIELD'] = pd.Categorical(report_data_demand['GHG_
 # Filter the data
 #    
 #    GHG_CONSTRAINT_TYPE == "hard" and
-#    BIODIVERSITY_LIMITS == "on" and
+#    BIODIVERSTIY_TARGET_GBF_2 == "on" and
 #    SOLVE_ECONOMY_WEIGHT >= 0 and
 #    SOLVE_ECONOMY_WEIGHT <= 0.5
 filter_rules = '''
     year != 2010 and
     DIET_DOM == "BAU" and
     GHG_CONSTRAINT_TYPE == "soft" and
-    BIODIVERSITY_LIMITS == "off" and
+    BIODIVERSTIY_TARGET_GBF_2 == "off" and
     SOLVE_ECONOMY_WEIGHT == 0.05
 '''.strip().replace('\n', '')
 

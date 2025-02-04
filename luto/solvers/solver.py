@@ -628,13 +628,13 @@ class LutoSolver:
 
 
     def _add_biodiversity_limit_constraints(self):
-        if settings.BIODIVERSITY_LIMITS != "on":
-            print('  ...biodiversity constraints TURNED OFF ...')
+        if settings.BIODIVERSTIY_TARGET_GBF_2 != "on":
+            print('  ...biodiversity constraints target-2 TURNED OFF ...')
             return
 
         print('  ...biodiversity constraints...')
 
-        # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSITY_LIMITS != "on".
+        # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSTIY_TARGET_GBF_2 != "on".
         biodiversity_limits = self._input_data.limits["biodiversity"]
 
         ag_contr = gp.quicksum(

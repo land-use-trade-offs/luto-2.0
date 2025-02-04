@@ -17,7 +17,6 @@
 
 import os
 import h5py
-
 import xarray as xr
 import numpy as np
 import pandas as pd
@@ -36,7 +35,7 @@ from typing import Any, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.settings import INPUT_DIR, NON_AG_LAND_USES_REVERSIBLE, OUTPUT_DIR
+from luto.settings import INPUT_DIR, NON_AG_LAND_USES_REVERSIBLE, NVIS_CLASS_DETAIL , NVIS_SPATIAL_DETAIL, OUTPUT_DIR
 from luto.tools.spatializers import upsample_array
 
 
@@ -1122,32 +1121,31 @@ class Data:
         # Vegetation data.
         ###############################################################
         
-        # Get the pre-European vegetation data, which will be used as the target for restoration
-        NVIS_pre_mvg_area_ha = pd.read_csv(os.path.join(INPUT_DIR, 'NVIS7_0_AUST_PRE_MVG_ALB_group_area_ha.csv'))
-        NVIS_pre_mvs_area_ha = pd.read_csv(os.path.join(INPUT_DIR, 'NVIS7_0_AUST_PRE_MVS_ALB_group_area_ha.csv'))
+        # Determine the NVIS input status
+        if NVIS_SPATIAL_DETAIL  == 'LOW':
+            NVIS_posix = 'single_argmax_layer'
+        elif NVIS_SPATIAL_DETAIL  == 'HIGH':
+            NVIS_posix = 'seperate_percent_layers'
+        else:
+            raise ValueError(f"Invalid NVIS input status: {NVIS_CLASS_DETAIL }, must be 'single_argmax' or 'seperate_percent'")
         
-        self.NVIS_PRE_MVG_AREA_g = NVIS_pre_mvg_area_ha['AREA_HA'].to_numpy()
-        self.NVIS_PRE_MVS_AREA_g = NVIS_pre_mvs_area_ha['AREA_HA'].to_numpy()
-        
-        # Get the group names
-        self.NVIS_MVG_names = NVIS_pre_mvg_area_ha['AREA_HA'].values.tolist()
-        self.NVIS_MVS_names = NVIS_pre_mvs_area_ha['AREA_HA'].values.tolist()
-        
-        # Load extant vegetation area data for each vegetation group
-        NVIS_ext_mvg_area_ha = pd.read_csv(os.path.join(INPUT_DIR, 'NVIS_ext_mvg_outside_LUTO_group_area_ha.csv'))
-        NVIS_ext_mvs_area_ha = pd.read_csv(os.path.join(INPUT_DIR, 'NVIS_ext_mvs_outside_LUTO_group_area_ha.csv'))
-        
-        # Load extant vegetation spatial data for each group
-        NVIS_ext_mvg_xr = xr.load_dataarray(os.path.join(INPUT_DIR, 'NVIS7_0_AUST_EXT_MVG_ALB_filter_group.nc'))
-        NVIS_ext_mvs_xr = xr.load_dataarray(os.path.join(INPUT_DIR, 'NVIS7_0_AUST_EXT_MVS_ALB_filter_group.nc'))
 
-        # Get the extant vegetation spatial data as numpy arrays
-        self.NVIS_EXT_MVG_gr = NVIS_ext_mvg_xr.values
-        self.NVIS_EXT_MVS_gr = NVIS_ext_mvs_xr.values
+        # Read in the pre-1750 vegetation statistics, and get NVIS class names and areas
+        NVIS_area_and_target = pd.read_csv(INPUT_DIR + f'/NVIS_{NVIS_CLASS_DETAIL}.csv', index_col=0, header=[0,1])
         
-        # Apply mask 
-        self.NVIS_EXT_MVG_gr = self.NVIS_EXT_MVG_gr[None, self.MASK]
-        self.NVIS_EXT_MVS_gr = self.NVIS_EXT_MVS_gr[None, self.MASK]
+        self.NVIS_PRE_NAMES = NVIS_area_and_target.index.to_list()
+        self.NVIS_PRE_AREA_NATURAL_AUS = NVIS_area_and_target.loc[:, ('TOTAL_AREA_HA', f'NVIS_SPATIAL_DETAIL_{NVIS_SPATIAL_DETAIL}')].to_numpy()
+        self.NVIS_PRE_AREA_OUTSIDE_LUTO = NVIS_area_and_target.loc[:, ('OUTSIDE_LUTO_AREA_HA', f'NVIS_SPATIAL_DETAIL_{NVIS_SPATIAL_DETAIL}')].to_numpy()
+
+        
+        # Read in vegetation layer data
+        NVIS_pre_xr = xr.load_dataarray(INPUT_DIR + f'/NVIS7_0_AUST_PRE_{NVIS_CLASS_DETAIL}_ALB_{NVIS_posix}.nc').values
+
+        # Apply mask
+        if NVIS_SPATIAL_DETAIL == 'LOW':
+            self.NVIS_PRE_gr = NVIS_pre_xr[self.MASK]
+        else:
+            self.NVIS_PRE_gr = NVIS_pre_xr[:, self.MASK]
 
 
         ###############################################################
