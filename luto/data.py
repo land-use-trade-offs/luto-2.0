@@ -391,6 +391,7 @@ class Data:
         self.REAL_AREA = self.get_array_resfactor_applied(self.REAL_AREA_NO_RESFACTOR) * self.RESMULT
 
         # Derive NCELLS (number of spatial cells) from the area array.
+        self.NCELLS_NO_RESFACTOR = self.REAL_AREA_NO_RESFACTOR.shape[0]
         self.NCELLS = self.REAL_AREA.shape[0]
         
         # Initial (2010) ag decision variable (X_mrj).
@@ -1122,6 +1123,21 @@ class Data:
             for yr in range(2010, 2101)
         }
 
+        # Major vegetation groups and subgroups
+        # Indexed (r,v): r indexes cells, v indexes vegetation groups/subgroups 
+        self.MAJOR_VEGETATION_GROUPS_RV = self.get_array_resfactor_applied(
+            np.ones((self.NCELLS_NO_RESFACTOR, 25))  # TODO: load from data
+        )
+        self.MAJOR_VEGETATION_SUBGROUPS_RV = self.get_array_resfactor_applied(
+            np.ones((self.NCELLS_NO_RESFACTOR, 90))  # TODO: load from data
+        )
+        self.N_MVG_CLASSES = self.MAJOR_VEGETATION_GROUPS_RV.shape[1]
+        self.N_MVS_CLASSES = self.MAJOR_VEGETATION_SUBGROUPS_RV.shape[1]
+
+        self.MVG_PROP_FINAL_TARGETS = {v: 0 for v in range(self.N_MVG_CLASSES)}  # TODO: load from data
+        self.MVS_PROP_FINAL_TARGETS = {v: 0 for v in range(self.N_MVS_CLASSES)}  # TODO: load from data
+
+        
 
 
         ###############################################################

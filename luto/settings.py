@@ -465,6 +465,10 @@ BIODIVERSITY_LIMITS = 'on'                 # 'on' or 'off', if 'off' the biodive
 CALC_BIODIVERSITY_CONTRIBUTION = False      # True or False, calculate/report biodiversity contribution; False will urn off reprojecting decision variables to xarray so speed up the model run.
 BIO_CALC_LEVEL = 'group'                    # 'group' or 'species' - determines whether to calculate biodiversity scores at the group or species level
 
+# Major vegetation (sub)group settings
+MAJOR_VEG_GROUP_LIMITS = "on"
+MAJOR_VEG_GROUP_DEF = "Groups"      # Either 'Groups' or 'Subgroups'
+MAJOR_VEG_GROUP_TARGET_YEAR = 2030
 
 
 # ---------------------------------------------------------------------------- #

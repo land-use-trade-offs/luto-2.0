@@ -192,3 +192,65 @@ def get_biodiversity_limits(data: Data, yr_cal: int):
     """
 
     return data.BIODIV_GBF_TARGET_2[yr_cal]
+
+
+def get_mvg_matrices(data: Data) -> np.ndarray:
+    mvg_vmrj = np.zeros((data.N_MVG_CLASSES, data.NLMS, data.NCELLS, data.N_AG_LUS))
+    for m in range(data.NLMS):
+        for j in data.LU_NATURAL:
+            mvg_vmrj[:, m, :, j] = data.MAJOR_VEGETATION_GROUPS_RV
+
+    return mvg_vmrj
+
+
+
+def get_mvs_matrices(data: Data) -> np.ndarray:
+    mvs_vmrj = np.zeros((data.N_MVS_CLASSES, data.NLMS, data.NCELLS, data.N_AG_LUS))
+    for m in range(data.NLMS):
+        for j in data.LU_NATURAL:
+            mvs_vmrj[:, m, :, j] = data.MAJOR_VEGETATION_SUBGROUPS_RV
+
+    return mvs_vmrj
+
+
+def get_major_vegetation_matrices(data: Data) -> np.ndarray:
+    """
+    TODO docstring
+    """
+    if settings.MAJOR_VEG_GROUP_DEF == "Groups":
+        return get_mvg_matrices(data)
+    
+    elif settings.MAJOR_VEG_GROUP_DEF == "Subgroups":
+        return get_mvs_matrices(data)
+    
+    else:
+        raise ValueError(
+            f"Setting MAJOR_VEG_GROUP_DEF must be either 'Groups' or 'Subgroups'. " 
+            f"Unknown value for setting: {settings.MAJOR_VEG_GROUP_DEF}"
+        )
+    
+
+def get_mvg_limits(yr_cal: int, data: Data) -> dict[int, float]:
+    pass
+
+
+def get_mvs_limits(yr_cal: int, data: Data) -> dict[int, float]:
+    pass
+
+
+def get_major_vegetation_group_limit(yr_cal: int, data: Data) -> float:
+    """
+    TODO
+    """
+    if settings.MAJOR_VEG_GROUP_DEF == "Groups":
+        return get_mvg_limits(yr_cal, data)
+    
+    elif settings.MAJOR_VEG_GROUP_DEF == "Subgroups":
+        return get_mvs_limits(yr_cal, data)
+    
+    else:
+        raise ValueError(
+            f"Setting MAJOR_VEG_GROUP_DEF must be either 'Groups' or 'Subgroups'. " 
+            f"Unknown value for setting: {settings.MAJOR_VEG_GROUP_DEF}"
+        )
+
