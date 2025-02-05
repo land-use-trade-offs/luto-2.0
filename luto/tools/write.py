@@ -1134,6 +1134,18 @@ def write_biodiversity_contribution(data: Data, yr_cal, path):
     bio_df.to_csv(os.path.join(path, f'biodiversity_contribution_{yr_cal}.csv'), index=False)
 
 
+def write_major_vegetation_groups(data: Data, yr_cal: int) -> None:
+    if not settings.MAJOR_VEG_GROUP_LIMITS == "on":
+        return
+    
+    print(f"Writing major vegetation groups' scores for {yr_cal}")
+
+    ra_sum = data.REAL_AREA.sum()
+    
+    mvg_df = pd.DataFrame(index=[yr_cal], columns=list(data.MAJOR_VEG_GROUP_NAMES.values()))
+    
+
+
 
 
 def write_ghg_separate(data: Data, yr_cal, path):
