@@ -198,6 +198,9 @@ class LutoSolver:
             if not AG_MANAGEMENTS[am]:
                 continue
 
+            if am == 'Savanna Burning':
+
+
             # Get snake_case version of the AM name for the variable name
             am_name = tools.am_name_snake_case(am)
 
@@ -207,6 +210,9 @@ class LutoSolver:
                 for r in dry_lu_cells:
                     dry_x_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][0, r, j]
                     dry_var_name = f"X_ag_man_dry_{am_name}_{j}_{r}"
+
+                    if am == 'Savanna Burning' and r in self._input_data.savanna_ineligible_cells:
+                        continue
 
                     self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                         lb=dry_x_lb, ub=1, name=dry_var_name,
@@ -322,15 +328,6 @@ class LutoSolver:
         Ag. man. variables cannot exceed the value of the agricultural variable.
         """
         print('  ...agricultural management constraints...')
-
-        savburn_ineligible_cells = self._input_data.savanna_ineligible_cells
-
-        for j_idx, j in enumerate(am_j_list):
-            for r in savburn_ineligible_cells:
-                constr = self.gurobi_model.addConstr(
-                    self.X_ag_man_dry_vars_jr['Savanna Burning'][j_idx, r] <= 1e-6
-                )
-                self.ag_management_constraints_r[r].append(constr)
 
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx, j in enumerate(am_j_list):
