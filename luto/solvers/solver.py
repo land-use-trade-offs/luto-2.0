@@ -275,7 +275,7 @@ class LutoSolver:
         )
         
         # Get the objective values for each sector
-        self.obj_economy = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr - self._input_data.economic_base_sum
+        self.obj_economy = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr
 
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             self.obj_demand = gp.quicksum(v * price for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices))
@@ -684,13 +684,13 @@ class LutoSolver:
 
 
     def _add_biodiversity_limit_constraints(self):
-        if settings.BIODIVERSITY_LIMITS != "on":
-            print('  ...biodiversity constraints TURNED OFF ...')
+        if settings.BIODIVERSTIY_TARGET_GBF_2 != "on":
+            print('  ...biodiversity constraints target-2 TURNED OFF ...')
             return
 
         print('  ...biodiversity constraints...')
 
-        # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSITY_LIMITS != "on".
+        # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSTIY_TARGET_GBF_2 != "on".
         biodiversity_limits = self._input_data.limits["biodiversity"]
 
         ag_contr = gp.quicksum(
@@ -1105,11 +1105,11 @@ class LutoSolver:
             non_ag_X_rk=non_ag_X_sol_rk,
             ag_man_X_mrj=ag_man_X_mrj_processed,
             prod_data=prod_data,
-            obj_val ={
+            obj_val = {
                 'SUM': self.gurobi_model.ObjVal,
                 'Economy': self.obj_economy.getValue(),
                 'Demand': self.obj_demand.getValue().sum()      if settings.DEMAND_CONSTRAINT_TYPE == 'soft' else 0,
-                'GHG': self.obj_ghg.getValue()                  if settings.GHG_CONSTRAINT_TYPE == 'soft' else 0
+                'GHG': self.obj_ghg.getValue()                  if settings.GHG_CONSTRAINT_TYPE == 'soft' else 0,            
             }
         )
 
