@@ -323,21 +323,30 @@ class LutoSolver:
         """
         print('  ...agricultural management constraints...')
 
+        savburn_ineligible_cells = self._input_data.savanna_ineligible_cells
+
+        for j_idx, j in enumerate(am_j_list):
+            for r in savburn_ineligible_cells:
+                constr = self.gurobi_model.addConstr(
+                    self.X_ag_man_dry_vars_jr['Savanna Burning'][j_idx, r] <= 1e-6
+                )
+                self.ag_management_constraints_r[r].append(constr)
+
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx, j in enumerate(am_j_list):
                 if cells is not None:
-                    lm0_r_vals = [r for r in cells if self._input_data.ag_x_mrj[0, r, j]]
-                    lm1_r_vals = [r for r in cells if self._input_data.ag_x_mrj[1, r, j]]
+                    lm_dry_r_vals  = [r for r in cells if self._input_data.ag_x_mrj[0, r, j]]
+                    lm_irr_r_vals  = [r for r in cells if self._input_data.ag_x_mrj[1, r, j]]
                 else:
-                    lm0_r_vals = self._input_data.ag_lu2cells[0, j]
-                    lm1_r_vals = self._input_data.ag_lu2cells[1, j]
+                    lm_dry_r_vals  = self._input_data.ag_lu2cells[0, j]
+                    lm_irr_r_vals  = self._input_data.ag_lu2cells[1, j]
 
-                for r in lm0_r_vals:
+                for r in lm_dry_r_vals :
                     constr = self.gurobi_model.addConstr(
                         self.X_ag_man_dry_vars_jr[am][j_idx, r] <= self.X_ag_dry_vars_jr[j, r]
                     )
                     self.ag_management_constraints_r[r].append(constr)
-                for r in lm1_r_vals:
+                for r in lm_irr_r_vals :
                     constr = self.gurobi_model.addConstr(
                         self.X_ag_man_irr_vars_jr[am][j_idx, r] <= self.X_ag_irr_vars_jr[j, r]
                     )

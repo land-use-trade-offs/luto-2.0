@@ -409,15 +409,8 @@ def get_savanna_burning_effect_c_mrj(data: Data, yr_idx: int):
         * data.REAL_AREA
     )
 
-    big_number = 999999999999
-    savburn_ineligible_cells = np.where(data.SAVBURN_ELIGIBLE == 0)[0]
-
     for m, j in itertools.product(range(data.NLMS), range(nlus)):
         new_c_mrj[m, :, j] = sav_burning_effect
-
-        # TODO: build in hard constraints (ub for variables) instead of this temorary measure
-        # to block certain cells from using Savanna Burning
-        new_c_mrj[m, savburn_ineligible_cells, j] = big_number
 
     return new_c_mrj
 
