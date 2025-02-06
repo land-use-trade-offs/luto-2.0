@@ -273,14 +273,19 @@ class LutoSolver:
         
         # Get the objective values for each sector
         self.obj_economy = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr - self._input_data.economic_base_sum
-        self.obj_demand = self.V * self._input_data.economic_BASE_YR_prices         if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
+
+        if settings.DEMAND_CONSTRAINT_TYPE == "soft":
+            self.obj_demand = gp.quicksum(v * price for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices))
+        else:
+            self.obj_demand = 0
+        
         self.obj_ghg = self.E * self._input_data.economic_target_yr_carbon_price    if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
 
         # Set the objective function
         sense = GRB.MINIMIZE if settings.OBJECTIVE == "mincost" else GRB.MAXIMIZE
         
         objective = self.obj_economy *  settings.SOLVE_ECONOMY_WEIGHT \
-            - (gp.quicksum(self.obj_demand) +  self.obj_ghg) * (1 - settings.SOLVE_ECONOMY_WEIGHT)  
+            - (self.obj_demand +  self.obj_ghg) * (1 - settings.SOLVE_ECONOMY_WEIGHT)  
                  
         self.gurobi_model.setObjective(objective, sense)  
         
