@@ -59,7 +59,7 @@ class SolverInputData:
     water_yield_RR_BASE_YR: dict                           # Water yield for the BASE_YR based on historical water yield layers .
     water_yield_outside_study_area: dict[int, float]       # Water yield from outside LUTO study area -> dict. Keys: year, region.
     
-    savanna_ineligible_r: np.ndarray        # Cells that are not eligible for savanna land use.
+    savanna_eligible_r: np.ndarray        # Cells that are not eligible for savanna land use.
 
     economic_contr_mrj: float               # base year economic contribution matrix.
     economic_BASE_YR_prices: np.ndarray     # target year commodity profit.
@@ -448,8 +448,8 @@ def get_target_yr_carbon_price(data: Data, target_year: int) -> float:
     return data.CARBON_PRICES[target_year]
 
 
-def get_savanna_ineligible_r(data: Data) -> np.ndarray:
-    return np.where(data.SAVBURN_ELIGIBLE == 0)[0]
+def get_savanna_eligible_r(data: Data) -> np.ndarray:
+    return np.where(data.SAVBURN_ELIGIBLE == 1)[0]
 
 
 def get_limits(
@@ -554,7 +554,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Use the water net yield outside LUTO study area for the YR_CAL_BASE year
         water_yield_RR_BASE_YR=get_w_RR_BASE_YR(data),                                  # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
         
-        savanna_ineligible_r=get_savanna_ineligible_r(data),
+        savanna_eligible_r=get_savanna_eligible_r(data),
 
         economic_contr_mrj=(ag_obj_mrj, non_ag_obj_rk,  ag_man_objs),
         economic_BASE_YR_prices=get_commodity_prices(data),
