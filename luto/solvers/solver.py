@@ -198,9 +198,6 @@ class LutoSolver:
             if not AG_MANAGEMENTS[am]:
                 continue
 
-            if am == 'Savanna Burning':
-
-
             # Get snake_case version of the AM name for the variable name
             am_name = tools.am_name_snake_case(am)
 
@@ -211,7 +208,7 @@ class LutoSolver:
                     dry_x_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][0, r, j]
                     dry_var_name = f"X_ag_man_dry_{am_name}_{j}_{r}"
 
-                    if am == 'Savanna Burning' and r in self._input_data.savanna_ineligible_cells:
+                    if am == 'Savanna Burning' and r in self._input_data.savanna_ineligible_r:
                         continue
 
                     self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
