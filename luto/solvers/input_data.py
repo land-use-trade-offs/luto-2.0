@@ -431,7 +431,7 @@ def get_commodity_prices(data: Data) -> np.ndarray:
 
     # Get the median price of each commodity
     for names, commodity in commodity_lookup.items():
-        prices = np.nanpercentile(data.AGEC_LVSTK[*names], 50)
+        prices = np.nanpercentile(data.AGEC_LVSTK[names[0], names[1]], 50)
         prices = prices * 1000 if commodity == 'dairy' else prices # convert to per tonne for dairy
         commodity_prices[commodity] = prices
 
