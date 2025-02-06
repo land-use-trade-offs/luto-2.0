@@ -378,6 +378,11 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 # ------------------- Agricultural biodiversity parameters -------------------
 
+BIODIV_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
+# BIODIV_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
+
+BIODIV_PENALTY = 1
+
 # Biodiversity contribution reporting 
 BIODIVERSTIY_TARGET_GBF_2 = 'on'                 # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
 CALC_BIODIVERSITY_CONTRIBUTION = False      # True or False, calculate/report biodiversity contribution; False will turn off reprojecting decision variables to xarray so speed up the model run.

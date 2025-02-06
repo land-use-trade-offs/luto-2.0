@@ -90,6 +90,7 @@ class LutoSolver:
         self.X_ag_man_irr_vars_jr = None
         self.V = None
         self.E = None
+        self.B = None
 
         # Initialise constraint lookups
         self.cell_usage_constraint_r = {}
@@ -103,6 +104,7 @@ class LutoSolver:
         self.ghg_emissions_reduction_soft_constraints = []
         self.biodiversity_expr = None
         self.biodiversity_limit_constraint = None
+        self.biodiversity_limit_soft_constraints = []
 
 
     def formulate(self):
@@ -133,7 +135,7 @@ class LutoSolver:
         self._add_agricultural_management_constraints()                 
         self._add_agricultural_management_adoption_limit_constraints()  
         self._add_demand_penalty_constraints()                          
-        self._add_water_usage_limit_constraints() if settings.WATER_LIMITS == 'on' else print('  ...TURNING OFF water usage constraints ...')
+        self._add_water_usage_limit_constraints()
         self._add_ghg_emissions_limit_constraints()                     
         self._add_biodiversity_limit_constraints()
 
@@ -227,12 +229,16 @@ class LutoSolver:
         Decision variables, V and E, for soft constraints.
         1) [V] Penalty vector for demand, each one conrespondes a commodity, that minimises the deviations from demand.
         2) [E] A single penalty scalar for GHG emissions, minimises its deviation from the target.
+        3) [B] A single penalty scalar for biodiversity, minimises its deviation from the target.
         """
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             self.V = self.gurobi_model.addMVar(self.ncms, name="V")
             
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             self.E = self.gurobi_model.addVar(name="E")
+
+        if settings.BIODIV_CONSTRAINT_TYPE == "soft":
+            self.B = self.gurobi_model.addVar(name="B")
 
         
 
@@ -280,6 +286,7 @@ class LutoSolver:
             self.obj_demand = 0
         
         self.obj_ghg = self.E * self._input_data.economic_target_yr_carbon_price    if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
+        self.obj_biodiv = self.B * settings.BIODIV_PENALTY                          if settings.BIODIV_CONSTRAINT_TYPE == "soft" else 0
 
         # Set the objective function
         sense = GRB.MINIMIZE if settings.OBJECTIVE == "mincost" else GRB.MAXIMIZE
@@ -505,6 +512,10 @@ class LutoSolver:
 
         print(f'  ...water net yield constraints by {settings.WATER_REGION_DEF}...')
 
+        if settings.WATER_LIMITS == 'off':
+            print('  ...TURNING OFF water usage constraints ...')
+            return
+
         # Ensure water use remains below limit for each region
         for region, (reg_name, limit_hist_level, ind) in self._input_data.limits["water"].items():
 
@@ -637,16 +648,23 @@ class LutoSolver:
             raise ValueError("Unknown choice for `GHG_CONSTRAINT_TYPE` setting: must be either 'hard' or 'soft'")
 
 
-    def _add_biodiversity_limit_constraints(self):
-        if settings.BIODIVERSTIY_TARGET_GBF_2 != "on":
-            print('  ...biodiversity constraints target-2 TURNED OFF ...')
-            return
+    def _add_biodiversity_usage_limit_constraints(self) -> None:
+        if settings.BIODIV_CONSTRAINT_TYPE == "hard":
+            print(f'  ...Hard biodiversity net yield constraints...')
+            self._add_hard_biodiversity_usage_limit_constraints()
 
-        print('  ...biodiversity constraints...')
+        elif settings.BIODIV_CONSTRAINT_TYPE == "soft":
+            print(f'  ...Soft biodiversity net yield constraints...')
+            self._add_soft_biodiversity_usage_limit_constraints()
 
-        # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSTIY_TARGET_GBF_2 != "on".
-        biodiversity_limits = self._input_data.limits["biodiversity"]
+        else:
+            raise ValueError(
+                f"Unknown value of BIODIV_CONSTRAINT_TYPE. "
+                f"Must be either 'hard' or 'soft'."
+            )
 
+
+    def _get_biodiversity_net_yield_expr(self) -> gp.LinExpr:
         ag_contr = gp.quicksum(
             gp.quicksum(
                 self._input_data.ag_b_mrj[0, :, :][:, j] * self.X_ag_dry_vars_jr[j, :]
@@ -677,12 +695,41 @@ class LutoSolver:
             for k in range(self._input_data.n_non_ag_lus)
         )
 
-        self.biodiversity_expr = ag_contr + ag_man_contr + non_ag_contr
+        return ag_contr + ag_man_contr + non_ag_contr
+
+
+    def _add_hard_biodiversity_usage_limit_constraints(self):
+        """
+        Adds constraints to handle biodiversity water usage limits.
+        """
+
+        if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
+            print('  ...biodiversity constraints target-2 TURNED OFF ...')
+            return
+        
+        # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSTIY_TARGET_GBF_2 != "on".
+        biodiversity_limits = self._input_data.limits["biodiversity"]
+
+        self.biodiversity_expr = self._get_biodiversity_net_yield_expr()
 
         print(f"    ...biodiversity target score: {biodiversity_limits:,.0f}")
         self.biodiversity_limit_constraint = self.gurobi_model.addConstr(
             self.biodiversity_expr >= biodiversity_limits
         )
+
+
+    def _add_soft_biodiversity_usage_limit_constraints(self) -> None:
+        biodiv_net_yield_region = self._get_biodiversity_net_yield_expr()
+
+        # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSTIY_TARGET_GBF_2 != "on".
+        biodiversity_limits = self._input_data.limits["biodiversity"]
+
+        # Bound the self.W variables to the difference between the desired and actual net yields
+        leq_constr = self.gurobi_model.addConstr(biodiv_net_yield_region - biodiversity_limits <= self.B)
+        geq_constr = self.gurobi_model.addConstr(biodiversity_limits - biodiv_net_yield_region <= self.B)
+        self.biodiversity_limit_soft_constraints.extend([leq_constr, geq_constr])
+
+        print(f"    ...biodiversity target score: {biodiversity_limits:,.0f}")
 
 
     def update_formulation(
