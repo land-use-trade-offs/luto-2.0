@@ -99,7 +99,9 @@ class LutoSolver:
         self.demand_penalty_constraints = []
         self.water_limit_constraints = []
         self.ghg_emissions_expr = None
-        self.ghg_emissions_limit_constraint = None
+        self.ghg_emissions_limit_constraint_ub = None
+        self.ghg_emissions_limit_constraint_lb = None
+        self.ghg_emissions_reduction_soft_constraints = []
         self.biodiversity_expr = None
         self.biodiversity_limit_constraint = None
 
@@ -209,7 +211,7 @@ class LutoSolver:
 
                     self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                         lb=dry_x_lb, ub=1, name=dry_var_name,
-                    )
+                    )               
 
                 irr_lu_cells = self._input_data.ag_lu2cells[1, j]
                 for r in irr_lu_cells:
@@ -219,6 +221,7 @@ class LutoSolver:
                     self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                         lb=irr_x_lb, ub=1, name=irr_var_name,
                     )
+                 
 
     def _setup_deviation_penalties(self):
         """
@@ -273,7 +276,12 @@ class LutoSolver:
         
         # Get the objective values for each sector
         self.obj_economy = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr - self._input_data.economic_base_sum
-        self.obj_demand = self.V * self._input_data.economic_BASE_YR_prices         if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
+
+        if settings.DEMAND_CONSTRAINT_TYPE == "soft":
+            self.obj_demand = gp.quicksum(v * price for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices))
+        else:
+            self.obj_demand = 0
+        
         self.obj_ghg = self.E * self._input_data.economic_target_yr_carbon_price    if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
         self.obj_water = self.W * settings.WATER_PENALTY                            if settings.WATER_CONSTRAINT_TYPE == "soft" else 0
 
@@ -281,7 +289,7 @@ class LutoSolver:
         sense = GRB.MINIMIZE if settings.OBJECTIVE == "mincost" else GRB.MAXIMIZE
         
         objective = self.obj_economy *  settings.SOLVE_ECONOMY_WEIGHT \
-            - (gp.quicksum(self.obj_demand) +  self.obj_ghg + gp.quicksum(self.obj_water)) * (1 - settings.SOLVE_ECONOMY_WEIGHT)  
+            - (self.obj_demand +  self.obj_ghg) * (1 - settings.SOLVE_ECONOMY_WEIGHT)  
                  
         self.gurobi_model.setObjective(objective, sense)
         
@@ -649,18 +657,28 @@ class LutoSolver:
             print('...GHG emissions constraints TURNED OFF ...')
             return
         
-        ghg_limit = self._input_data.limits["ghg"]
+        ghg_limit_ub = self._input_data.limits["ghg_ub"]
+        ghg_limit_lb = self._input_data.limits["ghg_lb"]
         self.ghg_emissions_expr = self._get_total_ghg_emissions_expr()
         
         if settings.GHG_CONSTRAINT_TYPE == 'hard':
-            print(f"...GHG emissions reduction target: {ghg_limit:,.0f} tCO2e")
-            self.ghg_emissions_limit_constraint = self.gurobi_model.addConstr(
-                self.ghg_emissions_expr <= ghg_limit
+            print(f"...GHG emissions reduction target")
+            print(f'    ...GHG emissions reduction target UB: {ghg_limit_ub:,.0f} tCO2e')
+            self.ghg_emissions_limit_constraint_ub = self.gurobi_model.addConstr(
+                self.ghg_emissions_expr <= ghg_limit_ub
+            )
+            print(f'    ...GHG emissions reduction target LB: {ghg_limit_lb:,.0f} tCO2e')
+            self.ghg_emissions_limit_constraint_lb = self.gurobi_model.addConstr(
+                self.ghg_emissions_expr >= ghg_limit_lb
             )
         elif settings.GHG_CONSTRAINT_TYPE == 'soft':
-            print(f"  ...GHG emissions reduction target: {ghg_limit:,.0f} tCO2e")
-            self.gurobi_model.addConstr(self.ghg_emissions_expr - ghg_limit <= self.E)
-            self.gurobi_model.addConstr(ghg_limit - self.ghg_emissions_expr <= self.E)
+            print(f"  ...GHG emissions reduction target: {ghg_limit_ub:,.0f} tCO2e")
+            self.ghg_emissions_reduction_soft_constraints.append(
+                self.gurobi_model.addConstr(self.ghg_emissions_expr - ghg_limit_ub <= self.E)
+            )
+            self.ghg_emissions_reduction_soft_constraints.append(
+                self.gurobi_model.addConstr(ghg_limit_ub - self.ghg_emissions_expr <= self.E)
+            )
         else:
             raise ValueError("Unknown choice for `GHG_CONSTRAINT_TYPE` setting: must be either 'hard' or 'soft'")
 
@@ -900,9 +918,18 @@ class LutoSolver:
         self.demand_penalty_constraints = []
         self.water_limit_constraints = []
 
-        if self.ghg_emissions_limit_constraint is not None:
-            self.gurobi_model.remove(self.ghg_emissions_limit_constraint)
-            self.ghg_emissions_limit_constraint = None
+        if self.ghg_emissions_limit_constraint_ub is not None:
+            self.gurobi_model.remove(self.ghg_emissions_limit_constraint_ub)
+            self.ghg_emissions_limit_constraint_ub = None
+            
+        if self.ghg_emissions_limit_constraint_lb is not None:
+            self.gurobi_model.remove(self.ghg_emissions_limit_constraint_lb)
+            self.ghg_emissions_limit_constraint_lb = None
+
+        if len(self.ghg_emissions_reduction_soft_constraints) > 0:
+            for constr in self.ghg_emissions_reduction_soft_constraints:
+                self.gurobi_model.remove(constr)
+            self.ghg_emissions_reduction_soft_constraints = []
 
         self._add_cell_usage_constraints(updated_cells)                 
         self._add_agricultural_management_constraints(updated_cells)    
@@ -1081,8 +1108,9 @@ class LutoSolver:
             obj_val ={
                 'SUM': self.gurobi_model.ObjVal,
                 'Economy': self.obj_economy.getValue(),
-                'Demand': self.obj_demand.getValue().sum(),
-                'GHG': self.obj_ghg.getValue()}
+                'Demand': self.obj_demand.getValue().sum()      if settings.DEMAND_CONSTRAINT_TYPE == 'soft' else 0,
+                'GHG': self.obj_ghg.getValue()                  if settings.GHG_CONSTRAINT_TYPE == 'soft' else 0
+            }
         )
 
     @property

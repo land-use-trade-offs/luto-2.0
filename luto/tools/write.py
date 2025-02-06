@@ -20,17 +20,22 @@ Writes model output and statistics to files.
 
 import os, re
 import shutil
+import threading
+import time
 import numpy as np
 import pandas as pd
+import psutil
 import xarray as xr
 import geopandas as gpd
 
+from itertools import product
 from datetime import datetime
 from joblib import Parallel, delayed
 
 from luto import settings
 from luto import tools
 from luto.data import Data
+from luto.tools.create_task_runs.helpers import log_memory_usage
 from luto.tools.spatializers import create_2d_map, write_gtiff
 from luto.tools.compmap import lumap_crossmap, lmmap_crossmap, crossmap_irrstat, crossmap_amstat
 
@@ -42,7 +47,7 @@ import luto.economics.agricultural.ghg as ag_ghg
 import luto.economics.agricultural.water as ag_water
 import luto.economics.agricultural.biodiversity as ag_biodiversity
 
-import luto.economics.non_agricultural.quantity as non_ag_quantity              # non_ag_quantity is all zeros, so skip the calculation here
+import luto.economics.non_agricultural.quantity as non_ag_quantity              # non_ag_quantity has already been calculated and stored in <sim.prod_data>
 import luto.economics.non_agricultural.revenue as non_ag_revenue
 import luto.economics.non_agricultural.cost as non_ag_cost
 import luto.economics.non_agricultural.transitions as non_ag_transitions
@@ -58,12 +63,15 @@ from luto.tools.report.create_html import data2html
 from luto.tools.report.create_static_maps import TIF2MAP
 
 from luto.tools.xarray_tools import calc_bio_hist_sum, calc_bio_score_species, interp_bio_species_to_shards, calc_bio_score_by_yr
-
-
+        
 
 timestamp_write = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
 def write_outputs(data: Data):
+    
+    memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
+    memory_thread.start()
+    
     # Write the model outputs to file
     write_data(data)
     # Move the log files to the output directory
@@ -127,9 +135,14 @@ def write_logs(data: Data):
     logs = [f"{settings.OUTPUT_DIR}/run_{data.timestamp_sim}_stdout.log",
             f"{settings.OUTPUT_DIR}/run_{data.timestamp_sim}_stderr.log",
             f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stdout.log",
-            f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stderr.log"]
+            f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stderr.log",
+            f'{settings.OUTPUT_DIR}/RES_{settings.RESFACTOR}_{settings.MODE}_mem_log.txt']
 
-    [shutil.move(log, f"{data.path}/{os.path.basename(log)}") for log in logs if os.path.exists(log)]
+    for log in logs:
+        try:
+            shutil.move(log, f"{data.path}/{os.path.basename(log)}")
+        except:
+            print(f"Could not move {log} to {data.path}")
     
     return None
 
@@ -143,17 +156,14 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     if not os.path.isdir(path_yr):
         os.mkdir(path_yr)
 
-    # # Write the decision variables, land-use and land management maps
-    if settings.WRITE_OUTPUT_GEOTIFFS:
-        write_files(data, yr_cal, path_yr)
-        write_files_separate(data, yr_cal, path_yr)
-
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CAUTION !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    # The area here was calculated from lumap/lmmap, which {maby not accurate !!!}
+    # The area here was calculated from lumap/lmmap, which {are not accurate !!!}
     # compared to the area calculated from dvars
     write_crosstab(data, yr_cal, path_yr, yr_cal_sim_pre)
 
     # Write the reset outputs
+    write_files(data, yr_cal, path_yr)
+    write_files_separate(data, yr_cal, path_yr) if settings.WRITE_OUTPUT_GEOTIFFS else None
     write_dvar_area(data, yr_cal, path_yr)
     write_quantity(data, yr_cal, path_yr, yr_cal_sim_pre)
     write_revenue_cost_ag(data, yr_cal, path_yr)
@@ -186,11 +196,8 @@ def get_settings(setting_path:str):
         settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
 
         # Set unused variables to None
-        settings_dict['GHG_LIMITS_FIELD'] = 'None' if settings.GHG_LIMITS_TYPE == 'dict' else settings_dict['GHG_LIMITS_FIELD']
-        settings_dict['GHG_LIMITS'] = 'None' if settings.GHG_LIMITS_TYPE == 'file' else settings_dict['GHG_LIMITS']
-
-        settings_dict['LAND_USAGE_CULL_PERCENTAGE'] = 'None' if settings.CULL_MODE in ['absolute', 'none'] else settings_dict['LAND_USAGE_CULL_PERCENTAGE']
-        settings_dict['MAX_LAND_USES_PER_CELL'] = 'None' if settings.CULL_MODE in ['percentage', 'none'] else settings_dict['MAX_LAND_USES_PER_CELL']
+        settings_dict['GHG_LIMITS_FIELD'] = 'None'              if settings.GHG_LIMITS_TYPE == 'dict' else settings_dict['GHG_LIMITS_FIELD']
+        settings_dict['GHG_LIMITS'] = 'None'                    if settings.GHG_LIMITS_TYPE == 'file' else settings_dict['GHG_LIMITS']
 
     return settings_dict
 
@@ -515,12 +522,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         # Get the base_year mrj matirx
         base_mrj = tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre])
         # Get the transition cost matrices for agricultural land-use
-        ag_transitions_cost_mat = ag_transitions.get_transition_matrices(data,
-                                                                        yr_idx,
-                                                                        yr_cal_sim_pre,
-                                                                        data.lumaps,
-                                                                        data.lmmaps,
-                                                                        separate = True)
+        ag_transitions_cost_mat = ag_transitions.get_transition_matrices(data, yr_idx, yr_cal_sim_pre, separate = True)
 
     cost_dfs = []
     # Convert the transition cost matrices to a DataFrame
@@ -680,8 +682,10 @@ def write_dvar_area(data: Data, yr_cal, path):
     # and sum over the landuse dimension (j/k)
     ag_area = np.einsum('mrj,r -> mj', data.ag_dvars[yr_cal], data.REAL_AREA)
     non_ag_area = np.einsum('rk,r -> k', data.non_ag_dvars[yr_cal], data.REAL_AREA)
-    ag_man_area_dict = {am: np.einsum('mrj,r -> mj', ammap, data.REAL_AREA)
-                        for am, ammap in data.ag_man_dvars[yr_cal].items()}
+    ag_man_area_dict = {
+        am: np.einsum('mrj,r -> mj', ammap, data.REAL_AREA)
+        for am, ammap in data.ag_man_dvars[yr_cal].items()
+    }
 
     # Agricultural landuse
     df_ag_area = pd.DataFrame(ag_area.reshape(-1),
@@ -734,7 +738,7 @@ def write_area_transition_start_end(data: Data, path):
     yr_cal_end = years[-1]
 
     # Get the decision variables for the start year
-    dvar_base = data.ag_dvars[data.YR_CAL_BASE]
+    dvar_base = tools.lumap2ag_l_mrj(data.lumaps[data.YR_CAL_BASE], data.lmmaps[data.YR_CAL_BASE])
 
     # Calculate the transition matrix for agricultural land uses (start) to agricultural land uses (end)
     transitions_ag2ag = []
@@ -781,7 +785,7 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         assert yr_cal_sim_pre >= data.YR_CAL_BASE and yr_cal_sim_pre < yr_cal,\
             f"yr_cal_sim_pre ({yr_cal_sim_pre}) must be >= {data.YR_CAL_BASE} and < {yr_cal}"
 
-        print(f'Writing production outputs for {yr_cal}')
+        print(f'Writing crosstab data for {yr_cal}')
 
         # LUS = ['Non-agricultural land'] + data.AGRICULTURAL_LANDUSES + NON_AG_LAND_USES.keys()
         ctlu, swlu = lumap_crossmap( data.lumaps[yr_cal_sim_pre]

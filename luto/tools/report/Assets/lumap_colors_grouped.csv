@@ -29,7 +29,7 @@ group_code,lu_code,lu_desc,lu_color_HEX,Note
 2,15,Livestock,#ffa77f,
 3,22,Unallocated - modified land,#00e6a9,
 4,23,Unallocated - natural land,#ffebbe,
-5,100,Environmental plantings,#abcd66,
+5,100,Environmental plantings,#778f45,
 5,101,Riparian Plantings,#005ce6,
 5,102,Sheep Agroforestry,#c500ff,
 5,103,Beef Agroforestry,#ff0000,

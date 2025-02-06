@@ -37,20 +37,25 @@ document.addEventListener("DOMContentLoaded", function () {
     let yearInput_ag2non_ag = document.getElementById('year_ag2non_ag');
     let yearOutput_ag2non_ag = document.getElementById('yearOutput_ag2non_ag');
 
-    yearInput_ag2ag.min = yearInput_ag2non_ag.min = modelYears[0];
-    yearInput_ag2ag.max = yearInput_ag2non_ag.max = modelYears[modelYears.length - 1];
-    yearInput_ag2ag.step = yearInput_ag2non_ag.step = modelYears[1] - modelYears[0];  
-    yearInput_ag2ag.value = yearInput_ag2non_ag.value = modelYears[0];
-    yearOutput_ag2ag.value = yearOutput_ag2non_ag.value = modelYears[0];
+    let yearInput_non_ag2ag = document.getElementById('year_non_ag2ag');
+    let yearOutput_non_ag2ag = document.getElementById('yearOutput_non_ag2ag');
 
+    yearInput_ag2ag.min = yearInput_ag2non_ag.min = yearInput_non_ag2ag.min = modelYears[0];
+    yearInput_ag2ag.max = yearInput_ag2non_ag.max = yearInput_non_ag2ag.max = modelYears[modelYears.length - 1];
+    yearInput_ag2ag.step = yearInput_ag2non_ag.step = yearInput_non_ag2ag.step = modelYears[1] - modelYears[0];
+    yearInput_ag2ag.value = yearInput_ag2non_ag.value = yearInput_non_ag2ag.value = modelYears[0];
+    yearOutput_ag2ag.value = yearOutput_ag2non_ag.value = yearOutput_non_ag2ag.value = modelYears[0];
+
+    // Call the draw functions for the transition matrix graphs
     draw_cost_ag2ag();
     draw_cost_ag2non_ag();
+    draw_cost_non_ag2ag();
   }
 
   // Set the title alignment to left
   Highcharts.setOptions({
     title: {
-        align: 'left'
+      align: 'left'
     }
   });
 
@@ -397,7 +402,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  
+
   // Chart:economics_2_ag_cost_2_Type_wide
   Highcharts.chart("economics_2_ag_cost_2_Type_wide", {
     chart: {
@@ -1037,8 +1042,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
     let values = data_ag2ag['series'].find(item => item.Year == slider_ag2ag.value)['data'];
     let lastElements = values.map(sublist => sublist[sublist.length - 1]);
-    let vale_min = Math.min(...lastElements.flat());
-    let vale_max = Math.max(...lastElements.flat());
+    let val_min = Math.min(...lastElements.flat());
+    let val_max = Math.max(...lastElements.flat());
 
     Highcharts.chart("economics_8_transition_ag2ag_cost_5_transition_matrix", {
       chart: {
@@ -1094,8 +1099,8 @@ document.addEventListener("DOMContentLoaded", function () {
           [0.9, '#c4463a'],
           [1, '#c4463a']
         ],
-        min: vale_min,
-        max: vale_max,
+        min: val_min,
+        max: val_max,
         startOnTick: false,
         endOnTick: false,
         reversed: false,
@@ -1232,7 +1237,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
   // Chart:economics_9_transition_ag2non_cost_5_transition_matrix
-
   let data_ag2non_ag = JSON.parse(
     document.getElementById("economics_9_transition_ag2non_cost_5_transition_matrix_csv").innerHTML
   );
@@ -1263,8 +1267,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
     values = data_ag2non_ag['series'].find(item => item.Year == slider_ag2non_ag.value)['data'];
     lastElements = values.map(sublist => sublist[sublist.length - 1]);
-    vale_min = Math.min(...lastElements.flat());
-    vale_max = Math.max(...lastElements.flat());
+    val_min = Math.min(...lastElements.flat());
+    val_max = Math.max(...lastElements.flat());
 
     Highcharts.chart("economics_9_transition_ag2non_cost_5_transition_matrix", {
       chart: {
@@ -1319,8 +1323,8 @@ document.addEventListener("DOMContentLoaded", function () {
           [0.9, '#c4463a'],
           [1, '#c4463a']
         ],
-        min: vale_min,
-        max: vale_max,
+        min: val_min,
+        max: val_max,
         startOnTick: false,
         endOnTick: false,
         reversed: false,
@@ -1564,220 +1568,334 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
 
-  // // Chart:economics_10_transition_non_ag2ag_cost_1_Cost type_wide
-  // Highcharts.chart("economics_10_transition_non_ag2ag_cost_1_Cost type_wide", {
-  //   chart: {
-  //     type: "column",
-  //     marginRight: 380,
-  //   },
+  // Chart:economics_10_transition_non_ag2ag_cost_5_transition_matrix
+  let data_non_ag2ag = JSON.parse(
+    document.getElementById("economics_10_transition_non_ag2ag_cost_5_transition_matrix_csv").innerHTML
+  );
 
-  //   title: {
-  //     text: "Cost by Cost type",
-  //   },
+  // Get the slider_non_ag2ag and the year span
+  let slider_non_ag2ag = document.getElementById("year_non_ag2ag");
+  let incrementButton_non_ag2ag = document.getElementById("increment_non_ag2ag");
+  let decrementButton_non_ag2ag = document.getElementById("decrement_non_ag2ag");
 
-  //   credits: {
-  //     enabled: false,
-  //   },
+  // Add event listeners to the buttons
+  slider_non_ag2ag.addEventListener("input", function () {
+    yearOutput_non_ag2ag.innerHTML = this.value;
+    draw_cost_non_ag2ag();
+  });
 
-  //   series: JSON.parse(
-  //     document.getElementById("economics_10_transition_non_ag2ag_cost_1_Cost type_wide_csv").innerHTML
-  //   ),
+  incrementButton_non_ag2ag.addEventListener("click", function () {
+    slider_non_ag2ag.value = parseInt(slider_non_ag2ag.value) + 1;
+    slider_non_ag2ag.dispatchEvent(new Event('input'));
+  });
 
-  //   yAxis: {
-  //     title: {
-  //       text: "Cost (billion AU$)",
-  //     },
-  //   },
-  //   xAxis: {
-  //     tickPositions: year_ticks,
-  //   },
+  decrementButton_non_ag2ag.addEventListener("click", function () {
+    slider_non_ag2ag.value = parseInt(slider_non_ag2ag.value) - 1;
+    slider_non_ag2ag.dispatchEvent(new Event('input'));
+  });
 
-  //   legend: {
-  //     align: "right",
-  //     verticalalign: "left",
-  //     layout: "vertical",
-  //     x: 0,
-  //     verticalAlign: "middle",
-  //   },
+  // Function to draw the chart
+  draw_cost_non_ag2ag = function () {
+    let values = data_non_ag2ag['series'].find(item => item.Year == slider_non_ag2ag.value)['data'];
+    let lastElements = values.map(sublist => sublist[sublist.length - 1]);
+    let val_min = Math.min(...lastElements.flat());
+    let val_max = Math.max(...lastElements.flat());
 
-  //   tooltip: {
-  //     formatter: function () {
-  //       return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-  //         }:</b>${this.y.toFixed(2)}<br/>`;
-  //     },
-  //   },
-  //   plotOptions: {
-  //     column: {
-  //       stacking: "normal",
-  //     },
-  //   },
-  //   exporting: {
-  //     sourceWidth: 1200,
-  //     sourceHeight: 600,
-  //   },
-  // });
+    Highcharts.chart("economics_10_transition_non_ag2ag_cost_5_transition_matrix", {
+      chart: {
+        type: "heatmap",
+        marginRight: 380,
+        inverted: true,
+      },
 
+      title: {
+        text: null,
+      },
 
-  // // Chart:economics_10_transition_non_ag2ag_cost_2_From land-use_wide
-  // Highcharts.chart("economics_10_transition_non_ag2ag_cost_2_From land-use_wide", {
-  //   chart: {
-  //     type: "column",
-  //     marginRight: 380,
-  //   },
+      credits: {
+        enabled: false,
+      },
 
-  //   title: {
-  //     text: "Cost by From land-use",
-  //   },
+      series: [{
+        data: values,
+        borderWidth: 0.2,
+        tooltip: {
+          headerFormat: '',
+          pointFormatter: function () {
+            return `${data_non_ag2ag["categories_from"][this.x]} 
+                    <b>==></b> ${data_non_ag2ag["categories_to"][this.y]}: 
+                    <b>${this.value.toFixed(2)} (billion $)</b>`;
+          }
+        },
+      }],
 
-  //   credits: {
-  //     enabled: false,
-  //   },
+      yAxis: {
+        min: 0,
+        max: data_non_ag2ag["categories_to"].length - 1,
+        categories: data_non_ag2ag["categories_to"],
+        title: {
+          text: "To Land-use",
+        },
+      },
 
-  //   series: JSON.parse(
-  //     document.getElementById("economics_10_transition_non_ag2ag_cost_2_From land-use_wide_csv").innerHTML
-  //   ),
+      xAxis: {
+        min: 0,
+        max: data_non_ag2ag["categories_from"].length - 1,
+        categories: data_non_ag2ag["categories_from"],
+        title: {
+          text: "From Land-use",
+        },
+      },
 
-  //   yAxis: {
-  //     title: {
-  //       text: "Cost (billion AU$)",
-  //     },
-  //   },
-  //   xAxis: {
-  //     tickPositions: year_ticks,
-  //   },
+      colorAxis: {
+        stops: [
+          [0, '#3060cf'],
+          [0.5, '#fffbbc'],
+          [0.9, '#c4463a'],
+          [1, '#c4463a']
+        ],
+        min: val_min,
+        max: val_max,
+        startOnTick: false,
+        endOnTick: false,
+        reversed: false,
+        labels: {
+          formatter: function () {
+            return this.value.toFixed(2);
+          }
+        }
+      },
 
-  //   legend: {
-  //     align: "right",
-  //     verticalalign: "left",
-  //     layout: "vertical",
-  //     x: 0,
-  //     verticalAlign: "middle",
-  //   },
+      legend: {
+        align: "right",
+        verticalalign: "left",
+        layout: "vertical",
+        x: -180,
+        verticalAlign: "middle",
+      },
 
-  //   tooltip: {
-  //     formatter: function () {
-  //       return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-  //         }:</b>${this.y.toFixed(2)}<br/>`;
-  //     },
-  //   },
-  //   plotOptions: {
-  //     column: {
-  //       stacking: "normal",
-  //     },
-  //   },
-  //   exporting: {
-  //     sourceWidth: 1200,
-  //     sourceHeight: 600,
-  //   },
-  // });
-
-
-  // // Chart:economics_10_transition_non_ag2ag_cost_3_To land-use_wide
-  // Highcharts.chart("economics_10_transition_non_ag2ag_cost_3_To land-use_wide", {
-  //   chart: {
-  //     type: "column",
-  //     marginRight: 380,
-  //   },
-
-  //   title: {
-  //     text: "Cost by To land-use",
-  //   },
-
-  //   credits: {
-  //     enabled: false,
-  //   },
-
-  //   series: JSON.parse(
-  //     document.getElementById("economics_10_transition_non_ag2ag_cost_3_To land-use_wide_csv").innerHTML
-  //   ),
-
-  //   yAxis: {
-  //     title: {
-  //       text: "Cost (billion AU$)",
-  //     },
-  //   },
-  //   xAxis: {
-  //     tickPositions: year_ticks,
-  //   },
-
-  //   legend: {
-  //     align: "right",
-  //     verticalalign: "left",
-  //     layout: "vertical",
-  //     x: 0,
-  //     verticalAlign: "middle",
-  //   },
-
-  //   tooltip: {
-  //     formatter: function () {
-  //       return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-  //         }:</b>${this.y.toFixed(2)}<br/>`;
-  //     },
-  //   },
-  //   plotOptions: {
-  //     column: {
-  //       stacking: "normal",
-  //     },
-  //   },
-  //   exporting: {
-  //     sourceWidth: 1200,
-  //     sourceHeight: 600,
-  //   },
-  // });
+      exporting: {
+        sourceWidth: 1200,
+        sourceHeight: 600,
+      },
+    });
+  };
 
 
-  // // Chart:economics_10_transition_non_ag2ag_cost_4_Water supply_wide
-  // Highcharts.chart("economics_10_transition_non_ag2ag_cost_4_Water supply_wide", {
-  //   chart: {
-  //     type: "column",
-  //     marginRight: 380,
-  //   },
+  // Chart:economics_10_transition_non_ag2ag_cost_1_Cost type_wide
+  Highcharts.chart("economics_10_transition_non_ag2ag_cost_1_Cost type_wide", {
+    chart: {
+      type: "column",
+      marginRight: 380,
+    },
 
-  //   title: {
-  //     text: "Cost by Irritation Status",
-  //   },
+    title: {
+      text: "Cost by Cost type",
+    },
 
-  //   credits: {
-  //     enabled: false,
-  //   },
+    credits: {
+      enabled: false,
+    },
 
-  //   series: JSON.parse(
-  //     document.getElementById("economics_10_transition_non_ag2ag_cost_4_Water supply_wide_csv").innerHTML
-  //   ),
+    series: JSON.parse(
+      document.getElementById("economics_10_transition_non_ag2ag_cost_1_Cost type_wide_csv").innerHTML
+    ),
 
-  //   yAxis: {
-  //     title: {
-  //       text: "Cost (billion AU$)",
-  //     },
-  //   },
-  //   xAxis: {
-  //     tickPositions: year_ticks,
-  //   },
+    yAxis: {
+      title: {
+        text: "Cost (billion AU$)",
+      },
+    },
+    xAxis: {
+      tickPositions: year_ticks,
+    },
 
-  //   legend: {
-  //     align: "right",
-  //     verticalalign: "left",
-  //     layout: "vertical",
-  //     x: 0,
-  //     verticalAlign: "middle",
-  //   },
+    legend: {
+      align: "right",
+      verticalalign: "left",
+      layout: "vertical",
+      x: 0,
+      verticalAlign: "middle",
+    },
 
-  //   tooltip: {
-  //     formatter: function () {
-  //       return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-  //         }:</b>${this.y.toFixed(2)}<br/>`;
-  //     },
-  //   },
-  //   plotOptions: {
-  //     column: {
-  //       stacking: "normal",
-  //     },
-  //   },
-  //   exporting: {
-  //     sourceWidth: 1200,
-  //     sourceHeight: 600,
-  //   },
-  // });
+    tooltip: {
+      formatter: function () {
+        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+          }:</b>${this.y.toFixed(2)}<br/>`;
+      },
+    },
+    plotOptions: {
+      column: {
+        stacking: "normal",
+      },
+    },
+    exporting: {
+      sourceWidth: 1200,
+      sourceHeight: 600,
+    },
+  });
+
+
+  // Chart:economics_10_transition_non_ag2ag_cost_2_From land-use_wide
+  Highcharts.chart("economics_10_transition_non_ag2ag_cost_2_From land-use_wide", {
+    chart: {
+      type: "column",
+      marginRight: 380,
+    },
+
+    title: {
+      text: "Cost by From land-use",
+    },
+
+    credits: {
+      enabled: false,
+    },
+
+    series: JSON.parse(
+      document.getElementById("economics_10_transition_non_ag2ag_cost_2_From land-use_wide_csv").innerHTML
+    ),
+
+    yAxis: {
+      title: {
+        text: "Cost (billion AU$)",
+      },
+    },
+    xAxis: {
+      tickPositions: year_ticks,
+    },
+
+    legend: {
+      align: "right",
+      verticalalign: "left",
+      layout: "vertical",
+      x: 0,
+      verticalAlign: "middle",
+    },
+
+    tooltip: {
+      formatter: function () {
+        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+          }:</b>${this.y.toFixed(2)}<br/>`;
+      },
+    },
+    plotOptions: {
+      column: {
+        stacking: "normal",
+      },
+    },
+    exporting: {
+      sourceWidth: 1200,
+      sourceHeight: 600,
+    },
+  });
+
+
+  // Chart:economics_10_transition_non_ag2ag_cost_3_To land-use_wide
+  Highcharts.chart("economics_10_transition_non_ag2ag_cost_3_To land-use_wide", {
+    chart: {
+      type: "column",
+      marginRight: 380,
+    },
+
+    title: {
+      text: "Cost by To land-use",
+    },
+
+    credits: {
+      enabled: false,
+    },
+
+    series: JSON.parse(
+      document.getElementById("economics_10_transition_non_ag2ag_cost_3_To land-use_wide_csv").innerHTML
+    ),
+
+    yAxis: {
+      title: {
+        text: "Cost (billion AU$)",
+      },
+    },
+    xAxis: {
+      tickPositions: year_ticks,
+    },
+
+    legend: {
+      align: "right",
+      verticalalign: "left",
+      layout: "vertical",
+      x: 0,
+      verticalAlign: "middle",
+    },
+
+    tooltip: {
+      formatter: function () {
+        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+          }:</b>${this.y.toFixed(2)}<br/>`;
+      },
+    },
+    plotOptions: {
+      column: {
+        stacking: "normal",
+      },
+    },
+    exporting: {
+      sourceWidth: 1200,
+      sourceHeight: 600,
+    },
+  });
+
+
+  // Chart:economics_10_transition_non_ag2ag_cost_4_Water supply_wide
+  Highcharts.chart("economics_10_transition_non_ag2ag_cost_4_Water supply_wide", {
+    chart: {
+      type: "column",
+      marginRight: 380,
+    },
+
+    title: {
+      text: "Cost by Irritation Status",
+    },
+
+    credits: {
+      enabled: false,
+    },
+
+    series: JSON.parse(
+      document.getElementById("economics_10_transition_non_ag2ag_cost_4_Water supply_wide_csv").innerHTML
+    ),
+
+    yAxis: {
+      title: {
+        text: "Cost (billion AU$)",
+      },
+    },
+    xAxis: {
+      tickPositions: year_ticks,
+    },
+
+    legend: {
+      align: "right",
+      verticalalign: "left",
+      layout: "vertical",
+      x: 0,
+      verticalAlign: "middle",
+    },
+
+    tooltip: {
+      formatter: function () {
+        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+          }:</b>${this.y.toFixed(2)}<br/>`;
+      },
+    },
+    plotOptions: {
+      column: {
+        stacking: "normal",
+      },
+    },
+    exporting: {
+      sourceWidth: 1200,
+      sourceHeight: 600,
+    },
+  });
 
 
 

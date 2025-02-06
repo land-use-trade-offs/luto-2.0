@@ -167,7 +167,7 @@ def get_beef_agroforestry_transitions_from_ag(
         (separate = True) Dict of separated transition costs.
     """
     agroforestry_costs = get_agroforestry_transitions_from_ag_base(data, yr_idx, lumap, lmmap, separate)
-    ag_t_costs = ag_transitions.get_transition_matrices(data, yr_idx, base_year, data.lumaps, data.lmmaps, separate)
+    ag_t_costs = ag_transitions.get_transition_matrices(data, yr_idx, base_year, separate)
     
     if separate:
         # Combine and return separated costs
@@ -285,7 +285,7 @@ def get_sheep_carbon_plantings_belt_from_ag(
         (separate = True) Dict of separated transition costs.
     """
     
-    ag_t_costs = ag_transitions.get_transition_matrices(data, yr_idx, base_year, data.lumaps, data.lmmaps, separate)
+    ag_t_costs = ag_transitions.get_transition_matrices(data, yr_idx, base_year, separate)
     
     if separate:
         # Combine and return separated costs
@@ -334,7 +334,7 @@ def get_beef_carbon_plantings_belt_from_ag(
         (separate = True) Dict of separated transition costs.
     """
     cp_belt_costs = get_carbon_plantings_belt_from_ag_base(data, yr_idx, lumap, lmmap, separate)
-    ag_t_costs = ag_transitions.get_transition_matrices(data, yr_idx, base_year, data.lumaps, data.lmmaps, separate)
+    ag_t_costs = ag_transitions.get_transition_matrices(data, yr_idx, base_year, separate)
     
     if separate:
         # Combine and return separated costs
@@ -412,7 +412,7 @@ def get_from_ag_transition_matrix(data: Data, yr_idx, base_year, lumap, lmmap, s
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
 
     agroforestry_costs = get_agroforestry_transitions_from_ag_base(data, yr_idx, lumap, lmmap, separate)
-    ag_t_costs = ag_transitions.get_transition_matrices(data, yr_idx, base_year, data.lumaps, data.lmmaps, separate)
+    ag_t_costs = ag_transitions.get_transition_matrices(data, yr_idx, base_year, separate)
     cp_belt_costs = get_carbon_plantings_belt_from_ag_base(data, yr_idx, lumap, lmmap, separate)
 
     env_plant_transitions_from_ag = get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate)

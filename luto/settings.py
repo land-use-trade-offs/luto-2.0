@@ -64,7 +64,7 @@ WASTE = 1                           # 1 for full waste, 0.5 for half waste
 FEED_EFFICIENCY = 'BAU'             # 'BAU' or 'High'
 
 # Add CO2 fertilisation effects on agricultural production from GAEZ v4
-CO2_FERT = 'on'   # or 'off'
+CO2_FERT = 'off'   # or 'off'
 
 # Fire impacts on carbon sequestration
 RISK_OF_REVERSAL = 0.05  # Risk of reversal buffer under ERF (reasonable values range from 0.05 [100 years] to 0.25 [25 years]) https://www.cleanenergyregulator.gov.au/ERF/Choosing-a-project-type/Opportunities-for-the-land-sector/Risk-of-reversal-buffer
@@ -89,6 +89,13 @@ DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 # Set amortisation period
 AMORTISATION_PERIOD = 30 # years
 
+# Deforestation legislation; If 'on' then deforestation is penalised by introducing a huge-cost (1 billion AUD/ha) for converting natural to modified land
+DEFORESTATION_LEGISLATION = 'on'  # 'on' or 'off'
+
+if DEFORESTATION_LEGISLATION == 'on':
+    NATURAL_TO_MODIFIED_LAND_PENALTY = 1e9
+else:
+    NATURAL_TO_MODIFIED_LAND_PENALTY = 0
 
 
 # ---------------------------------------------------------------------------- #
@@ -96,11 +103,11 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 20        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
-MODE = 'snapshot'   # Runs for target year only
-# MODE = 'timeseries'   # Runs each year from base year to target year
+# MODE = 'snapshot'   # Runs for target year only
+MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -118,7 +125,7 @@ DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in th
 WRITE_OUTPUT_GEOTIFFS = False    # Write GeoTiffs to output directory: True or False
 WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resolution: True or False
 PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = 50              # The Threads to use for map making, only work with PARALLEL_WRITE = True
+WRITE_THREADS = 10              # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
@@ -324,10 +331,11 @@ SOC_AMORTISATION = 15
 
 # GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
 GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
+GHG_ALLOW_LB_DELTA_T = 1e6    # The amount of GHG emissions that can be lowered than the target in the objective function (in tonnes CO2e)
 
 # Weight for the GHG/Demand deviation in the objective function
 ''' Range from 0 to 1, where 0 is fully minimising GHG and demand deviation, and 1 is only maximising profit. '''
-SOLVE_ECONOMY_WEIGHT = 0.25  
+SOLVE_ECONOMY_WEIGHT = 0.02  
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
@@ -473,8 +481,8 @@ CULL_MODE = 'absolute'      # cull to include at most MAX_LAND_USES_PER_CELL
 # CULL_MODE = 'percentage'    # cull the LAND_USAGE_THRESHOLD_PERCENTAGE % most expensive options
 # CULL_MODE = 'none'          # do no culling
 
-MAX_LAND_USES_PER_CELL = 12
-LAND_USAGE_CULL_PERCENTAGE = 0.15
+MAX_LAND_USES_PER_CELL = 12         if CULL_MODE == 'absolute' else 'Not used'
+LAND_USAGE_CULL_PERCENTAGE = 0.15   if CULL_MODE == 'percentage' else 'Not used'
 
 # Non-ag output coding. Non-agricultural land uses will appear on the land use map offset by this amount (e.g. land use 0 will appear as 100)
 NON_AGRICULTURAL_LU_BASE_CODE = 100

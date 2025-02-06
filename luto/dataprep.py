@@ -52,7 +52,7 @@ def create_new_dataset():
     nlum_inpath = 'N:/Data-Master/National_Landuse_Map/'
     BECCS_inpath = 'N:/Data-Master/BECCS/From_CSIRO/20211124_as_submitted/'
     GHG_off_land_inpath = 'N:/LUF-Modelling/Food_demand_AU/au.food.demand/Inputs/Off_land_GHG_emissions'
-    bio_contributions_inpath = 'N:/Data-Master/Biodiversity/biodiversity_contribution/data'
+    bio_contributions_inpath = 'N:/Data-Master/Biodiversity/Processing_as_LUTO_input/biodiversity_contribution_Species_Occurrence_Records/data'
     HACS_inpath = 'N:/Data-Master/Habitat_condition_assessment_system/Data/Processed/'
 
     # Set data output paths
