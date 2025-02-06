@@ -272,7 +272,7 @@ class LutoSolver:
         )
         
         # Get the objective values for each sector
-        self.obj_economy = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr - self._input_data.economic_base_sum
+        self.obj_economy = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr
 
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             self.obj_demand = gp.quicksum(v * price for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices))
