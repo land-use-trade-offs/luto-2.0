@@ -1,4 +1,4 @@
-import os, re, time, json, shutil, psutil, itertools
+import os, re, time, json, shutil, psutil, itertools, subprocess
 import pandas as pd
 
 from glob import glob
@@ -264,7 +264,7 @@ def submit_task(col:str, python_path:str=None, mode='single'):
         os.chdir('../../..')
         os.chdir(f'{TASK_ROOT_DIR}/{col}')
         # Submit the task 
-        os.system(f'{python_path} python_script.py')
+        subprocess.run([python_path, 'python_script.py'])
         print(f'Task {col} has been submitted!')
     
     # Start the task if the os is linux
@@ -274,7 +274,7 @@ def submit_task(col:str, python_path:str=None, mode='single'):
         os.chdir('../../..')
         os.chdir(f'{TASK_ROOT_DIR}/{col}')
         # Submit the task to the cluster
-        os.system(f'bash task_cmd.sh')
+        subprocess.run(['bash', 'task_cmd.sh'])
     
     else:
         raise 'Mode mush be in either "single" or "multiple" !'

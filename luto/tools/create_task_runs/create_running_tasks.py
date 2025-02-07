@@ -72,12 +72,14 @@ create_grid_search_parameters(grid_search)
 # Read the template for the custom settings
 grid_search_df = create_grid_search_template()
 
+import pandas as pd
+grid_search_df = pd.read_csv("/g/data/jk53/jinzhu/LUTO/Custom_runs/20250207_RES10_Timeseries/grid_search_template.csv")
 
 
 # Create the task runs
 
 # 1) Submit task to a single linux machine, and run simulations parallely
-create_task_runs(grid_search_df, mode='single', python_path='~/miniforge3/envs/luto/bin/python', n_workers=40, waite_mins=1.5)
+create_task_runs(grid_search_df, mode='single', python_path='/home/582/jw6041/miniforge3/envs/luto/bin/python', n_workers=40, waite_mins=1.5)
 
 # # 2) Submit task to multiple linux computation nodes
 # create_task_runs(grid_search_df, mode='multiple')
