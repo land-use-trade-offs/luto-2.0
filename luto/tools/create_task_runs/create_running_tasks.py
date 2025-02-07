@@ -30,14 +30,14 @@ grid_search = {
     ###############################################################
     'DEMAND_CONSTRAINT_TYPE': ['soft'],     # 'hard' or 'soft'
     'GHG_CONSTRAINT_TYPE': ['soft'],        # 'hard' or 'soft'
-    'BIODIVERSTIY_TARGET_GBF_2': ['on'],           # 'on' or 'off'
+    'BIODIVERSTIY_TARGET_GBF_2': ['off'],           # 'on' or 'off'
     
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_ECONOMY_WEIGHT': 
         # list(np.arange(5, 51, 2)/100),
-        [0.05, 0.1, 0.2, 0.3, 0.4, 0.5],
+        [0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99],
         # sorted([
         #     round(10**(-i) * (j/20), 10)
         #     for i in range(4)
@@ -50,7 +50,7 @@ grid_search = {
     ],
     'BIODIV_GBF_TARGET_2_DICT': [
         {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}, 
-        {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}
+        # {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}
     ],
     
     #-------------------- Diet BAU --------------------
@@ -72,14 +72,17 @@ create_grid_search_parameters(grid_search)
 # Read the template for the custom settings
 grid_search_df = create_grid_search_template()
 
-import pandas as pd
-grid_search_df = pd.read_csv('F:/jinzhu/Custom_runs/20250206_1_RES10_Timeseries/grid_search_template.csv')
 
 
 # Create the task runs
-if os.name == 'posix':
-    create_task_runs(grid_search_df)
-elif os.name == 'nt':
-    create_task_runs(grid_search_df, python_path='F:/jinzhu/conda_env/luto/python.exe', n_workers=10, waite_mins=1.5)
+
+# 1) Submit task to a single linux machine, and run simulations parallely
+create_task_runs(grid_search_df, mode='single', python_path='~/miniforge3/envs/luto/bin/python', n_workers=40, waite_mins=1.5)
+
+# # 2) Submit task to multiple linux computation nodes
+# create_task_runs(grid_search_df, mode='multiple')
+
+# # 3) Submit task to a single windows machine, and run simulations parallely
+# create_task_runs(grid_search_df, mode='single', python_path='F:/jinzhu/conda_env/luto/python.exe', n_workers=10, waite_mins=1.5)
 
 

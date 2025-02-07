@@ -112,12 +112,12 @@ def create_grid_search_template(
     return template_grid_search
 
 
-def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, n_workers:int=4, waite_mins:int=3):
+def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, mode='single', n_workers:int=4, waite_mins:int=3):
     '''
     Submit the tasks to the cluster using the custom settings.\n
     Parameters:
         - custom_settings (pd.DataFrame): The custom settings DataFrame.
-        - Only works in a windows system.
+        - Only works if mode == "single".
             - python_path (str): The path to the python executable.
             - n_workers (int): The number of workers to use for parallel processing.
             - waite_mins (int): The number of minutes to wait before excuting the next task in the queue.
@@ -145,19 +145,18 @@ def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, n_worke
         custom_dict = update_settings(custom_settings[col].to_dict(), col)
         
         
-        # Wait for the specified time before submitting the next task in a windows system
-        if os.name == 'nt':
-            time.sleep(col_idx * waite_mins * 60)
+        # Wait for the specified time before submitting the next task
+        time.sleep(col_idx * waite_mins * 60)
         
         # Submit the task
         create_run_folders(col)
         write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
-        submit_task(col, python_path)
+        submit_task(col, python_path, mode='single')
 
     # Submit the tasks in parallel; Using 4 threads is a safe number to submit
     # tasks in login node. Or use the specified number of cpus if not in a linux system
     workers = min(n_workers, len(custom_cols)) if os.name == 'posix' else n_workers
-    Parallel(n_jobs=workers, timeout=99999)(delayed(process_col)(col_idx, col) for col_idx, col in enumerate(custom_cols))
+    Parallel(n_jobs=workers, timeout=999999)(delayed(process_col)(col_idx, col) for col_idx, col in enumerate(custom_cols))
 
 
 def copy_folder_custom(source, destination, ignore_dirs=None):
@@ -254,12 +253,12 @@ def create_run_folders(col):
 
 
 
-def submit_task(col:str, python_path:str=None):
+def submit_task(col:str, python_path:str=None, mode='single'):
     # Copy the slurm script to the task folder
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{TASK_ROOT_DIR}/{col}/task_cmd.sh')
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/python_script.py', f'{TASK_ROOT_DIR}/{col}/python_script.py')
     
-    if os.name == 'nt': 
+    if mode =='single': 
         # Change the directory to the root of the project
         os.chdir(os.path.dirname(os.path.abspath(__file__)))
         os.chdir('../../..')
@@ -269,13 +268,16 @@ def submit_task(col:str, python_path:str=None):
         print(f'Task {col} has been submitted!')
     
     # Start the task if the os is linux
-    if os.name == 'posix':
+    elif mode =='multiple':
         # Change the directory to the root of the project
         os.chdir(os.path.dirname(os.path.abspath(__file__)))
         os.chdir('../../..')
         os.chdir(f'{TASK_ROOT_DIR}/{col}')
         # Submit the task to the cluster
         os.system(f'bash task_cmd.sh')
+    
+    else:
+        raise 'Mode mush be in either "single" or "multiple" !'
 
 
 def log_memory_usage(output_dir=settings.OUTPUT_DIR, interval=1):

@@ -12,7 +12,7 @@ sim.save_data_to_disk(data, f"{data.path}/DATA_REPORT/Data_{settings.MODE}_RES{s
 
 # Remove all files except the report directory if settings.KEEP_OUTPUTS is False
 '''
-KEEP_OUTPUTS is not originally defined in the settings, but will be added in the `luto\tools\create_task_runs\create_running_tasks.py` file.
+KEEP_OUTPUTS is not originally defined in the settings, but will be added in the `luto/tools/create_task_runs/create_running_tasks.py` file.
 '''
 
 if settings.KEEP_OUTPUTS is False:
