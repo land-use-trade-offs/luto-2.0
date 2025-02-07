@@ -6,7 +6,7 @@ from luto.tools.create_task_runs.helpers import process_task_root_dirs
 
 
 # Get the data
-task_root_dirs = [i for i in glob('../Custom_runs/*') if "20250128_1_SOFE_GHG_RES10_Timeseries" in i]
+task_root_dirs = [i for i in glob('../Custom_runs/*') if "20250206_1_RES10_Timeseries" in i]
 report_data, report_data_demand = process_task_root_dirs(task_root_dirs)
 
 # Reorder the data
@@ -34,7 +34,8 @@ filter_rules = '''
     DIET_DOM == "BAU" and
     GHG_CONSTRAINT_TYPE == "soft" and
     BIODIVERSTIY_TARGET_GBF_2 == "off" and
-    SOLVE_ECONOMY_WEIGHT == 0.05
+    MODE == "timeseries" and
+    SOLVE_ECONOMY_WEIGHT == 0.3
 '''.strip().replace('\n', '')
 
 report_data_filter = report_data.query(filter_rules).copy()
@@ -112,7 +113,7 @@ p_weigth_vs_demand = (
             x='year', 
             y='deviation_%', 
             fill='name', 
-            group='SOLVE_ECONOMY_WEIGHT'
+            group='name'
         )
     ) +
     p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +

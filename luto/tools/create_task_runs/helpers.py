@@ -104,6 +104,9 @@ def create_grid_search_template(
         template_grid_search = pd.concat([template_grid_search, new_column.rename(f'Run_{row["run_idx"]}')], axis=1)
         
     # Save the grid search template to the root task folder
+    num_nan = template_grid_search.isna().sum().sum()
+    if num_nan > 0:
+        raise ValueError(f'{num_nan} NANs found in the template CSV! \n Check settings before proceeding!')
     template_grid_search.to_csv(f'{TASK_ROOT_DIR}/grid_search_template.csv', index=False)
 
     return template_grid_search
@@ -141,23 +144,20 @@ def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, n_worke
         # Update the settings dictionary
         custom_dict = update_settings(custom_settings[col].to_dict(), col)
         
+        
+        # Wait for the specified time before submitting the next task in a windows system
+        if os.name == 'nt':
+            time.sleep(col_idx * waite_mins * 60)
+        
         # Submit the task
         create_run_folders(col)
         write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
-        
-        if os.name == 'posix':
-            submit_task(col, python_path)
-        else:
-            if col_idx < n_workers:
-                time.sleep(col_idx * waite_mins * 60)
-                submit_task(col, python_path)
-            else:
-                submit_task(col, python_path)   
+        submit_task(col, python_path)
 
     # Submit the tasks in parallel; Using 4 threads is a safe number to submit
     # tasks in login node. Or use the specified number of cpus if not in a linux system
-    workers = min(4, len(custom_cols)) if os.name == 'posix' else n_workers
-    Parallel(n_jobs=workers)(delayed(process_col)(col_idx,col) for col_idx,col in enumerate(custom_cols))
+    workers = min(n_workers, len(custom_cols)) if os.name == 'posix' else n_workers
+    Parallel(n_jobs=workers, timeout=99999)(delayed(process_col)(col_idx, col) for col_idx, col in enumerate(custom_cols))
 
 
 def copy_folder_custom(source, destination, ignore_dirs=None):

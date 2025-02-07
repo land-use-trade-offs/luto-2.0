@@ -19,10 +19,11 @@ grid_search = {
     ###############################################################
     # Working settings for the model run
     ###############################################################
-    'MODE': ['timeseries'],                # 'snapshot' or 'timeseries'
-    'RESFACTOR': [15],
+    'MODE': ['timeseries', 'snapshot'],                # 'snapshot' or 'timeseries'
+    'RESFACTOR': [10],
     'WRITE_THREADS': [10],
     'WRITE_OUTPUT_GEOTIFFS': [True],
+    'KEEP_OUTPUTS': [False],
     
     ###############################################################
     # Model run settings
@@ -36,7 +37,7 @@ grid_search = {
     ###############################################################
     'SOLVE_ECONOMY_WEIGHT': 
         # list(np.arange(5, 51, 2)/100),
-        [0.005, 0.01, 0.03, 0.05],
+        [0.05, 0.1, 0.2, 0.3, 0.4, 0.5],
         # sorted([
         #     round(10**(-i) * (j/20), 10)
         #     for i in range(4)
@@ -71,10 +72,14 @@ create_grid_search_parameters(grid_search)
 # Read the template for the custom settings
 grid_search_df = create_grid_search_template()
 
+import pandas as pd
+grid_search_df = pd.read_csv('F:/jinzhu/Custom_runs/20250206_1_RES10_Timeseries/grid_search_template.csv')
+
+
 # Create the task runs
 if os.name == 'posix':
     create_task_runs(grid_search_df)
 elif os.name == 'nt':
-    create_task_runs(grid_search_df, python_path='F:/jinzhu/conda_env/luto/python.exe', n_workers=24)
+    create_task_runs(grid_search_df, python_path='F:/jinzhu/conda_env/luto/python.exe', n_workers=10, waite_mins=1.5)
 
 
