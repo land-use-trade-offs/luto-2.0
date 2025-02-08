@@ -144,7 +144,6 @@ def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, mode='s
         # Update the settings dictionary
         custom_dict = update_settings(custom_settings[col].to_dict(), col)
         
-        
         # Wait for the specified time before submitting the next task
         time.sleep(col_idx * waite_mins * 60)
         
@@ -258,26 +257,20 @@ def submit_task(col:str, python_path:str=None, mode='single'):
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{TASK_ROOT_DIR}/{col}/task_cmd.sh')
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/python_script.py', f'{TASK_ROOT_DIR}/{col}/python_script.py')
     
-    if mode =='single': 
-        # Change the directory to the root of the project
-        os.chdir(os.path.dirname(os.path.abspath(__file__)))
-        os.chdir('../../..')
-        os.chdir(f'{TASK_ROOT_DIR}/{col}')
+    if mode == 'single': 
         # Submit the task 
-        subprocess.run([python_path, 'python_script.py'])
+        subprocess.run([python_path, 'python_script.py'], cwd=f'{TASK_ROOT_DIR}/{col}')
         print(f'Task {col} has been submitted!')
     
     # Start the task if the os is linux
-    elif mode =='multiple':
-        # Change the directory to the root of the project
-        os.chdir(os.path.dirname(os.path.abspath(__file__)))
-        os.chdir('../../..')
-        os.chdir(f'{TASK_ROOT_DIR}/{col}')
+    elif mode == 'multiple':
         # Submit the task to the cluster
-        subprocess.run(['bash', 'task_cmd.sh'])
+        subprocess.run(['bash', 'task_cmd.sh'], cwd=f'{TASK_ROOT_DIR}/{col}')
     
     else:
-        raise 'Mode mush be in either "single" or "multiple" !'
+        raise ValueError('Mode must be either "single" or "multiple"!')
+    
+    return f'Task {col} has been submitted!'
 
 
 def log_memory_usage(output_dir=settings.OUTPUT_DIR, interval=1):
