@@ -291,7 +291,7 @@ class LutoSolver:
 
         # Set the objective function
         if settings.OBJECTIVE == "maxprofit":
-            sense = GRB.MINIMIZE
+            sense = GRB.MAXIMIZE
             objective = self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT - (self.obj_demand +  self.obj_ghg) * (1 - settings.SOLVE_ECONOMY_WEIGHT)  
         elif settings.OBJECTIVE == "mincost":
             sense = GRB.MINIMIZE

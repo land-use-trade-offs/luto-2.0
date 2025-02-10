@@ -41,8 +41,8 @@ grid_search = {
     'MODE': ['timeseries', 'snapshot'],                # 'snapshot' or 'timeseries'
     'RESFACTOR': [10],
     'WRITE_THREADS': [10],
-    'WRITE_OUTPUT_GEOTIFFS': [True],
-    'KEEP_OUTPUTS': [False],
+    'WRITE_OUTPUT_GEOTIFFS': [False],
+    'KEEP_OUTPUTS': [True],
     
     ###############################################################
     # Model run settings
