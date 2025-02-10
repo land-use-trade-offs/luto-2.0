@@ -338,12 +338,18 @@ def process_task_root_dirs(task_root_dirs):
 
         for dir in run_dirs:
             run_idx = int(dir.split('_')[-1])
-            run_paras = grid_search_params.query(f'run_idx == {run_idx}').to_dict(orient='records')[0]
+            run_paras = grid_search_params.query(f'run_idx == {int(run_idx)}').to_dict(orient='records')[0]
+            
+            # Get the json data path
             json_path = os.path.join(task_root_dir, dir, 'DATA_REPORT', 'data')
-
             if not os.path.exists(json_path):
-                print(f"Path does not exist: {json_path}")
-                continue
+                runs = [i for i in glob(f"{task_root_dir}/{dir}/output/**") if os.path.isdir(i)]
+                if len(runs) == 0:
+                    print(f'No runs found in {dir}!')
+                    continue
+                else:
+                    json_path = os.path.join(runs[-1], 'DATA_REPORT', 'data')
+          
 
             df_profit = process_profit_data(json_path)
             df_ghg_deviation = process_GHG_deviation_data(json_path)

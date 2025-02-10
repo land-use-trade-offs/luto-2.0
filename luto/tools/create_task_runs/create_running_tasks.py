@@ -85,6 +85,6 @@ grid_search_df = pd.read_csv("F:/jinzhu/Custom_runs/20250207_RES10_Timeseries/gr
 # create_task_runs(grid_search_df, mode='multiple')
 
 # 3) Submit task to a single windows machine, and run simulations parallely
-create_task_runs(grid_search_df, mode='single', python_path='F:/jinzhu/conda_env/luto/python.exe', n_workers=10, waite_mins=1.5)
+create_task_runs(grid_search_df, mode='single', python_path='F:/jinzhu/conda_env/luto/python.exe', n_workers=30, waite_mins=1.5)
 
 

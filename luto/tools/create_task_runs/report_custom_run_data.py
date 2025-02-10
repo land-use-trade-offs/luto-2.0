@@ -6,7 +6,7 @@ from luto.tools.create_task_runs.helpers import process_task_root_dirs
 
 
 # Get the data
-task_root_dirs = [i for i in glob('../Custom_runs/*') if "20250206_1_RES10_Timeseries" in i]
+task_root_dirs = [i for i in glob('../Custom_runs/*') if "20250207_RES10_Timeseries" in i]
 report_data, report_data_demand = process_task_root_dirs(task_root_dirs)
 
 # Reorder the data
@@ -33,9 +33,9 @@ filter_rules = '''
     year != 2010 and
     DIET_DOM == "BAU" and
     GHG_CONSTRAINT_TYPE == "soft" and
-    BIODIVERSTIY_TARGET_GBF_2 == "off" and
+    BIODIVERSTIY_TARGET_GBF_2 == "on" and
     MODE == "timeseries" and
-    SOLVE_ECONOMY_WEIGHT == 0.3
+    SOLVE_ECONOMY_WEIGHT <= 0.3
 '''.strip().replace('\n', '')
 
 report_data_filter = report_data.query(filter_rules).copy()
@@ -108,15 +108,15 @@ p_weight_vs_GHG_deforestation = (
 
 p_weigth_vs_demand = (
     p9.ggplot(
-        report_data_demand_filterd, 
+        report_data_demand_filterd.query('year==2050'), 
         p9.aes(
             x='year', 
             y='deviation_%', 
             fill='name', 
-            group='name'
+            # group='SOLVE_ECONOMY_WEIGHT'
         )
     ) +
-    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
+    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ SOLVE_ECONOMY_WEIGHT', scales='free') +
     p9.geom_col(position='dodge') +
     p9.theme_bw() +
     # p9.coord_cartesian(ylim=(0, 50)) +

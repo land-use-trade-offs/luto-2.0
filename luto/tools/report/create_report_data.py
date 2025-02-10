@@ -1,7 +1,6 @@
 import os
 import json
 import re
-import itertools
 import shutil
 import pandas as pd
 import numpy as np
@@ -231,6 +230,12 @@ def save_report_data(raw_data_dir:str):
     
     # Get the demand data
     DEMAND_DATA_long = get_demand_df()
+    
+    # Rename the commodities index for Beef and Sheep live export
+    DEMAND_DATA_long.index = DEMAND_DATA_long.index.set_levels(
+        DEMAND_DATA_long.index.levels[1].str.replace('Beef lexp', 'Beef live export').str.replace('Sheep lexp', 'Sheep live export'),
+        level=1
+    )
 
     # Reorder the columns to match the order in COMMODITIES_ALL
     DEMAND_DATA_long = DEMAND_DATA_long.reindex(COMMODITIES_ALL, level=1).reset_index()
@@ -243,7 +248,6 @@ def save_report_data(raw_data_dir:str):
     # Convert quanlity to million tonnes
     DEMAND_DATA_long['Quantity (tonnes, ML)'] = DEMAND_DATA_long['Quantity (tonnes, ML)'] / 1e6
     DEMAND_DATA_long = DEMAND_DATA_long.query('Year.isin(@years)')
-    DEMAND_DATA_long.loc[:,'COMMODITY'] = DEMAND_DATA_long['COMMODITY'].str.replace('Beef lexp','Beef live export')
     DEMAND_DATA_long_filter_year = DEMAND_DATA_long.query(f'Year.isin({years_select})')
 
     # Plot_2_1: {Total} for 'Domestic', 'Exports', 'Feed', 'Imports', 'Production'(Tonnes) 
@@ -347,7 +351,7 @@ def save_report_data(raw_data_dir:str):
         
         
 
-    # Plot_2-5_(1-4): Commodities for 'Exports','Feed','Imports','Production' (Million Tonnes)
+    # Plot_2-5_(2-5): Commodities for 'Exports','Feed','Imports','Production' (Million Tonnes)
     for idx,Type in enumerate(DEMAND_DATA_long['Type'].unique()):
         if Type == 'Domestic':
             continue
@@ -371,7 +375,7 @@ def save_report_data(raw_data_dir:str):
     # Plot_2-5-6: Production (LUTO outputs, Million Tonnes)
     quantity_csv_paths = files.query('category == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)
     quantity_df = get_quantity_df(quantity_csv_paths)
-    quantity_df['Commodity'] = quantity_df['Commodity'].str.replace('Beef lexp','Beef live export')
+    quantity_df = quantity_df.replace({'Sheep lexp': 'Sheep live export', 'Beef lexp': 'Beef live export'})
     
     quantity_df_wide = quantity_df\
         .groupby(['Commodity'])[['Year','Prod_targ_year (tonnes, ML)']]\
@@ -388,8 +392,25 @@ def save_report_data(raw_data_dir:str):
     quantity_df_wide.to_json(f'{SAVE_DIR}/production_5_6_demand_Production_commodity_from_LUTO.json', orient='records')
     
     
-    # Plot_2-7: Difference between demand and production in percentage (%)
-    files.query('category == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)
+    # Plot_2-7: Demand achievement in the final target year (%)
+    quantify_diff = files.query('category == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)
+    quantify_diff = pd.concat([pd.read_csv(path) for path in quantify_diff['path']], ignore_index=True)
+    
+    quantify_diff = quantify_diff.replace({'Sheep lexp': 'Sheep live export', 'Beef lexp': 'Beef live export'})
+    quantify_diff = quantify_diff[['Year','Commodity','Prop_diff (%)']].rename(columns={'Prop_diff (%)': 'Demand Achievement (%)'})
+    
+    quantify_diff_wide = quantify_diff\
+        .groupby(['Commodity'])[['Year','Demand Achievement (%)']]\
+        .apply(lambda x: list(map(list,zip(x['Year'],x['Demand Achievement (%)']))))\
+        .reset_index()
+        
+    quantify_diff_wide.columns = ['name','data']
+    quantify_diff_wide['type'] = 'spline'
+    
+    quantify_diff_wide = quantify_diff_wide.set_index('name').reindex(COMMODITIES_ALL).reset_index()
+    quantify_diff_wide = quantify_diff_wide.dropna()
+    
+    quantify_diff_wide.to_json(f'{SAVE_DIR}/production_6_demand_achievement_commodity.json', orient='records')
 
 
 

@@ -225,7 +225,7 @@ class LutoSolver:
     def _setup_deviation_penalties(self):
         """
         Decision variables, V and E, for soft constraints.
-        1) [V] Penalty vector for demand, each one conrespondes a commodity, that minimises the deviations from demand.
+        1) [V] Penalty vector for demand, each one corespondes a commodity, that minimises the deviations from demand.
         2) [E] A single penalty scalar for GHG emissions, minimises its deviation from the target.
         """
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
@@ -278,8 +278,11 @@ class LutoSolver:
             self.obj_demand = gp.quicksum(v * price for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices))
         else:
             self.obj_demand = 0
-        
-        self.obj_ghg = self.E * self._input_data.economic_target_yr_carbon_price    if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
+            
+        if settings.GHG_CONSTRAINT_TYPE == "soft":
+            self.obj_ghg = self.E * self._input_data.economic_target_yr_carbon_price
+        else:
+            self.obj_ghg = 0
 
         # Set the objective function
         sense = GRB.MINIMIZE if settings.OBJECTIVE == "mincost" else GRB.MAXIMIZE

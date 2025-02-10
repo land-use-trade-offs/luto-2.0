@@ -28,7 +28,7 @@ LU_NATURAL = ['Beef - natural land',
 # Define the commodity categories
 COMMODITIES_ON_LAND = ['Apples','Beef live export','Beef meat','Citrus','Cotton','Dairy','Grapes',
                        'Hay','Nuts','Other non-cereal crops', 'Pears', 'Plantation fruit',
-                       'Rice', 'Sheep lexp', 'Sheep meat', 'Sheep wool', 'Stone fruit', 'Sugar',
+                       'Rice', 'Sheep live export', 'Sheep meat', 'Sheep wool', 'Stone fruit', 'Sugar',
                        'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
                        'Vegetables','Winter cereals','Winter legumes','Winter oilseeds']
 

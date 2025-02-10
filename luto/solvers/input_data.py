@@ -60,7 +60,7 @@ class SolverInputData:
     water_yield_outside_study_area: dict[int, float]       # Water yield from outside LUTO study area -> dict. Keys: year, region.
     
     economic_contr_mrj: float               # base year economic contribution matrix.
-    economic_BASE_YR_prices: np.ndarray     # target year commodity profit.
+    economic_BASE_YR_prices: np.ndarray     # base year commodity prices.
     economic_target_yr_carbon_price: float  # target year carbon price.
 
     offland_ghg: np.ndarray                 # GHG emissions from off-land commodities.
