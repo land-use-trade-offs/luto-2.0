@@ -399,6 +399,12 @@ def save_report_data(raw_data_dir:str):
     quantify_diff = quantify_diff.replace({'Sheep lexp': 'Sheep live export', 'Beef lexp': 'Beef live export'})
     quantify_diff = quantify_diff[['Year','Commodity','Prop_diff (%)']].rename(columns={'Prop_diff (%)': 'Demand Achievement (%)'})
     
+    # Add a fake data as placeholder for the year 2010
+    quantify_diff_fake = quantify_diff.copy()
+    quantify_diff_fake['Year'] = 2010
+    quantify_diff_fake['Demand Achievement (%)'] = 100
+    quantify_diff = pd.concat([quantify_diff, quantify_diff_fake],ignore_index=True)
+    
     quantify_diff_wide = quantify_diff\
         .groupby(['Commodity'])[['Year','Demand Achievement (%)']]\
         .apply(lambda x: list(map(list,zip(x['Year'],x['Demand Achievement (%)']))))\
@@ -406,9 +412,14 @@ def save_report_data(raw_data_dir:str):
         
     quantify_diff_wide.columns = ['name','data']
     quantify_diff_wide['type'] = 'spline'
+    quantify_diff_wide['showInLegend'] = True
     
     quantify_diff_wide = quantify_diff_wide.set_index('name').reindex(COMMODITIES_ALL).reset_index()
     quantify_diff_wide = quantify_diff_wide.dropna()
+    
+    # Add a row without any data but type as column
+    quantify_diff_wide.loc[len(quantify_diff_wide)] = ['',[[i,np.nan] for i in years],'column', False]
+    
     
     quantify_diff_wide.to_json(f'{SAVE_DIR}/production_6_demand_achievement_commodity.json', orient='records')
 
@@ -1267,7 +1278,6 @@ def save_report_data(raw_data_dir:str):
         
     water_inside_LUTO_specific_lu_sum_wide.columns = ['name','data']
     water_inside_LUTO_specific_lu_sum_wide['type'] = 'column'
-    water_inside_LUTO_specific_lu_sum_wide.loc[len(water_inside_LUTO_specific_lu_sum_wide)] = [None, [[2010, None], [2011, None]], 'spline']
     water_inside_LUTO_specific_lu_sum_wide.to_json(f'{SAVE_DIR}/water_2_water_net_yield_by_specific_landuse.json', orient='records')
     
     

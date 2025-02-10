@@ -285,11 +285,15 @@ class LutoSolver:
             self.obj_ghg = 0
 
         # Set the objective function
-        sense = GRB.MINIMIZE if settings.OBJECTIVE == "mincost" else GRB.MAXIMIZE
-        
-        objective = self.obj_economy *  settings.SOLVE_ECONOMY_WEIGHT \
-            - (self.obj_demand +  self.obj_ghg) * (1 - settings.SOLVE_ECONOMY_WEIGHT)  
-                 
+        if settings.OBJECTIVE == "maxprofit":
+            sense = GRB.MINIMIZE
+            objective = self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT - (self.obj_demand +  self.obj_ghg) * (1 - settings.SOLVE_ECONOMY_WEIGHT)  
+        elif settings.OBJECTIVE == "mincost":
+            sense = GRB.MINIMIZE
+            objective = self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT + (self.obj_demand +  self.obj_ghg) * (1 - settings.SOLVE_ECONOMY_WEIGHT)
+        else:
+            raise ValueError("Unknown choice for `OBJECTIVE` setting: must be either 'maxprofit' or 'mincost'")
+     
         self.gurobi_model.setObjective(objective, sense)  
         
         

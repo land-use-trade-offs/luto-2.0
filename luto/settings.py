@@ -105,12 +105,12 @@ else:
 RESFACTOR = 20        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
-# MODE = 'snapshot'   # Runs for target year only
-MODE = 'timeseries'   # Runs each year from base year to target year
+MODE = 'snapshot'   # Runs for target year only
+# MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
-OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
-# OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
+# OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
+OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
 # Specify how demand for agricultural commodity production should be met in the solver
 # DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
