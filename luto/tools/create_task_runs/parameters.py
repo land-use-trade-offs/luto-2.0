@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-TASK_ROOT_DIR = '../Custom_runs/20250207_RES10_Timeseries/'
+TASK_ROOT_DIR = '../Custom_runs/20250210_RES10_Timeseries/'
 
 EXCLUDE_DIRS = [
     'input', 

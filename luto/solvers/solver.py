@@ -230,9 +230,10 @@ class LutoSolver:
 
     def _setup_deviation_penalties(self):
         """
-        Decision variables, V and E, for soft constraints.
+        Decision variables, V, E and W, for soft constraints.
         1) [V] Penalty vector for demand, each one corespondes a commodity, that minimises the deviations from demand.
         2) [E] A single penalty scalar for GHG emissions, minimises its deviation from the target.
+        3) [W] Penalty vector for water usage, each one corespondes a region, that minimises the deviations from the target.
         """
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             self.V = self.gurobi_model.addMVar(self.ncms, name="V")
@@ -289,10 +290,10 @@ class LutoSolver:
         # Set the objective function
         if settings.OBJECTIVE == "mincost":
             sense = GRB.MINIMIZE
-            objective = self.obj_economy *  settings.SOLVE_ECONOMY_WEIGHT + (self.obj_demand +  self.obj_ghg + self.obj_water) * (1 - settings.SOLVE_ECONOMY_WEIGHT)
+            objective = self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT + (self.obj_demand +  self.obj_ghg + self.obj_water) * (1 - settings.SOLVE_ECONOMY_WEIGHT)
         elif settings.OBJECTIVE == "maxprofit":
             sense = GRB.MAXIMIZE
-            objective = self.obj_economy *  settings.SOLVE_ECONOMY_WEIGHT - (self.obj_demand +  self.obj_ghg + self.obj_water) * (1 - settings.SOLVE_ECONOMY_WEIGHT)
+            objective = self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT - (self.obj_demand +  self.obj_ghg + self.obj_water) * (1 - settings.SOLVE_ECONOMY_WEIGHT)
         else:
             raise ValueError(f"Unknown objective function: {settings.OBJECTIVE}")
         
