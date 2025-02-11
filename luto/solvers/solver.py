@@ -91,6 +91,7 @@ class LutoSolver:
         self.V = None
         self.E = None
         self.B = None
+        self.W = None
 
         # Initialise constraint lookups
         self.cell_usage_constraint_r = {}
@@ -240,7 +241,9 @@ class LutoSolver:
         if settings.BIODIV_CONSTRAINT_TYPE == "soft":
             self.B = self.gurobi_model.addVar(name="B")
 
-        
+        if settings.WATER_CONSTRAINT_TYPE == "soft":
+            num_regions = len(self._input_data.limits["water"].keys())
+            self.W = self.gurobi_model.addMVar(num_regions, name="W")
 
     def _setup_objective(self):
         """
@@ -287,14 +290,15 @@ class LutoSolver:
         
         self.obj_ghg = self.E * self._input_data.economic_target_yr_carbon_price    if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
         self.obj_biodiv = self.B * settings.BIODIV_PENALTY                          if settings.BIODIV_CONSTRAINT_TYPE == "soft" else 0
+        self.obj_water = self.W.sum() * settings.WATER_PENALTY                      if settings.WATER_CONSTRAINT_TYPE == "soft" else 0
 
         # Set the objective function
         sense = GRB.MINIMIZE if settings.OBJECTIVE == "mincost" else GRB.MAXIMIZE
         
         objective = self.obj_economy *  settings.SOLVE_ECONOMY_WEIGHT \
-            - (self.obj_demand +  self.obj_ghg) * (1 - settings.SOLVE_ECONOMY_WEIGHT)  
+            - (self.obj_demand +  self.obj_ghg + self.obj_water) * (1 - settings.SOLVE_ECONOMY_WEIGHT)
                  
-        self.gurobi_model.setObjective(objective, sense)  
+        self.gurobi_model.setObjective(objective, sense)
         
         
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
@@ -501,9 +505,51 @@ class LutoSolver:
                 'DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"'
             )
 
-        
+    def _get_water_net_yield_expr_for_region(
+        self,
+        ind: np.ndarray,
+        region: int,
+    ) -> gp.LinExpr:
+        """
+        Get the Gurobi linear expression for the net water yield of a given region.
+        """
+        ag_contr = gp.quicksum(
+            gp.quicksum(
+                self._input_data.ag_w_mrj[0, ind, j] * self.X_ag_dry_vars_jr[j, ind]
+            )  # Dryland agriculture contribution
+            + gp.quicksum(
+                self._input_data.ag_w_mrj[1, ind, j] * self.X_ag_irr_vars_jr[j, ind]
+            )  # Irrigated agriculture contribution
+            for j in range(self._input_data.n_ag_lus)
+        )
 
-    def _add_water_usage_limit_constraints(self):
+        ag_man_contr = gp.quicksum(
+            gp.quicksum(
+                self._input_data.ag_man_w_mrj[am][0, ind, j_idx]
+                * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
+            )  # Dryland alt. ag. management contributions
+            + gp.quicksum(
+                self._input_data.ag_man_w_mrj[am][1, ind, j_idx]
+                * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
+            )  # Irrigated alt. ag. management contributions
+            for am, am_j_list in self._input_data.am2j.items()
+            for j_idx in range(len(am_j_list))
+        )
+
+        non_ag_contr = gp.quicksum(
+            gp.quicksum(
+                self._input_data.non_ag_w_rk[ind, k] * self.X_non_ag_vars_kr[k, ind]
+            )  # Non-agricultural contribution
+            for k in range(self._input_data.n_non_ag_lus)
+        )
+
+        # Get the water yield outside the study area in the Base Year (2010) of the whole simulation
+        outside_luto_study_contr = self._input_data.water_yield_outside_study_area[region]
+
+        # Sum of all water yield contributions
+        return ag_contr + ag_man_contr + non_ag_contr + outside_luto_study_contr
+
+    def _add_hard_water_usage_limit_constraints(self) -> None:
         """
         Adds constraints to handle water usage limits.
         If `cells` is provided, only adds constraints for regions containing at least one of the
@@ -518,42 +564,7 @@ class LutoSolver:
 
         # Ensure water use remains below limit for each region
         for region, (reg_name, limit_hist_level, ind) in self._input_data.limits["water"].items():
-
-            ag_contr = gp.quicksum(
-                gp.quicksum(
-                    self._input_data.ag_w_mrj[0, ind, j] * self.X_ag_dry_vars_jr[j, ind]
-                )  # Dryland agriculture contribution
-                + gp.quicksum(
-                    self._input_data.ag_w_mrj[1, ind, j] * self.X_ag_irr_vars_jr[j, ind]
-                )  # Irrigated agriculture contribution
-                for j in range(self._input_data.n_ag_lus)
-            )
-
-            ag_man_contr = gp.quicksum(
-                gp.quicksum(
-                    self._input_data.ag_man_w_mrj[am][0, ind, j_idx]
-                    * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
-                )  # Dryland alt. ag. management contributions
-                + gp.quicksum(
-                    self._input_data.ag_man_w_mrj[am][1, ind, j_idx]
-                    * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
-                )  # Irrigated alt. ag. management contributions
-                for am, am_j_list in self._input_data.am2j.items()
-                for j_idx in range(len(am_j_list))
-            )
-
-            non_ag_contr = gp.quicksum(
-                gp.quicksum(
-                    self._input_data.non_ag_w_rk[ind, k] * self.X_non_ag_vars_kr[k, ind]
-                )  # Non-agricultural contribution
-                for k in range(self._input_data.n_non_ag_lus)
-            )
-
-            # Get the water yield outside the study area in the Base Year (2010) of the whole simulation
-            outside_luto_study_contr = self._input_data.water_yield_outside_study_area[region]
-
-            # Sum of all water yield contributions
-            w_net_yield_region = ag_contr + ag_man_contr + non_ag_contr + outside_luto_study_contr
+            w_net_yield_region = self._get_water_net_yield_expr_for_region(ind, region)
             
             # Under River Regions, we need to update the water constraint when the wny_hist_level < wny_BASE_YR_level
             if settings.WATER_REGION_DEF == 'Drainage Division':
@@ -574,6 +585,45 @@ class LutoSolver:
             if water_yield_constraint != limit_hist_level:
                 print(f"        ... updating water constraint to >= {water_yield_constraint:.2f} ML")
 
+    def _add_soft_water_usage_limit_constraints(self) -> None:
+        for region_idx, region_data in enumerate(self._input_data.limits["water"].items()):
+            region, (reg_name, limit_hist_level, ind) = region_data
+            w_net_yield_region = self._get_water_net_yield_expr_for_region(ind, region)
+
+            # Under River Regions, we need to update the water constraint when the wny_hist_level < wny_BASE_YR_level
+            if settings.WATER_REGION_DEF == 'Drainage Division':
+                water_yield_constraint = limit_hist_level
+            elif settings.WATER_REGION_DEF == 'River Region':
+                wny_BASE_YR_level = self._input_data.water_yield_RR_BASE_YR[region]
+                water_yield_constraint = min(limit_hist_level, wny_BASE_YR_level)
+            else:
+                raise ValueError(f"Unknown choice for `WATER_REGION_DEF` setting: must be either 'River Region' or 'Drainage Division'")
+            
+            # Bound the self.W variables to the difference between the desired and actual net yields
+            leq_constr = self.gurobi_model.addConstr(w_net_yield_region - water_yield_constraint <= self.W[region_idx])
+            geq_constr = self.gurobi_model.addConstr(w_net_yield_region - water_yield_constraint >= self.W[region_idx])
+            self.water_limit_constraints.extend([leq_constr, geq_constr])
+
+            # Report on the water yield in the region
+            if settings.VERBOSE == 1:
+                print(f"    ...net water yield goal in {reg_name}: {limit_hist_level:.2f} ML")
+            if water_yield_constraint != limit_hist_level:
+                print(f"        ... updating net water yield goal to {water_yield_constraint:.2f} ML")
+
+    def _add_water_usage_limit_constraints(self) -> None:
+        if settings.WATER_CONSTRAINT_TYPE == "hard":
+            print(f'  ...Hard water net yield constraints by {settings.WATER_REGION_DEF}...')
+            self._add_hard_water_usage_limit_constraints()
+
+        elif settings.WATER_CONSTRAINT_TYPE == "soft":
+            print(f'  ...Soft water net yield constraints by {settings.WATER_REGION_DEF}...')
+            self._add_soft_water_usage_limit_constraints()
+
+        else:
+            raise ValueError(
+                f"Unknown value of WATER_CONSTRAINT_TYPE setting: {settings.WATER_CONSTRAINT_TYPE}. "
+                f"Must be either 'hard' or 'soft'."
+            )
 
     def _get_total_ghg_emissions_expr(self) -> gp.LinExpr:
         # Pre-calculate the coefficients for each variable,
@@ -1109,7 +1159,7 @@ class LutoSolver:
             obj_val = {
                 'SUM': self.gurobi_model.ObjVal,
                 'Economy': self.obj_economy.getValue(),
-                'Demand': self.obj_demand.getValue().sum()      if settings.DEMAND_CONSTRAINT_TYPE == 'soft' else 0,
+                'Demand': self.obj_demand.getValue()            if settings.DEMAND_CONSTRAINT_TYPE == 'soft' else 0,
                 'GHG': self.obj_ghg.getValue()                  if settings.GHG_CONSTRAINT_TYPE == 'soft' else 0,            
             }
         )
