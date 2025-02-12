@@ -193,10 +193,12 @@ def get_major_vegetation_matrices(data: Data) -> np.ndarray:
     Returns:
     - Array indexed by (r, k, v) containing the contributions.
     """
-    mvg_rkv = np.zeros((data.NCELLS, data.N_NON_AG_LUS, data.N_MVG_CLASSES))
-    for k in data.NON_AG_LU_ENV_PLANTINGS:
-        mvg_rkv[:, k, :] = data.MAJOR_VEGETATION_GROUPS_RV
-        for v in range(data.N_MVG_CLASSES):
-            mvg_rkv[:, k, v] *= data.REAL_AREA  # Account for cells' proportional contributions based on cell size
+    mvg_rk = {
+        v: np.zeros((data.NCELLS, data.N_NON_AG_LUS)).astype(np.float32) 
+        for v in range(data.N_NVIS_CLASSES)
+    }
+    for k in range(len(data.NON_AG_LU_ENV_PLANTINGS)):
+        for v in range(data.N_NVIS_CLASSES):
+            mvg_rk[v][:, k] = data.NVIS_PRE_GR[v]
 
-    return mvg_rkv
+    return mvg_rk

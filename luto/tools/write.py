@@ -1135,14 +1135,14 @@ def write_biodiversity_contribution(data: Data, yr_cal, path):
 
 
 def write_major_vegetation_groups(data: Data, yr_cal: int) -> None:
-    if not settings.MAJOR_VEG_GROUP_LIMITS == "on":
+    if not settings.BIODIVERSTIY_TARGET_GBF_3 == "on":
         return
     
     print(f"Writing major vegetation groups' scores for {yr_cal}")
 
     ra_sum = data.REAL_AREA.sum()
     
-    mvg_df = pd.DataFrame(index=[yr_cal], columns=list(data.MAJOR_VEG_GROUP_NAMES.values()))
+    mvg_df = pd.DataFrame(index=[yr_cal], columns=list(data.NVIS_ID2DESC.values()))
     
 
 

@@ -736,7 +736,7 @@ class LutoSolver:
 
 
     def _add_major_vegetation_group_limit_constraints(self) -> None:
-        if settings.MAJOR_VEG_GROUP_LIMITS != "on":
+        if settings.BIODIVERSTIY_TARGET_GBF_3 != "on":
             print('  ...major vegetation group constraints TURNED OFF ...')
             return
         
@@ -744,29 +744,29 @@ class LutoSolver:
 
         v_limits, v_names = self._input_data.limits["major_vegetation_groups"]
 
-        for v, v_area_lb in v_limits.items():
+        for v, v_area_lb in enumerate(v_limits):
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.ag_mvg_mrjv[0, :, :, v][:, j] * self.X_ag_dry_vars_jr[j, :]
+                    self._input_data.ag_mvg_mrj[v][0, :, :][:, j] * self.X_ag_dry_vars_jr[j, :]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
-                    self._input_data.ag_mvg_mrjv[1, :, :, v][:, j] * self.X_ag_irr_vars_jr[j, :]
+                    self._input_data.ag_mvg_mrj[v][1, :, :][:, j] * self.X_ag_irr_vars_jr[j, :]
                 )  # Irrigated agriculture contribution
                 for j in range(self._input_data.n_ag_lus)
             )
 
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.non_ag_mvg_rkv[:, k, v] * self.X_non_ag_vars_kr[k, :]
+                    self._input_data.non_ag_mvg_rk[v][:, k] * self.X_non_ag_vars_kr[k, :]
                 )  # Non-agricultural contribution
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            outside_study_area_contr = self._input_data.major_veg_contr_outside_study_area[v]
+            outside_study_area_contr = self._input_data.mvg_contr_outside_study_area[v]
 
             self.major_vegetation_exprs[v] = ag_contr + non_ag_contr + outside_study_area_contr
 
-            print(f"        ...vegetation class {v_names[v]} target area: {v_area_lb:,.0f}")
+            print(f"    ...vegetation class {v_names[v]} target area: {v_area_lb:,.0f}")
             self.major_vegetation_limit_constraints[v] = self.gurobi_model.addConstr(
                 self.major_vegetation_exprs[v] >= v_area_lb
             )

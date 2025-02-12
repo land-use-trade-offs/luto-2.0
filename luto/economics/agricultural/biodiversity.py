@@ -194,7 +194,7 @@ def get_biodiversity_limits(data: Data, yr_cal: int):
     return data.BIODIV_GBF_TARGET_2[yr_cal]
 
 
-def get_major_vegetation_matrices(data: Data) -> np.ndarray:
+def get_major_vegetation_matrices(data: Data) -> dict[int, np.ndarray]:
     """
     Get the matrix containing the contribution of each cell/ag. land use combination 
     to each major vegetation group.
@@ -202,48 +202,57 @@ def get_major_vegetation_matrices(data: Data) -> np.ndarray:
     Returns:
     - Array indexed by (m, r, j, v) containing the contributions.
     """
-    mvg_mrjv = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS, data.N_MVG_CLASSES))
+    mvg_mrj = {
+        v: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)
+        for v in range(data.N_NVIS_CLASSES)
+    }
     for m in range(data.NLMS):
-        for j in data.LU_NATURAL:
-            mvg_mrjv[m, :, j, :] = data.MAJOR_VEGETATION_GROUPS_RV
-            for v in range(data.N_MVG_CLASSES):
-                mvg_mrjv[m, :, j, v] *= data.REAL_AREA  # Account for cells' proportional contributions based on cell size
+        for j in range(data.N_AG_LUS):
+            for v in range(data.N_NVIS_CLASSES):
+                mvg_mrj[v][m, :, j] = data.NVIS_PRE_GR[v] * data.BIODIV_HABITAT_DEGRADE_LOOK_UP[j]
 
-    return mvg_mrjv
+    return mvg_mrj
 
 
-def get_major_vegetation_group_limits(data: Data, yr_cal: int) -> tuple[dict[int, float], dict[int, str]]:
+def get_major_vegetation_group_limits(data: Data, yr_cal: int) -> tuple[np.ndarray, dict[int, str]]:
     """
     Gets the correct major vegetation group targets for the given year (yr_cal).
 
     Returns:
-    - dict[int, float]
-        A dictionary indexed by veg group (v) with the target for each group.
+    - np.ndarray
+        An array containing the limits of each NVIS class for the given yr_cal
     - dict[int, str]
-        A dictionary mapping of veg group index to name
+        A dictionary mapping of vegetation group ID to name
     """
-    if yr_cal >= settings.MAJOR_VEG_GROUP_TARGET_YEAR:
-        limits = data.MVG_PROP_FINAL_TARGETS
+
+    if not data.NVIS_LIMITS:
+        # Compute limits for all years if the limits don't already exist
+
+        if settings.BIODIVERSITY_GBF_3_TARGET_YEAR <= data.YR_CAL_BASE:
+            data.NVIS_LIMITS = {settings.BIODIVERSITY_GBF_3_TARGET_YEAR: data.NVIS_TOTAL_AREA_HA}
+            return data.NVIS_LIMITS[settings.BIODIVERSITY_GBF_3_TARGET_YEAR]
+
+        n_linspace_years = settings.BIODIVERSITY_GBF_3_TARGET_YEAR - data.YR_CAL_BASE + 1
+        yr_iter = range(data.YR_CAL_BASE, settings.BIODIVERSITY_GBF_3_TARGET_YEAR + 1)
+        nvis_limits_by_year = {yr: np.zeros(data.N_NVIS_CLASSES) for yr in yr_iter}  # Indexed: year, vegetation class
+        
+        # Set up targets dicts for each year
+        for yr in yr_iter:
+            # Fill in targets dicts
+            for v in range(data.N_NVIS_CLASSES):
+                v_targets = np.linspace(0, data.NVIS_TOTAL_AREA_HA[v], n_linspace_years)
+                for yr, target in zip(yr_iter, v_targets):
+                    nvis_limits_by_year[yr][v] = target
+
+        data.NVIS_LIMITS = nvis_limits_by_year
+        
+    if yr_cal >= settings.BIODIVERSITY_GBF_3_TARGET_YEAR:
+        limits = data.NVIS_LIMITS[settings.BIODIVERSITY_GBF_3_TARGET_YEAR]
     
     elif yr_cal <= data.YR_CAL_BASE:
-        limits = data.MVG_PROP_TARGETS_BY_YEAR[data.YR_CAL_BASE]
+        limits = data.NVIS_LIMITS[data.YR_CAL_BASE]
 
     else:
-        limits = data.MVG_PROP_TARGETS_BY_YEAR[yr_cal]
+        limits = data.NVIS_LIMITS[yr_cal]
 
-    ra_sum = data.REAL_AREA.sum()
-    for v in limits:
-        limits[v] *= ra_sum
-
-    return limits, data.MAJOR_VEG_GROUP_NAMES
-
-
-def get_major_vegetation_contrs_outside_study_area(data: Data) -> dict[int, float]:
-    """
-    Gets a dictionary mapping each major vegetation group (v) the contribution of
-    land outside LUTO's study area that applies to it.
-    """
-    props = data.MVG_PROP_OUTSIDE_STUDY_AREA
-    for v in props:
-        props[v] *= data.REAL_AREA
-    return props
+    return limits, data.NVIS_ID2DESC

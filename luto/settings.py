@@ -102,11 +102,11 @@ else:
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 20        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 10        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
-MODE = 'snapshot'   # Runs for target year only
-# MODE = 'timeseries'   # Runs each year from base year to target year
+# MODE = 'snapshot'   # Runs for target year only
+MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -154,7 +154,7 @@ NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect a
 BARHOMOGENOUS = 1  # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 50
+THREADS = 8
 
 
 # ---------------------------------------------------------------------------- #
@@ -475,6 +475,8 @@ BIODIVERSTIY_TARGET_GBF_3  = 'on'           # 'on' or 'off'.
     protect and manage 30% of the world's land, water, and coastal areas by 2030.
 '''
 
+BIODIVERSITY_GBF_3_TARGET_YEAR = 2030
+
 NVIS_SPATIAL_DETAIL = 'HIGH'                 # 'LOW' or 'HIGH'
 '''
 - If 'LOW' is selected, the primary group layers will be used to represent the vegetation type. 
@@ -494,10 +496,6 @@ the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers
   and each cell has a group index who covers the most area within this cell.
 '''
 
-# Major vegetation (sub)group settings
-MAJOR_VEG_GROUP_LIMITS = "on"
-MAJOR_VEG_GROUP_DEF = "Groups"      # Either 'Groups' or 'Subgroups'
-MAJOR_VEG_GROUP_TARGET_YEAR = 2030
 
 
 # ---------------------------------------------------------------------------- #
