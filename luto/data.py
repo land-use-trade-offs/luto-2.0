@@ -17,7 +17,6 @@
 
 import os
 import h5py
-
 import xarray as xr
 import numpy as np
 import pandas as pd
@@ -36,7 +35,7 @@ from typing import Any, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.settings import INPUT_DIR, NON_AG_LAND_USES_REVERSIBLE, OUTPUT_DIR
+from luto.settings import INPUT_DIR, NON_AG_LAND_USES_REVERSIBLE, NVIS_CLASS_DETAIL , NVIS_SPATIAL_DETAIL, OUTPUT_DIR
 from luto.tools.spatializers import upsample_array
 
 
@@ -174,7 +173,7 @@ class Data:
         self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                              # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
 
         # Get the lon/lat coordinates.
-        self.COORD_LON_LAT = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META_FULLRES['transform'])             # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
+        self.COORD_LON_LAT = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META_FULLRES['transform'])     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
 
         # Return combined land-use and resfactor mask
         if settings.RESFACTOR > 1:
@@ -1047,8 +1046,6 @@ class Data:
         )
         biodiv_GBF_target_2_proportions_2010_2100 = {yr: f(yr).item() for yr in range(2010, 2101)}
 
-
-
         # Get the connectivity score between 0 and 1, where 1 is the highest connectivity
         biodiv_priorities = pd.read_hdf(os.path.join(INPUT_DIR, 'biodiv_priorities.h5'))
 
@@ -1065,13 +1062,11 @@ class Data:
             raise ValueError(f"Invalid connectivity source: {settings.CONNECTIVITY_SOURCE}, must be 'NCI', 'DWI' or 'NONE'")
 
 
-
         # Get the Zonation output score between 0 and 1. biodiv_score_raw.sum() = 153 million
         biodiv_score_raw = biodiv_priorities['BIODIV_PRIORITY_SSP' + str(settings.SSP)].to_numpy(dtype = np.float32)
         # Weight the biodiversity score by the connectivity score
         self.BIODIV_SCORE_RAW_WEIGHTED = biodiv_score_raw * connectivity_score
-
-
+        
 
         # Habitat degradation scale for agricultural land-use
         biodiv_degrade_df = pd.read_csv(os.path.join(INPUT_DIR, 'HABITAT_CONDITION.csv'))                                                               # Load the HCAS percentile data (pd.DataFrame)
@@ -1092,7 +1087,6 @@ class Data:
 
         else:
             raise ValueError(f"Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
-
 
 
         # Get the biodiversity degradation score (0-1) for each cell
@@ -1128,47 +1122,42 @@ class Data:
             yr: biodiv_current_val + biodiv_degradation_val * biodiv_GBF_target_2_proportions_2010_2100[yr]
             for yr in range(2010, 2101)
         }
-
-        # Major vegetation groups and subgroups
-        # Indexed (r,v): r indexes cells, v indexes vegetation groups/subgroups
-        if settings.MAJOR_VEG_GROUP_DEF == "Groups":
-            self.MAJOR_VEGETATION_GROUPS_RV = self.get_array_resfactor_applied(
-                np.ones((self.NCELLS_NO_RESFACTOR, 25))  # TODO: load from data
-            )
-            self.MAJOR_VEG_GROUP_NAMES = {i: f"group {i}" for i in range(25)}
-
-        elif settings.MAJOR_VEG_GROUP_DEF == "Subgroups":
-            self.MAJOR_VEGETATION_GROUPS_RV = self.get_array_resfactor_applied(
-                np.ones((self.NCELLS_NO_RESFACTOR, 90))  # TODO: load from data
-            )
-            self.MAJOR_VEG_GROUP_NAMES = {i: f"group {i}" for i in range(90)}
-
+        
+        
+        ###############################################################
+        # Vegetation data.
+        ###############################################################
+        
+        print("\tLoading vegetation data...", flush=True)
+        
+        # Determine the NVIS input status
+        if NVIS_SPATIAL_DETAIL  == 'LOW':
+            NVIS_posix = 'single_argmax_layer'
+        elif NVIS_SPATIAL_DETAIL  == 'HIGH':
+            NVIS_posix = 'seperate_percent_layers'
         else:
-            raise ValueError(
-                f"Setting MAJOR_VEG_GROUP_DEF must be either 'Groups' or 'Subgroups'. " 
-                f"Unknown value for setting: {settings.MAJOR_VEG_GROUP_DEF}"
-            )
+            raise ValueError(f"Invalid NVIS input status: {NVIS_CLASS_DETAIL }, must be 'single_argmax' or 'seperate_percent'")
+        
 
-        self.N_MVG_CLASSES = self.MAJOR_VEGETATION_GROUPS_RV.shape[1]
+        # Read in the pre-1750 vegetation statistics, and get NVIS class names and areas
+        NVIS_area_and_target = pd.read_csv(INPUT_DIR + f'/NVIS_{NVIS_CLASS_DETAIL}_{NVIS_SPATIAL_DETAIL}_SPATIAL_DETAIL.csv')
+        
+        self.NVIS_ID2DESC = dict(enumerate(NVIS_area_and_target['group']))
+        self.NVIS_TOTAL_AREA_HA = NVIS_area_and_target['TOTAL_AREA_HA'].to_numpy()
+        self.NVIS_OUTSIDE_LUTO_AREA_HA = NVIS_area_and_target['OUTSIDE_LUTO_AREA_HA'].to_numpy()
+        self.N_NVIS_CLASSES = self.NVIS_TOTAL_AREA_HA.shape[0]
 
-        self.MVG_PROP_FINAL_TARGETS = {v: 0 for v in range(self.N_MVG_CLASSES)}  # TODO: load from data
+        # Read in vegetation layer data
+        NVIS_pre_xr = xr.load_dataarray(INPUT_DIR + f'/NVIS_{NVIS_CLASS_DETAIL}_{NVIS_SPATIAL_DETAIL}_SPATIAL_DETAIL.nc').values
 
-        self.MVG_PROP_TARGETS_BY_YEAR = {}
-        if settings.MAJOR_VEG_GROUP_TARGET_YEAR > self.YR_CAL_BASE:
-            yr_iter = range(self.YR_CAL_BASE, settings.MAJOR_VEG_GROUP_TARGET_YEAR + 1)
-            # Set up targets dicts for each year
-            for yr in yr_iter:
-                self.MVG_PROP_TARGETS_BY_YEAR[yr] = {v: 0 for v in range(self.N_MVG_CLASSES)}
-            
-            # Fill in targets dicts
-            for v in range(self.N_MVG_CLASSES):
-                n_years = settings.MAJOR_VEG_GROUP_TARGET_YEAR - self.YR_CAL_BASE + 1
-                v_targets = np.linspace(0, self.MVG_PROP_FINAL_TARGETS[v], n_years)
-                for yr, target in zip(yr_iter, v_targets):
-                    self.MVG_PROP_TARGETS_BY_YEAR[yr][v] = target
+        # Apply mask
+        if NVIS_SPATIAL_DETAIL == 'LOW':
+            self.NVIS_PRE_GR = NVIS_pre_xr[self.MASK]
+        else:
+            self.NVIS_PRE_GR = NVIS_pre_xr[:, self.MASK]
 
-        self.MVG_PROP_OUTSIDE_STUDY_AREA = {v: 0 for v in range(self.N_MVG_CLASSES)}
-
+        # To be computed during economic calculations
+        self.NVIS_LIMITS: dict[int, np.ndarray] = {}
         
 
 
