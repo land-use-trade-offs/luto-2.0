@@ -136,7 +136,7 @@ class LutoSolver:
         self._add_agricultural_management_constraints()                 
         self._add_agricultural_management_adoption_limit_constraints()  
         self._add_demand_penalty_constraints()                          
-        self._add_water_usage_limit_constraints()
+        self._add_water_usage_limit_constraints() if settings.WATER_LIMITS == 'on' else print('  ...TURNING OFF water usage constraints ...')
         self._add_ghg_emissions_limit_constraints()                     
         self._add_biodiversity_limit_constraints()
 
@@ -296,7 +296,7 @@ class LutoSolver:
         sense = GRB.MINIMIZE if settings.OBJECTIVE == "mincost" else GRB.MAXIMIZE
         
         objective = self.obj_economy *  settings.SOLVE_ECONOMY_WEIGHT \
-            - (self.obj_demand +  self.obj_ghg + self.obj_water) * (1 - settings.SOLVE_ECONOMY_WEIGHT)
+            - (self.obj_demand +  self.obj_ghg + self.obj_water + self.obj_biodiv) * (1 - settings.SOLVE_ECONOMY_WEIGHT)
                  
         self.gurobi_model.setObjective(objective, sense)
         
@@ -601,7 +601,7 @@ class LutoSolver:
             
             # Bound the self.W variables to the difference between the desired and actual net yields
             leq_constr = self.gurobi_model.addConstr(w_net_yield_region - water_yield_constraint <= self.W[region_idx])
-            geq_constr = self.gurobi_model.addConstr(w_net_yield_region - water_yield_constraint >= self.W[region_idx])
+            geq_constr = self.gurobi_model.addConstr(water_yield_constraint - w_net_yield_region <= self.W[region_idx])
             self.water_limit_constraints.extend([leq_constr, geq_constr])
 
             # Report on the water yield in the region
@@ -698,7 +698,7 @@ class LutoSolver:
             raise ValueError("Unknown choice for `GHG_CONSTRAINT_TYPE` setting: must be either 'hard' or 'soft'")
 
 
-    def _add_biodiversity_usage_limit_constraints(self) -> None:
+    def _add_biodiversity_limit_constraints(self) -> None:
         if settings.BIODIV_CONSTRAINT_TYPE == "hard":
             print(f'  ...Hard biodiversity net yield constraints...')
             self._add_hard_biodiversity_usage_limit_constraints()
@@ -769,14 +769,14 @@ class LutoSolver:
 
 
     def _add_soft_biodiversity_usage_limit_constraints(self) -> None:
-        biodiv_net_yield_region = self._get_biodiversity_net_yield_expr()
+        self.biodiversity_expr = self._get_biodiversity_net_yield_expr()
 
         # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSTIY_TARGET_GBF_2 != "on".
         biodiversity_limits = self._input_data.limits["biodiversity"]
 
         # Bound the self.W variables to the difference between the desired and actual net yields
-        leq_constr = self.gurobi_model.addConstr(biodiv_net_yield_region - biodiversity_limits <= self.B)
-        geq_constr = self.gurobi_model.addConstr(biodiversity_limits - biodiv_net_yield_region <= self.B)
+        leq_constr = self.gurobi_model.addConstr(self.biodiversity_expr - biodiversity_limits <= self.B)
+        geq_constr = self.gurobi_model.addConstr(biodiversity_limits - self.biodiversity_expr <= self.B)
         self.biodiversity_limit_soft_constraints.extend([leq_constr, geq_constr])
 
         print(f"    ...biodiversity target score: {biodiversity_limits:,.0f}")
@@ -1146,7 +1146,7 @@ class LutoSolver:
         if self.ghg_emissions_expr:
             prod_data["GHG Emissions"] = self.ghg_emissions_expr.getValue()
         if self.biodiversity_expr:
-            prod_data["Biodiversity"] = self.biodiversity_expr.getValue()
+            prod_data["biodiversity"] = self.biodiversity_expr.getValue()
 
         return SolverSolution(
             lumap=lumap,

@@ -1003,7 +1003,7 @@ def write_biodiversity(data: Data, yr_cal, path):
 
     # Get biodiversity score from model
     if yr_cal >= data.YR_CAL_BASE + 1:
-        biodiv_score = data.prod_data[yr_cal]['Biodiversity']
+        biodiv_score = data.prod_data[yr_cal]['biodiversity']
     else:
         # Return the base year biodiversity score
         biodiv_score = data.BIODIV_GBF_TARGET_2[data.YR_CAL_BASE]
