@@ -55,7 +55,7 @@ def load_data(base_year: int | None = None) -> Data:
     return Data(timestamp=timestamp, base_year=base_year)
 
 @tools.LogToFile(f"{settings.OUTPUT_DIR}/run_{timestamp}", 'a')
-def run( data: Data, base: int, target: int) -> None:
+def run( data: Data, target: int) -> None:
     """
     Run the simulation.
     Parameters:
@@ -65,21 +65,21 @@ def run( data: Data, base: int, target: int) -> None:
     memory_thread.start()
     
     # Set Data object's path and create output directories
-    data.set_path(base, target)
+    data.set_path(data.YR_CAL_BASE, target)
 
     # Run the simulation up to `year` sequentially.
     if settings.MODE == 'timeseries':
         if len(data.D_CY.shape) != 2:
             raise ValueError( "Demands need to be a time series array of shape (years, commodities) and years > 0." )
-        if target - base > data.D_CY.shape[0]:
+        if target - data.YR_CAL_BASE > data.D_CY.shape[0]:
             raise ValueError( "Not enough years in demands time series.")
 
-        steps = target - base
-        solve_timeseries(data, steps, base, target)
+        steps = target - data.YR_CAL_BASE
+        solve_timeseries(data, steps, data.YR_CAL_BASE, target)
 
     elif settings.MODE == 'snapshot':
         # If demands is a time series, choose the appropriate entry.
-        solve_snapshot(data, base, target)
+        solve_snapshot(data, data.YR_CAL_BASE, target)
 
     else:
         raise ValueError(f"Unkown MODE: {settings.MODE}.")
