@@ -45,14 +45,14 @@ timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
 
 @tools.LogToFile(f"{settings.OUTPUT_DIR}/run_{timestamp}")
-def load_data() -> Data:
+def load_data(base_year: int | None = None) -> Data:
     """
     Load the Data object containing all required data to run a LUTO simulation.
     """
     memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
     memory_thread.start()
     
-    return Data(timestamp=timestamp)
+    return Data(timestamp=timestamp, base_year=base_year)
 
 @tools.LogToFile(f"{settings.OUTPUT_DIR}/run_{timestamp}", 'a')
 def run( data: Data, base: int, target: int) -> None:
@@ -148,6 +148,9 @@ def solve_timeseries(data: Data, steps: int, base: int, target: int):
 
 
 def solve_snapshot(data: Data, base: int, target: int):
+    if base < 2010 or base >= target:
+        raise ValueError("Base year must be >= 2010 and less than the target year.")
+
     if len(data.D_CY.shape) == 2:
         d_c = data.D_CY[ target - data.YR_CAL_BASE ]       # Demands needs to be a timeseries from 2010 to target year
     else:

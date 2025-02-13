@@ -112,10 +112,10 @@ class Data:
     Contains all data required for the LUTO model to run. Loads all data upon initialisation.
     """
 
-    def __init__(self, timestamp: str) -> None:
+    def __init__(self, timestamp: str, base_year: int | None) -> None:
         """
         Sets up output containers (lumaps, lmmaps, etc) and loads all LUTO data, adjusted
-        for resfactor.
+        for resfactor and base year.
         """
         # Path for write module - overwrite when provided with a base and target year
         self.path = None
@@ -141,9 +141,8 @@ class Data:
         print('')
         print('Beginning data initialisation...')
 
-        self.YR_CAL_BASE = 2010  # The base year, i.e. where year index yr_idx == 0.
-
-
+        self.DATA_BASE_YR = 2010    # The base year used for lu and lm maps.
+        self.YR_CAL_BASE = base_year or self.DATA_BASE_YR  # The base year, i.e. where year index yr_idx == 0.
 
         ###############################################################
         # Masking and spatial coarse graining.
