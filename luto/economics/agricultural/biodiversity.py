@@ -206,10 +206,13 @@ def get_major_vegetation_matrices(data: Data) -> dict[int, np.ndarray]:
         v: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)
         for v in range(data.N_NVIS_CLASSES)
     }
-    for m in range(data.NLMS):
-        for j in range(data.N_AG_LUS):
-            for v in range(data.N_NVIS_CLASSES):
-                mvg_mrj[v][m, :, j] = data.NVIS_PRE_GR[v] * data.BIODIV_HABITAT_DEGRADE_LOOK_UP[j]
+    for j in range(data.N_AG_LUS):
+        for v in range(data.N_NVIS_CLASSES):
+            mvg_mrj[v][:, :, j] = (
+                data.NVIS_PRE_GR[v]
+                * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[j])
+                * data.REAL_AREA
+            )
 
     return mvg_mrj
 

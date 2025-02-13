@@ -672,6 +672,15 @@ def calc_water(
     return pd.concat([ag_df, non_ag_df, AM_df])
 
 
+def calc_major_vegetation_group_area_for_year(
+    mvg_mrj_dict: dict[int, np.ndarray], ag_l_mrj: np.ndarray
+) -> dict[int, float]:
+    prod_data = {}
+    for v, mvg_mrj in mvg_mrj_dict.items():
+        prod_data[v] = np.tensordot(mvg_mrj, ag_l_mrj, 3)
+    return prod_data
+
+
 class LogToFile:
     def __init__(self, log_path, mode:str='w'):
         self.log_path_stdout = f"{log_path}_stdout.log"

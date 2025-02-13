@@ -1158,6 +1158,12 @@ class Data:
 
         # To be computed during economic calculations
         self.NVIS_LIMITS: dict[int, np.ndarray] = {}
+
+        breakpoint()
+
+        self.NVIS_INDECES = {
+
+        }
         
 
 

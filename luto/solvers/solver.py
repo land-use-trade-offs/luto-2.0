@@ -138,9 +138,7 @@ class LutoSolver:
         self._add_demand_penalty_constraints()                          
         self._add_water_usage_limit_constraints() if settings.WATER_LIMITS == 'on' else print('  ...TURNING OFF water usage constraints ...')
         self._add_ghg_emissions_limit_constraints()                     
-        self._add_biodiversity_limit_constraints()
-        self._add_major_vegetation_group_limit_constraints()
-
+        self._add_biodiversity_constraints()
 
     def _setup_x_vars(self):
         """
@@ -689,10 +687,8 @@ class LutoSolver:
 
     def _add_biodiversity_limit_constraints(self):
         if settings.BIODIVERSTIY_TARGET_GBF_2 != "on":
-            print('  ...biodiversity constraints target-2 TURNED OFF ...')
+            print('    ...biodiversity constraints target-2 TURNED OFF ...')
             return
-
-        print('  ...biodiversity constraints...')
 
         # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSTIY_TARGET_GBF_2 != "on".
         biodiversity_limits = self._input_data.limits["biodiversity"]
@@ -737,10 +733,9 @@ class LutoSolver:
 
     def _add_major_vegetation_group_limit_constraints(self) -> None:
         if settings.BIODIVERSTIY_TARGET_GBF_3 != "on":
-            print('  ...major vegetation group constraints TURNED OFF ...')
+            print('    ...major vegetation group constraints TURNED OFF ...')
             return
         
-        print('  ...major vegetation group constraints...')
 
         v_limits, v_names = self._input_data.limits["major_vegetation_groups"]
 
@@ -770,6 +765,11 @@ class LutoSolver:
             self.major_vegetation_limit_constraints[v] = self.gurobi_model.addConstr(
                 self.major_vegetation_exprs[v] >= v_area_lb
             )
+
+    def _add_biodiversity_constraints(self) -> None:
+        print('  ...biodiversity constraints...')
+        self._add_biodiversity_limit_constraints()
+        self._add_major_vegetation_group_limit_constraints()
 
     def update_formulation(
         self,
@@ -954,7 +954,8 @@ class LutoSolver:
         if self.water_limit_constraints:
             self.gurobi_model.remove(self.water_limit_constraints)
         if self.major_vegetation_limit_constraints:
-            self.gurobi_model.remove(self.major_vegetation_limit_constraints.values())
+            for constr in self.major_vegetation_limit_constraints.values():
+                self.gurobi_model.remove(constr)
 
         self.adoption_limit_constraints = []
         self.demand_penalty_constraints = []
@@ -981,8 +982,7 @@ class LutoSolver:
         self._add_demand_penalty_constraints()                          
         self._add_water_usage_limit_constraints() if settings.WATER_LIMITS == 'on' else print('  ...TURNING OFF water constraints...')
         self._add_ghg_emissions_limit_constraints()                    
-        self._add_biodiversity_limit_constraints()                      
-        self._add_major_vegetation_group_limit_constraints()
+        self._add_biodiversity_constraints()
 
     def solve(self) -> SolverSolution:
         print("Starting solve...\n")
@@ -1135,7 +1135,7 @@ class LutoSolver:
                 if am_var_val >= settings.AGRICULTURAL_MANAGEMENT_USE_THRESHOLD:
                     ammaps[am][r] = 1
 
-        # # Process production amount for each commodity
+        # Process production amount for each commodity
         prod_data["Production"] = [self.total_q_exprs_c[c].getValue() for c in range(self.ncms)]
         if self.ghg_emissions_expr:
             prod_data["GHG Emissions"] = self.ghg_emissions_expr.getValue()
@@ -1143,7 +1143,7 @@ class LutoSolver:
             prod_data["Biodiversity"] = self.biodiversity_expr.getValue()
         if self.major_vegetation_exprs:
             prod_data["Major Vegetation Groups"] = {
-                v: expr.getValue() / self._input_data.ncells  # Divide by cells to get the proportion of the country
+                v: expr.getValue()
                 for v, expr in self.major_vegetation_exprs.items()
             }
 
