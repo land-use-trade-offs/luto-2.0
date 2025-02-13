@@ -771,6 +771,8 @@ def write_area_transition_start_end(data: Data, path):
 def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     """Write out land-use and production data"""
 
+    print(f'Writing area transition outputs for {yr_cal}')
+
     simulated_year_list = sorted(list(data.lumaps.keys()))
     yr_idx_sim = simulated_year_list.index(yr_cal)
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
