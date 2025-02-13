@@ -1145,7 +1145,7 @@ def write_major_vegetation_groups(data: Data, yr_cal: int, path) -> None:
 
     if yr_cal == data.YR_CAL_BASE:
         mvg_mrj_dict = ag_biodiversity.get_major_vegetation_matrices(data)
-        mvg_prod_data = tools.calc_major_vegetation_group_area_for_year(
+        mvg_prod_data = tools.calc_major_vegetation_group_ag_area_for_year(
             mvg_mrj_dict, data.AG_L_MRJ
         )
     else:

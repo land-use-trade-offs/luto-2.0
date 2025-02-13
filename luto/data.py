@@ -1088,6 +1088,11 @@ class Data:
         else:
             raise ValueError(f"Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
 
+        # Round degradation figures to avoid numerical issues in Gurobi
+        self.BIODIV_HABITAT_DEGRADE_LOOK_UP = {
+            j: round(x, settings.ROUND_DECMIALS) 
+            for j, x in self.BIODIV_HABITAT_DEGRADE_LOOK_UP.items()
+        }
 
         # Get the biodiversity degradation score (0-1) for each cell
         '''
@@ -1159,10 +1164,10 @@ class Data:
         # To be computed during economic calculations
         self.NVIS_LIMITS: dict[int, np.ndarray] = {}
 
-        breakpoint()
-
+        # Container storing which cells apply to each major vegetation group
         self.NVIS_INDECES = {
-
+            v: np.where(self.NVIS_PRE_GR[v] > 0)[0]
+            for v in range(self.NVIS_PRE_GR.shape[0])
         }
         
 

@@ -225,7 +225,10 @@ def get_major_vegetation_group_limits(data: Data, yr_cal: int) -> tuple[np.ndarr
     - np.ndarray
         An array containing the limits of each NVIS class for the given yr_cal
     - dict[int, str]
-        A dictionary mapping of vegetation group ID to name
+        A dictionary mapping of vegetation group index to name
+    - dict[int, np.ndarray]
+        A dictionary mapping of each vegetation group index to the cells
+        that the group applies to.
     """
 
     if not data.NVIS_LIMITS:
@@ -258,4 +261,4 @@ def get_major_vegetation_group_limits(data: Data, yr_cal: int) -> tuple[np.ndarr
     else:
         limits = data.NVIS_LIMITS[yr_cal]
 
-    return limits, data.NVIS_ID2DESC
+    return limits, data.NVIS_ID2DESC, data.NVIS_INDECES

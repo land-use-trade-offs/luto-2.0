@@ -327,11 +327,13 @@ def get_non_ag_lb_rk(data: Data, base_year):
     return output
 
 
-def get_non_ag_mvg_rk(data: Data):
+def get_non_ag_mvg_rk(data: Data, ag_mvg_mrj: dict[int, np.ndarray], base_year: int):
     if settings.BIODIVERSTIY_TARGET_GBF_3 != "on":
-        return np.empty(0)
+        return {}
     print('Getting non-agricultural major vegetation groups matrices...', flush = True)
-    output = non_ag_biodiversity.get_major_vegetation_matrices(data)
+    output = non_ag_biodiversity.get_major_vegetation_matrices(
+        data, ag_mvg_mrj, data.lumaps[base_year],
+    )
     return output
 
 
@@ -341,25 +343,25 @@ def get_ag_man_c_mrj(data: Data, target_index, ag_c_mrj: np.ndarray):
     return output
 
 
-def get_ag_man_g_mrj(data: Data, target_index, ag_g_mrj):
+def get_ag_man_g_mrj(data: Data, target_index, ag_g_mrj: np.ndarray):
     print('Getting agricultural management options\' GHG emission effects...', flush = True)
     output = ag_ghg.get_agricultural_management_ghg_matrices(data, ag_g_mrj, target_index)
     return output
 
 
-def get_ag_man_q_mrj(data: Data, target_index, ag_q_mrp):
+def get_ag_man_q_mrj(data: Data, target_index, ag_q_mrp: np.ndarray):
     print('Getting agricultural management options\' quantity effects...', flush = True)
     output = ag_quantity.get_agricultural_management_quantity_matrices(data, ag_q_mrp, target_index)
     return output
 
 
-def get_ag_man_r_mrj(data: Data, target_index, ag_r_mrj):
+def get_ag_man_r_mrj(data: Data, target_index, ag_r_mrj: np.ndarray):
     print('Getting agricultural management options\' revenue effects...', flush = True)
     output = ag_revenue.get_agricultural_management_revenue_matrices(data, ag_r_mrj, target_index)
     return output
 
 
-def get_ag_man_t_mrj(data: Data, target_index, ag_t_mrj):
+def get_ag_man_t_mrj(data: Data, target_index, ag_t_mrj: np.ndarray):
     print('Getting agricultural management options\' transition cost effects...', flush = True)
     output = ag_transition.get_agricultural_management_transition_matrices(data, ag_t_mrj, target_index)
     return output
@@ -371,7 +373,7 @@ def get_ag_man_w_mrj(data: Data, target_index):
     return output
 
 
-def get_ag_man_b_mrj(data: Data, target_index, ag_b_mrj):
+def get_ag_man_b_mrj(data: Data, target_index, ag_b_mrj: np.ndarray):
     print('Getting agricultural management options\' biodiversity effects...', flush = True)
     output = ag_biodiversity.get_agricultural_management_biodiversity_matrices(data, ag_b_mrj, target_index)
     return output
@@ -541,6 +543,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     ag_w_mrj = get_ag_w_mrj(data, target_index, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)     # Calculate water net yield matrices based on historical water yield layers
     ag_b_mrj = get_ag_b_mrj(data)
     ag_x_mrj = get_ag_x_mrj(data, base_year)
+    ag_mvg_mrj=get_ag_mvg_mrj(data)
 
     land_use_culling.apply_agricultural_land_use_culling(
         ag_x_mrj, ag_c_mrj, ag_t_mrj, ag_r_mrj
@@ -556,7 +559,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_x_mrj=ag_x_mrj,
         ag_q_mrp=ag_q_mrp,
         ag_ghg_t_mrj=get_ag_ghg_t_mrj(data, base_year),
-        ag_mvg_mrj=get_ag_mvg_mrj(data),
+        ag_mvg_mrj=ag_mvg_mrj,
 
         non_ag_g_rk=get_non_ag_g_rk(data, ag_g_mrj, base_year),
         non_ag_w_rk=get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR),  # Calculate non-ag water requirement matrices based on historical water yield layers
@@ -564,7 +567,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         non_ag_x_rk=get_non_ag_x_rk(data, ag_x_mrj, base_year),
         non_ag_q_crk=get_non_ag_q_crk(data, ag_q_mrp, base_year),
         non_ag_lb_rk=get_non_ag_lb_rk(data, base_year),
-        non_ag_mvg_rk=get_non_ag_mvg_rk(data),
+        non_ag_mvg_rk=get_non_ag_mvg_rk(data, ag_mvg_mrj, base_year),
         
         ag_man_g_mrj=get_ag_man_g_mrj(data, target_index, ag_g_mrj),
         ag_man_q_mrp=get_ag_man_q_mrj(data, target_index, ag_q_mrp),

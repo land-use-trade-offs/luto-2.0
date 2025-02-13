@@ -514,7 +514,7 @@ LAND_USAGE_CULL_PERCENTAGE = 0.15   if CULL_MODE == 'percentage' else 'Not used'
 NON_AGRICULTURAL_LU_BASE_CODE = 100
 
 # Number of decimals to round the lower bound matrices to for non-agricultural land uses and agricultural management options.
-LB_ROUND_DECMIALS = 6
+ROUND_DECMIALS = 6
 
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)

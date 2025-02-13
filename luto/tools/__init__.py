@@ -672,7 +672,7 @@ def calc_water(
     return pd.concat([ag_df, non_ag_df, AM_df])
 
 
-def calc_major_vegetation_group_area_for_year(
+def calc_major_vegetation_group_ag_area_for_year(
     mvg_mrj_dict: dict[int, np.ndarray], ag_l_mrj: np.ndarray
 ) -> dict[int, float]:
     prod_data = {}

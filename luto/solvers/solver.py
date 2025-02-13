@@ -737,22 +737,23 @@ class LutoSolver:
             return
         
 
-        v_limits, v_names = self._input_data.limits["major_vegetation_groups"]
+        v_limits, v_names, v_ind = self._input_data.limits["major_vegetation_groups"]
 
         for v, v_area_lb in enumerate(v_limits):
+            ind = v_ind[v]
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.ag_mvg_mrj[v][0, :, :][:, j] * self.X_ag_dry_vars_jr[j, :]
+                    self._input_data.ag_mvg_mrj[v][0, ind, :][:, j] * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
-                    self._input_data.ag_mvg_mrj[v][1, :, :][:, j] * self.X_ag_irr_vars_jr[j, :]
+                    self._input_data.ag_mvg_mrj[v][1, ind, :][:, j] * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
                 for j in range(self._input_data.n_ag_lus)
             )
 
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.non_ag_mvg_rk[v][:, k] * self.X_non_ag_vars_kr[k, :]
+                    self._input_data.non_ag_mvg_rk[v][ind, k] * self.X_non_ag_vars_kr[k, ind]
                 )  # Non-agricultural contribution
                 for k in range(self._input_data.n_non_ag_lus)
             )

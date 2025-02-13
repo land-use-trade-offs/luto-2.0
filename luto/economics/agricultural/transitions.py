@@ -348,8 +348,8 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> D
 
     return {
         am: np.divide(
-            np.floor(data.ag_man_dvars[base_year][am].astype(np.float32) * 10 ** settings.LB_ROUND_DECMIALS)
-            , 10 ** settings.LB_ROUND_DECMIALS
+            np.floor(data.ag_man_dvars[base_year][am].astype(np.float32) * 10 ** settings.ROUND_DECMIALS)
+            , 10 ** settings.ROUND_DECMIALS
         )
         for am in AG_MANAGEMENTS_TO_LAND_USES
     }
