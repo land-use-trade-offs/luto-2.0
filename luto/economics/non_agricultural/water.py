@@ -294,33 +294,33 @@ def get_w_net_yield_matrix(
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
 
-    non_agr_wreq_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}
+    non_agr_yield_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     if NON_AG_LAND_USES['Environmental Plantings']:
-        non_agr_wreq_matrices['Environmental Plantings'] = get_w_net_yield_matrix_env_planting(data, yr_idx, water_dr_yield, water_sr_yield).reshape((data.NCELLS, 1))
+        non_agr_yield_matrices['Environmental Plantings'] = get_w_net_yield_matrix_env_planting(data, yr_idx, water_dr_yield, water_sr_yield).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['Riparian Plantings']:
-        non_agr_wreq_matrices['Riparian Plantings'] = get_w_net_yield_matrix_rip_planting(data, yr_idx, water_dr_yield).reshape((data.NCELLS, 1))
+        non_agr_yield_matrices['Riparian Plantings'] = get_w_net_yield_matrix_rip_planting(data, yr_idx, water_dr_yield).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['Sheep Agroforestry']:
-        non_agr_wreq_matrices['Sheep Agroforestry'] = get_wreq_sheep_agroforestry(data, ag_w_mrj, agroforestry_x_r, yr_idx, water_dr_yield, water_sr_yield).reshape((data.NCELLS, 1))
+        non_agr_yield_matrices['Sheep Agroforestry'] = get_wreq_sheep_agroforestry(data, ag_w_mrj, agroforestry_x_r, yr_idx, water_dr_yield, water_sr_yield).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['Beef Agroforestry']:
-        non_agr_wreq_matrices['Beef Agroforestry'] = get_wreq_beef_agroforestry(data, ag_w_mrj, agroforestry_x_r, yr_idx, water_dr_yield, water_sr_yield).reshape((data.NCELLS, 1))
+        non_agr_yield_matrices['Beef Agroforestry'] = get_wreq_beef_agroforestry(data, ag_w_mrj, agroforestry_x_r, yr_idx, water_dr_yield, water_sr_yield).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['Carbon Plantings (Block)']:
-        non_agr_wreq_matrices['Carbon Plantings (Block)'] = get_w_net_yield_matrix_carbon_plantings_block(data, yr_idx, water_dr_yield).reshape((data.NCELLS, 1))
+        non_agr_yield_matrices['Carbon Plantings (Block)'] = get_w_net_yield_matrix_carbon_plantings_block(data, yr_idx, water_dr_yield).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['Sheep Carbon Plantings (Belt)']:
-        non_agr_wreq_matrices['Sheep Carbon Plantings (Belt)'] = get_wreq_sheep_carbon_plantings_belt(data, ag_w_mrj, cp_belt_x_r, yr_idx, water_dr_yield).reshape((data.NCELLS, 1))
+        non_agr_yield_matrices['Sheep Carbon Plantings (Belt)'] = get_wreq_sheep_carbon_plantings_belt(data, ag_w_mrj, cp_belt_x_r, yr_idx, water_dr_yield).reshape((data.NCELLS, 1))
     
     if NON_AG_LAND_USES['Beef Carbon Plantings (Belt)']:
-        non_agr_wreq_matrices['Beef Carbon Plantings (Belt)'] = get_wreq_beef_carbon_plantings_belt(data, ag_w_mrj, cp_belt_x_r, yr_idx, water_dr_yield).reshape((data.NCELLS, 1))
+        non_agr_yield_matrices['Beef Carbon Plantings (Belt)'] = get_wreq_beef_carbon_plantings_belt(data, ag_w_mrj, cp_belt_x_r, yr_idx, water_dr_yield).reshape((data.NCELLS, 1))
 
     if NON_AG_LAND_USES['BECCS']:
-        non_agr_wreq_matrices['BECCS'] = get_wreq_matrix_beccs(data, yr_idx, water_dr_yield).reshape((data.NCELLS, 1))
+        non_agr_yield_matrices['BECCS'] = get_wreq_matrix_beccs(data, yr_idx, water_dr_yield).reshape((data.NCELLS, 1))
 
-    non_agr_wreq_matrices = list(non_agr_wreq_matrices.values())
+    non_agr_yield_matrices = list(non_agr_yield_matrices.values())
 
-    return np.concatenate(non_agr_wreq_matrices, axis=1)
+    return np.concatenate(non_agr_yield_matrices, axis=1)

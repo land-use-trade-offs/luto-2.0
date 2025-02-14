@@ -88,6 +88,9 @@ p_weight_vs_profit = (
     )
 
 
+p_weight_vs_profit.save('F:/jinzhu/TMP/SOLVE_WEIGHT_plots/03_1_p_weight_vs_profit.svg')
+
+
 p_weight_vs_GHG_deviation = (
     p9.ggplot(
         report_data_filter, 
@@ -106,12 +109,15 @@ p_weight_vs_GHG_deviation = (
     p9.ylab('GHG deviation (Mt)')
     )
 
+p_weight_vs_GHG_deviation.save('F:/jinzhu/TMP/SOLVE_WEIGHT_plots/03_2_p_weight_vs_GHG_deviation.svg')
+
 p_weight_vs_GHG_deforestation = (
     p9.ggplot(
         report_data_filter, 
         p9.aes(
             x='year', 
             y='Deforestation', 
+            lintype='BIODIV_GBF_TARGET_2_DICT',
             color='SOLVE_ECONOMY_WEIGHT', 
             # linetype='DIET_GLOB',
             group='SOLVE_ECONOMY_WEIGHT',
@@ -125,22 +131,39 @@ p_weight_vs_GHG_deforestation = (
     )
 
 
-p_weigth_vs_demand = (
-    p9.ggplot(
-        report_data_demand_filterd.query('year==2050'), 
+p_weight_vs_demand = (
+    p9.ggplot(report_data_demand_filterd) +
+    p9.geom_line(
         p9.aes(
             x='year', 
             y='deviation_%', 
-            fill='name', 
-            # group='SOLVE_ECONOMY_WEIGHT'
-        )
+            color='name',
+            linetype='BIODIV_GBF_TARGET_2_DICT',
+            size='name',
+        ),
     ) +
-    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ SOLVE_ECONOMY_WEIGHT', scales='free') +
-    p9.geom_col(position='dodge') +
+    p9.scale_color_manual(
+        values={
+            'Sheep lexp': 'blue', 
+            'Sheep meat': 'green', 
+            'Sheep wool': 'red'
+        },
+        na_value='#bcbcbc'
+    ) +
+    p9.scale_size_manual(
+        values={
+            'Sheep lexp': 1, 
+            'Sheep meat': 1, 
+            'Sheep wool': 1
+        },
+        na_value=0.5
+    ) +
+    p9.facet_grid('SOLVE_ECONOMY_WEIGHT ~ GHG_LIMITS_FIELD', scales='free') +
     p9.theme_bw() +
-    # p9.coord_cartesian(ylim=(0, 50)) +
-    p9.guides(fill=p9.guide_legend(ncol=1))
+    p9.guides(color=p9.guide_legend(ncol=1))
 )
+
+p_weight_vs_demand.save('F:/jinzhu/TMP/SOLVE_WEIGHT_plots/03_3_p_weight_vs_demand.svg')
 
 
 

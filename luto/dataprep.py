@@ -29,10 +29,8 @@ and Brett Bryan, Deakin University
 # Load libraries
 import numpy as np
 import pandas as pd
-import xarray as xr
 import shutil, os, time, h5py
 
-from glob import glob
 from joblib import Parallel, delayed
 from luto.settings import INPUT_DIR, RAW_DATA
 
@@ -58,7 +56,7 @@ def create_new_dataset():
     nlum_inpath = 'N:/Data-Master/National_Landuse_Map/'
     BECCS_inpath = 'N:/Data-Master/BECCS/From_CSIRO/20211124_as_submitted/'
     GHG_off_land_inpath = 'N:/LUF-Modelling/Food_demand_AU/au.food.demand/Inputs/Off_land_GHG_emissions'
-    bio_contributions_inpath = 'N:/Data-Master/Biodiversity/Processing_as_LUTO_input/biodiversity_contribution_Species_Occurrence_Records/data/'
+    bio_contributions_inpath = 'N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km_to_NetCDF/'
     bio_NVIS_inpath = 'N:/Data-Master/NVIS/'
     bio_HACS_inpath = 'N:/Data-Master/Habitat_condition_assessment_system/Data/Processed/'
 
@@ -124,8 +122,8 @@ def create_new_dataset():
     shutil.copyfile(luto_1D_inpath + '20240918_Bundle_BC.xlsx', outpath + '20240918_Bundle_BC.xlsx')
 
     # Copy biodiversity suitability contribution files
-    shutil.copyfile(bio_contributions_inpath + 'bio_id_map.nc', outpath + 'bio_id_map.nc')
-    shutil.copyfile(bio_contributions_inpath + 'bio_mask.nc', outpath + 'bio_mask.nc')
+    shutil.copyfile(bio_contributions_inpath + 'BIODIVERSITY_TARGET_AND_SCORES.csv', outpath + 'BIODIVERSITY_TARGET_AND_SCORES.csv')
+    
     shutil.copyfile(bio_contributions_inpath + 'bio_ssp126_Condition_group.nc', outpath + 'bio_ssp126_Condition_group.nc')
     shutil.copyfile(bio_contributions_inpath + 'bio_ssp126_EnviroSuit.nc', outpath + 'bio_ssp126_EnviroSuit.nc')
     shutil.copyfile(bio_contributions_inpath + 'bio_ssp245_Condition_group.nc', outpath + 'bio_ssp245_Condition_group.nc')
@@ -134,7 +132,6 @@ def create_new_dataset():
     shutil.copyfile(bio_contributions_inpath + 'bio_ssp370_EnviroSuit.nc', outpath + 'bio_ssp370_EnviroSuit.nc')
     shutil.copyfile(bio_contributions_inpath + 'bio_ssp585_Condition_group.nc', outpath + 'bio_ssp585_Condition_group.nc')
     shutil.copyfile(bio_contributions_inpath + 'bio_ssp585_EnviroSuit.nc', outpath + 'bio_ssp585_EnviroSuit.nc')
-    shutil.copyfile(bio_contributions_inpath + 'bio_xr_hist_sum_species.nc', outpath + 'bio_xr_hist_sum_species.nc')
     
     # Copy biodiversity HACS data from DCCEEW
     shutil.copyfile(bio_HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'HABITAT_CONDITION.csv')
@@ -622,7 +619,22 @@ def create_new_dataset():
     s['CP_BELT_AG_AVG_T_CO2_HA_YR'] = bioph.eval('CP_BELT_TREES_AVG_T_CO2_HA_YR + CP_BELT_DEBRIS_AVG_T_CO2_HA_YR')
     s['CP_BELT_BG_AVG_T_CO2_HA_YR'] = bioph['CP_BELT_SOIL_AVG_T_CO2_HA_YR']
     s.to_hdf(outpath + 'cp_belt_avg_t_co2_ha_yr.h5', key = 'cp_belt_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    
+    # Average annual carbon sequestration by Human Induced Regrowth (block plantings) and save to file
+    s = pd.DataFrame(columns=['HIR_BLOCK_AG_AVG_T_CO2_HA_YR', 'HIR_BLOCK_BG_AVG_T_CO2_HA_YR'])
+    s['HIR_BLOCK_AG_AVG_T_CO2_HA_YR'] = bioph.eval('HIR_BLOCK_TREES_AVG_T_CO2_HA_YR + HIR_BLOCK_DEBRIS_AVG_T_CO2_HA_YR')
+    s['HIR_BLOCK_BG_AVG_T_CO2_HA_YR'] = bioph['HIR_BLOCK_SOIL_AVG_T_CO2_HA_YR']
+    s.to_hdf(outpath + 'hir_block_avg_t_co2_ha_yr.h5', key = 'hir_block_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    
+    # Average annual carbon sequestration by Human Induced Regrowth (riparian plantings) and save to file
+    s = pd.DataFrame(columns=['HIR_RIP_AG_AVG_T_CO2_HA_YR', 'HIR_RIP_BG_AVG_T_CO2_HA_YR'])
+    s['HIR_RIP_AG_AVG_T_CO2_HA_YR'] = bioph.eval('HIR_RIP_TREES_AVG_T_CO2_HA_YR + HIR_RIP_DEBRIS_AVG_T_CO2_HA_YR')
+    s['HIR_RIP_BG_AVG_T_CO2_HA_YR'] = bioph['HIR_RIP_SOIL_AVG_T_CO2_HA_YR']
+    s.to_hdf(outpath + 'hir_rip_avg_t_co2_ha_yr.h5', key = 'hir_rip_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
+    # MASK for Human Induced Regrowth (riparian plantings) and save to file
+    hir_mask = bioph['AVG_AN_PREC_MM_YR'] <= 300
+    np.save(outpath + 'hir_mask.npy', hir_mask.values)  # shape: (6956407,)
 
     # Fire risk low, medium, and high and save to file
     s = bioph[['FD_RISK_PERC_5TH', 'FD_RISK_MEDIAN', 'FD_RISK_PERC_95TH']].copy()
