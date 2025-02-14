@@ -1,18 +1,23 @@
-# Copyright 2022 Fjalar J. de Haan and Brett A. Bryan at Deakin University
+# Copyright 2025 Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., 
+# van Schoten, N., Hadjikakou, M., Sanson, J.,  Zyngier, R., Marcos-Martinez, R.,  
+# Navarro, J.,  Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., 
+# Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.
 #
-# This file is part of LUTO 2.0.
+# This file is part of LUTO2 - Version 2 of the Australian Land-Use Trade-Offs model
 #
-# LUTO 2.0 is free software: you can redistribute it and/or modify it under the
+# LUTO2 is free software: you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
 #
-# LUTO 2.0 is distributed in the hope that it will be useful, but WITHOUT ANY
+# LUTO2 is distributed in the hope that it will be useful, but WITHOUT ANY
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 # A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License along with
-# LUTO 2.0. If not, see <https://www.gnu.org/licenses/>.
+# LUTO2. If not, see <https://www.gnu.org/licenses/>.
+
+
 
 """
 Writes model output and statistics to files.
@@ -61,8 +66,6 @@ from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_html import data2html
 from luto.tools.report.create_static_maps import TIF2MAP
-
-from luto.tools.xarray_tools import calc_bio_hist_sum, calc_bio_score_species, interp_bio_species_to_shards, calc_bio_score_by_yr
         
 
 timestamp_write = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
@@ -1105,33 +1108,18 @@ def write_biodiversity_contribution(data: Data, yr_cal, path):
 
     print(f'Writing biodiversity contribution score for {yr_cal}')
 
-    # Get the decision variables for the year and convert them to xarray
-    ag_dvar_reprj_to_bio = data.ag_dvars_2D_reproj_match[yr_cal]
-    am_dvar_reprj_to_bio = data.ag_man_dvars_2D_reproj_match[yr_cal]
-    non_ag_dvar_reprj_to_bio = data.non_ag_dvars_2D_reproj_match[yr_cal]
 
     # Calculate the biodiversity contribution scores
     if settings.BIO_CALC_LEVEL == 'group':
-        bio_score_group = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_Condition_group.nc', chunks='auto')
-        bio_score_all_species_mean = bio_score_group.mean('group').expand_dims({'group': ['all_species']})  # Calculate the mean score of all species
-        bio_score_group = xr.combine_by_coords([bio_score_group, bio_score_all_species_mean])['data']       # Combine the mean score with the original score
-        bio_contribution_shards = [bio_score_group.sel(year=yr_cal, group=group) for group in bio_score_group['group'].values]
+        pass
     elif settings.BIO_CALC_LEVEL == 'species':
-        bio_raw_path = f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_EnviroSuit.nc'
-        bio_his_score_sum = calc_bio_hist_sum(bio_raw_path)
-        bio_contribution_species = calc_bio_score_species(bio_raw_path, bio_his_score_sum)
-        bio_contribution_shards = interp_bio_species_to_shards(bio_contribution_species, yr_cal)
+        pass
     else:
         raise ValueError('Invalid settings.BIO_CALC_LEVEL! Must be either "group" or "species".')
 
-    # Write the biodiversity contribution to csv
-    bio_df = calc_bio_score_by_yr(
-        ag_dvar_reprj_to_bio,
-        am_dvar_reprj_to_bio,
-        non_ag_dvar_reprj_to_bio,
-        bio_contribution_shards)
-
-    bio_df.to_csv(os.path.join(path, f'biodiversity_contribution_{yr_cal}.csv'), index=False)
+    # # Write the biodiversity contribution to csv
+    # bio_df = None
+    # bio_df.to_csv(os.path.join(path, f'biodiversity_contribution_{yr_cal}.csv'), index=False)
 
 
 

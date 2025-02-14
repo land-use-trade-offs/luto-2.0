@@ -1,18 +1,23 @@
-# Copyright 2022 Fjalar J. de Haan and Brett A. Bryan at Deakin University
+# Copyright 2025 Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., 
+# van Schoten, N., Hadjikakou, M., Sanson, J.,  Zyngier, R., Marcos-Martinez, R.,  
+# Navarro, J.,  Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., 
+# Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.
 #
-# This file is part of LUTO 2.0.
+# This file is part of LUTO2 - Version 2 of the Australian Land-Use Trade-Offs model
 #
-# LUTO 2.0 is free software: you can redistribute it and/or modify it under the
+# LUTO2 is free software: you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
 #
-# LUTO 2.0 is distributed in the hope that it will be useful, but WITHOUT ANY
+# LUTO2 is distributed in the hope that it will be useful, but WITHOUT ANY
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 # A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License along with
-# LUTO 2.0. If not, see <https://www.gnu.org/licenses/>.
+# LUTO2. If not, see <https://www.gnu.org/licenses/>.
+
+
 
 """
 Provides minimalist Solver class and pure helper functions.
@@ -225,9 +230,10 @@ class LutoSolver:
 
     def _setup_deviation_penalties(self):
         """
-        Decision variables, V and E, for soft constraints.
-        1) [V] Penalty vector for demand, each one conrespondes a commodity, that minimises the deviations from demand.
+        Decision variables, V, E and W, for soft constraints.
+        1) [V] Penalty vector for demand, each one corespondes a commodity, that minimises the deviations from demand.
         2) [E] A single penalty scalar for GHG emissions, minimises its deviation from the target.
+        3) [W] Penalty vector for water usage, each one corespondes a region, that minimises the deviations from the target.
         """
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             self.V = self.gurobi_model.addMVar(self.ncms, name="V")
@@ -276,21 +282,21 @@ class LutoSolver:
         
         # Get the objective values for each sector
         self.obj_economy = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr
+        self.obj_ghg = self.E * self._input_data.economic_target_yr_carbon_price                                        if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
+        self.obj_water = self.W.sum() * settings.WATER_PENALTY                                                          if settings.WATER_CONSTRAINT_TYPE == "soft" else 0
+        self.obj_demand = gp.quicksum(v * price for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices))  if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
 
-        if settings.DEMAND_CONSTRAINT_TYPE == "soft":
-            self.obj_demand = gp.quicksum(v * price for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices))
-        else:
-            self.obj_demand = 0
-        
-        self.obj_ghg = self.E * self._input_data.economic_target_yr_carbon_price    if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
-        self.obj_water = self.W.sum() * settings.WATER_PENALTY                      if settings.WATER_CONSTRAINT_TYPE == "soft" else 0
 
         # Set the objective function
-        sense = GRB.MINIMIZE if settings.OBJECTIVE == "mincost" else GRB.MAXIMIZE
+        if settings.OBJECTIVE == "mincost":
+            sense = GRB.MINIMIZE
+            objective = self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT + (self.obj_demand +  self.obj_ghg + self.obj_water) * (1 - settings.SOLVE_ECONOMY_WEIGHT)
+        elif settings.OBJECTIVE == "maxprofit":
+            sense = GRB.MAXIMIZE
+            objective = self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT - (self.obj_demand +  self.obj_ghg + self.obj_water) * (1 - settings.SOLVE_ECONOMY_WEIGHT)
+        else:
+            raise ValueError(f"Unknown objective function: {settings.OBJECTIVE}")
         
-        objective = self.obj_economy *  settings.SOLVE_ECONOMY_WEIGHT \
-            - (self.obj_demand +  self.obj_ghg + self.obj_water) * (1 - settings.SOLVE_ECONOMY_WEIGHT)
-                 
         self.gurobi_model.setObjective(objective, sense)
         
         

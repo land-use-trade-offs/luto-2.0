@@ -1,7 +1,25 @@
+# Copyright 2025 Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., 
+# van Schoten, N., Hadjikakou, M., Sanson, J.,  Zyngier, R., Marcos-Martinez, R.,  
+# Navarro, J.,  Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., 
+# Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.
+#
+# This file is part of LUTO2 - Version 2 of the Australian Land-Use Trade-Offs model
+#
+# LUTO2 is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# LUTO2 is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+# A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# LUTO2. If not, see <https://www.gnu.org/licenses/>.
+
 import os
 import json
 import re
-import itertools
 import shutil
 import pandas as pd
 import numpy as np
@@ -231,6 +249,12 @@ def save_report_data(raw_data_dir:str):
     
     # Get the demand data
     DEMAND_DATA_long = get_demand_df()
+    
+    # Rename the commodities index for Beef and Sheep live export
+    DEMAND_DATA_long.index = DEMAND_DATA_long.index.set_levels(
+        DEMAND_DATA_long.index.levels[1].str.replace('Beef lexp', 'Beef live export').str.replace('Sheep lexp', 'Sheep live export'),
+        level=1
+    )
 
     # Reorder the columns to match the order in COMMODITIES_ALL
     DEMAND_DATA_long = DEMAND_DATA_long.reindex(COMMODITIES_ALL, level=1).reset_index()
@@ -243,7 +267,6 @@ def save_report_data(raw_data_dir:str):
     # Convert quanlity to million tonnes
     DEMAND_DATA_long['Quantity (tonnes, ML)'] = DEMAND_DATA_long['Quantity (tonnes, ML)'] / 1e6
     DEMAND_DATA_long = DEMAND_DATA_long.query('Year.isin(@years)')
-    DEMAND_DATA_long.loc[:,'COMMODITY'] = DEMAND_DATA_long['COMMODITY'].str.replace('Beef lexp','Beef live export')
     DEMAND_DATA_long_filter_year = DEMAND_DATA_long.query(f'Year.isin({years_select})')
 
     # Plot_2_1: {Total} for 'Domestic', 'Exports', 'Feed', 'Imports', 'Production'(Tonnes) 
@@ -347,7 +370,7 @@ def save_report_data(raw_data_dir:str):
         
         
 
-    # Plot_2-5_(1-4): Commodities for 'Exports','Feed','Imports','Production' (Million Tonnes)
+    # Plot_2-5_(2-5): Commodities for 'Exports','Feed','Imports','Production' (Million Tonnes)
     for idx,Type in enumerate(DEMAND_DATA_long['Type'].unique()):
         if Type == 'Domestic':
             continue
@@ -371,7 +394,7 @@ def save_report_data(raw_data_dir:str):
     # Plot_2-5-6: Production (LUTO outputs, Million Tonnes)
     quantity_csv_paths = files.query('category == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)
     quantity_df = get_quantity_df(quantity_csv_paths)
-    quantity_df['Commodity'] = quantity_df['Commodity'].str.replace('Beef lexp','Beef live export')
+    quantity_df = quantity_df.replace({'Sheep lexp': 'Sheep live export', 'Beef lexp': 'Beef live export'})
     
     quantity_df_wide = quantity_df\
         .groupby(['Commodity'])[['Year','Prod_targ_year (tonnes, ML)']]\
@@ -388,8 +411,36 @@ def save_report_data(raw_data_dir:str):
     quantity_df_wide.to_json(f'{SAVE_DIR}/production_5_6_demand_Production_commodity_from_LUTO.json', orient='records')
     
     
-    # Plot_2-7: Difference between demand and production in percentage (%)
-    files.query('category == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)
+    # Plot_2-7: Demand achievement in the final target year (%)
+    quantify_diff = files.query('category == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)
+    quantify_diff = pd.concat([pd.read_csv(path) for path in quantify_diff['path']], ignore_index=True)
+    
+    quantify_diff = quantify_diff.replace({'Sheep lexp': 'Sheep live export', 'Beef lexp': 'Beef live export'})
+    quantify_diff = quantify_diff[['Year','Commodity','Prop_diff (%)']].rename(columns={'Prop_diff (%)': 'Demand Achievement (%)'})
+    
+    # Add a fake data as placeholder for the year 2010
+    quantify_diff_fake = quantify_diff.copy()
+    quantify_diff_fake['Year'] = 2010
+    quantify_diff_fake['Demand Achievement (%)'] = 100
+    quantify_diff = pd.concat([quantify_diff, quantify_diff_fake],ignore_index=True)
+    
+    quantify_diff_wide = quantify_diff\
+        .groupby(['Commodity'])[['Year','Demand Achievement (%)']]\
+        .apply(lambda x: list(map(list,zip(x['Year'],x['Demand Achievement (%)']))))\
+        .reset_index()
+        
+    quantify_diff_wide.columns = ['name','data']
+    quantify_diff_wide['type'] = 'spline'
+    quantify_diff_wide['showInLegend'] = True
+    
+    quantify_diff_wide = quantify_diff_wide.set_index('name').reindex(COMMODITIES_ALL).reset_index()
+    quantify_diff_wide = quantify_diff_wide.dropna()
+    
+    # Add a row without any data but type as column
+    quantify_diff_wide.loc[len(quantify_diff_wide)] = ['',[[i,np.nan] for i in years],'column', False]
+    
+    
+    quantify_diff_wide.to_json(f'{SAVE_DIR}/production_6_demand_achievement_commodity.json', orient='records')
 
 
 
@@ -1246,7 +1297,6 @@ def save_report_data(raw_data_dir:str):
         
     water_inside_LUTO_specific_lu_sum_wide.columns = ['name','data']
     water_inside_LUTO_specific_lu_sum_wide['type'] = 'column'
-    water_inside_LUTO_specific_lu_sum_wide.loc[len(water_inside_LUTO_specific_lu_sum_wide)] = [None, [[2010, None], [2011, None]], 'spline']
     water_inside_LUTO_specific_lu_sum_wide.to_json(f'{SAVE_DIR}/water_2_water_net_yield_by_specific_landuse.json', orient='records')
     
     
