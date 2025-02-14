@@ -1368,14 +1368,16 @@ class Data:
     
     
     def get_bio_GBF4A_target_by_yr(self, yr: int):
+        target_pct = []
         for tgt in self.BIO_GBF4A_TARGET_PCT:
             f = interp1d(
                 [2010, 2030, 2050],
-                [0] + list(tgt),
+                [0, tgt[0], max(tgt)],
                 kind = "linear",
                 fill_value = "extrapolate",
             )
-        return self.BIO_GBF4A_SCORE_BASE * f(yr)
+            target_pct.append(f(yr))
+        return self.BIO_GBF4A_SCORE_BASE * np.array(target_pct)
 
 
     # Convert dvar to its 2D representation
