@@ -1,18 +1,23 @@
-# Copyright 2022 Fjalar J. de Haan and Brett A. Bryan at Deakin University
+# Copyright 2025 Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., 
+# van Schoten, N., Hadjikakou, M., Sanson, J.,  Zyngier, R., Marcos-Martinez, R.,  
+# Navarro, J.,  Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., 
+# Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.
 #
-# This file is part of LUTO 2.0.
+# This file is part of LUTO2 - Version 2 of the Australian Land-Use Trade-Offs model
 #
-# LUTO 2.0 is free software: you can redistribute it and/or modify it under the
+# LUTO2 is free software: you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
 #
-# LUTO 2.0 is distributed in the hope that it will be useful, but WITHOUT ANY
+# LUTO2 is distributed in the hope that it will be useful, but WITHOUT ANY
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 # A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License along with
-# LUTO 2.0. If not, see <https://www.gnu.org/licenses/>.
+# LUTO2. If not, see <https://www.gnu.org/licenses/>.
+
+
 
 """ LUTO model settings. """
 
@@ -109,8 +114,8 @@ MODE = 'snapshot'   # Runs for target year only
 # MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
-OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
-# OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
+# OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
+OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
 # Specify how demand for agricultural commodity production should be met in the solver
 # DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
@@ -480,6 +485,8 @@ BIODIVERSTIY_TARGET_GBF_3  = 'on'           # 'on' or 'off'.
     protect and manage 30% of the world's land, water, and coastal areas by 2030.
 '''
 
+BIODIVERSITY_GBF_3_TARGET_YEAR = 2030
+
 NVIS_SPATIAL_DETAIL = 'HIGH'                 # 'LOW' or 'HIGH'
 '''
 - If 'LOW' is selected, the primary group layers will be used to represent the vegetation type. 
@@ -517,7 +524,7 @@ LAND_USAGE_CULL_PERCENTAGE = 0.15   if CULL_MODE == 'percentage' else 'Not used'
 NON_AGRICULTURAL_LU_BASE_CODE = 100
 
 # Number of decimals to round the lower bound matrices to for non-agricultural land uses and agricultural management options.
-LB_ROUND_DECMIALS = 6
+ROUND_DECMIALS = 6
 
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)

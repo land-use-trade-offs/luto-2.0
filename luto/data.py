@@ -1,18 +1,23 @@
-# Copyright 2022 Fjalar J. de Haan and Brett A. Bryan at Deakin University
+# Copyright 2025 Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., 
+# van Schoten, N., Hadjikakou, M., Sanson, J.,  Zyngier, R., Marcos-Martinez, R.,  
+# Navarro, J.,  Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., 
+# Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.
 #
-# This file is part of LUTO 2.0.
+# This file is part of LUTO2 - Version 2 of the Australian Land-Use Trade-Offs model
 #
-# LUTO 2.0 is free software: you can redistribute it and/or modify it under the
+# LUTO2 is free software: you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
 #
-# LUTO 2.0 is distributed in the hope that it will be useful, but WITHOUT ANY
+# LUTO2 is distributed in the hope that it will be useful, but WITHOUT ANY
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 # A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License along with
-# LUTO 2.0. If not, see <https://www.gnu.org/licenses/>.
+# LUTO2. If not, see <https://www.gnu.org/licenses/>.
+
+
 
 
 import os
@@ -35,7 +40,7 @@ from typing import Any, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.settings import INPUT_DIR, NON_AG_LAND_USES_REVERSIBLE, NVIS_CLASS_DETAIL , NVIS_SPATIAL_DETAIL, OUTPUT_DIR
+from luto.settings import INPUT_DIR, NVIS_CLASS_DETAIL , NVIS_SPATIAL_DETAIL, OUTPUT_DIR
 from luto.tools.spatializers import upsample_array
 
 
@@ -133,11 +138,6 @@ class Data:
         self.prod_data = {}
         self.obj_vals = {}
 
-        # Containers for reprojected dvar data
-        self.ag_dvars_2D_reproj_match = {}
-        self.non_ag_dvars_2D_reproj_match = {}
-        self.ag_man_dvars_2D_reproj_match = {}
-
         print('')
         print('Beginning data initialisation...')
 
@@ -203,16 +203,6 @@ class Data:
 
         else:
             raise KeyError("Resfactor setting invalid")
-
-
-
-        ###############################################################
-        # Load Xarray reference data.
-        ###############################################################
-        print("\tLoading reference Xarray for reproject decision variables...", flush=True)
-        self.REPROJECT_TARGET_ID_MAP = xr.load_dataset(f'{settings.INPUT_DIR}/bio_id_map.nc')['data'].compute()
-        self.REPROJECT_REFERENCE_MAP = xr.load_dataset(f'{settings.INPUT_DIR}/bio_mask.nc')['data'].compute()
-
 
 
         ###############################################################
@@ -624,12 +614,6 @@ class Data:
         self.RP_FENCING_LENGTH = self.get_array_resfactor_applied(
             ((2 * settings.RIPARIAN_PLANTING_TORTUOSITY_FACTOR * self.STREAM_LENGTH) / self.REAL_AREA_NO_RESFACTOR).astype(np.float32)
         )
-
-
-        # Initial reprojected dvars data (2D xarray, ).
-        self.add_ag_dvars_xr(self.YR_CAL_BASE, self.AG_L_MRJ)
-        self.add_am_dvars_xr(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
-        self.add_non_ag_dvars_xr(self.YR_CAL_BASE, self.NON_AG_L_RK)
 
 
         ###############################################################
@@ -1081,6 +1065,11 @@ class Data:
         else:
             raise ValueError(f"Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
 
+        # Round degradation figures to avoid numerical issues in Gurobi
+        self.BIODIV_HABITAT_DEGRADE_LOOK_UP = {
+            j: round(x, settings.ROUND_DECMIALS) 
+            for j, x in self.BIODIV_HABITAT_DEGRADE_LOOK_UP.items()
+        }
 
         # Get the biodiversity degradation score (0-1) for each cell
         '''
@@ -1138,6 +1127,7 @@ class Data:
         self.NVIS_ID2DESC = dict(enumerate(NVIS_area_and_target['group']))
         self.NVIS_TOTAL_AREA_HA = NVIS_area_and_target['TOTAL_AREA_HA'].to_numpy()
         self.NVIS_OUTSIDE_LUTO_AREA_HA = NVIS_area_and_target['OUTSIDE_LUTO_AREA_HA'].to_numpy()
+        self.N_NVIS_CLASSES = self.NVIS_TOTAL_AREA_HA.shape[0]
 
         # Read in vegetation layer data
         NVIS_pre_xr = xr.load_dataarray(INPUT_DIR + f'/NVIS_{NVIS_CLASS_DETAIL}_{NVIS_SPATIAL_DETAIL}_SPATIAL_DETAIL.nc').values
@@ -1147,6 +1137,39 @@ class Data:
             self.NVIS_PRE_GR = NVIS_pre_xr[self.MASK]
         else:
             self.NVIS_PRE_GR = NVIS_pre_xr[:, self.MASK]
+            
+            
+            
+        ###############################################################
+        # Species data.
+        ###############################################################
+        print("\tLoading Species variables...", flush=True)
+        
+        BIO_GBF4A_SPECIES_raw = xr.open_dataset(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_EnviroSuit.nc', chunks={'year':1,'species':1})['data']        
+
+        bio_GBF4A_target_score = pd.read_csv(INPUT_DIR + '/BIODIVERSITY_TARGET_AND_SCORES.csv', index_col=0, header=[0,1,2])
+        bio_GBF4A_target_score_sel = bio_GBF4A_target_score.loc[:, ('USER_DEFINED_TARGET', slice(None), slice(None))] > 0
+        bio_GBF4A_target_score_sel = bio_GBF4A_target_score_sel.values.sum(axis=1) > 0
+        bio_GBF4A_target_score_sel = bio_GBF4A_target_score[bio_GBF4A_target_score_sel].fillna(0)
+        
+        self.BIO_GBF4A_SEL_SPECIES = bio_GBF4A_target_score_sel.index.to_list()
+        self.BIO_GBF4A_TARGET_PCT = bio_GBF4A_target_score_sel['USER_DEFINED_TARGET'].to_numpy()
+        self.BIO_GBF4A_SCORE_BASE = bio_GBF4A_target_score_sel.loc[self.BIO_GBF4A_SEL_SPECIES, (f'ssp{settings.SSP}', 'all', '1990')].values
+
+        self.BIO_GBF4A_SPECIES = BIO_GBF4A_SPECIES_raw.sel(species=self.BIO_GBF4A_SEL_SPECIES).compute() / 100 # Convert suitability [1-100] to percentage [0-1]
+        self.BIO_GBF4A_GROUPS = xr.load_dataset(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_Condition_group.nc')['data']
+        
+
+        # To be computed during economic calculations
+        self.NVIS_LIMITS: dict[int, np.ndarray] = {}
+
+        # Container storing which cells apply to each major vegetation group
+        epsilon = 1e-5
+        self.NVIS_INDECES = {
+            v: np.where(self.NVIS_PRE_GR[v] > epsilon)[0]
+            for v in range(self.NVIS_PRE_GR.shape[0])
+        }
+        
 
 
         ###############################################################
@@ -1329,123 +1352,49 @@ class Data:
                 
         return lumap_resample_avg
 
-
-    # Functions to add reprojected dvars to the output containers
-    def add_ag_dvars_xr(self, yr: int, ag_dvar: np.ndarray):
-        self.ag_dvars_2D_reproj_match[yr] = self.reproj_match_ag_dvar(ag_dvar, self.REPROJECT_TARGET_ID_MAP, self.REPROJECT_REFERENCE_MAP)
-
-    def add_am_dvars_xr(self, yr: int, am_dvar: np.ndarray):
-        self.ag_man_dvars_2D_reproj_match[yr] = self.reproj_match_am_dvar(am_dvar, self.REPROJECT_TARGET_ID_MAP, self.REPROJECT_REFERENCE_MAP)
-
-    def add_non_ag_dvars_xr(self, yr: int, non_ag_dvar: np.ndarray):
-        self.non_ag_dvars_2D_reproj_match[yr] = self.reproj_match_non_ag_dvar(non_ag_dvar, self.REPROJECT_TARGET_ID_MAP, self.REPROJECT_REFERENCE_MAP)
-
-
-    # Functions to reproject and match the dvars to the target map
-    def reproj_match_ag_dvar(self, ag_dvars:np.ndarray, target_id_map:xr.DataArray, target_ref_map:xr.DataArray):
-
-        ag_dvars = self.ag_dvars_to_xr(ag_dvars)                # Convert the dvars to xarray
-
-        # Parallelize the reprojection and matching
-        def reproj_match(dvar, lm, lu):
-            dvar = self.dvar_to_2D(dvar)                        # Convert the dvar to its 2D representation
-            dvar = self.dvar_to_full_res(dvar)                  # Convert the 2D dvar to full resolution
-            dvar = self.bincount_avg(target_id_map, dvar)       # Calculate the average of the dvar values in each target id cell.
-            dvar = dvar.reshape(target_ref_map.shape)           # Reshape the dvar to match the target reference map
-            dvar = xr.DataArray(dvar, dims=('y', 'x'), coords={'y': target_ref_map['y'], 'x': target_ref_map['x']})
-            return dvar.expand_dims({'lm':[lm], 'lu':[lu]})
-
-        tasks = [delayed(reproj_match)(ag_dvars.sel(lm=lm, lu=lu), lm, lu)
-                 for lm,lu in product(self.LANDMANS, self.AGRICULTURAL_LANDUSES)]
-
-        return  xr.combine_by_coords( [i for i in Parallel(n_jobs=10, backend='threading', return_as='generator')(tasks)])
+    
+    def get_bio_GBF4A_species_by_yr(self, yr: int):
+        current_species_val = self.BIO_GBF4A_SPECIES.interp(            # Here the year interpolation is done first                      
+            year=yr,
+            method='linear', 
+            kwargs={'fill_value': 'extrapolate'}
+        ).interp(                                                       # Then the spatial interpolation and masking is done
+            x=xr.DataArray(self.COORD_LON_LAT[0], dims='cell'),
+            y=xr.DataArray(self.COORD_LON_LAT[1], dims='cell'),
+            method='linear'
+        ).drop_vars(['year']) 
+        
+        return (current_species_val * self.REAL_AREA).values
 
 
-    def reproj_match_am_dvar(self, am_dvars, target_id_map:xr.DataArray, target_ref_map:xr.DataArray):
-
-        am_dvars = self.am_dvars_to_xr(am_dvars)
-
-        # Parallelize the reprojection and matching
-        def reproj_match(dvar, am, lm, lu):
-            dvar = self.dvar_to_2D(dvar)
-            dvar = self.dvar_to_full_res(dvar)
-            dvar = self.bincount_avg(target_id_map, dvar)
-            dvar = dvar.reshape(target_ref_map.shape)
-            dvar = xr.DataArray(dvar, dims=('y', 'x'), coords={'y': target_ref_map['y'], 'x': target_ref_map['x']})
-            return dvar.expand_dims({'am':[am], 'lm':[lm], 'lu':[lu]})
-
-        # Parallelize the reprojection and matching
-        tasks = [delayed(reproj_match)(am_dvars.sel(am=am, lm=lm, lu=lu), am, lm, lu)
-                 for am,lm,lu in product(AG_MANAGEMENTS_TO_LAND_USES, self.LANDMANS, self.AGRICULTURAL_LANDUSES)]
-
-        return xr.combine_by_coords([i for i in Parallel(n_jobs=10, backend='threading', return_as='generator')(tasks)])
-
-
-
-    def reproj_match_non_ag_dvar(self, non_ag_dvars, target_id_map:xr.DataArray, target_ref_map:xr.DataArray):
-
-        non_ag_dvars = self.non_ag_dvars_to_xr(non_ag_dvars)
-
-        # Parallelize the reprojection and matching
-        def reproj_match(dvar, lu):
-            dvar = self.dvar_to_2D(dvar)
-            dvar = self.dvar_to_full_res(dvar) if settings.RESFACTOR > 1 else dvar
-            dvar = self.bincount_avg(target_id_map, dvar)
-            dvar = dvar.reshape(target_ref_map.shape)
-            dvar = xr.DataArray(dvar, dims=('y', 'x'), coords={'y': target_ref_map['y'], 'x': target_ref_map['x']})
-            return dvar.expand_dims({'lu':[lu]})
-
-        tasks = [delayed(reproj_match)(non_ag_dvars.sel(lu=lu),  lu) for lu in self.NON_AGRICULTURAL_LANDUSES]
-
-        return xr.combine_by_coords([i for i in Parallel(n_jobs=10, backend='threading', return_as='generator')(tasks)])
-
-
-    # Functions to convert dvars to xarray
-    def ag_dvars_to_xr(self, ag_dvars: np.ndarray):
-        ag_dvar_xr = xr.DataArray(
-            ag_dvars,
-            dims=('lm', 'cell', 'lu'),
-            coords={
-                'lm': self.LANDMANS,
-                'cell': np.arange(ag_dvars.shape[1]),
-                'lu': self.AGRICULTURAL_LANDUSES
-            }
-        ).reindex(lu=self.AGRICULTURAL_LANDUSES) # Reorder the dimensions to match the LUTO variable array indexing
-
-        return ag_dvar_xr
-
-
-    def am_dvars_to_xr(self, am_dvars: np.ndarray):
-        am_dvar_l = []
-        for am in am_dvars.keys():
-            am_dvar_xr = xr.DataArray(
-                am_dvars[am],
-                dims=('lm', 'cell', 'lu'),
-                coords={
-                    'lm': self.LANDMANS,
-                    'cell': np.arange(am_dvars[am].shape[1]),
-                    'lu': self.AGRICULTURAL_LANDUSES})
-
-            # Expand the am dimension, the dvar is a 4D array [am, lu, cell, lu]
-            am_dvar_xr = am_dvar_xr.expand_dims({'am':[am]})
-            am_dvar_l.append(am_dvar_xr)
-
-        return xr.combine_by_coords(am_dvar_l).reindex(
-            am=AG_MANAGEMENTS_TO_LAND_USES.keys(),
-            lu=self.AGRICULTURAL_LANDUSES,
-            lm=self.LANDMANS)   # Reorder the dimensions to match the LUTO variable array indexing
-
-
-    def non_ag_dvars_to_xr(self, non_ag_dvars: np.ndarray):
-        non_ag_dvar_xr = xr.DataArray(
-            non_ag_dvars,
-            dims=('cell', 'lu'),
-            coords={
-                'cell': np.arange(non_ag_dvars.shape[0]),
-                'lu': self.NON_AGRICULTURAL_LANDUSES})
-
-        return non_ag_dvar_xr.reindex(
-            lu=self.NON_AGRICULTURAL_LANDUSES) # Reorder the dimensions to match the LUTO variable array indexing
+    def get_bio_GBF4A_group_by_yr(self, yr: int):
+        current_group_contribution = self.BIO_GBF4A_GROUPS.interp(      # Here the year interpolation is done first
+            year=yr,
+            method='linear', 
+            kwargs={'fill_value': 'extrapolate'}
+        ).interp(                                                       # Then the spatial interpolation and masking is done
+            x=xr.DataArray(self.COORD_LON_LAT[0], dims='cell'),
+            y=xr.DataArray(self.COORD_LON_LAT[1], dims='cell'),
+            method='linear'
+        ).drop_vars(['year'])
+        # Weight the biodiversity contribution by the area of each cell, so that the biodiversity contribution score
+        # will not be affected by different RESFACTOR (i.e., cell size) values.
+        current_group_contribution = current_group_contribution  * self.REAL_AREA
+        
+        return  current_group_contribution
+    
+    
+    def get_bio_GBF4A_target_by_yr(self, yr: int):
+        target_pct = []
+        for tgt in self.BIO_GBF4A_TARGET_PCT:
+            f = interp1d(
+                [2010, 2030, 2050],
+                [0, tgt[0], max(tgt)],
+                kind = "linear",
+                fill_value = "extrapolate",
+            )
+            target_pct.append(f(yr))
+        return self.BIO_GBF4A_SCORE_BASE * np.array(target_pct)
 
 
     # Convert dvar to its 2D representation
