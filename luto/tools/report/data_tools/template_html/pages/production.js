@@ -597,5 +597,52 @@ Highcharts.setOptions({
       sourceHeight: 600,
     },
   });
+
+  // Chart:production_6_demand_achievement_commodity
+  Highcharts.chart("production_6_demand_achievement_commodity", {
+    chart: {
+      type: "spline",
+      marginRight: 380,
+    },
+    title: {
+      text: "Demand Target Achievement by Agricultural Commodity",
+    },
+    series: JSON.parse(
+      document.getElementById("production_6_demand_achievement_commodity_csv").innerHTML
+    ),
+    credits: {
+      enabled: false,
+    },
+    xAxis: {
+      tickPositions: year_ticks,
+    },
+    yAxis: {
+      title: {
+        text: "Achievement (%)",
+      },
+    },
+
+    legend: {
+      align: "right",
+      layout: "vertical",
+      x: -100,
+      verticalAlign: "middle",
+    },
+
+    tooltip: {
+      formatter: function () {
+        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+          }:</b>${this.y.toFixed(2)}<br/>`;
+      },
+    },
+
+    exporting: {
+      sourceWidth: 1200,
+      sourceHeight: 600,
+    },
+
+  });
+
+
 });
 

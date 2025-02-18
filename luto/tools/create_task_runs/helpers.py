@@ -1,4 +1,23 @@
-import os, re, time, json, shutil, psutil, itertools
+# Copyright 2025 Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., 
+# van Schoten, N., Hadjikakou, M., Sanson, J.,  Zyngier, R., Marcos-Martinez, R.,  
+# Navarro, J.,  Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., 
+# Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.
+#
+# This file is part of LUTO2 - Version 2 of the Australian Land-Use Trade-Offs model
+#
+# LUTO2 is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# LUTO2 is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+# A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# LUTO2. If not, see <https://www.gnu.org/licenses/>.
+
+import os, re, time, json, shutil, psutil, itertools, subprocess
 import pandas as pd
 
 from glob import glob
@@ -104,17 +123,20 @@ def create_grid_search_template(
         template_grid_search = pd.concat([template_grid_search, new_column.rename(f'Run_{row["run_idx"]}')], axis=1)
         
     # Save the grid search template to the root task folder
+    num_nan = template_grid_search.isna().sum().sum()
+    if num_nan > 0:
+        raise ValueError(f'{num_nan} NANs found in the template CSV! \n Check settings before proceeding!')
     template_grid_search.to_csv(f'{TASK_ROOT_DIR}/grid_search_template.csv', index=False)
 
     return template_grid_search
 
 
-def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, n_workers:int=4, waite_mins:int=3):
+def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, mode='single', n_workers:int=4, waite_mins:int=3):
     '''
     Submit the tasks to the cluster using the custom settings.\n
     Parameters:
         - custom_settings (pd.DataFrame): The custom settings DataFrame.
-        - Only works in a windows system.
+        - Only works if mode == "single".
             - python_path (str): The path to the python executable.
             - n_workers (int): The number of workers to use for parallel processing.
             - waite_mins (int): The number of minutes to wait before excuting the next task in the queue.
@@ -141,23 +163,18 @@ def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, n_worke
         # Update the settings dictionary
         custom_dict = update_settings(custom_settings[col].to_dict(), col)
         
+        # Wait for the specified time before submitting the next task
+        time.sleep(col_idx * waite_mins * 60)
+        
         # Submit the task
         create_run_folders(col)
         write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
-        
-        if os.name == 'posix':
-            submit_task(col, python_path)
-        else:
-            if col_idx < n_workers:
-                time.sleep(col_idx * waite_mins * 60)
-                submit_task(col, python_path)
-            else:
-                submit_task(col, python_path)   
+        submit_task(col, python_path, mode='single')
 
     # Submit the tasks in parallel; Using 4 threads is a safe number to submit
     # tasks in login node. Or use the specified number of cpus if not in a linux system
-    workers = min(4, len(custom_cols)) if os.name == 'posix' else n_workers
-    Parallel(n_jobs=workers)(delayed(process_col)(col_idx,col) for col_idx,col in enumerate(custom_cols))
+    workers = min(n_workers, len(custom_cols)) if os.name == 'posix' else n_workers
+    Parallel(n_jobs=workers, timeout=999999)(delayed(process_col)(col_idx, col) for col_idx, col in enumerate(custom_cols))
 
 
 def copy_folder_custom(source, destination, ignore_dirs=None):
@@ -254,28 +271,25 @@ def create_run_folders(col):
 
 
 
-def submit_task(col:str, python_path:str=None):
+def submit_task(col:str, python_path:str=None, mode='single'):
     # Copy the slurm script to the task folder
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{TASK_ROOT_DIR}/{col}/task_cmd.sh')
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/python_script.py', f'{TASK_ROOT_DIR}/{col}/python_script.py')
     
-    if os.name == 'nt': 
-        # Change the directory to the root of the project
-        os.chdir(os.path.dirname(os.path.abspath(__file__)))
-        os.chdir('../../..')
-        os.chdir(f'{TASK_ROOT_DIR}/{col}')
+    if mode == 'single': 
         # Submit the task 
-        os.system(f'{python_path} python_script.py')
+        subprocess.run([python_path, 'python_script.py'], cwd=f'{TASK_ROOT_DIR}/{col}')
         print(f'Task {col} has been submitted!')
     
     # Start the task if the os is linux
-    if os.name == 'posix':
-        # Change the directory to the root of the project
-        os.chdir(os.path.dirname(os.path.abspath(__file__)))
-        os.chdir('../../..')
-        os.chdir(f'{TASK_ROOT_DIR}/{col}')
+    elif mode == 'multiple':
         # Submit the task to the cluster
-        os.system(f'bash task_cmd.sh')
+        subprocess.run(['bash', 'task_cmd.sh'], cwd=f'{TASK_ROOT_DIR}/{col}')
+    
+    else:
+        raise ValueError('Mode must be either "single" or "multiple"!')
+    
+    return f'Task {col} has been submitted!'
 
 
 def log_memory_usage(output_dir=settings.OUTPUT_DIR, interval=1):
@@ -343,12 +357,18 @@ def process_task_root_dirs(task_root_dirs):
 
         for dir in run_dirs:
             run_idx = int(dir.split('_')[-1])
-            run_paras = grid_search_params.query(f'run_idx == {run_idx}').to_dict(orient='records')[0]
+            run_paras = grid_search_params.query(f'run_idx == {int(run_idx)}').to_dict(orient='records')[0]
+            
+            # Get the json data path
             json_path = os.path.join(task_root_dir, dir, 'DATA_REPORT', 'data')
-
             if not os.path.exists(json_path):
-                print(f"Path does not exist: {json_path}")
-                continue
+                runs = [i for i in glob(f"{task_root_dir}/{dir}/output/**") if os.path.isdir(i)]
+                if len(runs) == 0:
+                    print(f'No runs found in {dir}!')
+                    continue
+                else:
+                    json_path = os.path.join(runs[-1], 'DATA_REPORT', 'data')
+          
 
             df_profit = process_profit_data(json_path)
             df_ghg_deviation = process_GHG_deviation_data(json_path)
