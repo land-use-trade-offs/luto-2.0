@@ -372,9 +372,9 @@ def get_major_vegetation_matrices(
         v_sheep_agro_mvg = get_mvg_sheep_agroforestry(data, v, ag_mvg_mrj[v], agroforestry_x_r)
         v_beef_agro_mvg = get_mvg_beef_agroforestry(data, v, ag_mvg_mrj[v], agroforestry_x_r)
         v_cp_block_mvg = get_biodiv_carbon_plantings_block(data)
-        v_sheep_cp_belt_biodiv = get_mvg_sheep_carbon_plantings_belt(data, v, ag_mvg_mrj[v], cp_belt_x_r)
-        c_beef_cp_belt_biodiv = get_mvg_beef_carbon_plantings_belt(data, v, ag_mvg_mrj[v], cp_belt_x_r)
-        beccs_mvg = get_mvg_beccs(data, v)
+        v_sheep_cp_belt_mvg = get_mvg_sheep_carbon_plantings_belt(data, v, ag_mvg_mrj[v], cp_belt_x_r)
+        v_beef_cp_belt_mvg = get_mvg_beef_carbon_plantings_belt(data, v, ag_mvg_mrj[v], cp_belt_x_r)
+        v_beccs_mvg = get_mvg_beccs(data, v)
 
         v_mvg_matrices = [
             v_ep_mvg.reshape((data.NCELLS, 1)),
@@ -382,9 +382,9 @@ def get_major_vegetation_matrices(
             v_sheep_agro_mvg.reshape((data.NCELLS, 1)),
             v_beef_agro_mvg.reshape((data.NCELLS, 1)),
             v_cp_block_mvg.reshape((data.NCELLS, 1)),
-            v_sheep_cp_belt_biodiv.reshape((data.NCELLS, 1)),
-            c_beef_cp_belt_biodiv.reshape((data.NCELLS, 1)),
-            beccs_mvg.reshape((data.NCELLS, 1)),
+            v_sheep_cp_belt_mvg.reshape((data.NCELLS, 1)),
+            v_beef_cp_belt_mvg.reshape((data.NCELLS, 1)),
+            v_beccs_mvg.reshape((data.NCELLS, 1)),
         ]
 
         mvg_rk_dict[v] = np.concatenate(v_mvg_matrices, axis=1)
