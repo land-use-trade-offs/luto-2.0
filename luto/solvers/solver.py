@@ -29,7 +29,7 @@ import luto.settings as settings
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Any
 from gurobipy import GRB
 
 from luto import tools
@@ -65,7 +65,7 @@ class SolverSolution:
     ag_X_mrj: np.ndarray
     non_ag_X_rk: np.ndarray
     ag_man_X_mrj: dict[str, np.ndarray]
-    prod_data: dict[str, float]
+    prod_data: dict[str, Any]
     obj_val: dict[str, float]
 
 
@@ -95,6 +95,7 @@ class LutoSolver:
         self.X_ag_man_irr_vars_jr = None
         self.V = None
         self.E = None
+        self.B = None
         self.W = None
 
         # Initialise constraint lookups
@@ -109,6 +110,9 @@ class LutoSolver:
         self.ghg_emissions_reduction_soft_constraints = []
         self.biodiversity_expr = None
         self.biodiversity_limit_constraint = None
+        self.biodiversity_limit_soft_constraints = []
+        self.major_vegetation_exprs = {}
+        self.major_vegetation_limit_constraints = {}
 
 
     def formulate(self):
@@ -141,8 +145,7 @@ class LutoSolver:
         self._add_demand_penalty_constraints()                          
         self._add_water_usage_limit_constraints() if settings.WATER_LIMITS == 'on' else print('  ...TURNING OFF water usage constraints ...')
         self._add_ghg_emissions_limit_constraints()                     
-        self._add_biodiversity_limit_constraints()
-
+        self._add_biodiversity_constraints()
 
     def _setup_x_vars(self):
         """
@@ -210,6 +213,11 @@ class LutoSolver:
             for j_idx, j in enumerate(am_j_list):
                 # Create variable for all eligible cells - all lower bounds are zero
                 dry_lu_cells = self._input_data.ag_lu2cells[0, j]
+
+                # for savanna burning, remove extra ineligible cells 
+                if am_name == "savanna_burning":
+                    dry_lu_cells = np.intersect1d(dry_lu_cells, self._input_data.savanna_eligible_r)
+
                 for r in dry_lu_cells:
                     dry_x_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][0, r, j]
                     dry_var_name = f"X_ag_man_dry_{am_name}_{j}_{r}"
@@ -234,6 +242,7 @@ class LutoSolver:
         1) [V] Penalty vector for demand, each one corespondes a commodity, that minimises the deviations from demand.
         2) [E] A single penalty scalar for GHG emissions, minimises its deviation from the target.
         3) [W] Penalty vector for water usage, each one corespondes a region, that minimises the deviations from the target.
+        4) [B] A single penalty scalar for biodiversity, minimises its deviation from the target.
         """
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             self.V = self.gurobi_model.addMVar(self.ncms, name="V")
@@ -244,6 +253,9 @@ class LutoSolver:
         if settings.WATER_CONSTRAINT_TYPE == "soft":
             num_regions = len(self._input_data.limits["water"].keys())
             self.W = self.gurobi_model.addMVar(num_regions, name="W")
+
+        if settings.BIODIV_CONSTRAINT_TYPE == "soft":
+            self.B = self.gurobi_model.addVar(name="B")
 
     def _setup_objective(self):
         """
@@ -283,17 +295,19 @@ class LutoSolver:
         # Get the objective values for each sector
         self.obj_economy = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr
         self.obj_ghg = self.E * self._input_data.economic_target_yr_carbon_price                                        if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
+        self.obj_biodiv = self.B * settings.BIODIV_PENALTY                                                              if settings.BIODIV_CONSTRAINT_TYPE == "soft" else 0
         self.obj_water = self.W.sum() * settings.WATER_PENALTY                                                          if settings.WATER_CONSTRAINT_TYPE == "soft" else 0
         self.obj_demand = gp.quicksum(v * price for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices))  if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
 
 
         # Set the objective function
+        penalties = (self.obj_demand +  self.obj_ghg + self.obj_water + self.obj_biodiv)
         if settings.OBJECTIVE == "mincost":
             sense = GRB.MINIMIZE
-            objective = self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT + (self.obj_demand +  self.obj_ghg + self.obj_water) * (1 - settings.SOLVE_ECONOMY_WEIGHT)
+            objective = self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT + penalties * (1 - settings.SOLVE_ECONOMY_WEIGHT)
         elif settings.OBJECTIVE == "maxprofit":
             sense = GRB.MAXIMIZE
-            objective = self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT - (self.obj_demand +  self.obj_ghg + self.obj_water) * (1 - settings.SOLVE_ECONOMY_WEIGHT)
+            objective = self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT - penalties * (1 - settings.SOLVE_ECONOMY_WEIGHT)
         else:
             raise ValueError(f"Unknown objective function: {settings.OBJECTIVE}")
         
@@ -336,18 +350,18 @@ class LutoSolver:
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx, j in enumerate(am_j_list):
                 if cells is not None:
-                    lm0_r_vals = [r for r in cells if self._input_data.ag_x_mrj[0, r, j]]
-                    lm1_r_vals = [r for r in cells if self._input_data.ag_x_mrj[1, r, j]]
+                    lm_dry_r_vals  = [r for r in cells if self._input_data.ag_x_mrj[0, r, j]]
+                    lm_irr_r_vals  = [r for r in cells if self._input_data.ag_x_mrj[1, r, j]]
                 else:
-                    lm0_r_vals = self._input_data.ag_lu2cells[0, j]
-                    lm1_r_vals = self._input_data.ag_lu2cells[1, j]
+                    lm_dry_r_vals  = self._input_data.ag_lu2cells[0, j]
+                    lm_irr_r_vals  = self._input_data.ag_lu2cells[1, j]
 
-                for r in lm0_r_vals:
+                for r in lm_dry_r_vals :
                     constr = self.gurobi_model.addConstr(
                         self.X_ag_man_dry_vars_jr[am][j_idx, r] <= self.X_ag_dry_vars_jr[j, r]
                     )
                     self.ag_management_constraints_r[r].append(constr)
-                for r in lm1_r_vals:
+                for r in lm_irr_r_vals :
                     constr = self.gurobi_model.addConstr(
                         self.X_ag_man_irr_vars_jr[am][j_idx, r] <= self.X_ag_irr_vars_jr[j, r]
                     )
@@ -554,6 +568,13 @@ class LutoSolver:
         If `cells` is provided, only adds constraints for regions containing at least one of the
         provided cells.
         """
+
+        print(f'  ...water net yield constraints by {settings.WATER_REGION_DEF}...')
+
+        if settings.WATER_LIMITS == 'off':
+            print('  ...TURNING OFF water usage constraints ...')
+            return
+
         # Ensure water use remains below limit for each region
         for region, (reg_name, limit_hist_level, ind) in self._input_data.limits["water"].items():
             w_net_yield_region = self._get_water_net_yield_expr_for_region(ind, region)
@@ -593,7 +614,7 @@ class LutoSolver:
             
             # Bound the self.W variables to the difference between the desired and actual net yields
             leq_constr = self.gurobi_model.addConstr(w_net_yield_region - water_yield_constraint <= self.W[region_idx])
-            geq_constr = self.gurobi_model.addConstr(w_net_yield_region - water_yield_constraint >= self.W[region_idx])
+            geq_constr = self.gurobi_model.addConstr(water_yield_constraint - w_net_yield_region <= self.W[region_idx])
             self.water_limit_constraints.extend([leq_constr, geq_constr])
 
             # Report on the water yield in the region
@@ -690,16 +711,27 @@ class LutoSolver:
             raise ValueError("Unknown choice for `GHG_CONSTRAINT_TYPE` setting: must be either 'hard' or 'soft'")
 
 
-    def _add_biodiversity_limit_constraints(self):
-        if settings.BIODIVERSTIY_TARGET_GBF_2 != "on":
+    def _add_biodiversity_limit_constraints(self) -> None:
+        if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
             print('  ...biodiversity constraints target-2 TURNED OFF ...')
             return
+        
+        if settings.BIODIV_CONSTRAINT_TYPE == "hard":
+            print(f'  ...Hard biodiversity net yield constraints...')
+            self._add_hard_biodiversity_usage_limit_constraints()
 
-        print('  ...biodiversity constraints...')
+        elif settings.BIODIV_CONSTRAINT_TYPE == "soft":
+            print(f'  ...Soft biodiversity net yield constraints...')
+            self._add_soft_biodiversity_usage_limit_constraints()
 
-        # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSTIY_TARGET_GBF_2 != "on".
-        biodiversity_limits = self._input_data.limits["biodiversity"]
+        else:
+            raise ValueError(
+                f"Unknown value of BIODIV_CONSTRAINT_TYPE. "
+                f"Must be either 'hard' or 'soft'."
+            )
 
+
+    def _get_biodiversity_net_yield_expr(self) -> gp.LinExpr:
         ag_contr = gp.quicksum(
             gp.quicksum(
                 self._input_data.ag_b_mrj[0, :, :][:, j] * self.X_ag_dry_vars_jr[j, :]
@@ -730,13 +762,92 @@ class LutoSolver:
             for k in range(self._input_data.n_non_ag_lus)
         )
 
-        self.biodiversity_expr = ag_contr + ag_man_contr + non_ag_contr
+        return ag_contr + ag_man_contr + non_ag_contr
+
+
+    def _add_hard_biodiversity_usage_limit_constraints(self):
+        """
+        Adds constraints to handle biodiversity water usage limits.
+        """
+        # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSTIY_TARGET_GBF_2 != "on".
+        biodiversity_limits = self._input_data.limits["biodiversity"]
+
+        self.biodiversity_expr = self._get_biodiversity_net_yield_expr()
 
         print(f"    ...biodiversity target score: {biodiversity_limits:,.0f}")
         self.biodiversity_limit_constraint = self.gurobi_model.addConstr(
             self.biodiversity_expr >= biodiversity_limits
         )
 
+
+    def _add_soft_biodiversity_usage_limit_constraints(self) -> None:
+        self.biodiversity_expr = self._get_biodiversity_net_yield_expr()
+
+        # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSTIY_TARGET_GBF_2 != "on".
+        biodiversity_limits = self._input_data.limits["biodiversity"]
+
+        # Bound the self.W variables to the difference between the desired and actual net yields
+        leq_constr = self.gurobi_model.addConstr(self.biodiversity_expr - biodiversity_limits <= self.B)
+        geq_constr = self.gurobi_model.addConstr(biodiversity_limits - self.biodiversity_expr <= self.B)
+        self.biodiversity_limit_soft_constraints.extend([leq_constr, geq_constr])
+
+        print(f"    ...biodiversity target score: {biodiversity_limits:,.0f}")
+
+
+    def _add_major_vegetation_group_limit_constraints(self) -> None:
+        if settings.BIODIVERSTIY_TARGET_GBF_3 != "on":
+            print('    ...major vegetation group constraints TURNED OFF ...')
+            return
+        
+        v_limits, v_names, v_ind = self._input_data.limits["major_vegetation_groups"]
+
+        print(f"  ...Biodiversity GBF 3 (major vegetation groups) constraints...")
+
+        for v, v_area_lb in enumerate(v_limits):
+            ind = v_ind[v]
+            ag_contr = gp.quicksum(
+                gp.quicksum(
+                    self._input_data.ag_mvg_mrj[v][0, ind, :][:, j] * self.X_ag_dry_vars_jr[j, ind]
+                )  # Dryland agriculture contribution
+                + gp.quicksum(
+                    self._input_data.ag_mvg_mrj[v][1, ind, :][:, j] * self.X_ag_irr_vars_jr[j, ind]
+                )  # Irrigated agriculture contribution
+                for j in range(self._input_data.n_ag_lus)
+            )
+
+            ag_man_contr = gp.quicksum(
+                gp.quicksum(
+                    self._input_data.ag_man_mvg_mrj[am][v][0, ind, j_idx]
+                    * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
+                )  # Dryland alt. ag. management contributions
+                + gp.quicksum(
+                    self._input_data.ag_man_mvg_mrj[am][v][1, ind, j_idx]
+                    * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
+                )  # Irrigated alt. ag. management contributions
+                for am, am_j_list in self._input_data.am2j.items()
+                for j_idx in range(len(am_j_list))
+            )
+
+            non_ag_contr = gp.quicksum(
+                gp.quicksum(
+                    self._input_data.non_ag_mvg_rk[v][ind, k] * self.X_non_ag_vars_kr[k, ind]
+                )  # Non-agricultural contribution
+                for k in range(self._input_data.n_non_ag_lus)
+            )
+
+            outside_study_area_contr = self._input_data.mvg_contr_outside_study_area[v]
+
+            self.major_vegetation_exprs[v] = ag_contr + ag_man_contr + non_ag_contr + outside_study_area_contr
+
+            print(f"    ...vegetation class {v_names[v]} target area: {v_area_lb:,.0f}")
+            self.major_vegetation_limit_constraints[v] = self.gurobi_model.addConstr(
+                self.major_vegetation_exprs[v] >= v_area_lb
+            )
+
+    def _add_biodiversity_constraints(self) -> None:
+        print('  ...biodiversity constraints...')
+        self._add_biodiversity_limit_constraints()
+        self._add_major_vegetation_group_limit_constraints()
 
     def update_formulation(
         self,
@@ -920,10 +1031,15 @@ class LutoSolver:
             self.gurobi_model.remove(self.biodiversity_limit_constraint)
         if self.water_limit_constraints:
             self.gurobi_model.remove(self.water_limit_constraints)
+        if self.major_vegetation_limit_constraints:
+            for constr in self.major_vegetation_limit_constraints.values():
+                self.gurobi_model.remove(constr)
 
         self.adoption_limit_constraints = []
         self.demand_penalty_constraints = []
         self.water_limit_constraints = []
+        self.major_vegetation_exprs = {}
+        self.major_vegetation_limit_constraints = {}
 
         if self.ghg_emissions_limit_constraint_ub is not None:
             self.gurobi_model.remove(self.ghg_emissions_limit_constraint_ub)
@@ -944,7 +1060,7 @@ class LutoSolver:
         self._add_demand_penalty_constraints()                          
         self._add_water_usage_limit_constraints() if settings.WATER_LIMITS == 'on' else print('  ...TURNING OFF water constraints...')
         self._add_ghg_emissions_limit_constraints()                    
-        self._add_biodiversity_limit_constraints()                      
+        self._add_biodiversity_constraints()
 
     def solve(self) -> SolverSolution:
         print("Starting solve...\n")
@@ -994,9 +1110,16 @@ class LutoSolver:
         # Get agricultural management results
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx, j in enumerate(am_j_list):
-                for r in self._input_data.ag_lu2cells[0, j]:
+                eligible_dry_cells = self._input_data.ag_lu2cells[0, j]
+                eligible_irr_cells = self._input_data.ag_lu2cells[1, j]
+
+                if am == "Savanna Burning":
+                    eligible_dry_cells = np.intersect1d(eligible_dry_cells, self._input_data.savanna_eligible_r)
+                    eligible_irr_cells = np.intersect1d(eligible_irr_cells, self._input_data.savanna_eligible_r)
+
+                for r in eligible_dry_cells:
                     am_X_dry_sol_rj[am][r, j] = self.X_ag_man_dry_vars_jr[am][j_idx, r].X
-                for r in self._input_data.ag_lu2cells[1, j]:
+                for r in eligible_irr_cells:
                     am_X_irr_sol_rj[am][r, j] = self.X_ag_man_irr_vars_jr[am][j_idx, r].X
 
         """Note that output decision variables are mostly 0 or 1 but in some cases they are somewhere in between which creates issues
@@ -1097,12 +1220,17 @@ class LutoSolver:
                 if am_var_val >= settings.AGRICULTURAL_MANAGEMENT_USE_THRESHOLD:
                     ammaps[am][r] = 1
 
-        # # Process production amount for each commodity
+        # Process production amount for each commodity
         prod_data["Production"] = [self.total_q_exprs_c[c].getValue() for c in range(self.ncms)]
         if self.ghg_emissions_expr:
             prod_data["GHG Emissions"] = self.ghg_emissions_expr.getValue()
         if self.biodiversity_expr:
             prod_data["Biodiversity"] = self.biodiversity_expr.getValue()
+        if self.major_vegetation_exprs:
+            prod_data["Major Vegetation Groups"] = {
+                v: expr.getValue()
+                for v, expr in self.major_vegetation_exprs.items()
+            }
 
         return SolverSolution(
             lumap=lumap,
