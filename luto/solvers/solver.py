@@ -214,9 +214,8 @@ class LutoSolver:
                 # Create variable for all eligible cells - all lower bounds are zero
                 dry_lu_cells = self._input_data.ag_lu2cells[0, j]
 
-                # for savannah burning, remove extra ineligible cells 
-                if am_name == "savannah_burning":
-                    breakpoint()
+                # for savanna burning, remove extra ineligible cells 
+                if am_name == "savanna_burning":
                     dry_lu_cells = np.intersect1d(dry_lu_cells, self._input_data.savanna_eligible_r)
 
                 for r in dry_lu_cells:
@@ -1111,9 +1110,16 @@ class LutoSolver:
         # Get agricultural management results
         for am, am_j_list in self._input_data.am2j.items():
             for j_idx, j in enumerate(am_j_list):
-                for r in self._input_data.ag_lu2cells[0, j]:
+                eligible_dry_cells = self._input_data.ag_lu2cells[0, j]
+                eligible_irr_cells = self._input_data.ag_lu2cells[1, j]
+
+                if am == "Savanna Burning":
+                    eligible_dry_cells = np.intersect1d(eligible_dry_cells, self._input_data.savanna_eligible_r)
+                    eligible_irr_cells = np.intersect1d(eligible_irr_cells, self._input_data.savanna_eligible_r)
+
+                for r in eligible_dry_cells:
                     am_X_dry_sol_rj[am][r, j] = self.X_ag_man_dry_vars_jr[am][j_idx, r].X
-                for r in self._input_data.ag_lu2cells[1, j]:
+                for r in eligible_irr_cells:
                     am_X_irr_sol_rj[am][r, j] = self.X_ag_man_irr_vars_jr[am][j_idx, r].X
 
         """Note that output decision variables are mostly 0 or 1 but in some cases they are somewhere in between which creates issues
