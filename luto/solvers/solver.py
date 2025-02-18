@@ -797,6 +797,8 @@ class LutoSolver:
 
         v_limits, v_names, v_ind = self._input_data.limits["major_vegetation_groups"]
 
+        print(f"  ...Biodiversity GBF 3 (major vegetation groups) constraints...")
+
         for v, v_area_lb in enumerate(v_limits):
             ind = v_ind[v]
             ag_contr = gp.quicksum(
@@ -811,12 +813,12 @@ class LutoSolver:
 
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.ag_man_mvg_mrj[am][v][0, :, j_idx]
-                    * self.X_ag_man_dry_vars_jr[am][j_idx, :]
+                    self._input_data.ag_man_mvg_mrj[am][v][0, ind, j_idx]
+                    * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
                 )  # Dryland alt. ag. management contributions
                 + gp.quicksum(
-                    self._input_data.ag_man_mvg_mrj[am][v][1, :, j_idx]
-                    * self.X_ag_man_irr_vars_jr[am][j_idx, :]
+                    self._input_data.ag_man_mvg_mrj[am][v][1, ind, j_idx]
+                    * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
                 )  # Irrigated alt. ag. management contributions
                 for am, am_j_list in self._input_data.am2j.items()
                 for j_idx in range(len(am_j_list))

@@ -232,7 +232,7 @@ def get_major_vegetation_matrices(data: Data) -> dict[int, np.ndarray]:
             mvg_mrj[v][:, v_cells, j] = (
                 data.NVIS_PRE_GR[v][v_cells]
                 * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[j])
-                * data.REAL_AREA
+                * data.REAL_AREA[v_cells]
             )
 
     return mvg_mrj
