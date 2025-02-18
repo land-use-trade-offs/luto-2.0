@@ -1137,28 +1137,6 @@ class Data:
             self.NVIS_PRE_GR = NVIS_pre_xr[self.MASK]
         else:
             self.NVIS_PRE_GR = NVIS_pre_xr[:, self.MASK]
-            
-            
-            
-        ###############################################################
-        # Species data.
-        ###############################################################
-        print("\tLoading Species variables...", flush=True)
-        
-        BIO_GBF4A_SPECIES_raw = xr.open_dataset(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_EnviroSuit.nc', chunks={'year':1,'species':1})['data']        
-
-        bio_GBF4A_target_score = pd.read_csv(INPUT_DIR + '/BIODIVERSITY_TARGET_AND_SCORES.csv', index_col=0, header=[0,1,2])
-        bio_GBF4A_target_score_sel = bio_GBF4A_target_score.loc[:, ('USER_DEFINED_TARGET', slice(None), slice(None))] > 0
-        bio_GBF4A_target_score_sel = bio_GBF4A_target_score_sel.values.sum(axis=1) > 0
-        bio_GBF4A_target_score_sel = bio_GBF4A_target_score[bio_GBF4A_target_score_sel].fillna(0)
-        
-        self.BIO_GBF4A_SEL_SPECIES = bio_GBF4A_target_score_sel.index.to_list()
-        self.BIO_GBF4A_TARGET_PCT = bio_GBF4A_target_score_sel['USER_DEFINED_TARGET'].to_numpy()
-        self.BIO_GBF4A_SCORE_BASE = bio_GBF4A_target_score_sel.loc[self.BIO_GBF4A_SEL_SPECIES, (f'ssp{settings.SSP}', 'all', '1990')].values
-
-        self.BIO_GBF4A_SPECIES = BIO_GBF4A_SPECIES_raw.sel(species=self.BIO_GBF4A_SEL_SPECIES).compute() / 100 # Convert suitability [1-100] to percentage [0-1]
-        self.BIO_GBF4A_GROUPS = xr.load_dataset(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_Condition_group.nc')['data']
-        
 
         # To be computed during economic calculations
         self.NVIS_LIMITS: dict[int, np.ndarray] = {}
@@ -1169,6 +1147,27 @@ class Data:
             v: np.where(self.NVIS_PRE_GR[v] > epsilon)[0]
             for v in range(self.NVIS_PRE_GR.shape[0])
         }
+            
+            
+            
+        ###############################################################
+        # Species data.
+        ###############################################################
+        # print("\tLoading Species variables...", flush=True)
+        
+        # BIO_GBF4A_SPECIES_raw = xr.open_dataset(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_EnviroSuit.nc', chunks={'year':1,'species':1})['data']        
+
+        # bio_GBF4A_target_score = pd.read_csv(INPUT_DIR + '/BIODIVERSITY_TARGET_AND_SCORES.csv', index_col=0, header=[0,1,2])
+        # bio_GBF4A_target_score_sel = bio_GBF4A_target_score.loc[:, ('USER_DEFINED_TARGET', slice(None), slice(None))] > 0
+        # bio_GBF4A_target_score_sel = bio_GBF4A_target_score_sel.values.sum(axis=1) > 0
+        # bio_GBF4A_target_score_sel = bio_GBF4A_target_score[bio_GBF4A_target_score_sel].fillna(0)
+        
+        # self.BIO_GBF4A_SEL_SPECIES = bio_GBF4A_target_score_sel.index.to_list()
+        # self.BIO_GBF4A_TARGET_PCT = bio_GBF4A_target_score_sel['USER_DEFINED_TARGET'].to_numpy()
+        # self.BIO_GBF4A_SCORE_BASE = bio_GBF4A_target_score_sel.loc[self.BIO_GBF4A_SEL_SPECIES, (f'ssp{settings.SSP}', 'all', '1990')].values
+
+        # self.BIO_GBF4A_SPECIES = BIO_GBF4A_SPECIES_raw.sel(species=self.BIO_GBF4A_SEL_SPECIES).compute() / 100 # Convert suitability [1-100] to percentage [0-1]
+        # self.BIO_GBF4A_GROUPS = xr.load_dataset(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_Condition_group.nc')['data']
         
 
 

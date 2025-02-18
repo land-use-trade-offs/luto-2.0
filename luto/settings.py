@@ -107,7 +107,7 @@ else:
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 20        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 20       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
 MODE = 'snapshot'   # Runs for target year only
@@ -393,6 +393,10 @@ BIODIVERSTIY_TARGET_GBF_2 = 'on'                 # 'on' or 'off', if 'off' the b
 CALC_BIODIVERSITY_CONTRIBUTION = False      # True or False, calculate/report biodiversity contribution; False will turn off reprojecting decision variables to xarray so speed up the model run.
 BIO_CALC_LEVEL = 'group'                    # 'group' or 'species' - determines whether to calculate biodiversity scores at the group or species level
 
+# BIODIV_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
+BIODIV_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
+
+BIODIV_PENALTY = 1e4
 
 # Connectivity source source
 CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
