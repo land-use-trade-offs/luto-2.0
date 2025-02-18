@@ -205,9 +205,13 @@ class LutoSolver:
             for j_idx, j in enumerate(am_j_list):
                 # Create variable for all eligible cells - all lower bounds are zero
                 dry_lu_cells = self._input_data.ag_lu2cells[0, j]
-                eligible_dry_lu_cells = np.intersect1d(dry_lu_cells, self._input_data.savanna_eligible_r)
 
-                for r in eligible_dry_lu_cells:
+                # for savannah burning, remove extra ineligible cells 
+                if am_name == "savannah_burning":
+                    breakpoint()
+                    dry_lu_cells = np.intersect1d(dry_lu_cells, self._input_data.savanna_eligible_r)
+
+                for r in dry_lu_cells:
                     dry_x_lb = 0 if AG_MANAGEMENTS_REVERSIBLE[am] else self._input_data.ag_man_lb_mrj[am][0, r, j]
                     dry_var_name = f"X_ag_man_dry_{am_name}_{j}_{r}"
 
