@@ -180,6 +180,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_biodiversity(data, yr_cal, path_yr)
     write_biodiversity_separate(data, yr_cal, path_yr)
     write_biodiversity_contribution(data, yr_cal, path_yr)
+    write_major_vegetation_groups(data, yr_cal, path_yr)
 
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
 
@@ -1122,6 +1123,29 @@ def write_biodiversity_contribution(data: Data, yr_cal, path):
     # bio_df.to_csv(os.path.join(path, f'biodiversity_contribution_{yr_cal}.csv'), index=False)
 
 
+def write_major_vegetation_groups(data: Data, yr_cal: int, path) -> None:
+    if not settings.BIODIVERSTIY_TARGET_GBF_3 == "on":
+        return
+    
+    print(f"Writing NVIS vegetation classes' scores for {yr_cal}")
+    
+    mvg_df = pd.DataFrame(index=list(data.NVIS_ID2DESC.values()), columns=["Target", "Actual"])
+
+    if yr_cal == data.YR_CAL_BASE:
+        mvg_mrj_dict = ag_biodiversity.get_major_vegetation_matrices(data)
+        mvg_prod_data = tools.calc_major_vegetation_group_ag_area_for_year(
+            mvg_mrj_dict, data.AG_L_MRJ
+        )
+    else:
+        mvg_prod_data = data.prod_data[yr_cal]["Major Vegetation Groups"]
+
+    mvg_targets = ag_biodiversity.get_major_vegetation_group_limits(data, yr_cal)[0]
+
+    for v, name in data.NVIS_ID2DESC.items():
+        mvg_df.loc[name, "Target"] = mvg_targets[v]
+        mvg_df.loc[name, "Actual"] = mvg_prod_data[v]
+
+    mvg_df.to_csv(os.path.join(path, f'vegetation_groups_{yr_cal}.csv'), index=True)
 
 
 def write_ghg_separate(data: Data, yr_cal, path):

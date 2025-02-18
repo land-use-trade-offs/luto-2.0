@@ -29,7 +29,7 @@ import luto.settings as settings
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Any
 from gurobipy import GRB
 
 from luto import tools
@@ -65,7 +65,7 @@ class SolverSolution:
     ag_X_mrj: np.ndarray
     non_ag_X_rk: np.ndarray
     ag_man_X_mrj: dict[str, np.ndarray]
-    prod_data: dict[str, float]
+    prod_data: dict[str, Any]
     obj_val: dict[str, float]
 
 
@@ -109,6 +109,8 @@ class LutoSolver:
         self.ghg_emissions_reduction_soft_constraints = []
         self.biodiversity_expr = None
         self.biodiversity_limit_constraint = None
+        self.major_vegetation_exprs = {}
+        self.major_vegetation_limit_constraints = {}
 
 
     def formulate(self):
@@ -141,8 +143,7 @@ class LutoSolver:
         self._add_demand_penalty_constraints()                          
         self._add_water_usage_limit_constraints() if settings.WATER_LIMITS == 'on' else print('  ...TURNING OFF water usage constraints ...')
         self._add_ghg_emissions_limit_constraints()                     
-        self._add_biodiversity_limit_constraints()
-
+        self._add_biodiversity_constraints()
 
     def _setup_x_vars(self):
         """
@@ -692,10 +693,8 @@ class LutoSolver:
 
     def _add_biodiversity_limit_constraints(self):
         if settings.BIODIVERSTIY_TARGET_GBF_2 != "on":
-            print('  ...biodiversity constraints target-2 TURNED OFF ...')
+            print('    ...biodiversity constraints target-2 TURNED OFF ...')
             return
-
-        print('  ...biodiversity constraints...')
 
         # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSTIY_TARGET_GBF_2 != "on".
         biodiversity_limits = self._input_data.limits["biodiversity"]
@@ -737,6 +736,60 @@ class LutoSolver:
             self.biodiversity_expr >= biodiversity_limits
         )
 
+
+    def _add_major_vegetation_group_limit_constraints(self) -> None:
+        if settings.BIODIVERSTIY_TARGET_GBF_3 != "on":
+            print('    ...major vegetation group constraints TURNED OFF ...')
+            return
+        
+
+        v_limits, v_names, v_ind = self._input_data.limits["major_vegetation_groups"]
+
+        for v, v_area_lb in enumerate(v_limits):
+            ind = v_ind[v]
+            ag_contr = gp.quicksum(
+                gp.quicksum(
+                    self._input_data.ag_mvg_mrj[v][0, ind, :][:, j] * self.X_ag_dry_vars_jr[j, ind]
+                )  # Dryland agriculture contribution
+                + gp.quicksum(
+                    self._input_data.ag_mvg_mrj[v][1, ind, :][:, j] * self.X_ag_irr_vars_jr[j, ind]
+                )  # Irrigated agriculture contribution
+                for j in range(self._input_data.n_ag_lus)
+            )
+
+            ag_man_contr = gp.quicksum(
+                gp.quicksum(
+                    self._input_data.ag_man_mvg_mrj[am][v][0, :, j_idx]
+                    * self.X_ag_man_dry_vars_jr[am][j_idx, :]
+                )  # Dryland alt. ag. management contributions
+                + gp.quicksum(
+                    self._input_data.ag_man_mvg_mrj[am][v][1, :, j_idx]
+                    * self.X_ag_man_irr_vars_jr[am][j_idx, :]
+                )  # Irrigated alt. ag. management contributions
+                for am, am_j_list in self._input_data.am2j.items()
+                for j_idx in range(len(am_j_list))
+            )
+
+            non_ag_contr = gp.quicksum(
+                gp.quicksum(
+                    self._input_data.non_ag_mvg_rk[v][ind, k] * self.X_non_ag_vars_kr[k, ind]
+                )  # Non-agricultural contribution
+                for k in range(self._input_data.n_non_ag_lus)
+            )
+
+            outside_study_area_contr = self._input_data.mvg_contr_outside_study_area[v]
+
+            self.major_vegetation_exprs[v] = ag_contr + ag_man_contr + non_ag_contr + outside_study_area_contr
+
+            print(f"    ...vegetation class {v_names[v]} target area: {v_area_lb:,.0f}")
+            self.major_vegetation_limit_constraints[v] = self.gurobi_model.addConstr(
+                self.major_vegetation_exprs[v] >= v_area_lb
+            )
+
+    def _add_biodiversity_constraints(self) -> None:
+        print('  ...biodiversity constraints...')
+        self._add_biodiversity_limit_constraints()
+        self._add_major_vegetation_group_limit_constraints()
 
     def update_formulation(
         self,
@@ -920,10 +973,15 @@ class LutoSolver:
             self.gurobi_model.remove(self.biodiversity_limit_constraint)
         if self.water_limit_constraints:
             self.gurobi_model.remove(self.water_limit_constraints)
+        if self.major_vegetation_limit_constraints:
+            for constr in self.major_vegetation_limit_constraints.values():
+                self.gurobi_model.remove(constr)
 
         self.adoption_limit_constraints = []
         self.demand_penalty_constraints = []
         self.water_limit_constraints = []
+        self.major_vegetation_exprs = {}
+        self.major_vegetation_limit_constraints = {}
 
         if self.ghg_emissions_limit_constraint_ub is not None:
             self.gurobi_model.remove(self.ghg_emissions_limit_constraint_ub)
@@ -944,7 +1002,7 @@ class LutoSolver:
         self._add_demand_penalty_constraints()                          
         self._add_water_usage_limit_constraints() if settings.WATER_LIMITS == 'on' else print('  ...TURNING OFF water constraints...')
         self._add_ghg_emissions_limit_constraints()                    
-        self._add_biodiversity_limit_constraints()                      
+        self._add_biodiversity_constraints()
 
     def solve(self) -> SolverSolution:
         print("Starting solve...\n")
@@ -1097,12 +1155,17 @@ class LutoSolver:
                 if am_var_val >= settings.AGRICULTURAL_MANAGEMENT_USE_THRESHOLD:
                     ammaps[am][r] = 1
 
-        # # Process production amount for each commodity
+        # Process production amount for each commodity
         prod_data["Production"] = [self.total_q_exprs_c[c].getValue() for c in range(self.ncms)]
         if self.ghg_emissions_expr:
             prod_data["GHG Emissions"] = self.ghg_emissions_expr.getValue()
         if self.biodiversity_expr:
             prod_data["Biodiversity"] = self.biodiversity_expr.getValue()
+        if self.major_vegetation_exprs:
+            prod_data["Major Vegetation Groups"] = {
+                v: expr.getValue()
+                for v, expr in self.major_vegetation_exprs.items()
+            }
 
         return SolverSolution(
             lumap=lumap,
