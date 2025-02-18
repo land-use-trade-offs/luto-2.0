@@ -219,7 +219,8 @@ def get_major_vegetation_matrices(data: Data) -> dict[int, np.ndarray]:
     to each major vegetation group.
 
     Returns:
-    - Array indexed by (m, r, j, v) containing the contributions.
+    - Dict indexed by major vegetation groups v (integers) that contains the veg. groups'
+      contributions in arrays indexed (m, r, j).
     """
     mvg_mrj = {
         v: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)
@@ -227,8 +228,9 @@ def get_major_vegetation_matrices(data: Data) -> dict[int, np.ndarray]:
     }
     for j in range(data.N_AG_LUS):
         for v in range(data.N_NVIS_CLASSES):
-            mvg_mrj[v][:, :, j] = (
-                data.NVIS_PRE_GR[v]
+            v_cells = data.NVIS_INDECES[v]
+            mvg_mrj[v][:, v_cells, j] = (
+                data.NVIS_PRE_GR[v][v_cells]
                 * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[j])
                 * data.REAL_AREA
             )
@@ -340,21 +342,19 @@ def get_savanna_burning_effect_mvg_mrj(data: Data, v: int):
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
     mvg_mrj_effect = np.zeros((data.NLMS, data.NCELLS, nlus))
 
-    eds_sav_burning_biodiv_benefits = np.where( data.SAVBURN_ELIGIBLE, 
+    eds_sav_burning_mvg_benefits = np.where( data.SAVBURN_ELIGIBLE, 
         (1 - settings.LDS_BIODIVERSITY_VALUE) * data.NVIS_PRE_GR[v] * data.REAL_AREA, 
         0
     )
-    
-
     for m, j in itertools.product(range(data.NLMS), range(nlus)):
-        mvg_mrj_effect[m, :, j] = eds_sav_burning_biodiv_benefits
+        mvg_mrj_effect[m, :, j] = eds_sav_burning_mvg_benefits
 
     return mvg_mrj_effect
 
 
 def get_agtech_ei_effect_mvg_mrj(data: Data):
     """
-    Gets biodiversity impacts of using AgTech EI (no effect)
+    Gets major vegetation group impacts of using AgTech EI (no effect)
 
     Parameters:
     - data: The input data object containing information about NLMS and NCELLS.
@@ -368,13 +368,13 @@ def get_agtech_ei_effect_mvg_mrj(data: Data):
 
 def get_biochar_effect_mvg_mrj(data: Data, v_mvg_mrj: np.ndarray, yr_idx):
     """
-    Gets biodiversity impacts of using Biochar
+    Gets major vegetation group impacts of using Biochar
 
     Parameters:
     - data: The input data object containing information about NLMS and NCELLS.
 
     Returns:
-    - new_b_mrj: A numpy array representing the biodiversity impacts of using Biochar.
+    - mvg_mrj_effect: A numpy array representing the MVG impacts of using Biochar.
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Biochar']
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
@@ -400,14 +400,16 @@ def get_agricultural_management_major_veg_group_matrices(
     data: Data, ag_mvg_mrj: dict[int, np.ndarray], yr_idx: int
 ) -> dict[str, dict[int, np.ndarray]]:
     """
-    Calculate the biodiversity matrices for different agricultural management practices.
+    Calculate the major vegetation group matrices for different agricultural 
+    management practices.
 
     Parameters:
     - data: The input data used for calculations.
 
     Returns:
-    A dictionary containing the biodiversity matrices for different agricultural management practices.
-    The keys of the dictionary represent the management practices, and the values represent the corresponding biodiversity matrices.
+    A dictionary containing the MVG matrices for different agricultural management practices.
+    The keys of the dictionary represent the management practices, and the values represent the 
+    corresponding major vegetation groups effects' matrices.
     """
     asparagopsis_data = {}
     if settings.AG_MANAGEMENTS['Asparagopsis taxiformis']: 

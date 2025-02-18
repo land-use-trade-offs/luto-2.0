@@ -274,12 +274,6 @@ class Data:
             self.DESC2NONAGLU["Beef Carbon Plantings (Belt)"],
             self.DESC2NONAGLU["BECCS"],
         ]
-        self.NON_AG_LU_ENV_PLANTINGS = [
-            self.DESC2NONAGLU["Environmental Plantings"],
-            self.DESC2NONAGLU["Riparian Plantings"],
-            self.DESC2NONAGLU["Sheep Agroforestry"],
-            self.DESC2NONAGLU["Beef Agroforestry"],
-        ]
 
         # Define which land uses correspond to deep/shallow rooted water yield.
         self.LU_SHALLOW_ROOTED = [
@@ -386,7 +380,6 @@ class Data:
         self.REAL_AREA = self.get_array_resfactor_applied(self.REAL_AREA_NO_RESFACTOR) * self.RESMULT
 
         # Derive NCELLS (number of spatial cells) from the area array.
-        self.NCELLS_NO_RESFACTOR = self.REAL_AREA_NO_RESFACTOR.shape[0]
         self.NCELLS = self.REAL_AREA.shape[0]
         
         # Initial (2010) ag decision variable (X_mrj).
@@ -1171,8 +1164,9 @@ class Data:
         self.NVIS_LIMITS: dict[int, np.ndarray] = {}
 
         # Container storing which cells apply to each major vegetation group
+        epsilon = 1e-5
         self.NVIS_INDECES = {
-            v: np.where(self.NVIS_PRE_GR[v] > 0)[0]
+            v: np.where(self.NVIS_PRE_GR[v] > epsilon)[0]
             for v in range(self.NVIS_PRE_GR.shape[0])
         }
         
