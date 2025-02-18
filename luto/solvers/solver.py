@@ -751,6 +751,19 @@ class LutoSolver:
                 for j in range(self._input_data.n_ag_lus)
             )
 
+            ag_man_contr = gp.quicksum(
+                gp.quicksum(
+                    self._input_data.ag_man_mvg_mrj[am][v][0, :, j_idx]
+                    * self.X_ag_man_dry_vars_jr[am][j_idx, :]
+                )  # Dryland alt. ag. management contributions
+                + gp.quicksum(
+                    self._input_data.ag_man_mvg_mrj[am][v][1, :, j_idx]
+                    * self.X_ag_man_irr_vars_jr[am][j_idx, :]
+                )  # Irrigated alt. ag. management contributions
+                for am, am_j_list in self._input_data.am2j.items()
+                for j_idx in range(len(am_j_list))
+            )
+
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
                     self._input_data.non_ag_mvg_rk[v][ind, k] * self.X_non_ag_vars_kr[k, ind]
@@ -760,7 +773,7 @@ class LutoSolver:
 
             outside_study_area_contr = self._input_data.mvg_contr_outside_study_area[v]
 
-            self.major_vegetation_exprs[v] = ag_contr + non_ag_contr + outside_study_area_contr
+            self.major_vegetation_exprs[v] = ag_contr + ag_man_contr + non_ag_contr + outside_study_area_contr
 
             print(f"    ...vegetation class {v_names[v]} target area: {v_area_lb:,.0f}")
             self.major_vegetation_limit_constraints[v] = self.gurobi_model.addConstr(

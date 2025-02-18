@@ -57,6 +57,7 @@ class SolverInputData:
     ag_man_b_mrj: dict                      # Agricultural management options' biodiversity effects.
     ag_man_limits: dict                     # Agricultural management options' adoption limits.
     ag_man_lb_mrj: dict                     # Agricultural management options' lower bounds.
+    ag_man_mvg_mrj: dict[str, dict[int, np.ndarray]]      # Agricultural management options' major vegetation group effects
 
     water_yield_RR_BASE_YR: dict                           # Water yield for the BASE_YR based on historical water yield layers .
     water_yield_outside_study_area: dict[int, float]       # Water yield from outside LUTO study area -> dict. Key: region.
@@ -321,6 +322,14 @@ def get_ag_man_lb_mrj(data: Data, base_year):
     return output
 
 
+def get_ag_man_mvg_mrj(data: Data, target_index: int, ag_mvg_mrj: np.ndarray):
+    print('Getting agricultural management options\' major vegetation group effects...', flush = True)
+    output = ag_biodiversity.get_agricultural_management_major_veg_group_matrices(
+        data, ag_mvg_mrj, target_index
+    )
+    return output
+
+
 def get_non_ag_lb_rk(data: Data, base_year):
     print('Getting non-agricultural lower bound matrices...', flush = True)
     output = non_ag_transition.get_lower_bound_non_agricultural_matrices(data, base_year)
@@ -575,6 +584,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_b_mrj=get_ag_man_b_mrj(data, target_index, ag_b_mrj),
         ag_man_limits=get_ag_man_limits(data, target_index),                            
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
+        ag_man_mvg_mrj=get_ag_man_mvg_mrj(data, target_index, ag_mvg_mrj),
         
         water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Use the water net yield outside LUTO study area for the YR_CAL_BASE year
         water_yield_RR_BASE_YR=get_w_RR_BASE_YR(data),                                  # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
