@@ -794,7 +794,6 @@ class LutoSolver:
             print('    ...major vegetation group constraints TURNED OFF ...')
             return
         
-
         v_limits, v_names, v_ind = self._input_data.limits["major_vegetation_groups"]
 
         print(f"  ...Biodiversity GBF 3 (major vegetation groups) constraints...")
