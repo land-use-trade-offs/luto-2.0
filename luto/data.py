@@ -1064,6 +1064,11 @@ class Data:
         else:
             raise ValueError(f"Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
 
+        # Round degradation figures to avoid numerical issues in Gurobi
+        self.BIODIV_HABITAT_DEGRADE_LOOK_UP = {
+            j: round(x, settings.ROUND_DECMIALS) 
+            for j, x in self.BIODIV_HABITAT_DEGRADE_LOOK_UP.items()
+        }
 
         # Get the biodiversity degradation score (0-1) for each cell
         '''
@@ -1121,6 +1126,7 @@ class Data:
         self.NVIS_ID2DESC = dict(enumerate(NVIS_area_and_target['group']))
         self.NVIS_TOTAL_AREA_HA = NVIS_area_and_target['TOTAL_AREA_HA'].to_numpy()
         self.NVIS_OUTSIDE_LUTO_AREA_HA = NVIS_area_and_target['OUTSIDE_LUTO_AREA_HA'].to_numpy()
+        self.N_NVIS_CLASSES = self.NVIS_TOTAL_AREA_HA.shape[0]
 
         # Read in vegetation layer data
         NVIS_pre_xr = xr.load_dataarray(INPUT_DIR + f'/NVIS_{NVIS_CLASS_DETAIL}_{NVIS_SPATIAL_DETAIL}_SPATIAL_DETAIL.nc').values
@@ -1130,13 +1136,23 @@ class Data:
             self.NVIS_PRE_GR = NVIS_pre_xr[self.MASK]
         else:
             self.NVIS_PRE_GR = NVIS_pre_xr[:, self.MASK]
+
+        # To be computed during economic calculations
+        self.NVIS_LIMITS: dict[int, np.ndarray] = {}
+
+        # Container storing which cells apply to each major vegetation group
+        epsilon = 1e-5
+        self.NVIS_INDECES = {
+            v: np.where(self.NVIS_PRE_GR[v] > epsilon)[0]
+            for v in range(self.NVIS_PRE_GR.shape[0])
+        }
             
             
             
         ###############################################################
         # Species data.
         ###############################################################
-        print("\tLoading Species variables...", flush=True)
+        # print("\tLoading Species variables...", flush=True)
         
 
         # Read in the species data from Carla Archibald (noted as GBF-4A)

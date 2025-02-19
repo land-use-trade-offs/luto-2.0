@@ -107,7 +107,7 @@ else:
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 20        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 20       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
 MODE = 'snapshot'   # Runs for target year only
@@ -413,6 +413,10 @@ CALC_BIODIVERSITY_CONTRIBUTION = False              # True or False, calculate/r
 BIODIVERSTIY_TARGET_GBF_4_ACHIEVING_YEAR = 2030     # The year to achieve the GBF Target 4
 
 
+# BIODIV_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
+BIODIV_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
+
+BIODIV_PENALTY = 1e4
 
 # Connectivity source source
 CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
@@ -485,6 +489,8 @@ BIODIVERSTIY_TARGET_GBF_3  = 'on'           # 'on' or 'off'.
     protect and manage 30% of the world's land, water, and coastal areas by 2030.
 '''
 
+BIODIVERSITY_GBF_3_TARGET_YEAR = 2030
+
 NVIS_SPATIAL_DETAIL = 'HIGH'                 # 'LOW' or 'HIGH'
 '''
 - If 'LOW' is selected, the primary group layers will be used to represent the vegetation type. 
@@ -522,7 +528,7 @@ LAND_USAGE_CULL_PERCENTAGE = 0.15   if CULL_MODE == 'percentage' else 'Not used'
 NON_AGRICULTURAL_LU_BASE_CODE = 100
 
 # Number of decimals to round the lower bound matrices to for non-agricultural land uses and agricultural management options.
-LB_ROUND_DECMIALS = 6
+ROUND_DECMIALS = 6
 
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)

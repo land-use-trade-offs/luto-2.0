@@ -1235,6 +1235,6 @@ def get_lower_bound_non_agricultural_matrices(data: Data, base_year) -> np.ndarr
         return np.zeros((data.NCELLS, len(NON_AG_LAND_USES)))
         
     return np.divide(
-        np.floor(data.non_ag_dvars[base_year].astype(np.float32) * 10 ** settings.LB_ROUND_DECMIALS),
-        10 ** settings.LB_ROUND_DECMIALS,
+        np.floor(data.non_ag_dvars[base_year].astype(np.float32) * 10 ** settings.ROUND_DECMIALS),
+        10 ** settings.ROUND_DECMIALS,
     )
