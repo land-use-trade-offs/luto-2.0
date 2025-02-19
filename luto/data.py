@@ -33,7 +33,6 @@ import luto.economics.non_agricultural.quantity as non_ag_quantity
 
 from itertools import product
 from collections import defaultdict
-from joblib import Parallel, delayed
 
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -1139,21 +1138,44 @@ class Data:
         ###############################################################
         print("\tLoading Species variables...", flush=True)
         
+
+        # Read in the species data from Carla Archibald (noted as GBF-4A)
         BIO_GBF4A_SPECIES_raw = xr.open_dataset(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_EnviroSuit.nc', chunks={'year':1,'species':1})['data']        
 
-        bio_GBF4A_target_score = pd.read_csv(INPUT_DIR + '/BIODIVERSITY_TARGET_AND_SCORES.csv', index_col=0, header=[0,1,2])
-        bio_GBF4A_target_score_sel = bio_GBF4A_target_score.loc[:, ('USER_DEFINED_TARGET', slice(None), slice(None))] > 0
-        bio_GBF4A_target_score_sel = bio_GBF4A_target_score_sel.values.sum(axis=1) > 0
-        bio_GBF4A_target_score_sel = bio_GBF4A_target_score[bio_GBF4A_target_score_sel].fillna(0)
+        bio_GBF4A_target_percent = pd.read_csv(INPUT_DIR + '/BIODIVERSITY_GBF4A_TARGET.csv')
+        bio_GBF4A_baseline_score = pd.read_csv(INPUT_DIR + '/BIODIVERSITY_GBF4A_SCORES.csv')
+        bio_GBF4A_target_score_sel = bio_GBF4A_target_percent.query('USER_DEFINED_TARGET_PERCENT > 0')
         
-        self.BIO_GBF4A_SEL_SPECIES = bio_GBF4A_target_score_sel.index.to_list()
-        self.BIO_GBF4A_TARGET_PCT = bio_GBF4A_target_score_sel['USER_DEFINED_TARGET'].to_numpy()
-        self.BIO_GBF4A_SCORE_BASE = bio_GBF4A_target_score_sel.loc[self.BIO_GBF4A_SEL_SPECIES, (f'ssp{settings.SSP}', 'all', '1990')].values
-
-        self.BIO_GBF4A_SPECIES = BIO_GBF4A_SPECIES_raw.sel(species=self.BIO_GBF4A_SEL_SPECIES).compute() / 100 # Convert suitability [1-100] to percentage [0-1]
+        self.BIO_GBF4A_SEL_SPECIES = bio_GBF4A_target_score_sel['species'].tolist()
+        self.BIO_GBF4A_TARGET_PCT = bio_GBF4A_target_score_sel['USER_DEFINED_TARGET_PERCENT'].to_numpy()
+        self.BIO_GBF4A_SCORE_BASE_SEL = bio_GBF4A_baseline_score.query(f'year==1990 and SSP=={settings.SSP}').query(f'species in {self.BIO_GBF4A_SEL_SPECIES}')['BIO_SCORE_HA'].values 
+        self.BIO_GBF4A_OUTSIDE_LUTO_SCORE = bio_GBF4A_baseline_score.query(f'year == 2010 and SSP=={settings.SSP} and source == "out"').query(f'species in {self.BIO_GBF4A_SEL_SPECIES}')['BIO_SCORE_HA'].values
+        
+        self.BIO_GBF4A_SPECIES = BIO_GBF4A_SPECIES_raw.sel(species=self.BIO_GBF4A_SEL_SPECIES).compute()
         self.BIO_GBF4A_GROUPS = xr.load_dataset(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_Condition_group.nc')['data']
         
+        
+        # # Read in the species data from DCCEEW (noted as GBF-4B)
+        # BIO_GBF4B_SPECIES_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_DCCEEW_SNES.nc', chunks={'species':1})
+        # BIO_GBF4B_COMUNITY_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_DCCEEW_ECNES.nc', chunks={'species':1})
 
+        # BIO_GBF4B_SPECIES_score = pd.read_csv(INPUT_DIR + '/bio_DCCEEW_SNES_AREA_HA.csv')
+        # BIO_GBF4B_COMUNITY_score = pd.read_csv(INPUT_DIR + '/bio_DCCEEW_ECNES_AREA_HA.csv')
+        
+        # # Simulate user defined targets for species
+        # BIO_GBF4B_SPECIES_score = rand_target(BIO_GBF4B_SPECIES_score).query('USER_DEFINED_TARGET_PERCENT > 0')
+        # BIO_GBF4B_COMUNITY_score = rand_target(BIO_GBF4B_COMUNITY_score).query('USER_DEFINED_TARGET_PERCENT > 0')
+        
+        
+        # self.BIO_GBF4B_SPECIES_SEL = BIO_GBF4B_SPECIES_score[['SCIENTIFIC_NAME','PRESENCE_RANK']].values
+        # self.BIO_GBF4B_COMUNITY_SEL = BIO_GBF4B_COMUNITY_score[['COMMUNITY','PRES_RANK']].values
+        # self.BIO_GBF4B_SPECIES_TARGET_PCT = BIO_GBF4B_SPECIES_score['USER_DEFINED_TARGET_PERCENT'].to_numpy()
+        # self.BIO_GBF4B_COMUNITY_TARGET_PCT = BIO_GBF4B_COMUNITY_score['USER_DEFINED_TARGET_PERCENT'].to_numpy()
+        
+        # self.BIO_GBF4B_SPECIES = BIO_GBF4B_SPECIES_raw.sel(species=self.BIO_GBF4B_SPECIES_SEL[:,0])
+        
+    
+    
 
         ###############################################################
         # BECCS data.
@@ -1337,6 +1359,19 @@ class Data:
 
     
     def get_bio_GBF4A_species_by_yr(self, yr: int):
+        '''
+        Get the biodiversity suitability score [hectare weighted] for each species at the given year.
+        
+        The raw biodiversity suitability score [2D (shape, 808*978), (dtype, uint8, 0-100)] represents the 
+        suitability  of each cell for each species.  Here it is LINEARLY interpolated to the given year,
+        then LINEARLY interpolated to the given spatial coordinates.
+        
+        Because the coordinates are the controid of the `self.MASK` array, so the spatial interpolation is simultaneously
+        done with the masking. 
+        
+        The suitability score is then  weighted by the area (ha) of each cell. The area weighting
+        is necessary to ensure that the biodiversity suitability score will not be affected by different RESFACTOR (i.e., cell size) values.
+        '''
         current_species_val = self.BIO_GBF4A_SPECIES.interp(            # Here the year interpolation is done first                      
             year=yr,
             method='linear', 
@@ -1344,13 +1379,30 @@ class Data:
         ).interp(                                                       # Then the spatial interpolation and masking is done
             x=xr.DataArray(self.COORD_LON_LAT[0], dims='cell'),
             y=xr.DataArray(self.COORD_LON_LAT[1], dims='cell'),
-            method='linear'
-        ).drop_vars(['year']) 
+            method='linear'                                             # Use LINEAR interpolation for the `suitability` values
+        ).drop_vars(['year'])
         
-        return (current_species_val * self.REAL_AREA).values
+        # Weight the biodiversity suitability by the area of each cell, so that the biodiversity contribution score
+        # will not be affected by different RESFACTOR (i.e., cell size) values.
+        current_species_val = (current_species_val * self.REAL_AREA).values.astype(np.float32)
+        return current_species_val
 
 
     def get_bio_GBF4A_group_by_yr(self, yr: int):
+        '''
+        Get the biodiversity contribution score [hectare weighted] for each group at the given year.
+        
+        The raw contribution  score [2D (shape, 808*978), (dtype, float32, 0-1)] represents the 
+        percentage contribution of each cell to the total of biodiversity of Australia.  Here it is LINEARLY 
+        interpolated to the given year, then NEARESTLY (which is different from the `linear` interpopation for species data ) 
+        interpolated to the given spatial coordinates.
+        
+        Because the coordinates are the controid of the `self.MASK` array, so the spatial interpolation is simultaneously
+        done with the masking. 
+        
+        The contribution score is then weighted by the area (ha) of each cell. The area weighting is necessary to ensure
+        that the biodiversity contribution score will not be affected by different RESFACTOR (i.e., cell size) values.
+        '''
         current_group_contribution = self.BIO_GBF4A_GROUPS.interp(      # Here the year interpolation is done first
             year=yr,
             method='linear', 
@@ -1358,12 +1410,12 @@ class Data:
         ).interp(                                                       # Then the spatial interpolation and masking is done
             x=xr.DataArray(self.COORD_LON_LAT[0], dims='cell'),
             y=xr.DataArray(self.COORD_LON_LAT[1], dims='cell'),
-            method='linear'
+            method='nearest'                                            # Use NEAREST interpolation for the `contribution` values
         ).drop_vars(['year'])
+        
         # Weight the biodiversity contribution by the area of each cell, so that the biodiversity contribution score
         # will not be affected by different RESFACTOR (i.e., cell size) values.
         current_group_contribution = current_group_contribution  * self.REAL_AREA
-        
         return  current_group_contribution
     
     
@@ -1371,92 +1423,13 @@ class Data:
         target_pct = []
         for tgt in self.BIO_GBF4A_TARGET_PCT:
             f = interp1d(
-                [2010, 2030, 2050],
-                [0, tgt[0], max(tgt)],
-                kind = "linear",
-                fill_value = "extrapolate",
+                [2010, settings.BIODIVERSTIY_TARGET_GBF_4_ACHIEVING_YEAR],
+                [0, tgt],
+                kind="linear",
+                fill_value="extrapolate",
             )
-            target_pct.append(f(yr))
-        return self.BIO_GBF4A_SCORE_BASE * np.array(target_pct)
-
-
-    # Convert dvar to its 2D representation
-    def dvar_to_2D(self, map_:np.ndarray)-> np.ndarray:
-        '''
-        Convert the dvar from 1D vector to 2D array.
-        '''
-        map_1D = self.LUMAP_2D_RESFACTORED.copy().astype(np.float32) if settings.RESFACTOR > 1 else self.LUMAP_2D.copy().astype(np.float32)
-        np.place(map_1D, (map_1D != self.MASK_LU_CODE) & (map_1D != self.NODATA), map_)
-        return map_1D
-
-
-    # Upsample dvar to its full resolution representation
-    def dvar_to_full_res(self, dvar_2D:np.ndarray) -> np.ndarray:
-        '''
-        Upsample the dvar to its full resolution (RESFACTOR=1) representation.
-        '''
-        dense_2D_shape = self.NLUM_MASK.shape
-        dense_2D_map = np.repeat(np.repeat(dvar_2D, settings.RESFACTOR, axis=0), settings.RESFACTOR, axis=1)
-
-        # Adjust the dense_2D_map size if it differs from the NLUM_MASK
-        if dense_2D_map.shape[0] > dense_2D_shape[0] or dense_2D_map.shape[1] > dense_2D_shape[1]:
-            dense_2D_map = dense_2D_map[:dense_2D_shape[0], :dense_2D_shape[1]]
-
-        if dense_2D_map.shape[0] < dense_2D_shape[0] or dense_2D_map.shape[1] < dense_2D_shape[1]:
-            pad_height = dense_2D_shape[0] - dense_2D_map.shape[0]
-            pad_width = dense_2D_shape[1] - dense_2D_map.shape[1]
-            dense_2D_map = np.pad(
-                dense_2D_map,
-                pad_width=((0, pad_height), (0, pad_width)),
-                mode='edge')
-
-        # Apply the masks
-        filler_mask = self.LUMAP_2D != self.MASK_LU_CODE
-        dense_2D_map = np.where(filler_mask, dense_2D_map, self.MASK_LU_CODE)
-        dense_2D_map = np.where(self.NLUM_MASK, dense_2D_map, self.NODATA)
-        return dense_2D_map
-
-
-    # Calculate the average value of dvars within the target bin
-    def bincount_avg(self, target_id_map:xr.DataArray, dvar:np.ndarray) -> np.ndarray:
-        """
-        Calculate the average value of each bin based on the target_id_map and dvar arrays.
-        Here is where we reproject and match dvars to the target map. Essentially, we
-        created an ID map for the target map, where each pixcel has the  index of the
-        flattend target map but the same shape of the `NLUM_MASK` (see `N:/Data-Master/Biodiversity/biodiversity_contribution/Step_3_Match_lumap_to_biomap.py`).
-
-        We use `bincount` to get the occurence of dvar cells with the same target ID,
-        and get the sum of dvar values with the same target ID. At last, the average
-        of dvar cells within each target cell is calculated as `occurance / sum`.
-
-        Parameters:
-        - target_id_map (xr.DataArray): Array containing the bin indices.
-        - dvar (np.ndarray): Array containing the values corresponding to each bin.
-
-        Returns:
-        - np.ndarray: Array (1D) containing the average value of each bin.
-
-        Note:
-        - The average value is calculated by dividing the sum of values in each bin by the number of occurrences in that bin.
-        - Division by zero will result in a nan value, which is handled by replacing it with zero.
-
-        """
-        # Only dvar > 0 are necessary for the calculation
-        valid_mask = dvar > 0
-
-        # Flatten arrays
-        bin_flatten = target_id_map.values[valid_mask]
-        weights_flatten = dvar[valid_mask]
-        bin_occ = np.bincount(bin_flatten, minlength=target_id_map.max().values + 1)
-        bin_sum = np.bincount(bin_flatten, weights=weights_flatten, minlength=target_id_map.max().values + 1)
-
-        # Calculate the average value of each bin, ignoring division by zero (which will be nan)
-        with np.errstate(divide='ignore', invalid='ignore'):
-            bin_avg = (bin_sum / bin_occ).astype(np.float32)
-            bin_avg = np.nan_to_num(bin_avg)
-
-        return bin_avg
-
+            target_pct.append(f(yr) if yr <= settings.BIODIVERSTIY_TARGET_GBF_4_ACHIEVING_YEAR else tgt)
+        return  (self.BIO_GBF4A_SCORE_BASE_SEL * np.array(target_pct)) - self.BIO_GBF4A_OUTSIDE_LUTO_SCORE
 
 
     def add_production_data(self, yr: int, data_type: str, prod_data: Any):

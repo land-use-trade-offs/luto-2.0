@@ -388,10 +388,30 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 # ------------------- Agricultural biodiversity parameters -------------------
 
-# Biodiversity contribution reporting 
-BIODIVERSTIY_TARGET_GBF_2 = 'on'                 # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
-CALC_BIODIVERSITY_CONTRIBUTION = False      # True or False, calculate/report biodiversity contribution; False will turn off reprojecting decision variables to xarray so speed up the model run.
-BIO_CALC_LEVEL = 'group'                    # 'group' or 'species' - determines whether to calculate biodiversity scores at the group or species level
+
+
+
+# Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
+BIODIVERSTIY_TARGET_GBF_2 = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
+
+# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
+BIODIV_GBF_TARGET_2_DICT = {
+              2010: 0,    # Proportion of degraded land restored in year 2010
+              2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
+              2050: 0.3,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
+              2100: 0.3   # Stays at 2050 level
+             }            # (can add more years/targets)\
+""" Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
+    Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
+    in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
+"""
+
+
+
+# Global Biodiversity Framework Target 4: Halt Species Extinction, Protect Genetic Diversity, and Manage Human-Wildlife Conflicts
+CALC_BIODIVERSITY_CONTRIBUTION = False              # True or False, calculate/report biodiversity contribution; False will turn off reprojecting decision variables to xarray so speed up the model run.
+BIODIVERSTIY_TARGET_GBF_4_ACHIEVING_YEAR = 2030     # The year to achieve the GBF Target 4
+
 
 
 # Connectivity source source
@@ -410,7 +430,7 @@ CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
 connectivity_importance = 0.3                    # Weighting of connectivity score in biodiversity calculation (0 [not important] - 1 [very important])
 CONNECTIVITY_LB = 1 - connectivity_importance    # Sets the lower bound of the connectivity multiplier for bioidversity
 '''
-    !!!!!   ONLY WORKS IF CONNECTIVITY_SOURCE IS NOT 'NONE'   !!!!!
+    !   ONLY WORKS IF CONNECTIVITY_SOURCE IS NOT 'NONE'   ! \n
     The relative importance of the connectivity score in the biodiversity calculation. Used to scale the raw biodiversity score.
     I.e., the lower bound of the connectivity score for weighting the raw biodiversity priority score is CONNECTIVITY_LB.
 '''
@@ -453,21 +473,6 @@ BECCS_BIODIVERSITY_BENEFIT = 0
     For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value
     will be 0.6 * 0.8 = 0.48.
 '''
-
-# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
-BIODIV_GBF_TARGET_2_DICT = {
-              2010: 0,    # Proportion of degraded land restored in year 2010
-              2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
-              2050: 0.3,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
-              2100: 0.3   # Stays at 2050 level
-             }            # (can add more years/targets)\
-""" Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-    Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
-    in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
-"""
-
-
-
 
 
 
