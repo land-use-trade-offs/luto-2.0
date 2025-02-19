@@ -56,7 +56,8 @@ def create_new_dataset():
     nlum_inpath = 'N:/Data-Master/National_Landuse_Map/'
     BECCS_inpath = 'N:/Data-Master/BECCS/From_CSIRO/20211124_as_submitted/'
     GHG_off_land_inpath = 'N:/LUF-Modelling/Food_demand_AU/au.food.demand/Inputs/Off_land_GHG_emissions'
-    bio_contributions_inpath = 'N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km_to_NetCDF/'
+    bio_GBF_4a_inpath = 'N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km_to_NetCDF/'
+    bio_GBF_4b_inpath = 'N:/Data-Master/Biodiversity/DCCEEW/SNES_GEOTIFF/To_NetCDF/'
     bio_NVIS_inpath = 'N:/Data-Master/NVIS/'
     bio_HACS_inpath = 'N:/Data-Master/Habitat_condition_assessment_system/Data/Processed/'
 
@@ -97,6 +98,7 @@ def create_new_dataset():
 
     shutil.copyfile(fdh_inpath + 'yieldincreases-bau2022.csv', outpath + 'yieldincreases_bau2022.csv')
     shutil.copyfile(nlum_inpath + 'NLUM_2010-11_mask.tif', outpath + 'NLUM_2010-11_mask.tif')
+    shutil.copyfile(nlum_inpath + 'ag_landuses.csv', outpath + 'ag_landuses.csv')
 
     shutil.copyfile(luto_1D_inpath + 'GHG_targets_20240421.xlsx', outpath + 'GHG_targets.xlsx')
     shutil.copyfile(luto_1D_inpath + 'carbon_prices_20240612.xlsx', outpath + 'carbon_prices.xlsx')
@@ -121,17 +123,26 @@ def create_new_dataset():
     shutil.copyfile(luto_1D_inpath + '20231107_Bundle_AgTech_EI.xlsx', outpath + '20231107_Bundle_AgTech_EI.xlsx')
     shutil.copyfile(luto_1D_inpath + '20240918_Bundle_BC.xlsx', outpath + '20240918_Bundle_BC.xlsx')
 
-    # Copy biodiversity suitability contribution files
-    shutil.copyfile(bio_contributions_inpath + 'BIODIVERSITY_TARGET_AND_SCORES.csv', outpath + 'BIODIVERSITY_TARGET_AND_SCORES.csv')
+    # Copy biodiversity GBF-4A files
+    shutil.copyfile(bio_GBF_4a_inpath + 'BIODIVERSITY_GBF4A_SCORES.csv', outpath + 'BIODIVERSITY_GBF4A_SCORES.csv')
+    shutil.copyfile(bio_GBF_4a_inpath + 'BIODIVERSITY_GBF4A_TARGET.csv', outpath + 'BIODIVERSITY_GBF4A_TARGET.csv')
     
-    shutil.copyfile(bio_contributions_inpath + 'bio_ssp126_Condition_group.nc', outpath + 'bio_ssp126_Condition_group.nc')
-    shutil.copyfile(bio_contributions_inpath + 'bio_ssp126_EnviroSuit.nc', outpath + 'bio_ssp126_EnviroSuit.nc')
-    shutil.copyfile(bio_contributions_inpath + 'bio_ssp245_Condition_group.nc', outpath + 'bio_ssp245_Condition_group.nc')
-    shutil.copyfile(bio_contributions_inpath + 'bio_ssp245_EnviroSuit.nc', outpath + 'bio_ssp245_EnviroSuit.nc')
-    shutil.copyfile(bio_contributions_inpath + 'bio_ssp370_Condition_group.nc', outpath + 'bio_ssp370_Condition_group.nc')
-    shutil.copyfile(bio_contributions_inpath + 'bio_ssp370_EnviroSuit.nc', outpath + 'bio_ssp370_EnviroSuit.nc')
-    shutil.copyfile(bio_contributions_inpath + 'bio_ssp585_Condition_group.nc', outpath + 'bio_ssp585_Condition_group.nc')
-    shutil.copyfile(bio_contributions_inpath + 'bio_ssp585_EnviroSuit.nc', outpath + 'bio_ssp585_EnviroSuit.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp126_Condition_group.nc', outpath + 'bio_ssp126_Condition_group.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp126_EnviroSuit.nc', outpath + 'bio_ssp126_EnviroSuit.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp245_Condition_group.nc', outpath + 'bio_ssp245_Condition_group.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp245_EnviroSuit.nc', outpath + 'bio_ssp245_EnviroSuit.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp370_Condition_group.nc', outpath + 'bio_ssp370_Condition_group.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp370_EnviroSuit.nc', outpath + 'bio_ssp370_EnviroSuit.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp585_Condition_group.nc', outpath + 'bio_ssp585_Condition_group.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp585_EnviroSuit.nc', outpath + 'bio_ssp585_EnviroSuit.nc')
+    
+    # Copy biodiversity GBF-4B files
+    shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_ECNES_AREA_HA.csv', outpath + 'bio_DCCEEW_ECNES_AREA_HA.csv')
+    shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_SNES_AREA_HA.csv', outpath + 'bio_DCCEEW_SNES_AREA_HA.csv')
+    
+    shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_ECNES.nc', outpath + 'bio_DCCEEW_ECNES.nc')
+    shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_SNES.nc', outpath + 'bio_DCCEEW_SNES.nc')
+    
     
     # Copy biodiversity HACS data from DCCEEW
     shutil.copyfile(bio_HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'HABITAT_CONDITION.csv')
@@ -221,12 +232,8 @@ def create_new_dataset():
 
     ############### Create landuses -- lexicographically ordered list of land-uses (strings)
 
-    # Lexicographically ordered list of land-uses
-    ag_landuses = sorted(lmap['LU_DESC'].unique().tolist())
-    ag_landuses.remove('Non-agricultural land')
-
-    # Save to file
-    pd.DataFrame(ag_landuses).to_csv(outpath + 'ag_landuses.csv', index = False, header = False)
+    # Read in ag-landuse, which is a lexicographically ordered list
+    ag_landuses = pd.read_csv(outpath + 'ag_landuses.csv')
 
     # Create a non-agricultural landuses file
     # Do not sort the whole list alphabetically when adding new landuses to the model.
@@ -239,19 +246,12 @@ def create_new_dataset():
 
     ############### Create lumap -- 2010 land-use mapping.
 
-    # Map land-uses by lexicographical index on the map. Use -1 for anything _not_ in the land-use list.
-    lucode = [-1 if (r not in ag_landuses) else ag_landuses.index(r) for r in lmap['LU_DESC']]
-
-    # Convert to series and downcast to int8
-    lumap = pd.to_numeric( pd.Series(lucode), downcast = 'integer')
+    # Read in the 2010 land-use mapping, -1 indicates cells outside the LUTO study area
+    lumap = lmap['LU_ID_LUTO']
     
     # Get the index indicating the cells outside the LUTO study area
     idx_out_LUTO = (lumap == -1).values                                             # shape=6956407, sum=2737674
     idx_inside_LUTO = (lumap != -1).values                                          # shape=6956407, sum=4218733
-
-    # Save to file. HDF5 takes up way less disk space
-    lumap.to_hdf(outpath + 'lumap.h5', key = 'lumap', mode = 'w', format = 'fixed', index = False, complevel = 9)
-
 
 
 
@@ -584,9 +584,15 @@ def create_new_dataset():
 
     ############### Forest and reforestation data
 
-    # Carbon stock in mature forest on natural land and save to file
-    s = pd.DataFrame(columns=['REMNANT_VEG_T_CO2_HA'])
-    s['REMNANT_VEG_T_CO2_HA'] = bioph['REMNANT_VEG_T_CO2_HA']
+    # # Carbon stock in mature forest on natural land and save to file
+    # s = pd.DataFrame(columns=['REMNANT_VEG_T_CO2_HA'])
+    # s['REMNANT_VEG_T_CO2_HA'] = bioph['REMNANT_VEG_T_CO2_HA']
+    # s.to_hdf(outpath + 'natural_land_t_co2_ha.h5', key = 'natural_land_t_co2_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    
+    s = pd.DataFrame(columns=['NATURAL_LAND_AGB_TCO2_HA', 'NATURAL_LAND_AGB_DEBRIS_TCO2_HA', 'NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'])
+    s['NATURAL_LAND_AGB_TCO2_HA'] = bioph['NATURAL_LAND_AGB_TCO2_HA']
+    s['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] = bioph['NATURAL_LAND_AGB_DEBRIS_TCO2_HA']
+    s['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] = bioph['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA']
     s.to_hdf(outpath + 'natural_land_t_co2_ha.h5', key = 'natural_land_t_co2_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
     # Average annual carbon sequestration by Environmental Plantings (block plantings) and save to file

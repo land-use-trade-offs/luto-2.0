@@ -1102,21 +1102,20 @@ def write_biodiversity_separate(data: Data, yr_cal, path):
 
 
 def write_biodiversity_contribution(data: Data, yr_cal, path):
-    
-    # Do nothing if no need to calculate biodiversity contribution
-    if not settings.CALC_BIODIVERSITY_CONTRIBUTION:
-        return
 
     print(f'Writing biodiversity contribution score for {yr_cal}')
+    
+    # # Get dvars for the year
+    # ag_dvar_mrj = data.ag_dvars[yr_cal]
+    # non_ag_dvar_rk = data.non_ag_dvars[yr_cal]
+    # am_dvar_mrj = xr.DataArray(
+    #     np.zeros((len(AG_MANAGEMENTS_TO_LAND_USES), data.NCELLS, data.N_AG_LUS)),
+    #     dims=['ag_management', 'cell', 'ag_landuse'],
+    #     coords={'ag_management':list(AG_MANAGEMENTS_TO_LAND_USES.keys()),
+    #             'cell':np.arange(data.NCELLS),
+    #             'ag_landuse':np.arange(data.N_AG_LUS)})
 
 
-    # Calculate the biodiversity contribution scores
-    if settings.BIO_CALC_LEVEL == 'group':
-        pass
-    elif settings.BIO_CALC_LEVEL == 'species':
-        pass
-    else:
-        raise ValueError('Invalid settings.BIO_CALC_LEVEL! Must be either "group" or "species".')
 
     # # Write the biodiversity contribution to csv
     # bio_df = None
