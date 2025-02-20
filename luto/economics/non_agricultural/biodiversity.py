@@ -28,7 +28,9 @@ from luto.settings import (
     RIPARIAN_PLANTING_BIODIV_BENEFIT,
     AGROFORESTRY_BIODIV_BENEFIT,
     BECCS_BIODIVERSITY_BENEFIT,
-    )
+    AF_PROPORTION,
+    CP_BELT_PROPORTION,
+)
 
 
 def get_biodiv_environmental_plantings(data: Data) -> np.ndarray:
@@ -390,3 +392,36 @@ def get_major_vegetation_matrices(
         mvg_rk_dict[v] = np.concatenate(v_mvg_matrices, axis=1)
 
     return mvg_rk_dict
+
+
+def get_non_ag_lu_biodiv_benefits(data: Data) -> dict[int, float]:
+    return {
+        # Environmental plantings
+        0: ENV_PLANTING_BIODIVERSITY_BENEFIT,
+        # Riparian plantings
+        1: RIPARIAN_PLANTING_BIODIV_BENEFIT,
+        # Sheep agroforestry
+        2: (
+            AF_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
+            + (1 - AF_PROPORTION) * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_sheep_code(data)])
+        ),
+        # Beef agroforestry
+        3: (
+            AF_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
+            + (1 - AF_PROPORTION) * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_beef_code(data)])
+        ),
+        # Carbon plantings (block)
+        4: CARBON_PLANTING_BLOCK_BIODIV_BENEFIT,
+        # Sheep carbon plantings (belt)
+        5: (
+            CP_BELT_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
+            + (1 - CP_BELT_PROPORTION) * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_sheep_code(data)])
+        ),
+        # Beef carbon plantings (belt)
+        6: (
+            CP_BELT_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
+            + (1 - CP_BELT_PROPORTION) * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_beef_code(data)])
+        ),
+        # BECCS
+        7: BECCS_BIODIVERSITY_BENEFIT,
+    }

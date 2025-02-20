@@ -228,7 +228,7 @@ def get_major_vegetation_matrices(data: Data) -> dict[int, np.ndarray]:
     }
     for j in range(data.N_AG_LUS):
         for v in range(data.N_NVIS_CLASSES):
-            v_cells = data.NVIS_INDECES[v]
+            v_cells = data.MAJOR_VEG_INDECES[v]
             mvg_mrj[v][:, v_cells, j] = (
                 data.NVIS_PRE_GR[v][v_cells]
                 * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[j])
@@ -282,7 +282,7 @@ def get_major_vegetation_group_limits(data: Data, yr_cal: int) -> tuple[np.ndarr
     else:
         limits = data.NVIS_LIMITS[yr_cal]
 
-    return limits, data.NVIS_ID2DESC, data.NVIS_INDECES
+    return limits, data.NVIS_ID2DESC, data.MAJOR_VEG_INDECES
 
 
 def get_asparagopsis_effect_mvg_mrj(data: Data):
@@ -329,8 +329,7 @@ def get_ecological_grazing_effect_mvg_mrj(data: Data):
 
 def get_savanna_burning_effect_mvg_mrj(data: Data, v: int):
     """
-    Gets major vegetation groups impacts of using Savanna Burning. Impacts are calculated
-    as the same as biodiversity impacts.
+    Gets major vegetation groups impacts of using Savanna Burning.
 
     Parameters:
     - data: The input data containing information about land management and biodiversity.
@@ -340,16 +339,7 @@ def get_savanna_burning_effect_mvg_mrj(data: Data, v: int):
       of using Savanna Burning.
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
-    mvg_mrj_effect = np.zeros((data.NLMS, data.NCELLS, nlus))
-
-    eds_sav_burning_mvg_benefits = np.where( data.SAVBURN_ELIGIBLE, 
-        (1 - settings.LDS_BIODIVERSITY_VALUE) * data.NVIS_PRE_GR[v] * data.REAL_AREA, 
-        0
-    )
-    for m, j in itertools.product(range(data.NLMS), range(nlus)):
-        mvg_mrj_effect[m, :, j] = eds_sav_burning_mvg_benefits
-
-    return mvg_mrj_effect
+    return np.zeros((data.NLMS, data.NCELLS, nlus))
 
 
 def get_agtech_ei_effect_mvg_mrj(data: Data):
@@ -461,3 +451,49 @@ def get_agricultural_management_major_veg_group_matrices(
         'AgTech EI': agtech_ei_data,
         'Biochar': biochar_data,
     }
+
+
+def get_ag_management_biodiversity_benefits(
+    data: Data,
+    yr_cal: int,
+) -> dict[str, dict[int, float]]:
+    return {
+        'Asparagopsis taxiformis': {
+            j_idx: 0.0 
+            for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis'])
+        },
+        'Precision Agriculture': {
+            j_idx: 0.0 
+            for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture'])
+        },
+        'Ecological Grazing': {
+            j_idx: 0.0 
+            for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing'])
+        },
+        'Savanna Burning': {
+            j_idx: 0.0 
+            for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
+        },
+        'AgTech EI': {
+            j_idx: 0.0 
+            for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['AgTech EI'])
+        },
+        'Biochar': {
+            j_idx: data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact']
+            for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Biochar'])
+        },
+    }
+
+
+def get_species_conservation_limits(
+    data: Data,
+    yr_cal: int,
+) -> tuple[np.ndarray, dict[int, str], dict[int, np.ndarray]]:
+    """
+    
+    """
+    species_limits = data.get_bio_GBF4A_target_by_yr(yr_cal)
+    species_names = {s: spec_name for s, spec_name in enumerate(data.BIO_GBF4A_SEL_SPECIES)}
+    species_matrix = data.get_bio_GBF4A_species_by_yr(yr_cal)
+    species_inds = {s: np.where(species_matrix[s] > 0)[0] for s in range(data.N_SPECIES)}
+    return species_limits, species_names, species_inds

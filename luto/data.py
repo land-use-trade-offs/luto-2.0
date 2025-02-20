@@ -1142,7 +1142,7 @@ class Data:
 
         # Container storing which cells apply to each major vegetation group
         epsilon = 1e-5
-        self.NVIS_INDECES = {
+        self.MAJOR_VEG_INDECES = {
             v: np.where(self.NVIS_PRE_GR[v] > epsilon)[0]
             for v in range(self.NVIS_PRE_GR.shape[0])
         }
@@ -1163,6 +1163,7 @@ class Data:
         bio_GBF4A_target_score_sel = bio_GBF4A_target_percent.query('USER_DEFINED_TARGET_PERCENT > 0')
         
         self.BIO_GBF4A_SEL_SPECIES = bio_GBF4A_target_score_sel['species'].tolist()
+        self.N_SPECIES = len(self.BIO_GBF4A_SEL_SPECIES)
         self.BIO_GBF4A_TARGET_PCT = bio_GBF4A_target_score_sel['USER_DEFINED_TARGET_PERCENT'].to_numpy()
         self.BIO_GBF4A_SCORE_BASE_SEL = bio_GBF4A_baseline_score.query(f'year==1990 and SSP=={settings.SSP}').query(f'species in {self.BIO_GBF4A_SEL_SPECIES}')['BIO_SCORE_HA'].values 
         self.BIO_GBF4A_OUTSIDE_LUTO_SCORE = bio_GBF4A_baseline_score.query(f'year == 2010 and SSP=={settings.SSP} and source == "out"').query(f'species in {self.BIO_GBF4A_SEL_SPECIES}')['BIO_SCORE_HA'].values
@@ -1374,7 +1375,7 @@ class Data:
         return lumap_resample_avg
 
     
-    def get_bio_GBF4A_species_by_yr(self, yr: int):
+    def get_bio_GBF4A_species_by_yr(self, yr: int) -> np.ndarray:
         '''
         Get the biodiversity suitability score [hectare weighted] for each species at the given year.
         

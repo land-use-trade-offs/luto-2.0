@@ -60,7 +60,13 @@ class SolverInputData:
     ag_x_mrj: np.ndarray                    # Agricultural exclude matrices.
     ag_q_mrp: np.ndarray                    # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
     ag_ghg_t_mrj: np.ndarray                # GHG emissions released during transitions between agricultural land uses.
+    
+    ag_biodiv_degr_j: dict[int, float]      # Biodiversity degredation factor for each ag LU.
+    non_ag_biodiv_bnft_k: dict[int, float]  # Biodiversity benefits for each non-ag LU.
+    ag_man_biodiv_bnfts: dict[str, dict[int, float]]       # Biodiversity benefits for each AM option.
     ag_mvg_mrj: dict[int, np.ndarray]       # Agricultural major vegetation groups data: dict indexed by vegetation class (v)
+    mvg_contr_outside_study_area: dict[int, float]         # Contributions of land outside LUTO study area to each major veg. group (keys: major groups)
+    spec_cons_sr: np.ndarray                # Species conservation cell data - indexed by species (s) and cell (r).
 
     non_ag_g_rk: np.ndarray                 # Non-agricultural greenhouse gas emissions matrix.
     non_ag_w_rk: np.ndarray                 # Non-agricultural water requirements matrix.
@@ -88,8 +94,6 @@ class SolverInputData:
     economic_target_yr_carbon_price: float  # target year carbon price.
 
     offland_ghg: np.ndarray                 # GHG emissions from off-land commodities.
-
-    mvg_contr_outside_study_area: dict[int, float]         # Contributions of land outside LUTO study area to each major veg. group (keys: major groups)
 
     lu2pr_pj: np.ndarray                    # Conversion matrix: land-use to product(s).
     pr2cm_cp: np.ndarray                    # Conversion matrix: product(s) to commodity.
@@ -237,12 +241,34 @@ def get_ag_b_mrj(data: Data):
     return output.astype(np.float32)
 
 
+def get_ag_biodiv_degr_j(data: Data) -> dict[int, float]:
+    print('Getting biodiversity degredation data for agricultural land uses...', flush = True)
+    return data.BIODIV_HABITAT_DEGRADE_LOOK_UP
+
+
+def get_non_ag_biodiv_bnft_k(data: Data) -> dict[int, float]:
+    print('Getting biodiversity benefits data for non-agricultural land uses...', flush = True)
+    return non_ag_biodiversity.get_non_ag_lu_biodiv_benefits(data)
+
+
+def get_ag_man_biodiv_bnfts(data: Data, target_year: int) -> dict[str, dict[str, float]]:
+    print('Getting biodiversity benefits data for agricultural management options...', flush = True)
+    return ag_biodiversity.get_ag_management_biodiversity_benefits(data, target_year)
+
+
 def get_ag_mvg_mrj(data: Data):
     if settings.BIODIVERSTIY_TARGET_GBF_3 != "on":
         return np.empty(0)
     print('Getting agricultural major vegetation groups matrices...', flush = True)
     output = ag_biodiversity.get_major_vegetation_matrices(data)
     return output
+
+
+def get_ag_spec_sr(data: Data, target_year: int) -> np.ndarray:
+    if settings.BIODIVERSTIY_TARGET_GBF_4 != "on":
+        return np.empty(0)
+    print('Getting species conservation cell data...', flush = True)
+    return data.get_bio_GBF4A_species_by_yr(target_year)
 
 
 def get_non_ag_w_rk(
@@ -534,6 +560,8 @@ def get_limits(
         else 0
     )
 
+    limits["species_conservation"] = ag_biodiversity.get_species_conservation_limits(data, yr_cal)
+
     return limits
 
 
@@ -601,7 +629,12 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         non_ag_x_rk=get_non_ag_x_rk(data, ag_x_mrj, base_year),
         non_ag_q_crk=get_non_ag_q_crk(data, ag_q_mrp, base_year),
         non_ag_lb_rk=get_non_ag_lb_rk(data, base_year),
+
+        ag_biodiv_degr_j=get_ag_biodiv_degr_j(data),
+        non_ag_biodiv_bnft_k=get_non_ag_biodiv_bnft_k(data),
+        ag_man_biodiv_bnfts=get_ag_man_biodiv_bnfts(data, target_year),
         non_ag_mvg_rk=get_non_ag_mvg_rk(data, ag_mvg_mrj, base_year),
+        spec_cons_sr=get_ag_spec_sr(data, target_year),
         
         ag_man_g_mrj=get_ag_man_g_mrj(data, target_index, ag_g_mrj),
         ag_man_q_mrp=get_ag_man_q_mrj(data, target_index, ag_q_mrp),
