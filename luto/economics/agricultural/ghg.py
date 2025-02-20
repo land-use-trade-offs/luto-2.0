@@ -285,6 +285,7 @@ def get_ghg_transition_penalties(data: Data, lumap) -> np.ndarray:
     for lu in data.LU_MODIFIED_LAND:
         penalties_rj[natural_lu_cells, lu] = penalties_r
 
+
     return np.stack([penalties_rj] * 2)
 
 
