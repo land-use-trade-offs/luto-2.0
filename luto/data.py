@@ -35,7 +35,7 @@ from itertools import product
 from collections import defaultdict
 
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
@@ -157,7 +157,7 @@ class Data:
         self.MASK_LU_CODE = -1
 
         # Load LUMAP without resfactor
-        self.LUMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lumap.h5")).to_numpy()                   # 1D (ij flattend),  0-27 for land uses; -1 for non-agricultural land uses; All cells in Australia (land only)
+        self.LUMAP_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "lumap.h5")).to_numpy().astype(np.int8)  # 1D (ij flattend),  0-27 for land uses; -1 for non-agricultural land uses; All cells in Australia (land only)
 
         # NLUM mask.
         with rasterio.open(os.path.join(INPUT_DIR, "NLUM_2010-11_mask.tif")) as rst:
@@ -257,6 +257,7 @@ class Data:
             self.DESC2AGLU["Sheep - natural land"],
             self.DESC2AGLU["Unallocated - natural land"],
         ]
+        self.LU_LVSTK_NATURAL = [lu for lu in self.LU_NATURAL if self.AGLU2DESC[lu] != 'Unallocated - natural land']
         self.LU_MODIFIED_LAND = [self.DESC2AGLU[lu] for lu in self.AGRICULTURAL_LANDUSES if self.DESC2AGLU[lu] not in self.LU_NATURAL]
         
         self.LU_CROPS_INDICES = [self.AGRICULTURAL_LANDUSES.index(lu) for lu in self.AGRICULTURAL_LANDUSES if lu in self.LU_CROPS]
@@ -1004,7 +1005,7 @@ class Data:
 
 
         ###############################################################
-        # Biodiversity data.
+        # Biodiversity priority conservation data.
         ###############################################################
         print("\tLoading biodiversity data...", flush=True)
         """
@@ -1149,50 +1150,67 @@ class Data:
             
             
             
-        ###############################################################
-        # Species data.
-        ###############################################################
-        # print("\tLoading Species variables...", flush=True)
+        #####################################################################
+        # Biodiersity species suitability and environmental significance data.
+        #####################################################################
+        print("\tLoading Species suitability and environmental significance variables...", flush=True)
         
-
         # Read in the species data from Carla Archibald (noted as GBF-4A)
         BIO_GBF4A_SPECIES_raw = xr.open_dataset(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_EnviroSuit.nc', chunks={'year':1,'species':1})['data']        
 
-        bio_GBF4A_target_percent = pd.read_csv(INPUT_DIR + '/BIODIVERSITY_GBF4A_TARGET.csv')
+
+
         bio_GBF4A_baseline_score = pd.read_csv(INPUT_DIR + '/BIODIVERSITY_GBF4A_SCORES.csv')
-        bio_GBF4A_target_score_sel = bio_GBF4A_target_percent.query('USER_DEFINED_TARGET_PERCENT > 0')
+        bio_GBF4A_target_percent = pd.read_csv(INPUT_DIR + '/BIODIVERSITY_GBF4A_TARGET.csv')
         
-        self.BIO_GBF4A_SEL_SPECIES = bio_GBF4A_target_score_sel['species'].tolist()
-        self.BIO_GBF4A_TARGET_PCT = bio_GBF4A_target_score_sel['USER_DEFINED_TARGET_PERCENT'].to_numpy()
-        self.BIO_GBF4A_SCORE_BASE_SEL = bio_GBF4A_baseline_score.query(f'year==1990 and SSP=={settings.SSP}').query(f'species in {self.BIO_GBF4A_SEL_SPECIES}')['BIO_SCORE_HA'].values 
-        self.BIO_GBF4A_OUTSIDE_LUTO_SCORE = bio_GBF4A_baseline_score.query(f'year == 2010 and SSP=={settings.SSP} and source == "out"').query(f'species in {self.BIO_GBF4A_SEL_SPECIES}')['BIO_SCORE_HA'].values
+        self.BIO_GBF4A_SEL_SPECIES = [row['species'] for _,row in bio_GBF4A_target_percent.iterrows() 
+                                      if all([row['USER_DEFINED_TARGET_PERCENT_2030'] >0,
+                                             row['USER_DEFINED_TARGET_PERCENT_2050'] >0,
+                                             row['USER_DEFINED_TARGET_PERCENT_2100'] >0])]
         
-        self.BIO_GBF4A_SPECIES = BIO_GBF4A_SPECIES_raw.sel(species=self.BIO_GBF4A_SEL_SPECIES).compute()
+        self.BIO_GBF4A_SUITABILITY_OUTSDIE_LUTO_SCORE = bio_GBF4A_baseline_score.query(f'species in {self.BIO_GBF4A_SEL_SPECIES}')[['species', 'year', f'OUTSIDE_LUTO_NATURAL_SUITABILITY_AREA_WEIGHTED_HA_SSP{settings.SSP}']]
+        self.BIO_GBF4A_SUITABILITY_BASELINE_SCORE_TARGET_PERCENT = bio_GBF4A_target_percent.query(f'species in {self.BIO_GBF4A_SEL_SPECIES}')
+
+        self.BIO_GBF4A_SPECIES_LAYER = BIO_GBF4A_SPECIES_raw.sel(species=self.BIO_GBF4A_SEL_SPECIES).compute()
         self.BIO_GBF4A_GROUPS = xr.load_dataset(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_Condition_group.nc')['data']
         
         
-        # # Read in the species data from DCCEEW (noted as GBF-4B)
-        # BIO_GBF4B_SPECIES_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_DCCEEW_SNES.nc', chunks={'species':1})
-        # BIO_GBF4B_COMUNITY_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_DCCEEW_ECNES.nc', chunks={'species':1})
+        # Read in the species data from DCCEEW National Environmental Significance (noted as GBF-4B)
+        BIO_GBF4B_SNES_score = pd.read_csv(INPUT_DIR + '/bio_DCCEEW_SNES_target.csv')
+        BIO_GBF4B_ECNES_score = pd.read_csv(INPUT_DIR + '/bio_DCCEEW_ECNES_target.csv')
+        
+        self.BIO_GBF_4B_SNES_LIKELY_SEL = [row['SCIENTIFIC_NAME'] for _,row in BIO_GBF4B_SNES_score.iterrows()
+                                                if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY'] >0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY'] >0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY'] >0])]
+        
+        self.BIO_GBF_4B_SNES_MAYBE_SEL = [row['SCIENTIFIC_NAME'] for _,row in BIO_GBF4B_SNES_score.iterrows()
+                                                if all([row['USER_DEFINED_TARGET_PERCENT_2030_MAYBE'] >0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2050_MAYBE'] >0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2100_MAYBE'] >0])]
+        
+        self.BIO_GBF4B_ECNES_LIKELY_SEL = [row['COMMUNITY'] for _,row in BIO_GBF4B_ECNES_score.iterrows()
+                                                if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY'] >0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY'] >0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY'] >0])]
+        
+        self.BIO_GBF4B_ECNES_MAYBE_SEL = [row['COMMUNITY'] for _,row in BIO_GBF4B_ECNES_score.iterrows()
+                                                if all([row['USER_DEFINED_TARGET_PERCENT_2030_MAYBE'] >0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2050_MAYBE'] >0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2100_MAYBE'] >0])]
+        
+        
+        if len(self.BIO_GBF_4B_SNES_LIKELY_SEL) == 0 or len(self.BIO_GBF4B_ECNES_LIKELY_SEL) == 0:
+            raise ValueError("At least one of 'LIKELY' layers should be selected!")
 
-        # BIO_GBF4B_SPECIES_score = pd.read_csv(INPUT_DIR + '/bio_DCCEEW_SNES_AREA_HA.csv')
-        # BIO_GBF4B_COMUNITY_score = pd.read_csv(INPUT_DIR + '/bio_DCCEEW_ECNES_AREA_HA.csv')
-        
-        # # Simulate user defined targets for species
-        # BIO_GBF4B_SPECIES_score = rand_target(BIO_GBF4B_SPECIES_score).query('USER_DEFINED_TARGET_PERCENT > 0')
-        # BIO_GBF4B_COMUNITY_score = rand_target(BIO_GBF4B_COMUNITY_score).query('USER_DEFINED_TARGET_PERCENT > 0')
-        
-        
-        # self.BIO_GBF4B_SPECIES_SEL = BIO_GBF4B_SPECIES_score[['SCIENTIFIC_NAME','PRESENCE_RANK']].values
-        # self.BIO_GBF4B_COMUNITY_SEL = BIO_GBF4B_COMUNITY_score[['COMMUNITY','PRES_RANK']].values
-        # self.BIO_GBF4B_SPECIES_TARGET_PCT = BIO_GBF4B_SPECIES_score['USER_DEFINED_TARGET_PERCENT'].to_numpy()
-        # self.BIO_GBF4B_COMUNITY_TARGET_PCT = BIO_GBF4B_COMUNITY_score['USER_DEFINED_TARGET_PERCENT'].to_numpy()
-        
-        # self.BIO_GBF4B_SPECIES = BIO_GBF4B_SPECIES_raw.sel(species=self.BIO_GBF4B_SPECIES_SEL[:,0])
-        
-    
-    
 
+        self.BIO_GBF4B_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = BIO_GBF4B_SNES_score.query(f'SCIENTIFIC_NAME in {self.BIO_GBF_4B_SNES_LIKELY_SEL}')
+        self.BIO_GBF4B_SNES_BASELINE_SCORE_TARGET_PERCENT_MAYBE = BIO_GBF4B_SNES_score.query(f'SCIENTIFIC_NAME in {self.BIO_GBF_4B_SNES_MAYBE_SEL}')
+        self.BIO_GBF4B_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY = BIO_GBF4B_ECNES_score.query(f'COMMUNITY in {self.BIO_GBF4B_ECNES_LIKELY_SEL}')
+        self.BIO_GBF4B_ECNES_BASELINE_SCORE_TARGET_PERCENTE_MAYBE = BIO_GBF4B_ECNES_score.query(f'COMMUNITY in {self.BIO_GBF4B_ECNES_MAYBE_SEL}')
+        
+ 
+ 
         ###############################################################
         # BECCS data.
         ###############################################################
@@ -1374,21 +1392,21 @@ class Data:
         return lumap_resample_avg
 
     
-    def get_bio_GBF4A_species_by_yr(self, yr: int):
+    def get_GBF4A_bio_species_layers_by_yr(self, yr: int):
         '''
         Get the biodiversity suitability score [hectare weighted] for each species at the given year.
         
         The raw biodiversity suitability score [2D (shape, 808*978), (dtype, uint8, 0-100)] represents the 
-        suitability  of each cell for each species.  Here it is LINEARLY interpolated to the given year,
+        suitability of each cell for each species.  Here it is LINEARLY interpolated to the given year,
         then LINEARLY interpolated to the given spatial coordinates.
         
-        Because the coordinates are the controid of the `self.MASK` array, so the spatial interpolation is simultaneously
-        done with the masking. 
+        Because the coordinates are the controid of the `self.MASK` array, so the spatial interpolation is 
+        simultaneously a masking process. 
         
         The suitability score is then  weighted by the area (ha) of each cell. The area weighting
         is necessary to ensure that the biodiversity suitability score will not be affected by different RESFACTOR (i.e., cell size) values.
         '''
-        current_species_val = self.BIO_GBF4A_SPECIES.interp(            # Here the year interpolation is done first                      
+        current_species_val = self.BIO_GBF4A_SPECIES_LAYER.interp(            # Here the year interpolation is done first                      
             year=yr,
             method='linear', 
             kwargs={'fill_value': 'extrapolate'}
@@ -1404,17 +1422,17 @@ class Data:
         return current_species_val
 
 
-    def get_bio_GBF4A_group_by_yr(self, yr: int):
+    def get_GBF4A_bio_group_layers_by_yr(self, yr: int):
         '''
         Get the biodiversity contribution score [hectare weighted] for each group at the given year.
         
         The raw contribution  score [2D (shape, 808*978), (dtype, float32, 0-1)] represents the 
-        percentage contribution of each cell to the total of biodiversity of Australia.  Here it is LINEARLY 
-        interpolated to the given year, then NEARESTLY (which is different from the `linear` interpopation for species data ) 
-        interpolated to the given spatial coordinates.
+        percentage contribution of each cell to the total of biodiversity of Australia.  Here it 
+        is LINEARLY interpolated to the given year, then NEARESTLY (which is different from the 
+        `linear` interpopation for species data ) interpolated to the given spatial coordinates.
         
-        Because the coordinates are the controid of the `self.MASK` array, so the spatial interpolation is simultaneously
-        done with the masking. 
+        Because the coordinates are the controid of the `self.MASK` array, so the spatial interpolation is 
+        simultaneously a masking process. 
         
         The contribution score is then weighted by the area (ha) of each cell. The area weighting is necessary to ensure
         that the biodiversity contribution score will not be affected by different RESFACTOR (i.e., cell size) values.
@@ -1435,19 +1453,159 @@ class Data:
         return  current_group_contribution
     
     
-    def get_bio_GBF4A_target_by_yr(self, yr: int):
+    def get_GBF4A_bio_suitability_area_weighted_score_by_yr(self, yr: int):
+        '''
+        Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for all Australia.
+        '''
+        # Get the target percentage for each species at the given year
         target_pct = []
-        for tgt in self.BIO_GBF4A_TARGET_PCT:
+        for _,row in self.BIO_GBF4A_SUITABILITY_BASELINE_SCORE_TARGET_PERCENT.iterrows():
             f = interp1d(
-                [2010, settings.BIODIVERSTIY_TARGET_GBF_4_ACHIEVING_YEAR],
-                [0, tgt],
+                [1990, 2030, 2050, 2100],
+                [row['HABITAT_SUITABILITY_BASELINE_PERCENT'], row[f'USER_DEFINED_TARGET_PERCENT_2030'], row[f'USER_DEFINED_TARGET_PERCENT_2050'], row[f'USER_DEFINED_TARGET_PERCENT_2100']],
                 kind="linear",
                 fill_value="extrapolate",
             )
-            target_pct.append(f(yr) if yr <= settings.BIODIVERSTIY_TARGET_GBF_4_ACHIEVING_YEAR else tgt)
-        return  (self.BIO_GBF4A_SCORE_BASE_SEL * np.array(target_pct)) - self.BIO_GBF4A_OUTSIDE_LUTO_SCORE
+            target_pct.append(f(yr).item()) 
+            
+        # Calculate the target biodiversity suitability score for each species at the given year for all Australia
+        target_scores_all_AUS = self.BIO_GBF4A_SUITABILITY_BASELINE_SCORE_TARGET_PERCENT['HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA'] * np.array(target_pct)
+        return target_scores_all_AUS
+    
+    
+    def get_GBF4A_bio_suitability_area_weighted_score_outside_natural_LUTO_by_yr(self, yr: int):
+        '''
+        Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for the Outside LUTO natural land.
+        '''
+        outside_natural_luto_baseline = self.BIO_GBF4A_SUITABILITY_BASELINE_SCORE_TARGET_PERCENT['HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO']
+        outside_natural_luto = self.BIO_GBF4A_SUITABILITY_OUTSDIE_LUTO_SCORE.pivot(index='species', columns='year').reset_index()
+        outside_natural_luto.columns = outside_natural_luto.columns.droplevel() 
+        outside_natural_luto[1990] = outside_natural_luto_baseline.values
+        
+        outside_natural_scores = []
+        for _,row in outside_natural_luto.iterrows():
+            f = interp1d(
+                [1990, 2030, 2050, 2070, 2090],
+                [row[1990], row[2030], row[2050], row[2070], row[2090]],
+                kind="linear",
+                fill_value="extrapolate",
+            )
+            outside_natural_scores.append(f(yr).item())
+        
+        return  outside_natural_scores
+    
+    
+    def get_GBF4A_suitability_target_inside_natural_LUTO_by_yr(self, yr: int):
+        '''
+        Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for the Inside LUTO natural land.
+        '''
+        target_scores = self.get_GBF4A_bio_suitability_area_weighted_score_by_yr(yr) - self.get_GBF4A_bio_suitability_area_weighted_score_outside_natural_LUTO_by_yr(yr)
+        return target_scores.values
 
 
+    def get_GBF4B_SNES_target_inside_LUTO_natural_by_year(self, yr:int, layer:Literal['LIKELY', 'MAYBE']):
+        # Check the layer name
+        if layer == 'LIKELY':
+            snes_df = self.BIO_GBF4B_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY
+        elif layer == 'MAYBE':
+            snes_df = self.BIO_GBF4B_SNES_BASELINE_SCORE_TARGET_PERCENT_MAYBE
+        else:
+            raise ValueError("Invalid layer name. Must be 'LIKELY' or 'MAYBE'")
+        
+        # Check the num of selected species
+        if len(snes_df) == 0:
+            return 0
+        
+        target_pct = []
+        for _,row in snes_df.iterrows():
+            f = interp1d(
+                [2010, 2030, 2050, 2100],
+                [row['HABITAT_SIGNIFICANCE_BASELINE_PERCENT_LIKELY'], row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY'], row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY'], row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY']],
+                kind = "linear",
+                fill_value = "extrapolate",
+            )
+            target_pct.append(f(yr).item())
+            
+        # Get the significance score for all Australia
+        snes_score_all_Australia = snes_df['HABITAT_SIGNIFICANCE_BASELINE_ALL_AUSTRALIA_LIKELY'] * target_pct
+        # Subtract the the (significance score for outside LUTO natural) from (significance score for all Australia) 
+        # to get the (significance score for inside LUTO natural) 
+        snes_inside_LUTO_natural =  snes_score_all_Australia - snes_df['HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_LIKELY']
+        return snes_inside_LUTO_natural.values
+    
+        
+    def get_GBF4B_ECNES_target_inside_LUTO_natural_by_year(self, yr:int, layer:Literal['LIKELY', 'MAYBE']):
+        
+        # Check the layer name
+        if layer == 'LIKELY':
+            ecnes_df = self.BIO_GBF4B_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY
+        elif layer == 'MAYBE':
+            ecnes_df = self.BIO_GBF4B_ECNES_BASELINE_SCORE_TARGET_PERCENTE_MAYBE
+        else:
+            raise ValueError("Invalid layer name. Must be 'LIKELY' or 'MAYBE'")
+        
+        # Check the num of selected communities
+        if len(ecnes_df) == 0:
+            return 0
+        
+        target_pct = []
+        for _,row in ecnes_df.iterrows():
+            f = interp1d(
+                [2010, 2030, 2050, 2100],
+                [row['HABITAT_SIGNIFICANCE_BASELINE_PERCENT_LIKELY'], row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY'], row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY'], row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY']],
+                kind = "linear",
+                fill_value = "extrapolate",
+            )
+            target_pct.append(f(yr).item())
+            
+        # Get the significance score for all Australia
+        ecnes_score_all_Australia = ecnes_df['HABITAT_SIGNIFICANCE_BASELINE_ALL_AUSTRALIA_LIKELY'] * target_pct
+        # Subtract the the (significance score for outside LUTO natural) from (significance score for all Australia)
+        # to get the (significance score for inside LUTO natural)
+        ecnes_inside_LUTO_natural =  ecnes_score_all_Australia - ecnes_df['HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_LIKELY']
+        return ecnes_inside_LUTO_natural.values
+    
+    
+    def get_GBF4B_SNES_layers(self, layer:Literal['LIKELY', 'MAYBE']):
+        '''
+        Get the biodiversity significance score (area weighted [ha]) for each species at the given year for all Australia.
+        '''
+        BIO_GBF4B_SPECIES_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_DCCEEW_SNES.nc', chunks={'species':1})
+        # The presence values are 1 = MAYBE, 2 = LIKELY
+        if layer == 'LIKELY':
+            snes_arr =  BIO_GBF4B_SPECIES_raw.sel(species=self.BIO_GBF_4B_SNES_LIKELY_SEL, cell=self.MASK, presence=2).compute()
+        elif layer == 'MAYBE':
+            snes_arr = BIO_GBF4B_SPECIES_raw.sel(species=self.BIO_GBF_4B_SNES_MAYBE_SEL, cell=self.MASK, presence=1).compute()
+        else:
+            raise ValueError("Invalid layer name, must be 'LIKELY' or 'MAYBE'")
+        
+        # Check the num of selected species
+        if len(snes_arr) == 0:
+            return 0
+        
+        return (snes_arr.values * self.REAL_AREA).astype(np.float32)
+
+
+    def get_GBF4B_ECNES_layers(self, layer:Literal['LIKELY', 'MAYBE']):
+        '''
+        Get the biodiversity significance score (area weighted [ha]) for each species at the given year for all Australia.
+        '''
+        BIO_GBF4B_COMUNITY_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_DCCEEW_ECNES.nc', chunks={'species':1})
+        # The presence values are 1 = MAYBE, 2 = LIKELY
+        if layer == 'LIKELY':
+            ecnes_arr =  BIO_GBF4B_COMUNITY_raw.sel(species=self.BIO_GBF4B_ECNES_LIKELY_SEL, cell=self.MASK, presence=2).compute()
+        elif layer == 'MAYBE':
+            ecnes_arr = BIO_GBF4B_COMUNITY_raw.sel(species=self.BIO_GBF4B_ECNES_MAYBE_SEL, cell=self.MASK, presence=1).compute()
+        else:
+            raise ValueError("Invalid layer name, must be 'LIKELY' or 'MAYBE'")
+        
+        # Check the num of selected species
+        if len(ecnes_arr) == 0:
+            return 0
+        
+        return (ecnes_arr.values * self.REAL_AREA).astype(np.float32)
+    
+    
     def add_production_data(self, yr: int, data_type: str, prod_data: Any):
         """
         Safely save production data for a given year to the Data object.
