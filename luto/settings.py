@@ -162,9 +162,38 @@ BARHOMOGENOUS = 1  # Useful for recognizing infeasibility or unboundedness. At t
 THREADS = 50
 
 
+
+# ---------------------------------------------------------------------------- #
+# No-Go areas (Sptail extent to exclude land-use from being utilised in that area)
+# ---------------------------------------------------------------------------- #
+NO_GO_VECTORS = {
+    'Winter cereals':           '../raw_data/no_go_areas/no_go_Winter_cereals.shp',
+    'Environmental Plantings':  '../raw_data/no_go_areas/no_go_Enviornmental_Plantings.shp'
+}
+'''
+Land-use and vector file pairs to exclude land-use from being utilised in that area. 
+'''
+
+
+
+
+
+
 # ---------------------------------------------------------------------------- #
 # Non-agricultural land usage parameters
 # ---------------------------------------------------------------------------- #
+
+REFORESTATION_LIMITS_REGION = 'RivRegNum'  
+'''
+The filed indicates the user-defined regions to limite non-agricultural land uses (i.e., reforestation).
+
+User will provide a vector file possibly with different fileds. For example, if user provides a vector boundary downloaded 
+from Australian Bureau of Statistics (ABS) with different levels of region identifiers (SA2, SA3, SA4, etc.), then the user
+needs to specify the field name (e.g., "SA_NAME21") so that LUTO knows it will set the non-agricultural land uses adoption
+limitation based on SA2 level.
+'''
+
+
 NON_AG_LAND_USES = {
     'Environmental Plantings': True,
     'Riparian Plantings': True,
@@ -176,12 +205,14 @@ NON_AG_LAND_USES = {
     'BECCS': True,
 }
 """
-The dictionary below is the master list of all of the non agricultural land uses
+The dictionary here is the master list of all of the non agricultural land uses
 and whether they are currently enabled in the solver (True/False).
 
 To disable a non-agricultural land use, change the correpsonding value of the
 NON_AG_LAND_USES dictionary to false.
 """
+
+
 NON_AG_LAND_USES_REVERSIBLE = {
     'Environmental Plantings': False,
     'Riparian Plantings': False,
@@ -387,8 +418,6 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 # ------------------- Agricultural biodiversity parameters -------------------
-
-
 
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems

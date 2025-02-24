@@ -29,10 +29,13 @@ and Brett Bryan, Deakin University
 # Load libraries
 import numpy as np
 import pandas as pd
+import geopandas as gpd
+import rasterio
 import shutil, os, time, h5py
 
+from rasterio import features
 from joblib import Parallel, delayed
-from luto.settings import INPUT_DIR, RAW_DATA
+from luto.settings import INPUT_DIR, NO_GO_VECTORS, RAW_DATA
 
 
 
@@ -265,6 +268,35 @@ def create_new_dataset():
 
     # Save to file (int8)
     lmap['IRRIGATION'].to_hdf(outpath + 'lmmap.h5', key = 'lmmap', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    
+    
+    
+    ################# No-Go areas (Sptail extent to exclude land-use from being utilised in that area)
+    no_go_arrs = []
+    for no_ag_lu, no_go_path in NO_GO_VECTORS.items():
+        # Read the no-go area shapefile
+        no_go_shp = gpd.read_file(no_go_path)
+        # Check if the CRS is defined
+        if no_go_shp.crs is None:
+            raise ValueError(f"{no_go_path} does not have a CRS defined")
+        # Rasterize the reforestation vector; Fill with -1
+        with rasterio.open(outpath + 'NLUM_2010-11_mask.tif') as src:
+            src_arr = src.read(1)
+            src_meta = src.meta.copy()
+            no_go_shp = no_go_shp.to_crs(src_meta['crs'])
+            no_go_arr = rasterio.features.rasterize(
+                ((row['geometry'], 1) for _,row in no_go_shp.iterrows()),
+                out_shape=(src_meta['height'], src_meta['width']),
+                transform=src_meta['transform'],
+                fill=0,
+                dtype=np.int8
+            )
+            # Add the no-go area to the list
+            no_go_arrs.append(no_go_arr[np.nonzero(src_arr)].astype(np.bool_))
+        
+    # Save to file
+    no_go_arrs = np.stack(no_go_arrs, axis=0)
+    np.save(outpath + 'no_go_arrs.npy', no_go_arrs) # shape: (k, j)
 
 
 

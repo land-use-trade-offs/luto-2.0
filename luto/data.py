@@ -409,7 +409,6 @@ class Data:
         )
         self.add_non_ag_dvars(self.YR_CAL_BASE, self.NON_AG_L_RK)
 
-
         ###############################################################
         # Climate change impact data.
         ###############################################################
@@ -418,6 +417,11 @@ class Data:
         self.CLIMATE_CHANGE_IMPACT = pd.read_hdf(
             os.path.join(INPUT_DIR, "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".h5")
         )
+
+        ###############################################################
+        # No-Go areas (Sptail extent to exclude land-use from being utilised in that area).
+        ###############################################################
+        self.NO_GO_AREA = np.load(os.path.join(INPUT_DIR, "no_go_arrs.npy"))
 
 
 
@@ -1403,8 +1407,8 @@ class Data:
         Because the coordinates are the controid of the `self.MASK` array, so the spatial interpolation is 
         simultaneously a masking process. 
         
-        The suitability score is then  weighted by the area (ha) of each cell. The area weighting
-        is necessary to ensure that the biodiversity suitability score will not be affected by different RESFACTOR (i.e., cell size) values.
+        The suitability score is then weighted by the area (ha) of each cell. The area weighting is necessary 
+        to ensure that the biodiversity suitability score will not be affected by different RESFACTOR (i.e., cell size) values.
         '''
         current_species_val = self.BIO_GBF4A_SPECIES_LAYER.interp(            # Here the year interpolation is done first                      
             year=yr,
@@ -1507,8 +1511,10 @@ class Data:
         # Check the layer name
         if layer == 'LIKELY':
             snes_df = self.BIO_GBF4B_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY
+            snes_out_LUTO = snes_df['HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_LIKELY']
         elif layer == 'MAYBE':
             snes_df = self.BIO_GBF4B_SNES_BASELINE_SCORE_TARGET_PERCENT_MAYBE
+            snes_out_LUTO = snes_df['HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_MAYBE']
         else:
             raise ValueError("Invalid layer name. Must be 'LIKELY' or 'MAYBE'")
         
@@ -1530,7 +1536,7 @@ class Data:
         snes_score_all_Australia = snes_df['HABITAT_SIGNIFICANCE_BASELINE_ALL_AUSTRALIA_LIKELY'] * target_pct
         # Subtract the the (significance score for outside LUTO natural) from (significance score for all Australia) 
         # to get the (significance score for inside LUTO natural) 
-        snes_inside_LUTO_natural =  snes_score_all_Australia - snes_df['HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_LIKELY']
+        snes_inside_LUTO_natural =  snes_score_all_Australia - snes_out_LUTO
         return snes_inside_LUTO_natural.values
     
         
@@ -1539,8 +1545,10 @@ class Data:
         # Check the layer name
         if layer == 'LIKELY':
             ecnes_df = self.BIO_GBF4B_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY
+            ecnes_out_LUTO = ecnes_df['HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_LIKELY']
         elif layer == 'MAYBE':
             ecnes_df = self.BIO_GBF4B_ECNES_BASELINE_SCORE_TARGET_PERCENTE_MAYBE
+            ecnes_out_LUTO = ecnes_df['HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_MAYBE']
         else:
             raise ValueError("Invalid layer name. Must be 'LIKELY' or 'MAYBE'")
         
@@ -1562,7 +1570,7 @@ class Data:
         ecnes_score_all_Australia = ecnes_df['HABITAT_SIGNIFICANCE_BASELINE_ALL_AUSTRALIA_LIKELY'] * target_pct
         # Subtract the the (significance score for outside LUTO natural) from (significance score for all Australia)
         # to get the (significance score for inside LUTO natural)
-        ecnes_inside_LUTO_natural =  ecnes_score_all_Australia - ecnes_df['HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_LIKELY']
+        ecnes_inside_LUTO_natural =  ecnes_score_all_Australia - ecnes_out_LUTO
         return ecnes_inside_LUTO_natural.values
     
     
@@ -1573,7 +1581,7 @@ class Data:
         BIO_GBF4B_SPECIES_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_DCCEEW_SNES.nc', chunks={'species':1})
         # The presence values are 1 = MAYBE, 2 = LIKELY
         if layer == 'LIKELY':
-            snes_arr =  BIO_GBF4B_SPECIES_raw.sel(species=self.BIO_GBF_4B_SNES_LIKELY_SEL, cell=self.MASK, presence=2).compute()
+            snes_arr = BIO_GBF4B_SPECIES_raw.sel(species=self.BIO_GBF_4B_SNES_LIKELY_SEL, cell=self.MASK, presence=2).compute()
         elif layer == 'MAYBE':
             snes_arr = BIO_GBF4B_SPECIES_raw.sel(species=self.BIO_GBF_4B_SNES_MAYBE_SEL, cell=self.MASK, presence=1).compute()
         else:
@@ -1593,7 +1601,7 @@ class Data:
         BIO_GBF4B_COMUNITY_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_DCCEEW_ECNES.nc', chunks={'species':1})
         # The presence values are 1 = MAYBE, 2 = LIKELY
         if layer == 'LIKELY':
-            ecnes_arr =  BIO_GBF4B_COMUNITY_raw.sel(species=self.BIO_GBF4B_ECNES_LIKELY_SEL, cell=self.MASK, presence=2).compute()
+            ecnes_arr = BIO_GBF4B_COMUNITY_raw.sel(species=self.BIO_GBF4B_ECNES_LIKELY_SEL, cell=self.MASK, presence=2).compute()
         elif layer == 'MAYBE':
             ecnes_arr = BIO_GBF4B_COMUNITY_raw.sel(species=self.BIO_GBF4B_ECNES_MAYBE_SEL, cell=self.MASK, presence=1).compute()
         else:
