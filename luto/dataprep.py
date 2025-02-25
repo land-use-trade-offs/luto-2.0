@@ -137,8 +137,8 @@ def create_new_dataset():
     shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp585_EnviroSuit.nc', outpath + 'bio_ssp585_EnviroSuit.nc')
     
     # Copy biodiversity GBF-4B files
-    shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_ECNES_AREA_HA.csv', outpath + 'bio_DCCEEW_ECNES_AREA_HA.csv')
-    shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_SNES_AREA_HA.csv', outpath + 'bio_DCCEEW_SNES_AREA_HA.csv')
+    shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_ECNES_target.csv', outpath + 'bio_DCCEEW_ECNES_target.csv')
+    shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_SNES_target.csv', outpath + 'bio_DCCEEW_SNES_target.csv')
     
     shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_ECNES.nc', outpath + 'bio_DCCEEW_ECNES.nc')
     shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_SNES.nc', outpath + 'bio_DCCEEW_SNES.nc')
@@ -233,7 +233,7 @@ def create_new_dataset():
     ############### Create landuses -- lexicographically ordered list of land-uses (strings)
 
     # Read in ag-landuse, which is a lexicographically ordered list
-    ag_landuses = pd.read_csv(outpath + 'ag_landuses.csv')
+    ag_landuses = pd.read_csv(outpath + 'ag_landuses.csv', header = None)[0].to_list()
 
     # Create a non-agricultural landuses file
     # Do not sort the whole list alphabetically when adding new landuses to the model.
@@ -248,6 +248,9 @@ def create_new_dataset():
 
     # Read in the 2010 land-use mapping, -1 indicates cells outside the LUTO study area
     lumap = lmap['LU_ID_LUTO']
+
+    # Save to file (int8)
+    lumap.to_hdf(outpath + 'lumap.h5', key = 'lumap', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
     # Get the index indicating the cells outside the LUTO study area
     idx_out_LUTO = (lumap == -1).values                                             # shape=6956407, sum=2737674
@@ -632,11 +635,6 @@ def create_new_dataset():
     s['HIR_BLOCK_BG_AVG_T_CO2_HA_YR'] = bioph['HIR_BLOCK_SOIL_AVG_T_CO2_HA_YR']
     s.to_hdf(outpath + 'hir_block_avg_t_co2_ha_yr.h5', key = 'hir_block_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
-    # Average annual carbon sequestration by Human Induced Regrowth (riparian plantings) and save to file
-    s = pd.DataFrame(columns=['HIR_RIP_AG_AVG_T_CO2_HA_YR', 'HIR_RIP_BG_AVG_T_CO2_HA_YR'])
-    s['HIR_RIP_AG_AVG_T_CO2_HA_YR'] = bioph.eval('HIR_RIP_TREES_AVG_T_CO2_HA_YR + HIR_RIP_DEBRIS_AVG_T_CO2_HA_YR')
-    s['HIR_RIP_BG_AVG_T_CO2_HA_YR'] = bioph['HIR_RIP_SOIL_AVG_T_CO2_HA_YR']
-    s.to_hdf(outpath + 'hir_rip_avg_t_co2_ha_yr.h5', key = 'hir_rip_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
     # MASK for Human Induced Regrowth (riparian plantings) and save to file
     hir_mask = bioph['AVG_AN_PREC_MM_YR'] <= 300
@@ -1022,11 +1020,6 @@ def create_new_dataset():
 
     # Save to HDF5 file
     cell_xy.to_hdf(outpath + 'cell_BECCS_df.h5', key = 'cell_BECCS_df', mode = 'w', format = 'fixed', index = False, complevel = 9)
-
-
-
-
-
 
 
     # Complete processing and report back

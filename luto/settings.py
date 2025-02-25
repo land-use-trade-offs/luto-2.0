@@ -411,8 +411,6 @@ BIODIV_GBF_TARGET_2_DICT = {
 # Global Biodiversity Framework Target 4: Halt Species Extinction, Protect Genetic Diversity, and Manage Human-Wildlife Conflicts
 CALC_BIODIVERSITY_CONTRIBUTION = False              # True or False, calculate/report biodiversity contribution; False will turn off reprojecting decision variables to xarray so speed up the model run.
 BIODIVERSTIY_TARGET_GBF_4 = 'on'                    # 'on' or 'off'.
-BIODIVERSTIY_TARGET_GBF_4_ACHIEVING_YEAR = 2030     # The year to achieve the GBF Target 4
-
 
 # BIODIV_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
 BIODIV_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
