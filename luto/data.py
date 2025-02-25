@@ -21,7 +21,7 @@
 
 
 import os
-import h5py
+import h5py, netCDF4
 import xarray as xr
 import numpy as np
 import pandas as pd
@@ -426,10 +426,11 @@ class Data:
         print("\tLoading no-go areas and regional adoption zones...", flush=True)
    
         ##################### No-go areas
-        for lu in self.NO_GA_LANUSE:
+        self.NO_GO_LANDUSE = settings.NO_GO_VECTORS.keys()
+        for lu in self.NO_GO_LANDUSE:
             if not lu in self.AGRICULTURAL_LANDUSES + self.NON_AGRICULTURAL_LANDUSES:
                 raise KeyError(f"Land use '{lu}' in no-go area vector does not match any land use in the model.")
-        
+
         no_go_arrs = []
         for no_ag_lu, no_go_path in NO_GO_VECTORS.items():
             # Read the no-go area shapefile
@@ -451,10 +452,9 @@ class Data:
                 )
                 # Add the no-go area to the list
                 no_go_arrs.append(no_go_arr[np.nonzero(src_arr)].astype(np.bool_))
-            
-
-        self.NO_GO_AREA = np.stack(no_go_arrs, axis=0)[:, self.MASK]
-        self.NO_GA_LANUSE = settings.NO_GO_VECTORS.keys()
+       
+        self.NO_GO_REGION = np.stack(no_go_arrs, axis=0)[:, self.MASK]
+        
 
         
         ##################### Regional adoption zones
@@ -1662,7 +1662,13 @@ class Data:
     
     def get_regional_adoption_percent_by_year(self, yr: int):
         """
-        Get the reforestation percentage for each limiting region for the given year.
+        Get the regional adoption percentage for each region for the given year.
+        
+        Return a list of tuples where each tuple contains 
+        - the region ID, 
+        - landuse name, 
+        - the adoption percentage.
+        
         """
         reg_adop_limits = []
         for _,row in self.REGIONAL_ADOPTION_TARGETS.iterrows():
@@ -1675,6 +1681,23 @@ class Data:
             reg_adop_limits.append((row[REGIONAL_ADOPTION_ZONE], row['TARGET_LANDUSE'], f(yr).item()))
             
         return reg_adop_limits
+    
+    def get_regional_adoption_limit_ha_by_year(self, yr: int):
+        """
+        Get the regional adoption area for each region for the given year.
+        
+        Return a list of tuples where each tuple contains
+        - the region ID,
+        - landuse name,
+        - the adoption area (ha).
+        """
+        reg_adop_limits = self.get_regional_adoption_percent_by_year(yr)
+        reg_adop_limits_ha = []
+        for reg, landuse, pct in reg_adop_limits:
+            reg_total_area_ha = ((self.REGIONAL_ADOPTION_ZONES == reg) * self.REAL_AREA).sum()
+            reg_adop_limits_ha.append((reg, landuse, reg_total_area_ha * pct / 100))
+            
+        return reg_adop_limits_ha
     
     
     def add_production_data(self, yr: int, data_type: str, prod_data: Any):
