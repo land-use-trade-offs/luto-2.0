@@ -26,6 +26,8 @@ import xarray as xr
 import numpy as np
 import pandas as pd
 import rasterio
+import rasterio.features
+import geopandas as gpd
 
 import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
@@ -39,7 +41,7 @@ from typing import Any, Literal, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.settings import INPUT_DIR, NVIS_CLASS_DETAIL , NVIS_SPATIAL_DETAIL, OUTPUT_DIR
+from luto.settings import INPUT_DIR, NO_GO_VECTORS, NVIS_CLASS_DETAIL , NVIS_SPATIAL_DETAIL, OUTPUT_DIR, REGIONAL_ADOPTION_ZONE
 from luto.tools.spatializers import upsample_array
 
 
@@ -419,11 +421,55 @@ class Data:
         )
 
         ###############################################################
-        # No-Go areas (Sptail extent to exclude land-use from being utilised in that area).
+        # No-Go areas; Regional adoption constraints.
         ###############################################################
-        self.NO_GO_AREA = np.load(os.path.join(INPUT_DIR, "no_go_arrs.npy"))
+        print("\tLoading no-go areas and regional adoption zones...", flush=True)
+   
+        ##################### No-go areas
+        for lu in self.NO_GA_LANUSE:
+            if not lu in self.AGRICULTURAL_LANDUSES + self.NON_AGRICULTURAL_LANDUSES:
+                raise KeyError(f"Land use '{lu}' in no-go area vector does not match any land use in the model.")
+        
+        no_go_arrs = []
+        for no_ag_lu, no_go_path in NO_GO_VECTORS.items():
+            # Read the no-go area shapefile
+            no_go_shp = gpd.read_file(no_go_path)
+            # Check if the CRS is defined
+            if no_go_shp.crs is None:
+                raise ValueError(f"{no_go_path} does not have a CRS defined")
+            # Rasterize the reforestation vector; Fill with -1
+            with rasterio.open(INPUT_DIR + '/NLUM_2010-11_mask.tif') as src:
+                src_arr = src.read(1)
+                src_meta = src.meta.copy()
+                no_go_shp = no_go_shp.to_crs(src_meta['crs'])
+                no_go_arr = rasterio.features.rasterize(
+                    ((row['geometry'], 1) for _,row in no_go_shp.iterrows()),
+                    out_shape=(src_meta['height'], src_meta['width']),
+                    transform=src_meta['transform'],
+                    fill=0,
+                    dtype=np.int8
+                )
+                # Add the no-go area to the list
+                no_go_arrs.append(no_go_arr[np.nonzero(src_arr)].astype(np.bool_))
+            
 
+        self.NO_GO_AREA = np.stack(no_go_arrs, axis=0)[:, self.MASK]
+        self.NO_GA_LANUSE = settings.NO_GO_VECTORS.keys()
 
+        
+        ##################### Regional adoption zones
+        self.REGIONAL_ADOPTION_ZONES = self.get_array_resfactor_applied(
+            pd.read_hdf(os.path.join(INPUT_DIR, "regional_adoption_zones.h5"))[REGIONAL_ADOPTION_ZONE].to_numpy()
+        )
+        
+        regional_adoption_targets = pd.read_excel(os.path.join(INPUT_DIR, "regional_adoption_zones.xlsx"), sheet_name=REGIONAL_ADOPTION_ZONE)
+        self.REGIONAL_ADOPTION_TARGETS = regional_adoption_targets.iloc[
+            [idx for idx, row in regional_adoption_targets.iterrows() if
+                all([row['ADOPTION_PERCENTAGE_2030']>=0, 
+                    row['ADOPTION_PERCENTAGE_2050']>=0, 
+                    row['ADOPTION_PERCENTAGE_2100']>=0])
+            ]
+        ]
 
         ###############################################################
         # Livestock related data.
@@ -1612,6 +1658,23 @@ class Data:
             return 0
         
         return (ecnes_arr.values * self.REAL_AREA).astype(np.float32)
+    
+    
+    def get_regional_adoption_percent_by_year(self, yr: int):
+        """
+        Get the reforestation percentage for each limiting region for the given year.
+        """
+        reg_adop_limits = []
+        for _,row in self.REGIONAL_ADOPTION_TARGETS.iterrows():
+            f = interp1d(
+                [2010, 2030, 2050, 2100],
+                [row['BASE_LANDUSE_AREA_PERCENT'], row['ADOPTION_PERCENTAGE_2030'], row['ADOPTION_PERCENTAGE_2050'], row['ADOPTION_PERCENTAGE_2100']],
+                kind="linear",
+                fill_value="extrapolate",
+            )
+            reg_adop_limits.append((row[REGIONAL_ADOPTION_ZONE], row['TARGET_LANDUSE'], f(yr).item()))
+            
+        return reg_adop_limits
     
     
     def add_production_data(self, yr: int, data_type: str, prod_data: Any):

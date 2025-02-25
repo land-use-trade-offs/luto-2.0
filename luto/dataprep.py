@@ -33,6 +33,7 @@ import geopandas as gpd
 import rasterio
 import shutil, os, time, h5py
 
+from itertools import product
 from rasterio import features
 from joblib import Parallel, delayed
 from luto.settings import INPUT_DIR, NO_GO_VECTORS, RAW_DATA
@@ -242,10 +243,6 @@ def create_new_dataset():
     # Do not sort the whole list alphabetically when adding new landuses to the model.
     non_ag_landuses = ['Environmental Plantings', 'Riparian Plantings', 'Agroforestry', 'Carbon Plantings (Block)', 'Carbon Plantings (Belt)', 'BECCS']
 
-    # Save to file
-    pd.DataFrame(non_ag_landuses).to_csv(outpath + 'non_ag_landuses.csv', index = False, header = False)
-
-
 
     ############### Create lumap -- 2010 land-use mapping.
 
@@ -271,34 +268,56 @@ def create_new_dataset():
     
     
     
-    ################# No-Go areas (Sptail extent to exclude land-use from being utilised in that area)
-    no_go_arrs = []
-    for no_ag_lu, no_go_path in NO_GO_VECTORS.items():
-        # Read the no-go area shapefile
-        no_go_shp = gpd.read_file(no_go_path)
-        # Check if the CRS is defined
-        if no_go_shp.crs is None:
-            raise ValueError(f"{no_go_path} does not have a CRS defined")
-        # Rasterize the reforestation vector; Fill with -1
-        with rasterio.open(outpath + 'NLUM_2010-11_mask.tif') as src:
-            src_arr = src.read(1)
-            src_meta = src.meta.copy()
-            no_go_shp = no_go_shp.to_crs(src_meta['crs'])
-            no_go_arr = rasterio.features.rasterize(
-                ((row['geometry'], 1) for _,row in no_go_shp.iterrows()),
-                out_shape=(src_meta['height'], src_meta['width']),
-                transform=src_meta['transform'],
-                fill=0,
-                dtype=np.int8
-            )
-            # Add the no-go area to the list
-            no_go_arrs.append(no_go_arr[np.nonzero(src_arr)].astype(np.bool_))
+
+    ################# Regional adoption constraints
+    
+    # Get the code-name mapping for the regional adoption zones
+    code2name = {
+        'ABARES_AAGIS':['ABARES_AAGIS'], 
+        'LGA_CODE': ['LGA_NAME10'], 
+        'NRM_CODE': ['NRM_NAME'], 
+        'IBRA_ID': ['IBRA_SUB_CODE_7', 'IBRA_SUB_NAME_7', 'IBRA_REG_CODE_7', 'IBRA_REG_NAME_7'], 
+        'SLA_5DIGIT': ['SLA_NAME10'],
+    }
+    
+    
+    # Get the codes for regional adoption zones 
+    regional_adoption_zones = zones[code2name.keys()]
+    regional_adoption_zones.to_hdf(outpath + 'regional_adoption_zones.h5', key = 'regional_adoption_zones', mode = 'w', format = 'table', index = False, complevel = 9)
+
+
+    # Get the regional adoption zone names
+    regional_adoption_sheets = {}
+    for code,names in code2name.items():
         
-    # Save to file
-    no_go_arrs = np.stack(no_go_arrs, axis=0)
-    np.save(outpath + 'no_go_arrs.npy', no_go_arrs) # shape: (k, j)
+        # Get the unique attributes for each regional adoption zones
+        agg_names = zones.groupby(code).first().reset_index()[sorted(list(set([code] + names)))]
+        agg_names.insert(1, 'ADOPTION_PERCENTAGE_2100', np.nan)
+        agg_names.insert(1, 'ADOPTION_PERCENTAGE_2050', np.nan)
+        agg_names.insert(1, 'ADOPTION_PERCENTAGE_2030', np.nan)
+        agg_names.insert(1, 'TARGET_LANDUSE', [ag_landuses + non_ag_landuses] * len(agg_names))
+        agg_names = agg_names.explode('TARGET_LANDUSE')
+        agg_names.insert(1, 'BASE_LANDUSE_AREA_PERCENT', np.zeros(len(agg_names), dtype=np.float32))
+        
+        
+        # Calculate each land-use's area percentage in each zone
+        zone_area = zones.groupby(code)['CELL_HA'].sum().reset_index()
+        for lu_code in np.unique(lumap):
+            if lu_code == -1: continue  # Skip cells outside the LUTO study area (flagged as -1)
+            lu_arr = (lumap == lu_code)
+            lu_area = zones['CELL_HA'].loc[lu_arr].groupby(zones[code]).sum().reset_index()
+            lu_percentage = lu_area.merge(zone_area, on=code, how='left').eval('percent = CELL_HA_x / CELL_HA_y * 100')
+            # Save the land-use area percentage in each zone
+            agg_names.loc[(agg_names[code].isin(lu_percentage[code]) & (agg_names['TARGET_LANDUSE'] == ag_landuses[lu_code])), 'BASE_LANDUSE_AREA_PERCENT'] = lu_percentage['percent'].values
 
-
+        # Save the regional adoption zones to a dictionary
+        regional_adoption_sheets[code] = agg_names
+        
+        
+    # Save to Excel
+    with pd.ExcelWriter(outpath + 'regional_adoption_zones.xlsx') as writer:
+        for code, sheet in regional_adoption_sheets.items():
+            sheet.to_excel(writer, sheet_name=code, index=False)
 
 
     ############### Create real_area -- hectares per cell, corrected for geographic map projection.
@@ -308,7 +327,6 @@ def create_new_dataset():
 
     # Save to file
     zones['CELL_HA'].to_hdf(outpath + 'real_area.h5', key = 'real_area', mode = 'w', format = 'fixed', index = False, complevel = 9)
-
 
 
 

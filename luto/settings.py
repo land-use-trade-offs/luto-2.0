@@ -164,35 +164,35 @@ THREADS = 50
 
 
 # ---------------------------------------------------------------------------- #
-# No-Go areas (Sptail extent to exclude land-use from being utilised in that area)
+# No-Go areas; Regional adoption constraints
 # ---------------------------------------------------------------------------- #
+
 NO_GO_VECTORS = {
-    'Winter cereals':           '../raw_data/no_go_areas/no_go_Winter_cereals.shp',
-    'Environmental Plantings':  '../raw_data/no_go_areas/no_go_Enviornmental_Plantings.shp'
+    'Winter cereals':           'input/no_go_areas/no_go_Winter_cereals.shp',
+    'Environmental Plantings':  'input/no_go_areas/no_go_Enviornmental_Plantings.shp'
 }
 '''
 Land-use and vector file pairs to exclude land-use from being utilised in that area. 
+ - The key is the land-use name. 
+ - The value is the path to the ESRI shapefile.
 '''
 
-
-
+REGIONAL_ADOPTION_ZONE = 'ABARES_AAGIS' # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
+'''
+The regional adoption zone is the spatial unit used to enforce regional adoption constraints.
+The options are:
+  - 'ABARES_AAGIS': Australian Bureau of Agricultural and Resource Economics and Sciences (ABARES) Agricultural and Agribusiness Geographic Information System (AAGIS) regions.
+  - 'LGA_CODE': Local Government Area code.
+  - 'NRM_CODE': Natural Resource Management code.
+  - 'IBRA_ID': Interim Biogeographic Regionalisation of Australia (IBRA) region code.
+  - 'SLA_5DIGIT': Statistical Local Area (SLA) 5-digit code.
+'''
 
 
 
 # ---------------------------------------------------------------------------- #
 # Non-agricultural land usage parameters
 # ---------------------------------------------------------------------------- #
-
-REFORESTATION_LIMITS_REGION = 'RivRegNum'  
-'''
-The filed indicates the user-defined regions to limite non-agricultural land uses (i.e., reforestation).
-
-User will provide a vector file possibly with different fileds. For example, if user provides a vector boundary downloaded 
-from Australian Bureau of Statistics (ABS) with different levels of region identifiers (SA2, SA3, SA4, etc.), then the user
-needs to specify the field name (e.g., "SA_NAME21") so that LUTO knows it will set the non-agricultural land uses adoption
-limitation based on SA2 level.
-'''
-
 
 NON_AG_LAND_USES = {
     'Environmental Plantings': True,
