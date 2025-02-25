@@ -79,8 +79,8 @@ class SolverInputData:
     water_yield_outside_study_area: dict[int, float]       # Water yield from outside LUTO study area -> dict. Key: region.
     
     ag_biodiv_degr_j: dict[int, float]                     # Biodiversity degredation factor for each ag LU.
-    non_ag_biodiv_degr_k: dict[int, float]                 # Biodiversity benefits for each non-ag LU.
-    ag_man_biodiv_bnfts: dict[str, dict[int, float]]       # Biodiversity benefits for each AM option.
+    non_ag_biodiv_impact_k: dict[int, float]                 # Biodiversity benefits for each non-ag LU.
+    ag_man_biodiv_impacts: dict[str, dict[int, float]]       # Biodiversity benefits for each AM option.
     mvg_vr: np.ndarray                                     # Major vegetation group cell contribution data - indexed by veg. group (v) and cell (r)
     sc_sr: np.ndarray                                      # Species conservation cell contribution data - indexed by species (s) and cell (r).
     mvg_contr_outside_study_area: dict[int, float]         # Contributions of land outside LUTO study area to each major veg. group (keys: major groups)
@@ -244,14 +244,14 @@ def get_ag_biodiv_degr_j(data: Data) -> dict[int, float]:
     return data.BIODIV_HABITAT_DEGRADE_LOOK_UP
 
 
-def get_non_ag_biodiv_degr_k(data: Data) -> dict[int, float]:
+def get_non_ag_biodiv_impact_k(data: Data) -> dict[int, float]:
     print('Getting biodiversity benefits data for non-agricultural land uses...', flush = True)
     return non_ag_biodiversity.get_non_ag_lu_biodiv_impacts(data)
 
 
-def get_ag_man_biodiv_bnfts(data: Data, target_year: int) -> dict[str, dict[str, float]]:
+def get_ag_man_biodiv_impacts(data: Data, target_year: int) -> dict[str, dict[str, float]]:
     print('Getting biodiversity benefits data for agricultural management options...', flush = True)
-    return ag_biodiversity.get_ag_management_biodiversity_benefits(data, target_year)
+    return ag_biodiversity.get_ag_management_biodiversity_impacts(data, target_year)
 
 
 def get_mvg_vr(data: Data):
@@ -266,7 +266,7 @@ def get_sc_sr(data: Data, target_year: int) -> np.ndarray:
     if settings.BIODIVERSTIY_TARGET_GBF_4 != "on":
         return np.empty(0)
     print('Getting species conservation cell data...', flush = True)
-    return data.get_bio_GBF4A_species_by_yr(target_year) * data.REAL_AREA
+    return data.get_GBF4A_bio_species_layers_by_yr(target_year) * data.REAL_AREA
 
 
 def get_non_ag_w_rk(
@@ -619,8 +619,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         water_yield_RR_BASE_YR=get_w_RR_BASE_YR(data),                                  # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
 
         ag_biodiv_degr_j=get_ag_biodiv_degr_j(data),
-        non_ag_biodiv_degr_k=get_non_ag_biodiv_degr_k(data),
-        ag_man_biodiv_bnfts=get_ag_man_biodiv_bnfts(data, target_year),
+        non_ag_biodiv_impact_k=get_non_ag_biodiv_impact_k(data),
+        ag_man_biodiv_impacts=get_ag_man_biodiv_impacts(data, target_year),
         sc_sr=get_sc_sr(data, target_year),
         mvg_vr=get_mvg_vr(data),
 

@@ -825,12 +825,12 @@ class LutoSolver:
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
                     self._input_data.mvg_vr[v, ind]
-                    * (self._input_data.ag_man_biodiv_bnfts[am][j_idx] - 1)
+                    * (self._input_data.ag_man_biodiv_impacts[am][j_idx] - 1)
                     * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
                 )  # Dryland alt. ag. management contributions
                 + gp.quicksum(
                     self._input_data.mvg_vr[v, ind]
-                    * (self._input_data.ag_man_biodiv_bnfts[am][j_idx] - 1)
+                    * (self._input_data.ag_man_biodiv_impacts[am][j_idx] - 1)
                     * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
                 )  # Irrigated alt. ag. management contributions
                 for am, am_j_list in self._input_data.am2j.items()
@@ -840,7 +840,7 @@ class LutoSolver:
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
                     self._input_data.mvg_vr[v, ind]
-                    * self._input_data.non_ag_biodiv_degr_k[k]
+                    * self._input_data.non_ag_biodiv_impact_k[k]
                     * self.X_non_ag_vars_kr[k, ind]
                 )  # Non-agricultural contribution
                 for k in range(self._input_data.n_non_ag_lus)
@@ -863,20 +863,18 @@ class LutoSolver:
         s_limits, s_names, s_ind = self._input_data.limits["species_conservation"]
 
         print(f"  ...Biodiversity GBF 4 (species conservation) constraints...")
-
-        breakpoint()
         
         for s, s_area_lb in enumerate(s_limits):
             ind = s_ind[s]
             
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.sc_sr[s, ind]
+                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
                     * (1 - self._input_data.ag_biodiv_degr_j[j])
                     * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
-                    self._input_data.sc_sr[s, ind]
+                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
                     * (1 - self._input_data.ag_biodiv_degr_j[j])
                     * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
@@ -885,13 +883,13 @@ class LutoSolver:
 
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.sc_sr[s, ind]
-                    * (self._input_data.ag_man_biodiv_bnfts[am][j_idx] - 1)
+                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
+                    * (self._input_data.ag_man_biodiv_impacts[am][j_idx] - 1)
                     * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
                 )  # Dryland alt. ag. management contributions
                 + gp.quicksum(
-                    self._input_data.sc_sr[s, ind]
-                    * (self._input_data.ag_man_biodiv_bnfts[am][j_idx] - 1)
+                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
+                    * (self._input_data.ag_man_biodiv_impacts[am][j_idx] - 1)
                     * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
                 )  # Irrigated alt. ag. management contributions
                 for am, am_j_list in self._input_data.am2j.items()
@@ -900,18 +898,20 @@ class LutoSolver:
 
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.sc_sr[s, ind] 
-                    * self._input_data.non_ag_biodiv_degr_k[k]
+                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
+                    * self._input_data.non_ag_biodiv_impact_k[k]
                     * self.X_non_ag_vars_kr[k, ind]
                 )  # Non-agricultural contribution
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
+            # Divide by constant to reduce strain on the constraint matrix range
             self.species_conservation_exprs[s] = ag_contr + ag_man_contr + non_ag_contr
+            constr_area = s_area_lb / settings.SPECIES_CONSERVATION_DIV_CONSTANT
 
             print(f"    ...species {s_names[s]} conservation target area: {s_area_lb:,.0f}")
             self.species_conservation_constrs[s] = self.gurobi_model.addConstr(
-                self.species_conservation_exprs[s] >= s_area_lb
+                self.species_conservation_exprs[s] >= constr_area
             )
 
     def _add_biodiversity_constraints(self) -> None:

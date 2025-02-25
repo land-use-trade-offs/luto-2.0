@@ -264,7 +264,7 @@ def get_major_vegetation_group_limits(data: Data, yr_cal: int) -> tuple[np.ndarr
     return limits, data.NVIS_ID2DESC, data.MAJOR_VEG_INDECES
 
 
-def get_ag_management_biodiversity_benefits(
+def get_ag_management_biodiversity_impacts(
     data: Data,
     yr_cal: int,
 ) -> dict[str, dict[int, float]]:
@@ -290,7 +290,7 @@ def get_ag_management_biodiversity_benefits(
             for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['AgTech EI'])
         },
         'Biochar': {
-            j_idx: data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact']
+            j_idx: data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact'] - 1
             for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Biochar'])
         },
     }

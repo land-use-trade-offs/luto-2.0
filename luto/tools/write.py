@@ -1131,9 +1131,10 @@ def write_major_vegetation_groups(data: Data, yr_cal: int, path) -> None:
     mvg_df = pd.DataFrame(index=list(data.NVIS_ID2DESC.values()), columns=["Target", "Actual"])
 
     if yr_cal == data.YR_CAL_BASE:
-        mvg_mrj_dict = ag_biodiversity.get_major_vegetation_matrices(data)
+        mvg_vr = ag_biodiversity.get_major_vegetation_matrices(data)
+        ag_biodiv_degr_j = data.BIODIV_HABITAT_DEGRADE_LOOK_UP
         mvg_prod_data = tools.calc_major_vegetation_group_ag_area_for_year(
-            mvg_mrj_dict, data.AG_L_MRJ
+            mvg_vr, data.LUMAP, ag_biodiv_degr_j
         )
     else:
         mvg_prod_data = data.prod_data[yr_cal]["Major Vegetation Groups"]
