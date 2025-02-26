@@ -1456,7 +1456,7 @@ class Data:
         The suitability score is then weighted by the area (ha) of each cell. The area weighting is necessary 
         to ensure that the biodiversity suitability score will not be affected by different RESFACTOR (i.e., cell size) values.
         '''
-        current_species_val = self.BIO_GBF4A_SPECIES_LAYER.interp(            # Here the year interpolation is done first                      
+        current_species_val = self.BIO_GBF4A_SPECIES_LAYER.interp(      # Here the year interpolation is done first                      
             year=yr,
             method='linear', 
             kwargs={'fill_value': 'extrapolate'}
@@ -1503,7 +1503,7 @@ class Data:
         return  current_group_contribution
     
     
-    def get_GBF4A_bio_suitability_area_weighted_score_by_yr(self, yr: int):
+    def get_GBF4A_bio_suitability_area_weighted_score_all_Australia_by_yr(self, yr: int):
         '''
         Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for all Australia.
         '''
@@ -1549,18 +1549,16 @@ class Data:
         '''
         Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for the Inside LUTO natural land.
         '''
-        target_scores = self.get_GBF4A_bio_suitability_area_weighted_score_by_yr(yr) - self.get_GBF4A_bio_suitability_area_weighted_score_outside_natural_LUTO_by_yr(yr)
+        target_scores = self.get_GBF4A_bio_suitability_area_weighted_score_all_Australia_by_yr(yr) - self.get_GBF4A_bio_suitability_area_weighted_score_outside_natural_LUTO_by_yr(yr)
         return target_scores.values
 
 
     def get_GBF4B_SNES_target_inside_LUTO_natural_by_year(self, yr:int, layer:Literal['LIKELY', 'MAYBE']):
         # Check the layer name
         if layer == 'LIKELY':
-            snes_df = self.BIO_GBF4B_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY
-            snes_out_LUTO = snes_df['HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_LIKELY']
+            snes_out_LUTO = snes_df[f'HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_{layer}']
         elif layer == 'MAYBE':
             snes_df = self.BIO_GBF4B_SNES_BASELINE_SCORE_TARGET_PERCENT_MAYBE
-            snes_out_LUTO = snes_df['HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_MAYBE']
         else:
             raise ValueError("Invalid layer name. Must be 'LIKELY' or 'MAYBE'")
         
@@ -1572,16 +1570,16 @@ class Data:
         for _,row in snes_df.iterrows():
             f = interp1d(
                 [2010, 2030, 2050, 2100],
-                [row['HABITAT_SIGNIFICANCE_BASELINE_PERCENT_LIKELY'], row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY'], row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY'], row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY']],
+                [row[f'HABITAT_SIGNIFICANCE_BASELINE_PERCENT_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2030_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2050_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2100_{layer}']],
                 kind = "linear",
                 fill_value = "extrapolate",
             )
             target_pct.append(f(yr).item())
             
-        # Get the significance score for all Australia
-        snes_score_all_Australia = snes_df['HABITAT_SIGNIFICANCE_BASELINE_ALL_AUSTRALIA_LIKELY'] * target_pct
-        # Subtract the the (significance score for outside LUTO natural) from (significance score for all Australia) 
-        # to get the (significance score for inside LUTO natural) 
+        # Get the significance score for all Australia and outside LUTO natural
+        snes_out_LUTO = snes_df[f'HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_{layer}']
+        snes_score_all_Australia = snes_df['HABITAT_SIGNIFICANCE_BASELINE_ALL_AUSTRALIA_{layer}'] * target_pct
+        # Get the significance score for inside LUTO natural
         snes_inside_LUTO_natural =  snes_score_all_Australia - snes_out_LUTO
         return snes_inside_LUTO_natural.values
     
@@ -1591,10 +1589,8 @@ class Data:
         # Check the layer name
         if layer == 'LIKELY':
             ecnes_df = self.BIO_GBF4B_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY
-            ecnes_out_LUTO = ecnes_df['HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_LIKELY']
         elif layer == 'MAYBE':
             ecnes_df = self.BIO_GBF4B_ECNES_BASELINE_SCORE_TARGET_PERCENTE_MAYBE
-            ecnes_out_LUTO = ecnes_df['HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_MAYBE']
         else:
             raise ValueError("Invalid layer name. Must be 'LIKELY' or 'MAYBE'")
         
@@ -1606,16 +1602,16 @@ class Data:
         for _,row in ecnes_df.iterrows():
             f = interp1d(
                 [2010, 2030, 2050, 2100],
-                [row['HABITAT_SIGNIFICANCE_BASELINE_PERCENT_LIKELY'], row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY'], row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY'], row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY']],
+                [row[f'HABITAT_SIGNIFICANCE_BASELINE_PERCENT_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2030_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2050_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2100_{layer}']],
                 kind = "linear",
                 fill_value = "extrapolate",
             )
             target_pct.append(f(yr).item())
             
-        # Get the significance score for all Australia
-        ecnes_score_all_Australia = ecnes_df['HABITAT_SIGNIFICANCE_BASELINE_ALL_AUSTRALIA_LIKELY'] * target_pct
-        # Subtract the the (significance score for outside LUTO natural) from (significance score for all Australia)
-        # to get the (significance score for inside LUTO natural)
+        # Get the significance score for all Australia and outside LUTO natural
+        ecnes_out_LUTO = ecnes_df[f'HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_{layer}']
+        ecnes_score_all_Australia = ecnes_df[f'HABITAT_SIGNIFICANCE_BASELINE_ALL_AUSTRALIA_{layer}'] * target_pct
+        # Get the significance score for inside LUTO natural
         ecnes_inside_LUTO_natural =  ecnes_score_all_Australia - ecnes_out_LUTO
         return ecnes_inside_LUTO_natural.values
     
