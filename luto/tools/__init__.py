@@ -194,13 +194,7 @@ def get_beccs_cells(lumap) -> np.ndarray:
     return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 7)[0]
 
 
-def get_ag_natural_lu_cells(data, lumap) -> np.ndarray:
-    """
-    Gets all cells being used for agricultural natural land uses.
-    """
-    return np.nonzero(np.isin(lumap, data.LU_NATURAL))[0]
-
-def get_unallocated_natural_cells(data, lumap) -> np.ndarray:
+def get_unallocated_natural_lu_cells(data, lumap) -> np.ndarray:
     """
     Gets all cells being used for unallocated natural land uses.
     """
@@ -210,7 +204,7 @@ def get_lvstk_natural_lu_cells(data, lumap) -> np.ndarray:
     """
     Gets all cells being used for livestock natural land uses.
     """
-    return np.nonzero(np.isin(lumap, data.LU_LVSTK))[0]
+    return np.nonzero(np.isin(lumap, data.LU_LVSTK_NATURAL))[0]
 
 
 def get_non_ag_natural_lu_cells(data, lumap) -> np.ndarray:

@@ -379,7 +379,7 @@ class Data:
 
         # Actual hectares per cell, including projection corrections.
         self.REAL_AREA_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "real_area.h5")).to_numpy()
-        self.REAL_AREA = self.get_array_resfactor_applied(self.REAL_AREA_NO_RESFACTOR) * self.RESMULT
+        self.REAL_AREA = self.get(self.REAL_AREA_NO_RESFACTOR) * self.RESMULT
 
         # Derive NCELLS (number of spatial cells) from the area array.
         self.NCELLS = self.REAL_AREA.shape[0]
@@ -910,20 +910,36 @@ class Data:
         
         
         ###############################################################
-        # Carbon sequestration by trees data.
+        # Carbon sequestration by natural lands.
         ###############################################################
-        print("\tLoading carbon sequestration by trees data...", flush=True)
+        print("\tLoading carbon sequestration by natural lands data...", flush=True)
 
-        # Load the remnant vegetation carbon data.
-        rem_veg = pd.read_hdf(os.path.join(INPUT_DIR, "natural_land_t_co2_ha.h5")).to_numpy(
+        '''
+        ['NATURAL_LAND_AGB_TCO2_HA']
+            CO2 in aboveground living biomass in natural land i.e., the part impacted by livestock 
+        ['NATURAL_LAND_AGB_DEBRIS_TCO2_HA']
+            CO2 in aboveground living biomass and debris in natural land i.e., the part impacted by fire
+        ['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA']
+            CO2 in aboveground living biomass and debris and soil in natural land i.e., the part impacted by land clearance
+        '''
+    
+        # Load the natural land carbon data.
+        nat_land_CO2 = pd.read_hdf(os.path.join(INPUT_DIR, "natural_land_t_co2_ha.h5"))
+        # Get the carbon sequestration in each natural land types
+        co2e_stock_unall_natural = np.array(
+            nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * fire_risk.to_numpy() / 100),
             dtype=np.float32
         )
-        rem_veg = np.squeeze(rem_veg)  # Remove extraneous extra dimension
-
-        # Discount by fire risk.
-        self.NATURAL_LAND_T_CO2_HA = self.get_array_resfactor_applied(
-            rem_veg * (fire_risk.to_numpy() / 100)
+        co2e_stock_lvstk_natural = np.array(
+            co2e_stock_unall_natural - (0.3 * nat_land_CO2['NATURAL_LAND_AGB_TCO2_HA']) * (fire_risk.to_numpy() / 100),
+            dtype=np.float32
         )
+
+        # Get the carbon emissions from the one natural land to another
+        self.GHG_PENALTY_UNALL_NATURAL_TO_MODIFIED = self.get_array_resfactor_applied(co2e_stock_unall_natural)
+        self.GHG_PENALTY_UNALL_NATURAL_TO_LVSTK_NATURAL = self.get_array_resfactor_applied(co2e_stock_unall_natural - co2e_stock_lvstk_natural)
+        self.GHG_PENALTY_LVSTK_NATURAL_TO_UNALL_NATURAL = self.get_array_resfactor_applied(co2e_stock_lvstk_natural - co2e_stock_unall_natural)
+        self.GHG_PENALTY_LVSTK_NATURAL_TO_MODIFIED = self.get_array_resfactor_applied(co2e_stock_lvstk_natural)
 
 
 
@@ -1215,8 +1231,8 @@ class Data:
         
         self.BIO_GBF4A_SEL_SPECIES = [row['species'] for _,row in bio_GBF4A_target_percent.iterrows() 
                                       if all([row['USER_DEFINED_TARGET_PERCENT_2030'] >0,
-                                             row['USER_DEFINED_TARGET_PERCENT_2050'] >0,
-                                             row['USER_DEFINED_TARGET_PERCENT_2100'] >0])]
+                                              row['USER_DEFINED_TARGET_PERCENT_2050'] >0,
+                                              row['USER_DEFINED_TARGET_PERCENT_2100'] >0])]
         
         self.BIO_GBF4A_SUITABILITY_OUTSDIE_LUTO_SCORE = bio_GBF4A_baseline_score.query(f'species in {self.BIO_GBF4A_SEL_SPECIES}')[['species', 'year', f'OUTSIDE_LUTO_NATURAL_SUITABILITY_AREA_WEIGHTED_HA_SSP{settings.SSP}']]
         self.BIO_GBF4A_SUITABILITY_BASELINE_SCORE_TARGET_PERCENT = bio_GBF4A_target_percent.query(f'species in {self.BIO_GBF4A_SEL_SPECIES}')
@@ -1230,24 +1246,24 @@ class Data:
         BIO_GBF4B_ECNES_score = pd.read_csv(INPUT_DIR + '/bio_DCCEEW_ECNES_target.csv')
         
         self.BIO_GBF_4B_SNES_LIKELY_SEL = [row['SCIENTIFIC_NAME'] for _,row in BIO_GBF4B_SNES_score.iterrows()
-                                                if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY'] >0,
-                                                        row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY'] >0,
-                                                        row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY'] >0])]
+                                                if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY']>0])]
         
         self.BIO_GBF_4B_SNES_MAYBE_SEL = [row['SCIENTIFIC_NAME'] for _,row in BIO_GBF4B_SNES_score.iterrows()
-                                                if all([row['USER_DEFINED_TARGET_PERCENT_2030_MAYBE'] >0,
-                                                        row['USER_DEFINED_TARGET_PERCENT_2050_MAYBE'] >0,
-                                                        row['USER_DEFINED_TARGET_PERCENT_2100_MAYBE'] >0])]
+                                                if all([row['USER_DEFINED_TARGET_PERCENT_2030_MAYBE']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2050_MAYBE']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2100_MAYBE']>0])]
         
         self.BIO_GBF4B_ECNES_LIKELY_SEL = [row['COMMUNITY'] for _,row in BIO_GBF4B_ECNES_score.iterrows()
-                                                if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY'] >0,
-                                                        row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY'] >0,
-                                                        row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY'] >0])]
+                                                if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY']>0])]
         
         self.BIO_GBF4B_ECNES_MAYBE_SEL = [row['COMMUNITY'] for _,row in BIO_GBF4B_ECNES_score.iterrows()
-                                                if all([row['USER_DEFINED_TARGET_PERCENT_2030_MAYBE'] >0,
-                                                        row['USER_DEFINED_TARGET_PERCENT_2050_MAYBE'] >0,
-                                                        row['USER_DEFINED_TARGET_PERCENT_2100_MAYBE'] >0])]
+                                                if all([row['USER_DEFINED_TARGET_PERCENT_2030_MAYBE']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2050_MAYBE']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2100_MAYBE']>0])]
         
         
         if len(self.BIO_GBF_4B_SNES_LIKELY_SEL) == 0 or len(self.BIO_GBF4B_ECNES_LIKELY_SEL) == 0:

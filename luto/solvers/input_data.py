@@ -51,52 +51,52 @@ class SolverInputData:
     """
     An object that collects and stores all relevant data for solver.py.
     """   
-    base_year: int                          # The base year of this solving process
-    target_year: int                        # The target year of this solving process
+    base_year: int                                          # The base year of this solving process
+    target_year: int                                        # The target year of this solving process
 
-    ag_g_mrj: np.ndarray                    # Agricultural greenhouse gas emissions matrices.
-    ag_w_mrj: np.ndarray                    # Agricultural water requirements matrices.
-    ag_b_mrj: np.ndarray                    # Agricultural biodiversity matrices.
-    ag_x_mrj: np.ndarray                    # Agricultural exclude matrices.
-    ag_q_mrp: np.ndarray                    # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
-    ag_ghg_t_mrj: np.ndarray                # GHG emissions released during transitions between agricultural land uses.
-    ag_mvg_mrj: dict[int, np.ndarray]       # Agricultural major vegetation groups data: dict indexed by vegetation class (v)
+    ag_g_mrj: np.ndarray                                    # Agricultural greenhouse gas emissions matrices.
+    ag_w_mrj: np.ndarray                                    # Agricultural water requirements matrices.
+    ag_b_mrj: np.ndarray                                    # Agricultural biodiversity matrices.
+    ag_x_mrj: np.ndarray                                    # Agricultural exclude matrices.
+    ag_q_mrp: np.ndarray                                    # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
+    ag_ghg_t_mrj: np.ndarray                                # GHG emissions released during transitions between agricultural land uses.
+    ag_mvg_mrj: dict[int, np.ndarray]                       # Agricultural major vegetation groups data: dict indexed by vegetation class (v)
 
-    non_ag_g_rk: np.ndarray                 # Non-agricultural greenhouse gas emissions matrix.
-    non_ag_w_rk: np.ndarray                 # Non-agricultural water requirements matrix.
-    non_ag_b_rk: np.ndarray                 # Non-agricultural biodiversity matrix.
-    non_ag_x_rk: np.ndarray                 # Non-agricultural exclude matrices.
-    non_ag_q_crk: np.ndarray                # Non-agricultural yield matrix.
-    non_ag_lb_rk: np.ndarray                # Non-agricultural lower bound matrices.
-    non_ag_mvg_rk: dict[int, np.ndarray]    # Non-agricultural major vegetation groups data: dict indexed by vegetation class (v)
+    non_ag_g_rk: np.ndarray                                 # Non-agricultural greenhouse gas emissions matrix.
+    non_ag_w_rk: np.ndarray                                 # Non-agricultural water requirements matrix.
+    non_ag_b_rk: np.ndarray                                 # Non-agricultural biodiversity matrix.
+    non_ag_x_rk: np.ndarray                                 # Non-agricultural exclude matrices.
+    non_ag_q_crk: np.ndarray                                # Non-agricultural yield matrix.
+    non_ag_lb_rk: np.ndarray                                # Non-agricultural lower bound matrices.
+    non_ag_mvg_rk: dict[int, np.ndarray]                    # Non-agricultural major vegetation groups data: dict indexed by vegetation class (v)
 
-    ag_man_g_mrj: dict                      # Agricultural management options' GHG emission effects.
-    ag_man_q_mrp: dict                      # Agricultural management options' quantity effects.
-    ag_man_w_mrj: dict                      # Agricultural management options' water requirement effects.
-    ag_man_b_mrj: dict                      # Agricultural management options' biodiversity effects.
-    ag_man_limits: dict                     # Agricultural management options' adoption limits.
-    ag_man_lb_mrj: dict                     # Agricultural management options' lower bounds.
-    ag_man_mvg_mrj: dict[str, dict[int, np.ndarray]]      # Agricultural management options' major vegetation group effects
+    ag_man_g_mrj: dict                                      # Agricultural management options' GHG emission effects.
+    ag_man_q_mrp: dict                                      # Agricultural management options' quantity effects.
+    ag_man_w_mrj: dict                                      # Agricultural management options' water requirement effects.
+    ag_man_b_mrj: dict                                      # Agricultural management options' biodiversity effects.
+    ag_man_limits: dict                                     # Agricultural management options' adoption limits.
+    ag_man_lb_mrj: dict                                     # Agricultural management options' lower bounds.
+    ag_man_mvg_mrj: dict[str, dict[int, np.ndarray]]        # Agricultural management options' major vegetation group effects
 
-    water_yield_RR_BASE_YR: dict                           # Water yield for the BASE_YR based on historical water yield layers .
-    water_yield_outside_study_area: dict[int, float]       # Water yield from outside LUTO study area -> dict. Key: region.
+    water_yield_RR_BASE_YR: dict                            # Water yield for the BASE_YR based on historical water yield layers .
+    water_yield_outside_study_area: dict[int, float]        # Water yield from outside LUTO study area -> dict. Key: region.
     
-    savanna_eligible_r: np.ndarray        # Cells that are not eligible for savanna land use.
+    savanna_eligible_r: np.ndarray                          # Cells that are not eligible for savanna land use.
 
-    economic_contr_mrj: float               # base year economic contribution matrix.
-    economic_BASE_YR_prices: np.ndarray     # base year commodity prices.
-    economic_target_yr_carbon_price: float  # target year carbon price.
+    economic_contr_mrj: float                               # base year economic contribution matrix.
+    economic_BASE_YR_prices: np.ndarray                     # base year commodity prices.
+    economic_target_yr_carbon_price: float                  # target year carbon price.
 
-    offland_ghg: np.ndarray                 # GHG emissions from off-land commodities.
+    offland_ghg: np.ndarray                                 # GHG emissions from off-land commodities.
 
-    mvg_contr_outside_study_area: dict[int, float]         # Contributions of land outside LUTO study area to each major veg. group (keys: major groups)
+    mvg_contr_outside_study_area: dict[int, float]          # Contributions of land outside LUTO study area to each major veg. group (keys: major groups)
 
-    lu2pr_pj: np.ndarray                    # Conversion matrix: land-use to product(s).
-    pr2cm_cp: np.ndarray                    # Conversion matrix: product(s) to commodity.
-    limits: dict                            # Targets to use.
-    desc2aglu: dict                         # Map of agricultural land use descriptions to codes.
-    resmult: float                          # Resolution factor multiplier from data.RESMULT
-
+    lu2pr_pj: np.ndarray                                    # Conversion matrix: land-use to product(s).
+    pr2cm_cp: np.ndarray                                    # Conversion matrix: product(s) to commodity.
+    limits: dict                                            # Targets to use.
+    desc2aglu: dict                                         # Map of agricultural land use descriptions to codes.
+    resmult: float                                          # Resolution factor multiplier from data.RESMULT
+                
     @property
     def n_ag_lms(self):
         # Number of agricultural landmans

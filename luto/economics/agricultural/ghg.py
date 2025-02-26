@@ -273,18 +273,50 @@ def get_ghg_transition_penalties(data: Data, lumap) -> np.ndarray:
         np.ndarray, <unit : t/cell>.
     """
     ncells, n_ag_lus = data.REAL_AREA.shape[0], len(data.AGRICULTURAL_LANDUSES)
+    
+    # Get the cells index
+    unall_natural_cells = tools.get_unallocated_natural_lu_cells(data, lumap)
+    lvstk_natural_cells = tools.get_lvstk_natural_lu_cells(data, lumap)
+    
     # Set up empty array of penalties
-    penalties_rj = np.zeros((ncells, n_ag_lus), dtype=np.float32)
-    natural_lu_cells = tools.get_ag_natural_lu_cells(data, lumap)
+    penalties_unall_natural_to_modified_rj = np.zeros((ncells, n_ag_lus), dtype=np.float32)
+    penalties_unall_natural_to_lvstk_natural_rj = np.zeros((ncells, n_ag_lus), dtype=np.float32)
+    penalties_lvstk_natural_to_unall_natural_rj = np.zeros((ncells, n_ag_lus), dtype=np.float32)
+    penalties_lvstk_natural_to_modified_rj = np.zeros((ncells, n_ag_lus), dtype=np.float32)
 
-    # Calculate penalties and add to g_rj matrix
-    penalties_r = (
-          data.NATURAL_LAND_T_CO2_HA[natural_lu_cells]
-        * data.REAL_AREA[natural_lu_cells]
+    # Get GHG penalties from current land use to future land use
+    penalties_unall_natural_to_modified_r = (
+          data.GHG_PENALTY_UNALL_NATURAL_TO_MODIFIED[unall_natural_cells]
+        * data.REAL_AREA[unall_natural_cells]
     )
+    penalties_unall_natural_to_lvstk_natural_r = (
+          data.GHG_PENALTY_UNALL_NATURAL_TO_LVSTK_NATURAL[unall_natural_cells]
+        * data.REAL_AREA[unall_natural_cells]
+    ) 
+    penalties_lvstk_natural_to_unall_natural_r = (
+          data.GHG_PENALTY_LVSTK_NATURAL_TO_UNALL_NATURAL[lvstk_natural_cells]
+        * data.REAL_AREA[lvstk_natural_cells]
+    )
+    penalties_lvstk_natural_to_modified_r = (
+          data.GHG_PENALTY_LVSTK_NATURAL_TO_MODIFIED[lvstk_natural_cells]
+        * data.REAL_AREA[lvstk_natural_cells]
+    )
+    
+    # Assign the penalties to the transition matrices
     for lu in data.LU_MODIFIED_LAND:
-        penalties_rj[natural_lu_cells, lu] = penalties_r
-
+        penalties_unall_natural_to_modified_rj[unall_natural_cells, lu] = penalties_unall_natural_to_modified_r
+    for lu in data.LU_LVSTK_NATURAL:
+        penalties_unall_natural_to_lvstk_natural_rj[unall_natural_cells, lu] = penalties_unall_natural_to_lvstk_natural_r
+    for lu in list(data.DESC2AGLU["Unallocated - natural land"]):
+        penalties_lvstk_natural_to_unall_natural_rj[lvstk_natural_cells, lu] = penalties_lvstk_natural_to_unall_natural_r
+    for lu in data.LU_MODIFIED_LAND:
+        penalties_lvstk_natural_to_modified_rj[lvstk_natural_cells, lu] = penalties_lvstk_natural_to_modified_r
+        
+    # Sum the penalties
+    penalties_rj = penalties_unall_natural_to_modified_rj\
+                 + penalties_unall_natural_to_lvstk_natural_rj\
+                 + penalties_lvstk_natural_to_unall_natural_rj\
+                 + penalties_lvstk_natural_to_modified_rj       
 
     return np.stack([penalties_rj] * 2)
 

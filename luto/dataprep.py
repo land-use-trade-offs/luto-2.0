@@ -686,7 +686,7 @@ def create_new_dataset():
     s.to_hdf(outpath + 'hir_block_avg_t_co2_ha_yr.h5', key = 'hir_block_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
 
-    # MASK for Human Induced Regrowth (riparian plantings) and save to file
+    # MASK for Human Induced Regrowth; only allow planting where average annual precipitation is less than 300mm
     hir_mask = bioph['AVG_AN_PREC_MM_YR'] <= 300
     np.save(outpath + 'hir_mask.npy', hir_mask.values)  # shape: (6956407,)
 
