@@ -307,7 +307,7 @@ def get_ghg_transition_penalties(data: Data, lumap) -> np.ndarray:
         penalties_unall_natural_to_modified_rj[unall_natural_cells, lu] = penalties_unall_natural_to_modified_r
     for lu in data.LU_LVSTK_NATURAL:
         penalties_unall_natural_to_lvstk_natural_rj[unall_natural_cells, lu] = penalties_unall_natural_to_lvstk_natural_r
-    for lu in list(data.DESC2AGLU["Unallocated - natural land"]):
+    for lu in [data.DESC2AGLU["Unallocated - natural land"]]:
         penalties_lvstk_natural_to_unall_natural_rj[lvstk_natural_cells, lu] = penalties_lvstk_natural_to_unall_natural_r
     for lu in data.LU_MODIFIED_LAND:
         penalties_lvstk_natural_to_modified_rj[lvstk_natural_cells, lu] = penalties_lvstk_natural_to_modified_r
