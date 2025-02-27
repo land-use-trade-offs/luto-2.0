@@ -79,8 +79,10 @@ class SolverInputData:
     water_yield_outside_study_area: dict[int, float]       # Water yield from outside LUTO study area -> dict. Key: region.
     
     ag_biodiv_degr_j: dict[int, float]                     # Biodiversity degredation factor for each ag LU.
-    non_ag_biodiv_impact_k: dict[int, float]                 # Biodiversity benefits for each non-ag LU.
-    ag_man_biodiv_impacts: dict[str, dict[int, float]]       # Biodiversity benefits for each AM option.
+    non_ag_biodiv_impact_k: dict[int, float]               # Biodiversity benefits for each non-ag LU.
+    ag_man_biodiv_impacts: dict[
+        str, dict[int, float] | np.ndarray
+    ]                                                      # Biodiversity benefits for each AM option.
     mvg_vr: np.ndarray                                     # Major vegetation group cell contribution data - indexed by veg. group (v) and cell (r)
     sc_sr: np.ndarray                                      # Species conservation cell contribution data - indexed by species (s) and cell (r).
     mvg_contr_outside_study_area: dict[int, float]         # Contributions of land outside LUTO study area to each major veg. group (keys: major groups)
@@ -266,7 +268,7 @@ def get_sc_sr(data: Data, target_year: int) -> np.ndarray:
     if settings.BIODIVERSTIY_TARGET_GBF_4 != "on":
         return np.empty(0)
     print('Getting species conservation cell data...', flush = True)
-    return data.get_GBF4A_bio_species_layers_by_yr(target_year) * data.REAL_AREA
+    return ag_biodiversity.get_species_conservation_matrix(data, target_year)
 
 
 def get_non_ag_w_rk(

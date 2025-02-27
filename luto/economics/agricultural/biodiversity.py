@@ -214,7 +214,15 @@ def get_biodiversity_limits(data: Data, yr_cal: int):
 
 
 def get_major_vegetation_matrices(data: Data) -> np.ndarray:
-    return data.NVIS_PRE_GR * data.REAL_AREA
+    return data.NVIS_PRE_GR_LDS * data.REAL_AREA
+
+
+def get_species_conservation_matrix(data: Data, target_year: int):
+    return (
+        data.get_GBF4A_bio_species_layers_by_yr(target_year)
+        * data.BIODIV_DEGRADE_LDS
+        * data.REAL_AREA
+    )
 
 
 def get_major_vegetation_group_limits(data: Data, yr_cal: int) -> tuple[np.ndarray, dict[int, str]]:
@@ -281,10 +289,7 @@ def get_ag_management_biodiversity_impacts(
             j_idx: 0.0 
             for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing'])
         },
-        'Savanna Burning': {
-            j_idx: 0.0 
-            for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
-        },
+        'Savanna Burning': 1 - data.BIODIV_DEGRADE_LDS,
         'AgTech EI': {
             j_idx: 0.0 
             for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['AgTech EI'])
