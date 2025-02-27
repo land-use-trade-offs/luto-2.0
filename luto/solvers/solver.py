@@ -295,9 +295,10 @@ class LutoSolver:
         # Get the objective values for each sector
         self.obj_economy = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr
         self.obj_ghg = self.E * self._input_data.economic_target_yr_carbon_price                                        if settings.GHG_CONSTRAINT_TYPE == "soft" else 0
+        self.obj_demand = gp.quicksum(v * price for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices))  if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
+        
         self.obj_biodiv = self.B * settings.BIODIV_PENALTY                                                              if settings.BIODIV_CONSTRAINT_TYPE == "soft" else 0
         self.obj_water = self.W.sum() * settings.WATER_PENALTY                                                          if settings.WATER_CONSTRAINT_TYPE == "soft" else 0
-        self.obj_demand = gp.quicksum(v * price for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices))  if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0
 
 
         # Set the objective function
@@ -1243,8 +1244,10 @@ class LutoSolver:
             obj_val = {
                 'SUM': self.gurobi_model.ObjVal,
                 'Economy': self.obj_economy.getValue(),
-                'Demand': self.obj_demand.getValue()            if settings.DEMAND_CONSTRAINT_TYPE == 'soft' else 0,
-                'GHG': self.obj_ghg.getValue()                  if settings.GHG_CONSTRAINT_TYPE == 'soft' else 0,            
+                'Demand': self.obj_demand.getValue()          if settings.DEMAND_CONSTRAINT_TYPE == 'soft' else 0,
+                'GHG': self.obj_ghg.getValue()                if settings.GHG_CONSTRAINT_TYPE == 'soft' else 0,
+                'Biodiversity': self.obj_biodiv.getValue()    if settings.BIODIV_CONSTRAINT_TYPE == 'soft' else 0,
+                'Water': self.obj_water.getValue()            if settings.WATER_CONSTRAINT_TYPE == 'soft' else 0     
             }
         )
 

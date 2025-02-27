@@ -78,7 +78,7 @@ class SolverInputData:
     ag_man_lb_mrj: dict                                     # Agricultural management options' lower bounds.
     ag_man_mvg_mrj: dict[str, dict[int, np.ndarray]]        # Agricultural management options' major vegetation group effects
 
-    water_yield_RR_BASE_YR: dict                            # Water yield for the BASE_YR based on historical water yield layers .
+    water_yield_BASE_YR: dict                               # Water yield for the BASE_YR based on historical water yield layers .
     water_yield_outside_study_area: dict[int, float]        # Water yield from outside LUTO study area -> dict. Key: region.
     
     savanna_eligible_r: np.ndarray                          # Cells that are not eligible for savanna land use.
@@ -226,7 +226,7 @@ def get_w_outside_luto(data: Data, yr_cal: int):
     print('Getting water yield from outside LUTO study area...', flush = True)
     return ag_water.get_water_outside_luto_study_area_from_hist_level(data)
 
-def get_w_RR_BASE_YR(data: Data):
+def get_w_BASE_YR(data: Data):
     print('Getting water yield for the BASE_YR based on historical water yield layers...', flush = True)
     return ag_water.calc_water_net_yield_BASE_YR(data)
 
@@ -612,7 +612,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_mvg_mrj=get_ag_man_mvg_mrj(data, target_index, ag_mvg_mrj),
         
         water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Use the water net yield outside LUTO study area for the YR_CAL_BASE year
-        water_yield_RR_BASE_YR=get_w_RR_BASE_YR(data),                                  # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
+        water_yield_BASE_YR=get_w_BASE_YR(data),                                  # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
         
         savanna_eligible_r=get_savanna_eligible_r(data),
 

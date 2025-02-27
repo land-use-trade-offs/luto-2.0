@@ -29,14 +29,10 @@ and Brett Bryan, Deakin University
 # Load libraries
 import numpy as np
 import pandas as pd
-import geopandas as gpd
-import rasterio
 import shutil, os, time, h5py
 
-from itertools import product
-from rasterio import features
 from joblib import Parallel, delayed
-from luto.settings import INPUT_DIR, NO_GO_VECTORS, RAW_DATA
+from luto.settings import INPUT_DIR, RAW_DATA
 
 
 

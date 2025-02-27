@@ -1251,15 +1251,15 @@ def write_ghg_separate(data: Data, yr_cal, path):
         ghg_t = np.zeros(data.ag_dvars[yr_cal].shape, dtype=np.bool_)
     else:
         yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
-        ghg_t = ag_ghg.get_ghg_transition_penalties(data, data.lumaps[yr_cal_sim_pre])
+        ghg_t = ag_ghg.get_ghg_transition_penalties(data, data.lumaps[yr_cal_sim_pre], seperate=True)
 
 
     # Get the GHG emissions from lucc-convertion compared to the previous year
-    ghg_t_mj = np.einsum('mrj,mrj -> mj', data.ag_dvars[yr_cal], ghg_t)
+    ghg_t_smj = np.einsum('mrj,smrj -> smj', data.ag_dvars[yr_cal], ghg_t)
 
     # Summarize the array as a df
-    ghg_t_df = pd.DataFrame(ghg_t_mj.flatten(), index=pd.MultiIndex.from_product((data.LANDMANS, data.AGRICULTURAL_LANDUSES))).reset_index()
-    ghg_t_df.columns = ['Water_supply', 'Land-use', 'Value (t CO2e)']
+    ghg_t_df = pd.DataFrame(ghg_t_smj.flatten(), index=pd.MultiIndex.from_product((ghg_t.source.values, data.LANDMANS, data.AGRICULTURAL_LANDUSES))).reset_index()
+    ghg_t_df.columns = ['Source','Water_supply', 'Land-use', 'Value (t CO2e)']
     ghg_t_df['Type'] = 'Deforestation'
     ghg_t_df = ghg_t_df.replace({'dry': 'Dryland', 'irr':'Irrigated'})
     ghg_t_df['Year'] = yr_cal
