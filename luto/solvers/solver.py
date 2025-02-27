@@ -1158,6 +1158,11 @@ class LutoSolver:
                 self.gurobi_model.remove(constr)
             self.ghg_emissions_reduction_soft_constraints = []
 
+        if len(self.biodiversity_limit_soft_constraints) > 0:
+            for constr in self.biodiversity_limit_soft_constraints:
+                self.gurobi_model.remove(constr)
+            self.biodiversity_limit_soft_constraints = []
+
         self._add_cell_usage_constraints(updated_cells)
         self._add_agricultural_management_constraints(updated_cells)
         self._add_agricultural_management_adoption_limit_constraints()
