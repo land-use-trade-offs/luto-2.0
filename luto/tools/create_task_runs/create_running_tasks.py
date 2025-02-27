@@ -25,7 +25,7 @@ from luto.tools.create_task_runs.helpers import (
     create_task_runs
 )
 
-
+# Set the grid search parameters
 grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
@@ -38,34 +38,29 @@ grid_search = {
     ###############################################################
     # Working settings for the model run
     ###############################################################
-    'MODE': ['timeseries', 'snapshot'],                # 'snapshot' or 'timeseries'
-    'RESFACTOR': [10],
+    'MODE': ['timeseries'],                # 'snapshot' or 'timeseries'
+    'RESFACTOR': [15],
     'WRITE_THREADS': [10],
     'WRITE_OUTPUT_GEOTIFFS': [False],
-    'KEEP_OUTPUTS': [True],
+    'KEEP_OUTPUTS': [True],                 # If false, only keep report HTML
     
     ###############################################################
     # Model run settings
     ###############################################################
     'DEMAND_CONSTRAINT_TYPE': ['soft'],     # 'hard' or 'soft'
     'GHG_CONSTRAINT_TYPE': ['soft'],        # 'hard' or 'soft'
-    'BIODIVERSTIY_TARGET_GBF_2': ['off'],           # 'on' or 'off'
+    'BIODIVERSTIY_TARGET_GBF_2': ['off'],   # 'on' or 'off'
+    'WATER_CONSTRAINT_TYPE': ['hard'],      # 'hard' or 'soft'
     
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
-    'SOLVE_ECONOMY_WEIGHT': 
-        # list(np.arange(5, 51, 2)/100),
-        [0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99],
-        # sorted([
-        #     round(10**(-i) * (j/20), 10)
-        #     for i in range(4)
-        #     for j in range(1,19)
-        # ]),
+    'SOLVE_ECONOMY_WEIGHT': [0.05],
+    'BIODIV_PENALTY': [100, 500, 1000, 3000, 5000, 10000],
     'GHG_LIMITS_FIELD': [
         '1.5C (67%) excl. avoided emis', 
         # '1.5C (50%) excl. avoided emis', 
-        '1.8C (67%) excl. avoided emis'
+        # '1.8C (67%) excl. avoided emis'
     ],
     'BIODIV_GBF_TARGET_2_DICT': [
         {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}, 

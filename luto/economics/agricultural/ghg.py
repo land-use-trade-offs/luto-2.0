@@ -388,14 +388,14 @@ def get_ghg_penalties_lvstk_natural_to_modified(data: Data, lumap) -> np.ndarray
     return np.stack([penalties_lvstk_natural_to_modified_rj] * 2)
 
 
-def get_ghg_transition_penalties(data: Data, lumap, seperate=False) -> np.ndarray:
+def get_ghg_transition_penalties(data: Data, lumap, separate=False) -> np.ndarray:
     """
     Get the one-off greenhouse gas penalties for transitioning between land uses.
 
     Parameters:
       data (object): The data object containing relevant information.
       lumap (np.ndarray): The lumap object containing land use mapping.
-      seperate (bool): Whether to return the penalties for each transition separately.
+      separate (bool): Whether to return the penalties for each transition separately.
 
     Returns:
       greenhouse-gas-transition-penalties : (np.ndarray | xr.DataArray).
@@ -406,7 +406,7 @@ def get_ghg_transition_penalties(data: Data, lumap, seperate=False) -> np.ndarra
     penalties_lvstck_natural_to_modified = get_ghg_penalties_lvstk_natural_to_modified(data, lumap)
     penalties_unall_natural_to_modified = get_ghg_penalties_unall_natural_to_modified(data, lumap)
     
-    if seperate:
+    if separate:
         ghg_trainsition_penalties = xr.DataArray(
             np.stack([
                 penalties_lvstck_natural_to_unall_natural, 

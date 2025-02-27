@@ -17,13 +17,14 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-import os, re, time, json, shutil, psutil, itertools, subprocess
+import os, re, time, json
+import shutil, psutil, itertools, subprocess
 import pandas as pd
 
 from glob import glob
 from joblib import delayed, Parallel
 from luto import settings
-from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, TASK_ROOT_DIR
+from luto.tools.create_task_runs.parameters import BIO_TARGET_ORDER, EXCLUDE_DIRS, GHG_ORDER, TASK_ROOT_DIR
 from datetime import datetime
 
 def create_settings_template(to_path:str=TASK_ROOT_DIR):
@@ -394,5 +395,10 @@ def process_task_root_dirs(task_root_dirs):
             columns='name', 
             values='val')\
         .reset_index()
+        
+    # Reorder the data
+    report_data['GHG_LIMITS_FIELD'] = pd.Categorical(report_data['GHG_LIMITS_FIELD'], categories=GHG_ORDER, ordered=True)
+    report_data['BIODIV_GBF_TARGET_2_DICT'] = pd.Categorical(report_data['BIODIV_GBF_TARGET_2_DICT'], categories=BIO_TARGET_ORDER, ordered=True)
+    report_data_demand['GHG_LIMITS_FIELD'] = pd.Categorical(report_data_demand['GHG_LIMITS_FIELD'], categories=GHG_ORDER, ordered=True)
 
     return report_data, report_data_demand
