@@ -20,6 +20,7 @@
 import numpy as np
 
 from luto import tools
+from copy import deepcopy
 
 
 def get_sheep_q_cr(data, ag_q_mrp: np.ndarray) -> np.ndarray:
@@ -34,8 +35,8 @@ def get_sheep_q_cr(data, ag_q_mrp: np.ndarray) -> np.ndarray:
             sheep_p.append(p)
 
     sheep_q_cr = np.zeros((data.NCMS, data.NCELLS))
-    for p in sheep_p:
-        for c in range(data.NCMS):
+    for c in range(data.NCMS):
+        for p in sheep_p:
             if data.PR2CM[c, p]:
                 sheep_q_cr[c, :] += ag_q_mrp[0, :, p]
 
@@ -132,11 +133,11 @@ def get_quantity_sheep_agroforestry(
     base_agroforestry_quantity_cr = get_quantity_agroforestry_base(data)
 
     # Calculate contributions and return the sum
-    agroforestry_contr = base_agroforestry_quantity_cr
+    agroforestry_contr = deepcopy(base_agroforestry_quantity_cr)
     for c in range(data.NCMS):
         agroforestry_contr[c, :] *= agroforestry_x_r
 
-    sheep_contr = sheep_quantity_cr
+    sheep_contr = deepcopy(sheep_quantity_cr)
     for c in range(data.NCMS):
         sheep_contr[c, :] *= (1 - agroforestry_x_r)
 
@@ -163,11 +164,11 @@ def get_quantity_beef_agroforestry(
     base_agroforestry_quantity_cr = get_quantity_agroforestry_base(data)
 
     # Calculate contributions and return the sum
-    agroforestry_contr = base_agroforestry_quantity_cr
+    agroforestry_contr = deepcopy(base_agroforestry_quantity_cr)
     for c in range(data.NCMS):
         agroforestry_contr[c, :] *= agroforestry_x_r
 
-    beef_contr = beef_quantity_cr
+    beef_contr = deepcopy(beef_quantity_cr)
     for c in range(data.NCMS):
         beef_contr[c, :] *= (1 - agroforestry_x_r)
 
@@ -228,13 +229,13 @@ def get_quantity_sheep_carbon_plantings_belt(
     base_cp_quantity_cr = get_quantity_carbon_plantings_belt_base(data)
 
     # Calculate contributions and return the sum
-    cp_contr = base_cp_quantity_cr
+    cp_contr = deepcopy(base_cp_quantity_cr)
     for c in range(data.NCMS):
         cp_contr[c, :] *= cp_belt_x_r
 
-    sheep_contr = sheep_quantity_cr
+    sheep_contr = deepcopy(sheep_quantity_cr)
     for c in range(data.NCMS):
-        sheep_contr *= (1 - cp_belt_x_r)
+        sheep_contr[c, :] *= (1 - cp_belt_x_r)
 
     return cp_contr + sheep_contr
 
@@ -259,75 +260,13 @@ def get_quantity_beef_carbon_plantings_belt(
     base_cp_quantity_cr = get_quantity_carbon_plantings_belt_base(data)
 
     # Calculate contributions and return the sum
-    cp_contr = base_cp_quantity_cr
+    cp_contr = deepcopy(base_cp_quantity_cr)
     for c in range(data.NCMS):
         cp_contr[c, :] *= cp_belt_x_r
 
-    beef_contr = beef_quantity_cr
+    beef_contr = deepcopy(beef_quantity_cr)
     for c in range(data.NCMS):
-        beef_contr *= (1 - cp_belt_x_r)
-
-    return cp_contr + beef_contr
-
-
-def get_quantity_sheep_carbon_plantings_belt(
-    data, 
-    ag_q_mrp: np.ndarray, 
-    cp_belt_x_r: np.ndarray
-) -> np.ndarray:
-    """
-    Parameters
-    ------
-    data: Data object.
-    ag_c_mrj: agricultural cost matrix.
-    cp_belt_x_r: Carbon plantings belt exclude matrix.
-
-    Returns
-    ------
-    Numpy array indexed by (c, r)
-    """
-    sheep_quantity_cr = get_sheep_q_cr(data, ag_q_mrp)    
-    base_cp_quantity_cr = get_quantity_carbon_plantings_belt_base(data)
-
-    # Calculate contributions and return the sum
-    cp_contr = base_cp_quantity_cr
-    for c in range(data.NCMS):
-        cp_contr[c, :] *= cp_belt_x_r
-
-    sheep_contr = sheep_quantity_cr
-    for c in range(data.NCMS):
-        sheep_contr *= (1 - cp_belt_x_r)
-
-    return cp_contr + sheep_contr
-
-
-def get_quantity_beef_carbon_plantings_belt(
-    data, 
-    ag_q_mrp: np.ndarray, 
-    cp_belt_x_r: np.ndarray
-) -> np.ndarray:
-    """
-    Parameters
-    ------
-    data: Data object.
-    ag_c_mrj: agricultural cost matrix.
-    cp_belt_x_r: Carbon plantings belt exclude matrix.
-
-    Returns
-    ------
-    Numpy array indexed by (c, r)
-    """
-    beef_quantity_cr = get_beef_q_cr(data, ag_q_mrp)    
-    base_cp_quantity_cr = get_quantity_carbon_plantings_belt_base(data)
-
-    # Calculate contributions and return the sum
-    cp_contr = base_cp_quantity_cr
-    for c in range(data.NCMS):
-        cp_contr[c, :] *= cp_belt_x_r
-
-    beef_contr = beef_quantity_cr
-    for c in range(data.NCMS):
-        beef_contr *= (1 - cp_belt_x_r)
+        beef_contr[c, :] *= (1 - cp_belt_x_r)
 
     return cp_contr + beef_contr
 
@@ -363,14 +302,14 @@ def get_quantity_matrix(data, ag_q_mrp: np.ndarray, lumap: np.ndarray) -> np.nda
     """
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
-
+    
     env_plantings_quantity_matrix = get_quantity_env_plantings(data)
     rip_plantings_quantity_matrix = get_quantity_rip_plantings(data)
     sheep_agroforestry_quantity_matrix = get_quantity_sheep_agroforestry(data, ag_q_mrp, agroforestry_x_r)
-    beef_agroforestry_quantity_matrix = get_quantity_beef_agroforestry(data, ag_q_mrp, agroforestry_x_r)
-    carbon_plantings_block_quantity_matrix = get_quantity_carbon_plantings_block(data)
     sheep_carbon_plantings_belt_quantity_matrix = get_quantity_sheep_carbon_plantings_belt(data, ag_q_mrp, cp_belt_x_r)
+    carbon_plantings_block_quantity_matrix = get_quantity_carbon_plantings_block(data)
     beef_carbon_plantings_belt_quantity_matrix = get_quantity_beef_carbon_plantings_belt(data, ag_q_mrp, cp_belt_x_r)
+    beef_agroforestry_quantity_matrix = get_quantity_beef_agroforestry(data, ag_q_mrp, agroforestry_x_r)
     beccs_quantity_matrix = get_quantity_beccs(data)
 
     # reshape each matrix to be indexed (c, r, k) and concatenate on the k indexing
