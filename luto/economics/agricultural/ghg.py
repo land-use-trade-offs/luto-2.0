@@ -407,23 +407,11 @@ def get_ghg_transition_penalties(data: Data, lumap, separate=False) -> np.ndarra
     penalties_unall_natural_to_modified = get_ghg_penalties_unall_natural_to_modified(data, lumap)
     
     if separate:
-        ghg_trainsition_penalties = xr.DataArray(
-            np.stack([
+        ghg_trainsition_penalties = np.stack([
                 penalties_lvstck_natural_to_unall_natural, 
                 penalties_unall_natural_to_lvstck_natural, 
                 penalties_lvstck_natural_to_modified, 
-                penalties_unall_natural_to_modified]), 
-            dims = ['source', 'lm', 'cell', 'lu'], 
-            coords = {
-                'source': ['Livestock natural to unallocated natural',
-                           'Unallocated natural to livestock natural',
-                           'Livestock natural to modified',
-                           'Unallocated natural to modified'],
-                'lm': data.LANDMANS,
-                'cell': np.arange(data.NCELLS),
-                'lu': data.AGRICULTURAL_LANDUSES
-            }
-        )
+                penalties_unall_natural_to_modified])
     else:
         ghg_trainsition_penalties = penalties_lvstck_natural_to_unall_natural \
             + penalties_unall_natural_to_lvstck_natural \
