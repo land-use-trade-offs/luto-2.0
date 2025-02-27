@@ -1256,7 +1256,6 @@ def write_ghg_separate(data: Data, yr_cal, path):
 
 
     # Get the GHG emissions from lucc-convertion compared to the previous year
-    print(data.ag_dvars[yr_cal].shape, ghg_t.shape)
     ghg_t_smj = np.einsum('mrj,smrj -> smj', data.ag_dvars[yr_cal], ghg_t)
 
     # Summarize the array as a df
@@ -1264,8 +1263,6 @@ def write_ghg_separate(data: Data, yr_cal, path):
     ghg_t_df.columns = ['Type','Water_supply', 'Land-use', 'Value (t CO2e)']
     ghg_t_df = ghg_t_df.replace({'dry': 'Dryland', 'irr':'Irrigated'})
     ghg_t_df['Year'] = yr_cal
-
-    print('................................................................')
     
     # Save table to disk
     ghg_t_df['Year'] = yr_cal
