@@ -17,7 +17,12 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-TASK_ROOT_DIR = '../Custom_runs/20250227_RES15_Timeseries/'
+
+TASK_ROOT_DIR = '../Custom_runs/20250228_RES15_Timeseries_DIFF_BIO_PENALTIES'  
+if TASK_ROOT_DIR[-1] == '/':
+    TASK_ROOT_DIR = TASK_ROOT_DIR[:-1]
+
+
 
 EXCLUDE_DIRS = [
     'input', 

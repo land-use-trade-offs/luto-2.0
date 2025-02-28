@@ -21,6 +21,7 @@
 
 """ LUTO model settings. """
 
+import os
 import pandas as pd
 
 
@@ -168,8 +169,8 @@ THREADS = 50
 # ---------------------------------------------------------------------------- #
 
 NO_GO_VECTORS = {
-    'Winter cereals':           'input/no_go_areas/no_go_Winter_cereals.shp',
-    'Environmental Plantings':  'input/no_go_areas/no_go_Enviornmental_Plantings.shp'
+    'Winter cereals':           os.path.join(os.path.abspath(INPUT_DIR), 'no_go_areas/no_go_Winter_cereals.shp'),
+    'Environmental Plantings':  os.path.join(os.path.abspath(INPUT_DIR), 'no_go_areas/no_go_Enviornmental_Plantings.shp')
 }
 '''
 Land-use and vector file pairs to exclude land-use from being utilised in that area. 

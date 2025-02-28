@@ -252,7 +252,7 @@ class LutoSolver:
 
     def _setup_deviation_penalties(self):
         """
-        Decision variables, V, E and W, for soft constraints.
+        Decision variables, V, E and W, and B for soft constraints.
         1) [V] Penalty vector for demand, each one corespondes a commodity, that minimises the deviations from demand.
         2) [E] A single penalty scalar for GHG emissions, minimises its deviation from the target.
         3) [W] Penalty vector for water usage, each one corespondes a region, that minimises the deviations from the target.
@@ -1380,6 +1380,16 @@ class LutoSolver:
                 "GHG": (
                     self.obj_ghg.getValue()
                     if settings.GHG_CONSTRAINT_TYPE == "soft"
+                    else 0
+                ),
+                'Biodiversity': (
+                    self.obj_biodiv.getValue()
+                    if settings.BIODIV_CONSTRAINT_TYPE == "soft"
+                    else 0
+                ),
+                'Water': (
+                    self.obj_water.getValue()
+                    if settings.WATER_CONSTRAINT_TYPE == "soft"
                     else 0
                 ),
             },
