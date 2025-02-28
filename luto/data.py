@@ -1178,15 +1178,6 @@ class Data:
         
         print("\tLoading vegetation data...", flush=True)
         
-        # Determine the NVIS input status
-        if NVIS_SPATIAL_DETAIL  == 'LOW':
-            NVIS_posix = 'single_argmax_layer'
-        elif NVIS_SPATIAL_DETAIL  == 'HIGH':
-            NVIS_posix = 'seperate_percent_layers'
-        else:
-            raise ValueError(f"Invalid NVIS input status: {NVIS_CLASS_DETAIL }, must be 'single_argmax' or 'seperate_percent'")
-        
-
         # Read in the pre-1750 vegetation statistics, and get NVIS class names and areas
         NVIS_area_and_target = pd.read_csv(INPUT_DIR + f'/NVIS_{NVIS_CLASS_DETAIL}_{NVIS_SPATIAL_DETAIL}_SPATIAL_DETAIL.csv')
         
@@ -1230,9 +1221,9 @@ class Data:
         bio_GBF4A_target_percent = pd.read_csv(INPUT_DIR + '/BIODIVERSITY_GBF4A_TARGET.csv')
         
         self.BIO_GBF4A_SEL_SPECIES = [row['species'] for _,row in bio_GBF4A_target_percent.iterrows() 
-                                      if all([row['USER_DEFINED_TARGET_PERCENT_2030'] >0,
-                                              row['USER_DEFINED_TARGET_PERCENT_2050'] >0,
-                                              row['USER_DEFINED_TARGET_PERCENT_2100'] >0])]
+                                      if all([row['USER_DEFINED_TARGET_PERCENT_2030']>0,
+                                              row['USER_DEFINED_TARGET_PERCENT_2050']>0,
+                                              row['USER_DEFINED_TARGET_PERCENT_2100']>0])]
         
         self.BIO_GBF4A_SUITABILITY_OUTSDIE_LUTO_SCORE = bio_GBF4A_baseline_score.query(f'species in {self.BIO_GBF4A_SEL_SPECIES}')[['species', 'year', f'OUTSIDE_LUTO_NATURAL_SUITABILITY_AREA_WEIGHTED_HA_SSP{settings.SSP}']]
         self.BIO_GBF4A_SUITABILITY_BASELINE_SCORE_TARGET_PERCENT = bio_GBF4A_target_percent.query(f'species in {self.BIO_GBF4A_SEL_SPECIES}')
@@ -1320,8 +1311,8 @@ class Data:
         self.BIODIV_SCORE_RAW_WEIGHTED = self.get_array_resfactor_applied(self.BIODIV_SCORE_RAW_WEIGHTED)
         self.BIODIV_RAW_WEIGHTED_LDS = self.get_array_resfactor_applied(self.BIODIV_RAW_WEIGHTED_LDS)
 
-
         print("Data loading complete\n")
+        
 
     def get_coord(self, index_ij: np.ndarray, trans):
         """

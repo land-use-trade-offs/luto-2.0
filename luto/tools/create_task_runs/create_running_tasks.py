@@ -31,41 +31,57 @@ grid_search = {
     # Task run settings for submitting the job to the cluster
     ###############################################################
     'MEM': ['40GB'],
-    'NCPUS':[10],
+    'NCPUS':[20],
     'TIME': ['8:00:00'],
     'QUEUE': ['normalsr'],
     
+ 
     ###############################################################
     # Working settings for the model run
     ###############################################################
-    'MODE': ['timeseries'],                # 'snapshot' or 'timeseries'
+    'MODE': ['timeseries'],                 # 'snapshot' or 'timeseries'
     'RESFACTOR': [15],
     'WRITE_THREADS': [10],
     'WRITE_OUTPUT_GEOTIFFS': [False],
     'KEEP_OUTPUTS': [True],                 # If false, only keep report HTML
     
+ 
     ###############################################################
     # Model run settings
     ###############################################################
-    'DEMAND_CONSTRAINT_TYPE': ['soft'],     # 'hard' or 'soft'
-    'GHG_CONSTRAINT_TYPE': ['soft'],        # 'hard' or 'soft'
-    'BIODIVERSTIY_TARGET_GBF_2': ['off'],   # 'on' or 'off'
-    'WATER_CONSTRAINT_TYPE': ['hard'],      # 'hard' or 'soft'
     
-    ###############################################################
-    # Scenario settings for the model run
-    ###############################################################
-    'SOLVE_ECONOMY_WEIGHT': [0.05],
-    'BIODIV_PENALTY': [100, 500, 1000, 3000, 5000, 10000],
+    # Demand settings
+    'DEMAND_CONSTRAINT_TYPE': ['soft'],     # 'hard' or 'soft'
+    
+    # GHG settings
+    'GHG_CONSTRAINT_TYPE': ['soft'],        # 'hard' or 'soft'
     'GHG_LIMITS_FIELD': [
         '1.5C (67%) excl. avoided emis', 
         # '1.5C (50%) excl. avoided emis', 
         # '1.8C (67%) excl. avoided emis'
     ],
+    
+    # Biodiversity settings - GBF 2
+    'BIODIVERSTIY_TARGET_GBF_2': ['on'],    # 'on' or 'off'
+    'GBF2_PENALTY': [100, 500, 1000, 3000, 5000, 10000],
     'BIODIV_GBF_TARGET_2_DICT': [
         {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}, 
         # {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}
     ],
+    
+    # Biodiversity settings - GBF 3
+    'BIODIVERSTIY_TARGET_GBF_3': ['off'],   # 'on' or 'off'
+    
+    # Water settings
+    'WATER_CONSTRAINT_TYPE': ['hard'],      # 'hard' or 'soft'
+    # 'WATER_PENALTY': [100, 500, 1000, 3000, 5000, 10000],
+    
+    
+
+    ###############################################################
+    # Scenario settings for the model run
+    ###############################################################
+    'SOLVE_ECONOMY_WEIGHT': [0.05],
     
     #-------------------- Diet BAU --------------------
     'DIET_DOM': ['BAU',],            # 'BAU' or 'FLX'

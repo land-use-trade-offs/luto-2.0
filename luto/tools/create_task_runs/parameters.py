@@ -18,7 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 
-TASK_ROOT_DIR = '../Custom_runs/20250228_RES15_Timeseries_DIFF_BIO_PENALTIES'  
+TASK_ROOT_DIR = '../Custom_runs/20250228_RES15_Timeseries_DIFF_GBF_2_PENALTIES'  
 if TASK_ROOT_DIR[-1] == '/':
     TASK_ROOT_DIR = TASK_ROOT_DIR[:-1]
 

@@ -169,8 +169,8 @@ THREADS = 50
 # ---------------------------------------------------------------------------- #
 
 NO_GO_VECTORS = {
-    'Winter cereals':           os.path.join(os.path.abspath(INPUT_DIR), 'no_go_areas/no_go_Winter_cereals.shp'),
-    'Environmental Plantings':  os.path.join(os.path.abspath(INPUT_DIR), 'no_go_areas/no_go_Enviornmental_Plantings.shp')
+    'Winter cereals':           f'{os.path.abspath(INPUT_DIR)}/no_go_areas/no_go_Winter_cereals.shp',
+    'Environmental Plantings':  f'{os.path.abspath(INPUT_DIR)}/no_go_areas/no_go_Enviornmental_Plantings.shp'
 }
 '''
 Land-use and vector file pairs to exclude land-use from being utilised in that area. 
@@ -444,7 +444,7 @@ CALC_BIODIVERSITY_CONTRIBUTION = False              # True or False, calculate/r
 # BIODIV_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
 BIODIV_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 
-BIODIV_PENALTY = 1e4
+GBF2_PENALTY = 1e4
 
 # Connectivity source source
 CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
@@ -511,7 +511,7 @@ BECCS_BIODIVERSITY_BENEFIT = 0
 
 # ---------------------- Vegetation parameters ----------------------
 
-BIODIVERSTIY_TARGET_GBF_3  = 'on'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_3  = 'off'           # 'on' or 'off'.
 '''
     Target 3 of the Kunming-Montreal Global Biodiversity Framework:
     protect and manage 30% of the world's land, water, and coastal areas by 2030.

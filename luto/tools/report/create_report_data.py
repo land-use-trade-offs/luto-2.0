@@ -206,7 +206,7 @@ def save_report_data(raw_data_dir:str):
 
     # Get the total area of each land use
     transition_mat = transition_df_area.pivot(index='From land-use', columns='To land-use', values='Area (km2)')
-    transition_mat = transition_mat.reindex(index=LANDUSE_ALL_RENAMED, columns=LANDUSE_ALL_RENAMED)
+    transition_mat = transition_mat.reindex(index=AG_LANDUSE, columns=LANDUSE_ALL_RENAMED)
     transition_mat = transition_mat.fillna(0)
     total_area_from = transition_mat.sum(axis=1).values.reshape(-1, 1)
     
@@ -219,8 +219,8 @@ def save_report_data(raw_data_dir:str):
     transition_mat.loc['SUM'] = transition_mat.sum(axis=0)
 
     heat_area = transition_mat.style.background_gradient(cmap='Oranges', 
-                                                            axis=1, 
-                                                            subset=pd.IndexSlice[:transition_mat.index[-2], :transition_mat.columns[-2]]).format('{:,.0f}')
+                                                        axis=1, 
+                                                        subset=pd.IndexSlice[:transition_mat.index[-2], :transition_mat.columns[-2]]).format('{:,.0f}')
     
     heat_pct = transition_df_pct.style.background_gradient(cmap='Oranges', 
                                                         axis=1,

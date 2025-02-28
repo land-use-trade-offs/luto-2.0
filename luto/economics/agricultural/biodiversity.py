@@ -411,6 +411,17 @@ def get_agricultural_management_major_veg_group_matrices(
     The keys of the dictionary represent the management practices, and the values represent the 
     corresponding major vegetation groups effects' matrices.
     """
+    # Return empty dict if biodiversity target is not set
+    if settings.BIODIVERSTIY_TARGET_GBF_3 != 'on':
+        return {
+            'Asparagopsis taxiformis': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)),
+            'Precision Agriculture': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)),
+            'Ecological Grazing': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)),
+            'Savanna Burning': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)),
+            'AgTech EI': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)),
+            'Biochar': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)),
+        }
+        
     asparagopsis_data = {}
     if settings.AG_MANAGEMENTS['Asparagopsis taxiformis']: 
         asparagopsis_data = {

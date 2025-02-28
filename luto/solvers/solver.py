@@ -314,7 +314,7 @@ class LutoSolver:
             else 0
         )
         self.obj_biodiv = (
-            self.B * settings.BIODIV_PENALTY
+            self.B * settings.GBF2_PENALTY
             if settings.BIODIV_CONSTRAINT_TYPE == "soft"
             else 0
         )
@@ -865,7 +865,7 @@ class LutoSolver:
         # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSTIY_TARGET_GBF_2 != "on".
         biodiversity_limits = self._input_data.limits["biodiversity"]
 
-        # Bound the self.W variables to the difference between the desired and actual net yields
+        # Bound the self.B variables to the difference between the desired and actual net yields
         constr = self.gurobi_model.addConstr(biodiversity_limits - self.biodiversity_expr <= self.B)
         self.biodiversity_limit_soft_constraints.append(constr)
 
