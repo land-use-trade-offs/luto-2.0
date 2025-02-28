@@ -162,9 +162,38 @@ BARHOMOGENOUS = 1  # Useful for recognizing infeasibility or unboundedness. At t
 THREADS = 8
 
 
+
+# ---------------------------------------------------------------------------- #
+# No-Go areas; Regional adoption constraints
+# ---------------------------------------------------------------------------- #
+
+NO_GO_VECTORS = {
+    'Winter cereals':           'input/no_go_areas/no_go_Winter_cereals.shp',
+    'Environmental Plantings':  'input/no_go_areas/no_go_Enviornmental_Plantings.shp'
+}
+'''
+Land-use and vector file pairs to exclude land-use from being utilised in that area. 
+ - The key is the land-use name. 
+ - The value is the path to the ESRI shapefile.
+'''
+
+REGIONAL_ADOPTION_ZONE = 'ABARES_AAGIS' # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
+'''
+The regional adoption zone is the spatial unit used to enforce regional adoption constraints.
+The options are:
+  - 'ABARES_AAGIS': Australian Bureau of Agricultural and Resource Economics and Sciences (ABARES) Agricultural and Agribusiness Geographic Information System (AAGIS) regions.
+  - 'LGA_CODE': Local Government Area code.
+  - 'NRM_CODE': Natural Resource Management code.
+  - 'IBRA_ID': Interim Biogeographic Regionalisation of Australia (IBRA) region code.
+  - 'SLA_5DIGIT': Statistical Local Area (SLA) 5-digit code.
+'''
+
+
+
 # ---------------------------------------------------------------------------- #
 # Non-agricultural land usage parameters
 # ---------------------------------------------------------------------------- #
+
 NON_AG_LAND_USES = {
     'Environmental Plantings': True,
     'Riparian Plantings': True,
@@ -176,12 +205,14 @@ NON_AG_LAND_USES = {
     'BECCS': True,
 }
 """
-The dictionary below is the master list of all of the non agricultural land uses
+The dictionary here is the master list of all of the non agricultural land uses
 and whether they are currently enabled in the solver (True/False).
 
 To disable a non-agricultural land use, change the correpsonding value of the
 NON_AG_LAND_USES dictionary to false.
 """
+
+
 NON_AG_LAND_USES_REVERSIBLE = {
     'Environmental Plantings': False,
     'Riparian Plantings': False,
@@ -387,8 +418,6 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 # ------------------- Agricultural biodiversity parameters -------------------
-
-
 
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems

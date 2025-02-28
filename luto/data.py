@@ -21,11 +21,13 @@
 
 
 import os
-import h5py
+import h5py, netCDF4
 import xarray as xr
 import numpy as np
 import pandas as pd
 import rasterio
+import rasterio.features
+import geopandas as gpd
 
 import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
@@ -39,7 +41,7 @@ from typing import Any, Literal, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.settings import INPUT_DIR, NVIS_CLASS_DETAIL , NVIS_SPATIAL_DETAIL, OUTPUT_DIR
+from luto.settings import INPUT_DIR, NO_GO_VECTORS, NVIS_CLASS_DETAIL , NVIS_SPATIAL_DETAIL, OUTPUT_DIR, REGIONAL_ADOPTION_ZONE
 from luto.tools.spatializers import upsample_array
 
 
@@ -409,7 +411,6 @@ class Data:
         )
         self.add_non_ag_dvars(self.YR_CAL_BASE, self.NON_AG_L_RK)
 
-
         ###############################################################
         # Climate change impact data.
         ###############################################################
@@ -419,7 +420,56 @@ class Data:
             os.path.join(INPUT_DIR, "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".h5")
         )
 
+        ###############################################################
+        # No-Go areas; Regional adoption constraints.
+        ###############################################################
+        print("\tLoading no-go areas and regional adoption zones...", flush=True)
+   
+        ##################### No-go areas
+        self.NO_GO_LANDUSE = settings.NO_GO_VECTORS.keys()
+        for lu in self.NO_GO_LANDUSE:
+            if not lu in self.AGRICULTURAL_LANDUSES + self.NON_AGRICULTURAL_LANDUSES:
+                raise KeyError(f"Land use '{lu}' in no-go area vector does not match any land use in the model.")
 
+        no_go_arrs = []
+        for no_ag_lu, no_go_path in NO_GO_VECTORS.items():
+            # Read the no-go area shapefile
+            no_go_shp = gpd.read_file(no_go_path)
+            # Check if the CRS is defined
+            if no_go_shp.crs is None:
+                raise ValueError(f"{no_go_path} does not have a CRS defined")
+            # Rasterize the reforestation vector; Fill with -1
+            with rasterio.open(INPUT_DIR + '/NLUM_2010-11_mask.tif') as src:
+                src_arr = src.read(1)
+                src_meta = src.meta.copy()
+                no_go_shp = no_go_shp.to_crs(src_meta['crs'])
+                no_go_arr = rasterio.features.rasterize(
+                    ((row['geometry'], 1) for _,row in no_go_shp.iterrows()),
+                    out_shape=(src_meta['height'], src_meta['width']),
+                    transform=src_meta['transform'],
+                    fill=0,
+                    dtype=np.int8
+                )
+                # Add the no-go area to the list
+                no_go_arrs.append(no_go_arr[np.nonzero(src_arr)].astype(np.bool_))
+       
+        self.NO_GO_REGION = np.stack(no_go_arrs, axis=0)[:, self.MASK]
+        
+
+        
+        ##################### Regional adoption zones
+        self.REGIONAL_ADOPTION_ZONES = self.get_array_resfactor_applied(
+            pd.read_hdf(os.path.join(INPUT_DIR, "regional_adoption_zones.h5"))[REGIONAL_ADOPTION_ZONE].to_numpy()
+        )
+        
+        regional_adoption_targets = pd.read_excel(os.path.join(INPUT_DIR, "regional_adoption_zones.xlsx"), sheet_name=REGIONAL_ADOPTION_ZONE)
+        self.REGIONAL_ADOPTION_TARGETS = regional_adoption_targets.iloc[
+            [idx for idx, row in regional_adoption_targets.iterrows() if
+                all([row['ADOPTION_PERCENTAGE_2030']>=0, 
+                    row['ADOPTION_PERCENTAGE_2050']>=0, 
+                    row['ADOPTION_PERCENTAGE_2100']>=0])
+            ]
+        ]
 
         ###############################################################
         # Livestock related data.
@@ -1411,8 +1461,8 @@ class Data:
         Because the coordinates are the controid of the `self.MASK` array, so the spatial interpolation is 
         simultaneously a masking process. 
         
-        The suitability score is then  weighted by the area (ha) of each cell. The area weighting
-        is necessary to ensure that the biodiversity suitability score will not be affected by different RESFACTOR (i.e., cell size) values.
+        The suitability score is then weighted by the area (ha) of each cell. The area weighting is necessary 
+        to ensure that the biodiversity suitability score will not be affected by different RESFACTOR (i.e., cell size) values.
         '''
         current_species_val = self.BIO_GBF4A_SPECIES_LAYER.interp(            # Here the year interpolation is done first                      
             year=yr,
@@ -1515,8 +1565,10 @@ class Data:
         # Check the layer name
         if layer == 'LIKELY':
             snes_df = self.BIO_GBF4B_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY
+            snes_out_LUTO = snes_df['HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_LIKELY']
         elif layer == 'MAYBE':
             snes_df = self.BIO_GBF4B_SNES_BASELINE_SCORE_TARGET_PERCENT_MAYBE
+            snes_out_LUTO = snes_df['HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_MAYBE']
         else:
             raise ValueError("Invalid layer name. Must be 'LIKELY' or 'MAYBE'")
         
@@ -1538,7 +1590,7 @@ class Data:
         snes_score_all_Australia = snes_df['HABITAT_SIGNIFICANCE_BASELINE_ALL_AUSTRALIA_LIKELY'] * target_pct
         # Subtract the the (significance score for outside LUTO natural) from (significance score for all Australia) 
         # to get the (significance score for inside LUTO natural) 
-        snes_inside_LUTO_natural =  snes_score_all_Australia - snes_df['HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_LIKELY']
+        snes_inside_LUTO_natural =  snes_score_all_Australia - snes_out_LUTO
         return snes_inside_LUTO_natural.values
     
         
@@ -1547,8 +1599,10 @@ class Data:
         # Check the layer name
         if layer == 'LIKELY':
             ecnes_df = self.BIO_GBF4B_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY
+            ecnes_out_LUTO = ecnes_df['HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_LIKELY']
         elif layer == 'MAYBE':
             ecnes_df = self.BIO_GBF4B_ECNES_BASELINE_SCORE_TARGET_PERCENTE_MAYBE
+            ecnes_out_LUTO = ecnes_df['HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_MAYBE']
         else:
             raise ValueError("Invalid layer name. Must be 'LIKELY' or 'MAYBE'")
         
@@ -1570,7 +1624,7 @@ class Data:
         ecnes_score_all_Australia = ecnes_df['HABITAT_SIGNIFICANCE_BASELINE_ALL_AUSTRALIA_LIKELY'] * target_pct
         # Subtract the the (significance score for outside LUTO natural) from (significance score for all Australia)
         # to get the (significance score for inside LUTO natural)
-        ecnes_inside_LUTO_natural =  ecnes_score_all_Australia - ecnes_df['HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_LIKELY']
+        ecnes_inside_LUTO_natural =  ecnes_score_all_Australia - ecnes_out_LUTO
         return ecnes_inside_LUTO_natural.values
     
     
@@ -1581,7 +1635,7 @@ class Data:
         BIO_GBF4B_SPECIES_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_DCCEEW_SNES.nc', chunks={'species':1})
         # The presence values are 1 = MAYBE, 2 = LIKELY
         if layer == 'LIKELY':
-            snes_arr =  BIO_GBF4B_SPECIES_raw.sel(species=self.BIO_GBF_4B_SNES_LIKELY_SEL, cell=self.MASK, presence=2).compute()
+            snes_arr = BIO_GBF4B_SPECIES_raw.sel(species=self.BIO_GBF_4B_SNES_LIKELY_SEL, cell=self.MASK, presence=2).compute()
         elif layer == 'MAYBE':
             snes_arr = BIO_GBF4B_SPECIES_raw.sel(species=self.BIO_GBF_4B_SNES_MAYBE_SEL, cell=self.MASK, presence=1).compute()
         else:
@@ -1601,7 +1655,7 @@ class Data:
         BIO_GBF4B_COMUNITY_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_DCCEEW_ECNES.nc', chunks={'species':1})
         # The presence values are 1 = MAYBE, 2 = LIKELY
         if layer == 'LIKELY':
-            ecnes_arr =  BIO_GBF4B_COMUNITY_raw.sel(species=self.BIO_GBF4B_ECNES_LIKELY_SEL, cell=self.MASK, presence=2).compute()
+            ecnes_arr = BIO_GBF4B_COMUNITY_raw.sel(species=self.BIO_GBF4B_ECNES_LIKELY_SEL, cell=self.MASK, presence=2).compute()
         elif layer == 'MAYBE':
             ecnes_arr = BIO_GBF4B_COMUNITY_raw.sel(species=self.BIO_GBF4B_ECNES_MAYBE_SEL, cell=self.MASK, presence=1).compute()
         else:
@@ -1612,6 +1666,46 @@ class Data:
             return 0
         
         return (ecnes_arr.values * self.REAL_AREA).astype(np.float32)
+    
+    
+    def get_regional_adoption_percent_by_year(self, yr: int):
+        """
+        Get the regional adoption percentage for each region for the given year.
+        
+        Return a list of tuples where each tuple contains 
+        - the region ID, 
+        - landuse name, 
+        - the adoption percentage.
+        
+        """
+        reg_adop_limits = []
+        for _,row in self.REGIONAL_ADOPTION_TARGETS.iterrows():
+            f = interp1d(
+                [2010, 2030, 2050, 2100],
+                [row['BASE_LANDUSE_AREA_PERCENT'], row['ADOPTION_PERCENTAGE_2030'], row['ADOPTION_PERCENTAGE_2050'], row['ADOPTION_PERCENTAGE_2100']],
+                kind="linear",
+                fill_value="extrapolate",
+            )
+            reg_adop_limits.append((row[REGIONAL_ADOPTION_ZONE], row['TARGET_LANDUSE'], f(yr).item()))
+            
+        return reg_adop_limits
+    
+    def get_regional_adoption_limit_ha_by_year(self, yr: int):
+        """
+        Get the regional adoption area for each region for the given year.
+        
+        Return a list of tuples where each tuple contains
+        - the region ID,
+        - landuse name,
+        - the adoption area (ha).
+        """
+        reg_adop_limits = self.get_regional_adoption_percent_by_year(yr)
+        reg_adop_limits_ha = []
+        for reg, landuse, pct in reg_adop_limits:
+            reg_total_area_ha = ((self.REGIONAL_ADOPTION_ZONES == reg) * self.REAL_AREA).sum()
+            reg_adop_limits_ha.append((reg, landuse, reg_total_area_ha * pct / 100))
+            
+        return reg_adop_limits_ha
     
     
     def add_production_data(self, yr: int, data_type: str, prod_data: Any):
