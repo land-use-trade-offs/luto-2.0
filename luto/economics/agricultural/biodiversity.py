@@ -275,27 +275,30 @@ def get_major_vegetation_group_limits(data: Data, yr_cal: int) -> tuple[np.ndarr
 def get_ag_management_biodiversity_impacts(
     data: Data,
     yr_cal: int,
-) -> dict[str, dict[int, float]]:
+) -> dict[str, dict[int, np.ndarray]]:
     return {
         'Asparagopsis taxiformis': {
-            j_idx: 0.0 
+            j_idx: np.zeros(data.NCELLS)
             for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis'])
         },
         'Precision Agriculture': {
-            j_idx: 0.0 
+            j_idx: np.zeros(data.NCELLS)
             for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture'])
         },
         'Ecological Grazing': {
-            j_idx: 0.0 
+            j_idx: np.zeros(data.NCELLS)
             for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing'])
         },
-        'Savanna Burning': 1 - data.BIODIV_DEGRADE_LDS,
+        'Savanna Burning': {
+            j_idx: 1 - data.BIODIV_DEGRADE_LDS
+            for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
+        },
         'AgTech EI': {
-            j_idx: 0.0 
+            j_idx: np.zeros(data.NCELLS)
             for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['AgTech EI'])
         },
         'Biochar': {
-            j_idx: data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact'] - 1
+            j_idx: (data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact'] - 1) * np.ones(data.NCELLS)
             for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Biochar'])
         },
     }

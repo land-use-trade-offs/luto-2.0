@@ -80,9 +80,7 @@ class SolverInputData:
     
     ag_biodiv_degr_j: dict[int, float]                     # Biodiversity degredation factor for each ag LU.
     non_ag_biodiv_impact_k: dict[int, float]               # Biodiversity benefits for each non-ag LU.
-    ag_man_biodiv_impacts: dict[
-        str, dict[int, float] | np.ndarray
-    ]                                                      # Biodiversity benefits for each AM option.
+    ag_man_biodiv_impacts: dict[str, dict[int, np.ndarray]]# Biodiversity benefits for each AM option.
     mvg_vr: np.ndarray                                     # Major vegetation group cell contribution data - indexed by veg. group (v) and cell (r)
     sc_sr: np.ndarray                                      # Species conservation cell contribution data - indexed by species (s) and cell (r).
     mvg_contr_outside_study_area: dict[int, float]         # Contributions of land outside LUTO study area to each major veg. group (keys: major groups)

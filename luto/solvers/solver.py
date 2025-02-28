@@ -903,20 +903,12 @@ class LutoSolver:
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
                     self._input_data.mvg_vr[v, ind]
-                    * (
-                        am_impact[ind]
-                        if isinstance(am_impact := self._input_data.ag_man_biodiv_impacts[am], np.ndarray)
-                        else am_impact[j_idx]
-                    )
+                    * self._input_data.ag_man_biodiv_impacts[am][j_idx][ind]
                     * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
                 )  # Dryland alt. ag. management contributions
                 + gp.quicksum(
                     self._input_data.mvg_vr[v, ind]
-                    * (
-                        am_impact[ind]
-                        if isinstance(am_impact := self._input_data.ag_man_biodiv_impacts[am], np.ndarray)
-                        else am_impact[j_idx]
-                    )
+                    * self._input_data.ag_man_biodiv_impacts[am][j_idx][ind]
                     * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
                 )  # Irrigated alt. ag. management contributions
                 for am, am_j_list in self._input_data.am2j.items()
@@ -972,20 +964,12 @@ class LutoSolver:
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
                     (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
-                    * (
-                        am_impact[ind]
-                        if isinstance(am_impact := self._input_data.ag_man_biodiv_impacts[am], np.ndarray)
-                        else am_impact[j_idx]
-                    )
+                    * self._input_data.ag_man_biodiv_impacts[am][j_idx][ind]
                     * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
                 )  # Dryland alt. ag. management contributions
                 + gp.quicksum(
                     (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
-                    * (
-                        am_impact[ind]
-                        if isinstance(am_impact := self._input_data.ag_man_biodiv_impacts[am], np.ndarray)
-                        else am_impact[j_idx]
-                    )
+                    * self._input_data.ag_man_biodiv_impacts[am][j_idx][ind]
                     * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
                 )  # Irrigated alt. ag. management contributions
                 for am, am_j_list in self._input_data.am2j.items()
