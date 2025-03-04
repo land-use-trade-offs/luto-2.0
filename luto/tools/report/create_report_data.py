@@ -421,10 +421,17 @@ def save_report_data(raw_data_dir:str):
     quantify_diff = quantify_diff[['Year','Commodity','Prop_diff (%)']].rename(columns={'Prop_diff (%)': 'Demand Achievement (%)'})
     
     # Add a fake data as placeholder for the year 2010
-    quantify_diff_fake = quantify_diff.copy()
+    quantify_diff_fake = quantify_diff.query('Year == 2011').copy()
     quantify_diff_fake['Year'] = 2010
     quantify_diff_fake['Demand Achievement (%)'] = 100
-    quantify_diff = pd.concat([quantify_diff, quantify_diff_fake],ignore_index=True)
+    quantify_diff = pd.concat([quantify_diff_fake, quantify_diff], ignore_index=True)
+
+    # Remove rows where Demand Achievement (%) is 100 across all years
+    mask = quantify_diff.groupby('Commodity')['Demand Achievement (%)'].transform(lambda x: (round(x) == 100).all())
+    quantify_diff = quantify_diff[~mask]
+    
+    
+    quantify_diff_fake
     
     quantify_diff_wide = quantify_diff\
         .groupby(['Commodity'])[['Year','Demand Achievement (%)']]\
@@ -437,11 +444,7 @@ def save_report_data(raw_data_dir:str):
     
     quantify_diff_wide = quantify_diff_wide.set_index('name').reindex(COMMODITIES_ALL).reset_index()
     quantify_diff_wide = quantify_diff_wide.dropna()
-    
-    # Add a row without any data but type as column
-    quantify_diff_wide.loc[len(quantify_diff_wide)] = ['',[[i,np.nan] for i in years],'column', False]
-    
-    
+
     quantify_diff_wide.to_json(f'{SAVE_DIR}/production_6_demand_achievement_commodity.json', orient='records')
 
 
@@ -741,7 +744,7 @@ def save_report_data(raw_data_dir:str):
     cost_transition_ag2ag_trans_mat_json = {'categories': AG_LANDUSE,
                                             'series': json.loads(cost_transition_ag2ag_trans_mat_data.to_json(orient='records'))}
     
-    with open(f'{SAVE_DIR}/economics_8_transition_ag2ag_cost_5_transition_matrix.json', 'w') as outfile:
+    with open(f'{SAVE_DIR}/economics_8_transition_ag2ag_cost_6_transition_matrix.json', 'w') as outfile:
         outfile.write(json.dumps(cost_transition_ag2ag_trans_mat_json))
                                     
                                     
@@ -793,7 +796,7 @@ def save_report_data(raw_data_dir:str):
                                                 'series': json.loads(cost_transition_ag2non_ag_trans_mat_data.to_json(orient='records'))}
     
     
-    with open(f'{SAVE_DIR}/economics_9_transition_ag2non_cost_5_transition_matrix.json', 'w') as outfile:
+    with open(f'{SAVE_DIR}/economics_9_transition_ag2non_cost_6_transition_matrix.json', 'w') as outfile:
         outfile.write(json.dumps(cost_transition_ag2non_ag_trans_mat_json))
     
 
@@ -841,7 +844,7 @@ def save_report_data(raw_data_dir:str):
         'categories_to': AG_LANDUSE,
         'series': json.loads(cost_transition_non_ag2ag_trans_mat_data.to_json(orient='records'))}  
     
-    with open(f'{SAVE_DIR}/economics_10_transition_non_ag2ag_cost_5_transition_matrix.json', 'w') as outfile:
+    with open(f'{SAVE_DIR}/economics_10_transition_non_ag2ag_cost_6_transition_matrix.json', 'w') as outfile:
         outfile.write(json.dumps(cost_transition_non_ag2ag_trans_mat_json))                                              
                                                 
 
@@ -1399,6 +1402,7 @@ def save_report_data(raw_data_dir:str):
         bio_paths = files.query(filter_str).reset_index(drop=True)
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)
+        bio_df.loc[bio_df['Year']==2010,'Contribution Relative to Pre-1750 Level (%)'] = 0
         
         bio_df_net_sum = bio_df.groupby(['Year']).sum(numeric_only=True).reset_index()
         bio_df_net_sum_json = list(map(list,zip(bio_df_net_sum['Year'],bio_df_net_sum['Contribution Relative to Pre-1750 Level (%)'])))
@@ -1466,7 +1470,6 @@ def save_report_data(raw_data_dir:str):
         bio_df_group = bio_df_species_group.query('Level == "Group"').drop('Level',axis=1).copy()
         bio_df_group.columns = ['name','data']
         bio_df_group['type'] = 'spline'
-        bio_df_group.loc[len(bio_df_group)] = ['', [[2010, 0], [2011, 0]], 'column']
         bio_df_group.to_json(f'{SAVE_DIR}/biodiversity_GBF4_1_contribution_group_score_total.json', orient='records')
         
         
@@ -1489,7 +1492,7 @@ def save_report_data(raw_data_dir:str):
             df = df.drop('Name',axis=1)
             df.columns = ['name','data']
             df['type'] = 'column'
-            bio_df_group_type_records.append({idx:df.to_dict(orient='records')})
+            bio_df_group_type_records.append({'name':idx,'data':df.to_dict(orient='records')})
         
         with open(f'{SAVE_DIR}/biodiversity_GBF4_2_contribution_group_score_by_type.json', 'w') as outfile:
             json.dump(bio_df_group_type_records, outfile)
@@ -1514,7 +1517,7 @@ def save_report_data(raw_data_dir:str):
             df.columns = ['name','data']
             df['type'] = 'column'
             df = df.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index()
-            bio_df_group_records.append({idx:df.to_dict(orient='records')})
+            bio_df_group_records.append({'name':idx,'data':df.to_dict(orient='records')})
             
         with open(f'{SAVE_DIR}/biodiversity_GBF4_3_contribution_group_score_by_landuse.json', 'w') as outfile:
             json.dump(bio_df_group_records, outfile)
@@ -1535,7 +1538,6 @@ def save_report_data(raw_data_dir:str):
             bio_df_species = bio_df_species.query('Level == "Species"').drop('Level',axis=1).copy()
             bio_df_species.columns = ['name','data']
             bio_df_species['type'] = 'spline'
-            bio_df_species.loc[len(bio_df_species)] = ['', [[2010, 0], [2011, 0]], 'column']
             bio_df_species.to_json(f'{SAVE_DIR}/biodiversity_GBF4_4_contribution_species_score_total.json', orient='records')
             
             
@@ -1557,7 +1559,7 @@ def save_report_data(raw_data_dir:str):
                 df = df.drop('Name',axis=1)
                 df.columns = ['name','data']
                 df['type'] = 'column'
-                bio_df_species_type_records.append({idx:df.to_dict(orient='records')})
+                bio_df_species_type_records.append({'name':idx,'data':df.to_dict(orient='records')})
                 
             with open(f'{SAVE_DIR}/biodiversity_GBF4_5_contribution_species_score_by_type.json', 'w') as outfile:
                 json.dump(bio_df_species_type_records, outfile)
@@ -1582,7 +1584,7 @@ def save_report_data(raw_data_dir:str):
                 df.columns = ['name','data']
                 df['type'] = 'column'
                 df = df.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index()
-                bio_df_species_records.append({idx:df.to_dict(orient='records')})
+                bio_df_species_records.append({'name':idx,'data':df.to_dict(orient='records')})
                 
             with open(f'{SAVE_DIR}/biodiversity_GBF4_6_contribution_species_score_by_landuse.json', 'w') as outfile:
                 json.dump(bio_df_species_records, outfile)

@@ -1174,9 +1174,9 @@ def write_biodiversity_GBF4A_scores_species(data: Data, yr_cal, path):
     
 
     # Insert the type column
-    GBF4A_scores_species_ag = GBF4A_scores_species_ag.assign(Type='Agricultural', Year=yr_cal, Level='Species').replace({'dry':'Dryland', 'irr':'Irrigated'})
-    GBF4A_scores_species_non_ag = GBF4A_scores_species_non_ag.assign(Type='Non-Agricultural', Year=yr_cal, lm='Dryland', Level='Species')
-    GBF4A_scores_species_am = GBF4A_scores_species_am.assign(Type='Agri-Management', Year=yr_cal, Level='Species').replace({'dry':'Dryland', 'irr':'Irrigated'})
+    GBF4A_scores_species_ag = GBF4A_scores_species_ag.assign(Type='Agricultural Landuse', Year=yr_cal, Level='Species').replace({'dry':'Dryland', 'irr':'Irrigated'})
+    GBF4A_scores_species_non_ag = GBF4A_scores_species_non_ag.assign(Type='Non-Agricultural land-use', Year=yr_cal, lm='Dryland', Level='Species')
+    GBF4A_scores_species_am = GBF4A_scores_species_am.assign(Type='Agricultural Management', Year=yr_cal, Level='Species').replace({'dry':'Dryland', 'irr':'Irrigated'})
 
     # Save to disk
     pd.concat([
