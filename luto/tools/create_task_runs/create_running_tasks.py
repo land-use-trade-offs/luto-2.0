@@ -50,7 +50,7 @@ grid_search = {
     # Model run settings
     ###############################################################
     
-    # Demand settings
+    # --------------- Demand settings ---------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],     # 'hard' or 'soft'
     
     # GHG settings
@@ -61,7 +61,7 @@ grid_search = {
         # '1.8C (67%) excl. avoided emis'
     ],
     
-    # Biodiversity settings - GBF 2
+    # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSTIY_TARGET_GBF_2': ['on'],    # 'on' or 'off'
     'GBF2_PENALTY': [100, 500, 1000, 3000, 5000, 10000],
     'BIODIV_GBF_TARGET_2_DICT': [
@@ -69,10 +69,10 @@ grid_search = {
         # {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}
     ],
     
-    # Biodiversity settings - GBF 3
+    # --------------- Biodiversity settings - GBF 3 ---------------
     'BIODIVERSTIY_TARGET_GBF_3': ['off'],   # 'on' or 'off'
     
-    # Water settings
+    # --------------- Water settings ---------------
     'WATER_CONSTRAINT_TYPE': ['hard'],      # 'hard' or 'soft'
     # 'WATER_PENALTY': [100, 500, 1000, 3000, 5000, 10000],
     

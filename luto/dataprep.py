@@ -126,15 +126,18 @@ def create_new_dataset():
     # Copy biodiversity GBF-4A files
     shutil.copyfile(bio_GBF_4a_inpath + 'BIODIVERSITY_GBF4A_SCORES.csv', outpath + 'BIODIVERSITY_GBF4A_SCORES.csv')
     shutil.copyfile(bio_GBF_4a_inpath + 'BIODIVERSITY_GBF4A_TARGET.csv', outpath + 'BIODIVERSITY_GBF4A_TARGET.csv')
+    shutil.copyfile(bio_GBF_4a_inpath + 'BIODIVERSITY_GBF4A_SCORES_group.csv', outpath + 'BIODIVERSITY_GBF4A_SCORES_group.csv')
+    shutil.copyfile(bio_GBF_4a_inpath + 'BIODIVERSITY_GBF4A_TARGET_group.csv', outpath + 'BIODIVERSITY_GBF4A_TARGET_group.csv')
     
-    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp126_Condition_group.nc', outpath + 'bio_ssp126_Condition_group.nc')
     shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp126_EnviroSuit.nc', outpath + 'bio_ssp126_EnviroSuit.nc')
-    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp245_Condition_group.nc', outpath + 'bio_ssp245_Condition_group.nc')
     shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp245_EnviroSuit.nc', outpath + 'bio_ssp245_EnviroSuit.nc')
-    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp370_Condition_group.nc', outpath + 'bio_ssp370_Condition_group.nc')
     shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp370_EnviroSuit.nc', outpath + 'bio_ssp370_EnviroSuit.nc')
-    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp585_Condition_group.nc', outpath + 'bio_ssp585_Condition_group.nc')
     shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp585_EnviroSuit.nc', outpath + 'bio_ssp585_EnviroSuit.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp126_EnviroSuit_group.nc', outpath + 'bio_ssp126_EnviroSuit_group.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp245_EnviroSuit_group.nc', outpath + 'bio_ssp245_EnviroSuit_group.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp370_EnviroSuit_group.nc', outpath + 'bio_ssp370_EnviroSuit_group.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp585_EnviroSuit_group.nc', outpath + 'bio_ssp585_EnviroSuit_group.nc')
+    
     
     # Copy biodiversity GBF-4B files
     shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_ECNES_target.csv', outpath + 'bio_DCCEEW_ECNES_target.csv')

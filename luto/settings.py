@@ -437,12 +437,8 @@ BIODIV_GBF_TARGET_2_DICT = {
 """
 
 
-
-# Global Biodiversity Framework Target 4: Halt Species Extinction, Protect Genetic Diversity, and Manage Human-Wildlife Conflicts
-CALC_BIODIVERSITY_CONTRIBUTION = False              # True or False, calculate/report biodiversity contribution; False will turn off reprojecting decision variables to xarray so speed up the model run.
-
-# BIODIV_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
-BIODIV_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
+BIODIV_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
+# BIODIV_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 
 GBF2_PENALTY = 1e4
 
@@ -537,6 +533,14 @@ the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers
 - If 'MVS' is selected, the NVIS input layers will be be resampled to a single 1km resolution layer,
   and each cell has a group index who covers the most area within this cell.
 '''
+
+
+# ------------------------------- Species parameters -------------------------------
+BIODIVERSTIY_TARGET_GBF_4 =  'on'           # 'on' or 'off'.
+
+
+
+
 
 
 

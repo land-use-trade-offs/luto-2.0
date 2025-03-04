@@ -1071,7 +1071,7 @@ class Data:
 
 
         ###############################################################
-        # Biodiversity priority conservation data.
+        # Biodiversity priority conservation data. (GBF Target 2)
         ###############################################################
         print("\tLoading biodiversity data...", flush=True)
         """
@@ -1142,32 +1142,37 @@ class Data:
         The degradation scores are float values range between 0-1 indicating the discount of biodiversity value for each cell.
         E.g., 0.8 means the biodiversity value of the cell is 80% of the original raw biodiversity value.
         '''
-        biodiv_degrade_LDS = np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)                                            # Get the biodiversity degradation score for LDS burning (1D numpy array)
-        biodiv_degrade_habitat = np.vectorize(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.get)(self.LUMAP_NO_RESFACTOR).astype(np.float32)          # Get the biodiversity degradation score for each cell (1D numpy array)
+        biodiv_degrade_LDS = np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)                                                # Get the biodiversity degradation score for LDS burning (1D numpy array)
+        biodiv_degrade_habitat = np.vectorize(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.get)(self.LUMAP_NO_RESFACTOR).astype(np.float32)              # Get the biodiversity degradation score for each cell (1D numpy array)
 
-        # Get the biodiversity damage under LDS burning (0-1) for each cell
-        biodiv_degradation_raw_weighted_LDS = self.BIODIV_SCORE_RAW_WEIGHTED * (1 - biodiv_degrade_LDS)                     # Biodiversity damage under LDS burning (1D numpy array)
-        biodiv_degradation_raw_weighted_habitat = self.BIODIV_SCORE_RAW_WEIGHTED * (1 - biodiv_degrade_habitat)             # Biodiversity damage under under HCAS (1D numpy array)
+        # Get the biodiversity damage under LDS burning (0-1) for each cell 
+        biodiv_degradation_raw_weighted_LDS = self.BIODIV_SCORE_RAW_WEIGHTED * (1 - biodiv_degrade_LDS)                                         # Biodiversity damage under LDS burning (1D numpy array)
+        biodiv_degradation_raw_weighted_habitat = self.BIODIV_SCORE_RAW_WEIGHTED * (1 - biodiv_degrade_habitat)                                 # Biodiversity damage under under HCAS (1D numpy array)
 
-        # Get the biodiversity value at the beginning of the simulation
-        self.BIODIV_RAW_WEIGHTED_LDS = self.BIODIV_SCORE_RAW_WEIGHTED - biodiv_degradation_raw_weighted_LDS                 # Biodiversity value under LDS burning (1D numpy array); will be used as base score for calculating ag/non-ag stratagies impacts on biodiversity
-        biodiv_current_val = self.BIODIV_RAW_WEIGHTED_LDS - biodiv_degradation_raw_weighted_habitat                         # Biodiversity value at the beginning year (1D numpy array)
-        biodiv_current_val = np.nansum(biodiv_current_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK])          # Sum the biodiversity value within the LUMASK
+        # Get the biodiversity value at the beginning of the simulation                 
+        self.BIODIV_RAW_WEIGHTED_LDS = self.BIODIV_SCORE_RAW_WEIGHTED - biodiv_degradation_raw_weighted_LDS                                     # Biodiversity value under LDS burning (1D numpy array); will be used as base score for calculating ag/non-ag stratagies impacts on biodiversity
+        biodiv_base_yr_val = self.BIODIV_RAW_WEIGHTED_LDS - biodiv_degradation_raw_weighted_habitat                                             # Biodiversity value at the beginning year (1D numpy array)
+        self.BIODIV_BASE_YR_VAL_SUM = np.nansum(biodiv_base_yr_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK])                     # Sum the biodiversity value within the LUMASK
+        self.BIODIV_BASE_YR_VAL_EACH_LU = np.bincount(                                                                                          # Sum the biodiversity value within each land-use type
+            self.LUMAP_NO_RESFACTOR[self.LUMASK], 
+            weights=biodiv_base_yr_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK]
+        )                  
+        
 
-        # Biodiversity values need to be restored under the GBF Target 2
-        '''
-        The biodiversity value to be restored is calculated as the difference between the 'Unallocated - natural land'
-        and 'current land-use' regarding their biodiversity degradation scale.
-        '''
-        biodiv_degradation_val = (
-            biodiv_degradation_raw_weighted_LDS +                                                                           # Biodiversity degradation from HCAS
-            biodiv_degradation_raw_weighted_habitat                                                                         # Biodiversity degradation from LDS burning
+        # Biodiversity values need to be restored under the GBF Target 2                    
+        '''                 
+        The biodiversity value to be restored is calculated as the difference between the 'Unallocated - natural land'                  
+        and 'current land-use' regarding their biodiversity degradation scale.                  
+        '''                 
+        biodiv_degradation_base_yr_val = (
+            biodiv_degradation_raw_weighted_LDS +                                                                                               # Biodiversity degradation from LDS burning
+            biodiv_degradation_raw_weighted_habitat                                                                                             # Biodiversity degradation from HCAS
         )
-        biodiv_degradation_val = np.nansum(biodiv_degradation_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK])  # Sum the biodiversity degradation value within the LUMASK
+        self.BIODIV_BASE_YR_DEGRADATION = np.nansum(biodiv_degradation_base_yr_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK])     # Sum the biodiversity degradation value within the LUMASK
 
         # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
         self.BIODIV_GBF_TARGET_2 = {
-            yr: biodiv_current_val + biodiv_degradation_val * biodiv_GBF_target_2_proportions_2010_2100[yr]
+            yr: self.BIODIV_BASE_YR_VAL_SUM + self.BIODIV_BASE_YR_DEGRADATION * biodiv_GBF_target_2_proportions_2010_2100[yr]
             for yr in range(2010, 2101)
         }
         
@@ -1216,7 +1221,6 @@ class Data:
         BIO_GBF4A_SPECIES_raw = xr.open_dataset(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_EnviroSuit.nc', chunks={'year':1,'species':1})['data']        
 
 
-
         bio_GBF4A_baseline_score = pd.read_csv(INPUT_DIR + '/BIODIVERSITY_GBF4A_SCORES.csv')
         bio_GBF4A_target_percent = pd.read_csv(INPUT_DIR + '/BIODIVERSITY_GBF4A_TARGET.csv')
         
@@ -1225,11 +1229,14 @@ class Data:
                                               row['USER_DEFINED_TARGET_PERCENT_2050']>0,
                                               row['USER_DEFINED_TARGET_PERCENT_2100']>0])]
         
-        self.BIO_GBF4A_SUITABILITY_OUTSDIE_LUTO_SCORE = bio_GBF4A_baseline_score.query(f'species in {self.BIO_GBF4A_SEL_SPECIES}')[['species', 'year', f'OUTSIDE_LUTO_NATURAL_SUITABILITY_AREA_WEIGHTED_HA_SSP{settings.SSP}']]
-        self.BIO_GBF4A_SUITABILITY_BASELINE_SCORE_TARGET_PERCENT = bio_GBF4A_target_percent.query(f'species in {self.BIO_GBF4A_SEL_SPECIES}')
+        self.BIO_GBF4A_OUTSDIE_LUTO_SCORE_SPECIES = bio_GBF4A_baseline_score.query(f'species in {self.BIO_GBF4A_SEL_SPECIES}')[['species', 'year', f'OUTSIDE_LUTO_NATURAL_SUITABILITY_AREA_WEIGHTED_HA_SSP{settings.SSP}']]
+        self.BIO_GBF4A_OUTSDIE_LUTO_SCORE_GROUPS = pd.read_csv(INPUT_DIR + '/BIODIVERSITY_GBF4A_SCORES_group.csv')[['group', 'year', f'OUTSIDE_LUTO_NATURAL_SUITABILITY_AREA_WEIGHTED_HA_SSP{settings.SSP}']]
+        
+        self.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES = bio_GBF4A_target_percent.query(f'species in {self.BIO_GBF4A_SEL_SPECIES}')
+        self.BIO_GBF4A_BASELINE_SCORE_GROUPS = pd.read_csv(INPUT_DIR + '/BIODIVERSITY_GBF4A_TARGET_group.csv')
 
         self.BIO_GBF4A_SPECIES_LAYER = BIO_GBF4A_SPECIES_raw.sel(species=self.BIO_GBF4A_SEL_SPECIES).compute()
-        self.BIO_GBF4A_GROUPS = xr.load_dataset(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_Condition_group.nc')['data']
+        self.BIO_GBF4A_GROUPS_LAYER = xr.load_dataset(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_EnviroSuit_group.nc')['data']
         
         
         # Read in the species data from DCCEEW National Environmental Significance (noted as GBF-4B)
@@ -1449,12 +1456,12 @@ class Data:
         return lumap_resample_avg
 
     
-    def get_GBF4A_bio_species_layers_by_yr(self, yr: int):
+    def get_GBF4A_bio_layers_by_yr(self, yr: int, level:Literal['species', 'group']='species'):
         '''
         Get the biodiversity suitability score [hectare weighted] for each species at the given year.
         
         The raw biodiversity suitability score [2D (shape, 808*978), (dtype, uint8, 0-100)] represents the 
-        suitability of each cell for each species.  Here it is LINEARLY interpolated to the given year,
+        suitability of each cell for each species/group.  Here it is LINEARLY interpolated to the given year,
         then LINEARLY interpolated to the given spatial coordinates.
         
         Because the coordinates are the controid of the `self.MASK` array, so the spatial interpolation is 
@@ -1463,7 +1470,10 @@ class Data:
         The suitability score is then weighted by the area (ha) of each cell. The area weighting is necessary 
         to ensure that the biodiversity suitability score will not be affected by different RESFACTOR (i.e., cell size) values.
         '''
-        current_species_val = self.BIO_GBF4A_SPECIES_LAYER.interp(      # Here the year interpolation is done first                      
+        
+        input_lr = self.BIO_GBF4A_SPECIES_LAYER if level == 'species' else self.BIO_GBF4A_GROUPS_LAYER
+        
+        current_species_val = input_lr.interp(                          # Here the year interpolation is done first                      
             year=yr,
             method='linear', 
             kwargs={'fill_value': 'extrapolate'}
@@ -1477,46 +1487,15 @@ class Data:
         # will not be affected by different RESFACTOR (i.e., cell size) values.
         current_species_val = (current_species_val * self.REAL_AREA).values.astype(np.float32)
         return current_species_val
-
-
-    def get_GBF4A_bio_group_layers_by_yr(self, yr: int):
-        '''
-        Get the biodiversity contribution score [hectare weighted] for each group at the given year.
-        
-        The raw contribution  score [2D (shape, 808*978), (dtype, float32, 0-1)] represents the 
-        percentage contribution of each cell to the total of biodiversity of Australia.  Here it 
-        is LINEARLY interpolated to the given year, then NEARESTLY (which is different from the 
-        `linear` interpopation for species data ) interpolated to the given spatial coordinates.
-        
-        Because the coordinates are the controid of the `self.MASK` array, so the spatial interpolation is 
-        simultaneously a masking process. 
-        
-        The contribution score is then weighted by the area (ha) of each cell. The area weighting is necessary to ensure
-        that the biodiversity contribution score will not be affected by different RESFACTOR (i.e., cell size) values.
-        '''
-        current_group_contribution = self.BIO_GBF4A_GROUPS.interp(      # Here the year interpolation is done first
-            year=yr,
-            method='linear', 
-            kwargs={'fill_value': 'extrapolate'}
-        ).interp(                                                       # Then the spatial interpolation and masking is done
-            x=xr.DataArray(self.COORD_LON_LAT[0], dims='cell'),
-            y=xr.DataArray(self.COORD_LON_LAT[1], dims='cell'),
-            method='nearest'                                            # Use NEAREST interpolation for the `contribution` values
-        ).drop_vars(['year'])
-        
-        # Weight the biodiversity contribution by the area of each cell, so that the biodiversity contribution score
-        # will not be affected by different RESFACTOR (i.e., cell size) values.
-        current_group_contribution = current_group_contribution  * self.REAL_AREA
-        return  current_group_contribution
     
     
-    def get_GBF4A_bio_suitability_area_weighted_score_all_Australia_by_yr(self, yr: int):
+    def get_GBF4A_area_weighted_score_all_Australia_by_yr(self, yr: int):
         '''
         Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for all Australia.
         '''
         # Get the target percentage for each species at the given year
         target_pct = []
-        for _,row in self.BIO_GBF4A_SUITABILITY_BASELINE_SCORE_TARGET_PERCENT.iterrows():
+        for _,row in self.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES.iterrows():
             f = interp1d(
                 [1990, 2030, 2050, 2100],
                 [row['HABITAT_SUITABILITY_BASELINE_PERCENT'], row[f'USER_DEFINED_TARGET_PERCENT_2030'], row[f'USER_DEFINED_TARGET_PERCENT_2050'], row[f'USER_DEFINED_TARGET_PERCENT_2100']],
@@ -1526,21 +1505,31 @@ class Data:
             target_pct.append(f(yr).item()) 
             
         # Calculate the target biodiversity suitability score for each species at the given year for all Australia
-        target_scores_all_AUS = self.BIO_GBF4A_SUITABILITY_BASELINE_SCORE_TARGET_PERCENT['HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA'] * np.array(target_pct)
+        target_scores_all_AUS = self.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES['HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA'] * np.array(target_pct)
         return target_scores_all_AUS
     
     
-    def get_GBF4A_bio_suitability_area_weighted_score_outside_natural_LUTO_by_yr(self, yr: int):
+    def get_GBF4A_area_weighted_score_outside_natural_LUTO_by_yr(self, yr: int, level:Literal['species', 'group']='species'):
         '''
         Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for the Outside LUTO natural land.
         '''
-        outside_natural_luto_baseline = self.BIO_GBF4A_SUITABILITY_BASELINE_SCORE_TARGET_PERCENT['HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO']
-        outside_natural_luto = self.BIO_GBF4A_SUITABILITY_OUTSDIE_LUTO_SCORE.pivot(index='species', columns='year').reset_index()
-        outside_natural_luto.columns = outside_natural_luto.columns.droplevel() 
-        outside_natural_luto[1990] = outside_natural_luto_baseline.values
         
+        if level == 'species':
+            base_score = self.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES['HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO']
+            proj_score = self.BIO_GBF4A_OUTSDIE_LUTO_SCORE_SPECIES.pivot(index='species', columns='year').reset_index()
+        elif level == 'group':
+            base_score = self.BIO_GBF4A_BASELINE_SCORE_GROUPS['HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO']
+            proj_score = self.BIO_GBF4A_OUTSDIE_LUTO_SCORE_GROUPS.pivot(index='group', columns='year').reset_index()
+        else:
+            raise ValueError("Invalid level. Must be 'species' or 'group'")
+        
+        # Put the base score to the proj_score
+        proj_score.columns = proj_score.columns.droplevel() 
+        proj_score[1990] = base_score.values
+        
+        # Interpolate the suitability score for each species/group at the given year
         outside_natural_scores = []
-        for _,row in outside_natural_luto.iterrows():
+        for _,row in proj_score.iterrows():
             f = interp1d(
                 [1990, 2030, 2050, 2070, 2090],
                 [row[1990], row[2030], row[2050], row[2070], row[2090]],
@@ -1556,7 +1545,7 @@ class Data:
         '''
         Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for the Inside LUTO natural land.
         '''
-        target_scores = self.get_GBF4A_bio_suitability_area_weighted_score_all_Australia_by_yr(yr) - self.get_GBF4A_bio_suitability_area_weighted_score_outside_natural_LUTO_by_yr(yr)
+        target_scores = self.get_GBF4A_area_weighted_score_all_Australia_by_yr(yr) - self.get_GBF4A_area_weighted_score_outside_natural_LUTO_by_yr(yr)
         return target_scores.values
 
 

@@ -73,18 +73,6 @@ sim.run(data=data, base=2010, target=2050)
 
 
 
-#############################################################
-# Load data object from previous output directory
-#############################################################
-import luto.simulation as sim
-data = sim.read_dvars('path/to/previous/output/dir')
-sim.run(data=data, base=2010, target=2050)
-
-
-
-
-
-
 
 
 #################################################### Pixel-level data testing code

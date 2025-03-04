@@ -269,7 +269,7 @@ class LutoSolver:
             self.W = self.gurobi_model.addMVar(num_regions, name="W")
 
         if settings.BIODIV_CONSTRAINT_TYPE == "soft":
-            self.B = self.gurobi_model.addVar(name="B")
+            self.B = self.gurobi_model.addVar(name="B", lb=0)   # lb=0 will force B to be positive, so that when using soft constraints, the objective function will be minimized
 
     def _setup_objective(self):
         """
@@ -795,15 +795,15 @@ class LutoSolver:
 
     def _add_biodiversity_limit_constraints(self) -> None:
         if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
-            print("  ...biodiversity constraints target-2 TURNED OFF ...")
+            print("     ...biodiversity constraints target-2 TURNED OFF ...")
             return
 
         if settings.BIODIV_CONSTRAINT_TYPE == "hard":
-            print(f"  ...Hard biodiversity net yield constraints...")
+            print(f"    ...Hard biodiversity net yield constraints...")
             self._add_hard_biodiversity_usage_limit_constraints()
 
         elif settings.BIODIV_CONSTRAINT_TYPE == "soft":
-            print(f"  ...Soft biodiversity net yield constraints...")
+            print(f"    ...Soft biodiversity net yield constraints...")
             self._add_soft_biodiversity_usage_limit_constraints()
 
         else:

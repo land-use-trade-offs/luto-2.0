@@ -30,18 +30,18 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 
-    // biodiversity_1_total_score_by_category
-    Highcharts.chart("biodiversity_1_total_score_by_category", {
+    // biodiversity_GBF2_1_total_score_by_type
+    Highcharts.chart("biodiversity_GBF2_1_total_score_by_type", {
         chart: {
             type: "column",
             marginRight: 380,
         },
         title: {
-            text: "Total Biodiversity Score by Land-use/Management",
+            text: "Contribution to GBF-2 Target by Broad Land-use Type",
         },
         series: JSON.parse(
             document.getElementById(
-                "biodiversity_1_total_score_by_category_csv"
+                "biodiversity_GBF2_1_total_score_by_type_csv"
             ).innerHTML
         ),
         xAxis: {
@@ -49,7 +49,7 @@ document.addEventListener("DOMContentLoaded", function () {
         },
         yAxis: {
             title: {
-                text: "Quality-weighted Area (million ha)",
+                text: "Relative Contribution to 2010 Biodiversity Degradation Level (%)",
             },
         },
         plotOptions: {
@@ -75,18 +75,19 @@ document.addEventListener("DOMContentLoaded", function () {
         },
     });
 
-    // biodiversity_3_total_score_by_landuse
-    Highcharts.chart("biodiversity_3_total_score_by_landuse", {
+
+    // biodiversity_GBF2_2_total_score_by_landuse
+    Highcharts.chart("biodiversity_GBF2_2_total_score_by_landuse", {
         chart: {
             type: "column",
             marginRight: 380,
         },
         title: {
-            text: "Total Biodiversity Score by Land-use",
+            text: "Contribution to GBF-2 Target by Specific Land-use",
         },
         series: JSON.parse(
             document.getElementById(
-                "biodiversity_3_total_score_by_landuse_csv"
+                "biodiversity_GBF2_2_total_score_by_landuse_csv"
             ).innerHTML
         ),
         xAxis: {
@@ -94,182 +95,7 @@ document.addEventListener("DOMContentLoaded", function () {
         },
         yAxis: {
             title: {
-                text: "Quality-weighted Area (million ha)",
-            },
-        },
-        plotOptions: {
-            column: {
-                stacking: "normal",
-            },
-        },
-        tooltip: {
-            formatter: function () {
-                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-                    }:</b>${this.y.toFixed(2)}<br/>`;
-            },
-        },
-        legend: {
-            align: "right",
-            verticalalign: "left",
-            layout: "vertical",
-            x: 0,
-            verticalAlign: "middle",
-            itemStyle: {
-                // "fontSize": "11.5px",
-            },
-        },
-        credits: {
-            enabled: false,
-        },
-    });
-
-    // biodiversity_4_natural_land_area
-    Highcharts.chart("biodiversity_4_natural_land_area", {
-        chart: {
-            type: "column",
-            marginRight: 380,
-        },
-        title: {
-            text: "Land-Use Area (Natural land & Non-Agricultural land)",
-        },
-        series: JSON.parse(
-            document.getElementById("biodiversity_4_natural_land_area_csv").innerHTML
-        ),
-        xAxis: {
-            tickPositions: year_ticks,
-        },
-        yAxis: {
-            title: {
-                text: "Area (million ha)",
-            },
-        },
-        plotOptions: {
-            column: {
-                stacking: "normal",
-            },
-        },
-        tooltip: {
-            formatter: function () {
-                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-                    }:</b>${this.y.toFixed(2)}<br/>`;
-            },
-        },
-        legend: {
-            align: "right",
-            verticalalign: "left",
-            layout: "vertical",
-            x: 0,
-            verticalAlign: "middle",
-        },
-        credits: {
-            enabled: false,
-        },
-    });
-
-    // biodiversity_5_contribution_score_by_group
-    Highcharts.chart("biodiversity_5_contribution_score_by_group", {
-        chart: {
-            marginRight: 380,
-        },
-        plotOptions: {
-            column: {
-                showInLegend: false
-            },
-        },
-        title: {
-            text: "Biodiversity Contribution by Group",
-        },
-        series: JSON.parse(
-            document.getElementById("biodiversity_5_contribution_score_by_group_csv").innerHTML
-        ),
-        xAxis: {
-            tickPositions: year_ticks,
-        },
-        yAxis: {
-            title: {
-                text: "Contribution Score (%)",
-            },
-        },
-        tooltip: {
-            formatter: function () {
-                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-                    }:</b>${this.y.toFixed(2)}<br/>`;
-            },
-        },
-        legend: {
-            align: "right",
-            verticalalign: "left",
-            layout: "vertical",
-            x: -250,
-            verticalAlign: "middle",
-        },
-        credits: {
-            enabled: false,
-        },
-    });
-
-    // biodiversity_6_contribution_score_by_landuse_type_broad
-    Highcharts.chart("biodiversity_6_contribution_score_by_landuse_type_broad", {
-        chart: {
-            type: "column",
-            marginRight: 380,
-        },
-        title: {
-            text: "Biodiversity Contribution by Land-use Type (Broad)",
-        },
-        series: JSON.parse(
-            document.getElementById("biodiversity_6_contribution_score_by_landuse_type_broad_csv").innerHTML
-        ),
-        yAxis: {
-            title: {
-                text: "Contribution Score (%)",
-            },
-        },
-        xAxis: {
-            tickPositions: year_ticks,
-        },
-        plotOptions: {
-            column: {
-                stacking: "normal",
-            },
-        },
-        tooltip: {
-            formatter: function () {
-                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-                    }:</b>${this.y.toFixed(2)}<br/>`;
-            },
-        },
-        legend: {
-            align: "right",
-            verticalalign: "left",
-            layout: "vertical",
-            x: -150,
-            verticalAlign: "middle",
-        },
-        credits: {
-            enabled: false,
-        },
-    });
-
-
-    // biodiversity_7_contribution_score_by_landuse_type_specific
-    Highcharts.chart("biodiversity_7_contribution_score_by_landuse_type_specific", {
-        chart: {
-            type: "column",
-            marginRight: 380,
-        },
-        title: {
-            text: "Biodiversity Contribution by Land-use Type (Specific)",
-        },
-        series: JSON.parse(
-            document.getElementById("biodiversity_7_contribution_score_by_landuse_type_specific_csv").innerHTML
-        ),
-        xAxis: {
-            tickPositions: year_ticks,
-        },
-        yAxis: {
-            title: {
-                text: "Contribution Score (%)",
+                text: "Relative Contribution to 2010 Biodiversity Degradation Level (%)",
             },
         },
         plotOptions: {
@@ -286,19 +112,22 @@ document.addEventListener("DOMContentLoaded", function () {
         legend: {
             itemStyle: {
                 fontSize: "11px",
-            },
-            align: "right",
-            layout: "vertical",
-            x: -30,
-            y: -10,
-            verticalAlign: "middle",
-            itemMarginTop: 0,
-            itemMarginBottom: 1,
+                },
+                align: "right",
+                layout: "vertical",
+                x: -30,
+                y: -10,
+                verticalAlign: "middle",
+                itemMarginTop: 0,
+                itemMarginBottom: 1,
         },
         credits: {
             enabled: false,
         },
     });
+
+    
+
 
 });
 
