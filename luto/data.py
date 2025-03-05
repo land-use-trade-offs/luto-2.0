@@ -21,7 +21,7 @@
 
 
 import os
-import h5py, netCDF4
+import h5py
 import xarray as xr
 import numpy as np
 import pandas as pd
@@ -448,7 +448,7 @@ class Data:
                     out_shape=(src_meta['height'], src_meta['width']),
                     transform=src_meta['transform'],
                     fill=0,
-                    dtype=np.int8
+                    dtype=np.int16
                 )
                 # Add the no-go area to the list
                 no_go_arrs.append(no_go_arr[np.nonzero(src_arr)].astype(np.bool_))

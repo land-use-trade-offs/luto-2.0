@@ -1434,6 +1434,11 @@ class LutoSolver:
             prod_data["Major Vegetation Groups"] = {
                 v: expr.getValue() for v, expr in self.major_vegetation_exprs.items()
             }
+        if self.species_conservation_exprs:
+            prod_data["Species Conservation"] = {
+                s: expr.getValue() for s, expr in self.species_conservation_exprs.items()
+            }
+
 
         return SolverSolution(
             lumap=lumap,
