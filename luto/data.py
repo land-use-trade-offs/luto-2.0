@@ -21,7 +21,7 @@
 
 
 import os
-import h5py, netCDF4
+import h5py
 import xarray as xr
 import numpy as np
 import pandas as pd
@@ -448,7 +448,7 @@ class Data:
                     out_shape=(src_meta['height'], src_meta['width']),
                     transform=src_meta['transform'],
                     fill=0,
-                    dtype=np.int8
+                    dtype=np.int16
                 )
                 # Add the no-go area to the list
                 no_go_arrs.append(no_go_arr[np.nonzero(src_arr)].astype(np.bool_))
@@ -1200,12 +1200,16 @@ class Data:
         else:
             self.NVIS_PRE_GR = NVIS_pre_xr[:, self.MASK]
 
+        # Apply Savanna Burning penalties
+        veg_degradation_raw_weighted_LDS = self.NVIS_PRE_GR * (1 - self.BIODIV_DEGRADE_LDS)   # Savburn damages
+        self.NVIS_PRE_GR_LDS = self.NVIS_PRE_GR - veg_degradation_raw_weighted_LDS
+
         # To be computed during economic calculations
         self.NVIS_LIMITS: dict[int, np.ndarray] = {}
 
         # Container storing which cells apply to each major vegetation group
         epsilon = 1e-5
-        self.NVIS_INDECES = {
+        self.MAJOR_VEG_INDECES = {
             v: np.where(self.NVIS_PRE_GR[v] > epsilon)[0]
             for v in range(self.NVIS_PRE_GR.shape[0])
         }
