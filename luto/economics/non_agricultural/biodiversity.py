@@ -28,7 +28,9 @@ from luto.settings import (
     RIPARIAN_PLANTING_BIODIV_BENEFIT,
     AGROFORESTRY_BIODIV_BENEFIT,
     BECCS_BIODIVERSITY_BENEFIT,
-    )
+    AF_PROPORTION,
+    CP_BELT_PROPORTION,
+)
 
 
 def get_biodiv_environmental_plantings(data: Data) -> np.ndarray:
@@ -204,189 +206,34 @@ def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
     return np.concatenate(non_agr_b_matrices, axis=1)
 
 
-def get_mvg_environmental_plantings(data: Data, v: int) -> np.ndarray:
-    return data.NVIS_PRE_GR[v] * data.REAL_AREA * ENV_PLANTING_BIODIVERSITY_BENEFIT
-
-
-def get_mvg_riparian_plantings(data: Data, v: int) -> np.ndarray:
-    return data.NVIS_PRE_GR[v] * data.REAL_AREA * RIPARIAN_PLANTING_BIODIV_BENEFIT
-
-
-def get_mvg_agroforestry_base(data: Data, v: int) -> np.ndarray:
-    return data.NVIS_PRE_GR[v] * data.REAL_AREA * AGROFORESTRY_BIODIV_BENEFIT
-
-
-def get_mvg_sheep_agroforestry(
-    data: Data,
-    v: int,
-    v_mvg_mrj: np.ndarray,
-    agroforestry_x_r: np.ndarray,
-) -> np.ndarray:
-    """
-    Parameters
-    ------
-    data: Data object.
-    v: index of the major vegetation group for which the data should be calculated.
-    v_mvg_mrj: major veg group contribution matrix specific to v.
-    agroforestry_x_r: Agroforestry exclude matrix.
-
-    Returns
-    ------
-    Numpy array indexed by r
-    """
-    sheep_j = tools.get_sheep_code(data)
-
-    # Only use the dryland version of sheep
-    sheep_mvg = v_mvg_mrj[0, :, sheep_j]
-    base_agroforestry_mvg = get_mvg_agroforestry_base(data, v)
-
-    # Calculate contributions and return the sum
-    agroforestry_contr = base_agroforestry_mvg * agroforestry_x_r
-    sheep_contr = sheep_mvg * (1 - agroforestry_x_r)
-    return agroforestry_contr + sheep_contr
-
-
-def get_mvg_beef_agroforestry(
-    data: Data,
-    v: int,
-    v_mvg_mrj: np.ndarray,
-    agroforestry_x_r: np.ndarray
-) -> np.ndarray:
-    """
-    Parameters
-    ------
-    data: Data object.
-    v: index of the major vegetation group for which the data should be calculated.
-    v_mvg_mrj: major veg group contribution matrix specific to v.
-    agroforestry_x_r: Agroforestry exclude matrix.
-
-    Returns
-    ------
-    Numpy array indexed by r
-    """
-    beef_j = tools.get_beef_code(data)
-
-    # Only use the dryland version of beef
-    beef_mvg = v_mvg_mrj[0, :, beef_j]
-    base_agroforestry_mvg = get_mvg_agroforestry_base(data, v)
-
-    # Calculate contributions and return the sum
-    agroforestry_contr = base_agroforestry_mvg * agroforestry_x_r
-    beef_contr = beef_mvg * (1 - agroforestry_x_r)
-    return agroforestry_contr + beef_contr
-
-
-def get_mvg_carbon_plantings_block(data: Data, v: int) -> np.ndarray:
-    return data.NVIS_PRE_GR[v] * data.REAL_AREA * CARBON_PLANTING_BLOCK_BIODIV_BENEFIT
-
-
-def get_mvg_carbon_plantings_belt_base(data: Data, v: int) -> np.ndarray:
-    return data.NVIS_PRE_GR[v] * data.REAL_AREA * CARBON_PLANTING_BELT_BIODIV_BENEFIT
-
-
-def get_mvg_sheep_carbon_plantings_belt(
-    data: Data,
-    v: int,
-    v_mvg_mrj: np.ndarray, 
-    cp_belt_x_r: np.ndarray
-) -> np.ndarray:
-    """
-    Parameters
-    ------
-    data: Data object.
-    v: index of the major vegetation group for which the data should be calculated.
-    v_mvg_mrj: major veg group contribution matrix specific to v.
-    cp_belt_x_r: Carbon plantings belt exclude matrix.
-
-    Returns
-    ------
-    Numpy array indexed by r
-    """
-    sheep_j = tools.get_sheep_code(data)
-
-    # Only use the dryland version of sheep
-    sheep_mvg = v_mvg_mrj[0, :, sheep_j]
-    base_cp_mvg = get_mvg_carbon_plantings_belt_base(data, v)
-
-    # Calculate contributions and return the sum
-    cp_contr = base_cp_mvg * cp_belt_x_r
-    sheep_contr = sheep_mvg * (1 - cp_belt_x_r)
-    return cp_contr + sheep_contr
-
-
-def get_mvg_beef_carbon_plantings_belt(
-    data: Data,
-    v: int,
-    v_mvg_mrj: np.ndarray, 
-    cp_belt_x_r: np.ndarray
-) -> np.ndarray:
-    """
-    Parameters
-    ------
-    data: Data object.
-    v: index of the major vegetation group for which the data should be calculated.
-    v_mvg_mrj: major veg group contribution matrix specific to v.
-    cp_belt_x_r: Carbon plantings belt exclude matrix.
-
-    Returns
-    ------
-    Numpy array indexed by r
-    """
-    beef_j = tools.get_beef_code(data)
-
-    # Only use the dryland version of beef
-    beef_mvg = v_mvg_mrj[0, :, beef_j]
-    base_cp_mvg = get_mvg_carbon_plantings_belt_base(data, v)
-
-    # Calculate contributions and return the sum
-    cp_contr = base_cp_mvg * cp_belt_x_r
-    beef_contr = beef_mvg * (1 - cp_belt_x_r)
-    return cp_contr + beef_contr
-
-
-def get_mvg_beccs(data: Data, v: int):
-    return data.NVIS_PRE_GR[v] * data.REAL_AREA * BECCS_BIODIVERSITY_BENEFIT
-
-
-def get_major_vegetation_matrices(
-    data: Data, ag_mvg_mrj: dict[int, np.ndarray], lumap: np.ndarray
-) -> dict[int, np.ndarray]:
-    """
-    Get the matrix containing the contribution of each cell/non-ag. land use combination 
-    to each major vegetation group.
-
-    Returns:
-    - Arrays indexed by (r, k) containing the contributions for each vegetation group v.
-    """
-    mvg_rk_dict = {
-        v: np.zeros((data.NCELLS, data.N_NON_AG_LUS)).astype(np.float32) 
-        for v in range(data.N_NVIS_CLASSES)
+def get_non_ag_lu_biodiv_impacts(data: Data) -> dict[int, float]:
+    return {
+        # Environmental plantings
+        0: ENV_PLANTING_BIODIVERSITY_BENEFIT,
+        # Riparian plantings
+        1: RIPARIAN_PLANTING_BIODIV_BENEFIT,
+        # Sheep agroforestry
+        2: (
+            AF_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
+            + (1 - AF_PROPORTION) * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_sheep_code(data)])
+        ),
+        # Beef agroforestry
+        3: (
+            AF_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
+            + (1 - AF_PROPORTION) * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_beef_code(data)])
+        ),
+        # Carbon plantings (block)
+        4: CARBON_PLANTING_BLOCK_BIODIV_BENEFIT,
+        # Sheep carbon plantings (belt)
+        5: (
+            CP_BELT_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
+            + (1 - CP_BELT_PROPORTION) * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_sheep_code(data)])
+        ),
+        # Beef carbon plantings (belt)
+        6: (
+            CP_BELT_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
+            + (1 - CP_BELT_PROPORTION) * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_beef_code(data)])
+        ),
+        # BECCS
+        7: BECCS_BIODIVERSITY_BENEFIT,
     }
-
-    agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
-    cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
-
-    for v in range(data.N_NVIS_CLASSES):
-        v_ep_mvg = get_mvg_environmental_plantings(data, v)
-        v_rp_mvg = get_mvg_riparian_plantings(data, v)
-        v_sheep_agro_mvg = get_mvg_sheep_agroforestry(data, v, ag_mvg_mrj[v], agroforestry_x_r)
-        v_beef_agro_mvg = get_mvg_beef_agroforestry(data, v, ag_mvg_mrj[v], agroforestry_x_r)
-        v_cp_block_mvg = get_biodiv_carbon_plantings_block(data)
-        v_sheep_cp_belt_mvg = get_mvg_sheep_carbon_plantings_belt(data, v, ag_mvg_mrj[v], cp_belt_x_r)
-        v_beef_cp_belt_mvg = get_mvg_beef_carbon_plantings_belt(data, v, ag_mvg_mrj[v], cp_belt_x_r)
-        v_beccs_mvg = get_mvg_beccs(data, v)
-
-        v_mvg_matrices = [
-            v_ep_mvg.reshape((data.NCELLS, 1)),
-            v_rp_mvg.reshape((data.NCELLS, 1)),
-            v_sheep_agro_mvg.reshape((data.NCELLS, 1)),
-            v_beef_agro_mvg.reshape((data.NCELLS, 1)),
-            v_cp_block_mvg.reshape((data.NCELLS, 1)),
-            v_sheep_cp_belt_mvg.reshape((data.NCELLS, 1)),
-            v_beef_cp_belt_mvg.reshape((data.NCELLS, 1)),
-            v_beccs_mvg.reshape((data.NCELLS, 1)),
-        ]
-
-        mvg_rk_dict[v] = np.concatenate(v_mvg_matrices, axis=1)
-
-    return mvg_rk_dict

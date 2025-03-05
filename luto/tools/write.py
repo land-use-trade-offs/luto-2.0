@@ -181,6 +181,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_biodiversity_separate(data, yr_cal, path_yr)
     write_biodiversity_contribution(data, yr_cal, path_yr)
     write_major_vegetation_groups(data, yr_cal, path_yr)
+    write_species_conservation(data, yr_cal, path_yr)
 
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
 
@@ -1131,9 +1132,10 @@ def write_major_vegetation_groups(data: Data, yr_cal: int, path) -> None:
     mvg_df = pd.DataFrame(index=list(data.NVIS_ID2DESC.values()), columns=["Target", "Actual"])
 
     if yr_cal == data.YR_CAL_BASE:
-        mvg_mrj_dict = ag_biodiversity.get_major_vegetation_matrices(data)
+        mvg_vr = ag_biodiversity.get_major_vegetation_matrices(data)
+        ag_biodiv_degr_j = data.BIODIV_HABITAT_DEGRADE_LOOK_UP
         mvg_prod_data = tools.calc_major_vegetation_group_ag_area_for_year(
-            mvg_mrj_dict, data.AG_L_MRJ
+            mvg_vr, data.LUMAP, ag_biodiv_degr_j
         )
     else:
         mvg_prod_data = data.prod_data[yr_cal]["Major Vegetation Groups"]
@@ -1145,6 +1147,32 @@ def write_major_vegetation_groups(data: Data, yr_cal: int, path) -> None:
         mvg_df.loc[name, "Actual"] = mvg_prod_data[v]
 
     mvg_df.to_csv(os.path.join(path, f'vegetation_groups_{yr_cal}.csv'), index=True)
+
+
+def write_species_conservation(data: Data, yr_cal: int, path) -> None:
+    if not settings.BIODIVERSTIY_TARGET_GBF_4 == "on":
+        return
+    
+    print(f"Writing species conservation scores for {yr_cal}")
+    
+    sc_df = pd.DataFrame(index=data.BIO_GBF4A_SEL_SPECIES, columns=["Target", "Actual"])
+
+    if yr_cal == data.YR_CAL_BASE:
+        sc_sr = ag_biodiversity.get_species_conservation_matrix(data, yr_cal)
+        ag_biodiv_degr_j = data.BIODIV_HABITAT_DEGRADE_LOOK_UP
+        sc_prod_data = tools.calc_species_ag_area_for_year(
+            sc_sr, data.LUMAP, ag_biodiv_degr_j
+        )
+    else:
+        sc_prod_data = data.prod_data[yr_cal]["Species Conservation"]
+
+    sc_targets, species_names, _ = ag_biodiversity.get_species_conservation_limits(data, yr_cal)
+
+    for s, name in species_names.items():
+        sc_df.loc[name, "Target"] = sc_targets[s]
+        sc_df.loc[name, "Actual"] = sc_prod_data[s] * settings.SPECIES_CONSERVATION_DIV_CONSTANT
+
+    sc_df.to_csv(os.path.join(path, f'species_conservation_{yr_cal}.csv'), index=True)
 
 
 def write_ghg_separate(data: Data, yr_cal, path):

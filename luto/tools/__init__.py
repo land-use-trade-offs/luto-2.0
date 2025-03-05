@@ -690,11 +690,34 @@ def calc_water(
 
 
 def calc_major_vegetation_group_ag_area_for_year(
-    mvg_mrj_dict: dict[int, np.ndarray], ag_l_mrj: np.ndarray
+    mvg_vr: np.ndarray, lumap: np.ndarray, ag_biodiv_degr_j: dict[int, float]
 ) -> dict[int, float]:
     prod_data = {}
-    for v, mvg_mrj in mvg_mrj_dict.items():
-        prod_data[v] = np.tensordot(mvg_mrj, ag_l_mrj, 3)
+
+    ag_biodiv_impacts_j = {j: 1 - x for j, x in ag_biodiv_degr_j.items()}
+
+    # Numpy magic
+    ag_biodiv_degr_r = np.vectorize(ag_biodiv_impacts_j.get)(lumap)
+    
+    for v in range(mvg_vr.shape[0]):
+        prod_data[v] = mvg_vr[v, :] * ag_biodiv_degr_r
+
+    return prod_data
+
+
+def calc_species_ag_area_for_year(
+    sc_sr: np.ndarray, lumap: np.ndarray, ag_biodiv_degr_j: dict[int, float]
+) -> dict[int, float]:
+    prod_data = {}
+
+    ag_biodiv_impacts_j = {j: 1 - x for j, x in ag_biodiv_degr_j.items()}
+
+    # Numpy magic
+    ag_biodiv_degr_r = np.vectorize(ag_biodiv_impacts_j.get)(lumap)
+    
+    for s in range(sc_sr.shape[0]):
+        prod_data[s] = sc_sr[s, :] * ag_biodiv_degr_r
+
     return prod_data
 
 
