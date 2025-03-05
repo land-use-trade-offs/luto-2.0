@@ -1389,7 +1389,8 @@ def save_report_data(raw_data_dir:str):
     #########################################################
     
     
-    # ---------------- Biodiversity priority score  ----------------
+        
+    # ---------------- (GBF2) Biodiversity priority score  ----------------
     if settings.BIODIVERSTIY_TARGET_GBF_2 == 'on':
         
         # get biodiversity dataframe
@@ -1407,7 +1408,7 @@ def save_report_data(raw_data_dir:str):
         bio_df_net_sum = bio_df.groupby(['Year']).sum(numeric_only=True).reset_index()
         bio_df_net_sum_json = list(map(list,zip(bio_df_net_sum['Year'],bio_df_net_sum['Contribution Relative to Pre-1750 Level (%)'])))
 
-        
+
         
         # Plot_GBF2_1: Biodiversity total by Type
         bio_df_type = bio_df.groupby(['Year','Type']).sum(numeric_only=True).reset_index()
@@ -1435,12 +1436,72 @@ def save_report_data(raw_data_dir:str):
         bio_df_landuse = bio_df_landuse.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index()
         
         bio_df_landuse.to_json(f'{SAVE_DIR}/biodiversity_GBF2_2_total_score_by_landuse.json', orient='records')
-
-
-
+        
         
  
-    # ---------------- Biodiversity contribution score  ----------------
+        # Plot_GBF2_3: Biodiversity total by Agricultural Management
+        bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
+        bio_df_am = bio_df_am.groupby(['Year','Agri-Management']).sum(numeric_only=True).reset_index()
+        
+        bio_df_am = bio_df_am\
+            .groupby('Agri-Management')[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
+            .reset_index()
+            
+        bio_df_am.columns = ['name','data']
+        bio_df_am['type'] = 'column'
+        bio_df_am.to_json(f'{SAVE_DIR}/biodiversity_GBF2_3_total_score_by_agri_management.json', orient='records')
+        
+        
+        
+        
+        # Plot_GBF2_4: Biodiversity total by Non-Agricultural Land-use
+        bio_df_non_ag = bio_df.query('Type == "Non-Agricultural land-use"').copy()
+        bio_df_non_ag = bio_df_non_ag.groupby(['Year','Landuse']).sum(numeric_only=True).reset_index()
+        
+        bio_df_non_ag = bio_df_non_ag\
+            .groupby('Landuse')[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
+            .reset_index()
+            
+        bio_df_non_ag.columns = ['name','data']
+        bio_df_non_ag['type'] = 'column'
+        bio_df_non_ag.to_json(f'{SAVE_DIR}/biodiversity_GBF2_4_total_score_by_non_agri_landuse.json', orient='records')
+        
+            
+            
+    # ---------------- (GBF3) Biodiversity Major Vegetation Group score  ----------------
+    if settings.BIODIVERSTIY_TARGET_GBF_3 == 'on':
+        
+        # Get biodiversity dataframe
+        filter_str = '''
+            category == "biodiversity" 
+            and year_types == "single_year" 
+            and base_name.str.contains("biodiversity_GBF3")
+        '''.strip().replace('\n','')
+        
+        bio_paths = files.query(filter_str).reset_index(drop=True)
+        bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
+        bio_df = bio_df.replace(RENAME_AM_NON_AG)
+        
+        # Plot_GBF3_1: Biodiversity contribution score (group) total
+        bio_df_group = bio_df.groupby(['Vegetation Group','Year']).sum(numeric_only=True).reset_index()
+        bio_df_group = bio_df_group\
+            .groupby(['Vegetation Group'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
+            .reset_index()
+            
+        bio_df_group.columns = ['name','data']
+        bio_df_group['type'] = 'spline'
+        bio_df_group.to_json(f'{SAVE_DIR}/biodiversity_GBF3_1_contribution_group_score_total.json', orient='records')
+        
+        
+    df = bio_df.query('`Vegetation Group` == "Acacia Forests and Woodlands" and Year == 2030 and Type == "Agricultural Landuse"')
+
+
+
+ 
+    # ---------------- (GBF4) Biodiversity contribution score  ----------------
     
     # 1) Biodiversity suitability scores (GBF4a) by group
     if settings.BIODIVERSTIY_TARGET_GBF_4 == 'on':
@@ -1502,12 +1563,12 @@ def save_report_data(raw_data_dir:str):
         # Plot_GBF4_3: Biodiversity contribution score (group) by landuse
         bio_group_lu_sum = bio_df.query('Level == "Group"')\
             .drop('Level',axis=1)\
-            .groupby(['Year','Land Use','Name'])\
+            .groupby(['Year','Landuse','Name'])\
             .sum(numeric_only=True)\
             .reset_index()
         
         bio_group_lu_sum = bio_group_lu_sum\
-            .groupby(['Land Use','Name'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .groupby(['Landuse','Name'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
             .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
             .reset_index()
 
@@ -1569,12 +1630,12 @@ def save_report_data(raw_data_dir:str):
             # Plot_GBF4_6: Biodiversity contribution score (species) by landuse
             bio_species_lu_sum = bio_df.query('Level == "Species"')\
                 .drop('Level',axis=1)\
-                .groupby(['Year','Land Use','Name'])\
+                .groupby(['Year','Landuse','Name'])\
                 .sum(numeric_only=True)\
                 .reset_index()
                 
             bio_species_lu_sum = bio_species_lu_sum\
-                .groupby(['Land Use','Name'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+                .groupby(['Landuse','Name'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
                 .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
                 .reset_index()
                 

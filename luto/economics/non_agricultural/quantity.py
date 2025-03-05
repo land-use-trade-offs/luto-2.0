@@ -34,7 +34,7 @@ def get_sheep_q_cr(data, ag_q_mrp: np.ndarray) -> np.ndarray:
         if data.LU2PR[p, sheep_j]:
             sheep_p.append(p)
 
-    sheep_q_cr = np.zeros((data.NCMS, data.NCELLS))
+    sheep_q_cr = np.zeros((data.NCMS, data.NCELLS)).astype(np.float32)
     for c in range(data.NCMS):
         for p in sheep_p:
             if data.PR2CM[c, p]:
@@ -54,7 +54,7 @@ def get_beef_q_cr(data, ag_q_mrp: np.ndarray) -> np.ndarray:
         if data.LU2PR[p, beef_j]:
             beef_p.append(p)
 
-    beef_q_cr = np.zeros((data.NCMS, data.NCELLS))
+    beef_q_cr = np.zeros((data.NCMS, data.NCELLS)).astype(np.float32)
     for p in beef_p:
         for c in range(data.NCMS):
             if data.PR2CM[c, p]:
@@ -76,7 +76,7 @@ def get_quantity_env_plantings(data) -> np.ndarray:
         if used for environmental plantings.
         A matrix of zeros because environmental plantings doesn't produce anything.
     """
-    return np.zeros((data.NCMS, data.NCELLS))
+    return np.zeros((data.NCMS, data.NCELLS)).astype(np.float32)
 
 
 def get_quantity_rip_plantings(data) -> np.ndarray:
@@ -93,7 +93,7 @@ def get_quantity_rip_plantings(data) -> np.ndarray:
         A matrix of zeros because Riparian Plantings doesn't produce anything.
     """
 
-    return np.zeros((data.NCMS, data.NCELLS))
+    return np.zeros((data.NCMS, data.NCELLS)).astype(np.float32)
 
 
 def get_quantity_agroforestry_base(data) -> np.ndarray:
@@ -110,7 +110,7 @@ def get_quantity_agroforestry_base(data) -> np.ndarray:
         A matrix of zeros because agroforestry doesn't produce anything.
     """
 
-    return np.zeros((data.NCMS, data.NCELLS))
+    return np.zeros((data.NCMS, data.NCELLS)).astype(np.float32)
 
 
 def get_quantity_sheep_agroforestry(
@@ -189,7 +189,7 @@ def get_quantity_carbon_plantings_block(data) -> np.ndarray:
         if used for carbon plantings (block).
         A matrix of zeros because carbon plantings doesn't produce anything.
     """
-    return np.zeros((data.NCMS, data.NCELLS))
+    return np.zeros((data.NCMS, data.NCELLS)).astype(np.float32)
 
 
 def get_quantity_carbon_plantings_belt_base(data) -> np.ndarray:
@@ -206,7 +206,7 @@ def get_quantity_carbon_plantings_belt_base(data) -> np.ndarray:
         if used for carbon plantings (belt).
         A matrix of zeros because carbon plantings doesn't produce anything.
     """
-    return np.zeros((data.NCMS, data.NCELLS))
+    return np.zeros((data.NCMS, data.NCELLS)).astype(np.float32)
 
 
 def get_quantity_sheep_carbon_plantings_belt(
@@ -285,7 +285,7 @@ def get_quantity_beccs(data) -> np.ndarray:
         if used for BECCS.
         A matrix of zeros because BECCS doesn't produce anything.
     """
-    return np.zeros((data.NCMS, data.NCELLS))
+    return np.zeros((data.NCMS, data.NCELLS)).astype(np.float32)
 
 
 def get_quantity_matrix(data, ag_q_mrp: np.ndarray, lumap: np.ndarray) -> np.ndarray:

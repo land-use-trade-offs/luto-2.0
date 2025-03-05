@@ -292,7 +292,7 @@ def get_ag_t_mrj(data: Data, target_index, base_year):
         base_year
     ).astype(np.float32)
     # Transition costs occures if the base year is not the target year
-    return ag_t_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(ag_t_mrj)
+    return ag_t_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(ag_t_mrj).astype(np.float32)
 
 
 def get_ag_to_non_ag_t_rk(data: Data, target_index, base_year):
@@ -304,7 +304,7 @@ def get_ag_to_non_ag_t_rk(data: Data, target_index, base_year):
         data.lumaps[base_year], 
         data.lmmaps[base_year]).astype(np.float32)
     # Transition costs occures if the base year is not the target year
-    return non_ag_t_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(non_ag_t_mrj)
+    return non_ag_t_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(non_ag_t_mrj).astype(np.float32)
 
 
 def get_non_ag_to_ag_t_mrj(data: Data, base_year:int, target_index: int):
@@ -316,7 +316,7 @@ def get_non_ag_to_ag_t_mrj(data: Data, base_year:int, target_index: int):
         data.lumaps[base_year], 
         data.lmmaps[base_year]).astype(np.float32)
     # Transition costs occures if the base year is not the target year
-    return non_ag_to_ag_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(non_ag_to_ag_mrj)
+    return non_ag_to_ag_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(non_ag_to_ag_mrj).astype(np.float32)
 
 
 def get_non_ag_t_rk(data: Data, base_year):

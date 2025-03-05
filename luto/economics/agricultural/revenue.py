@@ -48,7 +48,7 @@ def get_rev_crop( data: Data   # Data object.
     """
     # Check if land-use exists in AGEC_CROPS (e.g., dryland Pears/Rice do not occur), if not return zeros
     if lu not in data.AGEC_CROPS['P1', lm].columns:
-        rev_t = np.zeros((data.NCELLS))
+        rev_t = np.zeros((data.NCELLS)).astype(np.float32)
         
     else:
         rev_multiplier = 1
@@ -104,7 +104,7 @@ def get_rev_lvstk( data: Data   # Data object.
                             )  
 
         # Set Wool and Milk to zero as they are not produced by beef cattle
-        rev_wool = rev_milk = np.zeros((data.NCELLS))
+        rev_wool = rev_milk = np.zeros((data.NCELLS)).astype(np.float32)
 
     elif lvstype == 'SHEEP':    
 
@@ -130,7 +130,7 @@ def get_rev_lvstk( data: Data   # Data object.
                                 )
 
         # Set Milk to zero as it is not produced by sheep
-        rev_milk = np.zeros((data.NCELLS)) # Set Milk to zero as it is not produced by sheep
+        rev_milk = np.zeros((data.NCELLS)).astype(np.float32) # Set Milk to zero as it is not produced by sheep
 
 
     elif lvstype == 'DAIRY':
@@ -144,7 +144,7 @@ def get_rev_lvstk( data: Data   # Data object.
                                 )
 
         # Set Meat, Wool and Live exports to zero
-        rev_meat = rev_wool = rev_lexp = np.zeros((data.NCELLS)) 
+        rev_meat = rev_wool = rev_lexp = np.zeros((data.NCELLS)).astype(np.float32)
 
     else:  # Livestock type is unknown.
         raise KeyError(f"Unknown {lvstype} livestock type. Check `lvstype`.")   
@@ -180,7 +180,7 @@ def get_rev( data: Data    # Data object.
         return get_rev_lvstk(data, lu, lm, yr_idx)
 
     elif lu in data.AGRICULTURAL_LANDUSES:
-        return  pd.DataFrame(np.zeros((data.NCELLS, 1)),
+        return  pd.DataFrame(np.zeros((data.NCELLS, 1)).astype(np.float32),
                              columns=pd.MultiIndex.from_product([[lu],[lm],['Revenue']]))
 
     else:

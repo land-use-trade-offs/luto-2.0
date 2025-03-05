@@ -127,6 +127,156 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
 
+    // biodiversity_GBF2_3_total_score_by_agri_management
+    Highcharts.chart("biodiversity_GBF2_3_total_score_by_agri_management", {
+        chart: {
+            type: "column",
+            marginRight: 380,
+        },
+        title: {
+            text: "Contribution to GBF-2 Target by Agricultural Management",
+        },
+        series: JSON.parse(
+            document.getElementById(
+                "biodiversity_GBF2_3_total_score_by_agri_management_csv"
+            ).innerHTML
+        ),
+        xAxis: {
+            tickPositions: year_ticks,
+        },
+        yAxis: {
+            title: {
+                text: "Relative Contribution to 2010 Biodiversity Degradation Level (%)",
+            },
+        },
+        plotOptions: {
+            column: {
+                stacking: "normal",
+            },
+        },
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                    }:</b>${this.y.toFixed(2)}<br/>`;
+            },
+        },
+        legend: {
+            align: "right",
+            verticalalign: "left",
+            layout: "vertical",
+            x: -100,
+            verticalAlign: "middle",
+        },
+        credits: {
+            enabled: false,
+        },
+    });
+
+
+    // biodiversity_GBF2_4_total_score_by_non_agri_landuse
+    Highcharts.chart("biodiversity_GBF2_4_total_score_by_non_agri_landuse", {
+        chart: {
+            type: "column",
+            marginRight: 380,
+        },
+        title: {
+            text: "Contribution to GBF-2 Target by Non-Agricultural Land-use",
+        },
+        series: JSON.parse(
+            document.getElementById(
+                "biodiversity_GBF2_4_total_score_by_non_agri_landuse_csv"
+            ).innerHTML
+        ),
+        xAxis: {
+            tickPositions: year_ticks,
+        },
+        yAxis: {
+            title: {
+                text: "Relative Contribution to 2010 Biodiversity Degradation Level (%)",
+            },
+        },
+        plotOptions: {
+            column: {
+                stacking: "normal",
+            },
+        },
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                    }:</b>${this.y.toFixed(2)}<br/>`;
+            },
+        },
+        legend: {
+            align: "right",
+            verticalalign: "left",
+            layout: "vertical",
+            x: 0,
+            verticalAlign: "middle",
+        },
+        credits: {
+            enabled: false,
+        },
+    });
+
+    // biodiversity_GBF3_1_contribution_group_score_total
+    Highcharts.chart("biodiversity_GBF3_1_contribution_group_score_total", {
+        chart: {
+            type: "column",
+            marginRight: 380,
+        },
+        title: {
+            text: "Total Biodiversity Suitability Score (GBF3A) by Group",
+        },
+        series: JSON.parse(
+            document.getElementById(
+                "biodiversity_GBF3_1_contribution_group_score_total_csv"
+            ).innerHTML
+        ).concat({
+            name: ' ',
+            data: [[2010, 0]],
+            visible: false,
+            showInLegend: false,
+        }),
+        xAxis: {
+            tickPositions: year_ticks,
+        },
+        yAxis: {
+            title: {
+                text: "Vegetation Score Relative to Pre-1750 Level (%)",
+            },
+        },
+        plotOptions: {
+            column: {
+                stacking: "normal",
+            },
+        },
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                    }:</b>${this.y.toFixed(2)}<br/>`;
+            },
+        },
+        legend: {
+            align: "right",
+            layout: "vertical",
+            x: -200,
+            y: -10,
+            verticalAlign: "middle",
+        },
+        credits: {
+            enabled: false,
+        },
+        });
+
+
+
+
+
+
+
+        
+
+
     // biodiversity_GBF4_1_contribution_group_score_total
     Highcharts.chart("biodiversity_GBF4_1_contribution_group_score_total", {
         chart: {

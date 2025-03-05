@@ -40,7 +40,7 @@ def get_breq_matrices(data: Data):
     Returns:
     - np.ndarray.
     """
-    b_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+    b_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
 
     for j in range(data.N_AG_LUS):
         b_mrj[:, :, j] = (
@@ -62,7 +62,7 @@ def get_asparagopsis_effect_b_mrj(data: Data):
     - An array of zeros with shape (data.NLMS, data.NCELLS, nlus).
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"])
-    return np.zeros((data.NLMS, data.NCELLS, nlus))
+    return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
 def get_precision_agriculture_effect_b_mrj(data: Data):
@@ -76,7 +76,7 @@ def get_precision_agriculture_effect_b_mrj(data: Data):
     - An array of zeros with shape (data.NLMS, data.NCELLS, nlus)
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Precision Agriculture"])
-    return np.zeros((data.NLMS, data.NCELLS, nlus))
+    return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
 def get_ecological_grazing_effect_b_mrj(data: Data):
@@ -90,7 +90,7 @@ def get_ecological_grazing_effect_b_mrj(data: Data):
     - An array of zeros with shape (NLMS, NCELLS, nlus)
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Ecological Grazing"])
-    return np.zeros((data.NLMS, data.NCELLS, nlus))
+    return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
 def get_savanna_burning_effect_b_mrj(data: Data):
@@ -108,7 +108,7 @@ def get_savanna_burning_effect_b_mrj(data: Data):
     - new_b_mrj: A numpy array representing the biodiversity impacts of using Savanna Burning.
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
-    new_b_mrj = np.zeros((data.NLMS, data.NCELLS, nlus))
+    new_b_mrj = np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
     eds_sav_burning_biodiv_benefits = np.where( data.SAVBURN_ELIGIBLE, 
                                                 (1 - settings.LDS_BIODIVERSITY_VALUE) * data.BIODIV_SCORE_RAW_WEIGHTED * data.REAL_AREA, 
@@ -133,7 +133,7 @@ def get_agtech_ei_effect_b_mrj(data: Data):
     - An array of zeros with shape (NLMS, NCELLS, nlus)
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["AgTech EI"])
-    return np.zeros((data.NLMS, data.NCELLS, nlus))
+    return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
 def get_biochar_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray, yr_idx):
@@ -223,7 +223,7 @@ def get_major_vegetation_matrices(data: Data) -> dict[int, np.ndarray]:
       contributions in arrays indexed (m, r, j).
     """
     mvg_mrj = {
-        v: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)
+        v: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32).astype(np.float32)
         for v in range(data.N_NVIS_CLASSES)
     }
     for j in range(data.N_AG_LUS):
@@ -296,7 +296,7 @@ def get_asparagopsis_effect_mvg_mrj(data: Data):
     - An array of zeros with shape (data.NLMS, data.NCELLS, nlus).
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"])
-    return np.zeros((data.NLMS, data.NCELLS, nlus))
+    return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
 def get_precision_agriculture_effect_mvg_mrj(data: Data):
@@ -310,7 +310,7 @@ def get_precision_agriculture_effect_mvg_mrj(data: Data):
     - An array of zeros with shape (data.NLMS, data.NCELLS, nlus)
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Precision Agriculture"])
-    return np.zeros((data.NLMS, data.NCELLS, nlus))
+    return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
 def get_ecological_grazing_effect_mvg_mrj(data: Data):
@@ -324,7 +324,7 @@ def get_ecological_grazing_effect_mvg_mrj(data: Data):
     - An array of zeros with shape (NLMS, NCELLS, nlus)
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Ecological Grazing"])
-    return np.zeros((data.NLMS, data.NCELLS, nlus))
+    return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
 def get_savanna_burning_effect_mvg_mrj(data: Data, v: int):
@@ -340,7 +340,7 @@ def get_savanna_burning_effect_mvg_mrj(data: Data, v: int):
       of using Savanna Burning.
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
-    mvg_mrj_effect = np.zeros((data.NLMS, data.NCELLS, nlus))
+    mvg_mrj_effect = np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
     eds_sav_burning_mvg_benefits = np.where( data.SAVBURN_ELIGIBLE, 
         (1 - settings.LDS_BIODIVERSITY_VALUE) * data.NVIS_PRE_GR[v] * data.REAL_AREA, 
@@ -363,7 +363,7 @@ def get_agtech_ei_effect_mvg_mrj(data: Data):
     - An array of zeros with shape (NLMS, NCELLS, nlus)
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["AgTech EI"])
-    return np.zeros((data.NLMS, data.NCELLS, nlus))
+    return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
 def get_biochar_effect_mvg_mrj(data: Data, v_mvg_mrj: np.ndarray, yr_idx):
@@ -414,12 +414,12 @@ def get_agricultural_management_major_veg_group_matrices(
     # Return empty dict if biodiversity target is not set
     if settings.BIODIVERSTIY_TARGET_GBF_3 != 'on':
         return {
-            'Asparagopsis taxiformis': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)),
-            'Precision Agriculture': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)),
-            'Ecological Grazing': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)),
-            'Savanna Burning': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)),
-            'AgTech EI': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)),
-            'Biochar': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)),
+            'Asparagopsis taxiformis': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32),
+            'Precision Agriculture': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32),
+            'Ecological Grazing': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32),
+            'Savanna Burning': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32),
+            'AgTech EI': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32),
+            'Biochar': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32),
         }
         
     asparagopsis_data = {}

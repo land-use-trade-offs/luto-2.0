@@ -610,7 +610,7 @@ def get_savanna_burning_effect_g_mrj(data):
     - sb_g_mrj: The GHG data <unit: t/cell> with the effects of savanna burning applied.
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
-    sb_g_mrj = np.zeros((data.NLMS, data.NCELLS, nlus))
+    sb_g_mrj = np.zeros((data.NLMS, data.NCELLS, nlus)).astype(np.float32)
 
     if not AG_MANAGEMENTS['Savanna Burning']:
         return sb_g_mrj

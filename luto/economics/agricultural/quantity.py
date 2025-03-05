@@ -240,7 +240,7 @@ def get_quantity_crop(data, pr, lm, yr_idx):
     
     # Check if land-use exists in AGEC_CROPS (e.g., dryland Pears/Rice do not occur), if not return zeros
     if pr not in data.AGEC_CROPS['Yield', lm].columns:
-        quantity = np.zeros((data.NCELLS))
+        quantity = np.zeros((data.NCELLS)).astype(np.float32)
         
     else: # Calculate the quantities
         
@@ -305,7 +305,7 @@ def get_quantity_matrix(data, lm, yr_idx):
     - q_rp: A 2D Numpy array representing the quantities per cell per product.
     """
 
-    q_rp = np.zeros((data.NCELLS, len(data.PRODUCTS)))
+    q_rp = np.zeros((data.NCELLS, len(data.PRODUCTS))).astype(np.float32)
     for j, pr in enumerate(data.PRODUCTS):
         q_rp[:, j] = get_quantity(data, pr, lm, yr_idx)
 
@@ -448,7 +448,7 @@ def get_savanna_burning_effect_q_mrp(data):
     Returns:
     - An array of zeros with shape (NLMS, NCELLS, NPRS)
     """
-    return np.zeros((data.NLMS, data.NCELLS, data.NPRS))
+    return np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
 
 
 def get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx):

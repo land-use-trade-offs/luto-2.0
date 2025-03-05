@@ -507,7 +507,7 @@ BECCS_BIODIVERSITY_BENEFIT = 0
 
 # ---------------------- Vegetation parameters ----------------------
 
-BIODIVERSTIY_TARGET_GBF_3  = 'off'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_3  = 'on'           # 'on' or 'off'.
 '''
     Target 3 of the Kunming-Montreal Global Biodiversity Framework:
     protect and manage 30% of the world's land, water, and coastal areas by 2030.
