@@ -317,7 +317,7 @@ class LutoSolver:
             else 0
         )
         self.obj_biodiv = (
-            self.B * settings.GBF2_PENALTY
+            self.B * settings.BIODIV_PENALTY
             if settings.BIODIV_CONSTRAINT_TYPE == "soft"
             else 0
         )
@@ -1091,8 +1091,8 @@ class LutoSolver:
             self.gurobi_model.remove(
                 list(self.X_ag_irr_vars_jr[:, r][np.where(self.X_ag_irr_vars_jr[:, r])])
             )
-            self.X_ag_dry_vars_jr[:, r] = np.zeros(self._input_data.n_ag_lus).astype(np.float32)
-            self.X_ag_irr_vars_jr[:, r] = np.zeros(self._input_data.n_ag_lus).astype(np.float32)
+            self.X_ag_dry_vars_jr[:, r] = np.zeros(self._input_data.n_ag_lus)
+            self.X_ag_irr_vars_jr[:, r] = np.zeros(self._input_data.n_ag_lus)
             for j in range(self._input_data.n_ag_lus):
                 if self._input_data.ag_x_mrj[0, r, j]:
                     self.X_ag_dry_vars_jr[j, r] = self.gurobi_model.addVar(
@@ -1108,7 +1108,7 @@ class LutoSolver:
             self.gurobi_model.remove(
                 list(self.X_non_ag_vars_kr[:, r][np.where(self.X_non_ag_vars_kr[:, r])])
             )
-            self.X_non_ag_vars_kr[:, r] = np.zeros(self._input_data.n_non_ag_lus).astype(np.float32)
+            self.X_non_ag_vars_kr[:, r] = np.zeros(self._input_data.n_non_ag_lus)
             for k, non_ag_lu_desc in zip(
                 range(self._input_data.n_non_ag_lus), NON_AG_LAND_USES
             ):
@@ -1144,8 +1144,8 @@ class LutoSolver:
                         ]
                     )
                 )
-                self.X_ag_man_dry_vars_jr[am][:, r] = np.zeros(len(am_j_list)).astype(np.float32)
-                self.X_ag_man_irr_vars_jr[am][:, r] = np.zeros(len(am_j_list)).astype(np.float32)
+                self.X_ag_man_dry_vars_jr[am][:, r] = np.zeros(len(am_j_list))
+                self.X_ag_man_irr_vars_jr[am][:, r] = np.zeros(len(am_j_list))
 
             for m, j in self._input_data.cells2ag_lu[r]:
                 # replace am variables
@@ -1477,4 +1477,3 @@ class LutoSolver:
     @property
     def ncms(self):
         return self.d_c.shape[0]  # Number of commodities.
-

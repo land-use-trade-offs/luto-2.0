@@ -219,7 +219,7 @@ def get_major_vegetation_matrices(data: Data) -> np.ndarray:
 
 def get_species_conservation_matrix(data: Data, target_year: int):
     return (
-        data.get_GBF4A_bio_species_layers_by_yr(target_year)
+        data.get_GBF4A_bio_layers_by_yr(target_year)
         * data.BIODIV_DEGRADE_LDS
         * data.REAL_AREA
     )
@@ -313,6 +313,6 @@ def get_species_conservation_limits(
     """
     species_limits = data.get_GBF4A_suitability_target_inside_natural_LUTO_by_yr(yr_cal)
     species_names = {s: spec_name for s, spec_name in enumerate(data.BIO_GBF4A_SEL_SPECIES)}
-    species_matrix = data.get_GBF4A_bio_species_layers_by_yr(yr_cal)
+    species_matrix = data.get_GBF4A_bio_layers_by_yr(yr_cal)
     species_inds = {s: np.where(species_matrix[s] > 0)[0] for s in range(data.N_SPECIES)}
     return species_limits, species_names, species_inds

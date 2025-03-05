@@ -616,7 +616,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
         
         water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Use the water net yield outside LUTO study area for the YR_CAL_BASE year
-        water_yield_RR_BASE_YR=get_w_RR_BASE_YR(data),                                  # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
+        water_yield_RR_BASE_YR=get_w_BASE_YR(data),                                     # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
 
         ag_biodiv_degr_j=get_ag_biodiv_degr_j(data),
         non_ag_biodiv_impact_k=get_non_ag_biodiv_impact_k(data),

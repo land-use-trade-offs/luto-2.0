@@ -21,7 +21,7 @@
 
 
 import os
-import h5py
+import h5py, netCDF4
 import xarray as xr
 import numpy as np
 import pandas as pd
@@ -1142,11 +1142,11 @@ class Data:
         The degradation scores are float values range between 0-1 indicating the discount of biodiversity value for each cell.
         E.g., 0.8 means the biodiversity value of the cell is 80% of the original raw biodiversity value.
         '''
-        biodiv_degrade_LDS = np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)                                                # Get the biodiversity degradation score for LDS burning (1D numpy array)
+        self.BIODIV_DEGRADE_LDS = np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)                                           # Get the biodiversity degradation score for LDS burning (1D numpy array)
         biodiv_degrade_habitat = np.vectorize(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.get)(self.LUMAP_NO_RESFACTOR).astype(np.float32)              # Get the biodiversity degradation score for each cell (1D numpy array)
 
-        # Get the biodiversity damage under LDS burning (0-1) for each cell 
-        biodiv_degradation_raw_weighted_LDS = self.BIODIV_SCORE_RAW_WEIGHTED * (1 - biodiv_degrade_LDS)                                         # Biodiversity damage under LDS burning (1D numpy array)
+        # Get the biodiversity damage under LDS burning (0-1) for each cell
+        biodiv_degradation_raw_weighted_LDS = self.BIODIV_SCORE_RAW_WEIGHTED * (1 - self.BIODIV_DEGRADE_LDS)                                    # Biodiversity damage under LDS burning (1D numpy array)
         biodiv_degradation_raw_weighted_habitat = self.BIODIV_SCORE_RAW_WEIGHTED * (1 - biodiv_degrade_habitat)                                 # Biodiversity damage under under HCAS (1D numpy array)
 
         # Get the biodiversity value at the beginning of the simulation                 
@@ -1156,7 +1156,10 @@ class Data:
         self.BIODIV_BASE_YR_VAL_EACH_LU = np.bincount(                                                                                          # Sum the biodiversity value within each land-use type
             self.LUMAP_NO_RESFACTOR[self.LUMASK], 
             weights=biodiv_base_yr_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK]
-        )                  
+        ) 
+        
+        # Apply the resfactor to the biodiversity degradation scores
+        self.BIODIV_DEGRADE_LDS = self.get_array_resfactor_applied(self.BIODIV_DEGRADE_LDS)                 
         
 
         # Biodiversity values need to be restored under the GBF Target 2                    
@@ -1242,6 +1245,7 @@ class Data:
         self.BIO_GBF4A_SPECIES_LAYER = BIO_GBF4A_SPECIES_raw.sel(species=self.BIO_GBF4A_SEL_SPECIES).compute()
         self.BIO_GBF4A_GROUPS_LAYER = xr.load_dataset(f'{settings.INPUT_DIR}/bio_ssp{settings.SSP}_EnviroSuit_group.nc')['data']
         
+        self.N_SPECIES = len(self.BIO_GBF4A_SEL_SPECIES)
         
         # Read in the species data from DCCEEW National Environmental Significance (noted as GBF-4B)
         BIO_GBF4B_SNES_score = pd.read_csv(INPUT_DIR + '/bio_DCCEEW_SNES_target.csv')
