@@ -69,6 +69,12 @@ def get_exclude_matrices(data: Data, lumap: np.ndarray):
     t_ij = data.AG_TMATRIX
 
     lumap_2010 = data.LUMAP
+    
+    no_go_regions = data.NO_GO_REGION_AG
+    no_go_j = [data.DESC2AGLU.get(desc) for desc in data.NO_GO_LANDUSE_AG]
+
+    for count, j in enumerate(no_go_j):
+        x_mrj[:, j, :] *= no_go_regions[count]
 
     # Get all agricultural and non-agricultural cells
     ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)
