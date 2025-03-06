@@ -21,6 +21,7 @@
 
 """ LUTO model settings. """
 
+import os
 import pandas as pd
 
 
@@ -107,11 +108,11 @@ else:
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 10       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 20       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
-MODE = 'snapshot'   # Runs for target year only
-# MODE = 'timeseries'   # Runs each year from base year to target year
+# MODE = 'snapshot'   # Runs for target year only
+MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 # OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -168,8 +169,8 @@ THREADS = 8
 # ---------------------------------------------------------------------------- #
 
 NO_GO_VECTORS = {
-    'Winter cereals':           'input/no_go_areas/no_go_Winter_cereals.shp',
-    'Environmental Plantings':  'input/no_go_areas/no_go_Enviornmental_Plantings.shp'
+    'Winter cereals':           f'{os.path.abspath(INPUT_DIR)}/no_go_areas/no_go_Winter_cereals.shp',
+    'Environmental Plantings':  f'{os.path.abspath(INPUT_DIR)}/no_go_areas/no_go_Enviornmental_Plantings.shp'
 }
 '''
 Land-use and vector file pairs to exclude land-use from being utilised in that area. 
@@ -177,7 +178,7 @@ Land-use and vector file pairs to exclude land-use from being utilised in that a
  - The value is the path to the ESRI shapefile.
 '''
 
-REGIONAL_ADOPTION_ZONE = 'ABARES_AAGIS' # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
+REGIONAL_ADOPTION_ZONE = 'LGA_CODE' # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 '''
 The regional adoption zone is the spatial unit used to enforce regional adoption constraints.
 The options are:
@@ -372,8 +373,8 @@ SOLVE_ECONOMY_WEIGHT = 0.05
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 
-# WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
-WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
+WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
+# WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
 
 WATER_PENALTY = 1
 
@@ -436,15 +437,10 @@ BIODIV_GBF_TARGET_2_DICT = {
 """
 
 
+BIODIV_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
+# BIODIV_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 
-# Global Biodiversity Framework Target 4: Halt Species Extinction, Protect Genetic Diversity, and Manage Human-Wildlife Conflicts
-CALC_BIODIVERSITY_CONTRIBUTION = False              # True or False, calculate/report biodiversity contribution; False will turn off reprojecting decision variables to xarray so speed up the model run.
-BIODIVERSTIY_TARGET_GBF_4 = 'on'                    # 'on' or 'off'.
-
-# BIODIV_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
-BIODIV_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
-
-BIODIV_PENALTY = 1e4
+GBF2_PENALTY = 1e4
 
 # Connectivity source source
 CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
@@ -537,6 +533,14 @@ the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers
 - If 'MVS' is selected, the NVIS input layers will be be resampled to a single 1km resolution layer,
   and each cell has a group index who covers the most area within this cell.
 '''
+
+
+# ------------------------------- Species parameters -------------------------------
+BIODIVERSTIY_TARGET_GBF_4 =  'on'           # 'on' or 'off'.
+
+
+
+
 
 
 

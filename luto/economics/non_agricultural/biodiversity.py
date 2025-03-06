@@ -215,24 +215,24 @@ def get_non_ag_lu_biodiv_impacts(data: Data) -> dict[int, float]:
         # Sheep agroforestry
         2: (
             AF_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
-            + (1 - AF_PROPORTION) * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_sheep_code(data)])
+            + (1 - AF_PROPORTION) * (data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_sheep_code(data)])
         ),
         # Beef agroforestry
         3: (
             AF_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
-            + (1 - AF_PROPORTION) * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_beef_code(data)])
+            + (1 - AF_PROPORTION) * (data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_beef_code(data)])
         ),
         # Carbon plantings (block)
         4: CARBON_PLANTING_BLOCK_BIODIV_BENEFIT,
         # Sheep carbon plantings (belt)
         5: (
             CP_BELT_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
-            + (1 - CP_BELT_PROPORTION) * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_sheep_code(data)])
+            + (1 - CP_BELT_PROPORTION) * (data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_sheep_code(data)])
         ),
         # Beef carbon plantings (belt)
         6: (
             CP_BELT_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
-            + (1 - CP_BELT_PROPORTION) * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_beef_code(data)])
+            + (1 - CP_BELT_PROPORTION) * (data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_beef_code(data)])
         ),
         # BECCS
         7: BECCS_BIODIVERSITY_BENEFIT,

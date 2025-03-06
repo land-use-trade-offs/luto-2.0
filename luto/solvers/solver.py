@@ -255,7 +255,7 @@ class LutoSolver:
 
     def _setup_deviation_penalties(self):
         """
-        Decision variables, V, E and W, for soft constraints.
+        Decision variables, V, E and W, and B for soft constraints.
         1) [V] Penalty vector for demand, each one corespondes a commodity, that minimises the deviations from demand.
         2) [E] A single penalty scalar for GHG emissions, minimises its deviation from the target.
         3) [W] Penalty vector for water usage, each one corespondes a region, that minimises the deviations from the target.
@@ -272,7 +272,7 @@ class LutoSolver:
             self.W = self.gurobi_model.addMVar(num_regions, name="W")
 
         if settings.BIODIV_CONSTRAINT_TYPE == "soft":
-            self.B = self.gurobi_model.addVar(name="B")
+            self.B = self.gurobi_model.addVar(name="B", lb=0)   # lb=0 will force B to be positive, so that when using soft constraints, the objective function will be minimized
 
     def _setup_objective(self):
         """
@@ -798,15 +798,15 @@ class LutoSolver:
 
     def _add_biodiversity_limit_constraints(self) -> None:
         if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
-            print("  ...biodiversity constraints target-2 TURNED OFF ...")
+            print("     ...biodiversity constraints target-2 TURNED OFF ...")
             return
 
         if settings.BIODIV_CONSTRAINT_TYPE == "hard":
-            print(f"  ...Hard biodiversity net yield constraints...")
+            print(f"    ...Hard biodiversity net yield constraints...")
             self._add_hard_biodiversity_usage_limit_constraints()
 
         elif settings.BIODIV_CONSTRAINT_TYPE == "soft":
-            print(f"  ...Soft biodiversity net yield constraints...")
+            print(f"    ...Soft biodiversity net yield constraints...")
             self._add_soft_biodiversity_usage_limit_constraints()
 
         else:
@@ -868,7 +868,7 @@ class LutoSolver:
         # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSTIY_TARGET_GBF_2 != "on".
         biodiversity_limits = self._input_data.limits["biodiversity"]
 
-        # Bound the self.W variables to the difference between the desired and actual net yields
+        # Bound the self.B variables to the difference between the desired and actual net yields
         constr = self.gurobi_model.addConstr(biodiversity_limits - self.biodiversity_expr <= self.B)
         self.biodiversity_limit_soft_constraints.append(constr)
 
@@ -889,12 +889,12 @@ class LutoSolver:
             ag_contr = gp.quicksum(
                 gp.quicksum(
                     self._input_data.mvg_vr[v, ind]
-                    * (1 - self._input_data.ag_biodiv_degr_j[j])
+                    * self._input_data.ag_biodiv_degr_j[j]
                     * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
                     self._input_data.mvg_vr[v, ind]
-                    * (1 - self._input_data.ag_biodiv_degr_j[j])
+                    * self._input_data.ag_biodiv_degr_j[j]
                     * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
                 for j in range(self._input_data.n_ag_lus)
@@ -950,12 +950,12 @@ class LutoSolver:
             ag_contr = gp.quicksum(
                 gp.quicksum(
                     (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
-                    * (1 - self._input_data.ag_biodiv_degr_j[j])
+                    * self._input_data.ag_biodiv_degr_j[j]
                     * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
                     (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
-                    * (1 - self._input_data.ag_biodiv_degr_j[j])
+                    * self._input_data.ag_biodiv_degr_j[j]
                     * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
                 for j in range(self._input_data.n_ag_lus)
@@ -1208,7 +1208,7 @@ class LutoSolver:
             for constr in self.major_vegetation_limit_constraints.values():
                 self.gurobi_model.remove(constr)
         if self.species_conservation_constrs:
-            for constr in self.species_conservation_constrs:
+            for constr in self.species_conservation_constrs.values():
                 self.gurobi_model.remove(constr)
 
         self.adoption_limit_constraints = []
@@ -1461,10 +1461,19 @@ class LutoSolver:
                     if settings.GHG_CONSTRAINT_TYPE == "soft"
                     else 0
                 ),
+                'Biodiversity': (
+                    self.obj_biodiv.getValue()
+                    if settings.BIODIV_CONSTRAINT_TYPE == "soft"
+                    else 0
+                ),
+                'Water': (
+                    self.obj_water.getValue()
+                    if settings.WATER_CONSTRAINT_TYPE == "soft"
+                    else 0
+                ),
             },
         )
 
     @property
     def ncms(self):
         return self.d_c.shape[0]  # Number of commodities.
-

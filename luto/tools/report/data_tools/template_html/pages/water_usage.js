@@ -196,7 +196,7 @@ document.addEventListener("DOMContentLoaded", function () {
           zIndex: 0, // Set the zIndex to 0 to prevent the arearange series from covering other series
         },
         spline: {
-          marker : {
+          marker: {
             enabled: false,
           },
         },

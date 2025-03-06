@@ -22,32 +22,16 @@ import plotnine as p9
 
 from glob import glob
 from luto.tools.create_task_runs.helpers import process_task_root_dirs
+from luto.tools.create_task_runs.parameters import BIO_TARGET_ORDER, GHG_ORDER
 
 
 # Get the data
 task_root_dirs = [i for i in glob('../Custom_runs/*') if "20250207_RES10_Timeseries" in i]
 report_data, report_data_demand = process_task_root_dirs(task_root_dirs)
 
-# Reorder the data
-ghg_order = [
-    '1.5C (67%) excl. avoided emis', 
-    # '1.5C (50%) excl. avoided emis', 
-    '1.8C (67%) excl. avoided emis'
-]
-bio_target_order = [
-    '{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}', 
-    '{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}'
-]
-report_data['GHG_LIMITS_FIELD'] = pd.Categorical(report_data['GHG_LIMITS_FIELD'], categories=ghg_order, ordered=True)
-report_data['BIODIV_GBF_TARGET_2_DICT'] = pd.Categorical(report_data['BIODIV_GBF_TARGET_2_DICT'], categories=bio_target_order, ordered=True)
-report_data_demand['GHG_LIMITS_FIELD'] = pd.Categorical(report_data_demand['GHG_LIMITS_FIELD'], categories=ghg_order, ordered=True)
+
 
 # Filter the data
-#    
-#    GHG_CONSTRAINT_TYPE == "hard" and
-#    BIODIVERSTIY_TARGET_GBF_2 == "on" and
-#    SOLVE_ECONOMY_WEIGHT >= 0 and
-#    SOLVE_ECONOMY_WEIGHT <= 0.5
 filter_rules = '''
     year != 2010 and
     DIET_DOM == "BAU" and

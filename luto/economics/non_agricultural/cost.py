@@ -259,7 +259,7 @@ def get_cost_matrix(data: Data, ag_c_mrj: np.ndarray, lumap, yr_cal):
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
 
-    non_agr_c_matrices = {use: np.zeros((data.NCELLS, 1)) for use in NON_AG_LAND_USES}
+    non_agr_c_matrices = {use: np.zeros((data.NCELLS, 1)).astype(np.float32) for use in NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     if NON_AG_LAND_USES['Environmental Plantings']:

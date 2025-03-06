@@ -29,14 +29,10 @@ and Brett Bryan, Deakin University
 # Load libraries
 import numpy as np
 import pandas as pd
-import geopandas as gpd
-import rasterio
 import shutil, os, time, h5py
 
-from itertools import product
-from rasterio import features
 from joblib import Parallel, delayed
-from luto.settings import INPUT_DIR, NO_GO_VECTORS, RAW_DATA
+from luto.settings import INPUT_DIR, RAW_DATA
 
 
 
@@ -130,15 +126,18 @@ def create_new_dataset():
     # Copy biodiversity GBF-4A files
     shutil.copyfile(bio_GBF_4a_inpath + 'BIODIVERSITY_GBF4A_SCORES.csv', outpath + 'BIODIVERSITY_GBF4A_SCORES.csv')
     shutil.copyfile(bio_GBF_4a_inpath + 'BIODIVERSITY_GBF4A_TARGET.csv', outpath + 'BIODIVERSITY_GBF4A_TARGET.csv')
+    shutil.copyfile(bio_GBF_4a_inpath + 'BIODIVERSITY_GBF4A_SCORES_group.csv', outpath + 'BIODIVERSITY_GBF4A_SCORES_group.csv')
+    shutil.copyfile(bio_GBF_4a_inpath + 'BIODIVERSITY_GBF4A_TARGET_group.csv', outpath + 'BIODIVERSITY_GBF4A_TARGET_group.csv')
     
-    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp126_Condition_group.nc', outpath + 'bio_ssp126_Condition_group.nc')
     shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp126_EnviroSuit.nc', outpath + 'bio_ssp126_EnviroSuit.nc')
-    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp245_Condition_group.nc', outpath + 'bio_ssp245_Condition_group.nc')
     shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp245_EnviroSuit.nc', outpath + 'bio_ssp245_EnviroSuit.nc')
-    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp370_Condition_group.nc', outpath + 'bio_ssp370_Condition_group.nc')
     shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp370_EnviroSuit.nc', outpath + 'bio_ssp370_EnviroSuit.nc')
-    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp585_Condition_group.nc', outpath + 'bio_ssp585_Condition_group.nc')
     shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp585_EnviroSuit.nc', outpath + 'bio_ssp585_EnviroSuit.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp126_EnviroSuit_group.nc', outpath + 'bio_ssp126_EnviroSuit_group.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp245_EnviroSuit_group.nc', outpath + 'bio_ssp245_EnviroSuit_group.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp370_EnviroSuit_group.nc', outpath + 'bio_ssp370_EnviroSuit_group.nc')
+    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp585_EnviroSuit_group.nc', outpath + 'bio_ssp585_EnviroSuit_group.nc')
+    
     
     # Copy biodiversity GBF-4B files
     shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_ECNES_target.csv', outpath + 'bio_DCCEEW_ECNES_target.csv')
@@ -686,7 +685,7 @@ def create_new_dataset():
     s.to_hdf(outpath + 'hir_block_avg_t_co2_ha_yr.h5', key = 'hir_block_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
 
-    # MASK for Human Induced Regrowth (riparian plantings) and save to file
+    # MASK for Human Induced Regrowth; only allow planting where average annual precipitation is less than 300mm
     hir_mask = bioph['AVG_AN_PREC_MM_YR'] <= 300
     np.save(outpath + 'hir_mask.npy', hir_mask.values)  # shape: (6956407,)
 

@@ -40,7 +40,7 @@ def get_breq_matrices(data: Data):
     Returns:
     - np.ndarray.
     """
-    b_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+    b_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
 
     for j in range(data.N_AG_LUS):
         b_mrj[:, :, j] = (
@@ -62,7 +62,7 @@ def get_asparagopsis_effect_b_mrj(data: Data):
     - An array of zeros with shape (data.NLMS, data.NCELLS, nlus).
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"])
-    return np.zeros((data.NLMS, data.NCELLS, nlus))
+    return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
 def get_precision_agriculture_effect_b_mrj(data: Data):
@@ -76,7 +76,7 @@ def get_precision_agriculture_effect_b_mrj(data: Data):
     - An array of zeros with shape (data.NLMS, data.NCELLS, nlus)
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Precision Agriculture"])
-    return np.zeros((data.NLMS, data.NCELLS, nlus))
+    return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
 def get_ecological_grazing_effect_b_mrj(data: Data):
@@ -90,7 +90,7 @@ def get_ecological_grazing_effect_b_mrj(data: Data):
     - An array of zeros with shape (NLMS, NCELLS, nlus)
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Ecological Grazing"])
-    return np.zeros((data.NLMS, data.NCELLS, nlus))
+    return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
 def get_savanna_burning_effect_b_mrj(data: Data):
@@ -108,7 +108,7 @@ def get_savanna_burning_effect_b_mrj(data: Data):
     - new_b_mrj: A numpy array representing the biodiversity impacts of using Savanna Burning.
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
-    new_b_mrj = np.zeros((data.NLMS, data.NCELLS, nlus))
+    new_b_mrj = np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
     eds_sav_burning_biodiv_benefits = np.where( data.SAVBURN_ELIGIBLE, 
                                                 (1 - settings.LDS_BIODIVERSITY_VALUE) * data.BIODIV_SCORE_RAW_WEIGHTED * data.REAL_AREA, 
@@ -133,7 +133,7 @@ def get_agtech_ei_effect_b_mrj(data: Data):
     - An array of zeros with shape (NLMS, NCELLS, nlus)
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["AgTech EI"])
-    return np.zeros((data.NLMS, data.NCELLS, nlus))
+    return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
 def get_biochar_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray, yr_idx):
@@ -219,7 +219,7 @@ def get_major_vegetation_matrices(data: Data) -> np.ndarray:
 
 def get_species_conservation_matrix(data: Data, target_year: int):
     return (
-        data.get_GBF4A_bio_species_layers_by_yr(target_year)
+        data.get_GBF4A_bio_layers_by_yr(target_year)
         * data.BIODIV_DEGRADE_LDS
         * data.REAL_AREA
     )
@@ -313,6 +313,6 @@ def get_species_conservation_limits(
     """
     species_limits = data.get_GBF4A_suitability_target_inside_natural_LUTO_by_yr(yr_cal)
     species_names = {s: spec_name for s, spec_name in enumerate(data.BIO_GBF4A_SEL_SPECIES)}
-    species_matrix = data.get_GBF4A_bio_species_layers_by_yr(yr_cal)
+    species_matrix = data.get_GBF4A_bio_layers_by_yr(yr_cal)
     species_inds = {s: np.where(species_matrix[s] > 0)[0] for s in range(data.N_SPECIES)}
     return species_limits, species_names, species_inds

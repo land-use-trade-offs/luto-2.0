@@ -215,39 +215,4 @@ def load_data_from_disk(path: str) -> Data:
     data.timestamp_sim = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
     
     return data
-    
-
-def read_dvars(output_dir:str)-> None:
-    '''
-    Read the output decision variables from the output directory and add them to the Data object.
-    '''
-    # Read all output files;
-    files = get_all_files(output_dir)
-    dvar_path = files.query('category == "ag_X_mrj"').iloc[0]['path']
-    # Check if the output resolution is the same as the settings.RESFACTOR
-    output_res = tools.get_out_resfactor(dvar_path)
-    if output_res != settings.RESFACTOR:
-        raise ValueError(f'Please change the `settings.RESFACTOR` ({settings.RESFACTOR}) to to be the same as output files ({output_res}).')
-
-    # Loading data from
-    data = load_data()
-
-    # Save reading dvars as a delayed task
-    tasks = [delayed(tools.read_dvars)(yr, files.query('base_ext == ".npy" and Year == @yr and year_types == "single_year"'))
-            for yr in sorted(files['Year'].unique())]
-
-    # Run the tasks in parallel to add the dvars to the data object
-    print(f'Reading decision variables from existing output directory...\n   {output_dir}')
-    for yr,dvar in Parallel(n_jobs=min(len(tasks), 10), return_as='generator')(tasks):
-        data.add_lumap(yr, dvar[0])
-        data.add_lmmap(yr, dvar[1])
-        data.add_ammaps(yr, dvar[2])
-        data.add_ag_dvars(yr, dvar[3])
-        data.add_non_ag_dvars(yr, dvar[4])
-        data.add_ag_man_dvars(yr, dvar[5])
-
-    # Remove the log file, because we only read the dvars
-    os.remove(f"{settings.OUTPUT_DIR}/run_{timestamp}_stderr.log")
-    os.remove(f"{settings.OUTPUT_DIR}/run_{timestamp}_stdout.log")
-
-    return data
+  
