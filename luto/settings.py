@@ -128,7 +128,7 @@ DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in th
 
 WRITE_OUTPUT_GEOTIFFS = False    # Write GeoTiffs to output directory: True or False
 WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resolution: True or False
-PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
+PARALLEL_WRITE = False           # If to use parallel processing to write GeoTiffs: True or False
 WRITE_THREADS = 10              # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
@@ -159,7 +159,7 @@ NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect a
 BARHOMOGENOUS = 1  # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 50
+THREADS = 10
 
 
 
@@ -167,6 +167,7 @@ THREADS = 50
 # No-Go areas; Regional adoption constraints
 # ---------------------------------------------------------------------------- #
 
+EXCLUDE_NO_GO_LU = False
 NO_GO_VECTORS = {
     'Winter cereals':           'input/no_go_areas/no_go_Winter_cereals.shp',
     'Environmental Plantings':  'input/no_go_areas/no_go_Enviornmental_Plantings.shp'
