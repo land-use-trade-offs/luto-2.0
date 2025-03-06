@@ -1020,87 +1020,89 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     
 def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
     
-    # Do nothing if biodiversity limits are off and no need to report
-    if not settings.BIODIVERSTIY_TARGET_GBF_3 == 'on':
-        return
+    pass
+    
+    # # Do nothing if biodiversity limits are off and no need to report
+    # if not settings.BIODIVERSTIY_TARGET_GBF_3 == 'on':
+    #     return
 
-    yr_idx = yr_cal - data.YR_CAL_BASE
-    mvs_out_LUTO_score = pd.DataFrame({
-        'mvg': data.NVIS_ID2DESC.values(), 
-        'BASE_OUTSIDE_SCORE': data.NVIS_OUTSIDE_LUTO_AREA_HA, 
-        'BASE_TOTAL_SCORE': data.NVIS_TOTAL_AREA_HA
-    })
+    # yr_idx = yr_cal - data.YR_CAL_BASE
+    # mvs_out_LUTO_score = pd.DataFrame({
+    #     'mvg': data.NVIS_ID2DESC.values(), 
+    #     'BASE_OUTSIDE_SCORE': data.NVIS_OUTSIDE_LUTO_AREA_HA, 
+    #     'BASE_TOTAL_SCORE': data.NVIS_TOTAL_AREA_HA
+    # })
 
-    # Get decision variables for the year
-    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
-    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
-    am_dvar_kmrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
+    # # Get decision variables for the year
+    # ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+    # non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+    # am_dvar_kmrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
 
-    # Get the major vegetation matrices    
-    ag_mvg_mrj = xr.DataArray(
-        np.stack(list(ag_biodiversity.get_major_vegetation_matrices(data).values())), 
-        dims=['mvg','lm','cell','lu'], 
-        coords={'mvg':list(data.NVIS_ID2DESC.values()), 'lm':data.LANDMANS, 'cell':range(data.NCELLS), 'lu':data.AGRICULTURAL_LANDUSES}
-    )
+    # # Get the major vegetation matrices    
+    # ag_mvg_mrj = xr.DataArray(
+    #     np.stack(list(ag_biodiversity.get_major_vegetation_matrices(data).values())), 
+    #     dims=['mvg','lm','cell','lu'], 
+    #     coords={'mvg':list(data.NVIS_ID2DESC.values()), 'lm':data.LANDMANS, 'cell':range(data.NCELLS), 'lu':data.AGRICULTURAL_LANDUSES}
+    # )
 
-    am_mvg_mrj = xr.DataArray(
-        np.full((len(AG_MANAGEMENTS_TO_LAND_USES), data.N_NVIS_CLASSES, len(data.LANDMANS), data.NCELLS, len(data.AGRICULTURAL_LANDUSES)), np.nan, dtype=np.float32),
-        dims=['am','mvg','lm','cell','lu'],
-        coords={'am':list(AG_MANAGEMENTS_TO_LAND_USES.keys()), 'mvg':list(data.NVIS_ID2DESC.values()), 'lm':data.LANDMANS, 'cell':range(data.NCELLS), 'lu':data.AGRICULTURAL_LANDUSES}
-    )
+    # am_mvg_mrj = xr.DataArray(
+    #     np.full((len(AG_MANAGEMENTS_TO_LAND_USES), data.N_NVIS_CLASSES, len(data.LANDMANS), data.NCELLS, len(data.AGRICULTURAL_LANDUSES)), np.nan, dtype=np.float32),
+    #     dims=['am','mvg','lm','cell','lu'],
+    #     coords={'am':list(AG_MANAGEMENTS_TO_LAND_USES.keys()), 'mvg':list(data.NVIS_ID2DESC.values()), 'lm':data.LANDMANS, 'cell':range(data.NCELLS), 'lu':data.AGRICULTURAL_LANDUSES}
+    # )
 
-    non_ag_mvg_rk = xr.DataArray(
-        np.stack(list(non_ag_biodiversity.get_major_vegetation_matrices(data, ag_mvg_mrj.values, data.lumaps[yr_cal]).values())), 
-        dims=['mvg','cell','lu'], 
-        coords={'mvg':list(data.NVIS_ID2DESC.values()), 'cell':range(data.NCELLS), 'lu':data.NON_AGRICULTURAL_LANDUSES}
-    )
+    # non_ag_mvg_rk = xr.DataArray(
+    #     np.stack(list(non_ag_biodiversity.get_major_vegetation_matrices(data, ag_mvg_mrj.values, data.lumaps[yr_cal]).values())), 
+    #     dims=['mvg','cell','lu'], 
+    #     coords={'mvg':list(data.NVIS_ID2DESC.values()), 'cell':range(data.NCELLS), 'lu':data.NON_AGRICULTURAL_LANDUSES}
+    # )
 
-    # Save actural values to am_mvg_mrj
-    am_veg_arr = ag_biodiversity.get_agricultural_management_major_veg_group_matrices(data, ag_mvg_mrj.values, yr_idx)
-    for am, lu in AG_MANAGEMENTS_TO_LAND_USES.items():
-        am_mvg_mrj.loc[am,:,:,:,lu] = np.stack(list(am_veg_arr[am].values()))
+    # # Save actural values to am_mvg_mrj
+    # am_veg_arr = ag_biodiversity.get_agricultural_management_major_veg_group_matrices(data, ag_mvg_mrj.values, yr_idx)
+    # for am, lu in AG_MANAGEMENTS_TO_LAND_USES.items():
+    #     am_mvg_mrj.loc[am,:,:,:,lu] = np.stack(list(am_veg_arr[am].values()))
 
 
-    # Get the base year biodiversity scores
-    GBF3_score_ag = (ag_dvar_mrj * ag_mvg_mrj
-        ).sum(['cell','lm']).to_dataframe('Area Weighted Score (ha)').reset_index(
-        ).merge(mvs_out_LUTO_score
-        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100')
+    # # Get the base year biodiversity scores
+    # GBF3_score_ag = (ag_dvar_mrj * ag_mvg_mrj
+    #     ).sum(['cell','lm']).to_dataframe('Area Weighted Score (ha)').reset_index(
+    #     ).merge(mvs_out_LUTO_score
+    #     ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100')
 
-    GBF3_score_am = (am_dvar_kmrj * am_mvg_mrj).sum(['cell','lm'], skipna=False).to_dataframe('Area Weighted Score (ha)').reset_index(
-        ).merge(mvs_out_LUTO_score,
-        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100')
+    # GBF3_score_am = (am_dvar_kmrj * am_mvg_mrj).sum(['cell','lm'], skipna=False).to_dataframe('Area Weighted Score (ha)').reset_index(
+    #     ).merge(mvs_out_LUTO_score,
+    #     ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100')
         
-    GBF3_score_non_ag = (non_ag_dvar_rk * non_ag_mvg_rk).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index(
-        ).merge(mvs_out_LUTO_score,
-        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100')
+    # GBF3_score_non_ag = (non_ag_dvar_rk * non_ag_mvg_rk).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index(
+    #     ).merge(mvs_out_LUTO_score,
+    #     ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100')
 
 
-    # Insert the Type/Year column, rename the water supply column
-    GBF3_score_ag = GBF3_score_ag.assign(Type='Agricultural Landuse', Year=yr_cal)
-    GBF3_score_non_ag = GBF3_score_non_ag.assign(Type='Non-Agricultural land-use', Year=yr_cal)
-    GBF3_score_am = GBF3_score_am.assign(Type='Agricultural Management', Year=yr_cal)
+    # # Insert the Type/Year column, rename the water supply column
+    # GBF3_score_ag = GBF3_score_ag.assign(Type='Agricultural Landuse', Year=yr_cal)
+    # GBF3_score_non_ag = GBF3_score_non_ag.assign(Type='Non-Agricultural land-use', Year=yr_cal)
+    # GBF3_score_am = GBF3_score_am.assign(Type='Agricultural Management', Year=yr_cal)
 
-    # Calculate the relative contribution percentage for the outside LUTO area
-    mvs_out_LUTO_score = mvs_out_LUTO_score.assign(Type='Outside LUTO study area', Year=yr_cal, lu='Outside LUTO study area'
-        ).eval('Relative_Contribution_Percentage = BASE_OUTSIDE_SCORE / BASE_TOTAL_SCORE * 100')
+    # # Calculate the relative contribution percentage for the outside LUTO area
+    # mvs_out_LUTO_score = mvs_out_LUTO_score.assign(Type='Outside LUTO study area', Year=yr_cal, lu='Outside LUTO study area'
+    #     ).eval('Relative_Contribution_Percentage = BASE_OUTSIDE_SCORE / BASE_TOTAL_SCORE * 100')
 
-    # Concatenate the dataframes, rename the columns, and reset the index, then save to a csv file
-    pd.concat([
-        GBF3_score_ag, 
-        GBF3_score_am, 
-        GBF3_score_non_ag,
-        mvs_out_LUTO_score
-    ],axis=0).rename(columns={
-        'lu':'Landuse',
-        'am':'Agri-Management',
-        'mvg':'Vegetation Group',
-        'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)'
-    }).reset_index(
-        drop=True
-    ).to_csv(
-        os.path.join(path, f'biodiversity_GBF3_scores_{yr_cal}.csv'), index=False
-    )
+    # # Concatenate the dataframes, rename the columns, and reset the index, then save to a csv file
+    # pd.concat([
+    #     GBF3_score_ag, 
+    #     GBF3_score_am, 
+    #     GBF3_score_non_ag,
+    #     mvs_out_LUTO_score
+    # ],axis=0).rename(columns={
+    #     'lu':'Landuse',
+    #     'am':'Agri-Management',
+    #     'mvg':'Vegetation Group',
+    #     'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)'
+    # }).reset_index(
+    #     drop=True
+    # ).to_csv(
+    #     os.path.join(path, f'biodiversity_GBF3_scores_{yr_cal}.csv'), index=False
+    # )
     
 
 

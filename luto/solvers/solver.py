@@ -889,12 +889,12 @@ class LutoSolver:
             ag_contr = gp.quicksum(
                 gp.quicksum(
                     self._input_data.mvg_vr[v, ind]
-                    * (1 - self._input_data.ag_biodiv_degr_j[j])
+                    * self._input_data.ag_biodiv_degr_j[j]
                     * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
                     self._input_data.mvg_vr[v, ind]
-                    * (1 - self._input_data.ag_biodiv_degr_j[j])
+                    * self._input_data.ag_biodiv_degr_j[j]
                     * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
                 for j in range(self._input_data.n_ag_lus)
@@ -950,12 +950,12 @@ class LutoSolver:
             ag_contr = gp.quicksum(
                 gp.quicksum(
                     (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
-                    * (1 - self._input_data.ag_biodiv_degr_j[j])
+                    * self._input_data.ag_biodiv_degr_j[j]
                     * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
                     (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
-                    * (1 - self._input_data.ag_biodiv_degr_j[j])
+                    * self._input_data.ag_biodiv_degr_j[j]
                     * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
                 for j in range(self._input_data.n_ag_lus)
@@ -1208,7 +1208,7 @@ class LutoSolver:
             for constr in self.major_vegetation_limit_constraints.values():
                 self.gurobi_model.remove(constr)
         if self.species_conservation_constrs:
-            for constr in self.species_conservation_constrs:
+            for constr in self.species_conservation_constrs.values():
                 self.gurobi_model.remove(constr)
 
         self.adoption_limit_constraints = []
