@@ -967,7 +967,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         return
 
     yr_idx = yr_cal - data.YR_CAL_BASE
-    print(f'Writing biodiversity GBF2 for {yr_cal}')
+    print(f'Writing biodiversity GBF2 scores (PRIORITY) for {yr_cal}')
 
     # Get the biodiversity scores b_mrj
     ag_biodiv_mrj = tools.ag_mrj_to_xr(data, ag_biodiversity.get_breq_matrices(data))
