@@ -157,11 +157,8 @@ def create_new_dataset():
     shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVG_HIGH_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVG_HIGH_SPATIAL_DETAIL.nc')
     shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVG_LOW_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVG_LOW_SPATIAL_DETAIL.nc')
     
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS_MVG_HIGH_SPATIAL_DETAIL.csv', outpath + 'NVIS_MVG_HIGH_SPATIAL_DETAIL.csv')
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS_MVG_LOW_SPATIAL_DETAIL.csv', outpath + 'NVIS_MVG_LOW_SPATIAL_DETAIL.csv')
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS_MVS_HIGH_SPATIAL_DETAIL.csv', outpath + 'NVIS_MVS_HIGH_SPATIAL_DETAIL.csv')
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS_MVS_LOW_SPATIAL_DETAIL.csv', outpath + 'NVIS_MVS_LOW_SPATIAL_DETAIL.csv')
-    
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx', outpath + 'BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx')
+
 
     ############### Read data
 

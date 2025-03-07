@@ -238,38 +238,8 @@ def get_major_vegetation_group_limits(data: Data, yr_cal: int) -> tuple[np.ndarr
         A dictionary mapping of each vegetation group index to the cells
         that the group applies to.
     """
-
-    if not data.NVIS_LIMITS:
-        # Compute limits for all years if the limits don't already exist
-
-        if settings.BIODIVERSITY_GBF_3_TARGET_YEAR <= data.YR_CAL_BASE:
-            data.NVIS_LIMITS = {settings.BIODIVERSITY_GBF_3_TARGET_YEAR: data.NVIS_TOTAL_AREA_HA}
-            return data.NVIS_LIMITS[settings.BIODIVERSITY_GBF_3_TARGET_YEAR]
-
-        n_linspace_years = settings.BIODIVERSITY_GBF_3_TARGET_YEAR - data.YR_CAL_BASE + 1
-        yr_iter = range(data.YR_CAL_BASE, settings.BIODIVERSITY_GBF_3_TARGET_YEAR + 1)
-        nvis_limits_by_year = {yr: np.zeros(data.N_NVIS_CLASSES) for yr in yr_iter}  # Indexed: year, vegetation class
-        
-        # Set up targets dicts for each year
-        for yr in yr_iter:
-            # Fill in targets dicts
-            for v in range(data.N_NVIS_CLASSES):
-                v_targets = np.linspace(0, data.NVIS_TOTAL_AREA_HA[v], n_linspace_years)
-                for yr, target in zip(yr_iter, v_targets):
-                    nvis_limits_by_year[yr][v] = target
-
-        data.NVIS_LIMITS = nvis_limits_by_year
-        
-    if yr_cal >= settings.BIODIVERSITY_GBF_3_TARGET_YEAR:
-        limits = data.NVIS_LIMITS[settings.BIODIVERSITY_GBF_3_TARGET_YEAR]
     
-    elif yr_cal <= data.YR_CAL_BASE:
-        limits = data.NVIS_LIMITS[data.YR_CAL_BASE]
-
-    else:
-        limits = data.NVIS_LIMITS[yr_cal]
-
-    return limits, data.NVIS_ID2DESC, data.MAJOR_VEG_INDECES
+    return data.get_GBF3_target_scores_by_year(yr_cal), data.BIO_GBF3_ID2DESC, data.MAJOR_VEG_INDECES
 
 
 def get_ag_management_biodiversity_impacts(
@@ -278,27 +248,27 @@ def get_ag_management_biodiversity_impacts(
 ) -> dict[str, dict[int, np.ndarray]]:
     return {
         'Asparagopsis taxiformis': {
-            j_idx: np.zeros(data.NCELLS)
+            j_idx: np.zeros(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis'])
         },
         'Precision Agriculture': {
-            j_idx: np.zeros(data.NCELLS)
+            j_idx: np.zeros(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture'])
         },
         'Ecological Grazing': {
-            j_idx: np.zeros(data.NCELLS)
+            j_idx: np.zeros(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing'])
         },
         'Savanna Burning': {
-            j_idx: 1 - data.BIODIV_DEGRADE_LDS
+            j_idx: 1 - data.BIODIV_DEGRADE_LDS.astype(np.float32)
             for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
         },
         'AgTech EI': {
-            j_idx: np.zeros(data.NCELLS)
+            j_idx: np.zeros(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['AgTech EI'])
         },
         'Biochar': {
-            j_idx: (data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact'] - 1) * np.ones(data.NCELLS)
+            j_idx: (data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact'] - 1) * np.ones(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Biochar'])
         },
     }

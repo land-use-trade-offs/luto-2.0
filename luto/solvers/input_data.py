@@ -632,7 +632,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
 
-        mvg_contr_outside_study_area=data.NVIS_OUTSIDE_LUTO_AREA_HA,
+        mvg_contr_outside_study_area=data.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO,
 
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,

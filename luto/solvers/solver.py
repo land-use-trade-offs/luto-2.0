@@ -82,6 +82,7 @@ class LutoSolver:
         self.final_target_year = final_target_year
         self._input_data = input_data
         self.d_c = d_c
+        self.ncms = self.d_c.shape[0]
         self.gurobi_model = gp.Model(f"LUTO {settings.VERSION}", env=gurenv)
 
         # Initialise variable stores
@@ -271,7 +272,7 @@ class LutoSolver:
             num_regions = len(self._input_data.limits["water"].keys())
             self.W = self.gurobi_model.addMVar(num_regions, name="W")
 
-        if settings.BIODIV_CONSTRAINT_TYPE == "soft":
+        if settings.GBF2_CONSTRAINT_TYPE == "soft":
             self.B = self.gurobi_model.addVar(name="B", lb=0)   # lb=0 will force B to be positive, so that when using soft constraints, the objective function will be minimized
 
     def _setup_objective(self):
@@ -317,8 +318,8 @@ class LutoSolver:
             else 0
         )
         self.obj_biodiv = (
-            self.B * settings.BIODIV_PENALTY
-            if settings.BIODIV_CONSTRAINT_TYPE == "soft"
+            self.B * settings.GBF2_PENALTY
+            if settings.GBF2_CONSTRAINT_TYPE == "soft"
             else 0
         )
         self.obj_water = (
@@ -798,20 +799,20 @@ class LutoSolver:
 
     def _add_biodiversity_limit_constraints(self) -> None:
         if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
-            print("     ...biodiversity constraints target-2 TURNED OFF ...")
+            print("    ...biodiversity GBF 2 (conservation priority) constraints TURNED OFF ...")
             return
 
-        if settings.BIODIV_CONSTRAINT_TYPE == "hard":
-            print(f"    ...Hard biodiversity net yield constraints...")
+        if settings.GBF2_CONSTRAINT_TYPE == "hard":
+            print(f"    ...Hard biodiversity GBF 2 (conservation priority) constraints ...")
             self._add_hard_biodiversity_usage_limit_constraints()
 
-        elif settings.BIODIV_CONSTRAINT_TYPE == "soft":
-            print(f"    ...Soft biodiversity net yield constraints...")
+        elif settings.GBF2_CONSTRAINT_TYPE == "soft":
+            print(f"    ...Soft biodiversity GBF 2 (conservation priority) constraints ...")
             self._add_soft_biodiversity_usage_limit_constraints()
 
         else:
             raise ValueError(
-                f"Unknown value of BIODIV_CONSTRAINT_TYPE. "
+                f"Unknown value of GBF2_CONSTRAINT_TYPE. "
                 f"Must be either 'hard' or 'soft'."
             )
 
@@ -857,7 +858,7 @@ class LutoSolver:
 
         self.biodiversity_expr = self._get_biodiversity_net_yield_expr()
 
-        print(f"    ...biodiversity target score: {biodiversity_limits:,.0f}")
+        print(f"      ...biodiversity GBF 2 (conservation priority): {biodiversity_limits:,.0f}")
         self.biodiversity_limit_constraint = self.gurobi_model.addConstr(
             self.biodiversity_expr >= biodiversity_limits
         )
@@ -872,7 +873,7 @@ class LutoSolver:
         constr = self.gurobi_model.addConstr(biodiversity_limits - self.biodiversity_expr <= self.B)
         self.biodiversity_limit_soft_constraints.append(constr)
 
-        print(f"    ...biodiversity target score: {biodiversity_limits:,.0f}")
+        print(f"      ...biodiversity GBF 2 (conservation priority): {biodiversity_limits:,.0f}")
 
     def _add_major_vegetation_group_limit_constraints(self) -> None:
         if settings.BIODIVERSTIY_TARGET_GBF_3 != "on":
@@ -881,7 +882,7 @@ class LutoSolver:
 
         v_limits, v_names, v_ind = self._input_data.limits["major_vegetation_groups"]
 
-        print(f"  ...Biodiversity GBF 3 (major vegetation groups) constraints...")
+        print(f"    ...Biodiversity GBF 3 (major vegetation groups) constraints...")
 
         for v, v_area_lb in enumerate(v_limits):
             ind = v_ind[v]
@@ -930,19 +931,19 @@ class LutoSolver:
                 ag_contr + ag_man_contr + non_ag_contr + outside_study_area_contr
             )
 
-            print(f"    ...vegetation class {v_names[v]} target area: {v_area_lb:,.0f}")
+            print(f"        ...vegetation class {v_names[v]} target area: {v_area_lb:,.0f}")
             self.major_vegetation_limit_constraints[v] = self.gurobi_model.addConstr(
                 self.major_vegetation_exprs[v] >= v_area_lb
             )
 
     def _add_species_conservation_constraints(self) -> None:
         if settings.BIODIVERSTIY_TARGET_GBF_4 != "on":
-            print('    ...species conservation constraints TURNED OFF ...')
+            print('     ...Biodiversity GBF 4 (species conservation) constraints TURNED OFF ...')
             return
         
         s_limits, s_names, s_ind = self._input_data.limits["species_conservation"]
 
-        print(f"  ...Biodiversity GBF 4 (species conservation) constraints...")
+        print(f"    ...Biodiversity GBF 4 (species conservation) constraints...")
         
         for s, s_area_lb in enumerate(s_limits):
             ind = s_ind[s]
@@ -989,7 +990,7 @@ class LutoSolver:
             self.species_conservation_exprs[s] = ag_contr + ag_man_contr + non_ag_contr
             constr_area = s_area_lb / settings.SPECIES_CONSERVATION_DIV_CONSTANT
 
-            print(f"    ...species {s_names[s]} conservation target area: {s_area_lb:,.0f}")
+            print(f"        ...species {s_names[s]} conservation target area: {s_area_lb:,.0f}")
             self.species_conservation_constrs[s] = self.gurobi_model.addConstr(
                 self.species_conservation_exprs[s] >= constr_area
             )
@@ -1461,9 +1462,9 @@ class LutoSolver:
                     if settings.GHG_CONSTRAINT_TYPE == "soft"
                     else 0
                 ),
-                'Biodiversity': (
+                'Biodiversity GBF2': (
                     self.obj_biodiv.getValue()
-                    if settings.BIODIV_CONSTRAINT_TYPE == "soft"
+                    if settings.GBF2_CONSTRAINT_TYPE == "soft"
                     else 0
                 ),
                 'Water': (
@@ -1474,6 +1475,3 @@ class LutoSolver:
             },
         )
 
-    @property
-    def ncms(self):
-        return self.d_c.shape[0]  # Number of commodities.

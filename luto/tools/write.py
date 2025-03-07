@@ -1019,90 +1019,99 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     
     
 def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
-    
-    pass
-    
-    # # Do nothing if biodiversity limits are off and no need to report
-    # if not settings.BIODIVERSTIY_TARGET_GBF_3 == 'on':
-    #     return
-
-    # yr_idx = yr_cal - data.YR_CAL_BASE
-    # mvs_out_LUTO_score = pd.DataFrame({
-    #     'mvg': data.NVIS_ID2DESC.values(), 
-    #     'BASE_OUTSIDE_SCORE': data.NVIS_OUTSIDE_LUTO_AREA_HA, 
-    #     'BASE_TOTAL_SCORE': data.NVIS_TOTAL_AREA_HA
-    # })
-
-    # # Get decision variables for the year
-    # ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
-    # non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
-    # am_dvar_kmrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
-
-    # # Get the major vegetation matrices    
-    # ag_mvg_mrj = xr.DataArray(
-    #     np.stack(list(ag_biodiversity.get_major_vegetation_matrices(data).values())), 
-    #     dims=['mvg','lm','cell','lu'], 
-    #     coords={'mvg':list(data.NVIS_ID2DESC.values()), 'lm':data.LANDMANS, 'cell':range(data.NCELLS), 'lu':data.AGRICULTURAL_LANDUSES}
-    # )
-
-    # am_mvg_mrj = xr.DataArray(
-    #     np.full((len(AG_MANAGEMENTS_TO_LAND_USES), data.N_NVIS_CLASSES, len(data.LANDMANS), data.NCELLS, len(data.AGRICULTURAL_LANDUSES)), np.nan, dtype=np.float32),
-    #     dims=['am','mvg','lm','cell','lu'],
-    #     coords={'am':list(AG_MANAGEMENTS_TO_LAND_USES.keys()), 'mvg':list(data.NVIS_ID2DESC.values()), 'lm':data.LANDMANS, 'cell':range(data.NCELLS), 'lu':data.AGRICULTURAL_LANDUSES}
-    # )
-
-    # non_ag_mvg_rk = xr.DataArray(
-    #     np.stack(list(non_ag_biodiversity.get_major_vegetation_matrices(data, ag_mvg_mrj.values, data.lumaps[yr_cal]).values())), 
-    #     dims=['mvg','cell','lu'], 
-    #     coords={'mvg':list(data.NVIS_ID2DESC.values()), 'cell':range(data.NCELLS), 'lu':data.NON_AGRICULTURAL_LANDUSES}
-    # )
-
-    # # Save actural values to am_mvg_mrj
-    # am_veg_arr = ag_biodiversity.get_agricultural_management_major_veg_group_matrices(data, ag_mvg_mrj.values, yr_idx)
-    # for am, lu in AG_MANAGEMENTS_TO_LAND_USES.items():
-    #     am_mvg_mrj.loc[am,:,:,:,lu] = np.stack(list(am_veg_arr[am].values()))
-
-
-    # # Get the base year biodiversity scores
-    # GBF3_score_ag = (ag_dvar_mrj * ag_mvg_mrj
-    #     ).sum(['cell','lm']).to_dataframe('Area Weighted Score (ha)').reset_index(
-    #     ).merge(mvs_out_LUTO_score
-    #     ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100')
-
-    # GBF3_score_am = (am_dvar_kmrj * am_mvg_mrj).sum(['cell','lm'], skipna=False).to_dataframe('Area Weighted Score (ha)').reset_index(
-    #     ).merge(mvs_out_LUTO_score,
-    #     ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100')
         
-    # GBF3_score_non_ag = (non_ag_dvar_rk * non_ag_mvg_rk).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index(
-    #     ).merge(mvs_out_LUTO_score,
-    #     ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100')
+    # Do nothing if biodiversity limits are off and no need to report
+    if not settings.BIODIVERSTIY_TARGET_GBF_3 == 'on':
+        return
+    
+    yr_idx = yr_cal - data.YR_CAL_BASE
+    veg_base_score_score = pd.DataFrame({
+        'vg': data.BIO_GBF3_ID2DESC.values(), 
+        'BASE_OUTSIDE_SCORE': data.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO, 
+        'BASE_TOTAL_SCORE': data.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA
+    })
+
+    # Get vegetation matrices for the year
+    vg_vr = xr.DataArray(
+        ag_biodiversity.get_major_vegetation_matrices(data), 
+        dims=['vg','cell'], 
+        coords={'vg':list(data.BIO_GBF3_ID2DESC.values()),  'cell':range(data.NCELLS)}
+    )
+
+    # Get the impacts of each ag/non-ag/am to vegetation matrices
+    ag_impact_j = xr.DataArray(
+        list(data.BIODIV_HABITAT_DEGRADE_LOOK_UP.values()),
+        dims=['lu'],
+        coords={'lu':data.AGRICULTURAL_LANDUSES}
+    )
+
+    non_ag_impact_k = xr.DataArray(
+        list(non_ag_biodiversity.get_non_ag_lu_biodiv_impacts(data).values()),
+        dims=['lu'],
+        coords={'lu':data.NON_AGRICULTURAL_LANDUSES}
+    )
+
+    am_lu_unpacke = [(am, l) for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items() for l in lus]
+
+    am_impact_ir = xr.DataArray(
+        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_impacts(data, yr_cal).items() for arr in v.values()]), 
+        dims=['idx', 'cell'], 
+        coords={
+            'idx': range(len(am_lu_unpacke)),
+            'cell': range(data.NCELLS)}
+    )
+
+    # Get decision variables for the year
+    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+    am_dvar_kmrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
+    am_dvar_kmrj = am_dvar_kmrj.sel(idx=am_dvar_kmrj['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpacke))).drop_vars(['idx'])
+
+    # Get the base year biodiversity scores
+    GBF3_score_ag = (vg_vr * ag_impact_j * ag_dvar_mrj
+        ).sum(['cell','lm']).to_dataframe('Area Weighted Score (ha)').reset_index(
+        ).merge(veg_base_score_score
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100')
+
+    GBF3_score_am = (vg_vr * am_impact_ir * am_dvar_kmrj
+        ).sum(['cell','lm'], skipna=False).to_dataframe('Area Weighted Score (ha)').reset_index(
+        ).merge(veg_base_score_score,
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
+        ).assign(
+            am = lambda x: x['idx'].apply(lambda idx: dict(enumerate(am_lu_unpacke))[idx][0]),
+            lu = lambda x: x['idx'].apply(lambda idx: dict(enumerate(am_lu_unpacke))[idx][1])
+        ).drop(columns=['idx'])
+        
+    GBF3_score_non_ag = (vg_vr * non_ag_impact_k * non_ag_dvar_rk).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index(
+        ).merge(veg_base_score_score,
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100')
 
 
-    # # Insert the Type/Year column, rename the water supply column
-    # GBF3_score_ag = GBF3_score_ag.assign(Type='Agricultural Landuse', Year=yr_cal)
-    # GBF3_score_non_ag = GBF3_score_non_ag.assign(Type='Non-Agricultural land-use', Year=yr_cal)
-    # GBF3_score_am = GBF3_score_am.assign(Type='Agricultural Management', Year=yr_cal)
+    # Insert the Type/Year column, rename the water supply column
+    GBF3_score_ag = GBF3_score_ag.assign(Type='Agricultural Landuse', Year=yr_cal)
+    GBF3_score_non_ag = GBF3_score_non_ag.assign(Type='Non-Agricultural land-use', Year=yr_cal)
+    GBF3_score_am = GBF3_score_am.assign(Type='Agricultural Management', Year=yr_cal)
 
-    # # Calculate the relative contribution percentage for the outside LUTO area
-    # mvs_out_LUTO_score = mvs_out_LUTO_score.assign(Type='Outside LUTO study area', Year=yr_cal, lu='Outside LUTO study area'
-    #     ).eval('Relative_Contribution_Percentage = BASE_OUTSIDE_SCORE / BASE_TOTAL_SCORE * 100')
+    # Calculate the relative contribution percentage for the outside LUTO area
+    veg_base_score_score = veg_base_score_score.assign(Type='Outside LUTO study area', Year=yr_cal, lu='Outside LUTO study area'
+        ).eval('Relative_Contribution_Percentage = BASE_OUTSIDE_SCORE / BASE_TOTAL_SCORE * 100')
 
-    # # Concatenate the dataframes, rename the columns, and reset the index, then save to a csv file
-    # pd.concat([
-    #     GBF3_score_ag, 
-    #     GBF3_score_am, 
-    #     GBF3_score_non_ag,
-    #     mvs_out_LUTO_score
-    # ],axis=0).rename(columns={
-    #     'lu':'Landuse',
-    #     'am':'Agri-Management',
-    #     'mvg':'Vegetation Group',
-    #     'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)'
-    # }).reset_index(
-    #     drop=True
-    # ).to_csv(
-    #     os.path.join(path, f'biodiversity_GBF3_scores_{yr_cal}.csv'), index=False
-    # )
+    # Concatenate the dataframes, rename the columns, and reset the index, then save to a csv file
+    pd.concat([
+        GBF3_score_ag, 
+        GBF3_score_am, 
+        GBF3_score_non_ag,
+        veg_base_score_score
+    ],axis=0).rename(columns={
+        'lu':'Landuse',
+        'am':'Agri-Management',
+        'vg':'Vegetation Group',
+        'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)'
+    }).reset_index(
+        drop=True
+    ).to_csv(
+        os.path.join(path, f'biodiversity_GBF3_scores_{yr_cal}.csv'), index=False
+    )
     
 
 
@@ -1125,19 +1134,19 @@ def write_biodiversity_GBF4A_scores_groups(data: Data, yr_cal, path):
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
     am_dvar_kmrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
-    
+
     # Get biodiversity scores; s : species/groups, r : cells
     ag_biodiv_groups_sr = xr.DataArray(
         data.get_GBF4A_bio_layers_by_yr(yr_cal, 'group'), 
         dims=['group', 'cell'], 
         coords={'group':data.BIO_GBF4A_GROUPS_LAYER.group.values, 'cell':np.arange(data.NCELLS)}
     )
- 
+
     # Get the GBF4A scores for the year
     GBF4A_scores_groups_ag = (ag_dvar_mrj * lumap_degradation * ag_biodiv_groups_sr
         ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().merge(
             data.BIO_GBF4A_BASELINE_SCORE_GROUPS,
-        ).eval('Relative_Contribution_Percentage = (`Area Weighted Score (ha)` + HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO) / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
 
     GBF4A_scores_groups_non_ag = (non_ag_dvar_rk * ag_biodiv_groups_sr
         ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().merge(
@@ -1149,18 +1158,25 @@ def write_biodiversity_GBF4A_scores_groups(data: Data, yr_cal, path):
             data.BIO_GBF4A_BASELINE_SCORE_GROUPS,
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
 
-    
+
 
     # Insert the type column
     GBF4A_scores_groups_ag = GBF4A_scores_groups_ag.assign( Type='Agricultural Landuse', Year=yr_cal, Level='Group').replace({'dry':'Dryland', 'irr':'Irrigated'})
     GBF4A_scores_groups_non_ag = GBF4A_scores_groups_non_ag.assign(Type='Non-Agricultural land-use', Year=yr_cal, lm='Dryland', Level='Group')
     GBF4A_scores_groups_am = GBF4A_scores_groups_am.assign(Type='Agricultural Management', Year=yr_cal, Level='Group').replace({'dry':'Dryland', 'irr':'Irrigated'})
-    
+
+    # Get the outside LUTO study area score
+    outside_LUTO_score = data.BIO_GBF4A_BASELINE_SCORE_GROUPS.copy(
+        ).assign(Year=yr_cal, lu='Outside LUTO study area', Type='Outside LUTO study area', Level='Group'
+        ).eval('Relative_Contribution_Percentage = HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
+
+
     # Save to disk
     pd.concat([
         GBF4A_scores_groups_ag,
         GBF4A_scores_groups_non_ag,
-        GBF4A_scores_groups_am
+        GBF4A_scores_groups_am,
+        outside_LUTO_score
     ], axis=0).rename(columns={
         'group':'Name',
         'lm':'Water Supply',
@@ -1206,7 +1222,7 @@ def write_biodiversity_GBF4A_scores_species(data: Data, yr_cal, path):
     GBF4A_scores_species_ag = (ag_dvar_mrj * lumap_degradation * ag_biodiv_species_sr
         ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().merge(
             data.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES,
-        ).eval('Relative_Contribution_Percentage = (`Area Weighted Score (ha)` + HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO) / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
 
 
     GBF4A_scores_species_non_ag = ( non_ag_dvar_rk * ag_biodiv_species_sr
@@ -1220,18 +1236,24 @@ def write_biodiversity_GBF4A_scores_species(data: Data, yr_cal, path):
             data.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES,
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
 
-    
 
     # Insert the type column
     GBF4A_scores_species_ag = GBF4A_scores_species_ag.assign(Type='Agricultural Landuse', Year=yr_cal, Level='Species').replace({'dry':'Dryland', 'irr':'Irrigated'})
     GBF4A_scores_species_non_ag = GBF4A_scores_species_non_ag.assign(Type='Non-Agricultural land-use', Year=yr_cal, lm='Dryland', Level='Species')
     GBF4A_scores_species_am = GBF4A_scores_species_am.assign(Type='Agricultural Management', Year=yr_cal, Level='Species').replace({'dry':'Dryland', 'irr':'Irrigated'})
 
+    # Get the outside LUTO study area score
+    outside_LUTO_score = data.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES.copy(
+        ).assign(Year=yr_cal, lu='Outside LUTO study area', Type='Outside LUTO study area', Level='Species'
+        ).eval('Relative_Contribution_Percentage = (HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO + HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO) / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
+
+
     # Save to disk
     pd.concat([
         GBF4A_scores_species_ag,
         GBF4A_scores_species_non_ag,
-        GBF4A_scores_species_am
+        GBF4A_scores_species_am,
+        outside_LUTO_score
     ], axis=0).rename(columns={
         'species':'Name',
         'lm':'Water Supply',
