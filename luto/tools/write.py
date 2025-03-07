@@ -1134,19 +1134,19 @@ def write_biodiversity_GBF4A_scores_groups(data: Data, yr_cal, path):
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
     am_dvar_kmrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
-    
+
     # Get biodiversity scores; s : species/groups, r : cells
     ag_biodiv_groups_sr = xr.DataArray(
         data.get_GBF4A_bio_layers_by_yr(yr_cal, 'group'), 
         dims=['group', 'cell'], 
         coords={'group':data.BIO_GBF4A_GROUPS_LAYER.group.values, 'cell':np.arange(data.NCELLS)}
     )
- 
+
     # Get the GBF4A scores for the year
     GBF4A_scores_groups_ag = (ag_dvar_mrj * lumap_degradation * ag_biodiv_groups_sr
         ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().merge(
             data.BIO_GBF4A_BASELINE_SCORE_GROUPS,
-        ).eval('Relative_Contribution_Percentage = (`Area Weighted Score (ha)` + HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO) / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
 
     GBF4A_scores_groups_non_ag = (non_ag_dvar_rk * ag_biodiv_groups_sr
         ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().merge(
@@ -1158,18 +1158,25 @@ def write_biodiversity_GBF4A_scores_groups(data: Data, yr_cal, path):
             data.BIO_GBF4A_BASELINE_SCORE_GROUPS,
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
 
-    
+
 
     # Insert the type column
     GBF4A_scores_groups_ag = GBF4A_scores_groups_ag.assign( Type='Agricultural Landuse', Year=yr_cal, Level='Group').replace({'dry':'Dryland', 'irr':'Irrigated'})
     GBF4A_scores_groups_non_ag = GBF4A_scores_groups_non_ag.assign(Type='Non-Agricultural land-use', Year=yr_cal, lm='Dryland', Level='Group')
     GBF4A_scores_groups_am = GBF4A_scores_groups_am.assign(Type='Agricultural Management', Year=yr_cal, Level='Group').replace({'dry':'Dryland', 'irr':'Irrigated'})
-    
+
+    # Get the outside LUTO study area score
+    outside_LUTO_score = data.BIO_GBF4A_BASELINE_SCORE_GROUPS.copy(
+        ).assign(Year=yr_cal, lu='Outside LUTO study area', Type='Outside LUTO study area', Level='Group'
+        ).eval('Relative_Contribution_Percentage = HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
+
+
     # Save to disk
     pd.concat([
         GBF4A_scores_groups_ag,
         GBF4A_scores_groups_non_ag,
-        GBF4A_scores_groups_am
+        GBF4A_scores_groups_am,
+        outside_LUTO_score
     ], axis=0).rename(columns={
         'group':'Name',
         'lm':'Water Supply',
@@ -1215,7 +1222,7 @@ def write_biodiversity_GBF4A_scores_species(data: Data, yr_cal, path):
     GBF4A_scores_species_ag = (ag_dvar_mrj * lumap_degradation * ag_biodiv_species_sr
         ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().merge(
             data.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES,
-        ).eval('Relative_Contribution_Percentage = (`Area Weighted Score (ha)` + HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO) / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
+        ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
 
 
     GBF4A_scores_species_non_ag = ( non_ag_dvar_rk * ag_biodiv_species_sr
@@ -1229,18 +1236,24 @@ def write_biodiversity_GBF4A_scores_species(data: Data, yr_cal, path):
             data.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES,
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
 
-    
 
     # Insert the type column
     GBF4A_scores_species_ag = GBF4A_scores_species_ag.assign(Type='Agricultural Landuse', Year=yr_cal, Level='Species').replace({'dry':'Dryland', 'irr':'Irrigated'})
     GBF4A_scores_species_non_ag = GBF4A_scores_species_non_ag.assign(Type='Non-Agricultural land-use', Year=yr_cal, lm='Dryland', Level='Species')
     GBF4A_scores_species_am = GBF4A_scores_species_am.assign(Type='Agricultural Management', Year=yr_cal, Level='Species').replace({'dry':'Dryland', 'irr':'Irrigated'})
 
+    # Get the outside LUTO study area score
+    outside_LUTO_score = data.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES.copy(
+        ).assign(Year=yr_cal, lu='Outside LUTO study area', Type='Outside LUTO study area', Level='Species'
+        ).eval('Relative_Contribution_Percentage = (HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO + HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO) / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
+
+
     # Save to disk
     pd.concat([
         GBF4A_scores_species_ag,
         GBF4A_scores_species_non_ag,
-        GBF4A_scores_species_am
+        GBF4A_scores_species_am,
+        outside_LUTO_score
     ], axis=0).rename(columns={
         'species':'Name',
         'lm':'Water Supply',
