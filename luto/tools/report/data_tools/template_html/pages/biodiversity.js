@@ -225,7 +225,7 @@ document.addEventListener("DOMContentLoaded", function () {
             marginRight: 380,
         },
         title: {
-            text: "Total Biodiversity Suitability Score (GBF3A) by Group",
+            text: "Total Vegetation Score (GBF3) by Group",
         },
         series: JSON.parse(
             document.getElementById(
@@ -259,8 +259,13 @@ document.addEventListener("DOMContentLoaded", function () {
         legend: {
             align: "right",
             layout: "vertical",
-            x: -200,
-            y: -10,
+            itemStyle: {
+                fontSize: "11px",
+            },
+            itemMarginBottom:0.5,
+            itemMarginTop:0,
+            x: -10,
+            y: 0,
             verticalAlign: "middle",
         },
         credits: {
@@ -268,6 +273,50 @@ document.addEventListener("DOMContentLoaded", function () {
         },
         });
 
+
+    // Chart:biodiversity_GBF3_2_contribution_group_score_by_type
+    const chartContainer5 = document.getElementById('biodiversity_GBF3_2_contribution_group_score_by_type');
+    chartData5 = JSON.parse(document.getElementById("biodiversity_GBF3_2_contribution_group_score_by_type_csv").innerHTML);
+
+    // Create blocks and render Highcharts in each block
+    chartData5.forEach((chart, index) => {
+        // Create a new div for each chart
+        const chartBlock5 = document.createElement('div');
+        chartBlock5.classList.add('chart-block');
+        chartBlock5.id = `chart5-${index + 1}`;
+        chartContainer5.appendChild(chartBlock5);
+
+        Highcharts.chart(chartBlock5.id, {
+            plotOptions: {
+                showInLegend: false,
+                column: {
+                    stacking: "normal",
+                },
+                },
+                title: {
+                    text: chart.name,
+                    align: 'center'
+                },
+                series: chart.data,
+                xAxis: {
+                    tickPositions: year_ticks,
+                },
+                yAxis: {
+                    title: {
+                        text: "Vegetation Score Relative to Pre-1750 Level (%)",
+                    },
+                },
+                tooltip: {
+                    formatter: function () {
+                        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                            }:</b>${this.y.toFixed(2)}<br/>`;
+                    },
+                },
+                credits: {
+                    enabled: false,
+                },
+                });
+                });
 
 
 

@@ -1471,32 +1471,52 @@ def save_report_data(raw_data_dir:str):
             
             
     # ---------------- (GBF3) Biodiversity Major Vegetation Group score  ----------------
-    # if settings.BIODIVERSTIY_TARGET_GBF_3 == 'on':
+    if settings.BIODIVERSTIY_TARGET_GBF_3 == 'on':
         
-    #     # Get biodiversity dataframe
-    #     filter_str = '''
-    #         category == "biodiversity" 
-    #         and year_types == "single_year" 
-    #         and base_name.str.contains("biodiversity_GBF3")
-    #     '''.strip().replace('\n','')
+        filter_str = '''
+            category == "biodiversity" 
+            and year_types == "single_year" 
+            and base_name.str.contains("biodiversity_GBF3")
+        '''.strip().replace('\n','')
         
-    #     bio_paths = files.query(filter_str).reset_index(drop=True)
-    #     bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
-    #     bio_df = bio_df.replace(RENAME_AM_NON_AG)
+        bio_paths = files.query(filter_str).reset_index(drop=True)
+        bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
+        bio_df = bio_df.replace(RENAME_AM_NON_AG)
         
-    #     # Plot_GBF3_1: Biodiversity contribution score (group) total
-    #     bio_df_group = bio_df.groupby(['Vegetation Group','Year']).sum(numeric_only=True).reset_index()
-    #     bio_df_group = bio_df_group\
-    #         .groupby(['Vegetation Group'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-    #         .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-    #         .reset_index()
+        
+        # Plot_GBF3_1: Biodiversity contribution score (group) total
+        bio_df_group = bio_df.groupby(['Vegetation Group','Year']).sum(numeric_only=True).reset_index()
+        bio_df_group = bio_df_group\
+            .groupby(['Vegetation Group'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
+            .reset_index()
             
-    #     bio_df_group.columns = ['name','data']
-    #     bio_df_group['type'] = 'spline'
-    #     bio_df_group.to_json(f'{SAVE_DIR}/biodiversity_GBF3_1_contribution_group_score_total.json', orient='records')
+        bio_df_group.columns = ['name','data']
+        bio_df_group['type'] = 'spline'
+        bio_df_group.to_json(f'{SAVE_DIR}/biodiversity_GBF3_1_contribution_group_score_total.json', orient='records')
         
         
-    # df = bio_df.query('`Vegetation Group` == "Acacia Forests and Woodlands" and Year == 2030 and Type == "Agricultural Landuse"')
+        # Plot_GBF3_2: Biodiversity contribution score (group) by Type
+        bio_df_group_type_sum = bio_df\
+            .groupby(['Year','Type','Vegetation Group'])\
+            .sum(numeric_only=True)\
+            .reset_index()
+            
+        bio_df_group_type_sum = bio_df_group_type_sum\
+            .groupby(['Type','Vegetation Group'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
+            .reset_index()
+            
+        bio_df_group_type_records = []
+        for idx,df in bio_df_group_type_sum.groupby('Vegetation Group'):
+            df = df.drop('Vegetation Group',axis=1)
+            df.columns = ['name','data']
+            df['type'] = 'column'
+            bio_df_group_type_records.append({'name':idx,'data':df.to_dict(orient='records')})
+            
+        with open(f'{SAVE_DIR}/biodiversity_GBF3_2_contribution_group_score_by_type.json', 'w') as outfile:
+            json.dump(bio_df_group_type_records, outfile)
+            
 
 
 
