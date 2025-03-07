@@ -1187,29 +1187,42 @@ class Data:
         print("\tLoading vegetation data...", flush=True)
         
         # Read in the pre-1750 vegetation statistics, and get NVIS class names and areas
-        NVIS_area_and_target = pd.read_csv(INPUT_DIR + f'/NVIS_{NVIS_CLASS_DETAIL}_{NVIS_SPATIAL_DETAIL}_SPATIAL_DETAIL.csv')
+        self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS = pd.read_excel(
+            INPUT_DIR + '/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx',
+            sheet_name = f'NVIS_{NVIS_CLASS_DETAIL}_{NVIS_SPATIAL_DETAIL}_SPATIAL_DETAIL'
+        )
         
-        self.NVIS_ID2DESC = dict(enumerate(NVIS_area_and_target['group']))
-        self.NVIS_TOTAL_AREA_HA = NVIS_area_and_target['TOTAL_AREA_HA'].to_numpy()
-        self.NVIS_OUTSIDE_LUTO_AREA_HA = NVIS_area_and_target['OUTSIDE_LUTO_AREA_HA'].to_numpy()
-        self.N_NVIS_CLASSES = self.NVIS_TOTAL_AREA_HA.shape[0]
+        for _,row in self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS.iterrows():
+            if not all([
+                row['USER_DEFINED_TARGET_PERCENT_2030'] >= 0,
+                row['USER_DEFINED_TARGET_PERCENT_2050'] >= 0,
+                row['USER_DEFINED_TARGET_PERCENT_2100'] >= 0]
+            ):
+                raise ValueError(f"NVIS class {row['group']} has no user-defined targets for all years.")
+        
+        self.BIO_GBF3_ID2DESC = dict(enumerate(self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['group']))
+        self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
+        self.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_OUTSIDE_LUTO_NATURAL_HA'].to_numpy()
+        self.BIO_GBF3_N_CLASSES = self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA.shape[0]
+      
 
         # Read in vegetation layer data
         NVIS_pre_xr = xr.load_dataarray(INPUT_DIR + f'/NVIS_{NVIS_CLASS_DETAIL}_{NVIS_SPATIAL_DETAIL}_SPATIAL_DETAIL.nc').values
 
         # Apply mask
         if NVIS_SPATIAL_DETAIL == 'LOW':
+            # 1D vector, each cell is an index of the NVIS class
             self.NVIS_PRE_GR = NVIS_pre_xr[self.MASK]
+            # Conver to 2D array, n_class * n_cell, each cell is 1 if the cell is the coresponding NVIS class, 0 otherwise
+            self.NVIS_PRE_GR = np.array([(self.NVIS_PRE_GR == i) for i in self.BIO_GBF3_ID2DESC.keys()]).astype(np.bool_)
         else:
-            self.NVIS_PRE_GR = NVIS_pre_xr[:, self.MASK]
+            # 2D array, n_class * n_cell, each cell is the area percentage of the coresponding NVIS class
+            self.NVIS_PRE_GR = NVIS_pre_xr[:, self.MASK] / 100  # divide by 100 to convert percentage to proportion
 
         # Apply Savanna Burning penalties
         veg_degradation_raw_weighted_LDS = self.NVIS_PRE_GR * (1 - self.BIODIV_DEGRADE_LDS)   # Savburn damages
         self.NVIS_PRE_GR_LDS = self.NVIS_PRE_GR - veg_degradation_raw_weighted_LDS
-
-        # To be computed during economic calculations
-        self.NVIS_LIMITS: dict[int, np.ndarray] = {}
-
+        
         # Container storing which cells apply to each major vegetation group
         epsilon = 1e-5
         self.MAJOR_VEG_INDECES = {
@@ -1462,6 +1475,29 @@ class Data:
                 lumap_resample_avg[idx_w, :, idx_lu] = cell_avg_1d
                 
         return lumap_resample_avg
+    
+    
+    
+    def get_GBF3_target_scores_by_year(self, yr:int):
+        '''
+        Interpolate the user-defined targets to get target at the given year
+        '''
+        
+        GBF3_target_percents = []
+        for _,row in self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS.iterrows():
+            f = interp1d(
+                [2010, 2030, 2050, 2100],
+                [min(row['BASE_YR_PERCENT'],row['USER_DEFINED_TARGET_PERCENT_2030']), 
+                 row['USER_DEFINED_TARGET_PERCENT_2030'], 
+                 row['USER_DEFINED_TARGET_PERCENT_2050'], 
+                 row['USER_DEFINED_TARGET_PERCENT_2100']
+                ],
+                kind="linear",
+                fill_value="extrapolate",
+            )
+            GBF3_target_percents.append(f(yr).item())
+            
+        return self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA * GBF3_target_percents / 100  # Convert the percentage to proportion
 
     
     def get_GBF4A_bio_layers_by_yr(self, yr: int, level:Literal['species', 'group']='species'):
