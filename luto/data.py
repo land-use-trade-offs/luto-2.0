@@ -686,11 +686,7 @@ class Data:
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
         self.AG_TMATRIX = np.load(os.path.join(INPUT_DIR, "ag_tmatrix.npy"))
         
-        # Apply penalty if a transition was occur from natural to modified land.
-        for i,j in product(range(self.N_AG_LUS), range(self.N_AG_LUS)):
-            if (not i in self.LU_MODIFIED_LAND) and (j in self.LU_MODIFIED_LAND):
-                self.AG_TMATRIX[i,j] += settings.NATURAL_TO_MODIFIED_LAND_PENALTY
-        
+  
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
         self.EXCLUDE = np.load(os.path.join(INPUT_DIR, "x_mrj.npy"))
         self.EXCLUDE = self.EXCLUDE[:, self.MASK, :]  # Apply resfactor specially for the exclude matrix

@@ -51,9 +51,9 @@ grid_search = {
     ###############################################################
     
     # --------------- Demand settings ---------------
-    'DEMAND_CONSTRAINT_TYPE': ['soft'],     # 'hard' or 'soft'
+    'DEMAND_CONSTRAINT_TYPE': ['soft'],     # 'hard' or 'soft'    
     
-    # GHG settings
+    # --------------- GHG settings ---------------
     'GHG_CONSTRAINT_TYPE': ['soft'],        # 'hard' or 'soft'
     'GHG_LIMITS_FIELD': [
         '1.5C (67%) excl. avoided emis', 
@@ -61,16 +61,25 @@ grid_search = {
         # '1.8C (67%) excl. avoided emis'
     ],
     
+    # --------------- Water constraints ---------------
+    'WATER_CONSTRAINT_TYPE': ['soft'],        # 'hard' or 'soft'
+    'WATER_PENALTY': [1, 100, 500, 1000, 3000, 5000, 10000],
+    
+    
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSTIY_TARGET_GBF_2': ['on'],    # 'on' or 'off'
-    'GBF2_PENALTY': [100, 500, 1000, 3000, 5000, 10000],
+    'GBF2_PENALTY': [1, 100, 500, 1000, 3000, 5000, 10000],
     'BIODIV_GBF_TARGET_2_DICT': [
         {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}, 
         # {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}
     ],
     
+    
     # --------------- Biodiversity settings - GBF 3 ---------------
     'BIODIVERSTIY_TARGET_GBF_3': ['off'],   # 'on' or 'off'
+    
+    # --------------- Biodiversity settings - GBF 4 ---------------
+    'BIODIVERSTIY_TARGET_GBF_4': ['off'],   # 'on' or 'off'
     
     # --------------- Water settings ---------------
     'WATER_CONSTRAINT_TYPE': ['hard'],      # 'hard' or 'soft'

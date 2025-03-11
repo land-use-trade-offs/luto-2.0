@@ -94,22 +94,6 @@ DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 # Set amortisation period
 AMORTISATION_PERIOD = 30 # years
 
-# Deforestation legislation; 
-DEFORESTATION_LEGISLATION = 'off'  # 'on' or 'off'
-'''
-Penalise deforestation by introducing a huge-cost (1 billion AUD/ha) for converting natural to modified land.
-
-This penalty may lead to numericall issues in the solver because the cost of deforestation is too high. 
-
-- If 'on' then deforestation is penalised
-- If 'off' then deforestation is not penalised
-'''
-
-if DEFORESTATION_LEGISLATION == 'on':
-    NATURAL_TO_MODIFIED_LAND_PENALTY = 1e9
-else:
-    NATURAL_TO_MODIFIED_LAND_PENALTY = 0
-
 
 # ---------------------------------------------------------------------------- #
 # Model parameters
