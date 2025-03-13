@@ -23,12 +23,12 @@ document.addEventListener("DOMContentLoaded", function () {
   // Get the year ticks and interval
   var year_ticks = years.length == 2 ? years : null;
 
-// Set the title alignment to left
-Highcharts.setOptions({
-  title: {
+  // Set the title alignment to left
+  Highcharts.setOptions({
+    title: {
       align: 'left'
-  }
-});
+    }
+  });
 
 
   // Chart:production_1_demand_type_wide
@@ -97,10 +97,10 @@ Highcharts.setOptions({
 
     xAxis: {
       tickWidth: 0.05,
-      
+
       categories: JSON.parse(
         document.getElementById("production_2_demand_on_off_wide_csv").innerHTML
-        )['categories'],
+      )['categories'],
 
       labels: {
         verticalAlign: "middle",
@@ -136,9 +136,9 @@ Highcharts.setOptions({
       align: 'right', // Aligns the legend to the right side of the chart container
       verticalAlign: 'middle', // Centers the legend vertically
       layout: 'vertical', // Arranges the legend items vertically
-      x: -200, // Shifts the legend left by 150px, effectively positioning it 50px from the plot area
-  },
-    
+      x: -150, // Shifts the legend left by 150px, effectively positioning it 50px from the plot area
+    },
+
 
     series: JSON.parse(
       document.getElementById("production_2_demand_on_off_wide_csv").innerHTML)['series'],
@@ -200,9 +200,14 @@ Highcharts.setOptions({
     },
 
     legend: {
+      itemStyle: {
+        fontSize: "11px",
+      },
       align: "right",
       layout: "vertical",
-      x: -100,
+      x: -150,
+      y: -10,
+      verticalAlign: "middle",
     },
 
     series: JSON.parse(
@@ -362,9 +367,13 @@ Highcharts.setOptions({
     },
 
     legend: {
+      itemStyle: {
+        fontSize: "11px",
+      },
       align: "right",
       layout: "vertical",
-      x: -100,
+      x: -150,
+      y: -10,
       verticalAlign: "middle",
     },
 
@@ -415,9 +424,13 @@ Highcharts.setOptions({
     },
 
     legend: {
+      itemStyle: {
+        fontSize: "11px",
+      },
       align: "right",
       layout: "vertical",
-      x: -100,
+      x: -150,
+      y: -10,
       verticalAlign: "middle",
     },
 
@@ -469,9 +482,13 @@ Highcharts.setOptions({
     },
 
     legend: {
+      itemStyle: {
+        fontSize: "11px",
+      },
       align: "right",
       layout: "vertical",
-      x: -100,
+      x: -150,
+      y: -10,
       verticalAlign: "middle",
     },
 
@@ -521,9 +538,13 @@ Highcharts.setOptions({
     },
 
     legend: {
+      itemStyle: {
+        fontSize: "11px",
+      },
       align: "right",
       layout: "vertical",
-      x: -100,
+      x: -150,
+      y: -10,
       verticalAlign: "middle",
     },
 
@@ -556,7 +577,7 @@ Highcharts.setOptions({
       text: "Total Production by Agricultural Commodity (outputs from LUTO)",
     },
 
-    series: JSON.parse( 
+    series: JSON.parse(
       document.getElementById("production_5_6_demand_Production_commodity_from_LUTO_csv").innerHTML
     ),
 
@@ -597,5 +618,58 @@ Highcharts.setOptions({
       sourceHeight: 600,
     },
   });
+
+  // Chart:production_6_demand_achievement_commodity
+  Highcharts.chart("production_6_demand_achievement_commodity", {
+    chart: {
+      type: "spline",
+      marginRight: 380,
+    },
+    title: {
+      text: "Commodities not Meeting Targets",
+    },
+    series: JSON.parse(
+      document.getElementById("production_6_demand_achievement_commodity_csv").innerHTML
+    ).concat({
+      name: ' ',
+      data: [[2010, 0]],
+      type: 'column',
+      visible: false,
+      showInLegend: false,
+    }),
+    credits: {
+      enabled: false,
+    },
+    xAxis: {
+      tickPositions: year_ticks,
+    },
+    yAxis: {
+      title: {
+        text: "Achievement (%)",
+      },
+    },
+
+    legend: {
+      align: "right",
+      layout: "vertical",
+      x: -100,
+      verticalAlign: "middle",
+    },
+
+    tooltip: {
+      formatter: function () {
+        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+          }:</b>${this.y.toFixed(2)}<br/>`;
+      },
+    },
+
+    exporting: {
+      sourceWidth: 1200,
+      sourceHeight: 600,
+    },
+
+  });
+
+
 });
 

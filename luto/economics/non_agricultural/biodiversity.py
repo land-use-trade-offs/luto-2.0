@@ -1,3 +1,22 @@
+# Copyright 2025 Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., 
+# van Schoten, N., Hadjikakou, M., Sanson, J.,  Zyngier, R., Marcos-Martinez, R.,  
+# Navarro, J.,  Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., 
+# Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.
+#
+# This file is part of LUTO2 - Version 2 of the Australian Land-Use Trade-Offs model
+#
+# LUTO2 is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# LUTO2 is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+# A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# LUTO2. If not, see <https://www.gnu.org/licenses/>.
+
 import numpy as np
 
 from luto.data import Data
@@ -9,7 +28,9 @@ from luto.settings import (
     RIPARIAN_PLANTING_BIODIV_BENEFIT,
     AGROFORESTRY_BIODIV_BENEFIT,
     BECCS_BIODIVERSITY_BENEFIT,
-    )
+    AF_PROPORTION,
+    CP_BELT_PROPORTION,
+)
 
 
 def get_biodiv_environmental_plantings(data: Data) -> np.ndarray:
@@ -171,7 +192,7 @@ def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
     beccs_biodiv = get_biodiv_beccs(data)
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-    non_agr_c_matrices = [
+    non_agr_b_matrices = [
         env_plantings_biodiv.reshape((data.NCELLS, 1)),
         rip_plantings_biodiv.reshape((data.NCELLS, 1)),
         sheep_agroforestry_biodiv.reshape((data.NCELLS, 1)),
@@ -182,4 +203,37 @@ def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
         beccs_biodiv.reshape((data.NCELLS, 1)),
     ]
 
-    return np.concatenate(non_agr_c_matrices, axis=1)
+    return np.concatenate(non_agr_b_matrices, axis=1)
+
+
+def get_non_ag_lu_biodiv_impacts(data: Data) -> dict[int, float]:
+    return {
+        # Environmental plantings
+        0: ENV_PLANTING_BIODIVERSITY_BENEFIT,
+        # Riparian plantings
+        1: RIPARIAN_PLANTING_BIODIV_BENEFIT,
+        # Sheep agroforestry
+        2: (
+            AF_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
+            + (1 - AF_PROPORTION) * (data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_sheep_code(data)])
+        ),
+        # Beef agroforestry
+        3: (
+            AF_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
+            + (1 - AF_PROPORTION) * (data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_beef_code(data)])
+        ),
+        # Carbon plantings (block)
+        4: CARBON_PLANTING_BLOCK_BIODIV_BENEFIT,
+        # Sheep carbon plantings (belt)
+        5: (
+            CP_BELT_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
+            + (1 - CP_BELT_PROPORTION) * (data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_sheep_code(data)])
+        ),
+        # Beef carbon plantings (belt)
+        6: (
+            CP_BELT_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
+            + (1 - CP_BELT_PROPORTION) * (data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_beef_code(data)])
+        ),
+        # BECCS
+        7: BECCS_BIODIVERSITY_BENEFIT,
+    }

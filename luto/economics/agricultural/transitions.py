@@ -1,18 +1,23 @@
-# Copyright 2022 Fjalar J. de Haan and Brett A. Bryan at Deakin University
+# Copyright 2025 Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., 
+# van Schoten, N., Hadjikakou, M., Sanson, J.,  Zyngier, R., Marcos-Martinez, R.,  
+# Navarro, J.,  Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., 
+# Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.
 #
-# This file is part of LUTO 2.0.
+# This file is part of LUTO2 - Version 2 of the Australian Land-Use Trade-Offs model
 #
-# LUTO 2.0 is free software: you can redistribute it and/or modify it under the
+# LUTO2 is free software: you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
 #
-# LUTO 2.0 is distributed in the hope that it will be useful, but WITHOUT ANY
+# LUTO2 is distributed in the hope that it will be useful, but WITHOUT ANY
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 # A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License along with
-# LUTO 2.0. If not, see <https://www.gnu.org/licenses/>.
+# LUTO2. If not, see <https://www.gnu.org/licenses/>.
+
+
 
 """
 Data about transitions costs.
@@ -69,7 +74,7 @@ def get_exclude_matrices(data: Data, lumap: np.ndarray):
     ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)
 
     # Transition costs from current land-use to all other land-uses j using current land-use map (in $/ha).
-    t_rj = np.zeros((data.NCELLS, len(data.AGRICULTURAL_LANDUSES)))
+    t_rj = np.zeros((data.NCELLS, len(data.AGRICULTURAL_LANDUSES))).astype(np.float32)
     t_rj[ag_cells, :] = t_ij[lumap[ag_cells]]
 
     # For non-agricultural cells, use the original 2010 solve's LUs to determine what LUs are possible for a cell
@@ -119,7 +124,7 @@ def get_transition_matrices(data: Data, yr_idx, base_year, separate=False):
 
     # Non-irrigation related transition costs for cell r to change to land-use j calculated based on lumap (in $/ha).
     # Only consider for cells currently being used for agriculture.
-    e_rj = np.zeros((ncells, n_ag_lus))
+    e_rj = np.zeros((ncells, n_ag_lus)).astype(np.float32)
     e_rj[ag_cells, :] = t_ij[lumap[ag_cells]]
 
     # Amortise upfront costs to annualised costs and converted to $ per cell via REAL_AREA
@@ -348,8 +353,8 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> D
 
     return {
         am: np.divide(
-            np.floor(data.ag_man_dvars[base_year][am].astype(np.float32) * 10 ** settings.LB_ROUND_DECMIALS)
-            , 10 ** settings.LB_ROUND_DECMIALS
+            np.floor(data.ag_man_dvars[base_year][am].astype(np.float32) * 10 ** settings.ROUND_DECMIALS)
+            , 10 ** settings.ROUND_DECMIALS
         )
         for am in AG_MANAGEMENTS_TO_LAND_USES
     }

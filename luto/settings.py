@@ -1,21 +1,27 @@
-# Copyright 2022 Fjalar J. de Haan and Brett A. Bryan at Deakin University
+# Copyright 2025 Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., 
+# van Schoten, N., Hadjikakou, M., Sanson, J.,  Zyngier, R., Marcos-Martinez, R.,  
+# Navarro, J.,  Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., 
+# Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.
 #
-# This file is part of LUTO 2.0.
+# This file is part of LUTO2 - Version 2 of the Australian Land-Use Trade-Offs model
 #
-# LUTO 2.0 is free software: you can redistribute it and/or modify it under the
+# LUTO2 is free software: you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
 #
-# LUTO 2.0 is distributed in the hope that it will be useful, but WITHOUT ANY
+# LUTO2 is distributed in the hope that it will be useful, but WITHOUT ANY
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 # A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License along with
-# LUTO 2.0. If not, see <https://www.gnu.org/licenses/>.
+# LUTO2. If not, see <https://www.gnu.org/licenses/>.
+
+
 
 """ LUTO model settings. """
 
+import os
 import pandas as pd
 
 
@@ -88,8 +94,16 @@ DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 # Set amortisation period
 AMORTISATION_PERIOD = 30 # years
 
-# Deforestation legislation; If 'on' then deforestation is penalised by introducing a huge-cost (1 billion AUD/ha) for converting natural to modified land
-DEFORESTATION_LEGISLATION = 'on'  # 'on' or 'off'
+# Deforestation legislation; 
+DEFORESTATION_LEGISLATION = 'off'  # 'on' or 'off'
+'''
+Penalise deforestation by introducing a huge-cost (1 billion AUD/ha) for converting natural to modified land.
+
+This penalty may lead to numericall issues in the solver because the cost of deforestation is too high. 
+
+- If 'on' then deforestation is penalised
+- If 'off' then deforestation is not penalised
+'''
 
 if DEFORESTATION_LEGISLATION == 'on':
     NATURAL_TO_MODIFIED_LAND_PENALTY = 1e9
@@ -102,15 +116,15 @@ else:
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 20        # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 20       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # How does the model run over time
-MODE = 'snapshot'   # Runs for target year only
-# MODE = 'timeseries'   # Runs each year from base year to target year
+# MODE = 'snapshot'   # Runs for target year only
+MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
-OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
-# OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
+# OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
+OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
 # Specify how demand for agricultural commodity production should be met in the solver
 # DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
@@ -120,9 +134,9 @@ DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in th
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
-
-WRITE_OUTPUT_GEOTIFFS = False    # Write GeoTiffs to output directory: True or False
+WRITE_OUTPUT_GEOTIFFS = False   # Write GeoTiffs to output directory: True or False
 WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resolution: True or False
+
 PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
 WRITE_THREADS = 10              # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
@@ -154,12 +168,41 @@ NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect a
 BARHOMOGENOUS = 1  # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 50
+THREADS = 32
+
+
+
+# ---------------------------------------------------------------------------- #
+# No-Go areas; Regional adoption constraints
+# ---------------------------------------------------------------------------- #
+
+NO_GO_VECTORS = {
+    'Winter cereals':           f'{os.path.abspath(INPUT_DIR)}/no_go_areas/no_go_Winter_cereals.shp',
+    'Environmental Plantings':  f'{os.path.abspath(INPUT_DIR)}/no_go_areas/no_go_Enviornmental_Plantings.shp'
+}
+'''
+Land-use and vector file pairs to exclude land-use from being utilised in that area. 
+ - The key is the land-use name. 
+ - The value is the path to the ESRI shapefile.
+'''
+
+REGIONAL_ADOPTION_ZONE = 'LGA_CODE' # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
+'''
+The regional adoption zone is the spatial unit used to enforce regional adoption constraints.
+The options are:
+  - 'ABARES_AAGIS': Australian Bureau of Agricultural and Resource Economics and Sciences (ABARES) Agricultural and Agribusiness Geographic Information System (AAGIS) regions.
+  - 'LGA_CODE': Local Government Area code.
+  - 'NRM_CODE': Natural Resource Management code.
+  - 'IBRA_ID': Interim Biogeographic Regionalisation of Australia (IBRA) region code.
+  - 'SLA_5DIGIT': Statistical Local Area (SLA) 5-digit code.
+'''
+
 
 
 # ---------------------------------------------------------------------------- #
 # Non-agricultural land usage parameters
 # ---------------------------------------------------------------------------- #
+
 NON_AG_LAND_USES = {
     'Environmental Plantings': True,
     'Riparian Plantings': True,
@@ -171,12 +214,14 @@ NON_AG_LAND_USES = {
     'BECCS': True,
 }
 """
-The dictionary below is the master list of all of the non agricultural land uses
+The dictionary here is the master list of all of the non agricultural land uses
 and whether they are currently enabled in the solver (True/False).
 
 To disable a non-agricultural land use, change the correpsonding value of the
 NON_AG_LAND_USES dictionary to false.
 """
+
+
 NON_AG_LAND_USES_REVERSIBLE = {
     'Environmental Plantings': False,
     'Riparian Plantings': False,
@@ -336,8 +381,8 @@ SOLVE_ECONOMY_WEIGHT = 0.05
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 
-# WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
-WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
+WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
+# WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
 
 WATER_PENALTY = 1
 
@@ -383,52 +428,69 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 # ------------------- Agricultural biodiversity parameters -------------------
 
-# Biodiversity contribution reporting 
-BIODIVERSTIY_TARGET_GBF_2 = 'on'                 # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
-CALC_BIODIVERSITY_CONTRIBUTION = False      # True or False, calculate/report biodiversity contribution; False will turn off reprojecting decision variables to xarray so speed up the model run.
-BIO_CALC_LEVEL = 'group'                    # 'group' or 'species' - determines whether to calculate biodiversity scores at the group or species level
 
+# Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
+BIODIVERSTIY_TARGET_GBF_2 = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
+
+# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
+BIODIV_GBF_TARGET_2_DICT = {
+              2010: 0,    # Proportion of degraded land restored in year 2010
+              2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
+              2050: 0.3,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
+              2100: 0.3   # Stays at 2050 level
+             }            # (can add more years/targets)\
+""" Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
+    Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
+    in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
+"""
+
+
+# GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
+GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
+
+
+GBF2_PENALTY = 1e4
+'''The penalty multiplier for not meeting the biodiversity target, only applies when undershooting the target'''
 
 # Connectivity source source
 CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
 '''
-    The connectivity source is the source of the connectivity score used to weigh the raw biodiversity priority score.
-    This score is normalised between 0 (fartherst) and 1 (closest).
-    Can be either 'NCI' or 'DWI'.
-        - if 'NCI' is selected, the connectivity score is sourced from the DCCEEW's National Connectivity Index (v3.0).
-        - if 'DWI' is selected, the connectivity score is calculated as distance to the nearest area of natural land as mapped
-          by the National Land Use Map of Australia.
-        - if 'NONE' is selected, the connectivity score is not used in the biodiversity calculation.
+The connectivity source is the source of the connectivity score used to weigh the raw biodiversity priority score.
+This score is normalised between 0 (fartherst) and 1 (closest).
+Can be either 'NCI' or 'DWI'.
+- if 'NCI' is selected, the connectivity score is sourced from the DCCEEW's National Connectivity Index (v3.0).
+- if 'DWI' is selected, the connectivity score is calculated as distance to the nearest area of natural land as mapped
+        by the National Land Use Map of Australia.
+- if 'NONE' is selected, the connectivity score is not used in the biodiversity calculation.
 '''
 
 # Connectivity score importance
 connectivity_importance = 0.3                    # Weighting of connectivity score in biodiversity calculation (0 [not important] - 1 [very important])
 CONNECTIVITY_LB = 1 - connectivity_importance    # Sets the lower bound of the connectivity multiplier for bioidversity
 '''
-    !!!!!   ONLY WORKS IF CONNECTIVITY_SOURCE IS NOT 'NONE'   !!!!!
-    The relative importance of the connectivity score in the biodiversity calculation. Used to scale the raw biodiversity score.
-    I.e., the lower bound of the connectivity score for weighting the raw biodiversity priority score is CONNECTIVITY_LB.
+!   ONLY WORKS IF CONNECTIVITY_SOURCE IS NOT 'NONE'   ! \n
+The relative importance of the connectivity score in the biodiversity calculation. Used to scale the raw biodiversity score.
+I.e., the lower bound of the connectivity score for weighting the raw biodiversity priority score is CONNECTIVITY_LB.
 '''
 
 
 # Habitat condition data source
 HABITAT_CONDITION = 'HCAS'                  # 'HCAS', 'USER_DEFINED', or 'NONE'
-'''Used to calculate the level of degradation of biodiversity under agricultural land uses (i.e., multiplier of the impact of ag on biodiversity).
-    - If 'HCAS' is selected, the habitat condition is calculated using the Habitat Condition Assessment System (HCAS)
-    - If 'USER_DEFINED' is selected, the habitat condition is calculated using the user defined values in the 'HCAS_USER_DEFINED' dictionary.
+'''
+Used to calculate the level of degradation of biodiversity under agricultural land uses (i.e., multiplier of the impact of ag on biodiversity).
+- If 'HCAS' is selected, the habitat condition is calculated using the Habitat Condition Assessment System (HCAS)
+- If 'USER_DEFINED' is selected, the habitat condition is calculated using the user defined values in the 'HCAS_USER_DEFINED' dictionary.
 '''
 
 
 # HCAS percentile for each land-use type
 HCAS_PERCENTILE = 50
-''' Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the
-    suitability for wild animals ranging between 0-1) for each land-use type.
+''' 
+Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the
+suitability for wild animals ranging between 0-1) for each land-use type.Avaliable percentiles is one of [10, 25, 50, 75, 90].
 
-    Here is the parameter defining the percentile used to represent each land-use's degradation scale to biodiversity. Avaliable percentiles
-    is one of [10, 25, 50, 75, 90].
-
-    For example, the 50th percentile for 'Beef - Modified land' is 0.22, meaning this land has 22% biodiversity score compared
-    to undisturbed natural land.
+For example, the 50th percentile for 'Beef - Modified land' is 0.22, meaning this land retains 22% biodiversity score compared
+to undisturbed natural land.
 '''
 
 # Biodiversity value under default late dry season savanna fire regime
@@ -444,25 +506,11 @@ CARBON_PLANTING_BELT_BIODIV_BENEFIT = 0.1
 RIPARIAN_PLANTING_BIODIV_BENEFIT = 1
 AGROFORESTRY_BIODIV_BENEFIT = 0.75
 BECCS_BIODIVERSITY_BENEFIT = 0
-''' The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
-    For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value
-    will be 0.6 * 0.8 = 0.48.
+''' 
+The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
+For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value
+will be 0.6 * 0.8 = 0.48.
 '''
-
-# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
-BIODIV_GBF_TARGET_2_DICT = {
-              2010: 0,    # Proportion of degraded land restored in year 2010
-              2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
-              2050: 0.3,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
-              2100: 0.3   # Stays at 2050 level
-             }            # (can add more years/targets)\
-""" Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-    Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
-    in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
-"""
-
-
-
 
 
 
@@ -471,8 +519,8 @@ BIODIV_GBF_TARGET_2_DICT = {
 
 BIODIVERSTIY_TARGET_GBF_3  = 'on'           # 'on' or 'off'.
 '''
-    Target 3 of the Kunming-Montreal Global Biodiversity Framework:
-    protect and manage 30% of the world's land, water, and coastal areas by 2030.
+Target 3 of the Kunming-Montreal Global Biodiversity Framework:
+protect and manage 30% of the world's land, water, and coastal areas by 2030.
 '''
 
 NVIS_SPATIAL_DETAIL = 'HIGH'                 # 'LOW' or 'HIGH'
@@ -495,6 +543,16 @@ the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers
 '''
 
 
+# ------------------------------- Species parameters -------------------------------
+BIODIVERSTIY_TARGET_GBF_4 =  'on'           # 'on' or 'off'.
+'''
+Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
+halt the extinction of known threatened species, protect genetic diversity, 
+and manage human-wildlife interactions
+'''
+
+
+
 
 # ---------------------------------------------------------------------------- #
 # Other parameters
@@ -512,7 +570,9 @@ LAND_USAGE_CULL_PERCENTAGE = 0.15   if CULL_MODE == 'percentage' else 'Not used'
 NON_AGRICULTURAL_LU_BASE_CODE = 100
 
 # Number of decimals to round the lower bound matrices to for non-agricultural land uses and agricultural management options.
-LB_ROUND_DECMIALS = 6
+ROUND_DECMIALS = 6
+
+SPECIES_CONSERVATION_DIV_CONSTANT = 1e4
 
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)

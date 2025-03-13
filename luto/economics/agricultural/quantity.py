@@ -1,18 +1,23 @@
-# Copyright 2022 Fjalar J. de Haan and Brett A. Bryan at Deakin University
+# Copyright 2025 Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., 
+# van Schoten, N., Hadjikakou, M., Sanson, J.,  Zyngier, R., Marcos-Martinez, R.,  
+# Navarro, J.,  Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., 
+# Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.
 #
-# This file is part of LUTO 2.0.
-# 
-# LUTO 2.0 is free software: you can redistribute it and/or modify it under the
+# This file is part of LUTO2 - Version 2 of the Australian Land-Use Trade-Offs model
+#
+# LUTO2 is free software: you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
-# 
-# LUTO 2.0 is distributed in the hope that it will be useful, but WITHOUT ANY
+#
+# LUTO2 is distributed in the hope that it will be useful, but WITHOUT ANY
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 # A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License along with
-# LUTO 2.0. If not, see <https://www.gnu.org/licenses/>. 
+# LUTO2. If not, see <https://www.gnu.org/licenses/>.
+
+
 
 """
 Pure functions for calculating the production quantities of agricutlural commodities.
@@ -235,7 +240,7 @@ def get_quantity_crop(data, pr, lm, yr_idx):
     
     # Check if land-use exists in AGEC_CROPS (e.g., dryland Pears/Rice do not occur), if not return zeros
     if pr not in data.AGEC_CROPS['Yield', lm].columns:
-        quantity = np.zeros((data.NCELLS))
+        quantity = np.zeros((data.NCELLS)).astype(np.float32)
         
     else: # Calculate the quantities
         
@@ -300,7 +305,7 @@ def get_quantity_matrix(data, lm, yr_idx):
     - q_rp: A 2D Numpy array representing the quantities per cell per product.
     """
 
-    q_rp = np.zeros((data.NCELLS, len(data.PRODUCTS)))
+    q_rp = np.zeros((data.NCELLS, len(data.PRODUCTS))).astype(np.float32)
     for j, pr in enumerate(data.PRODUCTS):
         q_rp[:, j] = get_quantity(data, pr, lm, yr_idx)
 
@@ -443,7 +448,7 @@ def get_savanna_burning_effect_q_mrp(data):
     Returns:
     - An array of zeros with shape (NLMS, NCELLS, NPRS)
     """
-    return np.zeros((data.NLMS, data.NCELLS, data.NPRS))
+    return np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
 
 
 def get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx):

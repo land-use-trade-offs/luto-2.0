@@ -1,18 +1,23 @@
-# Copyright 2022 Fjalar J. de Haan and Brett A. Bryan at Deakin University
+# Copyright 2025 Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., 
+# van Schoten, N., Hadjikakou, M., Sanson, J.,  Zyngier, R., Marcos-Martinez, R.,  
+# Navarro, J.,  Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., 
+# Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.
 #
-# This file is part of LUTO 2.0.
+# This file is part of LUTO2 - Version 2 of the Australian Land-Use Trade-Offs model
 #
-# LUTO 2.0 is free software: you can redistribute it and/or modify it under the
+# LUTO2 is free software: you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
 #
-# LUTO 2.0 is distributed in the hope that it will be useful, but WITHOUT ANY
+# LUTO2 is distributed in the hope that it will be useful, but WITHOUT ANY
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 # A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License along with
-# LUTO 2.0. If not, see <https://www.gnu.org/licenses/>.
+# LUTO2. If not, see <https://www.gnu.org/licenses/>.
+
+
 
 """
 To maintain state and handle iteration and data-view changes. This module
@@ -135,11 +140,6 @@ def solve_timeseries(data: Data, steps: int, base: int, target: int):
         data.add_ag_man_dvars(yr, solution.ag_man_X_mrj)
         data.add_obj_vals(yr, solution.obj_val)
 
-        if settings.CALC_BIODIVERSITY_CONTRIBUTION:
-            print(f'Reproject decision variables...')
-            data.add_ag_dvars_xr(yr, solution.ag_X_mrj)
-            data.add_am_dvars_xr(yr, solution.ag_man_X_mrj)
-            data.add_non_ag_dvars_xr(yr, solution.non_ag_X_rk)
 
         for data_type, prod_data in solution.prod_data.items():
             data.add_production_data(yr, data_type, prod_data)
@@ -175,12 +175,6 @@ def solve_snapshot(data: Data, base: int, target: int):
     data.add_non_ag_dvars(target, solution.non_ag_X_rk)
     data.add_ag_man_dvars(target, solution.ag_man_X_mrj)
     data.add_obj_vals(target, solution.obj_val)
-
-    if settings.CALC_BIODIVERSITY_CONTRIBUTION:
-        print(f'Reproject decision variables...')
-        data.add_ag_dvars_xr(target, solution.ag_X_mrj)
-        data.add_am_dvars_xr(target, solution.ag_man_X_mrj)
-        data.add_non_ag_dvars_xr(target, solution.non_ag_X_rk)
 
     for data_type, prod_data in solution.prod_data.items():
         data.add_production_data(target, data_type, prod_data)
@@ -224,39 +218,4 @@ def load_data_from_disk(path: str) -> Data:
     data.timestamp_sim = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
     
     return data
-    
-
-def read_dvars(output_dir:str)-> None:
-    '''
-    Read the output decision variables from the output directory and add them to the Data object.
-    '''
-    # Read all output files;
-    files = get_all_files(output_dir)
-    dvar_path = files.query('category == "ag_X_mrj"').iloc[0]['path']
-    # Check if the output resolution is the same as the settings.RESFACTOR
-    output_res = tools.get_out_resfactor(dvar_path)
-    if output_res != settings.RESFACTOR:
-        raise ValueError(f'Please change the `settings.RESFACTOR` ({settings.RESFACTOR}) to to be the same as output files ({output_res}).')
-
-    # Loading data from
-    data = load_data()
-
-    # Save reading dvars as a delayed task
-    tasks = [delayed(tools.read_dvars)(yr, files.query('base_ext == ".npy" and Year == @yr and year_types == "single_year"'))
-            for yr in sorted(files['Year'].unique())]
-
-    # Run the tasks in parallel to add the dvars to the data object
-    print(f'Reading decision variables from existing output directory...\n   {output_dir}')
-    for yr,dvar in Parallel(n_jobs=min(len(tasks), 10), return_as='generator')(tasks):
-        data.add_lumap(yr, dvar[0])
-        data.add_lmmap(yr, dvar[1])
-        data.add_ammaps(yr, dvar[2])
-        data.add_ag_dvars(yr, dvar[3])
-        data.add_non_ag_dvars(yr, dvar[4])
-        data.add_ag_man_dvars(yr, dvar[5])
-
-    # Remove the log file, because we only read the dvars
-    os.remove(f"{settings.OUTPUT_DIR}/run_{timestamp}_stderr.log")
-    os.remove(f"{settings.OUTPUT_DIR}/run_{timestamp}_stdout.log")
-
-    return data
+  

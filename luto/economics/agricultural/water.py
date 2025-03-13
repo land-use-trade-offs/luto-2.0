@@ -1,18 +1,23 @@
-# Copyright 2022 Fjalar J. de Haan and Brett A. Bryan at Deakin University
+# Copyright 2025 Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., 
+# van Schoten, N., Hadjikakou, M., Sanson, J.,  Zyngier, R., Marcos-Martinez, R.,  
+# Navarro, J.,  Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., 
+# Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.
 #
-# This file is part of LUTO 2.0.
+# This file is part of LUTO2 - Version 2 of the Australian Land-Use Trade-Offs model
 #
-# LUTO 2.0 is free software: you can redistribute it and/or modify it under the
+# LUTO2 is free software: you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
 #
-# LUTO 2.0 is distributed in the hope that it will be useful, but WITHOUT ANY
+# LUTO2 is distributed in the hope that it will be useful, but WITHOUT ANY
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 # A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License along with
-# LUTO 2.0. If not, see <https://www.gnu.org/licenses/>.
+# LUTO2. If not, see <https://www.gnu.org/licenses/>.
+
+
 
 """
 Pure functions to calculate water net yield by lm, lu and water limits.
@@ -79,7 +84,7 @@ def get_wyield_matrices(
     Returns:
         numpy.ndarray: The w_mrj <unit: ML/cell> water yield matrices, indexed (m, r, j).
     """
-    w_yield_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+    w_yield_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)
 
     w_yield_dr = data.WATER_YIELD_DR_FILE[yr_idx] if water_dr_yield is None else water_dr_yield
     w_yield_sr = data.WATER_YIELD_SR_FILE[yr_idx] if water_sr_yield is None else water_sr_yield
@@ -264,7 +269,7 @@ def get_savanna_burning_effect_w_mrj(data: Data):
     """
 
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
-    return np.zeros((data.NLMS, data.NCELLS, nlus))
+    return np.zeros((data.NLMS, data.NCELLS, nlus)).astype(np.float32)
 
 
 def get_agtech_ei_effect_w_mrj(data: Data, yr_idx):
@@ -341,32 +346,32 @@ def get_agricultural_management_water_matrices(data: Data, yr_idx) -> dict[str, 
     asparagopsis_data = (
         get_asparagopsis_effect_w_mrj(data, yr_idx)
         if settings.AG_MANAGEMENTS['Asparagopsis taxiformis']
-        else np.zeros((data.NLMS, data.NCELLS, len(AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis'])))
+        else np.zeros((data.NLMS, data.NCELLS, len(AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis']))).astype(np.float32)
     )
     precision_agriculture_data = (
         get_precision_agriculture_effect_w_mrj(data, yr_idx)
         if settings.AG_MANAGEMENTS['Precision Agriculture']
-        else np.zeros((data.NLMS, data.NCELLS, len(AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture'])))
+        else np.zeros((data.NLMS, data.NCELLS, len(AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']))).astype(np.float32)
     )
     eco_grazing_data = (
         get_ecological_grazing_effect_w_mrj(data, yr_idx)
         if settings.AG_MANAGEMENTS['Ecological Grazing']
-        else np.zeros((data.NLMS, data.NCELLS, len(AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing'])))
+        else np.zeros((data.NLMS, data.NCELLS, len(AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']))).astype(np.float32)
     )
     sav_burning_data = (
         get_savanna_burning_effect_w_mrj(data)
         if settings.AG_MANAGEMENTS['Savanna Burning']
-        else np.zeros((data.NLMS, data.NCELLS, len(AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])))
+        else np.zeros((data.NLMS, data.NCELLS, len(AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning']))).astype(np.float32)
     )
     agtech_ei_data = (
         get_agtech_ei_effect_w_mrj(data, yr_idx)
         if settings.AG_MANAGEMENTS['AgTech EI']
-        else np.zeros((data.NLMS, data.NCELLS, len(AG_MANAGEMENTS_TO_LAND_USES['AgTech EI'])))
+        else np.zeros((data.NLMS, data.NCELLS, len(AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']))).astype(np.float32)
     )
     biochar_data = (
         get_biochar_effect_w_mrj(data, yr_idx)
         if settings.AG_MANAGEMENTS['Biochar']
-        else np.zeros((data.NLMS, data.NCELLS, len(AG_MANAGEMENTS_TO_LAND_USES['Biochar'])))
+        else np.zeros((data.NLMS, data.NCELLS, len(AG_MANAGEMENTS_TO_LAND_USES['Biochar']))).astype(np.float32)
     )
 
     return {

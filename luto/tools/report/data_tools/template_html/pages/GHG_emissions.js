@@ -92,7 +92,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // Chart:GHG_2_individual_emission_Mt
   Highcharts.chart("GHG_2_individual_emission_Mt", {
     chart: {
-      marginRight: 380,
+      marginRight: 500,
     },
     title: {
       text: "GHG Emissions by Land-use/Management Type",
