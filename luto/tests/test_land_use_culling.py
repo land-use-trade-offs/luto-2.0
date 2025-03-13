@@ -43,7 +43,7 @@ def _generate_mock_mrj_matrix(
 
     Acts as a mock of an `mrj` matrix.
     """
-    matrix = np.zeros((max_m, max_r, len(values)))
+    matrix = np.zeros((max_m, max_r, len(values))).astype(np.float32)
     matrix[m, r, :] = np.array(values)
     return matrix
 

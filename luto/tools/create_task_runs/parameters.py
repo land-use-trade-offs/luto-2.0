@@ -17,7 +17,12 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-TASK_ROOT_DIR = '../Custom_runs/20250210_RES10_Timeseries/'
+
+TASK_ROOT_DIR = '../Custom_runs/20250228_RES15_Timeseries_DIFF_GBF_2_PENALTIES'  
+if TASK_ROOT_DIR[-1] == '/':
+    TASK_ROOT_DIR = TASK_ROOT_DIR[:-1]
+
+
 
 EXCLUDE_DIRS = [
     'input', 
@@ -26,4 +31,15 @@ EXCLUDE_DIRS = [
     '.vscode', 
     '__pycache__', 
     'jinzhu_inspect_code'
+]
+
+GHG_ORDER = [
+    '1.5C (67%) excl. avoided emis', 
+    '1.5C (50%) excl. avoided emis', 
+    '1.8C (67%) excl. avoided emis'
+]
+
+BIO_TARGET_ORDER = [
+    '{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}', 
+    '{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}'
 ]
