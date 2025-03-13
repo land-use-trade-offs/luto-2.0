@@ -551,6 +551,11 @@ halt the extinction of known threatened species, protect genetic diversity,
 and manage human-wildlife interactions
 '''
 
+SNES_CONSTRAINTS = 'on'    # 'on' or 'off'
+ECNES_CONSTRAINTS = 'on'   # 'on' or 'off'
+
+NES_LAYER_TYPE = 'likely'  # 'likely' or 'likely/maybe'
+
 
 
 

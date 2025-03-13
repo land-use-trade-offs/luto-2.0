@@ -83,6 +83,8 @@ class SolverInputData:
     ag_man_biodiv_impacts: dict[str, dict[int, np.ndarray]] # Biodiversity benefits for each AM option.
     mvg_vr: np.ndarray                                      # Major vegetation group cell contribution data - indexed by veg. group (v) and cell (r)
     sc_sr: np.ndarray                                       # Species conservation cell contribution data - indexed by species (s) and cell (r).
+    snes_xr: np.ndarray                                     # Species NES contribution data - indexed by species/ecological community (x) and cell (r).
+    ecnes_xr: np.ndarray                                    # Ecological community NES contribution data - indexed by species/ecological community (x) and cell (r).
     mvg_contr_outside_study_area: dict[int, float]          # Contributions of land outside LUTO study area to each major veg. group (keys: major groups)
 
     savanna_eligible_r: np.ndarray                          # Cells that are not eligible for savanna land use.
@@ -267,6 +269,18 @@ def get_sc_sr(data: Data, target_year: int) -> np.ndarray:
         return np.empty(0)
     print('Getting species conservation cell data...', flush = True)
     return ag_biodiversity.get_species_conservation_matrix(data, target_year)
+
+
+def get_snes_xr(data: Data) -> np.ndarray:
+    if settings.SNES_CONSTRAINTS != "on":
+        return np.empty(0)
+    return ag_biodiversity.get_snes_matrix(data)
+
+
+def get_ecnes_xr(data: Data) -> np.ndarray:
+    if settings.ECNES_CONSTRAINTS != "on":
+        return np.empty(0)
+    return ag_biodiversity.get_ecnes_matrix(data)
 
 
 def get_non_ag_w_rk(
@@ -542,6 +556,9 @@ def get_limits(
 
     limits["species_conservation"] = ag_biodiversity.get_species_conservation_limits(data, yr_cal)
 
+    limits["snes"] = ag_biodiversity.get_snes_limits(data, yr_cal)
+    limits["ecnes"] = ag_biodiversity.get_snes_limits(data, yr_cal)
+
     return limits
 
 
@@ -623,6 +640,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_biodiv_impacts=get_ag_man_biodiv_impacts(data, target_year),
         sc_sr=get_sc_sr(data, target_year),
         mvg_vr=get_mvg_vr(data),
+        snes_xr=get_snes_xr(data),
+        ecnes_xr=get_ecnes_xr(data),
 
         savanna_eligible_r=get_savanna_eligible_r(data),
 

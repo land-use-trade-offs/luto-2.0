@@ -21,7 +21,7 @@
 
 
 import os
-import h5py, netCDF4
+import h5py
 import xarray as xr
 import numpy as np
 import pandas as pd
@@ -1274,6 +1274,14 @@ class Data:
                                                         row['USER_DEFINED_TARGET_PERCENT_2050_MAYBE']>0,
                                                         row['USER_DEFINED_TARGET_PERCENT_2100_MAYBE']>0])]
         
+        self.BIO_GBF_4B_SNES_LIKELY_MAYBE_SEL = [row['SCIENTIFIC_NAME'] for _,row in BIO_GBF4B_SNES_score.iterrows()
+                                                if all([row['USER_DEFINED_TARGET_PERCENT_2030_MAYBE']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2050_MAYBE']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2100_MAYBE']>0])
+                                                or all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY']>0])]
+        
         self.BIO_GBF4B_ECNES_LIKELY_SEL = [row['COMMUNITY'] for _,row in BIO_GBF4B_ECNES_score.iterrows()
                                                 if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY']>0,
                                                         row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY']>0,
@@ -1283,6 +1291,14 @@ class Data:
                                                 if all([row['USER_DEFINED_TARGET_PERCENT_2030_MAYBE']>0,
                                                         row['USER_DEFINED_TARGET_PERCENT_2050_MAYBE']>0,
                                                         row['USER_DEFINED_TARGET_PERCENT_2100_MAYBE']>0])]
+        
+        self.BIO_GBF4B_ECNES_LIKELY_MAYBE_SEL = [row['COMMUNITY'] for _,row in BIO_GBF4B_ECNES_score.iterrows()
+                                                if all([row['USER_DEFINED_TARGET_PERCENT_2030_MAYBE']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2050_MAYBE']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2100_MAYBE']>0])
+                                                or all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY']>0,
+                                                        row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY']>0])]
         
         
         if len(self.BIO_GBF_4B_SNES_LIKELY_SEL) == 0 or len(self.BIO_GBF4B_ECNES_LIKELY_SEL) == 0:
@@ -1596,7 +1612,7 @@ class Data:
     def get_GBF4B_SNES_target_inside_LUTO_natural_by_year(self, yr:int, layer:Literal['LIKELY', 'MAYBE']):
         # Check the layer name
         if layer == 'LIKELY':
-            snes_out_LUTO = snes_df[f'HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_{layer}']
+            snes_df = self.BIO_GBF4B_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY
         elif layer == 'MAYBE':
             snes_df = self.BIO_GBF4B_SNES_BASELINE_SCORE_TARGET_PERCENT_MAYBE
         else:
@@ -1618,7 +1634,7 @@ class Data:
             
         # Get the significance score for all Australia and outside LUTO natural
         snes_out_LUTO = snes_df[f'HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_{layer}']
-        snes_score_all_Australia = snes_df['HABITAT_SIGNIFICANCE_BASELINE_ALL_AUSTRALIA_{layer}'] * target_pct
+        snes_score_all_Australia = snes_df[f'HABITAT_SIGNIFICANCE_BASELINE_ALL_AUSTRALIA_{layer}'] * target_pct
         # Get the significance score for inside LUTO natural
         snes_inside_LUTO_natural =  snes_score_all_Australia - snes_out_LUTO
         return snes_inside_LUTO_natural.values
@@ -1665,7 +1681,9 @@ class Data:
         if layer == 'LIKELY':
             snes_arr = BIO_GBF4B_SPECIES_raw.sel(species=self.BIO_GBF_4B_SNES_LIKELY_SEL, cell=self.MASK, presence=2).compute()
         elif layer == 'MAYBE':
-            snes_arr = BIO_GBF4B_SPECIES_raw.sel(species=self.BIO_GBF_4B_SNES_MAYBE_SEL, cell=self.MASK, presence=1).compute()
+            snes_arr = BIO_GBF4B_SPECIES_raw.sel(
+                species=self.BIO_GBF_4B_SNES_LIKELY_MAYBE_SEL, cell=self.MASK, presence=1
+            ).compute()
         else:
             raise ValueError("Invalid layer name, must be 'LIKELY' or 'MAYBE'")
         
@@ -1685,7 +1703,9 @@ class Data:
         if layer == 'LIKELY':
             ecnes_arr = BIO_GBF4B_COMUNITY_raw.sel(species=self.BIO_GBF4B_ECNES_LIKELY_SEL, cell=self.MASK, presence=2).compute()
         elif layer == 'MAYBE':
-            ecnes_arr = BIO_GBF4B_COMUNITY_raw.sel(species=self.BIO_GBF4B_ECNES_MAYBE_SEL, cell=self.MASK, presence=1).compute()
+            ecnes_arr = BIO_GBF4B_COMUNITY_raw.sel(
+                species=self.BIO_GBF4B_ECNES_LIKELY_MAYBE_SEL, cell=self.MASK, presence=1
+            ).compute()
         else:
             raise ValueError("Invalid layer name, must be 'LIKELY' or 'MAYBE'")
         

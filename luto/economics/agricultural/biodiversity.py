@@ -279,10 +279,99 @@ def get_species_conservation_limits(
     yr_cal: int,
 ) -> tuple[np.ndarray, dict[int, str], dict[int, np.ndarray]]:
     """
-    
+    Get species conservation limits.
+
+    Returns
+    -------
+    species_limits: np.ndarray
+        Limits for each species stored in an array.
+    species_names: dict[int, str]
+        Mapping of each species' ID to string format name
+    species_inds: dict[int, np.ndarray]
+        Mapping of each species' ID to the cells which contain it.
     """
     species_limits = data.get_GBF4A_suitability_target_inside_natural_LUTO_by_yr(yr_cal)
     species_names = {s: spec_name for s, spec_name in enumerate(data.BIO_GBF4A_SEL_SPECIES)}
     species_matrix = data.get_GBF4A_bio_layers_by_yr(yr_cal)
     species_inds = {s: np.where(species_matrix[s] > 0)[0] for s in range(data.N_SPECIES)}
     return species_limits, species_names, species_inds
+
+
+def get_snes_matrix(data: Data) -> np.ndarray:
+    """
+    Gets the SNES contributions  matrix.
+    
+    Returns
+    -------
+    np.ndarray
+        indexed (z, r) where z is species (independent of species conversation limits) and r is cell
+    """
+    if settings.NES_LAYER_TYPE == "likely":
+        return data.get_GBF4B_SNES_layers('LIKELY')
+    
+    elif settings.NES_LAYER_TYPE == "likely/maybe":
+        likely_data = data.get_GBF4B_SNES_layers('LIKELY')
+        maybe_data = data.get_GBF4B_SNES_layers('MAYBE')
+        breakpoint()
+        return likely_data + maybe_data
+    
+    else:
+        raise ValueError(
+            f"Unsupported value for NES_LAYER_TYPE setting: {settings.NES_LAYER_TYPE}. "
+            f"Must be either 'likely' or 'likely/maybe'."
+        )
+    
+
+def get_ecnes_matrix(data: Data) -> np.ndarray:
+    """
+    Gets the ECNES contributions  matrix.
+    
+    Returns
+    -------
+    np.ndarray
+        indexed (z, r) where z is species (independent of species conversation limits) and r is cell
+    """
+    if settings.NES_LAYER_TYPE == "likely":
+        return data.get_GBF4B_ECNES_layers('LIKELY')
+    
+    elif settings.NES_LAYER_TYPE == "likely/maybe":
+        likely_data = data.get_GBF4B_ECNES_layers('LIKELY')
+        maybe_data = data.get_GBF4B_ECNES_layers('MAYBE')
+        return likely_data + maybe_data
+    
+    else:
+        raise ValueError(
+            f"Unsupported value for NES_LAYER_TYPE setting: {settings.NES_LAYER_TYPE}. "
+            f"Must be either 'likely' or 'likely/maybe'."
+        )
+
+
+def get_snes_limits(data: Data, target_year: int) -> tuple[np.ndarray, dict[int, str]]:
+    """
+    Get species of national environmental significance limits.
+
+    Returns
+    -------
+    species_targets: np.ndarray
+        Array containing all selected species' limits
+    species_names: dict[int, str]
+        Mapping of each species' ID to string format name
+    """
+    if settings.ECNES_CONSTRAINTS != "on":
+        return np.empty(0), {}, {}
+        
+    if settings.NES_LAYER_TYPE == "likely":
+        species_targets = data.get_GBF4B_SNES_target_inside_LUTO_natural_by_year(target_year, 'LIKELY')
+        species_names = {x: name for x, name in enumerate(data.BIO_GBF_4B_SNES_LIKELY_SEL)}
+        return species_targets, species_names
+    
+    elif settings.NES_LAYER_TYPE == "likely/maybe":
+        species_targets = data.get_GBF4B_SNES_target_inside_LUTO_natural_by_year(target_year, 'MAYBE')
+        species_names = {x: name for x, name in enumerate(data.BIO_GBF_4B_SNES_LIKELY_MAYBE_SEL)}
+        return species_targets, species_names
+    
+    else:
+        raise ValueError(
+            f"Unsupported value for NES_LAYER_TYPE setting: {settings.NES_LAYER_TYPE}. "
+            f"Must be either 'likely' or 'likely/maybe'."
+        )
