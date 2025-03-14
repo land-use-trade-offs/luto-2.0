@@ -132,7 +132,6 @@ def run(
             if target_year not in years_to_run:
                 years_to_run.append(target_year)
 
-        breakpoint()
         solve_timeseries(data, years_to_run)
 
     elif settings.MODE == 'snapshot':

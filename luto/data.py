@@ -1776,7 +1776,6 @@ class Data:
         """
         if yr not in self.prod_data:
             self.prod_data[yr] = {}
-        breakpoint()
         self.prod_data[yr][data_type] = prod_data
 
     def add_obj_vals(self, yr: int, obj_val: float):
