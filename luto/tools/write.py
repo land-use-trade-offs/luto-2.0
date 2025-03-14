@@ -1024,7 +1024,6 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
     if not settings.BIODIVERSTIY_TARGET_GBF_3 == 'on':
         return
     
-    yr_idx = yr_cal - data.YR_CAL_BASE
     veg_base_score_score = pd.DataFrame({
         'vg': data.BIO_GBF3_ID2DESC.values(), 
         'BASE_OUTSIDE_SCORE': data.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO, 

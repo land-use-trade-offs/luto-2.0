@@ -45,6 +45,11 @@ from luto.tools.create_task_runs.helpers import log_memory_usage
 from luto.tools.report.data_tools import get_all_files
 from luto.tools.write import write_outputs
 
+from luto.tools import calc_major_vegetation_group_ag_area_for_year, calc_species_ag_area_for_year
+from luto.economics.agricultural.biodiversity import get_major_vegetation_matrices
+import luto.economics.agricultural.ghg as ag_ghg
+import luto.economics.agricultural.biodiversity as ag_biodiversity
+
 # Get date and time
 timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
@@ -110,7 +115,8 @@ def run(
         raise ValueError(f"Base year must be >= {data.YR_CAL_BASE} and less than the target year.")
 
     if base_year != data.YR_CAL_BASE:
-        data.populate_containers_new_base_year(base_year)
+        populate_containers_dynamic_base_year(data, base_year)
+        populate_production_data_dynamic_base_year(data, base_year, target_year)
 
     memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
     memory_thread.start()
@@ -143,6 +149,50 @@ def run(
     
     # Save the Data object to disk
     write_outputs(data)
+
+
+def populate_containers_dynamic_base_year(data: Data, base_year: int) -> None:
+        """
+        If the base year parsed to run() is not the same as data.YR_CAL_BASE
+        then
+            - Calculate and add data for the base year for containers. If this is not possible,
+            - Copy the data from the most recent year to the base year container.
+        """
+
+        years = list(data.lumaps.keys())
+        year_before_base_year = max([y for y in years if y < base_year])
+        
+        data.lumaps[base_year] = data.lumaps[year_before_base_year]
+        data.lmmaps[base_year] = data.lmmaps[year_before_base_year]
+        data.ammaps[base_year] = data.ammaps[year_before_base_year]
+        data.ag_dvars[base_year] = data.ag_dvars[year_before_base_year]
+        data.non_ag_dvars[base_year] = data.non_ag_dvars[year_before_base_year]
+        data.ag_man_dvars[base_year] = data.ag_man_dvars[year_before_base_year]
+        data.populate_productivity_container(base_year)
+
+
+def populate_production_data_dynamic_base_year(data: Data, base_year: int, target_year: int) -> None:
+    yr_idx = base_year - data.YR_CAL_BASE
+    years = list(data.lumaps.keys())
+    year_before_base_year = max([y for y in years if y < base_year])
+
+    major_vegetation_data = calc_major_vegetation_group_ag_area_for_year(
+        get_major_vegetation_matrices(data), 
+        data.lumaps[year_before_base_year],
+        data.BIODIV_HABITAT_DEGRADE_LOOK_UP,
+    )
+    ghg_emission_data = (ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True) * data.ag_dvars[data.YR_CAL_BASE]).sum()
+    biodiversity_data = (ag_biodiversity.get_breq_matrices(data) * data.ag_dvars[data.YR_CAL_BASE]).sum()
+    species_conservation_data = calc_species_ag_area_for_year(
+        ag_biodiversity.get_species_conservation_matrix(data, target_year),
+        data.lumaps[year_before_base_year],
+        data.BIODIV_HABITAT_DEGRADE_LOOK_UP,
+    )
+
+    data.add_production_data(base_year, "GHG Emissions", ghg_emission_data)
+    data.add_production_data(base_year, "Biodiversity", biodiversity_data)
+    data.add_production_data(base_year, "Major Vegetation Groups", major_vegetation_data)
+    data.add_production_data(base_year, "Species Conservation", species_conservation_data)
 
 
 def solve_timeseries(data: Data, years_to_run: list[int]) -> None:

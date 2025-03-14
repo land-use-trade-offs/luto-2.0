@@ -1346,27 +1346,6 @@ class Data:
         yr_cal_base_prod_data = self.get_production(year, self.LUMAP, self.LMMAP)
         self.add_production_data(year, "Production", yr_cal_base_prod_data)
 
-
-    def populate_containers_new_base_year(self, base_year: int) -> None:
-        """
-        If the base year parsed to run() is not the same as self.YR_CAL_BASE
-        then
-            - Calculate and add data for the base year for containers. If this is not possible,
-            - Copy the data from the most recent year to the base year container.
-        """
-
-        years = list(self.lumaps.keys())
-        year_before_base_year = max([y for y in years if y < base_year])
-        
-        self.lumaps[base_year] = self.lumaps[year_before_base_year]
-        self.lmmaps[base_year] = self.lmmaps[year_before_base_year]
-        self.ammaps[base_year] = self.ammaps[year_before_base_year]
-        self.ag_dvars[base_year] = self.ag_dvars[year_before_base_year]
-        self.non_ag_dvars[base_year] = self.non_ag_dvars[year_before_base_year]
-        self.ag_man_dvars[base_year] = self.ag_man_dvars[year_before_base_year]
-        self.populate_productivity_container(base_year)
-
-
     def get_coord(self, index_ij: np.ndarray, trans):
         """
         Calculate the coordinates [[lon,...],[lat,...]] based on
