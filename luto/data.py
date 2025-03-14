@@ -21,7 +21,7 @@
 
 
 import os
-import h5py, netCDF4
+import h5py #, netCDF4
 import xarray as xr
 import numpy as np
 import pandas as pd
@@ -118,7 +118,7 @@ class Data:
     Contains all data required for the LUTO model to run. Loads all data upon initialisation.
     """
 
-    def __init__(self, timestamp: str, base_year: int | None) -> None:
+    def __init__(self, timestamp: str) -> None:
         """
         Sets up output containers (lumaps, lmmaps, etc) and loads all LUTO data, adjusted
         for resfactor and base year.
@@ -142,8 +142,7 @@ class Data:
         print('')
         print('Beginning data initialisation...')
 
-        self.DATA_BASE_YR = 2010    # The base year used for lu and lm maps.
-        self.YR_CAL_BASE = base_year or self.DATA_BASE_YR  # The base year, i.e. where year index yr_idx == 0.
+        self.YR_CAL_BASE = 2010  # The base year, i.e. where year index yr_idx == 0.
 
         ###############################################################
         # Masking and spatial coarse graining.
@@ -638,9 +637,7 @@ class Data:
         self.AG_MAN_L_MRJ_DICT = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
         self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
         
-        print("\tCalculating base year productivity...", flush=True)
-        yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)
-        self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
+        self.calculate_year_productivity(self.YR_CAL_BASE)
 
 
 
@@ -1340,6 +1337,35 @@ class Data:
 
         print("Data loading complete\n")
         
+
+    def calculate_year_productivity(self, year) -> None:
+        """
+        Calculate the year productivity for the containers.
+        """
+        print(f"\tCalculating year productivity...", flush=True)
+        yr_cal_base_prod_data = self.get_production(year, self.LUMAP, self.LMMAP)
+        self.add_production_data(year, "Production", yr_cal_base_prod_data)
+
+
+    def populate_containers_new_base_year(self, base_year: int) -> None:
+        """
+        If the base year parsed to run() is not the same as self.YR_CAL_BASE
+        then
+            - Calculate and add data for the base year for containers. If this is not possible,
+            - Copy the data from the most recent year to the base year container.
+        """
+
+        years = list(self.lumaps.keys())
+        year_before_base_year = max([y for y in years if y < base_year])
+        
+        self.lumaps[base_year] = self.lumaps[year_before_base_year]
+        self.lmmaps[base_year] = self.lmmaps[year_before_base_year]
+        self.ammaps[base_year] = self.ammaps[year_before_base_year]
+        self.ag_dvars[base_year] = self.ag_dvars[year_before_base_year]
+        self.non_ag_dvars[base_year] = self.non_ag_dvars[year_before_base_year]
+        self.ag_man_dvars[base_year] = self.ag_man_dvars[year_before_base_year]
+        self.calculate_year_productivity(base_year)
+
 
     def get_coord(self, index_ij: np.ndarray, trans):
         """
