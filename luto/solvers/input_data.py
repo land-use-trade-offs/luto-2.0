@@ -557,7 +557,7 @@ def get_limits(
     limits["species_conservation"] = ag_biodiversity.get_species_conservation_limits(data, yr_cal)
 
     limits["snes"] = ag_biodiversity.get_snes_limits(data, yr_cal)
-    limits["ecnes"] = ag_biodiversity.get_snes_limits(data, yr_cal)
+    limits["ecnes"] = ag_biodiversity.get_ecnes_limits(data, yr_cal)
 
     return limits
 

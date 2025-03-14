@@ -1328,6 +1328,58 @@ def write_species_conservation(data: Data, yr_cal: int, path) -> None:
     sc_df.to_csv(os.path.join(path, f'species_conservation_{yr_cal}.csv'), index=True)
 
 
+def write_snes(data: Data, yr_cal: int, path) -> None:
+    if not settings.SNES_CONSTRAINTS == "on":
+        return
+    
+    print(f"Writing species of national environmental significance scores for {yr_cal}")
+    
+    snes_df = pd.DataFrame(index=data.BIO_GBF4A_SEL_SPECIES, columns=["Target", "Actual"])
+
+    x_targets, x_names = ag_biodiversity.get_snes_limits(data, yr_cal)
+
+    if yr_cal == data.YR_CAL_BASE:
+        snes_xr = ag_biodiversity.get_snes_matrix(data, yr_cal)
+        ag_biodiv_degr_j = data.BIODIV_HABITAT_DEGRADE_LOOK_UP
+        snes_prod_data = tools.calc_nes_ag_area_for_year(
+            snes_xr, data.LUMAP, ag_biodiv_degr_j
+        )
+    else:
+        snes_prod_data = data.prod_data[yr_cal]["SNES"] * settings.SPECIES_CONSERVATION_DIV_CONSTANT
+
+    for x, name in x_names.items():
+        snes_df.loc[name, "Target"] = x_targets[x]
+        snes_df.loc[name, "Actual"] = snes_prod_data[x]
+
+    snes_df.to_csv(os.path.join(path, f'snes_{yr_cal}.csv'), index=True)
+
+
+def write_ecnes(data: Data, yr_cal: int, path) -> None:
+    if not settings.ECNES_CONSTRAINTS == "on":
+        return
+    
+    print(f"Writing ecological communities of national environmental significance scores for {yr_cal}")
+    
+    ecnes_df = pd.DataFrame(index=data.BIO_GBF4A_SEL_SPECIES, columns=["Target", "Actual"])
+
+    x_targets, x_names = ag_biodiversity.get_snes_limits(data, yr_cal)
+
+    if yr_cal == data.YR_CAL_BASE:
+        ecnes_xr = ag_biodiversity.get_snes_matrix(data, yr_cal)
+        ag_biodiv_degr_j = data.BIODIV_HABITAT_DEGRADE_LOOK_UP
+        ecnes_prod_data = tools.calc_nes_ag_area_for_year(
+            ecnes_xr, data.LUMAP, ag_biodiv_degr_j
+        )
+    else:
+        ecnes_prod_data = data.prod_data[yr_cal]["ECNES"] * settings.SPECIES_CONSERVATION_DIV_CONSTANT
+
+    for x, name in x_names.items():
+        ecnes_df.loc[name, "Target"] = x_targets[x]
+        ecnes_df.loc[name, "Actual"] = ecnes_prod_data[x]
+
+    ecnes_df.to_csv(os.path.join(path, f'ecnes_{yr_cal}.csv'), index=True)
+
+
 def write_ghg_separate(data: Data, yr_cal, path):
 
     if not settings.GHG_EMISSIONS_LIMITS == 'on':

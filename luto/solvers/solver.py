@@ -954,12 +954,12 @@ class LutoSolver:
             
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
+                    self._input_data.sc_sr[s, ind]
                     * self._input_data.ag_biodiv_degr_j[j]
                     * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
-                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
+                    self._input_data.sc_sr[s, ind]
                     * self._input_data.ag_biodiv_degr_j[j]
                     * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
@@ -968,12 +968,12 @@ class LutoSolver:
 
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
-                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
+                    self._input_data.sc_sr[s, ind]
                     * self._input_data.ag_man_biodiv_impacts[am][j_idx][ind]
                     * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
                 )  # Dryland alt. ag. management contributions
                 + gp.quicksum(
-                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
+                    self._input_data.sc_sr[s, ind]
                     * self._input_data.ag_man_biodiv_impacts[am][j_idx][ind]
                     * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
                 )  # Irrigated alt. ag. management contributions
@@ -983,7 +983,7 @@ class LutoSolver:
 
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
+                    self._input_data.sc_sr[s, ind]
                     * self._input_data.non_ag_biodiv_impact_k[k]
                     * self.X_non_ag_vars_kr[k, ind]
                 )  # Non-agricultural contribution
@@ -991,7 +991,7 @@ class LutoSolver:
             )
 
             # Divide by constant to reduce strain on the constraint matrix range
-            self.species_conservation_exprs[s] = ag_contr + ag_man_contr + non_ag_contr
+            self.species_conservation_exprs[s] = (ag_contr + ag_man_contr + non_ag_contr) / settings.SPECIES_CONSERVATION_DIV_CONSTANT
             constr_area = s_area_lb / settings.SPECIES_CONSERVATION_DIV_CONSTANT
 
             print(f"        ...species {s_names[s]} conservation target area: {s_area_lb:,.0f}")
@@ -1049,16 +1049,17 @@ class LutoSolver:
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            self.snes_exprs[x] = ag_contr + ag_man_contr + non_ag_contr
+            self.snes_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / settings.SPECIES_CONSERVATION_DIV_CONSTANT
+            constr_lb = x_area_lb / (settings.SPECIES_CONSERVATION_DIV_CONSTANT * 1000)
 
             print(f"        ...SNES species {x_names[x]} target: {x_area_lb:,.0f}")
             self.snes_constrs[x] = self.gurobi_model.addConstr(
-                self.snes_exprs[x] >= x_area_lb
+                self.snes_exprs[x] >= constr_lb
             )
 
 
     def _add_ecnes_constraints(self) -> None:
-        if settings.SNES_CONSTRAINTS != "on":
+        if settings.ECNES_CONSTRAINTS != "on":
             print('     ...Ecological Communities of National Environmental Significance constraints TURNED OFF ...')
             return
         
@@ -1107,11 +1108,12 @@ class LutoSolver:
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            self.ecnes_exprs[x] = ag_contr + ag_man_contr + non_ag_contr
+            self.ecnes_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / settings.SPECIES_CONSERVATION_DIV_CONSTANT
+            constr_lb = x_area_lb / (settings.SPECIES_CONSERVATION_DIV_CONSTANT * 1000)
 
             print(f"        ...ECNES community {x_names[x]} target: {x_area_lb:,.0f}")
             self.ecnes_constrs[x] = self.gurobi_model.addConstr(
-                self.ecnes_exprs[x] >= x_area_lb
+                self.ecnes_exprs[x] >= constr_lb
             )
 
 
@@ -1120,6 +1122,8 @@ class LutoSolver:
         self._add_biodiversity_limit_constraints()
         self._add_major_vegetation_group_limit_constraints()
         self._add_species_conservation_constraints()
+        self._add_snes_constraints()
+        self._add_ecnes_constraints()
 
     def update_formulation(
         self,
@@ -1569,9 +1573,13 @@ class LutoSolver:
             prod_data["Species Conservation"] = {
                 s: expr.getValue() for s, expr in self.species_conservation_exprs.items()
             }
-        if self.national_env_significance_exprs:
-            prod_data["National Environmental Significance"] = {
-                z: expr.getValue() for z, expr in self.national_env_significance_exprs.items()
+        if self.snes_exprs:
+            prod_data["SNES"] = {
+                z: expr.getValue() for z, expr in self.snes_exprs.items()
+            }
+        if self.ecnes_exprs:
+            prod_data["ECNES"] = {
+                z: expr.getValue() for z, expr in self.ecnes_exprs.items()
             }
 
         return SolverSolution(
