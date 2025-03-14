@@ -637,7 +637,7 @@ class Data:
         self.AG_MAN_L_MRJ_DICT = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
         self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
         
-        self.calculate_year_productivity(self.YR_CAL_BASE)
+        self.populate_productivity_container(self.YR_CAL_BASE)
 
 
 
@@ -1338,9 +1338,9 @@ class Data:
         print("Data loading complete\n")
         
 
-    def calculate_year_productivity(self, year) -> None:
+    def populate_productivity_container(self, year) -> None:
         """
-        Calculate the year productivity for the containers.
+        Populate the year productivity container.
         """
         print(f"\tCalculating year productivity...", flush=True)
         yr_cal_base_prod_data = self.get_production(year, self.LUMAP, self.LMMAP)
@@ -1364,7 +1364,7 @@ class Data:
         self.ag_dvars[base_year] = self.ag_dvars[year_before_base_year]
         self.non_ag_dvars[base_year] = self.non_ag_dvars[year_before_base_year]
         self.ag_man_dvars[base_year] = self.ag_man_dvars[year_before_base_year]
-        self.calculate_year_productivity(base_year)
+        self.populate_productivity_container(base_year)
 
 
     def get_coord(self, index_ij: np.ndarray, trans):
@@ -1776,6 +1776,7 @@ class Data:
         """
         if yr not in self.prod_data:
             self.prod_data[yr] = {}
+        breakpoint()
         self.prod_data[yr][data_type] = prod_data
 
     def add_obj_vals(self, yr: int, obj_val: float):
