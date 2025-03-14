@@ -114,6 +114,9 @@ def run(
     if base_year < data.YR_CAL_BASE or base_year >= target_year:
         raise ValueError(f"Base year must be >= {data.YR_CAL_BASE} and less than the target year.")
 
+    if not step_size:
+        step_size = 1
+
     if base_year != data.YR_CAL_BASE:
         populate_containers_dynamic_base_year(data, base_year)
         populate_production_data_dynamic_base_year(data, base_year, target_year)
