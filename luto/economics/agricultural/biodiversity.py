@@ -45,7 +45,7 @@ def get_breq_matrices(data: Data):
     for j in range(data.N_AG_LUS):
         b_mrj[:, :, j] = (
             data.BIODIV_RAW_WEIGHTED_LDS -                                                      # Biodiversity score after Late Dry Season (LDS) burning
-            (data.BIODIV_SCORE_RAW_WEIGHTED * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[j]))     # Biodiversity degradation for land-use j
+            (data.BIODIV_SCORE_RAW_WEIGHTED_CRITICAL_AREA * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[j]))     # Biodiversity degradation for land-use j
         ) * data.REAL_AREA    
     
     return b_mrj
@@ -111,7 +111,7 @@ def get_savanna_burning_effect_b_mrj(data: Data):
     new_b_mrj = np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
     eds_sav_burning_biodiv_benefits = np.where( data.SAVBURN_ELIGIBLE, 
-                                                (1 - settings.LDS_BIODIVERSITY_VALUE) * data.BIODIV_SCORE_RAW_WEIGHTED * data.REAL_AREA, 
+                                                (1 - settings.LDS_BIODIVERSITY_VALUE) * data.BIODIV_SCORE_RAW_WEIGHTED_CRITICAL_AREA * data.REAL_AREA, 
                                                 0
                                               )
     

@@ -40,7 +40,7 @@ grid_search = {
     # Working settings for the model run
     ###############################################################
     'MODE': ['timeseries'],                 # 'snapshot' or 'timeseries'
-    'RESFACTOR': [15],
+    'RESFACTOR': [5],
     'WRITE_THREADS': [10],
     'WRITE_OUTPUT_GEOTIFFS': [False],
     'KEEP_OUTPUTS': [True],                 # If false, only keep report HTML
@@ -63,15 +63,18 @@ grid_search = {
     
     # --------------- Water constraints ---------------
     'WATER_CONSTRAINT_TYPE': ['soft'],        # 'hard' or 'soft'
-    'WATER_PENALTY': [1, 100, 500, 1000, 3000, 5000, 10000],
+    'WATER_PENALTY': [1],
+    'INCLUDE_WATER_LICENSE_COSTS': [1],
     
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSTIY_TARGET_GBF_2': ['on'],    # 'on' or 'off'
-    'GBF2_PENALTY': [1, 100, 500, 1000, 3000, 5000, 10000],
+    'GBF2_PENALTY': [10000],
     'BIODIV_GBF_TARGET_2_DICT': [
+        {2010: 0, 2030: 0.0, 2050: 0.0, 2100: 0.0}, 
         {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}, 
-        # {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}
+        {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5},
+        
     ],
     
     
@@ -80,13 +83,8 @@ grid_search = {
     
     # --------------- Biodiversity settings - GBF 4 ---------------
     'BIODIVERSTIY_TARGET_GBF_4': ['off'],   # 'on' or 'off'
-    
-    # --------------- Water settings ---------------
-    'WATER_CONSTRAINT_TYPE': ['hard'],      # 'hard' or 'soft'
-    # 'WATER_PENALTY': [100, 500, 1000, 3000, 5000, 10000],
-    
-    
 
+ 
     ###############################################################
     # Scenario settings for the model run
     ###############################################################

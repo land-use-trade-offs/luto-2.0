@@ -41,8 +41,15 @@ from typing import Any, Literal, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.settings import INPUT_DIR, NO_GO_VECTORS, NVIS_CLASS_DETAIL , NVIS_SPATIAL_DETAIL, OUTPUT_DIR, REGIONAL_ADOPTION_ZONE
 from luto.tools.spatializers import upsample_array
+from luto.settings import (
+    INPUT_DIR, 
+    NO_GO_VECTORS, 
+    NVIS_CLASS_DETAIL , 
+    NVIS_SPATIAL_DETAIL, 
+    OUTPUT_DIR, 
+    REGIONAL_ADOPTION_ZONE, 
+    GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE)
 
 
 
@@ -1054,13 +1061,17 @@ class Data:
         savburn_df = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_savanna_burning.h5') )
 
         # Load the columns as numpy arrays
-        self.SAVBURN_ELIGIBLE = savburn_df.ELIGIBLE_AREA.to_numpy()               # 1 = areas eligible for early dry season savanna burning under the ERF, 0 = ineligible
-        self.SAVBURN_AVEM_CH4_TCO2E_HA = savburn_df.SAV_AVEM_CH4_TCO2E_HA.to_numpy()  # Avoided emissions - methane
-        self.SAVBURN_AVEM_N2O_TCO2E_HA = savburn_df.SAV_AVEM_N2O_TCO2E_HA.to_numpy()  # Avoided emissions - nitrous oxide
-        self.SAVBURN_SEQ_CO2_TCO2E_HA = savburn_df.SAV_SEQ_CO2_TCO2E_HA.to_numpy()    # Additional carbon sequestration - carbon dioxide
+        self.SAVBURN_ELIGIBLE = self.get_array_resfactor_applied(
+            savburn_df.ELIGIBLE_AREA.to_numpy()                                       # 1 = areas eligible for early dry season savanna burning under the ERF, 0 = ineligible          
+        )
         self.SAVBURN_TOTAL_TCO2E_HA = self.get_array_resfactor_applied(
             savburn_df.AEA_TOTAL_TCO2E_HA.to_numpy()
         )
+        
+        # # Avoided emissions from savanna burning
+        # self.SAVBURN_AVEM_CH4_TCO2E_HA = savburn_df.SAV_AVEM_CH4_TCO2E_HA.to_numpy()  # Avoided emissions - methane
+        # self.SAVBURN_AVEM_N2O_TCO2E_HA = savburn_df.SAV_AVEM_N2O_TCO2E_HA.to_numpy()  # Avoided emissions - nitrous oxide
+        # self.SAVBURN_SEQ_CO2_TCO2E_HA = savburn_df.SAV_SEQ_CO2_TCO2E_HA.to_numpy()    # Additional carbon sequestration - carbon dioxide
 
         # Cost per hectare in dollars from settings
         self.SAVBURN_COST_HA = settings.SAVBURN_COST_HA_YR
@@ -1075,6 +1086,24 @@ class Data:
         Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
         in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
         """
+        
+        # Get the biodiversity rank value produced by the Zonation algorithm 
+        GBF2_rank_layer = self.get_array_resfactor_applied(
+            xr.open_dataarray(os.path.join(INPUT_DIR, 'GBF2_conserve_priority.nc')).sel(ssp=f'ssp{settings.SSP}').compute().values
+        )
+        
+        
+        # Get the conservation performance of cumulative area to rank value curve for GBF Target 2
+        # key is the cumulative area (%), value is the rank value. For example, the {5:0.63} means 
+        # that cells with >= 0.63 rank value take up 5% of the total area.
+        conservation_performance_area2contribution_curve = pd.read_excel(
+            os.path.join(INPUT_DIR, 'GBF2_conserve_performance.xlsx'), sheet_name=f'ssp{settings.SSP}'
+        ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
+        
+        
+        # Get the mask for the cells identified as critical areas for conservation
+        self.GBF2_PRIORITY_CONSERVATION_MASK = GBF2_rank_layer >= conservation_performance_area2contribution_curve[settings.GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE]
+        
 
         # Create a dictionary to hold the annual biodiversity target proportion data for GBF Target 2
         f = interp1d(
@@ -1090,45 +1119,32 @@ class Data:
 
         if settings.CONNECTIVITY_SOURCE == 'NCI':
             connectivity_score = biodiv_priorities['DCCEEW_NCI'].to_numpy(dtype = np.float32)
-            connectivity_score = np.where(self.LUMASK, connectivity_score, 1)               # Set the connectivity score to 1 for cells outside the LUMASK
+            connectivity_score = np.where(self.MASK, connectivity_score, 1)               # Set the connectivity score to 1 for cells outside the LUMASK
             connectivity_score = np.interp(connectivity_score, (connectivity_score.min(), connectivity_score.max()), (settings.CONNECTIVITY_LB, 1)).astype('float32')
         elif settings.CONNECTIVITY_SOURCE == 'DWI':
             connectivity_score = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.float32)
             connectivity_score = np.interp(connectivity_score, (connectivity_score.min(), connectivity_score.max()), (1, settings.CONNECTIVITY_LB)).astype('float32')
         elif settings.CONNECTIVITY_SOURCE == 'NONE':
-            connectivity_score = 1
+            connectivity_score = np.ones(self.NCELLS, dtype = np.float32)
         else:
             raise ValueError(f"Invalid connectivity source: {settings.CONNECTIVITY_SOURCE}, must be 'NCI', 'DWI' or 'NONE'")
-
-
-        # Get the Zonation output score between 0 and 1. biodiv_score_raw.sum() = 153 million
-        biodiv_score_raw = biodiv_priorities['BIODIV_PRIORITY_SSP' + str(settings.SSP)].to_numpy(dtype = np.float32)
-        # Weight the biodiversity score by the connectivity score
-        self.BIODIV_SCORE_RAW_WEIGHTED = biodiv_score_raw * connectivity_score
         
+        connectivity_score = self.get_array_resfactor_applied(connectivity_score)
 
-        # Habitat degradation scale for agricultural land-use
-        biodiv_degrade_df = pd.read_csv(os.path.join(INPUT_DIR, 'HABITAT_CONDITION.csv'))                                                               # Load the HCAS percentile data (pd.DataFrame)
 
-        if settings.HABITAT_CONDITION == 'HCAS':
-            '''
-            The degradation weight score of "HCAS" are float values range between 0-1 indicating the suitability for wild animals survival.
-            Here we average this dataset in year 2009, 2010, and 2011, then calculate the percentiles of the average score under each land-use type.
-            '''
-            self.BIODIV_HABITAT_DEGRADE_LOOK_UP = biodiv_degrade_df[['lu', f'PERCENTILE_{settings.HCAS_PERCENTILE}']]                                   # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
-            self.BIODIV_HABITAT_DEGRADE_LOOK_UP = {int(k):v for k,v in dict(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.values).items()}                        # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
-            unalloc_nat_land_bio_score = self.BIODIV_HABITAT_DEGRADE_LOOK_UP[self.DESC2AGLU['Unallocated - natural land']]                              # Get the biodiversity degradation score for unallocated natural land (float)
-            self.BIODIV_HABITAT_DEGRADE_LOOK_UP = {k:v*(1/unalloc_nat_land_bio_score) for k,v in self.BIODIV_HABITAT_DEGRADE_LOOK_UP.items()}           # Normalise the biodiversity degradation score to the unallocated natural land score
-
-        elif settings.HABITAT_CONDITION == 'USER_DEFINED':
-            self.BIODIV_HABITAT_DEGRADE_LOOK_UP = biodiv_degrade_df[['lu', 'USER_DEFINED']]
-            self.BIODIV_HABITAT_DEGRADE_LOOK_UP = {int(k):v for k,v in dict(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.values).items()}                        # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
-
-        else:
-            raise ValueError(f"Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
-
-        # Round degradation figures to avoid numerical issues in Gurobi
-        self.BIODIV_HABITAT_DEGRADE_LOOK_UP = {
+        # Get the raw biodiversity priority score
+        biodiv_score_raw = self.get_array_resfactor_applied(
+            biodiv_priorities['BIODIV_PRIORITY_SSP' + str(settings.SSP)].to_numpy(dtype = np.float32)
+        )
+        # Weight the biodiversity score by the connectivity score
+        self.BIODIV_SCORE_RAW_WEIGHTED_CRITICAL_AREA = biodiv_score_raw * connectivity_score * self.GBF2_PRIORITY_CONSERVATION_MASK
+        self.BIODIV_SCORE_RAW_WEIGHTED_CRITICAL_AREA = self.BIODIV_SCORE_RAW_WEIGHTED_CRITICAL_AREA * self.GBF2_PRIORITY_CONSERVATION_MASK
+        
+        # Get the habitat degradation look-up table
+        self.BIODIV_HABITAT_DEGRADE_LOOK_UP = pd.read_csv(os.path.join(INPUT_DIR, 'BIODIV_HABITAT_DEGRADE_LOOK_UP.csv'))\
+            .set_index('lu')['RETAIN_RATION_AFTER_DEGRADATE'].to_dict()
+        
+        self.BIODIV_HABITAT_DEGRADE_LOOK_UP = {         # Round degradation figures to avoid numerical issues in Gurobi
             j: round(x, settings.ROUND_DECMIALS) 
             for j, x in self.BIODIV_HABITAT_DEGRADE_LOOK_UP.items()
         }
@@ -1138,24 +1154,26 @@ class Data:
         The degradation scores are float values range between 0-1 indicating the discount of biodiversity value for each cell.
         E.g., 0.8 means the biodiversity value of the cell is 80% of the original raw biodiversity value.
         '''
-        self.BIODIV_DEGRADE_LDS = np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)                                           # Get the biodiversity degradation score for LDS burning (1D numpy array)
-        biodiv_degrade_habitat = np.vectorize(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.get)(self.LUMAP_NO_RESFACTOR).astype(np.float32)              # Get the biodiversity degradation score for each cell (1D numpy array)
+        self.BIODIV_DEGRADE_LDS = np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)                                                   # Get the biodiversity degradation score for LDS burning (1D numpy array)
+        biodiv_degrade_habitat = np.vectorize(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.get, otypes=[float])(self.LUMAP).astype(np.float32)                   # Get the biodiversity degradation score for each cell (1D numpy array)
 
-        # Get the biodiversity damage under LDS burning (0-1) for each cell
-        biodiv_degradation_raw_weighted_LDS = self.BIODIV_SCORE_RAW_WEIGHTED * (1 - self.BIODIV_DEGRADE_LDS)                                    # Biodiversity damage under LDS burning (1D numpy array)
-        biodiv_degradation_raw_weighted_habitat = self.BIODIV_SCORE_RAW_WEIGHTED * (1 - biodiv_degrade_habitat)                                 # Biodiversity damage under under HCAS (1D numpy array)
+        # Get the biodiversity damage under LDS burning and land-use change
+        biodiv_degradation_raw_weighted_LDS = self.BIODIV_SCORE_RAW_WEIGHTED_CRITICAL_AREA * (1 - self.BIODIV_DEGRADE_LDS)                                            # Biodiversity damage under LDS burning (1D numpy array)
+        biodiv_degradation_raw_weighted_habitat = self.BIODIV_SCORE_RAW_WEIGHTED_CRITICAL_AREA * (1 - biodiv_degrade_habitat)                                         # Biodiversity damage under under HCAS (1D numpy array)
 
-        # Get the biodiversity value at the beginning of the simulation                 
-        self.BIODIV_RAW_WEIGHTED_LDS = self.BIODIV_SCORE_RAW_WEIGHTED - biodiv_degradation_raw_weighted_LDS                                     # Biodiversity value under LDS burning (1D numpy array); will be used as base score for calculating ag/non-ag stratagies impacts on biodiversity
-        biodiv_base_yr_val = self.BIODIV_RAW_WEIGHTED_LDS - biodiv_degradation_raw_weighted_habitat                                             # Biodiversity value at the beginning year (1D numpy array)
-        self.BIODIV_BASE_YR_VAL_SUM = np.nansum(biodiv_base_yr_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK])                     # Sum the biodiversity value within the LUMASK
-        self.BIODIV_BASE_YR_VAL_EACH_LU = np.bincount(                                                                                          # Sum the biodiversity value within each land-use type
-            self.LUMAP_NO_RESFACTOR[self.LUMASK], 
-            weights=biodiv_base_yr_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK]
-        ) 
+        # Get the biodiversity value at the beginning of the simulation
+        self.BIODIV_RAW_WEIGHTED_LDS = self.BIODIV_SCORE_RAW_WEIGHTED_CRITICAL_AREA - biodiv_degradation_raw_weighted_LDS                                             # Biodiversity value under LDS burning (1D numpy array); will be used as base score for calculating ag/non-ag stratagies impacts on biodiversity
+        biodiv_base_yr_val = self.BIODIV_RAW_WEIGHTED_LDS - biodiv_degradation_raw_weighted_habitat                                                     # Biodiversity value at the beginning year (1D numpy array)
         
-        # Apply the resfactor to the biodiversity degradation scores
-        self.BIODIV_DEGRADE_LDS = self.get_array_resfactor_applied(self.BIODIV_DEGRADE_LDS)                 
+        # Get the retain value after degradation at the beginning of the simulation
+        self.BIODIV_BASE_YR_VAL_SUM = np.nansum(                                                                                                        # Sum the biodiversity value within the LUMASK
+            biodiv_base_yr_val[self.GBF2_PRIORITY_CONSERVATION_MASK] * self.REAL_AREA[self.GBF2_PRIORITY_CONSERVATION_MASK]
+        )                            
+        self.BIODIV_BASE_YR_VAL_EACH_LU = np.bincount(                                                                                                  # Sum the biodiversity value within each land-use type
+            self.LUMAP[self.GBF2_PRIORITY_CONSERVATION_MASK], 
+            weights=biodiv_base_yr_val[self.GBF2_PRIORITY_CONSERVATION_MASK] * self.REAL_AREA[self.GBF2_PRIORITY_CONSERVATION_MASK],
+            minlength=self.N_AG_LUS
+        ) 
         
 
         # Biodiversity values need to be restored under the GBF Target 2                    
@@ -1167,7 +1185,9 @@ class Data:
             biodiv_degradation_raw_weighted_LDS +                                                                                               # Biodiversity degradation from LDS burning
             biodiv_degradation_raw_weighted_habitat                                                                                             # Biodiversity degradation from HCAS
         )
-        self.BIODIV_BASE_YR_DEGRADATION = np.nansum(biodiv_degradation_base_yr_val[self.LUMASK] * self.REAL_AREA_NO_RESFACTOR[self.LUMASK])     # Sum the biodiversity degradation value within the LUMASK
+        self.BIODIV_BASE_YR_DEGRADATION = np.nansum(                                                                                            # Sum the biodiversity degradation value within the LUMASK
+            biodiv_degradation_base_yr_val[self.GBF2_PRIORITY_CONSERVATION_MASK] * self.REAL_AREA[self.GBF2_PRIORITY_CONSERVATION_MASK]
+        )     
 
         # Multiply by biodiversity target to get the additional biodiversity score required to achieve the target
         self.BIODIV_GBF_TARGET_2 = {
@@ -1327,13 +1347,6 @@ class Data:
         self.BECCS_REV_MULTS = pd.read_excel(cost_mult_excel, "BECCS revenue multiplier", index_col="Year")["BECCS_revenue_multiplier"].to_dict()
         self.FENCE_COST_MULTS = pd.read_excel(cost_mult_excel, "Fencing cost multiplier", index_col="Year")["Fencing_cost_multiplier"].to_dict()
 
-
-        ###############################################################
-        # Apply resfactor to various arrays required for data loading.
-        ###############################################################
-        self.SAVBURN_ELIGIBLE = self.get_array_resfactor_applied(self.SAVBURN_ELIGIBLE)
-        self.BIODIV_SCORE_RAW_WEIGHTED = self.get_array_resfactor_applied(self.BIODIV_SCORE_RAW_WEIGHTED)
-        self.BIODIV_RAW_WEIGHTED_LDS = self.get_array_resfactor_applied(self.BIODIV_RAW_WEIGHTED_LDS)
 
         print("Data loading complete\n")
         

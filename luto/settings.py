@@ -431,6 +431,23 @@ BIODIV_GBF_TARGET_2_DICT = {
 
 # GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
 GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
+'''
+The constraint type for the biodiversity target.
+- 'hard' adds biodiversity limits as a constraint in the solver (linear programming approach)
+- 'soft' adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
+'''
+
+GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE = 100
+'''
+Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
+more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 
+For example, cells with rank between 0.9-1.0 only cover 20% of the area but contribute to 40% of the biodiversity benefits.
+
+By sorting the rank values from high to low and plot the cumulative area and cumulative biodiversity benefits,
+we can get the a curve that shows the relationship between the area and the biodiversity benefits. In LUTO, we normalise
+the area and biodiversity benefits between 0-100, and use the `GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE` as the threshold
+to identify the critical area that should be conserved to achieve the biodiversity target.
+'''
 
 
 GBF2_PENALTY = 1e4
