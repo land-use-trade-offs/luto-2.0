@@ -585,8 +585,14 @@ def create_new_dataset():
     ############### Forest and reforestation data
 
     # Carbon stock in mature forest on natural land and save to file
-    s = pd.DataFrame(columns=['REMNANT_VEG_T_CO2_HA'])
-    s['REMNANT_VEG_T_CO2_HA'] = bioph['REMNANT_VEG_T_CO2_HA']
+    # s = pd.DataFrame(columns=['REMNANT_VEG_T_CO2_HA'])
+    # s['REMNANT_VEG_T_CO2_HA'] = bioph['REMNANT_VEG_T_CO2_HA']
+    # s.to_hdf(outpath + 'natural_land_t_co2_ha.h5', key = 'natural_land_t_co2_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    
+    s = pd.DataFrame(columns=['NATURAL_LAND_AGB_TCO2_HA', 'NATURAL_LAND_AGB_DEBRIS_TCO2_HA', 'NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'])
+    s['NATURAL_LAND_AGB_TCO2_HA'] = bioph['NATURAL_LAND_AGB_TCO2_HA']
+    s['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] = bioph['NATURAL_LAND_AGB_DEBRIS_TCO2_HA']
+    s['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] = bioph['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA']
     s.to_hdf(outpath + 'natural_land_t_co2_ha.h5', key = 'natural_land_t_co2_ha', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
     # Average annual carbon sequestration by Environmental Plantings (block plantings) and save to file
@@ -626,15 +632,15 @@ def create_new_dataset():
     s['HIR_BLOCK_BG_AVG_T_CO2_HA_YR'] = bioph['HIR_BLOCK_SOIL_AVG_T_CO2_HA_YR']
     s.to_hdf(outpath + 'hir_block_avg_t_co2_ha_yr.h5', key = 'hir_block_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
-    # Average annual carbon sequestration by Human Induced Regrowth (riparian plantings) and save to file
-    s = pd.DataFrame(columns=['HIR_RIP_AG_AVG_T_CO2_HA_YR', 'HIR_RIP_BG_AVG_T_CO2_HA_YR'])
-    s['HIR_RIP_AG_AVG_T_CO2_HA_YR'] = bioph.eval('HIR_RIP_TREES_AVG_T_CO2_HA_YR + HIR_RIP_DEBRIS_AVG_T_CO2_HA_YR')
-    s['HIR_RIP_BG_AVG_T_CO2_HA_YR'] = bioph['HIR_RIP_SOIL_AVG_T_CO2_HA_YR']
-    s.to_hdf(outpath + 'hir_rip_avg_t_co2_ha_yr.h5', key = 'hir_rip_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
+    # # Average annual carbon sequestration by Human Induced Regrowth (riparian plantings) and save to file
+    # s = pd.DataFrame(columns=['HIR_RIP_AG_AVG_T_CO2_HA_YR', 'HIR_RIP_BG_AVG_T_CO2_HA_YR'])
+    # s['HIR_RIP_AG_AVG_T_CO2_HA_YR'] = bioph.eval('HIR_RIP_TREES_AVG_T_CO2_HA_YR + HIR_RIP_DEBRIS_AVG_T_CO2_HA_YR')
+    # s['HIR_RIP_BG_AVG_T_CO2_HA_YR'] = bioph['HIR_RIP_SOIL_AVG_T_CO2_HA_YR']
+    # s.to_hdf(outpath + 'hir_rip_avg_t_co2_ha_yr.h5', key = 'hir_rip_avg_t_co2_ha_yr', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
-    # MASK for Human Induced Regrowth (riparian plantings) and save to file
-    hir_mask = bioph['AVG_AN_PREC_MM_YR'] <= 300
-    np.save(outpath + 'hir_mask.npy', hir_mask.values)  # shape: (6956407,)
+    # # MASK for Human Induced Regrowth (riparian plantings) and save to file
+    # hir_mask = bioph['AVG_AN_PREC_MM_YR'] <= 300
+    # np.save(outpath + 'hir_mask.npy', hir_mask.values)  # shape: (6956407,)
 
     # Fire risk low, medium, and high and save to file
     s = bioph[['FD_RISK_PERC_5TH', 'FD_RISK_MEDIAN', 'FD_RISK_PERC_95TH']].copy()
