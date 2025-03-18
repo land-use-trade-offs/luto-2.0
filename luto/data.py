@@ -21,7 +21,7 @@
 
 
 import os
-import h5py, netCDF4
+import h5py
 import xarray as xr
 import numpy as np
 import pandas as pd
@@ -132,6 +132,7 @@ class Data:
         """
         # Path for write module - overwrite when provided with a base and target year
         self.path = None
+        self.path_begin_end_compare = None
         # Timestamp of simulation to which this object belongs - will be updated each time a simulation
         # is run using this Data object.
         self.timestamp_sim = timestamp
@@ -150,8 +151,6 @@ class Data:
         print('Beginning data initialisation...')
 
         self.YR_CAL_BASE = 2010  # The base year, i.e. where year index yr_idx == 0.
-
-
 
         ###############################################################
         # Masking and spatial coarse graining.
@@ -433,13 +432,21 @@ class Data:
         print("\tLoading no-go areas and regional adoption zones...", flush=True)
    
         ##################### No-go areas
-        self.NO_GO_LANDUSE = settings.NO_GO_VECTORS.keys()
-        for lu in self.NO_GO_LANDUSE:
-            if not lu in self.AGRICULTURAL_LANDUSES + self.NON_AGRICULTURAL_LANDUSES:
+        self.NO_GO_LANDUSE_AG = []
+        self.NO_GO_LANDUSE_NON_AG = []
+
+        for lu in settings.NO_GO_VECTORS.keys():
+            if lu in self.AGRICULTURAL_LANDUSES:
+                self.NO_GO_LANDUSE_AG.append(lu)
+            elif lu in self.NON_AGRICULTURAL_LANDUSES:
+                self.NO_GO_LANDUSE_NON_AG.append(lu)
+            else:
                 raise KeyError(f"Land use '{lu}' in no-go area vector does not match any land use in the model.")
 
-        no_go_arrs = []
-        for no_ag_lu, no_go_path in NO_GO_VECTORS.items():
+        no_go_arrs_ag = []
+        no_go_arrs_non_ag = []
+
+        for lu, no_go_path in NO_GO_VECTORS.items():
             # Read the no-go area shapefile
             no_go_shp = gpd.read_file(no_go_path)
             # Check if the CRS is defined
@@ -457,10 +464,14 @@ class Data:
                     fill=0,
                     dtype=np.int16
                 )
-                # Add the no-go area to the list
-                no_go_arrs.append(no_go_arr[np.nonzero(src_arr)].astype(np.bool_))
-       
-        self.NO_GO_REGION = np.stack(no_go_arrs, axis=0)[:, self.MASK]
+                # Add the no-go area to the ag or non_ag list.
+                if lu in self.NO_GO_LANDUSE_AG:
+                    no_go_arrs_ag.append(no_go_arr[np.nonzero(src_arr)].astype(np.bool_))
+                elif lu in self.NO_GO_LANDUSE_NON_AG:
+                    no_go_arrs_non_ag.append(no_go_arr[np.nonzero(src_arr)].astype(np.bool_))
+
+        self.NO_GO_REGION_AG = np.stack(no_go_arrs_ag, axis=0)[:, self.MASK]
+        self.NO_GO_REGION_NON_AG = np.stack(no_go_arrs_non_ag, axis=0)[:, self.MASK]
         
 
         
@@ -640,7 +651,7 @@ class Data:
         self.AG_MAN_L_MRJ_DICT = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
         self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
         
-        print("\tCalculating base year productivity...", flush=True)
+        print(f"\tCalculating year productivity...", flush=True)
         yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)
         self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
 
@@ -1360,8 +1371,7 @@ class Data:
         self.FENCE_COST_MULTS = pd.read_excel(cost_mult_excel, "Fencing cost multiplier", index_col="Year")["Fencing_cost_multiplier"].to_dict()
 
 
-        print("Data loading complete\n")
-        
+        print("Data loading complete\n")        
 
     def get_coord(self, index_ij: np.ndarray, trans):
         """
@@ -1781,14 +1791,14 @@ class Data:
         """
         self.obj_vals[yr] = obj_val
 
-    def set_path(self, base_year, target_year) -> str:
+    def set_path(self, base_year, target_year, step_size, years) -> str:
         """Create a folder for storing outputs and return folder name."""
 
         # Get the years to write
         if settings.MODE == "snapshot":
             yr_all = [base_year, target_year]
         elif settings.MODE == "timeseries":
-            yr_all = list(range(base_year, target_year + 1))
+            yr_all = list(range(base_year, target_year + 1, step_size))
 
         # Create path name
         self.path = f"{OUTPUT_DIR}/{self.timestamp_sim}_RF{settings.RESFACTOR}_{yr_all[0]}-{yr_all[-1]}_{settings.MODE}"
@@ -1802,14 +1812,14 @@ class Data:
 
         # Add the path for the comparison between base-year and target-year if in the timeseries mode
         if settings.MODE == "timeseries":
-            path_begin_end_compare = f"{self.path}/begin_end_compare_{yr_all[0]}_{yr_all[-1]}"
+            self.path_begin_end_compare = f"{self.path}/begin_end_compare_{yr_all[0]}_{yr_all[-1]}"
             paths = (
                 paths
-                + [path_begin_end_compare]
+                + [self.path_begin_end_compare]
                 + [
-                    f"{path_begin_end_compare}/out_{yr_all[0]}",
-                    f"{path_begin_end_compare}/out_{yr_all[-1]}",
-                    f"{path_begin_end_compare}/out_{yr_all[-1]}/lucc_separate",
+                    f"{self.path_begin_end_compare}/out_{yr_all[0]}",
+                    f"{self.path_begin_end_compare}/out_{yr_all[-1]}",
+                    f"{self.path_begin_end_compare}/out_{yr_all[-1]}/lucc_separate",
                 ]
             )
 
