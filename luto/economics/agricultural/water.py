@@ -168,7 +168,7 @@ def get_asparagopsis_effect_w_mrj(data: Data, yr_idx):
 
     # Update values in the new matrix using the correct multiplier for each LU
     for lu_idx, lu in enumerate(land_uses):
-        multiplier = data.ASPARAGOPSIS_DATA[lu].loc[yr_cal, "Water Impacts"]
+        multiplier = data.ASPARAGOPSIS_DATA[lu].loc[yr_cal, "Water_use"]
         if multiplier != 1:
             j = lu_codes[lu_idx]
             # The effect is: new value = old value * multiplier - old value

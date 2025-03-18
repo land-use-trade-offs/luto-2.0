@@ -113,8 +113,7 @@ def write_data(data: Data):
     
     # Write the area/quantity comparison between base-year and target-year for the timeseries mode
     if complete_simulation:
-        begin_end_path = f"{data.path}/begin_end_compare_{years[0]}_{years[-1]}"
-        jobs += [delayed(write_output_single_year)(data, years[-1], f"{begin_end_path}/out_{years[-1]}", years[0])] if settings.MODE == 'timeseries' else []
+        jobs += [delayed(write_output_single_year)(data, years[-1], f"{data.path_begin_end_compare}/out_{years[-1]}", years[0])] if settings.MODE == 'timeseries' else []
     else:
         print(f'''The target year is not the last year in the simulation!
                   Only Writing the avaliable outputs ({years[0]}-{years[-1]}) to output directory.\n''')
@@ -125,7 +124,7 @@ def write_data(data: Data):
 
     # Copy the base-year outputs to the path_begin_end_compare
     if complete_simulation:
-        shutil.copytree(f"{data.path}/out_{years[0]}", f"{begin_end_path}/out_{years[0]}", dirs_exist_ok = True) if settings.MODE == 'timeseries' else None
+        shutil.copytree(f"{data.path}/out_{years[0]}", f"{data.path_begin_end_compare}/out_{years[0]}", dirs_exist_ok = True) if settings.MODE == 'timeseries' else None
     
     # Create the report HTML and png maps
     TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
@@ -1024,7 +1023,6 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
     if not settings.BIODIVERSTIY_TARGET_GBF_3 == 'on':
         return
     
-    yr_idx = yr_cal - data.YR_CAL_BASE
     veg_base_score_score = pd.DataFrame({
         'vg': data.BIO_GBF3_ID2DESC.values(), 
         'BASE_OUTSIDE_SCORE': data.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO, 
