@@ -21,7 +21,7 @@
 
 
 import os
-import h5py, netCDF4
+import h5py
 import xarray as xr
 import numpy as np
 import pandas as pd
@@ -433,13 +433,21 @@ class Data:
         print("\tLoading no-go areas and regional adoption zones...", flush=True)
    
         ##################### No-go areas
-        self.NO_GO_LANDUSE = settings.NO_GO_VECTORS.keys()
-        for lu in self.NO_GO_LANDUSE:
-            if not lu in self.AGRICULTURAL_LANDUSES + self.NON_AGRICULTURAL_LANDUSES:
+        self.NO_GO_LANDUSE_AG = []
+        self.NO_GO_LANDUSE_NON_AG = []
+
+        for lu in settings.NO_GO_VECTORS.keys():
+            if lu in self.AGRICULTURAL_LANDUSES:
+                self.NO_GO_LANDUSE_AG.append(lu)
+            elif lu in self.NON_AGRICULTURAL_LANDUSES:
+                self.NO_GO_LANDUSE_NON_AG.append(lu)
+            else:
                 raise KeyError(f"Land use '{lu}' in no-go area vector does not match any land use in the model.")
 
-        no_go_arrs = []
-        for no_ag_lu, no_go_path in NO_GO_VECTORS.items():
+        no_go_arrs_ag = []
+        no_go_arrs_non_ag = []
+
+        for lu, no_go_path in NO_GO_VECTORS.items():
             # Read the no-go area shapefile
             no_go_shp = gpd.read_file(no_go_path)
             # Check if the CRS is defined
@@ -457,10 +465,14 @@ class Data:
                     fill=0,
                     dtype=np.int16
                 )
-                # Add the no-go area to the list
-                no_go_arrs.append(no_go_arr[np.nonzero(src_arr)].astype(np.bool_))
-       
-        self.NO_GO_REGION = np.stack(no_go_arrs, axis=0)[:, self.MASK]
+                # Add the no-go area to the ag or non_ag list.
+                if lu in self.NO_GO_LANDUSE_AG:
+                    no_go_arrs_ag.append(no_go_arr[np.nonzero(src_arr)].astype(np.bool_))
+                elif lu in self.NO_GO_LANDUSE_NON_AG:
+                    no_go_arrs_non_ag.append(no_go_arr[np.nonzero(src_arr)].astype(np.bool_))
+
+        self.NO_GO_REGION_AG = np.stack(no_go_arrs_ag, axis=0)[:, self.MASK]
+        self.NO_GO_REGION_NON_AG = np.stack(no_go_arrs_non_ag, axis=0)[:, self.MASK]
         
 
         

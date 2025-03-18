@@ -1217,6 +1217,12 @@ def get_exclude_matrices(data: Data, ag_x_mrj, lumap) -> np.ndarray:
     if NON_AG_LAND_USES['BECCS']:
         non_ag_x_matrices['BECCS'] = get_exclusions_beccs(data, lumap)
 
+    if settings.EXCLUDE_NO_GO_LU:
+        no_go_regions = data.NO_GO_REGION_NON_AG
+        for count, desc in enumerate(data.NO_GO_LANDUSE_NON_AG):
+            if desc in non_ag_x_matrices.keys():
+                non_ag_x_matrices[desc] *= no_go_regions[count]
+
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     non_ag_x_matrices = [array.reshape((data.NCELLS, 1)) for array in non_ag_x_matrices.values()]
     return np.concatenate(non_ag_x_matrices, axis=1).astype(np.float32)
