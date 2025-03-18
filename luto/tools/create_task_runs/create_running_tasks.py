@@ -39,6 +39,7 @@ grid_search = {
     ###############################################################
     # Working settings for the model run
     ###############################################################
+    'OBJECTIVE': ['maxprofit'],             # 'maxprofit' or 'maxutility'
     'MODE': ['timeseries'],                 # 'snapshot' or 'timeseries'
     'RESFACTOR': [5],
     'WRITE_THREADS': [10],
@@ -76,8 +77,7 @@ grid_search = {
         {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5},
         
     ],
-    
-    
+
     # --------------- Biodiversity settings - GBF 3 ---------------
     'BIODIVERSTIY_TARGET_GBF_3': ['off'],   # 'on' or 'off'
     
