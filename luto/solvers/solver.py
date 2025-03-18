@@ -1050,7 +1050,7 @@ class LutoSolver:
             )
 
             self.snes_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / settings.SPECIES_CONSERVATION_DIV_CONSTANT
-            constr_lb = x_area_lb / (settings.SPECIES_CONSERVATION_DIV_CONSTANT * 1000)
+            constr_lb = x_area_lb / (settings.SPECIES_CONSERVATION_DIV_CONSTANT)
 
             print(f"        ...SNES species {x_names[x]} target: {x_area_lb:,.0f}")
             self.snes_constrs[x] = self.gurobi_model.addConstr(
