@@ -933,10 +933,10 @@ class Data:
         )
 
         # Get the carbon emissions from the one natural land to another
-        self.GHG_PENALTY_UNALL_NATURAL_TO_MODIFIED = self.get_array_resfactor_applied(co2e_stock_unall_natural)
-        self.GHG_PENALTY_UNALL_NATURAL_TO_LVSTK_NATURAL = self.get_array_resfactor_applied(co2e_stock_unall_natural - co2e_stock_lvstk_natural)
-        self.GHG_PENALTY_LVSTK_NATURAL_TO_UNALL_NATURAL = self.get_array_resfactor_applied(co2e_stock_lvstk_natural - co2e_stock_unall_natural)
-        self.GHG_PENALTY_LVSTK_NATURAL_TO_MODIFIED = self.get_array_resfactor_applied(co2e_stock_lvstk_natural)
+        self.GHG_PENALTY_UNALL_NATURAL_TO_MODIFIED = self.get_array_resfactor_applied(co2e_stock_unall_natural)                                  # Carbon stored in biomass emitted instantly and completely 
+        self.GHG_PENALTY_UNALL_NATURAL_TO_LVSTK_NATURAL = self.get_array_resfactor_applied(co2e_stock_unall_natural - co2e_stock_lvstk_natural)  # Carbon stored in biomass emitted instantly and completely 
+        self.GHG_PENALTY_LVSTK_NATURAL_TO_UNALL_NATURAL = self.get_array_resfactor_applied(co2e_stock_lvstk_natural - co2e_stock_unall_natural)  # Carbon accrues over time
+        self.GHG_PENALTY_LVSTK_NATURAL_TO_MODIFIED = self.get_array_resfactor_applied(co2e_stock_lvstk_natural)                                  # Carbon stored in biomass emitted instantly and completely 
 
 
 
@@ -948,7 +948,7 @@ class Data:
         # Load demand data (actual production (tonnes, ML) by commodity) - from demand model
         dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
 
-        # Select the demand data under the running scenario
+        # Select the demand data under the running scenariobbryan-January
         self.DEMAND_DATA = dd.loc[(settings.SCENARIO,
                                    settings.DIET_DOM,
                                    settings.DIET_GLOB,
