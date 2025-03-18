@@ -160,6 +160,7 @@ THREADS = 32
 # No-Go areas; Regional adoption constraints
 # ---------------------------------------------------------------------------- #
 
+EXCLUDE_NO_GO_LU = True
 NO_GO_VECTORS = {
     'Winter cereals':           f'{os.path.abspath(INPUT_DIR)}/no_go_areas/no_go_Winter_cereals.shp',
     'Environmental Plantings':  f'{os.path.abspath(INPUT_DIR)}/no_go_areas/no_go_Enviornmental_Plantings.shp'
