@@ -21,7 +21,7 @@
 
 
 import os
-import h5py, netCDF4
+import h5py
 import xarray as xr
 import numpy as np
 import pandas as pd
@@ -240,7 +240,7 @@ class Data:
 
         # Construct land-use index dictionary (distinct from LU_IDs!)
         self.AGLU2DESC = {i: lu for i, lu in enumerate(self.AGRICULTURAL_LANDUSES)}
-        self.DESC2AGLU = {value: key for key, value in self.AGLU2DESC.items()} ## Get from string name to j number.
+        self.DESC2AGLU = {value: key for key, value in self.AGLU2DESC.items()}
         self.AGLU2DESC[-1] = 'Non-agricultural land'
 
         # Some useful sub-sets of the land uses.
