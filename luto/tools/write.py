@@ -980,22 +980,22 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
 
     # Get the base year biodiversity scores
-    base_yr_bio_score = pd.DataFrame({'lu': data.AGRICULTURAL_LANDUSES, 'BASE_AREA_WEIGHTED_SCORE': data.BIODIV_BASE_YR_VAL_EACH_LU})
+    base_yr_bio_score = pd.DataFrame({'lu': data.AGRICULTURAL_LANDUSES, 'BASE_AREA_WEIGHTED_SCORE': data.BIO_BASE_YR_AREA_WEIGHTED_SUM_EACH_LU})
 
-    # Calculate the biodiversity scores; Divide by data.BIODIV_BASE_YR_DEGRADATION (total biodiversity degradation in base year) to get the relative contribution
+    # Calculate the biodiversity scores; Divide by data.BIO_BASE_YR_LOSS (total biodiversity degradation in base year) to get the relative contribution
     GBF2_ag = (ag_dvar_mrj * ag_biodiv_mrj
     ).sum(['cell','lm']).to_dataframe('Area Weighted Score (ha)').reset_index().merge(base_yr_bio_score, on='lu').assign(
-        Relative_Contribution_Percentage = lambda x:( (x['Area Weighted Score (ha)'] - x['BASE_AREA_WEIGHTED_SCORE'] ) / data.BIODIV_BASE_YR_DEGRADATION  * 100)
+        Relative_Contribution_Percentage = lambda x:( (x['Area Weighted Score (ha)'] - x['BASE_AREA_WEIGHTED_SCORE'] ) / data.BIO_BASE_YR_LOSS  * 100)
     )
 
     GBF2_non_ag = (non_ag_dvar_rk * non_ag_biodiv_rk 
     ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().assign(
-        Relative_Contribution_Percentage = lambda x:( x['Area Weighted Score (ha)'] / data.BIODIV_BASE_YR_DEGRADATION * 100)
+        Relative_Contribution_Percentage = lambda x:( x['Area Weighted Score (ha)'] / data.BIO_BASE_YR_LOSS * 100)
     )
 
     GBF2_am = (ag_mam_dvar_mrj * am_biodiv_mrj
     ).sum(['cell','lm'], skipna=False).to_dataframe('Area Weighted Score (ha)').reset_index().merge(base_yr_bio_score, on='lu', how='left').assign(
-        Relative_Contribution_Percentage = lambda x:( x['Area Weighted Score (ha)'] / data.BIODIV_BASE_YR_DEGRADATION * 100)
+        Relative_Contribution_Percentage = lambda x:( x['Area Weighted Score (ha)'] / data.BIO_BASE_YR_LOSS * 100)
     ).dropna()
 
 

@@ -44,8 +44,8 @@ def get_breq_matrices(data: Data):
 
     for j in range(data.N_AG_LUS):
         b_mrj[:, :, j] = (
-            data.BIODIV_RAW_WEIGHTED_LDS -                                                      # Biodiversity score after Late Dry Season (LDS) burning
-            (data.BIODIV_SCORE_RAW_WEIGHTED_CRITICAL_AREA * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[j]))     # Biodiversity degradation for land-use j
+            data.BIO_BASE_YR_AFTER_LDS -                                                      # Biodiversity score after Late Dry Season (LDS) burning
+            (data.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[j]))     # Biodiversity degradation for land-use j
         ) * data.REAL_AREA    
     
     return b_mrj
@@ -111,7 +111,7 @@ def get_savanna_burning_effect_b_mrj(data: Data):
     new_b_mrj = np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
     eds_sav_burning_biodiv_benefits = np.where( data.SAVBURN_ELIGIBLE, 
-                                                (1 - settings.LDS_BIODIVERSITY_VALUE) * data.BIODIV_SCORE_RAW_WEIGHTED_CRITICAL_AREA * data.REAL_AREA, 
+                                                (1 - settings.LDS_BIODIVERSITY_VALUE) * data.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * data.REAL_AREA, 
                                                 0
                                               )
     
@@ -220,7 +220,7 @@ def get_major_vegetation_matrices(data: Data) -> np.ndarray:
 def get_species_conservation_matrix(data: Data, target_year: int):
     return (
         data.get_GBF4A_bio_layers_by_yr(target_year)
-        * data.BIODIV_DEGRADE_LDS
+        * data.BIO_RETAIN_FRACTION_LDS
         * data.REAL_AREA
     )
 
@@ -260,7 +260,7 @@ def get_ag_management_biodiversity_impacts(
             for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing'])
         },
         'Savanna Burning': {
-            j_idx: 1 - data.BIODIV_DEGRADE_LDS.astype(np.float32)
+            j_idx: 1 - data.BIO_RETAIN_FRACTION_LDS.astype(np.float32)
             for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
         },
         'AgTech EI': {

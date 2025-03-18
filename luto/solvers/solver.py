@@ -284,8 +284,8 @@ class LutoSolver:
         # Get the objective values matrices for each sector
         ag_obj_mrj, non_ag_obj_rk, ag_man_objs = self._input_data.economic_contr_mrj
 
-        # Production costs + transition costs for all agricultural land uses.
-        ag_obj_contr = gp.quicksum(
+        # Get economic contributions
+        economy_ag_contr = gp.quicksum(
             ag_obj_mrj[0, self._input_data.ag_lu2cells[0, j], j]
             @ self.X_ag_dry_vars_jr[j, self._input_data.ag_lu2cells[0, j]]
             + ag_obj_mrj[1, self._input_data.ag_lu2cells[1, j], j]
@@ -293,8 +293,7 @@ class LutoSolver:
             for j in range(self._input_data.n_ag_lus)
         )
 
-        # Effects on production costs + transition costs for alternative agr. management options
-        ag_man_obj_contr = gp.quicksum(
+        economy_ag_man_contr = gp.quicksum(
             ag_man_objs[am][0, self._input_data.ag_lu2cells[0, j], j_idx]
             @ self.X_ag_man_dry_vars_jr[am][j_idx, self._input_data.ag_lu2cells[0, j]]
             + ag_man_objs[am][1, self._input_data.ag_lu2cells[1, j], j_idx]
@@ -303,23 +302,64 @@ class LutoSolver:
             for j_idx, j in enumerate(am_j_list)
         )
 
-        # Production costs + transition costs for all non-agricultural land uses.
-        non_ag_obj_contr = gp.quicksum(
+        economy_non_ag_contr = gp.quicksum(
             non_ag_obj_rk[:, k][self._input_data.non_ag_lu2cells[k]]
             @ self.X_non_ag_vars_kr[k, self._input_data.non_ag_lu2cells[k]]
             for k in range(self._input_data.n_non_ag_lus)
         )
 
-        # Get the objective values for each sector
-        self.obj_economy = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr
-        self.obj_ghg = (
-            self.E * self._input_data.economic_target_yr_carbon_price
-            if settings.GHG_CONSTRAINT_TYPE == "soft"
-            else 0
+        # Get the biodiversity priority contributions
+        bio_ag_contr = gp.quicksum(
+            gp.quicksum(
+                self._input_data.bio_priority_r[self._input_data.ag_lu2cells[0, j]]
+                * self.X_ag_dry_vars_jr[j, self._input_data.ag_lu2cells[0, j]]
+                * self._input_data.ag_biodiv_degr_j[j]
+            )  # Dryland agriculture contribution
+            + gp.quicksum(
+                self._input_data.bio_priority_r[self._input_data.ag_lu2cells[1, j]]
+                * self.X_ag_irr_vars_jr[j, self._input_data.ag_lu2cells[1, j]]
+                * self._input_data.ag_biodiv_degr_j[j]
+            )  # Irrigated agriculture contribution
+            for j in range(self._input_data.n_ag_lus)
         )
+
+        bio_ag_man_contr = gp.quicksum(
+            gp.quicksum(
+                self._input_data.bio_priority_r[self._input_data.ag_lu2cells[0, j_idx]]
+                * self._input_data.ag_man_biodiv_impacts[am][j_idx][self._input_data.ag_lu2cells[0, j_idx]]
+                * self.X_ag_man_dry_vars_jr[am][j_idx, self._input_data.ag_lu2cells[0, j_idx]]
+            )  # Dryland alt. ag. management contributions
+            + gp.quicksum(
+                self._input_data.bio_priority_r[self._input_data.ag_lu2cells[1, j_idx]]
+                * self._input_data.ag_man_biodiv_impacts[am][j_idx][self._input_data.ag_lu2cells[1, j_idx]]
+                * self.X_ag_man_irr_vars_jr[am][j_idx, self._input_data.ag_lu2cells[1, j_idx]]
+            )  # Irrigated alt. ag. management contributions
+            for am, am_j_list in self._input_data.am2j.items()
+            for j_idx in range(len(am_j_list))
+        )
+
+        bio_non_ag_contr = gp.quicksum(
+            gp.quicksum(
+                self._input_data.bio_priority_r[self._input_data.non_ag_lu2cells[k]]
+                * self._input_data.non_ag_biodiv_impact_k[k]
+                * self.X_non_ag_vars_kr[k, self._input_data.non_ag_lu2cells[k]]
+            )  # Non-agricultural contribution
+            for k in range(self._input_data.n_non_ag_lus)
+        )
+        
         self.obj_biodiv = (
             self.B * settings.GBF2_PENALTY
             if settings.GBF2_CONSTRAINT_TYPE == "soft"
+            else 0
+        )
+
+
+        # Get the objective values for each sector
+        self.obj_economy = economy_ag_contr + economy_ag_man_contr + economy_non_ag_contr
+        self.obj_biodiv = (bio_ag_contr + bio_ag_man_contr + bio_non_ag_contr) * settings.GBF2_SOLVE_WEIGHT
+        self.obj_ghg = (
+            self.E * self._input_data.economic_target_yr_carbon_price
+            if settings.GHG_CONSTRAINT_TYPE == "soft"
             else 0
         )
         self.obj_water = (
@@ -796,8 +836,14 @@ class LutoSolver:
             raise ValueError(
                 "Unknown choice for `GHG_CONSTRAINT_TYPE` setting: must be either 'hard' or 'soft'"
             )
+            
+    def _add_biodiversity_constraints(self) -> None:
+        print("  ...biodiversity constraints...")
+        self._add_conservation_priority_constraints()
+        self._add_major_vegetation_group_limit_constraints()
+        self._add_species_conservation_constraints()
 
-    def _add_biodiversity_limit_constraints(self) -> None:
+    def _add_conservation_priority_constraints(self) -> None:
         if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
             print("    ...biodiversity GBF 2 (conservation priority) constraints TURNED OFF ...")
             return
@@ -995,11 +1041,7 @@ class LutoSolver:
                 self.species_conservation_exprs[s] >= constr_area
             )
 
-    def _add_biodiversity_constraints(self) -> None:
-        print("  ...biodiversity constraints...")
-        self._add_biodiversity_limit_constraints()
-        self._add_major_vegetation_group_limit_constraints()
-        self._add_species_conservation_constraints()
+    
 
     def update_formulation(
         self,
