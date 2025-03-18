@@ -121,10 +121,11 @@ class Data:
     def __init__(self, timestamp: str) -> None:
         """
         Sets up output containers (lumaps, lmmaps, etc) and loads all LUTO data, adjusted
-        for resfactor and base year.
+        for resfactor.
         """
         # Path for write module - overwrite when provided with a base and target year
         self.path = None
+        self.path_begin_end_compare = None
         # Timestamp of simulation to which this object belongs - will be updated each time a simulation
         # is run using this Data object.
         self.timestamp_sim = timestamp
@@ -637,7 +638,9 @@ class Data:
         self.AG_MAN_L_MRJ_DICT = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
         self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
         
-        self.populate_productivity_container(self.YR_CAL_BASE)
+        print(f"\tCalculating year productivity...", flush=True)
+        yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)
+        self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
 
 
 
@@ -1335,16 +1338,7 @@ class Data:
         self.BIODIV_SCORE_RAW_WEIGHTED = self.get_array_resfactor_applied(self.BIODIV_SCORE_RAW_WEIGHTED)
         self.BIODIV_RAW_WEIGHTED_LDS = self.get_array_resfactor_applied(self.BIODIV_RAW_WEIGHTED_LDS)
 
-        print("Data loading complete\n")
-        
-
-    def populate_productivity_container(self, year) -> None:
-        """
-        Populate the year productivity container.
-        """
-        print(f"\tCalculating year productivity...", flush=True)
-        yr_cal_base_prod_data = self.get_production(year, self.LUMAP, self.LMMAP)
-        self.add_production_data(year, "Production", yr_cal_base_prod_data)
+        print("Data loading complete\n")        
 
     def get_coord(self, index_ij: np.ndarray, trans):
         """
@@ -1763,14 +1757,14 @@ class Data:
         """
         self.obj_vals[yr] = obj_val
 
-    def set_path(self, base_year, target_year) -> str:
+    def set_path(self, base_year, target_year, step_size, years) -> str:
         """Create a folder for storing outputs and return folder name."""
 
         # Get the years to write
         if settings.MODE == "snapshot":
             yr_all = [base_year, target_year]
         elif settings.MODE == "timeseries":
-            yr_all = list(range(base_year, target_year + 1))
+            yr_all = list(range(base_year, target_year + 1, step_size))
 
         # Create path name
         self.path = f"{OUTPUT_DIR}/{self.timestamp_sim}_RF{settings.RESFACTOR}_{yr_all[0]}-{yr_all[-1]}_{settings.MODE}"
@@ -1784,14 +1778,14 @@ class Data:
 
         # Add the path for the comparison between base-year and target-year if in the timeseries mode
         if settings.MODE == "timeseries":
-            path_begin_end_compare = f"{self.path}/begin_end_compare_{yr_all[0]}_{yr_all[-1]}"
+            self.path_begin_end_compare = f"{self.path}/begin_end_compare_{yr_all[0]}_{yr_all[-1]}"
             paths = (
                 paths
-                + [path_begin_end_compare]
+                + [self.path_begin_end_compare]
                 + [
-                    f"{path_begin_end_compare}/out_{yr_all[0]}",
-                    f"{path_begin_end_compare}/out_{yr_all[-1]}",
-                    f"{path_begin_end_compare}/out_{yr_all[-1]}/lucc_separate",
+                    f"{self.path_begin_end_compare}/out_{yr_all[0]}",
+                    f"{self.path_begin_end_compare}/out_{yr_all[-1]}",
+                    f"{self.path_begin_end_compare}/out_{yr_all[-1]}/lucc_separate",
                 ]
             )
 

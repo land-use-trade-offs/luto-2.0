@@ -50,6 +50,7 @@ from luto.economics.agricultural.biodiversity import get_major_vegetation_matric
 import luto.economics.agricultural.ghg as ag_ghg
 import luto.economics.agricultural.biodiversity as ag_biodiversity
 
+
 # Get date and time
 timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
@@ -63,6 +64,7 @@ def load_data() -> Data:
     memory_thread.start()
     
     return Data(timestamp=timestamp)
+
 
 @tools.LogToFile(f"{settings.OUTPUT_DIR}/run_{timestamp}", 'a')
 def run(
@@ -88,44 +90,19 @@ def run(
         - 'Years' essentially replaces base_year, target_year and step_size to allow for more flexibility so these
           should not be provided alongside 'years'.
     """
-
-    if years:
-        if len(years) < 2:
-            raise ValueError("Years must be populated with at least two years (inclusive of a base year).")
-
-        if step_size or base_year or target_year:
-            raise ValueError("Years cannot be provided alongside step_size, base_year or target_year.")
-        
-        if years != sorted(years):
-            raise ValueError("Years must be in ascending order.")
-        
-        if settings.MODE == 'snapshot':
-            if len(years) > 2:
-                raise ValueError("If MODE is 'snapshot' and years is used, only two years can be provided.")
-            base_year = years[0]
-            target_year = years[1]
-
-    if settings.MODE == 'snapshot' and step_size:
-        print(f"WARNING: Step size: {step_size} is ignored when MODE is 'snapshot'.")
-
-    if not base_year or not target_year:
-        raise ValueError("base_year and target_year must both be provided, or specificied in the years list.")
-
-    if base_year < data.YR_CAL_BASE or base_year >= target_year:
-        raise ValueError(f"Base year must be >= {data.YR_CAL_BASE} and less than the target year.")
+    validate_simulation_years_settings(data.YR_CAL_BASE, base_year, target_year, step_size, years)
 
     if not step_size:
         step_size = 1
 
     if base_year != data.YR_CAL_BASE:
         populate_containers_dynamic_base_year(data, base_year)
-        populate_production_data_dynamic_base_year(data, base_year, target_year)
 
     memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
     memory_thread.start()
     
     # Set Data object's path and create output directories
-    data.set_path(base_year, target_year)
+    data.set_path(base_year, target_year, step_size, years)
 
     # Run the simulation up to `year` sequentially.
     if settings.MODE == 'timeseries':
@@ -137,7 +114,7 @@ def run(
         if years:
             years_to_run = years
         else:
-            years_to_run = [yr for yr in range(base_year, target_year + 1, step_size)]
+            years_to_run = list(range(base_year, target_year + 1, step_size))
             if target_year not in years_to_run:
                 years_to_run.append(target_year)
 
@@ -154,48 +131,95 @@ def run(
     write_outputs(data)
 
 
-def populate_containers_dynamic_base_year(data: Data, base_year: int) -> None:
-        """
-        If the base year parsed to run() is not the same as data.YR_CAL_BASE
-        then
-            - Calculate and add data for the base year for containers. If this is not possible,
-            - Copy the data from the most recent year to the base year container.
-        """
+def validate_simulation_years_settings(
+    data_yr_cal_base: int,
+    base_year: int | None = None, 
+    target_year: int | None = None, 
+    step_size: int | None = None,
+    years: list[int] | None = None,
+) -> None:
+    """
+    Validates the years settings given to run a simulation.
+    Raises errors or warnings if the settings don't adhere to the following rules:
+    - if 'years' list is provided, it must have at least two years in it (the first year is the solve's base year)
+    - if 'years' list is provided, all other years settings should not be specified 
+    - if 'years' list is provided, it must be in ascending order
+    - the 'years' list cannot be specified for snapshot solves
+    - 'step_size' argument will be ignored for snapshot solves
+    - 'base_year' must be greater than 2010 and less than 'target_year'
+    """
+    if years:
+        if len(years) < 2:
+            raise ValueError("'years' must be populated with at least two years (inclusive of a base year).")
 
-        years = list(data.lumaps.keys())
-        year_before_base_year = max([y for y in years if y < base_year])
+        if step_size or base_year or target_year:
+            raise ValueError("'years' cannot be specified with step_size, base_year or target_year.")
         
-        data.lumaps[base_year] = data.lumaps[year_before_base_year]
-        data.lmmaps[base_year] = data.lmmaps[year_before_base_year]
-        data.ammaps[base_year] = data.ammaps[year_before_base_year]
-        data.ag_dvars[base_year] = data.ag_dvars[year_before_base_year]
-        data.non_ag_dvars[base_year] = data.non_ag_dvars[year_before_base_year]
-        data.ag_man_dvars[base_year] = data.ag_man_dvars[year_before_base_year]
-        data.populate_productivity_container(base_year)
+        if years != sorted(years):
+            raise ValueError("'years' must be in ascending order.")
+        
+        if settings.MODE == 'snapshot':
+            raise ValueError("'years' cannot be specified for snapshot solves.")
+
+    if settings.MODE == 'snapshot' and step_size:
+        print(f"WARNING: Step size: {step_size} is ignored when settings.MODE is 'snapshot'.")
+
+    if not years:
+        if not base_year or not target_year:
+            raise ValueError("Both base and target years, or 'years' argument, must be specified.")
+
+    if base_year < data_yr_cal_base or base_year >= target_year:
+        raise ValueError(f"Base year must be >= {data_yr_cal_base} and less than the target year.")
 
 
-def populate_production_data_dynamic_base_year(data: Data, base_year: int, target_year: int) -> None:
-    yr_idx = base_year - data.YR_CAL_BASE
-    years = list(data.lumaps.keys())
-    year_before_base_year = max([y for y in years if y < base_year])
+def populate_containers_dynamic_base_year(
+    data: Data,
+    base_year: int,
+) -> None:
+    """
+    If the base year parsed to run() is not the same as data.YR_CAL_BASE
+    then
+        - Calculate and add data for the base year for containers. If this is not possible,
+        - Copy the data from the most recent year to the base year container.
+    """
+    year_before_base_year = max([y for y in list(data.lumaps.keys()) if y < base_year])
 
-    major_vegetation_data = calc_major_vegetation_group_ag_area_for_year(
-        get_major_vegetation_matrices(data), 
-        data.lumaps[year_before_base_year],
-        data.BIODIV_HABITAT_DEGRADE_LOOK_UP,
-    )
-    ghg_emission_data = (ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True) * data.ag_dvars[data.YR_CAL_BASE]).sum()
-    biodiversity_data = (ag_biodiversity.get_breq_matrices(data) * data.ag_dvars[data.YR_CAL_BASE]).sum()
-    species_conservation_data = calc_species_ag_area_for_year(
-        ag_biodiversity.get_species_conservation_matrix(data, target_year),
-        data.lumaps[year_before_base_year],
-        data.BIODIV_HABITAT_DEGRADE_LOOK_UP,
-    )
+    data.lumaps[base_year] = data.lumaps[year_before_base_year]
+    data.lmmaps[base_year] = data.lmmaps[year_before_base_year]
+    data.ammaps[base_year] = data.ammaps[year_before_base_year]
+    data.ag_dvars[base_year] = data.ag_dvars[year_before_base_year]
+    data.non_ag_dvars[base_year] = data.non_ag_dvars[year_before_base_year]
+    data.ag_man_dvars[base_year] = data.ag_man_dvars[year_before_base_year]
 
+    # Populate production containers
+    if year_before_base_year == data.YR_CAL_BASE:
+        ghg_emission_data = (
+            ag_ghg.get_ghg_matrices(data, 0, aggregate=True) 
+            * data.ag_dvars[data.YR_CAL_BASE]
+        ).sum()
+        biodiversity_data = (ag_biodiversity.get_breq_matrices(data) * data.ag_dvars[data.YR_CAL_BASE]).sum()
+        major_vegetation_data = calc_major_vegetation_group_ag_area_for_year(
+            get_major_vegetation_matrices(data), 
+            data.lumaps[data.YR_CAL_BASE],
+            data.BIODIV_HABITAT_DEGRADE_LOOK_UP,
+        )
+        species_conservation_data = calc_species_ag_area_for_year(
+            ag_biodiversity.get_species_conservation_matrix(data, data.YR_CAL_BASE),
+            data.lumaps[year_before_base_year],
+            data.BIODIV_HABITAT_DEGRADE_LOOK_UP,
+        )
+        
+    else:
+        ghg_emission_data = data.prod_data[year_before_base_year]["GHG Emissions"]
+        biodiversity_data = data.prod_data[year_before_base_year]["Biodiversity"]
+        major_vegetation_data = data.prod_data[year_before_base_year]["Major Vegetation Groups"]
+        species_conservation_data = data.prod_data[year_before_base_year]["Species Conservation"]
+
+    data.add_production_data(base_year, "Production", data.prod_data[year_before_base_year]["Production"])
     data.add_production_data(base_year, "GHG Emissions", ghg_emission_data)
     data.add_production_data(base_year, "Biodiversity", biodiversity_data)
     data.add_production_data(base_year, "Major Vegetation Groups", major_vegetation_data)
-    data.add_production_data(base_year, "Species Conservation", species_conservation_data)
+    data.add_production_data(base_year, "Species Conservation", species_conservation_data)    
 
 
 def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
