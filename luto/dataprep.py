@@ -32,7 +32,7 @@ import pandas as pd
 import shutil, os, time, h5py
 
 from joblib import Parallel, delayed
-from luto.settings import INPUT_DIR, RAW_DATA
+from luto.settings import INPUT_DIR, RAW_DATA, HABITAT_CONDITION, HCAS_PERCENTILE
 
 
 
@@ -56,7 +56,8 @@ def create_new_dataset():
     nlum_inpath = 'N:/Data-Master/National_Landuse_Map/'
     BECCS_inpath = 'N:/Data-Master/BECCS/From_CSIRO/20211124_as_submitted/'
     GHG_off_land_inpath = 'N:/LUF-Modelling/Food_demand_AU/au.food.demand/Inputs/Off_land_GHG_emissions'
-    bio_GBF_4a_inpath = 'N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km_to_NetCDF/'
+    bio_GBF2_inpath = 'N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km_to_NetCDF/'
+    bio_GBF_4a_inpath = bio_GBF2_inpath
     bio_GBF_4b_inpath = 'N:/Data-Master/Biodiversity/DCCEEW/SNES_GEOTIFF/To_NetCDF/'
     bio_NVIS_inpath = 'N:/Data-Master/NVIS/'
     bio_HACS_inpath = 'N:/Data-Master/Habitat_condition_assessment_system/Data/Processed/'
@@ -122,6 +123,20 @@ def create_new_dataset():
     shutil.copyfile(luto_1D_inpath + '20231107_ECOGRAZE_Bundle.xlsx', outpath + '20231107_ECOGRAZE_Bundle.xlsx')
     shutil.copyfile(luto_1D_inpath + '20231107_Bundle_AgTech_EI.xlsx', outpath + '20231107_Bundle_AgTech_EI.xlsx')
     shutil.copyfile(luto_1D_inpath + '20240918_Bundle_BC.xlsx', outpath + '20240918_Bundle_BC.xlsx')
+    
+    # Copy biodiversity GBF-2 files
+    shutil.copyfile(bio_GBF2_inpath + 'GBF2_conserve_priority.nc', outpath + 'GBF2_conserve_priority.nc')
+    shutil.copyfile(bio_GBF2_inpath + 'GBF2_conserve_performance.xlsx', outpath + 'GBF2_conserve_performance.xlsx')
+    
+    
+    # Copy biodiversity GBF-3 data
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVS_HIGH_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVS_HIGH_SPATIAL_DETAIL.nc')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVS_LOW_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVS_LOW_SPATIAL_DETAIL.nc')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVG_HIGH_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVG_HIGH_SPATIAL_DETAIL.nc')
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVG_LOW_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVG_LOW_SPATIAL_DETAIL.nc')
+    
+    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx', outpath + 'BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx')
+
 
     # Copy biodiversity GBF-4A files
     shutil.copyfile(bio_GBF_4a_inpath + 'BIODIVERSITY_GBF4A_SCORES.csv', outpath + 'BIODIVERSITY_GBF4A_SCORES.csv')
@@ -151,14 +166,7 @@ def create_new_dataset():
     shutil.copyfile(bio_HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'HABITAT_CONDITION.csv')
     
     
-    # Copy biodiversity NVIS data
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVS_HIGH_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVS_HIGH_SPATIAL_DETAIL.nc')
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVS_LOW_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVS_LOW_SPATIAL_DETAIL.nc')
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVG_HIGH_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVG_HIGH_SPATIAL_DETAIL.nc')
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVG_LOW_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVG_LOW_SPATIAL_DETAIL.nc')
     
-    shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx', outpath + 'BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx')
-
 
     ############### Read data
 
@@ -234,6 +242,7 @@ def create_new_dataset():
 
     # Read in ag-landuse, which is a lexicographically ordered list
     ag_landuses = pd.read_csv(outpath + 'ag_landuses.csv', header = None)[0].to_list()
+    ag_desc2lu = dict(zip(ag_landuses, range(len(ag_landuses))))
 
     # Create a non-agricultural landuses file
     # Do not sort the whole list alphabetically when adding new landuses to the model.
@@ -248,11 +257,13 @@ def create_new_dataset():
     # Save to file (int8)
     lumap.to_hdf(outpath + 'lumap.h5', key = 'lumap', mode = 'w', format = 'fixed', index = False, complevel = 9)
     
-    # Get the index indicating the cells outside the LUTO study area
-    idx_out_LUTO = (lumap == -1).values                                             # shape=6956407, sum=2737674
+    # Get the index indicating the cells inside/outside LUTO study area
+    natural_cells = np.logical_not(bioph['NATURAL_AREA_INC_WATER'].values)          # 0 is natural, 1 is non-natural; so we flip the values to make 1 natural
     idx_inside_LUTO = (lumap != -1).values                                          # shape=6956407, sum=4218733
-
-
+    idx_outside_LUTO = (lumap == -1).values                                         # shape=6956407, sum=2737674
+    idx_inside_LUTO_natural = np.logical_and(idx_inside_LUTO, natural_cells)        # shape=6956407, sum=3267523
+    idx_outside_LUTO_natural = np.logical_and(idx_outside_LUTO, natural_cells)      # shape=6956407, sum=2677065
+    
 
     ############### Create lmmap -- present (2010) land management mapping.
 
@@ -547,7 +558,7 @@ def create_new_dataset():
         delayed(calculate_water_yield)(ssp, idx, zone)
         for ssp in ['126', '245', '370', '585']
         for (idx, zone) in [
-            (idx_out_LUTO, 'outside_LUTO_study_area'), 
+            (idx_outside_LUTO, 'outside_LUTO_study_area'), 
             (lmap['CELL_ID'], 'all_AUS_lands')
         ]
     ]
@@ -578,10 +589,10 @@ def create_new_dataset():
     ).to_numpy(dtype = np.float32)
     
     water_yield_hist_baseline_ml = water_yield_hist_baseline_ml_ha * zones['CELL_HA'].to_numpy(dtype = np.float32)
-    water_yield_hist_baseline_ml_outside_LUTO = water_yield_hist_baseline_ml[idx_out_LUTO]
+    water_yield_hist_baseline_ml_outside_LUTO = water_yield_hist_baseline_ml[idx_outside_LUTO]
 
-    dd_id_outside_LUTO = zones[idx_out_LUTO]['HR_DRAINDIV_ID'].values
-    rr_id_outside_LUTO = zones[idx_out_LUTO]['HR_RIVREG_ID'].values
+    dd_id_outside_LUTO = zones[idx_outside_LUTO]['HR_DRAINDIV_ID'].values
+    rr_id_outside_LUTO = zones[idx_outside_LUTO]['HR_RIVREG_ID'].values
     water_yield_outside_LUTO_hist_dd = dict(enumerate(np.bincount(dd_id_outside_LUTO, water_yield_hist_baseline_ml_outside_LUTO)))
     water_yield_outside_LUTO_hist_rr = dict(enumerate(np.bincount(rr_id_outside_LUTO, water_yield_hist_baseline_ml_outside_LUTO)))
     
@@ -616,8 +627,44 @@ def create_new_dataset():
     # Save to file
     biodiv_priorities.to_hdf(outpath + 'biodiv_priorities.h5', key = 'biodiv_priorities', mode = 'w', format = 'fixed', index = False, complevel = 9)
 
+    
+    # Precalculate the degradation score
+    
+    # 1) Get habitat degradation scale for each agricultural land-use
+    biodiv_degrade_df = pd.read_csv(os.path.join(INPUT_DIR, 'HABITAT_CONDITION.csv'))                                                               # Load the HCAS percentile data (pd.DataFrame)
 
-
+    if HABITAT_CONDITION == 'HCAS':
+        '''
+        The degradation weight score of "HCAS" are float values range between 0-1 indicating the suitability for wild animals survival.
+        Here we average this dataset in year 2009, 2010, and 2011, then calculate the percentiles of the average score under each land-use type.
+        '''
+        bio_HCAS_degrade_lookup = biodiv_degrade_df[['lu', f'PERCENTILE_{HCAS_PERCENTILE}']]                                # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
+        bio_HCAS_degrade_lookup = {int(k):v for k,v in dict(bio_HCAS_degrade_lookup.values).items()}                        # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
+        unalloc_nat_land_bio_score = bio_HCAS_degrade_lookup[ag_desc2lu['Unallocated - natural land']]                      # Get the biodiversity degradation score for unallocated natural land (float)
+        bio_HCAS_degrade_lookup = {k:v*(1/unalloc_nat_land_bio_score) for k,v in bio_HCAS_degrade_lookup.items()}           # Normalise the biodiversity degradation score to the unallocated natural land score
+    elif HABITAT_CONDITION == 'USER_DEFINED':
+        bio_HCAS_degrade_lookup = biodiv_degrade_df[['lu', 'USER_DEFINED']]
+        bio_HCAS_degrade_lookup = {int(k):v for k,v in dict(bio_HCAS_degrade_lookup.values).items()}                        # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
+    else:
+        raise ValueError(f"Invalid habitat condition source: {HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
+    
+    # Save to file; 
+    pd.DataFrame({'lu':bio_HCAS_degrade_lookup.keys(), 'RETAIN_RATION_AFTER_DEGRADATE':bio_HCAS_degrade_lookup.values()}).to_csv(os.path.join(outpath, 'BIODIV_HABITAT_DEGRADE_LOOK_UP.csv'), index=False)                 
+    
+    # 2) Convert look-up to layer
+    bio_HCAS_degrade_lookup[-1] = 0                          # Fill cells outside the LUTO study area (cells of -1) to 0
+    biodiv_degrade_habitat = np.vectorize(bio_HCAS_degrade_lookup.get, otypes=[float])(lumap).astype(np.float32)
+    biodiv_degrade_habitat[idx_outside_LUTO_natural] = 1.0   # Fill cells outside the LUTO study area and natural land to 1.0
+    
+    
+    # 3) Calculate the area-weighted degradation score
+    priority_area_weighted_baseline_user_pro_zone = np.ones_like(biodiv_degrade_habitat) * zones['CELL_HA'].values
+    priority_area_weighted_baseline_user_pro_inside_LUTO = (biodiv_degrade_habitat * zones['CELL_HA'].values)[idx_inside_LUTO]
+    priority_area_weighted_baseline_user_pro_outside_LUTO = (biodiv_degrade_habitat * zones['CELL_HA'].values)[idx_outside_LUTO]
+    
+    
+    
+    
 
     ############### Get stream length
 

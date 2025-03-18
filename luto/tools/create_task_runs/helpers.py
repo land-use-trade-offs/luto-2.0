@@ -318,6 +318,10 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, interval=1):
             
 
 def load_json_data(json_path, filename):
+    if not os.path.exists(os.path.join(json_path, filename)):
+        run_idx = re.compile(r'(Run_\d+)').findall(json_path)[0]
+        print(f'{run_idx}: File missing - {filename}!')
+        return pd.DataFrame({'year': [], 'val': [], 'name': []})
     with open(os.path.join(json_path, filename)) as f:
         return pd.json_normalize(json.load(f), 'data', ['name']).rename(columns={0: 'year', 1: 'val'})
 
@@ -335,8 +339,24 @@ def process_GHG_deviation_data(json_path):
     return df_deviation
 
 def process_GHG_deforestation_data(json_path):
-    df = load_json_data(json_path, 'GHG_2_individual_emission_Mt.json') 
-    return df.query('name == "Deforestation"')
+    
+    df = load_json_data(json_path, 'GHG_2_individual_emission_Mt.json')
+    if df.empty:
+        return df
+    
+    df = df.query('name in ["Livestock natural to modified", "Unallocated natural to modified"]'
+            ).pivot(index='year', columns='name', values='val'
+            ).reset_index(
+            ).eval("Total_Deforestation = `Livestock natural to modified` + `Unallocated natural to modified`"
+            ).melt(
+                id_vars='year', 
+                value_vars=['Livestock natural to modified', 'Unallocated natural to modified', 'Total_Deforestation'], 
+                var_name='name', 
+                value_name='val')
+    return df
+
+def process_bio_GBF2_data(json_path):
+    return load_json_data(json_path, 'biodiversity_GBF2_1_total_score_by_type.json')
 
 
 def process_demand_data(json_path):
@@ -348,8 +368,8 @@ def process_demand_data(json_path):
     return df_delta
 
 def process_task_root_dirs(task_root_dirs):
-    report_data = pd.DataFrame()
-    report_data_demand = pd.DataFrame()
+    report_Profit_GHG_BIO = pd.DataFrame()
+    report_Production = pd.DataFrame()
 
     for task_root_dir in task_root_dirs:
         grid_search_params = pd.read_csv(f"{task_root_dir}/grid_search_parameters.csv")
@@ -360,12 +380,14 @@ def process_task_root_dirs(task_root_dirs):
             run_idx = int(dir.split('_')[-1])
             run_paras = grid_search_params.query(f'run_idx == {int(run_idx)}').to_dict(orient='records')[0]
             
-            # Get the json data path
+            # Get the json data path; by default, the data is stored in 'DATA_REPORT' under the run_idx folder
             json_path = os.path.join(task_root_dir, dir, 'DATA_REPORT', 'data')
+            
+            # If the data is not found in the default path, search for the data in the `output` folders
             if not os.path.exists(json_path):
                 runs = [i for i in glob(f"{task_root_dir}/{dir}/output/**") if os.path.isdir(i)]
                 if len(runs) == 0:
-                    print(f'No runs found in {dir}!')
+                    print(f'{dir}: No runs found in this directory!')
                     continue
                 else:
                     json_path = os.path.join(runs[-1], 'DATA_REPORT', 'data')
@@ -375,30 +397,30 @@ def process_task_root_dirs(task_root_dirs):
             df_ghg_deviation = process_GHG_deviation_data(json_path)
             df_ghg_deforestation = process_GHG_deforestation_data(json_path)
             df_demand_deviation = process_demand_data(json_path)
+            df_bio_GBF2 = process_bio_GBF2_data(json_path)
 
-            report_data = pd.concat([
-                report_data,
+            report_Profit_GHG_BIO = pd.concat([
+                report_Profit_GHG_BIO,
                 df_profit[['year', 'name', 'val']].assign(**run_paras),
                 df_ghg_deviation[['year', 'name', 'val']].assign(**run_paras),
                 df_ghg_deforestation[['year', 'name', 'val']].assign(**run_paras)
             ]).reset_index(drop=True)
 
-            report_data_demand = pd.concat([
-                report_data_demand,
+            report_Production = pd.concat([
+                report_Production,
                 df_demand_deviation.assign(**run_paras)
             ]).reset_index(drop=True)
             
     # Pivot the report data so that the `name` columns is split into separate columns
-    report_data = report_data\
-        .pivot(
+    report_Profit_GHG_BIO = report_Profit_GHG_BIO.pivot(
             index=['year'] + grid_search_params.columns.tolist(), 
             columns='name', 
-            values='val')\
-        .reset_index()
+            values='val'
+        ).reset_index()
         
-    # Reorder the data
-    report_data['GHG_LIMITS_FIELD'] = pd.Categorical(report_data['GHG_LIMITS_FIELD'], categories=GHG_ORDER, ordered=True)
-    report_data['BIODIV_GBF_TARGET_2_DICT'] = pd.Categorical(report_data['BIODIV_GBF_TARGET_2_DICT'], categories=BIO_TARGET_ORDER, ordered=True)
-    report_data_demand['GHG_LIMITS_FIELD'] = pd.Categorical(report_data_demand['GHG_LIMITS_FIELD'], categories=GHG_ORDER, ordered=True)
+    # Reorder the data, categorize the columns, and reset the index
+    report_Profit_GHG_BIO['GHG_LIMITS_FIELD'] = pd.Categorical(report_Profit_GHG_BIO['GHG_LIMITS_FIELD'], categories=GHG_ORDER, ordered=True)
+    report_Profit_GHG_BIO['BIODIV_GBF_TARGET_2_DICT'] = pd.Categorical(report_Profit_GHG_BIO['BIODIV_GBF_TARGET_2_DICT'], categories=BIO_TARGET_ORDER, ordered=True)
+    report_Production['GHG_LIMITS_FIELD'] = pd.Categorical(report_Production['GHG_LIMITS_FIELD'], categories=GHG_ORDER, ordered=True)
 
-    return report_data, report_data_demand
+    return report_Profit_GHG_BIO, report_Production
