@@ -281,10 +281,9 @@ class LutoSolver:
         """
         print(f"Setting objective function to {settings.OBJECTIVE}...", flush=True)
 
-        # Get the objective values matrices for each sector
+        # Get economic contributions
         ag_obj_mrj, non_ag_obj_rk, ag_man_objs = self._input_data.economic_contr_mrj
 
-        # Get economic contributions
         economy_ag_contr = gp.quicksum(
             ag_obj_mrj[0, self._input_data.ag_lu2cells[0, j], j]
             @ self.X_ag_dry_vars_jr[j, self._input_data.ag_lu2cells[0, j]]
@@ -292,7 +291,6 @@ class LutoSolver:
             @ self.X_ag_irr_vars_jr[j, self._input_data.ag_lu2cells[1, j]]
             for j in range(self._input_data.n_ag_lus)
         )
-
         economy_ag_man_contr = gp.quicksum(
             ag_man_objs[am][0, self._input_data.ag_lu2cells[0, j], j_idx]
             @ self.X_ag_man_dry_vars_jr[am][j_idx, self._input_data.ag_lu2cells[0, j]]
@@ -301,62 +299,59 @@ class LutoSolver:
             for am, am_j_list in self._input_data.am2j.items()
             for j_idx, j in enumerate(am_j_list)
         )
-
         economy_non_ag_contr = gp.quicksum(
             non_ag_obj_rk[:, k][self._input_data.non_ag_lu2cells[k]]
             @ self.X_non_ag_vars_kr[k, self._input_data.non_ag_lu2cells[k]]
             for k in range(self._input_data.n_non_ag_lus)
         )
+        
+        self.obj_economy = economy_ag_contr + economy_ag_man_contr + economy_non_ag_contr
 
-        # Get the biodiversity priority contributions
+        # Get biodiversity contributions
         bio_ag_contr = gp.quicksum(
             gp.quicksum(
                 self._input_data.bio_priority_r[self._input_data.ag_lu2cells[0, j]]
                 * self.X_ag_dry_vars_jr[j, self._input_data.ag_lu2cells[0, j]]
                 * self._input_data.ag_biodiv_degr_j[j]
-            )  # Dryland agriculture contribution
+            )  
             + gp.quicksum(
                 self._input_data.bio_priority_r[self._input_data.ag_lu2cells[1, j]]
                 * self.X_ag_irr_vars_jr[j, self._input_data.ag_lu2cells[1, j]]
                 * self._input_data.ag_biodiv_degr_j[j]
-            )  # Irrigated agriculture contribution
+            )  
             for j in range(self._input_data.n_ag_lus)
         )
-
         bio_ag_man_contr = gp.quicksum(
             gp.quicksum(
                 self._input_data.bio_priority_r[self._input_data.ag_lu2cells[0, j_idx]]
                 * self._input_data.ag_man_biodiv_impacts[am][j_idx][self._input_data.ag_lu2cells[0, j_idx]]
                 * self.X_ag_man_dry_vars_jr[am][j_idx, self._input_data.ag_lu2cells[0, j_idx]]
-            )  # Dryland alt. ag. management contributions
+            )  
             + gp.quicksum(
                 self._input_data.bio_priority_r[self._input_data.ag_lu2cells[1, j_idx]]
                 * self._input_data.ag_man_biodiv_impacts[am][j_idx][self._input_data.ag_lu2cells[1, j_idx]]
                 * self.X_ag_man_irr_vars_jr[am][j_idx, self._input_data.ag_lu2cells[1, j_idx]]
-            )  # Irrigated alt. ag. management contributions
+            )  
             for am, am_j_list in self._input_data.am2j.items()
             for j_idx in range(len(am_j_list))
         )
-
         bio_non_ag_contr = gp.quicksum(
             gp.quicksum(
                 self._input_data.bio_priority_r[self._input_data.non_ag_lu2cells[k]]
                 * self._input_data.non_ag_biodiv_impact_k[k]
                 * self.X_non_ag_vars_kr[k, self._input_data.non_ag_lu2cells[k]]
-            )  # Non-agricultural contribution
+            )
             for k in range(self._input_data.n_non_ag_lus)
         )
+
+        self.obj_biodiv = bio_ag_contr + bio_ag_man_contr + bio_non_ag_contr
         
+        # Get the penalty values for each sector
         self.penalty_biodiv = (
             self.B * settings.GBF2_PENALTY
             if settings.GBF2_CONSTRAINT_TYPE == "soft"
             else 0
         )
-
-
-        # Get the objective values for each sector
-        self.obj_economy = economy_ag_contr + economy_ag_man_contr + economy_non_ag_contr
-        self.obj_biodiv = bio_ag_contr + bio_ag_man_contr + bio_non_ag_contr
         
         self.penalty_ghg = (
             self.E * self._input_data.economic_target_yr_carbon_price
@@ -376,10 +371,10 @@ class LutoSolver:
             if settings.DEMAND_CONSTRAINT_TYPE == "soft"
             else 0
         )
-
-        # Set the objective function
+        
         penalties = self.penalty_demand + self.penalty_ghg + self.penalty_water + self.penalty_biodiv
         
+        # Set the objective function
         if settings.OBJECTIVE == "mincost":
             sense = GRB.MINIMIZE
             objective = (
