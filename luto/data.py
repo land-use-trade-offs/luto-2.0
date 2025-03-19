@@ -1263,16 +1263,16 @@ class Data:
         
         likely_maybe_union = set(self.BIO_GBF_4B_SNES_LIKELY_SEL) & set(self.BIO_GBF_4B_SNES_LIKELY_AND_MAYBE_SEL)
         if len(likely_maybe_union) > 0:
-            print(f"WARNING: {len(likely_maybe_union)} species are found in both 'LIKELY' and 'LIKELY_MAYBE' layers!")
-            print(' LUTO will only use "LIKELY" layer to set target for SNES targets:')
-            [print(f"    {i}") for i in likely_maybe_union]
+            print(f"WARNING: {len(likely_maybe_union)} duplicate SNE species targets are found, will only use 'LIKELY' target for them!")
+            for idx, name in enumerate(likely_maybe_union):
+                print(f"    {idx+1}. {name}")
             self.BIO_GBF_4B_SNES_LIKELY_AND_MAYBE_SEL = list(set(self.BIO_GBF_4B_SNES_LIKELY_AND_MAYBE_SEL) - set(self.BIO_GBF_4B_SNES_LIKELY_SEL))
             
         likely_maybe_union = set(self.BIO_GBF4B_ECNES_LIKELY_SEL) & set(self.BIO_GBF4B_ECNES_LIKELY_AND_MAYBE_SEL)
         if len(likely_maybe_union) > 0:
-            print(f"WARNING: {len(likely_maybe_union)} communities are found in both 'LIKELY' and 'LIKELY_MAYBE' layers!")
-            print('LUTO will only use "LIKELY" layer to set target for ECNES targets:')
-            [print(f"    {i}") for i in likely_maybe_union]
+            print(f"WARNING: {len(likely_maybe_union)} duplicate ECNES species targets are found, will only use 'LIKELY' target for them!")
+            for idx, name in enumerate(likely_maybe_union):
+                print(f"    {idx+1}. {name}")
             self.BIO_GBF4B_ECNES_LIKELY_AND_MAYBE_SEL = list(set(self.BIO_GBF4B_ECNES_LIKELY_AND_MAYBE_SEL) - set(self.BIO_GBF4B_ECNES_LIKELY_SEL))
             
 
