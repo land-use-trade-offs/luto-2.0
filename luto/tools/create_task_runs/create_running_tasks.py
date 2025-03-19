@@ -42,6 +42,7 @@ grid_search = {
     'OBJECTIVE': ['maxprofit'],             # 'maxprofit' or 'maxutility'
     'MODE': ['timeseries'],                 # 'snapshot' or 'timeseries'
     'RESFACTOR': [5],
+    'STEP_SIZE': [5],
     'WRITE_THREADS': [10],
     'WRITE_OUTPUT_GEOTIFFS': [False],
     'KEEP_OUTPUTS': [True],                 # If false, only keep report HTML

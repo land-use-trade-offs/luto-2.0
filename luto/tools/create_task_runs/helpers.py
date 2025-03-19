@@ -31,7 +31,8 @@ from datetime import datetime
 def create_settings_template(to_path:str=TASK_ROOT_DIR):
 
     # Save the settings template to the root task folder
-    None if os.path.exists(to_path) else os.makedirs(to_path)
+    if not os.path.exists(to_path):
+        os.makedirs(to_path, exist_ok=True)
     
     # Check if the settings_template.csv already exists
     if os.path.exists(f'{to_path}/settings_template.csv'):
