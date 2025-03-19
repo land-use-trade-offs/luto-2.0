@@ -41,11 +41,11 @@ grid_search = {
     ###############################################################
     'OBJECTIVE': ['maxprofit'],             # 'maxprofit' or 'maxutility'
     'MODE': ['timeseries'],                 # 'snapshot' or 'timeseries'
-    'RESFACTOR': [5],
+    'RESFACTOR': [7],
     'STEP_SIZE': [5],
     'WRITE_THREADS': [10],
     'WRITE_OUTPUT_GEOTIFFS': [False],
-    'KEEP_OUTPUTS': [True],                 # If false, only keep report HTML
+    'KEEP_OUTPUTS': [False],                 # If false, only keep report HTML
     
  
     ###############################################################
@@ -66,13 +66,14 @@ grid_search = {
     # --------------- Water constraints ---------------
     'WATER_CONSTRAINT_TYPE': ['soft'],        # 'hard' or 'soft'
     'WATER_PENALTY': [1],
-    'INCLUDE_WATER_LICENSE_COSTS': [1],
+    'INCLUDE_WATER_LICENSE_COSTS': [0],
     
+    # --------------- Biodiversity priority zone ---------------
+    'GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE': [20],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSTIY_TARGET_GBF_2': ['on'],    # 'on' or 'off'
     'GBF2_PENALTY': [10000],
-    'SOLVE_BIODIV_PRIORITY_WEIGHT': [1, 10, 100, 500, 1000, 5000, 10000],
     'BIODIV_GBF_TARGET_2_DICT': [
         # {2010: 0, 2030: 0.0, 2050: 0.0, 2100: 0.0}, 
         {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}, 
@@ -90,7 +91,8 @@ grid_search = {
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
-    'SOLVE_ECONOMY_WEIGHT': [0.05],
+    'SOLVE_BIODIV_PRIORITY_WEIGHT': [1, 10, 100, 500, 1000, 5000, 10000],
+    'SOLVE_ECONOMY_WEIGHT': [0.001, 0.01, 0.05, 0.1, 0.2, 0.5, 0.7, 0.9, 0.95],
     
     #-------------------- Diet BAU --------------------
     'DIET_DOM': ['BAU',],            # 'BAU' or 'FLX'

@@ -347,7 +347,7 @@ class LutoSolver:
             for k in range(self._input_data.n_non_ag_lus)
         )
         
-        self.obj_biodiv = (
+        self.penalty_biodiv = (
             self.B * settings.GBF2_PENALTY
             if settings.GBF2_CONSTRAINT_TYPE == "soft"
             else 0
@@ -357,17 +357,18 @@ class LutoSolver:
         # Get the objective values for each sector
         self.obj_economy = economy_ag_contr + economy_ag_man_contr + economy_non_ag_contr
         self.obj_biodiv = bio_ag_contr + bio_ag_man_contr + bio_non_ag_contr
-        self.obj_ghg = (
+        
+        self.penalty_ghg = (
             self.E * self._input_data.economic_target_yr_carbon_price
             if settings.GHG_CONSTRAINT_TYPE == "soft"
             else 0
         )
-        self.obj_water = (
+        self.penalty_water = (
             self.W.sum() * settings.WATER_PENALTY
             if settings.WATER_CONSTRAINT_TYPE == "soft"
             else 0
         )
-        self.obj_demand = (
+        self.penalty_demand = (
             gp.quicksum(
                 v * price
                 for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices)
@@ -377,7 +378,8 @@ class LutoSolver:
         )
 
         # Set the objective function
-        penalties = self.obj_demand + self.obj_ghg + self.obj_water + self.obj_biodiv
+        penalties = self.penalty_demand + self.penalty_ghg + self.penalty_water + self.penalty_biodiv
+        
         if settings.OBJECTIVE == "mincost":
             sense = GRB.MINIMIZE
             objective = (
@@ -1499,12 +1501,12 @@ class LutoSolver:
                 "SUM": self.gurobi_model.ObjVal,
                 "Economy": self.obj_economy.getValue(),
                 "Demand": (
-                    self.obj_demand.getValue()
+                    self.penalty_demand.getValue()
                     if settings.DEMAND_CONSTRAINT_TYPE == "soft"
                     else 0
                 ),
                 "GHG": (
-                    self.obj_ghg.getValue()
+                    self.penalty_ghg.getValue()
                     if settings.GHG_CONSTRAINT_TYPE == "soft"
                     else 0
                 ),
@@ -1514,7 +1516,7 @@ class LutoSolver:
                     else 0
                 ),
                 'Water': (
-                    self.obj_water.getValue()
+                    self.penalty_water.getValue()
                     if settings.WATER_CONSTRAINT_TYPE == "soft"
                     else 0
                 ),
