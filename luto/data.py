@@ -386,7 +386,7 @@ class Data:
 
         # Actual hectares per cell, including projection corrections.
         self.REAL_AREA_NO_RESFACTOR = pd.read_hdf(os.path.join(INPUT_DIR, "real_area.h5")).to_numpy()
-        self.REAL_AREA = self.get_array_resfactor_applied(self.REAL_AREA_NO_RESFACTOR) * self.RESMULT
+        self.REAL_AREA = self.REAL_AREA_NO_RESFACTOR[self.MASK] * self.RESMULT
 
         # Derive NCELLS (number of spatial cells) from the area array.
         self.NCELLS = self.REAL_AREA.shape[0]
@@ -401,7 +401,7 @@ class Data:
         self.add_lumap(self.YR_CAL_BASE, self.LUMAP)
 
         # Initial (2010) land management map.
-        self.LMMAP = self.get_array_resfactor_applied(self.LMMAP_NO_RESFACTOR)
+        self.LMMAP = self.LMMAP_NO_RESFACTOR[self.MASK]
         self.add_lmmap(self.YR_CAL_BASE, self.LMMAP)
 
         # Initial (2010) agricutural management maps - no cells are used for alternative agricultural management options.
@@ -453,16 +453,16 @@ class Data:
             # Check if the CRS is defined
             if no_go_shp.crs is None:
                 raise ValueError(f"{no_go_path} does not have a CRS defined")
-            # Rasterize the reforestation vector; Fill with -1
+            # Rasterize the reforestation vector; Fill with 1.  0 is no-go, 1 is 'free' cells.
             with rasterio.open(INPUT_DIR + '/NLUM_2010-11_mask.tif') as src:
                 src_arr = src.read(1)
                 src_meta = src.meta.copy()
                 no_go_shp = no_go_shp.to_crs(src_meta['crs'])
                 no_go_arr = rasterio.features.rasterize(
-                    ((row['geometry'], 1) for _,row in no_go_shp.iterrows()),
+                    ((row['geometry'], 0) for _,row in no_go_shp.iterrows()),
                     out_shape=(src_meta['height'], src_meta['width']),
                     transform=src_meta['transform'],
-                    fill=0,
+                    fill=1,
                     dtype=np.int16
                 )
                 # Add the no-go area to the ag or non_ag list.
@@ -1358,11 +1358,6 @@ class Data:
         meta.update(width=width, height=height, compress='lzw', driver='GTiff', transform=trans, nodata=self.NODATA, dtype='float32')
         return meta
 
-    def get_array_resfactor_applied(self, array: np.ndarray):
-        """
-        Returns a version of the given array with the ResFactor applied.
-        """
-        return array[self.MASK]
 
     def add_lumap(self, yr: int, lumap: np.ndarray):
         """
