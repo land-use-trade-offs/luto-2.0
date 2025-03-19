@@ -453,16 +453,16 @@ class Data:
             # Check if the CRS is defined
             if no_go_shp.crs is None:
                 raise ValueError(f"{no_go_path} does not have a CRS defined")
-            # Rasterize the reforestation vector; Fill with 0, dtype int16
+            # Rasterize the reforestation vector; Fill with 1.  0 is no-go, 1 is 'free' cells.
             with rasterio.open(INPUT_DIR + '/NLUM_2010-11_mask.tif') as src:
                 src_arr = src.read(1)
                 src_meta = src.meta.copy()
                 no_go_shp = no_go_shp.to_crs(src_meta['crs'])
                 no_go_arr = rasterio.features.rasterize(
-                    ((row['geometry'], 1) for _,row in no_go_shp.iterrows()),
+                    ((row['geometry'], 0) for _,row in no_go_shp.iterrows()),
                     out_shape=(src_meta['height'], src_meta['width']),
                     transform=src_meta['transform'],
-                    fill=0,
+                    fill=1,
                     dtype=np.int16
                 )
                 # Add the no-go area to the ag or non_ag list.
