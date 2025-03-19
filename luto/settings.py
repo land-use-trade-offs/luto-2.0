@@ -170,7 +170,7 @@ THREADS = 32
 # No-Go areas; Regional adoption constraints
 # ---------------------------------------------------------------------------- #
 
-EXCLUDE_NO_GO_LU = True
+EXCLUDE_NO_GO_LU = False
 NO_GO_VECTORS = {
     'Winter cereals':           f'{os.path.abspath(INPUT_DIR)}/no_go_areas/no_go_Winter_cereals.shp',
     'Environmental Plantings':  f'{os.path.abspath(INPUT_DIR)}/no_go_areas/no_go_Enviornmental_Plantings.shp'
@@ -419,6 +419,8 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 # Biodiversity limits and parameters *******************************
+SOLVE_BIODIV_PRIORITY_WEIGHT = 10
+'''The weight of the biodiversity target in the objective function'''
 
 
 # ------------------- Agricultural biodiversity parameters -------------------
@@ -466,8 +468,6 @@ If set to 100, all cells will be considered as critical area, equal to setting t
 GBF2_PENALTY = 1e4
 '''The penalty multiplier for not meeting the biodiversity target, only applies when undershooting the target'''
 
-GBF2_SOLVE_WEIGHT = 10
-'''The weight of the biodiversity target in the objective function'''
 
 # Connectivity source source
 CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'

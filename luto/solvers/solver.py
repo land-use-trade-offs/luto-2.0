@@ -356,7 +356,7 @@ class LutoSolver:
 
         # Get the objective values for each sector
         self.obj_economy = economy_ag_contr + economy_ag_man_contr + economy_non_ag_contr
-        self.obj_biodiv = (bio_ag_contr + bio_ag_man_contr + bio_non_ag_contr) * settings.GBF2_SOLVE_WEIGHT
+        self.obj_biodiv = bio_ag_contr + bio_ag_man_contr + bio_non_ag_contr
         self.obj_ghg = (
             self.E * self._input_data.economic_target_yr_carbon_price
             if settings.GHG_CONSTRAINT_TYPE == "soft"
@@ -380,13 +380,17 @@ class LutoSolver:
         penalties = self.obj_demand + self.obj_ghg + self.obj_water + self.obj_biodiv
         if settings.OBJECTIVE == "mincost":
             sense = GRB.MINIMIZE
-            objective = self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT + penalties * (
-                1 - settings.SOLVE_ECONOMY_WEIGHT
+            objective = (
+                self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT 
+                + self.obj_biodiv * settings.SOLVE_BIODIV_PRIORITY_WEIGHT
+                + penalties * (1 - settings.SOLVE_ECONOMY_WEIGHT)
             )
         elif settings.OBJECTIVE == "maxprofit":
             sense = GRB.MAXIMIZE
-            objective = self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT - penalties * (
-                1 - settings.SOLVE_ECONOMY_WEIGHT
+            objective = (
+                self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT 
+                + self.obj_biodiv * settings.SOLVE_BIODIV_PRIORITY_WEIGHT
+                - penalties * (1 - settings.SOLVE_ECONOMY_WEIGHT)
             )
         else:
             raise ValueError(f"Unknown objective function: {settings.OBJECTIVE}")
