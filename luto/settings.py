@@ -102,6 +102,16 @@ AMORTISATION_PERIOD = 30 # years
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
 RESFACTOR = 20       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
+# The step size for the temporal domain (years)
+STEP_SIZE = 1
+'''
+The gap between two consecutive years in the model. For example, if the set-size is 5,
+the model will simulate on years of 2010, 2015, 2020, ..., 2050.
+
+Note, the target year will always be included in the simulation. Even if the step size
+does not reach the target year.
+'''
+
 # How does the model run over time
 # MODE = 'snapshot'   # Runs for target year only
 MODE = 'timeseries'   # Runs each year from base year to target year

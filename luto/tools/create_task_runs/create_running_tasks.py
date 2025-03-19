@@ -31,7 +31,7 @@ grid_search = {
     # Task run settings for submitting the job to the cluster
     ###############################################################
     'MEM': ['40GB'],
-    'NCPUS':[20],
+    'NCPUS':[10],
     'TIME': ['8:00:00'],
     'QUEUE': ['normalsr'],
     
@@ -115,10 +115,10 @@ grid_search_df = create_grid_search_template()
 # # 1) Submit task to a single linux machine, and run simulations parallely
 # create_task_runs(grid_search_df, mode='single', python_path='/home/582/jw6041/miniforge3/envs/luto/bin/python', n_workers=40, waite_mins=1.5)
 
-# # 2) Submit task to multiple linux computation nodes
-# create_task_runs(grid_search_df, mode='multiple')
+# 2) Submit task to multiple linux computation nodes
+create_task_runs(grid_search_df, mode='cluster')
 
-# 3) Submit task to a single windows machine, and run simulations parallely
-create_task_runs(grid_search_df, mode='single', python_path='F:/jinzhu/conda_env/luto/python.exe', n_workers=40, waite_mins=1.5)
+# # 3) Submit task to a single windows machine, and run simulations parallely
+# create_task_runs(grid_search_df, mode='single', python_path='F:/jinzhu/conda_env/luto/python.exe', n_workers=40, waite_mins=1.5)
 
 
