@@ -559,7 +559,7 @@ and manage human-wildlife interactions
 SNES_CONSTRAINTS = 'on'    # 'on' or 'off'
 ECNES_CONSTRAINTS = 'on'   # 'on' or 'off'
 
-NES_LAYER_TYPE = 'likely'  # 'likely' or 'likely/maybe'
+NES_LAYER_TYPE = 'likely'  # 'likely' or 'likely_and_maybe'
 
 
 
@@ -582,7 +582,7 @@ NON_AGRICULTURAL_LU_BASE_CODE = 100
 # Number of decimals to round the lower bound matrices to for non-agricultural land uses and agricultural management options.
 ROUND_DECMIALS = 6
 
-SPECIES_CONSERVATION_DIV_CONSTANT = 1e4
+BIODIVERSITY_BIG_CONSTR_DIV_FACTOR = 1e4
 
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)

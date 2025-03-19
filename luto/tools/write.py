@@ -1321,7 +1321,7 @@ def write_species_conservation(data: Data, yr_cal: int, path) -> None:
 
     for s, name in species_names.items():
         sc_df.loc[name, "Target"] = sc_targets[s]
-        sc_df.loc[name, "Actual"] = sc_prod_data[s] * settings.SPECIES_CONSERVATION_DIV_CONSTANT
+        sc_df.loc[name, "Actual"] = sc_prod_data[s] * settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR
 
     sc_df.to_csv(os.path.join(path, f'species_conservation_{yr_cal}.csv'), index=True)
 
@@ -1343,7 +1343,7 @@ def write_snes(data: Data, yr_cal: int, path) -> None:
             snes_xr, data.LUMAP, ag_biodiv_degr_j
         )
     else:
-        snes_prod_data = data.prod_data[yr_cal]["SNES"] * settings.SPECIES_CONSERVATION_DIV_CONSTANT
+        snes_prod_data = data.prod_data[yr_cal]["SNES"] * settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR
 
     for x, name in x_names.items():
         snes_df.loc[name, "Target"] = x_targets[x]
@@ -1369,7 +1369,7 @@ def write_ecnes(data: Data, yr_cal: int, path) -> None:
             ecnes_xr, data.LUMAP, ag_biodiv_degr_j
         )
     else:
-        ecnes_prod_data = data.prod_data[yr_cal]["ECNES"] * settings.SPECIES_CONSERVATION_DIV_CONSTANT
+        ecnes_prod_data = data.prod_data[yr_cal]["ECNES"] * settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR
 
     for x, name in x_names.items():
         ecnes_df.loc[name, "Target"] = x_targets[x]

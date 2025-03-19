@@ -991,8 +991,8 @@ class LutoSolver:
             )
 
             # Divide by constant to reduce strain on the constraint matrix range
-            self.species_conservation_exprs[s] = (ag_contr + ag_man_contr + non_ag_contr) / settings.SPECIES_CONSERVATION_DIV_CONSTANT
-            constr_area = s_area_lb / settings.SPECIES_CONSERVATION_DIV_CONSTANT
+            self.species_conservation_exprs[s] = (ag_contr + ag_man_contr + non_ag_contr) / settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR
+            constr_area = s_area_lb / settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR
 
             print(f"        ...species {s_names[s]} conservation target area: {s_area_lb:,.0f}")
             self.species_conservation_constrs[s] = self.gurobi_model.addConstr(
@@ -1010,6 +1010,12 @@ class LutoSolver:
         
         for x, x_area_lb in enumerate(x_limits):
             ind = np.where(self._input_data.snes_xr[x] > 0)[0]
+
+            if ind.size == 0:
+                print(
+                    f"        ...WARNING: SNES species {x_names[x]} target was NOT added: no cells can contribute to species target area "
+                    f"(data.get_GBF4B_SNES_layers() returns empty array for this species).")
+                continue
             
             ag_contr = gp.quicksum(
                 gp.quicksum(
@@ -1049,8 +1055,8 @@ class LutoSolver:
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            self.snes_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / settings.SPECIES_CONSERVATION_DIV_CONSTANT
-            constr_lb = x_area_lb / (settings.SPECIES_CONSERVATION_DIV_CONSTANT)
+            self.snes_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR
+            constr_lb = x_area_lb / (settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR)
 
             print(f"        ...SNES species {x_names[x]} target: {x_area_lb:,.0f}")
             self.snes_constrs[x] = self.gurobi_model.addConstr(
@@ -1069,6 +1075,12 @@ class LutoSolver:
         
         for x, x_area_lb in enumerate(x_limits):
             ind = np.where(self._input_data.ecnes_xr[x] > 0)[0]
+
+            if ind.size == 0:
+                print(
+                    f"        ...WARNING: ECNES species {x_names[x]} target was NOT added: no cells can contribute to species target area "
+                    f"(data.get_GBF4B_ECNES_layers() returns empty array for this community).")
+                continue
             
             ag_contr = gp.quicksum(
                 gp.quicksum(
@@ -1108,8 +1120,8 @@ class LutoSolver:
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            self.ecnes_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / settings.SPECIES_CONSERVATION_DIV_CONSTANT
-            constr_lb = x_area_lb / (settings.SPECIES_CONSERVATION_DIV_CONSTANT * 1000)
+            self.ecnes_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR
+            constr_lb = x_area_lb / (settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR * 1000)
 
             print(f"        ...ECNES community {x_names[x]} target: {x_area_lb:,.0f}")
             self.ecnes_constrs[x] = self.gurobi_model.addConstr(
