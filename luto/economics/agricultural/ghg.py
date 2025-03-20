@@ -401,8 +401,7 @@ def get_ghg_transition_penalties(data: Data, lumap, separate=False) -> np.ndarra
       greenhouse-gas-transition-penalties (np.ndarray): The greenhouse gas transition penalties.
     """
    
-    # penalties_lvstck_natural_to_unall_natural = get_ghg_penalties_lvstck_natural_to_unall_natural(data, lumap)
-    penalties_lvstck_natural_to_unall_natural = 0 # TODO: BIARRI will implement new non-ag stratagies (destocked natural land) coverting this 
+    penalties_lvstck_natural_to_unall_natural = get_ghg_penalties_lvstck_natural_to_unall_natural(data, lumap) * 0 # TODO: BIARRI will implement new non-ag stratagies (destocked natural land) coverting this 
     penalties_unall_natural_to_lvstck_natural = get_ghg_penalties_unall_natural_to_lvstk_natural(data, lumap)
     penalties_lvstck_natural_to_modified = get_ghg_penalties_lvstk_natural_to_modified(data, lumap)
     penalties_unall_natural_to_modified = get_ghg_penalties_unall_natural_to_modified(data, lumap)
