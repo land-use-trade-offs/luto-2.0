@@ -398,20 +398,22 @@ def get_ghg_transition_penalties(data: Data, lumap, separate=False) -> np.ndarra
       separate (bool): Whether to return the penalties for each transition separately.
 
     Returns:
-      greenhouse-gas-transition-penalties : (np.ndarray | xr.DataArray).
+      greenhouse-gas-transition-penalties (np.ndarray): The greenhouse gas transition penalties.
     """
    
-    penalties_lvstck_natural_to_unall_natural = get_ghg_penalties_lvstck_natural_to_unall_natural(data, lumap)
+    penalties_lvstck_natural_to_unall_natural = get_ghg_penalties_lvstck_natural_to_unall_natural(data, lumap) * 0 # TODO: BIARRI will implement new non-ag stratagies (destocked natural land) coverting this 
     penalties_unall_natural_to_lvstck_natural = get_ghg_penalties_unall_natural_to_lvstk_natural(data, lumap)
     penalties_lvstck_natural_to_modified = get_ghg_penalties_lvstk_natural_to_modified(data, lumap)
     penalties_unall_natural_to_modified = get_ghg_penalties_unall_natural_to_modified(data, lumap)
     
     if separate:
-        ghg_trainsition_penalties = np.stack([
-                penalties_lvstck_natural_to_unall_natural, 
-                penalties_unall_natural_to_lvstck_natural, 
-                penalties_lvstck_natural_to_modified, 
-                penalties_unall_natural_to_modified])
+        ghg_trainsition_penalties = {
+            'Livestock natural to unallocated natural': penalties_lvstck_natural_to_unall_natural,
+            'Unallocated natural to livestock natural': penalties_unall_natural_to_lvstck_natural,
+            'Livestock natural to modified': penalties_lvstck_natural_to_modified,
+            'Unallocated natural to modified': penalties_unall_natural_to_modified
+        }
+
     else:
         ghg_trainsition_penalties = penalties_lvstck_natural_to_unall_natural \
             + penalties_unall_natural_to_lvstck_natural \

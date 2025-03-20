@@ -924,7 +924,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Cost (billion AU$)",
+        text: "Cost (million AU$)",
       },
     },
     xAxis: {
@@ -977,7 +977,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Cost (billion AU$)",
+        text: "Cost (million AU$)",
       },
     },
     xAxis: {
@@ -1150,7 +1150,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Cost (billion AU$)",
+        text: "Cost (million AU$)",
       },
     },
     xAxis: {
@@ -1203,7 +1203,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Cost (billion AU$)",
+        text: "Cost (million AU$)",
       },
     },
     xAxis: {
@@ -1374,7 +1374,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Cost (billion AU$)",
+        text: "Cost (million AU$)",
       },
     },
     xAxis: {
@@ -1428,7 +1428,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Cost (billion AU$)",
+        text: "Cost (million AU$)",
       },
     },
     xAxis: {
@@ -1482,7 +1482,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Cost (billion AU$)",
+        text: "Cost (million AU$)",
       },
     },
     xAxis: {
@@ -1537,7 +1537,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Cost (billion AU$)",
+        text: "Cost (million AU$)",
       },
     },
     xAxis: {

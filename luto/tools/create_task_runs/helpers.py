@@ -21,6 +21,7 @@ import os, re, time, json
 import shutil, psutil, itertools, subprocess
 import pandas as pd
 
+from typing import Literal
 from glob import glob
 from joblib import delayed, Parallel
 from luto import settings
@@ -30,7 +31,8 @@ from datetime import datetime
 def create_settings_template(to_path:str=TASK_ROOT_DIR):
 
     # Save the settings template to the root task folder
-    None if os.path.exists(to_path) else os.makedirs(to_path)
+    if not os.path.exists(to_path):
+        os.makedirs(to_path, exist_ok=True)
     
     # Check if the settings_template.csv already exists
     if os.path.exists(f'{to_path}/settings_template.csv'):
@@ -50,12 +52,13 @@ def create_settings_template(to_path:str=TASK_ROOT_DIR):
             settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
             settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
             
-            # Add parameters
+            # Add parameters for the job submission
             settings_dict['JOB_NAME'] = 'auto'
             settings_dict['MEM'] = 'auto'
             settings_dict['QUEUE'] = 'normal'
-            settings_dict['WRITE_THREADS'] = 10 # 10 threads for writing is a safe number to avoid out-of-memory issues
-            settings_dict['NCPUS'] = min(settings_dict['THREADS']//4*4, 48) # max 48 cores
+            settings_dict['WRITE_THREADS'] = 10                     # 10 threads for writing is a safe number to avoid out-of-memory issues
+            settings_dict['KEEP_OUTPUTS'] = True
+            settings_dict['NCPUS'] = settings_dict['THREADS']//4*4  # Round down to the nearest multiple of 4
             settings_dict['TIME'] = '10:00:00'
 
             # Write the non-string values to a file
@@ -132,16 +135,18 @@ def create_grid_search_template(
     return template_grid_search
 
 
-def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, mode='single', n_workers:int=4, waite_mins:int=3):
+def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, mode:Literal['single','cluster']='single', n_workers:int=4):
     '''
     Submit the tasks to the cluster using the custom settings.\n
     Parameters:
-        - custom_settings (pd.DataFrame): The custom settings DataFrame.
-        - Only works if mode == "single".
-            - python_path (str): The path to the python executable.
-            - n_workers (int): The number of workers to use for parallel processing.
-            - waite_mins (int): The number of minutes to wait before excuting the next task in the queue.
+     custom_settings (pd.DataFrame):The custom settings DataFrame.
+     python_path (str, only works if mode == "single"): The path to the python executable.
+     mode (str): The mode to submit the tasks. Options are "single" or "cluster".
+     n_workers (int): The number of workers to use for parallel processing. 
     '''
+    
+    if mode not in ['single', 'cluster']:
+        raise ValueError('Mode must be either "single" or "cluster"!')
    
     # Read the custom settings file
     custom_settings = custom_settings.dropna(how='all', axis=1)
@@ -155,7 +160,7 @@ def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, mode='s
     if not custom_cols:
         raise ValueError('No custom settings found in the settings_template.csv file!')
 
-    def process_col(col_idx, col):
+    def process_col(col):
         # Read the non-string values from the file
         with open(f'{TASK_ROOT_DIR}/non_str_val.txt', 'r') as file:
             eval_vars = file.read().splitlines()
@@ -163,19 +168,15 @@ def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, mode='s
         custom_settings.loc[eval_vars, col] = custom_settings.loc[eval_vars, col].map(str).map(eval)
         # Update the settings dictionary
         custom_dict = update_settings(custom_settings[col].to_dict(), col)
-        
-        # Wait for the specified time before submitting the next task
-        time.sleep(col_idx * waite_mins * 60)
-        
         # Submit the task
         create_run_folders(col)
         write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
-        submit_task(col, python_path, mode='single')
+        submit_task(col, python_path, mode=mode)
 
     # Submit the tasks in parallel; Using 4 threads is a safe number to submit
     # tasks in login node. Or use the specified number of cpus if not in a linux system
     workers = min(n_workers, len(custom_cols)) if os.name == 'posix' else n_workers
-    Parallel(n_jobs=workers, timeout=999999)(delayed(process_col)(col_idx, col) for col_idx, col in enumerate(custom_cols))
+    Parallel(n_jobs=workers)(delayed(process_col)(col) for col in custom_cols)
 
 
 def copy_folder_custom(source, destination, ignore_dirs=None):
@@ -250,7 +251,7 @@ def update_settings(settings_dict:dict, col:str):
     settings_dict['CARBON_PRICES_FIELD'] = settings_dict['GHG_LIMITS_FIELD'][:9].replace('(','') 
 
     # Update the threads based on the number of cpus
-    settings_dict['THREADS'] = settings_dict['NCPUS']
+    settings_dict['THREADS'] = int(settings_dict['NCPUS'] * 1.5) # 1.5 times the number of cpus to increase CPU utilization
 
     return settings_dict
 
@@ -272,7 +273,7 @@ def create_run_folders(col):
 
 
 
-def submit_task(col:str, python_path:str=None, mode='single'):
+def submit_task(col:str, python_path:str=None, mode:Literal['single','cluster']='single'):
     # Copy the slurm script to the task folder
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{TASK_ROOT_DIR}/{col}/task_cmd.sh')
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/python_script.py', f'{TASK_ROOT_DIR}/{col}/python_script.py')
@@ -283,12 +284,12 @@ def submit_task(col:str, python_path:str=None, mode='single'):
         print(f'Task {col} has been submitted!')
     
     # Start the task if the os is linux
-    elif mode == 'multiple':
+    elif mode == 'cluster' and os.name == 'posix':
         # Submit the task to the cluster
         subprocess.run(['bash', 'task_cmd.sh'], cwd=f'{TASK_ROOT_DIR}/{col}')
     
     else:
-        raise ValueError('Mode must be either "single" or "multiple"!')
+        raise ValueError('Mode must be either "single" or "cluster"!')
     
     return f'Task {col} has been submitted!'
 

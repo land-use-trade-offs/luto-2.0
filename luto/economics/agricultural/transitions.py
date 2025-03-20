@@ -63,7 +63,7 @@ def get_exclude_matrices(data: Data, lumap: np.ndarray):
     # Boolean exclusion matrix based on SA2/NLUM agricultural land-use data (in mrj structure).
     # Effectively, this ensures that in any SA2 region the only combinations of land-use and land management
     # that can occur in the future are those that occur in 2010 (i.e., YR_CAL_BASE)
-    x_mrj = data.EXCLUDE
+    x_mrj = data.EXCLUDE.copy()
 
     # Raw transition-cost matrix is in $/ha and lexicographically ordered by land-use (shape = 28 x 28).
     t_ij = data.AG_TMATRIX
@@ -157,18 +157,20 @@ def get_transition_matrices(data: Data, yr_idx, base_year, separate=False):
     # -------------------------------------------------------------- #
 
     # Apply the cost of carbon released by transitioning natural land to modified land
-    ghg_t_mrj = ag_ghg.get_ghg_transition_penalties(data, lumap)               # <unit: t/ha>
-    ghg_t_mrj = tools.amortise(ghg_t_mrj * data.get_carbon_price_by_yr_idx(yr_idx))
-    ghg_t_mrj_cost = np.einsum('mrj,mrj,mrj->mrj', ghg_t_mrj, x_mrj, l_mrj_not)
+    ghg_transition = ag_ghg.get_ghg_transition_penalties(data, lumap, separate=True)        # <unit: t/ha>
+    ghg_t_types = ghg_transition.keys()
+    ghg_t_smrj = np.stack([ghg_transition[t] for t in ghg_t_types], axis=0)                 # s: ghg_t_types, m: land management, r: cell, j: land use
+    ghg_t_smrj = tools.amortise(ghg_t_smrj * data.get_carbon_price_by_yr_idx(yr_idx))
+    ghg_t_smrj_cost = np.einsum('smrj,mrj,mrj->smrj', ghg_t_smrj, x_mrj, l_mrj_not)
 
     # -------------------------------------------------------------- #
     # Total costs.                                                   #
     # -------------------------------------------------------------- #
 
     if separate:
-        return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, 'GHG emissions cost': ghg_t_mrj_cost}
+        return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, **ghg_transition}
     else:
-        return e_mrj + w_delta_mrj + ghg_t_mrj_cost
+        return e_mrj + w_delta_mrj + np.einsum('smrj->mrj', ghg_t_smrj_cost)
 
 
 def get_asparagopsis_effect_t_mrj(data: Data):

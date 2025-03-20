@@ -25,17 +25,19 @@ import luto.settings as settings
 
 # Run the simulation
 data = sim.load_data()
-sim.run(data=data, base=2010, target=2050)
-sim.save_data_to_disk(data, f"{data.path}/DATA_REPORT/Data_{settings.MODE}_RES{settings.RESFACTOR}.gz")
-
+sim.run(data=data, base_year=2010, target_year=2050, step_size=settings.STEP_SIZE)
 
 # Remove all files except the report directory if settings.KEEP_OUTPUTS is False
 '''
 KEEP_OUTPUTS is not originally defined in the settings, but will be added in the `luto/tools/create_task_runs/create_running_tasks.py` file.
 '''
 
-if settings.KEEP_OUTPUTS is False:
-
+if settings.KEEP_OUTPUTS:
+    
+    # Save the data object to disk
+    sim.save_data_to_disk(data, f"{data.path}/DATA_REPORT/Data_{settings.MODE}_RES{settings.RESFACTOR}.gz")
+    
+else:
     report_dir = f"{data.path}/DATA_REPORT"
     destination_dir ='./DATA_REPORT'
     shutil.move(report_dir, destination_dir)

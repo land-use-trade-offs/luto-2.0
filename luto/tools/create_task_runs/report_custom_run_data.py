@@ -27,12 +27,11 @@ from luto.tools.create_task_runs.parameters import BIO_TARGET_ORDER, GHG_ORDER
 
 
 # Get the data
-task_root_dirs = [i for i in glob('../Custom_runs/*') if "20250309_TEST2_DIFF_GBF2_AND_WATER_PENALTY" in i]
+task_root_dirs = [i for i in glob('../Custom_runs/*') if "20250319_TEST_COMBINE_BIO_ECONOMY_WEIGHTS" in i]
 report_data, report_data_demand = process_task_root_dirs(task_root_dirs)
 
 # Filter demand data, where a given commodity is near zero for a given year
 report_data_demand = report_data_demand.query('abs(`deviation_%`) > 0.1').copy()
-report_data_demand = report_data_demand.set_index(['year', 'name', 'GBF2_']).unstack().reset_index()
 
 
 # Filter the data
@@ -48,7 +47,7 @@ filter_rules = '''
     year != 2010
 '''.strip().replace('\n', '')
 
-report_data_filter = report_data.query(filter_rules).query('WATER_PENALTY == 500').copy()
+report_data_filter = report_data.query(filter_rules).copy()
 report_data_demand_filterd = report_data_demand.query(filter_rules).copy()
 
 
@@ -64,12 +63,12 @@ p_weight_vs_profit = (
         p9.aes(
             x='year', 
             y='Profit', 
-            color='WATER_PENALTY', 
+            # color='WATER_PENALTY', 
             # linetype='DIET_GLOB',
-            group='WATER_PENALTY',
+            # group='WATER_PENALTY',
         )
     ) +
-    p9.facet_wrap('GBF2_PENALTY', labeller='label_both') +
+    p9.facet_grid('SOLVE_BIODIV_PRIORITY_WEIGHT~SOLVE_ECONOMY_WEIGHT') +
     p9.geom_line(size=0.3) +
     p9.theme_bw() +
     p9.theme(
