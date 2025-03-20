@@ -652,7 +652,7 @@ class Data:
         self.AG_MAN_L_MRJ_DICT = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
         self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
         
-        print(f"\tCalculating year productivity...", flush=True)
+        print(f"\tCalculating base year productivity...", flush=True)
         yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)
         self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
 
@@ -930,7 +930,7 @@ class Data:
         print("\tLoading demand data...", flush=True)
 
         # Load demand data (actual production (tonnes, ML) by commodity) - from demand model
-        dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5') )
+        dd = pd.read_hdf(os.path.join(INPUT_DIR, 'demand_projections.h5'))
 
         # Select the demand data under the running scenariobbryan-January
         self.DEMAND_DATA = dd.loc[(settings.SCENARIO,
@@ -1039,7 +1039,7 @@ class Data:
         savburn_df = pd.read_hdf(os.path.join(INPUT_DIR, 'cell_savanna_burning.h5'), where=self.MASK)
 
         # Load the columns as numpy arrays
-        self.SAVBURN_ELIGIBLE =  savburn_df.ELIGIBLE_AREA.to_numpy()              # 1 = areas eligible for early dry season savanna burning under the ERF, 0 = ineligible          
+        self.SAVBURN_ELIGIBLE =  savburn_df.ELIGIBLE_AREA.to_numpy()                    # 1 = areas eligible for early dry season savanna burning under the ERF, 0 = ineligible          
         self.SAVBURN_TOTAL_TCO2E_HA = savburn_df.AEA_TOTAL_TCO2E_HA.to_numpy()
         
         # # Avoided emissions from savanna burning
@@ -1103,11 +1103,11 @@ class Data:
             j: round(x, settings.ROUND_DECMIALS) 
             for j, x in self.BIODIV_HABITAT_DEGRADE_LOOK_UP.items()}
         
-        bio_retain_fraction_habitat = np.vectorize(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.get, otypes=[float])(self.LUMAP).astype(np.float32)
+        self.BIO_BASE_YR_RETAIN_FRACTION_HABITAT = np.vectorize(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.get, otypes=[float])(self.LUMAP).astype(np.float32)
         self.BIO_RETAIN_FRACTION_LDS = np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)          
 
         bio_damage_LDS = self.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * (1 - self.BIO_RETAIN_FRACTION_LDS)           
-        bio_damage_habitat = self.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * (1 - bio_retain_fraction_habitat)         
+        bio_damage_habitat = self.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * (1 - self.BIO_BASE_YR_RETAIN_FRACTION_HABITAT)         
 
 
         # Get the biodiversity value after LDS and habitat impact for the beginning year (BASE YR = 2010)
@@ -1145,10 +1145,10 @@ class Data:
             fill_value = "extrapolate",
         )
         
-        biodiv_GBF_target_2_proportions_2010_2100 = {yr: f(yr).item() for yr in range(2010, 2101)}
+        self.BIO_GBF2_TARGET_PERCENT = {yr: f(yr).item() for yr in range(2010, 2101)}
 
-        self.BIODIV_GBF_TARGET_2 = {
-            yr: bio_baseline_area_weighted_sum * biodiv_GBF_target_2_proportions_2010_2100[yr]
+        self.BIO_GBF2_TARGET_SCORES = {
+            yr: bio_baseline_area_weighted_sum * self.BIO_GBF2_TARGET_PERCENT[yr]
             for yr in range(2010, 2101)
         }
         

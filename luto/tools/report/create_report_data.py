@@ -1403,23 +1403,21 @@ def save_report_data(raw_data_dir:str):
         bio_paths = files.query(filter_str).reset_index(drop=True)
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)
-        bio_df.loc[bio_df['Year']==2010,'Contribution Relative to Pre-1750 Level (%)'] = 0
         
-        bio_df_net_sum = bio_df.groupby(['Year']).sum(numeric_only=True).reset_index()
-        bio_df_net_sum_json = list(map(list,zip(bio_df_net_sum['Year'],bio_df_net_sum['Contribution Relative to Pre-1750 Level (%)'])))
 
-
-        
         # Plot_GBF2_1: Biodiversity total by Type
+        bio_df_target = bio_df.groupby(['Year'])[['Priority Target (%)']].agg('first').reset_index()
+        bio_df_target_json = list(map(list,zip(bio_df_target['Year'],bio_df_target['Priority Target (%)'])))
+        
         bio_df_type = bio_df.groupby(['Year','Type']).sum(numeric_only=True).reset_index()
         bio_df_type = bio_df_type\
             .groupby('Type')[['Year','Contribution Relative to Pre-1750 Level (%)']]\
             .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
             .reset_index()
-            
+
         bio_df_type.columns = ['name','data']
         bio_df_type['type'] = 'column'
-        bio_df_type.loc[len(bio_df_type)] = ['Net Biodiversity Achievement', bio_df_net_sum_json, 'spline']
+        bio_df_type.loc[len(bio_df_type)] = ['Priority Target (%)', bio_df_target_json, 'spline']
         bio_df_type.to_json(f'{SAVE_DIR}/biodiversity_GBF2_1_total_score_by_type.json', orient='records')
         
         

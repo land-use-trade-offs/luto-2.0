@@ -372,22 +372,22 @@ class LutoSolver:
             else 0
         )
         
-        penalties = self.penalty_demand + self.penalty_ghg + self.penalty_water + self.penalty_biodiv
+        self.penalties = self.penalty_demand + self.penalty_ghg + self.penalty_water + self.penalty_biodiv
         
         # Set the objective function
         if settings.OBJECTIVE == "mincost":
             sense = GRB.MINIMIZE
             objective = (
-                self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT 
+                self.obj_economy  * settings.SOLVE_ECONOMY_WEIGHT 
                 + self.obj_biodiv * settings.SOLVE_BIODIV_PRIORITY_WEIGHT
-                + penalties * (1 - settings.SOLVE_ECONOMY_WEIGHT)
+                + self.penalties * ( 1 - settings.SOLVE_ECONOMY_WEIGHT)
             )
         elif settings.OBJECTIVE == "maxprofit":
             sense = GRB.MAXIMIZE
             objective = (
-                self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT 
+                self.obj_economy  * settings.SOLVE_ECONOMY_WEIGHT 
                 + self.obj_biodiv * settings.SOLVE_BIODIV_PRIORITY_WEIGHT
-                - penalties * (1 - settings.SOLVE_ECONOMY_WEIGHT)
+                - self.penalties *  (1 - settings.SOLVE_ECONOMY_WEIGHT)
             )
         else:
             raise ValueError(f"Unknown objective function: {settings.OBJECTIVE}")
@@ -1493,28 +1493,62 @@ class LutoSolver:
             ag_man_X_mrj=ag_man_X_mrj_processed,
             prod_data=prod_data,
             obj_val={
-                "SUM": self.gurobi_model.ObjVal,
-                "Economy": self.obj_economy.getValue(),
-                "Demand": (
-                    self.penalty_demand.getValue()
+                "ObjVal": self.gurobi_model.ObjVal,
+                
+                "Economy Value": self.obj_economy.getValue(),
+                "Economy Objective": self.obj_economy.getValue() * settings.SOLVE_ECONOMY_WEIGHT,
+                
+                "Biodiversity Value": self.obj_biodiv.getValue(),
+                "Biodiversity Objective": self.obj_biodiv.getValue() * settings.SOLVE_BIODIV_PRIORITY_WEIGHT,
+                
+                "Penalties Value": self.penalties.getValue(),
+                "Penalties Objective": self.penalties.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT),
+                
+                
+                "Demand Deviation":(
+                  self.V.X
+                  if settings.DEMAND_CONSTRAINT_TYPE == "soft"
+                  else 0  
+                ),
+                "Demand Penalty": (
+                    self.penalty_demand.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)
                     if settings.DEMAND_CONSTRAINT_TYPE == "soft"
                     else 0
                 ),
-                "GHG": (
-                    self.penalty_ghg.getValue()
+                
+                "GHG Deviation":(
+                  self.E.X
+                  if settings.GHG_CONSTRAINT_TYPE == "soft"
+                  else 0  
+                ),
+                "GHG Penalty": (
+                    self.penalty_ghg.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)
                     if settings.GHG_CONSTRAINT_TYPE == "soft"
                     else 0
                 ),
-                'Biodiversity GBF2': (
-                    self.obj_biodiv.getValue()
+                
+                "Biodiversity (GBF2) Deviation":(
+                  self.B.X
+                  if settings.GBF2_CONSTRAINT_TYPE == "soft"
+                  else 0  
+                ),
+                "Biodiversity (GBF2) Penalty": (
+                    self.penalty_biodiv.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)
                     if settings.GBF2_CONSTRAINT_TYPE == "soft"
                     else 0
                 ),
-                'Water': (
-                    self.penalty_water.getValue()
+                
+                "Water Deviation":(
+                  self.W.X
+                  if settings.WATER_CONSTRAINT_TYPE == "soft"
+                  else 0  
+                ),
+                "Water Penalty": (
+                    self.penalty_water.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)
                     if settings.WATER_CONSTRAINT_TYPE == "soft"
                     else 0
                 ),
+                
             },
         )
 

@@ -199,7 +199,7 @@ def get_biodiversity_limits(data: Data, yr_cal: int):
     """
     Calculate the biodiversity limits for a given year used as a constraint.
 
-    The biodiversity score target timeline is specified in data.BIODIV_GBF_TARGET_2.
+    The biodiversity score target timeline is specified in data.BIO_GBF2_TARGET_SCORES.
 
     Parameters:
     - data: The data object containing relevant information.
@@ -210,7 +210,7 @@ def get_biodiversity_limits(data: Data, yr_cal: int):
 
     """
 
-    return data.BIODIV_GBF_TARGET_2[yr_cal]
+    return data.BIO_GBF2_TARGET_SCORES[yr_cal]
 
 
 def get_major_vegetation_matrices(data: Data) -> np.ndarray:
