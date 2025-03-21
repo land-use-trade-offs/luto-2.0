@@ -228,9 +228,9 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
 
     final_year = years_to_run[-1]
 
-    for s in range(len(years_to_run) - 1):
-        base_year = years_to_run[s]
-        target_year = years_to_run[s + 1]
+    for step in range(len(years_to_run) - 1):
+        base_year = years_to_run[step]
+        target_year = years_to_run[step + 1]
 
         print( "-------------------------------------------------")
         print( f"Running for year {target_year}"   )
@@ -238,14 +238,14 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
         start_time = time.time()
 
         input_data = get_input_data(data, base_year, target_year)
-        d_c = data.D_CY[s + 1]
+        d_c = data.D_CY[target_year - data.YR_CAL_BASE]
 
-        if s == 0:
+        if step == 0:
             luto_solver = LutoSolver(input_data, d_c, final_year)
             luto_solver.formulate()
 
-        if s > 0:
-            prev_base_year = years_to_run[s - 1]
+        if step > 0:
+            prev_base_year = years_to_run[step - 1]
 
             old_ag_x_mrj = luto_solver._input_data.ag_x_mrj.copy()
             old_ag_man_lb_mrj = luto_solver._input_data.ag_man_lb_mrj.copy()
@@ -267,18 +267,16 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
 
         solution = luto_solver.solve()
 
-        yr = target_year
-        data.add_lumap(yr, solution.lumap)
-        data.add_lmmap(yr, solution.lmmap)
-        data.add_ammaps(yr, solution.ammaps)
-        data.add_ag_dvars(yr, solution.ag_X_mrj)
-        data.add_non_ag_dvars(yr, solution.non_ag_X_rk)
-        data.add_ag_man_dvars(yr, solution.ag_man_X_mrj)
-        data.add_obj_vals(yr, solution.obj_val)
-
+        data.add_lumap(target_year, solution.lumap)
+        data.add_lmmap(target_year, solution.lmmap)
+        data.add_ammaps(target_year, solution.ammaps)
+        data.add_ag_dvars(target_year, solution.ag_X_mrj)
+        data.add_non_ag_dvars(target_year, solution.non_ag_X_rk)
+        data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
+        data.add_obj_vals(target_year, solution.obj_val)
 
         for data_type, prod_data in solution.prod_data.items():
-            data.add_production_data(yr, data_type, prod_data)
+            data.add_production_data(target_year, data_type, prod_data)
 
         print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' )
 

@@ -177,7 +177,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_ghg(data, yr_cal, path_yr)
     write_ghg_separate(data, yr_cal, path_yr)
     write_ghg_offland_commodity(data, yr_cal, path_yr)
-    # write_biodiversity_priority_scores(data, yr_cal, path_yr)
+    write_biodiversity_priority_scores(data, yr_cal, path_yr)
     write_biodiversity_GBF2_scores(data, yr_cal, path_yr)
     write_biodiversity_GBF3_scores(data, yr_cal, path_yr)
     write_biodiversity_GBF4A_scores_groups(data, yr_cal, path_yr)
@@ -980,18 +980,19 @@ def write_biodiversity_priority_scores(data: Data, yr_cal, path):
 
     # Apply habitat degradation impact
     for lu in data.AGRICULTURAL_LANDUSES:
+        ag_dvar_mrj = ag_dvar_mrj.copy()                    # Copy because the array is used as a view when feed to multiprocess
         ag_dvar_mrj.loc[{'lu':lu}] = ag_dvar_mrj.loc[{'lu':lu}] * data.BIODIV_HABITAT_DEGRADE_LOOK_UP[data.DESC2AGLU[lu]]
         
     am_impacts = ag_biodiversity.get_ag_management_biodiversity_impacts(data, yr_cal)
     for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items():
         for idx,lu in enumerate(lus):
+            ag_mam_dvar_mrj = ag_mam_dvar_mrj.copy()        # Copy because the array is used as a view when feed to multiprocess
             ag_mam_dvar_mrj.loc[{'am':am, 'lu':lu}] = ag_mam_dvar_mrj.loc[{'am':am, 'lu':lu}] * am_impacts[am][idx]
             
     non_ag_impacts = non_ag_biodiversity.get_non_ag_lu_biodiv_impacts(data)
     for idx,lu in enumerate(NON_AG_LAND_USES.keys()):
+        non_ag_dvar_rk = non_ag_dvar_rk.copy()              # Copy because the array is used as a view when feed to multiprocess
         non_ag_dvar_rk.loc[{'lu':lu}] = non_ag_dvar_rk.loc[{'lu':lu}] * non_ag_impacts[idx]
-
-
 
 
     # Calculate the biodiversity scores, Divide by total area-weighted biodiversity degradation in base year to get the relative contribution
@@ -1022,7 +1023,7 @@ def write_biodiversity_priority_scores(data: Data, yr_cal, path):
     ).rename(columns={
         'lu':'Landuse',
         'am':'Agri-Management',
-        'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)'
+        'Relative_Contribution_Percentage':'Contribution Relative to Base Year Level (%)'
     }).reset_index(
         drop=True
     ).to_csv(
@@ -1075,7 +1076,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     
     # Save the biodiversity scores
     pd.concat([ GBF2_ag, GBF2_non_ag, GBF2_am], axis=0
-    ).assign(Priority_Target=data.BIO_GBF2_TARGET_SCORES[yr_cal] 
+    ).assign(Priority_Target=data.BIO_GBF2_TARGET_PERCENT[yr_cal] * 100
     ).rename(columns={
         'lu':'Landuse',
         'am':'Agri-Management',
