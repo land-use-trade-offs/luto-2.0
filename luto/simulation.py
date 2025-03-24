@@ -47,11 +47,12 @@ from luto.tools import (
     calc_major_vegetation_group_ag_area_for_year, 
     calc_species_ag_area_for_year, 
     LogToFile,
-    get_timestamp
+    write_timestamp,
+    read_timestamp
 )
 
 
-@LogToFile(f"{settings.OUTPUT_DIR}/run_{get_timestamp()}")
+@LogToFile(f"{settings.OUTPUT_DIR}/run_{read_timestamp()}")
 def load_data() -> Data:
     """
     Load the Data object containing all required data to run a LUTO simulation.
@@ -63,7 +64,7 @@ def load_data() -> Data:
     return Data()
 
 
-@LogToFile(f"{settings.OUTPUT_DIR}/run_{get_timestamp()}", 'a')
+@LogToFile(f"{settings.OUTPUT_DIR}/run_{read_timestamp()}", 'a')
 def run(
     data: Data, 
     base_year: int | None = None, 
@@ -342,7 +343,7 @@ def load_data_from_disk(path: str) -> Data:
     if int(data.RESMULT ** 0.5) != settings.RESFACTOR:
         raise ValueError(f'Resolution factor from data loading ({int(data.RESMULT ** 0.5)}) does not match it of settings ({settings.RESFACTOR})!')
 
-    data.timestamp = get_timestamp()
+    data.timestamp = write_timestamp()
     
     return data
   

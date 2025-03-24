@@ -50,13 +50,18 @@ from luto.tools.report.create_static_maps import TIF2MAP
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.tools.report.data_tools import get_all_files
 
-def get_timestamp():
+def write_timestamp():
     timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
     timestamp_path = os.path.join(settings.OUTPUT_DIR, '.timestamp')
-    if not os.path.exists(timestamp_path):
-        with open(timestamp_path, 'w') as f: f.write(timestamp)
-    else:
+    with open(timestamp_path, 'w') as f: f.write(timestamp)
+    return timestamp
+
+def read_timestamp():
+    timestamp_path = os.path.join(settings.OUTPUT_DIR, '.timestamp')
+    if os.path.exists(timestamp_path):
         with open(timestamp_path, 'r') as f: timestamp = f.read()
+    else:
+        raise FileNotFoundError(f"Timestamp file not found at {timestamp_path}")
     return timestamp
 
 

@@ -69,7 +69,7 @@ from luto.tools.report.create_static_maps import TIF2MAP
 
 
 # Global timestamp for the run
-timestamp = tools.get_timestamp()
+timestamp = tools.write_timestamp()
           
 def write_outputs(data: Data):
     """Write model outputs to file"""
@@ -130,7 +130,8 @@ def move_logs(data: Data):
             f"{settings.OUTPUT_DIR}/run_{timestamp}_stderr.log",
             f"{settings.OUTPUT_DIR}/write_{timestamp}_stdout.log",
             f"{settings.OUTPUT_DIR}/write_{timestamp}_stderr.log",
-            f'{settings.OUTPUT_DIR}/RES_{settings.RESFACTOR}_{settings.MODE}_mem_log.txt']
+            f'{settings.OUTPUT_DIR}/RES_{settings.RESFACTOR}_{settings.MODE}_mem_log.txt',
+            f'{settings.OUTPUT_DIR}/.timestamp']
 
     for log in logs:
         try:
@@ -523,21 +524,26 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     cost_dfs = []
     # Convert the transition cost matrices to a DataFrame
-    for lu_desc, lu_idx in data.DESC2AGLU.items():
-        for cost_type in ag_transitions_cost_mat.keys():
+    for from_lu in data.AGRICULTURAL_LANDUSES:
+        for from_lm in data.LANDMANS:
+            for cost_type in ag_transitions_cost_mat.keys():
+                            
+                from_lu_idx = base_mrj[data.LANDMANS.index(from_lm), :, data.DESC2AGLU[from_lu]]    # Get the cells of 'from' land-use in the base year (r)
+                arr_trans = np.nan_to_num(ag_transitions_cost_mat[cost_type])[:,from_lu_idx,:]      # Get the transition cost matrix                    (m,r*,j)
+                arr_dvar = ag_dvar[:,from_lu_idx,:]                                                 # Get the decision variables                        (m,r*,j)                          
+                
+                cost_arr = np.einsum('mrj,mrj->mj', arr_trans, arr_dvar)                            # Multiply by decision variables
 
-            base_lu_arr = base_mrj[:, :, lu_idx]                                      # Get the base land-use array                       (m,r)
-            arr = np.nan_to_num(ag_transitions_cost_mat[cost_type])                   # Get the transition cost matrix                    (m,r,j)
-            arr = np.einsum('mr,mrj,mrj->mj', base_lu_arr, arr, ag_dvar)              # Multiply by decision variables
-
-            arr_df = pd.DataFrame(arr.flatten(),
-                            index=pd.MultiIndex.from_product([data.LANDMANS, data.AGRICULTURAL_LANDUSES],
-                            names=['Water Supply', 'To land-use']),
-                            columns=['Cost ($)']).reset_index()
-            arr_df.insert(0, 'Type', cost_type)
-            arr_df.insert(1, 'Year', yr_cal)
-            arr_df.insert(2, 'From land-use', lu_desc)
-            cost_dfs.append(arr_df)
+                arr_df = pd.DataFrame(
+                    cost_arr.flatten(),
+                    index=pd.MultiIndex.from_product([data.LANDMANS, data.AGRICULTURAL_LANDUSES],
+                    names=['To water-upply', 'To land-use']),
+                    columns=['Cost ($)']).reset_index()
+                arr_df.insert(0, 'Type', cost_type)
+                arr_df.insert(1, 'Year', yr_cal)
+                arr_df.insert(2, 'From land-use', from_lu)
+                arr_df.insert(3, 'From water-supply', from_lm)
+                cost_dfs.append(arr_df)
 
     # Save the cost DataFrames
     cost_df = pd.concat(cost_dfs, axis=0)
@@ -564,27 +570,39 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     # Get the transition cost matirces for non-agricultural land-use
     if yr_idx == 0:
         non_ag_transitions_cost_mat = {
-            k:{'Transition cost':np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)}
+            k:{'Transition cost':np.zeros((data.NCELLS, data.N_AG_LUS)).astype(np.float32)}
             for k in NON_AG_LAND_USES.keys()
         }
     else:
         non_ag_transitions_cost_mat = non_ag_transitions.get_from_ag_transition_matrix(
             data,yr_idx, yr_cal_sim_pre, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], separate=True
         )
+        
+
 
     cost_dfs = []
-    for idx,non_ag_type in enumerate(non_ag_transitions_cost_mat):
-        for cost_type in non_ag_transitions_cost_mat[non_ag_type]:
-            arr = non_ag_transitions_cost_mat[non_ag_type][cost_type]          # Get the transition cost matrix
-            arr = np.einsum('mrj,r->mj', arr, non_ag_dvar[:,idx])              # Multiply the transition cost matrix by the cost of non-agricultural land-use
-
-            arr_df = pd.DataFrame(arr.flatten(),
-                                index=pd.MultiIndex.from_product([data.LANDMANS, data.AGRICULTURAL_LANDUSES],names=['Water supply', 'From land-use']),
-                                columns=['Cost ($)']).reset_index()
-            arr_df.insert(0, 'To land-use', non_ag_type)
-            arr_df.insert(1, 'Cost type', cost_type)
-            arr_df.insert(2, 'Year', yr_cal)
-            cost_dfs.append(arr_df)
+    for from_lu in data.AGRICULTURAL_LANDUSES:
+        for from_lm in data.LANDMANS:
+            for to_lu in NON_AG_LAND_USES.keys():
+                for cost_type in non_ag_transitions_cost_mat[to_lu].keys():
+                    
+                    from_lu_idx = base_mrj[data.LANDMANS.index(from_lm), :, data.DESC2AGLU[from_lu]]                                                    # Get the land-use index of the from land-use (r*)
+                    arr_trans = non_ag_transitions_cost_mat[to_lu][cost_type][data.LANDMANS.index(from_lm), from_lu_idx, data.DESC2AGLU[from_lu]]       # Get the transition cost matrix of from land-use (r*)
+                    arr_dvar = non_ag_dvar[from_lu_idx, data.NON_AGRICULTURAL_LANDUSES.index(to_lu)]                                                    # Get the decision variable of the from land-use (r*,k)
+                    
+                    if arr_dvar.size == 0:
+                        continue
+                    
+                    cost_arr = np.einsum('r,r->', arr_trans, arr_dvar)                                # Calculate the cost array
+                    arr_df = pd.DataFrame([{
+                        'Cost type': cost_type,
+                        'From land-use': from_lu,
+                        'From water-supply': from_lm,
+                        'To land-use': to_lu,
+                        'Cost ($)': cost_arr,
+                        'Year': yr_cal
+                    }])
+                    cost_dfs.append(arr_df)
 
     # Save the cost DataFrames
     cost_df = pd.concat(cost_dfs, axis=0)

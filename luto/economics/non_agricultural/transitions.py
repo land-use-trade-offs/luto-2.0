@@ -66,9 +66,9 @@ def get_env_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
 
 
     if separate:
-        return {'Transition cost': np.einsum('mrj,mrj,r->mrj', base_ag_to_ep_t_mrj, l_mrj, data.REAL_AREA), 
-                'Establishment cost': np.einsum('r,mrj,r->mrj', est_costs_r, l_mrj, data.REAL_AREA),
-                'Water license cost': np.einsum('mrj,mrj,r->mrj', w_delta_mrj, l_mrj, data.REAL_AREA)}
+        return {'Ag2Non-Ag Transition cost': np.einsum('mrj,mrj,r->mrj', base_ag_to_ep_t_mrj, l_mrj, data.REAL_AREA), 
+                'Ag2Non-Ag Establishment cost': np.einsum('r,mrj,r->mrj', est_costs_r, l_mrj, data.REAL_AREA),
+                'Ag2Non-Ag Water license cost': np.einsum('mrj,mrj,r->mrj', w_delta_mrj, l_mrj, data.REAL_AREA)}
         
     ag2ep_transitions_r += est_costs_r
     return ag2ep_transitions_r * data.REAL_AREA
@@ -93,7 +93,7 @@ def get_rip_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
     
     if separate:
         l_mrj = lumap2ag_l_mrj(lumap, lmmap)
-        base_costs.update({'Fencing cost':np.einsum('r,mrj->mrj', fencing_cost, l_mrj)})
+        base_costs.update({'Ag2Non-Ag Fencing cost':np.einsum('r,mrj->mrj', fencing_cost, l_mrj)})
         return base_costs
     else:
         return base_costs + fencing_cost
@@ -118,7 +118,7 @@ def get_agroforestry_transitions_from_ag_base(data: Data, yr_idx, lumap, lmmap, 
     
     if separate:
         l_mrj = lumap2ag_l_mrj(lumap, lmmap)
-        base_costs.update({'Fencing cost':np.einsum('r,mrj->mrj', fencing_cost, l_mrj)})
+        base_costs.update({'Ag2Non-Ag Fencing cost':np.einsum('r,mrj->mrj', fencing_cost, l_mrj)})
         return base_costs
     else:
         return base_costs + fencing_cost
@@ -190,7 +190,7 @@ def get_beef_agroforestry_transitions_from_ag(
     
     if separate:
         # Combine and return separated costs
-        # Agroforestry keys: 'Transition cost', 'Establishment cost', 'Water license cost', 'Fencing cost'
+        # Agroforestry keys: 'Ag2Non-Ag Transition cost', 'Ag2Non-Ag Establishment cost', 'Ag2Non-Ag Water license cost', 'Ag2Non-Ag Fencing cost'
         combined_costs = {}
         for key, array in agroforestry_costs.items():
             combined_costs[key] = np.zeros(array.shape).astype(np.float32)
@@ -216,7 +216,7 @@ def get_beef_agroforestry_transitions_from_ag(
         agroforestry_contr = agroforestry_costs * agroforestry_x_r
         t_r = beef_contr + agroforestry_contr
 
-        # Set all non-agricultural land to have zero
+        # Set all non-agricultural land to have zero cost
         non_ag_cells = tools.get_non_ag_cells(lumap)
         t_r[non_ag_cells] = 0
 
@@ -256,9 +256,9 @@ def get_carbon_plantings_block_from_ag(data: Data, yr_idx, lumap, lmmap, separat
     ag2cp_transitions_r += est_costs_r
 
     if separate:
-        return {'Transition cost':np.einsum('mrj,mrj,r->mrj', base_ag_to_cp_t_mrj, l_mrj, data.REAL_AREA), 
-                'Establishment cost': np.einsum('r,mrj,r->mrj', est_costs_r, l_mrj, data.REAL_AREA),
-                'Water license cost': np.einsum('mrj,mrj,r->mrj', w_delta_mrj, l_mrj, data.REAL_AREA)}
+        return {'Ag2Non-Ag Transition cost':np.einsum('mrj,mrj,r->mrj', base_ag_to_cp_t_mrj, l_mrj, data.REAL_AREA), 
+                'Ag2Non-Ag Establishment cost': np.einsum('r,mrj,r->mrj', est_costs_r, l_mrj, data.REAL_AREA),
+                'Ag2Non-Ag Water license cost': np.einsum('mrj,mrj,r->mrj', w_delta_mrj, l_mrj, data.REAL_AREA)}
     else:
         return ag2cp_transitions_r * data.REAL_AREA
 
@@ -284,7 +284,7 @@ def get_carbon_plantings_belt_from_ag_base(data: Data, yr_idx, lumap, lmmap, sep
     
     if separate:
         l_mrj = lumap2ag_l_mrj(lumap, lmmap)
-        base_costs.update({'Fencing cost':np.einsum('r,mrj->mrj', fencing_cost, l_mrj)})
+        base_costs.update({'Ag2Non-Ag Fencing cost':np.einsum('r,mrj->mrj', fencing_cost, l_mrj)})
         return base_costs
     else:
         return base_costs + fencing_cost
@@ -505,8 +505,8 @@ def get_env_plantings_to_ag(data: Data, yr_idx, lumap, lmmap, separate=False) ->
     base_ep_to_ag_t_mrj[:, ag_cells, :] = 0
 
     if separate:
-        return {'Transition cost':np.einsum('mrj,mrj,r->mrj', base_ep_to_ag_t_mrj, l_mrj, data.REAL_AREA), 
-                'Water license cost': np.einsum('mrj,mrj,r->mrj', w_delta_mrj, l_mrj, data.REAL_AREA)}
+        return {'Non-Ag2Ag Transition cost':np.einsum('mrj,mrj,r->mrj', base_ep_to_ag_t_mrj, l_mrj, data.REAL_AREA), 
+                'Non-Ag2Ag Water license cost': np.einsum('mrj,mrj,r->mrj', w_delta_mrj, l_mrj, data.REAL_AREA)}
         
     # Add cost of water license and cost of installing/removing irrigation where relevant (pre-amortised)
     ep_to_ag_t_mrj = base_ep_to_ag_t_mrj + w_delta_mrj
@@ -600,7 +600,7 @@ def get_sheep_to_ag_base(data: Data, yr_idx: int, lumap, separate=False) -> np.n
     ghg_t_mrj_cost[:, ag_cells, :] = np.zeros((data.NLMS, ag_cells.shape[0], data.N_AG_LUS)).astype(np.float32)
 
     if separate:
-        return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, 'GHG emissions cost': ghg_t_mrj_cost}
+        return {'Non-Ag2Ag Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, 'GHG emissions cost': ghg_t_mrj_cost}
     
     else:
         return e_mrj + w_delta_mrj + ghg_t_mrj_cost
@@ -659,7 +659,7 @@ def get_beef_to_ag_base(data: Data, yr_idx, lumap, separate) -> np.ndarray|dict:
     ghg_t_mrj_cost[:, ag_cells, :] = np.zeros((data.NLMS, ag_cells.shape[0], data.N_AG_LUS)).astype(np.float32)
 
     if separate:
-        return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, 'GHG emissions cost': ghg_t_mrj_cost}
+        return {'Non-Ag2Ag Establishment cost': e_mrj, 'Non-Ag2Ag Water license cost': w_delta_mrj, 'Non-Ag2Ag GHG emissions cost': ghg_t_mrj_cost}
     
     else:
         t_mrj = e_mrj + w_delta_mrj + ghg_t_mrj_cost

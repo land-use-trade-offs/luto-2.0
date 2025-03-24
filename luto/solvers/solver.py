@@ -284,14 +284,14 @@ class LutoSolver:
         # Get economic contributions
         ag_obj_mrj, non_ag_obj_rk, ag_man_objs = self._input_data.economic_contr_mrj
 
-        economy_ag_contr = gp.quicksum(
+        self.economy_ag_contr = gp.quicksum(
             ag_obj_mrj[0, self._input_data.ag_lu2cells[0, j], j]
             @ self.X_ag_dry_vars_jr[j, self._input_data.ag_lu2cells[0, j]]
             + ag_obj_mrj[1, self._input_data.ag_lu2cells[1, j], j]
             @ self.X_ag_irr_vars_jr[j, self._input_data.ag_lu2cells[1, j]]
             for j in range(self._input_data.n_ag_lus)
         )
-        economy_ag_man_contr = gp.quicksum(
+        self.economy_ag_man_contr = gp.quicksum(
             ag_man_objs[am][0, self._input_data.ag_lu2cells[0, j], j_idx]
             @ self.X_ag_man_dry_vars_jr[am][j_idx, self._input_data.ag_lu2cells[0, j]]
             + ag_man_objs[am][1, self._input_data.ag_lu2cells[1, j], j_idx]
@@ -299,13 +299,13 @@ class LutoSolver:
             for am, am_j_list in self._input_data.am2j.items()
             for j_idx, j in enumerate(am_j_list)
         )
-        economy_non_ag_contr = gp.quicksum(
+        self.economy_non_ag_contr = gp.quicksum(
             non_ag_obj_rk[:, k][self._input_data.non_ag_lu2cells[k]]
             @ self.X_non_ag_vars_kr[k, self._input_data.non_ag_lu2cells[k]]
             for k in range(self._input_data.n_non_ag_lus)
         )
         
-        self.obj_economy = economy_ag_contr + economy_ag_man_contr + economy_non_ag_contr
+        self.obj_economy = self.economy_ag_contr + self.economy_ag_man_contr + self.economy_non_ag_contr
 
         # Get biodiversity contributions
         bio_ag_contr = gp.quicksum(
@@ -1495,8 +1495,12 @@ class LutoSolver:
             obj_val={
                 "ObjVal": self.gurobi_model.ObjVal,
                 
-                "Economy Value": self.obj_economy.getValue(),
-                "Economy Objective": self.obj_economy.getValue() * settings.SOLVE_ECONOMY_WEIGHT,
+                "Economy Total Value": self.obj_economy.getValue(),
+                "Economy Total Objective": self.obj_economy.getValue() * settings.SOLVE_ECONOMY_WEIGHT,
+                
+                'Economy Ag Value': self.economy_ag_contr.getValue(),
+                'Economy Am Value': self.economy_ag_man_contr.getValue(),
+                'Economy Non-Ag Value': self.economy_non_ag_contr.getValue(),
                 
                 "Biodiversity Value": self.obj_biodiv.getValue(),
                 "Biodiversity Objective": self.obj_biodiv.getValue() * settings.SOLVE_BIODIV_PRIORITY_WEIGHT,
