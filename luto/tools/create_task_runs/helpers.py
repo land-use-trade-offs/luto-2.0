@@ -294,15 +294,16 @@ def submit_task(col:str, python_path:str=None, mode:Literal['single','cluster']=
     return f'Task {col} has been submitted!'
 
 
-def log_memory_usage(output_dir=settings.OUTPUT_DIR, interval=1):
+def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1):
     '''
     Log the memory usage of the current process to a file.
     Parameters:
         output_dir (str): The directory to save the memory log file.
+        mode (str): The mode to open the file. Default is 'a' (append).
         interval (int): The interval in seconds to log the memory usage.
     '''
     
-    with open(f'{output_dir}/RES_{settings.RESFACTOR}_{settings.MODE}_mem_log.txt', mode='a') as file:
+    with open(f'{output_dir}/RES_{settings.RESFACTOR}_{settings.MODE}_mem_log.txt', mode=mode) as file:
         while True:
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             process = psutil.Process(os.getpid())

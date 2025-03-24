@@ -66,23 +66,24 @@ from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_html import data2html
 from luto.tools.report.create_static_maps import TIF2MAP
-        
 
-timestamp_write = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
+# Global timestamp for the run
+timestamp = tools.get_timestamp()
+          
 def write_outputs(data: Data):
     """Write model outputs to file"""
     
-    memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
+    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1), daemon=True)
     memory_thread.start()
     
     # Write the model outputs to file
     write_data(data)
     # Move the log files to the output directory
-    write_logs(data)
+    move_logs(data)
 
 
-@tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{timestamp_write}")
+@tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{timestamp}")
 def write_data(data: Data):
 
     # Write model run settings
@@ -133,13 +134,13 @@ def write_data(data: Data):
 
 
 
-def write_logs(data: Data):
+def move_logs(data: Data):
     # Move the log files to the output directory
-    logs = [f"{settings.OUTPUT_DIR}/run_{data.timestamp_sim}_stdout.log",
-            f"{settings.OUTPUT_DIR}/run_{data.timestamp_sim}_stderr.log",
-            f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stdout.log",
-            f"{settings.OUTPUT_DIR}/write_{timestamp_write}_stderr.log",
-            f'{settings.OUTPUT_DIR}/RES_{settings.RESFACTOR}_{settings.MODE}_mem_log.txt']
+    logs = [f"{settings.OUTPUT_DIR}/run_{timestamp}_stdout.log",
+            f"{settings.OUTPUT_DIR}/run_{timestamp}_stderr.log",
+            f"{settings.OUTPUT_DIR}/write_{timestamp}_stdout.log",
+            f"{settings.OUTPUT_DIR}/write_{timestamp}_stderr.log",
+            f'{settings.OUTPUT_DIR}/RES_{settings.RESFACTOR}_{settings.MODE}.txt']
 
     for log in logs:
         try:
@@ -562,7 +563,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     #---------------------------------------------------------------------
 
     # The agricultural management transition cost are all zeros, so skip the calculation here
-    # am_cost = ag_transitions.get_agricultural_management_transition_matrices(sim.data)
+    # am_cost = ag_transitions.get_agricultural_management_transition_matrices(data)
 
 
 
@@ -573,22 +574,20 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
     # Get the transition cost matirces for non-agricultural land-use
     if yr_idx == 0:
-        non_ag_transitions_cost_mat = {k:{'Transition cost':np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)}
-                                   for k in NON_AG_LAND_USES.keys()}
+        non_ag_transitions_cost_mat = {
+            k:{'Transition cost':np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)}
+            for k in NON_AG_LAND_USES.keys()
+        }
     else:
-        non_ag_transitions_cost_mat = non_ag_transitions.get_from_ag_transition_matrix(data,
-                                                                                       yr_idx,
-                                                                                       yr_cal_sim_pre,
-                                                                                       data.lumaps[yr_cal],
-                                                                                       data.lmmaps[yr_cal],
-                                                                                       separate=True)
+        non_ag_transitions_cost_mat = non_ag_transitions.get_from_ag_transition_matrix(
+            data,yr_idx, yr_cal_sim_pre, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], separate=True
+        )
 
     cost_dfs = []
     for idx,non_ag_type in enumerate(non_ag_transitions_cost_mat):
         for cost_type in non_ag_transitions_cost_mat[non_ag_type]:
             arr = non_ag_transitions_cost_mat[non_ag_type][cost_type]          # Get the transition cost matrix
             arr = np.einsum('mrj,r->mj', arr, non_ag_dvar[:,idx])              # Multiply the transition cost matrix by the cost of non-agricultural land-use
-
 
             arr_df = pd.DataFrame(arr.flatten(),
                                 index=pd.MultiIndex.from_product([data.LANDMANS, data.AGRICULTURAL_LANDUSES],names=['Water supply', 'From land-use']),

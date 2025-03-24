@@ -25,48 +25,45 @@ functions as a singleton class. It is intended to be the _only_ part of the
 model that has 'global' varying state.
 """
 
-import gzip
 import os
+import gzip
 import time
 import dill
 import threading
 import time
 
-from datetime import datetime
-from joblib import Parallel, delayed
-
-import luto.settings as settings
-
 from luto.data import Data
-from luto import tools
 from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
 from luto.tools.create_task_runs.helpers import log_memory_usage
-from luto.tools.report.data_tools import get_all_files
 from luto.tools.write import write_outputs
-
-from luto.tools import calc_major_vegetation_group_ag_area_for_year, calc_species_ag_area_for_year
 from luto.economics.agricultural.biodiversity import get_major_vegetation_matrices
+
+import luto.settings as settings
 import luto.economics.agricultural.ghg as ag_ghg
 import luto.economics.agricultural.biodiversity as ag_biodiversity
 
+from luto.tools import (
+    calc_major_vegetation_group_ag_area_for_year, 
+    calc_species_ag_area_for_year, 
+    LogToFile,
+    get_timestamp
+)
 
-# Get date and time
-timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
-
-@tools.LogToFile(f"{settings.OUTPUT_DIR}/run_{timestamp}")
+@LogToFile(f"{settings.OUTPUT_DIR}/run_{get_timestamp()}")
 def load_data() -> Data:
     """
     Load the Data object containing all required data to run a LUTO simulation.
     """
-    memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
+    # Thread to log memory usage
+    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'w',1), daemon=True)
     memory_thread.start()
-    
-    return Data(timestamp=timestamp)
+
+    return Data()
 
 
-@tools.LogToFile(f"{settings.OUTPUT_DIR}/run_{timestamp}", 'a')
+@LogToFile(f"{settings.OUTPUT_DIR}/run_{get_timestamp()}", 'a')
 def run(
     data: Data, 
     base_year: int | None = None, 
@@ -98,7 +95,7 @@ def run(
     if base_year != data.YR_CAL_BASE:
         populate_containers_dynamic_base_year(data, base_year)
 
-    memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
+    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1), daemon=True)
     memory_thread.start()
     
     # Set Data object's path and create output directories
@@ -345,8 +342,7 @@ def load_data_from_disk(path: str) -> Data:
     if int(data.RESMULT ** 0.5) != settings.RESFACTOR:
         raise ValueError(f'Resolution factor from data loading ({int(data.RESMULT ** 0.5)}) does not match it of settings ({settings.RESFACTOR})!')
 
-    # Update the timestamp
-    data.timestamp_sim = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
+    data.timestamp = get_timestamp()
     
     return data
   

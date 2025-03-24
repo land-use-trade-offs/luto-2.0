@@ -50,6 +50,15 @@ from luto.tools.report.create_static_maps import TIF2MAP
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.tools.report.data_tools import get_all_files
 
+def get_timestamp():
+    timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
+    timestamp_path = os.path.join(settings.OUTPUT_DIR, '.timestamp')
+    if not os.path.exists(timestamp_path):
+        with open(timestamp_path, 'w') as f: f.write(timestamp)
+    else:
+        with open(timestamp_path, 'r') as f: timestamp = f.read()
+    return timestamp
+
 
 def amortise(cost, rate=settings.DISCOUNT_RATE, horizon=settings.AMORTISATION_PERIOD):
     """Return NPV of future `cost` amortised to annual value at discount `rate` over `horizon` years."""
@@ -566,24 +575,6 @@ class LogToFile:
         return wrapper
 
     class StreamToLogger(object):
-        def __init__(self, file, orig_stream=None):
-            self.file = file
-            self.orig_stream = orig_stream
-
-        def write(self, buf):
-            if buf.strip():  # Only prepend timestamp to non-newline content
-                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                formatted_buf = f"{timestamp} - {buf}"
-            else:
-                formatted_buf = buf  # If buf is just a newline/whitespace, don't prepend timestamp
-            
-            if self.orig_stream:
-                self.orig_stream.write(formatted_buf)  # Write to the original stream if it exists
-            self.file.write(formatted_buf)  # Write to the log file
-
-        def flush(self):
-            self.file.flush()  # Ensure content is written to disk
-
         def __init__(self, file, orig_stream=None):
             self.file = file
             self.orig_stream = orig_stream

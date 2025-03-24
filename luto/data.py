@@ -20,6 +20,7 @@
 
 
 
+from datetime import datetime
 import os
 import h5py
 import xarray as xr
@@ -126,7 +127,7 @@ class Data:
     Contains all data required for the LUTO model to run. Loads all data upon initialisation.
     """
 
-    def __init__(self, timestamp: str) -> None:
+    def __init__(self) -> None:
         """
         Sets up output containers (lumaps, lmmaps, etc) and loads all LUTO data, adjusted
         for resfactor.
@@ -134,9 +135,10 @@ class Data:
         # Path for write module - overwrite when provided with a base and target year
         self.path = None
         self.path_begin_end_compare = None
-        # Timestamp of simulation to which this object belongs - will be updated each time a simulation
-        # is run using this Data object.
-        self.timestamp_sim = timestamp
+        
+        # Timestamp of simulation to which this object belongs.
+        with open(os.path.join(settings.OUTPUT_DIR, '.timestamp'), 'r') as f:
+            self.timestamp = f.read().strip()
 
         # Setup output containers
         self.lumaps = {}
@@ -1738,7 +1740,7 @@ class Data:
             yr_all = list(range(base_year, target_year + 1, step_size))
 
         # Create path name
-        self.path = f"{OUTPUT_DIR}/{self.timestamp_sim}_RF{settings.RESFACTOR}_{yr_all[0]}-{yr_all[-1]}_{settings.MODE}"
+        self.path = f"{OUTPUT_DIR}/{self.timestamp}_RF{settings.RESFACTOR}_{yr_all[0]}-{yr_all[-1]}_{settings.MODE}"
 
         # Get all paths
         paths = (
