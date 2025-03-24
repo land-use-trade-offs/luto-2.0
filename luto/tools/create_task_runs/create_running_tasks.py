@@ -31,7 +31,7 @@ grid_search = {
     # Task run settings for submitting the job to the cluster
     ###############################################################
     'MEM': ['40GB'],
-    'NCPUS':[20],
+    'NCPUS':[10],
     'TIME': ['8:00:00'],
     'QUEUE': ['normalsr'],
     
@@ -41,10 +41,11 @@ grid_search = {
     ###############################################################
     'OBJECTIVE': ['maxprofit'],             # 'maxprofit' or 'maxutility'
     'MODE': ['timeseries'],                 # 'snapshot' or 'timeseries'
-    'RESFACTOR': [5],
+    'RESFACTOR': [7],
+    'STEP_SIZE': [5],
     'WRITE_THREADS': [10],
     'WRITE_OUTPUT_GEOTIFFS': [False],
-    'KEEP_OUTPUTS': [True],                 # If false, only keep report HTML
+    'KEEP_OUTPUTS': [False],                 # If false, only keep report HTML
     
  
     ###############################################################
@@ -65,16 +66,18 @@ grid_search = {
     # --------------- Water constraints ---------------
     'WATER_CONSTRAINT_TYPE': ['soft'],        # 'hard' or 'soft'
     'WATER_PENALTY': [1],
-    'INCLUDE_WATER_LICENSE_COSTS': [1],
+    'INCLUDE_WATER_LICENSE_COSTS': [0],
     
+    # --------------- Biodiversity priority zone ---------------
+    'GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE': [20],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSTIY_TARGET_GBF_2': ['on'],    # 'on' or 'off'
     'GBF2_PENALTY': [10000],
     'BIODIV_GBF_TARGET_2_DICT': [
-        {2010: 0, 2030: 0.0, 2050: 0.0, 2100: 0.0}, 
+        # {2010: 0, 2030: 0.0, 2050: 0.0, 2100: 0.0}, 
         {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}, 
-        {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5},
+        # {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5},
         
     ],
 
@@ -88,7 +91,8 @@ grid_search = {
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
-    'SOLVE_ECONOMY_WEIGHT': [0.05],
+    'SOLVE_BIODIV_PRIORITY_WEIGHT': [1, 10, 100, 500, 1000, 5000, 10000],
+    'SOLVE_ECONOMY_WEIGHT': [0.001, 0.01, 0.05, 0.1, 0.2, 0.5, 0.7, 0.9, 0.95],
     
     #-------------------- Diet BAU --------------------
     'DIET_DOM': ['BAU',],            # 'BAU' or 'FLX'
@@ -115,10 +119,10 @@ grid_search_df = create_grid_search_template()
 # # 1) Submit task to a single linux machine, and run simulations parallely
 # create_task_runs(grid_search_df, mode='single', python_path='/home/582/jw6041/miniforge3/envs/luto/bin/python', n_workers=40, waite_mins=1.5)
 
-# # 2) Submit task to multiple linux computation nodes
-# create_task_runs(grid_search_df, mode='multiple')
+# 2) Submit task to multiple linux computation nodes
+create_task_runs(grid_search_df, mode='cluster')
 
-# 3) Submit task to a single windows machine, and run simulations parallely
-create_task_runs(grid_search_df, mode='single', python_path='F:/jinzhu/conda_env/luto/python.exe', n_workers=40, waite_mins=1.5)
+# # 3) Submit task to a single windows machine, and run simulations parallely
+# create_task_runs(grid_search_df, mode='single', python_path='F:/jinzhu/conda_env/luto/python.exe', n_workers=40, waite_mins=1.5)
 
 

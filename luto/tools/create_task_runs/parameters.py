@@ -18,7 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 
-TASK_ROOT_DIR = '../Custom_runs/20250313_TEST_XINHAO_SETTINGS'  
+TASK_ROOT_DIR = '../Custom_runs/20250319_TEST_COMBINE_BIO_ECONOMY_WEIGHTS'  
 # Remove possible trailing slash
 if TASK_ROOT_DIR[-1] == '/':
     TASK_ROOT_DIR = TASK_ROOT_DIR[:-1]

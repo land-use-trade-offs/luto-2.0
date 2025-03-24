@@ -285,20 +285,17 @@ class LutoSolver:
         """
         print(f"Setting objective function to {settings.OBJECTIVE}...", flush=True)
 
-        # Get the objective values matrices for each sector
+        # Get economic contributions
         ag_obj_mrj, non_ag_obj_rk, ag_man_objs = self._input_data.economic_contr_mrj
 
-        # Production costs + transition costs for all agricultural land uses.
-        ag_obj_contr = gp.quicksum(
+        economy_ag_contr = gp.quicksum(
             ag_obj_mrj[0, self._input_data.ag_lu2cells[0, j], j]
             @ self.X_ag_dry_vars_jr[j, self._input_data.ag_lu2cells[0, j]]
             + ag_obj_mrj[1, self._input_data.ag_lu2cells[1, j], j]
             @ self.X_ag_irr_vars_jr[j, self._input_data.ag_lu2cells[1, j]]
             for j in range(self._input_data.n_ag_lus)
         )
-
-        # Effects on production costs + transition costs for alternative agr. management options
-        ag_man_obj_contr = gp.quicksum(
+        economy_ag_man_contr = gp.quicksum(
             ag_man_objs[am][0, self._input_data.ag_lu2cells[0, j], j_idx]
             @ self.X_ag_man_dry_vars_jr[am][j_idx, self._input_data.ag_lu2cells[0, j]]
             + ag_man_objs[am][1, self._input_data.ag_lu2cells[1, j], j_idx]
@@ -306,32 +303,71 @@ class LutoSolver:
             for am, am_j_list in self._input_data.am2j.items()
             for j_idx, j in enumerate(am_j_list)
         )
-
-        # Production costs + transition costs for all non-agricultural land uses.
-        non_ag_obj_contr = gp.quicksum(
+        economy_non_ag_contr = gp.quicksum(
             non_ag_obj_rk[:, k][self._input_data.non_ag_lu2cells[k]]
             @ self.X_non_ag_vars_kr[k, self._input_data.non_ag_lu2cells[k]]
             for k in range(self._input_data.n_non_ag_lus)
         )
+        
+        self.obj_economy = economy_ag_contr + economy_ag_man_contr + economy_non_ag_contr
 
-        # Get the objective values for each sector
-        self.obj_economy = ag_obj_contr + ag_man_obj_contr + non_ag_obj_contr
-        self.obj_ghg = (
-            self.E * self._input_data.economic_target_yr_carbon_price
-            if settings.GHG_CONSTRAINT_TYPE == "soft"
-            else 0
+        # Get biodiversity contributions
+        bio_ag_contr = gp.quicksum(
+            gp.quicksum(
+                self._input_data.bio_priority_r[self._input_data.ag_lu2cells[0, j]]
+                * self.X_ag_dry_vars_jr[j, self._input_data.ag_lu2cells[0, j]]
+                * self._input_data.ag_biodiv_degr_j[j]
+            )  
+            + gp.quicksum(
+                self._input_data.bio_priority_r[self._input_data.ag_lu2cells[1, j]]
+                * self.X_ag_irr_vars_jr[j, self._input_data.ag_lu2cells[1, j]]
+                * self._input_data.ag_biodiv_degr_j[j]
+            )  
+            for j in range(self._input_data.n_ag_lus)
         )
-        self.obj_biodiv = (
+        bio_ag_man_contr = gp.quicksum(
+            gp.quicksum(
+                self._input_data.bio_priority_r[self._input_data.ag_lu2cells[0, j_idx]]
+                * self._input_data.ag_man_biodiv_impacts[am][j_idx][self._input_data.ag_lu2cells[0, j_idx]]
+                * self.X_ag_man_dry_vars_jr[am][j_idx, self._input_data.ag_lu2cells[0, j_idx]]
+            )  
+            + gp.quicksum(
+                self._input_data.bio_priority_r[self._input_data.ag_lu2cells[1, j_idx]]
+                * self._input_data.ag_man_biodiv_impacts[am][j_idx][self._input_data.ag_lu2cells[1, j_idx]]
+                * self.X_ag_man_irr_vars_jr[am][j_idx, self._input_data.ag_lu2cells[1, j_idx]]
+            )  
+            for am, am_j_list in self._input_data.am2j.items()
+            for j_idx in range(len(am_j_list))
+        )
+        bio_non_ag_contr = gp.quicksum(
+            gp.quicksum(
+                self._input_data.bio_priority_r[self._input_data.non_ag_lu2cells[k]]
+                * self._input_data.non_ag_biodiv_impact_k[k]
+                * self.X_non_ag_vars_kr[k, self._input_data.non_ag_lu2cells[k]]
+            )
+            for k in range(self._input_data.n_non_ag_lus)
+        )
+
+        self.obj_biodiv = bio_ag_contr + bio_ag_man_contr + bio_non_ag_contr
+        
+        # Get the penalty values for each sector
+        self.penalty_biodiv = (
             self.B * settings.GBF2_PENALTY
             if settings.GBF2_CONSTRAINT_TYPE == "soft"
             else 0
         )
-        self.obj_water = (
+        
+        self.penalty_ghg = (
+            self.E * self._input_data.economic_target_yr_carbon_price
+            if settings.GHG_CONSTRAINT_TYPE == "soft"
+            else 0
+        )
+        self.penalty_water = (
             self.W.sum() * settings.WATER_PENALTY
             if settings.WATER_CONSTRAINT_TYPE == "soft"
             else 0
         )
-        self.obj_demand = (
+        self.penalty_demand = (
             gp.quicksum(
                 v * price
                 for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices)
@@ -339,18 +375,23 @@ class LutoSolver:
             if settings.DEMAND_CONSTRAINT_TYPE == "soft"
             else 0
         )
-
+        
+        self.penalties = self.penalty_demand + self.penalty_ghg + self.penalty_water + self.penalty_biodiv
+        
         # Set the objective function
-        penalties = self.obj_demand + self.obj_ghg + self.obj_water + self.obj_biodiv
         if settings.OBJECTIVE == "mincost":
             sense = GRB.MINIMIZE
-            objective = self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT + penalties * (
-                1 - settings.SOLVE_ECONOMY_WEIGHT
+            objective = (
+                self.obj_economy  * settings.SOLVE_ECONOMY_WEIGHT 
+                + self.obj_biodiv * settings.SOLVE_BIODIV_PRIORITY_WEIGHT
+                + self.penalties * ( 1 - settings.SOLVE_ECONOMY_WEIGHT)
             )
         elif settings.OBJECTIVE == "maxprofit":
             sense = GRB.MAXIMIZE
-            objective = self.obj_economy * settings.SOLVE_ECONOMY_WEIGHT - penalties * (
-                1 - settings.SOLVE_ECONOMY_WEIGHT
+            objective = (
+                self.obj_economy  * settings.SOLVE_ECONOMY_WEIGHT 
+                + self.obj_biodiv * settings.SOLVE_BIODIV_PRIORITY_WEIGHT
+                - self.penalties *  (1 - settings.SOLVE_ECONOMY_WEIGHT)
             )
         else:
             raise ValueError(f"Unknown objective function: {settings.OBJECTIVE}")
@@ -800,8 +841,14 @@ class LutoSolver:
             raise ValueError(
                 "Unknown choice for `GHG_CONSTRAINT_TYPE` setting: must be either 'hard' or 'soft'"
             )
+            
+    def _add_biodiversity_constraints(self) -> None:
+        print("  ...biodiversity constraints...")
+        self._add_conservation_priority_constraints()
+        self._add_major_vegetation_group_limit_constraints()
+        self._add_species_conservation_constraints()
 
-    def _add_biodiversity_limit_constraints(self) -> None:
+    def _add_conservation_priority_constraints(self) -> None:
         if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
             print("    ...biodiversity GBF 2 (conservation priority) constraints TURNED OFF ...")
             return
@@ -1063,7 +1110,6 @@ class LutoSolver:
                 self.snes_exprs[x] >= constr_lb
             )
 
-
     def _add_ecnes_constraints(self) -> None:
         if settings.ECNES_CONSTRAINTS != "on":
             print('     ...Ecological Communities of National Environmental Significance constraints TURNED OFF ...')
@@ -1127,7 +1173,6 @@ class LutoSolver:
             self.ecnes_constrs[x] = self.gurobi_model.addConstr(
                 self.ecnes_exprs[x] >= constr_lb
             )
-
 
     def _add_biodiversity_constraints(self) -> None:
         print("  ...biodiversity constraints...")
@@ -1603,28 +1648,62 @@ class LutoSolver:
             ag_man_X_mrj=ag_man_X_mrj_processed,
             prod_data=prod_data,
             obj_val={
-                "SUM": self.gurobi_model.ObjVal,
-                "Economy": self.obj_economy.getValue(),
-                "Demand": (
-                    self.obj_demand.getValue()
+                "ObjVal": self.gurobi_model.ObjVal,
+                
+                "Economy Value": self.obj_economy.getValue(),
+                "Economy Objective": self.obj_economy.getValue() * settings.SOLVE_ECONOMY_WEIGHT,
+                
+                "Biodiversity Value": self.obj_biodiv.getValue(),
+                "Biodiversity Objective": self.obj_biodiv.getValue() * settings.SOLVE_BIODIV_PRIORITY_WEIGHT,
+                
+                "Penalties Value": self.penalties.getValue(),
+                "Penalties Objective": self.penalties.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT),
+                
+                
+                "Demand Deviation":(
+                  self.V.X
+                  if settings.DEMAND_CONSTRAINT_TYPE == "soft"
+                  else 0  
+                ),
+                "Demand Penalty": (
+                    self.penalty_demand.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)
                     if settings.DEMAND_CONSTRAINT_TYPE == "soft"
                     else 0
                 ),
-                "GHG": (
-                    self.obj_ghg.getValue()
+                
+                "GHG Deviation":(
+                  self.E.X
+                  if settings.GHG_CONSTRAINT_TYPE == "soft"
+                  else 0  
+                ),
+                "GHG Penalty": (
+                    self.penalty_ghg.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)
                     if settings.GHG_CONSTRAINT_TYPE == "soft"
                     else 0
                 ),
-                'Biodiversity GBF2': (
-                    self.obj_biodiv.getValue()
+                
+                "Biodiversity (GBF2) Deviation":(
+                  self.B.X
+                  if settings.GBF2_CONSTRAINT_TYPE == "soft"
+                  else 0  
+                ),
+                "Biodiversity (GBF2) Penalty": (
+                    self.penalty_biodiv.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)
                     if settings.GBF2_CONSTRAINT_TYPE == "soft"
                     else 0
                 ),
-                'Water': (
-                    self.obj_water.getValue()
+                
+                "Water Deviation":(
+                  self.W.X
+                  if settings.WATER_CONSTRAINT_TYPE == "soft"
+                  else 0  
+                ),
+                "Water Penalty": (
+                    self.penalty_water.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)
                     if settings.WATER_CONSTRAINT_TYPE == "soft"
                     else 0
                 ),
+                
             },
         )
 
