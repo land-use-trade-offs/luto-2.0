@@ -108,24 +108,14 @@ def write_data(data: Data):
 
     # Write outputs for each year
     jobs = [delayed(write_output_single_year)(data, yr, path_yr, None) for (yr, path_yr) in zip(years, paths)]
-
-    # Check if the simulation is complete by comparing the last year in the simulation with the target year
-    complete_simulation = max([int(i[-4:]) for i in os.listdir(data.path) if 'out_' in i]) == max(years)
-    
-    # Write the area/quantity comparison between base-year and target-year for the timeseries mode
-    if complete_simulation:
-        jobs += [delayed(write_output_single_year)(data, years[-1], f"{data.path_begin_end_compare}/out_{years[-1]}", years[0])] if settings.MODE == 'timeseries' else []
-    else:
-        print(f'''The target year is not the last year in the simulation!
-                  Only Writing the avaliable outputs ({years[0]}-{years[-1]}) to output directory.\n''')
+    jobs += [delayed(write_output_single_year)(data, years[-1], f"{data.path_begin_end_compare}/out_{years[-1]}", years[0])] if settings.MODE == 'timeseries' else []
 
     # Parallel write the outputs for each year
     num_jobs = min(len(jobs), settings.WRITE_THREADS) if settings.PARALLEL_WRITE else 1   # Use the minimum between jobs_num and threads for parallel writing
     Parallel(n_jobs=num_jobs)(jobs)
 
     # Copy the base-year outputs to the path_begin_end_compare
-    if complete_simulation:
-        shutil.copytree(f"{data.path}/out_{years[0]}", f"{data.path_begin_end_compare}/out_{years[0]}", dirs_exist_ok = True) if settings.MODE == 'timeseries' else None
+    shutil.copytree(f"{data.path}/out_{years[0]}", f"{data.path_begin_end_compare}/out_{years[0]}", dirs_exist_ok = True) if settings.MODE == 'timeseries' else None
     
     # Create the report HTML and png maps
     TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
@@ -140,7 +130,7 @@ def move_logs(data: Data):
             f"{settings.OUTPUT_DIR}/run_{timestamp}_stderr.log",
             f"{settings.OUTPUT_DIR}/write_{timestamp}_stdout.log",
             f"{settings.OUTPUT_DIR}/write_{timestamp}_stderr.log",
-            f'{settings.OUTPUT_DIR}/RES_{settings.RESFACTOR}_{settings.MODE}.txt']
+            f'{settings.OUTPUT_DIR}/RES_{settings.RESFACTOR}_{settings.MODE}_mem_log.txt']
 
     for log in logs:
         try:
@@ -183,7 +173,6 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_biodiversity_GBF3_scores(data, yr_cal, path_yr)
     write_biodiversity_GBF4A_scores_groups(data, yr_cal, path_yr)
     write_biodiversity_GBF4A_scores_species(data, yr_cal, path_yr)
-    
 
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
 
