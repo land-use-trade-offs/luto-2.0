@@ -23,15 +23,10 @@
 Pure helper functions and other tools.
 """
 
-
-
-import re
 import sys
-import time
 import os.path
 import traceback
 import functools
-import shutil
 
 import pandas as pd
 import numpy as np
@@ -41,14 +36,7 @@ import luto.settings as settings
 
 from typing import Tuple
 from datetime import datetime
-from itertools import product
-from joblib import Parallel, delayed
 
-from luto.tools.report.create_html import data2html
-from luto.tools.report.create_report_data import save_report_data
-from luto.tools.report.create_static_maps import TIF2MAP
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.tools.report.data_tools import get_all_files
 
 def write_timestamp():
     timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
@@ -397,21 +385,21 @@ def non_ag_rk_to_xr(data, arr):
 
 def am_mrj_to_xr(data, am_mrj_dict):
     emp_arr_xr = xr.DataArray(
-        np.full((len(AG_MANAGEMENTS_TO_LAND_USES), len(data.LANDMANS), data.NCELLS, len(data.AGRICULTURAL_LANDUSES)), np.nan),
+        np.full((len(settings.AG_MANAGEMENTS_TO_LAND_USES), len(data.LANDMANS), data.NCELLS, len(data.AGRICULTURAL_LANDUSES)), np.nan),
         dims=['am', 'lm', 'cell', 'lu'],
-        coords={'am': list(AG_MANAGEMENTS_TO_LAND_USES.keys()),
+        coords={'am': list(settings.AG_MANAGEMENTS_TO_LAND_USES.keys()),
                 'lm': data.LANDMANS,
                 'cell': np.arange(data.NCELLS),
                 'lu': data.AGRICULTURAL_LANDUSES}
     )
 
-    for am,lu in AG_MANAGEMENTS_TO_LAND_USES.items():
+    for am,lu in settings.AG_MANAGEMENTS_TO_LAND_USES.items():
         if emp_arr_xr.loc[am, :, :, lu].shape == am_mrj_dict[am].shape:
             # If the shape is the same, just assign the value
             emp_arr_xr.loc[am, :, :, lu] = am_mrj_dict[am]  
         else:
             # Otherwise, assign the array at index of the land use
-            lu_idx = [data.DESC2AGLU[i] for i in AG_MANAGEMENTS_TO_LAND_USES[am]]
+            lu_idx = [data.DESC2AGLU[i] for i in settings.AG_MANAGEMENTS_TO_LAND_USES[am]]
             emp_arr_xr.loc[am, :, :, lu] = am_mrj_dict[am][:,:, lu_idx]   
     return emp_arr_xr
 
@@ -499,7 +487,7 @@ def calc_water(
 
     # Agricultural managements contribution
     AM_dfs = []
-    for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
+    for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
         am_j = np.array([data.DESC2AGLU[lu] for lu in am_lus])
         am_mrj = ag_man_w_mrj[am][:, ind, :] * am_dvar[am][:, ind, :][:, :, am_j] 
         am_jm = np.einsum('mrj->jm', am_mrj)

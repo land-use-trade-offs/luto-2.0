@@ -26,15 +26,10 @@ Writes model output and statistics to files.
 import os, re
 import shutil
 import threading
-import time
 import numpy as np
 import pandas as pd
-import psutil
 import xarray as xr
-import geopandas as gpd
 
-from itertools import product
-from datetime import datetime
 from joblib import Parallel, delayed
 
 from luto import settings
@@ -60,8 +55,7 @@ import luto.economics.non_agricultural.ghg as non_ag_ghg
 import luto.economics.non_agricultural.water as non_ag_water
 import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
-from luto.settings import AG_MANAGEMENTS, NON_AG_LAND_USES
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import AG_MANAGEMENTS, NON_AG_LAND_USES, AG_MANAGEMENTS_TO_LAND_USES
 
 from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_html import data2html

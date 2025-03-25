@@ -19,7 +19,7 @@
 
 import itertools
 
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import AG_MANAGEMENTS_TO_LAND_USES
 from luto.tools.report.data_tools.parameters import (LANDUSE_ALL_RAW,
                                                      COMMODITIES_ALL,
                                                      GHG_NAMES, 

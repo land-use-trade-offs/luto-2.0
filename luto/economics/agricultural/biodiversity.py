@@ -26,7 +26,6 @@ import itertools
 import numpy as np
 
 from luto import settings
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data
 
 
@@ -61,7 +60,7 @@ def get_asparagopsis_effect_b_mrj(data: Data):
     Returns:
     - An array of zeros with shape (data.NLMS, data.NCELLS, nlus).
     """
-    nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"])
+    nlus = len(settings.AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"])
     return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
@@ -75,7 +74,7 @@ def get_precision_agriculture_effect_b_mrj(data: Data):
     Returns:
     - An array of zeros with shape (data.NLMS, data.NCELLS, nlus)
     """
-    nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Precision Agriculture"])
+    nlus = len(settings.AG_MANAGEMENTS_TO_LAND_USES["Precision Agriculture"])
     return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
@@ -89,7 +88,7 @@ def get_ecological_grazing_effect_b_mrj(data: Data):
     Returns:
     - An array of zeros with shape (NLMS, NCELLS, nlus)
     """
-    nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Ecological Grazing"])
+    nlus = len(settings.AG_MANAGEMENTS_TO_LAND_USES["Ecological Grazing"])
     return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
@@ -107,7 +106,7 @@ def get_savanna_burning_effect_b_mrj(data: Data):
     Returns:
     - new_b_mrj: A numpy array representing the biodiversity impacts of using Savanna Burning.
     """
-    nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
+    nlus = len(settings.AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
     new_b_mrj = np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
     eds_sav_burning_biodiv_benefits = np.where( data.SAVBURN_ELIGIBLE, 
@@ -132,7 +131,7 @@ def get_agtech_ei_effect_b_mrj(data: Data):
     Returns:
     - An array of zeros with shape (NLMS, NCELLS, nlus)
     """
-    nlus = len(AG_MANAGEMENTS_TO_LAND_USES["AgTech EI"])
+    nlus = len(settings.AG_MANAGEMENTS_TO_LAND_USES["AgTech EI"])
     return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
@@ -146,7 +145,7 @@ def get_biochar_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray, yr_idx):
     Returns:
     - new_b_mrj: A numpy array representing the biodiversity impacts of using Biochar.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Biochar']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Biochar']
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     yr_cal = data.YR_CAL_BASE + yr_idx
 
@@ -249,27 +248,27 @@ def get_ag_management_biodiversity_impacts(
     return {
         'Asparagopsis taxiformis': {
             j_idx: np.zeros(data.NCELLS).astype(np.float32)
-            for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis'])
+            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis'])
         },
         'Precision Agriculture': {
             j_idx: np.zeros(data.NCELLS).astype(np.float32)
-            for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture'])
+            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture'])
         },
         'Ecological Grazing': {
             j_idx: np.zeros(data.NCELLS).astype(np.float32)
-            for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing'])
+            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing'])
         },
         'Savanna Burning': {
             j_idx: 1 - data.BIO_RETAIN_FRACTION_LDS.astype(np.float32)
-            for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
+            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
         },
         'AgTech EI': {
             j_idx: np.zeros(data.NCELLS).astype(np.float32)
-            for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['AgTech EI'])
+            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['AgTech EI'])
         },
         'Biochar': {
             j_idx: (data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact'] - 1) * np.ones(data.NCELLS).astype(np.float32)
-            for j_idx, lu in enumerate(AG_MANAGEMENTS_TO_LAND_USES['Biochar'])
+            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Biochar'])
         },
     }
 

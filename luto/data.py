@@ -42,9 +42,9 @@ from dataclasses import dataclass
 from typing import Any, Literal, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.tools.spatializers import upsample_array
 from luto.settings import (
+    AG_MANAGEMENTS_TO_LAND_USES,
     INPUT_DIR, 
     NO_GO_VECTORS, 
     NVIS_CLASS_DETAIL , 

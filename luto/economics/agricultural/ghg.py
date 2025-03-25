@@ -32,8 +32,7 @@ import xarray as xr
 from luto.data import Data
 from luto.economics.agricultural.quantity import get_yield_pot
 import luto.tools as tools
-from luto.settings import AG_MANAGEMENTS
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.economics.agricultural.quantity import lvs_veg_types
 
 

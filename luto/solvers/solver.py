@@ -33,9 +33,13 @@ from gurobipy import GRB
 
 from luto import tools
 from luto.solvers.input_data import SolverInputData
-from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_REVERSIBLE
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.settings import NON_AG_LAND_USES, NON_AG_LAND_USES_REVERSIBLE
+from luto.settings import (
+    AG_MANAGEMENTS, 
+    AG_MANAGEMENTS_REVERSIBLE, 
+    AG_MANAGEMENTS_TO_LAND_USES,
+    NON_AG_LAND_USES, 
+    NON_AG_LAND_USES_REVERSIBLE
+)
 
 
 # Set Gurobi environment.

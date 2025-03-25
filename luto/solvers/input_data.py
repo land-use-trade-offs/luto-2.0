@@ -25,8 +25,7 @@ import numpy as np
 
 from luto import settings
 from luto.economics import land_use_culling
-from luto.settings import AG_MANAGEMENTS
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data
 
 import luto.economics.agricultural.cost as ag_cost

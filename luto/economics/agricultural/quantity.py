@@ -27,8 +27,7 @@ from typing import Dict
 import numpy as np
 from scipy.interpolate import interp1d
 
-from luto.settings import AG_MANAGEMENTS
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 
 
 def lvs_veg_types(lu) -> tuple[str, str]:
