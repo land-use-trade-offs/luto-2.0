@@ -32,9 +32,9 @@ def get_w_net_yield_matrix_env_planting(
     water_sr_yield: Optional[np.ndarray] = None
     ) -> np.ndarray:
     """
-    Get water requirements vector of environmental plantings.
+    Get water yields vector of environmental plantings.
 
-    To get the water requirements of environmental plantings, subtract the baseline 
+    To get the water yields of environmental plantings, subtract the baseline 
     water yields from the shallow-rooted water yields in the data. This represents
     how much water would be used if modified (i.e., cleared) land area was reforested
     with native pre-European vegetation communities (WATER_YIELD_HIST_NL). Pre-European 
@@ -63,9 +63,9 @@ def get_w_net_yield_matrix_carbon_plantings_block(
     water_dr_yield: Optional[np.ndarray] = None
     ) -> np.ndarray:
     """
-    Get water requirements vector of carbon plantings (block arrangement).
+    Get water yields vector of carbon plantings (block arrangement).
 
-    To get the water requirements of carbon plantings, subtract the deep-rooted 
+    To get the water yields of carbon plantings, subtract the deep-rooted 
     water yields from the shallow-rooted water yields in the data. This represents
     how much water would be used if modified (i.e., cleared) land area was reforested
     with wall-to-wall deep-rooted tree species (WATER_YIELD_HIST_DR). The assumption 
@@ -86,9 +86,9 @@ def get_w_net_yield_matrix_rip_planting(
     water_dr_yield: Optional[np.ndarray] = None
     ) -> np.ndarray:
     """
-    Get water requirements vector of riparian plantings.
+    Get water yields vector of riparian plantings.
 
-    To get the water requirements of riparian plantings, subtract the deep-rooted
+    To get the water yields of riparian plantings, subtract the deep-rooted
     water yields from the shallow-rooted water yields in the data.
 
     Note: this is the same as for environmental plantings.
@@ -107,9 +107,9 @@ def get_w_net_yield_agroforestry_base(
     water_sr_yield: Optional[np.ndarray] = None
     ) -> np.ndarray:
     """
-    Get water requirements vector of agroforestry.
+    Get water yields vector of agroforestry.
 
-    To get the water requirements of agroforestry, subtract the baseline
+    To get the water yields of agroforestry, subtract the baseline
     water yields from the shallow-rooted water yields in the data.
 
     Note: this is the same as for environmental plantings.
@@ -185,7 +185,7 @@ def get_wreq_beef_agroforestry(
 
 def get_wreq_carbon_plantings_belt_base(data: Data, yr_idx: int, water_dr_yield: Optional[np.ndarray] = None) -> np.ndarray:
     """
-    Get water requirements vector of carbon plantings (belt arrangement).
+    Get water requirments vector of carbon plantings (belt arrangement).
 
     Note: this is the same as for carbon plantings.
 
@@ -258,7 +258,7 @@ def get_wreq_beef_carbon_plantings_belt(
 
 def get_wreq_matrix_beccs(data: Data, yr_idx: int, water_dr_yield: Optional[np.ndarray] = None) -> np.ndarray:
     """
-    Get water requirements vector of BECCS.
+    Get water requirments vector of BECCS.
 
     Note: this is the same as for carbon plantings.
 
@@ -278,17 +278,17 @@ def get_w_net_yield_matrix(
     water_sr_yield: Optional[np.ndarray] = None
 ) -> np.ndarray:
     """
-    Get the water requirements matrix for all non-agricultural land uses.
+    Get the water yields matrix for all non-agricultural land uses.
 
     Parameters
     ----------
     data : object
-        The data object containing necessary information for calculating the water requirements.
+        The data object containing necessary information for calculating the water yields.
 
     Returns
     -------
     np.ndarray
-        The water requirements matrix for all non-agricultural land uses.
+        The water yields matrix for all non-agricultural land uses.
         Indexed by (r, k) where r is the cell index and k is the non-agricultural land usage index.
     """
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)

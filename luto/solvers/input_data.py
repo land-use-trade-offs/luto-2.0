@@ -55,14 +55,14 @@ class SolverInputData:
     target_year: int                                        # The target year of this solving process
 
     ag_g_mrj: np.ndarray                                    # Agricultural greenhouse gas emissions matrices.
-    ag_w_mrj: np.ndarray                                    # Agricultural water requirements matrices.
+    ag_w_mrj: np.ndarray                                    # Agricultural water yields matrices.
     ag_b_mrj: np.ndarray                                    # Agricultural biodiversity matrices.
     ag_x_mrj: np.ndarray                                    # Agricultural exclude matrices.
     ag_q_mrp: np.ndarray                                    # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
     ag_ghg_t_mrj: np.ndarray                                # GHG emissions released during transitions between agricultural land uses.
 
     non_ag_g_rk: np.ndarray                                 # Non-agricultural greenhouse gas emissions matrix.
-    non_ag_w_rk: np.ndarray                                 # Non-agricultural water requirements matrix.
+    non_ag_w_rk: np.ndarray                                 # Non-agricultural water yields matrix.
     non_ag_b_rk: np.ndarray                                 # Non-agricultural biodiversity matrix.
     non_ag_x_rk: np.ndarray                                 # Non-agricultural exclude matrices.
     non_ag_q_crk: np.ndarray                                # Non-agricultural yield matrix.
@@ -70,7 +70,7 @@ class SolverInputData:
 
     ag_man_g_mrj: dict                                      # Agricultural management options' GHG emission effects.
     ag_man_q_mrp: dict                                      # Agricultural management options' quantity effects.
-    ag_man_w_mrj: dict                                      # Agricultural management options' water requirement effects.
+    ag_man_w_mrj: dict                                      # Agricultural management options' water yield effects.
     ag_man_b_mrj: dict                                      # Agricultural management options' biodiversity effects.
     ag_man_limits: dict                                     # Agricultural management options' adoption limits.
     ag_man_lb_mrj: dict                                     # Agricultural management options' lower bounds.
@@ -282,7 +282,7 @@ def get_non_ag_w_rk(
     water_dr_yield: Optional[np.ndarray] = None, 
     water_sr_yield: Optional[np.ndarray] = None
     ):
-    print('Getting non-agricultural water requirement matrices...', flush = True)
+    print('Getting non-agricultural water yield matrices...', flush = True)
     yr_idx = target_year - data.YR_CAL_BASE
     output = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[base_year], yr_idx, water_dr_yield, water_sr_yield)
     return output.astype(np.float32)
@@ -409,7 +409,7 @@ def get_ag_man_t_mrj(data: Data, target_index, ag_t_mrj: np.ndarray):
 
 
 def get_ag_man_w_mrj(data: Data, target_index):
-    print('Getting agricultural management options\' water requirement effects...', flush = True)
+    print('Getting agricultural management options\' water yield effects...', flush = True)
     output = ag_water.get_agricultural_management_water_matrices(data, target_index)
     return output
 
@@ -607,7 +607,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_ghg_t_mrj=get_ag_ghg_t_mrj(data, base_year),
 
         non_ag_g_rk=get_non_ag_g_rk(data, ag_g_mrj, base_year),
-        non_ag_w_rk=get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR),  # Calculate non-ag water requirement matrices based on historical water yield layers
+        non_ag_w_rk=get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR),  # Calculate non-ag water yield matrices based on historical water yield layers
         non_ag_b_rk=get_non_ag_b_rk(data, ag_b_mrj, base_year),
         non_ag_x_rk=get_non_ag_x_rk(data, ag_x_mrj, base_year),
         non_ag_q_crk=get_non_ag_q_crk(data, ag_q_mrp, base_year),

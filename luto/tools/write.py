@@ -528,11 +528,11 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         for from_lm in data.LANDMANS:
             for cost_type in ag_transitions_cost_mat.keys():
                             
-                from_lu_idx = base_mrj[data.LANDMANS.index(from_lm), :, data.DESC2AGLU[from_lu]]    # Get the cells of 'from' land-use in the base year (r)
-                arr_trans = np.nan_to_num(ag_transitions_cost_mat[cost_type])[:,from_lu_idx,:]      # Get the transition cost matrix                    (m,r*,j)
-                arr_dvar = ag_dvar[:,from_lu_idx,:]                                                 # Get the decision variables                        (m,r*,j)                          
-                
-                cost_arr = np.einsum('mrj,mrj->mj', arr_trans, arr_dvar)                            # Multiply by decision variables
+                from_lu_idx = base_mrj[data.LANDMANS.index(from_lm), :, data.DESC2AGLU[from_lu]].astype(np.bool_)    # Get the cells of 'from' land-use in the base year (r)
+                arr_trans = np.nan_to_num(ag_transitions_cost_mat[cost_type])[:,from_lu_idx,:]                       # Get the transition cost matrix                    (m,r*,j)
+                arr_dvar = ag_dvar[:,from_lu_idx,:]                                                                  # Get the decision variables                        (m,r*,j)                          
+                        
+                cost_arr = np.einsum('mrj,mrj->mj', arr_trans, arr_dvar)                                             # Multiply by decision variables
 
                 arr_df = pd.DataFrame(
                     cost_arr.flatten(),
@@ -570,7 +570,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     # Get the transition cost matirces for non-agricultural land-use
     if yr_idx == 0:
         non_ag_transitions_cost_mat = {
-            k:{'Transition cost':np.zeros((data.NCELLS, data.N_AG_LUS)).astype(np.float32)}
+            k:{'Transition cost':np.zeros((len(data.LANDMANS), data.NCELLS, data.N_AG_LUS)).astype(np.float32)}
             for k in NON_AG_LAND_USES.keys()
         }
     else:
@@ -586,7 +586,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             for to_lu in NON_AG_LAND_USES.keys():
                 for cost_type in non_ag_transitions_cost_mat[to_lu].keys():
                     
-                    from_lu_idx = base_mrj[data.LANDMANS.index(from_lm), :, data.DESC2AGLU[from_lu]]                                                    # Get the land-use index of the from land-use (r*)
+                    from_lu_idx = base_mrj[data.LANDMANS.index(from_lm), :, data.DESC2AGLU[from_lu]].astype(np.bool_)                                   # Get the land-use index of the from land-use (r*)
                     arr_trans = non_ag_transitions_cost_mat[to_lu][cost_type][data.LANDMANS.index(from_lm), from_lu_idx, data.DESC2AGLU[from_lu]]       # Get the transition cost matrix of from land-use (r*)
                     arr_dvar = non_ag_dvar[from_lu_idx, data.NON_AGRICULTURAL_LANDUSES.index(to_lu)]                                                    # Get the decision variable of the from land-use (r*,k)
                     

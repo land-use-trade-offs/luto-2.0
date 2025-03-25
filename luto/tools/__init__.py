@@ -291,9 +291,9 @@ def get_water_delta_matrix(w_mrj, l_mrj, data, yr_idx):
     )
     w_delta_mrj[0] = np.where(l_mrj[1], w_delta_mrj[0] + remove_irrig, w_delta_mrj[0])
     
-
     # Amortise upfront costs to annualised costs
     w_delta_mrj = amortise(w_delta_mrj)
+    
     return w_delta_mrj  # <unit:$/cell>
 
 
