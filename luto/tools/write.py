@@ -26,15 +26,11 @@ Writes model output and statistics to files.
 import os, re
 import shutil
 import threading
-import time
 import numpy as np
 import pandas as pd
-import psutil
 import xarray as xr
-import geopandas as gpd
 
-from itertools import product
-from datetime import datetime
+
 from joblib import Parallel, delayed
 
 from luto import settings
