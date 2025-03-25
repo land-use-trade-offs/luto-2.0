@@ -130,7 +130,7 @@ def get_agroforestry_transitions_from_ag_base(data: Data, yr_idx, lumap, lmmap, 
     
 
 def get_sheep_agroforestry_transitions_from_ag(
-    data: Data, agroforestry_x_r, agroforestry_costs, ag_t_costs, yr_idx, base_year, lumap, lmmap, separate=False
+    data: Data, agroforestry_x_r, agroforestry_costs, ag_t_costs, lumap, separate=False
 ):
     """
     Get the base transition costs from agricultural land uses to Sheep Agroforestry for each cell.
@@ -145,17 +145,18 @@ def get_sheep_agroforestry_transitions_from_ag(
     
     non_ag_cells = tools.get_non_ag_cells(lumap)
     sheep_j = tools.get_sheep_code(data)
-    ag_cost = ag_t_costs.copy()
-    
-    if separate:
-        # Combine and return separated costs
-        for key, array in agroforestry_costs.items():
-            agroforestry_costs.update({key: agroforestry_costs[key] * agroforestry_x_r})
-            
-        for key, array in ag_cost.items():
-            ag_cost.update({key: ag_cost[key][0, :, sheep_j] * (1 - agroforestry_x_r)})
 
-        return {**agroforestry_costs, **ag_cost}
+    if separate:
+        # Copy the transition costs so we do not modify the original values
+        ag_cost = ag_t_costs.copy()
+        non_ag_cost = agroforestry_costs.copy()
+        # Combine and return separated costs
+        for key, array in non_ag_cost.items():
+            non_ag_cost.update({key: array * agroforestry_x_r})
+        for key, array in ag_cost.items():
+            ag_cost.update({key: array[0, :, sheep_j] * (1 - agroforestry_x_r)})
+
+        return {**non_ag_cost, **ag_cost}
 
     else:
         sheep_costs_r = ag_t_costs[0, :, sheep_j]                   # Assume sheep is dryland under sheep-agroforestry  
@@ -168,7 +169,7 @@ def get_sheep_agroforestry_transitions_from_ag(
     
 
 def get_beef_agroforestry_transitions_from_ag(
-    data: Data, agroforestry_x_r, agroforestry_costs, ag_t_costs, yr_idx, base_year, lumap, lmmap, separate=False
+    data: Data, agroforestry_x_r, agroforestry_costs, ag_t_costs, lumap, separate=False
 ):
     """
     Get the base transition costs from agricultural land uses to Beef Agroforestry for each cell.
@@ -183,19 +184,18 @@ def get_beef_agroforestry_transitions_from_ag(
     
     non_ag_cells = tools.get_non_ag_cells(lumap)
     beef_j = tools.get_beef_code(data)
-    ag_cost = ag_t_costs.copy()
-    
-    if separate:
-        # Combine and return separated costs
-        # Agroforestry keys: 'Transition cost (Ag2Non-Ag)', 'Establishment cost (Ag2Non-Ag)', 'Water license cost (Ag2Non-Ag)', 'Fencing cost (Ag2Non-Ag)'
-        for key, array in agroforestry_costs.items():
-            agroforestry_costs.update({key: agroforestry_costs[key] * agroforestry_x_r})
-            
-        # Beef cost keys: 'Establishment cost', 'Water license cost', 'GHG emissions cost'
-        for key, array in ag_cost.items():
-            ag_cost.update({key: ag_cost[key][0, :, beef_j] * (1 - agroforestry_x_r)})
 
-        return {**agroforestry_costs, **ag_cost}
+    if separate:
+        # Copy the transition costs so we do not modify the original values
+        ag_cost = ag_t_costs.copy()
+        non_ag_cost = agroforestry_costs.copy()
+        # Combine and return separated costs
+        for key, array in non_ag_cost.items():
+            non_ag_cost.update({key: array * agroforestry_x_r})
+        for key, array in ag_cost.items():
+            ag_cost.update({key: array[0, :, beef_j] * (1 - agroforestry_x_r)})
+
+        return {**non_ag_cost, **ag_cost}
 
     else:
         beef_costs_r = ag_t_costs[0, :, beef_j]    
@@ -278,7 +278,7 @@ def get_carbon_plantings_belt_from_ag_base(data: Data, yr_idx, lumap, lmmap, sep
 
 
 def get_sheep_carbon_plantings_belt_from_ag(
-    data: Data, cp_belt_x_r, cp_belt_costs, ag_t_costs, yr_idx, base_year, lumap, lmmap, separate=False
+    data: Data, cp_belt_x_r, cp_belt_costs, ag_t_costs, lumap, separate=False
 ):
     """
     Get the transition costs from agricultural land uses to Sheep Carbon Plantings (belt) for each cell.
@@ -293,18 +293,18 @@ def get_sheep_carbon_plantings_belt_from_ag(
     
     sheep_j = tools.get_sheep_code(data)
     non_ag_cells = tools.get_non_ag_cells(lumap)
-    ag_cost = ag_t_costs.copy()
-    
-    
+
     if separate:
+        # Copy the transition costs so we do not modify the original values
+        ag_cost = ag_t_costs.copy()
+        non_ag_cost = cp_belt_costs.copy()
         # Combine and return separated costs
-        for key, array in cp_belt_costs.items():
-            cp_belt_costs.update({key: cp_belt_costs[key] * cp_belt_x_r})
-
+        for key, array in non_ag_cost.items():
+            non_ag_cost.update({key: array * cp_belt_x_r})
         for key, array in ag_cost.items():
-            ag_cost.update({key: ag_cost[key][0, :, sheep_j] * (1 - cp_belt_x_r)})
+            ag_cost.update({key: array[0, :, sheep_j] * (1 - cp_belt_x_r)})
 
-        return {**cp_belt_costs, **ag_cost}
+        return {**non_ag_cost, **ag_cost}
 
     else:
         
@@ -318,7 +318,7 @@ def get_sheep_carbon_plantings_belt_from_ag(
 
 
 def get_beef_carbon_plantings_belt_from_ag(
-    data: Data, cp_belt_x_r, cp_belt_costs, ag_t_costs, yr_idx, base_year, lumap, lmmap, separate=False
+    data: Data, cp_belt_x_r, cp_belt_costs, ag_t_costs, lumap, separate=False
 ):
     """
     Get the base transition costs from agricultural land uses to Beef Carbon Plantings (belt) for each cell.
@@ -332,17 +332,18 @@ def get_beef_carbon_plantings_belt_from_ag(
     """
     non_ag_cells = tools.get_non_ag_cells(lumap)
     beef_j = tools.get_beef_code(data)
-    ag_cost = ag_t_costs.copy()
     
     if separate:
+        # Copy the transition costs so we do not modify the original values
+        ag_cost = ag_t_costs.copy()
+        non_ag_cost = cp_belt_costs.copy()
         # Combine and return separated costs
-        for key, array in cp_belt_costs.items():
-            cp_belt_costs.update({key: cp_belt_costs[key] * cp_belt_x_r})
-
+        for key, array in non_ag_cost.items():
+            non_ag_cost.update({key: array * cp_belt_x_r})
         for key, array in ag_cost.items():
-            ag_cost.update({key: ag_cost[key][0, :, beef_j] * (1 - cp_belt_x_r)})
-
-        return {**cp_belt_costs, **ag_cost}
+            ag_cost.update({key: array[0, :, beef_j] * (1 - cp_belt_x_r)})
+            
+        return {**non_ag_cost, **ag_cost}
 
     else:
         beef_costs_r = ag_t_costs[0, :, beef_j]          # Assume beef is dryland under beef-agroforestry
@@ -393,30 +394,21 @@ def get_from_ag_transition_matrix(data: Data, yr_idx, base_year, lumap, lmmap, s
         If separate is False, returns a 2-D array indexed by (r, k) where r is cell and k is non-agricultural land usage.
         If separate is True, returns a dictionary containing the transition costs for each non-agricultural land use.
     """
-    agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
-    cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
-
-    agroforestry_costs = get_agroforestry_transitions_from_ag_base(data, yr_idx, lumap, lmmap, separate)
+    
     ag_t_costs = ag_transitions.get_transition_matrices(data, yr_idx, base_year, separate)
+    
+    agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
+    agroforestry_costs = get_agroforestry_transitions_from_ag_base(data, yr_idx, lumap, lmmap, separate)
+    cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
     cp_belt_costs = get_carbon_plantings_belt_from_ag_base(data, yr_idx, lumap, lmmap, separate)
-
+    
     env_plant_transitions_from_ag = get_env_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate)
     rip_plant_transitions_from_ag = get_rip_plant_transitions_from_ag(data, yr_idx, lumap, lmmap, separate)
-    
-    sheep_agroforestry_transitions_from_ag = get_sheep_agroforestry_transitions_from_ag(
-        data, agroforestry_x_r, agroforestry_costs, ag_t_costs, yr_idx, base_year, lumap, lmmap, separate
-    )
-    beef_agroforestry_transitions_from_ag = get_beef_agroforestry_transitions_from_ag(
-        data, agroforestry_x_r, agroforestry_costs, ag_t_costs, yr_idx, base_year, lumap, lmmap, separate
-    )
+    sheep_agroforestry_transitions_from_ag = get_sheep_agroforestry_transitions_from_ag(data, agroforestry_x_r, agroforestry_costs, ag_t_costs, lumap, separate)
+    beef_agroforestry_transitions_from_ag = get_beef_agroforestry_transitions_from_ag( data, agroforestry_x_r, agroforestry_costs, ag_t_costs, lumap, separate)
     carbon_plantings_block_transitions_from_ag = get_carbon_plantings_block_from_ag(data, yr_idx, lumap, lmmap, separate)
-    
-    sheep_carbon_plantings_belt_transitions_from_ag = get_sheep_carbon_plantings_belt_from_ag(
-        data, cp_belt_x_r, cp_belt_costs, ag_t_costs, yr_idx, base_year, lumap, lmmap, separate
-    )
-    beef_carbon_plantings_belt_transitions_from_ag = get_beef_carbon_plantings_belt_from_ag(
-        data, cp_belt_x_r, cp_belt_costs, ag_t_costs, yr_idx, base_year, lumap, lmmap, separate
-    )
+    sheep_carbon_plantings_belt_transitions_from_ag = get_sheep_carbon_plantings_belt_from_ag(data, cp_belt_x_r, cp_belt_costs, ag_t_costs, lumap, separate)
+    beef_carbon_plantings_belt_transitions_from_ag = get_beef_carbon_plantings_belt_from_ag( data, cp_belt_x_r, cp_belt_costs, ag_t_costs, lumap, separate)
     beccs_transitions_from_ag = get_beccs_from_ag(data, yr_idx, lumap, lmmap, separate)
 
     if separate:
