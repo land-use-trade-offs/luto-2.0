@@ -39,10 +39,8 @@ from luto.tools.report.data_tools.parameters import (
     GHG_NAMES,
     LANDUSE_ALL_RENAMED,
     LU_CROPS, 
-    LU_NATURAL,
     LVSTK_MODIFIED, 
     LVSTK_NATURAL, 
-    NON_AG_LANDUSE_RAW, 
     RENAME_NON_AG,
     RENAME_AM_NON_AG
 )
@@ -708,7 +706,7 @@ def save_report_data(raw_data_dir:str):
     
     # Plot_3-8: Transition cost for Ag to Ag (million $)
     keep_cols = ['Year', 'Value (million)','Cost ($)']
-    loop_cols = cost_transition_ag2ag_df.columns.difference(keep_cols)
+    loop_cols = ['Type', 'From land-use', 'To land-use']
     
     for idx,col in enumerate(loop_cols):
         take_cols = keep_cols + [col]
@@ -744,7 +742,7 @@ def save_report_data(raw_data_dir:str):
     cost_transition_ag2ag_trans_mat_json = {'categories': AG_LANDUSE,
                                             'series': json.loads(cost_transition_ag2ag_trans_mat_data.to_json(orient='records'))}
     
-    with open(f'{SAVE_DIR}/economics_8_transition_ag2ag_cost_6_transition_matrix.json', 'w') as outfile:
+    with open(f'{SAVE_DIR}/economics_8_transition_ag2ag_cost_4_transition_matrix.json', 'w') as outfile:
         outfile.write(json.dumps(cost_transition_ag2ag_trans_mat_json))
                                     
                                     
@@ -753,7 +751,7 @@ def save_report_data(raw_data_dir:str):
                                 
     # Plot_3-9: Transition cost for Ag to Non-Ag (million $)
     keep_cols = ['Year', 'Value (million)','Cost ($)']
-    loop_cols = cost_transition_ag2non_ag_df.columns.difference(keep_cols)
+    loop_cols = ['Cost type', 'From land-use', 'To land-use']
     
     for idx,col in enumerate(loop_cols):
         take_cols = keep_cols + [col]
@@ -796,14 +794,14 @@ def save_report_data(raw_data_dir:str):
                                                 'series': json.loads(cost_transition_ag2non_ag_trans_mat_data.to_json(orient='records'))}
     
     
-    with open(f'{SAVE_DIR}/economics_9_transition_ag2non_cost_6_transition_matrix.json', 'w') as outfile:
+    with open(f'{SAVE_DIR}/economics_9_transition_ag2non_cost_4_transition_matrix.json', 'w') as outfile:
         outfile.write(json.dumps(cost_transition_ag2non_ag_trans_mat_json))
     
 
         
     # Plot_3-10: Transition cost for Non-Ag to Ag (Billion $)
     keep_cols = ['Year', 'Value (million)','Cost ($)']
-    loop_cols = cost_transition_non_ag2ag_df.columns.difference(keep_cols)
+    loop_cols = ['Cost type', 'From land-use', 'To land-use']
     
     for idx,col in enumerate(loop_cols):
         take_cols = keep_cols + [col]
@@ -844,7 +842,7 @@ def save_report_data(raw_data_dir:str):
         'categories_to': AG_LANDUSE,
         'series': json.loads(cost_transition_non_ag2ag_trans_mat_data.to_json(orient='records'))}  
     
-    with open(f'{SAVE_DIR}/economics_10_transition_non_ag2ag_cost_6_transition_matrix.json', 'w') as outfile:
+    with open(f'{SAVE_DIR}/economics_10_transition_non_ag2ag_cost_4_transition_matrix.json', 'w') as outfile:
         outfile.write(json.dumps(cost_transition_non_ag2ag_trans_mat_json))                                              
                                                 
 
