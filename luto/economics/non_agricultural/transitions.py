@@ -56,19 +56,23 @@ def get_env_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
     base_ag_to_ep_t_r = tools.amortise(base_ag_to_ep_t_r * data.REAL_AREA)
     base_ag_to_ep_t_r[non_ag_idx] = np.nan
     
-    # Waster costs (pre-amortised); Assume EP is dryland, and no 'REMOVE_IRRIG_COST' for EP
-    w_req_mrj = ag_water.get_wreq_matrices(data, yr_idx).astype(np.float32)
+    # Waster costs; Assume EP is dryland, and no 'REMOVE_IRRIG_COST' for EP
+    w_req_mrj = ag_water.get_wreq_matrices(data, yr_idx).astype(np.float32)     # <unit: ML/CELL>
     w_req_r = (w_req_mrj * l_mrj).sum(axis=0).sum(axis=1)
-    w_yield_r = non_ag_water.get_w_net_yield_matrix_env_planting(data, yr_idx)
-    
+    w_yield_r = non_ag_water.get_w_net_yield_matrix_env_planting(data, yr_idx)  # <unit: ML/CELL>
     w_delta_r = - (w_req_r + w_yield_r)
-    w_cost_r = w_delta_r * data.WATER_LICENCE_PRICE * data.WATER_LICENSE_COST_MULTS[yr_cal] * settings.INCLUDE_WATER_LICENSE_COSTS
+    
+    w_lincense_cost_r = w_delta_r * data.WATER_LICENCE_PRICE * data.WATER_LICENSE_COST_MULTS[yr_cal] * settings.INCLUDE_WATER_LICENSE_COSTS     # <unit: $/CELL>
+    w_rm_irrig_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA[:, np.newaxis]          # <unit: $/CELL>
+    
+    w_cost_r = w_lincense_cost_r + w_rm_irrig_r
     w_cost_r[non_ag_idx] = np.nan
 
     if separate:
         return {'Establishment cost (Ag2Non-Ag)': est_costs_r,
                 'Transition cost (Ag2Non-Ag)': base_ag_to_ep_t_r, 
-                'Water license cost (Ag2Non-Ag)': w_cost_r}
+                'Water license cost (Ag2Non-Ag)': w_lincense_cost_r,
+                'Remove irrigation cost (Ag2Non-Ag)': w_rm_irrig_r}
 
     return est_costs_r + base_ag_to_ep_t_r + w_cost_r
 
@@ -230,18 +234,23 @@ def get_carbon_plantings_block_from_ag(data: Data, yr_idx, lumap, lmmap, separat
     base_ag_to_cp_t_j[non_ag_idx] = np.nan
 
     # Water costs (pre-amortised)
-    w_req_mrj = ag_water.get_wreq_matrices(data, yr_idx).astype(np.float32)
+    w_req_mrj = ag_water.get_wreq_matrices(data, yr_idx).astype(np.float32)     # <unit: ML/CELL>
     w_req_r = (w_req_mrj * l_mrj).sum(axis=0).sum(axis=1)
-    w_yield_r = non_ag_water.get_w_net_yield_matrix_carbon_plantings_block(data, yr_idx)
-    
+    w_yield_r = non_ag_water.get_w_net_yield_matrix_env_planting(data, yr_idx)  # <unit: ML/CELL>
     w_delta_r = - (w_req_r + w_yield_r)
-    w_cost_r = w_delta_r * data.WATER_LICENCE_PRICE * data.WATER_LICENSE_COST_MULTS[yr_cal] * settings.INCLUDE_WATER_LICENSE_COSTS
+    
+    w_lincense_cost_r = w_delta_r * data.WATER_LICENCE_PRICE * data.WATER_LICENSE_COST_MULTS[yr_cal] * settings.INCLUDE_WATER_LICENSE_COSTS     # <unit: $/CELL>
+    w_rm_irrig_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA[:, np.newaxis]          # <unit: $/CELL>
+    
+    w_cost_r = w_lincense_cost_r + w_rm_irrig_r
     w_cost_r[non_ag_idx] = np.nan
 
     if separate:
         return {'Establishment cost (Ag2Non-Ag)': est_costs_r,
                 'Transition cost (Ag2Non-Ag)':base_ag_to_cp_t_j, 
-                'Water license cost (Ag2Non-Ag)': w_cost_r}
+                'Water license cost (Ag2Non-Ag)': w_lincense_cost_r,
+                'Remove irrigation cost (Ag2Non-Ag)': w_rm_irrig_r
+                }
     else:
         return est_costs_r + base_ag_to_cp_t_j + w_cost_r
 
@@ -396,7 +405,6 @@ def get_from_ag_transition_matrix(data: Data, yr_idx, base_year, lumap, lmmap, s
     """
     
     ag_t_costs = ag_transitions.get_transition_matrices(data, yr_idx, base_year, separate)
-    
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
     agroforestry_costs = get_agroforestry_transitions_from_ag_base(data, yr_idx, lumap, lmmap, separate)
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
@@ -413,29 +421,32 @@ def get_from_ag_transition_matrix(data: Data, yr_idx, base_year, lumap, lmmap, s
 
     if separate:
         # IMPORTANT: The order of the keys in the dictionary must match the order of the non-agricultural land uses
-        return {'Environmental Plantings': env_plant_transitions_from_ag,
-                'Riparian Plantings': rip_plant_transitions_from_ag,
-                'Sheep Agroforestry': sheep_agroforestry_transitions_from_ag,
-                'Beef Agroforestry': beef_agroforestry_transitions_from_ag,
-                'Carbon Plantings (Block)': carbon_plantings_block_transitions_from_ag,
-                'Sheep Carbon Plantings (Belt)': sheep_carbon_plantings_belt_transitions_from_ag,
-                'Beef Carbon Plantings (Belt)': beef_carbon_plantings_belt_transitions_from_ag,
-                'BECCS': beccs_transitions_from_ag}
+        return {
+            'Environmental Plantings': env_plant_transitions_from_ag,
+            'Riparian Plantings': rip_plant_transitions_from_ag,
+            'Sheep Agroforestry': sheep_agroforestry_transitions_from_ag,
+            'Beef Agroforestry': beef_agroforestry_transitions_from_ag,
+            'Carbon Plantings (Block)': carbon_plantings_block_transitions_from_ag,
+            'Sheep Carbon Plantings (Belt)': sheep_carbon_plantings_belt_transitions_from_ag,
+            'Beef Carbon Plantings (Belt)': beef_carbon_plantings_belt_transitions_from_ag,
+            'BECCS': beccs_transitions_from_ag
+        }
         
-    # Stack the transition matrices into a single 4-D array (k,m.r,j)
-    ag_to_non_agr_t_matrices = [
-        env_plant_transitions_from_ag,
-        rip_plant_transitions_from_ag,
-        sheep_agroforestry_transitions_from_ag,
-        beef_agroforestry_transitions_from_ag,
-        carbon_plantings_block_transitions_from_ag,
-        sheep_carbon_plantings_belt_transitions_from_ag,
-        beef_carbon_plantings_belt_transitions_from_ag,
-        beccs_transitions_from_ag,
-    ]
-    return np.array(ag_to_non_agr_t_matrices).T.astype(np.float32)
+    else:
+        # Stack the transition matrices into a single 2D array (r, k)
+        return np.array([
+            env_plant_transitions_from_ag,
+            rip_plant_transitions_from_ag,
+            sheep_agroforestry_transitions_from_ag,
+            beef_agroforestry_transitions_from_ag,
+            carbon_plantings_block_transitions_from_ag,
+            sheep_carbon_plantings_belt_transitions_from_ag,
+            beef_carbon_plantings_belt_transitions_from_ag,
+            beccs_transitions_from_ag,
+        ]).T.astype(np.float32)
 
 
+# TODO: Need to check the logic of transition cost, espcially the water cost.
 def get_env_plantings_to_ag(data: Data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
     """
     Get transition costs from environmental plantings to agricultural land uses for each cell.
