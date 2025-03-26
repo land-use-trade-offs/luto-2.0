@@ -213,7 +213,10 @@ def write_custom_settings(task_dir:str, settings_dict:dict):
                 bash_file.write(f'# {k} is a dictionary, which is not natively supported in bash\n')
                 for key, value in v.items():
                     key = str(key).replace(' ', '_').replace('(','').replace(')','')
-                    bash_file.write(f'{k}_{key}={value}\n') 
+                    if isinstance(value, list):
+                        bash_file.write(f'{k}_{key}=({ " ".join([str(elem) for elem in value])})\n')
+                    else:
+                        bash_file.write(f'{k}_{key}={value}\n') 
             # If the value is a string, write it as a string
             elif isinstance(v, str):
                 file.write(f'{k}="{v}"\n')

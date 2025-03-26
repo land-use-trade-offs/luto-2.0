@@ -27,12 +27,11 @@ import numpy as np
 from typing import Optional
 
 import luto.settings as settings
-from luto.data import Data
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
 
 
 
-def get_wreq_matrices(data: Data, yr_idx):
+def get_wreq_matrices(data, yr_idx):
     """
     Return water requirement (water use by irrigation and livestock drinking water) matrices
     by land management, cell, and land-use type.
@@ -46,7 +45,7 @@ def get_wreq_matrices(data: Data, yr_idx):
     """
 
     # Stack water requirements data
-    w_req_mrj = np.stack(( data.WREQ_DRY_RJ, data.WREQ_IRR_RJ ))    # <unit: ML/head|ha>
+    w_req_mrj = np.stack((data.WREQ_DRY_RJ, data.WREQ_IRR_RJ))    # <unit: ML/head|ha>
 
     # Covert water requirements units from ML/head to ML/ha
     for j, lu in enumerate(data.AGRICULTURAL_LANDUSES):
@@ -62,7 +61,8 @@ def get_wreq_matrices(data: Data, yr_idx):
 
 
 def get_wyield_matrices(
-    data: Data, yr_idx:int, 
+    data, 
+    yr_idx:int, 
     water_dr_yield: Optional[np.ndarray] = None,
     water_sr_yield: Optional[np.ndarray] = None
 ) -> np.ndarray:
@@ -109,7 +109,7 @@ def get_wyield_matrices(
 
 
 def get_water_net_yield_matrices(
-    data: Data, 
+    data, 
     yr_idx, 
     water_dr_yield: Optional[np.ndarray] = None,
     water_sr_yield: Optional[np.ndarray] = None
@@ -134,7 +134,7 @@ def get_water_net_yield_matrices(
     return get_wyield_matrices(data, yr_idx, water_dr_yield, water_sr_yield) - get_wreq_matrices(data, yr_idx)
 
 
-def get_asparagopsis_effect_w_mrj(data: Data, yr_idx):
+def get_asparagopsis_effect_w_mrj(data, yr_idx):
     """
     Applies the effects of using asparagopsis to the water net yield data
     for all relevant agr. land uses.
@@ -173,7 +173,7 @@ def get_asparagopsis_effect_w_mrj(data: Data, yr_idx):
     return w_mrj_effect
 
 
-def get_precision_agriculture_effect_w_mrj(data: Data, yr_idx):
+def get_precision_agriculture_effect_w_mrj(data, yr_idx):
     """
     Applies the effects of using precision agriculture to the water net yield data
     for all relevant agricultural land uses.
@@ -209,7 +209,7 @@ def get_precision_agriculture_effect_w_mrj(data: Data, yr_idx):
     return w_mrj_effect
 
 
-def get_ecological_grazing_effect_w_mrj(data: Data, yr_idx):
+def get_ecological_grazing_effect_w_mrj(data, yr_idx):
     """
     Applies the effects of using ecological grazing to the water net yield data
     for all relevant agricultural land uses.
@@ -245,7 +245,7 @@ def get_ecological_grazing_effect_w_mrj(data: Data, yr_idx):
     return w_mrj_effect
 
 
-def get_savanna_burning_effect_w_mrj(data: Data):
+def get_savanna_burning_effect_w_mrj(data):
     """
     Applies the effects of using savanna burning to the water net yield data
     for all relevant agr. land uses.
@@ -266,7 +266,7 @@ def get_savanna_burning_effect_w_mrj(data: Data):
     return np.zeros((data.NLMS, data.NCELLS, nlus)).astype(np.float32)
 
 
-def get_agtech_ei_effect_w_mrj(data: Data, yr_idx):
+def get_agtech_ei_effect_w_mrj(data, yr_idx):
     """
     Applies the effects of using AgTech EI to the water net yield data
     for all relevant agr. land uses.
@@ -303,7 +303,7 @@ def get_agtech_ei_effect_w_mrj(data: Data, yr_idx):
     return w_mrj_effect
 
 
-def get_biochar_effect_w_mrj(data: Data, yr_idx):
+def get_biochar_effect_w_mrj(data, yr_idx):
     """
     Applies the effects of using Biochar to the water net yield data
     for all relevant agr. land uses.
@@ -336,7 +336,7 @@ def get_biochar_effect_w_mrj(data: Data, yr_idx):
     return w_mrj_effect
 
 
-def get_agricultural_management_water_matrices(data: Data, yr_idx) -> dict[str, np.ndarray]:
+def get_agricultural_management_water_matrices(data, yr_idx) -> dict[str, np.ndarray]:
     asparagopsis_data = (
         get_asparagopsis_effect_w_mrj(data, yr_idx)
         if settings.AG_MANAGEMENTS['Asparagopsis taxiformis']
@@ -378,7 +378,7 @@ def get_agricultural_management_water_matrices(data: Data, yr_idx) -> dict[str, 
     }
 
 
-def get_water_outside_luto_study_area(data: Data, yr_cal:int) ->  dict[int, float]:
+def get_water_outside_luto_study_area(data, yr_cal:int) ->  dict[int, float]:
     """
     Return water yield from the outside regions of LUTO study area.
 
@@ -405,7 +405,7 @@ def get_water_outside_luto_study_area(data: Data, yr_cal:int) ->  dict[int, floa
     return water_yield_arr.loc[yr_cal].to_dict()
 
 
-def get_water_outside_luto_study_area_from_hist_level(data: Data) -> dict[int, float]:
+def get_water_outside_luto_study_area_from_hist_level(data) -> dict[int, float]:
     """
     Return water yield from the outside regions of LUTO study area based on historical levels.
 
@@ -457,7 +457,7 @@ def calc_water_net_yield_for_region(
     return ag_contr + non_ag_contr + ag_man_contr + water_yield_outside_luto_study_area
 
 
-def calc_water_net_yield_BASE_YR(data: Data) -> np.ndarray:
+def calc_water_net_yield_BASE_YR(data) -> np.ndarray:
     """
     Calculate the water net yield for the base year (2010) for all regions.
 
@@ -494,7 +494,7 @@ def calc_water_net_yield_BASE_YR(data: Data) -> np.ndarray:
 
 
 def get_water_net_yield_limit_values(
-    data: Data,
+    data,
 ) -> dict[int, tuple[str, float, np.ndarray]]:
     """
     Return water net yield limits for regions (River Regions or Drainage Divisions as specified in luto.settings.py).
