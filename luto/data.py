@@ -1738,6 +1738,14 @@ class Data:
             yr_all = [base_year, target_year]
         elif settings.MODE == "timeseries":
             yr_all = list(range(base_year, target_year + 1, step_size))
+ 
+        # `years` will supersede `yr_all` if it is not None
+        if years is not None:
+            yr_all = years
+            
+        # Append target year if not in the list
+        if target_year not in yr_all:
+            yr_all.append(target_year)
 
         # Create path name
         self.path = f"{OUTPUT_DIR}/{self.timestamp}_RF{settings.RESFACTOR}_{yr_all[0]}-{yr_all[-1]}_{settings.MODE}"

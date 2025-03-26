@@ -287,95 +287,42 @@ AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per h
 
 AG_MANAGEMENTS_TO_LAND_USES = {
     'Asparagopsis taxiformis': [
-        # 'Beef - natural land',    # Removed on 2025-03-17, as it is not applicable for methane reduction
-        'Beef - modified land',
-        # 'Sheep - natural land',   # Removed on 2025-03-17, as it is not applicable for methane reduction
-        'Sheep - modified land',
-        'Dairy - natural land',   
-        'Dairy - modified land',
+        'Beef - modified land', 'Sheep - modified land', 'Dairy - natural land', 'Dairy - modified land'
     ],
+    
     'Precision Agriculture': [
         # Cropping:
-        'Hay',
-        'Summer cereals',
-        'Summer legumes',
-        'Summer oilseeds',
-        'Winter cereals',
-        'Winter legumes',
-        'Winter oilseeds',
+        'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
         # Intensive Cropping:
-        'Cotton',
-        'Other non-cereal crops',
-        'Rice',
-        'Sugar',
-        'Vegetables',
+        'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
         # Horticulture:
-        'Apples',
-        'Citrus',
-        'Grapes',
-        'Nuts',
-        'Pears',
-        'Plantation fruit',
-        'Stone fruit',
-        'Tropical stone fruit',
+        'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'
     ],
+    
     'Ecological Grazing': [
-        'Beef - modified land',
-        'Sheep - modified land',
-        'Dairy - modified land',
+        'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
     ],
+    
     'Savanna Burning': [
-        'Beef - natural land',
-        'Dairy - natural land',
-        'Sheep - natural land',
-        'Unallocated - natural land',
+        'Beef - natural land', 'Dairy - natural land', 'Sheep - natural land', 'Unallocated - natural land',
     ],
+    
     'AgTech EI': [
         # Cropping:
-        'Hay',
-        'Summer cereals',
-        'Summer legumes',
-        'Summer oilseeds',
-        'Winter cereals',
-        'Winter legumes',
-        'Winter oilseeds',
+        'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
         # Intensive Cropping:
-        'Cotton',
-        'Other non-cereal crops',
-        'Rice',
-        'Sugar',
-        'Vegetables',
+        'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
         # Horticulture:
-        'Apples',
-        'Citrus',
-        'Grapes',
-        'Nuts',
-        'Pears',
-        'Plantation fruit',
-        'Stone fruit',
-        'Tropical stone fruit',
+        'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'
     ],
+    
     'Biochar': [
         # Cropping
-        'Hay',
-        'Summer cereals',
-        'Summer legumes',
-        'Summer oilseeds',
-        'Winter cereals',
-        'Winter legumes',
-        'Winter oilseeds',
+        'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
         # Horticulture:
-        'Apples',
-        'Citrus',
-        'Grapes',
-        'Nuts',
-        'Pears',
-        'Plantation fruit',
-        'Stone fruit',
-        'Tropical stone fruit',
+        'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit',
     ]
 }
-
 
 
 AG_MANAGEMENTS = {

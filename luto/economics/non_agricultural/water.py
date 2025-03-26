@@ -20,13 +20,12 @@
 import numpy as np
 
 from typing import Optional
-from luto.data import Data
 from luto.settings import NON_AG_LAND_USES
 from luto import tools
 
 
 def get_w_net_yield_matrix_env_planting(
-    data:Data, 
+    data, 
     yr_idx: int, 
     water_dr_yield: Optional[np.ndarray] = None,
     water_sr_yield: Optional[np.ndarray] = None
@@ -58,7 +57,7 @@ def get_w_net_yield_matrix_env_planting(
 
 
 def get_w_net_yield_matrix_carbon_plantings_block(
-    data:Data, 
+    data, 
     yr_idx: int, 
     water_dr_yield: Optional[np.ndarray] = None
     ) -> np.ndarray:
@@ -81,7 +80,7 @@ def get_w_net_yield_matrix_carbon_plantings_block(
 
 
 def get_w_net_yield_matrix_rip_planting(
-    data:Data, 
+    data, 
     yr_idx: int, 
     water_dr_yield: Optional[np.ndarray] = None
     ) -> np.ndarray:
@@ -101,7 +100,7 @@ def get_w_net_yield_matrix_rip_planting(
 
 
 def get_w_net_yield_agroforestry_base(
-    data:Data, 
+    data, 
     yr_idx: int, 
     water_dr_yield: Optional[np.ndarray] = None,
     water_sr_yield: Optional[np.ndarray] = None
@@ -122,7 +121,7 @@ def get_w_net_yield_agroforestry_base(
 
 
 def get_wreq_sheep_agroforestry(
-    data:Data, 
+    data, 
     ag_w_mrj: np.ndarray, 
     agroforestry_x_r: np.ndarray,
     yr_idx: int,
@@ -153,7 +152,7 @@ def get_wreq_sheep_agroforestry(
 
 
 def get_wreq_beef_agroforestry(
-    data:Data, 
+    data, 
     ag_w_mrj: np.ndarray, 
     agroforestry_x_r: np.ndarray,
     yr_idx: int,
@@ -183,7 +182,7 @@ def get_wreq_beef_agroforestry(
     return agroforestry_contr + beef_contr
 
 
-def get_wreq_carbon_plantings_belt_base(data:Data, yr_idx: int, water_dr_yield: Optional[np.ndarray] = None) -> np.ndarray:
+def get_wreq_carbon_plantings_belt_base(data, yr_idx: int, water_dr_yield: Optional[np.ndarray] = None) -> np.ndarray:
     """
     Get water requirments vector of carbon plantings (belt arrangement).
 
@@ -197,7 +196,7 @@ def get_wreq_carbon_plantings_belt_base(data:Data, yr_idx: int, water_dr_yield: 
 
 
 def get_wreq_sheep_carbon_plantings_belt(
-    data:Data, 
+    data, 
     ag_w_mrj: np.ndarray, 
     cp_belt_x_r: np.ndarray,
     yr_idx: int,
@@ -227,7 +226,7 @@ def get_wreq_sheep_carbon_plantings_belt(
 
 
 def get_wreq_beef_carbon_plantings_belt(
-    data:Data, 
+    data, 
     ag_w_mrj: np.ndarray, 
     cp_belt_x_r: np.ndarray,
     yr_idx: int,
@@ -256,7 +255,7 @@ def get_wreq_beef_carbon_plantings_belt(
     return cp_contr + beef_contr
 
 
-def get_wreq_matrix_beccs(data:Data, yr_idx: int, water_dr_yield: Optional[np.ndarray] = None) -> np.ndarray:
+def get_wreq_matrix_beccs(data, yr_idx: int, water_dr_yield: Optional[np.ndarray] = None) -> np.ndarray:
     """
     Get water requirments vector of BECCS.
 
@@ -270,7 +269,7 @@ def get_wreq_matrix_beccs(data:Data, yr_idx: int, water_dr_yield: Optional[np.nd
 
 
 def get_w_net_yield_matrix(
-    data:Data,
+    data,
     ag_w_mrj: np.ndarray,
     lumap: np.ndarray,
     yr_idx: int,
