@@ -37,6 +37,9 @@ import luto.settings as settings
 from typing import Tuple
 from datetime import datetime
 
+import luto.economics.agricultural.water as ag_water
+import luto.economics.non_agricultural.water as non_ag_water
+
 
 def write_timestamp():
     timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
@@ -238,18 +241,18 @@ def get_non_ag_cells(lumap) -> np.ndarray:
     return np.nonzero(lumap >= settings.NON_AGRICULTURAL_LU_BASE_CODE)[0]
 
 
-def get_water_delta_matrix(w_mrj, l_mrj, data, yr_idx):
+def get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx):
     """
     Gets the water delta matrix ($/cell) that applies the cost of installing/removing irrigation to
     base transition costs. Includes the costs of water license fees.
 
     Parameters:
-    - w_mrj (numpy.ndarray, <unit:ML/cell>): Water requirements matrix for target year.
-    - l_mrj (numpy.ndarray): Land-use and land management matrix for the base_year.
-    - data (object): Data object containing necessary information.
+     w_mrj (numpy.ndarray, <unit:ML/cell>): Water requirements matrix for target year.
+     l_mrj (numpy.ndarray): Land-use and land management matrix for the base_year.
+     data (object): Data object containing necessary information.
 
     Returns:
-    - w_delta_mrj (numpy.ndarray, <unit:$/cell>).
+     w_delta_mrj (numpy.ndarray, <unit:$/cell>).
     """
     yr_cal = data.YR_CAL_BASE + yr_idx
     
@@ -284,6 +287,46 @@ def get_water_delta_matrix(w_mrj, l_mrj, data, yr_idx):
     
     return w_delta_mrj  # <unit:$/cell>
 
+def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.ndarray, np.ndarray]:
+    """
+    Gets the water delta matrix ($/cell) that applies the cost of installing/removing irrigation to
+    base transition costs. Includes the costs of water license fees.
+    
+    Parameters:
+     data (object): Data object containing necessary information.
+     yr_idx (int): Index of the target year.
+     lumap (numpy.ndarray): Land-use map.
+     lmmap (numpy.ndarray): Land management map.
+    
+    Returns:
+     w_license_cost_r (numpy.ndarray) : Water license cost for each cell.
+     w_rm_irrig_cost_r (numpy.ndarray) : Cost of removing irrigation for each cell.
+     
+     
+    """
+    
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    l_mrj = lumap2ag_l_mrj(lumap, lmmap)
+    non_ag_cells = get_non_ag_cells(lumap)
+    
+    w_req_mrj = ag_water.get_wreq_matrices(data, yr_idx).astype(np.float32)     # <unit: ML/CELL>
+    w_req_r = (w_req_mrj * l_mrj).sum(axis=0).sum(axis=1)
+    w_yield_r = non_ag_water.get_w_net_yield_matrix_env_planting(data, yr_idx)  # <unit: ML/CELL>
+    w_delta_r = - (w_req_r + w_yield_r)
+    
+    w_license_cost_r = w_delta_r * data.WATER_LICENCE_PRICE * data.WATER_LICENSE_COST_MULTS[yr_cal] * settings.INCLUDE_WATER_LICENSE_COSTS     # <unit: $/CELL>
+    w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA                   # <unit: $/CELL>
+    
+    # Amortise upfront costs to annualised costs
+    w_license_cost_r = amortise(w_license_cost_r)
+    w_rm_irrig_cost_r = amortise(w_rm_irrig_cost_r)
+    
+    # Cells previously used for non-agricultural land uses will have nan values
+    w_license_cost_r[non_ag_cells] = np.nan
+    w_rm_irrig_cost_r[non_ag_cells] = np.nan
+    
+    return w_license_cost_r, w_rm_irrig_cost_r
+
 
 def am_name_snake_case(am_name):
     """Get snake_case version of the AM name"""
@@ -298,11 +341,11 @@ def get_exclusions_for_excluding_all_natural_cells(data, lumap) -> np.ndarray:
     indices of cells that use natural land uses, and 1 everywhere else.
 
     Parameters:
-    - data: The data object containing information about the cells.
-    - lumap: The land use map.
+     data: The data object containing information about the cells.
+     lumap: The land use map.
 
     Returns:
-    - exclude: An array of shape (NCELLS,) with values 0 at the indices of cells
+     exclude: An array of shape (NCELLS,) with values 0 at the indices of cells
                that use natural land uses, and 1 everywhere else.
     """
     exclude = np.ones(data.NCELLS)
@@ -319,11 +362,11 @@ def get_exclusions_agroforestry_base(data, lumap) -> np.ndarray:
     be done at each cell.
 
     Parameters:
-    - data: The data object containing information about the landscape.
-    - lumap: The land use map.
+     data: The data object containing information about the landscape.
+     lumap: The land use map.
 
     Returns:
-    - exclude: A 1-D array.
+     exclude: A 1-D array.
     """
     exclude = (np.ones(data.NCELLS) * settings.AF_PROPORTION).astype(np.float32)
 
@@ -339,11 +382,11 @@ def get_exclusions_carbon_plantings_belt_base(data, lumap) -> np.ndarray:
     be done at each cell.
 
     Parameters:
-    - data: The data object containing information about the cells.
-    - lumap: The land use map.
+     data (Data): The data object containing information about the cells.
+     lumap (np.ndarray): The land use map.
 
     Returns:
-    - exclude: A 1-D array
+     exclude: A 1-D array
     """
     exclude = (np.ones(data.NCELLS) * settings.CP_BELT_PROPORTION).astype(np.float32)
 
@@ -451,12 +494,12 @@ def calc_water(
 ) -> pd.DataFrame:
     
     '''
-    Note:
+    Note
         This function is only used for the `write_water` in the `luto.tools.write` module.
         Calculate water yields for year given the index. 
     
-    Return:
-    - pd.DataFrame, the water yields for year and region.
+    Return
+     pd.DataFrame, the water yields for year and region.
     '''
     
     # Calculate water yields for year and region.

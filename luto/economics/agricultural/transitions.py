@@ -148,7 +148,7 @@ def get_transition_matrices(data: Data, yr_idx, base_year, separate=False):
     # -------------------------------------------------------------- #
 
     w_mrj = get_wreq_matrices(data, yr_idx)                                     # <unit: ML/cell>
-    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)
+    w_delta_mrj = tools.get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)
     w_delta_mrj = np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not).astype(np.float32)
 
     # -------------------------------------------------------------- #
