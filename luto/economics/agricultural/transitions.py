@@ -142,6 +142,7 @@ def get_transition_matrices(data: Data, yr_idx, base_year, separate=False):
 
     # Update the cost matrix with exclude matrices; the transition cost for a cell that remain the same is 0.
     e_mrj = np.einsum('mrj,mrj,mrj->mrj', e_mrj, x_mrj, l_mrj_not).astype(np.float32)
+    e_mrj = np.nan_to_num(e_mrj)
 
     # -------------------------------------------------------------- #
     # Water license cost (upfront, amortised to annual, per cell).   #
