@@ -157,7 +157,7 @@ def get_beef_agroforestry_cells(lumap) -> np.ndarray:
 
 def get_agroforestry_cells(lumap) -> np.ndarray:
     """
-    Get an array with cells used that currently use agroforestry (either sheep or beef)
+    Get an array with cells that currently use agroforestry (either sheep or beef)
     """
     agroforestry_lus = [settings.NON_AGRICULTURAL_LU_BASE_CODE + 2, settings.NON_AGRICULTURAL_LU_BASE_CODE + 3]
     return np.nonzero(np.isin(lumap, agroforestry_lus))[0]
@@ -320,10 +320,6 @@ def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.nd
     # Amortise upfront costs to annualised costs
     w_license_cost_r = amortise(w_license_cost_r)
     w_rm_irrig_cost_r = amortise(w_rm_irrig_cost_r)
-    
-    # Cells previously used for non-agricultural land uses will have nan values
-    w_license_cost_r[non_ag_cells] = np.nan
-    w_rm_irrig_cost_r[non_ag_cells] = np.nan
     
     return w_license_cost_r, w_rm_irrig_cost_r
 

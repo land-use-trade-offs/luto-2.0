@@ -1334,7 +1334,7 @@ document.addEventListener("DOMContentLoaded", function () {
       align: "right",
       verticalalign: "left",
       layout: "vertical",
-      x: -150,
+      x: -100,
       verticalAlign: "middle",
     },
 

@@ -25,6 +25,7 @@ functions as a singleton class. It is intended to be the _only_ part of the
 model that has 'global' varying state.
 """
 
+
 import os
 import gzip
 import time
@@ -32,6 +33,7 @@ import dill
 import threading
 import time
 
+from glob import glob
 from luto.data import Data
 from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
@@ -60,6 +62,10 @@ def load_data() -> Data:
     # Thread to log memory usage
     memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'w',1), daemon=True)
     memory_thread.start()
+    
+    # Remove previous log files
+    for f in glob(f'{settings.OUTPUT_DIR}/*.log'):
+        os.remove(f)
 
     return Data()
 

@@ -44,16 +44,14 @@ def get_env_plant_transitions_from_ag(data: Data, yr_idx, lumap, w_license_cost_
         np.ndarray|dict: The transition costs as either a numpy array or a dictionary, depending on the value of `separate`.
     """
     yr_cal = data.YR_CAL_BASE + yr_idx
-    non_ag_idx = tools.get_non_ag_cells(lumap)
 
     # Establishment costs
     est_costs_r = tools.amortise(data.EP_EST_COST_HA * data.REAL_AREA * data.EST_COST_MULTS[yr_cal]).astype(np.float32)
-    est_costs_r[non_ag_idx] = np.nan
     
     # Transition costs
     base_ag_to_ep_t_r = np.vectorize(dict(enumerate(data.AG2EP_TRANSITION_COSTS_HA)).get, otypes=['float32'])(lumap)
     base_ag_to_ep_t_r = tools.amortise(base_ag_to_ep_t_r * data.REAL_AREA)
-    base_ag_to_ep_t_r[non_ag_idx] = np.nan
+    base_ag_to_ep_t_r = np.nan_to_num(base_ag_to_ep_t_r)
     
     # Waster costs; Assume EP is dryland, and no 'REMOVE_IRRIG_COST' for EP
     w_cost_r = w_license_cost_r + w_rm_irrig_cost_r
@@ -63,8 +61,8 @@ def get_env_plant_transitions_from_ag(data: Data, yr_idx, lumap, w_license_cost_
                 'Transition cost (Ag2Non-Ag)': base_ag_to_ep_t_r, 
                 'Water license cost (Ag2Non-Ag)': w_license_cost_r,
                 'Remove irrigation cost (Ag2Non-Ag)': w_rm_irrig_cost_r}
-
-    return est_costs_r + base_ag_to_ep_t_r + w_cost_r
+    else:   
+        return est_costs_r + base_ag_to_ep_t_r + w_cost_r
 
 
 def get_rip_plant_transitions_from_ag(data: Data, base_costs_r, yr_idx, lumap, separate=False) -> np.ndarray|dict:
@@ -76,17 +74,14 @@ def get_rip_plant_transitions_from_ag(data: Data, base_costs_r, yr_idx, lumap, s
     np.ndarray
         1-D array, indexed by cell.
     """
-    non_ag_idx = tools.get_non_ag_cells(lumap)
     base_costs_r_copy = base_costs_r.copy()     # Copy the transition costs so we do not modify the original values
-    
+
     fencing_cost_r = (
         data.RP_FENCING_LENGTH 
         * settings.FENCING_COST_PER_M
         * data.FENCE_COST_MULTS[data.YR_CAL_BASE + yr_idx]
         * data.REAL_AREA
     ).astype(np.float32)
-    
-    fencing_cost_r[non_ag_idx] = np.nan
     
     if separate:
         base_costs_r_copy.update({'Fencing cost (Ag2Non-Ag)':fencing_cost_r})
@@ -104,9 +99,8 @@ def get_agroforestry_transitions_from_ag_base(data: Data, base_costs_r, yr_idx, 
     np.ndarray
         1-D array, indexed by cell.
     """
-    non_ag_idx = tools.get_non_ag_cells(lumap)
     base_costs_r_copy = base_costs_r.copy()   # Copy the transition costs so we do not modify the original values
-    
+
     fencing_cost_r = (
         settings.AF_FENCING_LENGTH
         * settings.FENCING_COST_PER_M
@@ -114,7 +108,6 @@ def get_agroforestry_transitions_from_ag_base(data: Data, base_costs_r, yr_idx, 
         * data.REAL_AREA 
     ).astype(np.float32)
     
-    fencing_cost_r[non_ag_idx] = np.nan
     
     if separate:
         base_costs_r_copy.update({'Fencing cost (Ag2Non-Ag)':fencing_cost_r})
@@ -137,7 +130,6 @@ def get_sheep_agroforestry_transitions_from_ag(
         (separate = True) Dict of separated transition costs.
     """
     
-    non_ag_cells = tools.get_non_ag_cells(lumap)
     sheep_j = tools.get_sheep_code(data)
 
     if separate:
@@ -156,9 +148,6 @@ def get_sheep_agroforestry_transitions_from_ag(
         sheep_costs_r = ag_t_costs[0, :, sheep_j]                   # Assume sheep is dryland under sheep-agroforestry  
         t_r = (sheep_costs_r * (1 - agroforestry_x_r)) + (agroforestry_costs * agroforestry_x_r)
 
-        # Set all non-agricultural land to have nan values
-        t_r[non_ag_cells] = np.nan
-
         return t_r.astype(np.float32)
     
 
@@ -176,7 +165,6 @@ def get_beef_agroforestry_transitions_from_ag(
         (separate = True) Dict of separated transition costs.
     """
     
-    non_ag_cells = tools.get_non_ag_cells(lumap)
     beef_j = tools.get_beef_code(data)
 
     if separate:
@@ -195,9 +183,6 @@ def get_beef_agroforestry_transitions_from_ag(
         beef_costs_r = ag_t_costs[0, :, beef_j]    
         t_r = (beef_costs_r * (1 - agroforestry_x_r)) + (agroforestry_costs * agroforestry_x_r) 
 
-        # Set all non-agricultural land to have zero cost
-        t_r[non_ag_cells] = np.nan
-
         return t_r.astype(np.float32)
 
 
@@ -211,20 +196,17 @@ def get_carbon_plantings_block_from_ag(data: Data, yr_idx, lumap, w_license_cost
         1-D array, indexed by cell.
     """
     yr_cal = data.YR_CAL_BASE + yr_idx
-    non_ag_idx = tools.get_non_ag_cells(lumap)
-    
+
     # Establishment costs for each cell
     est_costs_r = tools.amortise(data.CP_EST_COST_HA * data.REAL_AREA * data.EST_COST_MULTS[yr_cal] ).astype(np.float32)
-    est_costs_r[non_ag_idx] = np.nan
     
     # Transition costs
     base_ag_to_cp_t_j = np.vectorize(dict(enumerate(data.AG2EP_TRANSITION_COSTS_HA)).get, otypes=['float32'])(lumap).astype(np.float32)
     base_ag_to_cp_t_j = tools.amortise(base_ag_to_cp_t_j * data.REAL_AREA).copy()
-    base_ag_to_cp_t_j[non_ag_idx] = np.nan
+    base_ag_to_cp_t_j = np.nan_to_num(base_ag_to_cp_t_j)
 
     # Water costs (pre-amortised)
     w_cost_r = w_license_cost_r + w_rm_irrig_cost_r
-    w_cost_r[non_ag_idx] = np.nan
 
     if separate:
         return {'Establishment cost (Ag2Non-Ag)': est_costs_r,
@@ -247,9 +229,9 @@ def get_carbon_plantings_belt_from_ag_base(data: Data, base_costs_r, yr_idx, lum
     dict
         (separate = True) Dict of separated transition costs.
     """
-    non_ag_idx = tools.get_non_ag_cells(lumap)
-    base_costs_r_copy = base_costs_r.copy()         # Copy the transition costs so we do not modify the original values
     
+    base_costs_r_copy = base_costs_r.copy()         # Copy the transition costs so we do not modify the original values
+
     fencing_cost_r = (
         settings.CP_BELT_FENCING_LENGTH
         * settings.FENCING_COST_PER_M
@@ -257,7 +239,6 @@ def get_carbon_plantings_belt_from_ag_base(data: Data, base_costs_r, yr_idx, lum
         * data.REAL_AREA
     ).astype(np.float32)
     
-    fencing_cost_r[non_ag_idx] = np.nan
     
     if separate:
         base_costs_r_copy.update({'Fencing cost (Ag2Non-Ag)':fencing_cost_r})
@@ -282,7 +263,6 @@ def get_sheep_carbon_plantings_belt_from_ag(
     """
     
     sheep_j = tools.get_sheep_code(data)
-    non_ag_cells = tools.get_non_ag_cells(lumap)
 
     if separate:
         # Copy the transition costs so we do not modify the original values
@@ -301,9 +281,6 @@ def get_sheep_carbon_plantings_belt_from_ag(
         sheep_costs_r = ag_t_costs[0, :, sheep_j]                   # Assume sheep is dryland under sheep-agroforestry
         t_r = (sheep_costs_r * (1 - cp_belt_x_r)) + (cp_belt_costs * cp_belt_x_r)
 
-        # Set all non-agricultural land to have nan values
-        t_r[non_ag_cells] = np.nan
-
         return t_r.astype(np.float32)
 
 
@@ -320,9 +297,9 @@ def get_beef_carbon_plantings_belt_from_ag(
     dict
         (separate = True) Dict of separated transition costs.
     """
-    non_ag_cells = tools.get_non_ag_cells(lumap)
-    beef_j = tools.get_beef_code(data)
     
+    beef_j = tools.get_beef_code(data)
+
     if separate:
         # Copy the transition costs so we do not modify the original values
         ag_cost = ag_t_costs.copy()
@@ -338,9 +315,6 @@ def get_beef_carbon_plantings_belt_from_ag(
     else:
         beef_costs_r = ag_t_costs[0, :, beef_j]          # Assume beef is dryland under beef-agroforestry
         t_r = (beef_costs_r * (1 - cp_belt_x_r)) + (cp_belt_costs * cp_belt_x_r)
-
-        # Set all non-agricultural land to have nan values
-        t_r[non_ag_cells] = np.nan
 
         return t_r
 
@@ -389,7 +363,7 @@ def get_from_ag_transition_matrix(data: Data, yr_idx, base_year, lumap, lmmap, s
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
     w_license_cost_r, w_rm_irrig_cost_r = tools.get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)
     
-    env_plant_transitions_from_ag = get_env_plant_transitions_from_ag(data, yr_idx, lumap, w_license_cost_r, w_rm_irrig_cost_r, separate)  # Base transition from ag to tree planting
+    env_plant_transitions_from_ag = get_env_plant_transitions_from_ag(data, yr_idx, lumap, w_license_cost_r, w_rm_irrig_cost_r, separate)   # Base transition from ag to tree planting
     rip_plant_transitions_from_ag = get_rip_plant_transitions_from_ag(data, env_plant_transitions_from_ag, yr_idx, lumap, separate)         # Base transition plus RF fencing costs
     agroforestry_costs = get_agroforestry_transitions_from_ag_base(data, env_plant_transitions_from_ag, yr_idx, lumap, separate)            # Base transition plus AF fencing costs
     cp_belt_costs = get_carbon_plantings_belt_from_ag_base(data, env_plant_transitions_from_ag, yr_idx, lumap, separate)                    # Base transition plus CP fencing costs
@@ -936,7 +910,7 @@ def get_exclusions_environmental_plantings(data: Data, lumap) -> np.ndarray:
     excluded_ag_lus_cells = np.where(np.isnan(data.AG2EP_TRANSITION_COSTS_HA))[0]
 
     # Create the exclude array as having 0 for every cell that has an excluded land use and 1 otherwise.
-    exclude = (~np.isin(lumap, excluded_ag_lus_cells)).astype(int)
+    exclude = np.where(np.isin(lumap, excluded_ag_lus_cells), 0, 1)
 
     # Ensure other non-agricultural land uses are excluded
     exclude[tools.get_non_ag_natural_lu_cells(data, lumap)] = 0

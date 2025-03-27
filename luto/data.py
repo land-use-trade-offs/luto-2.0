@@ -31,7 +31,7 @@ import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 
-
+from glob import glob
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Literal, Optional
@@ -1761,8 +1761,6 @@ class Data:
         for p in paths:
             if not os.path.exists(p):
                 os.mkdir(p)
-                
-        # 
 
         return self.path
 
