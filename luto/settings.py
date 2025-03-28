@@ -131,7 +131,7 @@ DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in th
 WRITE_OUTPUT_GEOTIFFS = False   # Write GeoTiffs to output directory: True or False
 WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resolution: True or False
 
-PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
+PARALLEL_WRITE = False           # If to use parallel processing to write GeoTiffs: True or False
 WRITE_THREADS = 5               # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
@@ -181,7 +181,8 @@ Land-use and vector file pairs to exclude land-use from being utilised in that a
  - The value is the path to the ESRI shapefile.
 '''
 
-REGIONAL_ADOPTION_ZONE = 'LGA_CODE' # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
+REGIONAL_ADOPTION_CONSTRAINTS = 'on'  # 'on' or 'off'
+REGIONAL_ADOPTION_ZONE = 'ABARES_AAGIS'   # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 '''
 The regional adoption zone is the spatial unit used to enforce regional adoption constraints.
 The options are:

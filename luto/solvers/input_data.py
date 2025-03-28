@@ -102,6 +102,7 @@ class SolverInputData:
     limits: dict                                            # Targets to use.
     desc2aglu: dict                                         # Map of agricultural land use descriptions to codes.
     resmult: float                                          # Resolution factor multiplier from data.RESMULT
+    real_area: np.ndarray                                   # Area of each cell, indexed by cell (r)
                 
     @property
     def n_ag_lms(self):
@@ -535,6 +536,7 @@ def get_limits(
     - Water net yield limits
     - GHG limits
     - Biodiversity limits
+    - Regional adoption limits
     """
     print('Getting environmental limits...', flush = True)
     # Limits is a dictionary with heterogeneous value sets.
@@ -563,6 +565,10 @@ def get_limits(
 
     limits["snes"] = ag_biodiversity.get_snes_limits(data, yr_cal)
     limits["ecnes"] = ag_biodiversity.get_ecnes_limits(data, yr_cal)
+
+    ag_reg_adoption, non_ag_reg_adoption = ag_transition.get_regional_adoption_limits(data, yr_cal)
+    limits["ag_regional_adoption"] = ag_reg_adoption
+    limits["non_ag_regional_adoption"] = non_ag_reg_adoption
 
     return limits
 
@@ -665,4 +671,5 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         limits=get_limits(data, target_year),
         desc2aglu=data.DESC2AGLU,
         resmult=data.RESMULT,
+        real_area=data.REAL_AREA,
     )
