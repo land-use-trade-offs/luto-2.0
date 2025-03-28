@@ -27,17 +27,16 @@ and Brett Bryan, Deakin University
 
 
 # Load libraries
-
+import h5py
 import numpy as np
 import pandas as pd
 import shutil, os, time, h5py
-import rasterio
 import xarray as xr
 
-from itertools import product
+
 from joblib import Parallel, delayed
-from luto.settings import INPUT_DIR, RAW_DATA, HABITAT_CONDITION, HCAS_PERCENTILE
-from luto.tools.spatializers import upsample_array
+from luto.settings import INPUT_DIR, RAW_DATA
+from itertools import product
 
 
 
@@ -113,14 +112,16 @@ def create_new_dataset():
 
     pd.read_hdf(luto_2D_inpath + 'cell_savanna_burning.h5').to_hdf(outpath + 'cell_savanna_burning.h5', key='cell_savanna_burning', mode='w', format='table', index=False, complevel=9)
 
-    shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp126_2010-2100_DR_ML_HA_mean.h5', outpath + 'water_yield_ssp126_2010-2100_dr_ml_ha.h5')
-    shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp126_2010-2100_SR_ML_HA_mean.h5', outpath + 'water_yield_ssp126_2010-2100_sr_ml_ha.h5')
-    shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean.h5', outpath + 'water_yield_ssp245_2010-2100_dr_ml_ha.h5')
-    shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean.h5', outpath + 'water_yield_ssp245_2010-2100_sr_ml_ha.h5')
-    shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp370_2010-2100_DR_ML_HA_mean.h5', outpath + 'water_yield_ssp370_2010-2100_dr_ml_ha.h5')
-    shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp370_2010-2100_SR_ML_HA_mean.h5', outpath + 'water_yield_ssp370_2010-2100_sr_ml_ha.h5')
-    shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp585_2010-2100_DR_ML_HA_mean.h5', outpath + 'water_yield_ssp585_2010-2100_dr_ml_ha.h5')
-    shutil.copyfile(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp585_2010-2100_SR_ML_HA_mean.h5', outpath + 'water_yield_ssp585_2010-2100_sr_ml_ha.h5')
+    # Save Water file to nc so we can read it without loading all data to mem
+    for ssp, root in product(['126', '245', '370', '585'], ['DR', 'SR']):
+        f_name = f'Water_yield_GCM-Ensemble_ssp{ssp}_2010-2100_{root}_ML_HA_mean'
+        with h5py.File(luto_4D_inpath + f_name + '.h5', 'r') as f:
+            ds = f[f_name][...]
+            encoding = {'data': {"compression": "gzip", "compression_opts": 9, "dtype": 'float32', 'chunksizes': (ds.shape[0], 10000)}}
+            data = xr.DataArray(ds, dims=['year', 'cell'], coords={'year': np.arange(2010, 2101), 'cell': np.arange(ds.shape[1])})
+            data.name = 'data'
+            data.to_netcdf(outpath + f'water_yield_ssp{ssp}_2010-2100_{root.lower()}_ml_ha.nc', encoding=encoding, mode='w', engine='h5netcdf')
+            
 
     # Copy agricultural management datafiles
     shutil.copyfile(luto_1D_inpath + '20231101_Bundle_MR.xlsx', outpath + '20231101_Bundle_MR.xlsx')
@@ -632,43 +633,7 @@ def create_new_dataset():
     biodiv_priorities.to_hdf(outpath + 'biodiv_priorities.h5', key='biodiv_priorities', mode='w', format='table', index=False, complevel=9)
 
     
-    # Precalculate the degradation score
-    
-    # 1) Get habitat degradation scale for each agricultural land-use
-    biodiv_degrade_df = pd.read_csv(os.path.join(INPUT_DIR, 'HABITAT_CONDITION.csv'))                                                               # Load the HCAS percentile data (pd.DataFrame)
 
-    if HABITAT_CONDITION == 'HCAS':
-        '''
-        The degradation weight score of "HCAS" are float values range between 0-1 indicating the suitability for wild animals survival.
-        Here we average this dataset in year 2009, 2010, and 2011, then calculate the percentiles of the average score under each land-use type.
-        '''
-        bio_HCAS_degrade_lookup = biodiv_degrade_df[['lu', f'PERCENTILE_{HCAS_PERCENTILE}']]                                # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
-        bio_HCAS_degrade_lookup = {int(k):v for k,v in dict(bio_HCAS_degrade_lookup.values).items()}                        # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
-        unalloc_nat_land_bio_score = bio_HCAS_degrade_lookup[ag_desc2lu['Unallocated - natural land']]                      # Get the biodiversity degradation score for unallocated natural land (float)
-        bio_HCAS_degrade_lookup = {k:v*(1/unalloc_nat_land_bio_score) for k,v in bio_HCAS_degrade_lookup.items()}           # Normalise the biodiversity degradation score to the unallocated natural land score
-    elif HABITAT_CONDITION == 'USER_DEFINED':
-        bio_HCAS_degrade_lookup = biodiv_degrade_df[['lu', 'USER_DEFINED']]
-        bio_HCAS_degrade_lookup = {int(k):v for k,v in dict(bio_HCAS_degrade_lookup.values).items()}                        # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
-    else:
-        raise ValueError(f"Invalid habitat condition source: {HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
-    
-    # Save to file; 
-    pd.DataFrame({'lu':bio_HCAS_degrade_lookup.keys(), 'RETAIN_RATION_AFTER_DEGRADATE':bio_HCAS_degrade_lookup.values()}).to_csv(os.path.join(outpath, 'BIODIV_HABITAT_DEGRADE_LOOK_UP.csv'), index=False)                 
-    
-    # 2) Convert look-up to layer
-    bio_HCAS_degrade_lookup[-1] = 0                          # Fill cells outside the LUTO study area (cells of -1) to 0
-    biodiv_degrade_habitat = np.vectorize(bio_HCAS_degrade_lookup.get, otypes=[float])(lumap).astype(np.float32)
-    biodiv_degrade_habitat[idx_outside_LUTO_natural] = 1.0   # Fill cells outside the LUTO study area and natural land to 1.0
-    
-    
-    # 3) Calculate the area-weighted degradation score
-    priority_area_weighted_baseline_user_pro_zone = np.ones_like(biodiv_degrade_habitat) * zones['CELL_HA'].values
-    priority_area_weighted_baseline_user_pro_inside_LUTO = (biodiv_degrade_habitat * zones['CELL_HA'].values)[idx_inside_LUTO]
-    priority_area_weighted_baseline_user_pro_outside_LUTO = (biodiv_degrade_habitat * zones['CELL_HA'].values)[idx_outside_LUTO]
-    
-    
-    
-    
 
     ############### Get stream length
 

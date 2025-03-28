@@ -43,8 +43,8 @@ def get_breq_matrices(data: Data):
 
     for j in range(data.N_AG_LUS):
         b_mrj[:, :, j] = (
-            data.BIO_BASE_YR_AFTER_LDS -                                                      # Biodiversity score after Late Dry Season (LDS) burning
-            (data.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * (1 - data.BIODIV_HABITAT_DEGRADE_LOOK_UP[j]))     # Biodiversity degradation for land-use j
+            data.BIO_CONTRIBUTION_LDS_WEIGHTED -                                             # Biodiversity score after Late Dry Season (LDS) burning
+            (data.BIO_CONTRIBUTION_RAW * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[j]))     # Biodiversity degradation for land-use j
         ) * data.REAL_AREA    
     
     return b_mrj
@@ -109,10 +109,11 @@ def get_savanna_burning_effect_b_mrj(data: Data):
     nlus = len(settings.AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
     new_b_mrj = np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
-    eds_sav_burning_biodiv_benefits = np.where( data.SAVBURN_ELIGIBLE, 
-                                                (1 - settings.LDS_BIODIVERSITY_VALUE) * data.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * data.REAL_AREA, 
-                                                0
-                                              )
+    eds_sav_burning_biodiv_benefits = np.where(
+        data.SAVBURN_ELIGIBLE, 
+        data.BIO_CONTRIBUTION_RAW * (1 - settings.LDS_BIODIVERSITY_VALUE) * data.REAL_AREA, 
+        0
+    ).astype(np.float32)
     
 
     for m, j in itertools.product(range(data.NLMS), range(nlus)):
@@ -209,7 +210,7 @@ def get_biodiversity_limits(data: Data, yr_cal: int):
 
     """
 
-    return data.BIO_GBF2_TARGET_SCORES[yr_cal]
+    return data.get_GBF2_target_for_yr_cal(yr_cal)
 
 
 def get_major_vegetation_matrices(data: Data) -> np.ndarray:
@@ -219,7 +220,7 @@ def get_major_vegetation_matrices(data: Data) -> np.ndarray:
 def get_species_conservation_matrix(data: Data, target_year: int):
     return (
         data.get_GBF4A_bio_layers_by_yr(target_year)
-        * data.BIO_RETAIN_FRACTION_LDS
+        * data.BIO_CONTRIBUTION_LDS_WEIGHTED
         * data.REAL_AREA
     )
 
@@ -259,7 +260,7 @@ def get_ag_management_biodiversity_impacts(
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing'])
         },
         'Savanna Burning': {
-            j_idx: 1 - data.BIO_RETAIN_FRACTION_LDS.astype(np.float32)
+            j_idx: 1 - data.BIO_CONTRIBUTION_LDS_WEIGHTED.astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
         },
         'AgTech EI': {

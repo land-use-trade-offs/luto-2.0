@@ -978,7 +978,7 @@ def write_biodiversity_priority_scores(data: Data, yr_cal, path):
 
     # Get the biodiversity scores b_mrj
     bio_priority_scores = xr.DataArray(
-        data.BIO_DISTANCE_WEIGHTED * data.REAL_AREA,
+        data.BIO_CONTRIBUTION_RAW * data.REAL_AREA,
         dims=['cell'],
         coords={'cell':range(data.NCELLS)}
     )
@@ -992,7 +992,7 @@ def write_biodiversity_priority_scores(data: Data, yr_cal, path):
     # Apply habitat degradation impact
     for lu in data.AGRICULTURAL_LANDUSES:
         ag_dvar_mrj = ag_dvar_mrj.copy()                    # Copy because the array is used as a view when feed to multiprocess
-        ag_dvar_mrj.loc[{'lu':lu}] = ag_dvar_mrj.loc[{'lu':lu}] * data.BIODIV_HABITAT_DEGRADE_LOOK_UP[data.DESC2AGLU[lu]]
+        ag_dvar_mrj.loc[{'lu':lu}] = ag_dvar_mrj.loc[{'lu':lu}] * data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]]
         
     am_impacts = ag_biodiversity.get_ag_management_biodiversity_impacts(data, yr_cal)
     for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items():
@@ -1007,7 +1007,7 @@ def write_biodiversity_priority_scores(data: Data, yr_cal, path):
 
 
     # Calculate the biodiversity scores, Divide by total area-weighted biodiversity degradation in base year to get the relative contribution
-    base_yr_score = (data.BIO_DISTANCE_WEIGHTED * data.BIO_BASE_YR_RETAIN_FRACTION_HABITAT * data.REAL_AREA).sum()
+    base_yr_score = (data.BIO_CONTRIBUTION_RAW * data.BIO_HCAS_CONTRIBUTION_BASE_YR * data.REAL_AREA).sum()
 
     priority_ag = (ag_dvar_mrj * bio_priority_scores
     ).sum(['cell','lm']).to_dataframe('Area Weighted Score (ha)').reset_index().assign(
@@ -1066,17 +1066,17 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     # Calculate the biodiversity scores; Divide by total biodiversity degradation in base year to get the relative contribution
     GBF2_ag = (ag_dvar_mrj * ag_biodiv_mrj
     ).sum(['cell','lm']).to_dataframe('Area Weighted Score (ha)').reset_index().assign(
-        Relative_Contribution_Percentage = lambda x:( (x['Area Weighted Score (ha)'] / (data.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * data.REAL_AREA).sum()) * 100)
+        Relative_Contribution_Percentage = lambda x:( (x['Area Weighted Score (ha)'] / (data.BIO_CONTRIBUTION_RAW * data.REAL_AREA).sum()) * 100)
     )
 
     GBF2_non_ag = (non_ag_dvar_rk * non_ag_biodiv_rk 
     ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().assign(
-        Relative_Contribution_Percentage = lambda x:( x['Area Weighted Score (ha)'] / (data.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * data.REAL_AREA).sum() * 100)
+        Relative_Contribution_Percentage = lambda x:( x['Area Weighted Score (ha)'] / (data.BIO_CONTRIBUTION_RAW * data.REAL_AREA).sum() * 100)
     )
 
     GBF2_am = (ag_mam_dvar_mrj * am_biodiv_mrj
     ).sum(['cell','lm'], skipna=False).to_dataframe('Area Weighted Score (ha)').reset_index().assign(
-        Relative_Contribution_Percentage = lambda x:( x['Area Weighted Score (ha)'] / (data.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * data.REAL_AREA).sum() * 100)
+        Relative_Contribution_Percentage = lambda x:( x['Area Weighted Score (ha)'] / (data.BIO_CONTRIBUTION_RAW * data.REAL_AREA).sum() * 100)
     ).dropna()
 
 
@@ -1122,7 +1122,7 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
 
     # Get the impacts of each ag/non-ag/am to vegetation matrices
     ag_impact_j = xr.DataArray(
-        list(data.BIODIV_HABITAT_DEGRADE_LOOK_UP.values()),
+        list(data.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values()),
         dims=['lu'],
         coords={'lu':data.AGRICULTURAL_LANDUSES}
     )
@@ -1207,7 +1207,7 @@ def write_biodiversity_GBF4A_scores_groups(data: Data, yr_cal, path):
     
     lumap = data.lumaps[yr_cal]
     lumap_degradation = xr.DataArray(
-        np.vectorize(data.BIODIV_HABITAT_DEGRADE_LOOK_UP.get)(lumap).astype(np.float32),
+        np.vectorize(data.BIO_HABITAT_CONTRIBUTION_LOOK_UP.get)(lumap).astype(np.float32),
         dims=['cell'],
         coords={'cell':np.arange(data.NCELLS)}
     )
@@ -1283,7 +1283,7 @@ def write_biodiversity_GBF4A_scores_species(data: Data, yr_cal, path):
     
     lumap = data.lumaps[yr_cal]
     lumap_degradation = xr.DataArray(
-        np.vectorize(data.BIODIV_HABITAT_DEGRADE_LOOK_UP.get)(lumap).astype(np.float32),
+        np.vectorize(data.BIO_HABITAT_CONTRIBUTION_LOOK_UP.get)(lumap).astype(np.float32),
         dims=['cell'],
         coords={'cell':np.arange(data.NCELLS)}
     )
@@ -1394,7 +1394,7 @@ def write_species_conservation(data: Data, yr_cal: int, path) -> None:
 
     if yr_cal == data.YR_CAL_BASE:
         sc_sr = ag_biodiversity.get_species_conservation_matrix(data, yr_cal)
-        ag_biodiv_degr_j = data.BIODIV_HABITAT_DEGRADE_LOOK_UP
+        ag_biodiv_degr_j = data.BIO_HABITAT_CONTRIBUTION_LOOK_UP
         sc_prod_data = tools.calc_species_ag_area_for_year(
             sc_sr, data.LUMAP, ag_biodiv_degr_j
         )

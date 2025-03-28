@@ -314,37 +314,31 @@ class LutoSolver:
         # Get biodiversity contributions
         bio_ag_contr = gp.quicksum(
             gp.quicksum(
-                self._input_data.bio_priority_r[self._input_data.ag_lu2cells[0, j]]
-                * self.X_ag_dry_vars_jr[j, self._input_data.ag_lu2cells[0, j]]
-                * self._input_data.ag_biodiv_degr_j[j]
-            )  
+                self._input_data.ag_b_mrj[0, :, j] * self.X_ag_dry_vars_jr[j, :]
+            )  # Dryland agriculture contribution
             + gp.quicksum(
-                self._input_data.bio_priority_r[self._input_data.ag_lu2cells[1, j]]
-                * self.X_ag_irr_vars_jr[j, self._input_data.ag_lu2cells[1, j]]
-                * self._input_data.ag_biodiv_degr_j[j]
-            )  
+                self._input_data.ag_b_mrj[1, :, j] * self.X_ag_irr_vars_jr[j, :]
+            )  # Irrigated agriculture contribution
             for j in range(self._input_data.n_ag_lus)
         )
+
         bio_ag_man_contr = gp.quicksum(
             gp.quicksum(
-                self._input_data.bio_priority_r[self._input_data.ag_lu2cells[0, j_idx]]
-                * self._input_data.ag_man_biodiv_impacts[am][j_idx][self._input_data.ag_lu2cells[0, j_idx]]
-                * self.X_ag_man_dry_vars_jr[am][j_idx, self._input_data.ag_lu2cells[0, j_idx]]
-            )  
+                self._input_data.ag_man_b_mrj[am][0, :, j_idx]
+                * self.X_ag_man_dry_vars_jr[am][j_idx, :]
+            )  # Dryland alt. ag. management contributions
             + gp.quicksum(
-                self._input_data.bio_priority_r[self._input_data.ag_lu2cells[1, j_idx]]
-                * self._input_data.ag_man_biodiv_impacts[am][j_idx][self._input_data.ag_lu2cells[1, j_idx]]
-                * self.X_ag_man_irr_vars_jr[am][j_idx, self._input_data.ag_lu2cells[1, j_idx]]
-            )  
+                self._input_data.ag_man_b_mrj[am][1, :, j_idx]
+                * self.X_ag_man_irr_vars_jr[am][j_idx, :]
+            )  # Irrigated alt. ag. management contributions
             for am, am_j_list in self._input_data.am2j.items()
             for j_idx in range(len(am_j_list))
         )
+
         bio_non_ag_contr = gp.quicksum(
             gp.quicksum(
-                self._input_data.bio_priority_r[self._input_data.non_ag_lu2cells[k]]
-                * self._input_data.non_ag_biodiv_impact_k[k]
-                * self.X_non_ag_vars_kr[k, self._input_data.non_ag_lu2cells[k]]
-            )
+                self._input_data.non_ag_b_rk[:, k] * self.X_non_ag_vars_kr[k, :]
+            )  # Non-agricultural contribution
             for k in range(self._input_data.n_non_ag_lus)
         )
 
@@ -868,37 +862,40 @@ class LutoSolver:
             )
 
     def _get_biodiversity_net_yield_expr(self) -> gp.LinExpr:
-        ag_contr = gp.quicksum(
+        
+
+        bio_ag_contr = gp.quicksum(
             gp.quicksum(
-                self._input_data.ag_b_mrj[0, :, :][:, j] * self.X_ag_dry_vars_jr[j, :]
-            )  # Dryland agriculture contribution
+                self.X_ag_dry_vars_jr[j, self._input_data.ag_lu2cells[0, j]]
+                * self._input_data.ag_biodiv_degr_j[j]
+            )  
             + gp.quicksum(
-                self._input_data.ag_b_mrj[1, :, :][:, j] * self.X_ag_irr_vars_jr[j, :]
-            )  # Irrigated agriculture contribution
+                self.X_ag_irr_vars_jr[j, self._input_data.ag_lu2cells[1, j]]
+                * self._input_data.ag_biodiv_degr_j[j]
+            )  
             for j in range(self._input_data.n_ag_lus)
         )
-
-        ag_man_contr = gp.quicksum(
+        bio_ag_man_contr = gp.quicksum(
             gp.quicksum(
-                self._input_data.ag_man_b_mrj[am][0, :, j_idx]
-                * self.X_ag_man_dry_vars_jr[am][j_idx, :]
-            )  # Dryland alt. ag. management contributions
+                self._input_data.ag_man_biodiv_impacts[am][j_idx][self._input_data.ag_lu2cells[0, j_idx]]
+                * self.X_ag_man_dry_vars_jr[am][j_idx, self._input_data.ag_lu2cells[0, j_idx]]
+            )  
             + gp.quicksum(
-                self._input_data.ag_man_b_mrj[am][1, :, j_idx]
-                * self.X_ag_man_irr_vars_jr[am][j_idx, :]
-            )  # Irrigated alt. ag. management contributions
+                self._input_data.ag_man_biodiv_impacts[am][j_idx][self._input_data.ag_lu2cells[1, j_idx]]
+                * self.X_ag_man_irr_vars_jr[am][j_idx, self._input_data.ag_lu2cells[1, j_idx]]
+            )  
             for am, am_j_list in self._input_data.am2j.items()
             for j_idx in range(len(am_j_list))
         )
-
-        non_ag_contr = gp.quicksum(
+        bio_non_ag_contr = gp.quicksum(
             gp.quicksum(
-                self._input_data.non_ag_b_rk[:, k] * self.X_non_ag_vars_kr[k, :]
-            )  # Non-agricultural contribution
+                self._input_data.non_ag_biodiv_impact_k[k]
+                * self.X_non_ag_vars_kr[k, self._input_data.non_ag_lu2cells[k]]
+            )
             for k in range(self._input_data.n_non_ag_lus)
         )
-
-        return ag_contr + ag_man_contr + non_ag_contr
+ 
+        return bio_ag_contr + bio_ag_man_contr + bio_non_ag_contr
 
     def _add_hard_biodiversity_usage_limit_constraints(self):
         """

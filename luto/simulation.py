@@ -205,12 +205,12 @@ def populate_containers_dynamic_base_year(
         major_vegetation_data = calc_major_vegetation_group_ag_area_for_year(
             get_major_vegetation_matrices(data), 
             data.lumaps[data.YR_CAL_BASE],
-            data.BIODIV_HABITAT_DEGRADE_LOOK_UP,
+            data.BIO_HABITAT_CONTRIBUTION_LOOK_UP,
         )
         species_conservation_data = calc_species_ag_area_for_year(
             ag_biodiversity.get_species_conservation_matrix(data, data.YR_CAL_BASE),
             data.lumaps[year_before_base_year],
-            data.BIODIV_HABITAT_DEGRADE_LOOK_UP,
+            data.BIO_HABITAT_CONTRIBUTION_LOOK_UP,
         )
         
     else:

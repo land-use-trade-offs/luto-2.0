@@ -31,7 +31,6 @@ import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 
-from glob import glob
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Literal, Optional
@@ -842,8 +841,8 @@ class Data:
         wyield_fname_sr = os.path.join(settings.INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_sr_ml_ha.h5')
         
         # Read the data into memory with [...], so that it can be pickled.
-        self.WATER_YIELD_DR_FILE = h5py.File(wyield_fname_dr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_DR_ML_HA_mean'][...][:, self.MASK]
-        self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_SR_ML_HA_mean'][...][:, self.MASK] 
+        self.WATER_YIELD_DR_FILE = h5py.File(wyield_fname_dr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_DR_ML_HA_mean'][:, self.MASK]
+        self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_SR_ML_HA_mean'][:, self.MASK] 
         
 
         # Water yield from outside LUTO study area.
@@ -1049,98 +1048,69 @@ class Data:
         Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
         in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
         """
-        
-        # Get the mask of priority conservation areas for biodiversity
-        bio_rank_layer = xr.open_dataarray(os.path.join(settings.INPUT_DIR, 'GBF2_conserve_priority.nc')).sel(ssp=f'ssp{settings.SSP}', cell=self.MASK).compute().values
 
-        conservation_area2contribution_curve = pd.read_excel(
-            os.path.join(settings.INPUT_DIR, 'GBF2_conserve_performance.xlsx'), sheet_name=f'ssp{settings.SSP}'
-        ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
-        
-        bio_priority_conservation_mask = (
-            bio_rank_layer >= conservation_area2contribution_curve[settings.GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE]
-        )
-
-
-        # Get distance connectivity score
-        biodiv_priorities = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'biodiv_priorities.h5'), where=self.MASK)
-
-        if settings.CONNECTIVITY_SOURCE == 'NCI':
-            connectivity_score = biodiv_priorities['DCCEEW_NCI'].to_numpy(dtype = np.float32)
-            connectivity_score = np.interp(connectivity_score, (connectivity_score.min(), connectivity_score.max()), (settings.CONNECTIVITY_LB, 1)).astype('float32')
-        elif settings.CONNECTIVITY_SOURCE == 'DWI':
-            connectivity_score = biodiv_priorities['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype = np.float32)
-            connectivity_score = np.interp(connectivity_score, (connectivity_score.min(), connectivity_score.max()), (1, settings.CONNECTIVITY_LB)).astype('float32')
-        elif settings.CONNECTIVITY_SOURCE == 'NONE':
-            connectivity_score = np.ones(self.NCELLS, dtype = np.float32)
-        else:
-            raise ValueError(f"Invalid connectivity source: {settings.CONNECTIVITY_SOURCE}, must be 'NCI', 'DWI' or 'NONE'")
-
-        # Get the raw biodiversity rank score; 1) weight by distance score; 2) mask by priority conservation areas 
-        biodiv_score_raw = biodiv_priorities['BIODIV_PRIORITY_SSP' + str(settings.SSP)].to_numpy(dtype = np.float32)
-
-        self.BIO_DISTANCE_WEIGHTED = biodiv_score_raw * connectivity_score
-        self.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION = self.BIO_DISTANCE_WEIGHTED * bio_priority_conservation_mask
+        biodiv_raw = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'biodiv_priorities.h5'), where=self.MASK)
+        biodiv_degrade_df = pd.read_csv(os.path.join(settings.INPUT_DIR, 'HABITAT_CONDITION.csv'))  
         
         
-        # Calculate the biodiversity socre under 1) Savana Burning and 2) HCAS impact
-        self.BIODIV_HABITAT_DEGRADE_LOOK_UP = pd.read_csv(os.path.join(settings.INPUT_DIR, 'BIODIV_HABITAT_DEGRADE_LOOK_UP.csv')
-            ).set_index('lu'
-            )['RETAIN_RATION_AFTER_DEGRADATE'].to_dict()
+        # ------------- Biodiversity priority scores for maximising overall biodiversity conservation in Australia ----------------------------
         
-        self.BIODIV_HABITAT_DEGRADE_LOOK_UP = {         # Round degradation figures to avoid numerical issues in Gurobi
-            j: round(x, settings.ROUND_DECMIALS) 
-            for j, x in self.BIODIV_HABITAT_DEGRADE_LOOK_UP.items()}
-        
-        self.BIO_BASE_YR_RETAIN_FRACTION_HABITAT = np.vectorize(self.BIODIV_HABITAT_DEGRADE_LOOK_UP.get, otypes=[float])(self.LUMAP).astype(np.float32)
-        self.BIO_RETAIN_FRACTION_LDS = np.where(self.SAVBURN_ELIGIBLE, settings.LDS_BIODIVERSITY_VALUE, 1)          
+        # Get connectivity score
+        match settings.CONNECTIVITY_SOURCE:
+            case 'NCI':
+                connectivity_score = biodiv_raw['DCCEEW_NCI'].to_numpy(dtype=np.float32)
+                connectivity_score = np.interp( biodiv_raw['DCCEEW_NCI'], (connectivity_score.min(), connectivity_score.max()), (settings.CONNECTIVITY_LB, 1)).astype('float32')
+            case 'DWI':
+                connectivity_score = biodiv_raw['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype=np.float32)
+                connectivity_score = np.interp(connectivity_score, (connectivity_score.min(), connectivity_score.max()), (1, settings.CONNECTIVITY_LB)).astype('float32')
+            case 'NONE':
+                connectivity_score = np.ones(self.NCELLS, dtype=np.float32)
+            case _:
+                raise ValueError(f"Invalid connectivity source: {settings.CONNECTIVITY_SOURCE}, must be 'NCI', 'DWI' or 'NONE'")
 
-        bio_damage_LDS = self.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * (1 - self.BIO_RETAIN_FRACTION_LDS)           
-        bio_damage_habitat = self.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * (1 - self.BIO_BASE_YR_RETAIN_FRACTION_HABITAT)         
 
-
-        # Get the biodiversity value after LDS and habitat impact for the beginning year (BASE YR = 2010)
-        self.BIO_BASE_YR_AFTER_LDS = self.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION - bio_damage_LDS                    
-        bio_base_yr_after_LDS_habitat = self.BIO_BASE_YR_AFTER_LDS - bio_damage_habitat                            
+        # Get the HCAS contribution scale (0-1)
+        match settings.HABITAT_CONDITION:
+            case 'HCAS':
+                bio_HCAS_degrade_lookup = biodiv_degrade_df.set_index('lu')[f'PERCENTILE_{settings.HCAS_PERCENTILE}'].to_dict()         # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
+                unallow_nat_scale = bio_HCAS_degrade_lookup[self.DESC2AGLU['Unallocated - natural land']]                               # Get the biodiversity degradation score for unallocated natural land (float)
+                bio_HCAS_degrade_lookup = {k:v*(1/unallow_nat_scale) for k,v in bio_HCAS_degrade_lookup.items()}                        # Normalise the biodiversity degradation score to the unallocated natural land score
+            case 'USER_DEFINED':
+                bio_HCAS_degrade_lookup = biodiv_degrade_df[['lu', 'USER_DEFINED']]
+                bio_HCAS_degrade_lookup = {int(k):v for k,v in dict(bio_HCAS_degrade_lookup.values).items()}                            # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
+            case _:
+                raise ValueError(f"Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
+        
+        self.BIO_HABITAT_CONTRIBUTION_LOOK_UP = {j: round(x, settings.ROUND_DECMIALS) for j, x in bio_HCAS_degrade_lookup.items()}      # Round to the specified decimal places to avoid numerical issues in the GUROBI solver
         
         
-        # Get the retain value after degradation at the beginning of the simulation
-        bio_baseline_area_weighted_sum = (self.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * self.REAL_AREA).sum()
-        bio_base_yr_after_LDS_habitat_area_weighted_sum = (bio_base_yr_after_LDS_habitat * self.REAL_AREA).sum()
-        bio_base_yr_after_LDS_habitat_percent2baseline = bio_base_yr_after_LDS_habitat_area_weighted_sum / bio_baseline_area_weighted_sum
-        
-        self.BIO_BASE_YR_AREA_WEIGHTED_SUM_EACH_LU = np.bincount(
-            self.LUMAP, 
-            weights=bio_base_yr_after_LDS_habitat * self.REAL_AREA,
-            minlength=self.N_AG_LUS
+        # Get the biodiversity contribution score 
+        self.BIO_CONTRIBUTION_RAW = biodiv_raw[f'BIODIV_PRIORITY_SSP{settings.SSP}'].values * connectivity_score
+        self.BIO_CONTRIBUTION_LDS_WEIGHTED = np.where(
+            self.SAVBURN_ELIGIBLE, 
+            self.BIO_CONTRIBUTION_RAW * settings.LDS_BIODIVERSITY_VALUE, 
+            self.BIO_CONTRIBUTION_RAW
         ) 
         
-        self.BIO_BASE_YR_LOSS = bio_baseline_area_weighted_sum * (1 - bio_base_yr_after_LDS_habitat_percent2baseline)
+
         
-   
-        # Calculate the biodiversity conservation target for each year
-        bio_base_yr_loss_percent = 1 - bio_base_yr_after_LDS_habitat_percent2baseline
-        bio_target_years_percent = [bio_base_yr_after_LDS_habitat_percent2baseline + (bio_base_yr_loss_percent * i) 
-                                    for i in settings.BIODIV_GBF_TARGET_2_DICT.values()]
-        bio_all_years_percent = {
-            self.YR_CAL_BASE: bio_base_yr_after_LDS_habitat_percent2baseline, 
-            **dict(zip(settings.BIODIV_GBF_TARGET_2_DICT.keys(), bio_target_years_percent))
-        }
-                
-        f = interp1d(
-            list(bio_all_years_percent.keys()),
-            list(bio_all_years_percent.values()),
-            kind = "linear",
-            fill_value = "extrapolate",
+        # ------------------ Habitat condition impacts for habitat conservation (GBF2) in 'CRITICAL' regions ---------------
+        
+        # Get the mask of 'Critical' regions for habitat conservation
+        bio_rank_layer = xr.open_dataarray(os.path.join(settings.INPUT_DIR, 'GBF2_conserve_priority.nc')
+        ).sel(ssp=f'ssp{settings.SSP}', cell=self.MASK
+        ).compute().values
+        
+        conservation_performance_curve = pd.read_excel(os.path.join(settings.INPUT_DIR, 'GBF2_conserve_performance.xlsx'), sheet_name=f'ssp{settings.SSP}'
+        ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
+        
+        self.BIO_CRITICAL_CONSERVATION_MASK = (
+            bio_rank_layer >= conservation_performance_curve[settings.GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE]
         )
         
-        self.BIO_GBF2_TARGET_PERCENT = {yr: f(yr).item() for yr in range(2010, 2101)}
-
-        self.BIO_GBF2_TARGET_SCORES = {
-            yr: bio_baseline_area_weighted_sum * self.BIO_GBF2_TARGET_PERCENT[yr]
-            for yr in range(2010, 2101)
-        }
+        self.BIO_HABITAT_CRITICAL_REGION_BASE_YR = self.get_habitat_condition_ly_for_yr_cal(self.YR_CAL_BASE)
         
+
         
         ###############################################################
         # Vegetation data.
@@ -1182,7 +1152,7 @@ class Data:
             self.NVIS_PRE_GR = NVIS_pre_xr[:, self.MASK] / 100  # divide by 100 to convert percentage to proportion
 
         # Apply Savanna Burning penalties
-        veg_degradation_raw_weighted_LDS = self.NVIS_PRE_GR * (1 - self.BIO_RETAIN_FRACTION_LDS)   # Savburn damages
+        veg_degradation_raw_weighted_LDS = self.NVIS_PRE_GR * (1 - self.BIO_CONTRIBUTION_LDS_WEIGHTED)   # Savburn damages
         self.NVIS_PRE_GR_LDS = self.NVIS_PRE_GR - veg_degradation_raw_weighted_LDS
         
         # Container storing which cells apply to each major vegetation group
@@ -1433,6 +1403,64 @@ class Data:
                 
         return lumap_resample_avg
     
+    
+    def get_habitat_condition_ly_for_yr_cal(self, yr_cal:int) -> np.ndarray:
+        """
+        Get the habitat condition score for each land use class.
+        
+        Parameters
+        ----------
+        yr_cal : int
+            The year for which to get the habitat condition score.
+            
+        Returns
+        -------
+        np.ndarray
+            The habitat condition score for each land use class.
+        """
+        if yr_cal not in self.lumaps:
+            raise ValueError(f"Year {yr_cal} not found in lumaps.")
+        
+        return np.vectorize(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.get, otypes=[np.float32])(self.lumaps[yr_cal]) * self.BIO_CRITICAL_CONSERVATION_MASK
+    
+    # Get the habitat condition score within critical regions for base year (2010)
+    def get_GBF2_target_for_yr_cal(self, yr_cal:int) -> float:
+        """
+        Get the habitat condition score for each land use class.
+        
+        Parameters
+        ----------
+        yr_cal : int
+            The year for which to get the habitat condition score.
+            
+        Returns
+        -------
+        np.ndarray
+            The habitat condition score for each land use class.
+        """
+ 
+        bio_habitat_score_baseline_sum = (self.BIO_CRITICAL_CONSERVATION_MASK * self.REAL_AREA).sum()
+        bio_habitat_score_base_yr_sum = (self.BIO_HABITAT_CRITICAL_REGION_BASE_YR * self.REAL_AREA).sum()
+        bio_habitat_score_base_yr_proportion = bio_habitat_score_base_yr_sum / bio_habitat_score_baseline_sum
+        bio_habitat_score_base_yr_loss = bio_habitat_score_baseline_sum - bio_habitat_score_base_yr_sum
+
+        bio_habitat_target_proportion = [
+            bio_habitat_score_base_yr_proportion + ((1 - bio_habitat_score_base_yr_proportion) * i)
+            for i in settings.BIODIV_GBF_TARGET_2_DICT.values()]
+
+        targets_key_years = {
+            self.YR_CAL_BASE: bio_habitat_score_base_yr_sum, 
+            **dict(zip(settings.BIODIV_GBF_TARGET_2_DICT.keys(), bio_habitat_score_baseline_sum * np.array(bio_habitat_target_proportion)))
+        }
+
+        f = interp1d(
+            list(targets_key_years.keys()),
+            list(targets_key_years.values()),
+            kind = "linear",
+            fill_value = "extrapolate"
+        )
+
+        return f(yr_cal).item()  # Convert the interpolated value to a scalar
     
     
     def get_GBF3_target_scores_by_year(self, yr:int):
