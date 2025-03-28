@@ -841,12 +841,6 @@ class LutoSolver:
             raise ValueError(
                 "Unknown choice for `GHG_CONSTRAINT_TYPE` setting: must be either 'hard' or 'soft'"
             )
-            
-    def _add_biodiversity_constraints(self) -> None:
-        print("  ...biodiversity constraints...")
-        self._add_conservation_priority_constraints()
-        self._add_major_vegetation_group_limit_constraints()
-        self._add_species_conservation_constraints()
 
     def _add_conservation_priority_constraints(self) -> None:
         if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
@@ -855,11 +849,11 @@ class LutoSolver:
 
         if settings.GBF2_CONSTRAINT_TYPE == "hard":
             print(f"    ...Hard biodiversity GBF 2 (conservation priority) constraints ...")
-            self._add_hard_biodiversity_usage_limit_constraints()
+            self._add_hard_conservation_priority_constraints()
 
         elif settings.GBF2_CONSTRAINT_TYPE == "soft":
             print(f"    ...Soft biodiversity GBF 2 (conservation priority) constraints ...")
-            self._add_soft_biodiversity_usage_limit_constraints()
+            self._add_soft_conservation_priority_constraints()
 
         else:
             raise ValueError(
@@ -900,7 +894,7 @@ class LutoSolver:
 
         return ag_contr + ag_man_contr + non_ag_contr
 
-    def _add_hard_biodiversity_usage_limit_constraints(self):
+    def _add_hard_conservation_priority_constraints(self):
         """
         Adds constraints to handle biodiversity water usage limits.
         """
@@ -914,7 +908,7 @@ class LutoSolver:
             self.biodiversity_expr >= biodiversity_limits
         )
 
-    def _add_soft_biodiversity_usage_limit_constraints(self) -> None:
+    def _add_soft_conservation_priority_constraints(self) -> None:
         self.biodiversity_expr = self._get_biodiversity_net_yield_expr()
 
         # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSTIY_TARGET_GBF_2 != "on".
@@ -1176,7 +1170,7 @@ class LutoSolver:
 
     def _add_biodiversity_constraints(self) -> None:
         print("  ...biodiversity constraints...")
-        self._add_biodiversity_limit_constraints()
+        self._add_conservation_priority_constraints()
         self._add_major_vegetation_group_limit_constraints()
         self._add_species_conservation_constraints()
         self._add_snes_constraints()
