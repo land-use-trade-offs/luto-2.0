@@ -113,6 +113,10 @@ class LutoSolver:
         self.major_vegetation_limit_constraints = {}
         self.species_conservation_exprs = {}
         self.species_conservation_constrs = {}
+        self.snes_exprs = {}
+        self.snes_constrs = {}
+        self.ecnes_exprs = {}
+        self.ecnes_constrs = {}
         self.regional_adoption_constrs = []
 
 
@@ -839,12 +843,6 @@ class LutoSolver:
             raise ValueError(
                 "Unknown choice for `GHG_CONSTRAINT_TYPE` setting: must be either 'hard' or 'soft'"
             )
-            
-    def _add_biodiversity_constraints(self) -> None:
-        print("  ...biodiversity constraints...")
-        self._add_conservation_priority_constraints()
-        self._add_major_vegetation_group_limit_constraints()
-        self._add_species_conservation_constraints()
 
     def _add_conservation_priority_constraints(self) -> None:
         if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
@@ -853,11 +851,11 @@ class LutoSolver:
 
         if settings.GBF2_CONSTRAINT_TYPE == "hard":
             print(f"    ...Hard biodiversity GBF 2 (conservation priority) constraints ...")
-            self._add_hard_biodiversity_usage_limit_constraints()
+            self._add_hard_conservation_priority_constraints()
 
         elif settings.GBF2_CONSTRAINT_TYPE == "soft":
             print(f"    ...Soft biodiversity GBF 2 (conservation priority) constraints ...")
-            self._add_soft_biodiversity_usage_limit_constraints()
+            self._add_soft_conservation_priority_constraints()
 
         else:
             raise ValueError(
@@ -898,7 +896,7 @@ class LutoSolver:
 
         return ag_contr + ag_man_contr + non_ag_contr
 
-    def _add_hard_biodiversity_usage_limit_constraints(self):
+    def _add_hard_conservation_priority_constraints(self):
         """
         Adds constraints to handle biodiversity water usage limits.
         """
@@ -912,7 +910,7 @@ class LutoSolver:
             self.biodiversity_expr >= biodiversity_limits
         )
 
-    def _add_soft_biodiversity_usage_limit_constraints(self) -> None:
+    def _add_soft_conservation_priority_constraints(self) -> None:
         self.biodiversity_expr = self._get_biodiversity_net_yield_expr()
 
         # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSTIY_TARGET_GBF_2 != "on".
@@ -999,12 +997,12 @@ class LutoSolver:
             
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
+                    self._input_data.sc_sr[s, ind]
                     * self._input_data.ag_biodiv_degr_j[j]
                     * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
-                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
+                    self._input_data.sc_sr[s, ind]
                     * self._input_data.ag_biodiv_degr_j[j]
                     * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
@@ -1013,12 +1011,12 @@ class LutoSolver:
 
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
-                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
+                    self._input_data.sc_sr[s, ind]
                     * self._input_data.ag_man_biodiv_impacts[am][j_idx][ind]
                     * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
                 )  # Dryland alt. ag. management contributions
                 + gp.quicksum(
-                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
+                    self._input_data.sc_sr[s, ind]
                     * self._input_data.ag_man_biodiv_impacts[am][j_idx][ind]
                     * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
                 )  # Irrigated alt. ag. management contributions
@@ -1028,7 +1026,7 @@ class LutoSolver:
 
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
+                    self._input_data.sc_sr[s, ind]
                     * self._input_data.non_ag_biodiv_impact_k[k]
                     * self.X_non_ag_vars_kr[k, ind]
                 )  # Non-agricultural contribution
@@ -1036,13 +1034,149 @@ class LutoSolver:
             )
 
             # Divide by constant to reduce strain on the constraint matrix range
-            self.species_conservation_exprs[s] = ag_contr + ag_man_contr + non_ag_contr
-            constr_area = s_area_lb / settings.SPECIES_CONSERVATION_DIV_CONSTANT
+            self.species_conservation_exprs[s] = (ag_contr + ag_man_contr + non_ag_contr) / settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR
+            constr_area = s_area_lb / settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR
 
             print(f"        ...species {s_names[s]} conservation target area: {s_area_lb:,.0f}")
             self.species_conservation_constrs[s] = self.gurobi_model.addConstr(
                 self.species_conservation_exprs[s] >= constr_area
             )
+
+    def _add_snes_constraints(self) -> None:
+        if settings.SNES_CONSTRAINTS != "on":
+            print('     ...Species of National Environmental Significance constraints TURNED OFF ...')
+            return
+        
+        x_limits, x_names = self._input_data.limits["snes"]
+
+        print(f"    ...Species of National Environmental Significance constraints...")
+        
+        for x, x_area_lb in enumerate(x_limits):
+            ind = np.where(self._input_data.snes_xr[x] > 0)[0]
+
+            if ind.size == 0:
+                print(
+                    f"        ...WARNING: SNES species {x_names[x]} target was NOT added: no cells can contribute to species target area "
+                    f"(data.get_GBF4B_SNES_layers() returns empty array for this species).")
+                continue
+            
+            ag_contr = gp.quicksum(
+                gp.quicksum(
+                    self._input_data.snes_xr[x, ind]
+                    * self._input_data.ag_biodiv_degr_j[j]
+                    * self.X_ag_dry_vars_jr[j, ind]
+                )  # Dryland agriculture contribution
+                + gp.quicksum(
+                    self._input_data.snes_xr[x, ind]
+                    * self._input_data.ag_biodiv_degr_j[j]
+                    * self.X_ag_irr_vars_jr[j, ind]
+                )  # Irrigated agriculture contribution
+                for j in range(self._input_data.n_ag_lus)
+            )
+
+            ag_man_contr = gp.quicksum(
+                gp.quicksum(
+                    self._input_data.snes_xr[x, ind]
+                    * self._input_data.ag_man_biodiv_impacts[am][j_idx][ind]
+                    * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
+                )  # Dryland alt. ag. management contributions
+                + gp.quicksum(
+                    self._input_data.snes_xr[x, ind]
+                    * self._input_data.ag_man_biodiv_impacts[am][j_idx][ind]
+                    * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
+                )  # Irrigated alt. ag. management contributions
+                for am, am_j_list in self._input_data.am2j.items()
+                for j_idx in range(len(am_j_list))
+            )
+
+            non_ag_contr = gp.quicksum(
+                gp.quicksum(
+                    self._input_data.snes_xr[x, ind]
+                    * self._input_data.non_ag_biodiv_impact_k[k]
+                    * self.X_non_ag_vars_kr[k, ind]
+                )  # Non-agricultural contribution
+                for k in range(self._input_data.n_non_ag_lus)
+            )
+
+            self.snes_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR
+            constr_lb = x_area_lb / (settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR)
+
+            print(f"        ...SNES species {x_names[x]} target: {x_area_lb:,.0f}")
+            self.snes_constrs[x] = self.gurobi_model.addConstr(
+                self.snes_exprs[x] >= constr_lb
+            )
+
+    def _add_ecnes_constraints(self) -> None:
+        if settings.ECNES_CONSTRAINTS != "on":
+            print('     ...Ecological Communities of National Environmental Significance constraints TURNED OFF ...')
+            return
+        
+        x_limits, x_names = self._input_data.limits["ecnes"]
+
+        print(f"    ...Ecological Communities of National Environmental Significance constraints...")
+        
+        for x, x_area_lb in enumerate(x_limits):
+            ind = np.where(self._input_data.ecnes_xr[x] > 0)[0]
+
+            if ind.size == 0:
+                print(
+                    f"        ...WARNING: ECNES species {x_names[x]} target was NOT added: no cells can contribute to species target area "
+                    f"(data.get_GBF4B_ECNES_layers() returns empty array for this community).")
+                continue
+            
+            ag_contr = gp.quicksum(
+                gp.quicksum(
+                    self._input_data.ecnes_xr[x, ind]
+                    * self._input_data.ag_biodiv_degr_j[j]
+                    * self.X_ag_dry_vars_jr[j, ind]
+                )  # Dryland agriculture contribution
+                + gp.quicksum(
+                    self._input_data.ecnes_xr[x, ind]
+                    * self._input_data.ag_biodiv_degr_j[j]
+                    * self.X_ag_irr_vars_jr[j, ind]
+                )  # Irrigated agriculture contribution
+                for j in range(self._input_data.n_ag_lus)
+            )
+
+            ag_man_contr = gp.quicksum(
+                gp.quicksum(
+                    self._input_data.ecnes_xr[x, ind]
+                    * self._input_data.ag_man_biodiv_impacts[am][j_idx][ind]
+                    * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
+                )  # Dryland alt. ag. management contributions
+                + gp.quicksum(
+                    self._input_data.ecnes_xr[x, ind]
+                    * self._input_data.ag_man_biodiv_impacts[am][j_idx][ind]
+                    * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
+                )  # Irrigated alt. ag. management contributions
+                for am, am_j_list in self._input_data.am2j.items()
+                for j_idx in range(len(am_j_list))
+            )
+
+            non_ag_contr = gp.quicksum(
+                gp.quicksum(
+                    self._input_data.ecnes_xr[x, ind]
+                    * self._input_data.non_ag_biodiv_impact_k[k]
+                    * self.X_non_ag_vars_kr[k, ind]
+                )  # Non-agricultural contribution
+                for k in range(self._input_data.n_non_ag_lus)
+            )
+
+            self.ecnes_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR
+            constr_lb = x_area_lb / (settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR * 1000)
+
+            print(f"        ...ECNES community {x_names[x]} target: {x_area_lb:,.0f}")
+            self.ecnes_constrs[x] = self.gurobi_model.addConstr(
+                self.ecnes_exprs[x] >= constr_lb
+            )
+
+    def _add_biodiversity_constraints(self) -> None:
+        print("  ...biodiversity constraints...")
+        self._add_conservation_priority_constraints()
+        self._add_major_vegetation_group_limit_constraints()
+        self._add_species_conservation_constraints()
+        self._add_snes_constraints()
+        self._add_ecnes_constraints()
 
     def _get_ag_cell_area_contr_for_reg(self, j: int, ind: np.ndarray) -> gp.LinExpr:
         return (
@@ -1296,6 +1430,12 @@ class LutoSolver:
         if self.species_conservation_constrs:
             for constr in self.species_conservation_constrs.values():
                 self.gurobi_model.remove(constr)
+        if self.snes_constrs:
+            for constr in self.snes_constrs.values():
+                self.gurobi_model.remove(constr)
+        if self.ecnes_constrs:
+            for constr in self.ecnes_constrs.values():
+                self.gurobi_model.remove(constr)
 
         self.adoption_limit_constraints = []
         self.demand_penalty_constraints = []
@@ -1304,6 +1444,10 @@ class LutoSolver:
         self.major_vegetation_limit_constraints = {}
         self.species_conservation_exprs = {}
         self.species_conservation_constrs = {}
+        self.snes_exprs = {}
+        self.snes_constrs = {}
+        self.ecnes_exprs = {}
+        self.ecnes_constrs = {}
 
         if self.ghg_emissions_limit_constraint_ub is not None:
             self.gurobi_model.remove(self.ghg_emissions_limit_constraint_ub)
@@ -1530,7 +1674,14 @@ class LutoSolver:
             prod_data["Species Conservation"] = {
                 s: expr.getValue() for s, expr in self.species_conservation_exprs.items()
             }
-
+        if self.snes_exprs:
+            prod_data["SNES"] = {
+                z: expr.getValue() for z, expr in self.snes_exprs.items()
+            }
+        if self.ecnes_exprs:
+            prod_data["ECNES"] = {
+                z: expr.getValue() for z, expr in self.ecnes_exprs.items()
+            }
 
         return SolverSolution(
             lumap=lumap,

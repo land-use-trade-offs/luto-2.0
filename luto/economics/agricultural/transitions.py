@@ -70,13 +70,14 @@ def get_exclude_matrices(data: Data, lumap: np.ndarray):
 
     lumap_2010 = data.LUMAP
     
+    new_x_mrj = x_mrj.copy()
     if settings.EXCLUDE_NO_GO_LU:
         no_go_regions = data.NO_GO_REGION_AG
         no_go_j = [data.DESC2AGLU.get(desc) for desc in data.NO_GO_LANDUSE_AG]
 
         for count, j in enumerate(no_go_j):
-            x_mrj[0, :, j] *= no_go_regions[count]
-            x_mrj[1, :, j] *= no_go_regions[count]
+            new_x_mrj[0, :, j] = x_mrj[0, :, j] * no_go_regions[count]
+            new_x_mrj[1, :, j] = x_mrj[1, :, j] * no_go_regions[count]
 
     # Get all agricultural and non-agricultural cells
     ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)
@@ -91,7 +92,7 @@ def get_exclude_matrices(data: Data, lumap: np.ndarray):
     # To be excluded based on disallowed switches as specified in transition cost matrix i.e., where t_rj is NaN.
     t_rj = np.where(np.isnan(t_rj), 0, 1)
 
-    return (x_mrj * t_rj).astype(np.int8)
+    return (new_x_mrj * t_rj).astype(np.int8)
 
 
 def get_transition_matrices(data: Data, yr_idx, base_year, separate=False):

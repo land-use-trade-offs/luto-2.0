@@ -1249,7 +1249,7 @@ class Data:
                                                 if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE']>0,
                                                         row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE']>0,
                                                         row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE']>0])]
-        
+                
         self.BIO_GBF4B_ECNES_LIKELY_SEL = [row['COMMUNITY'] for _,row in BIO_GBF4B_ECNES_score.iterrows()
                                                 if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY']>0,
                                                         row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY']>0,
@@ -1259,6 +1259,7 @@ class Data:
                                                 if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE']>0,
                                                         row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE']>0,
                                                         row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE']>0])]
+    
         
         
         if len(self.BIO_GBF_4B_SNES_LIKELY_SEL) == 0 or len(self.BIO_GBF4B_ECNES_LIKELY_SEL) == 0:
