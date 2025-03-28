@@ -113,6 +113,7 @@ class LutoSolver:
         self.major_vegetation_limit_constraints = {}
         self.species_conservation_exprs = {}
         self.species_conservation_constrs = {}
+        self.regional_adoption_constrs = []
 
 
     def formulate(self):
@@ -148,6 +149,7 @@ class LutoSolver:
         )
         self._add_ghg_emissions_limit_constraints()
         self._add_biodiversity_constraints()
+        self._add_regional_adoption_constraints()
 
     def _setup_x_vars(self):
         """
@@ -1042,7 +1044,47 @@ class LutoSolver:
                 self.species_conservation_exprs[s] >= constr_area
             )
 
+    def _get_ag_cell_area_contr_for_reg(self, j: int, ind: np.ndarray) -> gp.LinExpr:
+        return (
+            # Dryland ag area contribution
+            gp.quicksum(self._input_data.real_area[ind] * self.X_ag_dry_vars_jr[j, ind])
+            # Irrigated ag area contribution
+            + gp.quicksum(self._input_data.real_area[ind] * self.X_ag_irr_vars_jr[j, ind])
+        )
+
+    def _add_ag_regional_adoption_constraints(self) -> None:
+        reg_adopt_limits = self._input_data.limits["ag_regional_adoption"]
+
+        for reg_id, j, lu_name, reg_ind, reg_area_limit in reg_adopt_limits:
+            print(f"    ...adoption of {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} must not exceed {reg_area_limit:,.0f} HA...")
+            reg_expr = self._get_ag_cell_area_contr_for_reg(j, reg_ind)
+
+            self.regional_adoption_constrs.append(
+                self.gurobi_model.addConstr(reg_expr <= reg_area_limit)
+            )
+
+    def _get_non_ag_cell_area_contr_for_reg(self, k: int, ind: np.ndarray) -> gp.LinExpr:
+        return gp.quicksum(self._input_data.real_area[ind] * self.X_non_ag_vars_kr[k, ind])
     
+    def _add_non_ag_regional_adoption_constraints(self) -> None:
+        reg_adopt_limits = self._input_data.limits["non_ag_regional_adoption"]
+
+        for reg_id, k, lu_name, reg_ind, reg_area_limit in reg_adopt_limits:
+            print(f"    ...adoption of {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} must not exceed {reg_area_limit:,.0f} HA...")
+            reg_expr = self._get_non_ag_cell_area_contr_for_reg(k, reg_ind)
+            self.regional_adoption_constrs.append(
+                self.gurobi_model.addConstr(reg_expr <= reg_area_limit)
+            )
+
+    def _add_regional_adoption_constraints(self) -> None:
+        print("  ...regional adoption constraints...")
+
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+            print("  ...regional adoption constraints TURNED OFF...")
+            return
+
+        self._add_ag_regional_adoption_constraints()
+        self._add_non_ag_regional_adoption_constraints()
 
     def update_formulation(
         self,
@@ -1281,6 +1323,11 @@ class LutoSolver:
                 self.gurobi_model.remove(constr)
             self.biodiversity_limit_soft_constraints = []
 
+        if self.regional_adoption_constrs:
+            self.gurobi_model.remove(self.regional_adoption_constrs)
+
+        self.regional_adoption_constrs = []
+
         self._add_cell_usage_constraints(updated_cells)
         self._add_agricultural_management_constraints(updated_cells)
         self._add_agricultural_management_adoption_limit_constraints()
@@ -1292,6 +1339,7 @@ class LutoSolver:
         )
         self._add_ghg_emissions_limit_constraints()
         self._add_biodiversity_constraints()
+        self._add_regional_adoption_constraints()
 
     def solve(self) -> SolverSolution:
         print("Starting solve...\n")

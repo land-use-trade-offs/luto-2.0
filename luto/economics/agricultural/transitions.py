@@ -350,7 +350,7 @@ def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str,
     return ag_management_data
 
 
-def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> Dict[str, dict]:
+def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> dict[str, dict]:
     """
     Gets the lower bound for the agricultural land use of the current years optimisation.
     """
@@ -368,3 +368,27 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> D
         )
         for am in AG_MANAGEMENTS_TO_LAND_USES
     }
+
+
+def get_regional_adoption_limits(data: Data, yr_cal: int):
+    if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+        return None, None
+    
+    ag_reg_adoption_constrs = []
+    non_ag_reg_adoption_constrs = []
+
+    for reg_id, lu_name, area_limit_ha in data.get_regional_adoption_limit_ha_by_year(yr_cal):
+        reg_ind = np.where(data.REGIONAL_ADOPTION_ZONES == reg_id)[0]
+
+        if lu_name in data.DESC2AGLU:
+            lu_code = data.DESC2AGLU[lu_name]
+            ag_reg_adoption_constrs.append((reg_id, lu_code, lu_name, reg_ind, area_limit_ha))
+
+        elif lu_name in data.DESC2NONAGLU:
+            lu_code = data.DESC2NONAGLU[lu_name] - settings.NON_AGRICULTURAL_LU_BASE_CODE
+            non_ag_reg_adoption_constrs.append((reg_id, lu_code, lu_name, reg_ind, area_limit_ha))
+
+        else:
+            raise ValueError(f"Regional adoption constraint exists for unrecognised land use: {lu_name}")
+
+    return ag_reg_adoption_constrs, non_ag_reg_adoption_constrs
