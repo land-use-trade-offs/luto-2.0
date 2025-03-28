@@ -619,8 +619,8 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     else:
         non_ag_transitions_cost_mat = non_ag_transitions.get_to_ag_transition_matrix(data,
                                                                                     yr_idx,
-                                                                                    data.lumaps[yr_cal],
-                                                                                    data.lmmaps[yr_cal],
+                                                                                    data.lumaps[yr_cal_sim_pre],
+                                                                                    data.lmmaps[yr_cal_sim_pre],
                                                                                     separate=True)
 
     cost_dfs = []

@@ -47,13 +47,17 @@ def get_env_plant_transitions_from_ag(data: Data, yr_idx, lumap, w_license_cost_
 
     # Establishment costs
     est_costs_r = tools.amortise(data.EP_EST_COST_HA * data.REAL_AREA * data.EST_COST_MULTS[yr_cal]).astype(np.float32)
+    est_costs_r[tools.get_env_plantings_cells(lumap)] = 0.0
     
     # Transition costs
     base_ag_to_ep_t_r = np.vectorize(dict(enumerate(data.AG2EP_TRANSITION_COSTS_HA)).get, otypes=['float32'])(lumap)
     base_ag_to_ep_t_r = tools.amortise(base_ag_to_ep_t_r * data.REAL_AREA)
     base_ag_to_ep_t_r = np.nan_to_num(base_ag_to_ep_t_r)
+    base_ag_to_ep_t_r[tools.get_env_plantings_cells(lumap)] = 0.0
     
     # Waster costs; Assume EP is dryland, and no 'REMOVE_IRRIG_COST' for EP
+    w_license_cost_r[tools.get_env_plantings_cells(lumap)] = 0.0
+    w_rm_irrig_cost_r[tools.get_env_plantings_cells(lumap)] = 0.0
     w_cost_r = w_license_cost_r + w_rm_irrig_cost_r
 
     if separate:
@@ -199,13 +203,17 @@ def get_carbon_plantings_block_from_ag(data: Data, yr_idx, lumap, w_license_cost
 
     # Establishment costs for each cell
     est_costs_r = tools.amortise(data.CP_EST_COST_HA * data.REAL_AREA * data.EST_COST_MULTS[yr_cal] ).astype(np.float32)
+    est_costs_r[tools.get_carbon_plantings_block_cells(lumap)] = 0.0
     
     # Transition costs
     base_ag_to_cp_t_j = np.vectorize(dict(enumerate(data.AG2EP_TRANSITION_COSTS_HA)).get, otypes=['float32'])(lumap).astype(np.float32)
     base_ag_to_cp_t_j = tools.amortise(base_ag_to_cp_t_j * data.REAL_AREA).copy()
     base_ag_to_cp_t_j = np.nan_to_num(base_ag_to_cp_t_j)
+    base_ag_to_cp_t_j[tools.get_carbon_plantings_block_cells(lumap)] = 0.0
 
     # Water costs (pre-amortised)
+    w_license_cost_r[tools.get_carbon_plantings_block_cells(lumap)] = 0.0
+    w_rm_irrig_cost_r[tools.get_carbon_plantings_block_cells(lumap)] = 0.0
     w_cost_r = w_license_cost_r + w_rm_irrig_cost_r
 
     if separate:
@@ -363,17 +371,20 @@ def get_from_ag_transition_matrix(data: Data, yr_idx, base_year, lumap, lmmap, s
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
     w_license_cost_r, w_rm_irrig_cost_r = tools.get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)
     
-    env_plant_transitions_from_ag = get_env_plant_transitions_from_ag(data, yr_idx, lumap, w_license_cost_r, w_rm_irrig_cost_r, separate)   # Base transition from ag to tree planting
-    rip_plant_transitions_from_ag = get_rip_plant_transitions_from_ag(data, env_plant_transitions_from_ag, yr_idx, lumap, separate)         # Base transition plus RF fencing costs
-    agroforestry_costs = get_agroforestry_transitions_from_ag_base(data, env_plant_transitions_from_ag, yr_idx, lumap, separate)            # Base transition plus AF fencing costs
-    cp_belt_costs = get_carbon_plantings_belt_from_ag_base(data, env_plant_transitions_from_ag, yr_idx, lumap, separate)                    # Base transition plus CP fencing costs
-
-    sheep_agroforestry_transitions_from_ag = get_sheep_agroforestry_transitions_from_ag(data, agroforestry_x_r, agroforestry_costs, ag_t_costs, lumap, separate)
-    beef_agroforestry_transitions_from_ag = get_beef_agroforestry_transitions_from_ag( data, agroforestry_x_r, agroforestry_costs, ag_t_costs, lumap, separate)
-    carbon_plantings_block_transitions_from_ag = get_carbon_plantings_block_from_ag(data, yr_idx, lumap, w_license_cost_r, w_rm_irrig_cost_r, separate)
-    sheep_carbon_plantings_belt_transitions_from_ag = get_sheep_carbon_plantings_belt_from_ag(data, cp_belt_x_r, cp_belt_costs, ag_t_costs, lumap, separate)
-    beef_carbon_plantings_belt_transitions_from_ag = get_beef_carbon_plantings_belt_from_ag( data, cp_belt_x_r, cp_belt_costs, ag_t_costs, lumap, separate)
-    beccs_transitions_from_ag = get_beccs_from_ag(data, yr_idx, lumap, w_license_cost_r, w_rm_irrig_cost_r, separate)
+    env_plant_transitions_from_ag = get_env_plant_transitions_from_ag(data, yr_idx, lumap, w_license_cost_r, w_rm_irrig_cost_r, separate)                           # Base EP transition 
+    rip_plant_transitions_from_ag = get_rip_plant_transitions_from_ag(data, env_plant_transitions_from_ag, yr_idx, lumap, separate)                                 # Base EP transition plus RF fencing costs
+    agroforestry_costs = get_agroforestry_transitions_from_ag_base(data, env_plant_transitions_from_ag, yr_idx, lumap, separate)                                    # Base EP transition plus AF fencing costs
+    
+    sheep_agroforestry_transitions_from_ag = get_sheep_agroforestry_transitions_from_ag(data, agroforestry_x_r, agroforestry_costs, ag_t_costs, lumap, separate)    # Base EP transition plus RF fencing costs + sheep grazing
+    beef_agroforestry_transitions_from_ag = get_beef_agroforestry_transitions_from_ag( data, agroforestry_x_r, agroforestry_costs, ag_t_costs, lumap, separate)     # Base EP transition plus RF fencing costs + beef grazing
+    
+    carbon_plantings_block_transitions_from_ag = get_carbon_plantings_block_from_ag(data, yr_idx, lumap, w_license_cost_r, w_rm_irrig_cost_r, separate)             # Base CP transition 
+    cp_belt_costs = get_carbon_plantings_belt_from_ag_base(data, carbon_plantings_block_transitions_from_ag, yr_idx, lumap, separate)                               # Base CP transition plus CP fencing costs
+    
+    sheep_carbon_plantings_belt_transitions_from_ag = get_sheep_carbon_plantings_belt_from_ag(data, cp_belt_x_r, cp_belt_costs, ag_t_costs, lumap, separate)        # Base CP transition plus CP fencing costs + sheep grazing
+    beef_carbon_plantings_belt_transitions_from_ag = get_beef_carbon_plantings_belt_from_ag( data, cp_belt_x_r, cp_belt_costs, ag_t_costs, lumap, separate)         # Base CP transition plus CP fencing costs + beef grazing
+    
+    beccs_transitions_from_ag = get_beccs_from_ag(data, yr_idx, lumap, w_license_cost_r, w_rm_irrig_cost_r, separate)                                               # Base EP transition (the same)
 
     if separate:
         # IMPORTANT: The order of the keys in the dictionary must match the order of the non-agricultural land uses
