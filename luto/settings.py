@@ -131,7 +131,7 @@ DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in th
 WRITE_OUTPUT_GEOTIFFS = False   # Write GeoTiffs to output directory: True or False
 WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resolution: True or False
 
-PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
+PARALLEL_WRITE = False           # If to use parallel processing to write GeoTiffs: True or False
 WRITE_THREADS = 5               # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
@@ -181,7 +181,8 @@ Land-use and vector file pairs to exclude land-use from being utilised in that a
  - The value is the path to the ESRI shapefile.
 '''
 
-REGIONAL_ADOPTION_ZONE = 'LGA_CODE' # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
+REGIONAL_ADOPTION_CONSTRAINTS = 'on'  # 'on' or 'off'
+REGIONAL_ADOPTION_ZONE = 'ABARES_AAGIS'   # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 '''
 The regional adoption zone is the spatial unit used to enforce regional adoption constraints.
 The options are:
@@ -568,6 +569,11 @@ halt the extinction of known threatened species, protect genetic diversity,
 and manage human-wildlife interactions
 '''
 
+SNES_CONSTRAINTS = 'on'    # 'on' or 'off'
+ECNES_CONSTRAINTS = 'on'   # 'on' or 'off'
+
+NES_LAYER_TYPE = 'likely'  # 'likely' or 'likely_and_maybe'
+
 
 
 
@@ -589,7 +595,7 @@ NON_AGRICULTURAL_LU_BASE_CODE = 100
 # Number of decimals to round the lower bound matrices to for non-agricultural land uses and agricultural management options.
 ROUND_DECMIALS = 6
 
-SPECIES_CONSERVATION_DIV_CONSTANT = 1e4
+BIODIVERSITY_BIG_CONSTR_DIV_FACTOR = 1e4
 
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)
