@@ -100,7 +100,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 10       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
 STEP_SIZE = 1
@@ -113,8 +113,8 @@ does not reach the target year.
 '''
 
 # How does the model run over time
-MODE = 'snapshot'   # Runs for target year only
-# MODE = 'timeseries'   # Runs each year from base year to target year
+# MODE = 'snapshot'   # Runs for target year only
+MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -162,7 +162,7 @@ NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect a
 BARHOMOGENOUS = 1  # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 8
+THREADS = 32
 
 
 
