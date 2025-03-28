@@ -522,6 +522,7 @@ def get_limits(
     - Water net yield limits
     - GHG limits
     - Biodiversity limits
+    - Regional adoption limits
     """
     print('Getting environmental limits...', flush = True)
     # Limits is a dictionary with heterogeneous value sets.
@@ -550,7 +551,7 @@ def get_limits(
 
     ag_reg_adoption, non_ag_reg_adoption = ag_transition.get_regional_adoption_limits(data, yr_cal)
     limits["ag_regional_adoption"] = ag_reg_adoption
-    limits["non_ag_reg_adoption"] = non_ag_reg_adoption
+    limits["non_ag_regional_adoption"] = non_ag_reg_adoption
 
     return limits
 

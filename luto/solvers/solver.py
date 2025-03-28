@@ -1046,18 +1046,17 @@ class LutoSolver:
 
     def _get_ag_cell_area_contr_for_reg(self, j: int, ind: np.ndarray) -> gp.LinExpr:
         return (
-            gp.quicksum(
-                self._input_data.real_area[ind] * self.X_ag_dry_vars_jr[j, ind]
-            )  # Dryland ag area contribution
-            + gp.quicksum(
-                self._input_data.real_area[ind] * self.X_ag_irr_vars_jr[j, ind]
-            )  # Irrigated ag area contribution
+            # Dryland ag area contribution
+            gp.quicksum(self._input_data.real_area[ind] * self.X_ag_dry_vars_jr[j, ind])
+            # Irrigated ag area contribution
+            + gp.quicksum(self._input_data.real_area[ind] * self.X_ag_irr_vars_jr[j, ind])
         )
 
     def _add_ag_regional_adoption_constraints(self) -> None:
         reg_adopt_limits = self._input_data.limits["ag_regional_adoption"]
 
-        for _, j, reg_ind, reg_area_limit in reg_adopt_limits:
+        for reg_id, j, lu_name, reg_ind, reg_area_limit in reg_adopt_limits:
+            print(f"    ...adoption of {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} must not exceed {reg_area_limit:,.0f} HA...")
             reg_expr = self._get_ag_cell_area_contr_for_reg(j, reg_ind)
 
             self.regional_adoption_constrs.append(
@@ -1065,22 +1064,23 @@ class LutoSolver:
             )
 
     def _get_non_ag_cell_area_contr_for_reg(self, k: int, ind: np.ndarray) -> gp.LinExpr:
-        return gp.quicksum(
-            self._input_data.real_area[ind] * self.X_non_ag_vars_kr[k, ind]
-        )
+        return gp.quicksum(self._input_data.real_area[ind] * self.X_non_ag_vars_kr[k, ind])
     
     def _add_non_ag_regional_adoption_constraints(self) -> None:
         reg_adopt_limits = self._input_data.limits["non_ag_regional_adoption"]
 
-        for _, k, reg_ind, reg_area_limit in reg_adopt_limits:
-            reg_expr = self._get_ag_cell_area_contr_for_reg(k, reg_ind)
-
+        for reg_id, k, lu_name, reg_ind, reg_area_limit in reg_adopt_limits:
+            print(f"    ...adoption of {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} must not exceed {reg_area_limit:,.0f} HA...")
+            reg_expr = self._get_non_ag_cell_area_contr_for_reg(k, reg_ind)
             self.regional_adoption_constrs.append(
                 self.gurobi_model.addConstr(reg_expr <= reg_area_limit)
             )
 
     def _add_regional_adoption_constraints(self) -> None:
+        print("  ...regional adoption constraints...")
+
         if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+            print("  ...regional adoption constraints TURNED OFF...")
             return
 
         self._add_ag_regional_adoption_constraints()
