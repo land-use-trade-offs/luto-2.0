@@ -932,7 +932,7 @@ class LutoSolver:
 
     def _add_GBF3_major_vegetation_group_limit_constraints(self) -> None:
         if settings.BIODIVERSTIY_TARGET_GBF_3 != "on":
-            print("    ...major vegetation group constraints TURNED OFF ...")
+            print("    ... biodiversity GBF 3 (major vegetation group) constraints TURNED OFF ...")
             return
 
         v_limits, v_names, v_ind = self._input_data.limits["GBF_3+major_vegetation_groups"]

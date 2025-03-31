@@ -65,7 +65,8 @@ def load_data() -> Data:
     
     # Remove previous log files
     for f in glob(f'{settings.OUTPUT_DIR}/*.log'):
-        os.remove(f)
+        if not read_timestamp() in f:
+            os.remove(f)
 
     return Data()
 

@@ -515,38 +515,25 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         base_mrj = tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre])
         # Get the transition cost matrices for agricultural land-use
         ag_transitions_cost_mat = ag_transitions.get_transition_matrices(data, yr_idx, yr_cal_sim_pre, separate=True)
-        
-    # Get all land use decision variables
-    desc2lu_all = {**data.DESC2AGLU, **data.DESC2NONAGLU}
     
-    
+    # Convert the transition cost matrices to a DataFrame
     cost_dfs = []
-    for from_lu in desc2lu_all.keys():
-        for from_lm in data.LANDMANS:
-            for to_lu in NON_AG_LAND_USES.keys():
-                for cost_type in non_ag_transitions_cost_mat[to_lu].keys():
-                    
-                    lu_idx = data.lumaps[yr_cal_sim_pre] == desc2lu_all[from_lu]                          # Get the land-use index of the from land-use (r)
-                    lm_idx = data.lmmaps[yr_cal_sim_pre] == data.LANDMANS.index(from_lm)                  # Get the land-management index of the from land-management (r)
-                    from_lu_idx = lu_idx & lm_idx                                                         # Get the land-use index of the from land-use (r*)
-                    
-                    arr_dvar = non_ag_dvar[from_lu_idx, data.NON_AGRICULTURAL_LANDUSES.index(to_lu)]      # Get the decision variable of the from land-use (r*) 
-                    arr_trans = non_ag_transitions_cost_mat[to_lu][cost_type][from_lu_idx]                # Get the transition cost matrix of the unchanged land-use (r) 
-            
-                    if arr_dvar.size == 0:
-                        continue
-                    
-                    cost_arr = np.einsum('r,r->', arr_trans, arr_dvar)                                    # Calculate the cost array
-                    arr_df = pd.DataFrame([{
-                        'From land-use': from_lu,
-                        'From water-supply': from_lm,
-                        'To land-use': to_lu,
-                        'Cost type': cost_type,
-                        'Cost ($)': cost_arr,
-                        'Year': yr_cal
-                    }])
-                    
-                    cost_dfs.append(arr_df)
+    for lu_desc, lu_idx in data.DESC2AGLU.items():
+        for cost_type in ag_transitions_cost_mat.keys():
+
+            base_lu_arr = base_mrj[:, :, lu_idx]                              # Get the base land-use array                       (m,r)
+            arr = np.nan_to_num(ag_transitions_cost_mat[cost_type])           # Get the transition cost matrix                    (m,r,j)
+            arr = np.einsum('mr,mrj,mrj->mj', base_lu_arr, arr, ag_dvar)      # Multiply by decision variables
+
+            arr_df = pd.DataFrame(arr.flatten(),
+                            index=pd.MultiIndex.from_product([data.LANDMANS, data.AGRICULTURAL_LANDUSES],
+                            names=['Water Supply', 'To land-use']),
+                            columns=['Cost ($)']).reset_index()
+            arr_df.insert(0, 'Type', cost_type)
+            arr_df.insert(1, 'Year', yr_cal)
+            arr_df.insert(2, 'From land-use', lu_desc)
+            cost_dfs.append(arr_df) 
+    
 
     # Save the cost DataFrames
     cost_df = pd.concat(cost_dfs, axis=0)
@@ -580,21 +567,27 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         non_ag_transitions_cost_mat = non_ag_transitions.get_from_ag_transition_matrix(
             data,yr_idx, yr_cal_sim_pre, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], separate=True
         )
-        
+             
+    # Get all land use decision variables
+    desc2lu_all = {**data.DESC2AGLU, **data.DESC2NONAGLU}
+    
     cost_dfs = []
-    for from_lu in data.AGRICULTURAL_LANDUSES:
+    for from_lu in desc2lu_all.keys():
         for from_lm in data.LANDMANS:
             for to_lu in NON_AG_LAND_USES.keys():
                 for cost_type in non_ag_transitions_cost_mat[to_lu].keys():
                     
-                    from_lu_idx = base_mrj[data.LANDMANS.index(from_lm), :, data.DESC2AGLU[from_lu]].astype(np.bool_)  # Get the land-use index of the from land-use (r*)
-                    arr_trans = non_ag_transitions_cost_mat[to_lu][cost_type][from_lu_idx]                             # Get the transition cost matrix of from land-use (r*)
-                    arr_dvar = non_ag_dvar[from_lu_idx, data.NON_AGRICULTURAL_LANDUSES.index(to_lu)]                   # Get the decision variable of the from land-use (r*)
+                    lu_idx = data.lumaps[yr_cal_sim_pre] == desc2lu_all[from_lu]                          # Get the land-use index of the from land-use (r)
+                    lm_idx = data.lmmaps[yr_cal_sim_pre] == data.LANDMANS.index(from_lm)                  # Get the land-management index of the from land-management (r)
+                    from_lu_idx = lu_idx & lm_idx                                                         # Get the land-use index of the from land-use (r*)
                     
+                    arr_dvar = non_ag_dvar[from_lu_idx, data.NON_AGRICULTURAL_LANDUSES.index(to_lu)]      # Get the decision variable of the from land-use (r*) 
+                    arr_trans = non_ag_transitions_cost_mat[to_lu][cost_type][from_lu_idx]                # Get the transition cost matrix of the unchanged land-use (r) 
+            
                     if arr_dvar.size == 0:
                         continue
                     
-                    cost_arr = np.einsum('r,r->', arr_trans, arr_dvar)                                # Calculate the cost array
+                    cost_arr = np.einsum('r,r->', arr_trans, arr_dvar)                                    # Calculate the cost array
                     arr_df = pd.DataFrame([{
                         'From land-use': from_lu,
                         'From water-supply': from_lm,
@@ -603,6 +596,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
                         'Cost ($)': cost_arr,
                         'Year': yr_cal
                     }])
+                    
                     cost_dfs.append(arr_df)
 
     # Save the cost DataFrames
@@ -1006,8 +1000,8 @@ def write_biodiversity_priority_scores(data: Data, yr_cal, path):
         non_ag_dvar_rk.loc[{'lu':lu}] = non_ag_dvar_rk.loc[{'lu':lu}] * non_ag_impacts[idx]
 
 
-    # Calculate the biodiversity scores, Divide by total area-weighted biodiversity degradation in base year to get the relative contribution
-    base_yr_score = (data.BIO_CONNECTIVITY_RAW * data.BIO_HCAS_CONTRIBUTION_BASE_YR * data.REAL_AREA).sum()
+    # Calculate the biodiversity scores
+    base_yr_score = np.einsum('rj,r->', ag_biodiversity.get_bio_contribution_matrices_rj(data), data.lumaps[data.YR_CAL_BASE])
 
     priority_ag = (ag_dvar_mrj * bio_priority_scores
     ).sum(['cell','lm']).to_dataframe('Area Weighted Score (ha)').reset_index().assign(
@@ -1085,9 +1079,14 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     GBF2_non_ag = GBF2_non_ag.assign(Type='Non-Agricultural land-use', Year=yr_cal)
     GBF2_am = GBF2_am.assign(Type='Agricultural Management', Year=yr_cal)
     
+    GBF2_achive_percentage = (
+        data.get_GBF2_target_for_yr_cal(yr_cal)
+        / (data.BIO_PRIORITY_DEGRADED_AREAS_MASK * data.REAL_AREA).sum()
+    ) * 100
+    
     # Save the biodiversity scores
     pd.concat([ GBF2_ag, GBF2_non_ag, GBF2_am], axis=0
-    ).assign(Priority_Target=data.BIO_GBF2_TARGET_PERCENT[yr_cal] * 100
+    ).assign(Priority_Target=GBF2_achive_percentage
     ).rename(columns={
         'lu':'Landuse',
         'am':'Agri-Management',

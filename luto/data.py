@@ -1411,7 +1411,7 @@ class Data:
     # Get the habitat condition score within priority degraded areas for base year (2010)
     def get_GBF2_target_for_yr_cal(self, yr_cal:int) -> float:
         """
-        Get the habitat condition score for each land use class.
+        Get the target score for priority degrade areas conservation.
         
         Parameters
         ----------
@@ -1420,8 +1420,8 @@ class Data:
             
         Returns
         -------
-        np.ndarray
-            The habitat condition score for each land use class.
+        float
+            The priority degrade areas conservation target for the given year.
         """
  
         bio_habitat_score_baseline_sum = (self.BIO_PRIORITY_DEGRADED_AREAS_MASK * self.REAL_AREA).sum()
