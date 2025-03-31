@@ -490,19 +490,19 @@ The constraint type for the biodiversity target.
 - 'soft' adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 '''
 
-GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE = 20
+GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 20
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 
-For example, cells with rank between 0.9-1.0 only cover 20% of the area but contribute to 40% of the biodiversity benefits.
+For example, cells with rank between 0.9-1.0 only cover 20% of the areas but contribute to 40% of the biodiversity benefits.
 
 By sorting the rank values from high to low and plot the cumulative area and cumulative biodiversity benefits,
 we can get the a curve that shows the relationship between the area and the biodiversity benefits. In LUTO, we normalise
-the area and biodiversity benefits between 0-100, and use the `GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE` as the threshold
-to identify the critical area that should be conserved to achieve the biodiversity target.
+the area and biodiversity benefits between 0-100, and use the `GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT` as the threshold
+to identify the priority degraded areas that should be conserved to achieve the biodiversity target.
 
-If set to 0, no cells will be considered as critical area, equal to not setting any GBF2 target.
-If set to 100, all cells will be considered as critical area, equal to setting the GBF2 to the LUTO study area.
+If set to 0, no cells will be considered as priority degraded areas, equal to not setting any GBF2 target.
+If set to 100, all cells will be considered as priority degraded areas, equal to setting the GBF2 to the LUTO study area.
 '''
 
 
@@ -526,7 +526,6 @@ Can be either 'NCI' or 'DWI'.
 connectivity_importance = 0.3                    # Weighting of connectivity score in biodiversity calculation (0 [not important] - 1 [very important])
 CONNECTIVITY_LB = 1 - connectivity_importance    # Sets the lower bound of the connectivity multiplier for bioidversity
 '''
-!   ONLY WORKS IF CONNECTIVITY_SOURCE IS NOT 'NONE'   ! \n
 The relative importance of the connectivity score in the biodiversity calculation. Used to scale the raw biodiversity score.
 I.e., the lower bound of the connectivity score for weighting the raw biodiversity priority score is CONNECTIVITY_LB.
 '''
@@ -552,18 +551,18 @@ to undisturbed natural land.
 '''
 
 # Biodiversity value under default late dry season savanna fire regime
-LDS_BIODIVERSITY_VALUE = 0.8
+BIO_CONTRIBUTION_LDS = 0.8
 ''' For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value
     (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value (i.e., 1.0).
 '''
 
 # Non-agricultural biodiversity parameters 
-ENV_PLANTING_BIODIVERSITY_BENEFIT = 0.8
-CARBON_PLANTING_BLOCK_BIODIV_BENEFIT = 0.1
-CARBON_PLANTING_BELT_BIODIV_BENEFIT = 0.1
-RIPARIAN_PLANTING_BIODIV_BENEFIT = 1
-AGROFORESTRY_BIODIV_BENEFIT = 0.75
-BECCS_BIODIVERSITY_BENEFIT = 0
+BIO_CONTRIBUTION_ENV_PLANTING = 0.8
+BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK = 0.1
+BIO_CONTRIBUTION_CARBON_PLANTING_BELT = 0.1
+BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1
+BIO_CONTRIBUTION_AGROFORESTRY = 0.75
+BIO_CONTRIBUTION_BECCS = 0
 ''' 
 The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
 For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value

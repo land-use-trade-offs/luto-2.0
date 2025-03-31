@@ -357,7 +357,7 @@ def get_agricultural_management_revenue_matrices(data: Data, r_mrj, yr_idx) -> D
         r_mrj: The value of r_mrj parameter.
         yr_idx: The index of the year.
 
-    Returns:
+    Returns
         A dictionary containing revenue matrices for different agricultural management practices.
         The keys of the dictionary represent the management practices, and the values are numpy arrays.
 

@@ -839,8 +839,8 @@ class LutoSolver:
     def _add_biodiversity_constraints(self) -> None:
         print("  ...biodiversity constraints...")
         self._add_conservation_priority_constraints()
-        self._add_major_vegetation_group_limit_constraints()
-        self._add_species_conservation_constraints()
+        self._add_GBF3_major_vegetation_group_limit_constraints()
+        self._add_GBF4A_species_conservation_constraints()
 
     def _add_conservation_priority_constraints(self) -> None:
         if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
@@ -849,11 +849,11 @@ class LutoSolver:
 
         if settings.GBF2_CONSTRAINT_TYPE == "hard":
             print(f"    ...Hard biodiversity GBF 2 (conservation priority) constraints ...")
-            self._add_hard_biodiversity_usage_limit_constraints()
+            self._add_hard_GBF2_limit_constraints()
 
         elif settings.GBF2_CONSTRAINT_TYPE == "soft":
             print(f"    ...Soft biodiversity GBF 2 (conservation priority) constraints ...")
-            self._add_soft_biodiversity_usage_limit_constraints()
+            self._add_soft_GBF2_limit_constraints()
 
         else:
             raise ValueError(
@@ -861,27 +861,32 @@ class LutoSolver:
                 f"Must be either 'hard' or 'soft'."
             )
 
-    def _get_biodiversity_net_yield_expr(self) -> gp.LinExpr:
-        
+
+    def _get_GBF2_biodiversity_priority_area_contribution_expr(self) -> gp.LinExpr:
 
         bio_ag_contr = gp.quicksum(
             gp.quicksum(
-                self.X_ag_dry_vars_jr[j, self._input_data.ag_lu2cells[0, j]]
-                * self._input_data.ag_biodiv_degr_j[j]
-            )  
+                self._input_data.GBF2_raw_priority_degrade_area_r[self._input_data.ag_lu2cells[0, j]]
+                * self._input_data.biodiv_contr_ag_rj[self._input_data.ag_lu2cells[0, j], j]
+                * self.X_ag_dry_vars_jr[j, self._input_data.ag_lu2cells[0, j]]
+                
+            )
             + gp.quicksum(
-                self.X_ag_irr_vars_jr[j, self._input_data.ag_lu2cells[1, j]]
-                * self._input_data.ag_biodiv_degr_j[j]
+                self._input_data.GBF2_raw_priority_degrade_area_r[self._input_data.ag_lu2cells[1, j]]
+                * self._input_data.biodiv_contr_ag_rj[self._input_data.ag_lu2cells[1, j], j]
+                * self.X_ag_irr_vars_jr[j, self._input_data.ag_lu2cells[1, j]]
             )  
             for j in range(self._input_data.n_ag_lus)
         )
         bio_ag_man_contr = gp.quicksum(
             gp.quicksum(
-                self._input_data.ag_man_biodiv_impacts[am][j_idx][self._input_data.ag_lu2cells[0, j_idx]]
+                self._input_data.GBF2_raw_priority_degrade_area_r[self._input_data.ag_lu2cells[0, j_idx]]
+                * self._input_data.biodiv_contr_ag_man[am][j_idx][self._input_data.ag_lu2cells[0, j_idx]]
                 * self.X_ag_man_dry_vars_jr[am][j_idx, self._input_data.ag_lu2cells[0, j_idx]]
             )  
             + gp.quicksum(
-                self._input_data.ag_man_biodiv_impacts[am][j_idx][self._input_data.ag_lu2cells[1, j_idx]]
+                self._input_data.GBF2_raw_priority_degrade_area_r[self._input_data.ag_lu2cells[1, j_idx]]
+                * self._input_data.biodiv_contr_ag_man[am][j_idx][self._input_data.ag_lu2cells[1, j_idx]]
                 * self.X_ag_man_irr_vars_jr[am][j_idx, self._input_data.ag_lu2cells[1, j_idx]]
             )  
             for am, am_j_list in self._input_data.am2j.items()
@@ -889,7 +894,8 @@ class LutoSolver:
         )
         bio_non_ag_contr = gp.quicksum(
             gp.quicksum(
-                self._input_data.non_ag_biodiv_impact_k[k]
+                self._input_data.GBF2_raw_priority_degrade_area_r[self._input_data.non_ag_lu2cells[k]]
+                * self._input_data.biodiv_contr_non_ag_k[k]
                 * self.X_non_ag_vars_kr[k, self._input_data.non_ag_lu2cells[k]]
             )
             for k in range(self._input_data.n_non_ag_lus)
@@ -897,25 +903,26 @@ class LutoSolver:
  
         return bio_ag_contr + bio_ag_man_contr + bio_non_ag_contr
 
-    def _add_hard_biodiversity_usage_limit_constraints(self):
+
+    def _add_hard_GBF2_limit_constraints(self):
         """
         Adds constraints to handle biodiversity water usage limits.
         """
         # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSTIY_TARGET_GBF_2 != "on".
-        biodiversity_limits = self._input_data.limits["biodiversity"]
+        biodiversity_limits = self._input_data.limits["GBF2_priority_degrade_areas"]
 
-        self.biodiversity_expr = self._get_biodiversity_net_yield_expr()
+        self.biodiversity_expr = self._get_GBF2_biodiversity_priority_area_contribution_expr()
 
         print(f"      ...biodiversity GBF 2 (conservation priority): {biodiversity_limits:,.0f}")
         self.biodiversity_limit_constraint = self.gurobi_model.addConstr(
             self.biodiversity_expr >= biodiversity_limits
         )
 
-    def _add_soft_biodiversity_usage_limit_constraints(self) -> None:
-        self.biodiversity_expr = self._get_biodiversity_net_yield_expr()
+    def _add_soft_GBF2_limit_constraints(self) -> None:
+        self.biodiversity_expr = self._get_GBF2_biodiversity_priority_area_contribution_expr()
 
         # Returns biodiversity limits. Note that the biodiversity limits is 0 if BIODIVERSTIY_TARGET_GBF_2 != "on".
-        biodiversity_limits = self._input_data.limits["biodiversity"]
+        biodiversity_limits = self._input_data.limits["GBF2_priority_degrade_areas"]
 
         # Bound the self.B variables to the difference between the desired and actual net yields
         constr = self.gurobi_model.addConstr(biodiversity_limits - self.biodiversity_expr <= self.B)
@@ -923,12 +930,12 @@ class LutoSolver:
 
         print(f"      ...biodiversity GBF 2 (conservation priority): {biodiversity_limits:,.0f}")
 
-    def _add_major_vegetation_group_limit_constraints(self) -> None:
+    def _add_GBF3_major_vegetation_group_limit_constraints(self) -> None:
         if settings.BIODIVERSTIY_TARGET_GBF_3 != "on":
             print("    ...major vegetation group constraints TURNED OFF ...")
             return
 
-        v_limits, v_names, v_ind = self._input_data.limits["major_vegetation_groups"]
+        v_limits, v_names, v_ind = self._input_data.limits["GBF_3+major_vegetation_groups"]
 
         print(f"    ...Biodiversity GBF 3 (major vegetation groups) constraints...")
 
@@ -937,13 +944,13 @@ class LutoSolver:
 
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.mvg_vr[v, ind]
-                    * self._input_data.ag_biodiv_degr_j[j]
+                    self._input_data.GBF3_raw_MVG_area_vr[v, ind]
+                    * self._input_data.biodiv_contr_ag_rj[ind, j]
                     * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
-                    self._input_data.mvg_vr[v, ind]
-                    * self._input_data.ag_biodiv_degr_j[j]
+                    self._input_data.GBF3_raw_MVG_area_vr[v, ind]
+                    * self._input_data.biodiv_contr_ag_rj[ind, j]
                     * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
                 for j in range(self._input_data.n_ag_lus)
@@ -951,13 +958,13 @@ class LutoSolver:
 
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.mvg_vr[v, ind]
-                    * self._input_data.ag_man_biodiv_impacts[am][j_idx][ind]
+                    self._input_data.GBF3_raw_MVG_area_vr[v, ind]
+                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
                 )  # Dryland alt. ag. management contributions
                 + gp.quicksum(
-                    self._input_data.mvg_vr[v, ind]
-                    * self._input_data.ag_man_biodiv_impacts[am][j_idx][ind]
+                    self._input_data.GBF3_raw_MVG_area_vr[v, ind]
+                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
                 )  # Irrigated alt. ag. management contributions
                 for am, am_j_list in self._input_data.am2j.items()
@@ -966,30 +973,27 @@ class LutoSolver:
 
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.mvg_vr[v, ind]
-                    * self._input_data.non_ag_biodiv_impact_k[k]
+                    self._input_data.GBF3_raw_MVG_area_vr[v, ind]
+                    * self._input_data.biodiv_contr_non_ag_k[k]
                     * self.X_non_ag_vars_kr[k, ind]
                 )  # Non-agricultural contribution
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            outside_study_area_contr = self._input_data.mvg_contr_outside_study_area[v]
 
-            self.major_vegetation_exprs[v] = (
-                ag_contr + ag_man_contr + non_ag_contr + outside_study_area_contr
-            )
+            self.major_vegetation_exprs[v] = ag_contr + ag_man_contr + non_ag_contr 
 
             print(f"        ...vegetation class {v_names[v]} target area: {v_area_lb:,.0f}")
             self.major_vegetation_limit_constraints[v] = self.gurobi_model.addConstr(
                 self.major_vegetation_exprs[v] >= v_area_lb
             )
 
-    def _add_species_conservation_constraints(self) -> None:
+    def _add_GBF4A_species_conservation_constraints(self) -> None:
         if settings.BIODIVERSTIY_TARGET_GBF_4 != "on":
             print('     ...Biodiversity GBF 4 (species conservation) constraints TURNED OFF ...')
             return
         
-        s_limits, s_names, s_ind = self._input_data.limits["species_conservation"]
+        s_limits, s_names, s_ind = self._input_data.limits["GBF4A_species_conservation"]
 
         print(f"    ...Biodiversity GBF 4 (species conservation) constraints...")
         
@@ -998,13 +1002,13 @@ class LutoSolver:
             
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
-                    * self._input_data.ag_biodiv_degr_j[j]
+                    (self._input_data.GBF4_raw_species_area_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
+                    * self._input_data.biodiv_contr_ag_rj[ind, j]
                     * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
-                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
-                    * self._input_data.ag_biodiv_degr_j[j]
+                    (self._input_data.GBF4_raw_species_area_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
+                    * self._input_data.biodiv_contr_ag_rj[ind, j]
                     * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
                 for j in range(self._input_data.n_ag_lus)
@@ -1012,13 +1016,13 @@ class LutoSolver:
 
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
-                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
-                    * self._input_data.ag_man_biodiv_impacts[am][j_idx][ind]
+                    (self._input_data.GBF4_raw_species_area_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
+                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
                 )  # Dryland alt. ag. management contributions
                 + gp.quicksum(
-                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
-                    * self._input_data.ag_man_biodiv_impacts[am][j_idx][ind]
+                    (self._input_data.GBF4_raw_species_area_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
+                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
                 )  # Irrigated alt. ag. management contributions
                 for am, am_j_list in self._input_data.am2j.items()
@@ -1027,8 +1031,8 @@ class LutoSolver:
 
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    (self._input_data.sc_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
-                    * self._input_data.non_ag_biodiv_impact_k[k]
+                    (self._input_data.GBF4_raw_species_area_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT)
+                    * self._input_data.biodiv_contr_non_ag_k[k]
                     * self.X_non_ag_vars_kr[k, ind]
                 )  # Non-agricultural contribution
                 for k in range(self._input_data.n_non_ag_lus)

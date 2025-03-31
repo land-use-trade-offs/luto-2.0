@@ -39,7 +39,7 @@ def download_basemap(bounds_mercator: list[str]):
     Args:
         bounds_mercator (BoundingBox): The bounding box in Mercator projection. Defaults to None.
 
-    Returns:
+    Returns
         tuple: A tuple containing the downloaded basemap image and its extent.
     """
 
@@ -58,7 +58,7 @@ def create_color_csv_1_100(color_scheme:str='YlOrRd',
     """
     Create a CSV file contains the value(1-100)-color(HEX) records.
 
-    Parameters:
+    Parameters
     - color_scheme (str): 
         The name of the color scheme to use. Default is 'YlOrRd'.
     - save_path (str): 
@@ -66,7 +66,7 @@ def create_color_csv_1_100(color_scheme:str='YlOrRd',
     - extra_color (dict): 
         Additional colors to include in the dictionary. Default is {-100:(225, 225, 225, 255)}.
 
-    Returns:
+    Returns
         None
     """
     colors = mpl.colormaps[color_scheme]
@@ -91,7 +91,7 @@ def get_map_meta():
     """
     Get the map making metadata.
 
-    Returns:
+    Returns
         map_meta (DataFrame): DataFrame containing map metadata with columns 'map_type', 'csv_path', 'legend_type', and 'legend_position'.
     """
     
@@ -114,7 +114,7 @@ def get_map_fullname(path:str):
     Args:
         path (str): The path of the map.
 
-    Returns:
+    Returns
         str: The full name of the map.
     """
     for k,v in map_basename_rename.items():
@@ -129,7 +129,7 @@ def get_scenario(data_root_dir:str):
     Args:
         data_root_dir (str): The data root directory.
 
-    Returns:
+    Returns
         str: The scenario name.
     """
     with open(f'{data_root_dir}/model_run_settings.txt', 'r') as f:

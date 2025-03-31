@@ -312,11 +312,11 @@ def get_ghg_matrix(data: Data, ag_g_mrj, lumap, aggregate=True) -> np.ndarray:
     """
     Get the g_rk matrix containing non-agricultural greenhouse gas emissions.
 
-    Parameters:
+    Parameters
     - data: The input data for calculating greenhouse gas emissions.
     - aggregate: A boolean flag indicating whether to aggregate the matrices or not. Default is True.
 
-    Returns:
+    Returns
     - If aggregate is True, returns a numpy ndarray representing the aggregated g_rk matrix.
     - If aggregate is False, returns a pandas DataFrame representing the g_rk matrix.
 

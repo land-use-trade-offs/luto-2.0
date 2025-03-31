@@ -40,7 +40,7 @@ def get_env_plant_transitions_from_ag(data: Data, yr_idx, lumap, w_license_cost_
         w_rm_irrig_cost_r (np.ndarray): The costs of removing irrigation.
         separate (bool, optional): Whether to return separate costs or the total cost. Defaults to False.
 
-    Returns:
+    Returns
         np.ndarray|dict: The transition costs as either a numpy array or a dictionary, depending on the value of `separate`.
     """
     yr_cal = data.YR_CAL_BASE + yr_idx
@@ -897,10 +897,10 @@ def get_non_ag_transition_matrix(data: Data) -> np.ndarray:
     Get the matrix that contains transition costs for non-agricultural land uses. 
     There are no transition costs for non-agricultural land uses, therefore the matrix is filled with zeros.
     
-    Parameters:
+    Parameters
         data (object): The data object containing information about the model.
     
-    Returns:
+    Returns
         np.ndarray: The transition cost matrix, filled with zeros.
     """
     return np.zeros((data.NCELLS, data.N_NON_AG_LUS)).astype(np.float32)
@@ -910,11 +910,11 @@ def get_exclusions_environmental_plantings(data: Data, lumap) -> np.ndarray:
     """
     Get the exclusion array for the environmental plantings land use.
 
-    Parameters:
+    Parameters
     - data: The data object containing information about land use transitions.
     - lumap: The land use map.
 
-    Returns:
+    Returns
     - exclude: The exclusion array where 0 represents excluded land uses and 1 represents allowed land uses.
     """
     # Get (agricultural) land uses that cannot transition to environmental plantings
@@ -938,11 +938,11 @@ def get_exclusions_riparian_plantings(data: Data, lumap) -> np.ndarray:
     
     This function calculates and returns a 1-D array indexed by r that represents how much Riparian Plantings (RP) land use can be utilized.
     
-    Parameters:
+    Parameters
         data (DataFrame): The data containing information about the land use.
         lumap (array-like): The land use map.
         
-    Returns:
+    Returns
         np.ndarray: The exclusion array for Riparian Plantings land use.
     """
     exclude = (data.RP_PROPORTION).astype(np.float32)
@@ -970,7 +970,7 @@ def get_exclusions_sheep_agroforestry(
         ag_x_mrj (np.ndarray): The agroforestry land use matrix.
         lumap (np.ndarray): The land use map.
 
-    Returns:
+    Returns
         np.ndarray: An array of exclusions indicating which cells cannot utilize both agroforestry and sheep.
 
     """
@@ -997,7 +997,7 @@ def get_exclusions_beef_agroforestry(
         ag_x_mrj (np.ndarray): The ag_x_mrj array.
         lumap (np.ndarray): The lumap array.
 
-    Returns:
+    Returns
         np.ndarray: An array of exclusions, where 1 represents cells that cannot utilize both agroforestry and beef.
     """
     beef_j = tools.get_beef_code(data)
@@ -1017,11 +1017,11 @@ def get_exclusions_carbon_plantings_block(data, lumap) -> np.ndarray:
     Return a 1-D array indexed by r that represents how much carbon plantings (block) can possibly 
     be done at each cell.
 
-    Parameters:
+    Parameters
     - data: The data object containing information about the cells.
     - lumap: The land use map.
 
-    Returns:
+    Returns
     - exclude: A 1-D numpy array
     """
     exclude = np.ones(data.NCELLS)
@@ -1044,7 +1044,7 @@ def get_exclusions_sheep_carbon_plantings_belt(
         ag_x_mrj (np.ndarray): The ag_x_mrj array.
         lumap (np.ndarray): The lumap array.
 
-    Returns:
+    Returns
         np.ndarray: The exclusions array.
 
     """
@@ -1066,12 +1066,12 @@ def get_exclusions_beef_carbon_plantings_belt(
     """
     Calculate exclusions for cells that cannot utilize both agroforestry and beef.
 
-    Parameters:
+    Parameters
         data (Data): The data object containing necessary information.
         ag_x_mrj (np.ndarray): The agroforestry matrix.
         lumap (np.ndarray): The land use map.
 
-    Returns:
+    Returns
         np.ndarray: An array of exclusions, where 1 represents cells that cannot utilize both agroforestry and beef.
     """
     beef_j = tools.get_beef_code(data)
@@ -1091,11 +1091,11 @@ def get_exclusions_beccs(data, lumap) -> np.ndarray:
     Return a 1-D array indexed by r that represents how much BECCS can possibly 
     be done at each cell.
 
-    Parameters:
+    Parameters
     - data: The data object containing BECCS costs and other relevant information.
     - lumap: The land use map object.
 
-    Returns:
+    Returns
     - exclude: A 1-D array
     """
     exclude = np.zeros(data.NCELLS).astype(np.float32)

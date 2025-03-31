@@ -138,7 +138,7 @@ def create_grid_search_template(
 def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, mode:Literal['single','cluster']='single', n_workers:int=4):
     '''
     Submit the tasks to the cluster using the custom settings.\n
-    Parameters:
+    Parameters
      custom_settings (pd.DataFrame):The custom settings DataFrame.
      python_path (str, only works if mode == "single"): The path to the python executable.
      mode (str): The mode to submit the tasks. Options are "single" or "cluster".
@@ -300,7 +300,7 @@ def submit_task(col:str, python_path:str=None, mode:Literal['single','cluster']=
 def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1):
     '''
     Log the memory usage of the current process to a file.
-    Parameters:
+    Parameters
         output_dir (str): The directory to save the memory log file.
         mode (str): The mode to open the file. Default is 'a' (append).
         interval (int): The interval in seconds to log the memory usage.

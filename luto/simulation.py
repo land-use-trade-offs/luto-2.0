@@ -39,7 +39,7 @@ from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
 from luto.tools.create_task_runs.helpers import log_memory_usage
 from luto.tools.write import write_outputs
-from luto.economics.agricultural.biodiversity import get_major_vegetation_matrices
+from luto.economics.agricultural.biodiversity import get_GBF3_major_vegetation_matrices_vr
 
 import luto.settings as settings
 import luto.economics.agricultural.ghg as ag_ghg
@@ -82,7 +82,7 @@ def run(
     """
     Run the simulation.
 
-    Parameters:
+    Parameters
         - data: is a Data object which is previously loaded using load_data(),
         - base_year: optional argument base year for the simulation,
         - target_year: optional target year for the simulation,
@@ -201,14 +201,14 @@ def populate_containers_dynamic_base_year(
             ag_ghg.get_ghg_matrices(data, 0, aggregate=True) 
             * data.ag_dvars[data.YR_CAL_BASE]
         ).sum()
-        biodiversity_data = (ag_biodiversity.get_breq_matrices(data) * data.ag_dvars[data.YR_CAL_BASE]).sum()
+        biodiversity_data = (ag_biodiversity.get_bio_priority_score_matrices_mrj(data) * data.ag_dvars[data.YR_CAL_BASE]).sum()
         major_vegetation_data = calc_major_vegetation_group_ag_area_for_year(
-            get_major_vegetation_matrices(data), 
+            get_GBF3_major_vegetation_matrices_vr(data), 
             data.lumaps[data.YR_CAL_BASE],
             data.BIO_HABITAT_CONTRIBUTION_LOOK_UP,
         )
         species_conservation_data = calc_species_ag_area_for_year(
-            ag_biodiversity.get_species_conservation_matrix(data, data.YR_CAL_BASE),
+            ag_biodiversity.get_GBF4A_species_conservation_matrix_sr(data, data.YR_CAL_BASE),
             data.lumaps[year_before_base_year],
             data.BIO_HABITAT_CONTRIBUTION_LOOK_UP,
         )
@@ -338,7 +338,7 @@ def load_data_from_disk(path: str) -> Data:
     Raises:
         ValueError: if the resolution factor from the data object does not match the settings.RESFACTOR.
 
-    Returns:
+    Returns
         Data: `Data` object.
     """
     # Load the data object with gzip compression

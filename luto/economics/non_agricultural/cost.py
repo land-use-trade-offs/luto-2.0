@@ -250,10 +250,10 @@ def get_cost_matrix(data: Data, ag_c_mrj: np.ndarray, lumap, yr_cal):
     """
     Returns non-agricultural c_rk matrix of costs per cell and land use.
 
-    Parameters:
+    Parameters
     - data: The input data containing information about the cells and land use.
 
-    Returns:
+    Returns
     - cost_matrix: A 2D numpy array of costs per cell and land use.
     """
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)

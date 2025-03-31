@@ -50,10 +50,10 @@ def save_report_data(raw_data_dir:str):
     """
     Saves the report data in the specified directory.
 
-    Parameters:
+    Parameters
     raw_data_dir (str): The directory path where the raw output data is.
 
-    Returns:
+    Returns
     None
     """
     

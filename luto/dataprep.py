@@ -112,16 +112,24 @@ def create_new_dataset():
 
     pd.read_hdf(luto_2D_inpath + 'cell_savanna_burning.h5').to_hdf(outpath + 'cell_savanna_burning.h5', key='cell_savanna_burning', mode='w', format='table', index=False, complevel=9)
 
-    # Save Water file to nc so we can read it without loading all data to mem
-    for ssp, root in product(['126', '245', '370', '585'], ['DR', 'SR']):
-        f_name = f'Water_yield_GCM-Ensemble_ssp{ssp}_2010-2100_{root}_ML_HA_mean'
-        with h5py.File(luto_4D_inpath + f_name + '.h5', 'r') as f:
-            ds = f[f_name][...]
-            encoding = {'data': {"compression": "gzip", "compression_opts": 9, "dtype": 'float32', 'chunksizes': (ds.shape[0], 10000)}}
-            data = xr.DataArray(ds, dims=['year', 'cell'], coords={'year': np.arange(2010, 2101), 'cell': np.arange(ds.shape[1])})
-            data.name = 'data'
-            data.to_netcdf(outpath + f'water_yield_ssp{ssp}_2010-2100_{root.lower()}_ml_ha.nc', encoding=encoding, mode='w', engine='h5netcdf')
-            
+    # Save Water yield data to HDF5 in table format, so we can apply queries at reading time
+    with h5py.File(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp126_2010-2100_DR_ML_HA_mean.h5', 'r') as f:
+        pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp126_2010-2100_DR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp126_2010-2100_dr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
+    with h5py.File(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp126_2010-2100_SR_ML_HA_mean.h5', 'r') as f:
+        pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp126_2010-2100_SR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp126_2010-2100_sr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
+    with h5py.File(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean.h5', 'r') as f:
+        pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp245_2010-2100_DR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp245_2010-2100_dr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
+    with h5py.File(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean.h5', 'r') as f:
+        pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp245_2010-2100_SR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp245_2010-2100_sr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
+    with h5py.File(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp370_2010-2100_DR_ML_HA_mean.h5', 'r') as f:
+        pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp370_2010-2100_DR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp370_2010-2100_dr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
+    with h5py.File(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp370_2010-2100_SR_ML_HA_mean.h5', 'r') as f:
+        pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp370_2010-2100_SR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp370_2010-2100_sr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
+    with h5py.File(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp585_2010-2100_DR_ML_HA_mean.h5', 'r') as f:
+        pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp585_2010-2100_DR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp585_2010-2100_dr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
+    with h5py.File(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp585_2010-2100_SR_ML_HA_mean.h5', 'r') as f:
+        pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp585_2010-2100_SR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp585_2010-2100_sr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
+  
 
     # Copy agricultural management datafiles
     shutil.copyfile(luto_1D_inpath + '20231101_Bundle_MR.xlsx', outpath + '20231101_Bundle_MR.xlsx')
@@ -130,17 +138,18 @@ def create_new_dataset():
     shutil.copyfile(luto_1D_inpath + '20231107_Bundle_AgTech_EI.xlsx', outpath + '20231107_Bundle_AgTech_EI.xlsx')
     shutil.copyfile(luto_1D_inpath + '20240918_Bundle_BC.xlsx', outpath + '20240918_Bundle_BC.xlsx')
     
+    # Copy biodiversity HACS data from DCCEEW
+    shutil.copyfile(bio_HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'HABITAT_CONDITION.csv')
+    
     # Copy biodiversity GBF-2 files
-    shutil.copyfile(bio_GBF2_inpath + 'GBF2_conserve_priority.nc', outpath + 'GBF2_conserve_priority.nc')
     shutil.copyfile(bio_GBF2_inpath + 'GBF2_conserve_performance.xlsx', outpath + 'GBF2_conserve_performance.xlsx')
-    
-    
+
     # Copy biodiversity GBF-3 data
     shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVS_HIGH_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVS_HIGH_SPATIAL_DETAIL.nc')
     shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVS_LOW_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVS_LOW_SPATIAL_DETAIL.nc')
     shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVG_HIGH_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVG_HIGH_SPATIAL_DETAIL.nc')
     shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/NVIS7_0_AUST_PRE_MVG_LOW_SPATIAL_DETAIL.nc', outpath + 'NVIS_MVG_LOW_SPATIAL_DETAIL.nc')
-    
+
     shutil.copyfile(bio_NVIS_inpath + 'NVIS_V7_0_AUST_RASTERS_PRE_ALL/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx', outpath + 'BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx')
 
 
@@ -168,8 +177,7 @@ def create_new_dataset():
     shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_SNES.nc', outpath + 'bio_DCCEEW_SNES.nc')
     
     
-    # Copy biodiversity HACS data from DCCEEW
-    shutil.copyfile(bio_HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'HABITAT_CONDITION.csv')
+    
     
     
     

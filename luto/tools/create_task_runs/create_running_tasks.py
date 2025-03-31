@@ -69,7 +69,7 @@ grid_search = {
     'INCLUDE_WATER_LICENSE_COSTS': [0],
     
     # --------------- Biodiversity priority zone ---------------
-    'GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE': [20],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSTIY_TARGET_GBF_2': ['on'],    # 'on' or 'off'

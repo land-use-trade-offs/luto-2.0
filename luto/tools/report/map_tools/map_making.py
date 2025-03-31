@@ -44,7 +44,7 @@ def create_png_map(tif_path: str,
     """
     Creates a PNG map by overlaying a raster image with a basemap, shapefile, annotation, scale bar, north arrow, and legend.
 
-    Parameters:
+    Parameters
     - tif_path (str): 
         The path to the input raster image.
     - data_type (str):
@@ -62,7 +62,7 @@ def create_png_map(tif_path: str,
     - legend_params (dict):
         The parameters for the legend. Default is None.
 
-    Returns:
+    Returns
     - None
     """
 

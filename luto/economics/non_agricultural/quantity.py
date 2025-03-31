@@ -294,10 +294,10 @@ def get_quantity_matrix(data, ag_q_mrp: np.ndarray, lumap: np.ndarray) -> np.nda
     Values represent the yield of each commodity c from the cell r when using
     the non-agricultural land use k.
 
-    Parameters:
+    Parameters
     - data: The input data containing information about the land use and commodities.
 
-    Returns:
+    Returns
     - np.ndarray: The non-agricultural quantity matrix q_crk.
     """
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)

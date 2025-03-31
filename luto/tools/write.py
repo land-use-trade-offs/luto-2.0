@@ -978,7 +978,7 @@ def write_biodiversity_priority_scores(data: Data, yr_cal, path):
 
     # Get the biodiversity scores b_mrj
     bio_priority_scores = xr.DataArray(
-        data.BIO_CONTRIBUTION_RAW * data.REAL_AREA,
+        data.BIO_CONNECTIVITY_RAW * data.REAL_AREA,
         dims=['cell'],
         coords={'cell':range(data.NCELLS)}
     )
@@ -1007,7 +1007,7 @@ def write_biodiversity_priority_scores(data: Data, yr_cal, path):
 
 
     # Calculate the biodiversity scores, Divide by total area-weighted biodiversity degradation in base year to get the relative contribution
-    base_yr_score = (data.BIO_CONTRIBUTION_RAW * data.BIO_HCAS_CONTRIBUTION_BASE_YR * data.REAL_AREA).sum()
+    base_yr_score = (data.BIO_CONNECTIVITY_RAW * data.BIO_HCAS_CONTRIBUTION_BASE_YR * data.REAL_AREA).sum()
 
     priority_ag = (ag_dvar_mrj * bio_priority_scores
     ).sum(['cell','lm']).to_dataframe('Area Weighted Score (ha)').reset_index().assign(
@@ -1053,7 +1053,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     print(f'Writing biodiversity GBF2 scores (PRIORITY) for {yr_cal}')
 
     # Get the biodiversity scores b_mrj
-    ag_biodiv_mrj = tools.ag_mrj_to_xr(data, ag_biodiversity.get_breq_matrices(data))
+    ag_biodiv_mrj = tools.ag_mrj_to_xr(data, ag_biodiversity.get_bio_priority_score_matrices_mrj(data))
     am_biodiv_mrj = tools.am_mrj_to_xr(data, ag_biodiversity.get_agricultural_management_biodiversity_matrices(data, ag_biodiv_mrj.values, yr_idx))
     non_ag_biodiv_rk = tools.non_ag_rk_to_xr(data, non_ag_biodiversity.get_breq_matrix(data, ag_biodiv_mrj.values, data.lumaps[yr_cal]))
 
@@ -1066,17 +1066,17 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     # Calculate the biodiversity scores; Divide by total biodiversity degradation in base year to get the relative contribution
     GBF2_ag = (ag_dvar_mrj * ag_biodiv_mrj
     ).sum(['cell','lm']).to_dataframe('Area Weighted Score (ha)').reset_index().assign(
-        Relative_Contribution_Percentage = lambda x:( (x['Area Weighted Score (ha)'] / (data.BIO_CONTRIBUTION_RAW * data.REAL_AREA).sum()) * 100)
+        Relative_Contribution_Percentage = lambda x:( (x['Area Weighted Score (ha)'] / (data.BIO_CONNECTIVITY_RAW * data.REAL_AREA).sum()) * 100)
     )
 
     GBF2_non_ag = (non_ag_dvar_rk * non_ag_biodiv_rk 
     ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().assign(
-        Relative_Contribution_Percentage = lambda x:( x['Area Weighted Score (ha)'] / (data.BIO_CONTRIBUTION_RAW * data.REAL_AREA).sum() * 100)
+        Relative_Contribution_Percentage = lambda x:( x['Area Weighted Score (ha)'] / (data.BIO_CONNECTIVITY_RAW * data.REAL_AREA).sum() * 100)
     )
 
     GBF2_am = (ag_mam_dvar_mrj * am_biodiv_mrj
     ).sum(['cell','lm'], skipna=False).to_dataframe('Area Weighted Score (ha)').reset_index().assign(
-        Relative_Contribution_Percentage = lambda x:( x['Area Weighted Score (ha)'] / (data.BIO_CONTRIBUTION_RAW * data.REAL_AREA).sum() * 100)
+        Relative_Contribution_Percentage = lambda x:( x['Area Weighted Score (ha)'] / (data.BIO_CONNECTIVITY_RAW * data.REAL_AREA).sum() * 100)
     ).dropna()
 
 
@@ -1115,7 +1115,7 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
 
     # Get vegetation matrices for the year
     vg_vr = xr.DataArray(
-        ag_biodiversity.get_major_vegetation_matrices(data), 
+        ag_biodiversity.get_GBF3_major_vegetation_matrices_vr(data), 
         dims=['vg','cell'], 
         coords={'vg':list(data.BIO_GBF3_ID2DESC.values()),  'cell':range(data.NCELLS)}
     )
@@ -1393,15 +1393,15 @@ def write_species_conservation(data: Data, yr_cal: int, path) -> None:
     sc_df = pd.DataFrame(index=data.BIO_GBF4A_SEL_SPECIES, columns=["Target", "Actual"])
 
     if yr_cal == data.YR_CAL_BASE:
-        sc_sr = ag_biodiversity.get_species_conservation_matrix(data, yr_cal)
-        ag_biodiv_degr_j = data.BIO_HABITAT_CONTRIBUTION_LOOK_UP
+        GBF4_raw_species_area_sr = ag_biodiversity.get_GBF4A_species_conservation_matrix_sr(data, yr_cal)
+        biodiv_contr_ag_rj = data.BIO_HABITAT_CONTRIBUTION_LOOK_UP
         sc_prod_data = tools.calc_species_ag_area_for_year(
-            sc_sr, data.LUMAP, ag_biodiv_degr_j
+            GBF4_raw_species_area_sr, data.LUMAP, biodiv_contr_ag_rj
         )
     else:
         sc_prod_data = data.prod_data[yr_cal]["Species Conservation"]
 
-    sc_targets, species_names, _ = ag_biodiversity.get_species_conservation_limits(data, yr_cal)
+    sc_targets, species_names, _ = ag_biodiversity.get_GBF4A_species_conservation_limits(data, yr_cal)
 
     for s, name in species_names.items():
         sc_df.loc[name, "Target"] = sc_targets[s]

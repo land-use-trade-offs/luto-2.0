@@ -246,12 +246,12 @@ def get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx):
     Gets the water delta matrix ($/cell) that applies the cost of installing/removing irrigation to
     base transition costs. Includes the costs of water license fees.
 
-    Parameters:
+    Parameters
      w_mrj (numpy.ndarray, <unit:ML/cell>): Water requirements matrix for target year.
      l_mrj (numpy.ndarray): Land-use and land management matrix for the base_year.
      data (object): Data object containing necessary information.
 
-    Returns:
+    Returns
      w_delta_mrj (numpy.ndarray, <unit:$/cell>).
     """
     yr_cal = data.YR_CAL_BASE + yr_idx
@@ -292,13 +292,13 @@ def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.nd
     Gets the water delta matrix ($/cell) that applies the cost of installing/removing irrigation to
     base transition costs. Includes the costs of water license fees.
     
-    Parameters:
+    Parameters
      data (object): Data object containing necessary information.
      yr_idx (int): Index of the target year.
      lumap (numpy.ndarray): Land-use map.
      lmmap (numpy.ndarray): Land management map.
     
-    Returns:
+    Returns
      w_license_cost_r (numpy.ndarray) : Water license cost for each cell.
      w_rm_irrig_cost_r (numpy.ndarray) : Cost of removing irrigation for each cell.
      
@@ -336,11 +336,11 @@ def get_exclusions_for_excluding_all_natural_cells(data, lumap) -> np.ndarray:
     matrix for all such non-ag land uses, returning an array valued 0 at the 
     indices of cells that use natural land uses, and 1 everywhere else.
 
-    Parameters:
+    Parameters
      data: The data object containing information about the cells.
      lumap: The land use map.
 
-    Returns:
+    Returns
      exclude: An array of shape (NCELLS,) with values 0 at the indices of cells
                that use natural land uses, and 1 everywhere else.
     """
@@ -357,11 +357,11 @@ def get_exclusions_agroforestry_base(data, lumap) -> np.ndarray:
     Return a 1-D array indexed by r that represents how much agroforestry can possibly 
     be done at each cell.
 
-    Parameters:
+    Parameters
      data: The data object containing information about the landscape.
      lumap: The land use map.
 
-    Returns:
+    Returns
      exclude: A 1-D array.
     """
     exclude = (np.ones(data.NCELLS) * settings.AF_PROPORTION).astype(np.float32)
@@ -377,11 +377,11 @@ def get_exclusions_carbon_plantings_belt_base(data, lumap) -> np.ndarray:
     Return a 1-D array indexed by r that represents how much carbon plantings (belt) can possibly 
     be done at each cell.
 
-    Parameters:
+    Parameters
      data (Data): The data object containing information about the cells.
      lumap (np.ndarray): The land use map.
 
-    Returns:
+    Returns
      exclude: A 1-D array
     """
     exclude = (np.ones(data.NCELLS) * settings.CP_BELT_PROPORTION).astype(np.float32)
@@ -546,33 +546,33 @@ def calc_water(
 
 
 def calc_major_vegetation_group_ag_area_for_year(
-    mvg_vr: np.ndarray, lumap: np.ndarray, ag_biodiv_degr_j: dict[int, float]
+    GBF3_raw_MVG_area_vr: np.ndarray, lumap: np.ndarray, biodiv_contr_ag_rj: dict[int, float]
 ) -> dict[int, float]:
     prod_data = {}
 
-    ag_biodiv_impacts_j = {j: 1 - x for j, x in ag_biodiv_degr_j.items()}
+    ag_biodiv_impacts_j = {j: 1 - x for j, x in biodiv_contr_ag_rj.items()}
 
     # Numpy magic
     ag_biodiv_degr_r = np.vectorize(ag_biodiv_impacts_j.get)(lumap)
     
-    for v in range(mvg_vr.shape[0]):
-        prod_data[v] = mvg_vr[v, :] * ag_biodiv_degr_r
+    for v in range(GBF3_raw_MVG_area_vr.shape[0]):
+        prod_data[v] = GBF3_raw_MVG_area_vr[v, :] * ag_biodiv_degr_r
 
     return prod_data
 
 
 def calc_species_ag_area_for_year(
-    sc_sr: np.ndarray, lumap: np.ndarray, ag_biodiv_degr_j: dict[int, float]
+    GBF4_raw_species_area_sr: np.ndarray, lumap: np.ndarray, biodiv_contr_ag_rj: dict[int, float]
 ) -> dict[int, float]:
     prod_data = {}
 
-    ag_biodiv_impacts_j = {j: 1 - x for j, x in ag_biodiv_degr_j.items()}
+    ag_biodiv_impacts_j = {j: 1 - x for j, x in biodiv_contr_ag_rj.items()}
 
     # Numpy magic
     ag_biodiv_degr_r = np.vectorize(ag_biodiv_impacts_j.get)(lumap)
     
-    for s in range(sc_sr.shape[0]):
-        prod_data[s] = sc_sr[s, :] * ag_biodiv_degr_r
+    for s in range(GBF4_raw_species_area_sr.shape[0]):
+        prod_data[s] = GBF4_raw_species_area_sr[s, :] * ag_biodiv_degr_r
 
     return prod_data
 

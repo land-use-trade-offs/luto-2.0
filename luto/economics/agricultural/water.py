@@ -36,11 +36,11 @@ def get_wreq_matrices(data, yr_idx):
     Return water requirement (water use by irrigation and livestock drinking water) matrices
     by land management, cell, and land-use type.
 
-    Parameters:
+    Parameters
         data (object): The data object containing the required data.
         yr_idx (int): The index of the year.
 
-    Returns:
+    Returns
         numpy.ndarray: The w_mrj <unit: ML/cell> water requirement matrices, indexed (m, r, j).
     """
 
@@ -69,13 +69,13 @@ def get_wyield_matrices(
     """
     Return water yield matrices for YR_CAL_BASE (2010) by land management, cell, and land-use type.
 
-    Parameters:
+    Parameters
         data (object): The data object containing the required data.
         yr_idx (int): The index of the year.
         water_dr_yield (ndarray, <unit:ML/cell>): The water yield for deep-rooted vegetation.
         water_sr_yield (ndarray, <unit:ML/cell>): The water yield for shallow-rooted vegetation.
 
-    Returns:
+    Returns
         numpy.ndarray: The w_mrj <unit: ML/cell> water yield matrices, indexed (m, r, j).
     """
     w_yield_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)
@@ -118,7 +118,7 @@ def get_water_net_yield_matrices(
     Return water net yield matrices by land management, cell, and land-use type.
     The resulting array is used as the net yield w_mrj array in the input data of the solver.
 
-    Parameters:
+    Parameters
         data (object): The data object containing the required data.
         yr_idx (int): The index of the year.
         water_dr_yield (ndarray, <unit:ML/cell>): The water yield for deep-rooted vegetation.
@@ -128,7 +128,7 @@ def get_water_net_yield_matrices(
         Provides the `water_dr_yield` or `water_sr_yield` will make the `yr_idx` useless because
         the water net yield will be calculated based on the provided water yield data regardless of the year.
 
-    Returns:
+    Returns
         numpy.ndarray: The w_mrj <unit: ML/cell> water net yield matrices, indexed (m, r, j).
     """
     return get_wyield_matrices(data, yr_idx, water_dr_yield, water_sr_yield) - get_wreq_matrices(data, yr_idx)
@@ -144,7 +144,7 @@ def get_asparagopsis_effect_w_mrj(data, yr_idx):
         w_mrj (ndarray, <unit:ML/cell>): The water net yield data for all land uses.
         yr_idx (int): The index of the year.
 
-    Returns:
+    Returns
         ndarray <unit:ML/cell>: The updated water net yield data with the effects of using asparagopsis.
 
     Notes:
@@ -178,12 +178,12 @@ def get_precision_agriculture_effect_w_mrj(data, yr_idx):
     Applies the effects of using precision agriculture to the water net yield data
     for all relevant agricultural land uses.
 
-    Parameters:
+    Parameters
     - data: The data object containing relevant information for the calculation.
     - w_mrj <unit:ML/cell>: The original water net yield data for different land uses.
     - yr_idx: The index representing the year for which the calculation is performed.
 
-    Returns:
+    Returns
     - w_mrj_effect <unit:ML/cell>: The updated water net yield data after applying precision agriculture effects.
     """
 
@@ -214,12 +214,12 @@ def get_ecological_grazing_effect_w_mrj(data, yr_idx):
     Applies the effects of using ecological grazing to the water net yield data
     for all relevant agricultural land uses.
 
-    Parameters:
+    Parameters
     - data: The data object containing relevant information.
     - w_mrj <unit:ML/cell>: The water net yield data for different land uses.
     - yr_idx: The index of the year.
 
-    Returns:
+    Returns
     - w_mrj_effect <unit:ML/cell>: The updated water net yield data after applying ecological grazing effects.
     """
 
@@ -252,10 +252,10 @@ def get_savanna_burning_effect_w_mrj(data):
 
     Savanna burning does not affect water usage, so return an array of zeros.
 
-    Parameters:
+    Parameters
     - data: The input data object containing information about land uses and water net yield.
 
-    Returns:
+    Returns
     - An array of zeros with dimensions (NLMS, NCELLS, nlus), where:
         - NLMS: Number of land management systems
         - NCELLS: Number of cells
@@ -271,12 +271,12 @@ def get_agtech_ei_effect_w_mrj(data, yr_idx):
     Applies the effects of using AgTech EI to the water net yield data
     for all relevant agr. land uses.
 
-    Parameters:
+    Parameters
     - data: The data object containing relevant information.
     - w_mrj <unit:ML/cell>: The water net yield data for all land uses.
     - yr_idx: The index of the year.
 
-    Returns:
+    Returns
     - w_mrj_effect <unit:ML/cell>: The updated water net yield data with AgTech EI effects applied.
     """
 
@@ -308,12 +308,12 @@ def get_biochar_effect_w_mrj(data, yr_idx):
     Applies the effects of using Biochar to the water net yield data
     for all relevant agr. land uses.
 
-    Parameters:
+    Parameters
     - data: The data object containing relevant information.
     - w_mrj <unit:ML/cell>: The water net yield data for all land uses.
     - yr_idx: The index of the year.
 
-    Returns:
+    Returns
     - w_mrj_effect <unit:ML/cell>: The updated water net yield data with Biochar applied.
     """
 
@@ -382,11 +382,11 @@ def get_water_outside_luto_study_area(data, yr_cal:int) ->  dict[int, float]:
     """
     Return water yield from the outside regions of LUTO study area.
 
-    Parameters:
+    Parameters
         data (object): The data object containing the required data.
         yr_cal (int): The year for which the water yield is calculated.
 
-    Returns:
+    Returns
         dict[int, dict[int, float]]: <unit: ML/cell> dictionary of water yield amounts.
             The first key is year and the second key is region ID.
     """
@@ -409,10 +409,10 @@ def get_water_outside_luto_study_area_from_hist_level(data) -> dict[int, float]:
     """
     Return water yield from the outside regions of LUTO study area based on historical levels.
 
-    Parameters:
+    Parameters
         data (object): The data object containing the required data.
 
-    Returns:
+    Returns
         dict[int, float]: <unit: ML/cell> dictionary of water yield amounts.
     """
     if settings.WATER_REGION_DEF == 'River Region':
@@ -461,10 +461,10 @@ def calc_water_net_yield_BASE_YR(data) -> np.ndarray:
     """
     Calculate the water net yield for the base year (2010) for all regions.
 
-    Parameters:
+    Parameters
     - data: The data object containing the necessary input data.
 
-    Returns:
+    Returns
     - water_net_yield: The water net yield for all regions.
     """
     if data.WATER_YIELD_RR_BASE_YR is not None:
@@ -499,10 +499,10 @@ def get_water_net_yield_limit_values(
     """
     Return water net yield limits for regions (River Regions or Drainage Divisions as specified in luto.settings.py).
 
-    Parameters:
+    Parameters
     - data: The data object containing the necessary input data.
 
-    Returns:
+    Returns
     water_net_yield_limits: A dictionary of tuples containing the water use limits for each region\n
       region index:(
       - region name

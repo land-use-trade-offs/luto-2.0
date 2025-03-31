@@ -102,7 +102,7 @@ def get_transition_matrices(data: Data, yr_idx, base_year, separate=False):
         base_year (int): The base year for the transition calculations.
         separate (bool, optional): Whether to return separate cost matrices for each cost component.
                                    Defaults to False.
-    Returns:
+    Returns
         numpy.ndarray or dict: The transition matrices for land-use and land management transitions.
                                If `separate` is False, returns a numpy array representing the total costs.
                                If `separate` is True, returns a dictionary with separate cost matrices for
