@@ -424,6 +424,8 @@ def get_env_plantings_to_ag(data: Data, yr_idx, lumap, lmmap, separate=False) ->
         3-D array, indexed by (m, r, j).
     """
     yr_cal = data.YR_CAL_BASE + yr_idx
+    l_mrj = lumap2ag_l_mrj(lumap, lmmap)
+    l_mrj_not = np.logical_not(l_mrj)           # This ensures the lu remains the same has 0 cost
 
     # Get base transition costs: add cost of installing irrigation
     base_ep_to_ag_t = data.EP2AG_TRANSITION_COSTS_HA * data.TRANS_COST_MULTS[yr_cal]
@@ -433,22 +435,21 @@ def get_env_plantings_to_ag(data: Data, yr_idx, lumap, lmmap, separate=False) ->
 
     # Get water license price and costs of installing/removing irrigation where appropriate
     w_mrj = ag_water.get_wreq_matrices(data, yr_idx)
-    l_mrj = lumap2ag_l_mrj(lumap, lmmap)
     w_delta_mrj = tools.get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)
     w_delta_mrj[:, ag_cells, :] = 0
 
     # Reshape and amortise upfront costs to annualised costs
-    base_ep_to_ag_t_mrj = np.broadcast_to(base_ep_to_ag_t, (2, data.NCELLS, base_ep_to_ag_t.shape[0]))
+    base_ep_to_ag_t_mrj = np.broadcast_to(base_ep_to_ag_t, (data.NLMS, data.NCELLS, base_ep_to_ag_t.shape[0]))
     base_ep_to_ag_t_mrj = tools.amortise(base_ep_to_ag_t_mrj).copy()
     base_ep_to_ag_t_mrj[:, ag_cells, :] = 0
 
     if separate:
-        return {'Non-Ag2Ag Transition cost':np.einsum('mrj,mrj,r->mrj', base_ep_to_ag_t_mrj, l_mrj, data.REAL_AREA), 
-                'Non-Ag2Ag Water license cost': np.einsum('mrj,mrj,r->mrj', w_delta_mrj, l_mrj, data.REAL_AREA)}
+        return {'Non-Ag2Ag Transition cost':np.nan_to_num(np.einsum('mrj,mrj,r->mrj', base_ep_to_ag_t_mrj, l_mrj_not, data.REAL_AREA)), 
+                'Non-Ag2Ag Water license cost': np.nan_to_num(np.einsum('mrj,mrj,r->mrj', w_delta_mrj, l_mrj_not, data.REAL_AREA))}
         
     # Add cost of water license and cost of installing/removing irrigation where relevant (pre-amortised)
-    ep_to_ag_t_mrj = base_ep_to_ag_t_mrj + w_delta_mrj
-    return ep_to_ag_t_mrj * data.REAL_AREA[np.newaxis, :, np.newaxis]
+    ep_to_ag_t_mrj = (base_ep_to_ag_t_mrj + w_delta_mrj) * l_mrj_not * data.REAL_AREA[np.newaxis, :, np.newaxis]
+    return np.nan_to_num(ep_to_ag_t_mrj) 
 
 
 def get_rip_plantings_to_ag(data: Data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
@@ -538,10 +539,14 @@ def get_sheep_to_ag_base(data: Data, yr_idx: int, lumap, separate=False) -> np.n
     ghg_t_mrj_cost[:, ag_cells, :] = np.zeros((data.NLMS, ag_cells.shape[0], data.N_AG_LUS)).astype(np.float32)
 
     if separate:
-        return {'Non-Ag2Ag Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, 'GHG emissions cost': ghg_t_mrj_cost}
+        return {
+            'Non-Ag2Ag Establishment cost': np.nan_to_num(e_mrj), 
+            'Water license cost': np.nan_to_num(w_delta_mrj), 
+            'GHG emissions cost': np.nan_to_num(ghg_t_mrj_cost)
+        }
     
     else:
-        return e_mrj + w_delta_mrj + ghg_t_mrj_cost
+        return np.nan_to_num(e_mrj + w_delta_mrj + ghg_t_mrj_cost)
 
 
 def get_beef_to_ag_base(data: Data, yr_idx, lumap, separate) -> np.ndarray|dict:
@@ -575,7 +580,7 @@ def get_beef_to_ag_base(data: Data, yr_idx, lumap, separate) -> np.ndarray|dict:
     e_rj[ag_cells, :] = t_ij[all_beef_lumap[ag_cells]]
 
     e_rj = tools.amortise(e_rj) * data.REAL_AREA[:, np.newaxis]
-    e_mrj = np.stack([e_rj] * 2, axis=0)
+    e_mrj = np.stack([e_rj] * data.NLMS, axis=0)
     e_mrj = np.einsum('mrj,mrj,mrj->mrj', e_mrj, x_mrj, l_mrj_not)
 
     # Water license cost
@@ -597,17 +602,21 @@ def get_beef_to_ag_base(data: Data, yr_idx, lumap, separate) -> np.ndarray|dict:
     ghg_t_mrj_cost[:, ag_cells, :] = np.zeros((data.NLMS, ag_cells.shape[0], data.N_AG_LUS)).astype(np.float32)
 
     if separate:
-        return {'Non-Ag2Ag Establishment cost': e_mrj, 'Non-Ag2Ag Water license cost': w_delta_mrj, 'Non-Ag2Ag GHG emissions cost': ghg_t_mrj_cost}
+        return {
+            'Non-Ag2Ag Establishment cost': np.nan_to_num(e_mrj), 
+            'Non-Ag2Ag Water license cost': np.nan_to_num(w_delta_mrj), 
+            'Non-Ag2Ag GHG emissions cost': np.nan_to_num(ghg_t_mrj_cost)
+        }
     
     else:
         t_mrj = e_mrj + w_delta_mrj + ghg_t_mrj_cost
         # Set all costs for non-beef-agroforestry cells to zero
         t_mrj[:, non_beef_af_cells, :] = 0
-        return t_mrj
+        return np.nan_to_num(t_mrj)
 
 
 def get_sheep_agroforestry_to_ag(
-    data: Data, yr_idx, lumap, lmmap, agroforestry_x_r, separate
+    data: Data, yr_idx, lumap, lmmap, agroforestry_x_r, separate=False
 ) -> np.ndarray|dict:
     """
     Get transition costs of Sheep Agroforestry to all agricultural land uses.
@@ -655,7 +664,7 @@ def get_sheep_agroforestry_to_ag(
 
 
 def get_beef_agroforestry_to_ag(
-    data: Data, yr_idx, lumap, lmmap, agroforestry_x_r, separate
+    data: Data, yr_idx, lumap, lmmap, agroforestry_x_r, separate=False
 ) -> np.ndarray|dict:
     """
     Get transition costs of Beef Agroforestry to all agricultural land uses.
