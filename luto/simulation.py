@@ -65,8 +65,10 @@ def load_data() -> Data:
     
     # Remove previous log files
     for f in glob(f'{settings.OUTPUT_DIR}/*.log') + glob(f'{settings.OUTPUT_DIR}/*.txt'):
-        if not read_timestamp() in f:
+        try:
             os.remove(f)
+        except [PermissionError, FileNotFoundError] as e:
+            print(f"Error removing file {f}: {e}")
 
     return Data()
 
