@@ -1537,7 +1537,7 @@ class Data:
             target_pct.append(f(yr).item()) 
             
         # Calculate the target biodiversity suitability score for each species at the given year for all Australia
-        target_scores_all_AUS = self.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES['HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA'] * np.array(target_pct)
+        target_scores_all_AUS = self.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES['HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA'] * (np.array(target_pct) / 100) # Convert the percentage to proportion
         return target_scores_all_AUS
     
     

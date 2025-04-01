@@ -100,7 +100,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 13       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
 STEP_SIZE = 1
@@ -629,7 +629,7 @@ NON_AGRICULTURAL_LU_BASE_CODE = 100
 # Number of decimals to round the lower bound matrices to for non-agricultural land uses and agricultural management options.
 ROUND_DECMIALS = 6
 
-SPECIES_CONSERVATION_DIV_CONSTANT = 1e4
+SPECIES_CONSERVATION_DIV_CONSTANT = 1e4 # Constant used to rescale the species conservation value form 1e10 to 1e10/1e4 
 
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)

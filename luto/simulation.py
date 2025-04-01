@@ -64,7 +64,7 @@ def load_data() -> Data:
     memory_thread.start()
     
     # Remove previous log files
-    for f in glob(f'{settings.OUTPUT_DIR}/*.log'):
+    for f in glob(f'{settings.OUTPUT_DIR}/*.log') + glob(f'{settings.OUTPUT_DIR}/*.txt'):
         if not read_timestamp() in f:
             os.remove(f)
 

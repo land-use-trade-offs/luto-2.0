@@ -43,7 +43,7 @@ def get_bio_priority_score_matrices_mrj(data: Data):
 
     for j in range(data.N_AG_LUS):
         b_mrj[:, :, j] = (
-            data.BIO_CONNECTIVITY_LDS -                                                     # Biodiversity score after Late Dry Season (LDS) burning
+            data.BIO_CONNECTIVITY_LDS -                                             # Biodiversity score after Late Dry Season (LDS) burning
             (data.BIO_CONNECTIVITY_RAW * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[j]))    # Biodiversity degradation for land-use j
         ) * data.REAL_AREA    
     
@@ -273,7 +273,20 @@ def get_GBF4A_species_conservation_limits(
     yr_cal: int,
 ) -> tuple[np.ndarray, dict[int, str], dict[int, np.ndarray]]:
     """
+    Gets the correct species conservation targets for the given year (yr_cal).
     
+    Parameters
+        - data: The data object containing relevant information.
+        - yr_cal: The calendar year for which to calculate the species conservation limits.
+    
+    Returns
+        Tuple containing:
+        - np.ndarray
+            An array containing the limits of each species for the given yr_cal
+        - dict[int, str]
+            A dictionary mapping of species index to name
+        - dict[int, np.ndarray]
+            A dictionary mapping of each species index to the cells that the species applies to.
     """
     species_limits = data.get_GBF4A_suitability_target_inside_natural_LUTO_by_yr(yr_cal)
     species_names = {s: spec_name for s, spec_name in enumerate(data.BIO_GBF4A_SEL_SPECIES)}
@@ -301,7 +314,7 @@ def get_ag_management_biodiversity_impacts(
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing'])
         },
         'Savanna Burning': {
-            j_idx: 1 - data.BIO_CONNECTIVITY_LDS.astype(np.float32)
+            j_idx: np.where(data.SAVBURN_ELIGIBLE, (1 - settings.BIO_CONTRIBUTION_LDS), 0).astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
         },
         'AgTech EI': {

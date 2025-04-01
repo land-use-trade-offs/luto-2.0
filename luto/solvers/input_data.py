@@ -83,8 +83,8 @@ class SolverInputData:
     biodiv_contr_ag_man: dict[str, dict[int, np.ndarray]]               # Biodiversity contribution scale from agricultural management options.
     
     GBF2_raw_priority_degrade_area_r: np.ndarray                        # Raw areas (GBF2) from priority degrade areas - indexed by cell (r).
-    GBF3_raw_MVG_area_vr: np.ndarray                                     # Raw areas (GBF3) from Major vegetation group - indexed by veg. group (v) and cell (r)
-    GBF4_raw_species_area_sr: np.ndarray                                 # Raw areas (GBF4A) Species data - indexed by species (s) and cell (r).
+    GBF3_raw_MVG_area_vr: np.ndarray                                    # Raw areas (GBF3) from Major vegetation group - indexed by veg. group (v) and cell (r)
+    GBF4_raw_species_area_sr: np.ndarray                                # Raw areas (GBF4A) Species data - indexed by species (s) and cell (r).
 
     savanna_eligible_r: np.ndarray                                      # Cells that are eligible for savanna burnining land use.
 
@@ -540,7 +540,7 @@ def get_limits(
         else 0
     )
 
-    limits["GBF_3+major_vegetation_groups"] = (
+    limits["GBF_3_major_vegetation_groups"] = (
         ag_biodiversity.get_GBF3_major_vegetation_group_limits(data, yr_cal)
         if settings.BIODIVERSTIY_TARGET_GBF_3 == 'on'
         else 0
