@@ -1516,12 +1516,12 @@ class LutoSolver:
                 "Biodiversity Ag-Man Priority Area (ha)": self.bio_ag_man_contr.getValue(),
                 "Biodiversity Total Objective": self.obj_biodiv.getValue() * settings.SOLVE_BIODIV_PRIORITY_WEIGHT,
                 
-                "Penalties Value (AUD)": self.obj_penalties.getValue(),
+                "Penalties Value (AUD)": self.obj_penalties.getValue().items(),
                 "Penalties Objective": self.obj_penalties.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT),
                 
-                "Production Ag Value (t)":     {c:(self.ag_q_dry_c[c] + self.ag_q_irr_c[c].getValue()) for c in range(self.ncms)},
+                "Production Ag Value (t)":     {c:(self.ag_q_dry_c[c] + self.ag_q_irr_c[c]).getValue() for c in range(self.ncms)},
                 "Production Non-Ag Value (t)": {c:self.non_ag_q_c[c].getValue() for c in range(self.ncms)},
-                "Productoin Ag-Mam Value (t)": {c:(self.ag_q_dry_c[c] + self.ag_q_irr_c[c].getValue()) for c in range(self.ncms)},
+                "Productoin Ag-Mam Value (t)": {c:(self.ag_man_q_dry_c[c] + self.ag_man_q_irr_c[c]).getValue() for c in range(self.ncms)},
                 "Productoin Deviation (t)":    (self.V.X if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0),
                 "Productoin Penalty":          (self.penalty_demand.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)   if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0),
                 
