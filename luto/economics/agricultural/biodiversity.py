@@ -235,8 +235,8 @@ def get_bio_contribution_matrices_rj(data: Data):
 def get_GBF2_bio_priority_degraded_areas_r(data: Data):
     return np.where(
         data.SAVBURN_ELIGIBLE,
-        data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
-        data.REAL_AREA
+        data.REAL_AREA * data.BIO_PRIORITY_DEGRADED_AREAS_MASK * settings.BIO_CONTRIBUTION_LDS ,
+        data.REAL_AREA * data.BIO_PRIORITY_DEGRADED_AREAS_MASK
     ).astype(np.float32)
 
 
