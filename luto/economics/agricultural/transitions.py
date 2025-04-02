@@ -70,13 +70,14 @@ def get_exclude_matrices(data: Data, lumap: np.ndarray):
 
     lumap_2010 = data.LUMAP
     
+    new_x_mrj = x_mrj.copy()
     if settings.EXCLUDE_NO_GO_LU:
         no_go_regions = data.NO_GO_REGION_AG
         no_go_j = [data.DESC2AGLU.get(desc) for desc in data.NO_GO_LANDUSE_AG]
 
         for count, j in enumerate(no_go_j):
-            x_mrj[0, :, j] *= no_go_regions[count]
-            x_mrj[1, :, j] *= no_go_regions[count]
+            new_x_mrj[0, :, j] = x_mrj[0, :, j] * no_go_regions[count]
+            new_x_mrj[1, :, j] = x_mrj[1, :, j] * no_go_regions[count]
 
     # Get all agricultural and non-agricultural cells
     ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)
@@ -91,7 +92,7 @@ def get_exclude_matrices(data: Data, lumap: np.ndarray):
     # To be excluded based on disallowed switches as specified in transition cost matrix i.e., where t_rj is NaN.
     t_rj = np.where(np.isnan(t_rj), 0, 1)
 
-    return (x_mrj * t_rj).astype(np.int8)
+    return (new_x_mrj * t_rj).astype(np.int8)
 
 
 def get_transition_matrices(data: Data, yr_idx, base_year, separate=False):
@@ -350,7 +351,7 @@ def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str,
     return ag_management_data
 
 
-def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> Dict[str, dict]:
+def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> dict[str, dict]:
     """
     Gets the lower bound for the agricultural land use of the current years optimisation.
     """
@@ -368,3 +369,27 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> D
         )
         for am in AG_MANAGEMENTS_TO_LAND_USES
     }
+
+
+def get_regional_adoption_limits(data: Data, yr_cal: int):
+    if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+        return None, None
+    
+    ag_reg_adoption_constrs = []
+    non_ag_reg_adoption_constrs = []
+
+    for reg_id, lu_name, area_limit_ha in data.get_regional_adoption_limit_ha_by_year(yr_cal):
+        reg_ind = np.where(data.REGIONAL_ADOPTION_ZONES == reg_id)[0]
+
+        if lu_name in data.DESC2AGLU:
+            lu_code = data.DESC2AGLU[lu_name]
+            ag_reg_adoption_constrs.append((reg_id, lu_code, lu_name, reg_ind, area_limit_ha))
+
+        elif lu_name in data.DESC2NONAGLU:
+            lu_code = data.DESC2NONAGLU[lu_name] - settings.NON_AGRICULTURAL_LU_BASE_CODE
+            non_ag_reg_adoption_constrs.append((reg_id, lu_code, lu_name, reg_ind, area_limit_ha))
+
+        else:
+            raise ValueError(f"Regional adoption constraint exists for unrecognised land use: {lu_name}")
+
+    return ag_reg_adoption_constrs, non_ag_reg_adoption_constrs

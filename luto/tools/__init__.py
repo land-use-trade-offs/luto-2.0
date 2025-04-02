@@ -536,6 +536,22 @@ def calc_species_ag_area_for_year(
     return prod_data
 
 
+def calc_nes_ag_area_for_year(
+    nes_xr: np.ndarray, lumap: np.ndarray, ag_biodiv_degr_j: dict[int, float]
+) -> dict[int, float]:
+    prod_data = {}
+
+    ag_biodiv_impacts_j = {j: 1 - x for j, x in ag_biodiv_degr_j.items()}
+
+    # Numpy magic
+    ag_biodiv_degr_r = np.vectorize(ag_biodiv_impacts_j.get)(lumap)
+    
+    for x in range(nes_xr.shape[0]):
+        prod_data[x] = nes_xr[x, :] * ag_biodiv_degr_r
+
+    return prod_data
+
+
 class LogToFile:
     def __init__(self, log_path, mode:str='w'):
         self.log_path_stdout = f"{log_path}_stdout.log"
