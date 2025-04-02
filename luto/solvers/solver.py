@@ -884,16 +884,18 @@ class LutoSolver:
 
 
     def _get_GBF2_biodiversity_priority_area_contribution_expr(self) -> gp.LinExpr:
+        
+        # TODO using PRI_DE_MASK_IDX
 
         bio_ag_contr = gp.quicksum(
             gp.quicksum(
-                self._input_data.GBF2_raw_priority_degrade_area_r[self._input_data.ag_lu2cells[0, j]]
+                self._input_data.GBF2_raw_priority_degraded_area_r[self._input_data.ag_lu2cells[0, j]]
                 * self._input_data.biodiv_contr_ag_rj[self._input_data.ag_lu2cells[0, j], j]
                 * self.X_ag_dry_vars_jr[j, self._input_data.ag_lu2cells[0, j]]
                 
             )
             + gp.quicksum(
-                self._input_data.GBF2_raw_priority_degrade_area_r[self._input_data.ag_lu2cells[1, j]]
+                self._input_data.GBF2_raw_priority_degraded_area_r[self._input_data.ag_lu2cells[1, j]]
                 * self._input_data.biodiv_contr_ag_rj[self._input_data.ag_lu2cells[1, j], j]
                 * self.X_ag_irr_vars_jr[j, self._input_data.ag_lu2cells[1, j]]
             )  
@@ -901,12 +903,12 @@ class LutoSolver:
         )
         bio_ag_man_contr = gp.quicksum(
             gp.quicksum(
-                self._input_data.GBF2_raw_priority_degrade_area_r[self._input_data.ag_lu2cells[0, j_idx]]
+                self._input_data.GBF2_raw_priority_degraded_area_r[self._input_data.ag_lu2cells[0, j_idx]]
                 * self._input_data.biodiv_contr_ag_man[am][j_idx][self._input_data.ag_lu2cells[0, j_idx]]
                 * self.X_ag_man_dry_vars_jr[am][j_idx, self._input_data.ag_lu2cells[0, j_idx]]
             )  
             + gp.quicksum(
-                self._input_data.GBF2_raw_priority_degrade_area_r[self._input_data.ag_lu2cells[1, j_idx]]
+                self._input_data.GBF2_raw_priority_degraded_area_r[self._input_data.ag_lu2cells[1, j_idx]]
                 * self._input_data.biodiv_contr_ag_man[am][j_idx][self._input_data.ag_lu2cells[1, j_idx]]
                 * self.X_ag_man_irr_vars_jr[am][j_idx, self._input_data.ag_lu2cells[1, j_idx]]
             )  
@@ -915,7 +917,7 @@ class LutoSolver:
         )
         bio_non_ag_contr = gp.quicksum(
             gp.quicksum(
-                self._input_data.GBF2_raw_priority_degrade_area_r[self._input_data.non_ag_lu2cells[k]]
+                self._input_data.GBF2_raw_priority_degraded_area_r[self._input_data.non_ag_lu2cells[k]]
                 * self._input_data.biodiv_contr_non_ag_k[k]
                 * self.X_non_ag_vars_kr[k, self._input_data.non_ag_lu2cells[k]]
             )
@@ -1523,24 +1525,24 @@ class LutoSolver:
                 "Production Non-Ag Value (t)": {c:self.non_ag_q_c[c].getValue() for c in range(self.ncms)},
                 "Productoin Ag-Mam Value (t)": {c:(self.ag_man_q_dry_c[c] + self.ag_man_q_irr_c[c]).getValue() for c in range(self.ncms)},
                 "Productoin Deviation (t)":    (self.V.X if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0),
-                "Productoin Penalty":          (self.penalty_demand.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)   if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0),
-                
-                "Water value (ML)":            {k: v.getValue() for k,v in self.water_nyiled_exprs.items()},
-                "Water Deviation (ML)":        (self.W.X                                                               if settings.WATER_CONSTRAINT_TYPE == "soft" else 0),
-                "Water Penalty":               (self.penalty_water.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)    if settings.WATER_CONSTRAINT_TYPE == "soft" else 0),
-                
-                "GHG Ag Value (tCO2e)":         self.ghg_ag_contr.getValue(),
-                "GHG Non-Ag Value (tCO2e)":     self.ghg_non_ag_contr.getValue(),
-                "GHG Ag-Mam Value t(CO2e)":     self.ghg_ag_man_contr.getValue(),
-                "GHG Deviation (tCO2e)":       (self.E.X                                                               if settings.GHG_CONSTRAINT_TYPE == "soft" else 0),
-                "GHG Penalty":                 (self.penalty_ghg.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)      if settings.GHG_CONSTRAINT_TYPE == "soft" else 0),
-
-                "BIO (GBF2) value (ha)":        self.biodiversity_expr.getValue(),
-                "BIO (GBF2) Deviation (ha)":   (self.B.X                                                               if settings.GBF2_CONSTRAINT_TYPE == "soft" else 0),
-                "BIO (GBF2) Penalty":          (self.penalty_biodiv.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)   if settings.GBF2_CONSTRAINT_TYPE == "soft" else 0),
-                
-                "BIO (GBF3) value (ha)":       {k: v.getValue() for k,v in self.major_vegetation_exprs.items()},
-                "BIO (GBF4) value (ha)":       {k: v.getValue() for k,v in self.species_conservation_exprs.items()},
+                "Productoin Penalty":          (self.penalty_demand.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)            if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0),
+                            
+                "Water value (ML)":            ({k: v.getValue() for k,v in self.water_nyiled_exprs.items()}                    if settings.WATER_LIMITS == "on" else 0),
+                "Water Deviation (ML)":        (self.W.X                                                                        if settings.WATER_CONSTRAINT_TYPE == "soft" else 0),
+                "Water Penalty":               (self.penalty_water.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)             if settings.WATER_CONSTRAINT_TYPE == "soft" else 0),
+                            
+                "GHG Ag Value (tCO2e)":        (self.ghg_ag_contr.getValue()                                                    if settings.GHG_EMISSIONS_LIMITS == "on" else 0),
+                "GHG Non-Ag Value (tCO2e)":    (self.ghg_non_ag_contr.getValue()                                                if settings.GHG_EMISSIONS_LIMITS == "on" else 0),
+                "GHG Ag-Mam Value t(CO2e)":    (self.ghg_ag_man_contr.getValue()                                                if settings.GHG_EMISSIONS_LIMITS == "on" else 0),    
+                "GHG Deviation (tCO2e)":       (self.E.X                                                                        if settings.GHG_CONSTRAINT_TYPE == "soft" else 0),
+                "GHG Penalty":                 (self.penalty_ghg.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)               if settings.GHG_CONSTRAINT_TYPE == "soft" else 0),
+            
+                "BIO (GBF2) value (ha)":       (self.biodiversity_expr.getValue()                                               if settings.BIODIVERSTIY_TARGET_GBF_2 == "on" else 0),
+                "BIO (GBF2) Deviation (ha)":   (self.B.X                                                                        if settings.GBF2_CONSTRAINT_TYPE == "soft" else 0),
+                "BIO (GBF2) Penalty":          (self.penalty_biodiv.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)            if settings.GBF2_CONSTRAINT_TYPE == "soft" else 0),
+                            
+                "BIO (GBF3) value (ha)":       ({k: v.getValue() for k,v in self.major_vegetation_exprs.items()}                if settings.BIODIVERSTIY_TARGET_GBF_3 == "on" else 0),
+                "BIO (GBF4) value (ha)":       ({k: v.getValue() for k,v in self.species_conservation_exprs.items()}            if settings.BIODIVERSTIY_TARGET_GBF_4 == "on" else 0),
             },
         )
 

@@ -288,7 +288,7 @@ def get_GBF4A_species_conservation_limits(
         - dict[int, np.ndarray]
             A dictionary mapping of each species index to the cells that the species applies to.
     """
-    species_limits = data.get_GBF4A_suitability_target_inside_natural_LUTO_by_yr(yr_cal)
+    species_limits = data.get_GBF4A_target_inside_LUTO_by_yr(yr_cal)
     species_names = {s: spec_name for s, spec_name in enumerate(data.BIO_GBF4A_SEL_SPECIES)}
     species_matrix = data.get_GBF4A_bio_layers_by_yr(yr_cal)
     species_inds = {s: np.where(species_matrix[s] > 0)[0] for s in range(data.N_SPECIES)}

@@ -1140,8 +1140,8 @@ class Data:
         ).sel(cell=self.MASK).values
 
         # Get the NVIS layers
-        match settings.NVIS_SPATIAL_DETAIL:
-            case 'LOW':
+        match settings.NVIS_SPATIAL_DETAIL:   # TODO: Remove LOW spatial detail option
+            case 'LOW':  
                 # 1D vector, each cell is an index of the NVIS class
                 NVIS_layers = NVIS_xr
                 # Conver to 2D array, n_class * n_cell, each cell is 1 if the cell is the coresponding NVIS class, 0 otherwise
@@ -1509,7 +1509,7 @@ class Data:
             x=xr.DataArray(self.COORD_LON_LAT[0], dims='cell'),
             y=xr.DataArray(self.COORD_LON_LAT[1], dims='cell'),
             method='linear'                                             # Use LINEAR interpolation for the `suitability` values
-        ).drop_vars(['year'])
+        ).drop_vars(['year']).values
         
         # Apply Savanna Burning penalties
         current_species_val = np.where(
@@ -1521,7 +1521,7 @@ class Data:
         return current_species_val.astype(np.float32)
     
     
-    def get_GBF4A_area_weighted_score_all_Australia_by_yr(self, yr: int):
+    def get_GBF4A_score_all_Australia_by_yr(self, yr: int):
         '''
         Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for all Australia.
         '''
@@ -1529,7 +1529,7 @@ class Data:
         target_pct = []
         for _,row in self.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES.iterrows():
             f = interp1d(
-                [1990, 2030, 2050, 2100],
+                [2010, 2030, 2050, 2100],
                 [row['HABITAT_SUITABILITY_BASELINE_PERCENT'], row[f'USER_DEFINED_TARGET_PERCENT_2030'], row[f'USER_DEFINED_TARGET_PERCENT_2050'], row[f'USER_DEFINED_TARGET_PERCENT_2100']],
                 kind="linear",
                 fill_value="extrapolate",
@@ -1538,10 +1538,10 @@ class Data:
             
         # Calculate the target biodiversity suitability score for each species at the given year for all Australia
         target_scores_all_AUS = self.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES['HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA'] * (np.array(target_pct) / 100) # Convert the percentage to proportion
-        return target_scores_all_AUS
+        return target_scores_all_AUS.values
     
     
-    def get_GBF4A_area_weighted_score_outside_natural_LUTO_by_yr(self, yr: int, level:Literal['species', 'group']='species'):
+    def get_GBF4A_score_outside_natural_LUTO_by_yr(self, yr: int, level:Literal['species', 'group']='species'):
         '''
         Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for the Outside LUTO natural land.
         '''
@@ -1573,12 +1573,12 @@ class Data:
         return  outside_natural_scores
     
     
-    def get_GBF4A_suitability_target_inside_natural_LUTO_by_yr(self, yr: int):
+    def get_GBF4A_target_inside_LUTO_by_yr(self, yr: int):
         '''
         Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for the Inside LUTO natural land.
         '''
-        target_scores = self.get_GBF4A_area_weighted_score_all_Australia_by_yr(yr) - self.get_GBF4A_area_weighted_score_outside_natural_LUTO_by_yr(yr)
-        return target_scores.values
+        target_scores = self.get_GBF4A_score_all_Australia_by_yr(yr) - self.get_GBF4A_score_outside_natural_LUTO_by_yr(yr)
+        return target_scores
 
 
     def get_GBF4B_SNES_target_inside_LUTO_natural_by_year(self, yr:int, layer:Literal['LIKELY', 'LIKELY_AND_MAYBE']):

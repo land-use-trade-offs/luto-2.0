@@ -82,7 +82,7 @@ class SolverInputData:
     biodiv_contr_non_ag_k: dict[int, float]                             # Biodiversity contribution scale from non-agricultural land uses.
     biodiv_contr_ag_man: dict[str, dict[int, np.ndarray]]               # Biodiversity contribution scale from agricultural management options.
     
-    GBF2_raw_priority_degrade_area_r: np.ndarray                        # Raw areas (GBF2) from priority degrade areas - indexed by cell (r).
+    GBF2_raw_priority_degraded_area_r: np.ndarray                        # Raw areas (GBF2) from priority degrade areas - indexed by cell (r).
     GBF3_raw_MVG_area_vr: np.ndarray                                    # Raw areas (GBF3) from Major vegetation group - indexed by veg. group (v) and cell (r)
     GBF4_raw_species_area_sr: np.ndarray                                # Raw areas (GBF4A) Species data - indexed by species (s) and cell (r).
 
@@ -628,7 +628,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         biodiv_contr_non_ag_k=get_non_ag_biodiv_impact_k(data),
         biodiv_contr_ag_man=get_ag_man_biodiv_impacts(data, target_year),
 
-        GBF2_raw_priority_degrade_area_r = get_GBF2_priority_degrade_area_r(data),
+        GBF2_raw_priority_degraded_area_r = get_GBF2_priority_degrade_area_r(data),
         GBF3_raw_MVG_area_vr=get_GBF3_MVG_area_vr(data),
         GBF4_raw_species_area_sr=get_GBF4A_species_area_sr(data, target_year),
 

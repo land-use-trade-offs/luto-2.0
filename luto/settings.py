@@ -490,7 +490,7 @@ The constraint type for the biodiversity target.
 - 'soft' adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 '''
 
-GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 20
+GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 50
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 
@@ -601,7 +601,7 @@ the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers
 
 
 # ------------------------------- Species parameters -------------------------------
-BIODIVERSTIY_TARGET_GBF_4 =  'on'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_4 =  'off'           # 'on' or 'off'.
 '''
 Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
 halt the extinction of known threatened species, protect genetic diversity, 
