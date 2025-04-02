@@ -85,6 +85,8 @@ class SolverInputData:
     GBF2_raw_priority_degraded_area_r: np.ndarray                        # Raw areas (GBF2) from priority degrade areas - indexed by cell (r).
     GBF3_raw_MVG_area_vr: np.ndarray                                    # Raw areas (GBF3) from Major vegetation group - indexed by veg. group (v) and cell (r)
     GBF4_raw_species_area_sr: np.ndarray                                # Raw areas (GBF4A) Species data - indexed by species (s) and cell (r).
+    snes_xr: np.ndarray                                     # Species NES contribution data - indexed by species/ecological community (x) and cell (r).
+    ecnes_xr: np.ndarray                                    # Ecological community NES contribution data - indexed by species/ecological community (x) and cell (r).
 
     savanna_eligible_r: np.ndarray                                      # Cells that are eligible for savanna burnining land use.
 
@@ -99,6 +101,7 @@ class SolverInputData:
     limits: dict                                                        # Targets to use.
     desc2aglu: dict                                                     # Map of agricultural land use descriptions to codes.
     resmult: float                                                      # Resolution factor multiplier from data.RESMULT
+    real_area: np.ndarray                                   # Area of each cell, indexed by cell (r)
                 
     @property
     def n_ag_lms(self):
@@ -273,6 +276,18 @@ def get_GBF4A_species_area_sr(data: Data, target_year: int) -> np.ndarray:
         return np.empty(0)
     print('Getting species conservation cell data...', flush = True)
     return ag_biodiversity.get_GBF4A_species_conservation_matrix_sr(data, target_year)
+
+
+def get_snes_xr(data: Data) -> np.ndarray:
+    if settings.SNES_CONSTRAINTS != "on":
+        return np.empty(0)
+    return ag_biodiversity.get_snes_matrix(data)
+
+
+def get_ecnes_xr(data: Data) -> np.ndarray:
+    if settings.ECNES_CONSTRAINTS != "on":
+        return np.empty(0)
+    return ag_biodiversity.get_ecnes_matrix(data)
 
 
 def get_non_ag_w_rk(
@@ -522,6 +537,7 @@ def get_limits(
     - Water net yield limits
     - GHG limits
     - Biodiversity limits
+    - Regional adoption limits
     """
     print('Getting environmental limits...', flush = True)
     # Limits is a dictionary with heterogeneous value sets.
@@ -547,6 +563,13 @@ def get_limits(
     )
 
     limits["GBF4A_species_conservation"] = ag_biodiversity.get_GBF4A_species_conservation_limits(data, yr_cal)
+
+    limits["snes"] = ag_biodiversity.get_snes_limits(data, yr_cal)
+    limits["ecnes"] = ag_biodiversity.get_ecnes_limits(data, yr_cal)
+
+    ag_reg_adoption, non_ag_reg_adoption = ag_transition.get_regional_adoption_limits(data, yr_cal)
+    limits["ag_regional_adoption"] = ag_reg_adoption
+    limits["non_ag_regional_adoption"] = non_ag_reg_adoption
 
     return limits
 
@@ -631,6 +654,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         GBF2_raw_priority_degraded_area_r = get_GBF2_priority_degrade_area_r(data),
         GBF3_raw_MVG_area_vr=get_GBF3_MVG_area_vr(data),
         GBF4_raw_species_area_sr=get_GBF4A_species_area_sr(data, target_year),
+        snes_xr=get_snes_xr(data),
+        ecnes_xr=get_ecnes_xr(data),
 
         savanna_eligible_r=get_savanna_eligible_r(data),
 
@@ -645,4 +670,5 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         limits=get_limits(data, target_year),
         desc2aglu=data.DESC2AGLU,
         resmult=data.RESMULT,
+        real_area=data.REAL_AREA,
     )

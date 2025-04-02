@@ -464,19 +464,22 @@ class Data:
 
         
         ##################### Regional adoption zones
-        self.REGIONAL_ADOPTION_ZONEs = pd.read_hdf(
-            os.path.join(settings.INPUT_DIR, "regional_adoption_zones.h5"), where=self.MASK
-        )[settings.REGIONAL_ADOPTION_ZONE].to_numpy()
-    
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+            self.REGIONAL_ADOPTION_ZONES = None
+            self.REGIONAL_ADOPTION_TARGETS = None
+        else:
+            self.REGIONAL_ADOPTION_ZONES = pd.read_hdf(
+                os.path.join(INPUT_DIR, "regional_adoption_zones.h5"), where=self.MASK
+            )[REGIONAL_ADOPTION_ZONE].to_numpy()
         
-        regional_adoption_targets = pd.read_excel(os.path.join(settings.INPUT_DIR, "regional_adoption_zones.xlsx"), sheet_name=settings.REGIONAL_ADOPTION_ZONE)
-        self.REGIONAL_ADOPTION_TARGETS = regional_adoption_targets.iloc[
-            [idx for idx, row in regional_adoption_targets.iterrows() if
-                all([row['ADOPTION_PERCENTAGE_2030']>=0, 
-                     row['ADOPTION_PERCENTAGE_2050']>=0, 
-                     row['ADOPTION_PERCENTAGE_2100']>=0])
+            regional_adoption_targets = pd.read_excel(os.path.join(INPUT_DIR, "regional_adoption_zones.xlsx"), sheet_name=REGIONAL_ADOPTION_ZONE)
+            self.REGIONAL_ADOPTION_TARGETS = regional_adoption_targets.iloc[
+                [idx for idx, row in regional_adoption_targets.iterrows() if
+                    all([row['ADOPTION_PERCENTAGE_2030']>=0, 
+                        row['ADOPTION_PERCENTAGE_2050']>=0, 
+                        row['ADOPTION_PERCENTAGE_2100']>=0])
+                ]
             ]
-        ]
 
         ###############################################################
         # Livestock related data.
@@ -1209,7 +1212,7 @@ class Data:
                                                 if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE']>0,
                                                         row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE']>0,
                                                         row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE']>0])]
-        
+                
         self.BIO_GBF4B_ECNES_LIKELY_SEL = [row['COMMUNITY'] for _,row in BIO_GBF4B_ECNES_score.iterrows()
                                                 if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY']>0,
                                                         row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY']>0,
@@ -1219,6 +1222,7 @@ class Data:
                                                 if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE']>0,
                                                         row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE']>0,
                                                         row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE']>0])]
+    
         
         
         if len(self.BIO_GBF_4B_SNES_LIKELY_SEL) == 0 or len(self.BIO_GBF4B_ECNES_LIKELY_SEL) == 0:
@@ -1695,6 +1699,9 @@ class Data:
         - the adoption percentage.
         
         """
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+            return ()
+        
         reg_adop_limits = []
         for _,row in self.REGIONAL_ADOPTION_TARGETS.iterrows():
             f = interp1d(
@@ -1716,6 +1723,9 @@ class Data:
         - landuse name,
         - the adoption area (ha).
         """
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+            return ()
+        
         reg_adop_limits = self.get_regional_adoption_percent_by_year(yr)
         reg_adop_limits_ha = []
         for reg, landuse, pct in reg_adop_limits:

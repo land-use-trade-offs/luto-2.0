@@ -1,37 +1,71 @@
-LUTO 2 - the Land-Use Trade-Offs modelling framework
-=================================================
+# LUTO 2: The Land-Use Trade-Offs Model Version 2
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8313866.svg)](https://doi.org/10.5281/zenodo.8313866) (2.1 beta)
+## Introduction
+The Land Use Trade-Offs model v2 (LUTO2) is an integrated land systems model designed to simulate the optimal spatial arrangement of land use and land management decisions over time in Australia. It aims to achieve climate and biodiversity targets without compromising economic growth, food production or water security. The model is implemented as a Python package, offering users the flexibility to run interactively or to execute batch processes through scripted automation.
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8328560.svg)](https://doi.org/10.5281/zenodo.8328560) (2.1-beta input data)
+LUTO2 was developed through a collaboration between Deakin University and Climateworks Centre, with research contributions from CSIRO. The model is a cornerstone of Climateworks’ Land Use Futures program, which supports Australia’s transition to sustainable food and land systems. The technical development of LUTO2 is led by Professor Brett Bryan at Deakin University. LUTO2 continues the approach to land-use change modelling of its predecessor, the original LUTO, which was developed by CSIRO from 2010 - 2015 (see also Pedigree, below) and published under the GNU GPLv3 in 2021.
 
-LUTO 2 is version two of the Land-Use Trade-Offs model. The model predicts future spatial land-use distributions based on a economic cost-minimisation logic under various constraints, including environmental limits. The model is contained in a Python package (the framework) and can be run interactively or in a scripted manner (for batch runs).
+## Pedigree
+LUTO2 builds on the approach and pedigree of nearly two decades of land-use modelling expertise starting with the original LUTO model. The original LUTO model was developed by CSIRO for the Australian National Outlook in 2015 and was groundbreaking for quantifying and projecting land use changes and their sustainability impacts in Australia, illustrated by its published works in *Nature* in 2015 and 2017.
 
-The LUTO 2 modelling framework was developed at Deakin University by Fjalar de Haan, Brett Bryan, Carla Archibald, Michalis Hadjikakou, Shakil Khan, Raymundo Marcos-Martinez, Javier Navarro, Asef Nazari, and Dhananjay Thiruvady (see [CITATION.cff](CITATION.cff)) from early 2021 to early 2022. This work was funded by the Land-Use Futures program at ClimateWorks Australia. The Land-Use Futures project is a collaboration between ClimateWorks Australia, the CSIRO and Deakin University (see [luf@cwa](https://www.climateworksaustralia.org/project/land-use-futures/) and [luf@deakin](https://www.planet-a.earth/other-projects-1/e6xzzv5emwd7p9fsd8pxyluv4840iz)). LUTO 2 continues the approach to land-use change modelling of its predecessor, the original LUTO, which was developed at the CSIRO from 2010 - 2015 (see also [Pedigree](#pedigree), below) and published under the GNU GPLv3 in 2021.
+LUTO2 represents a generational leap in sophistication and functionality for national-scale land-use change modelling in Australia. Both LUTO versions are optimisation models but different commercial solvers are used (CPLEX in original LUTO, GUROBI in LUTO2). The spatial domains are different in extent, with LUTO2's being nearly 5 times as large. The data requirements to run LUTO2 are consequently different and heavier. There is no backwards compatibility whatsoever.
 
-# Pedigree #
+The original LUTO model is available online and should be cited as:
+> Bryan, Brett; Nolan, Martin; Stock, Florian; Graham, Paul; Dunstall, Simon; Ernst, Andreas; Connor, Jeff (2021): Land Use Trade-Offs (LUTO) Model. v1. CSIRO. Software Collection. https://doi.org/10.25919/y8ee-sk45.
 
-LUTO 2 is based on the original LUTO as regards its overall approach to land-use change modelling. In particular aspects like discretising the land-use map at a 1x1 square kilometres scale and representing it as a 1D array with land-uses as integers. The code and more information about the original LUTO model can be found at [luto@csiro](https://data.csiro.au/collection/csiro:52376v1) and should be cited as: Bryan, Brett; Nolan, Martin; Stock, Florian; Graham, Paul; Dunstall, Simon; Ernst, Andreas; Connor, Jeff (2021): Land Use Trade-Offs (LUTO) Model. v1. CSIRO. Software Collection. [https://doi.org/10.25919/y8ee-sk45](https://doi.org/10.25919/y8ee-sk45).
+This new version represents an entirely new model featuring a complete rewrite of the codebase and comprehensive upgrades to data and functionality. Enhancements to the original model include extended spatial coverage and timespan (2010 to 2100), a complete refresh of input data, additional land-use options and sustainability indicators and management solutions, the ability to model demand-side solutions, and additional environmental indicators and reporting. Due to LUTO2’s model complexity, the computational requirements to run the model are far more intensive.
 
-LUTO 2 is, however, a new model, written completely from scratch -- there is no original LUTO code in the LUTO 2 code base. The LUTO 2 economic logic governing land-use change is very different from that of the original LUTO. While the original LUTO is based on the assumption that farmers try to optimise their profits, the leading LUTO 2 assumption is that the overall agricultural system tries to minimise its costs of production (including costs of switching between agricultural commodities). Whilst the original LUTO allowed switching from a current land-use to an alternative in a one-way fashion, LUTO 2 features full commodity switching. Both LUTOs are optimisation models but different commercial solvers are used (CPLEX in original LUTO, GUROBI in LUTO 2). The spatial domains are different in extent, with LUTO 2's being nearly 10 times as large. The data requirements to run LUTO 2 are consequentially different and heavier. There is no backwards compatibility whatsoever.
+LUTO2’s modelling approach, indicators and solutions have been guided by extensive stakeholder consultation (documented here: https://doi.org/10.1007/s11625-024-01574-7) following principles of participatory model co-design.
 
-# Documentation #
-Documentation, including instructions on how to set up and run LUTO 2, can be found at [docs/luto2-overview.pdf](docs/luto2-overview.pdf).
+## Authors
+Coordinating lead author: **Bryan, B.A.**  
+Lead authors (in order of contribution): **Williams, N., Archibald, C.L., de Haan, F., Wang, J., van Schoten, N., Hadjikakou, M., Sanson, J., Zyngier, R., Marcos-Martinez, R., Navarro, J., Gao, L., Aghighi, H.**  
+Other significant contributors (in alphabetical order): **Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., Thiruvady, D.R.**
 
-LUTO 2.0 comes with a full diagram to illustrate its data preparation, workflow and code logics. The diagram link can be found in [this link](https://www.figma.com/file/7MXDM7vcXRhbUP1Egyt8FM/01_understand-the-input-data?type=whiteboard&node-id=0%3A1&t=JTSMHRDP5K2Cy6yl-1).
+## Documentation
+Documentation, including instructions on how to set up and run LUTO2, can be found at `docs/luto2-overview.pdf`.
 
-# Copyright #
-Copyright 2021 Fjalar J. de Haan and Brett A. Bryan, Deakin University.
+LUTO2 comes with a full diagram to illustrate its data preparation, workflow, and code logics. The diagram link can be found in this link.  
+*Replace with updated documentation currently in preparation when ready.*
 
-# Licence #
-LUTO 2 is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+## Steps to Run LUTO2
+1. Clone the repository:
+   ```sh
+   git clone https://github.com/land-use-trade-offs/luto-2.0.git
+   ```
+2. Create a Conda environment and install dependencies:
+   ```sh
+   cd luto-2.0
+   conda create --name luto_env --file requirements.txt
+   conda activate luto_env
+   ```
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+3. Run a basic simulation:
+   ```python
+   import luto.simulation as sim
+   data = sim.load_data()
+   sim.run(data=data, base_year=2010, target_year=2030, step_size=5)
+   ```
 
-You should have received a copy of the GNU General Public License along with this program. If not, see [\<https://www.gnu.org/licenses/\>](https://www.gnu.org/licenses/).
+4. After execution, an HTML report will be generated for easier visualization:
+   ```
+   /output/<run_dir>/DATA_REPORT/REPORT_HTML/index.html
+   ```
+   This report provides a structured overview of the results in an interactive format.
+   
+5. *Note:* LUTO2 requires a large spatio-temporal database located in the `/input` folder before simulation. This dataset can be obtained from **b.bryan@deakin.edu.au**.
 
-# Authors and Citation #
-See the [CITATION.cff](CITATION.cff) file for the LUTO 2 authors and how to cite the code base.
+## Copyright
+Copyright 2024 **Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., van Schoten, N., Hadjikakou, M., Sanson, J., Zyngier, R., Marcos-Martinez, R., Navarro, J., Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.**  
+Copyright 2021-2023 **Fjalar J. de Haan and Brett A. Bryan, Deakin University.** (see `CITATION.cff`).
 
+## License
+LUTO2 is free software: you can redistribute it and/or modify it under the terms of the **GNU General Public License** as published by the **Free Software Foundation**, either version 3 of the License, or (at your option) any later version.
 
+This program is distributed in the hope that it will be useful, but **without any warranty**; without even the implied warranty of **merchantability** or **fitness for a particular purpose**. See the **GNU General Public License** for more details.
+
+You should have received a copy of the **GNU General Public License** along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+## Citation
+> Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., van Schoten, N., Hadjikakou, M., Sanson, J., Zyngier, R., Marcos-Martinez, R., Navarro, J., Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R. (2024). The Land-Use Trade-Offs Model Version 2 (LUTO2): an integrated land system model for Australia. Software Collection. https://github.com/land-use-trade-offs/luto-2.0
 
