@@ -464,19 +464,22 @@ class Data:
 
         
         ##################### Regional adoption zones
-        self.REGIONAL_ADOPTION_ZONEs = pd.read_hdf(
-            os.path.join(settings.INPUT_DIR, "regional_adoption_zones.h5"), where=self.MASK
-        )[settings.REGIONAL_ADOPTION_ZONE].to_numpy()
-    
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+            self.REGIONAL_ADOPTION_ZONES = None
+            self.REGIONAL_ADOPTION_TARGETS = None
+        else:
+            self.REGIONAL_ADOPTION_ZONES = pd.read_hdf(
+                os.path.join(settings.INPUT_DIR, "regional_adoption_zones.h5"), where=self.MASK
+            )[settings.REGIONAL_ADOPTION_ZONE].to_numpy()
         
-        regional_adoption_targets = pd.read_excel(os.path.join(settings.INPUT_DIR, "regional_adoption_zones.xlsx"), sheet_name=settings.REGIONAL_ADOPTION_ZONE)
-        self.REGIONAL_ADOPTION_TARGETS = regional_adoption_targets.iloc[
-            [idx for idx, row in regional_adoption_targets.iterrows() if
-                all([row['ADOPTION_PERCENTAGE_2030']>=0, 
-                     row['ADOPTION_PERCENTAGE_2050']>=0, 
-                     row['ADOPTION_PERCENTAGE_2100']>=0])
+            regional_adoption_targets = pd.read_excel(os.path.join(settings.INPUT_DIR, "regional_adoption_zones.xlsx"), sheet_name=settings.REGIONAL_ADOPTION_ZONE)
+            self.REGIONAL_ADOPTION_TARGETS = regional_adoption_targets.iloc[
+                [idx for idx, row in regional_adoption_targets.iterrows() if
+                    all([row['ADOPTION_PERCENTAGE_2030']>=0, 
+                        row['ADOPTION_PERCENTAGE_2050']>=0, 
+                        row['ADOPTION_PERCENTAGE_2100']>=0])
+                ]
             ]
-        ]
 
         ###############################################################
         # Livestock related data.
@@ -1140,8 +1143,8 @@ class Data:
         ).sel(cell=self.MASK).values
 
         # Get the NVIS layers
-        match settings.NVIS_SPATIAL_DETAIL:
-            case 'LOW':
+        match settings.NVIS_SPATIAL_DETAIL:   # TODO: Remove LOW spatial detail option
+            case 'LOW':  
                 # 1D vector, each cell is an index of the NVIS class
                 NVIS_layers = NVIS_xr
                 # Conver to 2D array, n_class * n_cell, each cell is 1 if the cell is the coresponding NVIS class, 0 otherwise
@@ -1209,7 +1212,7 @@ class Data:
                                                 if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE']>0,
                                                         row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE']>0,
                                                         row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE']>0])]
-        
+                
         self.BIO_GBF4B_ECNES_LIKELY_SEL = [row['COMMUNITY'] for _,row in BIO_GBF4B_ECNES_score.iterrows()
                                                 if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY']>0,
                                                         row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY']>0,
@@ -1219,6 +1222,7 @@ class Data:
                                                 if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE']>0,
                                                         row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE']>0,
                                                         row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE']>0])]
+    
         
         
         if len(self.BIO_GBF_4B_SNES_LIKELY_SEL) == 0 or len(self.BIO_GBF4B_ECNES_LIKELY_SEL) == 0:
@@ -1509,7 +1513,7 @@ class Data:
             x=xr.DataArray(self.COORD_LON_LAT[0], dims='cell'),
             y=xr.DataArray(self.COORD_LON_LAT[1], dims='cell'),
             method='linear'                                             # Use LINEAR interpolation for the `suitability` values
-        ).drop_vars(['year'])
+        ).drop_vars(['year']).values
         
         # Apply Savanna Burning penalties
         current_species_val = np.where(
@@ -1521,7 +1525,7 @@ class Data:
         return current_species_val.astype(np.float32)
     
     
-    def get_GBF4A_area_weighted_score_all_Australia_by_yr(self, yr: int):
+    def get_GBF4A_score_all_Australia_by_yr(self, yr: int):
         '''
         Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for all Australia.
         '''
@@ -1529,7 +1533,7 @@ class Data:
         target_pct = []
         for _,row in self.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES.iterrows():
             f = interp1d(
-                [1990, 2030, 2050, 2100],
+                [2010, 2030, 2050, 2100],
                 [row['HABITAT_SUITABILITY_BASELINE_PERCENT'], row[f'USER_DEFINED_TARGET_PERCENT_2030'], row[f'USER_DEFINED_TARGET_PERCENT_2050'], row[f'USER_DEFINED_TARGET_PERCENT_2100']],
                 kind="linear",
                 fill_value="extrapolate",
@@ -1538,10 +1542,10 @@ class Data:
             
         # Calculate the target biodiversity suitability score for each species at the given year for all Australia
         target_scores_all_AUS = self.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES['HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA'] * (np.array(target_pct) / 100) # Convert the percentage to proportion
-        return target_scores_all_AUS
+        return target_scores_all_AUS.values
     
     
-    def get_GBF4A_area_weighted_score_outside_natural_LUTO_by_yr(self, yr: int, level:Literal['species', 'group']='species'):
+    def get_GBF4A_score_outside_natural_LUTO_by_yr(self, yr: int, level:Literal['species', 'group']='species'):
         '''
         Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for the Outside LUTO natural land.
         '''
@@ -1573,12 +1577,12 @@ class Data:
         return  outside_natural_scores
     
     
-    def get_GBF4A_suitability_target_inside_natural_LUTO_by_yr(self, yr: int):
+    def get_GBF4A_target_inside_LUTO_by_yr(self, yr: int):
         '''
         Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for the Inside LUTO natural land.
         '''
-        target_scores = self.get_GBF4A_area_weighted_score_all_Australia_by_yr(yr) - self.get_GBF4A_area_weighted_score_outside_natural_LUTO_by_yr(yr)
-        return target_scores.values
+        target_scores = self.get_GBF4A_score_all_Australia_by_yr(yr) - self.get_GBF4A_score_outside_natural_LUTO_by_yr(yr)
+        return target_scores
 
 
     def get_GBF4B_SNES_target_inside_LUTO_natural_by_year(self, yr:int, layer:Literal['LIKELY', 'LIKELY_AND_MAYBE']):
@@ -1695,6 +1699,9 @@ class Data:
         - the adoption percentage.
         
         """
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+            return ()
+        
         reg_adop_limits = []
         for _,row in self.REGIONAL_ADOPTION_TARGETS.iterrows():
             f = interp1d(
@@ -1716,10 +1723,13 @@ class Data:
         - landuse name,
         - the adoption area (ha).
         """
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+            return ()
+        
         reg_adop_limits = self.get_regional_adoption_percent_by_year(yr)
         reg_adop_limits_ha = []
         for reg, landuse, pct in reg_adop_limits:
-            reg_total_area_ha = ((self.REGIONAL_ADOPTION_ZONEs == reg) * self.REAL_AREA).sum()
+            reg_total_area_ha = ((self.REGIONAL_ADOPTION_ZONES == reg) * self.REAL_AREA).sum()
             reg_adop_limits_ha.append((reg, landuse, reg_total_area_ha * pct / 100))
             
         return reg_adop_limits_ha
