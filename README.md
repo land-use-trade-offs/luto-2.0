@@ -17,6 +17,19 @@ This new version represents an entirely new model featuring a complete rewrite o
 
 LUTO2’s modelling approach, indicators and solutions have been guided by extensive stakeholder consultation (documented here: https://doi.org/10.1007/s11625-024-01574-7) following principles of participatory model co-design. 
 
+## Steps to Run LUTO2
+1. Clone the repository:
+   ```sh
+   git clone https://github.com/land-use-trade-offs/luto-2.0.git
+   ```
+2. Create a Conda environment and install dependencies:
+   ```sh
+   cd luto-2.0
+   conda create --name luto_env --file requirements.txt
+   conda activate luto_env
+   ```
+3. *Note:* LUTO2 requires a large spatio-temporal database as input. This dataset can be obtained from **b.bryan@deakin.edu.au**.
+
 ## Authors
 Coordinating lead author: **Bryan, B.A.**  
 Lead authors (in order of contribution): **Williams, N., Archibald, C.L., de Haan, F., Wang, J., van Schoten, N., Hadjikakou, M., Sanson, J., Zyngier, R., Marcos-Martinez, R., Navarro, J., Gao, L., Aghighi, H.**  
@@ -24,6 +37,9 @@ Other significant contributors (in alphabetical order): **Armstrong, T., Bohl, H
 
 ## Documentation
 Documentation, including instructions on how to set up and run LUTO2, can be found at `docs/luto2-overview.pdf`.
+
+LUTO2 comes with a full diagram to illustrate its data preparation, workflow, and code logics. The diagram link can be found in this link.  
+*Replace with updated documentation currently in preparation when ready.*
 
 ## Copyright
 Copyright 2024 **Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., van Schoten, N., Hadjikakou, M., Sanson, J., Zyngier, R., Marcos-Martinez, R., Navarro, J., Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.**  
