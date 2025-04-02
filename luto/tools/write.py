@@ -1442,7 +1442,7 @@ def write_species_conservation(data: Data, yr_cal: int, path) -> None:
 
 
 def write_snes(data: Data, yr_cal: int, path) -> None:
-    if not settings.SNES_CONSTRAINTS == "on":
+    if not settings.BIODIVERSTIY_TARGET_GBF_4A == "on":
         return
     
     print(f"Writing species of national environmental significance scores for {yr_cal}")
@@ -1468,7 +1468,7 @@ def write_snes(data: Data, yr_cal: int, path) -> None:
 
 
 def write_ecnes(data: Data, yr_cal: int, path) -> None:
-    if not settings.ECNES_CONSTRAINTS == "on":
+    if not settings.BIODIVERSTIY_TARGET_GBF_4B == "on":
         return
     
     print(f"Writing ecological communities of national environmental significance scores for {yr_cal}")

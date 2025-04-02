@@ -406,7 +406,7 @@ def get_snes_limits(data: Data, target_year: int) -> tuple[np.ndarray, dict[int,
     species_names: dict[int, str]
         Mapping of each species' ID to string format name
     """
-    if settings.SNES_CONSTRAINTS != "on":
+    if settings.BIODIVERSTIY_TARGET_GBF_4A != "on":
         return np.empty(0), {}, {}
         
     if settings.NES_LAYER_TYPE == "likely":
@@ -437,7 +437,7 @@ def get_ecnes_limits(data: Data, target_year: int) -> tuple[np.ndarray, dict[int
     species_names: dict[int, str]
         Mapping of each species' ID to string format name
     """
-    if settings.ECNES_CONSTRAINTS != "on":
+    if settings.BIODIVERSTIY_TARGET_GBF_4B != "on":
         return np.empty(0), {}, {}
         
     if settings.NES_LAYER_TYPE == "likely":

@@ -469,10 +469,10 @@ class Data:
             self.REGIONAL_ADOPTION_TARGETS = None
         else:
             self.REGIONAL_ADOPTION_ZONES = pd.read_hdf(
-                os.path.join(INPUT_DIR, "regional_adoption_zones.h5"), where=self.MASK
-            )[REGIONAL_ADOPTION_ZONE].to_numpy()
+                os.path.join(settings.INPUT_DIR, "regional_adoption_zones.h5"), where=self.MASK
+            )[settings.REGIONAL_ADOPTION_ZONE].to_numpy()
         
-            regional_adoption_targets = pd.read_excel(os.path.join(INPUT_DIR, "regional_adoption_zones.xlsx"), sheet_name=REGIONAL_ADOPTION_ZONE)
+            regional_adoption_targets = pd.read_excel(os.path.join(settings.INPUT_DIR, "regional_adoption_zones.xlsx"), sheet_name=settings.REGIONAL_ADOPTION_ZONE)
             self.REGIONAL_ADOPTION_TARGETS = regional_adoption_targets.iloc[
                 [idx for idx, row in regional_adoption_targets.iterrows() if
                     all([row['ADOPTION_PERCENTAGE_2030']>=0, 
@@ -1729,7 +1729,7 @@ class Data:
         reg_adop_limits = self.get_regional_adoption_percent_by_year(yr)
         reg_adop_limits_ha = []
         for reg, landuse, pct in reg_adop_limits:
-            reg_total_area_ha = ((self.REGIONAL_ADOPTION_ZONEs == reg) * self.REAL_AREA).sum()
+            reg_total_area_ha = ((self.REGIONAL_ADOPTION_ZONES == reg) * self.REAL_AREA).sum()
             reg_adop_limits_ha.append((reg, landuse, reg_total_area_ha * pct / 100))
             
         return reg_adop_limits_ha

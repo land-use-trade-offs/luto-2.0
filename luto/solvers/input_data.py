@@ -279,13 +279,13 @@ def get_GBF4A_species_area_sr(data: Data, target_year: int) -> np.ndarray:
 
 
 def get_snes_xr(data: Data) -> np.ndarray:
-    if settings.SNES_CONSTRAINTS != "on":
+    if settings.BIODIVERSTIY_TARGET_GBF_4A != "on":
         return np.empty(0)
     return ag_biodiversity.get_snes_matrix(data)
 
 
 def get_ecnes_xr(data: Data) -> np.ndarray:
-    if settings.ECNES_CONSTRAINTS != "on":
+    if settings.BIODIVERSTIY_TARGET_GBF_4B != "on":
         return np.empty(0)
     return ag_biodiversity.get_ecnes_matrix(data)
 
