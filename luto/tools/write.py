@@ -1449,10 +1449,10 @@ def write_snes(data: Data, yr_cal: int, path) -> None:
     
     snes_df = pd.DataFrame(index=data.BIO_GBF4A_SEL_SPECIES, columns=["Target", "Actual"])
 
-    x_targets, x_names = ag_biodiversity.get_snes_limits(data, yr_cal)
+    x_targets, x_names = ag_biodiversity.get_GBF4B_snes_limits(data, yr_cal)
 
     if yr_cal == data.YR_CAL_BASE:
-        snes_xr = ag_biodiversity.get_snes_matrix(data, yr_cal)
+        snes_xr = ag_biodiversity.get_GBF4B_snes_matrix(data, yr_cal)
         ag_biodiv_degr_j = data.BIODIV_HABITAT_DEGRADE_LOOK_UP
         snes_prod_data = tools.calc_nes_ag_area_for_year(
             snes_xr, data.LUMAP, ag_biodiv_degr_j
@@ -1475,10 +1475,10 @@ def write_ecnes(data: Data, yr_cal: int, path) -> None:
     
     ecnes_df = pd.DataFrame(index=data.BIO_GBF4A_SEL_SPECIES, columns=["Target", "Actual"])
 
-    x_targets, x_names = ag_biodiversity.get_snes_limits(data, yr_cal)
+    x_targets, x_names = ag_biodiversity.get_GBF4B_snes_limits(data, yr_cal)
 
     if yr_cal == data.YR_CAL_BASE:
-        ecnes_xr = ag_biodiversity.get_snes_matrix(data, yr_cal)
+        ecnes_xr = ag_biodiversity.get_GBF4B_snes_matrix(data, yr_cal)
         ag_biodiv_degr_j = data.BIODIV_HABITAT_DEGRADE_LOOK_UP
         ecnes_prod_data = tools.calc_nes_ag_area_for_year(
             ecnes_xr, data.LUMAP, ag_biodiv_degr_j

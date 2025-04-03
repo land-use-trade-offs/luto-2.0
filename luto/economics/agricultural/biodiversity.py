@@ -265,7 +265,7 @@ def get_GBF3_major_vegetation_group_limits(data: Data, yr_cal: int) -> tuple[np.
         that the group applies to.
     """
     
-    return data.get_GBF3_limit_score_inside_natural_LUTO_by_yr(yr_cal), data.BIO_GBF3_ID2DESC, data.MAJOR_VEG_INDECES
+    return data.get_GBF3_limit_score_inside_LUTO_by_yr(yr_cal), data.BIO_GBF3_ID2DESC, data.MAJOR_VEG_INDECES
 
 
 def get_GBF4A_species_conservation_limits(
@@ -351,7 +351,7 @@ def get_species_conservation_limits(
     return species_limits, species_names, species_inds
 
 
-def get_snes_matrix(data: Data) -> np.ndarray:
+def get_GBF4B_snes_matrix(data: Data) -> np.ndarray:
     """
     Gets the SNES contributions  matrix.
     
@@ -361,10 +361,18 @@ def get_snes_matrix(data: Data) -> np.ndarray:
         indexed (z, r) where z is species (independent of species conversation limits) and r is cell
     """
     if settings.NES_LAYER_TYPE == "likely":
-        return data.get_GBF4B_SNES_layers('LIKELY') * data.REAL_AREA
+        return np.where(
+            data.SAVBURN_ELIGIBLE,
+            data.get_GBF4B_SNES_layers('LIKELY') * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
+            data.get_GBF4B_SNES_layers('LIKELY') * data.REAL_AREA
+        )
     
     elif settings.NES_LAYER_TYPE == "likely_and_maybe":
-        return data.get_GBF4B_SNES_layers('LIKELY_AND_MAYBE') * data.REAL_AREA
+        return np.where(
+            data.SAVBURN_ELIGIBLE,
+            data.get_GBF4B_SNES_layers('LIKELY_AND_MAYBE') * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
+            data.get_GBF4B_SNES_layers('LIKELY_AND_MAYBE') * data.REAL_AREA
+        )
     
     else:
         raise ValueError(
@@ -373,7 +381,7 @@ def get_snes_matrix(data: Data) -> np.ndarray:
         )
     
 
-def get_ecnes_matrix(data: Data) -> np.ndarray:
+def get_GBF4B_ecnes_matrix(data: Data) -> np.ndarray:
     """
     Gets the ECNES contributions  matrix.
     
@@ -383,10 +391,18 @@ def get_ecnes_matrix(data: Data) -> np.ndarray:
         indexed (z, r) where z is species (independent of species conversation limits) and r is cell
     """
     if settings.NES_LAYER_TYPE == "likely":
-        return data.get_GBF4B_ECNES_layers('LIKELY') * data.REAL_AREA
+        return np.where(
+            data.SAVBURN_ELIGIBLE,
+            data.get_GBF4B_ECNES_layers('LIKELY') * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
+            data.get_GBF4B_ECNES_layers('LIKELY') * data.REAL_AREA
+        )
     
     elif settings.NES_LAYER_TYPE == "likely_and_maybe":
-        return data.get_GBF4B_ECNES_layers('LIKELY_AND_MAYBE') * data.REAL_AREA
+        return np.where(
+            data.SAVBURN_ELIGIBLE,
+            data.get_GBF4B_ECNES_layers('LIKELY_AND_MAYBE') * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
+            data.get_GBF4B_ECNES_layers('LIKELY_AND_MAYBE') * data.REAL_AREA
+        )
     
     else:
         raise ValueError(
@@ -395,7 +411,7 @@ def get_ecnes_matrix(data: Data) -> np.ndarray:
         )
 
 
-def get_snes_limits(data: Data, target_year: int) -> tuple[np.ndarray, dict[int, str]]:
+def get_GBF4B_snes_limits(data: Data, target_year: int) -> tuple[np.ndarray, dict[int, str]]:
     """
     Get species of national environmental significance limits.
 
@@ -426,7 +442,7 @@ def get_snes_limits(data: Data, target_year: int) -> tuple[np.ndarray, dict[int,
         )
     
 
-def get_ecnes_limits(data: Data, target_year: int) -> tuple[np.ndarray, dict[int, str]]:
+def get_GBF4B_ecnes_limits(data: Data, target_year: int) -> tuple[np.ndarray, dict[int, str]]:
     """
     Get ecological communities of national environmental significance limits.
 

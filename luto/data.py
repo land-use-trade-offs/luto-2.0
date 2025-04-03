@@ -1438,7 +1438,7 @@ class Data:
         return f(yr_cal).item()  # Convert the interpolated value to a scalar
     
     
-    def get_GBF3_limit_score_inside_natural_LUTO_by_yr(self, yr:int):
+    def get_GBF3_limit_score_inside_LUTO_by_yr(self, yr:int):
         '''
         Interpolate the user-defined targets to get target at the given year
         '''
@@ -1637,7 +1637,7 @@ class Data:
     
     def get_GBF4B_SNES_layers(self, layer:Literal['LIKELY', 'LIKELY_AND_MAYBE']):
         '''
-        Get the biodiversity significance score (area weighted [ha]) for each species at the given year for all Australia.
+        Get the biodiversity significance score (raw percentage value) for each species at the given year for all Australia.
         '''
         BIO_GBF4B_SPECIES_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_DCCEEW_SNES.nc', chunks={'species':1})
         
@@ -1657,7 +1657,7 @@ class Data:
 
     def get_GBF4B_ECNES_layers(self, layer:Literal['LIKELY', 'LIKELY_AND_MAYBE']):
         '''
-        Get the biodiversity significance score (area weighted [ha]) for each species at the given year for all Australia.
+        Get the biodiversity significance score (raw percentage value) for each species at the given year for all Australia.
         '''
         BIO_GBF4B_COMUNITY_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_DCCEEW_ECNES.nc', chunks={'species':1})
 
