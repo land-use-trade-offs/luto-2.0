@@ -1121,7 +1121,7 @@ class Data:
         # Read in the pre-1750 vegetation statistics, and get NVIS class names and areas
         self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS = pd.read_excel(
             settings.INPUT_DIR + '/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx',
-            sheet_name = f'NVIS_{settings.NVIS_CLASS_DETAIL}_{settings.NVIS_SPATIAL_DETAIL}_SPATIAL_DETAIL'
+            sheet_name = f'NVIS_{settings.NVIS_CLASS_DETAIL}'
         )
         
         for _,row in self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS.iterrows():
@@ -1139,21 +1139,7 @@ class Data:
       
 
         # Read in vegetation layer data
-        NVIS_xr = xr.load_dataarray(settings.INPUT_DIR + f'/NVIS_{settings.NVIS_CLASS_DETAIL}_{settings.NVIS_SPATIAL_DETAIL}_SPATIAL_DETAIL.nc'
-        ).sel(cell=self.MASK).values
-
-        # Get the NVIS layers
-        match settings.NVIS_SPATIAL_DETAIL:   # TODO: Remove LOW spatial detail option
-            case 'LOW':  
-                # 1D vector, each cell is an index of the NVIS class
-                NVIS_layers = NVIS_xr
-                # Conver to 2D array, n_class * n_cell, each cell is 1 if the cell is the coresponding NVIS class, 0 otherwise
-                NVIS_layers = np.array([(NVIS_layers == i) for i in self.BIO_GBF3_ID2DESC.keys()]).astype(np.bool_)
-            case 'HIGH':
-                # 2D array, n_class * n_cell, each cell is the area percentage of the coresponding NVIS class
-                NVIS_layers = NVIS_xr / 100  # divide by 100 to convert percentage to proportion
-            case _:
-                raise ValueError(f"Invalid NVIS spatial detail: {settings.NVIS_SPATIAL_DETAIL}, must be 'LOW' or 'HIGH'")
+        NVIS_layers = xr.load_dataarray(settings.INPUT_DIR + f'/NVIS_{settings.NVIS_CLASS_DETAIL}.nc').sel(cell=self.MASK).values / 100  # divide by 100 to convert percentage to proportion
 
         # Apply Savanna Burning penalties
         self.NVIS_LAYERS_LDS = np.where(

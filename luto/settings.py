@@ -581,13 +581,6 @@ Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.
 '''
 
-NVIS_SPATIAL_DETAIL = 'HIGH'                 # 'LOW' or 'HIGH'
-'''
-- If 'LOW' is selected, the primary group layers will be used to represent the vegetation type. 
-- If 'HIGH' is selected, the sub group layers will be used to represent the vegetation type.
-'''
-
-
 NVIS_CLASS_DETAIL  = 'MVG'                  # 'MVG' or 'MVS'
 '''
 The National Vegetation Information System (NVIS) provides the 100m resolution information on
