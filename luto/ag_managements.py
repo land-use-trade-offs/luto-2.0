@@ -107,7 +107,9 @@ AG_MANAGEMENTS_TO_LAND_USES = {
         'Plantation fruit',
         'Stone fruit',
         'Tropical stone fruit',
-    ]
+    ],
+    'Beef - HIR': ['Beef - natural land'],
+    'Sheep - HIR': ['Sheep - natural land'],
 }
 
 # # Remove the am if it is set False (i.e., not a valid solution) in the settings

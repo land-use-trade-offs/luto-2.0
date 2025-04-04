@@ -100,7 +100,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 10       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
 STEP_SIZE = 1
@@ -162,7 +162,7 @@ NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect a
 BARHOMOGENOUS = 1  # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 32
+THREADS = 8
 
 
 
@@ -292,6 +292,8 @@ AG_MANAGEMENTS = {
     'Savanna Burning': True,
     'AgTech EI': True,
     'Biochar': True,
+    'Beef - HIR': True,
+    'Sheep - HIR': True,
 }
 """
 The dictionary below contains a master list of all agricultural management options and
@@ -307,6 +309,8 @@ AG_MANAGEMENTS_REVERSIBLE = {
     'Savanna Burning': True,
     'AgTech EI': True,
     'Biochar': True,
+    'Beef - HIR': False,
+    'Sheep - HIR': False,
 }
 """
 If settings.MODE == 'timeseries', the values of the below dictionary determine whether the model is allowed to abandon agricultural
@@ -327,6 +331,8 @@ SAVBURN_COST_HA_YR = 100
 
 # The minimum value an agricultural management variable must take for the write_output function to consider it being used on a cell
 AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1
+
+HIR_PRODUCTIVITY_PENALTY =  0.5
 
 
 # ---------------------------------------------------------------------------- #
@@ -377,8 +383,8 @@ SOLVE_ECONOMY_WEIGHT = 0.05
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 
-WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
-# WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
+# WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
+WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
 
 WATER_PENALTY = 1
 
@@ -442,8 +448,8 @@ BIODIV_GBF_TARGET_2_DICT = {
 """
 
 
-GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
-# GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
+# GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
+GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 '''
 The constraint type for the biodiversity target.
 - 'hard' adds biodiversity limits as a constraint in the solver (linear programming approach)
@@ -535,7 +541,7 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- Vegetation parameters ----------------------
 
-BIODIVERSTIY_TARGET_GBF_3  = 'on'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_3  = 'off'           # 'on' or 'off'.
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.
@@ -562,15 +568,15 @@ the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers
 
 
 # ------------------------------- Species parameters -------------------------------
-BIODIVERSTIY_TARGET_GBF_4 =  'on'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_4 =  'off'           # 'on' or 'off'.
 '''
 Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
 halt the extinction of known threatened species, protect genetic diversity, 
 and manage human-wildlife interactions
 '''
 
-SNES_CONSTRAINTS = 'on'    # 'on' or 'off'
-ECNES_CONSTRAINTS = 'on'   # 'on' or 'off'
+SNES_CONSTRAINTS = 'off'    # 'on' or 'off'
+ECNES_CONSTRAINTS = 'off'   # 'on' or 'off'
 
 NES_LAYER_TYPE = 'likely'  # 'likely' or 'likely_and_maybe'
 

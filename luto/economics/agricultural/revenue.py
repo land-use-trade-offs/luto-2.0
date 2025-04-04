@@ -27,7 +27,7 @@ import numpy as np
 import pandas as pd
 
 from typing import Dict
-from luto.settings import AG_MANAGEMENTS
+from luto.settings import AG_MANAGEMENTS, HIR_PRODUCTIVITY_PENALTY
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data
 from luto import settings
@@ -349,6 +349,52 @@ def get_biochar_effect_r_mrj(data: Data, r_mrj, yr_idx):
     return new_r_mrj
 
 
+def get_beef_hir_effect_r_mrj(data: Data, r_mrj):
+    """
+    Applies the effects of using HIR to the beef revenue data
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+
+    # Set up the effects matrix
+    r_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    if not AG_MANAGEMENTS['Beef - HIR']:
+        return r_mrj_effect
+    
+    # Update values in the new matrix    
+    for lu_idx in range(len(land_uses)):
+        multiplier = 1 - HIR_PRODUCTIVITY_PENALTY
+        if multiplier != 1:
+            j = lu_codes[lu_idx]
+            r_mrj_effect[:, :, lu_idx] = r_mrj[:, :, j] * (multiplier - 1)
+
+    return r_mrj_effect
+
+
+def get_sheep_hir_effect_r_mrj(data: Data, r_mrj):
+    """
+    Applies the effects of using HIR to the sheep revenue data
+    """
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+
+    # Set up the effects matrix
+    r_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    if not AG_MANAGEMENTS['Sheep - HIR']:
+        return r_mrj_effect
+    
+    # Update values in the new matrix    
+    for lu_idx in range(len(land_uses)):
+        multiplier = 1 - HIR_PRODUCTIVITY_PENALTY
+        if multiplier != 1:
+            j = lu_codes[lu_idx]
+            r_mrj_effect[:, :, lu_idx] = r_mrj[:, :, j] * (multiplier - 1)
+
+    return r_mrj_effect
+
+
 def get_agricultural_management_revenue_matrices(data: Data, r_mrj, yr_idx) -> Dict[str, np.ndarray]:
     """
     Calculate the revenue matrices for different agricultural management practices.
@@ -369,6 +415,8 @@ def get_agricultural_management_revenue_matrices(data: Data, r_mrj, yr_idx) -> D
     sav_burning_data = get_savanna_burning_effect_r_mrj(data, yr_idx) if AG_MANAGEMENTS['Savanna Burning'] else 0
     agtech_ei_data = get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['AgTech EI'] else 0
     biochar_data = get_biochar_effect_r_mrj(data, r_mrj, yr_idx) if AG_MANAGEMENTS['Biochar'] else 0
+    beef_hir_data = get_beef_hir_effect_r_mrj(data, r_mrj) if AG_MANAGEMENTS['Beef - HIR'] else 0
+    sheep_hir_data = get_sheep_hir_effect_r_mrj(data, r_mrj) if AG_MANAGEMENTS['Sheep - HIR'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -377,4 +425,6 @@ def get_agricultural_management_revenue_matrices(data: Data, r_mrj, yr_idx) -> D
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
         'Biochar': biochar_data,
+        'Beef - HIR': beef_hir_data,
+        'Sheep - HIR': sheep_hir_data,       
     }
