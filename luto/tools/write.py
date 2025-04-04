@@ -1250,7 +1250,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
 
     # Get biodiversity scores; s : species/groups, r : cells
     ag_biodiv_groups_sr = xr.DataArray(
-        data.get_GBF4_bio_layers_by_yr(yr_cal, 'group'), 
+        data.get_GBF8_bio_layers_by_yr(yr_cal, 'group'), 
         dims=['group', 'cell'], 
         coords={'group':data.BIO_GBF8_GROUPS_LAYER.group.values, 'cell':np.arange(data.NCELLS)}
     )
@@ -1326,7 +1326,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
     
     # Get biodiversity scores; s : species/groups, r : cells
     ag_biodiv_species_sr = xr.DataArray(
-        data.get_GBF4_bio_layers_by_yr(yr_cal, 'species'), 
+        data.get_GBF8_bio_layers_by_yr(yr_cal, 'species'), 
         dims=['species', 'cell'], 
         coords={'species':data.BIO_GBF8_SPECIES_LAYER.species.values, 'cell':np.arange(data.NCELLS)}
     )
@@ -1424,10 +1424,10 @@ def write_species_conservation(data: Data, yr_cal: int, path) -> None:
     sc_df = pd.DataFrame(index=data.BIO_GBF8_SEL_SPECIES, columns=["Target", "Actual"])
 
     if yr_cal == data.YR_CAL_BASE:
-        GBF4_raw_species_area_sr = ag_biodiversity.get_GBF4_species_conservation_matrix_sr(data, yr_cal)
+        GBF8_raw_species_area_sr = ag_biodiversity.get_GBF4_species_conservation_matrix_sr(data, yr_cal)
         biodiv_contr_ag_rj = data.BIO_HABITAT_CONTRIBUTION_LOOK_UP
         sc_prod_data = tools.calc_species_ag_area_for_year(
-            GBF4_raw_species_area_sr, data.LUMAP, biodiv_contr_ag_rj
+            GBF8_raw_species_area_sr, data.LUMAP, biodiv_contr_ag_rj
         )
     else:
         sc_prod_data = data.prod_data[yr_cal]["Species Conservation"]
@@ -1449,10 +1449,10 @@ def write_snes(data: Data, yr_cal: int, path) -> None:
     
     snes_df = pd.DataFrame(index=data.BIO_GBF8_SEL_SPECIES, columns=["Target", "Actual"])
 
-    x_targets, x_names = ag_biodiversity.get_GBF4B_snes_limits(data, yr_cal)
+    x_targets, x_names = ag_biodiversity.get_GBF4_snes_limits(data, yr_cal)
 
     if yr_cal == data.YR_CAL_BASE:
-        snes_xr = ag_biodiversity.get_GBF4B_snes_matrix(data, yr_cal)
+        snes_xr = ag_biodiversity.get_GBF4_snes_matrix(data, yr_cal)
         ag_biodiv_degr_j = data.BIODIV_HABITAT_DEGRADE_LOOK_UP
         snes_prod_data = tools.calc_nes_ag_area_for_year(
             snes_xr, data.LUMAP, ag_biodiv_degr_j
@@ -1475,10 +1475,10 @@ def write_ecnes(data: Data, yr_cal: int, path) -> None:
     
     ecnes_df = pd.DataFrame(index=data.BIO_GBF8_SEL_SPECIES, columns=["Target", "Actual"])
 
-    x_targets, x_names = ag_biodiversity.get_GBF4B_snes_limits(data, yr_cal)
+    x_targets, x_names = ag_biodiversity.get_GBF4_snes_limits(data, yr_cal)
 
     if yr_cal == data.YR_CAL_BASE:
-        ecnes_xr = ag_biodiversity.get_GBF4B_snes_matrix(data, yr_cal)
+        ecnes_xr = ag_biodiversity.get_GBF4_snes_matrix(data, yr_cal)
         ag_biodiv_degr_j = data.BIODIV_HABITAT_DEGRADE_LOOK_UP
         ecnes_prod_data = tools.calc_nes_ag_area_for_year(
             ecnes_xr, data.LUMAP, ag_biodiv_degr_j

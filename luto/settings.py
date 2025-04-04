@@ -581,7 +581,7 @@ Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.
 '''
 
-NVIS_CLASS_DETAIL  = 'MVS'                  # 'MVG' or 'MVS'
+NVIS_CLASS_DETAIL  = 'MVG'                  # 'MVG' or 'MVS'
 '''
 The National Vegetation Information System (NVIS) provides the 100m resolution information on
 the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers) across Australia.

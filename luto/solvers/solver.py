@@ -1010,7 +1010,7 @@ class LutoSolver:
         for s, s_area_lb in enumerate(s_limits):
             
             ind = s_ind[s]
-            GBF4_raw_area_r = self._input_data.GBF4_raw_species_area_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT
+            GBF4_raw_area_r = self._input_data.GBF8_raw_species_area_sr[s, ind]
             
             ag_contr = gp.quicksum(
                 gp.quicksum(
@@ -1059,7 +1059,7 @@ class LutoSolver:
                 self.species_conservation_exprs[s] >= constr_area
             )
 
-    def _add_GBF4B_snes_constraints(self) -> None:
+    def _add_GBF4_snes_constraints(self) -> None:
         if settings.BIODIVERSTIY_TARGET_GBF_4A != "on":
             print('     ...Species of National Environmental Significance constraints TURNED OFF ...')
             return
@@ -1069,22 +1069,22 @@ class LutoSolver:
         print(f"    ...Species of National Environmental Significance constraints...")
         
         for x, x_area_lb in enumerate(x_limits):
-            ind = np.where(self._input_data.GBF4B_snes_xr[x] > 0)[0]
+            ind = np.where(self._input_data.GBF4_snes_xr[x] > 0)[0]
 
             if ind.size == 0:
                 print(
                     f"        ...WARNING: SNES species {x_names[x]} target was NOT added: no cells can contribute to species target area "
-                    f"(data.get_GBF8_SNES_layers() returns empty array for this species).")
+                    f"(data.get_GBF4_SNES_layers() returns empty array for this species).")
                 continue
             
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4B_snes_xr[x, ind]
+                    self._input_data.GBF4_snes_xr[x, ind]
                     * self._input_data.biodiv_contr_ag_rj[ind, j]
                     * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
-                    self._input_data.GBF4B_snes_xr[x, ind]
+                    self._input_data.GBF4_snes_xr[x, ind]
                     * self._input_data.biodiv_contr_ag_rj[ind, j]
                     * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
@@ -1093,12 +1093,12 @@ class LutoSolver:
 
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4B_snes_xr[x, ind]
+                    self._input_data.GBF4_snes_xr[x, ind]
                     * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
                 )  # Dryland alt. ag. management contributions
                 + gp.quicksum(
-                    self._input_data.GBF4B_snes_xr[x, ind]
+                    self._input_data.GBF4_snes_xr[x, ind]
                     * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
                 )  # Irrigated alt. ag. management contributions
@@ -1108,7 +1108,7 @@ class LutoSolver:
 
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4B_snes_xr[x, ind]
+                    self._input_data.GBF4_snes_xr[x, ind]
                     * self._input_data.biodiv_contr_non_ag_k[k]
                     * self.X_non_ag_vars_kr[k, ind]
                 )  # Non-agricultural contribution
@@ -1133,22 +1133,22 @@ class LutoSolver:
         print(f"    ...Ecological Communities of National Environmental Significance constraints...")
         
         for x, x_area_lb in enumerate(x_limits):
-            ind = np.where(self._input_data.GBF4B_ecnes_xr[x] > 0)[0]
+            ind = np.where(self._input_data.GBF4_ecnes_xr[x] > 0)[0]
 
             if ind.size == 0:
                 print(
                     f"        ...WARNING: ECNES species {x_names[x]} target was NOT added: no cells can contribute to species target area "
-                    f"(data.get_GBF8_ECNES_layers() returns empty array for this community).")
+                    f"(data.get_GBF4_ECNES_layers() returns empty array for this community).")
                 continue
             
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4B_ecnes_xr[x, ind]
+                    self._input_data.GBF4_ecnes_xr[x, ind]
                     * self._input_data.biodiv_contr_ag_rj[ind, j]
                     * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
-                    self._input_data.GBF4B_ecnes_xr[x, ind]
+                    self._input_data.GBF4_ecnes_xr[x, ind]
                     * self._input_data.biodiv_contr_ag_rj[ind, j]
                     * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
@@ -1157,12 +1157,12 @@ class LutoSolver:
 
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4B_ecnes_xr[x, ind]
+                    self._input_data.GBF4_ecnes_xr[x, ind]
                     * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
                 )  # Dryland alt. ag. management contributions
                 + gp.quicksum(
-                    self._input_data.GBF4B_ecnes_xr[x, ind]
+                    self._input_data.GBF4_ecnes_xr[x, ind]
                     * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
                 )  # Irrigated alt. ag. management contributions
@@ -1172,7 +1172,7 @@ class LutoSolver:
 
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4B_ecnes_xr[x, ind]
+                    self._input_data.GBF4_ecnes_xr[x, ind]
                     * self._input_data.biodiv_contr_non_ag_k[k]
                     * self.X_non_ag_vars_kr[k, ind]
                 )  # Non-agricultural contribution

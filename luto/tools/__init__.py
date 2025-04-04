@@ -562,7 +562,7 @@ def calc_major_vegetation_group_ag_area_for_year(
 
 
 def calc_species_ag_area_for_year(
-    GBF4_raw_species_area_sr: np.ndarray, lumap: np.ndarray, biodiv_contr_ag_rj: dict[int, float]
+    GBF8_raw_species_area_sr: np.ndarray, lumap: np.ndarray, biodiv_contr_ag_rj: dict[int, float]
 ) -> dict[int, float]:
     prod_data = {}
 
@@ -571,8 +571,8 @@ def calc_species_ag_area_for_year(
     # Numpy magic
     ag_biodiv_degr_r = np.vectorize(ag_biodiv_impacts_j.get)(lumap)
     
-    for s in range(GBF4_raw_species_area_sr.shape[0]):
-        prod_data[s] = GBF4_raw_species_area_sr[s, :] * ag_biodiv_degr_r
+    for s in range(GBF8_raw_species_area_sr.shape[0]):
+        prod_data[s] = GBF8_raw_species_area_sr[s, :] * ag_biodiv_degr_r
 
     return prod_data
 

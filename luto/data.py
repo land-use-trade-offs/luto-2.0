@@ -1460,9 +1460,115 @@ class Data:
         limit_score_all_AUS = self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA * (np.array(GBF3_target_percents) / 100)  # Convert the percentage to proportion
             
         return limit_score_all_AUS - self.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO
-
     
-    def get_GBF4_bio_layers_by_yr(self, yr: int, level:Literal['species', 'group']='species'):
+    
+    
+    def get_GBF4_SNES_layers(self, layer:Literal['LIKELY', 'LIKELY_AND_MAYBE']):
+        '''
+        Get the biodiversity significance score (raw percentage value) for each species at the given year for all Australia.
+        '''
+        BIO_GBF8_SPECIES_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_GBF4_SNES.nc', chunks={'species':1})
+        
+        if layer == 'LIKELY':
+            snes_arr = BIO_GBF8_SPECIES_raw.sel(species=self.BIO_GBF8_SNES_LIKELY_SEL, cell=self.MASK, presence=layer).compute()
+        elif layer == 'LIKELY_AND_MAYBE':
+            snes_arr = BIO_GBF8_SPECIES_raw.sel(species=self.BIO_GBF8_SNES_LIKELY_AND_MAYBE_SEL, cell=self.MASK, presence=layer).compute()
+        else:
+            raise ValueError("Invalid layer name, must be 'LIKELY' or 'LIKELY_AND_MAYBE'")
+        
+        # Check the num of selected species
+        if len(snes_arr) == 0:
+            return np.array(0)
+        
+        return snes_arr.values.astype(np.float32)
+    
+    
+    def get_GBF4_SNES_target_inside_LUTO_by_year(self, yr:int, layer:Literal['LIKELY', 'LIKELY_AND_MAYBE']):
+        
+        # Check the layer name
+        if layer == 'LIKELY':
+            snes_df = self.BIO_GBF8_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY
+        elif layer == 'LIKELY_AND_MAYBE':
+            snes_df = self.BIO_GBF8_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE
+        else:
+            raise ValueError("Invalid layer name. Must be 'LIKELY' or 'LIKELY_AND_MAYBE'")
+        
+        # Check the num of selected species
+        if len(snes_df) == 0:
+            return 0
+        
+        target_pct = []
+        for _,row in snes_df.iterrows():
+            f = interp1d(
+                [2010, 2030, 2050, 2100],
+                [row[f'HABITAT_SIGNIFICANCE_BASELINE_PERCENT_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2030_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2050_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2100_{layer}']],
+                kind = "linear",
+                fill_value = "extrapolate",
+            )
+            target_pct.append(f(yr).item())
+            
+        # Get the significance score for all Australia and outside LUTO natural
+        snes_out_LUTO = snes_df[f'HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_{layer}']
+        snes_score_all_Australia = snes_df[f'HABITAT_SIGNIFICANCE_BASELINE_ALL_AUSTRALIA_{layer}'] * target_pct
+        # Get the significance score for inside LUTO natural
+        snes_inside_LUTO_natural =  snes_score_all_Australia - snes_out_LUTO
+        return snes_inside_LUTO_natural.values
+
+
+    def get_GBF4_ECNES_layers(self, layer:Literal['LIKELY', 'LIKELY_AND_MAYBE']):
+        '''
+        Get the biodiversity significance score (raw percentage value) for each species at the given year for all Australia.
+        '''
+        BIO_GBF8_COMUNITY_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_GBF4_ECNES.nc', chunks={'species':1})
+
+        if layer == 'LIKELY':
+            ecnes_arr = BIO_GBF8_COMUNITY_raw.sel(species=self.BIO_GBF8_ECNES_LIKELY_SEL, cell=self.MASK, presence=layer).compute()
+        elif layer == 'LIKELY_AND_MAYBE':
+            ecnes_arr = BIO_GBF8_COMUNITY_raw.sel(species=self.BIO_GBF8_ECNES_LIKELY_AND_MAYBE_SEL, cell=self.MASK, presence=layer).compute()
+        else:
+            raise ValueError("Invalid layer name, must be 'LIKELY' or 'LIKELY_AND_MAYBE'")
+        
+        # Check the num of selected species
+        if len(ecnes_arr) == 0:
+            return np.array(0)
+        
+        return ecnes_arr.values.astype(np.float32)
+    
+
+        
+    def get_GBF4_ECNES_target_inside_LUTO_by_year(self, yr:int, layer:Literal['LIKELY', 'LIKELY_AND_MAYBE']):
+        
+        # Check the layer name
+        if layer == 'LIKELY':
+            ecnes_df = self.BIO_GBF8_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY
+        elif layer == 'LIKELY_AND_MAYBE':
+            ecnes_df = self.BIO_GBF8_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE
+        else:
+            raise ValueError("Invalid layer name. Must be 'LIKELY' or 'LIKELY_AND_MAYBE'")
+        
+        # Check the num of selected communities
+        if len(ecnes_df) == 0:
+            return 0
+        
+        target_pct = []
+        for _,row in ecnes_df.iterrows():
+            f = interp1d(
+                [2010, 2030, 2050, 2100],
+                [row[f'HABITAT_SIGNIFICANCE_BASELINE_PERCENT_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2030_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2050_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2100_{layer}']],
+                kind = "linear",
+                fill_value = "extrapolate",
+            )
+            target_pct.append(f(yr).item())
+            
+        # Get the significance score for all Australia and outside LUTO natural
+        ecnes_out_LUTO = ecnes_df[f'HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_{layer}']
+        ecnes_score_all_Australia = ecnes_df[f'HABITAT_SIGNIFICANCE_BASELINE_ALL_AUSTRALIA_{layer}'] * target_pct
+        # Get the significance score for inside LUTO natural
+        ecnes_inside_LUTO_natural =  ecnes_score_all_Australia - ecnes_out_LUTO
+        return ecnes_inside_LUTO_natural.values
+    
+    
+    def get_GBF8_bio_layers_by_yr(self, yr: int, level:Literal['species', 'group']='species'):
         '''
         Get the biodiversity suitability score [hectare weighted] for each species at the given year.
         
@@ -1510,8 +1616,17 @@ class Data:
         
         return current_species_val.astype(np.float32)
     
+
+    def get_GBF8_target_inside_LUTO_by_yr(self, yr: int):
+        '''
+        Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for the Inside LUTO natural land.
+        '''
+        target_scores = self.get_GBF8_score_all_Australia_by_yr(yr) - self.get_GBF8_score_outside_natural_LUTO_by_yr(yr)
+        return target_scores
     
-    def get_GBF4_score_all_Australia_by_yr(self, yr: int):
+
+    
+    def get_GBF8_score_all_Australia_by_yr(self, yr: int):
         '''
         Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for all Australia.
         '''
@@ -1531,7 +1646,7 @@ class Data:
         return target_scores_all_AUS.values
     
     
-    def get_GBF4_score_outside_natural_LUTO_by_yr(self, yr: int, level:Literal['species', 'group']='species'):
+    def get_GBF8_score_outside_natural_LUTO_by_yr(self, yr: int, level:Literal['species', 'group']='species'):
         '''
         Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for the Outside LUTO natural land.
         '''
@@ -1561,119 +1676,8 @@ class Data:
             outside_natural_scores.append(f(yr).item())
         
         return  outside_natural_scores
-    
-    
-    def get_GBF4_target_inside_LUTO_by_yr(self, yr: int):
-        '''
-        Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for the Inside LUTO natural land.
-        '''
-        target_scores = self.get_GBF4_score_all_Australia_by_yr(yr) - self.get_GBF4_score_outside_natural_LUTO_by_yr(yr)
-        return target_scores
 
 
-    def get_GBF8_SNES_target_inside_LUTO_natural_by_year(self, yr:int, layer:Literal['LIKELY', 'LIKELY_AND_MAYBE']):
-        
-        # Check the layer name
-        if layer == 'LIKELY':
-            snes_df = self.BIO_GBF8_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY
-        elif layer == 'LIKELY_AND_MAYBE':
-            snes_df = self.BIO_GBF8_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE
-        else:
-            raise ValueError("Invalid layer name. Must be 'LIKELY' or 'LIKELY_AND_MAYBE'")
-        
-        # Check the num of selected species
-        if len(snes_df) == 0:
-            return 0
-        
-        target_pct = []
-        for _,row in snes_df.iterrows():
-            f = interp1d(
-                [2010, 2030, 2050, 2100],
-                [row[f'HABITAT_SIGNIFICANCE_BASELINE_PERCENT_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2030_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2050_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2100_{layer}']],
-                kind = "linear",
-                fill_value = "extrapolate",
-            )
-            target_pct.append(f(yr).item())
-            
-        # Get the significance score for all Australia and outside LUTO natural
-        snes_out_LUTO = snes_df[f'HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_{layer}']
-        snes_score_all_Australia = snes_df[f'HABITAT_SIGNIFICANCE_BASELINE_ALL_AUSTRALIA_{layer}'] * target_pct
-        # Get the significance score for inside LUTO natural
-        snes_inside_LUTO_natural =  snes_score_all_Australia - snes_out_LUTO
-        return snes_inside_LUTO_natural.values
-    
-        
-    def get_GBF8_ECNES_target_inside_LUTO_natural_by_year(self, yr:int, layer:Literal['LIKELY', 'LIKELY_AND_MAYBE']):
-        
-        # Check the layer name
-        if layer == 'LIKELY':
-            ecnes_df = self.BIO_GBF8_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY
-        elif layer == 'LIKELY_AND_MAYBE':
-            ecnes_df = self.BIO_GBF8_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE
-        else:
-            raise ValueError("Invalid layer name. Must be 'LIKELY' or 'LIKELY_AND_MAYBE'")
-        
-        # Check the num of selected communities
-        if len(ecnes_df) == 0:
-            return 0
-        
-        target_pct = []
-        for _,row in ecnes_df.iterrows():
-            f = interp1d(
-                [2010, 2030, 2050, 2100],
-                [row[f'HABITAT_SIGNIFICANCE_BASELINE_PERCENT_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2030_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2050_{layer}'], row[f'USER_DEFINED_TARGET_PERCENT_2100_{layer}']],
-                kind = "linear",
-                fill_value = "extrapolate",
-            )
-            target_pct.append(f(yr).item())
-            
-        # Get the significance score for all Australia and outside LUTO natural
-        ecnes_out_LUTO = ecnes_df[f'HABITAT_SIGNIFICANCE_BASELINE_OUT_LUTO_NATURAL_{layer}']
-        ecnes_score_all_Australia = ecnes_df[f'HABITAT_SIGNIFICANCE_BASELINE_ALL_AUSTRALIA_{layer}'] * target_pct
-        # Get the significance score for inside LUTO natural
-        ecnes_inside_LUTO_natural =  ecnes_score_all_Australia - ecnes_out_LUTO
-        return ecnes_inside_LUTO_natural.values
-    
-    
-    def get_GBF8_SNES_layers(self, layer:Literal['LIKELY', 'LIKELY_AND_MAYBE']):
-        '''
-        Get the biodiversity significance score (raw percentage value) for each species at the given year for all Australia.
-        '''
-        BIO_GBF8_SPECIES_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_GBF4_SNES.nc', chunks={'species':1})
-        
-        if layer == 'LIKELY':
-            snes_arr = BIO_GBF8_SPECIES_raw.sel(species=self.BIO_GBF8_SNES_LIKELY_SEL, cell=self.MASK, presence=layer).compute()
-        elif layer == 'LIKELY_AND_MAYBE':
-            snes_arr = BIO_GBF8_SPECIES_raw.sel(species=self.BIO_GBF8_SNES_LIKELY_AND_MAYBE_SEL, cell=self.MASK, presence=layer).compute()
-        else:
-            raise ValueError("Invalid layer name, must be 'LIKELY' or 'LIKELY_AND_MAYBE'")
-        
-        # Check the num of selected species
-        if len(snes_arr) == 0:
-            return np.array(0)
-        
-        return snes_arr.values.astype(np.float32)
-
-
-    def get_GBF8_ECNES_layers(self, layer:Literal['LIKELY', 'LIKELY_AND_MAYBE']):
-        '''
-        Get the biodiversity significance score (raw percentage value) for each species at the given year for all Australia.
-        '''
-        BIO_GBF8_COMUNITY_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_GBF4_ECNES.nc', chunks={'species':1})
-
-        if layer == 'LIKELY':
-            ecnes_arr = BIO_GBF8_COMUNITY_raw.sel(species=self.BIO_GBF8_ECNES_LIKELY_SEL, cell=self.MASK, presence=layer).compute()
-        elif layer == 'LIKELY_AND_MAYBE':
-            ecnes_arr = BIO_GBF8_COMUNITY_raw.sel(species=self.BIO_GBF8_ECNES_LIKELY_AND_MAYBE_SEL, cell=self.MASK, presence=layer).compute()
-        else:
-            raise ValueError("Invalid layer name, must be 'LIKELY' or 'LIKELY_AND_MAYBE'")
-        
-        # Check the num of selected species
-        if len(ecnes_arr) == 0:
-            return np.array(0)
-        
-        return ecnes_arr.values.astype(np.float32)
-    
     
     def get_regional_adoption_percent_by_year(self, yr: int):
         """

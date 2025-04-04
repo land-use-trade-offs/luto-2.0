@@ -154,8 +154,8 @@ def create_new_dataset():
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES.nc', outpath + 'bio_GBF4_SNES.nc')
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES.nc', outpath + 'bio_GBF4_ECNES.nc')
 
-    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES_target.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_ECNES.csv')
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES_target.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_SNES.csv')
+    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES_target.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_ECNES.csv')
     
     # Copy biodiversity GBF-8 files
     shutil.copyfile(bio_GBF8_inpath + 'bio_ssp126_EnviroSuit.nc', outpath + 'bio_GBF8_ssp126_EnviroSuit.nc')
@@ -171,9 +171,6 @@ def create_new_dataset():
     shutil.copyfile(bio_GBF8_inpath + 'BIODIVERSITY_GBF8_TARGET.csv', outpath + 'BIODIVERSITY_GBF8_TARGET.csv')
     shutil.copyfile(bio_GBF8_inpath + 'BIODIVERSITY_GBF8_SCORES_group.csv', outpath + 'BIODIVERSITY_GBF8_SCORES_group.csv')
     shutil.copyfile(bio_GBF8_inpath + 'BIODIVERSITY_GBF8_TARGET_group.csv', outpath + 'BIODIVERSITY_GBF8_TARGET_group.csv')
-    
-    
-  
     
 
     ############### Read data
