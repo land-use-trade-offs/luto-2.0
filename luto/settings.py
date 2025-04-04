@@ -100,7 +100,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 13       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
 STEP_SIZE = 1
@@ -181,7 +181,7 @@ Land-use and vector file pairs to exclude land-use from being utilised in that a
  - The value is the path to the ESRI shapefile.
 '''
 
-REGIONAL_ADOPTION_CONSTRAINTS = 'on'  # 'on' or 'off'
+REGIONAL_ADOPTION_CONSTRAINTS = 'off'  # 'on' or 'off'
 REGIONAL_ADOPTION_ZONE = 'ABARES_AAGIS'   # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 '''
 The regional adoption zone is the spatial unit used to enforce regional adoption constraints.
@@ -469,7 +469,7 @@ SOLVE_BIODIV_PRIORITY_WEIGHT = 10
 
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-BIODIVERSTIY_TARGET_GBF_2 = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
+BIODIVERSTIY_TARGET_GBF_2 = 'off'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
 
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 BIODIV_GBF_TARGET_2_DICT = {
@@ -581,7 +581,7 @@ Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.
 '''
 
-NVIS_CLASS_DETAIL  = 'MVG'                  # 'MVG' or 'MVS'
+NVIS_CLASS_DETAIL  = 'MVS'                  # 'MVG' or 'MVS'
 '''
 The National Vegetation Information System (NVIS) provides the 100m resolution information on
 the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers) across Australia.

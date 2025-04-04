@@ -265,7 +265,7 @@ def get_GBF3_major_vegetation_group_limits(data: Data, yr_cal: int) -> tuple[np.
         that the group applies to.
     """
     
-    return data.get_GBF3_limit_score_inside_natural_LUTO_by_yr(yr_cal), data.BIO_GBF3_ID2DESC, data.MAJOR_VEG_INDECES
+    return data.get_GBF3_limit_score_inside_LUTO_by_yr(yr_cal), data.BIO_GBF3_ID2DESC, data.MAJOR_VEG_INDECES
 
 
 def get_GBF4_species_conservation_limits(
@@ -351,7 +351,7 @@ def get_species_conservation_limits(
     return species_limits, species_names, species_inds
 
 
-def get_snes_matrix(data: Data) -> np.ndarray:
+def get_GBF4B_snes_matrix(data: Data) -> np.ndarray:
     """
     Gets the SNES contributions  matrix.
     
@@ -373,7 +373,7 @@ def get_snes_matrix(data: Data) -> np.ndarray:
         )
     
 
-def get_ecnes_matrix(data: Data) -> np.ndarray:
+def get_GBF4B_ecnes_matrix(data: Data) -> np.ndarray:
     """
     Gets the ECNES contributions  matrix.
     
@@ -395,7 +395,7 @@ def get_ecnes_matrix(data: Data) -> np.ndarray:
         )
 
 
-def get_snes_limits(data: Data, target_year: int) -> tuple[np.ndarray, dict[int, str]]:
+def get_GBF4B_snes_limits(data: Data, target_year: int) -> tuple[np.ndarray, dict[int, str]]:
     """
     Get species of national environmental significance limits.
 
@@ -426,7 +426,7 @@ def get_snes_limits(data: Data, target_year: int) -> tuple[np.ndarray, dict[int,
         )
     
 
-def get_ecnes_limits(data: Data, target_year: int) -> tuple[np.ndarray, dict[int, str]]:
+def get_GBF4B_ecnes_limits(data: Data, target_year: int) -> tuple[np.ndarray, dict[int, str]]:
     """
     Get ecological communities of national environmental significance limits.
 

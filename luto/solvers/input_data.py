@@ -82,7 +82,7 @@ class SolverInputData:
     biodiv_contr_non_ag_k: dict[int, float]                             # Biodiversity contribution scale from non-agricultural land uses.
     biodiv_contr_ag_man: dict[str, dict[int, np.ndarray]]               # Biodiversity contribution scale from agricultural management options.
     
-    GBF2_raw_priority_degraded_area_r: np.ndarray                        # Raw areas (GBF2) from priority degrade areas - indexed by cell (r).
+    GBF2_raw_priority_degraded_area_r: np.ndarray                       # Raw areas (GBF2) from priority degrade areas - indexed by cell (r).
     GBF3_raw_MVG_area_vr: np.ndarray                                    # Raw areas (GBF3) from Major vegetation group - indexed by veg. group (v) and cell (r)
     GBF4_raw_species_area_sr: np.ndarray                                # Raw areas (GBF4) Species data - indexed by species (s) and cell (r).
     snes_xr: np.ndarray                                     # Species NES contribution data - indexed by species/ecological community (x) and cell (r).
@@ -101,7 +101,7 @@ class SolverInputData:
     limits: dict                                                        # Targets to use.
     desc2aglu: dict                                                     # Map of agricultural land use descriptions to codes.
     resmult: float                                                      # Resolution factor multiplier from data.RESMULT
-    real_area: np.ndarray                                   # Area of each cell, indexed by cell (r)
+    real_area: np.ndarray                                               # Area of each cell, indexed by cell (r)
                 
     @property
     def n_ag_lms(self):
@@ -278,16 +278,16 @@ def get_GBF4_species_area_sr(data: Data, target_year: int) -> np.ndarray:
     return ag_biodiversity.get_GBF4_species_conservation_matrix_sr(data, target_year)
 
 
-def get_snes_xr(data: Data) -> np.ndarray:
+def get_GBF4B_snes_xr(data: Data) -> np.ndarray:
     if settings.BIODIVERSTIY_TARGET_GBF_4A != "on":
         return np.empty(0)
-    return ag_biodiversity.get_snes_matrix(data)
+    return ag_biodiversity.get_GBF4B_snes_matrix(data)
 
 
-def get_ecnes_xr(data: Data) -> np.ndarray:
+def get_GBF4B_ecnes_xr(data: Data) -> np.ndarray:
     if settings.BIODIVERSTIY_TARGET_GBF_4B != "on":
         return np.empty(0)
-    return ag_biodiversity.get_ecnes_matrix(data)
+    return ag_biodiversity.get_GBF4B_ecnes_matrix(data)
 
 
 def get_non_ag_w_rk(
@@ -564,8 +564,8 @@ def get_limits(
 
     limits["GBF4_species_conservation"] = ag_biodiversity.get_GBF4_species_conservation_limits(data, yr_cal)
 
-    limits["snes"] = ag_biodiversity.get_snes_limits(data, yr_cal)
-    limits["ecnes"] = ag_biodiversity.get_ecnes_limits(data, yr_cal)
+    limits["snes"] = ag_biodiversity.get_GBF4B_snes_limits(data, yr_cal)
+    limits["ecnes"] = ag_biodiversity.get_GBF4B_ecnes_limits(data, yr_cal)
 
     ag_reg_adoption, non_ag_reg_adoption = ag_transition.get_regional_adoption_limits(data, yr_cal)
     limits["ag_regional_adoption"] = ag_reg_adoption
