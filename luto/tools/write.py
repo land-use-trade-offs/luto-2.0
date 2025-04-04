@@ -167,8 +167,8 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     write_biodiversity_priority_scores(data, yr_cal, path_yr)
     write_biodiversity_GBF2_scores(data, yr_cal, path_yr)
     write_biodiversity_GBF3_scores(data, yr_cal, path_yr)
-    write_biodiversity_GBF4A_scores_groups(data, yr_cal, path_yr)
-    write_biodiversity_GBF4A_scores_species(data, yr_cal, path_yr)
+    write_biodiversity_GBF8_scores_groups(data, yr_cal, path_yr)
+    write_biodiversity_GBF8_scores_species(data, yr_cal, path_yr)
 
     print(f"Finished writing {yr_cal} out of {years[0]}-{years[-1]} years\n")
 
@@ -1228,7 +1228,7 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
     
 
 
-def write_biodiversity_GBF4A_scores_groups(data: Data, yr_cal, path):
+def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
     
     # Do nothing if biodiversity limits are off and no need to report
     if not settings.BIODIVERSTIY_TARGET_GBF_4 == 'on':
@@ -1250,45 +1250,45 @@ def write_biodiversity_GBF4A_scores_groups(data: Data, yr_cal, path):
 
     # Get biodiversity scores; s : species/groups, r : cells
     ag_biodiv_groups_sr = xr.DataArray(
-        data.get_GBF4A_bio_layers_by_yr(yr_cal, 'group'), 
+        data.get_GBF4_bio_layers_by_yr(yr_cal, 'group'), 
         dims=['group', 'cell'], 
-        coords={'group':data.BIO_GBF4A_GROUPS_LAYER.group.values, 'cell':np.arange(data.NCELLS)}
+        coords={'group':data.BIO_GBF8_GROUPS_LAYER.group.values, 'cell':np.arange(data.NCELLS)}
     )
 
-    # Get the GBF4A scores for the year
-    GBF4A_scores_groups_ag = (ag_dvar_mrj * lumap_degradation * ag_biodiv_groups_sr
+    # Get the GBF4 scores for the year
+    GBF4_scores_groups_ag = (ag_dvar_mrj * lumap_degradation * ag_biodiv_groups_sr
         ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().merge(
-            data.BIO_GBF4A_BASELINE_SCORE_GROUPS,
+            data.BIO_GBF8_BASELINE_SCORE_GROUPS,
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
 
-    GBF4A_scores_groups_non_ag = (non_ag_dvar_rk * ag_biodiv_groups_sr
+    GBF4_scores_groups_non_ag = (non_ag_dvar_rk * ag_biodiv_groups_sr
         ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().merge(
-            data.BIO_GBF4A_BASELINE_SCORE_GROUPS,
+            data.BIO_GBF8_BASELINE_SCORE_GROUPS,
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
 
-    GBF4A_scores_groups_am = (am_dvar_kmrj * lumap_degradation * ag_biodiv_groups_sr
+    GBF4_scores_groups_am = (am_dvar_kmrj * lumap_degradation * ag_biodiv_groups_sr
         ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().merge(
-            data.BIO_GBF4A_BASELINE_SCORE_GROUPS,
+            data.BIO_GBF8_BASELINE_SCORE_GROUPS,
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
 
 
 
     # Insert the type column
-    GBF4A_scores_groups_ag = GBF4A_scores_groups_ag.assign( Type='Agricultural Landuse', Year=yr_cal, Level='Group').replace({'dry':'Dryland', 'irr':'Irrigated'})
-    GBF4A_scores_groups_non_ag = GBF4A_scores_groups_non_ag.assign(Type='Non-Agricultural land-use', Year=yr_cal, lm='Dryland', Level='Group')
-    GBF4A_scores_groups_am = GBF4A_scores_groups_am.assign(Type='Agricultural Management', Year=yr_cal, Level='Group').replace({'dry':'Dryland', 'irr':'Irrigated'})
+    GBF4_scores_groups_ag = GBF4_scores_groups_ag.assign( Type='Agricultural Landuse', Year=yr_cal, Level='Group').replace({'dry':'Dryland', 'irr':'Irrigated'})
+    GBF4_scores_groups_non_ag = GBF4_scores_groups_non_ag.assign(Type='Non-Agricultural land-use', Year=yr_cal, lm='Dryland', Level='Group')
+    GBF4_scores_groups_am = GBF4_scores_groups_am.assign(Type='Agricultural Management', Year=yr_cal, Level='Group').replace({'dry':'Dryland', 'irr':'Irrigated'})
 
     # Get the outside LUTO study area score
-    outside_LUTO_score = data.BIO_GBF4A_BASELINE_SCORE_GROUPS.copy(
+    outside_LUTO_score = data.BIO_GBF8_BASELINE_SCORE_GROUPS.copy(
         ).assign(Year=yr_cal, lu='Outside LUTO study area', Type='Outside LUTO study area', Level='Group'
         ).eval('Relative_Contribution_Percentage = HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
 
 
     # Save to disk
     pd.concat([
-        GBF4A_scores_groups_ag,
-        GBF4A_scores_groups_non_ag,
-        GBF4A_scores_groups_am,
+        GBF4_scores_groups_ag,
+        GBF4_scores_groups_non_ag,
+        GBF4_scores_groups_am,
         outside_LUTO_score
     ], axis=0).rename(columns={
         'group':'Name',
@@ -1301,13 +1301,13 @@ def write_biodiversity_GBF4A_scores_groups(data: Data, yr_cal, path):
     ).reset_index(
         drop=True
     ).to_csv(
-        os.path.join(path, f'biodiversity_GBF4A_groups_scores_{yr_cal}.csv'), index=False
+        os.path.join(path, f'BIODIVERSITY_GBF8_groups_scores_{yr_cal}.csv'), index=False
     )
 
 
-def write_biodiversity_GBF4A_scores_species(data: Data, yr_cal, path):
+def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
     # Caculate the biodiversity scores for species, if user selected any species
-    if (not settings.BIODIVERSTIY_TARGET_GBF_4 == 'on') or (len(data.BIO_GBF4A_SEL_SPECIES) == 0):
+    if (not settings.BIODIVERSTIY_TARGET_GBF_4 == 'on') or (len(data.BIO_GBF8_SEL_SPECIES) == 0):
         return
     
     print(f'Writing biodiversity GBF4 scores (SPECIES) for {yr_cal}')
@@ -1326,46 +1326,46 @@ def write_biodiversity_GBF4A_scores_species(data: Data, yr_cal, path):
     
     # Get biodiversity scores; s : species/groups, r : cells
     ag_biodiv_species_sr = xr.DataArray(
-        data.get_GBF4A_bio_layers_by_yr(yr_cal, 'species'), 
+        data.get_GBF4_bio_layers_by_yr(yr_cal, 'species'), 
         dims=['species', 'cell'], 
-        coords={'species':data.BIO_GBF4A_SPECIES_LAYER.species.values, 'cell':np.arange(data.NCELLS)}
+        coords={'species':data.BIO_GBF8_SPECIES_LAYER.species.values, 'cell':np.arange(data.NCELLS)}
     )
 
-    # Get the GBF4A scores for the year; Merge with pre-1750 bioscore for all Australia; divide by pre-1750 score to get the relative contribution (%)
-    GBF4A_scores_species_ag = (ag_dvar_mrj * lumap_degradation * ag_biodiv_species_sr
+    # Get the GBF4 scores for the year; Merge with pre-1750 bioscore for all Australia; divide by pre-1750 score to get the relative contribution (%)
+    GBF4_scores_species_ag = (ag_dvar_mrj * lumap_degradation * ag_biodiv_species_sr
         ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().merge(
-            data.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES,
+            data.BIO_GBF8_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES,
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
 
 
-    GBF4A_scores_species_non_ag = ( non_ag_dvar_rk * ag_biodiv_species_sr
+    GBF4_scores_species_non_ag = ( non_ag_dvar_rk * ag_biodiv_species_sr
         ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().merge(
-            data.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES,
+            data.BIO_GBF8_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES,
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
 
 
-    GBF4A_scores_species_am = (am_dvar_kmrj * lumap_degradation * ag_biodiv_species_sr
+    GBF4_scores_species_am = (am_dvar_kmrj * lumap_degradation * ag_biodiv_species_sr
         ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index().merge(
-            data.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES,
+            data.BIO_GBF8_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES,
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
 
 
     # Insert the type column
-    GBF4A_scores_species_ag = GBF4A_scores_species_ag.assign(Type='Agricultural Landuse', Year=yr_cal, Level='Species').replace({'dry':'Dryland', 'irr':'Irrigated'})
-    GBF4A_scores_species_non_ag = GBF4A_scores_species_non_ag.assign(Type='Non-Agricultural land-use', Year=yr_cal, lm='Dryland', Level='Species')
-    GBF4A_scores_species_am = GBF4A_scores_species_am.assign(Type='Agricultural Management', Year=yr_cal, Level='Species').replace({'dry':'Dryland', 'irr':'Irrigated'})
+    GBF4_scores_species_ag = GBF4_scores_species_ag.assign(Type='Agricultural Landuse', Year=yr_cal, Level='Species').replace({'dry':'Dryland', 'irr':'Irrigated'})
+    GBF4_scores_species_non_ag = GBF4_scores_species_non_ag.assign(Type='Non-Agricultural land-use', Year=yr_cal, lm='Dryland', Level='Species')
+    GBF4_scores_species_am = GBF4_scores_species_am.assign(Type='Agricultural Management', Year=yr_cal, Level='Species').replace({'dry':'Dryland', 'irr':'Irrigated'})
 
     # Get the outside LUTO study area score
-    outside_LUTO_score = data.BIO_GBF4A_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES.copy(
+    outside_LUTO_score = data.BIO_GBF8_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES.copy(
         ).assign(Year=yr_cal, lu='Outside LUTO study area', Type='Outside LUTO study area', Level='Species'
         ).eval('Relative_Contribution_Percentage = (HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO + HABITAT_SUITABILITY_BASELINE_SCORE_OUTSIDE_LUTO) / HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA * 100')
 
 
     # Save to disk
     pd.concat([
-        GBF4A_scores_species_ag,
-        GBF4A_scores_species_non_ag,
-        GBF4A_scores_species_am,
+        GBF4_scores_species_ag,
+        GBF4_scores_species_non_ag,
+        GBF4_scores_species_am,
         outside_LUTO_score
     ], axis=0).rename(columns={
         'species':'Name',
@@ -1378,7 +1378,7 @@ def write_biodiversity_GBF4A_scores_species(data: Data, yr_cal, path):
     ).reset_index(
         drop=True
     ).to_csv(
-        os.path.join(path, f'biodiversity_GBF4A_species_scores_{yr_cal}.csv'), index=False
+        os.path.join(path, f'BIODIVERSITY_GBF8_species_scores_{yr_cal}.csv'), index=False
     )
         
 
@@ -1421,10 +1421,10 @@ def write_species_conservation(data: Data, yr_cal: int, path) -> None:
     
     print(f"Writing species conservation scores for {yr_cal}")
     
-    sc_df = pd.DataFrame(index=data.BIO_GBF4A_SEL_SPECIES, columns=["Target", "Actual"])
+    sc_df = pd.DataFrame(index=data.BIO_GBF8_SEL_SPECIES, columns=["Target", "Actual"])
 
     if yr_cal == data.YR_CAL_BASE:
-        GBF4_raw_species_area_sr = ag_biodiversity.get_GBF4A_species_conservation_matrix_sr(data, yr_cal)
+        GBF4_raw_species_area_sr = ag_biodiversity.get_GBF4_species_conservation_matrix_sr(data, yr_cal)
         biodiv_contr_ag_rj = data.BIO_HABITAT_CONTRIBUTION_LOOK_UP
         sc_prod_data = tools.calc_species_ag_area_for_year(
             GBF4_raw_species_area_sr, data.LUMAP, biodiv_contr_ag_rj
@@ -1432,7 +1432,7 @@ def write_species_conservation(data: Data, yr_cal: int, path) -> None:
     else:
         sc_prod_data = data.prod_data[yr_cal]["Species Conservation"]
 
-    sc_targets, species_names, _ = ag_biodiversity.get_GBF4A_species_conservation_limits(data, yr_cal)
+    sc_targets, species_names, _ = ag_biodiversity.get_GBF4_species_conservation_limits(data, yr_cal)
 
     for s, name in species_names.items():
         sc_df.loc[name, "Target"] = sc_targets[s]
@@ -1447,7 +1447,7 @@ def write_snes(data: Data, yr_cal: int, path) -> None:
     
     print(f"Writing species of national environmental significance scores for {yr_cal}")
     
-    snes_df = pd.DataFrame(index=data.BIO_GBF4A_SEL_SPECIES, columns=["Target", "Actual"])
+    snes_df = pd.DataFrame(index=data.BIO_GBF8_SEL_SPECIES, columns=["Target", "Actual"])
 
     x_targets, x_names = ag_biodiversity.get_snes_limits(data, yr_cal)
 
@@ -1473,7 +1473,7 @@ def write_ecnes(data: Data, yr_cal: int, path) -> None:
     
     print(f"Writing ecological communities of national environmental significance scores for {yr_cal}")
     
-    ecnes_df = pd.DataFrame(index=data.BIO_GBF4A_SEL_SPECIES, columns=["Target", "Actual"])
+    ecnes_df = pd.DataFrame(index=data.BIO_GBF8_SEL_SPECIES, columns=["Target", "Actual"])
 
     x_targets, x_names = ag_biodiversity.get_snes_limits(data, yr_cal)
 

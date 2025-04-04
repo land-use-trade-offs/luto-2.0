@@ -244,9 +244,9 @@ def get_GBF3_major_vegetation_matrices_vr(data: Data) -> np.ndarray:
     return data.NVIS_LAYERS_LDS * data.REAL_AREA
 
 
-def get_GBF4A_species_conservation_matrix_sr(data: Data, target_year: int):
+def get_GBF4_species_conservation_matrix_sr(data: Data, target_year: int):
     return (
-        data.get_GBF4A_bio_layers_by_yr(target_year)
+        data.get_GBF4_bio_layers_by_yr(target_year)
         * data.REAL_AREA
     )
 
@@ -268,7 +268,7 @@ def get_GBF3_major_vegetation_group_limits(data: Data, yr_cal: int) -> tuple[np.
     return data.get_GBF3_limit_score_inside_natural_LUTO_by_yr(yr_cal), data.BIO_GBF3_ID2DESC, data.MAJOR_VEG_INDECES
 
 
-def get_GBF4A_species_conservation_limits(
+def get_GBF4_species_conservation_limits(
     data: Data,
     yr_cal: int,
 ) -> tuple[np.ndarray, dict[int, str], dict[int, np.ndarray]]:
@@ -288,10 +288,10 @@ def get_GBF4A_species_conservation_limits(
         - dict[int, np.ndarray]
             A dictionary mapping of each species index to the cells that the species applies to.
     """
-    species_limits = data.get_GBF4A_target_inside_LUTO_by_yr(yr_cal)
-    species_names = {s: spec_name for s, spec_name in enumerate(data.BIO_GBF4A_SEL_SPECIES)}
-    species_matrix = data.get_GBF4A_bio_layers_by_yr(yr_cal)
-    species_inds = {s: np.where(species_matrix[s] > 0)[0] for s in range(data.N_SPECIES)}
+    species_limits = data.get_GBF4_target_inside_LUTO_by_yr(yr_cal)
+    species_names = {s: spec_name for s, spec_name in enumerate(data.BIO_GBF8_SEL_SPECIES)}
+    species_matrix = data.get_GBF4_bio_layers_by_yr(yr_cal)
+    species_inds = {s: np.where(species_matrix[s] > 0)[0] for s in range(data.N_GBF8_SPECIES)}
     return species_limits, species_names, species_inds
 
 
@@ -344,10 +344,10 @@ def get_species_conservation_limits(
     species_inds: dict[int, np.ndarray]
         Mapping of each species' ID to the cells which contain it.
     """
-    species_limits = data.get_GBF4A_suitability_target_inside_natural_LUTO_by_yr(yr_cal)
-    species_names = {s: spec_name for s, spec_name in enumerate(data.BIO_GBF4A_SEL_SPECIES)}
-    species_matrix = data.get_GBF4A_bio_layers_by_yr(yr_cal)
-    species_inds = {s: np.where(species_matrix[s] > 0)[0] for s in range(data.N_SPECIES)}
+    species_limits = data.get_GBF4_suitability_target_inside_natural_LUTO_by_yr(yr_cal)
+    species_names = {s: spec_name for s, spec_name in enumerate(data.BIO_GBF8_SEL_SPECIES)}
+    species_matrix = data.get_GBF4_bio_layers_by_yr(yr_cal)
+    species_inds = {s: np.where(species_matrix[s] > 0)[0] for s in range(data.N_GBF8_SPECIES)}
     return species_limits, species_names, species_inds
 
 
@@ -361,10 +361,10 @@ def get_snes_matrix(data: Data) -> np.ndarray:
         indexed (z, r) where z is species (independent of species conversation limits) and r is cell
     """
     if settings.NES_LAYER_TYPE == "likely":
-        return data.get_GBF4B_SNES_layers('LIKELY') * data.REAL_AREA
+        return data.get_GBF8_SNES_layers('LIKELY') * data.REAL_AREA
     
     elif settings.NES_LAYER_TYPE == "likely_and_maybe":
-        return data.get_GBF4B_SNES_layers('LIKELY_AND_MAYBE') * data.REAL_AREA
+        return data.get_GBF8_SNES_layers('LIKELY_AND_MAYBE') * data.REAL_AREA
     
     else:
         raise ValueError(
@@ -383,10 +383,10 @@ def get_ecnes_matrix(data: Data) -> np.ndarray:
         indexed (z, r) where z is species (independent of species conversation limits) and r is cell
     """
     if settings.NES_LAYER_TYPE == "likely":
-        return data.get_GBF4B_ECNES_layers('LIKELY') * data.REAL_AREA
+        return data.get_GBF8_ECNES_layers('LIKELY') * data.REAL_AREA
     
     elif settings.NES_LAYER_TYPE == "likely_and_maybe":
-        return data.get_GBF4B_ECNES_layers('LIKELY_AND_MAYBE') * data.REAL_AREA
+        return data.get_GBF8_ECNES_layers('LIKELY_AND_MAYBE') * data.REAL_AREA
     
     else:
         raise ValueError(
@@ -410,12 +410,12 @@ def get_snes_limits(data: Data, target_year: int) -> tuple[np.ndarray, dict[int,
         return np.empty(0), {}, {}
         
     if settings.NES_LAYER_TYPE == "likely":
-        species_targets = data.get_GBF4B_SNES_target_inside_LUTO_natural_by_year(target_year, 'LIKELY')
-        species_names = {x: name for x, name in enumerate(data.BIO_GBF_4B_SNES_LIKELY_SEL)}
+        species_targets = data.get_GBF8_SNES_target_inside_LUTO_natural_by_year(target_year, 'LIKELY')
+        species_names = {x: name for x, name in enumerate(data.BIO_GBF8_SNES_LIKELY_SEL)}
         return species_targets, species_names
     
     elif settings.NES_LAYER_TYPE == "likely_and_maybe":
-        species_targets = data.get_GBF4B_SNES_target_inside_LUTO_natural_by_year(target_year, 'LIKELY_AND_MAYBE')
+        species_targets = data.get_GBF8_SNES_target_inside_LUTO_natural_by_year(target_year, 'LIKELY_AND_MAYBE')
         species_names = {x: name for x, name in enumerate(data.BIO_GBF_4B_SNES_LIKELY_MAYBE_SEL)}
         return species_targets, species_names
     
@@ -441,13 +441,13 @@ def get_ecnes_limits(data: Data, target_year: int) -> tuple[np.ndarray, dict[int
         return np.empty(0), {}, {}
         
     if settings.NES_LAYER_TYPE == "likely":
-        species_targets = data.get_GBF4B_ECNES_target_inside_LUTO_natural_by_year(target_year, 'LIKELY')
-        species_names = {x: name for x, name in enumerate(data.BIO_GBF4B_ECNES_LIKELY_SEL)}
+        species_targets = data.get_GBF8_ECNES_target_inside_LUTO_natural_by_year(target_year, 'LIKELY')
+        species_names = {x: name for x, name in enumerate(data.BIO_GBF8_ECNES_LIKELY_SEL)}
         return species_targets, species_names
     
     elif settings.NES_LAYER_TYPE == "likely_and_maybe":
-        species_targets = data.get_GBF4B_ECNES_target_inside_LUTO_natural_by_year(target_year, 'LIKELY_AND_MAYBE')
-        species_names = {x: name for x, name in enumerate(data.BIO_GBF4B_ECNES_LIKELY_AND_MAYBE_SEL)}
+        species_targets = data.get_GBF8_ECNES_target_inside_LUTO_natural_by_year(target_year, 'LIKELY_AND_MAYBE')
+        species_names = {x: name for x, name in enumerate(data.BIO_GBF8_ECNES_LIKELY_AND_MAYBE_SEL)}
         return species_targets, species_names
     
     else:

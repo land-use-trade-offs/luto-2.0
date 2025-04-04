@@ -211,7 +211,7 @@ def populate_containers_dynamic_base_year(
             data.BIO_HABITAT_CONTRIBUTION_LOOK_UP,
         )
         species_conservation_data = calc_species_ag_area_for_year(
-            ag_biodiversity.get_GBF4A_species_conservation_matrix_sr(data, data.YR_CAL_BASE),
+            ag_biodiversity.get_GBF4_species_conservation_matrix_sr(data, data.YR_CAL_BASE),
             data.lumaps[year_before_base_year],
             data.BIO_HABITAT_CONTRIBUTION_LOOK_UP,
         )

@@ -856,7 +856,7 @@ class LutoSolver:
         print("  ...Biodiversity constraints...")
         self._add_GBF2_priority_degrade_areas_constraints()
         self._add_GBF3_major_vegetation_group_limit_constraints()
-        self._add_GBF4A_species_conservation_constraints()
+        self._add_GBF4_species_conservation_constraints()
 
 
     def _add_GBF2_priority_degrade_areas_constraints(self) -> None:
@@ -997,29 +997,29 @@ class LutoSolver:
 
 
 
-    def _add_GBF4A_species_conservation_constraints(self) -> None:
+    def _add_GBF4_species_conservation_constraints(self) -> None:
                 
         if settings.BIODIVERSTIY_TARGET_GBF_4 != "on":
             print('     ...Biodiversity GBF 4 (species conservation) constraints TURNED OFF ...')
             return
         
-        s_limits, s_names, s_ind = self._input_data.limits["GBF4A_species_conservation"]
+        s_limits, s_names, s_ind = self._input_data.limits["GBF4_species_conservation"]
 
         print(f"    ...Biodiversity GBF 4 (species conservation) constraints...")
         
         for s, s_area_lb in enumerate(s_limits):
             
             ind = s_ind[s]
-            GBF4A_raw_area_r = self._input_data.GBF4_raw_species_area_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT
+            GBF4_raw_area_r = self._input_data.GBF4_raw_species_area_sr[s, ind] / settings.SPECIES_CONSERVATION_DIV_CONSTANT
             
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    GBF4A_raw_area_r
+                    GBF4_raw_area_r
                     * self._input_data.biodiv_contr_ag_rj[ind, j]
                     * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
-                    GBF4A_raw_area_r
+                    GBF4_raw_area_r
                     * self._input_data.biodiv_contr_ag_rj[ind, j]
                     * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
@@ -1028,12 +1028,12 @@ class LutoSolver:
 
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
-                    GBF4A_raw_area_r
+                    GBF4_raw_area_r
                     * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
                 )  # Dryland alt. ag. management contributions
                 + gp.quicksum(
-                    GBF4A_raw_area_r
+                    GBF4_raw_area_r
                     * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
                 )  # Irrigated alt. ag. management contributions
@@ -1043,7 +1043,7 @@ class LutoSolver:
 
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    GBF4A_raw_area_r
+                    GBF4_raw_area_r
                     * self._input_data.biodiv_contr_non_ag_k[k]
                     * self.X_non_ag_vars_kr[k, ind]
                 )  # Non-agricultural contribution
@@ -1074,7 +1074,7 @@ class LutoSolver:
             if ind.size == 0:
                 print(
                     f"        ...WARNING: SNES species {x_names[x]} target was NOT added: no cells can contribute to species target area "
-                    f"(data.get_GBF4B_SNES_layers() returns empty array for this species).")
+                    f"(data.get_GBF8_SNES_layers() returns empty array for this species).")
                 continue
             
             ag_contr = gp.quicksum(
@@ -1138,7 +1138,7 @@ class LutoSolver:
             if ind.size == 0:
                 print(
                     f"        ...WARNING: ECNES species {x_names[x]} target was NOT added: no cells can contribute to species target area "
-                    f"(data.get_GBF4B_ECNES_layers() returns empty array for this community).")
+                    f"(data.get_GBF8_ECNES_layers() returns empty array for this community).")
                 continue
             
             ag_contr = gp.quicksum(
@@ -1191,7 +1191,7 @@ class LutoSolver:
         print("  ...biodiversity constraints...")
         self._add_GBF2_priority_degrade_areas_constraints()
         self._add_GBF3_major_vegetation_group_limit_constraints()
-        self._add_GBF4A_species_conservation_constraints()
+        self._add_GBF4_species_conservation_constraints()
         self._add_snes_constraints()
         self._add_ecnes_constraints()
 

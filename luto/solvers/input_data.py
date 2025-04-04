@@ -84,7 +84,7 @@ class SolverInputData:
     
     GBF2_raw_priority_degraded_area_r: np.ndarray                        # Raw areas (GBF2) from priority degrade areas - indexed by cell (r).
     GBF3_raw_MVG_area_vr: np.ndarray                                    # Raw areas (GBF3) from Major vegetation group - indexed by veg. group (v) and cell (r)
-    GBF4_raw_species_area_sr: np.ndarray                                # Raw areas (GBF4A) Species data - indexed by species (s) and cell (r).
+    GBF4_raw_species_area_sr: np.ndarray                                # Raw areas (GBF4) Species data - indexed by species (s) and cell (r).
     snes_xr: np.ndarray                                     # Species NES contribution data - indexed by species/ecological community (x) and cell (r).
     ecnes_xr: np.ndarray                                    # Ecological community NES contribution data - indexed by species/ecological community (x) and cell (r).
 
@@ -271,11 +271,11 @@ def get_GBF3_MVG_area_vr(data: Data):
     output = ag_biodiversity.get_GBF3_major_vegetation_matrices_vr(data)
     return output
 
-def get_GBF4A_species_area_sr(data: Data, target_year: int) -> np.ndarray:
+def get_GBF4_species_area_sr(data: Data, target_year: int) -> np.ndarray:
     if settings.BIODIVERSTIY_TARGET_GBF_4 != "on":
         return np.empty(0)
     print('Getting species conservation cell data...', flush = True)
-    return ag_biodiversity.get_GBF4A_species_conservation_matrix_sr(data, target_year)
+    return ag_biodiversity.get_GBF4_species_conservation_matrix_sr(data, target_year)
 
 
 def get_snes_xr(data: Data) -> np.ndarray:
@@ -562,7 +562,7 @@ def get_limits(
         else 0
     )
 
-    limits["GBF4A_species_conservation"] = ag_biodiversity.get_GBF4A_species_conservation_limits(data, yr_cal)
+    limits["GBF4_species_conservation"] = ag_biodiversity.get_GBF4_species_conservation_limits(data, yr_cal)
 
     limits["snes"] = ag_biodiversity.get_snes_limits(data, yr_cal)
     limits["ecnes"] = ag_biodiversity.get_ecnes_limits(data, yr_cal)
@@ -653,7 +653,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
 
         GBF2_raw_priority_degraded_area_r = get_GBF2_priority_degrade_area_r(data),
         GBF3_raw_MVG_area_vr=get_GBF3_MVG_area_vr(data),
-        GBF4_raw_species_area_sr=get_GBF4A_species_area_sr(data, target_year),
+        GBF4_raw_species_area_sr=get_GBF4_species_area_sr(data, target_year),
         snes_xr=get_snes_xr(data),
         ecnes_xr=get_ecnes_xr(data),
 

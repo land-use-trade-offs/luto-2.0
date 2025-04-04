@@ -1653,14 +1653,14 @@ def save_report_data(raw_data_dir:str):
  
     # ---------------- (GBF4) Biodiversity contribution score  ----------------
     
-    # 1) Biodiversity suitability scores (GBF4a) by group
+    # 1) Biodiversity suitability scores (GBF4) by group
     if settings.BIODIVERSTIY_TARGET_GBF_4 == 'on':
         
         # Get biodiversity dataframe
         filter_str = '''
             category == "biodiversity" 
             and year_types == "single_year" 
-            and base_name.str.contains("biodiversity_GBF4A")
+            and base_name.str.contains("BIODIVERSITY_GBF8")
         '''.strip().replace('\n','')
         
         bio_paths = files.query(filter_str).reset_index(drop=True)

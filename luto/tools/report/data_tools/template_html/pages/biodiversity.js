@@ -468,7 +468,7 @@ document.addEventListener("DOMContentLoaded", function () {
             marginRight: 380,
         },
         title: {
-            text: "Total Biodiversity Suitability Score (GBF4A) by Group",
+            text: "Total Biodiversity Suitability Score (GBF4) by Group",
         },
         series: JSON.parse(
             document.getElementById(
@@ -703,7 +703,7 @@ document.addEventListener("DOMContentLoaded", function () {
             marginRight: 380,
         },
         title: {
-            text: "Total Biodiversity Suitability Score (GBF4A-species)",
+            text: "Total Biodiversity Suitability Score (GBF4-species)",
         },
         series: JSON.parse(
             document.getElementById(

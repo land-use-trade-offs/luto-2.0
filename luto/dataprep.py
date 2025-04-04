@@ -61,8 +61,9 @@ def create_new_dataset():
     bio_HACS_inpath = 'N:/Data-Master/Habitat_condition_assessment_system/Data/Processed/'
     bio_GBF2_inpath = 'N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km_to_NetCDF/'
     bio_GBF3_NVIS_inpath = 'N:/Data-Master/NVIS/Processed'
-    bio_GBF_4a_inpath = bio_GBF2_inpath
-    bio_GBF_4b_inpath = 'N:/Data-Master/Biodiversity/DCCEEW/SNES_GEOTIFF/To_NetCDF/'
+    bio_GBF4_inpath = 'N:/Data-Master/Biodiversity/DCCEEW/SNES_GEOTIFF/To_NetCDF/'
+    bio_GBF8_inpath = bio_GBF2_inpath
+    
 
 
     # Set data output paths
@@ -138,44 +139,41 @@ def create_new_dataset():
     shutil.copyfile(luto_1D_inpath + '20240918_Bundle_BC.xlsx', outpath + '20240918_Bundle_BC.xlsx')
     
     # Copy biodiversity HACS data from DCCEEW
-    shutil.copyfile(bio_HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'HABITAT_CONDITION.csv')
+    shutil.copyfile(bio_HACS_inpath + 'HABITAT_CONDITION.csv', outpath + 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv')
     
     # Copy biodiversity GBF-2 files
-    shutil.copyfile(bio_GBF2_inpath + 'GBF2_conserve_performance.xlsx', outpath + 'GBF2_conserve_performance.xlsx')
+    shutil.copyfile(bio_GBF2_inpath + 'GBF2_conserve_performance.xlsx', outpath + 'BIODIVERSITY_GBF2_conservation_performance.xlsx')
 
     # Copy biodiversity GBF-3 data
-    shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVG.nc', outpath + 'NVIS_MVS.nc')
-    shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVG.nc', outpath + 'NVIS_MVG.nc')
+    shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVS.nc', outpath + 'bio_GBF3_NVIS_MVS.nc')
+    shutil.copyfile(bio_GBF3_NVIS_inpath + '/NVIS7_0_AUST_PRE_MVG.nc', outpath + 'bio_GBF3_NVIS_MVG.nc')
+    
     shutil.copyfile(bio_GBF3_NVIS_inpath + '/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx', outpath + 'BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx')
 
+    # Copy biodiversity GBF-4 files
+    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES.nc', outpath + 'bio_GBF4_SNES.nc')
+    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES.nc', outpath + 'bio_GBF4_ECNES.nc')
 
-    # Copy biodiversity GBF-4A files
-    shutil.copyfile(bio_GBF_4a_inpath + 'BIODIVERSITY_GBF4A_SCORES.csv', outpath + 'BIODIVERSITY_GBF4A_SCORES.csv')
-    shutil.copyfile(bio_GBF_4a_inpath + 'BIODIVERSITY_GBF4A_TARGET.csv', outpath + 'BIODIVERSITY_GBF4A_TARGET.csv')
-    shutil.copyfile(bio_GBF_4a_inpath + 'BIODIVERSITY_GBF4A_SCORES_group.csv', outpath + 'BIODIVERSITY_GBF4A_SCORES_group.csv')
-    shutil.copyfile(bio_GBF_4a_inpath + 'BIODIVERSITY_GBF4A_TARGET_group.csv', outpath + 'BIODIVERSITY_GBF4A_TARGET_group.csv')
+    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES_target.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_ECNES.csv')
+    shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES_target.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_SNES.csv')
     
-    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp126_EnviroSuit.nc', outpath + 'bio_ssp126_EnviroSuit.nc')
-    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp245_EnviroSuit.nc', outpath + 'bio_ssp245_EnviroSuit.nc')
-    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp370_EnviroSuit.nc', outpath + 'bio_ssp370_EnviroSuit.nc')
-    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp585_EnviroSuit.nc', outpath + 'bio_ssp585_EnviroSuit.nc')
-    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp126_EnviroSuit_group.nc', outpath + 'bio_ssp126_EnviroSuit_group.nc')
-    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp245_EnviroSuit_group.nc', outpath + 'bio_ssp245_EnviroSuit_group.nc')
-    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp370_EnviroSuit_group.nc', outpath + 'bio_ssp370_EnviroSuit_group.nc')
-    shutil.copyfile(bio_GBF_4a_inpath + 'bio_ssp585_EnviroSuit_group.nc', outpath + 'bio_ssp585_EnviroSuit_group.nc')
+    # Copy biodiversity GBF-8 files
+    shutil.copyfile(bio_GBF8_inpath + 'bio_ssp126_EnviroSuit.nc', outpath + 'bio_GBF8_ssp126_EnviroSuit.nc')
+    shutil.copyfile(bio_GBF8_inpath + 'bio_ssp245_EnviroSuit.nc', outpath + 'bio_GBF8_ssp245_EnviroSuit.nc')
+    shutil.copyfile(bio_GBF8_inpath + 'bio_ssp370_EnviroSuit.nc', outpath + 'bio_GBF8_ssp370_EnviroSuit.nc')
+    shutil.copyfile(bio_GBF8_inpath + 'bio_ssp585_EnviroSuit.nc', outpath + 'bio_GBF8_ssp585_EnviroSuit.nc')
+    shutil.copyfile(bio_GBF8_inpath + 'bio_ssp126_EnviroSuit_group.nc', outpath + 'bio_GBF8_ssp126_EnviroSuit_group.nc')
+    shutil.copyfile(bio_GBF8_inpath + 'bio_ssp245_EnviroSuit_group.nc', outpath + 'bio_GBF8_ssp245_EnviroSuit_group.nc')
+    shutil.copyfile(bio_GBF8_inpath + 'bio_ssp370_EnviroSuit_group.nc', outpath + 'bio_GBF8_ssp370_EnviroSuit_group.nc')
+    shutil.copyfile(bio_GBF8_inpath + 'bio_ssp585_EnviroSuit_group.nc', outpath + 'bio_GBF8_ssp585_EnviroSuit_group.nc')
     
-    
-    # Copy biodiversity GBF-4B files
-    shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_ECNES_target.csv', outpath + 'bio_DCCEEW_ECNES_target.csv')
-    shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_SNES_target.csv', outpath + 'bio_DCCEEW_SNES_target.csv')
-    
-    shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_ECNES.nc', outpath + 'bio_DCCEEW_ECNES.nc')
-    shutil.copyfile(bio_GBF_4b_inpath + 'bio_DCCEEW_SNES.nc', outpath + 'bio_DCCEEW_SNES.nc')
+    shutil.copyfile(bio_GBF8_inpath + 'BIODIVERSITY_GBF8_SCORES.csv', outpath + 'BIODIVERSITY_GBF8_SCORES.csv')
+    shutil.copyfile(bio_GBF8_inpath + 'BIODIVERSITY_GBF8_TARGET.csv', outpath + 'BIODIVERSITY_GBF8_TARGET.csv')
+    shutil.copyfile(bio_GBF8_inpath + 'BIODIVERSITY_GBF8_SCORES_group.csv', outpath + 'BIODIVERSITY_GBF8_SCORES_group.csv')
+    shutil.copyfile(bio_GBF8_inpath + 'BIODIVERSITY_GBF8_TARGET_group.csv', outpath + 'BIODIVERSITY_GBF8_TARGET_group.csv')
     
     
-    
-    
-    
+  
     
 
     ############### Read data
@@ -625,7 +623,7 @@ def create_new_dataset():
     ############### Get biodiversity priority layers
 
     # Biodiversity priorities under the four SSPs
-    biodiv_priorities = bioph[[
+    bio_PRIORITY_RANK_AND_AREA_CONNECTIVITY = bioph[[
         'BIODIV_PRIORITY_SSP126',
         'BIODIV_PRIORITY_SSP245',
         'BIODIV_PRIORITY_SSP370',
@@ -634,7 +632,7 @@ def create_new_dataset():
         'DCCEEW_NCI']].copy()
 
     # Save to file
-    biodiv_priorities.to_hdf(outpath + 'biodiv_priorities.h5', key='biodiv_priorities', mode='w', format='table', index=False, complevel=9)
+    bio_PRIORITY_RANK_AND_AREA_CONNECTIVITY.to_hdf(outpath + 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5', key='bio_PRIORITY_RANK_AND_AREA_CONNECTIVITY', mode='w', format='table', index=False, complevel=9)
 
     
 
