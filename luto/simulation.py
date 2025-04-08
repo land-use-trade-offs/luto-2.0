@@ -204,14 +204,14 @@ def populate_containers_dynamic_base_year(
             ag_ghg.get_ghg_matrices(data, 0, aggregate=True) 
             * data.ag_dvars[data.YR_CAL_BASE]
         ).sum()
-        biodiversity_data = (ag_biodiversity.get_bio_priority_score_matrices_mrj(data) * data.ag_dvars[data.YR_CAL_BASE]).sum()
+        biodiversity_data = (ag_biodiversity.get_bio_overall_priority_score_matrices_mrj(data) * data.ag_dvars[data.YR_CAL_BASE]).sum()
         major_vegetation_data = calc_major_vegetation_group_ag_area_for_year(
             get_GBF3_major_vegetation_matrices_vr(data), 
             data.lumaps[data.YR_CAL_BASE],
             data.BIO_HABITAT_CONTRIBUTION_LOOK_UP,
         )
         species_conservation_data = calc_species_ag_area_for_year(
-            ag_biodiversity.get_GBF4_species_conservation_matrix_sr(data, data.YR_CAL_BASE),
+            ag_biodiversity.get_GBF8_species_conservation_matrix_sr(data, data.YR_CAL_BASE),
             data.lumaps[year_before_base_year],
             data.BIO_HABITAT_CONTRIBUTION_LOOK_UP,
         )

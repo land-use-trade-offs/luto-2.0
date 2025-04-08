@@ -534,11 +534,14 @@ def save_report_data(raw_data_dir:str):
     cost_transition_non_ag2ag_sum.insert(1,'Type','Transition cost (Non-Ag2Ag)')
     
     
-    rev_cost_all = pd.concat([revenue_ag_sum,revenue_am_sum,revenue_non_ag_sum,
-                            cost_ag_sum,cost_am_sum,cost_non_ag_sum,
-                            cost_transition_ag2ag_sum,cost_transition_ag2non_sum,
-                            cost_transition_non_ag2ag_sum],axis=0)
-    rev_cost_all = rev_cost_all.groupby(['Year','Type']).sum(numeric_only=True).reset_index()
+    rev_cost_all = pd.concat([
+        revenue_ag_sum,revenue_am_sum,revenue_non_ag_sum,
+        cost_ag_sum,cost_am_sum,cost_non_ag_sum,
+        cost_transition_ag2ag_sum,cost_transition_ag2non_sum,
+        cost_transition_non_ag2ag_sum],axis=0
+    ).groupby(['Year','Type']
+    ).sum(numeric_only=True
+    ).reset_index()
 
     rev_cost_net = rev_cost_all.groupby(['Year']).sum(numeric_only=True).reset_index()
     rev_cost_net['Type'] = 'Profit'
@@ -560,13 +563,18 @@ def save_report_data(raw_data_dir:str):
     rev_cost_wide_json = pd.concat([rev_cost_all_wide, rev_cost_net_wide],axis=0)
     
     # Define the specific order
-    order = ['Agricultural land-use (revenue)', 
-             'Agricultural management (revenue)', 
-             'Non-agricultural land-use (revenue)',
-             'Agricultural land-use (cost)', 
-             'Agricultural management (cost)', 
-             'Non-agricultural land-use (cost)',
-             'Transition cost','Profit']
+    order = [
+        'Agricultural land-use (revenue)', 
+        'Agricultural management (revenue)', 
+        'Non-agricultural land-use (revenue)',
+        'Agricultural land-use (cost)', 
+        'Agricultural management (cost)', 
+        'Non-agricultural land-use (cost)',
+        'Transition cost (Ag2Ag)',
+        'Transition cost (Ag2Non-Ag)',
+        'Transition cost (Non-Ag2Ag)',
+        'Profit'
+    ]
     rev_cost_wide_json = rev_cost_wide_json.set_index('name').reindex(order).reset_index()
     
     rev_cost_wide_json.to_json(f'{SAVE_DIR}/economics_0_rev_cost_all_wide.json', orient='records')
@@ -1391,7 +1399,7 @@ def save_report_data(raw_data_dir:str):
     filter_str = '''
         category == "biodiversity"
         and year_types == "single_year"
-        and base_name == "biodiversity_priority_scores"
+        and base_name == "biodiversity_overall_priority_scores"
     '''.strip().replace('\n','')
     
     bio_paths = files.query(filter_str).reset_index(drop=True)
@@ -1651,244 +1659,240 @@ def save_report_data(raw_data_dir:str):
 
 
  
-    # ---------------- (GBF4) Biodiversity contribution score  ----------------
+    # ---------------- (GBF8) Biodiversity suitability under differen climate change  ----------------
     
-    # 1) Biodiversity suitability scores (GBF4) by group
-    if settings.BIODIVERSTIY_TARGET_GBF_4 == 'on':
+    # 1) Biodiversity suitability scores (GBF8) by group
+    if settings.BIODIVERSTIY_TARGET_GBF_8 == 'on':
         
         # Get biodiversity dataframe
         filter_str = '''
             category == "biodiversity" 
             and year_types == "single_year" 
-            and base_name.str.contains("BIODIVERSITY_GBF8")
+            and base_name.str.contains("biodiversity_GBF8_groups_scores")
         '''.strip().replace('\n','')
         
         bio_paths = files.query(filter_str).reset_index(drop=True)
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)                   # Rename the landuse
 
-        bio_df_species_group = bio_df.groupby(['Level','Name','Year']).sum(numeric_only=True).reset_index()
+        # Plot_GBF8_1: Biodiversity contribution score (group) total
+        bio_df_group = bio_df.groupby(['Group','Year']).sum(numeric_only=True).reset_index()
         
-        bio_df_species_group = bio_df_species_group\
-            .groupby(['Level','Name'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+        bio_df_group = bio_df_group\
+            .groupby(['Group'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
             .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
             .reset_index()
             
-
-        # Plot_GBF4_1: Biodiversity contribution score (group) total
-        bio_df_group = bio_df_species_group.query('Level == "Group"').drop('Level',axis=1).copy()
         bio_df_group.columns = ['name','data']
         bio_df_group['type'] = 'spline'
-        bio_df_group.to_json(f'{SAVE_DIR}/biodiversity_GBF4_1_contribution_group_score_total.json', orient='records')
+        bio_df_group.to_json(f'{SAVE_DIR}/biodiversity_GBF8_1_contribution_group_score_total.json', orient='records')
         
         
-        # Plot_GBF4_2: Biodiversity contribution score (group) by Type
-        bio_df_group_type_sum = bio_df.query('Level == "Group"')\
-            .drop('Level',axis=1)\
-            .groupby(['Year','Type','Name'])\
+        # Plot_GBF8_2: Biodiversity contribution score (group) by Type
+        bio_df_group_type_sum = bio_df\
+            .groupby(['Year','Type','Group'])\
             .sum(numeric_only=True)\
             .reset_index()
             
         bio_df_group_type_sum = bio_df_group_type_sum\
-            .groupby(['Type','Name'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .groupby(['Type','Group'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
             .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
             .reset_index()
             
         bio_df_group_type_records = []
-        for idx,df in bio_df_group_type_sum.groupby('Name'):
-            df = df.drop('Name',axis=1)
+        for idx,df in bio_df_group_type_sum.groupby('Group'):
+            df = df.drop('Group',axis=1)
             df.columns = ['name','data']
             df['type'] = 'column'
             bio_df_group_type_records.append({'name':idx,'data':df.to_dict(orient='records')})
         
-        with open(f'{SAVE_DIR}/biodiversity_GBF4_2_contribution_group_score_by_type.json', 'w') as outfile:
+        with open(f'{SAVE_DIR}/biodiversity_GBF8_2_contribution_group_score_by_type.json', 'w') as outfile:
             json.dump(bio_df_group_type_records, outfile)
         
         
         
-        # Plot_GBF4_3: Biodiversity contribution score (group) by landuse
-        bio_group_lu_sum = bio_df.query('Level == "Group"')\
-            .drop('Level',axis=1)\
-            .groupby(['Year','Landuse','Name'])\
+        # Plot_GBF8_3: Biodiversity contribution score (group) by landuse
+        bio_group_lu_sum = bio_df\
+            .groupby(['Year','Landuse','Group'])\
             .sum(numeric_only=True)\
             .reset_index()\
             .query('`Contribution Relative to Pre-1750 Level (%)` >1')
         
         bio_group_lu_sum = bio_group_lu_sum\
-            .groupby(['Landuse','Name'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .groupby(['Landuse','Group'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
             .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
             .reset_index()
 
         bio_df_group_records = []
-        for idx,df in bio_group_lu_sum.groupby('Name'):
-            df = df.drop('Name',axis=1)
+        for idx,df in bio_group_lu_sum.groupby('Group'):
+            df = df.drop('Group',axis=1)
             df.columns = ['name','data']
             df = df.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index().dropna()
             df['type'] = 'column'
             df['color'] = df['name'].apply(lambda x: LANDUSE_ALL_COLORS.get(x,'grey'))
             bio_df_group_records.append({'name':idx,'data':df.to_dict(orient='records')})
             
-        with open(f'{SAVE_DIR}/biodiversity_GBF4_3_contribution_group_score_by_landuse.json', 'w') as outfile:
+        with open(f'{SAVE_DIR}/biodiversity_GBF8_3_contribution_group_score_by_landuse.json', 'w') as outfile:
             json.dump(bio_df_group_records, outfile)
             
         
-        # Plot_GBF4_4: Biodiversity contribution score (group) by agricultural management
-        bio_group_am_sum = bio_df.query('Level == "Group" and Type == "Agricultural Management"')\
-            .drop('Level',axis=1)\
-            .groupby(['Year','Agri-Management','Name'])\
+        # Plot_GBF8_4: Biodiversity contribution score (group) by agricultural management
+        bio_group_am_sum = bio_df\
+            .groupby(['Year','Agri-Management','Group'])\
             .sum(numeric_only=True)\
             .reset_index()
             
         bio_group_am_sum = bio_group_am_sum\
-            .groupby(['Agri-Management','Name'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .groupby(['Agri-Management','Group'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
             .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
             .reset_index()
             
         bio_df_group_records = []
-        for idx,df in bio_group_am_sum.groupby('Name'):
-            df = df.drop('Name',axis=1)
+        for idx,df in bio_group_am_sum.groupby('Group'):
+            df = df.drop('Group',axis=1)
             df.columns = ['name','data']
             df['type'] = 'column'
             bio_df_group_records.append({'name':idx,'data':df.to_dict(orient='records')})
             
-        with open(f'{SAVE_DIR}/biodiversity_GBF4_4_contribution_group_score_by_agri_management.json', 'w') as outfile:
+        with open(f'{SAVE_DIR}/biodiversity_GBF8_4_contribution_group_score_by_agri_management.json', 'w') as outfile:
             json.dump(bio_df_group_records, outfile)
             
             
-        # Plot_GBF4_5: Biodiversity contribution score (group) by non-agricultural landuse
-        bio_group_non_ag_sum = bio_df.query('Level == "Group" and Type == "Non-Agricultural land-use"')\
-            .drop('Level',axis=1)\
-            .groupby(['Year','Landuse','Name'])\
+        # Plot_GBF8_5: Biodiversity contribution score (group) by non-agricultural landuse
+        bio_group_non_ag_sum = bio_df\
+            .groupby(['Year','Landuse','Group'])\
             .sum(numeric_only=True)\
             .reset_index()
                 
         bio_group_non_ag_sum = bio_group_non_ag_sum\
-            .groupby(['Landuse','Name'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .groupby(['Landuse','Group'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
             .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
             .reset_index()
             
         bio_df_group_records = []
-        for idx,df in bio_group_non_ag_sum.groupby('Name'):
-            df = df.drop('Name',axis=1)
+        for idx,df in bio_group_non_ag_sum.groupby('Group'):
+            df = df.drop('Group',axis=1)
             df.columns = ['name','data']
             df['type'] = 'column'
             bio_df_group_records.append({'name':idx,'data':df.to_dict(orient='records')})
             
-        with open(f'{SAVE_DIR}/biodiversity_GBF4_5_contribution_group_score_by_non_agri_landuse.json', 'w') as outfile:
+        with open(f'{SAVE_DIR}/biodiversity_GBF8_5_contribution_group_score_by_non_agri_landuse.json', 'w') as outfile:
             json.dump(bio_df_group_records, outfile)
             
             
             
         # Plot Species level biodiversity contribution score if 'Species' in bio_df['Level'].unique()
-        if 'Species' in bio_df['Level'].unique():
+        filter_str = '''
+            category == "biodiversity" 
+            and year_types == "single_year" 
+            and base_name.str.contains("biodiversity_GBF8_species_scores")
+        '''.strip().replace('\n','')
+        
+        bio_paths = files.query(filter_str).reset_index(drop=True)
+        bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
+        bio_df = bio_df.replace(RENAME_AM_NON_AG)                   # Rename the landuse
 
-            # Plot_GBF4_6: Biodiversity contribution score (species) total
-            bio_df_species = bio_df.groupby(['Level','Name','Year']).sum(numeric_only=True).reset_index()
+        # Plot_GBF8_6: Biodiversity contribution score (species) total
+        bio_df_species = bio_df.groupby(['Species','Year']).sum(numeric_only=True).reset_index()
+        
+        bio_df_species = bio_df_species\
+            .groupby(['Species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
+            .reset_index()
             
-            bio_df_species = bio_df_species\
-                .groupby(['Level','Name'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-                .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-                .reset_index()
-                
-            bio_df_species = bio_df_species.query('Level == "Species"').drop('Level',axis=1).copy()
-            bio_df_species.columns = ['name','data']
-            bio_df_species['type'] = 'spline'
-            bio_df_species.to_json(f'{SAVE_DIR}/biodiversity_GBF4_6_contribution_species_score_total.json', orient='records')
+        bio_df_species.columns = ['name','data']
+        bio_df_species['type'] = 'spline'
+        bio_df_species.to_json(f'{SAVE_DIR}/biodiversity_GBF8_6_contribution_species_score_total.json', orient='records')
+        
+        
+        
+        # Plot_GBF8_7: Biodiversity contribution score (species) by Type
+        bio_df_species_type_sum = bio_df\
+            .groupby(['Year','Type','Species'])\
+            .sum(numeric_only=True)\
+            .reset_index()
+            
+        bio_df_species_type_sum = bio_df_species_type_sum\
+            .groupby(['Type','Species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
+            .reset_index()
+            
+        bio_df_species_type_records = []
+        for idx,df in bio_df_species_type_sum.groupby('Species'):
+            df = df.drop('Species',axis=1)
+            df.columns = ['name','data']
+            df['type'] = 'column'
+            bio_df_species_type_records.append({'name':idx,'data':df.to_dict(orient='records')})
+            
+        with open(f'{SAVE_DIR}/biodiversity_GBF8_7_contribution_species_score_by_type.json', 'w') as outfile:
+            json.dump(bio_df_species_type_records, outfile)
             
             
+        # Plot_GBF8_8: Biodiversity contribution score (species) by landuse
+        bio_species_lu_sum = bio_df\
+            .groupby(['Year','Landuse','Species'])\
+            .sum(numeric_only=True)\
+            .reset_index()
             
-            # Plot_GBF4_7: Biodiversity contribution score (species) by Type
-            bio_df_species_type_sum = bio_df.query('Level == "Species"')\
-                .drop('Level',axis=1)\
-                .groupby(['Year','Type','Name'])\
-                .sum(numeric_only=True)\
-                .reset_index()
-                
-            bio_df_species_type_sum = bio_df_species_type_sum\
-                .groupby(['Type','Name'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-                .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-                .reset_index()
-                
-            bio_df_species_type_records = []
-            for idx,df in bio_df_species_type_sum.groupby('Name'):
-                df = df.drop('Name',axis=1)
-                df.columns = ['name','data']
-                df['type'] = 'column'
-                bio_df_species_type_records.append({'name':idx,'data':df.to_dict(orient='records')})
-                
-            with open(f'{SAVE_DIR}/biodiversity_GBF4_7_contribution_species_score_by_type.json', 'w') as outfile:
-                json.dump(bio_df_species_type_records, outfile)
-                
-                
-                
-            # Plot_GBF4_8: Biodiversity contribution score (species) by landuse
-            bio_species_lu_sum = bio_df.query('Level == "Species"')\
-                .drop('Level',axis=1)\
-                .groupby(['Year','Landuse','Name'])\
-                .sum(numeric_only=True)\
-                .reset_index()
-                
-            bio_species_lu_sum = bio_species_lu_sum\
-                .groupby(['Landuse','Name'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-                .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-                .reset_index()
-                
-            bio_df_species_records = []
-            for idx,df in bio_species_lu_sum.groupby('Name'):
-                df = df.drop('Name',axis=1)
-                df.columns = ['name','data']
-                df['type'] = 'column'
-                df = df.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index()
-                bio_df_species_records.append({'name':idx,'data':df.to_dict(orient='records')})
-                
-            with open(f'{SAVE_DIR}/biodiversity_GBF4_8_contribution_species_score_by_landuse.json', 'w') as outfile:
-                json.dump(bio_df_species_records, outfile)
-                
-                
-            # Plot_GBF4_9: Biodiversity contribution score (species) by agricultural management
-            bio_species_am_sum = bio_df.query('Level == "Species" and Type == "Agricultural Management"')\
-                .drop('Level',axis=1)\
-                .groupby(['Year','Agri-Management','Name'])\
-                .sum(numeric_only=True)\
-                .reset_index()
-                
-            bio_species_am_sum = bio_species_am_sum\
-                .groupby(['Agri-Management','Name'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-                .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-                .reset_index()
-                
-            bio_df_species_records = []
-            for idx,df in bio_species_am_sum.groupby('Name'):
-                df = df.drop('Name',axis=1)
-                df.columns = ['name','data']
-                df['type'] = 'column'
-                bio_df_species_records.append({'name':idx,'data':df.to_dict(orient='records')})
-                
-            with open(f'{SAVE_DIR}/biodiversity_GBF4_9_contribution_species_score_by_agri_management.json', 'w') as outfile:
-                json.dump(bio_df_species_records, outfile)
-                
-                
-            # Plot_GBF4_10: Biodiversity contribution score (species) by non-agricultural landuse
-            bio_species_non_ag_sum = bio_df.query('Level == "Species" and Type == "Non-Agricultural land-use"')\
-                .drop('Level',axis=1)\
-                .groupby(['Year','Landuse','Name'])\
-                .sum(numeric_only=True)\
-                .reset_index()
-                
-            bio_species_non_ag_sum = bio_species_non_ag_sum\
-                .groupby(['Landuse','Name'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-                .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-                .reset_index()
-                
-            bio_df_species_records = []
-            for idx,df in bio_species_non_ag_sum.groupby('Name'):
-                df = df.drop('Name',axis=1)
-                df.columns = ['name','data']
-                df['type'] = 'column'
-                bio_df_species_records.append({'name':idx,'data':df.to_dict(orient='records')})
-                
-            with open(f'{SAVE_DIR}/biodiversity_GBF4_10_contribution_species_score_by_non_agri_landuse.json', 'w') as outfile:
-                json.dump(bio_df_species_records, outfile)
+        bio_species_lu_sum = bio_species_lu_sum\
+            .groupby(['Landuse','Species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
+            .reset_index()
+            
+        bio_df_species_records = []
+        for idx,df in bio_species_lu_sum.groupby('Species'):
+            df = df.drop('Species',axis=1)
+            df.columns = ['name','data']
+            df['type'] = 'column'
+            df = df.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index()
+            bio_df_species_records.append({'name':idx,'data':df.to_dict(orient='records')})
+            
+        with open(f'{SAVE_DIR}/biodiversity_GBF8_8_contribution_species_score_by_landuse.json', 'w') as outfile:
+            json.dump(bio_df_species_records, outfile)
+            
+            
+        # Plot_GBF8_9: Biodiversity contribution score (species) by agricultural management
+        bio_species_am_sum = bio_df\
+            .groupby(['Year','Agri-Management','Species'])\
+            .sum(numeric_only=True)\
+            .reset_index()
+            
+        bio_species_am_sum = bio_species_am_sum\
+            .groupby(['Agri-Management','Species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
+            .reset_index()
+            
+        bio_df_species_records = []
+        for idx,df in bio_species_am_sum.groupby('Species'):
+            df = df.drop('Species',axis=1)
+            df.columns = ['name','data']
+            df['type'] = 'column'
+            bio_df_species_records.append({'name':idx,'data':df.to_dict(orient='records')})
+            
+        with open(f'{SAVE_DIR}/biodiversity_GBF8_9_contribution_species_score_by_agri_management.json', 'w') as outfile:
+            json.dump(bio_df_species_records, outfile)
+            
+            
+        # Plot_GBF8_10: Biodiversity contribution score (species) by non-agricultural landuse
+        bio_species_non_ag_sum = bio_df\
+            .groupby(['Year','Landuse','Species'])\
+            .sum(numeric_only=True)\
+            .reset_index()
+            
+        bio_species_non_ag_sum = bio_species_non_ag_sum\
+            .groupby(['Landuse','Species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
+            .reset_index()
+            
+        bio_df_species_records = []
+        for idx,df in bio_species_non_ag_sum.groupby('Species'):
+            df = df.drop('Species',axis=1)
+            df.columns = ['name','data']
+            df['type'] = 'column'
+            bio_df_species_records.append({'name':idx,'data':df.to_dict(orient='records')})
+            
+        with open(f'{SAVE_DIR}/biodiversity_GBF8_10_contribution_species_score_by_non_agri_landuse.json', 'w') as outfile:
+            json.dump(bio_df_species_records, outfile)
         
         
  

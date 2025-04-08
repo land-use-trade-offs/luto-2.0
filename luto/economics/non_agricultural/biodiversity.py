@@ -206,7 +206,7 @@ def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
     return np.concatenate(non_agr_b_matrices, axis=1)
 
 
-def get_non_ag_lu_biodiv_impacts(data: Data) -> dict[int, float]:
+def get_non_ag_lu_biodiv_contribution(data: Data) -> dict[int, float]:
     return {
         # Environmental plantings
         0: BIO_CONTRIBUTION_ENV_PLANTING,

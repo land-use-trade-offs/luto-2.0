@@ -239,23 +239,23 @@ def get_w_BASE_YR(data: Data):
 
 def get_ag_b_mrj(data: Data):
     print('Getting agricultural biodiversity requirement matrices...', flush = True)
-    output = ag_biodiversity.get_bio_priority_score_matrices_mrj(data)
+    output = ag_biodiversity.get_bio_overall_priority_score_matrices_mrj(data)
     return output.astype(np.float32)
 
 
 def get_ag_biodiv_contr_rj(data: Data) -> dict[int, float]:
     print('Getting biodiversity degredation data for agricultural land uses...', flush = True)
-    return ag_biodiversity.get_bio_contribution_matrices_rj(data)
+    return ag_biodiversity.get_ag_biodiversity_contribution(data)
 
 
 def get_non_ag_biodiv_impact_k(data: Data) -> dict[int, float]:
     print('Getting biodiversity benefits data for non-agricultural land uses...', flush = True)
-    return non_ag_biodiversity.get_non_ag_lu_biodiv_impacts(data)
+    return non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data)
 
 
 def get_ag_man_biodiv_impacts(data: Data, target_year: int) -> dict[str, dict[str, float]]:
     print('Getting biodiversity benefits data for agricultural management options...', flush = True)
-    return ag_biodiversity.get_ag_management_biodiversity_impacts(data, target_year)
+    return ag_biodiversity.get_ag_management_biodiversity_contribution(data, target_year)
 
 def get_GBF2_priority_degrade_area_r(data: Data) -> np.ndarray:
     if settings.BIODIVERSTIY_TARGET_GBF_2 != "on":
@@ -273,21 +273,21 @@ def get_GBF3_MVG_area_vr(data: Data):
 
 
 def get_GBF4_snes_xr(data: Data) -> np.ndarray:
-    if settings.BIODIVERSTIY_TARGET_GBF_4A != "on":
+    if settings.BIODIVERSTIY_TARGET_GBF_4_SNES != "on":
         return np.empty(0)
-    return ag_biodiversity.get_GBF4_snes_matrix(data)
+    return ag_biodiversity.get_GBF4_SNES_matrix_sr(data)
 
 
 def get_GBF4_ecnes_xr(data: Data) -> np.ndarray:
-    if settings.BIODIVERSTIY_TARGET_GBF_4B != "on":
+    if settings.BIODIVERSTIY_TARGET_GBF_4_ECNES != "on":
         return np.empty(0)
-    return ag_biodiversity.get_GBF4_ecnes_matrix(data)
+    return ag_biodiversity.get_GBF4_ECNES_matrix_sr(data)
 
 def get_GBF8_species_area_sr(data: Data, target_year: int) -> np.ndarray:
-    if settings.BIODIVERSTIY_TARGET_GBF_4 != "on":
+    if settings.BIODIVERSTIY_TARGET_GBF_8 != "on":
         return np.empty(0)
     print('Getting species conservation cell data...', flush = True)
-    return ag_biodiversity.get_GBF4_species_conservation_matrix_sr(data, target_year)
+    return ag_biodiversity.get_GBF8_species_conservation_matrix_sr(data, target_year)
 
 
 def get_non_ag_w_rk(
@@ -547,11 +547,10 @@ def get_limits(
 
     if settings.GHG_EMISSIONS_LIMITS == 'on':
         limits['ghg_ub'] = ag_ghg.get_ghg_limits(data, yr_cal)
-        limits['ghg_lb'] = ag_ghg.get_ghg_limits(data, yr_cal) - settings.GHG_ALLOW_LB_DELTA_T 
 
     # If biodiversity limits are not turned on, set the limit to 0.
     limits["GBF2_priority_degrade_areas"] = (
-        ag_biodiversity.get_biodiversity_limits(data, yr_cal)
+        ag_biodiversity.get_GBF2_biodiversity_limits(data, yr_cal)
         if settings.BIODIVERSTIY_TARGET_GBF_2 == 'on'
         else 0
     )
@@ -562,10 +561,9 @@ def get_limits(
         else 0
     )
 
-    limits["GBF4_species_conservation"] = ag_biodiversity.get_GBF4_species_conservation_limits(data, yr_cal)
-
-    limits["snes"] = ag_biodiversity.get_GBF4_snes_limits(data, yr_cal)
-    limits["ecnes"] = ag_biodiversity.get_GBF4_ecnes_limits(data, yr_cal)
+    limits["GBF4_SNES"] = ag_biodiversity.get_GBF4_SNES_limits(data, yr_cal)
+    limits["GBF4_ECNES"] = ag_biodiversity.get_GBF4_ECNES_limits(data, yr_cal)
+    limits["GBF8_species_conservation"] = ag_biodiversity.get_GBF8_species_conservation_limits(data, yr_cal)
 
     ag_reg_adoption, non_ag_reg_adoption = ag_transition.get_regional_adoption_limits(data, yr_cal)
     limits["ag_regional_adoption"] = ag_reg_adoption
