@@ -869,36 +869,36 @@ class LutoSolver:
             # TODO using PRI_DE_MASK_IDX to reduce the number of cells to be used in the calculation
             bio_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF2_raw_priority_degraded_area_r[self._input_data.ag_lu2cells[0, j]]
-                    * self._input_data.biodiv_contr_ag_rj[self._input_data.ag_lu2cells[0, j], j]
-                    * self.X_ag_dry_vars_jr[j, self._input_data.ag_lu2cells[0, j]]
+                    self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.priority_degraded_mask_idx)]
+                    * self._input_data.biodiv_contr_ag_rj[np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.priority_degraded_mask_idx), j]
+                    * self.X_ag_dry_vars_jr[j, np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.priority_degraded_mask_idx)]
                 )
                 + gp.quicksum(
-                    self._input_data.GBF2_raw_priority_degraded_area_r[self._input_data.ag_lu2cells[1, j]]
-                    * self._input_data.biodiv_contr_ag_rj[self._input_data.ag_lu2cells[1, j], j]
-                    * self.X_ag_irr_vars_jr[j, self._input_data.ag_lu2cells[1, j]]
+                    self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.priority_degraded_mask_idx)]
+                    * self._input_data.biodiv_contr_ag_rj[np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.priority_degraded_mask_idx), j]
+                    * self.X_ag_irr_vars_jr[j, np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.priority_degraded_mask_idx)]
                 )  
                 for j in range(self._input_data.n_ag_lus)
             )
             bio_ag_man_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF2_raw_priority_degraded_area_r[self._input_data.ag_lu2cells[0, j_idx]]
-                    * self._input_data.biodiv_contr_ag_man[am][j_idx][self._input_data.ag_lu2cells[0, j_idx]]
-                    * self.X_ag_man_dry_vars_jr[am][j_idx, self._input_data.ag_lu2cells[0, j_idx]]
+                    self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)]
+                    * self._input_data.biodiv_contr_ag_man[am][j_idx][np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)]
+                    * self.X_ag_man_dry_vars_jr[am][j_idx, np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)]
                 )  
                 + gp.quicksum(
-                    self._input_data.GBF2_raw_priority_degraded_area_r[self._input_data.ag_lu2cells[1, j_idx]]
-                    * self._input_data.biodiv_contr_ag_man[am][j_idx][self._input_data.ag_lu2cells[1, j_idx]]
-                    * self.X_ag_man_irr_vars_jr[am][j_idx, self._input_data.ag_lu2cells[1, j_idx]]
+                    self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)]
+                    * self._input_data.biodiv_contr_ag_man[am][j_idx][np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)]
+                    * self.X_ag_man_irr_vars_jr[am][j_idx, np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)]
                 )  
                 for am, am_j_list in self._input_data.am2j.items()
                 for j_idx in range(len(am_j_list))
             )
             bio_non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF2_raw_priority_degraded_area_r[self._input_data.non_ag_lu2cells[k]]
+                    self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.non_ag_lu2cells[k], self._input_data.priority_degraded_mask_idx)]
                     * self._input_data.biodiv_contr_non_ag_k[k]
-                    * self.X_non_ag_vars_kr[k, self._input_data.non_ag_lu2cells[k]]
+                    * self.X_non_ag_vars_kr[k, np.intersect1d(self._input_data.non_ag_lu2cells[k], self._input_data.priority_degraded_mask_idx)]
                 )
                 for k in range(self._input_data.n_non_ag_lus)
             )
@@ -1062,7 +1062,7 @@ class LutoSolver:
 
             if ind.size == 0:
                 print(
-                    f"        |-- WARNING: ECNES species {x_names[x]} target was NOT added: no cells can contribute to species target area.")
+                    f"       |-- WARNING: ECNES species {x_names[x]} target was NOT added: no cells can contribute to species target area.")
                 continue
             
             ag_contr = gp.quicksum(

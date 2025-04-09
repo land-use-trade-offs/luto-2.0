@@ -32,7 +32,6 @@ import luto.economics.non_agricultural.quantity as non_ag_quantity
 
 from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
 from luto.tools.spatializers import upsample_array
-from joblib import Parallel, delayed
 
 from collections import defaultdict
 from dataclasses import dataclass
@@ -162,8 +161,8 @@ class Data:
         # NLUM mask.
         with rasterio.open(os.path.join(settings.INPUT_DIR, "NLUM_2010-11_mask.tif")) as rst:
             self.NLUM_MASK = rst.read(1).astype(np.int8)                                                                # 2D map,  0 for ocean, 1 for land
-            self.LUMAP_2D = np.full_like(self.NLUM_MASK, self.NODATA, dtype=np.int16)                                   # 2D map,  full of nodata (-9999)
-            np.place(self.LUMAP_2D, self.NLUM_MASK == 1, self.LUMAP_NO_RESFACTOR)                                       # 2D map,  -9999 for ocean; -1 for desert, urban, water, etc; 0-27 for land uses
+            self.LUMAP_2D_FULLRES = np.full_like(self.NLUM_MASK, self.NODATA, dtype=np.int16)                                   # 2D map,  full of nodata (-9999)
+            np.place(self.LUMAP_2D_FULLRES, self.NLUM_MASK == 1, self.LUMAP_NO_RESFACTOR)                                       # 2D map,  -9999 for ocean; -1 for desert, urban, water, etc; 0-27 for land uses
             self.GEO_META_FULLRES = rst.meta                                                                            # dict,  key-value pairs of geospatial metadata for the full resolution land-use map
             self.GEO_META_FULLRES['dtype'] = 'float32'                                                                  # Set the data type to float32
             self.GEO_META_FULLRES['nodata'] = self.NODATA                                                               # Set the nodata value to -9999
@@ -188,7 +187,7 @@ class Data:
             self.MASK = self.LUMASK * resmask
 
             # Get the resfactored 2D lumap and x/y coordinates.
-            self.LUMAP_2D_RESFACTORED = self.LUMAP_2D[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR]
+            self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR]
 
             # Get the resfactored lon/lat coordinates.
             self.COORD_LON_LAT = self.COORD_LON_LAT_FULLRES[0][self.MASK], self.COORD_LON_LAT_FULLRES[1][self.MASK]
@@ -1159,8 +1158,8 @@ class Data:
       
 
         # Read in vegetation layer data
-        NVIS_layers = xr.load_dataarray(settings.INPUT_DIR + f"/NVIS_{settings.NVIS_TARGET_CLASS.split('_')[0]}.nc").values / 100  # divide by 100 to convert percentage to proportion
-        # NVIS_layers = np.array(Parallel(n_jobs=5)([delayed(self.get_exact_resfactored_arr)(arr.astype(np.float32)) for arr in NVIS_layers]))  
+        NVIS_layers = xr.load_dataarray(settings.INPUT_DIR + f"/NVIS_{settings.NVIS_TARGET_CLASS.split('_')[0]}.nc") 
+        NVIS_layers = np.array([self.get_exact_resfactored_average_arr(arr) for arr in NVIS_layers], dtype=np.float32) / 100.0  # divide by 100 to get the percentage of the area in each cell that is covered by the vegetation type
         
         # Apply Savanna Burning penalties
         self.NVIS_LAYERS_LDS = np.where(
@@ -1241,13 +1240,13 @@ class Data:
         snes_arr_likely = BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_SEL, presence='LIKELY')
         snes_arr_likely_maybe = BIO_GBF4_SPECIES_raw.sel(species=self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL, presence='LIKELY_AND_MAYBE')
         snes_arr = xr.concat([snes_arr_likely, snes_arr_likely_maybe], dim='species')
-        self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_exact_resfactored_arr(arr) for arr in snes_arr])
+        self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_exact_resfactored_average_arr(arr) for arr in snes_arr])
                 
         BIO_GBF4_COMUNITY_raw = xr.open_dataarray(f'{settings.INPUT_DIR}/bio_GBF4_ECNES.nc', chunks={'species':1})
         ecnes_arr_likely = BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_SEL, cell=self.MASK, presence='LIKELY').compute()
         ecnes_arr_likely_maybe = BIO_GBF4_COMUNITY_raw.sel(species=self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL, cell=self.MASK, presence='LIKELY_AND_MAYBE').compute()
         ecnes_arr = xr.concat([ecnes_arr_likely, ecnes_arr_likely_maybe], dim='species')
-        self.BIO_GBF4_COMUNITY_LAYERS = np.array([self.get_exact_resfactored_arr(arr) for arr in ecnes_arr])
+        self.BIO_GBF4_COMUNITY_LAYERS = np.array([self.get_exact_resfactored_average_arr(arr) for arr in ecnes_arr])
         
   
         
@@ -1404,43 +1403,62 @@ class Data:
         if settings.RESFACTOR == 1:
             return lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)[:, self.MASK, :]
 
-        # Create a 2D array of IDs for the LUMAP_2D_RESFACTORED
-        lumap_2d_id = np.arange(self.LUMAP_2D_RESFACTORED.size).reshape(self.LUMAP_2D_RESFACTORED.shape)
-        lumap_2d_id = upsample_array(self, lumap_2d_id, settings.RESFACTOR)    
-        lumask_2d_no_resfactor = (self.LUMAP_2D != self.NODATA) & (self.LUMAP_2D != self.MASK_LU_CODE)    
 
-        # Get the 2D water supply map at full resolution 
-        lmmap_full_2d = np.full_like(self.NLUM_MASK, self.NODATA, dtype=np.int16)                           # 2D map,  full of nodata (-9999)
-        np.place(lmmap_full_2d, self.NLUM_MASK == 1, self.LMMAP_NO_RESFACTOR)                               # 2D map,  -9999 for ocean; -1 for desert, urban, water, etc; 0-27 for land uses
-
-        # Calculate the number of cells with each resfactored ID cell
-        cell_count = np.bincount(lumap_2d_id.flatten(), lumask_2d_no_resfactor.flatten(), minlength=self.LUMAP_2D_RESFACTORED.size)
-        lumap_resample_avg = np.zeros((len(self.LANDMANS), self.NCELLS, self.N_AG_LUS), dtype=np.float32)
-                
+        lumap_resample_avg = np.zeros((len(self.LANDMANS), self.NCELLS, self.N_AG_LUS), dtype=np.float32)  
         for idx_lu in self.DESC2AGLU.values():
             for idx_w, _ in enumerate(self.LANDMANS):
-                # Get the cells with the same ID and water supply
-                lumap_w = (self.LUMAP_2D == idx_lu) * (lmmap_full_2d == idx_w)
-                cell_sum = np.bincount(lumap_2d_id.flatten(), lumap_w.flatten(), minlength=self.LUMAP_2D_RESFACTORED.size)
-
-                # Calculate the average value of each ID cell
-                with np.errstate(divide='ignore', invalid='ignore'):                    # Ignore the division by zero warning
-                    cell_avg = cell_sum / cell_count
-                    cell_avg[~np.isfinite(cell_avg)] = 0                                # Set the NaN and Inf to 0
-                    
-                # Reshape the 1D avg array to 2D array
-                cell_avg_2d = cell_avg.reshape(self.LUMAP_2D_RESFACTORED.shape)
-                # Upsample the 2D array from choarser resolution to finer resolution
-                cell_avg_2d = upsample_array(self, cell_avg_2d, settings.RESFACTOR).astype(np.float32)
-                # Only keep the cells within the luto study area
-                cell_avg_1d = cell_avg_2d[np.nonzero(self.NLUM_MASK)]
-                cell_avg_1d = cell_avg_1d[self.MASK]
-
-                lumap_resample_avg[idx_w, :, idx_lu] = cell_avg_1d
+                arr_lu_lm = self.LUMAP_NO_RESFACTOR * self.LMMAP_NO_RESFACTOR
+                lumap_resample_avg[idx_w, :, idx_lu] = self.get_exact_resfactored_average_arr(arr_lu_lm)
                 
         return lumap_resample_avg
     
+    
+    def get_exact_resfactored_lumap_mrj(self):
+        """
+        Rather than picking the center cell when resfactoring the lumap, this function
+        calculate the exact value of each land-use cell based from lumap to create dvars.
         
+        E.g., given a resfactor of 5, then each resfactored dvar cell will cover a 5x5 area.
+        If there are 9 Apple cells in the 5x5 area, then the dvar cell for it will be 9/25. 
+        
+        """
+        if settings.RESFACTOR == 1:
+            return lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)[:, self.MASK, :]
+
+        lumap_mrj = np.zeros((self.NLMS, self.NCELLS, self.N_AG_LUS), dtype=np.float32)
+        for idx_lu in self.DESC2AGLU.values():
+            for idx_w, _ in enumerate(self.LANDMANS):
+                # Get the cells with the same ID and water supply
+                lu_arr = (self.LUMAP_NO_RESFACTOR == idx_lu) * (self.LMMAP_NO_RESFACTOR == idx_w)
+                lumap_mrj[idx_w, :, idx_lu] = self.get_exact_resfactored_average_arr(lu_arr)        
+                    
+        return lumap_mrj
+    
+    
+    def get_exact_resfactored_average_arr(self, arr: np.ndarray) -> np.ndarray:
+            
+        arr_2d = np.zeros_like(self.LUMAP_2D_FULLRES, dtype=np.float32)      # Create a 2D array of zeros with the same shape as the LUMAP_2D_FULLRES
+        np.place(arr_2d, self.NLUM_MASK == 1, arr)                           # Place the values of arr in the 2D array where the LUMAP_2D_RESFACTORED is equal to idx_lu
+        
+        mask_arr_2d_resfactor = (self.LUMAP_2D_RESFACTORED != self.NODATA) & (self.LUMAP_2D_RESFACTORED != self.MASK_LU_CODE) 
+        mask_arr_2d_fullres = (self.LUMAP_2D_FULLRES != self.NODATA) & (self.LUMAP_2D_FULLRES != self.MASK_LU_CODE)
+
+        # Create a 2D array of IDs for the LUMAP_2D_RESFACTORED
+        id_arr_2d_resfactored = np.arange(self.LUMAP_2D_RESFACTORED.size).reshape(self.LUMAP_2D_RESFACTORED.shape)
+        id_arr_2d_fullres = upsample_array(self, id_arr_2d_resfactored, settings.RESFACTOR)
+
+        # Calculate the average value for each cell in the resfactored array
+        cell_count = np.bincount(id_arr_2d_fullres.flatten(), mask_arr_2d_fullres.flatten(), minlength=self.LUMAP_2D_RESFACTORED.size)
+        cell_sum = np.bincount(id_arr_2d_fullres.flatten(), arr_2d.flatten(), minlength=self.LUMAP_2D_RESFACTORED.size)
+        with np.errstate(divide='ignore', invalid='ignore'):                    # Ignore the division by zero warning
+            cell_avg = cell_sum / cell_count
+            cell_avg[~np.isfinite(cell_avg)] = 0                                # Set the NaN and Inf to 0
+            
+        # Reshape the 1D avg array to 2D array
+        cell_avg_2d = cell_avg.reshape(self.LUMAP_2D_RESFACTORED.shape)
+    
+        return cell_avg_2d[np.nonzero(mask_arr_2d_resfactor)]
+ 
     # Get the habitat condition score within priority degraded areas for base year (2010)
     def get_GBF2_target_for_yr_cal(self, yr_cal:int) -> float:
         """
@@ -1504,21 +1522,6 @@ class Data:
         limit_score_inside_LUTO = limit_score_all_AUS - self.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO
             
         return np.where(limit_score_inside_LUTO < 0, 0, limit_score_inside_LUTO)
-    
-    
-    
-    def get_exact_resfactored_arr(self, da, resampling=Resampling.average):
-        '''
-        Calculate the exact proportion of each resfactored SNES/ECNES cell.
-        
-        For example, if the resfactor is 5, then each resfactored cell will cover a 5x5 area.
-        If the sum of the SNES/ENCES cells within this 5x5 area is 9, then the dvar cell for it will be 9/25 = 0.36.
-        '''
-        
-        arr_fullres_2d = arr_to_xr(self, da).fillna(0)
-        arr_reproj_match = arr_fullres_2d.rio.reproject_match(self.LUMAP_2D_RESFACTORED_XR, resampling=resampling)
-        mask_2d_resfactored = (self.LUMAP_2D_RESFACTORED != self.NODATA) * (self.LUMAP_2D_RESFACTORED != self.MASK_LU_CODE)
-        return arr_reproj_match.values[np.nonzero(mask_2d_resfactored)]
 
     
     def get_GBF4_SNES_target_inside_LUTO_by_year(self, yr:int):

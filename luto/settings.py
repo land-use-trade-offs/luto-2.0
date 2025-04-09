@@ -131,7 +131,7 @@ DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in th
 WRITE_OUTPUT_GEOTIFFS = False   # Write GeoTiffs to output directory: True or False
 WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resolution: True or False
 
-PARALLEL_WRITE = False           # If to use parallel processing to write GeoTiffs: True or False
+PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
 WRITE_THREADS = 5               # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
@@ -574,7 +574,7 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- Vegetation parameters ----------------------
 
-BIODIVERSTIY_TARGET_GBF_3  = 'off'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_3  = 'on'           # 'on' or 'off'.
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.
@@ -591,8 +591,8 @@ the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers
 
 
 # ------------------------------- Species parameters -------------------------------
-BIODIVERSTIY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
-BIODIVERSTIY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_4_SNES =  'on'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_4_ECNES = 'on'           # 'on' or 'off'.
 
 '''
 Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 

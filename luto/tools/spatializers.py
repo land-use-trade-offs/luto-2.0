@@ -69,7 +69,7 @@ def get_fullres2D_map(data, map_:np.ndarray)-> np.ndarray:
         np.ndarray : The restored 2D full resolution land-use map.
     """
     LUMAP_FullRes_2D = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32) 
-    # Get the full resolution LUMAP_2D at the begining year, with -1 as Non-Agricultural Land, and -9999 as NoData
+    # Get the full resolution LUMAP_2D_RESFACTORED at the begining year, with -1 as Non-Agricultural Land, and -9999 as NoData
     np.place(LUMAP_FullRes_2D, data.NLUM_MASK, data.LUMAP_NO_RESFACTOR) 
     # Fill the LUMAP_FullRes_2D with map_ sequencialy by the row-col order of 1s in (LUMAP_FullRes_2D >=0) 
     np.place(LUMAP_FullRes_2D, LUMAP_FullRes_2D >=0, map_)
@@ -110,7 +110,7 @@ def place_nodata(data, map_:np.ndarray) -> np.ndarray:
     """
     
     # Apply the masks
-    filler_mask = (data.LUMAP_2D != data.MASK_LU_CODE)
+    filler_mask = (data.LUMAP_2D_RESFACTORED != data.MASK_LU_CODE)
     map_ = np.where(filler_mask, map_, data.MASK_LU_CODE)
     map_ = np.where(data.NLUM_MASK, map_, data.NODATA)
     
