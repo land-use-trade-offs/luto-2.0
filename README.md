@@ -37,7 +37,7 @@ LUTO2 comes with a full diagram to illustrate its data preparation, workflow, an
    ```sh
    cd luto-2.0
    conda env create luto/tools/create_task_runs/bash_scripts/conda_env.yml
-   conda activate luto_env
+   conda activate luto
    ```
 
 3. Run a basic simulation:
