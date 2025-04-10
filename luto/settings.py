@@ -465,7 +465,7 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 # Biodiversity limits and parameters *******************************
-SOLVE_BIODIV_PRIORITY_WEIGHT = 0.001
+SOLVE_BIODIV_PRIORITY_WEIGHT = 0.995
 '''The weight of the biodiversity target in the objective function'''
 
 
