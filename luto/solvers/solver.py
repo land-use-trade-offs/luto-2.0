@@ -548,6 +548,9 @@ class LutoSolver:
 
         # Repeat to get contributions of alternative agr. management options
         # Convert variables to PR/p representation
+        self.ag_man_q_dry_c = [0 for _ in range(self.ncms)]
+        self.ag_man_q_irr_c = [0 for _ in range(self.ncms)]
+        
         for am, am_j_list in self._input_data.am2j.items():
             X_ag_man_dry_pr = np.zeros(
                 (self._input_data.nprs, self._input_data.ncells), dtype=object
@@ -575,7 +578,7 @@ class LutoSolver:
                 for p in range(self._input_data.nprs)
             ]
 
-            self.ag_man_q_dry_c = [
+            self.ag_man_q_dry_c += [
                 gp.quicksum(
                     ag_man_q_dry_p[p]
                     for p in range(self._input_data.nprs)
@@ -583,7 +586,7 @@ class LutoSolver:
                 )
                 for c in range(self.ncms)
             ]
-            self.ag_man_q_irr_c = [
+            self.ag_man_q_irr_c += [
                 gp.quicksum(
                     ag_man_q_irr_p[p]
                     for p in range(self._input_data.nprs)
@@ -1698,10 +1701,10 @@ class LutoSolver:
                 'Economy Ag-Man Value (AUD)': self.economy_ag_man_contr.getValue(),
                 "Economy Total Objective": self.obj_economy.getValue() * settings.SOLVE_ECONOMY_WEIGHT,
                 
-                "Biodiversity Total Priority Area (ha)": self.obj_biodiv.getValue(),
-                "Biodiversity Ag Priority Area (ha)": self.bio_ag_contr.getValue(),
-                "Biodiversity Non-Ag Priority Area (ha)": self.bio_non_ag_contr.getValue(),
-                "Biodiversity Ag-Man Priority Area (ha)": self.bio_ag_man_contr.getValue(),
+                "Biodiversity Total Priority Score (score)": self.obj_biodiv.getValue(),
+                "Biodiversity Ag Priority Score (score)": self.bio_ag_contr.getValue(),
+                "Biodiversity Non-Ag Priority Score (score)": self.bio_non_ag_contr.getValue(),
+                "Biodiversity Ag-Man Priority Score (score)": self.bio_ag_man_contr.getValue(),
                 "Biodiversity Total Objective": self.obj_biodiv.getValue() * settings.SOLVE_BIODIV_PRIORITY_WEIGHT,
                 
                 "Penalties Value (AUD)": self.obj_penalties.getValue(),

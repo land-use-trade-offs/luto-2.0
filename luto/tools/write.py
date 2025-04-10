@@ -992,7 +992,7 @@ def write_biodiversity_overall_priority_scores(data: Data, yr_cal, path):
     bio_non_ag_priority_rk = tools.non_ag_rk_to_xr(data, non_ag_biodiversity.get_breq_matrix(data,bio_ag_priority_mrj.values, data.lumaps[yr_cal_previouse]))
 
     # Calculate the biodiversity scores
-    base_yr_score = np.einsum('rj,mrj->', ag_biodiversity.get_ag_biodiversity_contribution(data), data.AG_L_MRJ)
+    base_yr_score = np.einsum('rj,mrj->', ag_biodiversity.get_ag_biodiversity_contribution(data, yr_cal), data.AG_L_MRJ)
 
     priority_ag = (ag_dvar_mrj * bio_ag_priority_mrj
         ).sum(['cell','lm']
@@ -1057,7 +1057,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 
 
     # Apply habitat contribution from ag/am/non-ag land-use to biodiversity scores
-    ag_impacts_rj = ag_biodiversity.get_ag_biodiversity_contribution(data)
+    ag_impacts_rj = ag_biodiversity.get_ag_biodiversity_contribution(data, yr_cal)
     for lu,lu_idx in data.DESC2AGLU.items():
         bio_ag_priority_rmj = bio_ag_priority_rmj.copy()            # Get a copy of the data array to avoid assign to a view
         bio_ag_priority_rmj.loc[{'lu':lu}] = bio_ag_priority_rmj.loc[{'lu':lu}] * ag_impacts_rj[:,lu_idx][:,None]

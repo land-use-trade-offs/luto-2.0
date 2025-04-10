@@ -132,7 +132,7 @@ WRITE_OUTPUT_GEOTIFFS = False   # Write GeoTiffs to output directory: True or Fa
 WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resolution: True or False
 
 PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = 5               # The Threads to use for map making, only work with PARALLEL_WRITE = True
+WRITE_THREADS = 3               # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
@@ -397,11 +397,16 @@ GHG_LIMITS = {
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
 GHG_LIMITS_FIELD = '1.8C (67%) excl. avoided emis'
 
-# Carbon price scenario: either 'AS_GHG', 'Default', '100', or None.
+# Carbon price scenario: either 'AS_GHG', 'Default', '100', or 'CONSTANT', or NONE.
 # Setting to None falls back to the 'Default' scenario.
 CARBON_PRICES_FIELD = 'AS_GHG'
 if CARBON_PRICES_FIELD == 'AS_GHG':
     CARBON_PRICES_FIELD = GHG_LIMITS_FIELD[:9].replace('(','')  # '1.5C (67%) excl. avoided emis' -> '1.5C 67%'
+
+CARBON_PRICE_COSTANT = 0.0  # The constant value to add to the carbon price (e.g., $10/tonne CO2e).
+'''
+    Only works when CARBON_PRICES_FIELD is set to 'CONSTANT'.
+'''
 
 
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
@@ -603,7 +608,7 @@ and manage human-wildlife interactions
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------
-BIODIVERSTIY_TARGET_GBF_8 = 'off'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_8 = 'on'           # 'on' or 'off'.
 '''
 Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
 reduce the impacts of climate change on biodiversity and ecosystems.

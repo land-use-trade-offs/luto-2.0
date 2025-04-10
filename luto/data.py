@@ -1141,8 +1141,9 @@ class Data:
         self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS = pd.read_excel(
             settings.INPUT_DIR + '/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx',
             sheet_name = f'NVIS_{settings.NVIS_TARGET_CLASS}'
-        )
+        ).sort_values(by='group', ascending=True)
         
+
         for _,row in self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS.iterrows():
             if not all([
                 row['USER_DEFINED_TARGET_PERCENT_2030'] >= 0,
@@ -1184,8 +1185,8 @@ class Data:
         print("\tLoading environmental significance data...", flush=True)
         
         # Read in the species data from DCCEEW National Environmental Significance (noted as GBF-4)
-        BIO_GBF4_SNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_SNES.csv')
-        BIO_GBF4_ECNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_ECNES.csv')
+        BIO_GBF4_SNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_SNES.csv').sort_values(by='SCIENTIFIC_NAME', ascending=True)
+        BIO_GBF4_ECNES_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF4_TARGET_ECNES.csv').sort_values(by='COMMUNITY', ascending=True)
         
         self.BIO_GBF4_SNES_LIKELY_SEL = [row['SCIENTIFIC_NAME'] for _,row in BIO_GBF4_SNES_score.iterrows()
                                                 if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY']>0,
@@ -1257,8 +1258,8 @@ class Data:
         
         # Read in the species data from Carla Archibald (noted as GBF-8)
         BIO_GBF8_SPECIES_raw = xr.open_dataset(f'{settings.INPUT_DIR}/bio_GBF8_ssp{settings.SSP}_EnviroSuit.nc', chunks={'year':1,'species':1})['data']        
-        bio_GBF8_baseline_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_SCORES.csv')
-        bio_GBF8_target_percent = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_TARGET.csv')
+        bio_GBF8_baseline_score = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_SCORES.csv').sort_values(by='species', ascending=True)
+        bio_GBF8_target_percent = pd.read_csv(settings.INPUT_DIR + '/BIODIVERSITY_GBF8_TARGET.csv').sort_values(by='species', ascending=True)
         
         self.BIO_GBF8_SEL_SPECIES = [row['species'] for _,row in bio_GBF8_target_percent.iterrows() 
                                       if all([row['USER_DEFINED_TARGET_PERCENT_2030']>0,
@@ -1871,7 +1872,7 @@ class Data:
         The resulting year should be between 2010 - 2100
         """
         yr_cal = yr_idx + self.YR_CAL_BASE
-        return 0 #self.get_carbon_price_by_year(yr_cal)
+        return settings.CARBON_PRICE_COSTANT if settings.CARBON_PRICES_FIELD == 'CONSTANT' else self.get_carbon_price_by_year(yr_cal)
 
     def get_carbon_price_by_year(self, yr_cal: int) -> float:
         """
@@ -1883,7 +1884,7 @@ class Data:
                 f"Carbon price data not given for the given year: {yr_cal}. "
                 f"Year should be between {self.YR_CAL_BASE} and 2100."
             )
-        return 0 #self.CARBON_PRICES[yr_cal]
+        return settings.CARBON_PRICE_COSTANT if settings.CARBON_PRICES_FIELD == 'CONSTANT' else self.CARBON_PRICES[yr_cal]
 
     def get_water_nl_yield_for_yr_idx(
         self,

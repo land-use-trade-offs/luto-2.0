@@ -1656,9 +1656,82 @@ def save_report_data(raw_data_dir:str):
         with open(f'{SAVE_DIR}/biodiversity_GBF3_5_contribution_group_score_by_non_agri_landuse.json', 'w') as outfile:
             json.dump(bio_df_group_records, outfile)
             
+            
+            
+            
+    # ---------------- (GBF4) Biodiversity National Significance score  ----------------
+    if settings.BIODIVERSTIY_TARGET_GBF_4_SNES == 'on':
+        
+        # Get biodiversity dataframe
+        filter_str = '''
+            category == "biodiversity" 
+            and year_types == "single_year" 
+            and base_name.str.contains("biodiversity_GBF4_SNES_scores")
+        '''.strip().replace('\n', '')
+        
+        bio_paths = files.query(filter_str).reset_index(drop=True)
+        bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
+        bio_df = bio_df.replace(RENAME_AM_NON_AG)  # Rename the landuse
+        
+        
+        bio_df.groupby(['Year','Type'])[['Contribution Relative to Pre-1750 Level (%)']].sum(numeric_only=True).reset_index()
+        bio_df.query('Type != "Outside LUTO study area"').head()
+        bio_df.query('Year == 2010 and Type == "Agricultural Landuse"').sort_values('Contribution Relative to Pre-1750 Level (%)', ascending=False).head()
+        
 
+        # Plot_GBF4_1: Biodiversity SNES total score by Type
+        bio_df_type = bio_df.groupby(['Year', 'Type']).sum(numeric_only=True).reset_index()
+        bio_df_type = bio_df_type\
+            .groupby('Type')[['Year', 'Contribution Relative to Pre-1750 Level (%)']]\
+            .apply(lambda x: list(map(list, zip(x['Year'], x['Contribution Relative to Pre-1750 Level (%)']))))\
+            .reset_index()
+        
+        bio_df_type.columns = ['name', 'data']
+        bio_df_type['type'] = 'column'
+        bio_df_type.to_json(f'{SAVE_DIR}/biodiversity_GBF4_1_SNES_total_score_by_type.json', orient='records')
 
- 
+        # Plot_GBF4_2: Biodiversity SNES total score by landuse
+        bio_df_landuse = bio_df.groupby(['Year', 'Landuse']).sum(numeric_only=True).reset_index()
+        bio_df_landuse = bio_df_landuse\
+            .groupby('Landuse')[['Year', 'Contribution Relative to Pre-1750 Level (%)']]\
+            .apply(lambda x: list(map(list, zip(x['Year'], x['Contribution Relative to Pre-1750 Level (%)']))))\
+            .reset_index()
+        
+        bio_df_landuse.columns = ['name', 'data']
+        bio_df_landuse['type'] = 'column'
+        bio_df_landuse = bio_df_landuse.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index()
+        bio_df_landuse.to_json(f'{SAVE_DIR}/biodiversity_GBF4_2_SNES_total_score_by_landuse.json', orient='records')
+
+        # Plot_GBF4_3: Biodiversity SNES total score by Agricultural Management
+        bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
+        bio_df_am = bio_df_am.groupby(['Year', 'Agri-Management']).sum(numeric_only=True).reset_index()
+        
+        bio_df_am = bio_df_am\
+            .groupby('Agri-Management')[['Year', 'Contribution Relative to Pre-1750 Level (%)']]\
+            .apply(lambda x: list(map(list, zip(x['Year'], x['Contribution Relative to Pre-1750 Level (%)']))))\
+            .reset_index()
+        
+        bio_df_am.columns = ['name', 'data']
+        bio_df_am['type'] = 'column'
+        bio_df_am.to_json(f'{SAVE_DIR}/biodiversity_GBF4_3_SNES_total_score_by_agri_management.json', orient='records')
+
+        # Plot_GBF4_4: Biodiversity SNES total score by Non-Agricultural Land-use
+        bio_df_non_ag = bio_df.query('Type == "Non-Agricultural land-use"').copy()
+        bio_df_non_ag = bio_df_non_ag.groupby(['Year', 'Landuse']).sum(numeric_only=True).reset_index()
+        
+        bio_df_non_ag = bio_df_non_ag\
+            .groupby('Landuse')[['Year', 'Contribution Relative to Pre-1750 Level (%)']]\
+            .apply(lambda x: list(map(list, zip(x['Year'], x['Contribution Relative to Pre-1750 Level (%)']))))\
+            .reset_index()
+        
+        bio_df_non_ag.columns = ['name', 'data']
+        bio_df_non_ag['type'] = 'column'
+        bio_df_non_ag.to_json(f'{SAVE_DIR}/biodiversity_GBF4_4_SNES_total_score_by_non_agri_landuse.json', orient='records')
+    
+    
+    
+    
+    
     # ---------------- (GBF8) Biodiversity suitability under differen climate change  ----------------
     
     # 1) Biodiversity suitability scores (GBF8) by group

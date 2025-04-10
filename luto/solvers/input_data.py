@@ -244,9 +244,9 @@ def get_ag_b_mrj(data: Data):
     return output.astype(np.float32)
 
 
-def get_ag_biodiv_contr_rj(data: Data) -> dict[int, float]:
+def get_ag_biodiv_contr_rj(data: Data, yr_cal) -> dict[int, float]:
     print('Getting biodiversity degredation data for agricultural land uses...', flush = True)
-    return ag_biodiversity.get_ag_biodiversity_contribution(data)
+    return ag_biodiversity.get_ag_biodiversity_contribution(data, yr_cal)
 
 
 def get_non_ag_biodiv_impact_k(data: Data) -> dict[int, float]:
@@ -649,7 +649,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Use the water net yield outside LUTO study area for the YR_CAL_BASE year
         water_yield_RR_BASE_YR=get_w_BASE_YR(data),                                     # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
         
-        biodiv_contr_ag_rj=get_ag_biodiv_contr_rj(data),
+        biodiv_contr_ag_rj=get_ag_biodiv_contr_rj(data, target_year),
         biodiv_contr_non_ag_k=get_non_ag_biodiv_impact_k(data),
         biodiv_contr_ag_man=get_ag_man_biodiv_impacts(data, target_year),
 

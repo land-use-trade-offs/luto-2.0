@@ -349,7 +349,7 @@ def get_GBF8_species_conservation_limits(
     return species_limits, species_names, species_inds
 
 
-def get_ag_biodiversity_contribution(data: Data):
+def get_ag_biodiversity_contribution(data: Data, yr_cal: int) -> np.ndarray:
     """
     Return b_rj biodiversity contribution matrices by land-use type.
 
@@ -362,7 +362,8 @@ def get_ag_biodiversity_contribution(data: Data):
     b_rj = np.zeros((data.NCELLS, data.N_AG_LUS), dtype=np.float32)
     
     for j in range(data.N_AG_LUS):
-        b_rj[:, j] = data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[j]
+        j_mask = data.lumaps[yr_cal] == j
+        b_rj[j_mask, j] = data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[j]
         
     return b_rj
 

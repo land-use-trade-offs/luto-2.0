@@ -30,6 +30,196 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 
+
+    // biodiversity_priority_1_total_score_by_type
+    Highcharts.chart("biodiversity_priority_1_total_score_by_type", {
+        chart: {
+            type: "column",
+            marginRight: 380,
+        },
+        title: {
+            text: "Biodiversity Priority Score by Broad Land-use Type",
+        },
+        series: JSON.parse(
+            document.getElementById(
+                "biodiversity_priority_1_total_score_by_type_csv"
+            ).innerHTML
+        ),
+        xAxis: {
+            tickPositions: year_ticks,
+        },
+        yAxis: {
+            title: {
+                text: "Contribution weighted area (ha)",
+            },
+        },
+        plotOptions: {
+            column: {
+                stacking: "normal",
+            },
+
+        },
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                    }:</b>${this.y.toFixed(2)}<br/>`;
+            },
+        },
+        legend: {
+            align: "right",
+            verticalalign: "left",
+            layout: "vertical",
+            x: -150,
+            verticalAlign: "middle",
+        },
+        credits: {
+            enabled: false,
+        },
+    });
+
+    // biodiversity_priority_2_total_score_by_landuse
+    Highcharts.chart("biodiversity_priority_2_total_score_by_landuse", {
+        chart: {
+            type: "column",
+            marginRight: 380,
+        },
+        title: {
+            text: "Biodiversity Priority Score by Agricultural Land-use",
+        },
+        series: JSON.parse(
+            document.getElementById(
+                "biodiversity_priority_2_total_score_by_landuse_csv"
+            ).innerHTML
+        ),
+        xAxis: {
+            tickPositions: year_ticks,
+        },
+        yAxis: {
+            title: {
+                text: "Contribution weighted area (ha)",
+            },
+        },
+        plotOptions: {
+            column: {
+                stacking: "normal",
+            },
+        },
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                    }:</b>${this.y.toFixed(2)}<br/>`;
+            },
+        },
+        legend: {
+            itemStyle: {
+              fontSize: "11px",
+            },
+            align: "right",
+            layout: "vertical",
+            x: -30,
+            y: -10,
+            verticalAlign: "middle",
+            itemMarginTop: 0,
+            itemMarginBottom: 1,
+          },
+        credits: {
+            enabled: false,
+        },
+    });
+
+    // biodiversity_priority_3_total_score_by_agri_management
+    Highcharts.chart("biodiversity_priority_3_total_score_by_agri_management", {
+        chart: {
+            type: "column",
+            marginRight: 380,
+        },
+        title: {
+            text: "Biodiversity Priority Score by Agricultural Management",
+        },
+        series: JSON.parse(
+            document.getElementById(
+                "biodiversity_priority_3_total_score_by_agri_management_csv"
+            ).innerHTML
+        ),
+        xAxis: {
+            tickPositions: year_ticks,
+        },
+        yAxis: {
+            title: {
+                text: "Contribution weighted area (ha)",
+            },
+        },
+        plotOptions: {
+            column: {
+                stacking: "normal",
+            },
+        },
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                    }:</b>${this.y.toFixed(2)}<br/>`;
+            },
+        },
+        legend: {
+            align: "right",
+            verticalalign: "left",
+            layout: "vertical",
+            x: -150,
+            verticalAlign: "middle",
+        },
+        credits: {
+            enabled: false,
+        },
+    });
+
+
+    // biodiversity_priority_4_total_score_by_non_agri_landuse
+    Highcharts.chart("biodiversity_priority_4_total_score_by_non_agri_landuse", {
+        chart: {
+            type: "column",
+            marginRight: 380,
+        },
+        title: {
+            text: "Biodiversity Priority Score by Non-Agricultural Land-use",
+        },
+        series: JSON.parse(
+            document.getElementById(
+                "biodiversity_priority_4_total_score_by_non_agri_landuse_csv"
+            ).innerHTML
+        ),
+        xAxis: {
+            tickPositions: year_ticks,
+        },
+        yAxis: {
+            title: {
+                text: "Contribution weighted area (ha)",
+            },
+        },
+        plotOptions: {
+            column: {
+                stacking: "normal",
+            },
+        },
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                    }:</b>${this.y.toFixed(2)}<br/>`;
+            },
+        },
+        legend: {
+            align: "right",
+            verticalalign: "left",
+            layout: "vertical",
+            x: 0,
+            verticalAlign: "middle",
+        },
+        credits: {
+            enabled: false,
+        },
+    });
+
+
+
     // biodiversity_GBF2_1_total_score_by_type
     Highcharts.chart("biodiversity_GBF2_1_total_score_by_type", {
         chart: {
@@ -456,8 +646,6 @@ document.addEventListener("DOMContentLoaded", function () {
             },
         });
     });
-
-
 
 
 
