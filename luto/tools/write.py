@@ -1158,17 +1158,15 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
 
     # Get the impacts of each ag/non-ag/am to vegetation matrices
     ag_impact_j = xr.DataArray(
-        list(data.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values()),
+        ag_biodiversity.get_ag_biodiversity_contribution(data),
         dims=['lu'],
         coords={'lu':data.AGRICULTURAL_LANDUSES}
     )
-
     non_ag_impact_k = xr.DataArray(
         list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()),
         dims=['lu'],
         coords={'lu':data.NON_AGRICULTURAL_LANDUSES}
     )
-
     am_impact_ir = xr.DataArray(
         np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]), 
         dims=['idx', 'cell'], 
@@ -1245,7 +1243,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
 
     # Apply habitat contribution from ag/am/non-ag land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
-        list(data.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values()),
+        ag_biodiversity.get_ag_biodiversity_contribution(data),
         dims=['lu'],
         coords={'lu':data.AGRICULTURAL_LANDUSES}
     )
@@ -1341,9 +1339,9 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
 
     # Apply habitat contribution from ag/am/non-ag land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
-        list(data.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values()),
+        ag_biodiversity.get_ag_biodiversity_contribution(data),
         dims=['lu'],
-        coords={'lu': data.AGRICULTURAL_LANDUSES}
+        coords={'lu':data.AGRICULTURAL_LANDUSES}
     )
     non_ag_impact_k = xr.DataArray(
         list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()),
@@ -1442,9 +1440,9 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
         
     # Get the habitat contribution for ag/non-ag/am land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
-        list(data.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values()),
+        ag_biodiversity.get_ag_biodiversity_contribution(data),
         dims=['lu'],
-        coords={'lu': data.AGRICULTURAL_LANDUSES}
+        coords={'lu':data.AGRICULTURAL_LANDUSES}
     )
     non_ag_impact_k = xr.DataArray(
         list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()),
@@ -1538,9 +1536,9 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
 
     # Get the habitat contribution for ag/non-ag/am land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
-        list(data.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values()),
+        ag_biodiversity.get_ag_biodiversity_contribution(data),
         dims=['lu'],
-        coords={'lu': data.AGRICULTURAL_LANDUSES}
+        coords={'lu':data.AGRICULTURAL_LANDUSES}
     )
     non_ag_impact_k = xr.DataArray(
         list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()),
