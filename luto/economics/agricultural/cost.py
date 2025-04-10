@@ -30,10 +30,9 @@ import numpy as np
 import pandas as pd
 
 import luto.settings as settings
-from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
-from luto.settings import AG_MANAGEMENTS
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data
+from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types, get_quantity
+from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types
 
 
@@ -46,7 +45,7 @@ def get_cost_crop(data: Data, lu, lm, yr_idx):
         lm (str): Land management (e.g., 'dry', 'irr').
         yr_idx (int): Number of years post base-year ('YR_CAL_BASE').
 
-    Returns:
+    Returns
         pandas.DataFrame: Costs of the crop as a numpy array, with columns representing different cost types.
 
     Raises:
@@ -153,7 +152,7 @@ def get_cost_lvstk(data: Data, lu, lm, yr_idx):
         lm (str): Land management (e.g. 'dry', 'irr').
         yr_idx (int): Number of years post base-year ('YR_CAL_BASE').
 
-    Returns:
+    Returns
         pandas.DataFrame: Costs as numpy array, with columns representing different cost types.
 
     Raises:
@@ -212,7 +211,7 @@ def get_cost(data: Data, lu, lm, yr_idx):
         lm (str): Land management (e.g. 'dry', 'irr', 'org').
         yr_idx (int): Number of years post base-year ('YR_CAL_BASE').
 
-    Returns:
+    Returns
         np.array: Production cost <unit: $/cell> of `lu`+`lm` in `yr_idx`.
 
     Raises:
@@ -237,12 +236,12 @@ def get_cost_matrix(data: Data, lm, yr_idx):
     """
     Return agricultural c_rj matrix <unit: $/cell> per lu under `lm` in `yr_idx`.
     
-    Parameters:
+    Parameters
         data (DataFrame): The input data containing agricultural land use information.
         lm (str): The land use type.
         yr_idx (int): The index of the year.
     
-    Returns:
+    Returns
         DataFrame: The cost matrix representing the costs per cell for each land use under the given land use type and year index.
     """
     
@@ -256,12 +255,12 @@ def get_cost_matrices(data: Data, yr_idx, aggregate=True):
     """
     Return agricultural c_mrj matrix <unit: $/cell> as 3D Numpy array.
 
-    Parameters:
+    Parameters
     - data: The input data containing information about land management.
     - yr_idx: The index of the year.
     - aggregate: A boolean value indicating whether to aggregate the cost matrices or not. Default is True.
 
-    Returns:
+    Returns
     - If aggregate is True, returns a 3D Numpy array representing the aggregated cost matrix.
     - If aggregate is False, returns a pandas DataFrame representing the cost matrix.
 
@@ -286,11 +285,11 @@ def get_asparagopsis_effect_c_mrj(data: Data, yr_idx):
     Applies the effects of using asparagopsis to the cost data
     for all relevant agricultural land uses.
 
-    Parameters:
+    Parameters
     - data: The data object containing relevant information.
     - yr_idx: The index of the year.
 
-    Returns:
+    Returns
     - new_c_mrj: The updated cost matrix <unit: $/cell>.
 
     This function calculates the cost per cell for each relevant agricultural land use
@@ -325,11 +324,11 @@ def get_precision_agriculture_effect_c_mrj(data: Data, yr_idx):
     Applies the effects of using precision agriculture to the cost data
     for all relevant agr. land uses.
 
-    Parameters:
+    Parameters
     - data: The data object containing the necessary information.
     - yr_idx: The index of the year to calculate the effects for.
 
-    Returns:
+    Returns
     - new_c_mrj: The updated cost data matrix <unit: $/cell>.
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
@@ -354,11 +353,11 @@ def get_ecological_grazing_effect_c_mrj(data: Data, yr_idx):
     Applies the effects of using ecological grazing to the cost data
     for all relevant agr. land uses.
 
-    Parameters:
+    Parameters
     - data: The data object containing the necessary input data.
     - yr_idx: The index of the year for which the effects are calculated.
 
-    Returns:
+    Returns
     - new_c_mrj: The matrix containing the updated cost <unit: $/cell>.
     """
 
@@ -396,10 +395,10 @@ def get_savanna_burning_effect_c_mrj(data: Data, yr_idx: int):
     Applies the effects of using LDS Savanna Burning to the cost data
     for all relevant agr. land uses.
 
-    Parameters:
+    Parameters
     - data: The input data containing relevant information for calculations.
 
-    Returns:
+    Returns
     - new_c_mrj: The modified cost data <unit: $/cell>.
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
@@ -425,11 +424,11 @@ def get_agtech_ei_effect_c_mrj(data: Data, yr_idx):
     Applies the effects of using AgTech EI to the cost data
     for all relevant agr. land uses.
 
-    Parameters:
+    Parameters
     - data: The data object containing the necessary information.
     - yr_idx: The index of the year.
 
-    Returns:
+    Returns
     - new_c_mrj: The updated cost data <unit: $/cell>.
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']
@@ -454,11 +453,11 @@ def get_biochar_effect_c_mrj(data: Data, yr_idx: int):
     Applies the effects of using Biochar to the cost data
     for all relevant agr. land uses.
 
-    Parameters:
+    Parameters
     - data: The data object containing the necessary information.
     - yr_idx: The index of the year.
 
-    Returns:
+    Returns
     - new_c_mrj: The updated cost data <unit: $/cell>.
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Biochar']
@@ -487,7 +486,7 @@ def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
         c_mrj (float): The cost of marginal reduction in emissions.
         yr_idx (int): The index of the year.
 
-    Returns:
+    Returns
         dict: A dictionary containing the cost matrices for different agricultural management practices.
             The keys are the names of the practices and the values are the corresponding cost matrices.
     """

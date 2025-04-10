@@ -131,8 +131,8 @@ DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in th
 WRITE_OUTPUT_GEOTIFFS = False   # Write GeoTiffs to output directory: True or False
 WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resolution: True or False
 
-PARALLEL_WRITE = False           # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = 5               # The Threads to use for map making, only work with PARALLEL_WRITE = True
+PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
+WRITE_THREADS = 2               # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
@@ -162,7 +162,7 @@ NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect a
 BARHOMOGENOUS = 1  # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
-THREADS = 32
+THREADS = min(32, os.cpu_count())
 
 
 
@@ -181,7 +181,7 @@ Land-use and vector file pairs to exclude land-use from being utilised in that a
  - The value is the path to the ESRI shapefile.
 '''
 
-REGIONAL_ADOPTION_CONSTRAINTS = 'on'  # 'on' or 'off'
+REGIONAL_ADOPTION_CONSTRAINTS = 'off'  # 'on' or 'off'
 REGIONAL_ADOPTION_ZONE = 'ABARES_AAGIS'   # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 '''
 The regional adoption zone is the spatial unit used to enforce regional adoption constraints.
@@ -285,6 +285,47 @@ AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per h
 # ---------------------------------------------------------------------------- #
 # Agricultural management parameters
 # ---------------------------------------------------------------------------- #
+
+AG_MANAGEMENTS_TO_LAND_USES = {
+    'Asparagopsis taxiformis': [
+        'Beef - modified land', 'Sheep - modified land', 'Dairy - natural land', 'Dairy - modified land'
+    ],
+    
+    'Precision Agriculture': [
+        # Cropping:
+        'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
+        # Intensive Cropping:
+        'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
+        # Horticulture:
+        'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'
+    ],
+    
+    'Ecological Grazing': [
+        'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
+    ],
+    
+    'Savanna Burning': [
+        'Beef - natural land', 'Dairy - natural land', 'Sheep - natural land', 'Unallocated - natural land',
+    ],
+    
+    'AgTech EI': [
+        # Cropping:
+        'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
+        # Intensive Cropping:
+        'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
+        # Horticulture:
+        'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'
+    ],
+    
+    'Biochar': [
+        # Cropping
+        'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
+        # Horticulture:
+        'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit',
+    ]
+}
+
+
 AG_MANAGEMENTS = {
     'Asparagopsis taxiformis': True,
     'Precision Agriculture': True,
@@ -354,21 +395,25 @@ GHG_LIMITS = {
              }
 
 # Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'
+GHG_LIMITS_FIELD = '1.8C (67%) excl. avoided emis'
 
-# Carbon price scenario: either 'AS_GHG', 'Default', '100', or None.
+# Carbon price scenario: either 'AS_GHG', 'Default', '100', or 'CONSTANT', or NONE.
 # Setting to None falls back to the 'Default' scenario.
 CARBON_PRICES_FIELD = 'AS_GHG'
 if CARBON_PRICES_FIELD == 'AS_GHG':
     CARBON_PRICES_FIELD = GHG_LIMITS_FIELD[:9].replace('(','')  # '1.5C (67%) excl. avoided emis' -> '1.5C 67%'
 
+CARBON_PRICE_COSTANT = 0.0  # The constant value to add to the carbon price (e.g., $10/tonne CO2e).
+'''
+    Only works when CARBON_PRICES_FIELD is set to 'CONSTANT'.
+'''
+
 
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
 SOC_AMORTISATION = 15
 
-# GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
-GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
-GHG_ALLOW_LB_DELTA_T = 1e6    # The amount of GHG emissions that can be lowered than the target in the objective function (in tonnes CO2e)
+GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
+# GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
 # Weight for the GHG/Demand deviation in the objective function
 ''' Range from 0 to 1, where 0 is fully minimising GHG and demand deviation, and 1 is only maximising profit. '''
@@ -420,7 +465,7 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 # Biodiversity limits and parameters *******************************
-SOLVE_BIODIV_PRIORITY_WEIGHT = 10
+SOLVE_BIODIV_PRIORITY_WEIGHT = 0.995
 '''The weight of the biodiversity target in the objective function'''
 
 
@@ -433,8 +478,8 @@ BIODIVERSTIY_TARGET_GBF_2 = 'on'            # 'on' or 'off', if 'off' the biodiv
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 BIODIV_GBF_TARGET_2_DICT = {
               2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
-              2050: 0.3,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
-              2100: 0.3   # Stays at 2050 level
+              2050: 0.5,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
+              2100: 0.5   # Stays at 2050 level
              }            # (can add more years/targets)\
 """ Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
     Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -450,19 +495,19 @@ The constraint type for the biodiversity target.
 - 'soft' adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 '''
 
-GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE = 20
+GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 50
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 
-For example, cells with rank between 0.9-1.0 only cover 20% of the area but contribute to 40% of the biodiversity benefits.
+For example, cells with rank between 0.9-1.0 only cover 20% of the areas but contribute to 40% of the biodiversity benefits.
 
 By sorting the rank values from high to low and plot the cumulative area and cumulative biodiversity benefits,
 we can get the a curve that shows the relationship between the area and the biodiversity benefits. In LUTO, we normalise
-the area and biodiversity benefits between 0-100, and use the `GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE` as the threshold
-to identify the critical area that should be conserved to achieve the biodiversity target.
+the area and biodiversity benefits between 0-100, and use the `GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT` as the threshold
+to identify the priority degraded areas that should be conserved to achieve the biodiversity target.
 
-If set to 0, no cells will be considered as critical area, equal to not setting any GBF2 target.
-If set to 100, all cells will be considered as critical area, equal to setting the GBF2 to the LUTO study area.
+If set to 0, no cells will be considered as priority degraded areas, equal to not setting any GBF2 target.
+If set to 100, all cells will be considered as priority degraded areas, equal to setting the GBF2 to the LUTO study area.
 '''
 
 
@@ -486,7 +531,6 @@ Can be either 'NCI' or 'DWI'.
 connectivity_importance = 0.3                    # Weighting of connectivity score in biodiversity calculation (0 [not important] - 1 [very important])
 CONNECTIVITY_LB = 1 - connectivity_importance    # Sets the lower bound of the connectivity multiplier for bioidversity
 '''
-!   ONLY WORKS IF CONNECTIVITY_SOURCE IS NOT 'NONE'   ! \n
 The relative importance of the connectivity score in the biodiversity calculation. Used to scale the raw biodiversity score.
 I.e., the lower bound of the connectivity score for weighting the raw biodiversity priority score is CONNECTIVITY_LB.
 '''
@@ -512,18 +556,18 @@ to undisturbed natural land.
 '''
 
 # Biodiversity value under default late dry season savanna fire regime
-LDS_BIODIVERSITY_VALUE = 0.8
+BIO_CONTRIBUTION_LDS = 0.8
 ''' For example, 0.8 means that all areas in the area eligible for savanna burning have a biodiversity value of 0.8 * the raw biodiv value
     (due to hot fires etc). When EDS sav burning is implemented the area is attributed the full biodiversity value (i.e., 1.0).
 '''
 
 # Non-agricultural biodiversity parameters 
-ENV_PLANTING_BIODIVERSITY_BENEFIT = 0.8
-CARBON_PLANTING_BLOCK_BIODIV_BENEFIT = 0.1
-CARBON_PLANTING_BELT_BIODIV_BENEFIT = 0.1
-RIPARIAN_PLANTING_BIODIV_BENEFIT = 1
-AGROFORESTRY_BIODIV_BENEFIT = 0.75
-BECCS_BIODIVERSITY_BENEFIT = 0
+BIO_CONTRIBUTION_ENV_PLANTING = 0.8
+BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK = 0.1
+BIO_CONTRIBUTION_CARBON_PLANTING_BELT = 0.1
+BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1
+BIO_CONTRIBUTION_AGROFORESTRY = 0.75
+BIO_CONTRIBUTION_BECCS = 0
 ''' 
 The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.
 For example, if the raw biodiversity priority value is 0.6 and the benefit is 0.8, then the biodiversity value
@@ -541,38 +585,34 @@ Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.
 '''
 
-NVIS_SPATIAL_DETAIL = 'HIGH'                 # 'LOW' or 'HIGH'
-'''
-- If 'LOW' is selected, the primary group layers will be used to represent the vegetation type. 
-- If 'HIGH' is selected, the sub group layers will be used to represent the vegetation type.
-'''
-
-
-NVIS_CLASS_DETAIL  = 'MVG'                  # 'MVG' or 'MVS'
+NVIS_TARGET_CLASS  = 'MVS'                  # 'MVG', 'MVS', 'MVG_IBRA', 'MVS_IBRA'
 '''
 The National Vegetation Information System (NVIS) provides the 100m resolution information on
 the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers) across Australia.
 
-- If 'MVG' is selected, the NVIS input layers will be be resampled to 1km resolution, 
-  and each layer representing the percentage of a vegetation group's coverage.
-    
-- If 'MVS' is selected, the NVIS input layers will be be resampled to a single 1km resolution layer,
-  and each cell has a group index who covers the most area within this cell.
+- If 'MVG/MVS' is selected, use need to define conservation target for each NVIS group across the whole study area.
+- If 'MVS_IBRA/MVG_IBRA' is selected, use need to define conservation target for each NVIS group for selected the IBRA region.
 '''
 
 
 # ------------------------------- Species parameters -------------------------------
-BIODIVERSTIY_TARGET_GBF_4 =  'on'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_4_SNES =  'on'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_4_ECNES = 'on'           # 'on' or 'off'.
+
 '''
 Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
 halt the extinction of known threatened species, protect genetic diversity, 
 and manage human-wildlife interactions
 '''
 
-SNES_CONSTRAINTS = 'on'    # 'on' or 'off'
-ECNES_CONSTRAINTS = 'on'   # 'on' or 'off'
 
-NES_LAYER_TYPE = 'likely'  # 'likely' or 'likely_and_maybe'
+
+# -------------------------------- Climate change impacts on biodiversity -------------------------------
+BIODIVERSTIY_TARGET_GBF_8 = 'on'           # 'on' or 'off'.
+'''
+Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
+reduce the impacts of climate change on biodiversity and ecosystems.
+'''
 
 
 

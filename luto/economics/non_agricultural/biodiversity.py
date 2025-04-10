@@ -22,27 +22,27 @@ import numpy as np
 from luto.data import Data
 from luto import tools
 from luto.settings import (
-    ENV_PLANTING_BIODIVERSITY_BENEFIT, 
-    CARBON_PLANTING_BLOCK_BIODIV_BENEFIT, 
-    CARBON_PLANTING_BELT_BIODIV_BENEFIT, 
-    RIPARIAN_PLANTING_BIODIV_BENEFIT,
-    AGROFORESTRY_BIODIV_BENEFIT,
-    BECCS_BIODIVERSITY_BENEFIT,
+    BIO_CONTRIBUTION_ENV_PLANTING, 
+    BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK, 
+    BIO_CONTRIBUTION_CARBON_PLANTING_BELT, 
+    BIO_CONTRIBUTION_RIPARIAN_PLANTING,
+    BIO_CONTRIBUTION_AGROFORESTRY,
+    BIO_CONTRIBUTION_BECCS,
     AF_PROPORTION,
     CP_BELT_PROPORTION,
 )
 
 
 def get_biodiv_environmental_plantings(data: Data) -> np.ndarray:
-    return data.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * data.REAL_AREA * ENV_PLANTING_BIODIVERSITY_BENEFIT
+    return data.BIO_CONNECTIVITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_ENV_PLANTING
 
 
 def get_biodiv_riparian_plantings(data: Data) -> np.ndarray:
-    return data.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * data.REAL_AREA * RIPARIAN_PLANTING_BIODIV_BENEFIT
+    return data.BIO_CONNECTIVITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_RIPARIAN_PLANTING
 
 
 def get_biodiv_agroforestry_base(data: Data) -> np.ndarray:
-    return data.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * data.REAL_AREA * AGROFORESTRY_BIODIV_BENEFIT
+    return data.BIO_CONNECTIVITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_AGROFORESTRY
 
 
 def get_biodiv_sheep_agroforestry(
@@ -102,11 +102,11 @@ def get_biodiv_beef_agroforestry(
 
 
 def get_biodiv_carbon_plantings_block(data: Data) -> np.ndarray:
-    return data.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * data.REAL_AREA * CARBON_PLANTING_BLOCK_BIODIV_BENEFIT
+    return data.BIO_CONNECTIVITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK
 
 
 def get_biodiv_carbon_plantings_belt_base(data: Data) -> np.ndarray:
-    return data.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * data.REAL_AREA * CARBON_PLANTING_BELT_BIODIV_BENEFIT
+    return data.BIO_CONNECTIVITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_CARBON_PLANTING_BELT
 
 
 def get_biodiv_sheep_carbon_plantings_belt(
@@ -166,17 +166,17 @@ def get_biodiv_beef_carbon_plantings_belt(
 
 
 def get_biodiv_beccs(data: Data):
-    return data.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * data.REAL_AREA * BECCS_BIODIVERSITY_BENEFIT
+    return data.BIO_CONNECTIVITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_BECCS
 
 
 def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
     """
     Returns non-agricultural c_rk matrix of costs per cell and land use.
 
-    Parameters:
+    Parameters
     - data: The input data object containing necessary information.
 
-    Returns:
+    Returns
     - numpy.ndarray: The non-agricultural c_rk matrix of costs per cell and land use.
     """
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
@@ -206,34 +206,34 @@ def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
     return np.concatenate(non_agr_b_matrices, axis=1)
 
 
-def get_non_ag_lu_biodiv_impacts(data: Data) -> dict[int, float]:
+def get_non_ag_lu_biodiv_contribution(data: Data) -> dict[int, float]:
     return {
         # Environmental plantings
-        0: ENV_PLANTING_BIODIVERSITY_BENEFIT,
+        0: BIO_CONTRIBUTION_ENV_PLANTING,
         # Riparian plantings
-        1: RIPARIAN_PLANTING_BIODIV_BENEFIT,
+        1: BIO_CONTRIBUTION_RIPARIAN_PLANTING,
         # Sheep agroforestry
         2: (
-            AF_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
-            + (1 - AF_PROPORTION) * (data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_sheep_code(data)])
+            AF_PROPORTION * BIO_CONTRIBUTION_AGROFORESTRY
+            + (1 - AF_PROPORTION) * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_sheep_code(data)])
         ),
         # Beef agroforestry
         3: (
-            AF_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
-            + (1 - AF_PROPORTION) * (data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_beef_code(data)])
+            AF_PROPORTION * BIO_CONTRIBUTION_AGROFORESTRY
+            + (1 - AF_PROPORTION) * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_beef_code(data)])
         ),
         # Carbon plantings (block)
-        4: CARBON_PLANTING_BLOCK_BIODIV_BENEFIT,
+        4: BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK,
         # Sheep carbon plantings (belt)
         5: (
-            CP_BELT_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
-            + (1 - CP_BELT_PROPORTION) * (data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_sheep_code(data)])
+            CP_BELT_PROPORTION * BIO_CONTRIBUTION_AGROFORESTRY
+            + (1 - CP_BELT_PROPORTION) * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_sheep_code(data)])
         ),
         # Beef carbon plantings (belt)
         6: (
-            CP_BELT_PROPORTION * AGROFORESTRY_BIODIV_BENEFIT
-            + (1 - CP_BELT_PROPORTION) * (data.BIODIV_HABITAT_DEGRADE_LOOK_UP[tools.get_beef_code(data)])
+            CP_BELT_PROPORTION * BIO_CONTRIBUTION_AGROFORESTRY
+            + (1 - CP_BELT_PROPORTION) * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_beef_code(data)])
         ),
         # BECCS
-        7: BECCS_BIODIVERSITY_BENEFIT,
+        7: BIO_CONTRIBUTION_BECCS,
     }

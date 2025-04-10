@@ -23,15 +23,10 @@
 Pure helper functions and other tools.
 """
 
-
-
-import re
 import sys
-import time
 import os.path
 import traceback
 import functools
-import shutil
 
 import pandas as pd
 import numpy as np
@@ -41,14 +36,24 @@ import luto.settings as settings
 
 from typing import Tuple
 from datetime import datetime
-from itertools import product
-from joblib import Parallel, delayed
 
-from luto.tools.report.create_html import data2html
-from luto.tools.report.create_report_data import save_report_data
-from luto.tools.report.create_static_maps import TIF2MAP
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.tools.report.data_tools import get_all_files
+import luto.economics.agricultural.water as ag_water
+import luto.economics.non_agricultural.water as non_ag_water
+
+
+def write_timestamp():
+    timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
+    timestamp_path = os.path.join(settings.OUTPUT_DIR, '.timestamp')
+    with open(timestamp_path, 'w') as f: f.write(timestamp)
+    return timestamp
+
+def read_timestamp():
+    timestamp_path = os.path.join(settings.OUTPUT_DIR, '.timestamp')
+    if os.path.exists(timestamp_path):
+        with open(timestamp_path, 'r') as f: timestamp = f.read()
+    else:
+        raise FileNotFoundError(f"Timestamp file not found at {timestamp_path}")
+    return timestamp
 
 
 def amortise(cost, rate=settings.DISCOUNT_RATE, horizon=settings.AMORTISATION_PERIOD):
@@ -152,7 +157,7 @@ def get_beef_agroforestry_cells(lumap) -> np.ndarray:
 
 def get_agroforestry_cells(lumap) -> np.ndarray:
     """
-    Get an array with cells used that currently use agroforestry (either sheep or beef)
+    Get an array with cells that currently use agroforestry (either sheep or beef)
     """
     agroforestry_lus = [settings.NON_AGRICULTURAL_LU_BASE_CODE + 2, settings.NON_AGRICULTURAL_LU_BASE_CODE + 3]
     return np.nonzero(np.isin(lumap, agroforestry_lus))[0]
@@ -236,18 +241,18 @@ def get_non_ag_cells(lumap) -> np.ndarray:
     return np.nonzero(lumap >= settings.NON_AGRICULTURAL_LU_BASE_CODE)[0]
 
 
-def get_water_delta_matrix(w_mrj, l_mrj, data, yr_idx):
+def get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx):
     """
     Gets the water delta matrix ($/cell) that applies the cost of installing/removing irrigation to
     base transition costs. Includes the costs of water license fees.
 
-    Parameters:
-    - w_mrj (numpy.ndarray, <unit:ML/cell>): Water requirements matrix for target year.
-    - l_mrj (numpy.ndarray): Land-use and land management matrix for the base_year.
-    - data (object): Data object containing necessary information.
+    Parameters
+     w_mrj (numpy.ndarray, <unit:ML/cell>): Water requirements matrix for target year.
+     l_mrj (numpy.ndarray): Land-use and land management matrix for the base_year.
+     data (object): Data object containing necessary information.
 
-    Returns:
-    - w_delta_mrj (numpy.ndarray, <unit:$/cell>).
+    Returns
+     w_delta_mrj (numpy.ndarray, <unit:$/cell>).
     """
     yr_cal = data.YR_CAL_BASE + yr_idx
     
@@ -277,10 +282,46 @@ def get_water_delta_matrix(w_mrj, l_mrj, data, yr_idx):
     )
     w_delta_mrj[0] = np.where(l_mrj[1], w_delta_mrj[0] + remove_irrig, w_delta_mrj[0])
     
-
     # Amortise upfront costs to annualised costs
     w_delta_mrj = amortise(w_delta_mrj)
+    
     return w_delta_mrj  # <unit:$/cell>
+
+def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.ndarray, np.ndarray]:
+    """
+    Gets the water delta matrix ($/cell) that applies the cost of installing/removing irrigation to
+    base transition costs. Includes the costs of water license fees.
+    
+    Parameters
+     data (object): Data object containing necessary information.
+     yr_idx (int): Index of the target year.
+     lumap (numpy.ndarray): Land-use map.
+     lmmap (numpy.ndarray): Land management map.
+    
+    Returns
+     w_license_cost_r (numpy.ndarray) : Water license cost for each cell.
+     w_rm_irrig_cost_r (numpy.ndarray) : Cost of removing irrigation for each cell.
+     
+     
+    """
+    
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    l_mrj = lumap2ag_l_mrj(lumap, lmmap)
+    non_ag_cells = get_non_ag_cells(lumap)
+    
+    w_req_mrj = ag_water.get_wreq_matrices(data, yr_idx).astype(np.float32)     # <unit: ML/CELL>
+    w_req_r = (w_req_mrj * l_mrj).sum(axis=0).sum(axis=1)
+    w_yield_r = non_ag_water.get_w_net_yield_matrix_env_planting(data, yr_idx)  # <unit: ML/CELL>
+    w_delta_r = - (w_req_r + w_yield_r)
+    
+    w_license_cost_r = w_delta_r * data.WATER_LICENCE_PRICE * data.WATER_LICENSE_COST_MULTS[yr_cal] * settings.INCLUDE_WATER_LICENSE_COSTS     # <unit: $/CELL>
+    w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA                   # <unit: $/CELL>
+    
+    # Amortise upfront costs to annualised costs
+    w_license_cost_r = amortise(w_license_cost_r)
+    w_rm_irrig_cost_r = amortise(w_rm_irrig_cost_r)
+    
+    return w_license_cost_r, w_rm_irrig_cost_r
 
 
 def am_name_snake_case(am_name):
@@ -295,12 +336,12 @@ def get_exclusions_for_excluding_all_natural_cells(data, lumap) -> np.ndarray:
     matrix for all such non-ag land uses, returning an array valued 0 at the 
     indices of cells that use natural land uses, and 1 everywhere else.
 
-    Parameters:
-    - data: The data object containing information about the cells.
-    - lumap: The land use map.
+    Parameters
+     data: The data object containing information about the cells.
+     lumap: The land use map.
 
-    Returns:
-    - exclude: An array of shape (NCELLS,) with values 0 at the indices of cells
+    Returns
+     exclude: An array of shape (NCELLS,) with values 0 at the indices of cells
                that use natural land uses, and 1 everywhere else.
     """
     exclude = np.ones(data.NCELLS)
@@ -316,12 +357,12 @@ def get_exclusions_agroforestry_base(data, lumap) -> np.ndarray:
     Return a 1-D array indexed by r that represents how much agroforestry can possibly 
     be done at each cell.
 
-    Parameters:
-    - data: The data object containing information about the landscape.
-    - lumap: The land use map.
+    Parameters
+     data: The data object containing information about the landscape.
+     lumap: The land use map.
 
-    Returns:
-    - exclude: A 1-D array.
+    Returns
+     exclude: A 1-D array.
     """
     exclude = (np.ones(data.NCELLS) * settings.AF_PROPORTION).astype(np.float32)
 
@@ -336,12 +377,12 @@ def get_exclusions_carbon_plantings_belt_base(data, lumap) -> np.ndarray:
     Return a 1-D array indexed by r that represents how much carbon plantings (belt) can possibly 
     be done at each cell.
 
-    Parameters:
-    - data: The data object containing information about the cells.
-    - lumap: The land use map.
+    Parameters
+     data (Data): The data object containing information about the cells.
+     lumap (np.ndarray): The land use map.
 
-    Returns:
-    - exclude: A 1-D array
+    Returns
+     exclude: A 1-D array
     """
     exclude = (np.ones(data.NCELLS) * settings.CP_BELT_PROPORTION).astype(np.float32)
 
@@ -383,21 +424,21 @@ def non_ag_rk_to_xr(data, arr):
 
 def am_mrj_to_xr(data, am_mrj_dict):
     emp_arr_xr = xr.DataArray(
-        np.full((len(AG_MANAGEMENTS_TO_LAND_USES), len(data.LANDMANS), data.NCELLS, len(data.AGRICULTURAL_LANDUSES)), np.nan),
+        np.full((len(settings.AG_MANAGEMENTS_TO_LAND_USES), len(data.LANDMANS), data.NCELLS, len(data.AGRICULTURAL_LANDUSES)), np.nan),
         dims=['am', 'lm', 'cell', 'lu'],
-        coords={'am': list(AG_MANAGEMENTS_TO_LAND_USES.keys()),
+        coords={'am': list(settings.AG_MANAGEMENTS_TO_LAND_USES.keys()),
                 'lm': data.LANDMANS,
                 'cell': np.arange(data.NCELLS),
                 'lu': data.AGRICULTURAL_LANDUSES}
     )
 
-    for am,lu in AG_MANAGEMENTS_TO_LAND_USES.items():
+    for am,lu in settings.AG_MANAGEMENTS_TO_LAND_USES.items():
         if emp_arr_xr.loc[am, :, :, lu].shape == am_mrj_dict[am].shape:
             # If the shape is the same, just assign the value
             emp_arr_xr.loc[am, :, :, lu] = am_mrj_dict[am]  
         else:
             # Otherwise, assign the array at index of the land use
-            lu_idx = [data.DESC2AGLU[i] for i in AG_MANAGEMENTS_TO_LAND_USES[am]]
+            lu_idx = [data.DESC2AGLU[i] for i in settings.AG_MANAGEMENTS_TO_LAND_USES[am]]
             emp_arr_xr.loc[am, :, :, lu] = am_mrj_dict[am][:,:, lu_idx]   
     return emp_arr_xr
 
@@ -449,12 +490,12 @@ def calc_water(
 ) -> pd.DataFrame:
     
     '''
-    Note:
+    Note
         This function is only used for the `write_water` in the `luto.tools.write` module.
         Calculate water yields for year given the index. 
     
-    Return:
-    - pd.DataFrame, the water yields for year and region.
+    Return
+     pd.DataFrame, the water yields for year and region.
     '''
     
     # Calculate water yields for year and region.
@@ -485,7 +526,7 @@ def calc_water(
 
     # Agricultural managements contribution
     AM_dfs = []
-    for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
+    for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
         am_j = np.array([data.DESC2AGLU[lu] for lu in am_lus])
         am_mrj = ag_man_w_mrj[am][:, ind, :] * am_dvar[am][:, ind, :][:, :, am_j] 
         am_jm = np.einsum('mrj->jm', am_mrj)
@@ -505,33 +546,33 @@ def calc_water(
 
 
 def calc_major_vegetation_group_ag_area_for_year(
-    mvg_vr: np.ndarray, lumap: np.ndarray, ag_biodiv_degr_j: dict[int, float]
+    GBF3_raw_MVG_area_vr: np.ndarray, lumap: np.ndarray, biodiv_contr_ag_rj: dict[int, float]
 ) -> dict[int, float]:
     prod_data = {}
 
-    ag_biodiv_impacts_j = {j: 1 - x for j, x in ag_biodiv_degr_j.items()}
+    ag_biodiv_impacts_j = {j: 1 - x for j, x in biodiv_contr_ag_rj.items()}
 
     # Numpy magic
     ag_biodiv_degr_r = np.vectorize(ag_biodiv_impacts_j.get)(lumap)
     
-    for v in range(mvg_vr.shape[0]):
-        prod_data[v] = mvg_vr[v, :] * ag_biodiv_degr_r
+    for v in range(GBF3_raw_MVG_area_vr.shape[0]):
+        prod_data[v] = GBF3_raw_MVG_area_vr[v, :] * ag_biodiv_degr_r
 
     return prod_data
 
 
 def calc_species_ag_area_for_year(
-    sc_sr: np.ndarray, lumap: np.ndarray, ag_biodiv_degr_j: dict[int, float]
+    GBF8_raw_species_area_sr: np.ndarray, lumap: np.ndarray, biodiv_contr_ag_rj: dict[int, float]
 ) -> dict[int, float]:
     prod_data = {}
 
-    ag_biodiv_impacts_j = {j: 1 - x for j, x in ag_biodiv_degr_j.items()}
+    ag_biodiv_impacts_j = {j: 1 - x for j, x in biodiv_contr_ag_rj.items()}
 
     # Numpy magic
     ag_biodiv_degr_r = np.vectorize(ag_biodiv_impacts_j.get)(lumap)
     
-    for s in range(sc_sr.shape[0]):
-        prod_data[s] = sc_sr[s, :] * ag_biodiv_degr_r
+    for s in range(GBF8_raw_species_area_sr.shape[0]):
+        prod_data[s] = GBF8_raw_species_area_sr[s, :] * ag_biodiv_degr_r
 
     return prod_data
 
@@ -582,24 +623,6 @@ class LogToFile:
         return wrapper
 
     class StreamToLogger(object):
-        def __init__(self, file, orig_stream=None):
-            self.file = file
-            self.orig_stream = orig_stream
-
-        def write(self, buf):
-            if buf.strip():  # Only prepend timestamp to non-newline content
-                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                formatted_buf = f"{timestamp} - {buf}"
-            else:
-                formatted_buf = buf  # If buf is just a newline/whitespace, don't prepend timestamp
-            
-            if self.orig_stream:
-                self.orig_stream.write(formatted_buf)  # Write to the original stream if it exists
-            self.file.write(formatted_buf)  # Write to the log file
-
-        def flush(self):
-            self.file.flush()  # Ensure content is written to disk
-
         def __init__(self, file, orig_stream=None):
             self.file = file
             self.orig_stream = orig_stream

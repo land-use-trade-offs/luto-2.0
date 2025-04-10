@@ -28,10 +28,10 @@ def list_all_files(directory):
     """
     This function is used to get all the file paths under the given directory
 
-    Parameters:
+    Parameters
     directory (str): The given directory.
 
-    Returns:
+    Returns
     list: The list of file paths under the given directory.
     """
     
@@ -51,7 +51,7 @@ def add_txt_2_html(html_path:str, txt:str, id:str)->None:
             - It can be either a string or a file path.
         id (str): The ID of the HTML element where the text content should be added.
 
-    Returns:
+    Returns
         None
     """
     
@@ -88,7 +88,7 @@ def add_data_2_html(html_path:str, data_pathes:list)->None:
         html_path (str): The path to the HTML file.
         data_pathes (list): A list of paths to the data files.
 
-    Returns:
+    Returns
         None: This function does not return anything.
     """
 
@@ -143,7 +143,7 @@ def select_years(year_list):
     Args:
         year_list (list): A list of years.
 
-    Returns:
+    Returns
         list: A list containing the selected years.
 
     """

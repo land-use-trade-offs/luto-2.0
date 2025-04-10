@@ -70,7 +70,7 @@ def create_maps(row, model_run_scenario):
         row (pandas.Series): A row of data containing information about the map.
         model_run_scenario (str): The model run scenario text (or path to).
 
-    Returns:
+    Returns
         None
     """
     

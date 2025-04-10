@@ -56,7 +56,7 @@ def hex_color_to_numeric(hex_color: str, toFloat: bool = False) -> tuple:
     Args:
         hex_color (str): The hexadecimal color code to convert.
 
-    Returns:
+    Returns
         tuple: A tuple containing the red, green, blue, and (optional) alpha components of the color.
     """
     # Remove the '#' character (if present)
@@ -99,7 +99,7 @@ def convert_1band_to_4band_in_memory(initial_tif:str,
         color_dict (dict): 
             A dictionary of color values for each class.
 
-    Returns:
+    Returns
         MemoryFile: The new MemoryFile containing the 4-band (RGBA) array.
     """
     
@@ -135,14 +135,14 @@ def reproject_raster_in_memory(src_memfile,
     """
     Reproject a raster in a MemoryFile to Web Mercator and return a new MemoryFile.
 
-    Parameters:
+    Parameters
         src_memfile (MemoryFile): 
             The source raster in a MemoryFile.
         dst_crs (CRS, optional): 
             The destination CRS to reproject the raster to. 
             Defaults to EPSG:3857 (Web Mercator).
 
-    Returns:
+    Returns
         MemoryFile: The reprojected raster in a new MemoryFile.
     """
     
@@ -192,7 +192,7 @@ def save_colored_raster_as_png(src_memfile: MemoryFile,
             The destination CRS for transforming the bounding box. 
             Defaults to 'EPSG:4283' (GDA 1994).
 
-    Returns:
+    Returns
         Tuple[List[float], List[List[float]]]:
             A tuple containing the center coordinates and bounds of the transformed bounding box.
             The center coordinates are in the format [latitude, longitude].
@@ -244,7 +244,7 @@ def process_int_raster( initial_tif:str=None,
         dst_crs (str):
             Destination coordinate reference system (default is 'EPSG:4283' (GDA 1994)).
     
-    Returns:
+    Returns
         tuple: A tuple containing the center, bounds for folium, and mercator bounding box.
     """
     # Process the raster entirely in memory
@@ -290,7 +290,7 @@ def float_img_to_int(tif_path: str,
         tif_path (str): The path to the input TIFF file.
         band (int, optional): The band number to read from the TIFF file. Defaults to 1.
 
-    Returns:
+    Returns
         MemoryFile: The in-memory file containing the converted integer image.
     """
     with rasterio.open(tif_path) as src:
@@ -323,7 +323,7 @@ def process_float_raster(initial_tif:str=None,
     reprojecting it. Save the reprojected raster as a GeoTIFF file 
     and a PNG file. Return the center and bounds for folium.
 
-    Parameters:
+    Parameters
     initial_tif (str): 
         Path to the initial float raster image.
     band (int, default=1): 
@@ -337,7 +337,7 @@ def process_float_raster(initial_tif:str=None,
     dst_crs (str, default='EPSG:4283' (GDA 1994)): 
         Destination CRS for reprojecting the raster image.
 
-    Returns:
+    Returns
     tuple: A tuple containing the center coordinates, bounds for folium, and the mercator bounding box.
     """
     
@@ -378,7 +378,7 @@ def process_raster(tif_path: str,
         color_csv (str): The path to the CSV file containing color information.
         data_type (str): The type of data in the raster image ('integer' or 'float').
 
-    Returns:
+    Returns
         tuple: A tuple containing the center, bounds for folium map, and mercator bbox.
     """    
     

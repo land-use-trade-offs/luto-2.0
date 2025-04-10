@@ -23,13 +23,9 @@
 To compare LUTO 2.0 spatial arrays.
 """
 
-
 import numpy as np
 import pandas as pd
-from collections import defaultdict
-
 import luto.settings as settings
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
 
 
 def lumap_crossmap(oldmap, newmap, ag_landuses, non_ag_landuses, real_area):
@@ -182,7 +178,7 @@ def crossmap_amstat( am
         ludict[(k + base)*2 + 1] = f"{lu} ({am})"
 
     # Collect all j values that apply to the given AM option
-    am_j = [j for j, lu_name in enumerate(ag_landuses) if lu_name in AG_MANAGEMENTS_TO_LAND_USES[am]]
+    am_j = [j for j, lu_name in enumerate(ag_landuses) if lu_name in settings.AG_MANAGEMENTS_TO_LAND_USES[am]]
     am_j = np.array(am_j)
 
     # Encode information about the given AM usage by doubling up land uses

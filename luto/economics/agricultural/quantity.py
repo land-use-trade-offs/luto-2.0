@@ -27,8 +27,7 @@ from typing import Dict
 import numpy as np
 from scipy.interpolate import interp1d
 
-from luto.settings import AG_MANAGEMENTS
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 
 
 def lvs_veg_types(lu) -> tuple[str, str]:
@@ -37,7 +36,7 @@ def lvs_veg_types(lu) -> tuple[str, str]:
     Args:
         lu (str): The livestock land-use.
 
-    Returns:
+    Returns
         tuple: A tuple containing the livestock type and vegetation type.
 
     Raises:
@@ -71,13 +70,13 @@ def get_ccimpact(data, lu, lm, yr_idx):
     """
     Return climate change impact multiplier at (zero-based) year index.
 
-    Parameters:
+    Parameters
     - data: The data object containing climate change impact data.
     - lu: The land-use for which the climate change impact is calculated.
     - lm: The land-management for which the climate change impact is calculated.
     - yr_idx: The zero-based index of the year for which the climate change impact is calculated.
 
-    Returns:
+    Returns
     - The climate change impact multiplier at the specified year index.
     """
 
@@ -105,14 +104,14 @@ def get_yield_pot(data, lvstype, vegtype, lm, yr_idx):
     """
     Return the yield potential <unit: head/ha> for livestock by land cover type.
 
-    Parameters:
+    Parameters
     - data: Data object or module.
     - lvstype: Livestock type (one of 'BEEF', 'SHEEP' or 'DAIRY').
     - vegtype: Vegetation type (one of 'natural land' or 'modified land').
     - lm: Land-management type.
     - yr_idx: Number of years post 2010.
 
-    Returns:
+    Returns
     - yield_pot: The yield potential <unit: head/ha>.
     """
 
@@ -155,7 +154,7 @@ def get_quantity_lvstk(data, pr, lm, yr_idx):
         lm (str): Land management.
         yr_idx (int): Number of years post base-year ('YR_CAL_BASE').
 
-    Returns:
+    Returns
         numpy.ndarray: Livestock yield of `pr`+`lm` in `yr_idx` as 1D Numpy array.
 
     Units:
@@ -225,7 +224,7 @@ def get_quantity_crop(data, pr, lm, yr_idx):
         lm (str): Land management.
         yr_idx (int): Number of years post base-year ('YR_CAL_BASE').
 
-    Returns:
+    Returns
         numpy.ndarray: 1D Numpy array containing crop yield <unit: t/cell>.
 
     Raises:
@@ -265,7 +264,7 @@ def get_quantity(data, pr, lm, yr_idx):
         lm (str): Land management.
         yr_idx (int): Number of years post base-year ('YR_CAL_BASE').
 
-    Returns:
+    Returns
         numpy.ndarray: 1D Numpy array representing the yield <unit: t/cell>.
 
     Raises:
@@ -296,12 +295,12 @@ def get_quantity_matrix(data, lm, yr_idx):
     """
     Return q_rp matrix of quantities per cell per product as 2D Numpy array.
 
-    Parameters:
+    Parameters
     - data: The data object containing information about cells and products.
     - lm: The lm object representing the land management.
     - yr_idx: The index of the year.
 
-    Returns:
+    Returns
     - q_rp: A 2D Numpy array representing the quantities per cell per product.
     """
 
@@ -317,11 +316,11 @@ def get_quantity_matrices(data, yr_idx):
     """
     Return q_mrp matrix of quantities per cell as 3D Numpy array.
 
-    Parameters:
+    Parameters
     - data: The input data containing information about quantities.
     - yr_idx: The index of the year.
 
-    Returns:
+    Returns
     - q_mrp: A 3D Numpy array representing the matrix of quantities per cell.
     """
     return np.stack(tuple( get_quantity_matrix(data, lm, yr_idx)
@@ -333,12 +332,12 @@ def get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx):
     Applies the effects of using asparagopsis to the quantity data
     for all relevant agr. land uses.
 
-    Parameters:
+    Parameters
     - data: The data object containing relevant information.
     - q_mrp: The quantity data for all land uses and products.
     - yr_idx: The index of the year.
 
-    Returns:
+    Returns
     - new_q_mrp: The updated quantity data after applying the effects of using asparagopsis.
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES["Asparagopsis taxiformis"]
@@ -370,12 +369,12 @@ def get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx):
     Applies the effects of using precision agriculture to the quantity data
     for all relevant agricultural land uses.
 
-    Parameters:
+    Parameters
     - data: The data object containing relevant information.
     - q_mrp: The quantity data for all land uses.
     - yr_idx: The index of the year.
 
-    Returns:
+    Returns
     - new_q_mrp: The updated quantity data after applying precision agriculture effects.
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']
@@ -405,12 +404,12 @@ def get_ecological_grazing_effect_q_mrp(data, q_mrp, yr_idx):
     Applies the effects of using ecological grazing to the quantity data
     for all relevant agricultural land uses.
 
-    Parameters:
+    Parameters
     - data: The data object containing relevant information.
     - q_mrp: The quantity data to be updated.
     - yr_idx: The index of the year to be used for calculations.
 
-    Returns:
+    Returns
     - new_q_mrp: The updated quantity data after applying ecological grazing effects.
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
@@ -442,10 +441,10 @@ def get_savanna_burning_effect_q_mrp(data):
 
     Since EDSSB has no effect on quantity produced, return an array of zeros.
 
-    Parameters:
+    Parameters
     - data: The input data object containing information about the model
 
-    Returns:
+    Returns
     - An array of zeros with shape (NLMS, NCELLS, NPRS)
     """
     return np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
@@ -456,12 +455,12 @@ def get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx):
     Applies the effects of using AgTech EI to the quantity data
     for all relevant agr. land uses.
 
-    Parameters:
+    Parameters
     - data: The data object containing relevant information.
     - q_mrp: The quantity data to be updated.
     - yr_idx: The index of the year.
 
-    Returns:
+    Returns
     - new_q_mrp: The updated quantity data
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']
@@ -491,12 +490,12 @@ def get_biochar_effect_q_mrp(data, q_mrp, yr_idx):
     Applies the effects of using Biochar to the quantity data
     for all relevant agricultural land uses.
 
-    Parameters:
+    Parameters
     - data: The data object containing relevant information.
     - q_mrp: The quantity data to be updated.
     - yr_idx: The index of the year to be used for calculations.
 
-    Returns:
+    Returns
     - new_q_mrp: The updated quantity data after applying Biochar effects.
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Biochar']
@@ -530,7 +529,7 @@ def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[s
         q_mrp: The 3D matix coresponding to water-supply, cell, and product.
         yr_idx: The 0-based year index.
 
-    Returns:
+    Returns
         A dictionary containing the quantity matrices for different agricultural management practices.
         The keys of the dictionary represent the names of the practices, and the values are the corresponding quantity matrices.
     """

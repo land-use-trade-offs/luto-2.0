@@ -18,7 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 import os
-import shutil
+import shutil, pickle
 import luto.simulation as sim
 import luto.settings as settings
 
@@ -26,6 +26,13 @@ import luto.settings as settings
 # Run the simulation
 data = sim.load_data()
 sim.run(data=data, base_year=2010, target_year=2050, step_size=settings.STEP_SIZE)
+
+
+# Save objectives to disk
+with open(f"{data.path}/DATA_REPORT/obj_vals.pkl", 'wb') as f:
+    pickle.dump(data.obj_vals, f)
+
+
 
 # Remove all files except the report directory if settings.KEEP_OUTPUTS is False
 '''

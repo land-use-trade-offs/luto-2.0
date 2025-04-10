@@ -138,7 +138,7 @@ def create_grid_search_template(
 def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, mode:Literal['single','cluster']='single', n_workers:int=4):
     '''
     Submit the tasks to the cluster using the custom settings.\n
-    Parameters:
+    Parameters
      custom_settings (pd.DataFrame):The custom settings DataFrame.
      python_path (str, only works if mode == "single"): The path to the python executable.
      mode (str): The mode to submit the tasks. Options are "single" or "cluster".
@@ -213,7 +213,10 @@ def write_custom_settings(task_dir:str, settings_dict:dict):
                 bash_file.write(f'# {k} is a dictionary, which is not natively supported in bash\n')
                 for key, value in v.items():
                     key = str(key).replace(' ', '_').replace('(','').replace(')','')
-                    bash_file.write(f'{k}_{key}={value}\n') 
+                    if isinstance(value, list):
+                        bash_file.write(f'{k}_{key}=({ " ".join([str(elem) for elem in value])})\n')
+                    else:
+                        bash_file.write(f'{k}_{key}={value}\n') 
             # If the value is a string, write it as a string
             elif isinstance(v, str):
                 file.write(f'{k}="{v}"\n')
@@ -294,15 +297,16 @@ def submit_task(col:str, python_path:str=None, mode:Literal['single','cluster']=
     return f'Task {col} has been submitted!'
 
 
-def log_memory_usage(output_dir=settings.OUTPUT_DIR, interval=1):
+def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1):
     '''
     Log the memory usage of the current process to a file.
-    Parameters:
+    Parameters
         output_dir (str): The directory to save the memory log file.
+        mode (str): The mode to open the file. Default is 'a' (append).
         interval (int): The interval in seconds to log the memory usage.
     '''
     
-    with open(f'{output_dir}/RES_{settings.RESFACTOR}_{settings.MODE}_mem_log.txt', mode='a') as file:
+    with open(f'{output_dir}/RES_{settings.RESFACTOR}_{settings.MODE}_mem_log.txt', mode=mode) as file:
         while True:
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             process = psutil.Process(os.getpid())

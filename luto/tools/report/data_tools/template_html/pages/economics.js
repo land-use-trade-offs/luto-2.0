@@ -903,8 +903,8 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
 
-  // Chart:economics_8_transition_ag2ag_cost_1_From land-use_wide
-  Highcharts.chart("economics_8_transition_ag2ag_cost_1_From land-use_wide", {
+  // Chart:economics_8_transition_ag2ag_cost_2_From land-use_wide
+  Highcharts.chart("economics_8_transition_ag2ag_cost_2_From land-use_wide", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -919,7 +919,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_8_transition_ag2ag_cost_1_From land-use_wide_csv").innerHTML
+      document.getElementById("economics_8_transition_ag2ag_cost_2_From land-use_wide_csv").innerHTML
     ),
 
     yAxis: {
@@ -956,8 +956,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:economics_8_transition_ag2ag_cost_2_To land-use_wide
-  Highcharts.chart("economics_8_transition_ag2ag_cost_2_To land-use_wide", {
+  // Chart:economics_8_transition_ag2ag_cost_3_To land-use_wide
+  Highcharts.chart("economics_8_transition_ag2ag_cost_3_To land-use_wide", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -972,7 +972,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_8_transition_ag2ag_cost_2_To land-use_wide_csv").innerHTML
+      document.getElementById("economics_8_transition_ag2ag_cost_3_To land-use_wide_csv").innerHTML
     ),
 
     yAxis: {
@@ -1011,9 +1011,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 
-  // economics_8_transition_ag2ag_cost_6_transition_matrix
+  // economics_8_transition_ag2ag_cost_4_transition_matrix
   let data_ag2ag = JSON.parse(
-    document.getElementById("economics_8_transition_ag2ag_cost_6_transition_matrix_csv").innerHTML
+    document.getElementById("economics_8_transition_ag2ag_cost_4_transition_matrix_csv").innerHTML
   );
 
   // Get the slider_ag2ag and the year span
@@ -1045,7 +1045,7 @@ document.addEventListener("DOMContentLoaded", function () {
     let val_min = Math.min(...lastElements.flat());
     let val_max = Math.max(...lastElements.flat());
 
-    Highcharts.chart("economics_8_transition_ag2ag_cost_6_transition_matrix", {
+    Highcharts.chart("economics_8_transition_ag2ag_cost_4_transition_matrix", {
       chart: {
         type: "heatmap",
         marginRight: 380,
@@ -1129,8 +1129,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 
-  // Chart:economics_8_transition_ag2ag_cost_3_Type_wide
-  Highcharts.chart("economics_8_transition_ag2ag_cost_3_Type_wide", {
+  // Chart:economics_8_transition_ag2ag_cost_1_Type_wide
+  Highcharts.chart("economics_8_transition_ag2ag_cost_1_Type_wide", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -1145,7 +1145,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_8_transition_ag2ag_cost_3_Type_wide_csv").innerHTML
+      document.getElementById("economics_8_transition_ag2ag_cost_1_Type_wide_csv").innerHTML
     ),
 
     yAxis: {
@@ -1182,63 +1182,12 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:economics_9_transition_ag2non_cost_5_Water supply_wide
-  Highcharts.chart("economics_9_transition_ag2non_cost_5_Water supply_wide", {
-    chart: {
-      type: "column",
-      marginRight: 380,
-    },
-
-    title: {
-      text: "Transition Cost (Agricultural to Agricultural) by Irrigation Status",
-    },
-
-    credits: {
-      enabled: false,
-    },
-
-    series: JSON.parse(
-      document.getElementById("economics_9_transition_ag2non_cost_5_Water supply_wide_csv").innerHTML
-    ),
-
-    yAxis: {
-      title: {
-        text: "Cost (million AU$)",
-      },
-    },
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-
-    legend: {
-      align: "right",
-      verticalalign: "left",
-      layout: "vertical",
-      x: -180,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-    plotOptions: {
-      column: {
-        stacking: "normal",
-      },
-    },
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
+ 
 
 
-  // Chart:economics_9_transition_ag2non_cost_6_transition_matrix
+  // Chart:economics_9_transition_ag2non_cost_4_transition_matrix
   let data_ag2non_ag = JSON.parse(
-    document.getElementById("economics_9_transition_ag2non_cost_6_transition_matrix_csv").innerHTML
+    document.getElementById("economics_9_transition_ag2non_cost_4_transition_matrix_csv").innerHTML
   );
 
   // Get the slider_ag2ag and the year span
@@ -1254,7 +1203,7 @@ document.addEventListener("DOMContentLoaded", function () {
     val_min = Math.min(...lastElements.flat());
     val_max = Math.max(...lastElements.flat());
 
-    Highcharts.chart("economics_9_transition_ag2non_cost_6_transition_matrix", {
+    Highcharts.chart("economics_9_transition_ag2non_cost_4_transition_matrix", {
       chart: {
         type: "heatmap",
         marginRight: 380,
@@ -1385,7 +1334,7 @@ document.addEventListener("DOMContentLoaded", function () {
       align: "right",
       verticalalign: "left",
       layout: "vertical",
-      x: -150,
+      x: -100,
       verticalAlign: "middle",
     },
 
@@ -1516,63 +1465,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 
-  // Chart:economics_10_transition_non_ag2ag_cost_5_Water supply_wide
-  Highcharts.chart("economics_10_transition_non_ag2ag_cost_5_Water supply_wide", {
-    chart: {
-      type: "column",
-      marginRight: 380,
-    },
-
-    title: {
-      text: "Transition Cost (Agricultural to Non-Agricultural) by Irritation Status",
-    },
-
-    credits: {
-      enabled: false,
-    },
-
-    series: JSON.parse(
-      document.getElementById("economics_10_transition_non_ag2ag_cost_5_Water supply_wide_csv").innerHTML
-    ),
-
-    yAxis: {
-      title: {
-        text: "Cost (million AU$)",
-      },
-    },
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-
-    legend: {
-      align: "right",
-      verticalalign: "left",
-      layout: "vertical",
-      x: -180,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-    plotOptions: {
-      column: {
-        stacking: "normal",
-      },
-    },
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-
-  // Chart:economics_10_transition_non_ag2ag_cost_6_transition_matrix
+  // Chart:economics_10_transition_non_ag2ag_cost_4_transition_matrix
   let data_non_ag2ag = JSON.parse(
-    document.getElementById("economics_10_transition_non_ag2ag_cost_6_transition_matrix_csv").innerHTML
+    document.getElementById("economics_10_transition_non_ag2ag_cost_4_transition_matrix_csv").innerHTML
   );
 
   // Get the slider_non_ag2ag and the year span
@@ -1603,7 +1498,7 @@ document.addEventListener("DOMContentLoaded", function () {
     let val_min = Math.min(...lastElements.flat());
     let val_max = Math.max(...lastElements.flat());
 
-    Highcharts.chart("economics_10_transition_non_ag2ag_cost_6_transition_matrix", {
+    Highcharts.chart("economics_10_transition_non_ag2ag_cost_4_transition_matrix", {
       chart: {
         type: "heatmap",
         marginRight: 380,

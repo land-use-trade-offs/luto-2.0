@@ -25,8 +25,7 @@ import numpy as np
 
 from luto import settings
 from luto.economics import land_use_culling
-from luto.settings import AG_MANAGEMENTS
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data
 
 import luto.economics.agricultural.cost as ag_cost
@@ -51,58 +50,59 @@ class SolverInputData:
     """
     An object that collects and stores all relevant data for solver.py.
     """   
-    base_year: int                                          # The base year of this solving process
-    target_year: int                                        # The target year of this solving process
+    base_year: int                                                      # The base year of this solving process
+    target_year: int                                                    # The target year of this solving process
 
-    ag_g_mrj: np.ndarray                                    # Agricultural greenhouse gas emissions matrices.
-    ag_w_mrj: np.ndarray                                    # Agricultural water requirements matrices.
-    ag_b_mrj: np.ndarray                                    # Agricultural biodiversity matrices.
-    ag_x_mrj: np.ndarray                                    # Agricultural exclude matrices.
-    ag_q_mrp: np.ndarray                                    # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
-    ag_ghg_t_mrj: np.ndarray                                # GHG emissions released during transitions between agricultural land uses.
+    ag_g_mrj: np.ndarray                                                # Agricultural greenhouse gas emissions matrices.
+    ag_w_mrj: np.ndarray                                                # Agricultural water yields matrices.
+    ag_b_mrj: np.ndarray                                                # Agricultural biodiversity matrices.
+    ag_x_mrj: np.ndarray                                                # Agricultural exclude matrices.
+    ag_q_mrp: np.ndarray                                                # Agricultural yield matrices -- note the `p` (product) index instead of `j` (land-use).
+    ag_ghg_t_mrj: np.ndarray                                            # GHG emissions released during transitions between agricultural land uses.
 
-    non_ag_g_rk: np.ndarray                                 # Non-agricultural greenhouse gas emissions matrix.
-    non_ag_w_rk: np.ndarray                                 # Non-agricultural water requirements matrix.
-    non_ag_b_rk: np.ndarray                                 # Non-agricultural biodiversity matrix.
-    non_ag_x_rk: np.ndarray                                 # Non-agricultural exclude matrices.
-    non_ag_q_crk: np.ndarray                                # Non-agricultural yield matrix.
-    non_ag_lb_rk: np.ndarray                                # Non-agricultural lower bound matrices.
+    non_ag_g_rk: np.ndarray                                             # Non-agricultural greenhouse gas emissions matrix.
+    non_ag_w_rk: np.ndarray                                             # Non-agricultural water yields matrix.
+    non_ag_b_rk: np.ndarray                                             # Non-agricultural biodiversity matrix.
+    non_ag_x_rk: np.ndarray                                             # Non-agricultural exclude matrices.
+    non_ag_q_crk: np.ndarray                                            # Non-agricultural yield matrix.
+    non_ag_lb_rk: np.ndarray                                            # Non-agricultural lower bound matrices.
 
-    ag_man_g_mrj: dict                                      # Agricultural management options' GHG emission effects.
-    ag_man_q_mrp: dict                                      # Agricultural management options' quantity effects.
-    ag_man_w_mrj: dict                                      # Agricultural management options' water requirement effects.
-    ag_man_b_mrj: dict                                      # Agricultural management options' biodiversity effects.
-    ag_man_limits: dict                                     # Agricultural management options' adoption limits.
-    ag_man_lb_mrj: dict                                     # Agricultural management options' lower bounds.
+    ag_man_g_mrj: dict                                                  # Agricultural management options' GHG emission effects.
+    ag_man_q_mrp: dict                                                  # Agricultural management options' quantity effects.
+    ag_man_w_mrj: dict                                                  # Agricultural management options' water yield effects.
+    ag_man_b_mrj: dict                                                  # Agricultural management options' biodiversity effects.
+    ag_man_limits: dict                                                 # Agricultural management options' adoption limits.
+    ag_man_lb_mrj: dict                                                 # Agricultural management options' lower bounds.
 
-    water_yield_RR_BASE_YR: dict                            # Water yield for the BASE_YR based on historical water yield layers .
-    water_yield_outside_study_area: dict[int, float]        # Water yield from outside LUTO study area -> dict. Key: region.
+    water_yield_RR_BASE_YR: dict                                        # Water yield for the BASE_YR based on historical water yield layers .
+    water_yield_outside_study_area: dict[int, float]                    # Water yield from outside LUTO study area -> dict. Key: region.
     
-    bio_priority_r: np.ndarray                              # Biodiversity priority area wieghted scores.
         
-    ag_biodiv_degr_j: dict[int, float]                      # Biodiversity degredation factor for each ag LU.
-    non_ag_biodiv_impact_k: dict[int, float]                # Biodiversity benefits for each non-ag LU.
-    ag_man_biodiv_impacts: dict[str, dict[int, np.ndarray]] # Biodiversity benefits for each AM option.
-    mvg_vr: np.ndarray                                      # Major vegetation group cell contribution data - indexed by veg. group (v) and cell (r)
-    sc_sr: np.ndarray                                       # Species conservation cell contribution data - indexed by species (s) and cell (r).
-    snes_xr: np.ndarray                                     # Species NES contribution data - indexed by species/ecological community (x) and cell (r).
-    ecnes_xr: np.ndarray                                    # Ecological community NES contribution data - indexed by species/ecological community (x) and cell (r).
-    mvg_contr_outside_study_area: dict[int, float]          # Contributions of land outside LUTO study area to each major veg. group (keys: major groups)
+    biodiv_contr_ag_j: np.ndarray                                      # Biodiversity contribution scale from agricultural land uses.
+    biodiv_contr_non_ag_k: dict[int, float]                             # Biodiversity contribution scale from non-agricultural land uses.
+    biodiv_contr_ag_man: dict[str, dict[int, np.ndarray]]               # Biodiversity contribution scale from agricultural management options.
+    
+    GBF2_raw_priority_degraded_area_r: np.ndarray                       # Raw areas (GBF2) from priority degrade areas - indexed by cell (r).
+    GBF3_raw_MVG_area_vr: np.ndarray                                    # Raw areas (GBF3) from Major vegetation group - indexed by veg. group (v) and cell (r)
+    GBF4_snes_xr: np.ndarray                                            # Raw areas (GBF4) Species NES contribution data - indexed by species/ecological community (x) and cell (r).
+    GBF4_ecnes_xr: np.ndarray                                           # Raw areas (GBF4) Ecological community NES contribution data - indexed by species/ecological community (x) and cell (r).
+    GBF8_raw_species_area_sr: np.ndarray                                # Raw areas (GBF8) Species data - indexed by species (s) and cell (r).
 
-    savanna_eligible_r: np.ndarray                          # Cells that are not eligible for savanna land use.
+    savanna_eligible_r: np.ndarray                                      # Cells that are eligible for savanna burnining land use.
+    priority_degraded_mask_idx: np.ndarray                                # Mask of priority degraded areas - indexed by cell (r).
 
-    economic_contr_mrj: float                               # base year economic contribution matrix.
-    economic_BASE_YR_prices: np.ndarray                     # base year commodity prices.
-    economic_target_yr_carbon_price: float                  # target year carbon price.
+    economic_contr_mrj: float                                           # base year economic contribution matrix.
+    economic_BASE_YR_prices: np.ndarray                                 # base year commodity prices.
+    economic_target_yr_carbon_price: float                              # target year carbon price.
 
-    offland_ghg: np.ndarray                                 # GHG emissions from off-land commodities.
+    offland_ghg: np.ndarray                                             # GHG emissions from off-land commodities.
 
-    lu2pr_pj: np.ndarray                                    # Conversion matrix: land-use to product(s).
-    pr2cm_cp: np.ndarray                                    # Conversion matrix: product(s) to commodity.
-    limits: dict                                            # Targets to use.
-    desc2aglu: dict                                         # Map of agricultural land use descriptions to codes.
-    resmult: float                                          # Resolution factor multiplier from data.RESMULT
-    real_area: np.ndarray                                   # Area of each cell, indexed by cell (r)
+    lu2pr_pj: np.ndarray                                                # Conversion matrix: land-use to product(s).
+    pr2cm_cp: np.ndarray                                                # Conversion matrix: product(s) to commodity.
+    limits: dict                                                        # Targets to use.
+    desc2aglu: dict                                                     # Map of agricultural land use descriptions to codes.
+    resmult: float                                                      # Resolution factor multiplier from data.RESMULT
+    real_area: np.ndarray                                               # Area of each cell, indexed by cell (r)
                 
     @property
     def n_ag_lms(self):
@@ -240,53 +240,55 @@ def get_w_BASE_YR(data: Data):
 
 def get_ag_b_mrj(data: Data):
     print('Getting agricultural biodiversity requirement matrices...', flush = True)
-    output = ag_biodiversity.get_breq_matrices(data)
+    output = ag_biodiversity.get_bio_overall_priority_score_matrices_mrj(data)
     return output.astype(np.float32)
 
 
-def get_ag_biodiv_degr_j(data: Data) -> dict[int, float]:
+def get_ag_biodiv_contr_j(data: Data) -> dict[int, float]:
     print('Getting biodiversity degredation data for agricultural land uses...', flush = True)
-    return data.BIODIV_HABITAT_DEGRADE_LOOK_UP
+    return ag_biodiversity.get_ag_biodiversity_contribution(data)
 
-def get_biodiv_priority_area_wieghted_scores(data: Data) -> np.ndarray:
-    print('Getting biodiversity priority area wieghted scores...', flush = True)
-    return data.BIO_DISTANCE_WEIGHTED * data.REAL_AREA
 
 def get_non_ag_biodiv_impact_k(data: Data) -> dict[int, float]:
     print('Getting biodiversity benefits data for non-agricultural land uses...', flush = True)
-    return non_ag_biodiversity.get_non_ag_lu_biodiv_impacts(data)
+    return non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data)
 
 
 def get_ag_man_biodiv_impacts(data: Data, target_year: int) -> dict[str, dict[str, float]]:
     print('Getting biodiversity benefits data for agricultural management options...', flush = True)
-    return ag_biodiversity.get_ag_management_biodiversity_impacts(data, target_year)
+    return ag_biodiversity.get_ag_management_biodiversity_contribution(data, target_year)
 
+def get_GBF2_priority_degrade_area_r(data: Data) -> np.ndarray:
+    if settings.BIODIVERSTIY_TARGET_GBF_2 != "on":
+        return np.empty(0)
+    print('Getting priority degrade area matrices...', flush = True)
+    output = ag_biodiversity.get_GBF2_bio_priority_degraded_areas_r(data)
+    return output
 
-def get_mvg_vr(data: Data):
+def get_GBF3_MVG_area_vr(data: Data):
     if settings.BIODIVERSTIY_TARGET_GBF_3 != "on":
         return np.empty(0)
     print('Getting agricultural major vegetation groups matrices...', flush = True)
-    output = ag_biodiversity.get_major_vegetation_matrices(data)
+    output = ag_biodiversity.get_GBF3_major_vegetation_matrices_vr(data)
     return output
 
 
-def get_sc_sr(data: Data, target_year: int) -> np.ndarray:
-    if settings.BIODIVERSTIY_TARGET_GBF_4 != "on":
+def get_GBF4_snes_xr(data: Data) -> np.ndarray:
+    if settings.BIODIVERSTIY_TARGET_GBF_4_SNES != "on":
+        return np.empty(0)
+    return ag_biodiversity.get_GBF4_SNES_matrix_sr(data)
+
+
+def get_GBF4_ecnes_xr(data: Data) -> np.ndarray:
+    if settings.BIODIVERSTIY_TARGET_GBF_4_ECNES != "on":
+        return np.empty(0)
+    return ag_biodiversity.get_GBF4_ECNES_matrix_sr(data)
+
+def get_GBF8_species_area_sr(data: Data, target_year: int) -> np.ndarray:
+    if settings.BIODIVERSTIY_TARGET_GBF_8 != "on":
         return np.empty(0)
     print('Getting species conservation cell data...', flush = True)
-    return ag_biodiversity.get_species_conservation_matrix(data, target_year)
-
-
-def get_snes_xr(data: Data) -> np.ndarray:
-    if settings.SNES_CONSTRAINTS != "on":
-        return np.empty(0)
-    return ag_biodiversity.get_snes_matrix(data)
-
-
-def get_ecnes_xr(data: Data) -> np.ndarray:
-    if settings.ECNES_CONSTRAINTS != "on":
-        return np.empty(0)
-    return ag_biodiversity.get_ecnes_matrix(data)
+    return ag_biodiversity.get_GBF8_species_conservation_matrix_sr(data, target_year)
 
 
 def get_non_ag_w_rk(
@@ -297,7 +299,7 @@ def get_non_ag_w_rk(
     water_dr_yield: Optional[np.ndarray] = None, 
     water_sr_yield: Optional[np.ndarray] = None
     ):
-    print('Getting non-agricultural water requirement matrices...', flush = True)
+    print('Getting non-agricultural water yield matrices...', flush = True)
     yr_idx = target_year - data.YR_CAL_BASE
     output = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj, data.lumaps[base_year], yr_idx, water_dr_yield, water_sr_yield)
     return output.astype(np.float32)
@@ -424,7 +426,7 @@ def get_ag_man_t_mrj(data: Data, target_index, ag_t_mrj: np.ndarray):
 
 
 def get_ag_man_w_mrj(data: Data, target_index):
-    print('Getting agricultural management options\' water requirement effects...', flush = True)
+    print('Getting agricultural management options\' water yield effects...', flush = True)
     output = ag_water.get_agricultural_management_water_matrices(data, target_index)
     return output
 
@@ -527,6 +529,9 @@ def get_target_yr_carbon_price(data: Data, target_year: int) -> float:
 def get_savanna_eligible_r(data: Data) -> np.ndarray:
     return np.where(data.SAVBURN_ELIGIBLE == 1)[0]
 
+def get_priority_degraded_mask_idx(data: Data) -> np.ndarray:
+    return np.where(data.BIO_PRIORITY_DEGRADED_AREAS_MASK)[0]
+
 
 def get_limits(
     data: Data, yr_cal: int,
@@ -546,25 +551,23 @@ def get_limits(
 
     if settings.GHG_EMISSIONS_LIMITS == 'on':
         limits['ghg_ub'] = ag_ghg.get_ghg_limits(data, yr_cal)
-        limits['ghg_lb'] = ag_ghg.get_ghg_limits(data, yr_cal) - settings.GHG_ALLOW_LB_DELTA_T 
 
     # If biodiversity limits are not turned on, set the limit to 0.
-    limits['biodiversity'] = (
-        ag_biodiversity.get_biodiversity_limits(data, yr_cal)
+    limits["GBF2_priority_degrade_areas"] = (
+        ag_biodiversity.get_GBF2_biodiversity_limits(data, yr_cal)
         if settings.BIODIVERSTIY_TARGET_GBF_2 == 'on'
         else 0
     )
 
-    limits["major_vegetation_groups"] = (
-        ag_biodiversity.get_major_vegetation_group_limits(data, yr_cal)
+    limits["GBF_3_major_vegetation_groups"] = (
+        ag_biodiversity.get_GBF3_major_vegetation_group_limits(data, yr_cal)
         if settings.BIODIVERSTIY_TARGET_GBF_3 == 'on'
         else 0
     )
 
-    limits["species_conservation"] = ag_biodiversity.get_species_conservation_limits(data, yr_cal)
-
-    limits["snes"] = ag_biodiversity.get_snes_limits(data, yr_cal)
-    limits["ecnes"] = ag_biodiversity.get_ecnes_limits(data, yr_cal)
+    limits["GBF4_SNES"] = ag_biodiversity.get_GBF4_SNES_limits(data, yr_cal)
+    limits["GBF4_ECNES"] = ag_biodiversity.get_GBF4_ECNES_limits(data, yr_cal)
+    limits["GBF8_species_conservation"] = ag_biodiversity.get_GBF8_species_conservation_limits(data, yr_cal)
 
     ag_reg_adoption, non_ag_reg_adoption = ag_transition.get_regional_adoption_limits(data, yr_cal)
     limits["ag_regional_adoption"] = ag_reg_adoption
@@ -630,7 +633,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_ghg_t_mrj=get_ag_ghg_t_mrj(data, base_year),
 
         non_ag_g_rk=get_non_ag_g_rk(data, ag_g_mrj, base_year),
-        non_ag_w_rk=get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR),  # Calculate non-ag water requirement matrices based on historical water yield layers
+        non_ag_w_rk=get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR),  # Calculate non-ag water yield matrices based on historical water yield layers
         non_ag_b_rk=get_non_ag_b_rk(data, ag_b_mrj, base_year),
         non_ag_x_rk=get_non_ag_x_rk(data, ag_x_mrj, base_year),
         non_ag_q_crk=get_non_ag_q_crk(data, ag_q_mrp, base_year),
@@ -645,26 +648,25 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         
         water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Use the water net yield outside LUTO study area for the YR_CAL_BASE year
         water_yield_RR_BASE_YR=get_w_BASE_YR(data),                                     # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
-
-        bio_priority_r=get_biodiv_priority_area_wieghted_scores(data),
         
-        ag_biodiv_degr_j=get_ag_biodiv_degr_j(data),
-        non_ag_biodiv_impact_k=get_non_ag_biodiv_impact_k(data),
-        ag_man_biodiv_impacts=get_ag_man_biodiv_impacts(data, target_year),
-        sc_sr=get_sc_sr(data, target_year),
-        mvg_vr=get_mvg_vr(data),
-        snes_xr=get_snes_xr(data),
-        ecnes_xr=get_ecnes_xr(data),
+        biodiv_contr_ag_j=get_ag_biodiv_contr_j(data),
+        biodiv_contr_non_ag_k=get_non_ag_biodiv_impact_k(data),
+        biodiv_contr_ag_man=get_ag_man_biodiv_impacts(data, target_year),
+
+        GBF2_raw_priority_degraded_area_r = get_GBF2_priority_degrade_area_r(data),
+        GBF3_raw_MVG_area_vr=get_GBF3_MVG_area_vr(data),
+        GBF4_snes_xr=get_GBF4_snes_xr(data),
+        GBF4_ecnes_xr=get_GBF4_ecnes_xr(data),
+        GBF8_raw_species_area_sr=get_GBF8_species_area_sr(data, target_year),
 
         savanna_eligible_r=get_savanna_eligible_r(data),
+        priority_degraded_mask_idx=get_priority_degraded_mask_idx(data),
 
         economic_contr_mrj=(ag_obj_mrj, non_ag_obj_rk,  ag_man_objs),
         economic_BASE_YR_prices=get_commodity_prices(data),
         economic_target_yr_carbon_price=get_target_yr_carbon_price(data, target_year), 
         
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
-
-        mvg_contr_outside_study_area=data.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO,
 
         lu2pr_pj=data.LU2PR,
         pr2cm_cp=data.PR2CM,
