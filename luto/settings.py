@@ -132,7 +132,7 @@ WRITE_OUTPUT_GEOTIFFS = False   # Write GeoTiffs to output directory: True or Fa
 WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resolution: True or False
 
 PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = 3               # The Threads to use for map making, only work with PARALLEL_WRITE = True
+WRITE_THREADS = 2               # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
@@ -465,7 +465,7 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 # Biodiversity limits and parameters *******************************
-SOLVE_BIODIV_PRIORITY_WEIGHT = 10
+SOLVE_BIODIV_PRIORITY_WEIGHT = 0.001
 '''The weight of the biodiversity target in the objective function'''
 
 

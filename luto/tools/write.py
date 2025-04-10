@@ -1036,99 +1036,93 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 
     print(f'Writing biodiversity GBF2 scores (PRIORITY) for {yr_cal}')
     
-    # Get the total priority degraded areas
-    total_priority_degraded_area = (data.BIO_PRIORITY_DEGRADED_AREAS_MASK * data.REAL_AREA).sum()
-    
-    # Get the decision variables for the year
-    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
-    ag_mam_dvar_mrj =  tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
-    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+    # Unpack the ag managements and land uses
+    am_lu_unpack = [(am, l) for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items() for l in lus]
 
-    # Get the priority degrade areas scores
-    GBF2_priority_degrade_areas_r =  xr.DataArray(
+    # Get decision variables for the year
+    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+    non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+    am_dvar_jri = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
+    am_dvar_jri = am_dvar_jri.sel(idx=am_dvar_jri['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpack)))
+
+    # Get the priority degraded areas score
+    priority_degraded_area_score_r = xr.DataArray(
         ag_biodiversity.get_GBF2_bio_priority_degraded_areas_r(data),
         dims=['cell'],
         coords={'cell':range(data.NCELLS)}
     )
 
-    bio_ag_priority_rmj,_ = xr.broadcast(GBF2_priority_degrade_areas_r, ag_dvar_mrj)
-    bio_am_priority_rtmj,_ = xr.broadcast(GBF2_priority_degrade_areas_r, ag_mam_dvar_mrj)
-    bio_non_ag_priority_rk,_ = xr.broadcast(GBF2_priority_degrade_areas_r, non_ag_dvar_rk)
+    # Get the impacts of each ag/non-ag/am to vegetation matrices
+    ag_impact_j = xr.DataArray(
+        ag_biodiversity.get_ag_biodiversity_contribution(data),
+        dims=['lu'],
+        coords={'lu':data.AGRICULTURAL_LANDUSES}
+    )
+    non_ag_impact_k = xr.DataArray(
+        list(non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data).values()),
+        dims=['lu'],
+        coords={'lu':data.NON_AGRICULTURAL_LANDUSES}
+    )
+    am_impact_ir = xr.DataArray(
+        np.stack([arr for _, v in ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal).items() for arr in v.values()]), 
+        dims=['idx', 'cell'], 
+        coords={
+            'idx': pd.MultiIndex.from_tuples(am_lu_unpack, names=['am', 'lu']),
+            'cell': range(data.NCELLS)}
+    )
 
+    # Get the total area of the priority degraded areas
+    total_priority_degraded_area = (data.BIO_PRIORITY_DEGRADED_AREAS_MASK * data.REAL_AREA).sum()
+    real_area_xr = xr.DataArray(data.REAL_AREA, dims=['cell'],coords={'cell': range(data.NCELLS)})
 
-    # Apply habitat contribution from ag/am/non-ag land-use to biodiversity scores
-    ag_impacts_j = ag_biodiversity.get_ag_biodiversity_contribution(data)
-    for lu,lu_idx in data.DESC2AGLU.items():
-        bio_ag_priority_rmj = bio_ag_priority_rmj.copy()            # Get a copy of the data array to avoid assign to a view
-        bio_ag_priority_rmj.loc[{'lu':lu}] = bio_ag_priority_rmj.loc[{'lu':lu}] * ag_impacts_j[lu_idx]
-        
-    am_contribution = ag_biodiversity.get_ag_management_biodiversity_contribution(data, yr_cal)
-    for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items():
-        for idx,lu in enumerate(lus):
-            bio_am_priority_rtmj = bio_am_priority_rtmj.copy()      # Get a copy of the data array to avoid assign to a view
-            bio_am_priority_rtmj.loc[{'am':am, 'lu':lu}] = bio_am_priority_rtmj.loc[{'am':am, 'lu':lu}] * am_contribution[am][idx][:,None]
-            
-    non_ag_contribution = non_ag_biodiversity.get_non_ag_lu_biodiv_contribution(data)
-    for idx,lu in enumerate(NON_AG_LAND_USES.keys()):
-        bio_non_ag_priority_rk = bio_non_ag_priority_rk.copy()      # Get a copy of the data array to avoid assign to a view
-        bio_non_ag_priority_rk.loc[{'lu':lu}] = bio_non_ag_priority_rk.loc[{'lu':lu}] * non_ag_contribution[idx]
-
-
-    # Calculate the biodiversity scores; Divide by total biodiversity degradation in base year to get the relative contribution
-    GBF2_ag = (ag_dvar_mrj * bio_ag_priority_rmj
+    GBF2_score_ag = (priority_degraded_area_score_r * ag_impact_j * ag_dvar_mrj
         ).sum(['cell','lm']
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
         ).assign(Relative_Contribution_Percentage = lambda x:((x['Area Weighted Score (ha)'] / total_priority_degraded_area) * 100)
         ).assign(Type='Agricultural Landuse', Year=yr_cal)
-
-
-    GBF2_non_ag = (non_ag_dvar_rk * bio_non_ag_priority_rk
+    GBF2_score_non_ag = (priority_degraded_area_score_r * non_ag_impact_k * non_ag_dvar_rk
         ).sum(['cell']
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(
         ).assign(Relative_Contribution_Percentage = lambda x:(x['Area Weighted Score (ha)'] / total_priority_degraded_area * 100)
-        ).assign(Type='Non-Agricultural land-use', Year=yr_cal)
-
-
-    GBF2_am = (ag_mam_dvar_mrj * bio_am_priority_rtmj
+        ).assign(Type='Non-Agricultural land-use', Year=yr_cal)  
+    GBF2_score_am = (priority_degraded_area_score_r * am_impact_ir * am_dvar_jri
         ).sum(['cell','lm'], skipna=False
         ).to_dataframe('Area Weighted Score (ha)'
-        ).reset_index(
-        ).assign(Relative_Contribution_Percentage = lambda x:(x['Area Weighted Score (ha)'] / total_priority_degraded_area * 100)
-        ).dropna(
+        ).reset_index(allow_duplicates=True
+        ).T.drop_duplicates(
+        ).T.assign(Relative_Contribution_Percentage = lambda x:(x['Area Weighted Score (ha)'] / total_priority_degraded_area * 100)
         ).assign(Type='Agricultural Management', Year=yr_cal)
-
-    # Fill nan to empty dataframes
-    if GBF2_ag.empty:
-        GBF2_ag.loc[0] = 0
-        GBF2_ag = GBF2_ag.astype({'Type':str, 'lu':str,'Year':'int'})
-        GBF2_ag.loc[0, ['Type', 'lu' ,'Year']] = ['Agricultural Landuse', 'Apples', yr_cal]
-
-    if GBF2_non_ag.empty:
-        GBF2_non_ag.loc[0] = 0
-        GBF2_non_ag = GBF2_non_ag.astype({'Type':str, 'lu':str,'Year':'int'})
-        GBF2_non_ag.loc[0, ['Type', 'lu' ,'Year']] = ['Agricultural Management', 'Apples', yr_cal]
-
-    if GBF2_am.empty:
-        GBF2_am.loc[0] = 0
-        GBF2_am = GBF2_am.astype({'Type':str, 'lu':str,'Year':'int'})
-        GBF2_am.loc[0, ['Type', 'lu' ,'Year']] = ['Non-Agricultural land-use', 'Environmental Plantings', yr_cal]
-
-    # Save the biodiversity scores
-    GBF2_achive_percentage = (data.get_GBF2_target_for_yr_cal(yr_cal) / total_priority_degraded_area) * 100
         
+    # Fill nan to empty dataframes
+    if GBF2_score_ag.empty:
+        GBF2_score_ag.loc[0] = 0
+        GBF2_score_ag = GBF2_score_ag.astype({'Type':str, 'lu':str,'Year':'int'})
+        GBF2_score_ag.loc[0, ['Type', 'lu' ,'Year']] = ['Agricultural Landuse', 'Apples', yr_cal]
+
+    if GBF2_score_non_ag.empty:
+        GBF2_score_non_ag.loc[0] = 0
+        GBF2_score_non_ag = GBF2_score_non_ag.astype({'Type':str, 'lu':str,'Year':'int'})
+        GBF2_score_non_ag.loc[0, ['Type', 'lu' ,'Year']] = ['Agricultural Management', 'Apples', yr_cal]
+
+    if GBF2_score_am.empty:
+        GBF2_score_am.loc[0] = 0
+        GBF2_score_am = GBF2_score_am.astype({'Type':str, 'lu':str,'Year':'int'})
+        GBF2_score_am.loc[0, ['Type', 'lu' ,'Year']] = ['Non-Agricultural land-use', 'Environmental Plantings', yr_cal]
+        
+    # Save to disk  
     pd.concat([
-            GBF2_ag,
-            GBF2_non_ag,
-            GBF2_am], axis=0
-        ).assign(Priority_Target=GBF2_achive_percentage
+            GBF2_score_ag,
+            GBF2_score_non_ag,
+            GBF2_score_am], axis=0
+        ).assign( Priority_Target=(data.get_GBF2_target_for_yr_cal(yr_cal) / total_priority_degraded_area) * 100,
         ).rename(columns={
             'lu':'Landuse',
             'am':'Agri-Management',
             'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)',
-            'Priority_Target':'Priority Target (%)'}).reset_index(
-            drop=True
+            'Priority_Target':'Priority Target (%)'}
+        ).reset_index(drop=True
         ).to_csv(os.path.join(path, f'biodiversity_GBF2_priority_scores_{yr_cal}.csv'), index=False)
     
     
@@ -1145,8 +1139,8 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
     # Get decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
-    am_dvar_kmrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
-    am_dvar_kmrj = am_dvar_kmrj.sel(idx=am_dvar_kmrj['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpack)))
+    am_dvar_jri = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
+    am_dvar_jri = am_dvar_jri.sel(idx=am_dvar_jri['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpack)))
 
 
     # Get vegetation matrices for the year
@@ -1183,13 +1177,16 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
         ).eval('Relative_Contribution_Percentage = BASE_OUTSIDE_SCORE / BASE_TOTAL_SCORE * 100')
 
     GBF3_score_ag = (vegetation_score_vr * ag_impact_j * ag_dvar_mrj
-        ).sum(['cell','lm']).to_dataframe('Area Weighted Score (ha)').reset_index(
+        ).sum(['cell','lm']
+        ).to_dataframe('Area Weighted Score (ha)'
+        ).reset_index(
         ).merge(veg_base_score_score
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Landuse', Year=yr_cal)
 
-    GBF3_score_am = (vegetation_score_vr * am_impact_ir * am_dvar_kmrj
-        ).sum(['cell','lm'], skipna=False).to_dataframe('Area Weighted Score (ha)'
+    GBF3_score_am = (vegetation_score_vr * am_impact_ir * am_dvar_jri
+        ).sum(['cell','lm'], skipna=False
+        ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(allow_duplicates=True
         ).T.drop_duplicates(
         ).T.merge(veg_base_score_score,
@@ -1197,7 +1194,10 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Management', Year=yr_cal)
         
-    GBF3_score_non_ag = (vegetation_score_vr * non_ag_impact_k * non_ag_dvar_rk).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index(
+    GBF3_score_non_ag = (vegetation_score_vr * non_ag_impact_k * non_ag_dvar_rk
+        ).sum(['cell']
+        ).to_dataframe('Area Weighted Score (ha)'
+        ).reset_index(
         ).merge(veg_base_score_score,
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Non-Agricultural land-use', Year=yr_cal)
@@ -1231,8 +1231,8 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     # Get decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
-    am_dvar_kmrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
-    am_dvar_kmrj = am_dvar_kmrj.sel(idx=am_dvar_kmrj['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpack)))
+    am_dvar_jri = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
+    am_dvar_jri = am_dvar_jri.sel(idx=am_dvar_jri['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpack)))
 
     # Get the biodiversity scores for the year
     bio_snes_sr = xr.DataArray(
@@ -1275,12 +1275,14 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
 
     # Calculate the biodiversity scores
     GBF4_score_ag = (bio_snes_sr * ag_impact_j * ag_dvar_mrj
-        ).sum(['cell','lm']).to_dataframe('Area Weighted Score (ha)').reset_index(
+        ).sum(['cell','lm']
+        ).to_dataframe('Area Weighted Score (ha)'
+        ).reset_index(
         ).merge(base_yr_score
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Landuse', Year=yr_cal)
         
-    GBF4_score_am = (bio_snes_sr * am_impact_ir * am_dvar_kmrj
+    GBF4_score_am = (bio_snes_sr * am_impact_ir * am_dvar_jri
         ).sum(['cell','lm'], skipna=False).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(allow_duplicates=True
         ).T.drop_duplicates(
@@ -1290,7 +1292,9 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         ).assign(Type='Agricultural Management', Year=yr_cal)
         
     GBF4_score_non_ag = (bio_snes_sr * non_ag_impact_k * non_ag_dvar_rk
-        ).sum(['cell']).to_dataframe('Area Weighted Score (ha)').reset_index(
+        ).sum(['cell']
+        ).to_dataframe('Area Weighted Score (ha)'
+        ).reset_index(
         ).merge(base_yr_score,
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Non-Agricultural land-use', Year=yr_cal)
@@ -1327,8 +1331,8 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     # Get decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
-    am_dvar_kmrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
-    am_dvar_kmrj = am_dvar_kmrj.sel(idx=am_dvar_kmrj['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpack)))
+    am_dvar_jri = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
+    am_dvar_jri = am_dvar_jri.sel(idx=am_dvar_jri['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpack)))
 
     # Get the biodiversity scores for the year
     bio_ecnes_sr = xr.DataArray(
@@ -1379,7 +1383,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Landuse', Year=yr_cal)
 
-    GBF4_score_am = (bio_ecnes_sr * am_impact_ir * am_dvar_kmrj
+    GBF4_score_am = (bio_ecnes_sr * am_impact_ir * am_dvar_jri
         ).sum(['cell', 'lm'], skipna=False).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(allow_duplicates=True
         ).T.drop_duplicates(
@@ -1426,8 +1430,8 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
     # Get decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
-    am_dvar_kmrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
-    am_dvar_kmrj = am_dvar_kmrj.sel(idx=am_dvar_kmrj['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpack)))
+    am_dvar_jri = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
+    am_dvar_jri = am_dvar_jri.sel(idx=am_dvar_jri['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpack)))
 
     # Get biodiversity scores for selected species
     bio_scores_sr = xr.DataArray(
@@ -1473,7 +1477,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Landuse', Year=yr_cal)
         
-    GBF8_scores_groups_am = (am_dvar_kmrj * bio_scores_sr * am_impact_ir
+    GBF8_scores_groups_am = (am_dvar_jri * bio_scores_sr * am_impact_ir
         ).sum(['cell', 'lm']
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(allow_duplicates=True
@@ -1522,8 +1526,8 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
     # Get decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
-    am_dvar_kmrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
-    am_dvar_kmrj = am_dvar_kmrj.sel(idx=am_dvar_kmrj['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpack)))
+    am_dvar_jri = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
+    am_dvar_jri = am_dvar_jri.sel(idx=am_dvar_jri['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpack)))
 
     # Get biodiversity scores for selected species
     bio_scores_sr = xr.DataArray(
@@ -1570,7 +1574,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
         ).eval('Relative_Contribution_Percentage = `Area Weighted Score (ha)` / BASE_TOTAL_SCORE * 100'
         ).assign(Type='Agricultural Landuse', Year=yr_cal)
 
-    GBF8_scores_species_am = (am_dvar_kmrj * bio_scores_sr * am_impact_ir
+    GBF8_scores_species_am = (am_dvar_jri * bio_scores_sr * am_impact_ir
         ).sum(['cell', 'lm']
         ).to_dataframe('Area Weighted Score (ha)'
         ).reset_index(allow_duplicates=True
