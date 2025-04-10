@@ -548,8 +548,8 @@ class LutoSolver:
 
         # Repeat to get contributions of alternative agr. management options
         # Convert variables to PR/p representation
-        self.ag_man_q_dry_c = [0 for _ in range(self.ncms)]
-        self.ag_man_q_irr_c = [0 for _ in range(self.ncms)]
+        self.ag_man_q_dry_c = [gp.LinExpr(0) for _ in range(self.ncms)]
+        self.ag_man_q_irr_c = [gp.LinExpr(0) for _ in range(self.ncms)]
         
         for am, am_j_list in self._input_data.am2j.items():
             X_ag_man_dry_pr = np.zeros(
@@ -1179,47 +1179,34 @@ class LutoSolver:
 
         
 
-    def _get_ag_cell_area_contr_for_reg(self, j: int, ind: np.ndarray) -> gp.LinExpr:
-        return (
-            # Dryland ag area contribution
-            gp.quicksum(self._input_data.real_area[ind] * self.X_ag_dry_vars_jr[j, ind])
-            # Irrigated ag area contribution
-            + gp.quicksum(self._input_data.real_area[ind] * self.X_ag_irr_vars_jr[j, ind])
-        )
-
-    def _add_ag_regional_adoption_constraints(self) -> None:
-        reg_adopt_limits = self._input_data.limits["ag_regional_adoption"]
-
-        for reg_id, j, lu_name, reg_ind, reg_area_limit in reg_adopt_limits:
-            print(f"    ...adoption of {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} must not exceed {reg_area_limit:,.0f} HA...")
-            reg_expr = self._get_ag_cell_area_contr_for_reg(j, reg_ind)
-
-            self.regional_adoption_constrs.append(
-                self.gurobi_model.addConstr(reg_expr <= reg_area_limit)
-            )
-
-    def _get_non_ag_cell_area_contr_for_reg(self, k: int, ind: np.ndarray) -> gp.LinExpr:
-        return gp.quicksum(self._input_data.real_area[ind] * self.X_non_ag_vars_kr[k, ind])
-    
-    def _add_non_ag_regional_adoption_constraints(self) -> None:
-        reg_adopt_limits = self._input_data.limits["non_ag_regional_adoption"]
-
-        for reg_id, k, lu_name, reg_ind, reg_area_limit in reg_adopt_limits:
-            print(f"    ...adoption of {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} must not exceed {reg_area_limit:,.0f} HA...")
-            reg_expr = self._get_non_ag_cell_area_contr_for_reg(k, reg_ind)
-            self.regional_adoption_constrs.append(
-                self.gurobi_model.addConstr(reg_expr <= reg_area_limit)
-            )
 
     def _add_regional_adoption_constraints(self) -> None:
-        print("  ...regional adoption constraints...")
 
         if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
-            print("  ...regional adoption constraints TURNED OFF...")
+            print("     |-- regional adoption constraints TURNED OFF...")
             return
+        
+        print("  ...regional adoption constraints...")
+        
+        # Add adoption constraints for agricultural land uses
+        reg_adopt_limits = self._input_data.limits["ag_regional_adoption"]
+        for reg_id, j, lu_name, reg_ind, reg_area_limit in reg_adopt_limits:
+            print(f"     |-- adding adoption limit for {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} >= {reg_area_limit:,.0f} HA...")
+            reg_expr = (
+                  gp.quicksum(self._input_data.real_area[reg_ind] * self.X_ag_dry_vars_jr[j, reg_ind])
+                + gp.quicksum(self._input_data.real_area[reg_ind] * self.X_ag_irr_vars_jr[j, reg_ind])
+            )
+            self.regional_adoption_constrs.append(self.gurobi_model.addConstr(reg_expr <= reg_area_limit))
+        
+        # Add adoption constraints for non-agricultural land uses
+        reg_adopt_limits = self._input_data.limits["non_ag_regional_adoption"]
+        for reg_id, k, lu_name, reg_ind, reg_area_limit in reg_adopt_limits:
+            print(f"     |-- adding adoption limit for {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} >= {reg_area_limit:,.0f} HA...")
+            reg_expr = gp.quicksum(self._input_data.real_area[reg_ind] * self.X_non_ag_vars_kr[k, reg_ind])
+            self.regional_adoption_constrs.append(self.gurobi_model.addConstr(reg_expr <= reg_area_limit))
 
-        self._add_ag_regional_adoption_constraints()
-        self._add_non_ag_regional_adoption_constraints()
+
+
 
     def update_formulation(
         self,
