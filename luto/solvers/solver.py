@@ -1180,7 +1180,7 @@ class LutoSolver:
     def _add_regional_adoption_constraints(self) -> None:
 
         if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
-            print("     |-- regional adoption constraints TURNED OFF...")
+            print("  ... regional adoption constraints TURNED OFF...")
             return
         
         print("  ...regional adoption constraints...")
