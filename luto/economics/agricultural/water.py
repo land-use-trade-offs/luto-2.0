@@ -340,32 +340,32 @@ def get_agricultural_management_water_matrices(data, yr_idx) -> dict[str, np.nda
     asparagopsis_data = (
         get_asparagopsis_effect_w_mrj(data, yr_idx)
         if settings.AG_MANAGEMENTS['Asparagopsis taxiformis']
-        else np.zeros((data.NLMS, data.NCELLS, len(settings.AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis']))).astype(np.float32)
+        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['Asparagopsis taxiformis']))).astype(np.float32)
     )
     precision_agriculture_data = (
         get_precision_agriculture_effect_w_mrj(data, yr_idx)
         if settings.AG_MANAGEMENTS['Precision Agriculture']
-        else np.zeros((data.NLMS, data.NCELLS, len(settings.AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']))).astype(np.float32)
+        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['Precision Agriculture']))).astype(np.float32)
     )
     eco_grazing_data = (
         get_ecological_grazing_effect_w_mrj(data, yr_idx)
         if settings.AG_MANAGEMENTS['Ecological Grazing']
-        else np.zeros((data.NLMS, data.NCELLS, len(settings.AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']))).astype(np.float32)
+        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['Ecological Grazing']))).astype(np.float32)
     )
     sav_burning_data = (
         get_savanna_burning_effect_w_mrj(data)
         if settings.AG_MANAGEMENTS['Savanna Burning']
-        else np.zeros((data.NLMS, data.NCELLS, len(settings.AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning']))).astype(np.float32)
+        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['Savanna Burning']))).astype(np.float32)
     )
     agtech_ei_data = (
         get_agtech_ei_effect_w_mrj(data, yr_idx)
         if settings.AG_MANAGEMENTS['AgTech EI']
-        else np.zeros((data.NLMS, data.NCELLS, len(settings.AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']))).astype(np.float32)
+        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['AgTech EI']))).astype(np.float32)
     )
     biochar_data = (
         get_biochar_effect_w_mrj(data, yr_idx)
         if settings.AG_MANAGEMENTS['Biochar']
-        else np.zeros((data.NLMS, data.NCELLS, len(settings.AG_MANAGEMENTS_TO_LAND_USES['Biochar']))).astype(np.float32)
+        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['Biochar']))).astype(np.float32)
     )
 
     return {

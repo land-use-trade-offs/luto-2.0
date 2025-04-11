@@ -366,32 +366,41 @@ def get_ag_management_biodiversity_contribution(
     data: Data,
     yr_cal: int,
 ) -> dict[str, dict[int, np.ndarray]]:
-    return {
-        'Asparagopsis taxiformis': {
+    
+    am_contr_dict = {}
+    
+    if settings.AG_MANAGEMENTS['Asparagopsis taxiformis']:
+        am_contr_dict['Asparagopsis taxiformis'] = {
             j_idx: np.zeros(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis'])
-        },
-        'Precision Agriculture': {
+        }
+    if settings.AG_MANAGEMENTS['Precision Agriculture']:
+        am_contr_dict['Precision Agriculture'] = {
             j_idx: np.zeros(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture'])
-        },
-        'Ecological Grazing': {
+        }
+    if settings.AG_MANAGEMENTS['Ecological Grazing']:
+        am_contr_dict['Ecological Grazing'] = {
             j_idx: np.zeros(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing'])
-        },
-        'Savanna Burning': {
+        }
+    if settings.AG_MANAGEMENTS['Savanna Burning']:
+        am_contr_dict['Savanna Burning'] = {
             j_idx: np.where(data.SAVBURN_ELIGIBLE, (1 - settings.BIO_CONTRIBUTION_LDS), 0).astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
-        },
-        'AgTech EI': {
+        }
+    if settings.AG_MANAGEMENTS['AgTech EI']:
+        am_contr_dict['AgTech EI'] = {
             j_idx: np.zeros(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['AgTech EI'])
-        },
-        'Biochar': {
+        }
+    if settings.AG_MANAGEMENTS['Biochar']:
+        am_contr_dict['Biochar'] = {
             j_idx: (data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact'] - 1) * np.ones(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Biochar'])
-        },
-    }
+        }
+    
+    return am_contr_dict
 
 
 

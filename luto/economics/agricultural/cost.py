@@ -361,7 +361,7 @@ def get_ecological_grazing_effect_c_mrj(data: Data, yr_idx):
     - new_c_mrj: The matrix containing the updated cost <unit: $/cell>.
     """
 
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing'] if AG_MANAGEMENTS['Ecological Grazing'] else settings.REMOVED_DICT['Ecological Grazing']
     yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix

@@ -102,7 +102,7 @@ def run(
     # Update the simulation years in the data object
     data.reporting_years = years      
     data.set_path(years)
-    print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]}, total {len(years)} runs!\n", flush=True)
+    print(f"\nRunning LUTO {settings.VERSION} between {years[0]} - {years[-1]}, total {len(years)} runs!\n", flush=True)
         
     # Sanity check
     if data.YR_CAL_BASE not in years:

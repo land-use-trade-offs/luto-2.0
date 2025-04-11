@@ -356,8 +356,10 @@ AG_MANAGEMENTS_TO_LAND_USES = {
 }
 
 # Update AG_MANAGEMENTS_TO_LAND_USES to remove any land uses that are not enabled
+REMOVED_DICT = {}
 for am in list(AG_MANAGEMENTS_TO_LAND_USES.keys()):  # Iterate over a copy of the keys
     if not AG_MANAGEMENTS[am]:
+        REMOVED_DICT[am] = AG_MANAGEMENTS_TO_LAND_USES[am] 
         AG_MANAGEMENTS_TO_LAND_USES.pop(am)
         AG_MANAGEMENTS_REVERSIBLE.pop(am)
 
@@ -443,7 +445,7 @@ GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (l
 
 # Weight for the GHG/Demand deviation in the objective function
 ''' Range from 0 to 1, where 0 is fully minimising GHG and demand deviation, and 1 is only maximising profit. '''
-SOLVE_WEIGHT_ALPHA = 0.05  
+SOLVE_WEIGHT_ALPHA = 0.5  
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
@@ -605,7 +607,7 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- Vegetation parameters ----------------------
 
-BIODIVERSTIY_TARGET_GBF_3  = 'on'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_3  = 'off'           # 'on' or 'off'.
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.
@@ -622,8 +624,8 @@ the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers
 
 
 # ------------------------------- Species parameters -------------------------------
-BIODIVERSTIY_TARGET_GBF_4_SNES =  'on'           # 'on' or 'off'.
-BIODIVERSTIY_TARGET_GBF_4_ECNES = 'on'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
 
 '''
 Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
@@ -634,7 +636,7 @@ and manage human-wildlife interactions
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------
-BIODIVERSTIY_TARGET_GBF_8 = 'on'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_8 = 'off'           # 'on' or 'off'.
 '''
 Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
 reduce the impacts of climate change on biodiversity and ecosystems.
