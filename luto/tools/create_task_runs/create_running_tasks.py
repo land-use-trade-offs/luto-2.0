@@ -39,13 +39,13 @@ grid_search = {
     ###############################################################
     # Working settings for the model run
     ###############################################################
-    'OBJECTIVE': ['maxprofit'],             # 'maxprofit' or 'maxutility'
-    'MODE': ['timeseries'],                 # 'snapshot' or 'timeseries'
+    'OBJECTIVE': ['maxprofit'],                 # 'maxprofit' or 'maxutility'
+    'MODE': ['timeseries'],                     # 'snapshot' or 'timeseries'
     'RESFACTOR': [15],
-    'SIM_YERAS': [list(range(2020, 2051))],   # Years to run the model 
+    'SIM_YERAS': [list(range(2020, 2051, 5))],   # Years to run the model 
     'WRITE_THREADS': [5],
     'WRITE_OUTPUT_GEOTIFFS': [False],
-    'KEEP_OUTPUTS': [False],                # If false, only keep report HTML
+    'KEEP_OUTPUTS': [False],                    # If false, only keep report HTML
     
  
     ###############################################################
@@ -58,9 +58,8 @@ grid_search = {
     # --------------- GHG settings ---------------
     'GHG_CONSTRAINT_TYPE': ['hard'],        # 'hard' or 'soft'
     'GHG_LIMITS_FIELD': [
-        '1.5C (67%) excl. avoided emis', 
-        '1.5C (50%) excl. avoided emis', 
-        '1.8C (67%) excl. avoided emis'
+        '1.5C (50%) excl. avoided emis SCOPE1', 
+        '1.8C (67%) excl. avoided emis SCOPE1'
     ],
     
     # --------------- Water constraints ---------------
@@ -74,8 +73,8 @@ grid_search = {
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSTIY_TARGET_GBF_2': ['on'],    # 'on' or 'off'
     'BIODIV_GBF_TARGET_2_DICT': [
-        {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}, 
-        {2010: 0, 2030: 0.5, 2050: 0.5, 2100: 0.5},
+        {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}, 
+        {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5},
     ],
 
     # --------------- Biodiversity settings - GBF 3 ---------------
