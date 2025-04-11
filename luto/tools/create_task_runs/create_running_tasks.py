@@ -30,9 +30,9 @@ grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['100GB'],
-    'NCPUS':[25],
-    'TIME': ['16:00:00'],
+    'MEM': ['24GB'],
+    'NCPUS':[6],
+    'TIME': ['2:00:00'],
     'QUEUE': ['normalsr'],
     
  
@@ -41,11 +41,11 @@ grid_search = {
     ###############################################################
     'OBJECTIVE': ['maxprofit'],             # 'maxprofit' or 'maxutility'
     'MODE': ['timeseries'],                 # 'snapshot' or 'timeseries'
-    'RESFACTOR': [15,10,7,5,3],
-    'STEP_SIZE': [10,5,3,1],
-    'WRITE_THREADS': [10],
+    'RESFACTOR': [15],
+    'SIM_YERAS': [list(range(2020, 2050))],   # Years to run the model 
+    'WRITE_THREADS': [5],
     'WRITE_OUTPUT_GEOTIFFS': [False],
-    'KEEP_OUTPUTS': [False],                 # If false, only keep report HTML
+    'KEEP_OUTPUTS': [False],                # If false, only keep report HTML
     
  
     ###############################################################
@@ -53,46 +53,53 @@ grid_search = {
     ###############################################################
     
     # --------------- Demand settings ---------------
-    'DEMAND_CONSTRAINT_TYPE': ['soft'],     # 'hard' or 'soft'    
+    'DEMAND_CONSTRAINT_TYPE': ['hard'],     # 'hard' or 'soft'    
     
     # --------------- GHG settings ---------------
-    'GHG_CONSTRAINT_TYPE': ['soft'],        # 'hard' or 'soft'
+    'GHG_CONSTRAINT_TYPE': ['hard'],        # 'hard' or 'soft'
     'GHG_LIMITS_FIELD': [
         '1.5C (67%) excl. avoided emis', 
-        # '1.5C (50%) excl. avoided emis', 
-        # '1.8C (67%) excl. avoided emis'
+        '1.5C (50%) excl. avoided emis', 
+        '1.8C (67%) excl. avoided emis'
     ],
     
     # --------------- Water constraints ---------------
-    'WATER_CONSTRAINT_TYPE': ['soft'],        # 'hard' or 'soft'
+    'WATER_CONSTRAINT_TYPE': ['hard'],        # 'hard' or 'soft'
     'WATER_PENALTY': [1],
     'INCLUDE_WATER_LICENSE_COSTS': [0],
     
     # --------------- Biodiversity priority zone ---------------
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSTIY_TARGET_GBF_2': ['on'],    # 'on' or 'off'
-    'GBF2_PENALTY': [10000],
     'BIODIV_GBF_TARGET_2_DICT': [
-        # {2010: 0, 2030: 0.0, 2050: 0.0, 2100: 0.0}, 
-        {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}, 
-        # {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5},
-        
+        {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}, 
+        {2010: 0, 2030: 0.5, 2050: 0.5, 2100: 0.5},
     ],
 
     # --------------- Biodiversity settings - GBF 3 ---------------
     'BIODIVERSTIY_TARGET_GBF_3': ['off'],   # 'on' or 'off'
     
     # --------------- Biodiversity settings - GBF 4 ---------------
-    'BIODIVERSTIY_TARGET_GBF_4': ['off'],   # 'on' or 'off'
+    'BIODIVERSTIY_TARGET_GBF_4_SNES' : ['off'],         # 'on' or 'off'.
+    'BIODIVERSTIY_TARGET_GBF_4_ECNES' : ['off'],           # 'on' or 'off'.
+    
+    # --------------- Biodiversity settings - GBF 8 ---------------
+    'BIODIVERSTIY_TARGET_GBF_8': ['off'],   # 'on' or 'off'
 
  
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
-    'SOLVE_BIODIV_PRIORITY_WEIGHT': [10000],
-    'SOLVE_ECONOMY_WEIGHT': [0.05],
+    'SOLVE_BIODIV_PRIORITY_WEIGHT': (
+        (np.arange(0,90,20)/100).tolist() + 
+        (np.arange(900,1000,20)/1000).tolist()
+    ), 
+    'SOLVE_ECONOMY_WEIGHT': (
+        (np.arange(0,10,1)/100).tolist() + 
+        (np.arange(10,100,20)/100).tolist() 
+    ),
     
     #-------------------- Diet BAU --------------------
     'DIET_DOM': ['BAU',],            # 'BAU' or 'FLX'

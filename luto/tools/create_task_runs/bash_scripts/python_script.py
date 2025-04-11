@@ -25,7 +25,7 @@ import luto.settings as settings
 
 # Run the simulation
 data = sim.load_data()
-sim.run(data=data, base_year=2010, target_year=2050, step_size=settings.STEP_SIZE)
+sim.run(data=data, years=settings.SIM_YERAS)
 
 
 # Save objectives to disk

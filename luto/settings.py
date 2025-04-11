@@ -103,7 +103,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-STEP_SIZE = 1
+SIM_YERAS = range(2020,2051)
 '''
 The gap between two consecutive years in the model. For example, if the set-size is 5,
 the model will simulate on years of 2010, 2015, 2020, ..., 2050.
