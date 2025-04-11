@@ -406,7 +406,7 @@ class LutoSolver:
             else 0
         )
 
-        return self.penalty_demand + self.penalty_ghg + self.penalty_water + self.penalty_biodiv
+        return self.penalty_demand + self.penalty_ghg + self.penalty_water + self.penalty_biodiv + gp.LinExpr(0)
         
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
