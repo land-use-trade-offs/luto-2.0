@@ -80,10 +80,8 @@ class LutoSolver:
         self,
         input_data: SolverInputData,
         d_c: np.array,
-        final_target_year: int,
     ):
 
-        self.final_target_year = final_target_year
         self._input_data = input_data
         self.d_c = d_c
         self.ncms = self.d_c.shape[0]

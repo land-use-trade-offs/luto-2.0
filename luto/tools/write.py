@@ -91,7 +91,7 @@ def write_data(data: Data):
     write_settings(data.path)
 
     # Get the years to write
-    years = sorted(list(data.lumaps.keys()))
+    years = data.reporting_years
     paths = [f"{data.path}/out_{yr}" for yr in years]
 
     ###############################################################
@@ -782,14 +782,12 @@ def write_area_transition_start_end(data: Data, path):
 
     print(f'Save transition matrix between start and end year\n')
 
-    # Get all years from sim
-    years = sorted(data.ag_dvars.keys())
-
     # Get the end year
-    yr_cal_end = years[-1]
+    yr_cal_start = data.reporting_years[0]
+    yr_cal_end = data.reporting_years[-1]
 
     # Get the decision variables for the start year
-    dvar_base = tools.lumap2ag_l_mrj(data.lumaps[data.YR_CAL_BASE], data.lmmaps[data.YR_CAL_BASE])
+    dvar_base = tools.lumap2ag_l_mrj(data.lumaps[yr_cal_start], data.lmmaps[yr_cal_start])
 
     # Calculate the transition matrix for agricultural land uses (start) to agricultural land uses (end)
     transitions_ag2ag = []
@@ -815,7 +813,7 @@ def write_area_transition_start_end(data: Data, path):
     transition.columns = ['From land-use','To land-use','Area (ha)']
 
     # Write the transition matrix to a csv file
-    transition.to_csv(os.path.join(path, f'transition_matrix_{data.YR_CAL_BASE}_{yr_cal_end}.csv'), index=False)
+    transition.to_csv(os.path.join(path, f'transition_matrix_{yr_cal_start}_{yr_cal_end}.csv'), index=False)
 
 
 
@@ -1660,7 +1658,7 @@ def write_ghg(data: Data, yr_cal, path):
     if yr_cal >= data.YR_CAL_BASE + 1:
         ghg_emissions = data.prod_data[yr_cal]['GHG Emissions']
     else:
-        ghg_emissions = (ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True) * data.ag_dvars[data.YR_CAL_BASE]).sum()
+        ghg_emissions = (ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True) * data.ag_dvars[data.reporting_years[0]]).sum()
 
     # Save GHG emissions to file
     df = pd.DataFrame({

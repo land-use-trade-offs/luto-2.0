@@ -20,6 +20,7 @@
 
 import os
 import xarray as xr
+import netCDF4
 import numpy as np
 import pandas as pd
 import rasterio
@@ -1753,43 +1754,30 @@ class Data:
         """
         self.obj_vals[yr] = obj_val
 
-    def set_path(self, base_year, target_year, step_size, years) -> str:
+    def set_path(self, years) -> str:
         """Create a folder for storing outputs and return folder name."""
 
-        # Get the years to write
-        if settings.MODE == "snapshot":
-            yr_all = [base_year, target_year]
-        elif settings.MODE == "timeseries":
-            yr_all = list(range(base_year, target_year + 1, step_size))
- 
-        # `years` will supersede `yr_all` if it is not None
-        if years is not None:
-            yr_all = years
-            
-        # Append target year if not in the list
-        if target_year not in yr_all:
-            yr_all.append(target_year)
 
         # Create path name
-        self.path = f"{settings.OUTPUT_DIR}/{self.timestamp}_RF{settings.RESFACTOR}_{yr_all[0]}-{yr_all[-1]}_{settings.MODE}"
+        self.path = f"{settings.OUTPUT_DIR}/{self.timestamp}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}_{settings.MODE}"
 
         # Get all paths
         paths = (
             [self.path]
-            + [f"{self.path}/out_{yr}" for yr in yr_all]
-            + [f"{self.path}/out_{yr}/lucc_separate" for yr in yr_all[1:]]
+            + [f"{self.path}/out_{yr}" for yr in years]
+            + [f"{self.path}/out_{yr}/lucc_separate" for yr in years[1:]]
         )  # Skip creating lucc_separate for base year
 
         # Add the path for the comparison between base-year and target-year if in the timeseries mode
         if settings.MODE == "timeseries":
-            self.path_begin_end_compare = f"{self.path}/begin_end_compare_{yr_all[0]}_{yr_all[-1]}"
+            self.path_begin_end_compare = f"{self.path}/begin_end_compare_{years[0]}_{years[-1]}"
             paths = (
                 paths
                 + [self.path_begin_end_compare]
                 + [
-                    f"{self.path_begin_end_compare}/out_{yr_all[0]}",
-                    f"{self.path_begin_end_compare}/out_{yr_all[-1]}",
-                    f"{self.path_begin_end_compare}/out_{yr_all[-1]}/lucc_separate",
+                    f"{self.path_begin_end_compare}/out_{years[0]}",
+                    f"{self.path_begin_end_compare}/out_{years[-1]}",
+                    f"{self.path_begin_end_compare}/out_{years[-1]}/lucc_separate",
                 ]
             )
 
