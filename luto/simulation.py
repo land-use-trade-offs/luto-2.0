@@ -32,8 +32,10 @@ import time
 import dill
 import threading
 import time
+import pandas as pd
 
 from glob import glob
+
 from luto.data import Data
 from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver

@@ -929,8 +929,11 @@ class LutoSolver:
 
         print(f"    ...Biodiversity GBF 3 (major vegetation groups) constraints...")
 
-        # TODO: skip if asking for a negative target 
         for v, v_area_lb in enumerate(v_limits):
+            
+            if v_limits[v] == 0:
+                print(f"       |-- vegetation class {v_names[v]} target area: {v_area_lb:,.0f} (skipped in the solver)")
+                continue
             
             ind = v_ind[v]
             MVG_raw_area_r = self._input_data.GBF3_raw_MVG_area_vr[v, ind]
@@ -1693,9 +1696,9 @@ class LutoSolver:
                 
                 "Production Ag Value (t)":          {c:(self.ag_q_dry_c[c] + self.ag_q_irr_c[c]).getValue() for c in range(self.ncms)},
                 "Production Non-Ag Value (t)":      {c:self.non_ag_q_c[c].getValue() for c in range(self.ncms)},
-                "Productoin Ag-Mam Value (t)":      {c:(self.ag_man_q_dry_c[c] + self.ag_man_q_irr_c[c]).getValue() for c in range(self.ncms)},
-                "Productoin Deviation (t)":         (self.V.X if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0),
-                "Productoin Penalty":               (self.penalty_demand.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)            if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0),
+                "Production Ag-Mam Value (t)":      {c:(self.ag_man_q_dry_c[c] + self.ag_man_q_irr_c[c]).getValue() for c in range(self.ncms)},
+                "Production Deviation (t)":         (self.V.X if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0),
+                "Production Penalty":               (self.penalty_demand.getValue() * (1 - settings.SOLVE_ECONOMY_WEIGHT)            if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0),
                             
                 "Water value (ML)":                 ({k: v.getValue() for k,v in self.water_nyiled_exprs.items()}                    if settings.WATER_LIMITS == "on" else 0),
                 "Water Deviation (ML)":             (self.W.X                                                                        if settings.WATER_CONSTRAINT_TYPE == "soft" else 0),

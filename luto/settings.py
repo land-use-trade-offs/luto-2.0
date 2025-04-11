@@ -394,8 +394,17 @@ GHG_LIMITS = {
               2100: -100 * 1e6   # GHG emissions target and year (can add more years/targets)
              }
 
-# Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-GHG_LIMITS_FIELD = '1.8C (67%) excl. avoided emis'
+# Take data from 'GHG_targets.xlsx', 
+GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'
+'''
+options include: 
+- Assuming agriculture is responsible to sequester 100% of the carbon emissions
+    - '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)' 
+- Assuming agriculture is responsible to sequester carbon emissions not including electricity emissions and  off-land emissions 
+    - '1.5C (67%) excl. avoided emis', '1.5C (50%) excl. avoided emis', or '1.8C (67%) excl. avoided emis'
+- Assuming agriculture is responsible to sequester carbon emissions only within the agricultural sector
+    - '1.5C (67%) - BASIC', '1.5C (50%) - BASIC', or '1.8C (67%) - BASIC'
+'''
 
 # Carbon price scenario: either 'AS_GHG', 'Default', '100', or 'CONSTANT', or NONE.
 # Setting to None falls back to the 'Default' scenario.
@@ -405,8 +414,18 @@ if CARBON_PRICES_FIELD == 'AS_GHG':
 
 CARBON_PRICE_COSTANT = 0.0  # The constant value to add to the carbon price (e.g., $10/tonne CO2e).
 '''
-    Only works when CARBON_PRICES_FIELD is set to 'CONSTANT'.
+Only works when CARBON_PRICES_FIELD is set to 'CONSTANT'.
 '''
+
+
+ONLY_BASIC_GHG = False  # If True, only considers the basic GHG types (i.e., CO2E_KG_HA_SOIL, CO2E_KG_HEAD_DUNG_URINE, CO2E_KG_HEAD_ENTERIC, CO2E_KG_HEAD_FODDER, CO2E_KG_HEAD_IND_LEACH_RUNOFF, CO2E_KG_HEAD_SEED).
+'''
+Basic GHG types are the direct emissions from the land-use and livestock types, excluding
+indirect emissions such as fertiliser, irrigation, land management, etc.
+'''
+
+BASIC_GHG_TYPES_CROP = ['CO2E_KG_HA_SOIL', 'CO2E_KG_HA_SOWING']
+BASIC_GHG_TYPES_LVSTK = ['CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG_HEAD_FODDER', 'CO2E_KG_HEAD_IND_LEACH_RUNOFF', 'CO2E_KG_HEAD_SEED']
 
 
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
@@ -465,7 +484,7 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 # Biodiversity limits and parameters *******************************
-SOLVE_BIODIV_PRIORITY_WEIGHT = 0.995
+SOLVE_BIODIV_PRIORITY_WEIGHT = 0.99
 '''The weight of the biodiversity target in the objective function'''
 
 
