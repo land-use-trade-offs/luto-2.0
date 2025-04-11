@@ -304,12 +304,12 @@ class LutoSolver:
         # Set the objective function
         if settings.OBJECTIVE == "mincost":
             sense = GRB.MINIMIZE
-            obj_wrap = self.obj_economy  * settings.SOLVE_ECONOMY_WEIGHT + self.obj_penalties * ( 1 - settings.SOLVE_ECONOMY_WEIGHT)
-            objective = obj_wrap * (1 - settings.SOLVE_BIODIV_PRIORITY_WEIGHT) - self.obj_biodiv * settings.SOLVE_BIODIV_PRIORITY_WEIGHT
+            obj_wrap = self.obj_economy  * settings.SOLVE_ECONOMY_WEIGHT - self.obj_biodiv * ( 1 - settings.SOLVE_ECONOMY_WEIGHT)
+            objective = obj_wrap * (1 - settings.SOLVE_BIODIV_PRIORITY_WEIGHT) +  self.obj_penalties * settings.SOLVE_BIODIV_PRIORITY_WEIGHT
         elif settings.OBJECTIVE == "maxprofit":
             sense = GRB.MAXIMIZE
-            obj_wrap = self.obj_economy  * settings.SOLVE_ECONOMY_WEIGHT - self.obj_penalties * (1 - settings.SOLVE_ECONOMY_WEIGHT)
-            objective = obj_wrap * (1 - settings.SOLVE_BIODIV_PRIORITY_WEIGHT) + self.obj_biodiv * settings.SOLVE_BIODIV_PRIORITY_WEIGHT
+            obj_wrap = self.obj_economy  * settings.SOLVE_ECONOMY_WEIGHT + self.obj_biodiv * (1 - settings.SOLVE_ECONOMY_WEIGHT)
+            objective = obj_wrap * (1 - settings.SOLVE_BIODIV_PRIORITY_WEIGHT) - self.obj_penalties * settings.SOLVE_BIODIV_PRIORITY_WEIGHT
         else:
             raise ValueError(f"Unknown objective function: {settings.OBJECTIVE}")
 

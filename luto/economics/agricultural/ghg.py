@@ -64,8 +64,8 @@ def get_ghg_crop(data: Data, lu, lm, aggregate):
     if lu in data.AGGHG_CROPS['CO2E_KG_HA_CHEM_APPL', lm].columns:
 
         # Get the data column {ghg_rs: r -> each pixel,  s -> each GHG source}
-        if settings.ONLY_BASIC_GHG:
-            ghg_rs = data.AGGHG_CROPS.loc[:, (data.AGGHG_CROPS.columns.get_level_values(0).isin(settings.BASIC_GHG_TYPES_CROP)) & 
+        if settings.USE_GHG_SCOPE_1:
+            ghg_rs = data.AGGHG_CROPS.loc[:, (data.AGGHG_CROPS.columns.get_level_values(0).isin(settings.CROP_GHG_SCOPE_1)) & 
                                              (data.AGGHG_CROPS.columns.get_level_values(1) == lm) & 
                                              (data.AGGHG_CROPS.columns.get_level_values(2) == lu)]
         else:
@@ -119,11 +119,11 @@ def get_ghg_lvstk( data: Data  # Data object.
     # Get the yield potential, i.e. the total number of livestock head per hectare.
     yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
 
-    # Get GHG emissions by source in kg CO2e per head of livestock.  settings.BASIC_GHG_TYPES_LVSTK
+    # Get GHG emissions by source in kg CO2e per head of livestock.  settings.LVSTK_GHG_SCOPE_1
     # Note: ghg_rs (r -> each cell, s -> each GHG source)
-    if settings.ONLY_BASIC_GHG:
+    if settings.USE_GHG_SCOPE_1:
         ghg_raw = data.AGGHG_LVSTK.loc[:, (data.AGGHG_LVSTK.columns.get_level_values(0) == lvstype) &
-                                          (data.AGGHG_LVSTK.columns.get_level_values(1).isin(settings.BASIC_GHG_TYPES_LVSTK))]
+                                          (data.AGGHG_LVSTK.columns.get_level_values(1).isin(settings.LVSTK_GHG_SCOPE_1))]
     else:
         ghg_raw = data.AGGHG_LVSTK.loc[:, (lvstype, slice(None)) ]
 
