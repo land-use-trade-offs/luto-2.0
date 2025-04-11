@@ -100,6 +100,9 @@ def run(
           should not be provided alongside 'years'.
     """
     validate_simulation_years_settings(data.YR_CAL_BASE, base_year, target_year, step_size, years)
+    
+    base_year = years[0]
+    target_year = years[-1]
 
     if not step_size:
         step_size = 1
@@ -169,6 +172,9 @@ def validate_simulation_years_settings(
         
         if settings.MODE == 'snapshot':
             raise ValueError("'years' cannot be specified for snapshot solves.")
+        
+        base_year = years[0]
+        target_year = years[-1]
 
     if settings.MODE == 'snapshot' and step_size:
         print(f"WARNING: Step size: {step_size} is ignored when settings.MODE is 'snapshot'.")
