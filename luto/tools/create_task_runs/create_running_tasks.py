@@ -96,7 +96,7 @@ grid_search = {
         (np.arange(0,90,20)/100).tolist() + 
         (np.arange(900,1000,20)/1000).tolist()
     ), 
-    'SOLVE_ECONOMY_WEIGHT': (
+    'SOLVE_WEIGHT_ALPHA': (
         (np.arange(0,10,1)/100).tolist() + 
         (np.arange(10,100,20)/100).tolist() 
     ),

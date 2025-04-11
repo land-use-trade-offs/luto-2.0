@@ -439,7 +439,7 @@ GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (l
 
 # Weight for the GHG/Demand deviation in the objective function
 ''' Range from 0 to 1, where 0 is fully minimising GHG and demand deviation, and 1 is only maximising profit. '''
-SOLVE_ECONOMY_WEIGHT = 0.05  
+SOLVE_WEIGHT_ALPHA = 0.05  
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
@@ -487,7 +487,7 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 # Biodiversity limits and parameters *******************************
-SOLVE_BIODIV_PRIORITY_WEIGHT = 0.99
+SOLVE_WEIGHT_BETA = 0
 '''The weight of the biodiversity target in the objective function'''
 
 
