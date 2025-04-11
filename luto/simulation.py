@@ -32,7 +32,6 @@ import time
 import dill
 import threading
 import time
-import pandas as pd
 
 from glob import glob
 
@@ -40,23 +39,17 @@ from luto.data import Data
 from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
 from luto.tools.create_task_runs.helpers import log_memory_usage
-from luto.tools.write import write_outputs
-from luto.economics.agricultural.biodiversity import get_GBF3_major_vegetation_matrices_vr
 
 import luto.settings as settings
-import luto.economics.agricultural.ghg as ag_ghg
-import luto.economics.agricultural.biodiversity as ag_biodiversity
 
 from luto.tools import (
-    calc_major_vegetation_group_ag_area_for_year, 
-    calc_species_ag_area_for_year, 
     LogToFile,
     write_timestamp,
     read_timestamp
 )
 
 
-@LogToFile(f"{settings.OUTPUT_DIR}/run_{read_timestamp()}")
+@LogToFile(f"{settings.OUTPUT_DIR}/run_{write_timestamp()}")
 def load_data() -> Data:
     """
     Load the Data object containing all required data to run a LUTO simulation.
@@ -128,10 +121,6 @@ def run(
     else:
         raise ValueError(f"Unkown MODE: {settings.MODE}.")
     
-    # Save the Data object to disk
-    write_outputs(data)
-
-   
 
 
 def solve_timeseries(data: Data, years_to_run: list[int]) -> None:

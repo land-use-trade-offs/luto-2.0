@@ -21,11 +21,13 @@ import os
 import shutil, pickle
 import luto.simulation as sim
 import luto.settings as settings
+from luto.tools.write import write_outputs
 
 
 # Run the simulation
 data = sim.load_data()
 sim.run(data=data, years=settings.SIM_YERAS)
+write_outputs(data)
 
 
 # Save objectives to disk
