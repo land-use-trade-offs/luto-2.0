@@ -36,8 +36,8 @@ LUTO2 comes with a full diagram to illustrate its data preparation, workflow, an
 2. Create a Conda environment and install dependencies:
    ```sh
    cd luto-2.0
-   conda create --name luto_env --file requirements.txt
-   conda activate luto_env
+   conda env create luto/tools/create_task_runs/bash_scripts/conda_env.yml
+   conda activate luto
    ```
 
 3. Run a basic simulation:
