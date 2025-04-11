@@ -80,7 +80,6 @@ def run(
     data: Data, 
     base_year: int | None = None, 
     target_year: int | None = None, 
-    *,
     step_size: int | None = None,
     years: list[int] | None = None,
 ) -> None:
@@ -99,7 +98,12 @@ def run(
         - 'Years' essentially replaces base_year, target_year and step_size to allow for more flexibility so these
           should not be provided alongside 'years'.
     """
-    validate_simulation_years_settings(data.YR_CAL_BASE, base_year, target_year, step_size, years)
+
+    if years:
+        years = sorted(years)
+        print(f"Running LUTO {settings.VERSION} for the specifed years {years[0]} - {years[-1]}", flush=True)
+    else:
+        years = list(range(base_year, target_year + 1, step_size))
     
     base_year = years[0]
     target_year = years[-1]

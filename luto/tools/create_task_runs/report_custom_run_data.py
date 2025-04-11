@@ -41,7 +41,7 @@ DIET_DOM == "BAU" and
 GHG_CONSTRAINT_TYPE == "soft" and
 BIODIVERSTIY_TARGET_GBF_2 == "on" and
 MODE == "timeseries" and
-SOLVE_ECONOMY_WEIGHT <= 0.3
+SOLVE_WEIGHT_ALPHA <= 0.3
 '''
 filter_rules = '''
     year != 2010
@@ -68,7 +68,7 @@ p_weight_vs_profit = (
             # group='WATER_PENALTY',
         )
     ) +
-    p9.facet_grid('SOLVE_BIODIV_PRIORITY_WEIGHT~SOLVE_ECONOMY_WEIGHT') +
+    p9.facet_grid('SOLVE_WEIGHT_BETA~SOLVE_WEIGHT_ALPHA') +
     p9.geom_line(size=0.3) +
     p9.theme_bw() +
     p9.theme(
@@ -149,7 +149,7 @@ p_weight_vs_demand.save('F:/jinzhu/TMP/SOLVE_WEIGHT_plots/03_3_p_weight_vs_deman
 #     p9.ggplot(
 #         report_data_filter, 
 #         p9.aes(
-#             x='SOLVE_ECONOMY_WEIGHT', 
+#             x='SOLVE_WEIGHT_ALPHA', 
 #             y='Profit',
 #         )
 #     ) +
@@ -165,7 +165,7 @@ p_weight_vs_demand.save('F:/jinzhu/TMP/SOLVE_WEIGHT_plots/03_3_p_weight_vs_deman
 #     p9.ggplot(
 #         report_data_filter, 
 #         p9.aes(
-#             x='SOLVE_ECONOMY_WEIGHT', 
+#             x='SOLVE_WEIGHT_ALPHA', 
 #             y='GHG deviation'
 #         )
 #     ) +
@@ -180,7 +180,7 @@ p_weight_vs_demand.save('F:/jinzhu/TMP/SOLVE_WEIGHT_plots/03_3_p_weight_vs_deman
 #     p9.ggplot(
 #         report_data_filter, 
 #         p9.aes(
-#             x='SOLVE_ECONOMY_WEIGHT', 
+#             x='SOLVE_WEIGHT_ALPHA', 
 #             y='Deforestation', 
 #         )
 #     ) +
@@ -197,7 +197,7 @@ p_weight_vs_demand.save('F:/jinzhu/TMP/SOLVE_WEIGHT_plots/03_3_p_weight_vs_deman
 #         p9.aes(
 #             x='GHG deviation', 
 #             y='Profit', 
-#             color='SOLVE_ECONOMY_WEIGHT', 
+#             color='SOLVE_WEIGHT_ALPHA', 
 #             shape='DIET_GLOB',
 #             group='interaction',
 #         )

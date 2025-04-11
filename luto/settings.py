@@ -207,7 +207,7 @@ NON_AG_LAND_USES = {
     'Carbon Plantings (Block)': True,
     'Sheep Carbon Plantings (Belt)': True,
     'Beef Carbon Plantings (Belt)': True,
-    'BECCS': True,
+    'BECCS': False,
 }
 """
 The dictionary here is the master list of all of the non agricultural land uses
@@ -329,7 +329,7 @@ AG_MANAGEMENTS_TO_LAND_USES = {
 AG_MANAGEMENTS = {
     'Asparagopsis taxiformis': True,
     'Precision Agriculture': True,
-    'Ecological Grazing': True,
+    'Ecological Grazing': False,
     'Savanna Burning': True,
     'AgTech EI': True,
     'Biochar': True,
@@ -402,9 +402,12 @@ options include:
     - '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)' 
 - Assuming agriculture is responsible to sequester carbon emissions not including electricity emissions and  off-land emissions 
     - '1.5C (67%) excl. avoided emis', '1.5C (50%) excl. avoided emis', or '1.8C (67%) excl. avoided emis'
-- Assuming agriculture is responsible to sequester carbon emissions only within the agricultural sector
-    - '1.5C (67%) - BASIC', '1.5C (50%) - BASIC', or '1.8C (67%) - BASIC'
+- Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions from land-use and livestock types)
+    - '1.5C (67%) excl. avoided emis SCOPE1', '1.5C (50%) excl. avoided emis SCOPE1', or '1.8C (67%) excl. avoided emis SCOPE1'
 '''
+  	  	  
+
+
 
 # Carbon price scenario: either 'AS_GHG', 'Default', '100', or 'CONSTANT', or NONE.
 # Setting to None falls back to the 'Default' scenario.
@@ -418,14 +421,14 @@ Only works when CARBON_PRICES_FIELD is set to 'CONSTANT'.
 '''
 
 
-ONLY_BASIC_GHG = False  # If True, only considers the basic GHG types (i.e., CO2E_KG_HA_SOIL, CO2E_KG_HEAD_DUNG_URINE, CO2E_KG_HEAD_ENTERIC, CO2E_KG_HEAD_FODDER, CO2E_KG_HEAD_IND_LEACH_RUNOFF, CO2E_KG_HEAD_SEED).
+USE_GHG_SCOPE_1 = False  # If True, only considers the basic GHG types (i.e., CO2E_KG_HA_SOIL, CO2E_KG_HEAD_DUNG_URINE, CO2E_KG_HEAD_ENTERIC, CO2E_KG_HEAD_FODDER, CO2E_KG_HEAD_IND_LEACH_RUNOFF, CO2E_KG_HEAD_SEED).
 '''
 Basic GHG types are the direct emissions from the land-use and livestock types, excluding
 indirect emissions such as fertiliser, irrigation, land management, etc.
 '''
 
-BASIC_GHG_TYPES_CROP = ['CO2E_KG_HA_SOIL', 'CO2E_KG_HA_SOWING']
-BASIC_GHG_TYPES_LVSTK = ['CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG_HEAD_FODDER', 'CO2E_KG_HEAD_IND_LEACH_RUNOFF', 'CO2E_KG_HEAD_SEED']
+CROP_GHG_SCOPE_1 = ['CO2E_KG_HA_SOIL']
+LVSTK_GHG_SCOPE_1 = ['CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG_HEAD_IND_LEACH_RUNOFF', 'CO2E_KG_HEAD_MANURE_MGT']
 
 
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
@@ -436,7 +439,7 @@ GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (l
 
 # Weight for the GHG/Demand deviation in the objective function
 ''' Range from 0 to 1, where 0 is fully minimising GHG and demand deviation, and 1 is only maximising profit. '''
-SOLVE_ECONOMY_WEIGHT = 0.05  
+SOLVE_WEIGHT_ALPHA = 0.05  
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
@@ -484,7 +487,7 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 # Biodiversity limits and parameters *******************************
-SOLVE_BIODIV_PRIORITY_WEIGHT = 0.99
+SOLVE_WEIGHT_BETA = 0
 '''The weight of the biodiversity target in the objective function'''
 
 
