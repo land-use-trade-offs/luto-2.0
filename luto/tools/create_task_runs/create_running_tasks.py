@@ -53,7 +53,8 @@ grid_search = {
     ###############################################################
     
     # --------------- Demand settings ---------------
-    'DEMAND_CONSTRAINT_TYPE': ['soft'],     # 'hard' or 'soft'    
+    'DEMAND_CONSTRAINT_TYPE': ['soft'],     # 'hard' or 'soft' 
+    'CARBON_PRICES_FIELD': ['CONSTANT'],   
     
     # --------------- GHG settings ---------------
     'GHG_CONSTRAINT_TYPE': ['hard'],        # 'hard' or 'soft'
@@ -92,10 +93,13 @@ grid_search = {
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_WEIGHT_ALPHA': (
-        (np.arange(0,10,1)/100).tolist() + 
+        (np.arange(1,10,1)/100).tolist() + 
         (np.arange(10,100,10)/100).tolist() 
     ),
-    'SOLVE_WEIGHT_BETA': [0], 
+    'SOLVE_WEIGHT_BETA': (
+        (np.arange(1,90,10)/100).tolist() + 
+        (np.arange(90,100,1)/100).tolist() 
+    ), 
     
     
     #-------------------- Diet BAU --------------------

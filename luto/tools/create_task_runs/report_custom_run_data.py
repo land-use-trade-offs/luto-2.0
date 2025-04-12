@@ -23,15 +23,11 @@ import plotnine as p9
 
 from glob import glob
 from luto.tools.create_task_runs.helpers import process_task_root_dirs
-from luto.tools.create_task_runs.parameters import BIO_TARGET_ORDER, GHG_ORDER
 
 
 # Get the data
-task_root_dirs = [i for i in glob('../Custom_runs/*') if "20250319_TEST_COMBINE_BIO_ECONOMY_WEIGHTS" in i]
+task_root_dirs = [i for i in glob('../Custom_runs/*') if "20250411_GRID_SEARCH_RES15_TIMESERIES" in i][:10]
 report_data, report_data_demand = process_task_root_dirs(task_root_dirs)
-
-# Filter demand data, where a given commodity is near zero for a given year
-report_data_demand = report_data_demand.query('abs(`deviation_%`) > 0.1').copy()
 
 
 # Filter the data
@@ -47,8 +43,15 @@ filter_rules = '''
     year != 2010
 '''.strip().replace('\n', '')
 
-report_data_filter = report_data.query(filter_rules).copy()
-report_data_demand_filterd = report_data_demand.query(filter_rules).copy()
+report_data_filter = (
+    report_data
+    .query('SOLVE_WEIGHT_ALPHA==@weight_alpha and SOLVE_WEIGHT_BETA==@weight_beta')
+)
+
+
+# Weights
+weight_alpha = 0.8
+weight_beta = 0.98
 
 
 # Plotting
@@ -63,12 +66,10 @@ p_weight_vs_profit = (
         p9.aes(
             x='year', 
             y='Profit', 
-            # color='WATER_PENALTY', 
-            # linetype='DIET_GLOB',
-            # group='WATER_PENALTY',
+            linetype='BIODIV_GBF_TARGET_2_DICT',
         )
     ) +
-    p9.facet_grid('SOLVE_WEIGHT_BETA~SOLVE_WEIGHT_ALPHA') +
+    p9.facet_wrap('GHG_LIMITS_FIELD') +
     p9.geom_line(size=0.3) +
     p9.theme_bw() +
     p9.theme(
@@ -81,59 +82,26 @@ p_weight_vs_profit = (
 
 p_weight_vs_profit.save('F:/jinzhu/TMP/SOLVE_WEIGHT_plots/03_1_p_weight_vs_profit.svg')
 
-
-p_weight_vs_GHG_deviation = (
-    p9.ggplot(
-        report_data_filter, 
-        p9.aes(
-            x='year', 
-            y='GHG deviation', 
-            color='GBF2_PENALTY', 
-            # linetype='DIET_GLOB',
-            group='GBF2_PENALTY',
-        )
-    ) +
-    # p9.facet_wrap('WATER_PENALTY', labeller='label_both') +
-    p9.geom_line() +
-    p9.theme_bw() +
-    # p9.scale_x_log10() +
-    p9.ylab('GHG deviation (Mt)')
-    )
-
-p_weight_vs_GHG_deviation.save('F:/jinzhu/TMP/SOLVE_WEIGHT_plots/03_2_p_weight_vs_GHG_deviation.svg')
-
-p_weight_vs_GHG_deforestation = (
-    p9.ggplot(
-        report_data_filter, 
-        p9.aes(
-            x='year', 
-            y='Total_Deforestation', 
-            # lintype='BIODIV_GBF_TARGET_2_DICT',
-            color='GBF2_PENALTY', 
-            # linetype='DIET_GLOB',
-            group='GBF2_PENALTY',
-        )
-    ) +
-    # p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
-    p9.geom_line() +
-    p9.theme_bw() +
-    # p9.scale_x_log10() +
-    p9.ylab('Deforestation (Mt)')
-    )
-
+# ------------------
+report_data_demand_filterd = (
+    report_data_demand
+    .query('SOLVE_WEIGHT_ALPHA==@weight_alpha and SOLVE_WEIGHT_BETA==@weight_beta')
+    .query('abs(`deviation_%`) <=5 and abs(`deviation_%`)>=0.001')
+)
 
 p_weight_vs_demand = (
-    p9.ggplot(report_data_demand_filterd) +
-    p9.geom_line(
+    p9.ggplot(
+        report_data_demand_filterd, 
         p9.aes(
             x='year', 
             y='deviation_%', 
-            color='name',
-            # linetype='GBF2_PENALTY.astype("category")',
-        ),
+            fill='name', 
+        )
     ) +
-    p9.facet_wrap('GBF2_PENALTY', scales='free') +
+    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT~GHG_LIMITS_FIELD') +
+    p9.geom_col(position='stack') +
     p9.theme_bw() +
+    p9.theme(strip_text=p9.element_text(size=8)) +
     p9.guides(color=p9.guide_legend(ncol=1))
 )
 
@@ -142,6 +110,44 @@ p_weight_vs_demand.save('F:/jinzhu/TMP/SOLVE_WEIGHT_plots/03_3_p_weight_vs_deman
 
 
 
+# p_weight_vs_GHG_deviation = (
+#     p9.ggplot(
+#         report_data_filter, 
+#         p9.aes(
+#             x='year', 
+#             y='GHG deviation', 
+#             color='GBF2_PENALTY', 
+#             # linetype='DIET_GLOB',
+#             group='GBF2_PENALTY',
+#         )
+#     ) +
+#     # p9.facet_wrap('WATER_PENALTY', labeller='label_both') +
+#     p9.geom_line() +
+#     p9.theme_bw() +
+#     # p9.scale_x_log10() +
+#     p9.ylab('GHG deviation (Mt)')
+#     )
+
+# p_weight_vs_GHG_deviation.save('F:/jinzhu/TMP/SOLVE_WEIGHT_plots/03_2_p_weight_vs_GHG_deviation.svg')
+
+# p_weight_vs_GHG_deforestation = (
+#     p9.ggplot(
+#         report_data_filter, 
+#         p9.aes(
+#             x='year', 
+#             y='Total_Deforestation', 
+#             # lintype='BIODIV_GBF_TARGET_2_DICT',
+#             color='GBF2_PENALTY', 
+#             # linetype='DIET_GLOB',
+#             group='GBF2_PENALTY',
+#         )
+#     ) +
+#     # p9.facet_grid('BIODIV_GBF_TARGET_2_DICT ~ GHG_LIMITS_FIELD', scales='free') +
+#     p9.geom_line() +
+#     p9.theme_bw() +
+#     # p9.scale_x_log10() +
+#     p9.ylab('Deforestation (Mt)')
+#     )
 
 
 # # Snapshoot plots

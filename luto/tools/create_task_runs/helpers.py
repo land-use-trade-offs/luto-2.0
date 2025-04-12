@@ -422,10 +422,18 @@ def process_task_root_dirs(task_root_dirs):
             columns='name', 
             values='val'
         ).reset_index()
-        
-    # Reorder the data, categorize the columns, and reset the index
-    report_Profit_GHG_BIO['GHG_LIMITS_FIELD'] = pd.Categorical(report_Profit_GHG_BIO['GHG_LIMITS_FIELD'], categories=GHG_ORDER, ordered=True)
-    report_Profit_GHG_BIO['BIODIV_GBF_TARGET_2_DICT'] = pd.Categorical(report_Profit_GHG_BIO['BIODIV_GBF_TARGET_2_DICT'], categories=BIO_TARGET_ORDER, ordered=True)
-    report_Production['GHG_LIMITS_FIELD'] = pd.Categorical(report_Production['GHG_LIMITS_FIELD'], categories=GHG_ORDER, ordered=True)
+    
+    # Rename the GHG and BIO filed
+    report_Profit_GHG_BIO['GHG_LIMITS_FIELD'] = report_Profit_GHG_BIO['GHG_LIMITS_FIELD'].replace(GHG_ORDER)
+    report_Profit_GHG_BIO['BIODIV_GBF_TARGET_2_DICT'] = report_Profit_GHG_BIO['BIODIV_GBF_TARGET_2_DICT'].replace(BIO_TARGET_ORDER)
 
+    report_Production['BIODIV_GBF_TARGET_2_DICT'] = report_Production['BIODIV_GBF_TARGET_2_DICT'].replace(BIO_TARGET_ORDER)
+    report_Production['GHG_LIMITS_FIELD'] = report_Production['GHG_LIMITS_FIELD'].replace(GHG_ORDER)
+    
+    # # Reorder the data, categorize the columns, and reset the index
+    # report_Profit_GHG_BIO['GHG_LIMITS_FIELD'] = pd.Categorical(report_Profit_GHG_BIO['GHG_LIMITS_FIELD'], categories=GHG_ORDER, ordered=True)
+    # report_Profit_GHG_BIO['BIODIV_GBF_TARGET_2_DICT'] = pd.Categorical(report_Profit_GHG_BIO['BIODIV_GBF_TARGET_2_DICT'], categories=BIO_TARGET_ORDER, ordered=True)
+    # report_Production['GHG_LIMITS_FIELD'] = pd.Categorical(report_Production['GHG_LIMITS_FIELD'], categories=GHG_ORDER, ordered=True)
+
+    
     return report_Profit_GHG_BIO, report_Production

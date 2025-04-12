@@ -417,9 +417,11 @@ options include:
 
 # Carbon price scenario: either 'AS_GHG', 'Default', '100', or 'CONSTANT', or NONE.
 # Setting to None falls back to the 'Default' scenario.
-CARBON_PRICES_FIELD = 'AS_GHG'
+CARBON_PRICES_FIELD = 'CONSTANT'
+
 if CARBON_PRICES_FIELD == 'AS_GHG':
     CARBON_PRICES_FIELD = GHG_LIMITS_FIELD[:9].replace('(','')  # '1.5C (67%) excl. avoided emis' -> '1.5C 67%'
+
 
 CARBON_PRICE_COSTANT = 0.0  # The constant value to add to the carbon price (e.g., $10/tonne CO2e).
 '''
