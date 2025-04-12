@@ -171,12 +171,13 @@ def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, mode:Li
         # Submit the task
         create_run_folders(col)
         write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
-        submit_task(col, python_path, mode=mode)
+        return submit_task(col, python_path, mode=mode)
 
     # Submit the tasks in parallel; Using 4 threads is a safe number to submit
     # tasks in login node. Or use the specified number of cpus if not in a linux system
     workers = min(n_workers, len(custom_cols)) if os.name == 'posix' else n_workers
-    Parallel(n_jobs=workers)(delayed(process_col)(col) for col in custom_cols)
+    for msg in Parallel(n_jobs=workers)(delayed(process_col)(col) for col in custom_cols):
+        print(msg)
 
 
 def copy_folder_custom(source, destination, ignore_dirs=None):
@@ -284,7 +285,6 @@ def submit_task(col:str, python_path:str=None, mode:Literal['single','cluster']=
     if mode == 'single': 
         # Submit the task 
         subprocess.run([python_path, 'python_script.py'], cwd=f'{TASK_ROOT_DIR}/{col}')
-        print(f'Task {col} has been submitted!')
     
     # Start the task if the os is linux
     elif mode == 'cluster' and os.name == 'posix':
