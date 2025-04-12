@@ -53,7 +53,7 @@ grid_search = {
     ###############################################################
     
     # --------------- Demand settings ---------------
-    'DEMAND_CONSTRAINT_TYPE': ['hard'],     # 'hard' or 'soft'    
+    'DEMAND_CONSTRAINT_TYPE': ['soft'],     # 'hard' or 'soft'    
     
     # --------------- GHG settings ---------------
     'GHG_CONSTRAINT_TYPE': ['hard'],        # 'hard' or 'soft'
@@ -91,14 +91,12 @@ grid_search = {
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
-    'SOLVE_BIODIV_PRIORITY_WEIGHT': (
-        (np.arange(0,90,20)/100).tolist() + 
-        (np.arange(900,1000,20)/1000).tolist()
-    ), 
     'SOLVE_WEIGHT_ALPHA': (
         (np.arange(0,10,1)/100).tolist() + 
-        (np.arange(10,100,20)/100).tolist() 
+        (np.arange(10,100,10)/100).tolist() 
     ),
+    'SOLVE_WEIGHT_BETA': [0], 
+    
     
     #-------------------- Diet BAU --------------------
     'DIET_DOM': ['BAU',],            # 'BAU' or 'FLX'
@@ -123,12 +121,12 @@ grid_search_df = create_grid_search_template()
 # Create the task runs
 
 # # 1) Submit task to a single linux machine, and run simulations parallely
-# create_task_runs(grid_search_df, mode='single', python_path='/home/582/jw6041/miniforge3/envs/luto/bin/python', n_workers=40, waite_mins=1.5)
+# create_task_runs(grid_search_df, mode='single', python_path='/home/582/jw6041/miniforge3/envs/luto/bin/python', n_workers=40)
 
 # 2) Submit task to multiple linux computation nodes
-create_task_runs(grid_search_df, mode='cluster')
+# create_task_runs(grid_search_df, mode='cluster')
 
 # # 3) Submit task to a single windows machine, and run simulations parallely
-# create_task_runs(grid_search_df, mode='single', python_path='F:/jinzhu/conda_env/luto/python.exe', n_workers=40, waite_mins=1.5)
+create_task_runs(grid_search_df, mode='single', python_path='F:/jinzhu/conda_env/luto/python.exe', n_workers=40)
 
 
