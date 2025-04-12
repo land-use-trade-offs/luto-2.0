@@ -31,7 +31,6 @@ import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 
-from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
 from luto.tools.spatializers import upsample_array
 
 from collections import defaultdict
@@ -39,7 +38,6 @@ from dataclasses import dataclass
 from typing import Any, Literal, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
-from rasterio.enums import Resampling
 
 
 

@@ -103,7 +103,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YERAS = [2020,2035,2050] # range(2020,2050)
+SIM_YERAS = list(range(2020,2051,5)) # range(2020,2050)
 
 
 # How does the model run over time
@@ -423,7 +423,8 @@ CARBON_PRICES_FIELD = 'CONSTANT'
 if CARBON_PRICES_FIELD == 'AS_GHG':
     CARBON_PRICES_FIELD = GHG_LIMITS_FIELD[:9].replace('(','')  # '1.5C (67%) excl. avoided emis' -> '1.5C 67%'
 
-CARBON_PRICE_COSTANT = 0.0  # The constant value to add to the carbon price (e.g., $10/tonne CO2e).
+if CARBON_PRICES_FIELD == 'CONSTANT':
+    CARBON_PRICE_COSTANT = 0.0  # The constant value to add to the carbon price (e.g., $10/tonne CO2e).
 '''
 Only works when CARBON_PRICES_FIELD is set to 'CONSTANT'.
 '''
@@ -447,7 +448,7 @@ GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (l
 
 # Weight for the GHG/Demand deviation in the objective function
 ''' Range from 0 to 1, where 0 is fully minimising GHG and demand deviation, and 1 is only maximising profit. '''
-SOLVE_WEIGHT_ALPHA = 0.8  
+SOLVE_WEIGHT_ALPHA = 0.9  
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
@@ -495,7 +496,7 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 # Biodiversity limits and parameters *******************************
-SOLVE_WEIGHT_BETA = 0.98
+SOLVE_WEIGHT_BETA = 0.99
 '''The weight of the biodiversity target in the objective function'''
 
 

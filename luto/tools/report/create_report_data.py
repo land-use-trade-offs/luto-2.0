@@ -70,13 +70,14 @@ def save_report_data(raw_data_dir:str):
 
     # Get all LUTO output files and store them in a dataframe
     files = get_all_files(raw_data_dir).reset_index(drop=True)
+    files['Year'] = files['Year'].astype(int)
+    files = files.query('Year.isin(@years)')
     
     # The land-use groupings to combine the land-use into a single category
     lu_group = pd.read_csv('luto/tools/report/Assets/lu_group.csv')
     lu_group_expand = lu_group.set_index(['Category', 'color_HEX']).apply(lambda x: x.str.split(', ').explode()).reset_index()
     
-    # Set the years to be int
-    files['Year'] = files['Year'].astype(int)
+    
     
     
     
@@ -394,8 +395,14 @@ def save_report_data(raw_data_dir:str):
         
         
     # Plot_2-5-6: Production (LUTO outputs, Million Tonnes)
-    quantity_csv_paths = files.query('category == "quantity" and base_name == "quantity_comparison" and year_types == "single_year"').reset_index(drop=True)
-    quantity_df = get_quantity_df(quantity_csv_paths)
+    filter_str = '''
+        category == "quantity" 
+        and base_name == "quantity_comparison" 
+        and year_types == "single_year"
+    '''.replace('\n','').replace('    ','')
+    
+    quantity_csv_paths = files.query(filter_str).reset_index(drop=True)
+    quantity_df = get_quantity_df(quantity_csv_paths).query('Year.isin(@years)')
     quantity_df = quantity_df.replace({'Sheep lexp': 'Sheep live export', 'Beef lexp': 'Beef live export'})
     
     quantity_df_wide = quantity_df\
@@ -429,9 +436,7 @@ def save_report_data(raw_data_dir:str):
     # Remove rows where Demand Achievement (%) is 100 across all years
     mask = quantify_diff.groupby('Commodity')['Demand Achievement (%)'].transform(lambda x: (round(x) == 100).all())
     quantify_diff = quantify_diff[~mask]
-    
-    
-    quantify_diff_fake
+
     
     quantify_diff_wide = quantify_diff\
         .groupby(['Commodity'])[['Year','Demand Achievement (%)']]\
