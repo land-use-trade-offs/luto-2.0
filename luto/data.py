@@ -188,8 +188,8 @@ class Data:
         
         
         # Get the lon/lat coordinates.
-        self.COORD_LON_LAT = self.get_coord(np.nonzero(self.MASK), self.GEO_META_FULLRES['transform'])     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
-        
+        self.COORD_LON_LAT = self.get_coord(np.nonzero(self.LUMASK), self.GEO_META_FULLRES['transform'])     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
+        self.COORD_LON_LAT = [i[self.MASK] for i in self.COORD_LON_LAT]  # Only keep the coordinates for the cells that are not masked out (i.e., land uses). 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only) and not masked out
         
         # Get the resfactored lumap_2D as xarray DataArray
         self.LUMAP_2D_RESFACTORED_XR = xr.DataArray(
