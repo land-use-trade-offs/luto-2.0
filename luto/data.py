@@ -994,20 +994,24 @@ class Data:
         self.OFF_LAND_GHG_EMISSION_C = self.OFF_LAND_GHG_EMISSION.groupby(['YEAR']).sum(numeric_only=True).values
 
         # Read the carbon price per tonne over the years (indexed by the relevant year)
-        carbon_price_sheet = settings.CARBON_PRICES_FIELD or "Default"
-        carbon_price_usecols = "A,B"
-        carbon_price_col_names = ["Year", "Carbon_price_$_tCO2e"]
-        carbon_price_sheet_index_col = "Year" # if carbon_price_sheet != "Default" else 0
-        carbon_price_sheet_header = 0         # if carbon_price_sheet != "Default" else None
+        if settings.CARBON_PRICES_FIELD == 'CONSTANT':
+            self.CARBON_PRICES = {yr: settings.CARBON_PRICE_COSTANT for yr in range(2010, 2101)}
+        else:
+            carbon_price_sheet = settings.CARBON_PRICES_FIELD or "Default"
+            carbon_price_usecols = "A,B"
+            carbon_price_col_names = ["Year", "Carbon_price_$_tCO2e"]
+            carbon_price_sheet_index_col = "Year" # if carbon_price_sheet != "Default" else 0
+            carbon_price_sheet_header = 0         # if carbon_price_sheet != "Default" else None
 
-        self.CARBON_PRICES: dict[int, float] = pd.read_excel(
-            os.path.join(settings.INPUT_DIR, 'carbon_prices.xlsx'),
-            sheet_name=carbon_price_sheet,
-            usecols=carbon_price_usecols,
-            names=carbon_price_col_names,
-            header=carbon_price_sheet_header,
-            index_col=carbon_price_sheet_index_col,
-        )["Carbon_price_$_tCO2e"].to_dict()
+            self.CARBON_PRICES: dict[int, float] = pd.read_excel(
+                os.path.join(settings.INPUT_DIR, 'carbon_prices.xlsx'),
+                sheet_name=carbon_price_sheet,
+                usecols=carbon_price_usecols,
+                names=carbon_price_col_names,
+                header=carbon_price_sheet_header,
+                index_col=carbon_price_sheet_index_col,
+            )["Carbon_price_$_tCO2e"].to_dict()
+            
 
 
         ###############################################################
@@ -1860,7 +1864,7 @@ class Data:
         The resulting year should be between 2010 - 2100
         """
         yr_cal = yr_idx + self.YR_CAL_BASE
-        return settings.CARBON_PRICE_COSTANT if settings.CARBON_PRICES_FIELD == 'CONSTANT' else self.get_carbon_price_by_year(yr_cal)
+        return self.get_carbon_price_by_year(yr_cal)
 
     def get_carbon_price_by_year(self, yr_cal: int) -> float:
         """
@@ -1872,7 +1876,7 @@ class Data:
                 f"Carbon price data not given for the given year: {yr_cal}. "
                 f"Year should be between {self.YR_CAL_BASE} and 2100."
             )
-        return settings.CARBON_PRICE_COSTANT if settings.CARBON_PRICES_FIELD == 'CONSTANT' else self.CARBON_PRICES[yr_cal]
+        return self.CARBON_PRICES[yr_cal]
 
     def get_water_nl_yield_for_yr_idx(
         self,

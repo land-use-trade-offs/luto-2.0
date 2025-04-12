@@ -115,8 +115,8 @@ OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires sof
 # OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
 # Specify how demand for agricultural commodity production should be met in the solver
-DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
-# DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
+# DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
+DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
 
 
 # ---------------------------------------------------------------------------- #
@@ -419,9 +419,9 @@ options include:
 # Setting to None falls back to the 'Default' scenario.
 CARBON_PRICES_FIELD = 'CONSTANT'
 
+# Automatically update the carbon price field if it is set to 'AS_GHG'
 if CARBON_PRICES_FIELD == 'AS_GHG':
     CARBON_PRICES_FIELD = GHG_LIMITS_FIELD[:9].replace('(','')  # '1.5C (67%) excl. avoided emis' -> '1.5C 67%'
-
 
 CARBON_PRICE_COSTANT = 0.0  # The constant value to add to the carbon price (e.g., $10/tonne CO2e).
 '''
@@ -447,7 +447,7 @@ GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (l
 
 # Weight for the GHG/Demand deviation in the objective function
 ''' Range from 0 to 1, where 0 is fully minimising GHG and demand deviation, and 1 is only maximising profit. '''
-SOLVE_WEIGHT_ALPHA = 0.5  
+SOLVE_WEIGHT_ALPHA = 0.8  
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
@@ -495,7 +495,7 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 # Biodiversity limits and parameters *******************************
-SOLVE_WEIGHT_BETA = 0
+SOLVE_WEIGHT_BETA = 0.98
 '''The weight of the biodiversity target in the objective function'''
 
 
