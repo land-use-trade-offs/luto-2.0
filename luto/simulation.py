@@ -39,6 +39,7 @@ from luto.data import Data
 from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
 from luto.tools.create_task_runs.helpers import log_memory_usage
+from luto.tools.write import write_outputs
 
 import luto.settings as settings
 
@@ -47,6 +48,7 @@ from luto.tools import (
     write_timestamp,
     read_timestamp
 )
+
 
 
 @LogToFile(f"{settings.OUTPUT_DIR}/run_{write_timestamp()}")
@@ -71,55 +73,44 @@ def load_data() -> Data:
 @LogToFile(f"{settings.OUTPUT_DIR}/run_{read_timestamp()}", 'a')
 def run(
     data: Data, 
-    base_year: int | None = None, 
-    target_year: int | None = None, 
-    years: list[int] | None = settings.SIM_YERAS,
+    years = settings.SIM_YERAS,
 ) -> None:
     """
     Run the simulation.
 
     Parameters
         - data: is a Data object which is previously loaded using load_data(),
-        - base_year: optional argument base year for the simulation,
-        - target_year: optional target year for the simulation,
-        - years: optional argument to specify the years for which the simulation is run.
+        - years: is a list of years to run the simulation for. If not provided, it will
+            use the default years from settings.SIM_YERAS.
     """
-    # Get all simulation years
-    if years and (base_year or target_year):
-        raise ValueError("Please provide either years or base_year and target_year, not both.")
-    elif years:
-        years = sorted(years)
-    else:
-        years = list(range(base_year, target_year + 1))
+    # Start recording memory usage
+    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1), daemon=True)
+    memory_thread.start()
     
-    # Update the simulation years in the data object
-    data.reporting_years = years      
+    
+    # Update the simulation years in the data object  
+    years = sorted(years)
     data.set_path(years)
-    print(f"\nRunning LUTO {settings.VERSION} between {years[0]} - {years[-1]}, total {len(years)} runs!\n", flush=True)
+    print('\n')
+    print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]}, total {len(years)} runs!\n", flush=True)
         
     # Sanity check
     if data.YR_CAL_BASE not in years:
         years.insert(0, data.YR_CAL_BASE)
 
-    if settings.MODE == 'snapshot' and len(years) > 2 and years[0] != data.YR_CAL_BASE:
+    if settings.MODE == 'snapshot' and (len(years) > 2 or years[0] != data.YR_CAL_BASE):
         raise ValueError(f"Snapshot mode only works with 2 years starting from {data.YR_CAL_BASE}. Please provide a base and target year.")
-    
-
-    # Start simulation
-    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1), daemon=True)
-    memory_thread.start()
-    
-    year_start = years[0]
-    year_end = years[-1]
-    
 
     # Run the simulation up to `year` sequentially.
     if settings.MODE == 'timeseries':
         solve_timeseries(data, years)
     elif settings.MODE == 'snapshot':
-        solve_snapshot(data, year_start, year_end)
+        solve_snapshot(data, years[0], years[-1])
     else:
         raise ValueError(f"Unkown MODE: {settings.MODE}.")
+    
+    # Save the data to disk
+    write_outputs(data)
     
 
 

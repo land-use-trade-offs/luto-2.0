@@ -60,12 +60,16 @@ def save_report_data(raw_data_dir:str):
     # Set the save directory    
     SAVE_DIR = f'{raw_data_dir}/DATA_REPORT/data'
     
+    # Select the years to reduce the column number to avoid cluttering in the multi-level axis graphing
+    years = sorted(settings.SIM_YERAS)
+    years_select = select_years(years)
+    
     # Create the directory if it does not exist
     if not os.path.exists(SAVE_DIR):
         os.makedirs(SAVE_DIR)
 
     # Get all LUTO output files and store them in a dataframe
-    files = get_all_files(raw_data_dir)
+    files = get_all_files(raw_data_dir).reset_index(drop=True)
     
     # The land-use groupings to combine the land-use into a single category
     lu_group = pd.read_csv('luto/tools/report/Assets/lu_group.csv')
@@ -74,9 +78,7 @@ def save_report_data(raw_data_dir:str):
     # Set the years to be int
     files['Year'] = files['Year'].astype(int)
     
-    # Select the years to reduce the column number to avoid cluttering in the multi-level axis graphing
-    years = sorted(files['Year'].unique().tolist())
-    years_select = select_years(years)
+    
     
     
 
