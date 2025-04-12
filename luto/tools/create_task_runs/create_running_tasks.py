@@ -25,13 +25,15 @@ from luto.tools.create_task_runs.helpers import (
     create_task_runs
 )
 
+os.environ["GRB_LICENSE_FILE"] = "/home/582/jw6041/gurobi_lic_res1/gurobi.lic"
+
 # Set the grid search parameters
 grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
     ###############################################################
     'MEM': ['24GB'],
-    'NCPUS':[6],
+    'NCPUS':[64],
     'TIME': ['2:00:00'],
     'QUEUE': ['normalsr'],
     
@@ -41,11 +43,11 @@ grid_search = {
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                 # 'maxprofit' or 'maxutility'
     'MODE': ['timeseries'],                     # 'snapshot' or 'timeseries'
-    'RESFACTOR': [15],
-    'SIM_YERAS': [list(range(2020, 2051, 5))],   # Years to run the model 
+    'RESFACTOR': [1],
+    'SIM_YERAS': [list(range(2020, 2051, 10))],   # Years to run the model 
     'WRITE_THREADS': [5],
-    'WRITE_OUTPUT_GEOTIFFS': [False],
-    'KEEP_OUTPUTS': [False],                    # If false, only keep report HTML
+    'WRITE_OUTPUT_GEOTIFFS': [True],
+    'KEEP_OUTPUTS': [True],                    # If false, only keep report HTML
     
  
     ###############################################################
@@ -92,14 +94,8 @@ grid_search = {
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
-    'SOLVE_WEIGHT_ALPHA': (
-        (np.arange(1,10,1)/100).tolist() + 
-        (np.arange(10,100,10)/100).tolist() 
-    ),
-    'SOLVE_WEIGHT_BETA': (
-        (np.arange(1,90,10)/100).tolist() + 
-        (np.arange(90,100,1)/100).tolist() 
-    ), 
+    'SOLVE_WEIGHT_ALPHA': [0.8],
+    'SOLVE_WEIGHT_BETA': [0.98], 
     
     
     #-------------------- Diet BAU --------------------
@@ -125,7 +121,7 @@ grid_search_df = create_grid_search_template()
 # Create the task runs
 
 # # 1) Submit task to a single linux machine, and run simulations parallely
-create_task_runs(grid_search_df, mode='single', python_path='/home/582/jw6041/miniforge3/envs/luto/bin/python', n_workers=100)
+create_task_runs(grid_search_df, mode='single', python_path='/home/582/jw6041/miniforge3/envs/luto/bin/python', n_workers=4)
 
 # 2) Submit task to multiple linux computation nodes
 # create_task_runs(grid_search_df, mode='cluster')

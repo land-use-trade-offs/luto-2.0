@@ -198,6 +198,7 @@ class Data:
         elif settings.RESFACTOR == 1:
             self.MASK = self.LUMASK
             self.GEO_META = self.GEO_META_FULLRES
+            self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES
 
         else:
             raise KeyError("Resfactor setting invalid")
