@@ -170,9 +170,6 @@ class Data:
         # (True means included cells. Boolean dtype.)
         self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                                      # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
 
-        # Get the lon/lat coordinates.
-        self.COORD_LON_LAT = self.get_coord(np.nonzero(self.MASK), self.GEO_META_FULLRES['transform'])     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
-        
         # Return combined land-use and resfactor mask
         if settings.RESFACTOR > 1:
             rf_mask = self.NLUM_MASK.copy()
@@ -188,6 +185,10 @@ class Data:
             self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES
         else:
             raise KeyError("Resfactor setting invalid")
+        
+        
+        # Get the lon/lat coordinates.
+        self.COORD_LON_LAT = self.get_coord(np.nonzero(self.MASK), self.GEO_META_FULLRES['transform'])     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
         
         
         # Get the resfactored lumap_2D as xarray DataArray
