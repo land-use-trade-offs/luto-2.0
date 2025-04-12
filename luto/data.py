@@ -171,8 +171,8 @@ class Data:
         self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                                      # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
 
         # Get the lon/lat coordinates.
-        self.COORD_LON_LAT_FULLRES = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META_FULLRES['transform'])     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
-
+        self.COORD_LON_LAT = self.get_coord(np.nonzero(self.MASK), self.GEO_META_FULLRES['transform'])     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
+        
         # Return combined land-use and resfactor mask
         if settings.RESFACTOR > 1:
             rf_mask = self.NLUM_MASK.copy()
@@ -181,13 +181,11 @@ class Data:
             resmask = np.where(rf_mask[nonzeroes] == 0, True, False)
             self.MASK = self.LUMASK * resmask
             self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR]
-            self.COORD_LON_LAT = self.COORD_LON_LAT_FULLRES[0][self.MASK], self.COORD_LON_LAT_FULLRES[1][self.MASK]
             self.GEO_META = self.update_geo_meta()
         elif settings.RESFACTOR == 1:
             self.MASK = self.LUMASK
             self.GEO_META = self.GEO_META_FULLRES
             self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES
-            self.COORD_LON_LAT = self.COORD_LON_LAT_FULLRES
         else:
             raise KeyError("Resfactor setting invalid")
         
@@ -1601,7 +1599,7 @@ class Data:
         ).interp(                                                       # Then the spatial interpolation and masking is done
             x=xr.DataArray(self.COORD_LON_LAT[0], dims='cell'),
             y=xr.DataArray(self.COORD_LON_LAT[1], dims='cell'),
-            method='linear'                                             # Use LINEAR interpolation for the `suitability` values
+            method='linear'                                             # Use LINEAR interpolation
         ).drop_vars(['year']).values
         
         # Apply Savanna Burning penalties
