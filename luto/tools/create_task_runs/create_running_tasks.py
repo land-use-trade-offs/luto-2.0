@@ -25,7 +25,7 @@ from luto.tools.create_task_runs.helpers import (
     create_task_runs
 )
 
-os.environ["GRB_LICENSE_FILE"] = "/home/582/jw6041/gurobi_lic_res3/gurobi.lic"
+os.environ["GRB_LICENSE_FILE"] = "/home/582/jw6041/gurobi_lic_res1_2/gurobi.lic"
 
 # Set the grid search parameters
 grid_search = {
@@ -33,7 +33,7 @@ grid_search = {
     # Task run settings for submitting the job to the cluster
     ###############################################################
     'MEM': ['24GB'],
-    'NCPUS':[26],
+    'NCPUS':[12],
     'TIME': ['2:00:00'],
     'QUEUE': ['normalsr'],
     
@@ -43,8 +43,8 @@ grid_search = {
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                 # 'maxprofit' or 'maxutility'
     'MODE': ['timeseries'],                     # 'snapshot' or 'timeseries'
-    'RESFACTOR': [3],
-    'SIM_YERAS': [list(range(2020, 2051, 1))],   # Years to run the model 
+    'RESFACTOR': [1],
+    'SIM_YERAS': [list(range(2020, 2051, 10))],   # Years to run the model 
     'WRITE_THREADS': [5],
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'KEEP_OUTPUTS': [True],                    # If false, only keep report HTML

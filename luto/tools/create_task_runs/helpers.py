@@ -253,7 +253,7 @@ def update_settings(settings_dict:dict, col:str):
     settings_dict['MEM'] = settings_dict['MEM'] if settings_dict['MEM'] != 'auto' else MEM
 
     # Update the threads based on the number of cpus
-    settings_dict['THREADS'] = int(settings_dict['NCPUS']) # 1.5 times the number of cpus to increase CPU utilization
+    settings_dict['THREADS'] = int(settings_dict['NCPUS'])
 
     return settings_dict
 
