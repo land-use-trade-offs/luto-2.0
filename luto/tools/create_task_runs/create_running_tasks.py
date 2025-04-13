@@ -121,13 +121,9 @@ grid_search_df = create_grid_search_template()
 
 # Create the task runs
 
-# # 1) Submit task to a single linux machine, and run simulations parallely
-# create_task_runs(grid_search_df, mode='single', python_path='/home/582/jw6041/miniforge3/envs/luto/bin/python', n_workers=4)
+# 1) Submit task to a single linux machine, and run simulations parallely
+create_task_runs(grid_search_df, mode='single', n_workers=4)
 
 # 2) Submit task to multiple linux computation nodes
 # create_task_runs(grid_search_df, mode='cluster')
-
-# # 3) Submit task to a single windows machine, and run simulations parallely
-create_task_runs(grid_search_df, mode='single', python_path='F:/jinzhu/conda_env/luto/python.exe', n_workers=4)
-
 
