@@ -135,7 +135,7 @@ def create_grid_search_template(
     return template_grid_search
 
 
-def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, mode:Literal['single','cluster']='single', n_workers:int=4):
+def create_task_runs(custom_settings:pd.DataFrame, mode:Literal['single','cluster']='single', n_workers:int=4):
     '''
     Submit the tasks to the cluster using the custom settings.\n
     Parameters
@@ -171,7 +171,7 @@ def create_task_runs(custom_settings:pd.DataFrame, python_path:str=None, mode:Li
         # Submit the task
         create_run_folders(col)
         write_custom_settings(f'{TASK_ROOT_DIR}/{col}', custom_dict)
-        return submit_task(col, python_path, mode=mode)
+        return submit_task(col, mode=mode)
 
     # Submit the tasks in parallel; Using 4 threads is a safe number to submit
     # tasks in login node. Or use the specified number of cpus if not in a linux system
@@ -277,14 +277,14 @@ def create_run_folders(col):
 
 
 
-def submit_task(col:str, python_path:str=None, mode:Literal['single','cluster']='single'):
+def submit_task(col:str,mode:Literal['single','cluster']='single'):
     # Copy the slurm script to the task folder
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{TASK_ROOT_DIR}/{col}/task_cmd.sh')
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/python_script.py', f'{TASK_ROOT_DIR}/{col}/python_script.py')
     
     if mode == 'single': 
         # Submit the task 
-        subprocess.run([python_path, 'python_script.py'], cwd=f'{TASK_ROOT_DIR}/{col}')
+        subprocess.run(['python', 'python_script.py'], cwd=f'{TASK_ROOT_DIR}/{col}')
     
     # Start the task if the os is linux
     elif mode == 'cluster' and os.name == 'posix':
