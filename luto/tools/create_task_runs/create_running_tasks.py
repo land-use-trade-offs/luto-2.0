@@ -25,7 +25,7 @@ from luto.tools.create_task_runs.helpers import (
     create_task_runs
 )
 
-os.environ["GRB_LICENSE_FILE"] = "/home/582/jw6041/gurobi_lic_res1/gurobi.lic"
+# os.environ["GRB_LICENSE_FILE"] = "/home/582/jw6041/gurobi_lic_res1/gurobi.lic"
 
 # Set the grid search parameters
 grid_search = {
@@ -60,6 +60,7 @@ grid_search = {
     
     # --------------- GHG settings ---------------
     'GHG_CONSTRAINT_TYPE': ['hard'],        # 'hard' or 'soft'
+    'USE_GHG_SCOPE_1': [True],         # True or False
     'GHG_LIMITS_FIELD': [
         '1.5C (50%) excl. avoided emis SCOPE1', 
         '1.8C (67%) excl. avoided emis SCOPE1'
@@ -121,12 +122,12 @@ grid_search_df = create_grid_search_template()
 # Create the task runs
 
 # # 1) Submit task to a single linux machine, and run simulations parallely
-create_task_runs(grid_search_df, mode='single', python_path='/home/582/jw6041/miniforge3/envs/luto/bin/python', n_workers=4)
+# create_task_runs(grid_search_df, mode='single', python_path='/home/582/jw6041/miniforge3/envs/luto/bin/python', n_workers=4)
 
 # 2) Submit task to multiple linux computation nodes
 # create_task_runs(grid_search_df, mode='cluster')
 
 # # 3) Submit task to a single windows machine, and run simulations parallely
-# create_task_runs(grid_search_df, mode='single', python_path='F:/jinzhu/conda_env/luto/python.exe', n_workers=40)
+create_task_runs(grid_search_df, mode='single', python_path='F:/jinzhu/conda_env/luto/python.exe', n_workers=4)
 
 
