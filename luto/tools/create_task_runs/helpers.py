@@ -18,6 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 import os, re, time, json
+import numpy as np
 import shutil, psutil, itertools, subprocess
 import pandas as pd
 
@@ -281,6 +282,8 @@ def submit_task(col:str,mode:Literal['single','cluster']='single'):
     # Copy the slurm script to the task folder
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{TASK_ROOT_DIR}/{col}/task_cmd.sh')
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/python_script.py', f'{TASK_ROOT_DIR}/{col}/python_script.py')
+    
+    time.sleep(np.random.choice([1, 2]))
     
     if mode == 'single': 
         # Submit the task 

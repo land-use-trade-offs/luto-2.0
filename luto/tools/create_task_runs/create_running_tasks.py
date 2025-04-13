@@ -25,7 +25,7 @@ from luto.tools.create_task_runs.helpers import (
     create_task_runs
 )
 
-# os.environ["GRB_LICENSE_FILE"] = "/home/582/jw6041/gurobi_lic_res1/gurobi.lic"
+os.environ["GRB_LICENSE_FILE"] = "/home/582/jw6041/gurobi_lic_res3/gurobi.lic"
 
 # Set the grid search parameters
 grid_search = {
@@ -33,7 +33,7 @@ grid_search = {
     # Task run settings for submitting the job to the cluster
     ###############################################################
     'MEM': ['24GB'],
-    'NCPUS':[32],
+    'NCPUS':[26],
     'TIME': ['2:00:00'],
     'QUEUE': ['normalsr'],
     
@@ -44,7 +44,7 @@ grid_search = {
     'OBJECTIVE': ['maxprofit'],                 # 'maxprofit' or 'maxutility'
     'MODE': ['timeseries'],                     # 'snapshot' or 'timeseries'
     'RESFACTOR': [3],
-    'SIM_YERAS': [list(range(2020, 2051, 11))],   # Years to run the model 
+    'SIM_YERAS': [list(range(2020, 2051, 1))],   # Years to run the model 
     'WRITE_THREADS': [5],
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'KEEP_OUTPUTS': [True],                    # If false, only keep report HTML
@@ -56,9 +56,10 @@ grid_search = {
     
     # --------------- Demand settings ---------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],     # 'hard' or 'soft' 
-    'CARBON_PRICES_FIELD': ['CONSTANT'],   
+       
     
     # --------------- GHG settings ---------------
+    'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],        # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],         # True or False
     'GHG_LIMITS_FIELD': [
