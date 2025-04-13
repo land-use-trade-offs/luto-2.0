@@ -783,7 +783,7 @@ def write_area_transition_start_end(data: Data, path):
     print(f'Save transition matrix between start and end year\n')
 
     # Get the end year
-    yr_cal_start = settings.SIM_YERAS[0]
+    yr_cal_start = data.YR_CAL_BASE
     yr_cal_end = settings.SIM_YERAS[-1]
 
     # Get the decision variables for the start year

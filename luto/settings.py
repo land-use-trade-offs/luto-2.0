@@ -430,7 +430,7 @@ Only works when CARBON_PRICES_FIELD is set to 'CONSTANT'.
 '''
 
 
-USE_GHG_SCOPE_1 = False  # If True, only considers the basic GHG types (i.e., CO2E_KG_HA_SOIL, CO2E_KG_HEAD_DUNG_URINE, CO2E_KG_HEAD_ENTERIC, CO2E_KG_HEAD_FODDER, CO2E_KG_HEAD_IND_LEACH_RUNOFF, CO2E_KG_HEAD_SEED).
+USE_GHG_SCOPE_1 = True  # If True, only considers the basic GHG types (i.e., CO2E_KG_HA_SOIL, CO2E_KG_HEAD_DUNG_URINE, CO2E_KG_HEAD_ENTERIC, CO2E_KG_HEAD_FODDER, CO2E_KG_HEAD_IND_LEACH_RUNOFF, CO2E_KG_HEAD_SEED).
 '''
 Basic GHG types are the direct emissions from the land-use and livestock types, excluding
 indirect emissions such as fertiliser, irrigation, land management, etc.
