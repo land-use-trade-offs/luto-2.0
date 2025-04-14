@@ -18,7 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 
-TASK_ROOT_DIR = '../Custom_runs/20250414_RES15_GRID_SEARCH_ALPHA_WEIGHTS_600K'  
+TASK_ROOT_DIR = '../Custom_runs/20250414_RES15_GRID_SEARCH_ALPHA_WEIGHTS_6000K'  
 # Remove possible trailing slash
 if TASK_ROOT_DIR[-1] == '/':
     TASK_ROOT_DIR = TASK_ROOT_DIR[:-1]

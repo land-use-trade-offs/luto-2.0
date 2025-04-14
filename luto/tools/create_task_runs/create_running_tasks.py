@@ -33,7 +33,7 @@ grid_search = {
     # Task run settings for submitting the job to the cluster
     ###############################################################
     'MEM': ['24GB'],
-    'NCPUS':[2],
+    'NCPUS':[4],
     'TIME': ['2:00:00'],
     'QUEUE': ['normalsr'],
     
@@ -97,8 +97,7 @@ grid_search = {
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_WEIGHT_ALPHA': (
-        (np.arange(1,6000,100)/600000).tolist()
-        + (np.arange(1,10,1)/1000).tolist()
+        (np.arange(1,1000,50)/(600000*1000)).tolist()
     ),
     'SOLVE_WEIGHT_BETA': [0.98], 
     

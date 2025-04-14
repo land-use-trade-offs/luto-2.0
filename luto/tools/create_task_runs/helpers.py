@@ -18,16 +18,24 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 import os, re, time, json
-import numpy as np
 import shutil, psutil, itertools, subprocess
+import numpy as np
 import pandas as pd
 
-from typing import Literal
 from glob import glob
-from joblib import delayed, Parallel
-from luto import settings
-from luto.tools.create_task_runs.parameters import BIO_TARGET_ORDER, EXCLUDE_DIRS, GHG_ORDER, TASK_ROOT_DIR
+from tqdm.auto import tqdm
+from typing import Literal
 from datetime import datetime
+from joblib import delayed, Parallel
+
+from luto import settings
+from luto.tools.create_task_runs.parameters import (
+    BIO_TARGET_ORDER, 
+    EXCLUDE_DIRS, 
+    GHG_ORDER, 
+    TASK_ROOT_DIR
+)
+
 
 
 
@@ -365,73 +373,58 @@ def process_demand_data(json_path):
     df_demand = load_json_data(json_path, 'production_5_6_demand_Production_commodity_from_LUTO.json')
     df_luto = load_json_data(json_path, 'production_5_5_demand_Production_commodity.json')
     df_delta = df_demand.merge(df_luto, on=['year', 'name'], suffixes=('_luto', '_demand'))
-    df_delta['deviation_t'] = df_delta.eval('val_luto - val_demand')
-    df_delta['deviation_%'] = df_delta.eval('(val_luto - val_demand) / val_demand * 100')
+    # df_delta['deviation_t'] = df_delta.eval('val_luto - val_demand')
+    df_delta['val'] = df_delta.eval('(val_luto - val_demand) / val_demand * 100')
     return df_delta
 
-def process_task_root_dirs(task_root_dirs):
-    report_Profit_GHG_BIO = pd.DataFrame()
-    report_Production = pd.DataFrame()
 
-    for task_root_dir in task_root_dirs:
-        grid_search_params = pd.read_csv(f"{task_root_dir}/grid_search_parameters.csv")
-        run_dirs = [i for i in os.listdir(task_root_dir) if os.path.isdir(os.path.join(task_root_dir, i))]
-        run_dirs = [i for i in run_dirs if 'Run_' in i]
-
-        for dir in run_dirs:
-            run_idx = int(dir.split('_')[-1])
-            run_paras = grid_search_params.query(f'run_idx == {int(run_idx)}').to_dict(orient='records')[0]
-            
-            # Get the json data path; by default, the data is stored in 'DATA_REPORT' under the run_idx folder
-            json_path = os.path.join(task_root_dir, dir, 'DATA_REPORT', 'data')
-            
-            # If the data is not found in the default path, search for the data in the `output` folders
-            if not os.path.exists(json_path):
-                runs = [i for i in glob(f"{task_root_dir}/{dir}/output/**") if os.path.isdir(i)]
-                if len(runs) == 0:
-                    print(f'{dir}: No runs found in this directory!')
-                    continue
-                else:
-                    json_path = os.path.join(runs[-1], 'DATA_REPORT', 'data')
-          
-
-            df_profit = process_profit_data(json_path)
-            df_ghg_deviation = process_GHG_deviation_data(json_path)
-            df_ghg_deforestation = process_GHG_deforestation_data(json_path)
-            df_demand_deviation = process_demand_data(json_path)
-            df_bio_GBF2 = process_bio_GBF2_data(json_path)
-
-            report_Profit_GHG_BIO = pd.concat([
-                report_Profit_GHG_BIO,
-                df_profit[['year', 'name', 'val']].assign(**run_paras),
-                df_ghg_deviation[['year', 'name', 'val']].assign(**run_paras),
-                df_ghg_deforestation[['year', 'name', 'val']].assign(**run_paras),
-                df_bio_GBF2[['year', 'name', 'val']].assign(**run_paras),
-            ]).reset_index(drop=True)
-
-            report_Production = pd.concat([
-                report_Production,
-                df_demand_deviation.assign(**run_paras)
-            ]).reset_index(drop=True)
-            
-    # Pivot the report data so that the `name` columns is split into separate columns
-    report_Profit_GHG_BIO = report_Profit_GHG_BIO.pivot(
-            index=['year'] + grid_search_params.columns.tolist(), 
-            columns='name', 
-            values='val'
-        ).reset_index()
+def get_report_df(json_path, run_paras):
     
-    # Rename the GHG and BIO filed
-    report_Profit_GHG_BIO['GHG_LIMITS_FIELD'] = report_Profit_GHG_BIO['GHG_LIMITS_FIELD'].replace(GHG_ORDER)
-    report_Profit_GHG_BIO['BIODIV_GBF_TARGET_2_DICT'] = report_Profit_GHG_BIO['BIODIV_GBF_TARGET_2_DICT'].replace(BIO_TARGET_ORDER)
+    df_profit = process_profit_data(json_path)
+    df_ghg_deviation = process_GHG_deviation_data(json_path)
+    df_ghg_deforestation = process_GHG_deforestation_data(json_path)
+    df_demand_deviation = process_demand_data(json_path)
+    df_bio_objective = process_bio_GBF2_data(json_path)
 
-    report_Production['BIODIV_GBF_TARGET_2_DICT'] = report_Production['BIODIV_GBF_TARGET_2_DICT'].replace(BIO_TARGET_ORDER)
-    report_Production['GHG_LIMITS_FIELD'] = report_Production['GHG_LIMITS_FIELD'].replace(GHG_ORDER)
-    
-    # # Reorder the data, categorize the columns, and reset the index
-    # report_Profit_GHG_BIO['GHG_LIMITS_FIELD'] = pd.Categorical(report_Profit_GHG_BIO['GHG_LIMITS_FIELD'], categories=GHG_ORDER, ordered=True)
-    # report_Profit_GHG_BIO['BIODIV_GBF_TARGET_2_DICT'] = pd.Categorical(report_Profit_GHG_BIO['BIODIV_GBF_TARGET_2_DICT'], categories=BIO_TARGET_ORDER, ordered=True)
-    # report_Production['GHG_LIMITS_FIELD'] = pd.Categorical(report_Production['GHG_LIMITS_FIELD'], categories=GHG_ORDER, ordered=True)
+    report_df = pd.concat([
+        df_profit[['year', 'name', 'val']].assign(Type='Profit_billion_AUD'),
+        df_demand_deviation[['year', 'name', 'val']].assign(Type='Production_Mt'),
+        df_ghg_deviation[['year', 'name', 'val']].assign(Type='GHG_Deviation_pct'),
+        df_ghg_deforestation[['year', 'name', 'val']].assign(Type='GHG_Deforestration_Mt'),
+        df_bio_objective[['year', 'name', 'val']].assign(Type='Biodiversity_area_score'),
+    ]).assign(**run_paras).reset_index(drop=True)
 
+    report_df['GHG_LIMITS_FIELD'] = report_df['GHG_LIMITS_FIELD'].replace(GHG_ORDER)
+    report_df['BIODIV_GBF_TARGET_2_DICT'] = report_df['BIODIV_GBF_TARGET_2_DICT'].replace(BIO_TARGET_ORDER)
+
+    return report_df
+
+
+
+def process_task_root_dirs(task_root_dir, n_workers=4):
     
-    return report_Profit_GHG_BIO, report_Production
+
+    grid_search_params = pd.read_csv(f"{task_root_dir}/grid_search_parameters.csv")
+    run_dirs = [i for i in os.listdir(task_root_dir) if os.path.isdir(os.path.join(task_root_dir, i))]
+    run_dirs = [i for i in run_dirs if 'Run_' in i]
+    
+    tasks = []
+    for dir in run_dirs:
+        run_idx = int(dir.split('_')[-1])
+        run_paras = grid_search_params.query(f'run_idx == {int(run_idx)}').to_dict(orient='records')[0]
+        # Locate the latest json data path
+        json_path = next(
+            # Find json in 'output' folder
+            iter(sorted(glob(f"{task_root_dir}/{dir}/output/**/DATA_REPORT/data"), key=os.path.getmtime)),
+            # Find json in 'DATA_REPORT' folder
+            os.path.join(task_root_dir, dir, 'DATA_REPORT', 'data')
+        )
+        if not os.path.exists(json_path):
+            print(f'{dir}: No json outputs find in Rrun_{run_idx}!')
+            continue
+        # Json to df
+        tasks.append(delayed(get_report_df)(json_path, run_paras))
+    
+    return pd.concat(tqdm(Parallel(n_jobs=n_workers, return_as='generator')(tasks), total=len(tasks)), ignore_index=True)
+
+        
