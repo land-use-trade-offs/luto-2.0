@@ -570,22 +570,22 @@ class LutoSolver:
                 for p in range(self._input_data.nprs)
             ]
 
-            self.ag_man_q_dry_c += [
-                gp.quicksum(
-                    ag_man_q_dry_p[p]
-                    for p in range(self._input_data.nprs)
-                    if self._input_data.pr2cm_cp[c, p]
+            for c in range(self.ncms):
+                self.ag_man_q_dry_c[c] += (
+                    gp.quicksum(
+                        ag_man_q_dry_p[p]
+                        for p in range(self._input_data.nprs)
+                        if self._input_data.pr2cm_cp[c, p]
+                    )   
                 )
-                for c in range(self.ncms)
-            ]
-            self.ag_man_q_irr_c += [
-                gp.quicksum(
-                    ag_man_q_irr_p[p]
-                    for p in range(self._input_data.nprs)
-                    if self._input_data.pr2cm_cp[c, p]
+                self.ag_man_q_irr_c += (
+                    gp.quicksum(
+                        ag_man_q_irr_p[p]
+                        for p in range(self._input_data.nprs)
+                        if self._input_data.pr2cm_cp[c, p]
+                    )
                 )
-                for c in range(self.ncms)
-            ]
+                
 
         # Calculate non-agricultural commodity contributions
         self.non_ag_q_c = [
