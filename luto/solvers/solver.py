@@ -578,7 +578,7 @@ class LutoSolver:
                         if self._input_data.pr2cm_cp[c, p]
                     )   
                 )
-                self.ag_man_q_irr_c += (
+                self.ag_man_q_irr_c[c] += (
                     gp.quicksum(
                         ag_man_q_irr_p[p]
                         for p in range(self._input_data.nprs)

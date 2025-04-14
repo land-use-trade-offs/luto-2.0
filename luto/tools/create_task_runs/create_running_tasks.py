@@ -97,7 +97,8 @@ grid_search = {
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_WEIGHT_ALPHA': (
-        (np.arange(1,1000,50)/(600000*1000)).tolist()
+        (np.arange(1,1000,20)/(600000*1000)).tolist()
+        + (np.arange(1,1000,20)/(600000)).tolist()
     ),
     'SOLVE_WEIGHT_BETA': [0.98], 
     
