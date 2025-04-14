@@ -44,7 +44,7 @@ from luto.settings import (
 
 # Set Gurobi environment.
 gurenv = gp.Env(logfilename="gurobi.log", empty=True)  # (empty = True)
-gurenv.setParam("Method", int(settings.SOLVE_METHOD))
+gurenv.setParam("Method", settings.SOLVE_METHOD)
 gurenv.setParam("OutputFlag", settings.VERBOSE)
 gurenv.setParam("Presolve", settings.PRESOLVE)
 gurenv.setParam("Aggregate", settings.AGGREGATE)

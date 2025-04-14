@@ -160,13 +160,17 @@ def create_task_runs(custom_settings:pd.DataFrame, mode:Literal['single','cluste
     # Check if there are any custom settings
     if not custom_cols:
         raise ValueError('No custom settings found in the settings_template.csv file!')
+    
+
+    # Eval the non-string settings back to it type
+    with open(f'{TASK_ROOT_DIR}/non_str_val.txt', 'r') as file:
+            eval_vars = file.read().splitlines()
+            
+    for col in custom_cols:
+        custom_settings.loc[eval_vars, col] = custom_settings.loc[eval_vars, col].map(str).map(eval)
+
 
     def process_col(col):
-        # Read the non-string values from the file
-        with open(f'{TASK_ROOT_DIR}/non_str_val.txt', 'r') as file:
-            eval_vars = file.read().splitlines()
-        # Evaluate the non-string values to their original types
-        custom_settings.loc[eval_vars, col] = custom_settings.loc[eval_vars, col].map(str).map(eval)
         # Update the settings dictionary
         custom_dict = update_settings(custom_settings[col].to_dict(), col)
         # Submit the task
@@ -283,8 +287,14 @@ def submit_task(col:str, mode:Literal['single','cluster']='single'):
     time.sleep(np.random.choice([1, 2]))
     
     if mode == 'single': 
-        # Submit the task 
-        subprocess.run(['python', 'python_script.py'], cwd=f'{TASK_ROOT_DIR}/{col}')
+        # Submit the task
+        while True:
+            try:
+                subprocess.run(['python', 'python_script.py'], cwd=f'{TASK_ROOT_DIR}/{col}', check=True)
+                break  # Exit the loop if the task succeeds
+            except subprocess.CalledProcessError:
+                print(f"Task {col} failed. Retrying in 10 seconds...")
+                time.sleep(10)
     
     # Start the task if the os is linux
     elif mode == 'cluster' and os.name == 'posix':
