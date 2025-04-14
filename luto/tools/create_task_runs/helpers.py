@@ -176,8 +176,8 @@ def create_task_runs(custom_settings:pd.DataFrame, mode:Literal['single','cluste
 
     # Submit the tasks in parallel; Using 4 threads is a safe number to submit
     # tasks in login node. Or use the specified number of cpus if not in a linux system
-    workers = min(n_workers, len(custom_cols)) if os.name == 'posix' else n_workers
-    for msg in Parallel(n_jobs=workers)(delayed(process_col)(col) for col in custom_cols):
+    workers = min(n_workers, len(custom_cols))
+    for msg in Parallel(n_jobs=workers, return_as='generator')(delayed(process_col)(col) for col in custom_cols):
         print(msg)
 
 
@@ -275,7 +275,7 @@ def create_run_folders(col):
 
 
 
-def submit_task(col:str,mode:Literal['single','cluster']='single'):
+def submit_task(col:str, mode:Literal['single','cluster']='single'):
     # Copy the slurm script to the task folder
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{TASK_ROOT_DIR}/{col}/task_cmd.sh')
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/python_script.py', f'{TASK_ROOT_DIR}/{col}/python_script.py')

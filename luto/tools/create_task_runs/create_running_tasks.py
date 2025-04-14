@@ -25,7 +25,7 @@ from luto.tools.create_task_runs.helpers import (
     create_task_runs
 )
 
-os.environ["GRB_LICENSE_FILE"] = "/home/582/jw6041/gurobi_lic_res1_2/gurobi.lic"
+os.environ["GRB_LICENSE_FILE"] = "/home/582/jw6041/gurobi_lic_res1/gurobi.lic"
 
 # Set the grid search parameters
 grid_search = {
@@ -44,7 +44,7 @@ grid_search = {
     'OBJECTIVE': ['maxprofit'],                 # 'maxprofit' or 'maxutility'
     'MODE': ['timeseries'],                     # 'snapshot' or 'timeseries'
     'RESFACTOR': [1],
-    'SIM_YERAS': [list(range(2020, 2051, 10))],   # Years to run the model 
+    'SIM_YERAS': [[2010,2050]],   # Years to run the model 
     'WRITE_THREADS': [5],
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'KEEP_OUTPUTS': [True],                    # If false, only keep report HTML
@@ -73,11 +73,12 @@ grid_search = {
     'INCLUDE_WATER_LICENSE_COSTS': [0],
     
     # --------------- Biodiversity priority zone ---------------
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSTIY_TARGET_GBF_2': ['on'],    # 'on' or 'off'
     'BIODIV_GBF_TARGET_2_DICT': [
+        {2010: 0, 2030: 0.0, 2050: 0.0, 2100: 0.0}, 
         {2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}, 
         {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5},
     ],
@@ -123,7 +124,7 @@ grid_search_df = create_grid_search_template()
 # Create the task runs
 
 # 1) Submit task to a single linux machine, and run simulations parallely
-create_task_runs(grid_search_df, mode='single', n_workers=4)
+create_task_runs(grid_search_df, mode='single', n_workers=6)
 
 # 2) Submit task to multiple linux computation nodes
 # create_task_runs(grid_search_df, mode='cluster')

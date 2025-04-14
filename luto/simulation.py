@@ -92,7 +92,7 @@ def run(
     years = sorted(years)
     data.set_path(years)
     print('\n')
-    print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]}, total {len(years)} runs!\n", flush=True)
+    print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]} at RES-{settings.RESFACTOR}, total {len(years)} runs!\n", flush=True)
         
     # Sanity check
     if data.YR_CAL_BASE not in years:
