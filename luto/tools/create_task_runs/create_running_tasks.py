@@ -20,8 +20,8 @@
 import os
 import numpy as np
 from luto.tools.create_task_runs.helpers import (
-    create_grid_search_parameters, 
-    create_grid_search_template, 
+    create_grid_search_permutations, 
+    create_grid_search_settings_df, 
     create_task_runs
 )
 
@@ -97,9 +97,8 @@ grid_search = {
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_WEIGHT_ALPHA': (
-        (np.arange(1,10,1)/1000).tolist()
-        + (np.arange(10,200,25)/1000).tolist()  
-        + (np.arange(200,999,100)/1000).tolist()  
+        (np.arange(1,6000,100)/600000).tolist()
+        + (np.arange(1,10,1)/1000).tolist()
     ),
     'SOLVE_WEIGHT_BETA': [0.98], 
     
@@ -118,16 +117,16 @@ grid_search = {
 
 # Create the settings parameters
 ''' This will create a parameter CSV based on `grid_search`. '''
-create_grid_search_parameters(grid_search)
+create_grid_search_permutations(grid_search)
 
 # Read the template for the custom settings
-grid_search_df = create_grid_search_template()
+grid_search_df = create_grid_search_settings_df()
 
 
 # Create the task runs
 
 # 1) Submit task to a single linux machine, and run simulations parallely
-create_task_runs(grid_search_df, mode='single', n_workers=30)
+create_task_runs(grid_search_df, mode='single', n_workers=50)
 
 # 2) Submit task to multiple linux computation nodes
 # create_task_runs(grid_search_df, mode='cluster')

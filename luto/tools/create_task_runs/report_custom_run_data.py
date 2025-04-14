@@ -26,32 +26,28 @@ from luto.tools.create_task_runs.helpers import process_task_root_dirs
 
 
 # Get the data
-task_root_dirs = [i for i in glob('../Custom_runs/*') if "20250411_GRID_SEARCH_RES15_TIMESERIES" in i][:10]
+task_root_dirs = [i for i in glob('../Custom_runs/*') if "20250414_RES5_GRID_SEARCH_ALPHA_WEIGHTS" in i][:10]
 report_data, report_data_demand = process_task_root_dirs(task_root_dirs)
-
-
-# Filter the data
-'''
-year != 2010 and
-DIET_DOM == "BAU" and
-GHG_CONSTRAINT_TYPE == "soft" and
-BIODIVERSTIY_TARGET_GBF_2 == "on" and
-MODE == "timeseries" and
-SOLVE_WEIGHT_ALPHA <= 0.3
-'''
-filter_rules = '''
-    year != 2010
-'''.strip().replace('\n', '')
-
-report_data_filter = (
-    report_data
-    .query('SOLVE_WEIGHT_ALPHA==@weight_alpha and SOLVE_WEIGHT_BETA==@weight_beta')
-)
 
 
 # Weights
 weight_alpha = 0.8
 weight_beta = 0.98
+
+# Filter the data
+filter_rules = '''
+    year != 2010 
+
+'''.strip().replace('\n', '')
+
+report_data_filter = report_data.query(filter_rules).copy()
+report_data_filter['group'] = (
+    report_data_filter['GHG_LIMITS_FIELD'].astype(str) 
+    + '_' 
+    + report_data_filter['BIODIV_GBF_TARGET_2_DICT'].astype(str)
+    + '_'
+    + report_data_filter['SOLVE_WEIGHT_ALPHA'].astype(str)
+)
 
 
 # Plotting
@@ -66,10 +62,12 @@ p_weight_vs_profit = (
         p9.aes(
             x='year', 
             y='Profit', 
+            color='SOLVE_WEIGHT_ALPHA',
             linetype='BIODIV_GBF_TARGET_2_DICT',
+            group='group'
         )
     ) +
-    p9.facet_wrap('GHG_LIMITS_FIELD') +
+    p9.facet_grid('GHG_LIMITS_FIELD~BIODIV_GBF_TARGET_2_DICT') +
     p9.geom_line(size=0.3) +
     p9.theme_bw() +
     p9.theme(
