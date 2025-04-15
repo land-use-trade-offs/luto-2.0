@@ -420,7 +420,7 @@ def process_task_root_dirs(task_root_dir, n_workers=4):
             os.path.join(task_root_dir, dir, 'DATA_REPORT', 'data')
         )
         if not os.path.exists(json_path):
-            print(f'{dir}: No json outputs find in Rrun_{run_idx}!')
+            print(f'{dir}: No json outputs find in Run_{run_idx}!')
             continue
         # Json to df
         tasks.append(delayed(get_report_df)(json_path, run_paras))

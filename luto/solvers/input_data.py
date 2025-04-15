@@ -695,7 +695,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         
         base_yr_prod = {
             "Economy Total Value (AUD)": get_BASE_YR_economic_value(data),
-            "Biodiversity Value (AUD)": get_BASE_YR_biodiv_value(data)
+            "Biodiversity Value (score)": get_BASE_YR_biodiv_value(data)
         },
         
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],

@@ -296,7 +296,7 @@ class LutoSolver:
         
         # Get objectives 
         self.obj_economy = self._setup_economy_objective() / self._input_data.base_yr_prod["Economy Total Value (AUD)"]         # Normalise to the base year economy value
-        self.obj_biodiv = self._setup_biodiversity_objective() / self._input_data.base_yr_prod["Biodiversity Value (AUD)"]      # Normalise to the base year biodiversity value
+        self.obj_biodiv = self._setup_biodiversity_objective() / self._input_data.base_yr_prod["Biodiversity Value (score)"]      # Normalise to the base year biodiversity value
         self.obj_penalties = self._setup_penalty_objectives()
  
         # Set the objective function
