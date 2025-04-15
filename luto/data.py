@@ -536,7 +536,7 @@ class Data:
         print("\tLoading agricultural management options' data...", flush=True)
 
         # Asparagopsis taxiformis data
-        asparagopsis_file = os.path.join(settings.INPUT_DIR, "20231101_Bundle_MR.xlsx")
+        asparagopsis_file = os.path.join(settings.INPUT_DIR, "20250415_Bundle_MR.xlsx")
         self.ASPARAGOPSIS_DATA = {}
         self.ASPARAGOPSIS_DATA["Beef - modified land"] = pd.read_excel(
             asparagopsis_file, sheet_name="MR bundle (ext cattle)", index_col="Year"

@@ -18,6 +18,8 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 import os
+import pandas as pd
+from luto.tools.create_task_runs.parameters import TASK_ROOT_DIR
 import numpy as np
 from luto.tools.create_task_runs.helpers import (
     create_grid_search_permutations, 
@@ -96,11 +98,8 @@ grid_search = {
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
-    'SOLVE_WEIGHT_ALPHA': (
-        (np.arange(1,1000,20)/(600000*1000)).tolist()
-        + (np.arange(1,1000,20)/(600000)).tolist()
-    ),
-    'SOLVE_WEIGHT_BETA': [0.98], 
+    'SOLVE_WEIGHT_ALPHA': np.arange(0,1,0.05).tolist(),
+    'SOLVE_WEIGHT_BETA': np.arange(0,1,0.05).tolist(), 
     
     
     #-------------------- Diet BAU --------------------
@@ -122,11 +121,10 @@ create_grid_search_permutations(grid_search)
 # Read the template for the custom settings
 grid_search_df = create_grid_search_settings_df()
 
-
 # Create the task runs
 
 # 1) Submit task to a single linux machine, and run simulations parallely
-create_task_runs(grid_search_df, mode='single', n_workers=50)
+create_task_runs(grid_search_df, mode='single', n_workers=100)
 
 # 2) Submit task to multiple linux computation nodes
 # create_task_runs(grid_search_df, mode='cluster')
