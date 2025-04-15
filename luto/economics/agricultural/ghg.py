@@ -30,12 +30,11 @@ import pandas as pd
 
 import luto.tools as tools
 from luto import settings
-from luto.data import Data
 from luto.economics.agricultural.quantity import get_yield_pot
 from luto.economics.agricultural.quantity import lvs_veg_types
 
 
-def get_ghg_crop(data: Data, lu, lm, aggregate):
+def get_ghg_crop(data, lu, lm, aggregate):
     """Return crop GHG emissions <unit: t/cell>  of `lu`+`lm` in `yr_idx` 
     as (np array|pd.DataFrame) depending on aggregate (True|False).
 
@@ -88,7 +87,7 @@ def get_ghg_crop(data: Data, lu, lm, aggregate):
 
 
 
-def get_ghg_lvstk( data: Data  # Data object.
+def get_ghg_lvstk( data  # Data object.
                  , lu          # Land use.
                  , lm          # Land management.
                  , yr_idx      # Number of years post base-year ('YR_CAL_BASE').
@@ -161,7 +160,7 @@ def get_ghg_lvstk( data: Data  # Data object.
        
 
 
-def get_ghg(data: Data, lu, lm, yr_idx, aggregate):
+def get_ghg(data, lu, lm, yr_idx, aggregate):
     """Return GHG emissions [tCO2e/cell] of `lu`+`lm` in `yr_idx` 
     as (np array|pd.DataFrame) depending on aggregate (True|False).
 
@@ -194,7 +193,7 @@ def get_ghg(data: Data, lu, lm, yr_idx, aggregate):
 
 
 
-def get_ghg_matrix(data: Data, lm, yr_idx, aggregate):
+def get_ghg_matrix(data, lm, yr_idx, aggregate):
     """
     Return g_rj matrix <unit: t/cell> per lu under `lm` in `yr_idx`.
 
@@ -225,7 +224,7 @@ def get_ghg_matrix(data: Data, lm, yr_idx, aggregate):
         
 
 
-def get_ghg_matrices(data: Data, yr_idx, aggregate=True):
+def get_ghg_matrices(data, yr_idx, aggregate=True):
     """
     Return g_mrj matrix <unit: t/cell> as 3D Numpy array.
     
@@ -252,7 +251,7 @@ def get_ghg_matrices(data: Data, yr_idx, aggregate=True):
 
 
 
-def get_ghg_penalties_lvstck_natural_to_unall_natural(data: Data, lumap) -> np.ndarray:
+def get_ghg_penalties_lvstck_natural_to_unall_natural(data, lumap) -> np.ndarray:
     """
     Gets the one-off greenhouse gas penalties for transitioning livestock natural land to unallocated natural land.
     
@@ -281,7 +280,7 @@ def get_ghg_penalties_lvstck_natural_to_unall_natural(data: Data, lumap) -> np.n
 
 
 
-def get_ghg_penalties_unall_natural_to_lvstk_natural(data: Data, lumap) -> np.ndarray:
+def get_ghg_penalties_unall_natural_to_lvstk_natural(data, lumap) -> np.ndarray:
     """
     Gets the one-off greenhouse gas penalties for transitioning unallocated natural land to livestock natural land.
     
@@ -308,7 +307,7 @@ def get_ghg_penalties_unall_natural_to_lvstk_natural(data: Data, lumap) -> np.nd
     return np.stack([penalties_unall_natural_to_lvstk_natural_rj] * 2)
 
 
-def get_ghg_penalties_lvstk_natural_to_modified(data: Data, lumap) -> np.ndarray:
+def get_ghg_penalties_lvstk_natural_to_modified(data, lumap) -> np.ndarray:
     """
     Gets the one-off greenhouse gas penalties for transitioning livestock natural land to modified land.
     
@@ -336,7 +335,7 @@ def get_ghg_penalties_lvstk_natural_to_modified(data: Data, lumap) -> np.ndarray
 
 
 
-def get_ghg_penalties_unall_natural_to_modified(data: Data, lumap) -> np.ndarray:
+def get_ghg_penalties_unall_natural_to_modified(data, lumap) -> np.ndarray:
     """
     Gets the one-off greenhouse gas penalties for transitioning unallocated natural land to modified land.
 
@@ -366,7 +365,7 @@ def get_ghg_penalties_unall_natural_to_modified(data: Data, lumap) -> np.ndarray
 
 
 
-def get_ghg_penalties_lvstk_natural_to_modified(data: Data, lumap) -> np.ndarray:
+def get_ghg_penalties_lvstk_natural_to_modified(data, lumap) -> np.ndarray:
     """
     Gets the one-off greenhouse gas penalties for transitioning livestock natural land to modified land.
 
@@ -394,7 +393,7 @@ def get_ghg_penalties_lvstk_natural_to_modified(data: Data, lumap) -> np.ndarray
     return np.stack([penalties_lvstk_natural_to_modified_rj] * 2)
 
 
-def get_ghg_transition_penalties(data: Data, lumap, separate=False) -> np.ndarray:
+def get_ghg_transition_penalties(data, lumap, separate=False) -> np.ndarray:
     """
     Get the one-off greenhouse gas penalties for transitioning between land uses.
 
@@ -430,7 +429,7 @@ def get_ghg_transition_penalties(data: Data, lumap, separate=False) -> np.ndarra
     
     
     
-def get_ghg_limits(data: Data, target):
+def get_ghg_limits(data, target):
     """
     Return greenhouse gas emissions limits in tonnes CO2e from year target.
 
@@ -494,7 +493,7 @@ def get_asparagopsis_effect_g_mrj(data, yr_idx):
     return new_g_mrj
 
 
-def get_precision_agriculture_effect_g_mrj(data: Data, yr_idx):
+def get_precision_agriculture_effect_g_mrj(data, yr_idx):
     """
     Applies the effects of using precision agriculture to the GHG data
     for all relevant agr. land uses.
@@ -549,7 +548,7 @@ def get_precision_agriculture_effect_g_mrj(data: Data, yr_idx):
     return new_g_mrj
 
 
-def get_ecological_grazing_effect_g_mrj(data: Data, yr_idx):
+def get_ecological_grazing_effect_g_mrj(data, yr_idx):
     """
     Applies the effects of using ecological grazing to the GHG data
     for all relevant agricultural land uses.
@@ -766,7 +765,7 @@ def get_biochar_effect_g_mrj(data, yr_idx):
     return new_g_mrj
 
 
-def get_agricultural_management_ghg_matrices(data: Data, g_mrj, yr_idx) -> dict[str, np.ndarray]:
+def get_agricultural_management_ghg_matrices(data, g_mrj, yr_idx) -> dict[str, np.ndarray]:
     """
     Calculate the greenhouse gas (GHG) matrices for different agricultural management practices.
 

@@ -31,14 +31,16 @@ import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 
-from luto.tools.spatializers import upsample_array
-
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Literal, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
 
+from luto.tools.spatializers import upsample_array
+from luto.economics.agricultural.biodiversity import get_bio_overall_priority_score_matrices_mrj
+from luto.economics.agricultural.cost import get_cost_matrices
+from luto.economics.agricultural.revenue import get_rev_matrices
 
 
 
@@ -650,7 +652,11 @@ class Data:
         
         print(f"\tCalculating base year productivity...", flush=True)
         yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)
+        yr_cal_base_economy = self.get_economic_value(self.YR_CAL_BASE)
+        
         self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
+        self.add_production_data(self.YR_CAL_BASE, "Economy Total Value (AUD)", yr_cal_base_economy)
+        
 
 
 
@@ -1843,6 +1849,37 @@ class Data:
         # Return total commodity production as numpy array.
         total_q_c = ag_q_c + non_ag_q_c + ag_man_q_c
         return total_q_c
+    
+    def get_economic_value(self, yr_cal):
+        """
+        Calculate the economic value of the agricultural sector.
+        """
+        
+        yr_idx = yr_cal - self.YR_CAL_BASE
+        
+        # Get the revenue and cost matrices
+        r_mrj = get_rev_matrices(self, yr_idx)
+        c_mrj = get_cost_matrices(self, yr_idx)
+
+        # Calculate the economic value
+        if settings.MODE == 'maxprofit':
+            e_mrj = (r_mrj - c_mrj)
+        elif settings.MODE == 'maxcost':
+            e_mrj = c_mrj
+        else:
+            raise ValueError("Invalid mode. Use 'maxprofit' or 'maxcost'.")
+
+        return np.einsum('mrj,mrj->', e_mrj, self.AG_L_MRJ)
+    
+    
+    def get_biodiv_value(self):
+        """
+        Calculate the economic value of the agricultural sector.
+        """
+        # Get the revenue and cost matrices
+        ag_b_mrj = get_bio_overall_priority_score_matrices_mrj(self)
+        return np.einsum('mrj,mrj->', ag_b_mrj, self.AG_L_MRJ)
+
 
     def get_carbon_price_by_yr_idx(self, yr_idx: int) -> float:
         """

@@ -26,10 +26,9 @@ import itertools
 import numpy as np
 
 from luto import settings
-from luto.data import Data
 
 
-def get_bio_overall_priority_score_matrices_mrj(data: Data):
+def get_bio_overall_priority_score_matrices_mrj(data):
     """
     Return b_mrj biodiversity score matrices by land management, cell, and land-use type.
 
@@ -50,7 +49,7 @@ def get_bio_overall_priority_score_matrices_mrj(data: Data):
     return b_mrj
 
 
-def get_asparagopsis_effect_b_mrj(data: Data):
+def get_asparagopsis_effect_b_mrj(data):
     """
     Gets biodiversity impacts of using Asparagopsis taxiformis (no effect)
 
@@ -64,7 +63,7 @@ def get_asparagopsis_effect_b_mrj(data: Data):
     return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
-def get_precision_agriculture_effect_b_mrj(data: Data):
+def get_precision_agriculture_effect_b_mrj(data):
     """
     Gets biodiversity impacts of using Precision Agriculture (no effect)
 
@@ -78,7 +77,7 @@ def get_precision_agriculture_effect_b_mrj(data: Data):
     return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
-def get_ecological_grazing_effect_b_mrj(data: Data):
+def get_ecological_grazing_effect_b_mrj(data):
     """
     Gets biodiversity impacts of using Ecological Grazing (no effect)
 
@@ -92,7 +91,7 @@ def get_ecological_grazing_effect_b_mrj(data: Data):
     return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
-def get_savanna_burning_effect_b_mrj(data: Data):
+def get_savanna_burning_effect_b_mrj(data):
     """
     Gets biodiversity impacts of using Savanna Burning.
 
@@ -122,7 +121,7 @@ def get_savanna_burning_effect_b_mrj(data: Data):
     return new_b_mrj
 
 
-def get_agtech_ei_effect_b_mrj(data: Data):
+def get_agtech_ei_effect_b_mrj(data):
     """
     Gets biodiversity impacts of using AgTech EI (no effect)
 
@@ -136,7 +135,7 @@ def get_agtech_ei_effect_b_mrj(data: Data):
     return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
-def get_biochar_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray, yr_idx):
+def get_biochar_effect_b_mrj(data, ag_b_mrj: np.ndarray, yr_idx):
     """
     Gets biodiversity impacts of using Biochar
 
@@ -166,7 +165,7 @@ def get_biochar_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray, yr_idx):
     return b_mrj_effect
 
 
-def get_agricultural_management_biodiversity_matrices(data: Data, ag_b_mrj: np.ndarray, yr_idx: int):
+def get_agricultural_management_biodiversity_matrices(data, ag_b_mrj: np.ndarray, yr_idx: int):
     """
     Calculate the biodiversity matrices for different agricultural management practices.
 
@@ -195,7 +194,7 @@ def get_agricultural_management_biodiversity_matrices(data: Data, ag_b_mrj: np.n
     }
 
 
-def get_GBF2_biodiversity_limits(data: Data, yr_cal: int):
+def get_GBF2_biodiversity_limits(data, yr_cal: int):
     """
     Calculate the biodiversity limits for a given year used as a constraint.
 
@@ -214,7 +213,7 @@ def get_GBF2_biodiversity_limits(data: Data, yr_cal: int):
 
 
 
-def get_GBF2_bio_priority_degraded_areas_r(data: Data):
+def get_GBF2_bio_priority_degraded_areas_r(data):
     return np.where(
         data.SAVBURN_ELIGIBLE,
         data.REAL_AREA * data.BIO_PRIORITY_DEGRADED_AREAS_MASK * settings.BIO_CONTRIBUTION_LDS ,
@@ -222,11 +221,11 @@ def get_GBF2_bio_priority_degraded_areas_r(data: Data):
     ).astype(np.float32)
 
 
-def get_GBF3_major_vegetation_matrices_vr(data: Data) -> np.ndarray:
+def get_GBF3_major_vegetation_matrices_vr(data) -> np.ndarray:
     return data.NVIS_LAYERS_LDS * data.REAL_AREA
 
 
-def get_GBF3_major_vegetation_group_limits(data: Data, yr_cal: int) -> tuple[np.ndarray, dict[int, str]]:
+def get_GBF3_major_vegetation_group_limits(data, yr_cal: int) -> tuple[np.ndarray, dict[int, str]]:
     """
     Gets the correct major vegetation group targets for the given year (yr_cal).
 
@@ -243,7 +242,7 @@ def get_GBF3_major_vegetation_group_limits(data: Data, yr_cal: int) -> tuple[np.
     return data.get_GBF3_limit_score_inside_LUTO_by_yr(yr_cal), data.BIO_GBF3_ID2DESC, data.MAJOR_VEG_INDECES
 
 
-def get_GBF4_SNES_matrix_sr(data: Data) -> np.ndarray:
+def get_GBF4_SNES_matrix_sr(data) -> np.ndarray:
     """
     Gets the SNES contributions  matrix.
     
@@ -259,7 +258,7 @@ def get_GBF4_SNES_matrix_sr(data: Data) -> np.ndarray:
     ).astype(np.float32)
     
 
-def get_GBF4_ECNES_matrix_sr(data: Data) -> np.ndarray:
+def get_GBF4_ECNES_matrix_sr(data) -> np.ndarray:
     """
     Gets the ECNES contributions  matrix.
     
@@ -275,7 +274,7 @@ def get_GBF4_ECNES_matrix_sr(data: Data) -> np.ndarray:
     ).astype(np.float32)
     
 
-def get_GBF4_SNES_limits(data: Data, target_year: int) -> tuple[np.ndarray, dict[int, str]]:
+def get_GBF4_SNES_limits(data, target_year: int) -> tuple[np.ndarray, dict[int, str]]:
     """
     Get species of national environmental significance limits.
 
@@ -295,7 +294,7 @@ def get_GBF4_SNES_limits(data: Data, target_year: int) -> tuple[np.ndarray, dict
     
 
 
-def get_GBF4_ECNES_limits(data: Data, target_year: int) -> tuple[np.ndarray, dict[int, str]]:
+def get_GBF4_ECNES_limits(data, target_year: int) -> tuple[np.ndarray, dict[int, str]]:
     """
     Get ecological communities of national environmental significance limits.
 
@@ -314,7 +313,7 @@ def get_GBF4_ECNES_limits(data: Data, target_year: int) -> tuple[np.ndarray, dic
     return species_targets, species_names
 
 
-def get_GBF8_species_conservation_matrix_sr(data: Data, target_year: int):
+def get_GBF8_species_conservation_matrix_sr(data, target_year: int):
     return np.where(
         data.SAVBURN_ELIGIBLE,
         data.get_GBF8_bio_layers_by_yr(target_year) * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
@@ -323,7 +322,7 @@ def get_GBF8_species_conservation_matrix_sr(data: Data, target_year: int):
 
 
 def get_GBF8_species_conservation_limits(
-    data: Data,
+    data,
     yr_cal: int,
 ) -> tuple[np.ndarray, dict[int, str], dict[int, np.ndarray]]:
     """
@@ -349,7 +348,7 @@ def get_GBF8_species_conservation_limits(
     return species_limits, species_names, species_inds
 
 
-def get_ag_biodiversity_contribution(data: Data) -> np.ndarray:
+def get_ag_biodiversity_contribution(data) -> np.ndarray:
     """
     Return b_rj biodiversity contribution matrices by land-use type.
 
@@ -363,7 +362,7 @@ def get_ag_biodiversity_contribution(data: Data) -> np.ndarray:
 
 
 def get_ag_management_biodiversity_contribution(
-    data: Data,
+    data,
     yr_cal: int,
 ) -> dict[str, dict[int, np.ndarray]]:
     
