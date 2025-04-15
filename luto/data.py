@@ -138,7 +138,7 @@ class Data:
         self.obj_vals = {}
 
         print('')
-        print('Beginning data initialisation...')
+        print(f'Beginning data initialisation at RES{settings.RESFACTOR}...')
 
         self.YR_CAL_BASE = 2010  # The base year, i.e. where year index yr_idx == 0.
 
