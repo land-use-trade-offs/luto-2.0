@@ -371,6 +371,27 @@ class Data:
             for lu in self.AGRICULTURAL_LANDUSES:
                 if lu.split(' -')[0].lower() in c:
                     self.CM2LU_IDX[c].append(self.AGRICULTURAL_LANDUSES.index(lu))
+                    
+                    
+        ###############################################################
+        # Cost multiplier data.
+        ###############################################################
+        cost_mult_excel = pd.ExcelFile(os.path.join(settings.INPUT_DIR, 'cost_multipliers.xlsx'))
+        self.AC_COST_MULTS = pd.read_excel(cost_mult_excel, "AC_multiplier", index_col="Year")
+        self.QC_COST_MULTS = pd.read_excel(cost_mult_excel, "QC_multiplier", index_col="Year")
+        self.FOC_COST_MULTS = pd.read_excel(cost_mult_excel, "FOC_multiplier", index_col="Year")
+        self.FLC_COST_MULTS = pd.read_excel(cost_mult_excel, "FLC_multiplier", index_col="Year")
+        self.FDC_COST_MULTS = pd.read_excel(cost_mult_excel, "FDC_multiplier", index_col="Year")
+        self.WP_COST_MULTS = pd.read_excel(cost_mult_excel, "WP_multiplier", index_col="Year")["Water_delivery_price_multiplier"].to_dict()
+        self.WATER_LICENSE_COST_MULTS = pd.read_excel(cost_mult_excel, "Water License Cost multiplier", index_col="Year")["Water_license_cost_multiplier"].to_dict()
+        self.EST_COST_MULTS = pd.read_excel(cost_mult_excel, "Establishment cost multiplier", index_col="Year")["Establishment_cost_multiplier"].to_dict()
+        self.MAINT_COST_MULTS = pd.read_excel(cost_mult_excel, "Maintennance cost multiplier", index_col="Year")["Maintennance_cost_multiplier"].to_dict()
+        self.TRANS_COST_MULTS = pd.read_excel(cost_mult_excel, "Transitions cost multiplier", index_col="Year")["Transitions_cost_multiplier"].to_dict()
+        self.SAVBURN_COST_MULTS = pd.read_excel(cost_mult_excel, "Savanna burning cost multiplier", index_col="Year")["Savanna_burning_cost_multiplier"].to_dict()
+        self.IRRIG_COST_MULTS = pd.read_excel(cost_mult_excel, "Irrigation cost multiplier", index_col="Year")["Irrigation_cost_multiplier"].to_dict()
+        self.BECCS_COST_MULTS = pd.read_excel(cost_mult_excel, "BECCS cost multiplier", index_col="Year")["BECCS_cost_multiplier"].to_dict()
+        self.BECCS_REV_MULTS = pd.read_excel(cost_mult_excel, "BECCS revenue multiplier", index_col="Year")["BECCS_revenue_multiplier"].to_dict()
+        self.FENCE_COST_MULTS = pd.read_excel(cost_mult_excel, "Fencing cost multiplier", index_col="Year")["Fencing_cost_multiplier"].to_dict()
 
 
 
@@ -641,22 +662,6 @@ class Data:
         fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_bau2022.csv")
         self.BAU_PROD_INCR = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
 
-
-
-        ###############################################################
-        # Calculate base year production 
-        ###############################################################
-
-        self.AG_MAN_L_MRJ_DICT = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
-        self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
-        
-        print(f"\tCalculating base year productivity...", flush=True)
-        yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)
-        yr_cal_base_economy = self.get_economic_value(self.YR_CAL_BASE)
-        
-        self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
-        self.add_production_data(self.YR_CAL_BASE, "Economy Total Value (AUD)", yr_cal_base_economy)
-        
 
 
 
@@ -1289,30 +1294,29 @@ class Data:
         self.BECCS_REV_AUD_HA_YR = beccs_df['BECCS_REV_AUD_HA_YR'].to_numpy()
         self.BECCS_TCO2E_HA_YR = beccs_df['BECCS_TCO2E_HA_YR'].to_numpy()
         self.BECCS_MWH_HA_YR = beccs_df['BECCS_MWH_HA_YR'].to_numpy()
-
-
+        
+        
+        
         ###############################################################
-        # Cost multiplier data.
+        # Calculate base year production 
         ###############################################################
-        cost_mult_excel = pd.ExcelFile(os.path.join(settings.INPUT_DIR, 'cost_multipliers.xlsx'))
-        self.AC_COST_MULTS = pd.read_excel(cost_mult_excel, "AC_multiplier", index_col="Year")
-        self.QC_COST_MULTS = pd.read_excel(cost_mult_excel, "QC_multiplier", index_col="Year")
-        self.FOC_COST_MULTS = pd.read_excel(cost_mult_excel, "FOC_multiplier", index_col="Year")
-        self.FLC_COST_MULTS = pd.read_excel(cost_mult_excel, "FLC_multiplier", index_col="Year")
-        self.FDC_COST_MULTS = pd.read_excel(cost_mult_excel, "FDC_multiplier", index_col="Year")
-        self.WP_COST_MULTS = pd.read_excel(cost_mult_excel, "WP_multiplier", index_col="Year")["Water_delivery_price_multiplier"].to_dict()
-        self.WATER_LICENSE_COST_MULTS = pd.read_excel(cost_mult_excel, "Water License Cost multiplier", index_col="Year")["Water_license_cost_multiplier"].to_dict()
-        self.EST_COST_MULTS = pd.read_excel(cost_mult_excel, "Establishment cost multiplier", index_col="Year")["Establishment_cost_multiplier"].to_dict()
-        self.MAINT_COST_MULTS = pd.read_excel(cost_mult_excel, "Maintennance cost multiplier", index_col="Year")["Maintennance_cost_multiplier"].to_dict()
-        self.TRANS_COST_MULTS = pd.read_excel(cost_mult_excel, "Transitions cost multiplier", index_col="Year")["Transitions_cost_multiplier"].to_dict()
-        self.SAVBURN_COST_MULTS = pd.read_excel(cost_mult_excel, "Savanna burning cost multiplier", index_col="Year")["Savanna_burning_cost_multiplier"].to_dict()
-        self.IRRIG_COST_MULTS = pd.read_excel(cost_mult_excel, "Irrigation cost multiplier", index_col="Year")["Irrigation_cost_multiplier"].to_dict()
-        self.BECCS_COST_MULTS = pd.read_excel(cost_mult_excel, "BECCS cost multiplier", index_col="Year")["BECCS_cost_multiplier"].to_dict()
-        self.BECCS_REV_MULTS = pd.read_excel(cost_mult_excel, "BECCS revenue multiplier", index_col="Year")["BECCS_revenue_multiplier"].to_dict()
-        self.FENCE_COST_MULTS = pd.read_excel(cost_mult_excel, "Fencing cost multiplier", index_col="Year")["Fencing_cost_multiplier"].to_dict()
+
+        self.AG_MAN_L_MRJ_DICT = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
+        self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
+        
+        print(f"\tCalculating base year productivity...", flush=True)
+        yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)
+        yr_cal_base_economy = self.get_economic_value(self.YR_CAL_BASE)
+        yr_cal_base_biodiv = self.get_biodiv_value()
+        
+        self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
+        self.add_production_data(self.YR_CAL_BASE, "Economy Total Value (AUD)", yr_cal_base_economy)
+        self.add_production_data(self.YR_CAL_BASE, "Biodiversity Total Priority Score (score)", yr_cal_base_biodiv)
 
 
-        print("Data loading complete\n")        
+        print("Data loading complete\n")     
+        
+           
 
     def get_coord(self, index_ij: np.ndarray, trans):
         """
@@ -1862,12 +1866,12 @@ class Data:
         c_mrj = get_cost_matrices(self, yr_idx)
 
         # Calculate the economic value
-        if settings.MODE == 'maxprofit':
+        if settings.OBJECTIVE == 'maxprofit':
             e_mrj = (r_mrj - c_mrj)
-        elif settings.MODE == 'maxcost':
+        elif settings.OBJECTIVE == 'mincost':
             e_mrj = c_mrj
         else:
-            raise ValueError("Invalid mode. Use 'maxprofit' or 'maxcost'.")
+            raise ValueError("Invalid `settings.OBJECTIVE`. Use 'maxprofit' or 'maxcost'.")
 
         return np.einsum('mrj,mrj->', e_mrj, self.AG_L_MRJ)
     
