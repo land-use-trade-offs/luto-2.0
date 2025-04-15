@@ -295,19 +295,31 @@ class LutoSolver:
 
         
         # Get objectives 
-        self.obj_economy = self._setup_economy_objective()          # When 'mincost', obj_economy is the cost; when 'maxprofit', obj_economy is (revenue - cost)
-        self.obj_biodiv = self._setup_biodiversity_objective()
+        self.obj_economy = self._setup_economy_objective() / self._input_data.base_yr_prod["Economy Total Value (AUD)"]         # Normalise to the base year economy value
+        self.obj_biodiv = self._setup_biodiversity_objective() / self._input_data.base_yr_prod["Biodiversity Value (AUD)"]      # Normalise to the base year biodiversity value
         self.obj_penalties = self._setup_penalty_objectives()
  
         # Set the objective function
         if settings.OBJECTIVE == "mincost":
             sense = GRB.MINIMIZE
-            obj_wrap = self.obj_economy  * settings.SOLVE_WEIGHT_ALPHA - self.obj_biodiv * ( 1 - settings.SOLVE_WEIGHT_ALPHA)
-            objective = obj_wrap * (1 - settings.SOLVE_WEIGHT_BETA) +  self.obj_penalties * settings.SOLVE_WEIGHT_BETA
+            obj_wrap = (
+                self.obj_economy  * settings.SOLVE_WEIGHT_ALPHA 
+                - self.obj_biodiv * ( 1 - settings.SOLVE_WEIGHT_ALPHA)
+            )
+            objective = (
+                obj_wrap * (1 - settings.SOLVE_WEIGHT_BETA) + 
+                self.obj_penalties * settings.SOLVE_WEIGHT_BETA
+            )
         elif settings.OBJECTIVE == "maxprofit":
             sense = GRB.MAXIMIZE
-            obj_wrap = self.obj_economy  * settings.SOLVE_WEIGHT_ALPHA + self.obj_biodiv * (1 - settings.SOLVE_WEIGHT_ALPHA)
-            objective = obj_wrap * (1 - settings.SOLVE_WEIGHT_BETA) - self.obj_penalties * settings.SOLVE_WEIGHT_BETA
+            obj_wrap = (
+                self.obj_economy  * settings.SOLVE_WEIGHT_ALPHA 
+                + self.obj_biodiv * (1 - settings.SOLVE_WEIGHT_ALPHA)
+            )
+            objective = (
+                obj_wrap * (1 - settings.SOLVE_WEIGHT_BETA) 
+                - self.obj_penalties * settings.SOLVE_WEIGHT_BETA
+            )
         else:
             raise ValueError(f"Unknown objective function: {settings.OBJECTIVE}")
 

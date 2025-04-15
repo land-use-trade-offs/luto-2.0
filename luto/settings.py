@@ -103,7 +103,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YERAS = list(range(2020,2051,5)) # range(2020,2050)
+SIM_YERAS = list(range(2010,2051,10)) # range(2020,2050)
 
 
 # How does the model run over time
@@ -447,8 +447,12 @@ GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (l
 # GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
 # Weight for the GHG/Demand deviation in the objective function
-''' Range from 0 to 1, where 0 is fully minimising GHG and demand deviation, and 1 is only maximising profit. '''
-SOLVE_WEIGHT_ALPHA = 1/(600000)  
+SOLVE_WEIGHT_ALPHA = 0.5  
+''' 
+Range from 0 to 1 that balances the relative important between economic values and biodiversity scores.
+ - if approaching 0, the model will focus on maximising biodiversity scores.
+ - if approaching 1, the model will focus on maximising prifit (or minimising cost).
+'''
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
