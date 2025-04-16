@@ -1305,13 +1305,8 @@ class Data:
         self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
         
         print(f"\tCalculating base year productivity...", flush=True)
-        yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)
-        yr_cal_base_economy = self.get_economic_value(self.YR_CAL_BASE)
-        yr_cal_base_biodiv = self.get_biodiv_value()
-        
+        yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)        
         self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
-        self.add_production_data(self.YR_CAL_BASE, "Economy Total Value (AUD)", yr_cal_base_economy)
-        self.add_production_data(self.YR_CAL_BASE, "Biodiversity Total Priority Score (score)", yr_cal_base_biodiv)
 
 
         print("Data loading complete\n")     
@@ -1853,36 +1848,6 @@ class Data:
         # Return total commodity production as numpy array.
         total_q_c = ag_q_c + non_ag_q_c + ag_man_q_c
         return total_q_c
-    
-    def get_economic_value(self, yr_cal):
-        """
-        Calculate the economic value of the agricultural sector.
-        """
-        
-        yr_idx = yr_cal - self.YR_CAL_BASE
-        
-        # Get the revenue and cost matrices
-        r_mrj = get_rev_matrices(self, yr_idx)
-        c_mrj = get_cost_matrices(self, yr_idx)
-
-        # Calculate the economic value
-        if settings.OBJECTIVE == 'maxprofit':
-            e_mrj = (r_mrj - c_mrj)
-        elif settings.OBJECTIVE == 'mincost':
-            e_mrj = c_mrj
-        else:
-            raise ValueError("Invalid `settings.OBJECTIVE`. Use 'maxprofit' or 'maxcost'.")
-
-        return np.einsum('mrj,mrj->', e_mrj, self.AG_L_MRJ)
-    
-    
-    def get_biodiv_value(self):
-        """
-        Calculate the economic value of the agricultural sector.
-        """
-        # Get the revenue and cost matrices
-        ag_b_mrj = get_bio_overall_priority_score_matrices_mrj(self)
-        return np.einsum('mrj,mrj->', ag_b_mrj, self.AG_L_MRJ)
 
 
     def get_carbon_price_by_yr_idx(self, yr_idx: int) -> float:

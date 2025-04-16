@@ -454,6 +454,14 @@ Range from 0 to 1 that balances the relative important between economic values a
  - if approaching 1, the model will focus on maximising prifit (or minimising cost).
 '''
 
+SOLVE_WEIGHT_BETA = 0.99
+'''
+The weight of the deviations from target in the objective function.
+ - if approaching 0, the model will ignore the deviations from target.
+ - if approaching 1, the model will try harder to meet the target.
+'''
+
+
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 
@@ -500,8 +508,6 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 # Biodiversity limits and parameters *******************************
-SOLVE_WEIGHT_BETA = 0.99
-'''The weight of the biodiversity target in the objective function'''
 
 
 # ------------------- Agricultural biodiversity parameters -------------------
