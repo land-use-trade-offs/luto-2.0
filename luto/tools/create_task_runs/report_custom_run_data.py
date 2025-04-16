@@ -29,7 +29,7 @@ p9.options.dpi = 100
 
 
 # Get the data
-task_root_dir = '/g/data/jk53/jinzhu/LUTO/Custom_runs/20250415_RES13_GRID_SEARCH_ALPHA_BETA_WEIGHTS/'
+task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20250414_GRID_SEARCH_1/"
 report_data = process_task_root_dirs(task_root_dir)
 
 
@@ -37,7 +37,6 @@ report_data = process_task_root_dirs(task_root_dir)
 query_str = '''
     Type == "Production_Mt" 
     and year != 2010
-    and SOLVE_WEIGHT_BETA == 0.05
     '''.replace('\n', ' ').replace('  ', ' ')
 
 df_demand = report_data.query(query_str).copy()
@@ -70,8 +69,7 @@ df_demand['run_idx'] = df_demand['run_idx'].astype(str)
 
 query_str = '''
     Type == "Profit_billion_AUD" 
-    and SOLVE_WEIGHT_ALPHA == 0.95 
-    and SOLVE_WEIGHT_BETA == 0.05
+    and SOLVE_WEIGHT_BETA == 0.95
     '''.replace('\n', ' ').replace('  ', ' ')
 
 df_profit = report_data.query(query_str).copy()
@@ -120,10 +118,7 @@ p_weight_vs_profit.save('F:/jinzhu/TMP/SOLVE_WEIGHT_plots/03_1_p_weight_vs_profi
 # ------------------ Biodiversity ------------------
 query_str = '''
     Type == "Biodiversity_area_score"
-    and SOLVE_WEIGHT_ALPHA != 0 
-    and SOLVE_WEIGHT_ALPHA != 1
-    and SOLVE_WEIGHT_BETA != 1
-    and SOLVE_WEIGHT_BETA != 0
+    and SOLVE_WEIGHT_BETA == 0.95
     '''.replace('\n', ' ').replace('  ', ' ')
     
 df_bio = report_data.query(query_str).copy()
