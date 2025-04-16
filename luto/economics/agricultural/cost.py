@@ -485,8 +485,7 @@ def get_beef_hir_effect_c_mrj(data: Data, yr_idx: int):
 
     c_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
-    for lm in data.LANDMANS:
-        m = data.LANDMAN_TO_M[lm]
+    for m, lm in enumerate(data.LANDMANS):
         for lu_idx, lu in enumerate(land_uses):
             # Quantity costs are reduced by 50% under HIR
             lvstype, vegtype = lvs_veg_types(lu)
@@ -508,8 +507,7 @@ def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):
 
     c_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
-    for lm in data.LANDMANS:
-        m = data.LANDMAN_TO_M[lm]
+    for m, lm in enumerate(data.LANDMANS):
         for lu_idx, lu in enumerate(land_uses):
             # Quantity costs are reduced by 50% under HIR
             lvstype, vegtype = lvs_veg_types(lu)
@@ -544,7 +542,7 @@ def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
     agtech_ei_data = get_agtech_ei_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['AgTech EI'] else 0
     biochar_data = get_biochar_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Biochar'] else 0
     beef_hir_data = get_beef_hir_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Beef - HIR'] else 0
-    sheep_hir_data = get_beef_hir_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Sheep - HIR'] else 0
+    sheep_hir_data = get_sheep_hir_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Sheep - HIR'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,

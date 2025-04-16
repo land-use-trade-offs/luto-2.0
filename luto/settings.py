@@ -208,6 +208,7 @@ NON_AG_LAND_USES = {
     'Sheep Carbon Plantings (Belt)': True,
     'Beef Carbon Plantings (Belt)': True,
     'BECCS': True,
+    'Destocked - natural land': True,
 }
 """
 The dictionary here is the master list of all of the non agricultural land uses
@@ -227,6 +228,7 @@ NON_AG_LAND_USES_REVERSIBLE = {
     'Sheep Carbon Plantings (Belt)': False,
     'Beef Carbon Plantings (Belt)': False,
     'BECCS': False,
+    'Destocked - natural land': True,
 }
 """
 If settings.MODE == 'timeseries', the values of the below dictionary determine whether the model is allowed to abandon non-agr.
@@ -332,8 +334,8 @@ SAVBURN_COST_HA_YR = 100
 # The minimum value an agricultural management variable must take for the write_output function to consider it being used on a cell
 AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1
 
-HIR_PRODUCTIVITY_PENALTY =  0.5
-
+HIR_PRODUCTIVITY_PENALTY = 0.5
+HIR_BIODIVERSITY_PENALTY = 0.5  # Biodiversity penalty of HIR when compared to destocked land
 
 # ---------------------------------------------------------------------------- #
 # Off-land commodity parameters
@@ -450,6 +452,8 @@ BIODIV_GBF_TARGET_2_DICT = {
 
 # GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
 GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
+
+
 '''
 The constraint type for the biodiversity target.
 - 'hard' adds biodiversity limits as a constraint in the solver (linear programming approach)
@@ -613,6 +617,7 @@ BIODIVERSITY_BIG_CONSTR_DIV_FACTOR = 1e4
 5: 'Sheep Carbon Plantings (Belt)'
 6: 'Beef Carbon Plantings (Belt)'
 7: 'BECCS'
+8: 'Destocked - natural land'
 
 
 AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)

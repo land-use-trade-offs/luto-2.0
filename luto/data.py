@@ -306,7 +306,6 @@ class Data:
 
         # Get number of land management types
         self.NLMS = len(self.LANDMANS)
-        self.LANDMAN_TO_M = dict(zip(self.LANDMANS, self.NLMS))
 
         # List of products. Everything upper case to avoid mistakes.
         self.PR_CROPS = [s.upper() for s in self.LU_CROPS]
@@ -1309,10 +1308,7 @@ class Data:
         ###############################################################
         print("\tLoading HIR data...", flush=True)
 
-        hir_df = pd.read_hdf(os.path.join(INPUT_DIR, 'hir_block_avg_t_co2_ha_yr.h5'), where=self.MASK)
-        self.HIR_BLOCK_AG_AVG_T_CO2_HA_YR = hir_df['HIR_BLOCK_AG_AVG_T_CO2_HA_YR'].to_numpy()
-        self.HIR_BLOCK_BG_AVG_T_CO2_HA_YR = hir_df['HIR_BLOCK_BG_AVG_T_CO2_HA_YR'].to_numpy()
-        self.HIR_MASK = np.load(os.path.join(INPUT_DIR, "hir_mask.npy"))
+        self.HIR_MASK = np.load(os.path.join(INPUT_DIR, "hir_mask.npy"))[self.MASK]
 
 
         ###############################################################

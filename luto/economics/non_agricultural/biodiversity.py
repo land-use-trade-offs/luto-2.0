@@ -30,6 +30,7 @@ from luto.settings import (
     BECCS_BIODIVERSITY_BENEFIT,
     AF_PROPORTION,
     CP_BELT_PROPORTION,
+    HIR_BIODIVERSITY_PENALTY,
 )
 
 
@@ -166,7 +167,31 @@ def get_biodiv_beef_carbon_plantings_belt(
 
 
 def get_biodiv_beccs(data: Data):
+    """
+    Parameters
+    ------
+    data: Data object.
+
+    Returns
+    ------
+    Numpy array indexed by r
+    """
     return data.BIO_DISTANCE_WEIGHTED_PRIORITY_REGION * data.REAL_AREA * BECCS_BIODIVERSITY_BENEFIT
+
+
+def get_biodiv_destocked_land(data: Data, ag_b_mrj: np.ndarray):
+    """
+    Parameters
+    ------
+    data: Data object.
+    ag_b_mrj: agricultural biodiversity matrix.
+
+    Returns
+    ------
+    Numpy array indexed by r
+    """
+    unallocated_j = tools.get_unallocated_natural_land_code(data)
+    return ag_b_mrj[0, :, unallocated_j]
 
 
 def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
@@ -190,6 +215,7 @@ def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
     sheep_carbon_plantings_belt_biodiv = get_biodiv_sheep_carbon_plantings_belt(data, ag_b_mrj, cp_belt_x_r)
     beef_carbon_plantings_belt_biodiv = get_biodiv_beef_carbon_plantings_belt(data, ag_b_mrj, cp_belt_x_r)
     beccs_biodiv = get_biodiv_beccs(data)
+    destocked_biodiv = get_biodiv_destocked_land(data, ag_b_mrj)
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     non_agr_b_matrices = [
@@ -201,6 +227,7 @@ def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
         sheep_carbon_plantings_belt_biodiv.reshape((data.NCELLS, 1)),
         beef_carbon_plantings_belt_biodiv.reshape((data.NCELLS, 1)),
         beccs_biodiv.reshape((data.NCELLS, 1)),
+        destocked_biodiv.reshape((data.NCELLS, 1)),
     ]
 
     return np.concatenate(non_agr_b_matrices, axis=1)
@@ -236,4 +263,6 @@ def get_non_ag_lu_biodiv_impacts(data: Data) -> dict[int, float]:
         ),
         # BECCS
         7: BECCS_BIODIVERSITY_BENEFIT,
+        # Destocked land
+        8: 1 - HIR_BIODIVERSITY_PENALTY,
     }

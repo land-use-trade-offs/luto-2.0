@@ -288,6 +288,23 @@ def get_quantity_beccs(data) -> np.ndarray:
     return np.zeros((data.NCMS, data.NCELLS)).astype(np.float32)
 
 
+def get_quantity_destocked(data) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    data: object/module
+        Data object or module with fields like in `luto.data`.
+
+    Returns
+    -------
+    np.ndarray
+        Indexed by (c, r): represents the quantity commodity c produced by cell r
+        if used for Destocked land.
+        A matrix of zeros because destocked land doesn't produce anything.
+    """
+    return np.zeros((data.NCMS, data.NCELLS)).astype(np.float32)
+
+
 def get_quantity_matrix(data, ag_q_mrp: np.ndarray, lumap: np.ndarray) -> np.ndarray:
     """
     Get the non-agricultural quantity matrix q_crk.
@@ -311,6 +328,7 @@ def get_quantity_matrix(data, ag_q_mrp: np.ndarray, lumap: np.ndarray) -> np.nda
     beef_carbon_plantings_belt_quantity_matrix = get_quantity_beef_carbon_plantings_belt(data, ag_q_mrp, cp_belt_x_r)
     beef_agroforestry_quantity_matrix = get_quantity_beef_agroforestry(data, ag_q_mrp, agroforestry_x_r)
     beccs_quantity_matrix = get_quantity_beccs(data)
+    destocked_quantity_matrix = get_quantity_destocked(data)
 
     # reshape each matrix to be indexed (c, r, k) and concatenate on the k indexing
     non_agr_quantity_matrices = [
@@ -322,6 +340,7 @@ def get_quantity_matrix(data, ag_q_mrp: np.ndarray, lumap: np.ndarray) -> np.nda
         sheep_carbon_plantings_belt_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
         beef_carbon_plantings_belt_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
         beccs_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
+        destocked_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
     ]
 
     return np.concatenate(non_agr_quantity_matrices, axis=2)

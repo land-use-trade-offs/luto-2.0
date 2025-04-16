@@ -195,6 +195,13 @@ def get_beccs_cells(lumap) -> np.ndarray:
     return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 7)[0]
 
 
+def get_destocked_land_cells(lumap) -> np.ndarray:
+    """
+    Get an array with all destocked land cells
+    """
+    return np.nonzero(lumap == settings.NON_AGRICULTURAL_LU_BASE_CODE + 8)[0]
+
+
 def get_unallocated_natural_lu_cells(data, lumap) -> np.ndarray:
     """
     Gets all cells being used for unallocated natural land uses.
@@ -363,6 +370,35 @@ def get_beef_code(data):
     Get the land use code (j) for 'Beef - modified land'
     """
     return data.DESC2AGLU['Beef - modified land']
+
+
+def get_natural_sheep_code(data):
+    """
+    Get the land use code (j) for 'Sheep - natural land'
+    """
+    return data.DESC2AGLU['Sheep - natural land']
+
+
+def get_natural_beef_code(data):
+    """
+    Get the land use code (j) for 'Beef - modified land'
+    """
+    return data.DESC2AGLU['Beef - natural land']
+
+
+def get_unallocated_natural_land_code(data):
+    """
+    Get the land use code (j) for 'Unallocated - natural land'
+    """
+    return data.DESC2AGLU['Unallocated - natural land']
+
+
+def get_cells_using_ag_landuse(lumap: np.ndarray, j: int) -> np.ndarray:
+    """
+    Gets the cells in the given 'lumap' using the land use indexed by 'j'
+    """
+    return np.where(lumap == j)[0]
+
 
 def ag_mrj_to_xr(data, arr):
     return xr.DataArray(

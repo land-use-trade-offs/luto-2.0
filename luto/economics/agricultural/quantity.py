@@ -29,7 +29,6 @@ from scipy.interpolate import interp1d
 
 from luto.settings import AG_MANAGEMENTS, HIR_PRODUCTIVITY_PENALTY
 from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
-from luto.data import Data
 
 
 def lvs_veg_types(lu) -> tuple[str, str]:
@@ -522,7 +521,7 @@ def get_biochar_effect_q_mrp(data, q_mrp, yr_idx):
     return new_q_mrp
 
 
-def get_beef_hir_effect_q_mrp(data: Data, q_mrp):
+def get_beef_hir_effect_q_mrp(data, q_mrp):
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
 
@@ -543,7 +542,7 @@ def get_beef_hir_effect_q_mrp(data: Data, q_mrp):
     return q_mrp_effect
 
 
-def get_sheep_hir_effect_q_mrp(data: Data, q_mrp):
+def get_sheep_hir_effect_q_mrp(data, q_mrp):
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
 

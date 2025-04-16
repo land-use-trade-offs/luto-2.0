@@ -235,6 +235,23 @@ def get_rev_beccs(data: Data, yr_cal: int) -> np.ndarray:
     return base_rev + np.nan_to_num(data.BECCS_TCO2E_HA_YR) * data.REAL_AREA * data.get_carbon_price_by_year(yr_cal)
 
 
+def get_rev_destocked(data: Data, ag_r_mrj: np.ndarray) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    data: object/module
+        Data object or module with fields like in `luto.data`.
+    ag_r_mrj: np.ndarray
+        Agricultural revenue matrix.
+
+    Returns
+    -------
+    np.ndarray
+    """
+    unallocated_j = tools.get_unallocated_natural_land_code(data)
+    return ag_r_mrj[0, :, unallocated_j]
+
+
 def get_rev_matrix(data: Data, yr_cal: int, ag_r_mrj, lumap) -> np.ndarray:
     """
     Gets the matrix containing the revenue produced by each non-agricultural land use for each cell.
@@ -274,6 +291,9 @@ def get_rev_matrix(data: Data, yr_cal: int, ag_r_mrj, lumap) -> np.ndarray:
 
     if NON_AG_LAND_USES['BECCS']:
         non_agr_rev_matrices['BECCS'] = get_rev_beccs(data, yr_cal).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Destocked - natural land']:
+        non_agr_rev_matrices['Destocked - natural land'] = get_rev_destocked(data, ag_r_mrj).reshape((data.NCELLS, 1))
 
     non_agr_rev_matrices = list(non_agr_rev_matrices.values())
 
