@@ -56,7 +56,7 @@ else:
 
     # Remove all files except the report directory
     for item in os.listdir('.'):
-        if item != 'DATA_REPORT':
+        if item != 'DATA_REPORT.zip':
             try:
                 if os.path.isfile(item) or os.path.islink(item):
                     os.unlink(item)  # Remove the file or link

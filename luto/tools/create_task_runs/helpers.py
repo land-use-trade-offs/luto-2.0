@@ -165,11 +165,8 @@ def create_task_runs(custom_settings:pd.DataFrame, mode:Literal['single','cluste
     with open(f'{TASK_ROOT_DIR}/non_str_val.txt', 'r') as file:
             eval_vars = file.read().splitlines()
     
-    # Skip run if report dir exist
     for col in custom_cols:
         custom_settings.loc[eval_vars, col] = custom_settings.loc[eval_vars, col].map(str).map(eval)
-        if os.path.isdir(f'{TASK_ROOT_DIR}/{col}/DATA_REPORT/'):
-            return f'Skip {col} because report folder found there ...'
 
     def process_col(col):
         custom_dict = update_settings(custom_settings[col].to_dict(), col)
