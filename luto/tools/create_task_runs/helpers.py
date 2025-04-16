@@ -19,6 +19,7 @@
 
 import os, re, time, json
 import shutil, psutil, itertools, subprocess
+import zipfile
 import numpy as np
 import pandas as pd
 
@@ -326,20 +327,26 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1):
             
             
 
-def load_json_data(json_path, filename):
-    if not os.path.exists(os.path.join(json_path, filename)):
-        run_idx = re.compile(r'(Run_\d+)').findall(json_path)[0]
+def load_json_data(zip_path, filename):
+    if not os.path.exists(os.path.join(zip_path)):
+        run_idx = re.compile(r'(Run_\d+)').findall(zip_path)[0]
         print(f'{run_idx}: File missing - {filename}!')
         return pd.DataFrame({'year': [], 'val': [], 'name': []})
-    with open(os.path.join(json_path, filename)) as f:
-        return pd.json_normalize(json.load(f), 'data', ['name']).rename(columns={0: 'year', 1: 'val'})
+    else:
+        with zipfile.ZipFile(os.path.join(zip_path), 'r') as zip_ref:
+            with zip_ref.open(os.path.join('data', filename)) as f:
+                # Load the JSON data into a DataFrame
+                return pd.json_normalize(json.load(f), 'data', ['name']).rename(columns={0: 'year', 1: 'val'})
 
-def process_profit_data(json_path):
-    df = load_json_data(json_path, 'economics_0_rev_cost_all_wide.json')
+
+
+def process_profit_data(zip_path):
+    df = load_json_data(zip_path, 'economics_0_rev_cost_all_wide.json')
     return df.query('name == "Profit"')
 
-def process_GHG_deviation_data(json_path):
-    df = load_json_data(json_path, 'GHG_2_individual_emission_Mt.json')
+
+def process_GHG_deviation_data(zip_path):
+    df = load_json_data(zip_path, 'GHG_2_individual_emission_Mt.json')
     df_target = df.query('name == "GHG emissions limit"')
     df_actual = df.query('name == "Net emissions"')
     df_deviation = df_target.merge(df_actual, on='year', suffixes=('_target', '_actual'))
@@ -347,9 +354,10 @@ def process_GHG_deviation_data(json_path):
     df_deviation['val'] = df_deviation['val_actual'] - df_deviation['val_target']
     return df_deviation
 
-def process_GHG_deforestation_data(json_path):
+
+def process_GHG_deforestation_data(zip_path):
     
-    df = load_json_data(json_path, 'GHG_2_individual_emission_Mt.json')
+    df = load_json_data(zip_path, 'GHG_2_individual_emission_Mt.json')
     if df.empty:
         return df
     
@@ -364,26 +372,26 @@ def process_GHG_deforestation_data(json_path):
                 value_name='val')
     return df
 
-def process_bio_GBF2_data(json_path):
-    return load_json_data(json_path, 'biodiversity_priority_1_total_score_by_type.json')
+def process_bio_GBF2_data(zip_path):
+    return load_json_data(zip_path, 'biodiversity_priority_1_total_score_by_type.json')
 
 
-def process_demand_data(json_path):
-    df_demand = load_json_data(json_path, 'production_5_6_demand_Production_commodity_from_LUTO.json')
-    df_luto = load_json_data(json_path, 'production_5_5_demand_Production_commodity.json')
+def process_demand_data(zip_path):
+    df_demand = load_json_data(zip_path, 'production_5_6_demand_Production_commodity_from_LUTO.json')
+    df_luto = load_json_data(zip_path, 'production_5_5_demand_Production_commodity.json')
     df_delta = df_demand.merge(df_luto, on=['year', 'name'], suffixes=('_luto', '_demand'))
     # df_delta['deviation_t'] = df_delta.eval('val_luto - val_demand')
     df_delta['val'] = df_delta.eval('(val_luto - val_demand) / val_demand * 100')
     return df_delta
 
 
-def get_report_df(json_path, run_paras):
+def get_report_df(zip_path, run_paras):
     
-    df_profit = process_profit_data(json_path)
-    df_ghg_deviation = process_GHG_deviation_data(json_path)
-    df_ghg_deforestation = process_GHG_deforestation_data(json_path)
-    df_demand_deviation = process_demand_data(json_path)
-    df_bio_objective = process_bio_GBF2_data(json_path)
+    df_profit = process_profit_data(zip_path)
+    df_ghg_deviation = process_GHG_deviation_data(zip_path)
+    df_ghg_deforestation = process_GHG_deforestation_data(zip_path)
+    df_demand_deviation = process_demand_data(zip_path)
+    df_bio_objective = process_bio_GBF2_data(zip_path)
 
     report_df = pd.concat([
         df_profit[['year', 'name', 'val']].assign(Type='Profit_billion_AUD'),
@@ -412,17 +420,12 @@ def process_task_root_dirs(task_root_dir, n_workers=4):
         run_idx = int(dir.split('_')[-1])
         run_paras = grid_search_params.query(f'run_idx == {int(run_idx)}').to_dict(orient='records')[0]
         # Locate the latest json data path
-        json_path = next(
-            # Find json in 'output' folder
-            iter(sorted(glob(f"{task_root_dir}/{dir}/output/**/DATA_REPORT/data"), key=os.path.getmtime)),
-            # Find json in 'DATA_REPORT' folder
-            os.path.join(task_root_dir, dir, 'DATA_REPORT', 'data')
-        )
-        if not os.path.exists(json_path):
-            print(f'{dir}: No json outputs find in Run_{run_idx}!')
+        zip_path = os.path.join(task_root_dir, dir, 'DATA_REPORT.zip')
+        if not os.path.exists(zip_path):
+            print(f'{dir}: No outputs find in Run_{run_idx}!')
             continue
         # Json to df
-        tasks.append(delayed(get_report_df)(json_path, run_paras))
+        tasks.append(delayed(get_report_df)(zip_path, run_paras))
     
     return pd.concat(tqdm(Parallel(n_jobs=n_workers, return_as='generator')(tasks), total=len(tasks)), ignore_index=True)
 

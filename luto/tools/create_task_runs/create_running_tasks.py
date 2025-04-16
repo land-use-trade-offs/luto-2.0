@@ -26,7 +26,7 @@ from luto.tools.create_task_runs.helpers import (
     create_task_runs
 )
 
-compute_num = 1
+compute_num = 4
 
 os.environ["GRB_LICENSE_FILE"] = f"/home/582/jw6041/gurobi_lic_compute_{compute_num}/gurobi.lic"
 
@@ -50,7 +50,7 @@ grid_search = {
     'SIM_YERAS': [[2010,2020,2030,2040,2050]],   # Years to run the model 
     'WRITE_THREADS': [5],
     'WRITE_OUTPUT_GEOTIFFS': [False],
-    'KEEP_OUTPUTS': [False],                    # If false, only keep report HTML
+    'KEEP_OUTPUTS': [False],                    # If False, only keep report HTML
     
  
     ###############################################################
@@ -134,7 +134,7 @@ chunks = np.array_split(range(grid_search_df.shape[1]-2), 4)
 grid_search_df = grid_search_df.loc[:, ['Name'] + [f'Run_{i+1:04}' for i in chunks[compute_num - 1]]]
 
 # 1) Submit task to a single linux machine, and run simulations parallely
-create_task_runs(grid_search_df, mode='single', n_workers=10)
+create_task_runs(grid_search_df, mode='single', n_workers=100)
 
 # 2) Submit task to multiple linux computation nodes
 # create_task_runs(grid_search_df, mode='cluster')

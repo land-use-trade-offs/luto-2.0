@@ -29,7 +29,7 @@ p9.options.dpi = 100
 
 
 # Get the data
-task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20250414_GRID_SEARCH_1/"
+task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20250414_GRID_SEARCH/"
 report_data = process_task_root_dirs(task_root_dir)
 
 
@@ -63,10 +63,6 @@ p_weight_vs_demand.save('F:/jinzhu/TMP/SOLVE_WEIGHT_plots/03_3_p_weight_vs_deman
 
 
 # -------------------- Profit -------------------
-# Ensure consistent data types for 'run_idx' in both DataFrames
-report_data['run_idx'] = report_data['run_idx'].astype(str)
-df_demand['run_idx'] = df_demand['run_idx'].astype(str)
-
 query_str = '''
     Type == "Profit_billion_AUD" 
     and SOLVE_WEIGHT_BETA == 0.95
@@ -107,10 +103,6 @@ p_weight_vs_profit = (
 
 
 p_weight_vs_profit.save('F:/jinzhu/TMP/SOLVE_WEIGHT_plots/03_1_p_weight_vs_profit.svg')
-
-
-
-
 
 
 
