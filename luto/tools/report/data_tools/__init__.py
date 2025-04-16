@@ -31,7 +31,7 @@ def extract_dtype_from_path(path):
     Args:
         path (str): The file path.
 
-    Returns:
+    Returns
         tuple: A tuple containing the year type and data type extracted from the file path.
     """
     # Define the output categories and its corresponding file patterns
@@ -99,7 +99,7 @@ def get_all_files(data_root):
     Args:
         data_root (str): The root directory to search for files.
 
-    Returns:
+    Returns
         pandas.DataFrame: A DataFrame containing the file paths, along with 
         additional columns for year, year types, category, base name, and 
         base extension.
@@ -156,7 +156,7 @@ def get_quantity_df(in_dfs):
     Args:
         in_dfs (pandas.DataFrame): A dataframe containing information about input dataframes.
 
-    Returns:
+    Returns
         pandas.DataFrame: A dataframe with concatenated and transformed quantity information.
 
     """

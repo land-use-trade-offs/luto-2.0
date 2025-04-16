@@ -28,8 +28,7 @@ from typing import Dict
 from copy import deepcopy
 
 from luto.data import Data, lumap2ag_l_mrj
-from luto.settings import AG_MANAGEMENTS
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.economics.agricultural.water import get_wreq_matrices
 import luto.economics.agricultural.ghg as ag_ghg
 from luto import settings
@@ -123,7 +122,7 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
         lmmap (np.ndarray): Land management map of the base year for the transitions.
         separate (bool, optional): Whether to return separate cost matrices for each cost component.
                                    Defaults to False.
-    Returns:
+    Returns
         numpy.ndarray or dict: The transition matrices for land-use and land management transitions.
                                If `separate` is False, returns a numpy array representing the total costs.
                                If `separate` is True, returns a dictionary with separate cost matrices for
@@ -161,15 +160,16 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
     e_mrj = np.stack([e_rj, e_rj], axis=0)
 
     # Update the cost matrix with exclude matrices; the transition cost for a cell that remain the same is 0.
-    e_mrj = np.einsum('mrj,mrj,mrj->mrj', e_mrj, x_mrj, l_mrj_not)
+    e_mrj = np.einsum('mrj,mrj,mrj->mrj', e_mrj, x_mrj, l_mrj_not).astype(np.float32)
+    e_mrj = np.nan_to_num(e_mrj)
 
     # -------------------------------------------------------------- #
     # Water license cost (upfront, amortised to annual, per cell).   #
     # -------------------------------------------------------------- #
 
     w_mrj = get_wreq_matrices(data, yr_idx)                                     # <unit: ML/cell>
-    w_delta_mrj = tools.get_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)
-    w_delta_mrj = np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not)
+    w_delta_mrj = tools.get_ag_to_ag_water_delta_matrix(w_mrj, l_mrj, data, yr_idx)
+    w_delta_mrj = np.einsum('mrj,mrj,mrj->mrj', w_delta_mrj, x_mrj, l_mrj_not).astype(np.float32)
 
     # -------------------------------------------------------------- #
     # Carbon costs of transitioning cells.                           #
@@ -177,10 +177,20 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
 
     # Apply the cost of carbon released by transitioning natural land to modified land
     ghg_transition = ag_ghg.get_ghg_transition_penalties(data, lumap, separate=True)        # <unit: t/ha>
+    
+    ghg_transition = {
+        k:np.einsum('mrj,mrj,mrj->mrj', v, x_mrj, l_mrj_not).astype(np.float32)             # No GHG penalty for cells that remain the same, or are prohibited from transitioning
+        for k, v in ghg_transition.items()
+    }
+    
+    ghg_transition = {
+    k:tools.amortise(v * data.get_carbon_price_by_yr_idx(yr_idx))                       # Amortise the GHG penalties
+    for k,v in ghg_transition.items()
+    }
+    
     ghg_t_types = ghg_transition.keys()
     ghg_t_smrj = np.stack([ghg_transition[t] for t in ghg_t_types], axis=0)                 # s: ghg_t_types, m: land management, r: cell, j: land use
-    ghg_t_smrj = tools.amortise(ghg_t_smrj * data.get_carbon_price_by_yr_idx(yr_idx))
-    ghg_t_smrj_cost = np.einsum('smrj,mrj,mrj->smrj', ghg_t_smrj, x_mrj, l_mrj_not)
+    ghg_t_mrj = np.einsum('smrj->mrj', ghg_t_smrj)
 
     # -------------------------------------------------------------- #
     # Total costs.                                                   #
@@ -189,11 +199,10 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
     if separate:
         return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, **ghg_transition}
     else:
-        t_mrj = e_mrj + w_delta_mrj + np.einsum('smrj->mrj', ghg_t_smrj_cost)
         # Ensure transition costs for destocked land cells are zero - already handled in 'non_ag_to_ag_t_mrj' in input_data.py
         destocked_cells = tools.get_destocked_land_cells(lumap)
-        t_mrj[:, destocked_cells, :] = 0
-        return t_mrj
+        ghg_t_mrj[:, destocked_cells, :] = 0
+        return ghg_t_mrj
 
 
 def get_transition_matrices_from_base_year(data: Data, yr_idx, base_year, separate=False):

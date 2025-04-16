@@ -17,24 +17,23 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-from typing import Optional
 import numpy as np
-from luto.settings import NON_AG_LAND_USES
 
-from luto.data import Data
+from typing import Optional
+from luto.settings import NON_AG_LAND_USES
 from luto import tools
 
 
 def get_w_net_yield_matrix_env_planting(
-    data: Data, 
+    data, 
     yr_idx: int, 
     water_dr_yield: Optional[np.ndarray] = None,
     water_sr_yield: Optional[np.ndarray] = None
     ) -> np.ndarray:
     """
-    Get water requirements vector of environmental plantings.
+    Get water yields vector of environmental plantings.
 
-    To get the water requirements of environmental plantings, subtract the baseline 
+    To get the water yields of environmental plantings, subtract the baseline 
     water yields from the shallow-rooted water yields in the data. This represents
     how much water would be used if modified (i.e., cleared) land area was reforested
     with native pre-European vegetation communities (WATER_YIELD_HIST_NL). Pre-European 
@@ -58,14 +57,14 @@ def get_w_net_yield_matrix_env_planting(
 
 
 def get_w_net_yield_matrix_carbon_plantings_block(
-    data: Data, 
+    data, 
     yr_idx: int, 
     water_dr_yield: Optional[np.ndarray] = None
     ) -> np.ndarray:
     """
-    Get water requirements vector of carbon plantings (block arrangement).
+    Get water yields vector of carbon plantings (block arrangement).
 
-    To get the water requirements of carbon plantings, subtract the deep-rooted 
+    To get the water yields of carbon plantings, subtract the deep-rooted 
     water yields from the shallow-rooted water yields in the data. This represents
     how much water would be used if modified (i.e., cleared) land area was reforested
     with wall-to-wall deep-rooted tree species (WATER_YIELD_HIST_DR). The assumption 
@@ -81,14 +80,14 @@ def get_w_net_yield_matrix_carbon_plantings_block(
 
 
 def get_w_net_yield_matrix_rip_planting(
-    data: Data, 
+    data, 
     yr_idx: int, 
     water_dr_yield: Optional[np.ndarray] = None
     ) -> np.ndarray:
     """
-    Get water requirements vector of riparian plantings.
+    Get water yields vector of riparian plantings.
 
-    To get the water requirements of riparian plantings, subtract the deep-rooted
+    To get the water yields of riparian plantings, subtract the deep-rooted
     water yields from the shallow-rooted water yields in the data.
 
     Note: this is the same as for environmental plantings.
@@ -101,15 +100,15 @@ def get_w_net_yield_matrix_rip_planting(
 
 
 def get_w_net_yield_agroforestry_base(
-    data: Data, 
+    data, 
     yr_idx: int, 
     water_dr_yield: Optional[np.ndarray] = None,
     water_sr_yield: Optional[np.ndarray] = None
     ) -> np.ndarray:
     """
-    Get water requirements vector of agroforestry.
+    Get water yields vector of agroforestry.
 
-    To get the water requirements of agroforestry, subtract the baseline
+    To get the water yields of agroforestry, subtract the baseline
     water yields from the shallow-rooted water yields in the data.
 
     Note: this is the same as for environmental plantings.
@@ -122,7 +121,7 @@ def get_w_net_yield_agroforestry_base(
 
 
 def get_wreq_sheep_agroforestry(
-    data: Data, 
+    data, 
     ag_w_mrj: np.ndarray, 
     agroforestry_x_r: np.ndarray,
     yr_idx: int,
@@ -132,7 +131,7 @@ def get_wreq_sheep_agroforestry(
     """
     Parameters
     ------
-    data: Data object.
+    data object.
     ag_w_mrj: agricultural water requirements matrix.
     agroforestry_x_r: Agroforestry exclude matrix.
 
@@ -153,7 +152,7 @@ def get_wreq_sheep_agroforestry(
 
 
 def get_wreq_beef_agroforestry(
-    data: Data, 
+    data, 
     ag_w_mrj: np.ndarray, 
     agroforestry_x_r: np.ndarray,
     yr_idx: int,
@@ -163,7 +162,7 @@ def get_wreq_beef_agroforestry(
     """
     Parameters
     ------
-    data: Data object.
+    data object.
     ag_w_mrj: agricultural wreq matrix.
     agroforestry_x_r: Agroforestry exclude matrix.
 
@@ -183,9 +182,9 @@ def get_wreq_beef_agroforestry(
     return agroforestry_contr + beef_contr
 
 
-def get_wreq_carbon_plantings_belt_base(data: Data, yr_idx: int, water_dr_yield: Optional[np.ndarray] = None) -> np.ndarray:
+def get_wreq_carbon_plantings_belt_base(data, yr_idx: int, water_dr_yield: Optional[np.ndarray] = None) -> np.ndarray:
     """
-    Get water requirements vector of carbon plantings (belt arrangement).
+    Get water requirments vector of carbon plantings (belt arrangement).
 
     Note: this is the same as for carbon plantings.
 
@@ -197,7 +196,7 @@ def get_wreq_carbon_plantings_belt_base(data: Data, yr_idx: int, water_dr_yield:
 
 
 def get_wreq_sheep_carbon_plantings_belt(
-    data: Data, 
+    data, 
     ag_w_mrj: np.ndarray, 
     cp_belt_x_r: np.ndarray,
     yr_idx: int,
@@ -206,7 +205,7 @@ def get_wreq_sheep_carbon_plantings_belt(
     """
     Parameters
     ------
-    data: Data object.
+    data object.
     ag_w_mrj: agricultural water requirements matrix.
     cp_belt_x_r: Carbon plantings belt exclude matrix.
 
@@ -227,7 +226,7 @@ def get_wreq_sheep_carbon_plantings_belt(
 
 
 def get_wreq_beef_carbon_plantings_belt(
-    data: Data, 
+    data, 
     ag_w_mrj: np.ndarray, 
     cp_belt_x_r: np.ndarray,
     yr_idx: int,
@@ -236,7 +235,7 @@ def get_wreq_beef_carbon_plantings_belt(
     """
     Parameters
     ------
-    data: Data object.
+    data object.
     ag_w_mrj: agricultural water requirements matrix.
     cp_belt_x_r: Carbon plantings belt exclude matrix.
 
@@ -256,9 +255,9 @@ def get_wreq_beef_carbon_plantings_belt(
     return cp_contr + beef_contr
 
 
-def get_wreq_matrix_beccs(data: Data, yr_idx: int, water_dr_yield: Optional[np.ndarray] = None) -> np.ndarray:
+def get_wreq_matrix_beccs(data, yr_idx: int, water_dr_yield: Optional[np.ndarray] = None) -> np.ndarray:
     """
-    Get water requirements vector of BECCS.
+    Get water requirments vector of BECCS.
 
     Note: this is the same as for carbon plantings.
 
@@ -275,7 +274,7 @@ def get_wreq_matrix_destocked(data: Data, ag_w_mrj):
 
 
 def get_w_net_yield_matrix(
-    data: Data,
+    data,
     ag_w_mrj: np.ndarray,
     lumap: np.ndarray,
     yr_idx: int,
@@ -283,17 +282,17 @@ def get_w_net_yield_matrix(
     water_sr_yield: Optional[np.ndarray] = None
 ) -> np.ndarray:
     """
-    Get the water requirements matrix for all non-agricultural land uses.
+    Get the water yields matrix for all non-agricultural land uses.
 
     Parameters
     ----------
     data : object
-        The data object containing necessary information for calculating the water requirements.
+        The data object containing necessary information for calculating the water yields.
 
     Returns
     -------
     np.ndarray
-        The water requirements matrix for all non-agricultural land uses.
+        The water yields matrix for all non-agricultural land uses.
         Indexed by (r, k) where r is the cell index and k is the non-agricultural land usage index.
     """
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)

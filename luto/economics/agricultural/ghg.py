@@ -32,8 +32,7 @@ import xarray as xr
 from luto.data import Data
 from luto.economics.agricultural.quantity import get_yield_pot
 import luto.tools as tools
-from luto.settings import AG_MANAGEMENTS
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.economics.agricultural.quantity import lvs_veg_types
 
 
@@ -48,7 +47,7 @@ def get_ghg_crop(data: Data, lu, lm, yr_idx, aggregate):
         yr_idx (int): Number of years from base year, counting from zero.
         aggregate (bool): True -> return GHG emission as np.array, False -> return GHG emission as pd.DataFrame.
 
-    Returns:
+    Returns
         np.array or pd.DataFrame: Crop GHG emissions <unit: t/cell>  of `lu`+`lm` in `yr_idx`.
 
     Crop GHG emissions include:
@@ -166,7 +165,7 @@ def get_ghg(data: Data, lu, lm, yr_idx, aggregate):
         yr_idx (int): Number of years from base year, counting from zero.
         aggregate (bool): True -> return GHG emission as np.array, False -> return GHG emission as pd.DataFrame.
 
-    Returns:
+    Returns
         np.array or pd.DataFrame: GHG emissions [tCO2e/cell] of `lu`+`lm` in `yr_idx`.
 
     Raises:
@@ -192,13 +191,13 @@ def get_ghg_matrix(data: Data, lm, yr_idx, aggregate):
     """
     Return g_rj matrix <unit: t/cell> per lu under `lm` in `yr_idx`.
 
-    Parameters:
+    Parameters
     - data: The data object containing the necessary information.
     - lm: The land use model.
     - yr_idx: The index of the year.
     - aggregate: A boolean indicating whether to aggregate the results or not.
 
-    Returns:
+    Returns
     - If `aggregate` is True, returns a numpy array of shape (NCELLS, len(data.AGRICULTURAL_LANDUSES)).
     - If `aggregate` is False, returns a pandas DataFrame with columns corresponding to each agricultural land use.
 
@@ -223,12 +222,12 @@ def get_ghg_matrices(data: Data, yr_idx, aggregate=True):
     """
     Return g_mrj matrix <unit: t/cell> as 3D Numpy array.
     
-    Parameters:
+    Parameters
         data (object): The data object containing the necessary information.
         yr_idx (int): The index of the year.
         aggregate (bool, optional): Whether to aggregate the results. Defaults to True.
     
-    Returns:
+    Returns
         numpy.ndarray or pandas.DataFrame: The GHG emissions matrix as a 3D Numpy array if aggregate is True,
         or as a pandas DataFrame if aggregate is False.
     """
@@ -250,11 +249,11 @@ def get_ghg_penalties_lvstck_natural_to_unall_natural(data: Data, lumap) -> np.n
     """
     Gets the one-off greenhouse gas penalties for transitioning livestock natural land to unallocated natural land.
     
-    Parameters:
+    Parameters
         data (object): The data object containing relevant information.
         lumap (1D array): The lumap object containing land use mapping.
 
-    Returns:
+    Returns
         np.ndarray, <unit : t/cell>.
     """
     
@@ -279,11 +278,11 @@ def get_ghg_penalties_unall_natural_to_lvstk_natural(data: Data, lumap) -> np.nd
     """
     Gets the one-off greenhouse gas penalties for transitioning unallocated natural land to livestock natural land.
     
-    Parameters:
+    Parameters
         data (object): The data object containing relevant information.
         lumap (1D array): The lumap object containing land use mapping.
 
-    Returns:
+    Returns
         np.ndarray, <unit : t/cell>.
     """
     
@@ -306,11 +305,11 @@ def get_ghg_penalties_lvstk_natural_to_modified(data: Data, lumap) -> np.ndarray
     """
     Gets the one-off greenhouse gas penalties for transitioning livestock natural land to modified land.
     
-    Parameters:
+    Parameters
         data (object): The data object containing relevant information.
         lumap (1D array): The lumap object containing land use mapping.
 
-    Returns:
+    Returns
         np.ndarray, <unit : t/cell>.
     """
     
@@ -334,11 +333,11 @@ def get_ghg_penalties_unall_natural_to_modified(data: Data, lumap) -> np.ndarray
     """
     Gets the one-off greenhouse gas penalties for transitioning unallocated natural land to modified land.
 
-    Parameters:
+    Parameters
         data (object): The data object containing relevant information.
         lumap (1D array): The lumap object containing land use mapping.
 
-    Returns:
+    Returns
         np.ndarray, <unit : t/cell>.
     """
     ncells, n_ag_lus = data.REAL_AREA.shape[0], len(data.AGRICULTURAL_LANDUSES)
@@ -364,11 +363,11 @@ def get_ghg_penalties_lvstk_natural_to_modified(data: Data, lumap) -> np.ndarray
     """
     Gets the one-off greenhouse gas penalties for transitioning livestock natural land to modified land.
 
-    Parameters:
+    Parameters
         data (object): The data object containing relevant information.
         lumap (1D array): The lumap object containing land use mapping.
 
-    Returns:
+    Returns
         penalties (np.ndarray) : <unit : t/cell>.
     """
     ncells, n_ag_lus = data.REAL_AREA.shape[0], len(data.AGRICULTURAL_LANDUSES)
@@ -392,12 +391,12 @@ def get_ghg_transition_penalties(data: Data, lumap, separate=False) -> np.ndarra
     """
     Get the one-off greenhouse gas penalties for transitioning between land uses.
 
-    Parameters:
+    Parameters
       data (object): The data object containing relevant information.
       lumap (np.ndarray): The lumap object containing land use mapping.
       separate (bool): Whether to return the penalties for each transition separately.
 
-    Returns:
+    Returns
       greenhouse-gas-transition-penalties (np.ndarray): The greenhouse gas transition penalties.
     """
    
@@ -428,11 +427,11 @@ def get_ghg_limits(data: Data, target):
     """
     Return greenhouse gas emissions limits in tonnes CO2e from year target.
 
-    Parameters:
+    Parameters
     - data: The data containing greenhouse gas emissions targets.
     - target: The target year for which the emissions limit is requested.
 
-    Returns:
+    Returns
     - The greenhouse gas emissions limit in tonnes CO2e for the specified target year.
     """
     return data.GHG_TARGETS[target]
@@ -445,11 +444,11 @@ def get_asparagopsis_effect_g_mrj(data, yr_idx):
     Applies the effects of using asparagopsis to the GHG data
     for all relevant agricultural land uses.
 
-    Parameters:
+    Parameters
     - data: The input data containing GHG and land use information.
     - yr_idx: The index of the year to calculate the effects for.
 
-    Returns:
+    Returns
     - new_g_mrj: The matrix <unit: t/cell> containing the updated GHG data with the effects of using asparagopsis.
 
     Note: This function relies on other helper functions such as lvs_veg_types and get_yield_pot to calculate
@@ -493,11 +492,11 @@ def get_precision_agriculture_effect_g_mrj(data: Data, yr_idx):
     Applies the effects of using precision agriculture to the GHG data
     for all relevant agr. land uses.
 
-    Parameters:
+    Parameters
     - data: The input data containing the necessary information.
     - yr_idx: The index of the year to calculate the effects for.
 
-    Returns:
+    Returns
     - new_g_mrj: The matrix <unit: t/cell> containing the updated GHG data after applying the effects of precision agriculture.
     """
 
@@ -548,11 +547,11 @@ def get_ecological_grazing_effect_g_mrj(data: Data, yr_idx):
     Applies the effects of using ecological grazing to the GHG data
     for all relevant agricultural land uses.
 
-    Parameters:
+    Parameters
     - data: The input data containing relevant information for calculations.
     - yr_idx: The index of the year for which the calculations are performed.
 
-    Returns:
+    Returns
     - new_g_mrj: The matrix <unit: t/cell> containing the updated GHG data after applying ecological grazing effects.
     """
 
@@ -604,11 +603,11 @@ def get_savanna_burning_effect_g_mrj(data):
     Applies the effects of using savanna burning to the GHG data
     for all relevant agr. land uses.
 
-    Parameters:
+    Parameters
     - data: The input data containing relevant information.
     - g_mrj: The savanna burning factor.
 
-    Returns:
+    Returns
     - sb_g_mrj: The GHG data <unit: t/cell> with the effects of savanna burning applied.
     """
     nlus = len(AG_MANAGEMENTS_TO_LAND_USES["Savanna Burning"])
@@ -631,11 +630,11 @@ def get_agtech_ei_effect_g_mrj(data, yr_idx):
     Applies the effects of using AgTech EI to the GHG data
     for all relevant agr. land uses.
 
-    Parameters:
+    Parameters
     - data: The input data containing the necessary information.
     - yr_idx: The index of the year to calculate the effects for.
 
-    Returns:
+    Returns
     - new_g_mrj: The matrix <unit: t/cell> containing the updated GHG data after applying the AgTech EI effects.
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']
@@ -703,11 +702,11 @@ def get_biochar_effect_g_mrj(data, yr_idx):
     Applies the effects of using Biochar to the GHG data
     for all relevant agr. land uses.
 
-    Parameters:
+    Parameters
     - data: The input data containing the necessary information.
     - yr_idx: The index of the year to calculate the effects for.
 
-    Returns:
+    Returns
     - new_g_mrj: The matrix <unit: t/cell> containing the updated GHG data after applying the Biochar effects.
     """
     land_uses = AG_MANAGEMENTS_TO_LAND_USES['Biochar']
@@ -801,7 +800,7 @@ def get_agricultural_management_ghg_matrices(data: Data, g_mrj, yr_idx) -> dict[
         g_mrj: The g_mrj parameter.
         yr_idx: The year index.
 
-    Returns:
+    Returns
         A dictionary containing the GHG matrices <unit: t/cell> for different agricultural management practices.
         The keys of the dictionary represent the management practices, and the values are numpy arrays.
 

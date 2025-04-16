@@ -38,7 +38,7 @@ def get_demand_df(egg_weight=EGGS_AVG_WEIGHT) -> pd.DataFrame:
     Args:
         egg_weight (int, optional): The weight of each egg in grams. Defaults to settings.EGGS_AVG_WEIGHT.
 
-    Returns:
+    Returns
         pd.DataFrame: The demand dataframe for off-land commodities.
     """
 

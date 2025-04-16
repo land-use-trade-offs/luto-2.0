@@ -39,7 +39,7 @@ def create_2d_map(data, map_:np.ndarray=None, filler:int=-1, nodata:int=-9999) -
         filler (int): The value used to indicate "Non-Agricultural Land".
         nodata (int): The value used to indicate "No Data".
 
-    Returns:
+    Returns
         np.ndarray: The created 2D map.
 
     """
@@ -65,11 +65,11 @@ def get_fullres2D_map(data, map_:np.ndarray)-> np.ndarray:
         `data`(Data): The data object containing the NLUM_MASK and LUMAP_NO_RESFACTOR arrays.
         `map_`(np.ndarray): The 1D np.ndarray to be filled into the `NLUM_MASK` array.
 
-    Returns:
+    Returns
         np.ndarray : The restored 2D full resolution land-use map.
     """
     LUMAP_FullRes_2D = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32) 
-    # Get the full resolution LUMAP_2D at the begining year, with -1 as Non-Agricultural Land, and -9999 as NoData
+    # Get the full resolution LUMAP_2D_RESFACTORED at the begining year, with -1 as Non-Agricultural Land, and -9999 as NoData
     np.place(LUMAP_FullRes_2D, data.NLUM_MASK, data.LUMAP_NO_RESFACTOR) 
     # Fill the LUMAP_FullRes_2D with map_ sequencialy by the row-col order of 1s in (LUMAP_FullRes_2D >=0) 
     np.place(LUMAP_FullRes_2D, LUMAP_FullRes_2D >=0, map_)
@@ -85,7 +85,7 @@ def get_coarse2D_map(data, map_:np.ndarray)-> np.ndarray:
         `data` (Data): The input data used to create the map.
         `map_` (np.ndarray): The initial 1D map used to create a 2D map.
         
-    Returns:
+    Returns
         np.ndarray: The generated coarse 2D map.
 
     """
@@ -104,13 +104,13 @@ def place_nodata(data, map_:np.ndarray) -> np.ndarray:
         data (Data): The input data used to create the map.
         map_ (np.ndarray, 2D): The map to be modified.
 
-    Returns:
+    Returns
         np.ndarray: The map with NoData values placed based on the NLUM_MASK.
 
     """
     
     # Apply the masks
-    filler_mask = (data.LUMAP_2D != data.MASK_LU_CODE)
+    filler_mask = (data.LUMAP_2D_RESFACTORED != data.MASK_LU_CODE)
     map_ = np.where(filler_mask, map_, data.MASK_LU_CODE)
     map_ = np.where(data.NLUM_MASK, map_, data.NODATA)
     
@@ -121,12 +121,12 @@ def upsample_array(data, map_:np.ndarray, factor:int) -> np.ndarray:
     """
     Upsamples the given array based on the provided map and factor.
 
-    Parameters:
+    Parameters
     data (object): The input data to derive the original dense_2D shape from NLUM mask.
     map_ (2D, np.ndarray): The map used for upsampling.
     factor (int): The upsampling factor.
 
-    Returns:
+    Returns
     np.ndarray: The upsampled array.
     """
     dense_2D_shape = data.NLUM_MASK.shape
@@ -163,11 +163,11 @@ def replace_with_nearest(map_: np.ndarray, filler: int) -> np.ndarray:
     """
     Replaces filler values in the input array with the nearest non-filler values.
 
-    Parameters:
+    Parameters
         map_ (np.ndarray, 2D): The input array.
         filler (int): The value to be considered as invalid.
 
-    Returns:
+    Returns
         np.ndarray (2D): The array with invalid values replaced by the nearest non-invalid values.
     """
     # Create a mask for invalid values
@@ -186,12 +186,12 @@ def write_gtiff(map_:np.ndarray, fname:str, data):
     """
     Write a GeoTiff file with the given map data.
 
-    Parameters:
+    Parameters
     map_ (np.ndarray, 2D): The map data to be written as a GeoTiff.
     fname (str): The file name (including path) of the output GeoTiff file.
     data (Data): The data object containing the GeoTiff metadata. Default is Data.
 
-    Returns:
+    Returns
     None
     """
     

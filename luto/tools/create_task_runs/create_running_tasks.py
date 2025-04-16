@@ -30,9 +30,9 @@ grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['40GB'],
-    'NCPUS':[10],
-    'TIME': ['8:00:00'],
+    'MEM': ['100GB'],
+    'NCPUS':[25],
+    'TIME': ['16:00:00'],
     'QUEUE': ['normalsr'],
     
  
@@ -41,8 +41,8 @@ grid_search = {
     ###############################################################
     'OBJECTIVE': ['maxprofit'],             # 'maxprofit' or 'maxutility'
     'MODE': ['timeseries'],                 # 'snapshot' or 'timeseries'
-    'RESFACTOR': [7],
-    'STEP_SIZE': [5],
+    'RESFACTOR': [15,10,7,5,3],
+    'STEP_SIZE': [10,5,3,1],
     'WRITE_THREADS': [10],
     'WRITE_OUTPUT_GEOTIFFS': [False],
     'KEEP_OUTPUTS': [False],                 # If false, only keep report HTML
@@ -69,7 +69,7 @@ grid_search = {
     'INCLUDE_WATER_LICENSE_COSTS': [0],
     
     # --------------- Biodiversity priority zone ---------------
-    'GBF2_PRIORITY_CRITICAL_AREA_PERCENTAGE': [20],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSTIY_TARGET_GBF_2': ['on'],    # 'on' or 'off'
@@ -91,8 +91,8 @@ grid_search = {
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
-    'SOLVE_BIODIV_PRIORITY_WEIGHT': [1, 10, 100, 500, 1000, 5000, 10000],
-    'SOLVE_ECONOMY_WEIGHT': [0.001, 0.01, 0.05, 0.1, 0.2, 0.5, 0.7, 0.9, 0.95],
+    'SOLVE_BIODIV_PRIORITY_WEIGHT': [10000],
+    'SOLVE_ECONOMY_WEIGHT': [0.05],
     
     #-------------------- Diet BAU --------------------
     'DIET_DOM': ['BAU',],            # 'BAU' or 'FLX'

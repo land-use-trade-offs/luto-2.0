@@ -28,14 +28,12 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 from itertools import product
-
-from luto.data import Data
 from luto.tools.Manual_jupyter_books.helpers.parameters import NOTEBOOK_META_DICT
 from luto.tools.spatializers import get_coarse2D_map
 
 
 
-def full_res_1d_raw_to_2d(data:Data, arr:np.ndarray) -> np.ndarray:
+def full_res_1d_raw_to_2d(data, arr:np.ndarray) -> np.ndarray:
     '''
     This function converts a 1D numpy array to an 2D array with the same shape as `NLUM_MASK`.
     
@@ -57,7 +55,7 @@ def full_res_1d_raw_to_2d(data:Data, arr:np.ndarray) -> np.ndarray:
 
 
 
-def arr_to_xr(data:Data, arr:np.ndarray) -> xr.DataArray:
+def arr_to_xr(data, arr:np.ndarray) -> xr.DataArray:
     '''
     This function converts a 1D numpy array to an 2D xarray DataArray with `transform` and `lon/lat`.
     
@@ -99,7 +97,7 @@ def arr_to_xr(data:Data, arr:np.ndarray) -> xr.DataArray:
     
 
 
-def mrj_to_xr(data:Data, in_mrj:np.ndarray) -> xr.DataArray:
+def mrj_to_xr(data, in_mrj:np.ndarray) -> xr.DataArray:
     '''
     This function converts a `mrj` array to an xarray DataArray and give each dimension a valida name.
         - The `m` dimension will have names from ['dry', 'irr']; 

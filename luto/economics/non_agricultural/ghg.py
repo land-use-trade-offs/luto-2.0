@@ -47,7 +47,7 @@ def get_ghg_env_plantings(data: Data, aggregate) -> np.ndarray|pd.DataFrame:
     elif aggregate==False:
         return pd.DataFrame(-data.EP_BLOCK_AVG_T_CO2_HA * data.REAL_AREA, columns=['ENV_PLANTINGS'])
     else:
-    # If the aggregate arguments is not in [True,False]. That must be someting wrong
+        # If the aggregate arguments is not in [True,False]. That must be someting wrong
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
 
@@ -354,11 +354,11 @@ def get_ghg_matrix(data: Data, ag_g_mrj, lumap, aggregate=True) -> np.ndarray:
     """
     Get the g_rk matrix containing non-agricultural greenhouse gas emissions.
 
-    Parameters:
+    Parameters
     - data: The input data for calculating greenhouse gas emissions.
     - aggregate: A boolean flag indicating whether to aggregate the matrices or not. Default is True.
 
-    Returns:
+    Returns
     - If aggregate is True, returns a numpy ndarray representing the aggregated g_rk matrix.
     - If aggregate is False, returns a pandas DataFrame representing the g_rk matrix.
 

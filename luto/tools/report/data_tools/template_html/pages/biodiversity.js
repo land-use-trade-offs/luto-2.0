@@ -30,6 +30,196 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 
+
+    // biodiversity_priority_1_total_score_by_type
+    Highcharts.chart("biodiversity_priority_1_total_score_by_type", {
+        chart: {
+            type: "column",
+            marginRight: 380,
+        },
+        title: {
+            text: "Biodiversity Priority Score by Broad Land-use Type",
+        },
+        series: JSON.parse(
+            document.getElementById(
+                "biodiversity_priority_1_total_score_by_type_csv"
+            ).innerHTML
+        ),
+        xAxis: {
+            tickPositions: year_ticks,
+        },
+        yAxis: {
+            title: {
+                text: "Contribution weighted area (ha)",
+            },
+        },
+        plotOptions: {
+            column: {
+                stacking: "normal",
+            },
+
+        },
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                    }:</b>${this.y.toFixed(2)}<br/>`;
+            },
+        },
+        legend: {
+            align: "right",
+            verticalalign: "left",
+            layout: "vertical",
+            x: -150,
+            verticalAlign: "middle",
+        },
+        credits: {
+            enabled: false,
+        },
+    });
+
+    // biodiversity_priority_2_total_score_by_landuse
+    Highcharts.chart("biodiversity_priority_2_total_score_by_landuse", {
+        chart: {
+            type: "column",
+            marginRight: 380,
+        },
+        title: {
+            text: "Biodiversity Priority Score by Agricultural Land-use",
+        },
+        series: JSON.parse(
+            document.getElementById(
+                "biodiversity_priority_2_total_score_by_landuse_csv"
+            ).innerHTML
+        ),
+        xAxis: {
+            tickPositions: year_ticks,
+        },
+        yAxis: {
+            title: {
+                text: "Contribution weighted area (ha)",
+            },
+        },
+        plotOptions: {
+            column: {
+                stacking: "normal",
+            },
+        },
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                    }:</b>${this.y.toFixed(2)}<br/>`;
+            },
+        },
+        legend: {
+            itemStyle: {
+              fontSize: "11px",
+            },
+            align: "right",
+            layout: "vertical",
+            x: -30,
+            y: -10,
+            verticalAlign: "middle",
+            itemMarginTop: 0,
+            itemMarginBottom: 1,
+          },
+        credits: {
+            enabled: false,
+        },
+    });
+
+    // biodiversity_priority_3_total_score_by_agri_management
+    Highcharts.chart("biodiversity_priority_3_total_score_by_agri_management", {
+        chart: {
+            type: "column",
+            marginRight: 380,
+        },
+        title: {
+            text: "Biodiversity Priority Score by Agricultural Management",
+        },
+        series: JSON.parse(
+            document.getElementById(
+                "biodiversity_priority_3_total_score_by_agri_management_csv"
+            ).innerHTML
+        ),
+        xAxis: {
+            tickPositions: year_ticks,
+        },
+        yAxis: {
+            title: {
+                text: "Contribution weighted area (ha)",
+            },
+        },
+        plotOptions: {
+            column: {
+                stacking: "normal",
+            },
+        },
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                    }:</b>${this.y.toFixed(2)}<br/>`;
+            },
+        },
+        legend: {
+            align: "right",
+            verticalalign: "left",
+            layout: "vertical",
+            x: -150,
+            verticalAlign: "middle",
+        },
+        credits: {
+            enabled: false,
+        },
+    });
+
+
+    // biodiversity_priority_4_total_score_by_non_agri_landuse
+    Highcharts.chart("biodiversity_priority_4_total_score_by_non_agri_landuse", {
+        chart: {
+            type: "column",
+            marginRight: 380,
+        },
+        title: {
+            text: "Biodiversity Priority Score by Non-Agricultural Land-use",
+        },
+        series: JSON.parse(
+            document.getElementById(
+                "biodiversity_priority_4_total_score_by_non_agri_landuse_csv"
+            ).innerHTML
+        ),
+        xAxis: {
+            tickPositions: year_ticks,
+        },
+        yAxis: {
+            title: {
+                text: "Contribution weighted area (ha)",
+            },
+        },
+        plotOptions: {
+            column: {
+                stacking: "normal",
+            },
+        },
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                    }:</b>${this.y.toFixed(2)}<br/>`;
+            },
+        },
+        legend: {
+            align: "right",
+            verticalalign: "left",
+            layout: "vertical",
+            x: 0,
+            verticalAlign: "middle",
+        },
+        credits: {
+            enabled: false,
+        },
+    });
+
+
+
     // biodiversity_GBF2_1_total_score_by_type
     Highcharts.chart("biodiversity_GBF2_1_total_score_by_type", {
         chart: {
@@ -459,20 +649,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 
-
-
-    // biodiversity_GBF4_1_contribution_group_score_total
-    Highcharts.chart("biodiversity_GBF4_1_contribution_group_score_total", {
+    // biodiversity_GBF8_1_contribution_group_score_total
+    Highcharts.chart("biodiversity_GBF8_1_contribution_group_score_total", {
         chart: {
             type: "column",
             marginRight: 380,
         },
         title: {
-            text: "Total Biodiversity Suitability Score (GBF4A) by Group",
+            text: "Total Biodiversity Suitability Score (GBF8) by Group",
         },
         series: JSON.parse(
             document.getElementById(
-                "biodiversity_GBF4_1_contribution_group_score_total_csv"
+                "biodiversity_GBF8_1_contribution_group_score_total_csv"
             ).innerHTML
         ).concat({
             name: ' ',
@@ -513,9 +701,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 
-    // Chart:biodiversity_GBF4_2_contribution_group_score_by_type
-    const chartContainer = document.getElementById('biodiversity_GBF4_2_contribution_group_score_by_type');
-    chartData = JSON.parse(document.getElementById("biodiversity_GBF4_2_contribution_group_score_by_type_csv").innerHTML);
+    // Chart:biodiversity_GBF8_2_contribution_group_score_by_type
+    const chartContainer = document.getElementById('biodiversity_GBF8_2_contribution_group_score_by_type');
+    chartData = JSON.parse(document.getElementById("biodiversity_GBF8_2_contribution_group_score_by_type_csv").innerHTML);
 
     // Create blocks and render Highcharts in each block
     chartData.forEach((chart, index) => {
@@ -558,9 +746,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     });
 
-    // biodiversity_GBF4_3_contribution_group_score_by_landuse
-    const chartContainer2 = document.getElementById('biodiversity_GBF4_3_contribution_group_score_by_landuse');
-    const chartData2 = JSON.parse(document.getElementById("biodiversity_GBF4_3_contribution_group_score_by_landuse_csv").innerHTML);
+    // biodiversity_GBF8_3_contribution_group_score_by_landuse
+    const chartContainer2 = document.getElementById('biodiversity_GBF8_3_contribution_group_score_by_landuse');
+    const chartData2 = JSON.parse(document.getElementById("biodiversity_GBF8_3_contribution_group_score_by_landuse_csv").innerHTML);
 
     // Create blocks and render Highcharts in each block
     chartData2.forEach((chart, index) => {
@@ -606,9 +794,9 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
 
-    // biodiversity_GBF4_4_contribution_group_score_by_agri_management
-    const chartContainer9 = document.getElementById('biodiversity_GBF4_4_contribution_group_score_by_agri_management');
-    const chartData9 = JSON.parse(document.getElementById("biodiversity_GBF4_4_contribution_group_score_by_agri_management_csv").innerHTML);
+    // biodiversity_GBF8_4_contribution_group_score_by_agri_management
+    const chartContainer9 = document.getElementById('biodiversity_GBF8_4_contribution_group_score_by_agri_management');
+    const chartData9 = JSON.parse(document.getElementById("biodiversity_GBF8_4_contribution_group_score_by_agri_management_csv").innerHTML);
 
     // Create blocks and render Highcharts in each block
     chartData9.forEach((chart, index) => {
@@ -650,9 +838,9 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
-    // biodiversity_GBF4_5_contribution_group_score_by_non_agri_landuse
-    const chartContainer10 = document.getElementById('biodiversity_GBF4_5_contribution_group_score_by_non_agri_landuse');
-    const chartData10 = JSON.parse(document.getElementById("biodiversity_GBF4_5_contribution_group_score_by_non_agri_landuse_csv").innerHTML);
+    // biodiversity_GBF8_5_contribution_group_score_by_non_agri_landuse
+    const chartContainer10 = document.getElementById('biodiversity_GBF8_5_contribution_group_score_by_non_agri_landuse');
+    const chartData10 = JSON.parse(document.getElementById("biodiversity_GBF8_5_contribution_group_score_by_non_agri_landuse_csv").innerHTML);
 
     // Create blocks and render Highcharts in each block
     chartData10.forEach((chart, index) => {
@@ -696,18 +884,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 
-    // biodiversity_GBF4_6_contribution_species_score_total
-    Highcharts.chart("biodiversity_GBF4_6_contribution_species_score_total", {
+    // biodiversity_GBF8_6_contribution_species_score_total
+    Highcharts.chart("biodiversity_GBF8_6_contribution_species_score_total", {
         chart: {
             type: "column",
             marginRight: 380,
         },
         title: {
-            text: "Total Biodiversity Suitability Score (GBF4A-species)",
+            text: "Total Biodiversity Suitability Score (GBF8-species)",
         },
         series: JSON.parse(
             document.getElementById(
-                "biodiversity_GBF4_6_contribution_species_score_total_csv"
+                "biodiversity_GBF8_6_contribution_species_score_total_csv"
             ).innerHTML
         ).concat({
             name: ' ',
@@ -746,9 +934,9 @@ document.addEventListener("DOMContentLoaded", function () {
         },
     });
 
-    // biodiversity_GBF4_7_contribution_species_score_by_type
-    const chartContainer3 = document.getElementById('biodiversity_GBF4_7_contribution_species_score_by_type');
-    const chartData3 = JSON.parse(document.getElementById("biodiversity_GBF4_7_contribution_species_score_by_type_csv").innerHTML);
+    // biodiversity_GBF8_7_contribution_species_score_by_type
+    const chartContainer3 = document.getElementById('biodiversity_GBF8_7_contribution_species_score_by_type');
+    const chartData3 = JSON.parse(document.getElementById("biodiversity_GBF8_7_contribution_species_score_by_type_csv").innerHTML);
 
     // Create blocks and render Highcharts in each block
     chartData3.forEach((chart, index) => {
@@ -791,9 +979,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     });
 
-    // biodiversity_GBF4_8_contribution_species_score_by_landuse
-    const chartContainer4 = document.getElementById('biodiversity_GBF4_8_contribution_species_score_by_landuse');
-    const chartData4 = JSON.parse(document.getElementById("biodiversity_GBF4_8_contribution_species_score_by_landuse_csv").innerHTML);
+    // biodiversity_GBF8_8_contribution_species_score_by_landuse
+    const chartContainer4 = document.getElementById('biodiversity_GBF8_8_contribution_species_score_by_landuse');
+    const chartData4 = JSON.parse(document.getElementById("biodiversity_GBF8_8_contribution_species_score_by_landuse_csv").innerHTML);
 
     // Create blocks and render Highcharts in each block
     chartData4.forEach((chart, index) => {
@@ -840,9 +1028,9 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
 
-    // biodiversity_GBF4_9_contribution_species_score_by_agri_management
-    const chartContainer11 = document.getElementById('biodiversity_GBF4_9_contribution_species_score_by_agri_management');
-    const chartData11 = JSON.parse(document.getElementById("biodiversity_GBF4_9_contribution_species_score_by_agri_management_csv").innerHTML);
+    // biodiversity_GBF8_9_contribution_species_score_by_agri_management
+    const chartContainer11 = document.getElementById('biodiversity_GBF8_9_contribution_species_score_by_agri_management');
+    const chartData11 = JSON.parse(document.getElementById("biodiversity_GBF8_9_contribution_species_score_by_agri_management_csv").innerHTML);
 
     // Create blocks and render Highcharts in each block
     chartData11.forEach((chart, index) => {
@@ -884,9 +1072,9 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
-    // biodiversity_GBF4_10_contribution_species_score_by_non_agri_landuse
-    const chartContainer12 = document.getElementById('biodiversity_GBF4_10_contribution_species_score_by_non_agri_landuse');
-    const chartData12 = JSON.parse(document.getElementById("biodiversity_GBF4_10_contribution_species_score_by_non_agri_landuse_csv").innerHTML);
+    // biodiversity_GBF8_10_contribution_species_score_by_non_agri_landuse
+    const chartContainer12 = document.getElementById('biodiversity_GBF8_10_contribution_species_score_by_non_agri_landuse');
+    const chartData12 = JSON.parse(document.getElementById("biodiversity_GBF8_10_contribution_species_score_by_non_agri_landuse_csv").innerHTML);
 
     // Create blocks and render Highcharts in each block
     chartData12.forEach((chart, index) => {

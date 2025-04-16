@@ -27,8 +27,7 @@ import numpy as np
 import pandas as pd
 
 from typing import Dict
-from luto.settings import AG_MANAGEMENTS, HIR_PRODUCTIVITY_PENALTY
-from luto.ag_managements import AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import AG_MANAGEMENTS, HIR_PRODUCTIVITY_PENALTY, AG_MANAGEMENTS_TO_LAND_USES
 from luto.data import Data
 from luto import settings
 from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types
@@ -404,7 +403,7 @@ def get_agricultural_management_revenue_matrices(data: Data, r_mrj, yr_idx) -> D
         r_mrj: The value of r_mrj parameter.
         yr_idx: The index of the year.
 
-    Returns:
+    Returns
         A dictionary containing revenue matrices for different agricultural management practices.
         The keys of the dictionary represent the management practices, and the values are numpy arrays.
 

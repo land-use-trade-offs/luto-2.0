@@ -4,14 +4,14 @@ document.addEventListener("DOMContentLoaded", function () {
     const container = document.getElementById('settingsTable');
     const data = document.getElementById('settingsTxt').innerText;
 
-    console.log(data);
 
     data.split('\n').forEach(line => {
         let label, value;
 
         if (line.includes(':')) {
             // Split the line into label and value if a colon is present
-            [label, value] = line.split(':').map(s => String(s).trim());
+            [label, ...value] = line.split(':');
+            value = value.join(':'); // Join the value array into a string and split it into an array
         } else {
             // Use the entire line as the label if no colon is present
             label = String(line).trim();
@@ -28,6 +28,12 @@ document.addEventListener("DOMContentLoaded", function () {
         const valueSpan = document.createElement('span');
         valueSpan.classList.add('value');
         valueSpan.textContent = value;
+
+        if (value.length >= 40) {
+            valueSpan.style.fontSize = '12px';
+        } else if (value.length >= 20) {
+            valueSpan.style.fontSize = '14px';
+        }
 
         rowDiv.appendChild(labelSpan);
         rowDiv.appendChild(valueSpan);

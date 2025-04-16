@@ -256,10 +256,10 @@ def get_rev_matrix(data: Data, yr_cal: int, ag_r_mrj, lumap) -> np.ndarray:
     """
     Gets the matrix containing the revenue produced by each non-agricultural land use for each cell.
 
-    Parameters:
+    Parameters
         data (Data): The data object containing the necessary information.
 
-    Returns:
+    Returns
         np.ndarray.
     """
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)

@@ -25,48 +25,55 @@ functions as a singleton class. It is intended to be the _only_ part of the
 model that has 'global' varying state.
 """
 
-import gzip
+
 import os
+import gzip
 import time
 import dill
 import threading
 import time
 
-from datetime import datetime
-from joblib import Parallel, delayed
-
-import luto.settings as settings
-
+from glob import glob
 from luto.data import Data
-from luto import tools
 from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
 from luto.tools.create_task_runs.helpers import log_memory_usage
-from luto.tools.report.data_tools import get_all_files
 from luto.tools.write import write_outputs
+from luto.economics.agricultural.biodiversity import get_GBF3_major_vegetation_matrices_vr
 
-from luto.tools import calc_major_vegetation_group_ag_area_for_year, calc_species_ag_area_for_year
-from luto.economics.agricultural.biodiversity import get_major_vegetation_matrices
+import luto.settings as settings
 import luto.economics.agricultural.ghg as ag_ghg
 import luto.economics.agricultural.biodiversity as ag_biodiversity
 
+from luto.tools import (
+    calc_major_vegetation_group_ag_area_for_year, 
+    calc_species_ag_area_for_year, 
+    LogToFile,
+    write_timestamp,
+    read_timestamp
+)
 
-# Get date and time
-timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
 
-
-@tools.LogToFile(f"{settings.OUTPUT_DIR}/run_{timestamp}")
+@LogToFile(f"{settings.OUTPUT_DIR}/run_{read_timestamp()}")
 def load_data() -> Data:
     """
     Load the Data object containing all required data to run a LUTO simulation.
     """
-    memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
+    # Thread to log memory usage
+    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'w',1), daemon=True)
     memory_thread.start()
     
-    return Data(timestamp=timestamp)
+    # Remove previous log files
+    for f in glob(f'{settings.OUTPUT_DIR}/*.log') + glob(f'{settings.OUTPUT_DIR}/*.txt'):
+        try:
+            os.remove(f)
+        except:
+            print(f"Error removing file {f}")
+
+    return Data()
 
 
-@tools.LogToFile(f"{settings.OUTPUT_DIR}/run_{timestamp}", 'a')
+@LogToFile(f"{settings.OUTPUT_DIR}/run_{read_timestamp()}", 'a')
 def run(
     data: Data, 
     base_year: int | None = None, 
@@ -78,7 +85,7 @@ def run(
     """
     Run the simulation.
 
-    Parameters:
+    Parameters
         - data: is a Data object which is previously loaded using load_data(),
         - base_year: optional argument base year for the simulation,
         - target_year: optional target year for the simulation,
@@ -98,7 +105,7 @@ def run(
     if base_year != data.YR_CAL_BASE:
         populate_containers_dynamic_base_year(data, base_year)
 
-    memory_thread = threading.Thread(target=log_memory_usage, daemon=True)
+    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1), daemon=True)
     memory_thread.start()
     
     # Set Data object's path and create output directories
@@ -197,16 +204,16 @@ def populate_containers_dynamic_base_year(
             ag_ghg.get_ghg_matrices(data, 0, aggregate=True) 
             * data.ag_dvars[data.YR_CAL_BASE]
         ).sum()
-        biodiversity_data = (ag_biodiversity.get_breq_matrices(data) * data.ag_dvars[data.YR_CAL_BASE]).sum()
+        biodiversity_data = (ag_biodiversity.get_bio_overall_priority_score_matrices_mrj(data) * data.ag_dvars[data.YR_CAL_BASE]).sum()
         major_vegetation_data = calc_major_vegetation_group_ag_area_for_year(
-            get_major_vegetation_matrices(data), 
+            get_GBF3_major_vegetation_matrices_vr(data), 
             data.lumaps[data.YR_CAL_BASE],
-            data.BIODIV_HABITAT_DEGRADE_LOOK_UP,
+            data.BIO_HABITAT_CONTRIBUTION_LOOK_UP,
         )
         species_conservation_data = calc_species_ag_area_for_year(
-            ag_biodiversity.get_species_conservation_matrix(data, data.YR_CAL_BASE),
+            ag_biodiversity.get_GBF8_species_conservation_matrix_sr(data, data.YR_CAL_BASE),
             data.lumaps[year_before_base_year],
-            data.BIODIV_HABITAT_DEGRADE_LOOK_UP,
+            data.BIO_HABITAT_CONTRIBUTION_LOOK_UP,
         )
         
     else:
@@ -228,9 +235,9 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
 
     final_year = years_to_run[-1]
 
-    for s in range(len(years_to_run) - 1):
-        base_year = years_to_run[s]
-        target_year = years_to_run[s + 1]
+    for step in range(len(years_to_run) - 1):
+        base_year = years_to_run[step]
+        target_year = years_to_run[step + 1]
 
         print( "-------------------------------------------------")
         print( f"Running for year {target_year}"   )
@@ -238,14 +245,14 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
         start_time = time.time()
 
         input_data = get_input_data(data, base_year, target_year)
-        d_c = data.D_CY[s + 1]
+        d_c = data.D_CY[target_year - data.YR_CAL_BASE]
 
-        if s == 0:
+        if step == 0:
             luto_solver = LutoSolver(input_data, d_c, final_year)
             luto_solver.formulate()
 
-        if s > 0:
-            prev_base_year = years_to_run[s - 1]
+        if step > 0:
+            prev_base_year = years_to_run[step - 1]
 
             old_ag_x_mrj = luto_solver._input_data.ag_x_mrj.copy()
             old_ag_man_lb_mrj = luto_solver._input_data.ag_man_lb_mrj.copy()
@@ -267,18 +274,16 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
 
         solution = luto_solver.solve()
 
-        yr = target_year
-        data.add_lumap(yr, solution.lumap)
-        data.add_lmmap(yr, solution.lmmap)
-        data.add_ammaps(yr, solution.ammaps)
-        data.add_ag_dvars(yr, solution.ag_X_mrj)
-        data.add_non_ag_dvars(yr, solution.non_ag_X_rk)
-        data.add_ag_man_dvars(yr, solution.ag_man_X_mrj)
-        data.add_obj_vals(yr, solution.obj_val)
-
+        data.add_lumap(target_year, solution.lumap)
+        data.add_lmmap(target_year, solution.lmmap)
+        data.add_ammaps(target_year, solution.ammaps)
+        data.add_ag_dvars(target_year, solution.ag_X_mrj)
+        data.add_non_ag_dvars(target_year, solution.non_ag_X_rk)
+        data.add_ag_man_dvars(target_year, solution.ag_man_X_mrj)
+        data.add_obj_vals(target_year, solution.obj_val)
 
         for data_type, prod_data in solution.prod_data.items():
-            data.add_production_data(yr, data_type, prod_data)
+            data.add_production_data(target_year, data_type, prod_data)
 
         print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' )
 
@@ -336,7 +341,7 @@ def load_data_from_disk(path: str) -> Data:
     Raises:
         ValueError: if the resolution factor from the data object does not match the settings.RESFACTOR.
 
-    Returns:
+    Returns
         Data: `Data` object.
     """
     # Load the data object with gzip compression
@@ -347,8 +352,7 @@ def load_data_from_disk(path: str) -> Data:
     if int(data.RESMULT ** 0.5) != settings.RESFACTOR:
         raise ValueError(f'Resolution factor from data loading ({int(data.RESMULT ** 0.5)}) does not match it of settings ({settings.RESFACTOR})!')
 
-    # Update the timestamp
-    data.timestamp_sim = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
+    data.timestamp = write_timestamp()
     
     return data
   
