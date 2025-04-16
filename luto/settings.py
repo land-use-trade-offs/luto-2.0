@@ -324,7 +324,10 @@ AG_MANAGEMENTS_TO_LAND_USES = {
         'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
         # Horticulture:
         'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit',
-    ]
+    ],
+
+    'Beef - HIR': ['Beef - natural land'],
+    'Sheep - HIR': ['Sheep - natural land'],
 }
 
 
