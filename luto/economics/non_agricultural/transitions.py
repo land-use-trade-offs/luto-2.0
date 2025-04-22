@@ -388,7 +388,7 @@ def get_from_ag_transition_matrix(
         If separate is True, returns a dictionary containing the transition costs for each non-agricultural land use.
     """
     
-    ag_t_costs = ag_transitions.get_transition_matrices(data, yr_idx, base_year, separate)
+    ag_t_costs = ag_transitions.get_transition_matrices_from_base_year(data, yr_idx, base_year, separate)
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
     w_license_cost_r, w_rm_irrig_cost_r = tools.get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)
@@ -434,6 +434,7 @@ def get_from_ag_transition_matrix(
             sheep_carbon_plantings_belt_transitions_from_ag,
             beef_carbon_plantings_belt_transitions_from_ag,
             beccs_transitions_from_ag,
+            destocked_from_ag,
         ]).T.astype(np.float32)
 
 

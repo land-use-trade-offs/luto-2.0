@@ -177,7 +177,7 @@ def get_beef_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
     Returns:
     - b_mrj_effect: A numpy array representing the biodiversity impacts of using Biochar.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
@@ -201,7 +201,7 @@ def get_sheep_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
     Returns:
     - b_mrj_effect: A numpy array representing the biodiversity impacts of using Biochar.
     """
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
     lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
     b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
@@ -359,7 +359,7 @@ def get_species_conservation_limits(
     return species_limits, species_names, species_inds
 
 
-def get_snes_matrix(data: Data) -> np.ndarray:
+def get_GBF4_SNES_matrix_sr(data: Data) -> np.ndarray:
     """
     Gets the SNES contributions  matrix.
     
@@ -506,6 +506,14 @@ def get_ag_management_biodiversity_contribution(
         'Biochar': {
             j_idx: (data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact'] - 1) * np.ones(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Biochar'])
+        },
+        'Beef - HIR': {
+            j_idx: np.ones(data.NCELLS).astype(np.float32) * (1 - settings.HIR_BIODIVERSITY_PENALTY)
+            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR'])
+        },
+        'Sheep - HIR': {
+            j_idx: np.ones(data.NCELLS).astype(np.float32) * (1 - settings.HIR_BIODIVERSITY_PENALTY)
+            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR'])
         },
     }
 

@@ -20,6 +20,7 @@
 
 import os
 import xarray as xr
+import h5py
 import numpy as np
 import pandas as pd
 import rasterio
@@ -862,8 +863,8 @@ class Data:
         wyield_fname_sr = os.path.join(settings.INPUT_DIR, 'water_yield_ssp' + str(settings.SSP) + '_2010-2100_sr_ml_ha.h5')
         
         # Read water yield data
-        self.WATER_YIELD_DR_FILE = pd.read_hdf(wyield_fname_dr, where=self.MASK).T.values
-        self.WATER_YIELD_SR_FILE = pd.read_hdf(wyield_fname_sr, where=self.MASK).T.values
+        self.WATER_YIELD_DR_FILE = h5py.File(wyield_fname_dr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_DR_ML_HA_mean'][:, self.MASK]
+        self.WATER_YIELD_SR_FILE = h5py.File(wyield_fname_sr, 'r')[f'Water_yield_GCM-Ensemble_ssp{settings.SSP}_2010-2100_SR_ML_HA_mean'][:, self.MASK]
         
 
         # Water yield from outside LUTO study area.
@@ -1159,9 +1160,8 @@ class Data:
       
 
         # Read in vegetation layer data
-        NVIS_layers = xr.load_dataarray(settings.INPUT_DIR + f"/NVIS_{settings.NVIS_TARGET_CLASS.split('_')[0]}.nc") 
-        NVIS_layers = np.array([self.get_exact_resfactored_average_arr(arr) for arr in NVIS_layers], dtype=np.float32) / 100.0  # divide by 100 to get the percentage of the area in each cell that is covered by the vegetation type
-        
+        NVIS_layers = xr.load_dataarray(settings.INPUT_DIR + f"/NVIS_{settings.NVIS_TARGET_CLASS.split('_')[0]}.nc").values / 100  # divide by 100 to convert percentage to proportion
+        NVIS_layers = NVIS_layers[self.MASK]
         # Apply Savanna Burning penalties
         self.NVIS_LAYERS_LDS = np.where(
             self.SAVBURN_ELIGIBLE,
@@ -1300,7 +1300,7 @@ class Data:
         ###############################################################
         print("\tLoading HIR data...", flush=True)
 
-        self.HIR_MASK = np.load(os.path.join(INPUT_DIR, "hir_mask.npy"))[self.MASK]
+        self.HIR_MASK = np.load(os.path.join(settings.INPUT_DIR, "hir_mask.npy"))[self.MASK]
 
 
         ###############################################################
@@ -1862,6 +1862,9 @@ class Data:
         j2p = {j: [p for p in range(self.NPRS) if self.LU2PR[p, j]]
                         for j in range(self.N_AG_LUS)}
         for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items():
+            if not settings.AG_MANAGEMENTS[am]:
+                continue
+
             am_j_list = [self.DESC2AGLU[lu] for lu in am_lus]
             current_ag_man_X_mrp = np.zeros(ag_q_mrp.shape, dtype=np.float32)
             for j in am_j_list:

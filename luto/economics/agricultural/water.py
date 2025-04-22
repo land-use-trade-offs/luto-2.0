@@ -27,7 +27,6 @@ import numpy as np
 from typing import Optional
 
 import luto.settings as settings
-from luto.data import Data
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
 
 
@@ -337,7 +336,7 @@ def get_biochar_effect_w_mrj(data, yr_idx):
     return w_mrj_effect
 
 
-def get_beef_hir_effect_w_mrj(data: Data, yr_idx):
+def get_beef_hir_effect_w_mrj(data, yr_idx):
     """
     Applies the effects of using HIR to the water net yield data
     for the natural beef land use.
@@ -374,7 +373,7 @@ def get_beef_hir_effect_w_mrj(data: Data, yr_idx):
     return w_mrj_effects
 
 
-def get_sheep_hir_effect_w_mrj(data: Data, yr_idx):
+def get_sheep_hir_effect_w_mrj(data, yr_idx):
     """
     Applies the effects of using HIR to the water net yield data
     for the natural sheep land use.

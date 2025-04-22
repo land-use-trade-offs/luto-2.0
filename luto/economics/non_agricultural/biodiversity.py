@@ -262,7 +262,7 @@ def get_non_ag_lu_biodiv_contribution(data: Data) -> dict[int, float]:
             + (1 - CP_BELT_PROPORTION) * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_beef_code(data)])
         ),
         # BECCS
-        7: BECCS_BIODIVERSITY_BENEFIT,
+        7: BIO_CONTRIBUTION_BECCS,
         # Destocked land
         8: 1 - HIR_BIODIVERSITY_PENALTY,
     }
