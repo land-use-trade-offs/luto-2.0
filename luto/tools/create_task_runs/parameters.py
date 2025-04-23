@@ -18,7 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 
-TASK_ROOT_DIR = '../Custom_runs/20250326_TEST_STEPSIZE_RESFACTOR'  
+TASK_ROOT_DIR = '../Custom_runs/20250414_GRID_SEARCH_4'  
 # Remove possible trailing slash
 if TASK_ROOT_DIR[-1] == '/':
     TASK_ROOT_DIR = TASK_ROOT_DIR[:-1]
@@ -34,13 +34,17 @@ EXCLUDE_DIRS = [
     'jinzhu_inspect_code'
 ]
 
-GHG_ORDER = [
-    '1.5C (67%) excl. avoided emis', 
-    '1.5C (50%) excl. avoided emis', 
-    '1.8C (67%) excl. avoided emis'
-]
+GHG_ORDER = {
+    '1.5C (67%) excl. avoided emis': '1.5C (67%)', 
+    '1.5C (50%) excl. avoided emis': '1.5C (50%)', 
+    '1.8C (67%) excl. avoided emis': '1.8C (67%)',
+    '1.5C (67%) excl. avoided emis SCOPE1': '1.5C (67%)', 
+    '1.5C (50%) excl. avoided emis SCOPE1': '1.5C (50%)', 
+    '1.8C (67%) excl. avoided emis SCOPE1': '1.8C (67%)',}
+    
 
-BIO_TARGET_ORDER = [
-    '{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}', 
-    '{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}'
-]
+
+BIO_TARGET_ORDER = {
+    '{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}':'30*30', 
+    '{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}':'50*50'
+}

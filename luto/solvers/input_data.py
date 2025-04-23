@@ -76,9 +76,8 @@ class SolverInputData:
 
     water_yield_RR_BASE_YR: dict                                        # Water yield for the BASE_YR based on historical water yield layers .
     water_yield_outside_study_area: dict[int, float]                    # Water yield from outside LUTO study area -> dict. Key: region.
-    
-        
-    biodiv_contr_ag_j: np.ndarray                                      # Biodiversity contribution scale from agricultural land uses.
+      
+    biodiv_contr_ag_j: np.ndarray                                       # Biodiversity contribution scale from agricultural land uses.
     biodiv_contr_non_ag_k: dict[int, float]                             # Biodiversity contribution scale from non-agricultural land uses.
     biodiv_contr_ag_man: dict[str, dict[int, np.ndarray]]               # Biodiversity contribution scale from agricultural management options.
     
@@ -94,6 +93,8 @@ class SolverInputData:
     economic_contr_mrj: float                                           # base year economic contribution matrix.
     economic_BASE_YR_prices: np.ndarray                                 # base year commodity prices.
     economic_target_yr_carbon_price: float                              # target year carbon price.
+    
+    base_yr_prod: dict[str, float]                                      # Base year production of each commodity.
 
     offland_ghg: np.ndarray                                             # GHG emissions from off-land commodities.
 
@@ -526,6 +527,39 @@ def get_target_yr_carbon_price(data: Data, target_year: int) -> float:
     return data.CARBON_PRICES[target_year]
 
 
+def get_BASE_YR_economic_value(data: Data):
+    """
+    Calculate the economic value of the agricultural sector.
+    """
+    # Get the revenue and cost matrices
+    r_mrj = ag_revenue.get_rev_matrices(data, 0)
+    c_mrj = ag_cost.get_cost_matrices(data, 0)
+    # Calculate the economic value
+    if settings.OBJECTIVE == 'maxprofit':
+        e_mrj = (r_mrj - c_mrj)
+    elif settings.OBJECTIVE == 'mincost':
+        e_mrj = c_mrj
+    else:
+        raise ValueError("Invalid `settings.OBJECTIVE`. Use 'maxprofit' or 'maxcost'.")
+    return np.einsum('mrj,mrj->', e_mrj, data.AG_L_MRJ)
+    
+    
+def get_BASE_YR_biodiv_value(data: Data):
+    """
+    Calculate the economic value of the agricultural sector.
+    """
+    # Get the revenue and cost matrices
+    ag_b_mrj = ag_biodiversity.get_bio_overall_priority_score_matrices_mrj(data)
+    return np.einsum('mrj,mrj->', ag_b_mrj, data.AG_L_MRJ)
+    
+def get_BASE_YR_production_t(data: Data):
+    """
+    Calculate the production of each commodity in the base year.
+    """
+    # Get the revenue and cost matrices
+    return data.get_production(data.YR_CAL_BASE, data.LUMAP, data.LMMAP).sum()
+
+
 def get_savanna_eligible_r(data: Data) -> np.ndarray:
     return np.where(data.SAVBURN_ELIGIBLE == 1)[0]
 
@@ -665,6 +699,12 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         economic_contr_mrj=(ag_obj_mrj, non_ag_obj_rk,  ag_man_objs),
         economic_BASE_YR_prices=get_commodity_prices(data),
         economic_target_yr_carbon_price=get_target_yr_carbon_price(data, target_year), 
+        
+        base_yr_prod = {
+            "BASE_YR Economy(AUD)": get_BASE_YR_economic_value(data),
+            "BASE_YR Biodiversity (score)": get_BASE_YR_biodiv_value(data),
+            "BASE_YR Production (t)": get_BASE_YR_production_t(data),
+        },
         
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
 

@@ -22,7 +22,7 @@ import shutil
 import pandas as pd
 from glob import glob
 
-from luto.tools.report.data_tools import get_all_files
+from luto import settings
 from luto.tools.report.data_tools.helper_func import add_data_2_html, add_txt_2_html
 from luto.tools.report.data_tools.parameters import SPATIAL_MAP_DICT, RENAME_AM_NON_AG
 
@@ -43,9 +43,7 @@ def data2html(raw_data_dir):
         raise FileNotFoundError(f"Report directory not found: {report_dir}") 
     
     # Get the avaliable years for the model
-    files = get_all_files(raw_data_dir)
-    years = sorted(files['Year'].unique().tolist())
-    years_str = str(years)
+    years_str = str(sorted(settings.SIM_YERAS))
         
         
     ####################################################

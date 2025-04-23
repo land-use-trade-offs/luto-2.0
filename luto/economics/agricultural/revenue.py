@@ -28,12 +28,10 @@ import pandas as pd
 
 from typing import Dict
 from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
-from luto.data import Data
-from luto import settings
 from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types
 from luto.economics.agricultural.ghg import get_savanna_burning_effect_g_mrj
 
-def get_rev_crop( data: Data   # Data object.
+def get_rev_crop( data         # Data object.
                 , lu           # Land use.
                 , lm           # Land management.
                 , yr_idx       # Number of years post base-year ('YR_CAL_BASE').
@@ -65,7 +63,7 @@ def get_rev_crop( data: Data   # Data object.
     # Return revenue as MultiIndexed DataFrame.
     return pd.DataFrame(rev_t, columns=pd.MultiIndex.from_product([[lu],[lm],['Revenue']]))
 
-def get_rev_lvstk( data: Data   # Data object.
+def get_rev_lvstk( data   # Data object.
                  , lu           # Land use.
                  , lm           # Land management.
                  , yr_idx       # Number of years post base-year ('YR_CAL_BASE').
@@ -159,7 +157,7 @@ def get_rev_lvstk( data: Data   # Data object.
     return rev_seperate
 
 
-def get_rev( data: Data    # Data object.
+def get_rev( data    # Data object.
             , lu           # Land use.
             , lm           # Land management.
             , yr_idx       # Number of years post base-year ('YR_CAL_BASE')
@@ -186,7 +184,7 @@ def get_rev( data: Data    # Data object.
         raise KeyError(f"Land-use '{lu}' not found in data.LANDUSES")
 
 
-def get_rev_matrix(data: Data, lm, yr_idx):
+def get_rev_matrix(data, lm, yr_idx):
     """Return r_rj matrix of revenue/cell per lu under `lm` in `yr_idx`."""
     
     # Concatenate the revenue from each land use into a single Multiindex DataFrame.
@@ -195,7 +193,7 @@ def get_rev_matrix(data: Data, lm, yr_idx):
     return r_rjs
 
 
-def get_rev_matrices(data: Data, yr_idx, aggregate:bool = True):
+def get_rev_matrices(data, yr_idx, aggregate:bool = True):
     """Return r_mrj matrix of revenue per cell as 3D Numpy array."""
 
     # Concatenate the revenue from each land management into a single Multiindex DataFrame.
@@ -210,7 +208,7 @@ def get_rev_matrices(data: Data, yr_idx, aggregate:bool = True):
     return np.einsum('jmr->mrj', arr_jmr)
 
 
-def get_asparagopsis_effect_r_mrj(data: Data, r_mrj, yr_idx):
+def get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx):
     """
     Applies the effects of using asparagopsis to the revenue data
     for all relevant agr. land uses.
@@ -237,7 +235,7 @@ def get_asparagopsis_effect_r_mrj(data: Data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_precision_agriculture_effect_r_mrj(data: Data, r_mrj, yr_idx):
+def get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx):
     """
     Applies the effects of using precision agriculture to the revenue data
     for all relevant agr. land uses.
@@ -262,7 +260,7 @@ def get_precision_agriculture_effect_r_mrj(data: Data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_ecological_grazing_effect_r_mrj(data: Data, r_mrj, yr_idx):
+def get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx):
     """
     Applies the effects of using ecologiacl grazing to the revenue data
     for all relevant agr. land uses.
@@ -287,7 +285,7 @@ def get_ecological_grazing_effect_r_mrj(data: Data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_savanna_burning_effect_r_mrj(data: Data, yr_idx: int):
+def get_savanna_burning_effect_r_mrj(data, yr_idx: int):
     """
     Applies the effects of using EDS savanna burning to the revenue data
     for all relevant agr. land uses.
@@ -298,7 +296,7 @@ def get_savanna_burning_effect_r_mrj(data: Data, yr_idx: int):
     return ghg_effect * data.get_carbon_price_by_yr_idx(yr_idx)
 
 
-def get_agtech_ei_effect_r_mrj(data: Data, r_mrj, yr_idx):
+def get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx):
     """
     Applies the effects of using AgTech EI to the revenue data
     for all relevant agr. land uses.
@@ -323,7 +321,7 @@ def get_agtech_ei_effect_r_mrj(data: Data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_biochar_effect_r_mrj(data: Data, r_mrj, yr_idx):
+def get_biochar_effect_r_mrj(data, r_mrj, yr_idx):
     """
     Applies the effects of using Biochar to the revenue data
     for all relevant agr. land uses.
@@ -348,7 +346,7 @@ def get_biochar_effect_r_mrj(data: Data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_agricultural_management_revenue_matrices(data: Data, r_mrj, yr_idx) -> Dict[str, np.ndarray]:
+def get_agricultural_management_revenue_matrices(data, r_mrj, yr_idx) -> Dict[str, np.ndarray]:
     """
     Calculate the revenue matrices for different agricultural management practices.
 
