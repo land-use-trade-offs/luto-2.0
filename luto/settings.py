@@ -447,14 +447,14 @@ GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (l
 # GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
 # Weight for the GHG/Demand deviation in the objective function
-SOLVE_WEIGHT_ALPHA = 0.5  
+SOLVE_WEIGHT_ALPHA = 0.1  
 ''' 
 Range from 0 to 1 that balances the relative important between economic values and biodiversity scores.
  - if approaching 0, the model will focus on maximising biodiversity scores.
  - if approaching 1, the model will focus on maximising prifit (or minimising cost).
 '''
 
-SOLVE_WEIGHT_BETA = 0.99
+SOLVE_WEIGHT_BETA = 0.9
 '''
 The weight of the deviations from target in the objective function.
  - if approaching 0, the model will ignore the deviations from target.
