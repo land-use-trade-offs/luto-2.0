@@ -408,7 +408,7 @@ def get_report_df(zip_path, run_paras):
 
 
 
-def process_task_root_dirs(task_root_dir, n_workers=4):
+def process_task_root_dirs(task_root_dir, n_workers=10):
     
 
     grid_search_params = pd.read_csv(f"{task_root_dir}/grid_search_parameters.csv")

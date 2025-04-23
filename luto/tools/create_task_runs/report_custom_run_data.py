@@ -254,6 +254,15 @@ fix_year = 2050
 fix_beta = 0.9
 fix_alpha = 0.1
 
+
+df_demand = report_data.query('Type == "Production_Mt" ').copy()
+df_demand['val'] = df_demand['val'].abs()
+df_demand_avg = df_demand.groupby(
+    ['year', 'GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT', 'SOLVE_WEIGHT_ALPHA', 'SOLVE_WEIGHT_BETA']
+)['val'].mean().reset_index()
+
+
+
 fix_profit = report_data.query('Type == "Profit_billion_AUD" ').copy()
 
 fix_bio = report_data.query('Type == "Biodiversity_area_score"').copy().groupby(
