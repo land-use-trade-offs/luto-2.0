@@ -20,7 +20,6 @@
 
 import os
 import xarray as xr
-import h5py
 import numpy as np
 import pandas as pd
 import rasterio
@@ -1162,7 +1161,7 @@ class Data:
         # Read in vegetation layer data
         NVIS_layers = xr.load_dataarray(settings.INPUT_DIR + f"/NVIS_{settings.NVIS_TARGET_CLASS.split('_')[0]}.nc") 
         NVIS_layers = np.array([self.get_exact_resfactored_average_arr(arr) for arr in NVIS_layers], dtype=np.float32) / 100.0  # divide by 100 to get the percentage of the area in each cell that is covered by the vegetation type
-        
+
         # Apply Savanna Burning penalties
         self.NVIS_LAYERS_LDS = np.where(
             self.SAVBURN_ELIGIBLE,
