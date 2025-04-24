@@ -103,14 +103,8 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 10       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-STEP_SIZE = 1
-'''
-The gap between two consecutive years in the model. For example, if the set-size is 5,
-the model will simulate on years of 2010, 2015, 2020, ..., 2050.
+SIM_YERAS = list(range(2010,2051,10)) # range(2020,2050)
 
-Note, the target year will always be included in the simulation. Even if the step size
-does not reach the target year.
-'''
 
 # How does the model run over time
 # MODE = 'snapshot'   # Runs for target year only
@@ -207,7 +201,7 @@ NON_AG_LAND_USES = {
     'Carbon Plantings (Block)': True,
     'Sheep Carbon Plantings (Belt)': True,
     'Beef Carbon Plantings (Belt)': True,
-    'BECCS': True,
+    'BECCS': False,
     'Destocked - natural land': True,
 }
 """
@@ -288,6 +282,42 @@ AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per h
 # Agricultural management parameters
 # ---------------------------------------------------------------------------- #
 
+
+AG_MANAGEMENTS = {
+    'Asparagopsis taxiformis': True,
+    'Precision Agriculture': True,
+    'Ecological Grazing': False,
+    'Savanna Burning': True,
+    'AgTech EI': True,
+    'Biochar': True,
+}
+"""
+The dictionary below contains a master list of all agricultural management options and
+which land uses they correspond to.
+
+To disable an ag-mangement option, change the corresponding value in the AG_MANAGEMENTS dictionary to False.
+"""
+
+
+AG_MANAGEMENTS_REVERSIBLE = {
+    'Asparagopsis taxiformis': True,
+    'Precision Agriculture': True,
+    'Ecological Grazing': True,
+    'Savanna Burning': True,
+    'AgTech EI': True,
+    'Biochar': True,
+}
+"""
+If settings.MODE == 'timeseries', the values of the below dictionary determine whether the model is allowed to abandon agricultural
+management options on cells in the years after it chooses to utilise them. For example, if a cell has is using 'Asparagopsis taxiformis',
+and the corresponding value in this dictionary is False, all cells using Asparagopsis taxiformis must also utilise this land use
+and agricultural management combination in all subsequent years.
+
+WARNING: changing to False will result in 'locking in' land uses on cells that utilise the agricultural management option for
+the rest of the simulation. This may be an unintended side effect.
+"""
+
+
 AG_MANAGEMENTS_TO_LAND_USES = {
     'Asparagopsis taxiformis': [
         'Beef - modified land', 'Sheep - modified land', 'Dairy - natural land', 'Dairy - modified land'
@@ -367,6 +397,15 @@ and agricultural management combination in all subsequent years.
 WARNING: changing to False will result in 'locking in' land uses on cells that utilise the agricultural management option for
 the rest of the simulation. This may be an unintended side effect.
 """
+# Update AG_MANAGEMENTS_TO_LAND_USES to remove any land uses that are not enabled
+REMOVED_DICT = {}
+for am in list(AG_MANAGEMENTS_TO_LAND_USES.keys()):  # Iterate over a copy of the keys
+    if not AG_MANAGEMENTS[am]:
+        REMOVED_DICT[am] = AG_MANAGEMENTS_TO_LAND_USES[am] 
+        AG_MANAGEMENTS_TO_LAND_USES.pop(am)
+        AG_MANAGEMENTS_REVERSIBLE.pop(am)
+
+
 
 # The cost for removing and establishing irrigation infrastructure ($ per hectare)
 REMOVE_IRRIG_COST = 5000
@@ -405,19 +444,44 @@ GHG_LIMITS = {
               2100: -100 * 1e6   # GHG emissions target and year (can add more years/targets)
              }
 
-# Take data from 'GHG_targets.xlsx', options include: 'None', '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)'
-GHG_LIMITS_FIELD = '1.8C (67%) excl. avoided emis'
+# Take data from 'GHG_targets.xlsx', 
+GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'
+'''
+options include: 
+- Assuming agriculture is responsible to sequester 100% of the carbon emissions
+    - '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)' 
+- Assuming agriculture is responsible to sequester carbon emissions not including electricity emissions and  off-land emissions 
+    - '1.5C (67%) excl. avoided emis', '1.5C (50%) excl. avoided emis', or '1.8C (67%) excl. avoided emis'
+- Assuming agriculture is responsible to sequester carbon emissions only in the scope 1 emissions (i.e., direct emissions from land-use and livestock types)
+    - '1.5C (67%) excl. avoided emis SCOPE1', '1.5C (50%) excl. avoided emis SCOPE1', or '1.8C (67%) excl. avoided emis SCOPE1'
+'''
+  	  	  
+
+
 
 # Carbon price scenario: either 'AS_GHG', 'Default', '100', or 'CONSTANT', or NONE.
 # Setting to None falls back to the 'Default' scenario.
-CARBON_PRICES_FIELD = 'AS_GHG'
+CARBON_PRICES_FIELD = 'CONSTANT'
+
+# Automatically update the carbon price field if it is set to 'AS_GHG'
 if CARBON_PRICES_FIELD == 'AS_GHG':
     CARBON_PRICES_FIELD = GHG_LIMITS_FIELD[:9].replace('(','')  # '1.5C (67%) excl. avoided emis' -> '1.5C 67%'
 
-CARBON_PRICE_COSTANT = 0.0  # The constant value to add to the carbon price (e.g., $10/tonne CO2e).
+if CARBON_PRICES_FIELD == 'CONSTANT':
+    CARBON_PRICE_COSTANT = 0.0  # The constant value to add to the carbon price (e.g., $10/tonne CO2e).
 '''
-    Only works when CARBON_PRICES_FIELD is set to 'CONSTANT'.
+Only works when CARBON_PRICES_FIELD is set to 'CONSTANT'.
 '''
+
+
+USE_GHG_SCOPE_1 = True  # If True, only considers the basic GHG types (i.e., CO2E_KG_HA_SOIL, CO2E_KG_HEAD_DUNG_URINE, CO2E_KG_HEAD_ENTERIC, CO2E_KG_HEAD_FODDER, CO2E_KG_HEAD_IND_LEACH_RUNOFF, CO2E_KG_HEAD_SEED).
+'''
+Basic GHG types are the direct emissions from the land-use and livestock types, excluding
+indirect emissions such as fertiliser, irrigation, land management, etc.
+'''
+
+CROP_GHG_SCOPE_1 = ['CO2E_KG_HA_SOIL']
+LVSTK_GHG_SCOPE_1 = ['CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG_HEAD_IND_LEACH_RUNOFF', 'CO2E_KG_HEAD_MANURE_MGT']
 
 
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
@@ -427,8 +491,20 @@ GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (l
 # GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
 # Weight for the GHG/Demand deviation in the objective function
-''' Range from 0 to 1, where 0 is fully minimising GHG and demand deviation, and 1 is only maximising profit. '''
-SOLVE_ECONOMY_WEIGHT = 0.05  
+SOLVE_WEIGHT_ALPHA = 0.1  
+''' 
+Range from 0 to 1 that balances the relative important between economic values and biodiversity scores.
+ - if approaching 0, the model will focus on maximising biodiversity scores.
+ - if approaching 1, the model will focus on maximising prifit (or minimising cost).
+'''
+
+SOLVE_WEIGHT_BETA = 0.9
+'''
+The weight of the deviations from target in the objective function.
+ - if approaching 0, the model will ignore the deviations from target.
+ - if approaching 1, the model will try harder to meet the target.
+'''
+
 
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
@@ -476,8 +552,6 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 
 # Biodiversity limits and parameters *******************************
-SOLVE_BIODIV_PRIORITY_WEIGHT = 0.995
-'''The weight of the biodiversity target in the objective function'''
 
 
 # ------------------- Agricultural biodiversity parameters -------------------
@@ -609,8 +683,8 @@ the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers
 
 
 # ------------------------------- Species parameters -------------------------------
-BIODIVERSTIY_TARGET_GBF_4_SNES =  'on'           # 'on' or 'off'.
-BIODIVERSTIY_TARGET_GBF_4_ECNES = 'on'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
 
 '''
 Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
@@ -621,7 +695,7 @@ and manage human-wildlife interactions
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------
-BIODIVERSTIY_TARGET_GBF_8 = 'on'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_8 = 'off'           # 'on' or 'off'.
 '''
 Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
 reduce the impacts of climate change on biodiversity and ecosystems.

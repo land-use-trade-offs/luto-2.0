@@ -18,19 +18,17 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 import os
-import shutil, pickle
+import shutil
+import zipfile
 import luto.simulation as sim
 import luto.settings as settings
+from luto.tools.write import write_outputs
 
 
 # Run the simulation
 data = sim.load_data()
-sim.run(data=data, base_year=2010, target_year=2050, step_size=settings.STEP_SIZE)
-
-
-# Save objectives to disk
-with open(f"{data.path}/DATA_REPORT/obj_vals.pkl", 'wb') as f:
-    pickle.dump(data.obj_vals, f)
+sim.run(data=data, years=settings.SIM_YERAS)
+write_outputs(data)
 
 
 
@@ -46,11 +44,19 @@ if settings.KEEP_OUTPUTS:
     
 else:
     report_dir = f"{data.path}/DATA_REPORT"
-    destination_dir ='./DATA_REPORT'
-    shutil.move(report_dir, destination_dir)
+    archive_path ='./DATA_REPORT.zip'
+    
+    # Zip the output directory, and remove the original directory
+    with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for root, dirs, files in os.walk(report_dir):
+            for file in files:
+                abs_path = os.path.join(root, file)
+                rel_path = os.path.relpath(abs_path, start=report_dir)
+                zipf.write(abs_path, arcname=rel_path)
 
+    # Remove all files except the report directory
     for item in os.listdir('.'):
-        if item != 'DATA_REPORT':
+        if item != 'DATA_REPORT.zip':
             try:
                 if os.path.isfile(item) or os.path.islink(item):
                     os.unlink(item)  # Remove the file or link
@@ -58,3 +64,6 @@ else:
                     shutil.rmtree(item)  # Remove the directory
             except Exception as e:
                 print(f"Failed to delete {item}. Reason: {e}")
+                
+    
+    

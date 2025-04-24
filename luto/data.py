@@ -20,6 +20,7 @@
 
 import os
 import xarray as xr
+import netCDF4
 import numpy as np
 import pandas as pd
 import rasterio
@@ -30,16 +31,16 @@ import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 
-from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
-from luto.tools.spatializers import upsample_array
-
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Literal, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
-from rasterio.enums import Resampling
 
+from luto.tools.spatializers import upsample_array
+from luto.economics.agricultural.biodiversity import get_bio_overall_priority_score_matrices_mrj
+from luto.economics.agricultural.cost import get_cost_matrices
+from luto.economics.agricultural.revenue import get_rev_matrices
 
 
 
@@ -139,7 +140,7 @@ class Data:
         self.obj_vals = {}
 
         print('')
-        print('Beginning data initialisation...')
+        print(f'Beginning data initialisation at RES{settings.RESFACTOR}...')
 
         self.YR_CAL_BASE = 2010  # The base year, i.e. where year index yr_idx == 0.
 
@@ -171,38 +172,26 @@ class Data:
         # (True means included cells. Boolean dtype.)
         self.LUMASK = self.LUMAP_NO_RESFACTOR != self.MASK_LU_CODE                                                      # 1D (ij flattend);  `True` for land uses; `False` for desert, urban, water, etc
 
-        # Get the lon/lat coordinates.
-        self.COORD_LON_LAT_FULLRES = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META_FULLRES['transform'])     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
-
         # Return combined land-use and resfactor mask
         if settings.RESFACTOR > 1:
-
-            # Create settings.RESFACTOR mask for spatial coarse-graining.
             rf_mask = self.NLUM_MASK.copy()
             nonzeroes = np.nonzero(rf_mask)
             rf_mask[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR] = 0
             resmask = np.where(rf_mask[nonzeroes] == 0, True, False)
-
-            # Superimpose resfactor mask upon land-use map mask (Boolean).
             self.MASK = self.LUMASK * resmask
-
-            # Get the resfactored 2D lumap and x/y coordinates.
             self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES[int(settings.RESFACTOR/2)::settings.RESFACTOR, int(settings.RESFACTOR/2)::settings.RESFACTOR]
-
-            # Get the resfactored lon/lat coordinates.
-            self.COORD_LON_LAT = self.COORD_LON_LAT_FULLRES[0][self.MASK], self.COORD_LON_LAT_FULLRES[1][self.MASK]
-
-            # Update the geospatial metadata.
             self.GEO_META = self.update_geo_meta()
-
-
         elif settings.RESFACTOR == 1:
             self.MASK = self.LUMASK
             self.GEO_META = self.GEO_META_FULLRES
-
+            self.LUMAP_2D_RESFACTORED = self.LUMAP_2D_FULLRES
         else:
             raise KeyError("Resfactor setting invalid")
         
+        
+        # Get the lon/lat coordinates.
+        self.COORD_LON_LAT_2D_FULLRES = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META_FULLRES['transform'])     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
+        self.COORD_LON_LAT = [i[self.MASK] for i in self.COORD_LON_LAT_2D_FULLRES]  # Only keep the coordinates for the cells that are not masked out (i.e., land uses). 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only) and not masked out
         
         # Get the resfactored lumap_2D as xarray DataArray
         self.LUMAP_2D_RESFACTORED_XR = xr.DataArray(
@@ -382,6 +371,27 @@ class Data:
             for lu in self.AGRICULTURAL_LANDUSES:
                 if lu.split(' -')[0].lower() in c:
                     self.CM2LU_IDX[c].append(self.AGRICULTURAL_LANDUSES.index(lu))
+                    
+                    
+        ###############################################################
+        # Cost multiplier data.
+        ###############################################################
+        cost_mult_excel = pd.ExcelFile(os.path.join(settings.INPUT_DIR, 'cost_multipliers.xlsx'))
+        self.AC_COST_MULTS = pd.read_excel(cost_mult_excel, "AC_multiplier", index_col="Year")
+        self.QC_COST_MULTS = pd.read_excel(cost_mult_excel, "QC_multiplier", index_col="Year")
+        self.FOC_COST_MULTS = pd.read_excel(cost_mult_excel, "FOC_multiplier", index_col="Year")
+        self.FLC_COST_MULTS = pd.read_excel(cost_mult_excel, "FLC_multiplier", index_col="Year")
+        self.FDC_COST_MULTS = pd.read_excel(cost_mult_excel, "FDC_multiplier", index_col="Year")
+        self.WP_COST_MULTS = pd.read_excel(cost_mult_excel, "WP_multiplier", index_col="Year")["Water_delivery_price_multiplier"].to_dict()
+        self.WATER_LICENSE_COST_MULTS = pd.read_excel(cost_mult_excel, "Water License Cost multiplier", index_col="Year")["Water_license_cost_multiplier"].to_dict()
+        self.EST_COST_MULTS = pd.read_excel(cost_mult_excel, "Establishment cost multiplier", index_col="Year")["Establishment_cost_multiplier"].to_dict()
+        self.MAINT_COST_MULTS = pd.read_excel(cost_mult_excel, "Maintennance cost multiplier", index_col="Year")["Maintennance_cost_multiplier"].to_dict()
+        self.TRANS_COST_MULTS = pd.read_excel(cost_mult_excel, "Transitions cost multiplier", index_col="Year")["Transitions_cost_multiplier"].to_dict()
+        self.SAVBURN_COST_MULTS = pd.read_excel(cost_mult_excel, "Savanna burning cost multiplier", index_col="Year")["Savanna_burning_cost_multiplier"].to_dict()
+        self.IRRIG_COST_MULTS = pd.read_excel(cost_mult_excel, "Irrigation cost multiplier", index_col="Year")["Irrigation_cost_multiplier"].to_dict()
+        self.BECCS_COST_MULTS = pd.read_excel(cost_mult_excel, "BECCS cost multiplier", index_col="Year")["BECCS_cost_multiplier"].to_dict()
+        self.BECCS_REV_MULTS = pd.read_excel(cost_mult_excel, "BECCS revenue multiplier", index_col="Year")["BECCS_revenue_multiplier"].to_dict()
+        self.FENCE_COST_MULTS = pd.read_excel(cost_mult_excel, "Fencing cost multiplier", index_col="Year")["Fencing_cost_multiplier"].to_dict()
 
 
 
@@ -652,18 +662,6 @@ class Data:
         fpath = os.path.join(settings.INPUT_DIR, "yieldincreases_bau2022.csv")
         self.BAU_PROD_INCR = pd.read_csv(fpath, header=[0, 1]).astype(np.float32)
 
-
-
-        ###############################################################
-        # Calculate base year production 
-        ###############################################################
-
-        self.AG_MAN_L_MRJ_DICT = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
-        self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
-        
-        print(f"\tCalculating base year productivity...", flush=True)
-        yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)
-        self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
 
 
 
@@ -993,20 +991,24 @@ class Data:
         self.OFF_LAND_GHG_EMISSION_C = self.OFF_LAND_GHG_EMISSION.groupby(['YEAR']).sum(numeric_only=True).values
 
         # Read the carbon price per tonne over the years (indexed by the relevant year)
-        carbon_price_sheet = settings.CARBON_PRICES_FIELD or "Default"
-        carbon_price_usecols = "A,B"
-        carbon_price_col_names = ["Year", "Carbon_price_$_tCO2e"]
-        carbon_price_sheet_index_col = "Year" # if carbon_price_sheet != "Default" else 0
-        carbon_price_sheet_header = 0         # if carbon_price_sheet != "Default" else None
+        if settings.CARBON_PRICES_FIELD == 'CONSTANT':
+            self.CARBON_PRICES = {yr: settings.CARBON_PRICE_COSTANT for yr in range(2010, 2101)}
+        else:
+            carbon_price_sheet = settings.CARBON_PRICES_FIELD or "Default"
+            carbon_price_usecols = "A,B"
+            carbon_price_col_names = ["Year", "Carbon_price_$_tCO2e"]
+            carbon_price_sheet_index_col = "Year" # if carbon_price_sheet != "Default" else 0
+            carbon_price_sheet_header = 0         # if carbon_price_sheet != "Default" else None
 
-        self.CARBON_PRICES: dict[int, float] = pd.read_excel(
-            os.path.join(settings.INPUT_DIR, 'carbon_prices.xlsx'),
-            sheet_name=carbon_price_sheet,
-            usecols=carbon_price_usecols,
-            names=carbon_price_col_names,
-            header=carbon_price_sheet_header,
-            index_col=carbon_price_sheet_index_col,
-        )["Carbon_price_$_tCO2e"].to_dict()
+            self.CARBON_PRICES: dict[int, float] = pd.read_excel(
+                os.path.join(settings.INPUT_DIR, 'carbon_prices.xlsx'),
+                sheet_name=carbon_price_sheet,
+                usecols=carbon_price_usecols,
+                names=carbon_price_col_names,
+                header=carbon_price_sheet_header,
+                index_col=carbon_price_sheet_index_col,
+            )["Carbon_price_$_tCO2e"].to_dict()
+            
 
 
         ###############################################################
@@ -1303,28 +1305,22 @@ class Data:
         self.HIR_MASK = np.load(os.path.join(settings.INPUT_DIR, "hir_mask.npy"))[self.MASK]
 
 
+
         ###############################################################
-        # Cost multiplier data.
+        # Calculate base year production 
         ###############################################################
-        cost_mult_excel = pd.ExcelFile(os.path.join(settings.INPUT_DIR, 'cost_multipliers.xlsx'))
-        self.AC_COST_MULTS = pd.read_excel(cost_mult_excel, "AC_multiplier", index_col="Year")
-        self.QC_COST_MULTS = pd.read_excel(cost_mult_excel, "QC_multiplier", index_col="Year")
-        self.FOC_COST_MULTS = pd.read_excel(cost_mult_excel, "FOC_multiplier", index_col="Year")
-        self.FLC_COST_MULTS = pd.read_excel(cost_mult_excel, "FLC_multiplier", index_col="Year")
-        self.FDC_COST_MULTS = pd.read_excel(cost_mult_excel, "FDC_multiplier", index_col="Year")
-        self.WP_COST_MULTS = pd.read_excel(cost_mult_excel, "WP_multiplier", index_col="Year")["Water_delivery_price_multiplier"].to_dict()
-        self.WATER_LICENSE_COST_MULTS = pd.read_excel(cost_mult_excel, "Water License Cost multiplier", index_col="Year")["Water_license_cost_multiplier"].to_dict()
-        self.EST_COST_MULTS = pd.read_excel(cost_mult_excel, "Establishment cost multiplier", index_col="Year")["Establishment_cost_multiplier"].to_dict()
-        self.MAINT_COST_MULTS = pd.read_excel(cost_mult_excel, "Maintennance cost multiplier", index_col="Year")["Maintennance_cost_multiplier"].to_dict()
-        self.TRANS_COST_MULTS = pd.read_excel(cost_mult_excel, "Transitions cost multiplier", index_col="Year")["Transitions_cost_multiplier"].to_dict()
-        self.SAVBURN_COST_MULTS = pd.read_excel(cost_mult_excel, "Savanna burning cost multiplier", index_col="Year")["Savanna_burning_cost_multiplier"].to_dict()
-        self.IRRIG_COST_MULTS = pd.read_excel(cost_mult_excel, "Irrigation cost multiplier", index_col="Year")["Irrigation_cost_multiplier"].to_dict()
-        self.BECCS_COST_MULTS = pd.read_excel(cost_mult_excel, "BECCS cost multiplier", index_col="Year")["BECCS_cost_multiplier"].to_dict()
-        self.BECCS_REV_MULTS = pd.read_excel(cost_mult_excel, "BECCS revenue multiplier", index_col="Year")["BECCS_revenue_multiplier"].to_dict()
-        self.FENCE_COST_MULTS = pd.read_excel(cost_mult_excel, "Fencing cost multiplier", index_col="Year")["Fencing_cost_multiplier"].to_dict()
+
+        self.AG_MAN_L_MRJ_DICT = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
+        self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
+        
+        print(f"\tCalculating base year productivity...", flush=True)
+        yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)        
+        self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
 
 
-        print("Data loading complete\n")        
+        print("Data loading complete\n")     
+        
+           
 
     def get_coord(self, index_ij: np.ndarray, trans):
         """
@@ -1618,7 +1614,7 @@ class Data:
         ).interp(                                                       # Then the spatial interpolation and masking is done
             x=xr.DataArray(self.COORD_LON_LAT[0], dims='cell'),
             y=xr.DataArray(self.COORD_LON_LAT[1], dims='cell'),
-            method='linear'                                             # Use LINEAR interpolation for the `suitability` values
+            method='linear'                                             # Use LINEAR interpolation
         ).drop_vars(['year']).values
         
         # Apply Savanna Burning penalties
@@ -1762,43 +1758,30 @@ class Data:
         """
         self.obj_vals[yr] = obj_val
 
-    def set_path(self, base_year, target_year, step_size, years) -> str:
+    def set_path(self, years) -> str:
         """Create a folder for storing outputs and return folder name."""
 
-        # Get the years to write
-        if settings.MODE == "snapshot":
-            yr_all = [base_year, target_year]
-        elif settings.MODE == "timeseries":
-            yr_all = list(range(base_year, target_year + 1, step_size))
- 
-        # `years` will supersede `yr_all` if it is not None
-        if years is not None:
-            yr_all = years
-            
-        # Append target year if not in the list
-        if target_year not in yr_all:
-            yr_all.append(target_year)
 
         # Create path name
-        self.path = f"{settings.OUTPUT_DIR}/{self.timestamp}_RF{settings.RESFACTOR}_{yr_all[0]}-{yr_all[-1]}_{settings.MODE}"
+        self.path = f"{settings.OUTPUT_DIR}/{self.timestamp}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}_{settings.MODE}"
 
         # Get all paths
         paths = (
             [self.path]
-            + [f"{self.path}/out_{yr}" for yr in yr_all]
-            + [f"{self.path}/out_{yr}/lucc_separate" for yr in yr_all[1:]]
+            + [f"{self.path}/out_{yr}" for yr in years]
+            + [f"{self.path}/out_{yr}/lucc_separate" for yr in years[1:]]
         )  # Skip creating lucc_separate for base year
 
         # Add the path for the comparison between base-year and target-year if in the timeseries mode
         if settings.MODE == "timeseries":
-            self.path_begin_end_compare = f"{self.path}/begin_end_compare_{yr_all[0]}_{yr_all[-1]}"
+            self.path_begin_end_compare = f"{self.path}/begin_end_compare_{years[0]}_{years[-1]}"
             paths = (
                 paths
                 + [self.path_begin_end_compare]
                 + [
-                    f"{self.path_begin_end_compare}/out_{yr_all[0]}",
-                    f"{self.path_begin_end_compare}/out_{yr_all[-1]}",
-                    f"{self.path_begin_end_compare}/out_{yr_all[-1]}/lucc_separate",
+                    f"{self.path_begin_end_compare}/out_{years[0]}",
+                    f"{self.path_begin_end_compare}/out_{years[-1]}",
+                    f"{self.path_begin_end_compare}/out_{years[-1]}/lucc_separate",
                 ]
             )
 
@@ -1878,13 +1861,14 @@ class Data:
         total_q_c = ag_q_c + non_ag_q_c + ag_man_q_c
         return total_q_c
 
+
     def get_carbon_price_by_yr_idx(self, yr_idx: int) -> float:
         """
         Return the price of carbon per tonne for a given year index (since 2010).
         The resulting year should be between 2010 - 2100
         """
         yr_cal = yr_idx + self.YR_CAL_BASE
-        return settings.CARBON_PRICE_COSTANT if settings.CARBON_PRICES_FIELD == 'CONSTANT' else self.get_carbon_price_by_year(yr_cal)
+        return self.get_carbon_price_by_year(yr_cal)
 
     def get_carbon_price_by_year(self, yr_cal: int) -> float:
         """
@@ -1896,7 +1880,7 @@ class Data:
                 f"Carbon price data not given for the given year: {yr_cal}. "
                 f"Year should be between {self.YR_CAL_BASE} and 2100."
             )
-        return settings.CARBON_PRICE_COSTANT if settings.CARBON_PRICES_FIELD == 'CONSTANT' else self.CARBON_PRICES[yr_cal]
+        return self.CARBON_PRICES[yr_cal]
 
     def get_water_nl_yield_for_yr_idx(
         self,

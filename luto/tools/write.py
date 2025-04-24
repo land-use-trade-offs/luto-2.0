@@ -91,15 +91,16 @@ def write_data(data: Data):
     write_settings(data.path)
 
     # Get the years to write
-    years = sorted(list(data.lumaps.keys()))
+    years = settings.SIM_YERAS
     paths = [f"{data.path}/out_{yr}" for yr in years]
 
     ###############################################################
     #                     Create raw outputs                      #
     ###############################################################
 
-    # Write the area transition between base-year and target-year
+    # Write tasks only once
     write_area_transition_start_end(data, f'{data.path}/out_{years[-1]}')
+    # write_objetive(data)
 
     # Write outputs for each year
     jobs = [delayed(write_output_single_year)(data, yr, path_yr, None) for (yr, path_yr) in zip(years, paths)]
@@ -206,6 +207,35 @@ def write_settings(path):
     # Write the settings to a file
     with open(os.path.join(path, 'model_run_settings.txt'), 'w') as f:
         f.writelines(f'{k}:{v}\n' for k, v in settings_dict.items())
+        
+        
+        
+# def write_objetive(data):
+#     """Save the objective values to a CSV file.
+#     Arguments:
+#         data: `Data` object.
+#     """
+#     print(f'Writing objective values to file')
+    
+#     names_d = {
+#             'Production': [i.capitalize() for i in data.COMMODITIES],
+#             'Water': list(data.RIVREG_DICT.values()) if settings.WATER_REGION_DEF == 'River Region' else list(data.DRAINDIV_DICT.values()),
+#             'BIO (GBF3)': list(data.BIO_GBF3_ID2DESC.values()),
+#             'BIO (GBF4) SNES': data.BIO_GBF4_SNES_SEL_ALL,
+#             'BIO (GBF4) ECNES': data.BIO_GBF4_ECNES_SEL_ALL,
+#             'BIO (GBF8)': data.BIO_GBF8_SEL_SPECIES,
+#     }
+
+#     records = []
+#     for yr_cal in data.obj_vals.keys():
+#         for k,v in data.obj_vals[yr_cal].items():
+#             if isinstance(v, dict):
+#                 rename_k = [i for i in names_d.keys() if i in k][0]
+#                 records.extend([{"year": yr_cal,"type": k,"name": names_d[rename_k][kk],"value": vv,} for kk, vv in enumerate(v.values())])
+#             else:
+#                 records.append({"year": yr_cal,"type": k,"name": None,"value": v,})
+            
+#     pd.DataFrame(records).to_csv(f'{data.path}/DATA_REPORT/objectives.csv', index=False)
 
 
 
@@ -752,14 +782,12 @@ def write_area_transition_start_end(data: Data, path):
 
     print(f'Save transition matrix between start and end year\n')
 
-    # Get all years from sim
-    years = sorted(data.ag_dvars.keys())
-
     # Get the end year
-    yr_cal_end = years[-1]
+    yr_cal_start = data.YR_CAL_BASE
+    yr_cal_end = settings.SIM_YERAS[-1]
 
     # Get the decision variables for the start year
-    dvar_base = tools.lumap2ag_l_mrj(data.lumaps[data.YR_CAL_BASE], data.lmmaps[data.YR_CAL_BASE])
+    dvar_base = tools.lumap2ag_l_mrj(data.lumaps[yr_cal_start], data.lmmaps[yr_cal_start])
 
     # Calculate the transition matrix for agricultural land uses (start) to agricultural land uses (end)
     transitions_ag2ag = []
@@ -785,7 +813,7 @@ def write_area_transition_start_end(data: Data, path):
     transition.columns = ['From land-use','To land-use','Area (ha)']
 
     # Write the transition matrix to a csv file
-    transition.to_csv(os.path.join(path, f'transition_matrix_{data.YR_CAL_BASE}_{yr_cal_end}.csv'), index=False)
+    transition.to_csv(os.path.join(path, f'transition_matrix_{yr_cal_start}_{yr_cal_end}.csv'), index=False)
 
 
 
@@ -1630,7 +1658,7 @@ def write_ghg(data: Data, yr_cal, path):
     if yr_cal >= data.YR_CAL_BASE + 1:
         ghg_emissions = data.prod_data[yr_cal]['GHG Emissions']
     else:
-        ghg_emissions = (ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True) * data.ag_dvars[data.YR_CAL_BASE]).sum()
+        ghg_emissions = (ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True) * data.ag_dvars[settings.SIM_YERAS[0]]).sum()
 
     # Save GHG emissions to file
     df = pd.DataFrame({
