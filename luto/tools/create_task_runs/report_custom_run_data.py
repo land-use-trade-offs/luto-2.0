@@ -30,7 +30,7 @@ p9.options.dpi = 100
 
 
 # Get the data
-task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20250414_GRID_SEARCH/"
+task_root_dir = "N:/LUF-Modelling/LUTO2_JZ/Custom_runs/20250414_GRID_SEARCH"
 report_data = process_task_root_dirs(task_root_dir)
 
 # Commodities allowed to not meet target
@@ -44,7 +44,6 @@ commodity_out_targets = {
 
 
 
-
 # -------------- Weight landscape (Demand) ----------------------
 query_str = '''
     Type == "Production_Mt" 
@@ -54,20 +53,8 @@ query_str = '''
 
 # Get demand data
 df_demand = report_data.query(query_str).copy()
-df_demand['val_log'] = np.sign(df_demand['val']) * np.log10(abs(df_demand['val']))
-df_demand['val_log'] = df_demand['val_log'].fillna(-np.inf)  # Replace NaNs with -inf after log10
 
-
-# Get valid runs
-valid_runs = set(report_data['run_idx']) - set(
-    df_demand.query(
-        'name not in @commodity_out_targets and abs(val) >= 10'
-    )['run_idx']
-)
-df_demand = df_demand.query('run_idx.isin(@valid_runs)')
-
-
-
+df_demand['val'] = df_demand['val'].abs()
 df_demand_avg = df_demand.groupby(
     ['year', 'GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT', 'SOLVE_WEIGHT_ALPHA', 'SOLVE_WEIGHT_BETA']
 )['val'].mean().reset_index()
@@ -76,7 +63,7 @@ df_demand_avg = df_demand.groupby(
 
 plot_landscape_demand = (
     p9.ggplot(
-        df_demand_avg.query('SOLVE_WEIGHT_ALPHA<0.21 and SOLVE_WEIGHT_BETA > 0.79 and year == 2050'),
+        df_demand_avg.query('year == 2050 and val < 10'),
         p9.aes(
             x='SOLVE_WEIGHT_ALPHA', 
             y='SOLVE_WEIGHT_BETA', 
@@ -267,9 +254,18 @@ fix_year = 2050
 fix_beta = 0.9
 fix_alpha = 0.1
 
-fix_profit = report_data.query('Type == "Profit_billion_AUD" and SOLVE_WEIGHT_ALPHA ==@fix_alpha').copy()
 
-fix_bio = report_data.query('Type == "Biodiversity_area_score" and SOLVE_WEIGHT_ALPHA ==@fix_alpha').copy().groupby(
+df_demand = report_data.query('Type == "Production_Mt" ').copy()
+df_demand['val'] = df_demand['val'].abs()
+df_demand_avg = df_demand.groupby(
+    ['year', 'GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT', 'SOLVE_WEIGHT_ALPHA', 'SOLVE_WEIGHT_BETA']
+)['val'].mean().reset_index()
+
+
+
+fix_profit = report_data.query('Type == "Profit_billion_AUD" ').copy()
+
+fix_bio = report_data.query('Type == "Biodiversity_area_score"').copy().groupby(
     ['year', 'GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT', 'SOLVE_WEIGHT_ALPHA','SOLVE_WEIGHT_BETA']
 )['val'].sum().reset_index()
 
@@ -283,7 +279,7 @@ fix_df = pd.merge(
         'SOLVE_WEIGHT_ALPHA',
         'SOLVE_WEIGHT_BETA',
     ], 
-).query('year == @fix_year and SOLVE_WEIGHT_BETA>0.89')
+).query('year == @fix_year and SOLVE_WEIGHT_BETA==@fix_beta and SOLVE_WEIGHT_ALPHA <=0.21')
 
 profit_vs_bio = (
     p9.ggplot()
@@ -292,8 +288,8 @@ profit_vs_bio = (
         mapping=p9.aes(
             x='val_x', 
             y='val_y', 
-            color='SOLVE_WEIGHT_BETA',
-            group='SOLVE_WEIGHT_BETA')
+            color='SOLVE_WEIGHT_ALPHA',
+            group='SOLVE_WEIGHT_ALPHA')
     ) +
     p9.theme_bw() +
     p9.facet_grid('BIODIV_GBF_TARGET_2_DICT~GHG_LIMITS_FIELD', scales='free') +

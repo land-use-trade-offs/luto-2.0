@@ -334,7 +334,7 @@ def load_json_data(zip_path, filename):
         return pd.DataFrame({'year': [], 'val': [], 'name': []})
     else:
         with zipfile.ZipFile(os.path.join(zip_path), 'r') as zip_ref:
-            with zip_ref.open(os.path.join('data', filename)) as f:
+            with zip_ref.open(f'data/{filename}') as f:
                 # Load the JSON data into a DataFrame
                 return pd.json_normalize(json.load(f), 'data', ['name']).rename(columns={0: 'year', 1: 'val'})
 
@@ -408,7 +408,7 @@ def get_report_df(zip_path, run_paras):
 
 
 
-def process_task_root_dirs(task_root_dir, n_workers=4):
+def process_task_root_dirs(task_root_dir, n_workers=10):
     
 
     grid_search_params = pd.read_csv(f"{task_root_dir}/grid_search_parameters.csv")
