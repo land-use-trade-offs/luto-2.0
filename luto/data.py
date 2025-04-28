@@ -20,7 +20,6 @@
 
 import os
 import xarray as xr
-import netCDF4
 import numpy as np
 import pandas as pd
 import rasterio
@@ -38,10 +37,6 @@ from affine import Affine
 from scipy.interpolate import interp1d
 
 from luto.tools.spatializers import upsample_array
-from luto.economics.agricultural.biodiversity import get_bio_overall_priority_score_matrices_mrj
-from luto.economics.agricultural.cost import get_cost_matrices
-from luto.economics.agricultural.revenue import get_rev_matrices
-
 
 
 def dict2matrix(d, fromlist, tolist):
