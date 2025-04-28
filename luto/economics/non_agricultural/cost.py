@@ -259,7 +259,7 @@ def get_cost_destocked(data: Data, ag_c_mrj: np.ndarray) -> np.ndarray:
         1-D array Indexed by cell.
     """
     unallocated_j = tools.get_unallocated_natural_land_code(data)
-    return ag_c_mrj[0, :, unallocated_j]ghg
+    return ag_c_mrj[0, :, unallocated_j]
 
 
 def get_cost_matrix(data: Data, ag_c_mrj: np.ndarray, lumap, yr_cal):

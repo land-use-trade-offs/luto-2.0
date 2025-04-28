@@ -777,9 +777,8 @@ def get_beef_hir_effect_g_mrj(data: Data):
     )
 
     for idx in range(len(land_uses)):
-        g_mrj_effect[:, :, idx] = -lvstck_penalty_r
+        g_mrj_effect[:, :, idx] = lvstck_penalty_r
 
-    breakpoint()
     return g_mrj_effect
 
 

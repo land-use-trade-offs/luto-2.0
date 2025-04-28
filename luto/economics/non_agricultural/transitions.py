@@ -341,18 +341,33 @@ def get_beccs_from_ag(data, yr_idx, lumap, w_license_cost_r, w_rm_irrig_cost_r, 
 
 
 
-def get_destocked_from_ag(data: Data, ag_t_mrj: np.ndarray) -> np.ndarray:
+def get_destocked_from_ag(data: Data, ag_t_mrj: np.ndarray | dict, separate: bool = False) -> np.ndarray | dict:
     """
     Get transition costs from agricultural land uses to destocked land for each cell.
 
     Returns
     -------
-    np.ndarray
-        1-D array, indexed by cell.
+    if separate == False:
+        np.ndarray
+            1-D array, indexed by cell.
+    if separate == True:
+        dict
+            Separated dictionary of transition cost arrays.
     """
     unallocated_j = tools.get_unallocated_natural_land_code(data)
-    destocked_t_mrj = ag_t_mrj[0, :, unallocated_j]
-    return destocked_t_mrj
+
+    if separate == False:
+        return ag_t_mrj[0, :, unallocated_j]
+    
+    elif separate == True:
+        return {
+            k: v[0, :, unallocated_j] for k, v in ag_t_mrj.items()
+        }
+
+    raise ValueError(
+        f"Incorrect value for 'separate' when calling get_destocked_from_ag: {separate}. "
+        f"should be either True or False."
+    )
 
 
 def get_from_ag_transition_matrix(
@@ -361,7 +376,7 @@ def get_from_ag_transition_matrix(
     base_year: int,
     lumap: np.ndarray,
     lmmap: np.ndarray,
-    ag_t_mrj: np.ndarray,
+    ag_t_mrj: np.ndarray | dict,
     separate: bool = False
 ) -> np.ndarray|dict:
     """
@@ -377,6 +392,9 @@ def get_from_ag_transition_matrix(
         The land use map.
     lmmap : dict
         The land management map.
+    ag_t_mrj: np.ndarray | dict
+        Agricultural transitions: should be the ag_t_mrj array if separate==False and the separated agricultural
+        tranistions dictionary if separate==True
     separate : bool, optional
         If True, return a dictionary containing the transition costs for each non-agricultural land use.
         If False, return a 2-D array indexed by (r, k) where r is cell and k is non-agricultural land usage.
@@ -407,7 +425,7 @@ def get_from_ag_transition_matrix(
     beef_carbon_plantings_belt_transitions_from_ag = get_beef_carbon_plantings_belt_from_ag( data, cp_belt_x_r, cp_belt_costs, ag_t_costs, lumap, separate)         # Base CP transition plus CP fencing costs + beef grazing
     
     beccs_transitions_from_ag = get_beccs_from_ag(data, yr_idx, lumap, w_license_cost_r, w_rm_irrig_cost_r, separate)                                               # Base EP transition (the same)
-    destocked_from_ag = get_destocked_from_ag(data, ag_t_mrj)
+    destocked_from_ag = get_destocked_from_ag(data, ag_t_mrj, separate)
 
     if separate:
         # IMPORTANT: The order of the keys in the dictionary must match the order of the non-agricultural land uses
@@ -420,7 +438,7 @@ def get_from_ag_transition_matrix(
             'Sheep Carbon Plantings (Belt)': sheep_carbon_plantings_belt_transitions_from_ag,
             'Beef Carbon Plantings (Belt)': beef_carbon_plantings_belt_transitions_from_ag,
             'BECCS': beccs_transitions_from_ag,
-            'Destocked - natural land': destocked_from_ag
+            'Destocked - natural land': destocked_from_ag,
         }
         
     else:
@@ -877,7 +895,7 @@ def get_beccs_to_ag(data: Data, yr_idx, lumap, lmmap, separate=False) -> np.ndar
         return get_env_plantings_to_ag(data, yr_idx, lumap, lmmap)
     
 
-def get_destocked_to_ag(data: Data, yr_idx: int, lumap: np.ndarray) -> np.ndarray:
+def get_destocked_to_ag(data: Data, yr_idx: int, lumap: np.ndarray, separate: bool = False) -> np.ndarray:
     """
     Get transition costs from destocked land to agricultural land uses for each cell.
     Transition costs are based on the transition costs of unallocated natural land to agricultural land.
@@ -892,18 +910,35 @@ def get_destocked_to_ag(data: Data, yr_idx: int, lumap: np.ndarray) -> np.ndarra
     all_dry_lmmap = (np.zeros(data.NCELLS)).astype(np.int8)
 
     destocked_cells = tools.get_destocked_land_cells(lumap)
-    if destocked_cells.size == 0:
+    if destocked_cells.size == 0 and separate == False:
         return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
     
     # Get transition costs from destocked cells by using transition costs from unallocated land
-    unallocated_t_mrj = ag_transitions.get_transition_matrices_from_maps(data, yr_idx, all_unallocated_lumap, all_dry_lmmap)
+    unallocated_t_mrj = ag_transitions.get_transition_matrices_from_maps(
+        data, yr_idx, all_unallocated_lumap, all_dry_lmmap, separate=separate
+    )
 
-    destocked_t_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
-    destocked_t_mrj[:, destocked_cells, :] = unallocated_t_mrj[:, destocked_cells, :]
-    return destocked_t_mrj
+    if separate == False:
+        destocked_t_mrj = np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
+        destocked_t_mrj[:, destocked_cells, :] = unallocated_t_mrj[:, destocked_cells, :]
+        return destocked_t_mrj
+    
+    elif separate == True:
+        sep_destocked_trans = {k: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)) for k in unallocated_t_mrj}
+        if destocked_cells.size == 0:
+            return sep_destocked_trans
+
+        for k, v in unallocated_t_mrj.items():
+            sep_destocked_trans[k][:, destocked_cells, :] = v[:, destocked_cells, :]
+        return sep_destocked_trans
+
+    raise ValueError(
+        f"Incorrect value for 'separate' when calling get_destocked_from_ag: {separate}. "
+        f"should be either True or False."
+    )
 
 
-def get_to_ag_transition_matrix(data: Data, yr_idx, lumap, lmmap, ag_t_mrj: np.ndarray, separate=False) -> np.ndarray|dict:
+def get_to_ag_transition_matrix(data: Data, yr_idx, lumap, lmmap, separate=False) -> np.ndarray|dict:
     """
     Get the matrix containing transition costs from non-agricultural land uses to agricultural land uses.
 
@@ -943,7 +978,7 @@ def get_to_ag_transition_matrix(data: Data, yr_idx, lumap, lmmap, ag_t_mrj: np.n
     non_ag_to_agr_t_matrices['Sheep Carbon Plantings (Belt)'] = get_sheep_carbon_plantings_belt_to_ag(data, yr_idx, lumap, lmmap, cp_belt_x_r, separate)
     non_ag_to_agr_t_matrices['Beef Carbon Plantings (Belt)'] = get_beef_carbon_plantings_belt_to_ag(data, yr_idx, lumap, lmmap, cp_belt_x_r, separate)
     non_ag_to_agr_t_matrices['BECCS'] = get_beccs_to_ag(data, yr_idx, lumap, lmmap, separate)
-    non_ag_to_agr_t_matrices['Destocked - natural land'] = get_destocked_to_ag(data, yr_idx, lumap)
+    non_ag_to_agr_t_matrices['Destocked - natural land'] = get_destocked_to_ag(data, yr_idx, lumap, separate)
 
     if separate:
         # Note: The order of the keys in the dictionary must match the order of the non-agricultural land uses
