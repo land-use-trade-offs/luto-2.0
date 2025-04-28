@@ -26,6 +26,8 @@ import itertools
 import numpy as np
 
 from luto import settings
+from luto import tools
+from luto.data import Data
 
 
 def get_bio_overall_priority_score_matrices_mrj(data):
@@ -165,6 +167,54 @@ def get_biochar_effect_b_mrj(data, ag_b_mrj: np.ndarray, yr_idx):
     return b_mrj_effect
 
 
+def get_beef_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
+    """
+    Gets biodiversity impacts of using HIR on beef.
+
+    Parameters:
+    - data: The input data object containing information about NLMS and NCELLS.
+
+    Returns:
+    - b_mrj_effect: A numpy array representing the biodiversity impacts of using Biochar.
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
+    lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
+    b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    unallocated_j = tools.get_unallocated_natural_land_code(data)
+    # HIR's biodiversity contribution is based on that of unallocated land 
+    unallocated_b_mr = ag_b_mrj[:, :, unallocated_j]
+
+    for idx in range(len(lu_codes)):
+        b_mrj_effect[:, :, idx] = unallocated_b_mr * (1 - settings.HIR_BIODIVERSITY_PENALTY)
+
+    return b_mrj_effect
+
+
+def get_sheep_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
+    """
+    Gets biodiversity impacts of using HIR on beef.
+
+    Parameters:
+    - data: The input data object containing information about NLMS and NCELLS.
+
+    Returns:
+    - b_mrj_effect: A numpy array representing the biodiversity impacts of using Biochar.
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
+    lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
+    b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+
+    unallocated_j = tools.get_unallocated_natural_land_code(data)
+    # HIR's biodiversity contribution is based on that of unallocated land 
+    unallocated_b_mr = ag_b_mrj[:, :, unallocated_j]
+
+    for idx in range(len(lu_codes)):
+        b_mrj_effect[:, :, idx] = unallocated_b_mr * (1 - settings.HIR_BIODIVERSITY_PENALTY)
+
+    return b_mrj_effect
+
+
 def get_agricultural_management_biodiversity_matrices(data, ag_b_mrj: np.ndarray, yr_idx: int):
     """
     Calculate the biodiversity matrices for different agricultural management practices.
@@ -183,6 +233,8 @@ def get_agricultural_management_biodiversity_matrices(data, ag_b_mrj: np.ndarray
     sav_burning_data = get_savanna_burning_effect_b_mrj(data) if settings.AG_MANAGEMENTS['Savanna Burning'] else 0
     agtech_ei_data = get_agtech_ei_effect_b_mrj(data) if settings.AG_MANAGEMENTS['AgTech EI'] else 0
     biochar_data = get_biochar_effect_b_mrj(data, ag_b_mrj, yr_idx) if settings.AG_MANAGEMENTS['Biochar'] else 0
+    beef_hir_data = get_beef_hir_effect_b_mrj(data, ag_b_mrj) if settings.AG_MANAGEMENTS['Beef - HIR'] else 0
+    sheep_hir_data = get_sheep_hir_effect_b_mrj(data, ag_b_mrj) if settings.AG_MANAGEMENTS['Sheep - HIR'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -191,6 +243,8 @@ def get_agricultural_management_biodiversity_matrices(data, ag_b_mrj: np.ndarray
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
         'Biochar': biochar_data,
+        'Beef - HIR': beef_hir_data,
+        'Sheep - HIR': sheep_hir_data,
     }
 
 
@@ -398,8 +452,15 @@ def get_ag_management_biodiversity_contribution(
             j_idx: (data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact'] - 1) * np.ones(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Biochar'])
         }
+    if settings.AG_MANAGEMENTS['Beef - HIR']:
+        am_contr_dict['Beef - HIR'] = {
+            j_idx: np.ones(data.NCELLS).astype(np.float32) * (1 - settings.HIR_BIODIVERSITY_PENALTY)
+            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR'])
+        }
+    if settings.AG_MANAGEMENTS['Sheep - HIR']:
+        am_contr_dict['Sheep - HIR'] = {
+            j_idx: np.ones(data.NCELLS).astype(np.float32) * (1 - settings.HIR_BIODIVERSITY_PENALTY)
+            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR'])
+        }
     
     return am_contr_dict
-
-
-

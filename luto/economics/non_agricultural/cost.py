@@ -246,6 +246,22 @@ def get_cost_beccs(data: Data, yr_cal: int) -> np.ndarray:
     return np.nan_to_num(data.BECCS_COSTS_AUD_HA_YR) * data.BECCS_COST_MULTS[yr_cal] * data.REAL_AREA
 
 
+def get_cost_destocked(data: Data, ag_c_mrj: np.ndarray) -> np.ndarray:
+    """
+    Parameters
+    ----------
+    data: Data object.
+
+    Returns
+    -------
+    np.ndarray
+        Cost of maintaining destocked land for each cell. Equivalent to maintaining unallocated land.
+        1-D array Indexed by cell.
+    """
+    unallocated_j = tools.get_unallocated_natural_land_code(data)
+    return ag_c_mrj[0, :, unallocated_j]
+
+
 def get_cost_matrix(data: Data, ag_c_mrj: np.ndarray, lumap, yr_cal):
     """
     Returns non-agricultural c_rk matrix of costs per cell and land use.
@@ -285,6 +301,9 @@ def get_cost_matrix(data: Data, ag_c_mrj: np.ndarray, lumap, yr_cal):
 
     if NON_AG_LAND_USES['BECCS']:
         non_agr_c_matrices['BECCS'] = get_cost_beccs(data, yr_cal).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Destocked - natural land']:
+        non_agr_c_matrices['Destocked - natural land'] = get_cost_destocked(data, ag_c_mrj).reshape((data.NCELLS, 1))
 
     non_agr_c_matrices = list(non_agr_c_matrices.values())
     return np.concatenate(non_agr_c_matrices, axis=1)

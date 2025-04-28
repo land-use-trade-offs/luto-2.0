@@ -100,7 +100,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 10       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
 SIM_YERAS = list(range(2010,2051,10)) # range(2020,2050)
@@ -202,6 +202,7 @@ NON_AG_LAND_USES = {
     'Sheep Carbon Plantings (Belt)': True,
     'Beef Carbon Plantings (Belt)': True,
     'BECCS': False,
+    'Destocked - natural land': True,
 }
 """
 The dictionary here is the master list of all of the non agricultural land uses
@@ -221,6 +222,7 @@ NON_AG_LAND_USES_REVERSIBLE = {
     'Sheep Carbon Plantings (Belt)': False,
     'Beef Carbon Plantings (Belt)': False,
     'BECCS': False,
+    'Destocked - natural land': True,
 }
 """
 If settings.MODE == 'timeseries', the values of the below dictionary determine whether the model is allowed to abandon non-agr.
@@ -352,9 +354,49 @@ AG_MANAGEMENTS_TO_LAND_USES = {
         'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
         # Horticulture:
         'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit',
-    ]
+    ],
+
+    'Beef - HIR': ['Beef - natural land'],
+    'Sheep - HIR': ['Sheep - natural land'],
 }
 
+
+AG_MANAGEMENTS = {
+    'Asparagopsis taxiformis': True,
+    'Precision Agriculture': True,
+    'Ecological Grazing': True,
+    'Savanna Burning': True,
+    'AgTech EI': True,
+    'Biochar': True,
+    'Beef - HIR': True,
+    'Sheep - HIR': True,
+}
+"""
+The dictionary below contains a master list of all agricultural management options and
+which land uses they correspond to.
+
+To disable an ag-mangement option, change the corresponding value in the AG_MANAGEMENTS dictionary to False.
+"""
+
+AG_MANAGEMENTS_REVERSIBLE = {
+    'Asparagopsis taxiformis': True,
+    'Precision Agriculture': True,
+    'Ecological Grazing': True,
+    'Savanna Burning': True,
+    'AgTech EI': True,
+    'Biochar': True,
+    'Beef - HIR': True,
+    'Sheep - HIR': True,
+}
+"""
+If settings.MODE == 'timeseries', the values of the below dictionary determine whether the model is allowed to abandon agricultural
+management options on cells in the years after it chooses to utilise them. For example, if a cell has is using 'Asparagopsis taxiformis',
+and the corresponding value in this dictionary is False, all cells using Asparagopsis taxiformis must also utilise this land use
+and agricultural management combination in all subsequent years.
+
+WARNING: changing to False will result in 'locking in' land uses on cells that utilise the agricultural management option for
+the rest of the simulation. This may be an unintended side effect.
+"""
 # Update AG_MANAGEMENTS_TO_LAND_USES to remove any land uses that are not enabled
 REMOVED_DICT = {}
 for am in list(AG_MANAGEMENTS_TO_LAND_USES.keys()):  # Iterate over a copy of the keys
@@ -375,6 +417,8 @@ SAVBURN_COST_HA_YR = 100
 # The minimum value an agricultural management variable must take for the write_output function to consider it being used on a cell
 AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1
 
+HIR_PRODUCTIVITY_PENALTY = 0.5
+HIR_BIODIVERSITY_PENALTY = 0.5  # Biodiversity penalty of HIR when compared to destocked land
 
 # ---------------------------------------------------------------------------- #
 # Off-land commodity parameters
@@ -465,8 +509,8 @@ The weight of the deviations from target in the objective function.
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 
-WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
-# WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
+# WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
+WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
 
 WATER_PENALTY = 1
 
@@ -528,8 +572,10 @@ BIODIV_GBF_TARGET_2_DICT = {
 """
 
 
-GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
-# GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
+# GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
+GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
+
+
 '''
 The constraint type for the biodiversity target.
 - 'hard' adds biodiversity limits as a constraint in the solver (linear programming approach)
@@ -688,6 +734,7 @@ BIODIVERSITY_BIG_CONSTR_DIV_FACTOR = 1e4
 5: 'Sheep Carbon Plantings (Belt)'
 6: 'Beef Carbon Plantings (Belt)'
 7: 'BECCS'
+8: 'Destocked - natural land'
 
 
 AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)

@@ -88,7 +88,8 @@ RENAME_NON_AG = {
     "Carbon Plantings (Block)": "Carbon plantings (monoculture)",
     "Sheep Carbon Plantings (Belt)": "Farm forestry (hardwood timber + sheep)",
     "Beef Carbon Plantings (Belt)": "Farm forestry (hardwood timber + beef)",
-    "BECCS": "BECCS (Bioenergy with Carbon Capture and Storage)"
+    "BECCS": "BECCS (Bioenergy with Carbon Capture and Storage)",
+    "Destocked - natural land": "Destocked - natural land",
 }
 
 RENAME_AM_NON_AG = {**RENAME_AM, **RENAME_NON_AG}

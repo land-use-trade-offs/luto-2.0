@@ -268,6 +268,11 @@ def get_wreq_matrix_beccs(data, yr_idx: int, water_dr_yield: Optional[np.ndarray
     return get_w_net_yield_matrix_carbon_plantings_block(data, yr_idx, water_dr_yield)
 
 
+def get_wreq_matrix_destocked(data, ag_w_mrj):
+    unallocated_j = tools.get_unallocated_natural_land_code(data)
+    return ag_w_mrj[0, :, unallocated_j]
+
+
 def get_w_net_yield_matrix(
     data,
     ag_w_mrj: np.ndarray,
@@ -319,6 +324,9 @@ def get_w_net_yield_matrix(
 
     if NON_AG_LAND_USES['BECCS']:
         non_agr_yield_matrices['BECCS'] = get_wreq_matrix_beccs(data, yr_idx, water_dr_yield).reshape((data.NCELLS, 1))
+
+    if NON_AG_LAND_USES['Destocked - natural land']:
+        non_agr_yield_matrices['Destocked - natural land'] = get_wreq_matrix_destocked(data, ag_w_mrj).reshape((data.NCELLS, 1))
 
     non_agr_yield_matrices = list(non_agr_yield_matrices.values())
 

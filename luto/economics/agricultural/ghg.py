@@ -28,6 +28,7 @@ import itertools
 import numpy as np
 import pandas as pd
 
+from luto.data import Data
 import luto.tools as tools
 from luto import settings
 from luto.economics.agricultural.quantity import get_yield_pot
@@ -765,6 +766,38 @@ def get_biochar_effect_g_mrj(data, yr_idx):
     return new_g_mrj
 
 
+def get_beef_hir_effect_g_mrj(data: Data):
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
+    g_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses)))
+
+    lvstck_penalty_r = np.zeros(data.NCELLS)
+    lvstck_penalty_r[data.HIR_MASK] = (
+        data.GHG_PENALTY_LVSTK_NATURAL_TO_UNALL_NATURAL[data.HIR_MASK] 
+        * data.REAL_AREA[data.HIR_MASK]
+    )
+
+    for idx in range(len(land_uses)):
+        g_mrj_effect[:, :, idx] = lvstck_penalty_r
+
+    return g_mrj_effect
+
+
+def get_sheep_hir_effect_g_mrj(data: Data):
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
+    g_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses)))
+
+    lvstck_penalty_r = np.zeros(data.NCELLS)
+    lvstck_penalty_r[data.HIR_MASK] = (
+        data.GHG_PENALTY_LVSTK_NATURAL_TO_UNALL_NATURAL[data.HIR_MASK] 
+        * data.REAL_AREA[data.HIR_MASK]
+    )
+
+    for idx in range(len(land_uses)):
+        g_mrj_effect[:, :, idx] = -lvstck_penalty_r
+
+    return g_mrj_effect
+
+
 def get_agricultural_management_ghg_matrices(data, g_mrj, yr_idx) -> dict[str, np.ndarray]:
     """
     Calculate the greenhouse gas (GHG) matrices for different agricultural management practices.
@@ -785,6 +818,8 @@ def get_agricultural_management_ghg_matrices(data, g_mrj, yr_idx) -> dict[str, n
     sav_burning_ghg_impact = get_savanna_burning_effect_g_mrj(data) if settings.AG_MANAGEMENTS['Savanna Burning'] else 0
     agtech_ei_ghg_impact = get_agtech_ei_effect_g_mrj(data, yr_idx) if settings.AG_MANAGEMENTS['AgTech EI'] else 0
     biochar_ghg_impact = get_biochar_effect_g_mrj(data, yr_idx) if settings.AG_MANAGEMENTS['Biochar'] else 0
+    beef_hir_ghg_impact = get_beef_hir_effect_g_mrj(data) if settings.AG_MANAGEMENTS['Beef - HIR'] else 0
+    sheep_hir_ghg_impact = get_sheep_hir_effect_g_mrj(data) if settings.AG_MANAGEMENTS['Sheep - HIR'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -793,4 +828,6 @@ def get_agricultural_management_ghg_matrices(data, g_mrj, yr_idx) -> dict[str, n
         'Savanna Burning': sav_burning_ghg_impact,
         'AgTech EI': agtech_ei_ghg_impact,
         'Biochar': biochar_ghg_impact,
+        'Beef - HIR': beef_hir_ghg_impact,
+        'Sheep - HIR': sheep_hir_ghg_impact,
     }

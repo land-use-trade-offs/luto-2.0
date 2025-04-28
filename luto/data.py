@@ -20,7 +20,6 @@
 
 import os
 import xarray as xr
-import netCDF4
 import numpy as np
 import pandas as pd
 import rasterio
@@ -38,10 +37,6 @@ from affine import Affine
 from scipy.interpolate import interp1d
 
 from luto.tools.spatializers import upsample_array
-from luto.economics.agricultural.biodiversity import get_bio_overall_priority_score_matrices_mrj
-from luto.economics.agricultural.cost import get_cost_matrices
-from luto.economics.agricultural.revenue import get_rev_matrices
-
 
 
 def dict2matrix(d, fromlist, tolist):
@@ -1163,7 +1158,7 @@ class Data:
         # Read in vegetation layer data
         NVIS_layers = xr.load_dataarray(settings.INPUT_DIR + f"/NVIS_{settings.NVIS_TARGET_CLASS.split('_')[0]}.nc") 
         NVIS_layers = np.array([self.get_exact_resfactored_average_arr(arr) for arr in NVIS_layers], dtype=np.float32) / 100.0  # divide by 100 to get the percentage of the area in each cell that is covered by the vegetation type
-        
+
         # Apply Savanna Burning penalties
         self.NVIS_LAYERS_LDS = np.where(
             self.SAVBURN_ELIGIBLE,
@@ -1294,9 +1289,18 @@ class Data:
         self.BECCS_REV_AUD_HA_YR = beccs_df['BECCS_REV_AUD_HA_YR'].to_numpy()
         self.BECCS_TCO2E_HA_YR = beccs_df['BECCS_TCO2E_HA_YR'].to_numpy()
         self.BECCS_MWH_HA_YR = beccs_df['BECCS_MWH_HA_YR'].to_numpy()
-        
-        
-        
+
+
+
+        ###############################################################
+        # HIR data.
+        ###############################################################
+        print("\tLoading HIR data...", flush=True)
+
+        self.HIR_MASK = np.load(os.path.join(settings.INPUT_DIR, "hir_mask.npy"))[self.MASK].astype(bool)
+
+
+
         ###############################################################
         # Calculate base year production 
         ###############################################################
@@ -1836,6 +1840,9 @@ class Data:
         j2p = {j: [p for p in range(self.NPRS) if self.LU2PR[p, j]]
                         for j in range(self.N_AG_LUS)}
         for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items():
+            if not settings.AG_MANAGEMENTS[am]:
+                continue
+            
             am_j_list = [self.DESC2AGLU[lu] for lu in am_lus]
             current_ag_man_X_mrp = np.zeros(ag_q_mrp.shape, dtype=np.float32)
             for j in am_j_list:

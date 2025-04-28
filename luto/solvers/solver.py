@@ -229,11 +229,20 @@ class LutoSolver:
             for j_idx, j in enumerate(am_j_list):
                 # Create variable for all eligible cells - all lower bounds are zero
                 dry_lu_cells = self._input_data.ag_lu2cells[0, j]
+                irr_lu_cells = self._input_data.ag_lu2cells[1, j]
 
                 # for savanna burning, remove extra ineligible cells
                 if am_name == "savanna_burning":
                     dry_lu_cells = np.intersect1d(
                         dry_lu_cells, self._input_data.savanna_eligible_r
+                    )
+
+                elif am_name == "beef_-_hir" or am_name == "sheep_-_hir":
+                    dry_lu_cells = np.intersect1d(
+                        dry_lu_cells, self._input_data.hir_eligible_r
+                    )
+                    irr_lu_cells = np.intersect1d(
+                        irr_lu_cells, self._input_data.hir_eligible_r
                     )
 
                 for r in dry_lu_cells:
@@ -249,8 +258,7 @@ class LutoSolver:
                         ub=1,
                         name=dry_var_name,
                     )
-
-                irr_lu_cells = self._input_data.ag_lu2cells[1, j]
+                
                 for r in irr_lu_cells:
                     irr_x_lb = (
                         0
@@ -1547,6 +1555,14 @@ class LutoSolver:
                     )
                     eligible_irr_cells = np.intersect1d(
                         eligible_irr_cells, self._input_data.savanna_eligible_r
+                    )
+
+                elif am == "Beef - HIR" or am == "Sheep - HIR":
+                    eligible_dry_cells = np.intersect1d(
+                        eligible_dry_cells, self._input_data.hir_eligible_r
+                    )
+                    eligible_irr_cells = np.intersect1d(
+                        eligible_irr_cells, self._input_data.hir_eligible_r
                     )
 
                 for r in eligible_dry_cells:
