@@ -199,10 +199,11 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
     if separate:
         return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, **ghg_transition}
     else:
+        t_mrj = e_mrj + w_delta_mrj + ghg_t_mrj
         # Ensure transition costs for destocked land cells are zero - already handled in 'non_ag_to_ag_t_mrj' in input_data.py
         destocked_cells = tools.get_destocked_land_cells(lumap)
-        ghg_t_mrj[:, destocked_cells, :] = 0
-        return ghg_t_mrj
+        t_mrj[:, destocked_cells, :] = 0
+        return t_mrj
 
 
 def get_transition_matrices_from_base_year(data: Data, yr_idx, base_year, separate=False):

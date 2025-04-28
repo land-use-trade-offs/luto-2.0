@@ -1187,11 +1187,11 @@ def get_exclusions_destocked(data: Data, lumap: np.ndarray):
     """
     destocked_x_r = np.zeros(data.NCELLS).astype(np.int8)
     
-    sheep_j = tools.get_natural_sheep_code
+    sheep_j = tools.get_natural_sheep_code(data)
     sheep_cells = tools.get_cells_using_ag_landuse(lumap, sheep_j)
     destocked_x_r[sheep_cells] = 1
 
-    beef_j = tools.get_natural_beef_code
+    beef_j = tools.get_natural_beef_code(data)
     beef_cells = tools.get_cells_using_ag_landuse(lumap, beef_j)
     destocked_x_r[beef_cells] = 1
 

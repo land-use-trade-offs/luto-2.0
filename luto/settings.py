@@ -385,8 +385,8 @@ AG_MANAGEMENTS_REVERSIBLE = {
     'Savanna Burning': True,
     'AgTech EI': True,
     'Biochar': True,
-    'Beef - HIR': False,
-    'Sheep - HIR': False,
+    'Beef - HIR': True,
+    'Sheep - HIR': True,
 }
 """
 If settings.MODE == 'timeseries', the values of the below dictionary determine whether the model is allowed to abandon agricultural

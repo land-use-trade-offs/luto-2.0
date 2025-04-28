@@ -548,7 +548,7 @@ def get_sheep_hir_effect_q_mrp(data, q_mrp):
     # Set up the effects matrix
     q_mrp_effect = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
 
-    if not AG_MANAGEMENTS['Beef - HIR']:
+    if not AG_MANAGEMENTS['Sheep - HIR']:
         return q_mrp_effect
     
     # Update values in the new matrix    

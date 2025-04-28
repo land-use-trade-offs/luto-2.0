@@ -340,6 +340,7 @@ def get_ghg_destocked_land(
     unallocated_ghg_r = ag_g_mrj[0, :, unallocated_j]
 
     destocked_ghg_r = unallocated_ghg_r - penalty_ghg_r
+    breakpoint()
     if aggregate==True:
         return destocked_ghg_r
     elif aggregate==False:

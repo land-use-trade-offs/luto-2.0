@@ -186,7 +186,7 @@ def get_beef_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
     unallocated_b_mr = ag_b_mrj[:, :, unallocated_j]
 
     for idx in range(len(lu_codes)):
-        b_mrj_effect[:, :, idx] = -(unallocated_b_mr * (1 - settings.HIR_BIODIVERSITY_PENALTY))
+        b_mrj_effect[:, :, idx] = unallocated_b_mr * (1 - settings.HIR_BIODIVERSITY_PENALTY)
 
     return b_mrj_effect
 
@@ -210,7 +210,7 @@ def get_sheep_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
     unallocated_b_mr = ag_b_mrj[:, :, unallocated_j]
 
     for idx in range(len(lu_codes)):
-        b_mrj_effect[:, :, idx] = -(unallocated_b_mr * (1 - settings.HIR_BIODIVERSITY_PENALTY))
+        b_mrj_effect[:, :, idx] = unallocated_b_mr * (1 - settings.HIR_BIODIVERSITY_PENALTY)
 
     return b_mrj_effect
 
@@ -294,69 +294,6 @@ def get_GBF3_major_vegetation_group_limits(data, yr_cal: int) -> tuple[np.ndarra
     """
     
     return data.get_GBF3_limit_score_inside_LUTO_by_yr(yr_cal), data.BIO_GBF3_ID2DESC, data.MAJOR_VEG_INDECES
-
-
-def get_ag_management_biodiversity_impacts(
-    data: Data,
-    yr_cal: int,
-) -> dict[str, dict[int, np.ndarray]]:
-    return {
-        'Asparagopsis taxiformis': {
-            j_idx: np.zeros(data.NCELLS).astype(np.float32)
-            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis'])
-        },
-        'Precision Agriculture': {
-            j_idx: np.zeros(data.NCELLS).astype(np.float32)
-            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture'])
-        },
-        'Ecological Grazing': {
-            j_idx: np.zeros(data.NCELLS).astype(np.float32)
-            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing'])
-        },
-        'Savanna Burning': {
-            j_idx: 1 - data.BIO_RETAIN_FRACTION_LDS.astype(np.float32)
-            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning'])
-        },
-        'AgTech EI': {
-            j_idx: np.zeros(data.NCELLS).astype(np.float32)
-            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['AgTech EI'])
-        },
-        'Biochar': {
-            j_idx: (data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact'] - 1) * np.ones(data.NCELLS).astype(np.float32)
-            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Biochar'])
-        },
-        'Beef - HIR': {
-            j_idx: (np.ones(data.NCELLS) * (1 - settings.HIR_BIODIVERSITY_PENALTY)).astype(np.float32)
-            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR'])
-        },
-        'Sheep - HIR': {
-            j_idx: (np.ones(data.NCELLS) * (1 - settings.HIR_BIODIVERSITY_PENALTY)).astype(np.float32)
-            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR'])
-        },
-    }
-
-
-def get_species_conservation_limits(
-    data: Data,
-    yr_cal: int,
-) -> tuple[np.ndarray, dict[int, str], dict[int, np.ndarray]]:
-    """
-    Get species conservation limits.
-
-    Returns
-    -------
-    species_limits: np.ndarray
-        Limits for each species stored in an array.
-    species_names: dict[int, str]
-        Mapping of each species' ID to string format name
-    species_inds: dict[int, np.ndarray]
-        Mapping of each species' ID to the cells which contain it.
-    """
-    species_limits = data.get_GBF4A_suitability_target_inside_natural_LUTO_by_yr(yr_cal)
-    species_names = {s: spec_name for s, spec_name in enumerate(data.BIO_GBF4A_SEL_SPECIES)}
-    species_matrix = data.get_GBF4A_bio_layers_by_yr(yr_cal)
-    species_inds = {s: np.where(species_matrix[s] > 0)[0] for s in range(data.N_SPECIES)}
-    return species_limits, species_names, species_inds
 
 
 def get_GBF4_SNES_matrix_sr(data) -> np.ndarray:
@@ -527,6 +464,3 @@ def get_ag_management_biodiversity_contribution(
         }
     
     return am_contr_dict
-
-
-
