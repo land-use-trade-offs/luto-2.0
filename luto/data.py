@@ -1297,7 +1297,7 @@ class Data:
         ###############################################################
         print("\tLoading HIR data...", flush=True)
 
-        self.HIR_MASK = np.load(os.path.join(settings.INPUT_DIR, "hir_mask.npy"))[self.MASK]
+        self.HIR_MASK = np.load(os.path.join(settings.INPUT_DIR, "hir_mask.npy"))[self.MASK].astype(bool)
 
 
 
