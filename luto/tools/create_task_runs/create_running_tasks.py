@@ -26,8 +26,8 @@ from luto.tools.create_task_runs.helpers import (
     create_task_runs
 )
 
+# Set up license
 compute_num = 4
-
 os.environ["GRB_LICENSE_FILE"] = f"/home/582/jw6041/gurobi_lic_compute_{compute_num}/gurobi.lic"
 
 # Set the grid search parameters
@@ -64,7 +64,7 @@ grid_search = {
     # --------------- GHG settings ---------------
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],        # 'hard' or 'soft'
-    'USE_GHG_SCOPE_1': [True],         # True or False
+    'USE_GHG_SCOPE_1': [True],              # True or False
     'GHG_LIMITS_FIELD': [
         '1.5C (50%) excl. avoided emis SCOPE1', 
         '1.8C (67%) excl. avoided emis SCOPE1'
@@ -101,14 +101,10 @@ grid_search = {
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_WEIGHT_ALPHA': (
-        np.arange(0.01,0.1,0.01).tolist()
-        + np.arange(0.1,0.9,0.1).tolist()
-        + np.arange(0.9,1,0.01).tolist()
+        np.arange(0.01,0.21,0.01).tolist()
     ),
     'SOLVE_WEIGHT_BETA': (
-        np.arange(0.01,0.1,0.01).tolist()
-        + np.arange(0.1,0.9,0.1).tolist()
-        + np.arange(0.9,1,0.01).tolist()
+        np.arange(0.8,1.0,0.01).tolist()
     ), 
     
     
