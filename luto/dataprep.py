@@ -698,8 +698,8 @@ def create_new_dataset():
     
 
     # MASK for Human Induced Regrowth; only allow planting where average annual precipitation is less than 300mm
-    hir_mask = bioph['AVG_AN_PREC_MM_YR'] <= 300
-    np.save(outpath + 'hir_mask.npy', hir_mask.values)  # shape: (6956407,)
+    hir_mask = zones['HIR_MASK'].copy().values
+    np.save(outpath + 'hir_mask.npy', hir_mask)  # shape: (6956407,)
 
     # Fire risk low, medium, and high and save to file
     s = bioph[['FD_RISK_PERC_5TH', 'FD_RISK_MEDIAN', 'FD_RISK_PERC_95TH']].copy()

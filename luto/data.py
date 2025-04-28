@@ -38,9 +38,6 @@ from affine import Affine
 from scipy.interpolate import interp1d
 
 from luto.tools.spatializers import upsample_array
-from luto.economics.agricultural.biodiversity import get_bio_overall_priority_score_matrices_mrj
-from luto.economics.agricultural.cost import get_cost_matrices
-from luto.economics.agricultural.revenue import get_rev_matrices
 
 
 
@@ -193,20 +190,7 @@ class Data:
         self.COORD_LON_LAT_2D_FULLRES = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META_FULLRES['transform'])     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
         self.COORD_LON_LAT = [i[self.MASK] for i in self.COORD_LON_LAT_2D_FULLRES]  # Only keep the coordinates for the cells that are not masked out (i.e., land uses). 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only) and not masked out
         
-        # Get the resfactored lumap_2D as xarray DataArray
-        self.LUMAP_2D_RESFACTORED_XR = xr.DataArray(
-                self.LUMAP_2D_RESFACTORED,
-                dims=["y", "x"],
-                coords={
-                    "y": self.GEO_META['transform'].f + self.GEO_META['transform'].e * (np.arange(self.LUMAP_2D_RESFACTORED.shape[0]) + 0.5),
-                    "x": self.GEO_META['transform'].c + self.GEO_META['transform'].a * (np.arange(self.LUMAP_2D_RESFACTORED.shape[1]) + 0.5),
-                },
-                attrs={
-                    "crs": self.GEO_META['crs'],
-                    "transform": self.GEO_META['transform'],
-                }
-            )
-
+        
 
         ###############################################################
         # Load agricultural crop and livestock data.
@@ -713,6 +697,9 @@ class Data:
         # Non-agricultural data.
         ###############################################################
         print("\tLoading non-agricultural data...", flush=True)
+        
+        # Load HIR mask
+        self.HIR_MASK = np.load(os.path.join(settings.INPUT_DIR, "hir_mask.npy"))
 
         # Load plantings economic data
         self.EP_EST_COST_HA = pd.read_hdf(os.path.join(settings.INPUT_DIR, "ep_est_cost_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32)
