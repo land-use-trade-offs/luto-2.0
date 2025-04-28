@@ -23,6 +23,7 @@ from luto.settings import NON_AG_LAND_USES
 
 from luto.data import Data
 from luto import tools
+from luto.economics.agricultural import ghg as ag_ghg
 
 
 def get_ghg_env_plantings(data: Data, aggregate) -> np.ndarray|pd.DataFrame:
@@ -306,6 +307,47 @@ def get_ghg_beccs(data, aggregate) -> np.ndarray|pd.DataFrame:
     else:
     # If the aggregate arguments is not in [True,False]. That must be someting wrong
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
+    
+
+def get_ghg_destocked_land(
+    data: Data,
+    ag_g_mrj: np.ndarray,
+    lumap: np.ndarray,
+    aggregate: bool = True,
+) -> np.ndarray:
+    """
+    Calculate the greenhouse gas emissions of Destocked land for each cell.
+    
+    Parameters
+    ----------
+    data: object/module
+        Data object or module with fields like in `luto.data`.
+
+    Returns
+    -------
+    if aggregate == True (default)  -> np.ndarray
+       aggregate == False           -> pd.DataFrame
+    """
+    lvstk_natural_cells = tools.get_lvstk_natural_lu_cells(data, lumap)
+    
+    penalty_ghg_r = np.zeros(data.NCELLS)
+    penalty_ghg_r[lvstk_natural_cells] = (
+          data.GHG_PENALTY_LVSTK_NATURAL_TO_UNALL_NATURAL[lvstk_natural_cells]
+        * data.REAL_AREA[lvstk_natural_cells]
+    )
+
+    unallocated_j = tools.get_unallocated_natural_land_code(data)
+    unallocated_ghg_r = ag_g_mrj[0, :, unallocated_j]
+
+    destocked_ghg_r = unallocated_ghg_r + penalty_ghg_r
+    if aggregate==True:
+        return destocked_ghg_r
+    elif aggregate==False:
+        return pd.DataFrame(destocked_ghg_r, columns=['DESTOCKED_LAND'])
+    else:
+    # If the aggregate arguments is not in [True,False]. That must be someting wrong
+        raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
+
 
 
 def get_ghg_matrix(data: Data, ag_g_mrj, lumap, aggregate=True) -> np.ndarray:
@@ -356,6 +398,9 @@ def get_ghg_matrix(data: Data, ag_g_mrj, lumap, aggregate=True) -> np.ndarray:
 
     if NON_AG_LAND_USES['BECCS']:
         non_agr_ghg_matrices['BECCS'] = get_ghg_beccs(data, aggregate)
+
+    if NON_AG_LAND_USES['Destocked - natural land']:
+        non_agr_ghg_matrices['Destocked - natural land'] = get_ghg_destocked_land(data, ag_g_mrj, lumap, aggregate)
       
     if aggregate==True:
         # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing

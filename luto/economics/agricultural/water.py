@@ -336,6 +336,82 @@ def get_biochar_effect_w_mrj(data, yr_idx):
     return w_mrj_effect
 
 
+def get_beef_hir_effect_w_mrj(data, yr_idx):
+    """
+    Applies the effects of using HIR to the water net yield data
+    for the natural beef land use.
+
+    Parameters:
+    - data: The data object containing relevant information.
+    - w_mrj <unit:ML/cell>: The water net yield data for all land uses.
+    - yr_idx: The index of the year.
+
+    Returns:
+    - w_mrj_effects <unit:ML/cell>: The updated water net yield data with Biochar applied.
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
+
+    w_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+    base_w_req_mrj = np.stack(( data.WREQ_DRY_RJ, data.WREQ_IRR_RJ ))
+
+    for lu_idx, lu in enumerate(land_uses):
+        j = data.DESC2AGLU[lu]
+
+        multiplier = 1 - settings.HIR_PRODUCTIVITY_PENALTY
+
+        # Reduce water requirements due to drop in yield potential (increase in net yield)
+        if lu in data.LU_LVSTK:
+            lvs, veg = lvs_veg_types(lu)
+
+            w_mrj_effects[0, :, lu_idx] = (
+                (multiplier - 1) * base_w_req_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', yr_idx)
+            )
+            w_mrj_effects[1, :, lu_idx] = (
+                (multiplier - 1) * base_w_req_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)
+            )
+
+    return w_mrj_effects
+
+
+def get_sheep_hir_effect_w_mrj(data, yr_idx):
+    """
+    Applies the effects of using HIR to the water net yield data
+    for the natural sheep land use.
+
+    Parameters:
+    - data: The data object containing relevant information.
+    - w_mrj <unit:ML/cell>: The water net yield data for all land uses.
+    - yr_idx: The index of the year.
+
+    Returns:
+    - w_mrj_effects <unit:ML/cell>: The updated water net yield data with Biochar applied.
+    """
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
+
+    w_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
+    base_w_req_mrj = np.stack(( data.WREQ_DRY_RJ, data.WREQ_IRR_RJ ))
+
+    for lu_idx, lu in enumerate(land_uses):
+        j = data.DESC2AGLU[lu]
+
+        multiplier = 1 - settings.HIR_PRODUCTIVITY_PENALTY
+
+        # Reduce water requirements due to drop in yield potential (increase in net yield)
+        if lu in data.LU_LVSTK:
+            lvs, veg = lvs_veg_types(lu)
+
+            w_mrj_effects[0, :, lu_idx] = (
+                multiplier * base_w_req_mrj[0, :, j] * get_yield_pot(data, lvs, veg, 'dry', yr_idx)
+            )
+            w_mrj_effects[1, :, lu_idx] = (
+                multiplier * base_w_req_mrj[1, :, j] * get_yield_pot(data, lvs, veg, 'irr', 0)
+            )
+
+        # TODO - potential effects of increased water yield of HIR areas?
+
+    return w_mrj_effects
+
+
 def get_agricultural_management_water_matrices(data, yr_idx) -> dict[str, np.ndarray]:
     asparagopsis_data = (
         get_asparagopsis_effect_w_mrj(data, yr_idx)
@@ -367,6 +443,16 @@ def get_agricultural_management_water_matrices(data, yr_idx) -> dict[str, np.nda
         if settings.AG_MANAGEMENTS['Biochar']
         else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['Biochar']))).astype(np.float32)
     )
+    beef_hir_data = (
+        get_beef_hir_effect_w_mrj(data, yr_idx)
+        if settings.AG_MANAGEMENTS['Beef - HIR']
+        else np.zeros((data.NLMS, data.NCELLS, len(settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']))).astype(np.float32)
+    )
+    sheep_hir_data = (
+        get_sheep_hir_effect_w_mrj(data, yr_idx)
+        if settings.AG_MANAGEMENTS['Sheep - HIR']
+        else np.zeros((data.NLMS, data.NCELLS, len(settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']))).astype(np.float32)
+    )
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -375,6 +461,8 @@ def get_agricultural_management_water_matrices(data, yr_idx) -> dict[str, np.nda
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
         'Biochar': biochar_data,
+        'Beef - HIR': beef_hir_data,
+        'Sheep - HIR': sheep_hir_data,
     }
 
 

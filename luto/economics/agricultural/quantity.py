@@ -27,7 +27,7 @@ from typing import Dict
 import numpy as np
 from scipy.interpolate import interp1d
 
-from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import AG_MANAGEMENTS, HIR_PRODUCTIVITY_PENALTY, AG_MANAGEMENTS_TO_LAND_USES
 
 
 def lvs_veg_types(lu) -> tuple[str, str]:
@@ -520,6 +520,48 @@ def get_biochar_effect_q_mrp(data, q_mrp, yr_idx):
     return new_q_mrp
 
 
+def get_beef_hir_effect_q_mrp(data, q_mrp):
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+
+    # Set up the effects matrix
+    q_mrp_effect = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
+
+    if not AG_MANAGEMENTS['Beef - HIR']:
+        return q_mrp_effect
+    
+    # Update values in the new matrix    
+    for lu, j in zip(land_uses, lu_codes):
+        multiplier = 1 - HIR_PRODUCTIVITY_PENALTY
+        # Apply to all products associated with land use
+        for p in range(data.NPRS):
+            if data.LU2PR[p, j]:
+                q_mrp_effect[:, :, p] = q_mrp[:, :, p] * (multiplier - 1)
+
+    return q_mrp_effect
+
+
+def get_sheep_hir_effect_q_mrp(data, q_mrp):
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
+
+    # Set up the effects matrix
+    q_mrp_effect = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
+
+    if not AG_MANAGEMENTS['Sheep - HIR']:
+        return q_mrp_effect
+    
+    # Update values in the new matrix    
+    for lu, j in zip(land_uses, lu_codes):
+        multiplier = 1 - HIR_PRODUCTIVITY_PENALTY
+        # Apply to all products associated with land use
+        for p in range(data.NPRS):
+            if data.LU2PR[p, j]:
+                q_mrp_effect[:, :, p] = q_mrp[:, :, p] * (multiplier - 1)
+
+    return q_mrp_effect
+
+
 def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[str, np.ndarray]:
     """
     Calculates the quantity matrices for different agricultural management practices.
@@ -539,6 +581,8 @@ def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[s
     sav_burning_data = get_savanna_burning_effect_q_mrp(data) if AG_MANAGEMENTS['Savanna Burning'] else 0
     agtech_ei_data = get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx) if AG_MANAGEMENTS['AgTech EI'] else 0
     biochar_data = get_biochar_effect_q_mrp(data, q_mrp, yr_idx) if AG_MANAGEMENTS['Biochar'] else 0
+    beef_hir_data = get_beef_hir_effect_q_mrp(data, q_mrp) if AG_MANAGEMENTS['Beef - HIR'] else 0
+    sheep_hir_data = get_sheep_hir_effect_q_mrp(data, q_mrp) if AG_MANAGEMENTS['Sheep - HIR'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -547,4 +591,6 @@ def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[s
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
         'Biochar': biochar_data,
+        'Beef - HIR': beef_hir_data,
+        'Sheep - HIR': sheep_hir_data,
     }
