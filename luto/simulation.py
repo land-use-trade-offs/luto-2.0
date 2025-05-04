@@ -73,7 +73,7 @@ def load_data() -> Data:
 @LogToFile(f"{settings.OUTPUT_DIR}/run_{read_timestamp()}", 'a')
 def run(
     data: Data, 
-    years = settings.SIM_YERAS,
+    years = settings.SIM_YEARS,
 ) -> None:
     """
     Run the simulation.
@@ -81,7 +81,7 @@ def run(
     Parameters
         - data: is a Data object which is previously loaded using load_data(),
         - years: is a list of years to run the simulation for. If not provided, it will
-            use the default years from settings.SIM_YERAS.
+            use the default years from settings.SIM_YEARS.
     """
     # Start recording memory usage
     memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1), daemon=True)

@@ -27,7 +27,7 @@ from luto.tools.write import write_outputs
 
 # Run the simulation
 data = sim.load_data()
-sim.run(data=data, years=settings.SIM_YERAS)
+sim.run(data=data, years=settings.SIM_YEARS)
 write_outputs(data)
 
 

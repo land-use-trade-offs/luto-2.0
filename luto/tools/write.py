@@ -91,7 +91,7 @@ def write_data(data: Data):
     write_settings(data.path)
 
     # Get the years to write
-    years = settings.SIM_YERAS
+    years = settings.SIM_YEARS
     paths = [f"{data.path}/out_{yr}" for yr in years]
 
     ###############################################################
@@ -785,7 +785,7 @@ def write_area_transition_start_end(data: Data, path):
 
     # Get the end year
     yr_cal_start = data.YR_CAL_BASE
-    yr_cal_end = settings.SIM_YERAS[-1]
+    yr_cal_end = settings.SIM_YEARS[-1]
 
     # Get the decision variables for the start year
     dvar_base = tools.lumap2ag_l_mrj(data.lumaps[yr_cal_start], data.lmmaps[yr_cal_start])
@@ -1659,7 +1659,7 @@ def write_ghg(data: Data, yr_cal, path):
     if yr_cal >= data.YR_CAL_BASE + 1:
         ghg_emissions = data.prod_data[yr_cal]['GHG Emissions']
     else:
-        ghg_emissions = (ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True) * data.ag_dvars[settings.SIM_YERAS[0]]).sum()
+        ghg_emissions = (ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True) * data.ag_dvars[settings.SIM_YEARS[0]]).sum()
 
     # Save GHG emissions to file
     df = pd.DataFrame({

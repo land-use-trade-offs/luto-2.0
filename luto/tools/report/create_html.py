@@ -43,7 +43,7 @@ def data2html(raw_data_dir):
         raise FileNotFoundError(f"Report directory not found: {report_dir}") 
     
     # Get the avaliable years for the model
-    years_str = str(sorted(settings.SIM_YERAS))
+    years_str = str(sorted(settings.SIM_YEARS))
         
         
     ####################################################

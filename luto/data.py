@@ -911,7 +911,7 @@ class Data:
         # Get the carbon emissions from the one natural land to another
         self.GHG_PENALTY_UNALL_NATURAL_TO_MODIFIED = co2e_stock_unall_natural
         self.GHG_PENALTY_UNALL_NATURAL_TO_LVSTK_NATURAL = co2e_stock_unall_natural - co2e_stock_lvstk_natural
-        self.GHG_PENALTY_LVSTK_NATURAL_TO_UNALL_NATURAL = co2e_stock_lvstk_natural - co2e_stock_unall_natural
+        self.GHG_PENALTY_LVSTK_NATURAL_TO_UNALL_NATURAL = (co2e_stock_lvstk_natural - co2e_stock_unall_natural)/91
         self.GHG_PENALTY_LVSTK_NATURAL_TO_MODIFIED = co2e_stock_lvstk_natural
 
 

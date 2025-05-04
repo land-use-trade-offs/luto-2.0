@@ -47,7 +47,7 @@ grid_search = {
     'OBJECTIVE': ['maxprofit'],                 # 'maxprofit' or 'maxutility'
     'MODE': ['timeseries'],                     # 'snapshot' or 'timeseries'
     'RESFACTOR': [15],
-    'SIM_YERAS': [[2010,2020,2030,2040,2050]],   # Years to run the model 
+    'SIM_YEARS': [[2010,2020,2030,2040,2050]],   # Years to run the model 
     'WRITE_THREADS': [5],
     'WRITE_OUTPUT_GEOTIFFS': [False],
     'KEEP_OUTPUTS': [False],                    # If False, only keep report HTML

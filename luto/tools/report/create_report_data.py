@@ -61,7 +61,7 @@ def save_report_data(raw_data_dir:str):
     SAVE_DIR = f'{raw_data_dir}/DATA_REPORT/data'
     
     # Select the years to reduce the column number to avoid cluttering in the multi-level axis graphing
-    years = sorted(settings.SIM_YERAS)
+    years = sorted(settings.SIM_YEARS)
     years_select = select_years(years)
     
     # Create the directory if it does not exist
