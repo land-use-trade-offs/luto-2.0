@@ -282,24 +282,9 @@ def submit_task(col:str, mode:Literal['single','cluster']='single'):
     time.sleep(np.random.choice([1, 2]))
     
     if mode == 'single': 
-        # Submit the task
-        retries = 3
-        for attempt in range(retries):
-            try:
-                subprocess.run(['python', 'python_script.py'], cwd=f'{TASK_ROOT_DIR}/{col}', check=True)
-                break  # Exit the loop if the task succeeds
-            except subprocess.CalledProcessError:
-                if attempt < retries - 1:
-                    print(f"Task {col} failed. Retrying in 10 seconds... (Attempt {attempt + 1}/{retries})")
-                    time.sleep(10)
-            else:
-                raise RuntimeError(f"Task {col} failed after {retries} attempts.")
-    
-    # Start the task if the os is linux
+        subprocess.run(['python', 'python_script.py'], cwd=f'{TASK_ROOT_DIR}/{col}', check=True)
     elif mode == 'cluster' and os.name == 'posix':
-        # Submit the task to the cluster
         subprocess.run(['bash', 'task_cmd.sh'], cwd=f'{TASK_ROOT_DIR}/{col}')
-    
     else:
         raise ValueError('Mode must be either "single" or "cluster"!')
     

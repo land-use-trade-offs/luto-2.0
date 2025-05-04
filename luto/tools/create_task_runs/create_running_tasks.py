@@ -34,7 +34,7 @@ grid_search = {
     # Task run settings for submitting the job to the cluster
     ###############################################################
     'MEM': ['24GB'],
-    'NCPUS':[2],
+    'NCPUS':[20],
     'TIME': ['2:00:00'],
     'QUEUE': ['normalsr'],
     
