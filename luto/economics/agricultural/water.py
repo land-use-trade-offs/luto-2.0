@@ -446,12 +446,12 @@ def get_agricultural_management_water_matrices(data, yr_idx) -> dict[str, np.nda
     beef_hir_data = (
         get_beef_hir_effect_w_mrj(data, yr_idx)
         if settings.AG_MANAGEMENTS['Beef - HIR']
-        else np.zeros((data.NLMS, data.NCELLS, len(settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']))).astype(np.float32)
+        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['Beef - HIR']))).astype(np.float32)
     )
     sheep_hir_data = (
         get_sheep_hir_effect_w_mrj(data, yr_idx)
         if settings.AG_MANAGEMENTS['Sheep - HIR']
-        else np.zeros((data.NLMS, data.NCELLS, len(settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']))).astype(np.float32)
+        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['Sheep - HIR']))).astype(np.float32)
     )
 
     return {

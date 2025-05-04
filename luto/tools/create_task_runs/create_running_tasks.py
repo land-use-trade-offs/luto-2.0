@@ -26,9 +26,7 @@ from luto.tools.create_task_runs.helpers import (
     create_task_runs
 )
 
-# Set up license
-compute_num = 4
-os.environ["GRB_LICENSE_FILE"] = f"/home/582/jw6041/gurobi_lic_compute_{compute_num}/gurobi.lic"
+
 
 # Set the grid search parameters
 grid_search = {
@@ -46,11 +44,11 @@ grid_search = {
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                 # 'maxprofit' or 'maxutility'
     'MODE': ['timeseries'],                     # 'snapshot' or 'timeseries'
-    'RESFACTOR': [15],
-    'SIM_YEARS': [[2010,2020,2030,2040,2050]],   # Years to run the model 
+    'RESFACTOR': [5],
+    'SIM_YEARS': [list(range(2020,2051,5))],   # Years to run the model 
     'WRITE_THREADS': [5],
-    'WRITE_OUTPUT_GEOTIFFS': [False],
-    'KEEP_OUTPUTS': [False],                    # If False, only keep report HTML
+    'WRITE_OUTPUT_GEOTIFFS': [True],
+    'KEEP_OUTPUTS': [True],                    # If False, only keep report HTML
     
  
     ###############################################################
@@ -80,10 +78,10 @@ grid_search = {
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSTIY_TARGET_GBF_2': ['on'],    # 'on' or 'off'
+    'BIODIVERSTIY_TARGET_GBF_2': ['on','off'],    # 'on' or 'off'
     'BIODIV_GBF_TARGET_2_DICT': [
-        {2010: 0, 2030: 0.15, 2050: 0.3, 2100: 0.3}, 
-        {2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.3}, 
+        {2010: 0, 2030: 0.15, 2050: 0.15, 2100: 0.15}, 
+        {2010: 0, 2030: 0.15, 2050: 0.25, 2100: 0.25}, 
     ],
 
     # --------------- Biodiversity settings - GBF 3 ---------------
@@ -100,12 +98,8 @@ grid_search = {
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
-    'SOLVE_WEIGHT_ALPHA': (
-        np.arange(0.01,0.21,0.01).tolist()
-    ),
-    'SOLVE_WEIGHT_BETA': (
-        np.arange(0.8,1.0,0.01).tolist()
-    ), 
+    'SOLVE_WEIGHT_ALPHA': [0.1],
+    'SOLVE_WEIGHT_BETA': [0.9], 
     
     
     #-------------------- Diet BAU --------------------
@@ -126,11 +120,11 @@ create_grid_search_permutations(grid_search)
 
 # Read the template for the custom settings
 grid_search_df = create_grid_search_settings_df()
-chunks = np.array_split(range(grid_search_df.shape[1]-2), 4)
-grid_search_df = grid_search_df.loc[:, ['Name'] + [f'Run_{i+1:04}' for i in chunks[compute_num - 1]]]
+
+
 
 # 1) Submit task to a single linux machine, and run simulations parallely
-create_task_runs(grid_search_df, mode='single', n_workers=100)
+create_task_runs(grid_search_df, mode='single', n_workers=8)
 
 # 2) Submit task to multiple linux computation nodes
 # create_task_runs(grid_search_df, mode='cluster')
