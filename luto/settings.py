@@ -100,10 +100,10 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 5       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS = list(range(2010,2051,10)) # range(2020,2050)
+SIM_YEARS = list(range(2010,2051,5)) # range(2020,2050)
 
 
 # How does the model run over time
@@ -166,8 +166,8 @@ THREADS = min(32, os.cpu_count())
 
 EXCLUDE_NO_GO_LU = False
 NO_GO_VECTORS = {
-    'Winter cereals':           f'{os.path.abspath(INPUT_DIR)}/no_go_areas/no_go_Winter_cereals.shp',
-    'Environmental Plantings':  f'{os.path.abspath(INPUT_DIR)}/no_go_areas/no_go_Enviornmental_Plantings.shp'
+    'Winter cereals':           os.path.join(INPUT_DIR, 'no_go_areas', 'no_go_Winter_cereals.shp'),
+    'Environmental Plantings':  os.path.join(INPUT_DIR, 'no_go_areas', 'no_go_Enviornmental_Plantings.shp')
 }
 '''
 Land-use and vector file pairs to exclude land-use from being utilised in that area. 
@@ -284,45 +284,33 @@ AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per h
 
 
 AG_MANAGEMENTS_TO_LAND_USES = {
-    'Asparagopsis taxiformis': [
-        'Beef - modified land', 'Sheep - modified land', 'Dairy - natural land', 'Dairy - modified land'
-    ],
+    'Asparagopsis taxiformis':  ['Beef - modified land', 'Sheep - modified land', 'Dairy - natural land', 'Dairy - modified land'],
     
-    'Precision Agriculture': [
-        # Cropping:
-        'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
-        # Intensive Cropping:
-        'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
-        # Horticulture:
-        'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'
-    ],
+    'Precision Agriculture':    [# Cropping:
+                                'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
+                                # Intensive Cropping:
+                                'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
+                                # Horticulture:
+                                'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'],
     
-    'Ecological Grazing': [
-        'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
-    ],
+    'Ecological Grazing':       ['Beef - modified land', 'Sheep - modified land', 'Dairy - modified land'],
     
-    'Savanna Burning': [
-        'Beef - natural land', 'Dairy - natural land', 'Sheep - natural land', 'Unallocated - natural land',
-    ],
+    'Savanna Burning': [        'Beef - natural land', 'Dairy - natural land', 'Sheep - natural land', 'Unallocated - natural land'],
     
-    'AgTech EI': [
-        # Cropping:
-        'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
-        # Intensive Cropping:
-        'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
-        # Horticulture:
-        'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'
-    ],
+    'AgTech EI': [              # Cropping:
+                                'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
+                                # Intensive Cropping:
+                                'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
+                                # Horticulture:
+                                'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'],
     
-    'Biochar': [
-        # Cropping
-        'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
-        # Horticulture:
-        'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit',
-    ],
+    'Biochar':                  [# Cropping
+                                'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
+                                # Horticulture:
+                                'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'],
 
-    'Beef - HIR': ['Beef - natural land'],
-    'Sheep - HIR': ['Sheep - natural land'],
+    'Beef - HIR':               ['Beef - natural land'],
+    'Sheep - HIR':              ['Sheep - natural land'],
 }
 
 

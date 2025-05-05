@@ -20,6 +20,7 @@
 
 import os
 import xarray as xr
+import netCDF4  # Necessary for runing LUTO2 in Denethor
 import numpy as np
 import pandas as pd
 import rasterio
