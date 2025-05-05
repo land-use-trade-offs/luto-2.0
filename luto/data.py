@@ -593,7 +593,6 @@ class Data:
         self.SOIL_CARBON_AVG_T_CO2_HA = (
             pd.read_hdf(os.path.join(settings.INPUT_DIR, "soil_carbon_t_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32) 
             * (44 / 12) 
-            / settings.SOC_AMORTISATION
         )
 
 

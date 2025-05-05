@@ -545,6 +545,7 @@ def get_ecological_grazing_effect_g_mrj(data, yr_idx):
                     data.SOIL_CARBON_AVG_T_CO2_HA
                     * soil_multiplier
                     * data.REAL_AREA  # adjust for resfactor
+                    / settings.SOC_AMORTISATION # annualise the soil carbon sequestration
                 )
                 new_g_mrj[m, :, lu_idx] -= soil_reduction_amnt
 
@@ -706,6 +707,7 @@ def get_biochar_effect_g_mrj(data, yr_idx):
                     data.SOIL_CARBON_AVG_T_CO2_HA
                     * soil_multiplier
                     * data.REAL_AREA  # adjust for resfactor
+                    / settings.SOC_AMORTISATION # annualise the soil carbon sequestration 
                 )
                 new_g_mrj[m, :, lu_idx] -= soil_reduction_amnt
 

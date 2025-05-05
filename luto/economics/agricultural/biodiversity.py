@@ -167,6 +167,7 @@ def get_biochar_effect_b_mrj(data, ag_b_mrj: np.ndarray, yr_idx):
     return b_mrj_effect
 
 
+
 def get_beef_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
     """
     Gets biodiversity impacts of using HIR on beef.
@@ -178,15 +179,15 @@ def get_beef_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
     - b_mrj_effect: A numpy array representing the biodiversity impacts of using Biochar.
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
-    lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
     unallocated_j = tools.get_unallocated_natural_land_code(data)
     # HIR's biodiversity contribution is based on that of unallocated land 
     unallocated_b_mr = ag_b_mrj[:, :, unallocated_j]
 
-    for idx in range(len(lu_codes)):
-        b_mrj_effect[:, :, idx] = unallocated_b_mr * (1 - settings.HIR_BIODIVERSITY_PENALTY)
+    for idx, lu_code in enumerate(lu_codes):
+        b_mrj_effect[:, :, idx] = unallocated_b_mr * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu_code])
 
     return b_mrj_effect
 
@@ -202,15 +203,15 @@ def get_sheep_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
     - b_mrj_effect: A numpy array representing the biodiversity impacts of using Biochar.
     """
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
-    lu_codes = np.array([data.DESC2AGLU[lu] for lu in land_uses])
+    lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
     unallocated_j = tools.get_unallocated_natural_land_code(data)
     # HIR's biodiversity contribution is based on that of unallocated land 
     unallocated_b_mr = ag_b_mrj[:, :, unallocated_j]
 
-    for idx in range(len(lu_codes)):
-        b_mrj_effect[:, :, idx] = unallocated_b_mr * (1 - settings.HIR_BIODIVERSITY_PENALTY)
+    for idx, lu_code in enumerate(lu_codes):
+        b_mrj_effect[:, :, idx] = unallocated_b_mr * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu_code])
 
     return b_mrj_effect
 
