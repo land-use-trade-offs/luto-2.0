@@ -278,17 +278,19 @@ def submit_task(col:str, mode:Literal['single','cluster']='single'):
     # Copy the slurm script to the task folder
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/task_cmd.sh', f'{TASK_ROOT_DIR}/{col}/task_cmd.sh')
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/python_script.py', f'{TASK_ROOT_DIR}/{col}/python_script.py')
-    
-    time.sleep(np.random.choice([1, 2]))
-    
-    if mode == 'single': 
-        subprocess.run(['python', 'python_script.py'], cwd=f'{TASK_ROOT_DIR}/{col}', check=True)
-    elif mode == 'cluster' and os.name == 'posix':
-        subprocess.run(['bash', 'task_cmd.sh'], cwd=f'{TASK_ROOT_DIR}/{col}')
-    else:
-        raise ValueError('Mode must be either "single" or "cluster"!')
-    
-    return f'Task {col} has been submitted!'
+
+
+    with open(f'{TASK_ROOT_DIR}/{col}/run_std.log', 'w') as std_file, \
+         open(f'{TASK_ROOT_DIR}/{col}/run_err.log', 'w') as err_file:
+
+        if mode == 'single': 
+            subprocess.run(['python', 'python_script.py'], cwd=f'{TASK_ROOT_DIR}/{col}', stdout=std_file, stderr=err_file)
+        elif mode == 'cluster' and os.name == 'posix':
+            subprocess.run(['bash', 'task_cmd.sh'], cwd=f'{TASK_ROOT_DIR}/{col}', stdout=std_file, stderr=err_file)
+        else:
+            raise ValueError('Mode must be either "single" or "cluster"!')
+        
+        return f'Task {col} has been submitted!'
 
 
 def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1):
