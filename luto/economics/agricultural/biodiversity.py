@@ -455,12 +455,18 @@ def get_ag_management_biodiversity_contribution(
         }
     if settings.AG_MANAGEMENTS['Beef - HIR']:
         am_contr_dict['Beef - HIR'] = {
-            j_idx: np.ones(data.NCELLS).astype(np.float32) * (1 - settings.HIR_BIODIVERSITY_PENALTY)
+            j_idx: (
+                np.ones(data.NCELLS).astype(np.float32) 
+                * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_natural_beef_code(data)])    # The proportional gap of biodiversity between beef-natural to full-natural
+            )
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR'])
         }
     if settings.AG_MANAGEMENTS['Sheep - HIR']:
         am_contr_dict['Sheep - HIR'] = {
-            j_idx: np.ones(data.NCELLS).astype(np.float32) * (1 - settings.HIR_BIODIVERSITY_PENALTY)
+            j_idx: (
+                np.ones(data.NCELLS).astype(np.float32)
+                * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_natural_sheep_code(data)])   # The proportional gap of biodiversity between sheep-natural to full-natural
+            )
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR'])
         }
     

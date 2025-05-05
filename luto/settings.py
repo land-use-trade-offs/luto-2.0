@@ -370,11 +370,14 @@ SAVBURN_COST_HA_YR = 100
 # The minimum value an agricultural management variable must take for the write_output function to consider it being used on a cell
 AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1
 
+# Productivity contribution of HIR compared to not implementing HIR
+HIR_PRODUCTIVITY_CONTRIBUTION = 0.5
 
+# Maintainace cost for HIR
+BEEF_HIR_MAINTAINANCE_COST_PER_HA_PER_YEAR = 0
+SHEEP_HIR_MAINTAINANCE_COST_PER_HA_PER_YEAR = 0
 
-HIR_PRODUCTIVITY_PENALTY = 0.5
-HIR_BIODIVERSITY_PENALTY = 0.5  # Biodiversity penalty of HIR when compared to destocked land
-
+# HIR effecting years
 HIR_EFFECT_YEARS = 91
 
 

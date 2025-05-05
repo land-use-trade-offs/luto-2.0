@@ -30,7 +30,6 @@ from luto.settings import (
     BIO_CONTRIBUTION_BECCS,
     AF_PROPORTION,
     CP_BELT_PROPORTION,
-    HIR_BIODIVERSITY_PENALTY,
 )
 
 
@@ -272,5 +271,5 @@ def get_non_ag_lu_biodiv_contribution(data: Data) -> dict[int, float]:
         # BECCS
         7: BIO_CONTRIBUTION_BECCS,
         # Destocked land
-        8: 1 - HIR_BIODIVERSITY_PENALTY,
+        8: data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_unallocated_natural_land_code(data)],
     }
