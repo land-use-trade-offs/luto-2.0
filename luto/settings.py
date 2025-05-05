@@ -100,10 +100,10 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 5       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS = list(range(2010,2051,5)) # range(2020,2050)
+SIM_YEARS = list(range(2010,2051,10)) # range(2020,2050)
 
 
 # How does the model run over time
@@ -370,8 +370,15 @@ SAVBURN_COST_HA_YR = 100
 # The minimum value an agricultural management variable must take for the write_output function to consider it being used on a cell
 AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1
 
+
+
 HIR_PRODUCTIVITY_PENALTY = 0.5
 HIR_BIODIVERSITY_PENALTY = 0.5  # Biodiversity penalty of HIR when compared to destocked land
+
+HIR_EFFECT_YEARS = 91
+
+
+
 
 # ---------------------------------------------------------------------------- #
 # Off-land commodity parameters

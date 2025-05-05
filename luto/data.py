@@ -899,22 +899,11 @@ class Data:
     
         # Load the natural land carbon data.
         nat_land_CO2 = pd.read_hdf(os.path.join(settings.INPUT_DIR, "natural_land_t_co2_ha.h5"), where=self.MASK)
-        # Get the carbon sequestration in each natural land types
-        co2e_stock_unall_natural = np.array(
+        
+        # Get the carbon stock of unallowcated natural land
+        self.CO2E_STOCK_UNALL_NATURAL = np.array(
             nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * fire_risk.to_numpy() / 100),
-            dtype=np.float32
         )
-        co2e_stock_lvstk_natural = np.array(
-            co2e_stock_unall_natural - (0.3 * nat_land_CO2['NATURAL_LAND_AGB_TCO2_HA']) * (fire_risk.to_numpy() / 100),
-            dtype=np.float32
-        )
-
-        # Get the carbon emissions from the one natural land to another
-        self.GHG_PENALTY_UNALL_NATURAL_TO_MODIFIED = co2e_stock_unall_natural
-        self.GHG_PENALTY_UNALL_NATURAL_TO_LVSTK_NATURAL = co2e_stock_unall_natural - co2e_stock_lvstk_natural
-        self.GHG_PENALTY_LVSTK_NATURAL_TO_UNALL_NATURAL = (co2e_stock_lvstk_natural - co2e_stock_unall_natural)/91
-        self.GHG_PENALTY_LVSTK_NATURAL_TO_MODIFIED = co2e_stock_lvstk_natural
-
 
 
         ###############################################################

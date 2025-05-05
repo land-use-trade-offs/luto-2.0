@@ -327,7 +327,7 @@ def get_non_ag_q_crk(data: Data, ag_q_mrp: np.ndarray, base_year: int):
 
 def get_ag_ghg_t_mrj(data: Data, base_year):
     print('Getting agricultural transitions GHG emissions...', flush = True)
-    output = ag_ghg.get_ghg_transition_penalties(data, data.lumaps[base_year])
+    output = ag_ghg.get_ghg_transition_emissions(data, data.lumaps[base_year])
     return output.astype(np.float32)
 
 

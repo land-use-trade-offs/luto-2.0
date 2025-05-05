@@ -18,7 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 
-TASK_ROOT_DIR = '../Custom_runs/20250504_HIR_RES5_YR5_START_2010'  
+TASK_ROOT_DIR = '../Custom_runs/20250505_RES15_YR5_START_10_TEST_RUNS'  
 # Remove possible trailing slash
 if TASK_ROOT_DIR[-1] == '/':
     TASK_ROOT_DIR = TASK_ROOT_DIR[:-1]

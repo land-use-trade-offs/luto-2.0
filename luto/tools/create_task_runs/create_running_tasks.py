@@ -44,8 +44,8 @@ grid_search = {
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                 # 'maxprofit' or 'maxutility'
     'MODE': ['timeseries'],                     # 'snapshot' or 'timeseries'
-    'RESFACTOR': [5],
-    'SIM_YEARS': [list(range(2020,2051,5))],   # Years to run the model 
+    'RESFACTOR': [15],
+    'SIM_YEARS': [list(range(2010,2051,10))],   # Years to run the model 
     'WRITE_THREADS': [5],
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'KEEP_OUTPUTS': [True],                    # If False, only keep report HTML
@@ -124,8 +124,8 @@ grid_search_df = create_grid_search_settings_df()
 
 
 # 1) Submit task to a single linux machine, and run simulations parallely
-create_task_runs(grid_search_df, mode='single', n_workers=8)
+# create_task_runs(grid_search_df, mode='single', n_workers=8)
 
 # 2) Submit task to multiple linux computation nodes
-# create_task_runs(grid_search_df, mode='cluster')
+create_task_runs(grid_search_df, mode='cluster')
 

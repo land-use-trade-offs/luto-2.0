@@ -1777,7 +1777,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
         pass
     else:
         yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
-        ghg_t_dict = ag_ghg.get_ghg_transition_penalties(data, data.lumaps[yr_cal_sim_pre], separate=True)
+        ghg_t_dict = ag_ghg.get_ghg_transition_emissions(data, data.lumaps[yr_cal_sim_pre], separate=True)
         transition_types = ghg_t_dict.keys()
         ghg_t = np.stack([ghg_t_dict[tt] for tt in transition_types], axis=0)
 

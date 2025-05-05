@@ -176,7 +176,7 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
     # -------------------------------------------------------------- #
 
     # Apply the cost of carbon released by transitioning natural land to modified land
-    ghg_transition = ag_ghg.get_ghg_transition_penalties(data, lumap, separate=True)        # <unit: t/ha>
+    ghg_transition = ag_ghg.get_ghg_transition_emissions(data, lumap, separate=True)        # <unit: t/ha>
     
     ghg_transition = {
         k:np.einsum('mrj,mrj,mrj->mrj', v, x_mrj, l_mrj_not).astype(np.float32)             # No GHG penalty for cells that remain the same, or are prohibited from transitioning
@@ -392,7 +392,7 @@ def get_biochar_adoption_limit(data, yr_idx):
 
 def get_beef_hir_adoption_limit(data: Data):
     """
-    Gets the adoption limit of Beef HIR for each possible land use.
+    Gets the adoption limit of Beef - HIR for each possible land use.
     """
     hir_limits = {}
     for lu in AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']:
@@ -404,7 +404,7 @@ def get_beef_hir_adoption_limit(data: Data):
 
 def get_sheep_hir_adoption_limit(data: Data):
     """
-    Gets the adoption limit of Sheep HIR for each possible land use.
+    Gets the adoption limit of Sheep - HIR for each possible land use.
     """
     hir_limits = {}
     for lu in AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']:
