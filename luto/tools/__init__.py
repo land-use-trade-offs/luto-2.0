@@ -32,11 +32,13 @@ import pandas as pd
 import numpy as np
 import xarray as xr
 import numpy_financial as npf
-import luto.settings as settings
+import matplotlib.patches as patches
 
 from typing import Tuple
 from datetime import datetime
+from matplotlib import pyplot as plt
 
+import luto.settings as settings
 import luto.economics.agricultural.water as ag_water
 import luto.economics.non_agricultural.water as non_ag_water
 
@@ -498,6 +500,43 @@ def map_desc_to_dvar_index(category: str,
     df['dvar'] = [dvar_arr[:, j] for j in df['dvar_idx']]
 
     return df.reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+
+
+def plot_t_mat(t_mat:xr.DataArray):
+    
+    '''
+    Plot the transition matrix with hatched rectangles for NaN values.
+    
+    Parameters
+    ----------
+    t_mat : xr.DataArray
+        The transition matrix to plot.
+        
+    '''
+ 
+    # Set up plot
+    fig, ax = plt.subplots(figsize=(8, 8))
+
+    # Plot with imshow for correct alignment
+    im = ax.imshow(t_mat.values, cmap='viridis', origin='upper')
+
+    # Set tick positions and labels
+    ax.set_xticks(np.arange(len(t_mat.coords['to_lu'])))
+    ax.set_yticks(np.arange(len(t_mat.coords['from_lu'])))
+    ax.set_xticklabels(t_mat.coords['to_lu'].values, rotation=90)
+    ax.set_yticklabels(t_mat.coords['from_lu'].values)
+
+    # Move x labels to top
+    ax.xaxis.set_label_position('top')
+    ax.xaxis.tick_top()
+
+    # Draw hatched rectangles over NaNs
+    nrows, ncols = t_mat.shape
+    for i in range(nrows):
+        for j in range(ncols):
+            if np.isnan(t_mat[i, j]):
+                rect = patches.Rectangle((j - 0.5, i - 0.5), 1, 1, hatch='////', fill=False, edgecolor='gray', linewidth=0.0)
+                ax.add_patch(rect)
 
 
 def get_out_resfactor(dvar_path:str):
