@@ -305,7 +305,6 @@ def get_ghg_beccs(data, aggregate) -> np.ndarray|pd.DataFrame:
     elif aggregate==False:
         return pd.DataFrame(-np.nan_to_num(data.BECCS_TCO2E_HA_YR) * data.REAL_AREA, columns=['BECCS'])
     else:
-    # If the aggregate arguments is not in [True,False]. That must be someting wrong
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
     
 

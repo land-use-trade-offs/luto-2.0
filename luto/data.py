@@ -778,10 +778,31 @@ class Data:
             dims=['from_lu','to_lu'],
             coords={'from_lu':self.AGRICULTURAL_LANDUSES, 'to_lu':self.NON_AGRICULTURAL_LANDUSES}
         )
-        tmat_from_ag_xr = xr.concat([tmat_ag2ag_xr, tmat_ag2non_ag_xr], dim='to_lu')                       # Combine ag2ag and ag2non-ag
-        tmat_from_ag_xr.loc[:,'Destocked - natural land'] = self.AG_TO_DESTOCKED_NATURAL_COSTS_HA       # Ag to Destock-natural has its own values
-
-
+        tmat_from_ag_xr = xr.concat([tmat_ag2ag_xr, tmat_ag2non_ag_xr], dim='to_lu')                        # Combine ag2ag and ag2non-ag
+        tmat_from_ag_xr.loc[:,'Destocked - natural land'] = self.AG_TO_DESTOCKED_NATURAL_COSTS_HA           # Ag to Destock-natural has its own values
+        
+        
+        # Transition matrix of non-ag to unallocated-modified land (land clearing)
+        tmat_wood_clear = np.load(os.path.join(settings.INPUT_DIR, 'transition_cost_clearing_forest.npz'))
+        
+        tmat_clear_EP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
+        tmat_clear_RP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood'] * np.median(self.RP_PROPORTION[self.RP_PROPORTION > 0])
+        tmat_clear_sheep_ag_forest = (tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']) * settings.AF_PROPORTION
+        tmat_clear_beef_ag_forest = (tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']) * settings.AF_PROPORTION
+        tmat_clear_CP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
+        tmat_clear_sheep_CP = (tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']) * settings.CP_BELT_PROPORTION
+        tmat_clear_beef_CP = (tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']) * settings.CP_BELT_PROPORTION
+        tmat_clear_BECCS = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
+        tmat_clear_destocked_nat = tmat_wood_clear['tmat_clear_light_wood'] + tmat_wood_clear['tmat_clear_dense_wood']
+        
+        tmat_costs = np.array([
+            tmat_clear_EP, tmat_clear_RP, tmat_clear_sheep_ag_forest, tmat_clear_beef_ag_forest,
+            tmat_clear_CP, tmat_clear_sheep_CP, tmat_clear_beef_CP, tmat_clear_BECCS, tmat_clear_destocked_nat
+        ]).T
+        
+        
+        
+        
         # Transition matrix from non-ag
         tmat_non_ag2ag_xr = xr.DataArray(
             np.repeat(self.EP2AG_TRANSITION_COSTS_HA.reshape(1,-1), len(self.NON_AGRICULTURAL_LANDUSES), axis=0),
@@ -795,14 +816,14 @@ class Data:
         )
 
 
-        np.fill_diagonal(tmat_non_ag2non_ag_xr.values, 0)                                               # Lu staty the same has 0 cost
-        tmat_from_non_ag_xr = xr.concat([tmat_non_ag2ag_xr, tmat_non_ag2non_ag_xr], dim='to_lu')           # Combine non-ag2ag and non-ag2non-ag
-        tmat_from_non_ag_xr.loc['Destocked - natural land', 'Unallocated - natural land'] = np.nan      # Destocked-natural can not transit to unallow-natural
+        np.fill_diagonal(tmat_non_ag2non_ag_xr.values, 0)                                                   # Lu staty the same has 0 cost
+        tmat_from_non_ag_xr = xr.concat([tmat_non_ag2ag_xr, tmat_non_ag2non_ag_xr], dim='to_lu')            # Combine non-ag2ag and non-ag2non-ag
+        tmat_from_non_ag_xr.loc['Destocked - natural land', 'Unallocated - natural land'] = np.nan          # Destocked-natural can not transit to unallow-natural
 
         # Get the full transition cost matrix
         self.T_MAT = xr.concat([tmat_from_ag_xr, tmat_from_non_ag_xr], dim='from_lu')
         self.T_MAT.loc[self.NON_AGRICULTURAL_LANDUSES, [self.AGLU2DESC[i] for i in self.LU_NATURAL]] = np.nan       # non-ag2natural is not allowed
-        self.T_MAT.loc[self.NON_AGRICULTURAL_LANDUSES, 'Unallocated - modified land'] = 20390                       # Clearing non-ag land requires such cost; TODO, move this number to spreed sheet
+        self.T_MAT.loc[self.NON_AGRICULTURAL_LANDUSES, 'Unallocated - modified land'] = tmat_costs                  # Clearing non-ag land requires such cost; TODO, move this number to spreed sheet
         
         # tools.plot_t_mat(self.T_MAT)
         
@@ -1790,7 +1811,7 @@ class Data:
 
 
         # Create path name
-        self.path = f"{settings.OUTPUT_DIR}/{self.timestamp}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}_{settings.MODE}"
+        self.path = f"{settings.OUTPUT_DIR}/{self.timestamp}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}"
 
         # Get all paths
         paths = (
@@ -1800,17 +1821,16 @@ class Data:
         )  # Skip creating lucc_separate for base year
 
         # Add the path for the comparison between base-year and target-year if in the timeseries mode
-        if settings.MODE == "timeseries":
-            self.path_begin_end_compare = f"{self.path}/begin_end_compare_{years[0]}_{years[-1]}"
-            paths = (
-                paths
-                + [self.path_begin_end_compare]
-                + [
-                    f"{self.path_begin_end_compare}/out_{years[0]}",
-                    f"{self.path_begin_end_compare}/out_{years[-1]}",
-                    f"{self.path_begin_end_compare}/out_{years[-1]}/lucc_separate",
-                ]
-            )
+        self.path_begin_end_compare = f"{self.path}/begin_end_compare_{years[0]}_{years[-1]}"
+        paths = (
+            paths
+            + [self.path_begin_end_compare]
+            + [
+                f"{self.path_begin_end_compare}/out_{years[0]}",
+                f"{self.path_begin_end_compare}/out_{years[-1]}",
+                f"{self.path_begin_end_compare}/out_{years[-1]}/lucc_separate",
+            ]
+        )
 
         # Create all paths
         for p in paths:

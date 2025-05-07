@@ -40,7 +40,7 @@ KEEP_OUTPUTS is not originally defined in the settings, but will be added in the
 if settings.KEEP_OUTPUTS:
     
     # Save the data object to disk
-    sim.save_data_to_disk(data, f"{data.path}/DATA_REPORT/Data_{settings.MODE}_RES{settings.RESFACTOR}.gz")
+    sim.save_data_to_disk(data, f"{data.path}/DATA_REPORT/Data_RES{settings.RESFACTOR}.gz")
     
 else:
     report_dir = f"{data.path}/DATA_REPORT"

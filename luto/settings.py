@@ -106,10 +106,6 @@ RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at
 SIM_YEARS = list(range(2010,2051,10)) # range(2020,2050)
 
 
-# How does the model run over time
-# MODE = 'snapshot'   # Runs for target year only
-MODE = 'timeseries'   # Runs each year from base year to target year
-
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
 # OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
@@ -225,7 +221,7 @@ NON_AG_LAND_USES_REVERSIBLE = {
     'Destocked - natural land': True,
 }
 """
-If settings.MODE == 'timeseries', the values of the below dictionary determine whether the model is allowed to abandon non-agr.
+The values of the below dictionary determine whether the model is allowed to abandon non-agr.
 land uses on cells in the years after it chooses to utilise them. For example, if a cell has is using 'Environmental Plantings'
 and the corresponding value in this dictionary is False, all cells using EP must also utilise this land use in all subsequent
 years.
@@ -342,7 +338,7 @@ AG_MANAGEMENTS_REVERSIBLE = {
     'Sheep - HIR': True,
 }
 """
-If settings.MODE == 'timeseries', the values of the below dictionary determine whether the model is allowed to abandon agricultural
+The values of the below dictionary determine whether the model is allowed to abandon agricultural
 management options on cells in the years after it chooses to utilise them. For example, if a cell has is using 'Asparagopsis taxiformis',
 and the corresponding value in this dictionary is False, all cells using Asparagopsis taxiformis must also utilise this land use
 and agricultural management combination in all subsequent years.
@@ -615,8 +611,8 @@ BIO_CONTRIBUTION_LDS = 0.8
 BIO_CONTRIBUTION_ENV_PLANTING = 0.8
 BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK = 0.1
 BIO_CONTRIBUTION_CARBON_PLANTING_BELT = 0.1
-BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1.2
-BIO_CONTRIBUTION_AGROFORESTRY = 0.75        # TODO: use rip proportion * EP contribution
+BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1.2 
+BIO_CONTRIBUTION_AGROFORESTRY = 0.75       
 BIO_CONTRIBUTION_BECCS = 0
 ''' 
 The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.

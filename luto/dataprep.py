@@ -79,7 +79,7 @@ def create_new_dataset():
     # Copy raw data files from their source into raw_data folder for further processing
 
     shutil.copyfile(fdh_inpath + 'tmatrix-cat2lus.csv', raw_data + 'tmatrix_cat2lus.csv')
-    shutil.copyfile(fdh_inpath + 'transitions_costs_20230901.xlsx', raw_data + 'transitions_costs_20230901.xlsx')
+    shutil.copyfile(fdh_inpath + 'transitions_costs_20250430.xlsx', raw_data + 'transitions_costs_20250430.xlsx')
 
     shutil.copyfile(profit_map_inpath + 'NLUM_SPREAD_LU_ID_Mapped_Concordance.h5', raw_data + 'NLUM_SPREAD_LU_ID_Mapped_Concordance.h5')
 
@@ -183,7 +183,7 @@ def create_new_dataset():
 
     # Read in from-to costs in category-to-category format
     # tmcat = pd.read_csv(raw_data + 'tmatrix_categories.csv', index_col = 0)
-    tmcat = pd.read_excel( raw_data + 'transitions_costs_20230901.xlsx'
+    tmcat = pd.read_excel( raw_data + 'transitions_costs_20250430.xlsx'
                           , sheet_name = 'Current'
                           , usecols = 'B:M'
                           , skiprows = 5
@@ -191,10 +191,28 @@ def create_new_dataset():
                           , index_col = 0)
 
     # Read transition costs from agricultural land to environmental plantings
-    ag_to_new_land_uses = pd.read_excel( raw_data + 'transitions_costs_20230901.xlsx'
+    ag_to_new_land_uses = pd.read_excel( raw_data + 'transitions_costs_20250430.xlsx'
                                        , sheet_name = 'Ag_to_new_land-uses'
                                        , usecols = 'B,C'
                                        , index_col = 0 )
+    
+    # Read land clearing costs for non-agricultural land to unallocated modified land
+    tmat_clear_data = pd.read_excel(
+        raw_data + 'transitions_costs_20250430.xlsx',
+        sheet_name='Current',
+        usecols='F',
+        skiprows=19,
+        nrows=3,
+        index_col=0
+    ).index.values
+
+    np.savez(
+        outpath + 'transition_cost_clearing_forest.npz',
+        tmat_clear_light_wood=tmat_clear_data[0],
+        tmat_clear_dense_wood=tmat_clear_data[1],
+        tmat_clear_wood_barrier=tmat_clear_data[2]
+    )
+     
 
     # Read the categories to land-uses concordance
     cat2lus = pd.read_csv(raw_data + 'tmatrix_cat2lus.csv').to_numpy()

@@ -302,7 +302,7 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1):
         interval (int): The interval in seconds to log the memory usage.
     '''
     
-    with open(f'{output_dir}/RES_{settings.RESFACTOR}_{settings.MODE}_mem_log.txt', mode=mode) as file:
+    with open(f'{output_dir}/RES_{settings.RESFACTOR}_mem_log.txt', mode=mode) as file:
         while True:
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             process = psutil.Process(os.getpid())

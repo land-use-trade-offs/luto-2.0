@@ -43,7 +43,6 @@ grid_search = {
     # Working settings for the model run
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                 # 'maxprofit' or 'maxutility'
-    'MODE': ['timeseries'],                     # 'snapshot' or 'timeseries'
     'RESFACTOR': [15],
     'SIM_YEARS': [list(range(2010,2051,10))],   # Years to run the model 
     'WRITE_THREADS': [5],

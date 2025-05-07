@@ -79,11 +79,10 @@ class LutoSolver:
     def __init__(
         self,
         input_data: SolverInputData,
-        d_c: np.array,
     ):
 
         self._input_data = input_data
-        self.d_c = d_c
+        self.d_c = input_data.demand_c
         self.ncms = self.d_c.shape[0]
         self.gurobi_model = gp.Model(f"LUTO {settings.VERSION}", env=gurenv)
 

@@ -38,7 +38,7 @@ def get_biodiv_environmental_plantings(data: Data) -> np.ndarray:
 
 
 def get_biodiv_riparian_plantings(data: Data) -> np.ndarray:
-    return data.BIO_CONNECTIVITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_RIPARIAN_PLANTING
+    return data.BIO_CONNECTIVITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_RIPARIAN_PLANTING * data.RP_PROPORTION
 
 
 def get_biodiv_agroforestry_base(data: Data) -> np.ndarray:
@@ -245,7 +245,7 @@ def get_non_ag_lu_biodiv_contribution(data: Data) -> dict[int, float]:
         # Environmental plantings
         0: BIO_CONTRIBUTION_ENV_PLANTING,
         # Riparian plantings
-        1: BIO_CONTRIBUTION_RIPARIAN_PLANTING,
+        1: BIO_CONTRIBUTION_RIPARIAN_PLANTING * np.median(data.RP_PROPORTION[data.RP_PROPORTION > 0]),
         # Sheep agroforestry
         2: (
             AF_PROPORTION * BIO_CONTRIBUTION_AGROFORESTRY
