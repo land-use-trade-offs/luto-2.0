@@ -245,7 +245,7 @@ def get_non_ag_lu_biodiv_contribution(data: Data) -> dict[int, float]:
         # Environmental plantings
         0: BIO_CONTRIBUTION_ENV_PLANTING,
         # Riparian plantings
-        1: BIO_CONTRIBUTION_RIPARIAN_PLANTING * np.median(data.RP_PROPORTION[data.RP_PROPORTION > 0]),
+        1: BIO_CONTRIBUTION_RIPARIAN_PLANTING,
         # Sheep agroforestry
         2: (
             AF_PROPORTION * BIO_CONTRIBUTION_AGROFORESTRY

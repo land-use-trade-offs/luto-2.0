@@ -1298,10 +1298,7 @@ class LutoSolver:
                     if not NON_AG_LAND_USES_REVERSIBLE[non_ag_desc]
                 )
                 and all(
-                    (
-                        old_ag_man_lb_mrj.get(am)[:, r, :]
-                        == self._input_data.ag_man_lb_mrj.get(am)[:, r, :]
-                    ).all()
+                    (old_ag_man_lb_mrj.get(am)[:, r, :] == self._input_data.ag_man_lb_mrj.get(am)[:, r, :]).all()
                     for am in AG_MANAGEMENTS_TO_LAND_USES
                     if not AG_MANAGEMENTS_REVERSIBLE[am]
                 )
@@ -1433,15 +1430,16 @@ class LutoSolver:
         if self.bio_GBF3_major_vegetation_limit_constraints:
             for constr in self.bio_GBF3_major_vegetation_limit_constraints.values():
                 self.gurobi_model.remove(constr)
-        if self.bio_GBF8_species_conservation_constrs:
-            for constr in self.bio_GBF8_species_conservation_constrs.values():
-                self.gurobi_model.remove(constr)
         if self.bio_GBF4_SNES_constrs:
             for constr in self.bio_GBF4_SNES_constrs.values():
                 self.gurobi_model.remove(constr)
         if self.bio_GBF4_ECNES_constrs:
             for constr in self.bio_GBF4_ECNES_constrs.values():
                 self.gurobi_model.remove(constr)
+        if self.bio_GBF8_species_conservation_constrs:
+            for constr in self.bio_GBF8_species_conservation_constrs.values():
+                self.gurobi_model.remove(constr)
+        
 
         self.adoption_limit_constraints = []
         self.demand_penalty_constraints = []

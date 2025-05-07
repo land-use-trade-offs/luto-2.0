@@ -100,7 +100,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 5       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
 SIM_YEARS = list(range(2010,2051,10)) # range(2020,2050)
@@ -611,7 +611,7 @@ BIO_CONTRIBUTION_LDS = 0.8
 BIO_CONTRIBUTION_ENV_PLANTING = 0.8
 BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK = 0.1
 BIO_CONTRIBUTION_CARBON_PLANTING_BELT = 0.1
-BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1.2 
+BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1.2
 BIO_CONTRIBUTION_AGROFORESTRY = 0.75       
 BIO_CONTRIBUTION_BECCS = 0
 ''' 
