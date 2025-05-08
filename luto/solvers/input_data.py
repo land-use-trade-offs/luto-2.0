@@ -52,6 +52,7 @@ class SolverInputData:
     """   
     base_year: int                                                      # The base year of this solving process
     target_year: int                                                    # The target year of this solving process
+    demand_c: np.ndarray                                                # The commodity demand of the target year
 
     ag_g_mrj: np.ndarray                                                # Agricultural greenhouse gas emissions matrices.
     ag_w_mrj: np.ndarray                                                # Agricultural water yields matrices.
@@ -188,6 +189,9 @@ class SolverInputData:
                 cells2non_ag_lu[r].append(k)
 
         return dict(cells2non_ag_lu) 
+    
+def get_demand_c(data, target_year):
+    return data.D_CY[target_year - data.YR_CAL_BASE]
     
 def get_ag_c_mrj(data: Data, target_index):
     print('Getting agricultural cost matrices...', flush = True)
@@ -327,7 +331,7 @@ def get_non_ag_q_crk(data: Data, ag_q_mrp: np.ndarray, base_year: int):
 
 def get_ag_ghg_t_mrj(data: Data, base_year):
     print('Getting agricultural transitions GHG emissions...', flush = True)
-    output = ag_ghg.get_ghg_transition_penalties(data, data.lumaps[base_year])
+    output = ag_ghg.get_ghg_transition_emissions(data, data.lumaps[base_year])
     return output.astype(np.float32)
 
 
@@ -377,13 +381,13 @@ def get_non_ag_t_rk(data: Data, base_year):
 
 def get_ag_x_mrj(data: Data, base_year):
     print('Getting agricultural exclude matrices...', flush = True)
-    output = ag_transition.get_exclude_matrices(data, data.lumaps[base_year])
+    output = ag_transition.get_to_ag_exclude_matrices(data, data.lumaps[base_year])
     return output
 
 
-def get_non_ag_x_rk(data: Data, ag_x_mrj, base_year):
+def get_non_ag_x_rk(data: Data, base_year):
     print('Getting non-agricultural exclude matrices...', flush = True)
-    output = non_ag_transition.get_exclude_matrices(data, ag_x_mrj, data.lumaps[base_year])
+    output = non_ag_transition.get_to_non_ag_exclude_matrices(data, data.lumaps[base_year])
     return output
 
 
@@ -664,6 +668,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     return SolverInputData(
         base_year=base_year,
         target_year=target_year,
+        demand_c=get_demand_c(data, target_year),
         
         ag_g_mrj=ag_g_mrj,
         ag_w_mrj=ag_w_mrj,
@@ -675,7 +680,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         non_ag_g_rk=get_non_ag_g_rk(data, ag_g_mrj, base_year),
         non_ag_w_rk=get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR),  # Calculate non-ag water yield matrices based on historical water yield layers
         non_ag_b_rk=get_non_ag_b_rk(data, ag_b_mrj, base_year),
-        non_ag_x_rk=get_non_ag_x_rk(data, ag_x_mrj, base_year),
+        non_ag_x_rk=get_non_ag_x_rk(data, base_year),
         non_ag_q_crk=get_non_ag_q_crk(data, ag_q_mrp, base_year),
         non_ag_lb_rk=get_non_ag_lb_rk(data, base_year),
         

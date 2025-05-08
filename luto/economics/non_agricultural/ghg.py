@@ -19,11 +19,11 @@
 
 import numpy as np
 import pandas as pd
-from luto.settings import NON_AG_LAND_USES
+import luto.settings as settings
 
 from luto.data import Data
 from luto import tools
-from luto.economics.agricultural import ghg as ag_ghg
+
 
 
 def get_ghg_env_plantings(data: Data, aggregate) -> np.ndarray|pd.DataFrame:
@@ -305,18 +305,18 @@ def get_ghg_beccs(data, aggregate) -> np.ndarray|pd.DataFrame:
     elif aggregate==False:
         return pd.DataFrame(-np.nan_to_num(data.BECCS_TCO2E_HA_YR) * data.REAL_AREA, columns=['BECCS'])
     else:
-    # If the aggregate arguments is not in [True,False]. That must be someting wrong
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
     
 
 def get_ghg_destocked_land(
     data: Data,
-    ag_g_mrj: np.ndarray,
     lumap: np.ndarray,
     aggregate: bool = True,
 ) -> np.ndarray:
     """
-    Calculate the greenhouse gas emissions of Destocked land for each cell.
+    Calculate the greenhouse gas emissions of Destocked land for each cell. Note, only cells that are 
+    livestock - natural land in the BASE_YR (2010) and then converted into unallowcated - natural land 
+    in the target year are 'destocked'.
     
     Parameters
     ----------
@@ -328,24 +328,24 @@ def get_ghg_destocked_land(
     if aggregate == True (default)  -> np.ndarray
        aggregate == False           -> pd.DataFrame
     """
-    lvstk_natural_cells = tools.get_lvstk_natural_lu_cells(data, lumap)
-    
+    # Only cells that are livestock - natural land in the BASE_YR (2010) and then converted into unallowcated - natural land in the target year are 'destocked'.
+    lumap_BASE_YR = data.lumaps[data.YR_CAL_BASE]
     penalty_ghg_r = np.zeros(data.NCELLS)
-    penalty_ghg_r[lvstk_natural_cells] = (
-          data.GHG_PENALTY_LVSTK_NATURAL_TO_UNALL_NATURAL[lvstk_natural_cells]
-        * data.REAL_AREA[lvstk_natural_cells]
-    )
+    
+    for from_lu in data.LU_LVSTK_NATURAL:
+        penalty_ghg_r[lumap_BASE_YR == from_lu] = (
+            data.CO2E_STOCK_UNALL_NATURAL[lumap_BASE_YR == from_lu]
+            * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[from_lu] - 1)
+            * data.REAL_AREA[lumap_BASE_YR == from_lu]
+            / settings.HIR_EFFECT_YEARS    # Annualise carbon sequestration capacity to align the full grwoth span of a tree
+        )
 
-    unallocated_j = tools.get_unallocated_natural_land_code(data)
-    unallocated_ghg_r = ag_g_mrj[0, :, unallocated_j]
-
-    destocked_ghg_r = unallocated_ghg_r + penalty_ghg_r
     if aggregate==True:
-        return destocked_ghg_r
+        return penalty_ghg_r
     elif aggregate==False:
-        return pd.DataFrame(destocked_ghg_r, columns=['DESTOCKED_LAND'])
+        return pd.DataFrame(penalty_ghg_r, columns=['DESTOCKED_LAND'])
     else:
-    # If the aggregate arguments is not in [True,False]. That must be someting wrong
+        # If the aggregate arguments is not in [True,False]. That must be someting wrong
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 
 
@@ -372,35 +372,35 @@ def get_ghg_matrix(data: Data, ag_g_mrj, lumap, aggregate=True) -> np.ndarray:
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
 
-    non_agr_ghg_matrices = {use: np.zeros((data.NCELLS, 1)).astype(np.float32) for use in NON_AG_LAND_USES}
+    non_agr_ghg_matrices = {use: np.zeros((data.NCELLS, 1)).astype(np.float32) for use in settings.NON_AG_LAND_USES}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-    if NON_AG_LAND_USES['Environmental Plantings']:
+    if settings.NON_AG_LAND_USES['Environmental Plantings']:
         non_agr_ghg_matrices['Environmental Plantings'] = get_ghg_env_plantings(data, aggregate)
 
-    if NON_AG_LAND_USES['Riparian Plantings']:
+    if settings.NON_AG_LAND_USES['Riparian Plantings']:
         non_agr_ghg_matrices['Riparian Plantings'] = get_ghg_rip_plantings(data, aggregate)
 
-    if NON_AG_LAND_USES['Sheep Agroforestry']:
+    if settings.NON_AG_LAND_USES['Sheep Agroforestry']:
         non_agr_ghg_matrices['Sheep Agroforestry'] = get_ghg_sheep_agroforestry(data, ag_g_mrj, agroforestry_x_r, aggregate)
 
-    if NON_AG_LAND_USES['Beef Agroforestry']:
+    if settings.NON_AG_LAND_USES['Beef Agroforestry']:
         non_agr_ghg_matrices['Beef Agroforestry'] = get_ghg_beef_agroforestry(data, ag_g_mrj, agroforestry_x_r, aggregate)
 
-    if NON_AG_LAND_USES['Carbon Plantings (Block)']:
+    if settings.NON_AG_LAND_USES['Carbon Plantings (Block)']:
         non_agr_ghg_matrices['Carbon Plantings (Block)'] = get_ghg_carbon_plantings_block(data, aggregate)
 
-    if NON_AG_LAND_USES['Sheep Carbon Plantings (Belt)']:
+    if settings.NON_AG_LAND_USES['Sheep Carbon Plantings (Belt)']:
         non_agr_ghg_matrices['Sheep Carbon Plantings (Belt)'] = get_ghg_sheep_carbon_plantings_belt(data, ag_g_mrj, cp_belt_x_r, aggregate)
 
-    if NON_AG_LAND_USES['Beef Carbon Plantings (Belt)']:
+    if settings.NON_AG_LAND_USES['Beef Carbon Plantings (Belt)']:
         non_agr_ghg_matrices['Beef Carbon Plantings (Belt)'] = get_ghg_beef_carbon_plantings_belt(data, ag_g_mrj, cp_belt_x_r, aggregate)
 
-    if NON_AG_LAND_USES['BECCS']:
+    if settings.NON_AG_LAND_USES['BECCS']:
         non_agr_ghg_matrices['BECCS'] = get_ghg_beccs(data, aggregate)
 
-    if NON_AG_LAND_USES['Destocked - natural land']:
-        non_agr_ghg_matrices['Destocked - natural land'] = get_ghg_destocked_land(data, ag_g_mrj, lumap, aggregate)
+    if settings.NON_AG_LAND_USES['Destocked - natural land']:
+        non_agr_ghg_matrices['Destocked - natural land'] = get_ghg_destocked_land(data, lumap, aggregate)
       
     if aggregate==True:
         # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing

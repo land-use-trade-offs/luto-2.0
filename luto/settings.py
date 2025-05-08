@@ -100,15 +100,11 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 10       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 5       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YERAS = list(range(2010,2051,10)) # range(2020,2050)
+SIM_YEARS = list(range(2010,2051,10)) # range(2020,2050)
 
-
-# How does the model run over time
-# MODE = 'snapshot'   # Runs for target year only
-MODE = 'timeseries'   # Runs each year from base year to target year
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
@@ -126,7 +122,7 @@ WRITE_OUTPUT_GEOTIFFS = False   # Write GeoTiffs to output directory: True or Fa
 WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resolution: True or False
 
 PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = 2               # The Threads to use for map making, only work with PARALLEL_WRITE = True
+WRITE_THREADS = 5               # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
@@ -166,8 +162,8 @@ THREADS = min(32, os.cpu_count())
 
 EXCLUDE_NO_GO_LU = False
 NO_GO_VECTORS = {
-    'Winter cereals':           f'{os.path.abspath(INPUT_DIR)}/no_go_areas/no_go_Winter_cereals.shp',
-    'Environmental Plantings':  f'{os.path.abspath(INPUT_DIR)}/no_go_areas/no_go_Enviornmental_Plantings.shp'
+    'Winter cereals':           os.path.join(INPUT_DIR, 'no_go_areas', 'no_go_Winter_cereals.shp'),
+    'Environmental Plantings':  os.path.join(INPUT_DIR, 'no_go_areas', 'no_go_Enviornmental_Plantings.shp')
 }
 '''
 Land-use and vector file pairs to exclude land-use from being utilised in that area. 
@@ -225,7 +221,7 @@ NON_AG_LAND_USES_REVERSIBLE = {
     'Destocked - natural land': True,
 }
 """
-If settings.MODE == 'timeseries', the values of the below dictionary determine whether the model is allowed to abandon non-agr.
+The values of the below dictionary determine whether the model is allowed to abandon non-agr.
 land uses on cells in the years after it chooses to utilise them. For example, if a cell has is using 'Environmental Plantings'
 and the corresponding value in this dictionary is False, all cells using EP must also utilise this land use in all subsequent
 years.
@@ -283,6 +279,37 @@ AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per h
 # ---------------------------------------------------------------------------- #
 
 
+AG_MANAGEMENTS_TO_LAND_USES = {
+    'Asparagopsis taxiformis':  ['Beef - modified land', 'Sheep - modified land', 'Dairy - natural land', 'Dairy - modified land'],
+    
+    'Precision Agriculture':    [# Cropping:
+                                'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
+                                # Intensive Cropping:
+                                'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
+                                # Horticulture:
+                                'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'],
+    
+    'Ecological Grazing':       ['Beef - modified land', 'Sheep - modified land', 'Dairy - modified land'],
+    
+    'Savanna Burning': [        'Beef - natural land', 'Dairy - natural land', 'Sheep - natural land', 'Unallocated - natural land'],
+    
+    'AgTech EI': [              # Cropping:
+                                'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
+                                # Intensive Cropping:
+                                'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
+                                # Horticulture:
+                                'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'],
+    
+    'Biochar':                  [# Cropping
+                                'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
+                                # Horticulture:
+                                'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'],
+
+    'Beef - HIR':               ['Beef - natural land'],
+    'Sheep - HIR':              ['Sheep - natural land'],
+}
+
+
 AG_MANAGEMENTS = {
     'Asparagopsis taxiformis': True,
     'Precision Agriculture': True,
@@ -290,84 +317,6 @@ AG_MANAGEMENTS = {
     'Savanna Burning': True,
     'AgTech EI': True,
     'Biochar': True,
-}
-"""
-The dictionary below contains a master list of all agricultural management options and
-which land uses they correspond to.
-
-To disable an ag-mangement option, change the corresponding value in the AG_MANAGEMENTS dictionary to False.
-"""
-
-
-AG_MANAGEMENTS_REVERSIBLE = {
-    'Asparagopsis taxiformis': True,
-    'Precision Agriculture': True,
-    'Ecological Grazing': True,
-    'Savanna Burning': True,
-    'AgTech EI': True,
-    'Biochar': True,
-}
-"""
-If settings.MODE == 'timeseries', the values of the below dictionary determine whether the model is allowed to abandon agricultural
-management options on cells in the years after it chooses to utilise them. For example, if a cell has is using 'Asparagopsis taxiformis',
-and the corresponding value in this dictionary is False, all cells using Asparagopsis taxiformis must also utilise this land use
-and agricultural management combination in all subsequent years.
-
-WARNING: changing to False will result in 'locking in' land uses on cells that utilise the agricultural management option for
-the rest of the simulation. This may be an unintended side effect.
-"""
-
-
-AG_MANAGEMENTS_TO_LAND_USES = {
-    'Asparagopsis taxiformis': [
-        'Beef - modified land', 'Sheep - modified land', 'Dairy - natural land', 'Dairy - modified land'
-    ],
-    
-    'Precision Agriculture': [
-        # Cropping:
-        'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
-        # Intensive Cropping:
-        'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
-        # Horticulture:
-        'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'
-    ],
-    
-    'Ecological Grazing': [
-        'Beef - modified land', 'Sheep - modified land', 'Dairy - modified land',
-    ],
-    
-    'Savanna Burning': [
-        'Beef - natural land', 'Dairy - natural land', 'Sheep - natural land', 'Unallocated - natural land',
-    ],
-    
-    'AgTech EI': [
-        # Cropping:
-        'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
-        # Intensive Cropping:
-        'Cotton', 'Other non-cereal crops', 'Rice', 'Sugar', 'Vegetables',
-        # Horticulture:
-        'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'
-    ],
-    
-    'Biochar': [
-        # Cropping
-        'Hay', 'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Winter cereals', 'Winter legumes', 'Winter oilseeds',
-        # Horticulture:
-        'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit',
-    ],
-
-    'Beef - HIR': ['Beef - natural land'],
-    'Sheep - HIR': ['Sheep - natural land'],
-}
-
-
-AG_MANAGEMENTS = {
-    'Asparagopsis taxiformis': True,
-    'Precision Agriculture': True,
-    'Ecological Grazing': True,
-    'Savanna Burning': True,
-    'AgTech EI': True,
-    'Biochar': True,
     'Beef - HIR': True,
     'Sheep - HIR': True,
 }
@@ -389,7 +338,7 @@ AG_MANAGEMENTS_REVERSIBLE = {
     'Sheep - HIR': True,
 }
 """
-If settings.MODE == 'timeseries', the values of the below dictionary determine whether the model is allowed to abandon agricultural
+The values of the below dictionary determine whether the model is allowed to abandon agricultural
 management options on cells in the years after it chooses to utilise them. For example, if a cell has is using 'Asparagopsis taxiformis',
 and the corresponding value in this dictionary is False, all cells using Asparagopsis taxiformis must also utilise this land use
 and agricultural management combination in all subsequent years.
@@ -417,8 +366,18 @@ SAVBURN_COST_HA_YR = 100
 # The minimum value an agricultural management variable must take for the write_output function to consider it being used on a cell
 AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1
 
-HIR_PRODUCTIVITY_PENALTY = 0.5
-HIR_BIODIVERSITY_PENALTY = 0.5  # Biodiversity penalty of HIR when compared to destocked land
+# Productivity contribution of HIR compared to not implementing HIR
+HIR_PRODUCTIVITY_CONTRIBUTION = 0.5
+
+# Maintainace cost for HIR
+BEEF_HIR_MAINTAINANCE_COST_PER_HA_PER_YEAR = 0
+SHEEP_HIR_MAINTAINANCE_COST_PER_HA_PER_YEAR = 0
+
+# HIR effecting years
+HIR_EFFECT_YEARS = 91
+
+
+
 
 # ---------------------------------------------------------------------------- #
 # Off-land commodity parameters
@@ -445,7 +404,7 @@ GHG_LIMITS = {
              }
 
 # Take data from 'GHG_targets.xlsx', 
-GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis'
+GHG_LIMITS_FIELD = '1.8C (67%) excl. avoided emis SCOPE1'
 '''
 options include: 
 - Assuming agriculture is responsible to sequester 100% of the carbon emissions
@@ -485,7 +444,7 @@ LVSTK_GHG_SCOPE_1 = ['CO2E_KG_HEAD_DUNG_URINE', 'CO2E_KG_HEAD_ENTERIC', 'CO2E_KG
 
 
 # Number of years over which to spread (average) soil carbon accumulation (from Mosnier et al. 2022 and Johnson et al. 2021)
-SOC_AMORTISATION = 15
+SOC_AMORTISATION = 91   # (2025/05/05) Change from 15 -> 91; This makes sure BIO_CHAR has the same GHG effect span as HIR
 
 GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (linear programming approach)
 # GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
@@ -562,9 +521,9 @@ BIODIVERSTIY_TARGET_GBF_2 = 'on'            # 'on' or 'off', if 'off' the biodiv
 
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
 BIODIV_GBF_TARGET_2_DICT = {
-              2030: 0.3,  # Proportion of degraded land restored in year 2030 - GBF Target 2
-              2050: 0.5,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
-              2100: 0.5   # Stays at 2050 level
+              2030: 0.15,  # Proportion of degraded land restored in year 2030 - GBF Target 2
+              2050: 0.15,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
+              2100: 0.15   # Stays at 2050 level
              }            # (can add more years/targets)\
 """ Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
     Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -582,7 +541,7 @@ The constraint type for the biodiversity target.
 - 'soft' adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 '''
 
-GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 50
+GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 
@@ -652,8 +611,8 @@ BIO_CONTRIBUTION_LDS = 0.8
 BIO_CONTRIBUTION_ENV_PLANTING = 0.8
 BIO_CONTRIBUTION_CARBON_PLANTING_BLOCK = 0.1
 BIO_CONTRIBUTION_CARBON_PLANTING_BELT = 0.1
-BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1
-BIO_CONTRIBUTION_AGROFORESTRY = 0.75
+BIO_CONTRIBUTION_RIPARIAN_PLANTING = 1.2
+BIO_CONTRIBUTION_AGROFORESTRY = 0.75       
 BIO_CONTRIBUTION_BECCS = 0
 ''' 
 The benefit of each non-agricultural land use to biodiversity is set as a proportion to the raw biodiversity priority value.

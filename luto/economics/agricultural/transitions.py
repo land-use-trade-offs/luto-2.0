@@ -35,7 +35,7 @@ from luto import settings
 import luto.tools as tools
 
 
-def get_exclude_matrices(data: Data, lumap: np.ndarray):
+def get_to_ag_exclude_matrices(data: Data, lumap: np.ndarray):
     """Return x_mrj exclude matrices.
 
     An exclude matrix indicates whether switching land-use for a certain cell r
@@ -60,56 +60,28 @@ def get_exclude_matrices(data: Data, lumap: np.ndarray):
         different land-management versions of the land-use `j` to switch _to_.
         With m==0 conventional dryland, m==1 conventional irrigated.
     """
-    # Boolean exclusion matrix based on SA2/NLUM agricultural land-use data (in mrj structure).
-    # Effectively, this ensures that in any SA2 region the only combinations of land-use and land management
-    # that can occur in the future are those that occur in 2010 (i.e., YR_CAL_BASE)
-    x_mrj = data.EXCLUDE.copy()
+    # Spatial exclusoin; if a land-use never exists in a SA2 region in 2010, it will be disallowed in this region forever
+    x_mrj = data.EXCLUDE.copy().astype(np.int8)
 
-    # Raw transition-cost matrix is in $/ha and lexicographically ordered by land-use (shape = 28 x 28).
-    t_ij = data.AG_TMATRIX
-
-    lumap_2010 = data.LUMAP
+    # Transition exclusion; Whether a landuse can be converted to another one (np.nan indicates NOT-ALLOW)
+    t_ij = data.T_MAT.loc[:,data.AGRICULTURAL_LANDUSES].copy()                                          # Lexicographical transition matix (2D, all-lus to ag-lus).
+    ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)                                       # Get ag and non-ag index from base year lumap
+    lumap2desc = np.vectorize(data.ALLLU2DESC.get, otypes=[str])
     
-    new_x_mrj = x_mrj.copy()
+    t_rj = np.ones((data.NCELLS, len(data.AGRICULTURAL_LANDUSES))).astype(np.float32)       # Empty ones_rj array to be filled with transition flag (1 allow, 0 not allow)
+    t_rj[ag_cells, :] = t_ij[lumap[ag_cells]]                                               # For ag cells in the base year lumap, get transition cost (np.nan is not-allow) for them
+    t_rj[non_ag_cells, :] *= t_ij.sel(from_lu=lumap2desc(lumap[non_ag_cells]))              # For non-ag cells in the base year lumap, get transition cost (np.nan is not-allow) for them
+    t_rj[non_ag_cells, :] *= t_ij.sel(from_lu=lumap2desc(data.LUMAP[non_ag_cells]))         # For non-ag cells, find its ag status in BASE_YR (2010), then get transition cost based on these 2010-ag status
+    t_rj = np.where(np.isnan(t_rj), 0, 1).astype(np.int8)     
+
+    # No-go exclusion; user-defined layer specifying which land-use are not disallowd at where
+    no_go_x_mrj = np.ones_like(data.AG_L_MRJ)
     if settings.EXCLUDE_NO_GO_LU:
-        no_go_regions = data.NO_GO_REGION_AG
-        no_go_j = [data.DESC2AGLU.get(desc) for desc in data.NO_GO_LANDUSE_AG]
+        for no_go_x_r, no_go_desc in zip(data.NO_GO_REGION_AG, data.NO_GO_LANDUSE_AG):
+            no_go_j = data.DESC2AGLU[no_go_desc]
+            no_go_x_mrj[:,:,no_go_j] = no_go_x_r
 
-        for count, j in enumerate(no_go_j):
-            new_x_mrj[0, :, j] = x_mrj[0, :, j] * no_go_regions[count]
-            new_x_mrj[1, :, j] = x_mrj[1, :, j] * no_go_regions[count]
-
-    # For the sake of exclusions only, treat destocked cells as unallocated cells
-    unallocated_j = tools.get_unallocated_natural_land_code(data)
-    destocked_cells = tools.get_destocked_land_cells(lumap)
-    new_lumap = deepcopy(lumap)
-    new_lumap[destocked_cells] = unallocated_j
-
-    # Get all agricultural and non-agricultural cells
-    ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(new_lumap)
-
-    # Transition costs from current land-use to all other land-uses j using current land-use map (in $/ha).
-    t_rj = np.zeros((data.NCELLS, len(data.AGRICULTURAL_LANDUSES))).astype(np.float32)
-    t_rj[ag_cells, :] = t_ij[new_lumap[ag_cells]]
-
-    # For non-agricultural cells, use the original 2010 solve's LUs to determine what LUs are possible for a cell
-    t_rj[non_ag_cells, :] = t_ij[lumap_2010[non_ag_cells]]
-
-    # To be excluded based on disallowed switches as specified in transition cost matrix i.e., where t_rj is NaN.
-    t_rj = np.where(np.isnan(t_rj), 0, 1)
-
-    x_mrj = (new_x_mrj * t_rj).astype(np.int8)
-
-    # Disallow switches from sheep and beef to unallocated land (must transition to destocked land instead)
-    sheep_j = tools.get_natural_sheep_code
-    sheep_cells = tools.get_cells_using_ag_landuse(lumap, sheep_j)
-    x_mrj[:, sheep_cells, unallocated_j] = 0
-
-    beef_j = tools.get_natural_beef_code
-    beef_cells = tools.get_cells_using_ag_landuse(lumap, beef_j)
-    x_mrj[:, beef_cells, unallocated_j] = 0
-
-    return x_mrj
+    return (x_mrj * t_rj * no_go_x_mrj).astype(np.int8)
 
 
 def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray, lmmap: np.ndarray, separate=False):
@@ -135,7 +107,7 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
     l_mrj_not = np.logical_not(l_mrj)
 
     # Get the exclusion matrix
-    x_mrj = get_exclude_matrices(data, lumap)
+    x_mrj = get_to_ag_exclude_matrices(data, lumap)
 
     ag_cells, _ = tools.get_ag_and_non_ag_cells(lumap)
 
@@ -176,7 +148,7 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
     # -------------------------------------------------------------- #
 
     # Apply the cost of carbon released by transitioning natural land to modified land
-    ghg_transition = ag_ghg.get_ghg_transition_penalties(data, lumap, separate=True)        # <unit: t/ha>
+    ghg_transition = ag_ghg.get_ghg_transition_emissions(data, lumap, separate=True)        # <unit: t/ha>
     
     ghg_transition = {
         k:np.einsum('mrj,mrj,mrj->mrj', v, x_mrj, l_mrj_not).astype(np.float32)             # No GHG penalty for cells that remain the same, or are prohibited from transitioning
@@ -392,7 +364,7 @@ def get_biochar_adoption_limit(data, yr_idx):
 
 def get_beef_hir_adoption_limit(data: Data):
     """
-    Gets the adoption limit of Beef HIR for each possible land use.
+    Gets the adoption limit of Beef - HIR for each possible land use.
     """
     hir_limits = {}
     for lu in AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']:
@@ -404,7 +376,7 @@ def get_beef_hir_adoption_limit(data: Data):
 
 def get_sheep_hir_adoption_limit(data: Data):
     """
-    Gets the adoption limit of Sheep HIR for each possible land use.
+    Gets the adoption limit of Sheep - HIR for each possible land use.
     """
     hir_limits = {}
     for lu in AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']:

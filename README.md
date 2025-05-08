@@ -44,7 +44,7 @@ LUTO2 comes with a full diagram to illustrate its data preparation, workflow, an
    ```python
    import luto.simulation as sim
    data = sim.load_data()
-   sim.run(data=data, base_year=2010, target_year=2030, step_size=5)
+   sim.run(data=data)
    ```
 
 4. After execution, an HTML report will be generated for easier visualization:

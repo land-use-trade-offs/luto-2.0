@@ -491,12 +491,10 @@ def get_beef_hir_effect_c_mrj(data: Data, yr_idx: int):
             lvstype_capital = lvstype.capitalize()
             yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
 
-            q_costs = data.AGEC_LVSTK['QC', lvstype] * yield_pot * data.QC_COST_MULTS.loc[yr_cal, lvstype_capital]
+            q_costs = data.AGEC_LVSTK['QC', lvstype] * yield_pot * data.QC_COST_MULTS.loc[yr_cal, lvstype_capital] * data.REAL_AREA
+            c_mrj_effects[m, :, lu_idx] = (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1) * q_costs
 
-            multiplier = 1 - settings.HIR_PRODUCTIVITY_PENALTY
-            c_mrj_effects[m, :, lu_idx] = (multiplier - 1) * q_costs
-
-    return c_mrj_effects
+    return c_mrj_effects + (settings.BEEF_HIR_MAINTAINANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None]
 
 
 def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):
@@ -513,12 +511,10 @@ def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):
             lvstype_capital = lvstype.capitalize()
             yield_pot = get_yield_pot(data, lvstype, vegtype, lm, yr_idx)
 
-            q_costs = data.AGEC_LVSTK['QC', lvstype] * yield_pot * data.QC_COST_MULTS.loc[yr_cal, lvstype_capital]
+            q_costs = data.AGEC_LVSTK['QC', lvstype] * yield_pot * data.QC_COST_MULTS.loc[yr_cal, lvstype_capital] * data.REAL_AREA
+            c_mrj_effects[m, :, lu_idx] = (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1) * q_costs
 
-            multiplier = 1 - settings.HIR_PRODUCTIVITY_PENALTY
-            c_mrj_effects[m, :, lu_idx] = (multiplier - 1) * q_costs
-
-    return c_mrj_effects
+    return c_mrj_effects + (settings.SHEEP_HIR_MAINTAINANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None]
 
 
 def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):

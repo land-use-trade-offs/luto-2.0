@@ -25,7 +25,9 @@ import pandas as pd
 import rasterio
 import rasterio.features
 import geopandas as gpd
+import netCDF4 # necessary for running luto in Denethor
 
+from luto import tools
 import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
@@ -188,20 +190,7 @@ class Data:
         self.COORD_LON_LAT_2D_FULLRES = self.get_coord(np.nonzero(self.NLUM_MASK), self.GEO_META_FULLRES['transform'])     # 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only)
         self.COORD_LON_LAT = [i[self.MASK] for i in self.COORD_LON_LAT_2D_FULLRES]  # Only keep the coordinates for the cells that are not masked out (i.e., land uses). 2D array([lon, ...], [lat, ...]);  lon/lat coordinates for each cell in Australia (land only) and not masked out
         
-        # Get the resfactored lumap_2D as xarray DataArray
-        self.LUMAP_2D_RESFACTORED_XR = xr.DataArray(
-                self.LUMAP_2D_RESFACTORED,
-                dims=["y", "x"],
-                coords={
-                    "y": self.GEO_META['transform'].f + self.GEO_META['transform'].e * (np.arange(self.LUMAP_2D_RESFACTORED.shape[0]) + 0.5),
-                    "x": self.GEO_META['transform'].c + self.GEO_META['transform'].a * (np.arange(self.LUMAP_2D_RESFACTORED.shape[1]) + 0.5),
-                },
-                attrs={
-                    "crs": self.GEO_META['crs'],
-                    "transform": self.GEO_META['transform'],
-                }
-            )
-
+        
 
         ###############################################################
         # Load agricultural crop and livestock data.
@@ -225,12 +214,9 @@ class Data:
         self.AGRICULTURAL_LANDUSES = pd.read_csv((os.path.join(settings.INPUT_DIR, 'ag_landuses.csv')), header = None)[0].to_list()
         self.NON_AGRICULTURAL_LANDUSES = list(settings.NON_AG_LAND_USES.keys())
 
-        self.NONAGLU2DESC = dict(zip(range(settings.NON_AGRICULTURAL_LU_BASE_CODE,
-                                    settings.NON_AGRICULTURAL_LU_BASE_CODE + len(self.NON_AGRICULTURAL_LANDUSES)),
-                            self.NON_AGRICULTURAL_LANDUSES))
-
+        self.NONAGLU2DESC = dict(zip(range(settings.NON_AGRICULTURAL_LU_BASE_CODE, settings.NON_AGRICULTURAL_LU_BASE_CODE + len(self.NON_AGRICULTURAL_LANDUSES)), self.NON_AGRICULTURAL_LANDUSES))
         self.DESC2NONAGLU = {value: key for key, value in self.NONAGLU2DESC.items()}
-
+ 
         # Get number of land-uses
         self.N_AG_LUS = len(self.AGRICULTURAL_LANDUSES)
         self.N_NON_AG_LUS = len(self.NON_AGRICULTURAL_LANDUSES)
@@ -239,6 +225,11 @@ class Data:
         self.AGLU2DESC = {i: lu for i, lu in enumerate(self.AGRICULTURAL_LANDUSES)}
         self.DESC2AGLU = {value: key for key, value in self.AGLU2DESC.items()}
         self.AGLU2DESC[-1] = 'Non-agricultural land'
+        
+        # Combine ag and non-ag landuses
+        self.ALL_LANDUSES = self.AGRICULTURAL_LANDUSES + self.NON_AGRICULTURAL_LANDUSES
+        self.ALLDESC2LU = {**self.AGLU2DESC, **self.DESC2NONAGLU}
+        self.ALLLU2DESC = {**self.AGLU2DESC, **self.NONAGLU2DESC}
 
         # Some useful sub-sets of the land uses.
         self.LU_CROPS = [ lu for lu in self.AGRICULTURAL_LANDUSES if 'Beef' not in lu
@@ -505,6 +496,8 @@ class Data:
                 ]
             ]
 
+
+
         ###############################################################
         # Livestock related data.
         ###############################################################
@@ -696,6 +689,7 @@ class Data:
 
         # Raw transition cost matrix. In AUD/ha and ordered lexicographically.
         self.AG_TMATRIX = np.load(os.path.join(settings.INPUT_DIR, "ag_tmatrix.npy"))
+        self.AG_TO_DESTOCKED_NATURAL_COSTS_HA = np.load(os.path.join(settings.INPUT_DIR, "ag_to_destock_tmatrix.npy"))
         
   
         # Boolean x_mrj matrix with allowed land uses j for each cell r under lm.
@@ -708,6 +702,9 @@ class Data:
         # Non-agricultural data.
         ###############################################################
         print("\tLoading non-agricultural data...", flush=True)
+        
+        # Load HIR mask
+        self.HIR_MASK = np.load(os.path.join(settings.INPUT_DIR, "hir_mask.npy"))
 
         # Load plantings economic data
         self.EP_EST_COST_HA = pd.read_hdf(os.path.join(settings.INPUT_DIR, "ep_est_cost_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32)
@@ -764,7 +761,73 @@ class Data:
         self.EP2AG_TRANSITION_COSTS_HA = np.load(
             os.path.join(settings.INPUT_DIR, "ep_to_ag_tmatrix.npy")
         )  # shape: (28,)
+        
+        
+        ##############################################################
+        # Transition cost for all land use
+        #############################################################
+        
+        # Transition matrix from ag
+        tmat_ag2ag_xr = xr.DataArray(
+            self.AG_TMATRIX,
+            dims=['from_lu','to_lu'],
+            coords={'from_lu':self.AGRICULTURAL_LANDUSES, 'to_lu':self.AGRICULTURAL_LANDUSES }
+        )
+        tmat_ag2non_ag_xr = xr.DataArray(
+            np.repeat(self.AG2EP_TRANSITION_COSTS_HA.reshape(-1,1), len(self.NON_AGRICULTURAL_LANDUSES), axis=1),
+            dims=['from_lu','to_lu'],
+            coords={'from_lu':self.AGRICULTURAL_LANDUSES, 'to_lu':self.NON_AGRICULTURAL_LANDUSES}
+        )
+        tmat_from_ag_xr = xr.concat([tmat_ag2ag_xr, tmat_ag2non_ag_xr], dim='to_lu')                        # Combine ag2ag and ag2non-ag
+        tmat_from_ag_xr.loc[:,'Destocked - natural land'] = self.AG_TO_DESTOCKED_NATURAL_COSTS_HA           # Ag to Destock-natural has its own values
+        
+        
+        # Transition matrix of non-ag to unallocated-modified land (land clearing)
+        tmat_wood_clear = np.load(os.path.join(settings.INPUT_DIR, 'transition_cost_clearing_forest.npz'))
+        
+        tmat_clear_EP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
+        tmat_clear_RP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood'] * np.median(self.RP_PROPORTION[self.RP_PROPORTION > 0])
+        tmat_clear_sheep_ag_forest = (tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']) * settings.AF_PROPORTION
+        tmat_clear_beef_ag_forest = (tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']) * settings.AF_PROPORTION
+        tmat_clear_CP = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
+        tmat_clear_sheep_CP = (tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']) * settings.CP_BELT_PROPORTION
+        tmat_clear_beef_CP = (tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']) * settings.CP_BELT_PROPORTION
+        tmat_clear_BECCS = tmat_wood_clear['tmat_clear_wood_barrier'] + tmat_wood_clear['tmat_clear_dense_wood']
+        tmat_clear_destocked_nat = tmat_wood_clear['tmat_clear_light_wood'] + tmat_wood_clear['tmat_clear_dense_wood']
+        
+        tmat_costs = np.array([
+            tmat_clear_EP, tmat_clear_RP, tmat_clear_sheep_ag_forest, tmat_clear_beef_ag_forest,
+            tmat_clear_CP, tmat_clear_sheep_CP, tmat_clear_beef_CP, tmat_clear_BECCS, tmat_clear_destocked_nat
+        ]).T
+        
+        
+        
+        
+        # Transition matrix from non-ag
+        tmat_non_ag2ag_xr = xr.DataArray(
+            np.repeat(self.EP2AG_TRANSITION_COSTS_HA.reshape(1,-1), len(self.NON_AGRICULTURAL_LANDUSES), axis=0),
+            dims=['from_lu','to_lu'],
+            coords={'from_lu':self.NON_AGRICULTURAL_LANDUSES, 'to_lu':self.AGRICULTURAL_LANDUSES }
+        )
+        tmat_non_ag2non_ag_xr = xr.DataArray(
+            np.full((len(self.NON_AGRICULTURAL_LANDUSES), len(self.NON_AGRICULTURAL_LANDUSES)), np.nan),
+            dims=['from_lu','to_lu'],
+            coords={'from_lu':self.NON_AGRICULTURAL_LANDUSES, 'to_lu':self.NON_AGRICULTURAL_LANDUSES }
+        )
 
+
+        np.fill_diagonal(tmat_non_ag2non_ag_xr.values, 0)                                                   # Lu staty the same has 0 cost
+        tmat_from_non_ag_xr = xr.concat([tmat_non_ag2ag_xr, tmat_non_ag2non_ag_xr], dim='to_lu')            # Combine non-ag2ag and non-ag2non-ag
+        tmat_from_non_ag_xr.loc['Destocked - natural land', 'Unallocated - natural land'] = np.nan          # Destocked-natural can not transit to unallow-natural
+
+        # Get the full transition cost matrix
+        self.T_MAT = xr.concat([tmat_from_ag_xr, tmat_from_non_ag_xr], dim='from_lu')
+        self.T_MAT.loc[self.NON_AGRICULTURAL_LANDUSES, [self.AGLU2DESC[i] for i in self.LU_NATURAL]] = np.nan       # non-ag2natural is not allowed
+        self.T_MAT.loc[self.NON_AGRICULTURAL_LANDUSES, 'Unallocated - modified land'] = tmat_costs                  # Clearing non-ag land requires such cost; TODO, move this number to spreed sheet
+        
+        # tools.plot_t_mat(self.T_MAT)
+        
+        
 
         ###############################################################
         # Water data.
@@ -908,21 +971,13 @@ class Data:
     
         # Load the natural land carbon data.
         nat_land_CO2 = pd.read_hdf(os.path.join(settings.INPUT_DIR, "natural_land_t_co2_ha.h5"), where=self.MASK)
-        # Get the carbon sequestration in each natural land types
-        co2e_stock_unall_natural = np.array(
+        
+        # Get the carbon stock of unallowcated natural land
+        self.CO2E_STOCK_UNALL_NATURAL = np.array(
             nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * fire_risk.to_numpy() / 100),
-            dtype=np.float32
         )
-        co2e_stock_lvstk_natural = np.array(
-            co2e_stock_unall_natural - (0.3 * nat_land_CO2['NATURAL_LAND_AGB_TCO2_HA']) * (fire_risk.to_numpy() / 100),
-            dtype=np.float32
-        )
-
-        # Get the carbon emissions from the one natural land to another
-        self.GHG_PENALTY_UNALL_NATURAL_TO_MODIFIED = co2e_stock_unall_natural
-        self.GHG_PENALTY_UNALL_NATURAL_TO_LVSTK_NATURAL = co2e_stock_unall_natural - co2e_stock_lvstk_natural
-        self.GHG_PENALTY_LVSTK_NATURAL_TO_UNALL_NATURAL = co2e_stock_lvstk_natural - co2e_stock_unall_natural
-        self.GHG_PENALTY_LVSTK_NATURAL_TO_MODIFIED = co2e_stock_lvstk_natural
+        
+        
 
 
 
@@ -1092,10 +1147,9 @@ class Data:
             case 'HCAS':
                 bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[f'PERCENTILE_{settings.HCAS_PERCENTILE}'].to_dict()       # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
                 unallow_nat_scale = bio_HCAS_contribution_lookup[self.DESC2AGLU['Unallocated - natural land']]                                      # Get the biodiversity degradation score for unallocated natural land (float)
-                bio_HCAS_contribution_lookup = {k:v*(1/unallow_nat_scale) for k,v in bio_HCAS_contribution_lookup.items()}                          # Normalise the biodiversity degradation score to the unallocated natural land score
+                bio_HCAS_contribution_lookup = {int(k):v*(1/unallow_nat_scale) for k,v in bio_HCAS_contribution_lookup.items()}                     # Normalise the biodiversity degradation score to the unallocated natural land score
             case 'USER_DEFINED':
-                bio_HCAS_contribution_lookup = biodiv_contribution_lookup[['lu', 'USER_DEFINED']]
-                bio_HCAS_contribution_lookup = {int(k):v for k,v in dict(bio_HCAS_contribution_lookup.values).items()}                              # Convert the biodiversity degradation score to a dictionary {land-use-code: score}
+                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[ 'USER_DEFINED'].to_dict()
             case _:
                 raise ValueError(f"Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
         
@@ -1300,7 +1354,6 @@ class Data:
         self.HIR_MASK = np.load(os.path.join(settings.INPUT_DIR, "hir_mask.npy"))[self.MASK].astype(bool)
 
 
-
         ###############################################################
         # Calculate base year production 
         ###############################################################
@@ -1346,10 +1399,10 @@ class Data:
             dict: The updated geographic metadata.
         """
         meta = self.GEO_META_FULLRES.copy()
-        height, width = (self.GEO_META_FULLRES['height'], self.GEO_META_FULLRES['width'])  if settings.WRITE_FULL_RES_MAPS else self.LUMAP_2D_RESFACTORED.shape
+        height, width =  self.LUMAP_2D_RESFACTORED.shape
         trans = list(self.GEO_META_FULLRES['transform'])
-        trans[0] = trans[0] if settings.WRITE_FULL_RES_MAPS else trans[0] * settings.RESFACTOR    # Adjust the X resolution
-        trans[4] = trans[4] if settings.WRITE_FULL_RES_MAPS else trans[4] * settings.RESFACTOR    # Adjust the Y resolution
+        trans[0] = trans[0] * settings.RESFACTOR    # Adjust the X resolution
+        trans[4] = trans[4] * settings.RESFACTOR    # Adjust the Y resolution
         trans = Affine(*trans)
         meta.update(width=width, height=height, compress='lzw', driver='GTiff', transform=trans, nodata=self.NODATA, dtype='float32')
         return meta
@@ -1758,7 +1811,7 @@ class Data:
 
 
         # Create path name
-        self.path = f"{settings.OUTPUT_DIR}/{self.timestamp}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}_{settings.MODE}"
+        self.path = f"{settings.OUTPUT_DIR}/{self.timestamp}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}"
 
         # Get all paths
         paths = (
@@ -1768,17 +1821,16 @@ class Data:
         )  # Skip creating lucc_separate for base year
 
         # Add the path for the comparison between base-year and target-year if in the timeseries mode
-        if settings.MODE == "timeseries":
-            self.path_begin_end_compare = f"{self.path}/begin_end_compare_{years[0]}_{years[-1]}"
-            paths = (
-                paths
-                + [self.path_begin_end_compare]
-                + [
-                    f"{self.path_begin_end_compare}/out_{years[0]}",
-                    f"{self.path_begin_end_compare}/out_{years[-1]}",
-                    f"{self.path_begin_end_compare}/out_{years[-1]}/lucc_separate",
-                ]
-            )
+        self.path_begin_end_compare = f"{self.path}/begin_end_compare_{years[0]}_{years[-1]}"
+        paths = (
+            paths
+            + [self.path_begin_end_compare]
+            + [
+                f"{self.path_begin_end_compare}/out_{years[0]}",
+                f"{self.path_begin_end_compare}/out_{years[-1]}",
+                f"{self.path_begin_end_compare}/out_{years[-1]}/lucc_separate",
+            ]
+        )
 
         # Create all paths
         for p in paths:

@@ -91,7 +91,7 @@ def write_data(data: Data):
     write_settings(data.path)
 
     # Get the years to write
-    years = settings.SIM_YERAS
+    years = settings.SIM_YEARS
     paths = [f"{data.path}/out_{yr}" for yr in years]
 
     ###############################################################
@@ -104,14 +104,14 @@ def write_data(data: Data):
 
     # Write outputs for each year
     jobs = [delayed(write_output_single_year)(data, yr, path_yr, None) for (yr, path_yr) in zip(years, paths)]
-    jobs += [delayed(write_output_single_year)(data, years[-1], f"{data.path_begin_end_compare}/out_{years[-1]}", years[0])] if settings.MODE == 'timeseries' else []
+    jobs += [delayed(write_output_single_year)(data, years[-1], f"{data.path_begin_end_compare}/out_{years[-1]}", years[0])]
 
     # Parallel write the outputs for each year
     num_jobs = min(len(jobs), settings.WRITE_THREADS) if settings.PARALLEL_WRITE else 1   # Use the minimum between jobs_num and threads for parallel writing
     Parallel(n_jobs=num_jobs)(jobs)
 
     # Copy the base-year outputs to the path_begin_end_compare
-    shutil.copytree(f"{data.path}/out_{years[0]}", f"{data.path_begin_end_compare}/out_{years[0]}", dirs_exist_ok = True) if settings.MODE == 'timeseries' else None
+    shutil.copytree(f"{data.path}/out_{years[0]}", f"{data.path_begin_end_compare}/out_{years[0]}", dirs_exist_ok = True)
     
     # Create the report HTML and png maps
     TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
@@ -126,7 +126,7 @@ def move_logs(data: Data):
             f"{settings.OUTPUT_DIR}/run_{timestamp}_stderr.log",
             f"{settings.OUTPUT_DIR}/write_{timestamp}_stdout.log",
             f"{settings.OUTPUT_DIR}/write_{timestamp}_stderr.log",
-            f'{settings.OUTPUT_DIR}/RES_{settings.RESFACTOR}_{settings.MODE}_mem_log.txt',
+            f'{settings.OUTPUT_DIR}/RES_{settings.RESFACTOR}_mem_log.txt',
             f'{settings.OUTPUT_DIR}/.timestamp']
 
     for log in logs:
@@ -785,7 +785,7 @@ def write_area_transition_start_end(data: Data, path):
 
     # Get the end year
     yr_cal_start = data.YR_CAL_BASE
-    yr_cal_end = settings.SIM_YERAS[-1]
+    yr_cal_end = settings.SIM_YEARS[-1]
 
     # Get the decision variables for the start year
     dvar_base = tools.lumap2ag_l_mrj(data.lumaps[yr_cal_start], data.lmmaps[yr_cal_start])
@@ -1659,7 +1659,7 @@ def write_ghg(data: Data, yr_cal, path):
     if yr_cal >= data.YR_CAL_BASE + 1:
         ghg_emissions = data.prod_data[yr_cal]['GHG Emissions']
     else:
-        ghg_emissions = (ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True) * data.ag_dvars[settings.SIM_YERAS[0]]).sum()
+        ghg_emissions = (ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True) * data.ag_dvars[settings.SIM_YEARS[0]]).sum()
 
     # Save GHG emissions to file
     df = pd.DataFrame({
@@ -1777,7 +1777,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
         pass
     else:
         yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
-        ghg_t_dict = ag_ghg.get_ghg_transition_penalties(data, data.lumaps[yr_cal_sim_pre], separate=True)
+        ghg_t_dict = ag_ghg.get_ghg_transition_emissions(data, data.lumaps[yr_cal_sim_pre], separate=True)
         transition_types = ghg_t_dict.keys()
         ghg_t = np.stack([ghg_t_dict[tt] for tt in transition_types], axis=0)
 

@@ -70,7 +70,7 @@ def apply_agricultural_land_use_culling(x_mrj, c_mrj, t_mrj, r_mrj):
     This function modifies the x_mrj matrix in-place.
 
     Args:
-        x_mrj (np.ndarray): The 'exclude' matrix returned by `get_exclude_matrices`. This will
+        x_mrj (np.ndarray): The 'exclude' matrix returned by `get_to_ag_exclude_matrices`. This will
             be modified in-place by this function.
         c_mrj (np.ndarray): The 'cost' matrix.
         t_mrj (np.ndarray): The 'transition' matrix.
