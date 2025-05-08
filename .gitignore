@@ -2,6 +2,7 @@
 .spyproject/
 **/__pycache__/
 .vscode/**
+.vscode-upload.json
 
 /jinzhu_inspect_code/*
 /jinzhu_inspect_code
