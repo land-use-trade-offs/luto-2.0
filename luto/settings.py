@@ -162,8 +162,8 @@ THREADS = min(32, os.cpu_count())
 
 EXCLUDE_NO_GO_LU = False
 NO_GO_VECTORS = {
-    'Winter cereals':           os.path.join(INPUT_DIR, 'no_go_areas', 'no_go_Winter_cereals.shp'),
-    'Environmental Plantings':  os.path.join(INPUT_DIR, 'no_go_areas', 'no_go_Enviornmental_Plantings.shp')
+    'Winter cereals':           os.path.join(os.path.abspath(INPUT_DIR), 'no_go_areas', 'no_go_Winter_cereals.shp'),
+    'Environmental Plantings':  os.path.join(os.path.abspath(INPUT_DIR), 'no_go_areas', 'no_go_Enviornmental_Plantings.shp')
 }
 '''
 Land-use and vector file pairs to exclude land-use from being utilised in that area. 

@@ -36,3 +36,4 @@ gurobi.log
 
 *.tmp
 **/*.7z
+.vscode-upload.json

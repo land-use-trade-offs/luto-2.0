@@ -42,7 +42,7 @@ from luto.tools.create_task_runs.parameters import (
 
 
 
-def copy_settings_as_df() -> pd.DataFrame:
+def get_settings_df() -> pd.DataFrame:
     '''
     Save {k:v} in the settings.py file to a DataFrame.
     '''
@@ -87,7 +87,7 @@ def copy_settings_as_df() -> pd.DataFrame:
 
 
 
-def create_grid_search_permutations(grid_dict:dict) -> None:
+def get_grid_search_param_df(grid_dict:dict) -> None:
     '''
     Permutate the grid search parameters and save them to a CSV file.\n
     '''
@@ -103,20 +103,20 @@ def create_grid_search_permutations(grid_dict:dict) -> None:
 
     print(f'Grid search template has been created with {len(permutations_df)} permutations!')
     
+    return permutations_df
+    
     
 
-def create_grid_search_settings_df(settings_df:pd.DataFrame = copy_settings_as_df()) -> pd.DataFrame:
+def get_grid_search_settings_df(settings_df:pd.DataFrame, grid_search_param_df:pd.DataFrame) -> pd.DataFrame:
     '''
     Create a dataframe that each row is an independent settings for a run.\n
     '''
     
     # Read the settings template file and the grid search parameters
     template_grid_search = settings_df.copy()
-    permutations_df = pd.read_csv(f'{TASK_ROOT_DIR}/grid_search_parameters.csv')
-
 
     # Loop through the permutations DataFrame and create new columns with updated settings
-    for _, row in permutations_df.iterrows():
+    for _, row in grid_search_param_df.iterrows():
         # Replace the settings using the key-value pairs in the permutation item
         new_column = template_grid_search['Default_run'].copy() 
         for k, v in row.items():
