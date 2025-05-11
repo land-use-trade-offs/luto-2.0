@@ -38,13 +38,13 @@ from glob import glob
 from luto.data import Data
 from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
-from luto.tools.create_task_runs.helpers import log_memory_usage
 from luto.tools.write import write_outputs
 
 import luto.settings as settings
 
 from luto.tools import (
     LogToFile,
+    log_memory_usage,
     write_timestamp,
     read_timestamp
 )

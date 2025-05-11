@@ -17,9 +17,7 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
-import os
-import pandas as pd
-import numpy as np
+
 from luto.tools.create_task_runs.helpers import (
     get_settings_df,
     get_grid_search_param_df,
@@ -27,6 +25,8 @@ from luto.tools.create_task_runs.helpers import (
     create_task_runs,
 )
 
+# Define the root dir for the task runs
+TASK_ROOT_DIR = 'F:/jinzhu/LUTO/Custom_runs/20250509_RES9_DCCEEW_REPORT'
 
 
 # Set the grid search parameters
@@ -116,17 +116,20 @@ grid_search = {
     # 'FEED_EFFICIENCY': ['High'],      # 'BAU' or 'High'
 }
 
-# Create the settings parameters
-''' This will create a parameter CSV based on `grid_search`. '''
-settings_df = get_settings_df()
-grid_search_param_df = get_grid_search_param_df(grid_search)
-grid_search_df = get_grid_search_settings_df(settings_df, grid_search_param_df)
 
 
 
-# 1) Submit task to a single linux machine, and run simulations parallely
-create_task_runs(grid_search_df, mode='single', n_workers=min(len(grid_search_df), 100))
 
-# 2) Submit task to multiple linux computation nodes
-# create_task_runs(grid_search_df, mode='cluster')
+if __name__ == '__main__':
+    
+    # Create the grid settings parameters
+    default_settings_df = get_settings_df(TASK_ROOT_DIR)
+    grid_search_param_df = get_grid_search_param_df(TASK_ROOT_DIR, grid_search)
+    grid_search_settings_df = get_grid_search_settings_df(TASK_ROOT_DIR, default_settings_df, grid_search_param_df)
+
+    # 1) Submit task to a single linux machine, and run simulations parallely
+    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
+
+    # 2) Submit task to multiple linux computation nodes
+    # create_task_runs(grid_search_df, mode='cluster')
 

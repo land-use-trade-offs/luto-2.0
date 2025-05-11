@@ -25,7 +25,6 @@ import luto.tools as tools
 import luto.economics.agricultural.water as ag_water
 import luto.economics.agricultural.ghg as ag_ghg
 import luto.economics.agricultural.transitions as ag_transitions
-from luto.settings import NON_AG_LAND_USES
 
 
 def get_env_plant_transitions_from_ag(data: Data, yr_idx, lumap, w_license_cost_r, w_rm_irrig_cost_r, separate=False) -> np.ndarray|dict:
@@ -56,8 +55,8 @@ def get_env_plant_transitions_from_ag(data: Data, yr_idx, lumap, w_license_cost_
     base_ag_to_ep_t_r[tools.get_env_plantings_cells(lumap)] = 0.0
     
     # Waster costs; Assume EP is dryland, and no 'REMOVE_IRRIG_COST' for EP
-    w_license_cost_r[tools.get_env_plantings_cells(lumap)] = 0.0
-    w_rm_irrig_cost_r[tools.get_env_plantings_cells(lumap)] = 0.0
+    w_license_cost_r[tools.get_env_plantings_cells(lumap)] = 0 # TODO: use water licesen price layer here
+    w_rm_irrig_cost_r[tools.get_env_plantings_cells(lumap)] = settings.NEW_IRRIG_COST
     w_cost_r = w_license_cost_r + w_rm_irrig_cost_r
 
     if separate:
@@ -964,7 +963,7 @@ def get_to_ag_transition_matrix(data: Data, yr_idx, lumap, lmmap, separate=False
 
     """
     
-    non_ag_to_agr_t_matrices = {lu: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32) for lu in NON_AG_LAND_USES}
+    non_ag_to_agr_t_matrices = {lu: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32) for lu in settings.NON_AG_LAND_USES}
 
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
@@ -1043,8 +1042,12 @@ def get_to_non_ag_exclude_matrices(data: Data, lumap) -> np.ndarray:
         for no_go_x_r, no_go_desc in zip(data.NO_GO_REGION_NON_AG, data.NO_GO_LANDUSE_NON_AG):
             no_go_j = data.DESC2NONAGLU[no_go_desc]
             no_go_x_rk[:,no_go_j] = no_go_x_r
+            
+    # Assign non-ag maximum land-use proportions
+    no_go_x_rk = (t_rk * no_go_x_rk).astype(np.float32)
+    no_go_x_rk[:, 1] *= data.RP_PROPORTION              # Riparian Plantings can not exceed its proportion to the cell
 
-    return (t_rk * no_go_x_rk).astype(np.int8)
+    return no_go_x_rk
 
 
 def get_lower_bound_non_agricultural_matrices(data: Data, base_year) -> np.ndarray:
@@ -1057,9 +1060,11 @@ def get_lower_bound_non_agricultural_matrices(data: Data, base_year) -> np.ndarr
     """
 
     if base_year == data.YR_CAL_BASE or base_year not in data.non_ag_dvars:
-        return np.zeros((data.NCELLS, len(NON_AG_LAND_USES))).astype(np.float32)
+        return np.zeros((data.NCELLS, len(settings.NON_AG_LAND_USES))).astype(np.float32)
         
-    return np.divide(
-        np.floor(data.non_ag_dvars[base_year].astype(np.float32) * 10 ** settings.ROUND_DECMIALS),
-        10 ** settings.ROUND_DECMIALS,
-    )
+    # return np.divide(
+    #     np.floor(data.non_ag_dvars[base_year].astype(np.float32) * 10 ** settings.ROUND_DECMIALS),
+    #     10 ** settings.ROUND_DECMIALS,
+    # )
+    
+    return data.non_ag_dvars[base_year].astype(np.float32)

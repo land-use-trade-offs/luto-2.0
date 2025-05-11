@@ -48,7 +48,6 @@ pd.set_option('display.float_format', '{:,.4f}'.format)
 
 INPUT_DIR = 'input'
 OUTPUT_DIR = 'output'
-DATA_DIR = 'input'
 RAW_DATA = '../raw_data'
 
 
@@ -100,7 +99,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 5       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 13       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
 SIM_YEARS = list(range(2010,2051,10)) # range(2020,2050)
@@ -234,7 +233,7 @@ This is expected behaviour and the user must choose how to deal with it.
 """
 
 # Cost of fencing per linear metre
-FENCING_COST_PER_M = 10
+FENCING_COST_PER_M = 2
 
 # Environmental Plantings Parameters
 EP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
@@ -361,7 +360,7 @@ REMOVE_IRRIG_COST = 5000
 NEW_IRRIG_COST = 10000
 
 # Savanna burning cost per hectare per year ($/ha/yr)
-SAVBURN_COST_HA_YR = 100
+SAVBURN_COST_HA_YR = 10
 
 # The minimum value an agricultural management variable must take for the write_output function to consider it being used on a cell
 AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1

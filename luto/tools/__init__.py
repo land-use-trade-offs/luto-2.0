@@ -25,11 +25,13 @@ Pure helper functions and other tools.
 
 import sys
 import os.path
+import time
 import traceback
 import functools
 
 import pandas as pd
 import numpy as np
+import psutil
 import xarray as xr
 import numpy_financial as npf
 import matplotlib.patches as patches
@@ -719,3 +721,28 @@ class LogToFile:
         def flush(self):
             # Ensure content is written to disk
             self.file.flush()
+            
+            
+
+def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1):
+    '''
+    Log the memory usage of the current process to a file.
+    Parameters
+        output_dir (str): The directory to save the memory log file.
+        mode (str): The mode to open the file. Default is 'a' (append).
+        interval (int): The interval in seconds to log the memory usage.
+    '''
+    
+    with open(f'{output_dir}/RES_{settings.RESFACTOR}_mem_log.txt', mode=mode) as file:
+        while True:
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            process = psutil.Process(os.getpid())
+            memory_usage = process.memory_info().rss
+            children = process.children(recursive=True)
+            # Include the memory usage of the child processes to get accurate memory usage under parallel processing
+            if children:
+                memory_usage += sum(child.memory_info().rss for child in children)
+            memory_usage /= (1024 * 1024 * 1024)
+            file.write(f'{timestamp}\t{memory_usage:.2f}\n')
+            file.flush()  # Ensure data is written to the file immediately
+            time.sleep(interval)

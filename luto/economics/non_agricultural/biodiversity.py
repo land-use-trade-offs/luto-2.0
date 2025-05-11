@@ -19,6 +19,7 @@
 
 import numpy as np
 
+from luto import settings
 from luto.data import Data
 from luto import tools
 from luto.settings import (
@@ -38,7 +39,7 @@ def get_biodiv_environmental_plantings(data: Data) -> np.ndarray:
 
 
 def get_biodiv_riparian_plantings(data: Data) -> np.ndarray:
-    return data.BIO_CONNECTIVITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_RIPARIAN_PLANTING * data.RP_PROPORTION
+    return data.BIO_CONNECTIVITY_RAW * data.REAL_AREA * BIO_CONTRIBUTION_RIPARIAN_PLANTING
 
 
 def get_biodiv_agroforestry_base(data: Data) -> np.ndarray:
@@ -190,14 +191,15 @@ def get_biodiv_destocked_land(data: Data, lumap: np.ndarray):
     Numpy array indexed by r
     """
     destock_b_contr = np.zeros(data.NCELLS)
-    
-    from_lu = data.DESC2AGLU['Unallocated - natural land']
-    for to_lu in data.LU_LVSTK_NATURAL:
+    to_lu = data.DESC2AGLU['Unallocated - natural land']
+
+    for from_lu in data.LU_LVSTK_NATURAL:
         destock_b_contr[lumap == from_lu] = (
             data.BIO_CONNECTIVITY_RAW[lumap == from_lu] 
-            * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu])
+            * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[to_lu] - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[from_lu])
             * data.REAL_AREA[lumap == from_lu]
         )
+        
     return destock_b_contr
 
 

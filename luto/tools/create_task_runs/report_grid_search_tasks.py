@@ -22,6 +22,7 @@ import pandas as pd
 import numpy as np
 import plotnine as p9
 import plotly.express as px
+from luto.tools.create_task_runs.create_grid_search_tasks import TASK_ROOT_DIR
 from luto.tools.create_task_runs.helpers import process_task_root_dirs
 
 
@@ -31,13 +32,13 @@ p9.options.dpi = 100
 
 
 # Get the data
-task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20250428_GRID_SEARCH"
+task_root_dir = TASK_ROOT_DIR.rstrip('/')       # Or replace with the desired task run root dir
 report_data = process_task_root_dirs(task_root_dir)
 
 
 # -------------- Plot the weight's landscape map (Demand's deviation) ----------------------
 query_str = '''
-    Type == "Production_Mt" 
+    Type == "Production_deviation_pct" 
     and year != 2010
     '''.replace('\n', ' ').replace('  ', ' ')
 
@@ -183,7 +184,7 @@ plot_landscape_profit = (
 
 # -------------- Plot the weight's landscape map (biodiversity score) ----------------------
 query_str = '''
-    Type == "Biodiversity_area_score"
+    Type == "Biodiversity_obj_score"
     '''.replace('\n', ' ').replace('  ', ' ')
     
 df_bio = report_data.query(query_str).query('run_idx.isin(@valid_runs_demand_profit)').copy()
@@ -411,7 +412,7 @@ p_weight_vs_profit = (
 
 # ------------------ Demand ------------------
 query_str = '''
-    Type == "Production_Mt"
+    Type == "Production_deviation_pct"
     and run_idx.isin(@valid_runs_demand_profit)
     '''.replace('\n', ' ').replace('  ', ' ')
     
@@ -468,7 +469,7 @@ p_weight_vs_demand = (
 
 # ------------------ Biodiversity ------------------
 query_str = '''
-    Type == "Biodiversity_area_score"
+    Type == "Biodiversity_obj_score"
     and run_idx.isin(@valid_runs_demand_profit)
     '''.replace('\n', ' ').replace('  ', ' ')
 

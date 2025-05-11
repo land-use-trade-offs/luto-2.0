@@ -36,7 +36,6 @@ from joblib import Parallel, delayed
 from luto import settings
 from luto import tools
 from luto.data import Data
-from luto.tools.create_task_runs.helpers import log_memory_usage
 from luto.tools.spatializers import create_2d_map, write_gtiff
 from luto.tools.compmap import lumap_crossmap, lmmap_crossmap, crossmap_irrstat, crossmap_amstat
 
@@ -69,7 +68,7 @@ timestamp = tools.write_timestamp()
 def write_outputs(data: Data):
     """Write model outputs to file"""
     
-    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1), daemon=True)
+    memory_thread = threading.Thread(target=tools.log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1), daemon=True)
     memory_thread.start()
     
     # Write the model outputs to file
