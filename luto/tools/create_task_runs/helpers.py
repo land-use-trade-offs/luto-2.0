@@ -33,7 +33,6 @@ from luto.tools.create_task_runs.parameters import (
 )
 
 
-
 def get_settings_df(task_root_dir:str) -> pd.DataFrame:
     '''
     Save the default settings file to a datafram.
@@ -109,15 +108,16 @@ def get_grid_search_settings_df(task_root_dir:str, settings_df:pd.DataFrame, gri
     '''
     Loop through the grid search parameters and create a settings template for each run.
     '''
-    # Read the settings template file and the grid search parameters
+    
     template_grid_search = settings_df.copy()
+    task_dir = os.path.basename(os.path.normpath(task_root_dir))
 
     # Loop through the permutations DataFrame and create new columns with updated settings
     run_settings_dfs = []
     for _, row in grid_search_param_df.iterrows():
         settings_dict = template_grid_search.set_index('Name')['Default_run'].to_dict()
         settings_dict.update(row.to_dict())
-        settings_dict = update_settings(settings_dict, f'Run_{row['run_idx']:04}')
+        settings_dict = update_settings(settings_dict, f'{task_dir}_Run_{row['run_idx']:04}')
         run_settings_dfs.append(pd.Series(settings_dict, name=f'Run_{row['run_idx']:04}'))
     
     template_grid_search = pd.concat(run_settings_dfs, axis=1).reset_index(names='Name')
@@ -161,14 +161,12 @@ def write_settings(task_dir:str, settings_dict:dict):
 def write_terminal_vars(task_dir:str, col:str, settings_dict:dict):
     with open(f'{task_dir}/luto/settings_bash.py', 'w') as bash_file:
         for key, value in settings_dict.items():
-            if key not in ['MEM', 'NCPUS', 'TIME', 'QUEUE']:
+            if key not in ['MEM', 'NCPUS', 'TIME', 'QUEUE', 'JOB_NAME']:
                 continue
             if isinstance(value, str):
                 bash_file.write(f'export {key}="{value}"\n')
             else:
                 bash_file.write(f'export {key}={value}\n')
-        # Update the JOB_NAME
-        bash_file.write(f'export JOB_NAME="{col}"\n')
         
 
 

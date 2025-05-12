@@ -26,7 +26,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250512_RES5_STARTS_2010'
+TASK_ROOT_DIR = '../Custom_runs/20250512_DCCEEW_REPORT_01_CONNECTIVITY_ONF_OFF' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -45,7 +45,7 @@ grid_search = {
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                 # 'maxprofit' or 'maxutility'
     'RESFACTOR': [5],
-    'SIM_YEARS': [list(range(2010,2051,10))],   # Years to run the model 
+    'SIM_YEARS': [list(range(2020,2051,5))],   # Years to run the model 
     'WRITE_THREADS': [5],
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'KEEP_OUTPUTS': [False],                    # If False, only keep report HTML
@@ -65,7 +65,7 @@ grid_search = {
     'USE_GHG_SCOPE_1': [True],                  # True or False
     'GHG_LIMITS_FIELD': [
         '1.5C (50%) excl. avoided emis SCOPE1', 
-        '1.8C (67%) excl. avoided emis SCOPE1'
+        # '1.8C (67%) excl. avoided emis SCOPE1'
     ],
     
     # --------------- Water constraints ---------------
@@ -75,15 +75,15 @@ grid_search = {
     'INCLUDE_WATER_LICENSE_COSTS': [0],
     
     # --------------- Biodiversity priority zone ---------------
-    'CONNECTIVITY_SOURCE': ['NCI'],
+    'CONNECTIVITY_SOURCE': ['NCI','DWI', None],
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
     
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSTIY_TARGET_GBF_2': ['on', 'off'],    # 'on' or 'off'
+    'BIODIVERSTIY_TARGET_GBF_2': ['on'],    # 'on' or 'off'
     'BIODIV_GBF_TARGET_2_DICT': [
         {2010: 0, 2030: 0.15, 2050: 0.15, 2100: 0.15}, 
-        {2010: 0, 2030: 0.15, 2050: 0.25, 2100: 0.25}, 
+        # {2010: 0, 2030: 0.15, 2050: 0.25, 2100: 0.25}, 
     ],
 
     # --------------- Biodiversity settings - GBF 3 ---------------
