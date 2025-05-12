@@ -84,7 +84,11 @@ def get_grid_search_param_df(task_root_dir:str, grid_dict:dict) -> None:
     permutations_df.insert(0, 'run_idx', [i for i in range(1, len(permutations_df) + 1)])
     permutations_df.to_csv(f'{task_root_dir}/grid_search_parameters.csv', index=False)
 
+    # Report the grid search parameters
     print(f'Grid search template has been created with {len(permutations_df)} permutations!')
+    for k, v in grid_dict.items():
+        if len(v) > 1:
+            print(f'    {k:<30} : {len(v)} values')
     
     return permutations_df
     
