@@ -159,7 +159,7 @@ THREADS = min(32, os.cpu_count())
 # No-Go areas; Regional adoption constraints
 # ---------------------------------------------------------------------------- #
 
-EXCLUDE_NO_GO_LU = True
+EXCLUDE_NO_GO_LU = False
 NO_GO_VECTORS = {
     'Winter cereals':           os.path.join(os.path.abspath(INPUT_DIR), 'no_go_areas', 'no_go_Winter_cereals.shp'),
     'Environmental Plantings':  os.path.join(os.path.abspath(INPUT_DIR), 'no_go_areas', 'no_go_Enviornmental_Plantings.shp')
