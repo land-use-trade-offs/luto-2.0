@@ -1040,12 +1040,12 @@ def get_to_non_ag_exclude_matrices(data: Data, lumap) -> np.ndarray:
     no_go_x_rk = np.ones((data.NCELLS, data.N_NON_AG_LUS))  
     if settings.EXCLUDE_NO_GO_LU:
         for no_go_x_r, no_go_desc in zip(data.NO_GO_REGION_NON_AG, data.NO_GO_LANDUSE_NON_AG):
-            no_go_j = data.DESC2NONAGLU[no_go_desc]
-            no_go_x_rk[:,no_go_j] = no_go_x_r
+            no_go_j = data.NON_AGRICULTURAL_LANDUSES.index(no_go_desc)   # Get the index of the non-agricultural land use
+            no_go_x_rk[:, no_go_j] = no_go_x_r
             
     # Assign non-ag maximum land-use proportions
     no_go_x_rk = (t_rk * no_go_x_rk).astype(np.float32)
-    no_go_x_rk[:, 1] *= data.RP_PROPORTION              # Riparian Plantings can not exceed its proportion to the cell
+    no_go_x_rk[:, 1] *= data.RP_PROPORTION                  # Riparian Plantings can not exceed its proportion to the cell
 
     return no_go_x_rk
 
