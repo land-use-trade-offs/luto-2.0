@@ -23,6 +23,21 @@ import luto.settings as settings
 # Get the root directory of the data
 YR_BASE = 2010
 
+# Colors for reporting HTML to loop through
+COLORS = [
+    "#8085e9",
+    "#f15c80",
+    "#e4d354",
+    "#2b908f",
+    "#f45b5b",
+    "#7cb5ec",
+    "#434348",
+    "#90ed7d",
+    "#f7a35c",
+    "#91e8e1",
+]
+
+
 # Define crop-lvstk land uses
 LU_CROPS = ['Apples','Citrus','Cotton','Grapes','Hay','Nuts','Other non-cereal crops',
             'Pears','Plantation fruit','Rice','Stone fruit','Sugar','Summer cereals',

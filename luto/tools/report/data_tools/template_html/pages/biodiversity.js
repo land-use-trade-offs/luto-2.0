@@ -1,19 +1,9 @@
 // Create Chart
 document.addEventListener("DOMContentLoaded", function () {
-    Highcharts.setOptions({
-        colors: [
-            "#7cb5ec",
-            "#434348",
-            "#90ed7d",
-            "#f7a35c",
-            "#8085e9",
-            "#f15c80",
-            "#e4d354",
-            "#2b908f",
-            "#f45b5b",
-            "#91e8e1",
-        ],
-    });
+
+    // Set the default color palette for Highcharts
+    var colors = eval(document.getElementById("colors").innerHTML);
+    Highcharts.setOptions({colors: colors});
 
     // Set the title alignment to left
     Highcharts.setOptions({

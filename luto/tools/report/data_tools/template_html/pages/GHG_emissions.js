@@ -1,33 +1,28 @@
 // make charts
 document.addEventListener("DOMContentLoaded", function () {
-  Highcharts.setOptions({
-    colors: [
-      "#7cb5ec",
-      "#434348",
-      "#90ed7d",
-      "#f7a35c",
-      "#8085e9",
-      "#f15c80",
-      "#e4d354",
-      "#2b908f",
-      "#f45b5b",
-      "#91e8e1",
-    ],
-  });
-
+  
+  // Set the default color palette for Highcharts
+  var colors = eval(document.getElementById("colors").innerHTML);
+  Highcharts.setOptions({colors: colors});
 
   // Get the available years for plotting
-  var years = eval(document.getElementById("model_years").innerHTML).map(function (x) { return parseInt(x); });
+  var years = eval(document.getElementById("model_years").innerHTML).map(
+    function (x) {
+      return parseInt(x);
+    }
+  );
   // Sort the years
-  years.sort(function (a, b) { return a - b; });
+  years.sort(function (a, b) {
+    return a - b;
+  });
   // Get the year ticks and interval
   var year_ticks = years.length == 2 ? years : null;
 
   // Set the title alignment to left
   Highcharts.setOptions({
     title: {
-        align: 'left'
-    }
+      align: "left",
+    },
   });
 
   // Chart:GHG_1_cunsum_emission_Mt
@@ -69,8 +64,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     tooltip: {
       formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+        return `<b>Year:</b> ${this.x}<br><b>${
+          this.series.name
+        }:</b>${this.y.toFixed(2)}<br/>`;
       },
     },
 
@@ -92,7 +88,8 @@ document.addEventListener("DOMContentLoaded", function () {
   // Chart:GHG_2_individual_emission_Mt
   Highcharts.chart("GHG_2_individual_emission_Mt", {
     chart: {
-      marginRight: 500,
+      type: "column",
+      marginRight: 380,
     },
     title: {
       text: "GHG Emissions by Land-use/Management Type",
@@ -108,13 +105,14 @@ document.addEventListener("DOMContentLoaded", function () {
     legend: {
       align: "right",
       layout: "vertical",
-      x: -150,
+      x: -100,
       verticalAlign: "middle",
     },
     tooltip: {
       formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+        return `<b>Year:</b> ${this.x}<br><b>${
+          this.series.name
+        }:</b>${this.y.toFixed(2)}<br/>`;
       },
     },
     series: JSON.parse(
@@ -136,8 +134,6 @@ document.addEventListener("DOMContentLoaded", function () {
       sourceHeight: 600,
     },
   });
-
-
 
   // Chart:GHG_4_3_1_crop_lvstk_emission_Mt
   Highcharts.chart("GHG_4_3_1_crop_lvstk_emission_Mt", {
@@ -176,8 +172,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     tooltip: {
       formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+        return `<b>Year:</b> ${this.x}<br><b>${
+          this.series.name
+        }:</b>${this.y.toFixed(2)}<br/>`;
       },
     },
 
@@ -233,8 +230,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     tooltip: {
       formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+        return `<b>Year:</b> ${this.x}<br><b>${
+          this.series.name
+        }:</b>${this.y.toFixed(2)}<br/>`;
       },
     },
 
@@ -290,8 +288,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     tooltip: {
       formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+        return `<b>Year:</b> ${this.x}<br><b>${
+          this.series.name
+        }:</b>${this.y.toFixed(2)}<br/>`;
       },
     },
 
@@ -339,16 +338,17 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     legend: {
-        align: 'right',
-        verticalAlign: 'middle',
-        layout: 'vertical',
-        x: 0,
+      align: "right",
+      verticalAlign: "middle",
+      layout: "vertical",
+      x: 0,
     },
 
     tooltip: {
       formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+        return `<b>Year:</b> ${this.x}<br><b>${
+          this.series.name
+        }:</b>${this.y.toFixed(2)}<br/>`;
       },
     },
 
@@ -381,21 +381,20 @@ document.addEventListener("DOMContentLoaded", function () {
       tickWidth: 0.05,
 
       categories: JSON.parse(
-        document.getElementById("GHG_4_3_5_lu_lm_emission_Mt_wide_csv").innerHTML
-      )['categories'],
+        document.getElementById("GHG_4_3_5_lu_lm_emission_Mt_wide_csv")
+          .innerHTML
+      )["categories"],
 
       labels: {
-        y:10,
+        y: 10,
         rotation: -90,
         align: "right",
-
-    },
-
+      },
     },
 
     series: JSON.parse(
       document.getElementById("GHG_4_3_5_lu_lm_emission_Mt_wide_csv").innerHTML
-    )['series'],
+    )["series"],
 
     yAxis: {
       title: {
@@ -410,8 +409,9 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     tooltip: {
       formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+        return `<b>Year:</b> ${this.x}<br><b>${
+          this.series.name
+        }:</b>${this.y.toFixed(2)}<br/>`;
       },
     },
 
@@ -470,11 +470,10 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     tooltip: {
       formatter: function () {
-        return `<b>${this.series.name
-          }:</b>${this.y.toFixed(3)}<br/>`;
+        return `<b>${this.series.name}:</b>${this.y.toFixed(3)}<br/>`;
       },
     },
-  
+
     legend: {
       align: "right",
       layout: "vertical",
@@ -524,8 +523,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     tooltip: {
       formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+        return `<b>Year:</b> ${this.x}<br><b>${
+          this.series.name
+        }:</b>${this.y.toFixed(2)}<br/>`;
       },
     },
 
@@ -580,8 +580,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     tooltip: {
       formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+        return `<b>Year:</b> ${this.x}<br><b>${
+          this.series.name
+        }:</b>${this.y.toFixed(2)}<br/>`;
       },
     },
 
@@ -599,7 +600,6 @@ document.addEventListener("DOMContentLoaded", function () {
       },
     },
   });
-
 
   Highcharts.chart("GHG_4_3_9_off_land_type_emission_Mt", {
     chart: {
@@ -628,7 +628,6 @@ document.addEventListener("DOMContentLoaded", function () {
       },
     },
 
-
     legend: {
       align: "right",
       layout: "vertical",
@@ -638,8 +637,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     tooltip: {
       formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+        return `<b>Year:</b> ${this.x}<br><b>${
+          this.series.name
+        }:</b>${this.y.toFixed(2)}<br/>`;
       },
     },
 
@@ -658,9 +658,6 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-
-
-
   // Chart:GHG_4_4_ag_reduction_source_wide_Mt
   Highcharts.chart("GHG_4_4_ag_reduction_source_wide_Mt", {
     chart: {
@@ -677,8 +674,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_4_4_ag_reduction_source_wide_Mt_csv").innerHTML
-
+      document.getElementById("GHG_4_4_ag_reduction_source_wide_Mt_csv")
+        .innerHTML
     ),
 
     yAxis: {
@@ -699,8 +696,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     tooltip: {
       formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+        return `<b>Year:</b> ${this.x}<br><b>${
+          this.series.name
+        }:</b>${this.y.toFixed(2)}<br/>`;
       },
     },
 
@@ -756,8 +754,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     tooltip: {
       formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+        return `<b>Year:</b> ${this.x}<br><b>${
+          this.series.name
+        }:</b>${this.y.toFixed(2)}<br/>`;
       },
     },
 
@@ -792,7 +791,9 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_4_5_2_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt_csv").innerHTML
+      document.getElementById(
+        "GHG_4_5_2_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt_csv"
+      ).innerHTML
     ),
 
     yAxis: {
@@ -813,8 +814,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     tooltip: {
       formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+        return `<b>Year:</b> ${this.x}<br><b>${
+          this.series.name
+        }:</b>${this.y.toFixed(2)}<br/>`;
       },
     },
 
@@ -849,7 +851,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_4_5_3_GHG_ag_man_dry_irr_df_wide_Mt_csv").innerHTML
+      document.getElementById("GHG_4_5_3_GHG_ag_man_dry_irr_df_wide_Mt_csv")
+        .innerHTML
     ),
 
     yAxis: {
@@ -870,8 +873,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     tooltip: {
       formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
+        return `<b>Year:</b> ${this.x}<br><b>${
+          this.series.name
+        }:</b>${this.y.toFixed(2)}<br/>`;
       },
     },
 

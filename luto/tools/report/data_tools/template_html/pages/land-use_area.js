@@ -1,19 +1,8 @@
 document.addEventListener("DOMContentLoaded", function () {
 
-  Highcharts.setOptions({
-    colors: [
-      "#8085e9",
-      "#f15c80",
-      "#e4d354",
-      "#2b908f",
-      "#f45b5b",
-      "#7cb5ec",
-      "#434348",
-      "#90ed7d",
-      "#f7a35c",
-      "#91e8e1",
-    ],
-  });
+  // Set the default color palette for Highcharts
+  var colors = eval(document.getElementById("colors").innerHTML);
+  Highcharts.setOptions({colors: colors});
 
 
 
@@ -111,15 +100,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       itemStyle: {
-        fontSize: "11px",
+        fontSize: "10.5px",
       },
       align: "right",
       layout: "vertical",
-      x: -30,
-      y: -10,
+      x: -40,
+      y: -20,
       verticalAlign: "middle",
       itemMarginTop: 0,
-      itemMarginBottom: 1,
+      itemMarginBottom: 0.75,
     },
 
     tooltip: {

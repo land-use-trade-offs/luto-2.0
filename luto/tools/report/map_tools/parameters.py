@@ -17,13 +17,9 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
+from luto.settings import AG_MANAGEMENTS_TO_LAND_USES
 from luto.tools.report.data_tools.parameters import AG_LANDUSE, LANDUSE_ALL_RAW, RENAME_AM_NON_AG
 
-
-# The ag management names
-ag_management = ['Asparagopsis taxiformis', 
-                 'Precision Agriculture', 
-                 'Ecological Grazing']
 
 # The figure size and DPI for PNG map
 FIG_SIZE = (11.2, 13.6)
@@ -54,7 +50,7 @@ map_multiple_lucc = {
              'irr': 'Irrigated Land',
              }
 
-map_single_lucc = AG_LANDUSE + ag_management + LANDUSE_ALL_RAW
+map_single_lucc = AG_LANDUSE + list(AG_MANAGEMENTS_TO_LAND_USES.keys()) + LANDUSE_ALL_RAW
 map_single_lucc = {k:k for k in map_single_lucc}
 
 # Dictionary {k:v} for renaming the map names
@@ -63,13 +59,15 @@ map_basename_rename = map_multiple_lucc | map_single_lucc | RENAME_AM_NON_AG
 
 
 # The extra colors for the float rasters
-extra_color_float_tif = {   0:(200, 200, 200, 255), # 0 is the non-Agriculture land in the raw tif file
-                          -100:(225, 225, 225, 255)  # -100 refers to the nodata pixels in the raw tif file
-                        } 
+extra_color_float_tif = {
+  0:(200, 200, 200, 255),     # 0 is the non-Agriculture land in the raw tif file
+  -100:(225, 225, 225, 255)   # -100 refers to the nodata pixels in the raw tif file
+} 
 
-extra_desc_float_tif = {0: 'Agricultural land',
-                        -100: 'Non-Agriculture land'
-                        }  
+extra_desc_float_tif = {
+  0: 'Agricultural land',
+  -100: 'Non-Agriculture land'
+}  
 
 
 # The data types for each map type

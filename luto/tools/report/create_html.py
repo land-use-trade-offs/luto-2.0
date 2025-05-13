@@ -24,7 +24,7 @@ from glob import glob
 
 from luto import settings
 from luto.tools.report.data_tools.helper_func import add_data_2_html, add_txt_2_html
-from luto.tools.report.data_tools.parameters import SPATIAL_MAP_DICT, RENAME_AM_NON_AG
+from luto.tools.report.data_tools.parameters import COLORS, SPATIAL_MAP_DICT, RENAME_AM_NON_AG
 
 
 
@@ -90,6 +90,7 @@ def data2html(raw_data_dir):
     # Write avaliable years to each page .content[#model_years pre]
     for page in glob(f"{report_dir}/REPORT_HTML/pages/*.html"):
         add_txt_2_html(page, years_str, "model_years")
+        add_txt_2_html(page, str(COLORS), "colors")
         add_txt_2_html(page, str(RENAME_AM_NON_AG), "RENAME_AM_NON_AG") 
         add_txt_2_html(page, str(SPATIAL_MAP_DICT), "SPATIAL_MAP_DICT") 
     
