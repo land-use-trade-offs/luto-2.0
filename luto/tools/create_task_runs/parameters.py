@@ -24,7 +24,8 @@ EXCLUDE_DIRS = [
     '.git', 
     '.vscode', 
     '__pycache__', 
-    'jinzhu_inspect_code'
+    'jinzhu_inspect_code',
+    'docs',
 ]
 
 GHG_ORDER = {

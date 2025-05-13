@@ -114,9 +114,15 @@ fig.show()
 
 
 
-####################### Area #######################
-task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20250512_DCCEEW_REPORT_02_GBF3_MVS_ONF_OFF/"
+####################### BIO GBF-4 ECNES  #######################
+task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20250512_DCCEEW_REPORT_04_GBF8_BIO_CLIMATE_OFF/"
 report_data = process_task_root_dirs(task_root_dir)
+print(report_data['Type'].unique())
+
+
+
+
+
 
 
 
