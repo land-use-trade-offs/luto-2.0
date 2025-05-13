@@ -26,7 +26,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250512_DCCEEW_REPORT_01_CONNECTIVITY_ONF_OFF' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250512_DCCEEW_REPORT_05_NOG_GO_ON_OFF' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -34,8 +34,8 @@ grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['24GB'],
-    'NCPUS':[6],
+    'MEM': ['40GB'],
+    'NCPUS':[10],
     'TIME': ['4:00:00'],
     'QUEUE': ['normalsr'],
     
@@ -48,7 +48,7 @@ grid_search = {
     'SIM_YEARS': [list(range(2020,2051,5))],   # Years to run the model 
     'WRITE_THREADS': [5],
     'WRITE_OUTPUT_GEOTIFFS': [True],
-    'KEEP_OUTPUTS': [False],                    # If False, only keep report HTML
+    'KEEP_OUTPUTS': [True],                    # If False, only keep report HTML
     
  
     ###############################################################
@@ -57,6 +57,9 @@ grid_search = {
     
     # --------------- Demand settings ---------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],         # 'hard' or 'soft' 
+    
+    # --------------- Land use settings ---------------
+    'EXCLUDE_NO_GO_LU': [True, False],         # True or False
        
     
     # --------------- GHG settings ---------------
@@ -75,7 +78,7 @@ grid_search = {
     'INCLUDE_WATER_LICENSE_COSTS': [0],
     
     # --------------- Biodiversity priority zone ---------------
-    'CONNECTIVITY_SOURCE': ['NCI','DWI', None],
+    'CONNECTIVITY_SOURCE': ['NCI'],
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
     
     

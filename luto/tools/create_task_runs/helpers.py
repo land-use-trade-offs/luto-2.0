@@ -122,15 +122,33 @@ def get_grid_search_settings_df(task_root_dir:str, settings_df:pd.DataFrame, gri
     
     template_grid_search = pd.concat(run_settings_dfs, axis=1).reset_index(names='Name')
     template_grid_search.to_csv(f'{task_root_dir}/grid_search_template.csv', index=False)
+    
+    grid_search_param_df = grid_search_param_df.loc[:, grid_search_param_df.nunique() > 1]
+    grid_search_param_df.to_csv(f'{task_root_dir}/grid_search_parameters_unique.csv', index=False)
 
     return template_grid_search
 
 
-def create_run_folders(task_root_dir, col):
-    cwd = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../'))
-    shutil.copytree(cwd, f'{task_root_dir}/{col}', dirs_exist_ok=True, ignore=shutil.ignore_patterns(*EXCLUDE_DIRS))
-    if not os.path.exists(f'{task_root_dir}/{col}/output'):
-        os.makedirs(f'{task_root_dir}/{col}/output', exist_ok=True)
+
+def copy_folder_custom(source, destination, ignore_dirs=None):
+    ignore_dirs = set() if ignore_dirs is None else set(ignore_dirs)
+    os.makedirs(destination, exist_ok=True)
+    jobs = []
+    for item in os.listdir(source):
+        if item in ignore_dirs: continue   
+        s = os.path.join(source, item)
+        d = os.path.join(destination, item)
+        jobs += copy_folder_custom(s, d) if os.path.isdir(s) else [(s, d)]
+    return jobs   
+
+def create_run_folders(task_root_dir:str, col:str, n_workers:int):
+    src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../'))
+    dst_dir = f'{task_root_dir}/{col}'
+    # Copy the files from the source to the destination
+    from_to_files = copy_folder_custom(src_dir, dst_dir, EXCLUDE_DIRS)
+    Parallel(n_jobs=n_workers)(delayed(shutil.copy2)(s, d) for s, d in from_to_files)
+    # Create an output folder for the task
+    os.makedirs(f'{dst_dir}/output', exist_ok=True)
     
     
 def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster']='single'): 
@@ -205,7 +223,7 @@ def create_task_runs(
     tasks = []  
     for col in custom_settings.columns:
         settings_dict = custom_settings.loc[:, col].copy()
-        create_run_folders(task_root_dir, col)
+        create_run_folders(task_root_dir, col, n_workers)
         write_settings(f'{task_root_dir}/{col}', settings_dict)
         write_terminal_vars(f'{task_root_dir}/{col}', col, settings_dict)
         tasks.append(delayed(submit_task)(task_root_dir, col, mode=mode))
@@ -321,7 +339,8 @@ def process_task_root_dirs(task_root_dir, n_workers=10):
         json_dir_path = os.path.join(task_root_dir, dir, 'DATA_REPORT.zip')
         
         # Then try to find the JSON data in the unzipped `output` folder
-        if not os.path.exists(json_dir_path) and (output_dir := os.path.join(task_root_dir, dir, 'output')):
+        output_dir = os.path.join(task_root_dir, dir, 'output')
+        if (not os.path.exists(json_dir_path)) and os.path.exists(output_dir):
             last_dir = sorted([d for d in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, d))])[-1]
             json_dir_path = os.path.join(output_dir, last_dir, 'DATA_REPORT', 'data')
         else:
@@ -335,7 +354,11 @@ def process_task_root_dirs(task_root_dir, n_workers=10):
         
         # Json to df
         tasks.append(delayed(get_report_df)(json_dir_path, run_paras))
+        
+    # Concatenate the results, only keep the columns with more than 1 unique value
+    out_df = pd.concat(tqdm(Parallel(n_jobs=n_workers, return_as='generator')(tasks), total=len(tasks)), ignore_index=True)
+    out_df =  out_df.loc[:, out_df.nunique() > 1]
     
-    return pd.concat(tqdm(Parallel(n_jobs=n_workers, return_as='generator')(tasks), total=len(tasks)), ignore_index=True)
+    return out_df
 
         

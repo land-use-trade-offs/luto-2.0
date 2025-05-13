@@ -22,6 +22,8 @@ import pandas as pd
 import numpy as np
 import plotnine as p9
 import plotly.express as px
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 from luto.tools.create_task_runs.create_grid_search_tasks import TASK_ROOT_DIR
 from luto.tools.create_task_runs.helpers import process_task_root_dirs
 
@@ -34,496 +36,91 @@ p9.options.dpi = 100
 # Get the data
 task_root_dir = TASK_ROOT_DIR.rstrip('/')       # Or replace with the desired task run root dir
 report_data = process_task_root_dirs(task_root_dir)
+print(report_data['Type'].unique())
 
 
-# -------------- Plot the weight's landscape map (Demand's deviation) ----------------------
-query_str = '''
-    Type == "Production_deviation_pct" 
-    and year != 2010
-    '''.replace('\n', ' ').replace('  ', ' ')
+####################### Area #######################
+task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20250512_DCCEEW_REPORT_01_CONNECTIVITY_ONF_OFF/"
+report_data = process_task_root_dirs(task_root_dir)
+area_landuse = report_data.query('Type == "Area_non_ag_lu_million_km2"').replace(np.nan, 'None')
 
-# Get demand data
-df_demand = report_data.query(query_str).copy()
-
-df_demand_avg = df_demand.eval('val = abs(val)'
-    ).groupby(['year', 'GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT', 'SOLVE_WEIGHT_ALPHA', 'SOLVE_WEIGHT_BETA']
-    )[['val','run_idx']].agg(val=('val', 'mean'), run_idx=('run_idx', 'first')
-    ).reset_index()
+# Get jitter and hatch values
+jitter_map = {'DWI': -1, 'NCI': 1, 'None': 0}
+hatch_map = {'DWI': '////', 'NCI': r'\\\\', 'None': ''}
+area_landuse['jitter_val'] = area_landuse['CONNECTIVITY_SOURCE'].map(jitter_map)
 
 
-# Plot demand's deviation landscape without filtering
-plot_landscape_demand = (
-    p9.ggplot(
-        df_demand_avg,
-        p9.aes(
-            x='SOLVE_WEIGHT_ALPHA', 
-            y='SOLVE_WEIGHT_BETA', 
-            fill='val', 
-        )
-    ) +
-    p9.geom_point(stroke=0) +
-    # p9.facet_wrap('name') +
-    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT~GHG_LIMITS_FIELD') +
-    p9.theme_bw() +
-    p9.theme(
-        strip_text=p9.element_text(size=8), 
-        legend_position='bottom',
-        legend_title=p9.element_blank(),
-        legend_box='horizontal'
-    ) 
+# Group by CONNECTIVITY_SOURCE and prepare data for rectangle plotting
+rectangles = pd.DataFrame()
+for (name, year), group in area_landuse.groupby(['CONNECTIVITY_SOURCE', 'year']):
+    rectangle = pd.DataFrame({
+        'name': name,
+        'year': year,
+        'rect_x_start': year + group['jitter_val'] - 0.4,
+        'rect_x_end': year + group['jitter_val'] + 0.4,
+        'rect_y_start': 0,
+        'rect_y_end': group['val'].sum()
+    })
+    rectangles = pd.concat([rectangle, rectangles], ignore_index=True)
+
+
+
+p = (
+    p9.ggplot(area_landuse) 
+    + p9.geom_col(p9.aes(x='year + jitter_val', y='val', fill='name'), position='stack', alpha=0.8)  # stack columns by CONNECTIVITY_SOURCE
+    + p9.theme_bw()
+    + p9.labs(
+        x='Year',
+        y='Area (million km2)',
+        fill='Land Use Type'  
+    )
+    + p9.guides(fill=p9.guide_legend(ncol=1))  # Reduce legend icon size further
+    + p9.theme(
+        legend_key=p9.element_rect(color=''),  # Set legend key background to white
+    )
 )
 
 
+# Export to matplotlib
+fig = p.draw()
 
-# Plot demand's deviation landscape with filtering
-commodity_out_targets = {
-    'Beef live export',
-    'Beef meat',
-    'Sheep live export',
-    'Sheep meat',
-    'Sheep wool',
-}
+# Now you can access the underlying matplotlib axes and modify them
+ax = fig.axes[0]
 
-valid_runs_demand = set(report_data['run_idx']) - set(
-    df_demand.query(
-        'name not in @commodity_out_targets and abs(val) >= 10'
-    )['run_idx']
-)
+# Plot rectangles from the prepared data
+for _, row in rectangles.iterrows():
+    rect = patches.Rectangle(
+        (row['rect_x_start'], row['rect_y_start']),
+        row['rect_x_end'] - row['rect_x_start'],
+        row['rect_y_end'] - row['rect_y_start'],
+        hatch=hatch_map[row['name']],
+        fill=False, 
+        edgecolor='gray', 
+        linewidth=0.01,
+        alpha=0.5,  # Adjust transparency
+        zorder=0  # Set zorder to a lower value to place the patch below other elements
+    )
+    ax.add_patch(rect)
 
-df_demand_avg = df_demand.query('run_idx.isin(@valid_runs_demand)'
-    ).eval('val = abs(val)'
-    ).groupby(['year', 'GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT', 'SOLVE_WEIGHT_ALPHA', 'SOLVE_WEIGHT_BETA']
-    )[['val','run_idx']].agg(val=('val', 'mean'), run_idx=('run_idx', 'first')
-    ).reset_index()
+# Add legend for the hatches
+legend_patches = [
+    patches.Patch(facecolor='none', edgecolor='grey', hatch=hatch, label=label)
+    for label, hatch in hatch_map.items()
+]
+ax.legend(handles=legend_patches, title='', loc=(1.045, 0.12), fontsize=10, frameon=False)
 
-plot_landscape_demand = (
-    p9.ggplot(
-        df_demand_avg,
-        p9.aes(
-            x='SOLVE_WEIGHT_ALPHA', 
-            y='SOLVE_WEIGHT_BETA', 
-            fill='val', 
-        )
-    ) +
-    p9.geom_point(stroke=0) +
-    # p9.facet_wrap('name') +
-    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT~GHG_LIMITS_FIELD') +
-    p9.theme_bw() +
-    p9.theme(
-        strip_text=p9.element_text(size=8), 
-        legend_position='bottom',
-        legend_title=p9.element_blank(),
-        legend_box='horizontal'
-    ) 
-)
-
-
-# -------------- Plot the weight's landscape map (Profit in Billion AUD) ----------------------
-query_str = '''
-    Type == "Profit_billion_AUD" 
-    and run_idx.isin(@valid_runs_demand)
-    '''.replace('\n', ' ').replace('  ', ' ')
-
-# Get profit data
-df_profit = report_data.query(query_str).query('year == 2050')
-
-
-# Plot profit landscape without filtering
-plot_landscape_profit = (
-    p9.ggplot(
-        df_profit,
-        p9.aes(
-            x='SOLVE_WEIGHT_ALPHA', 
-            y='SOLVE_WEIGHT_BETA', 
-            fill='val', 
-        )
-    ) +
-    p9.geom_point(size=3,stroke=0) +
-    # p9.facet_wrap('name') +
-    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT~GHG_LIMITS_FIELD') +
-    p9.theme_bw() +
-    p9.theme(
-        strip_text=p9.element_text(size=8), 
-        legend_position='bottom',
-        legend_title=p9.element_blank(),
-        legend_box='horizontal'
-    ) 
-)
-
-
-# Plot profit landscape with filtering
-valid_runs_demand_profit = valid_runs_demand - set(
-     report_data.query(query_str).query('val <= -100')['run_idx']
-)
-
-df_profit_filtered = report_data.query(query_str).query('run_idx.isin(@valid_runs_demand_profit)')
-
-
-plot_landscape_profit = (
-    p9.ggplot(
-        df_profit_filtered,
-        p9.aes(
-            x='SOLVE_WEIGHT_ALPHA', 
-            y='SOLVE_WEIGHT_BETA', 
-            fill='val', 
-        )
-    ) +
-    p9.geom_point(size=3,stroke=0) +
-    # p9.facet_wrap('name') +
-    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT~GHG_LIMITS_FIELD') +
-    p9.theme_bw() +
-    p9.theme(
-        strip_text=p9.element_text(size=8), 
-        legend_position='bottom',
-        legend_title=p9.element_blank(),
-        legend_box='horizontal'
-    ) 
-)
-
-
-
-# -------------- Plot the weight's landscape map (biodiversity score) ----------------------
-query_str = '''
-    Type == "Biodiversity_obj_score"
-    '''.replace('\n', ' ').replace('  ', ' ')
-    
-df_bio = report_data.query(query_str).query('run_idx.isin(@valid_runs_demand_profit)').copy()
-
-df_bio_sum = df_bio.eval('val = val / 1e3'
-    ).groupby(['year', 'GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT', 'SOLVE_WEIGHT_ALPHA', 'SOLVE_WEIGHT_BETA']
-    )['val'].sum().reset_index().query('year == 2050')
-
-
-# Plot biodiversity landscape without filtering
-plot_landscape_bio = (
-    p9.ggplot(
-        df_bio_sum,
-        p9.aes(
-            x='SOLVE_WEIGHT_ALPHA', 
-            y='SOLVE_WEIGHT_BETA', 
-            fill='val', 
-        )
-    ) +
-    p9.geom_point(size=3,stroke=0) +
-    # p9.facet_wrap('name') +
-    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT~GHG_LIMITS_FIELD') +
-    p9.theme_bw() +
-    p9.theme(
-        strip_text=p9.element_text(size=8), 
-        legend_position='bottom',
-        legend_title=p9.element_blank(),
-        legend_box='horizontal'
-    ) 
-)
-
-
-
-# ------------------------ Profit V.S. Biodiversity -------------------------
-df_profit = report_data.query('Type == "Profit_billion_AUD"'
-    ).query('run_idx.isin(@valid_runs_demand_profit)'
-    ).copy()
-
-profit_vs_bio_df = pd.merge(
-    df_profit, 
-    df_bio_sum, 
-    on=['run_idx','year'],
-    suffixes=['_profit','_bio']
-    ).query('year == 2050')
-
-
-# Interactive plot - Alpah as color
-fig = px.scatter(
-    profit_vs_bio_df,
-    x='val_profit',
-    y='val_bio',
-    color='SOLVE_WEIGHT_ALPHA_profit', 
-    facet_row='BIODIV_GBF_TARGET_2_DICT_profit',
-    facet_col='GHG_LIMITS_FIELD_profit',
-    hover_data=['run_idx', 'SOLVE_WEIGHT_ALPHA_profit', 'SOLVE_WEIGHT_BETA_profit'],
-)
-
-
-for annotation in fig.layout.annotations:
-    annotation.text = annotation.text.split('=')[-1]
-
-fig.update_layout(
-    template='plotly_white',
-    title='Profit V.S. Biodiversity',
-    yaxis_title='Profit V.S. Biodiversity',
-)
-
-fig.show()
-
-
-# Interactive plot - Beta as color
-fig = px.scatter(
-    profit_vs_bio_df,
-    x='val_profit',
-    y='val_bio',
-    color='SOLVE_WEIGHT_BETA_profit', 
-    facet_row='BIODIV_GBF_TARGET_2_DICT_profit',
-    facet_col='GHG_LIMITS_FIELD_profit',
-    hover_data=['run_idx', 'SOLVE_WEIGHT_ALPHA_profit', 'SOLVE_WEIGHT_BETA_profit'],
-)
-
-
-for annotation in fig.layout.annotations:
-    annotation.text = annotation.text.split('=')[-1]
-
-fig.update_layout(
-    template='plotly_white',
-    title='Profit V.S. Biodiversity',
-    yaxis_title='Profit V.S. Biodiversity',
-)
-
+# Show the final plot
 fig.show()
 
 
 
-
-
-# ------------------------ Profit V.S. Demand's deviation -------------------------
-df_profit = report_data.query('Type == "Profit_billion_AUD"'
-    ).query('run_idx.isin(@valid_runs_demand_profit)'
-    ).copy()
-
-profit_vs_demand_df = pd.merge(
-    df_profit, 
-    df_demand_avg, 
-    on=['run_idx','year'],
-    suffixes=['_profit','_demand']
-    ).query('year == 2050')
-
-
-# Interactive plot - Alpah as color
-fig = px.scatter(
-    profit_vs_demand_df,
-    x='val_profit',
-    y='val_demand',
-    color='SOLVE_WEIGHT_ALPHA_profit', 
-    facet_row='BIODIV_GBF_TARGET_2_DICT_profit',
-    facet_col='GHG_LIMITS_FIELD_profit',
-    hover_data=['run_idx', 'SOLVE_WEIGHT_ALPHA_profit', 'SOLVE_WEIGHT_BETA_profit'],
-)
-
-
-for annotation in fig.layout.annotations:
-    annotation.text = annotation.text.split('=')[-1]
-
-fig.update_layout(
-    template='plotly_white',
-    title='Profit V.S. Demand\'s deviation'
-)
-
-fig.show()
-
-
-# Interactive plot - Beta as color
-fig = px.scatter(
-    profit_vs_demand_df,
-    x='val_profit',
-    y='val_demand',
-    color='SOLVE_WEIGHT_BETA_profit', 
-    facet_row='BIODIV_GBF_TARGET_2_DICT_profit',
-    facet_col='GHG_LIMITS_FIELD_profit',
-    hover_data=['run_idx', 'SOLVE_WEIGHT_ALPHA_profit', 'SOLVE_WEIGHT_BETA_profit'],
-)
-
-
-for annotation in fig.layout.annotations:
-    annotation.text = annotation.text.split('=')[-1]
-
-fig.update_layout(
-    template='plotly_white',
-    title='Profit V.S. Demand\'s deviation'
-)
-
-fig.show()
+####################### Area #######################
+task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20250512_DCCEEW_REPORT_02_GBF3_MVS_ONF_OFF/"
+report_data = process_task_root_dirs(task_root_dir)
 
 
 
 
 
-############### Get the optimal Alpha/Beta 
-optim_alpha = 0.1
-optim_beta = 0.9
 
-
-
-# -------------------- Profit -------------------
-query_str = '''
-    Type == "Profit_billion_AUD"
-    and run_idx.isin(@valid_runs_demand_profit)
-    '''.replace('\n', ' ').replace('  ', ' ')
-    
-query_str_optim = ''' 
-    SOLVE_WEIGHT_ALPHA >= @optim_alpha - 0.005 
-    and SOLVE_WEIGHT_ALPHA <= @optim_alpha + 0.005
-    and SOLVE_WEIGHT_BETA >= @optim_beta - 0.005
-    and SOLVE_WEIGHT_BETA <= @optim_beta + 0.005
-    '''.replace('\n', ' ').replace('  ', ' ')
-
-
-# With optim filtering
-df_profit = report_data.query(query_str).query('run_idx.isin(@valid_runs_demand_profit)').copy()
-
-p_weight_vs_profit = (
-    p9.ggplot(
-        df_profit, 
-        p9.aes(
-            x='year', 
-            y='val', 
-            color='SOLVE_WEIGHT_ALPHA',
-            group='run_idx'
-        )
-    ) +
-    p9.facet_grid('GHG_LIMITS_FIELD~BIODIV_GBF_TARGET_2_DICT') +
-    p9.geom_line(size=0.3) +
-    p9.theme_bw() +
-    p9.theme(
-        strip_text=p9.element_text(size=8)
-    ) +
-    p9.ylab('Profit (billion AUD)')
-)
-
-# With optim filtering
-df_profit_optim = df_profit.query(query_str_optim)
-
-p_weight_vs_profit = (
-    p9.ggplot(
-        df_profit_optim, 
-        p9.aes(
-            x='year', 
-            y='val', 
-            color='BIODIV_GBF_TARGET_2_DICT',
-            group='run_idx'
-        )
-    ) +
-    p9.facet_wrap('GHG_LIMITS_FIELD') +
-    p9.geom_line(size=0.3) +
-    p9.theme_bw() +
-    p9.theme(
-        strip_text=p9.element_text(size=8)
-    ) +
-    p9.ylab('Profit (billion AUD)')
-)
-
-
-
-# ------------------ Demand ------------------
-query_str = '''
-    Type == "Production_deviation_pct"
-    and run_idx.isin(@valid_runs_demand_profit)
-    '''.replace('\n', ' ').replace('  ', ' ')
-    
-query_str_optim = ''' 
-    SOLVE_WEIGHT_ALPHA >= @optim_alpha - 0.005 
-    and SOLVE_WEIGHT_ALPHA <= @optim_alpha + 0.005
-    and SOLVE_WEIGHT_BETA >= @optim_beta - 0.005
-    and SOLVE_WEIGHT_BETA <= @optim_beta + 0.005
-    '''.replace('\n', ' ').replace('  ', ' ')
-
-
-# With optim filtering
-df_demand = report_data.query(query_str).query('abs(val) >= 1')
-
-p_weight_vs_demand = (
-    p9.ggplot(
-        df_demand, 
-        p9.aes(
-            x='year', 
-            y='val', 
-            fill='name',
-            group='run_idx'   
-        )
-    ) +
-    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT~GHG_LIMITS_FIELD') +
-    p9.geom_col(position='jitter') +
-    p9.theme_bw() +
-    p9.theme(strip_text=p9.element_text(size=8)) +
-    p9.guides(color=p9.guide_legend(ncol=1))
-)
-
-# With optim filtering
-df_demand_optim = df_demand.query(query_str_optim)
-
-p_weight_vs_demand = (
-    p9.ggplot(
-        df_demand_optim, 
-        p9.aes(
-            x='year', 
-            y='val', 
-            fill='name',
-            group='run_idx'   
-        )
-    ) +
-    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT~GHG_LIMITS_FIELD') +
-    p9.geom_col(position='jitter') +
-    p9.theme_bw() +
-    p9.theme(strip_text=p9.element_text(size=8)) +
-    p9.guides(color=p9.guide_legend(ncol=1))
-)
-
-
-
-
-# ------------------ Biodiversity ------------------
-query_str = '''
-    Type == "Biodiversity_obj_score"
-    and run_idx.isin(@valid_runs_demand_profit)
-    '''.replace('\n', ' ').replace('  ', ' ')
-
-query_str_optim = ''' 
-    SOLVE_WEIGHT_ALPHA >= @optim_alpha - 0.005 
-    and SOLVE_WEIGHT_ALPHA <= @optim_alpha + 0.005
-    and SOLVE_WEIGHT_BETA >= @optim_beta - 0.005
-    and SOLVE_WEIGHT_BETA <= @optim_beta + 0.005
-    '''.replace('\n', ' ').replace('  ', ' ')
-
-    
-df_bio = report_data.query(query_str).copy()
-
-df_bio_sum = df_bio.groupby(['year', 'GHG_LIMITS_FIELD', 'BIODIV_GBF_TARGET_2_DICT', 'SOLVE_WEIGHT_ALPHA', 'SOLVE_WEIGHT_BETA']
-    )[['val','run_idx']].agg(val=('val', 'mean'), run_idx=('run_idx', 'first')
-    ).reset_index()
-
-
-# Without optim filtering
-p_weight_vs_bio = (
-    p9.ggplot(
-        df_bio_sum, 
-        p9.aes(
-            x='year', 
-            y='val', 
-            color='SOLVE_WEIGHT_ALPHA',
-            group='run_idx',
-        )
-    ) +
-    p9.facet_grid('BIODIV_GBF_TARGET_2_DICT~GHG_LIMITS_FIELD') +
-    p9.geom_line(size=0.3) +
-    p9.theme_bw() +
-    p9.theme(strip_text=p9.element_text(size=8)) +
-    p9.ylab('Mean Biodiversity Area Score')
-)
-
-
-# With optim filtering
-df_bio_sum_optim = df_bio_sum.query(query_str_optim)
-
-p_weight_vs_bio = (
-    p9.ggplot(
-        df_bio_sum_optim, 
-        p9.aes(
-            x='year', 
-            y='val', 
-            color='BIODIV_GBF_TARGET_2_DICT',
-            group='run_idx',
-        )
-    ) +
-    p9.facet_wrap('GHG_LIMITS_FIELD') +
-    p9.geom_line(size=0.3) +
-    p9.theme_bw() +
-    p9.theme(strip_text=p9.element_text(size=8)) +
-    p9.ylab('Biodiversity Area Score')
-)
 
