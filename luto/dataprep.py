@@ -61,7 +61,7 @@ def create_new_dataset():
     bio_HACS_inpath = 'N:/Data-Master/Habitat_condition_assessment_system/Data/Processed/'
     bio_GBF2_inpath = 'N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km_to_NetCDF/'
     bio_GBF3_NVIS_inpath = 'N:/Data-Master/NVIS/Processed'
-    bio_GBF4_inpath = 'N:/Data-Master/Biodiversity/DCCEEW/SNES_GEOTIFF/To_NetCDF/'
+    bio_GBF4_inpath = 'N:/Data-Master/Biodiversity/DCCEEW/SNES_ECNES/Processed/'
     bio_GBF8_inpath = bio_GBF2_inpath
     
 
@@ -153,7 +153,7 @@ def create_new_dataset():
     # Copy biodiversity GBF-4 files
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES.nc', outpath + 'bio_GBF4_SNES.nc')
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES.nc', outpath + 'bio_GBF4_ECNES.nc')
-
+    
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES_target.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_SNES.csv')
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES_target.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_ECNES.csv')
     

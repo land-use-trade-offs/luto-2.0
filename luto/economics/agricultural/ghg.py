@@ -725,6 +725,10 @@ def get_beef_hir_effect_g_mrj(data: Data):
         * data.REAL_AREA[data.HIR_MASK]
         / settings.HIR_EFFECT_YEARS    # Annualise carbon sequestration capacity to align the full grwoth span of a tree
     )
+    
+    # ag_g_mrj['unall'] - ag_g_mrj['beef']   -> ag_g_mrj['beef'] * settings.HIR_PRODUCTIVITY_CONTRIBUTION TODO: 
+    
+    
 
     for idx in range(len(land_uses)):
         g_mrj_effect[:, :, idx] = lvstck_penalty_r 

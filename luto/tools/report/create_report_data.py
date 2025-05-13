@@ -203,7 +203,7 @@ def save_report_data(raw_data_dir:str):
 
     # Plot_1-6/7: Area (km2) Transition by Land use
     transition_path = files.query('category =="transition_matrix"')
-    transition_df_area = pd.read_csv(transition_path['path'].values[0], index_col=0).reset_index()
+    transition_df_area = pd.read_csv(transition_path['path'].values[0], index_col=0).reset_index() 
     transition_df_area['Area (km2)'] = transition_df_area['Area (ha)'] / 100   
     transition_df_area = transition_df_area.replace(RENAME_AM_NON_AG)
 
