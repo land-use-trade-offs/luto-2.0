@@ -26,7 +26,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250512_DCCEEW_REPORT_05_NOG_GO_ON_OFF' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250512_DCCEEW_REPORT_02_GBF3_MVS_ON_OFF' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -44,11 +44,11 @@ grid_search = {
     # Working settings for the model run
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                 # 'maxprofit' or 'maxutility'
-    'RESFACTOR': [5],
+    'RESFACTOR': [7],
     'SIM_YEARS': [list(range(2020,2051,5))],   # Years to run the model 
-    'WRITE_THREADS': [5],
+    'WRITE_THREADS': [2],
     'WRITE_OUTPUT_GEOTIFFS': [True],
-    'KEEP_OUTPUTS': [True],                    # If False, only keep report HTML
+    'KEEP_OUTPUTS': [False],                    # If False, only keep report HTML
     
  
     ###############################################################
@@ -59,7 +59,7 @@ grid_search = {
     'DEMAND_CONSTRAINT_TYPE': ['soft'],         # 'hard' or 'soft' 
     
     # --------------- Land use settings ---------------
-    'EXCLUDE_NO_GO_LU': [True, False],         # True or False
+    'EXCLUDE_NO_GO_LU': [False],         # True or False
        
     
     # --------------- GHG settings ---------------
@@ -90,7 +90,7 @@ grid_search = {
     ],
 
     # --------------- Biodiversity settings - GBF 3 ---------------
-    'BIODIVERSTIY_TARGET_GBF_3': ['off'],   # 'on' or 'off'
+    'BIODIVERSTIY_TARGET_GBF_3': ['on','off'],   # 'on' or 'off'
     
     # --------------- Biodiversity settings - GBF 4 ---------------
     'BIODIVERSTIY_TARGET_GBF_4_SNES' : ['off'],         # 'on' or 'off'.
