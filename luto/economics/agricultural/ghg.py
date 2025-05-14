@@ -35,7 +35,7 @@ from luto.economics.agricultural.quantity import get_yield_pot
 from luto.economics.agricultural.quantity import lvs_veg_types
 
 
-def get_ghg_crop(data, lu, lm, aggregate):
+def get_ghg_crop(data:Data, lu, lm, aggregate):
     """Return crop GHG emissions <unit: t/cell>  of `lu`+`lm` in `yr_idx` 
     as (np array|pd.DataFrame) depending on aggregate (True|False).
 
@@ -88,7 +88,7 @@ def get_ghg_crop(data, lu, lm, aggregate):
 
 
 
-def get_ghg_lvstk( data  # Data object.
+def get_ghg_lvstk( data:Data    # Data object.
                  , lu          # Land use.
                  , lm          # Land management.
                  , yr_idx      # Number of years post base-year ('YR_CAL_BASE').
@@ -161,7 +161,7 @@ def get_ghg_lvstk( data  # Data object.
        
 
 
-def get_ghg(data, lu, lm, yr_idx, aggregate):
+def get_ghg(data:Data, lu, lm, yr_idx, aggregate):
     """Return GHG emissions [tCO2e/cell] of `lu`+`lm` in `yr_idx` 
     as (np array|pd.DataFrame) depending on aggregate (True|False).
 
@@ -194,7 +194,7 @@ def get_ghg(data, lu, lm, yr_idx, aggregate):
 
 
 
-def get_ghg_matrix(data, lm, yr_idx, aggregate):
+def get_ghg_matrix(data:Data, lm, yr_idx, aggregate):
     """
     Return g_rj matrix <unit: t/cell> per lu under `lm` in `yr_idx`.
 
@@ -225,7 +225,7 @@ def get_ghg_matrix(data, lm, yr_idx, aggregate):
         
 
 
-def get_ghg_matrices(data, yr_idx, aggregate=True):
+def get_ghg_matrices(data:Data, yr_idx, aggregate=True):
     """
     Return g_mrj matrix <unit: t/cell> as 3D Numpy array.
     
@@ -376,7 +376,7 @@ def get_ghg_transition_emissions(data:Data, lumap, separate=False) -> np.ndarray
     
     
     
-def get_ghg_limits(data, target):
+def get_ghg_limits(data:Data, target):
     """
     Return greenhouse gas emissions limits in tonnes CO2e from year target.
 
@@ -392,7 +392,7 @@ def get_ghg_limits(data, target):
 
 
 
-def get_asparagopsis_effect_g_mrj(data, yr_idx):
+def get_asparagopsis_effect_g_mrj(data:Data, yr_idx):
     """
     Applies the effects of using asparagopsis to the GHG data
     for all relevant agricultural land uses.
@@ -440,7 +440,7 @@ def get_asparagopsis_effect_g_mrj(data, yr_idx):
     return new_g_mrj
 
 
-def get_precision_agriculture_effect_g_mrj(data, yr_idx):
+def get_precision_agriculture_effect_g_mrj(data:Data, yr_idx):
     """
     Applies the effects of using precision agriculture to the GHG data
     for all relevant agr. land uses.
@@ -495,7 +495,7 @@ def get_precision_agriculture_effect_g_mrj(data, yr_idx):
     return new_g_mrj
 
 
-def get_ecological_grazing_effect_g_mrj(data, yr_idx):
+def get_ecological_grazing_effect_g_mrj(data:Data, yr_idx):
     """
     Applies the effects of using ecological grazing to the GHG data
     for all relevant agricultural land uses.
@@ -552,7 +552,7 @@ def get_ecological_grazing_effect_g_mrj(data, yr_idx):
     return new_g_mrj
 
 
-def get_savanna_burning_effect_g_mrj(data):
+def get_savanna_burning_effect_g_mrj(data:Data):
     """
     Applies the effects of using savanna burning to the GHG data
     for all relevant agr. land uses.
@@ -579,7 +579,7 @@ def get_savanna_burning_effect_g_mrj(data):
     return sb_g_mrj
 
 
-def get_agtech_ei_effect_g_mrj(data, yr_idx):
+def get_agtech_ei_effect_g_mrj(data:Data, yr_idx):
     """
     Applies the effects of using AgTech EI to the GHG data
     for all relevant agr. land uses.
@@ -651,7 +651,7 @@ def get_agtech_ei_effect_g_mrj(data, yr_idx):
     return new_g_mrj
 
 
-def get_biochar_effect_g_mrj(data, yr_idx):
+def get_biochar_effect_g_mrj(data:Data, yr_idx):
     """
     Applies the effects of using Biochar to the GHG data
     for all relevant agr. land uses.
@@ -754,13 +754,12 @@ def get_sheep_hir_effect_g_mrj(data: Data):
     return g_mrj_effect
 
 
-def get_agricultural_management_ghg_matrices(data, g_mrj, yr_idx) -> dict[str, np.ndarray]:
+def get_agricultural_management_ghg_matrices(data:Data, yr_idx) -> dict[str, np.ndarray]:
     """
     Calculate the greenhouse gas (GHG) matrices for different agricultural management practices.
 
     Args:
         data: The input data for the calculations.
-        g_mrj: The g_mrj parameter.
         yr_idx: The year index.
 
     Returns

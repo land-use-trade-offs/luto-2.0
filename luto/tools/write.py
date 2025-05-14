@@ -1798,7 +1798,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
     # -------------------------------------------------------------------#
 
     # Get the ag_man_g_mrj
-    ag_man_g_mrj = ag_ghg.get_agricultural_management_ghg_matrices(data, ag_g_mrj, yr_idx)
+    ag_man_g_mrj = ag_ghg.get_agricultural_management_ghg_matrices(data, yr_idx)
 
     am_dfs = []
     for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():

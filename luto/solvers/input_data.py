@@ -409,9 +409,9 @@ def get_ag_man_c_mrj(data: Data, target_index, ag_c_mrj: np.ndarray):
     return output
 
 
-def get_ag_man_g_mrj(data: Data, target_index, ag_g_mrj: np.ndarray):
+def get_ag_man_g_mrj(data: Data, target_index):
     print('Getting agricultural management options\' GHG emission effects...', flush = True)
-    output = ag_ghg.get_agricultural_management_ghg_matrices(data, ag_g_mrj, target_index)
+    output = ag_ghg.get_agricultural_management_ghg_matrices(data, target_index)
     return output
 
 
@@ -684,7 +684,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         non_ag_q_crk=get_non_ag_q_crk(data, ag_q_mrp, base_year),
         non_ag_lb_rk=get_non_ag_lb_rk(data, base_year),
         
-        ag_man_g_mrj=get_ag_man_g_mrj(data, target_index, ag_g_mrj),
+        ag_man_g_mrj=get_ag_man_g_mrj(data, target_index),
         ag_man_q_mrp=get_ag_man_q_mrj(data, target_index, ag_q_mrp),
         ag_man_w_mrj=get_ag_man_w_mrj(data, target_index),
         ag_man_b_mrj=get_ag_man_b_mrj(data, target_index, ag_b_mrj),

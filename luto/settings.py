@@ -106,8 +106,8 @@ SIM_YEARS = list(range(2010,2051,10)) # range(2020,2050)
 
 
 # Define the objective function
-# OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
-OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
+OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
+# OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
 # Specify how demand for agricultural commodity production should be met in the solver
 # DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
