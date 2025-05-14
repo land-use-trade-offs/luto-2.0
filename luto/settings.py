@@ -505,7 +505,7 @@ AG_SHARE_OF_WATER_USE = 0.7 # Ag share is 70% across all catchments, could be up
 LIVESTOCK_DRINKING_WATER = 1
 
 # Consider water license costs (0 [off] or 1 [on]) of land-use transition ***** If on then there is a noticeable water sell-off by irrigators in the MDB when maximising profit
-INCLUDE_WATER_LICENSE_COSTS = 0
+INCLUDE_WATER_LICENSE_COSTS = 1
 
 
 
@@ -624,7 +624,7 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- Vegetation parameters ----------------------
 
-BIODIVERSTIY_TARGET_GBF_3  = 'off'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_3  = 'on'           # 'on' or 'off'.
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.

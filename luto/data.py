@@ -1195,28 +1195,26 @@ class Data:
         print("\tLoading vegetation data...", flush=True)
         
         # Read in the pre-1750 vegetation statistics, and get NVIS class names and areas
-        self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS = pd.read_excel(
+        GBF3_targets_df = pd.read_excel(
             settings.INPUT_DIR + '/BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx',
             sheet_name = f'NVIS_{settings.NVIS_TARGET_CLASS}'
         ).sort_values(by='group', ascending=True)
         
-
-        for _,row in self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS.iterrows():
-            if not all([
-                row['USER_DEFINED_TARGET_PERCENT_2030'] >= 0,
-                row['USER_DEFINED_TARGET_PERCENT_2050'] >= 0,
-                row['USER_DEFINED_TARGET_PERCENT_2100'] >= 0]
-            ):
-                raise ValueError(f"NVIS class {row['group']} has no user-defined targets for all years.")
         
-        self.BIO_GBF3_ID2DESC = dict(enumerate(self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['group']))
+        self.GBF3_GROUPS_SEL = [row['group'] for _,row in GBF3_targets_df.iterrows()
+            if all([row['USER_DEFINED_TARGET_PERCENT_2030']>0,
+                    row['USER_DEFINED_TARGET_PERCENT_2050']>0,
+                    row['USER_DEFINED_TARGET_PERCENT_2100']>0])]
+        
+        self.BIO_GBF3_ID2DESC = dict(enumerate(self.GBF3_GROUPS_SEL))
+        self.BIO_GBF3_N_CLASSES = len(self.GBF3_GROUPS_SEL) 
+        
+        self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS = GBF3_targets_df.query('group.isin(@self.GBF3_GROUPS_SEL)')
         self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
         self.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_OUTSIDE_LUTO_NATURAL_HA'].to_numpy()
-        self.BIO_GBF3_N_CLASSES = self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA.shape[0]
-      
-
+        
         # Read in vegetation layer data
-        NVIS_layers = xr.load_dataarray(settings.INPUT_DIR + f"/NVIS_{settings.NVIS_TARGET_CLASS.split('_')[0]}.nc") 
+        NVIS_layers = xr.open_dataarray(settings.INPUT_DIR + f"/NVIS_{settings.NVIS_TARGET_CLASS.split('_')[0]}.nc").sel(group=self.GBF3_GROUPS_SEL)
         NVIS_layers = np.array([self.get_exact_resfactored_average_arr(arr) for arr in NVIS_layers], dtype=np.float32) / 100.0  # divide by 100 to get the percentage of the area in each cell that is covered by the vegetation type
 
         # Apply Savanna Burning penalties

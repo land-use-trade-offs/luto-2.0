@@ -150,6 +150,8 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
     # Apply the cost of carbon released by transitioning natural land to modified land
     ghg_transition = ag_ghg.get_ghg_transition_emissions(data, lumap, separate=True)        # <unit: t/ha>
     
+    # ghg_transition *= data.REAL_AREA[:, np.newaxis]                                         # <unit: $/cell>  TODO: check if this is needed
+    
     ghg_transition = {
         k:np.einsum('mrj,mrj,mrj->mrj', v, x_mrj, l_mrj_not).astype(np.float32)             # No GHG penalty for cells that remain the same, or are prohibited from transitioning
         for k, v in ghg_transition.items()
