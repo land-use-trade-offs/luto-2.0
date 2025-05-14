@@ -351,13 +351,13 @@ def get_beef_hir_effect_r_mrj(data: Data, r_mrj):
     """
     Applies the effects of using HIR to the beef revenue data
     """
-    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
 
     # Set up the effects matrix
     r_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
-    if not settings.AG_MANAGEMENTS['Beef - HIR']:
+    if not settings.AG_MANAGEMENTS['HIR - Beef']:
         return r_mrj_effect
     
     # Update values in the new matrix    
@@ -372,13 +372,13 @@ def get_sheep_hir_effect_r_mrj(data: Data, r_mrj):
     """
     Applies the effects of using HIR to the sheep revenue data
     """
-    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
 
     # Set up the effects matrix
     r_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
-    if not settings.AG_MANAGEMENTS['Sheep - HIR']:
+    if not settings.AG_MANAGEMENTS['HIR - Sheep']:
         return r_mrj_effect
     
     # Update values in the new matrix    
@@ -409,8 +409,8 @@ def get_agricultural_management_revenue_matrices(data, r_mrj, yr_idx) -> dict[st
     sav_burning_data = get_savanna_burning_effect_r_mrj(data, yr_idx) if settings.AG_MANAGEMENTS['Savanna Burning'] else 0
     agtech_ei_data = get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx) if settings.AG_MANAGEMENTS['AgTech EI'] else 0
     biochar_data = get_biochar_effect_r_mrj(data, r_mrj, yr_idx) if settings.AG_MANAGEMENTS['Biochar'] else 0
-    beef_hir_data = get_beef_hir_effect_r_mrj(data, r_mrj) if settings.AG_MANAGEMENTS['Beef - HIR'] else 0
-    sheep_hir_data = get_sheep_hir_effect_r_mrj(data, r_mrj) if settings.AG_MANAGEMENTS['Sheep - HIR'] else 0
+    beef_hir_data = get_beef_hir_effect_r_mrj(data, r_mrj) if settings.AG_MANAGEMENTS['HIR - Beef'] else 0
+    sheep_hir_data = get_sheep_hir_effect_r_mrj(data, r_mrj) if settings.AG_MANAGEMENTS['HIR - Sheep'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -419,6 +419,6 @@ def get_agricultural_management_revenue_matrices(data, r_mrj, yr_idx) -> dict[st
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
         'Biochar': biochar_data,
-        'Beef - HIR': beef_hir_data,
-        'Sheep - HIR': sheep_hir_data,       
+        'HIR - Beef': beef_hir_data,
+        'HIR - Sheep': sheep_hir_data,       
     }

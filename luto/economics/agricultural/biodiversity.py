@@ -178,7 +178,7 @@ def get_beef_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
     Returns:
     - b_mrj_effect: A numpy array representing the biodiversity impacts of using Biochar.
     """
-    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
@@ -202,7 +202,7 @@ def get_sheep_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
     Returns:
     - b_mrj_effect: A numpy array representing the biodiversity impacts of using Biochar.
     """
-    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
@@ -234,8 +234,8 @@ def get_agricultural_management_biodiversity_matrices(data:Data, ag_b_mrj: np.nd
     sav_burning_data = get_savanna_burning_effect_b_mrj(data) if settings.AG_MANAGEMENTS['Savanna Burning'] else 0
     agtech_ei_data = get_agtech_ei_effect_b_mrj(data) if settings.AG_MANAGEMENTS['AgTech EI'] else 0
     biochar_data = get_biochar_effect_b_mrj(data, ag_b_mrj, yr_idx) if settings.AG_MANAGEMENTS['Biochar'] else 0
-    beef_hir_data = get_beef_hir_effect_b_mrj(data, ag_b_mrj) if settings.AG_MANAGEMENTS['Beef - HIR'] else 0
-    sheep_hir_data = get_sheep_hir_effect_b_mrj(data, ag_b_mrj) if settings.AG_MANAGEMENTS['Sheep - HIR'] else 0
+    beef_hir_data = get_beef_hir_effect_b_mrj(data, ag_b_mrj) if settings.AG_MANAGEMENTS['HIR - Beef'] else 0
+    sheep_hir_data = get_sheep_hir_effect_b_mrj(data, ag_b_mrj) if settings.AG_MANAGEMENTS['HIR - Sheep'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -244,8 +244,8 @@ def get_agricultural_management_biodiversity_matrices(data:Data, ag_b_mrj: np.nd
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
         'Biochar': biochar_data,
-        'Beef - HIR': beef_hir_data,
-        'Sheep - HIR': sheep_hir_data,
+        'HIR - Beef': beef_hir_data,
+        'HIR - Sheep': sheep_hir_data,
     }
 
 
@@ -453,21 +453,21 @@ def get_ag_management_biodiversity_contribution(
             j_idx: (data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact'] - 1) * np.ones(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Biochar'])
         }
-    if settings.AG_MANAGEMENTS['Beef - HIR']:
-        am_contr_dict['Beef - HIR'] = {
+    if settings.AG_MANAGEMENTS['HIR - Beef']:
+        am_contr_dict['HIR - Beef'] = {
             j_idx: (
                 np.ones(data.NCELLS).astype(np.float32) 
                 * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_natural_beef_code(data)])    # The proportional gap of biodiversity between beef-natural to full-natural
             )
-            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR'])
+            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef'])
         }
-    if settings.AG_MANAGEMENTS['Sheep - HIR']:
-        am_contr_dict['Sheep - HIR'] = {
+    if settings.AG_MANAGEMENTS['HIR - Sheep']:
+        am_contr_dict['HIR - Sheep'] = {
             j_idx: (
                 np.ones(data.NCELLS).astype(np.float32)
                 * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_natural_sheep_code(data)])   # The proportional gap of biodiversity between sheep-natural to full-natural
             )
-            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR'])
+            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep'])
         }
     
     return am_contr_dict

@@ -302,8 +302,8 @@ AG_MANAGEMENTS_TO_LAND_USES = {
                                 # Horticulture:
                                 'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'],
 
-    'Beef - HIR':               ['Beef - natural land'],
-    'Sheep - HIR':              ['Sheep - natural land'],
+    'HIR - Beef':               ['Beef - natural land'],
+    'HIR - Sheep':              ['Sheep - natural land'],
 }
 
 
@@ -314,8 +314,8 @@ AG_MANAGEMENTS = {
     'Savanna Burning': True,
     'AgTech EI': True,
     'Biochar': True,
-    'Beef - HIR': True,
-    'Sheep - HIR': True,
+    'HIR - Beef': True,
+    'HIR - Sheep': True,
 }
 """
 The dictionary below contains a master list of all agricultural management options and
@@ -331,8 +331,8 @@ AG_MANAGEMENTS_REVERSIBLE = {
     'Savanna Burning': True,
     'AgTech EI': True,
     'Biochar': True,
-    'Beef - HIR': True,
-    'Sheep - HIR': True,
+    'HIR - Beef': True,
+    'HIR - Sheep': True,
 }
 """
 The values of the below dictionary determine whether the model is allowed to abandon agricultural

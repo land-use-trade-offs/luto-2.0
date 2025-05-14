@@ -349,7 +349,7 @@ def get_beef_hir_effect_w_mrj(data, yr_idx):
     Returns:
     - w_mrj_effects <unit:ML/cell>: The updated water net yield data with Biochar applied.
     """
-    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
 
     w_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
     base_w_req_mrj = np.stack(( data.WREQ_DRY_RJ, data.WREQ_IRR_RJ ))
@@ -386,7 +386,7 @@ def get_sheep_hir_effect_w_mrj(data, yr_idx):
     Returns:
     - w_mrj_effects <unit:ML/cell>: The updated water net yield data with Biochar applied.
     """
-    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
 
     w_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
     base_w_req_mrj = np.stack(( data.WREQ_DRY_RJ, data.WREQ_IRR_RJ ))
@@ -445,13 +445,13 @@ def get_agricultural_management_water_matrices(data, yr_idx) -> dict[str, np.nda
     )
     beef_hir_data = (
         get_beef_hir_effect_w_mrj(data, yr_idx)
-        if settings.AG_MANAGEMENTS['Beef - HIR']
-        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['Beef - HIR']))).astype(np.float32)
+        if settings.AG_MANAGEMENTS['HIR - Beef']
+        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['HIR - Beef']))).astype(np.float32)
     )
     sheep_hir_data = (
         get_sheep_hir_effect_w_mrj(data, yr_idx)
-        if settings.AG_MANAGEMENTS['Sheep - HIR']
-        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['Sheep - HIR']))).astype(np.float32)
+        if settings.AG_MANAGEMENTS['HIR - Sheep']
+        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['HIR - Sheep']))).astype(np.float32)
     )
 
     return {
@@ -461,8 +461,8 @@ def get_agricultural_management_water_matrices(data, yr_idx) -> dict[str, np.nda
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
         'Biochar': biochar_data,
-        'Beef - HIR': beef_hir_data,
-        'Sheep - HIR': sheep_hir_data,
+        'HIR - Beef': beef_hir_data,
+        'HIR - Sheep': sheep_hir_data,
     }
 
 

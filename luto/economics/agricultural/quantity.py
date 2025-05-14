@@ -523,13 +523,13 @@ def get_biochar_effect_q_mrp(data, q_mrp, yr_idx):
 
 
 def get_beef_hir_effect_q_mrp(data, q_mrp):
-    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
 
     # Set up the effects matrix
     q_mrp_effect = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
 
-    if not settings.AG_MANAGEMENTS['Beef - HIR']:
+    if not settings.AG_MANAGEMENTS['HIR - Beef']:
         return q_mrp_effect
     
     # Update values in the new matrix    
@@ -543,13 +543,13 @@ def get_beef_hir_effect_q_mrp(data, q_mrp):
 
 
 def get_sheep_hir_effect_q_mrp(data, q_mrp):
-    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
 
     # Set up the effects matrix
     q_mrp_effect = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
 
-    if not settings.AG_MANAGEMENTS['Sheep - HIR']:
+    if not settings.AG_MANAGEMENTS['HIR - Sheep']:
         return q_mrp_effect
     
     # Update values in the new matrix    
@@ -591,6 +591,6 @@ def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[s
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
         'Biochar': biochar_data,
-        'Beef - HIR': beef_hir_data,
-        'Sheep - HIR': sheep_hir_data,
+        'HIR - Beef': beef_hir_data,
+        'HIR - Sheep': sheep_hir_data,
     }

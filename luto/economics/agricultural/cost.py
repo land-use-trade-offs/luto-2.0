@@ -480,7 +480,7 @@ def get_biochar_effect_c_mrj(data:Data, yr_idx: int):
 def get_beef_hir_effect_c_mrj(data: Data, yr_idx: int):
     yr_cal = data.YR_CAL_BASE + yr_idx
 
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
 
     c_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
@@ -500,7 +500,7 @@ def get_beef_hir_effect_c_mrj(data: Data, yr_idx: int):
 def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):
     yr_cal = data.YR_CAL_BASE + yr_idx
 
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
 
     c_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
@@ -536,8 +536,8 @@ def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
     sav_burning_data = get_savanna_burning_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Savanna Burning'] else 0
     agtech_ei_data = get_agtech_ei_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['AgTech EI'] else 0
     biochar_data = get_biochar_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Biochar'] else 0
-    beef_hir_data = get_beef_hir_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Beef - HIR'] else 0
-    sheep_hir_data = get_sheep_hir_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Sheep - HIR'] else 0
+    beef_hir_data = get_beef_hir_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['HIR - Beef'] else 0
+    sheep_hir_data = get_sheep_hir_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['HIR - Sheep'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -546,6 +546,6 @@ def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
         'Biochar': biochar_data,
-        'Beef - HIR': beef_hir_data,
-        'Sheep - HIR': sheep_hir_data,
+        'HIR - Beef': beef_hir_data,
+        'HIR - Sheep': sheep_hir_data,
     }

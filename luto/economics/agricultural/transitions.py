@@ -256,12 +256,12 @@ def get_biochar_effect_t_mrj(data):
 
 
 def get_beef_hir_effect_t_mrj(data):
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
 def get_sheep_hir_effect_t_mrj(data):
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
@@ -272,8 +272,8 @@ def get_agricultural_management_transition_matrices(data: Data, t_mrj, yr_idx) -
     sav_burning_data = get_savanna_burning_effect_t_mrj(data) if AG_MANAGEMENTS['Savanna Burning'] else 0
     agtech_ei_data = get_agtech_ei_effect_t_mrj(data) if AG_MANAGEMENTS['AgTech EI'] else 0
     biochar_data = get_biochar_effect_t_mrj(data) if AG_MANAGEMENTS['Biochar'] else 0
-    beef_hir_data = get_beef_hir_effect_t_mrj(data) if AG_MANAGEMENTS['Beef - HIR'] else 0
-    sheep_hir_data = get_sheep_hir_effect_t_mrj(data) if AG_MANAGEMENTS['Sheep - HIR'] else 0
+    beef_hir_data = get_beef_hir_effect_t_mrj(data) if AG_MANAGEMENTS['HIR - Beef'] else 0
+    sheep_hir_data = get_sheep_hir_effect_t_mrj(data) if AG_MANAGEMENTS['HIR - Sheep'] else 0
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -282,8 +282,8 @@ def get_agricultural_management_transition_matrices(data: Data, t_mrj, yr_idx) -
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
         'Biochar': biochar_data,
-        'Beef - HIR': beef_hir_data,
-        'Sheep - HIR': sheep_hir_data,
+        'HIR - Beef': beef_hir_data,
+        'HIR - Sheep': sheep_hir_data,
     }
 
 
@@ -366,10 +366,10 @@ def get_biochar_adoption_limit(data, yr_idx):
 
 def get_beef_hir_adoption_limit(data: Data):
     """
-    Gets the adoption limit of Beef - HIR for each possible land use.
+    Gets the adoption limit of HIR - Beef for each possible land use.
     """
     hir_limits = {}
-    for lu in AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']:
+    for lu in AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']:
         j = data.DESC2AGLU[lu]
         hir_limits[j] = 1
 
@@ -378,10 +378,10 @@ def get_beef_hir_adoption_limit(data: Data):
 
 def get_sheep_hir_adoption_limit(data: Data):
     """
-    Gets the adoption limit of Sheep - HIR for each possible land use.
+    Gets the adoption limit of HIR - Sheep for each possible land use.
     """
     hir_limits = {}
-    for lu in AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']:
+    for lu in AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']:
         j = data.DESC2AGLU[lu]
         hir_limits[j] = 1
 
@@ -412,10 +412,10 @@ def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str,
         ag_management_data['AgTech EI'] = get_agtech_ei_adoption_limit(data, yr_idx)
     if AG_MANAGEMENTS['Biochar']:
         ag_management_data['Biochar'] = get_biochar_adoption_limit(data, yr_idx)
-    if AG_MANAGEMENTS['Beef - HIR']:
-        ag_management_data['Beef - HIR'] = get_beef_hir_adoption_limit(data)
-    if AG_MANAGEMENTS['Sheep - HIR']:
-        ag_management_data['Sheep - HIR'] = get_sheep_hir_adoption_limit(data)
+    if AG_MANAGEMENTS['HIR - Beef']:
+        ag_management_data['HIR - Beef'] = get_beef_hir_adoption_limit(data)
+    if AG_MANAGEMENTS['HIR - Sheep']:
+        ag_management_data['HIR - Sheep'] = get_sheep_hir_adoption_limit(data)
 
     return ag_management_data
 

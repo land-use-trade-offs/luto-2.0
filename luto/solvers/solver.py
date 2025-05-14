@@ -236,7 +236,7 @@ class LutoSolver:
                         dry_lu_cells, self._input_data.savanna_eligible_r
                     )
 
-                elif am_name == "beef_-_hir" or am_name == "sheep_-_hir":
+                elif am_name == "hir_-_beef" or am_name == "hir_-_sheep":
                     dry_lu_cells = np.intersect1d(
                         dry_lu_cells, self._input_data.hir_eligible_r
                     )
@@ -1554,7 +1554,7 @@ class LutoSolver:
                         eligible_irr_cells, self._input_data.savanna_eligible_r
                     )
 
-                elif am == "Beef - HIR" or am == "Sheep - HIR":
+                elif am == "HIR - Beef" or am == "HIR - Sheep":
                     eligible_dry_cells = np.intersect1d(
                         eligible_dry_cells, self._input_data.hir_eligible_r
                     )
