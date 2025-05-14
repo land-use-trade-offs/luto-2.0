@@ -29,29 +29,21 @@ from affine import Affine
 from scipy.ndimage import distance_transform_edt
 
 
-def create_2d_map(data, map_:np.ndarray=None, filler:int=-1, nodata:int=-9999) -> np.ndarray:
+def create_2d_map(data, map_:np.ndarray=None) -> np.ndarray:
     """
     Create a 2D map based on the given data and map.
 
     Args:
         data (Data): The input data used to create the map.
         map_ (np.ndarray, 1D array): The initial map to be modified.
-        filler (int): The value used to indicate "Non-Agricultural Land".
-        nodata (int): The value used to indicate "No Data".
 
-    Returns
+    Returns:
         np.ndarray: The created 2D map.
 
     """
     
     if settings.RESFACTOR > 1:
-        map_ = get_coarse2D_map(data, map_)
-        if settings.WRITE_FULL_RES_MAPS:
-            # Fill the "Non-Agriculture land" with nearst "Ag land"
-            map_ = np.where(map_ == data.NODATA, data.MASK_LU_CODE, map_)               # Replace the nodata with filler
-            map_ = replace_with_nearest(map_, data.MASK_LU_CODE)                        # Replace the filler with the nearest non-filler value
-            map_ = upsample_and_fill_nodata(data, map_, factor=settings.RESFACTOR)
-        return map_    
+        return get_coarse2D_map(data, map_)    
     else: 
         return get_fullres2D_map(data, map_)                       
                 

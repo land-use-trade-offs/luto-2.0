@@ -282,10 +282,10 @@ def write_files(data: Data, yr_cal, path):
     non_ag_dvar_argmax = np.where(non_ag_dvar_mask, non_ag_dvar, 0).astype(np.float32)
 
     # Put the excluded land-use and land management types back in the array.
-    lumap = create_2d_map(data, data.lumaps[yr_cal], filler=data.MASK_LU_CODE)
-    lmmap = create_2d_map(data, data.lmmaps[yr_cal], filler=data.MASK_LU_CODE)
-    ammap = create_2d_map(data, ag_man_dvar_argmax, filler=data.MASK_LU_CODE)
-    non_ag = create_2d_map(data, non_ag_dvar_argmax, filler=data.MASK_LU_CODE)
+    lumap = create_2d_map(data, data.lumaps[yr_cal])
+    lmmap = create_2d_map(data, data.lmmaps[yr_cal])
+    ammap = create_2d_map(data, ag_man_dvar_argmax)
+    non_ag = create_2d_map(data, non_ag_dvar_argmax)
 
     lumap_fname = f'lumap_{yr_cal}.tiff'
     lmmap_fname = f'lmmap_{yr_cal}.tiff'
@@ -334,7 +334,7 @@ def write_files_separate(data: Data, yr_cal, path, ammap_separate=False):
         category = row['Category']
         dvar_idx = row['dvar_idx']
         desc = row['lu_desc']
-        dvar = create_2d_map(data, row['dvar'].astype(np.float32), filler=data.MASK_LU_CODE)
+        dvar = create_2d_map(data, row['dvar'].astype(np.float32))
         fname = f'{category}_{dvar_idx:02}_{desc}_{yr_cal}.tiff'
         lucc_separate_path = os.path.join(lucc_separate_dir, fname)
         write_gtiff(dvar, lucc_separate_path, data=data)
