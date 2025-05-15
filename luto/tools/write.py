@@ -1156,7 +1156,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
         
     # Do nothing if biodiversity limits are off and no need to report
-    if not settings.BIODIVERSTIY_TARGET_GBF_3 == 'off':
+    if settings.BIODIVERSTIY_TARGET_GBF_3 == 'off':
         return
     
     # Unpack the agricultural management land-use
