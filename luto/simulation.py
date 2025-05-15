@@ -94,9 +94,8 @@ def run(
     print('\n')
     print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]} at RES-{settings.RESFACTOR}, total {len(years)} runs!\n", flush=True)
         
-    # Sanity check
-    if data.YR_CAL_BASE not in years:
-        years.insert(0, data.YR_CAL_BASE)
+    # Insert the base year at the beginning of the years list if not already present
+    if data.YR_CAL_BASE not in years: years.insert(0, data.YR_CAL_BASE)
 
     # Solve and write output
     solve_timeseries(data, years)

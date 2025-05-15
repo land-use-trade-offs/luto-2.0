@@ -514,29 +514,37 @@ INCLUDE_WATER_LICENSE_COSTS = 1
 
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-BIODIVERSTIY_TARGET_GBF_2 = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
+BIODIVERSTIY_TARGET_GBF_2 = 'medium'            # 'off', 'medium', or 'high'
+'''
+Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
+Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
+in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
 
-# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
-BIODIV_GBF_TARGET_2_DICT = {
-              2030: 0.15,  # Proportion of degraded land restored in year 2030 - GBF Target 2
-              2050: 0.15,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
-              2100: 0.15   # Stays at 2050 level
-             }            # (can add more years/targets)\
-""" Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-    Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
-    in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
-"""
+- 'off' will turn off the GBF-3 target. 
+- 'medium' is the medium level of biodiversity target (i.e., restore 15% of degreaded biodiversity socore in the 'priority degraded land').
+- 'high' is the high level of biodiversity target (i.e., restore 25% of degreaded biodiversity socore in the 'priority degraded land').
+'''
 
-
-# GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
-GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
-
-
+GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
+# GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 '''
 The constraint type for the biodiversity target.
 - 'hard' adds biodiversity limits as a constraint in the solver (linear programming approach)
 - 'soft' adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 '''
+
+
+# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
+match BIODIVERSTIY_TARGET_GBF_2:
+    case 'off':
+        GBF2_TARGET_DICT = None
+    case 'medium':
+        GBF2_TARGET_DICT = {2030: 0.15, 2050: 0.15, 2100: 0.15}
+    case 'high':
+        GBF2_TARGET_DICT = {2030: 0.15, 2050: 0.25, 2100: 0.25}
+    case _:
+        raise ValueError(f"Invalid value for BIODIVERSTIY_TARGET_GBF_2: {BIODIVERSTIY_TARGET_GBF_2}. Must be 'off', 'medium', or 'high'.")  
+
 
 GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
 '''
@@ -622,13 +630,19 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- Vegetation parameters ----------------------
 
-BIODIVERSTIY_TARGET_GBF_3  = 'off'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_3  = 'medium'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.
+
+- if 'off' is selected, turn off the GBF-3 target for biodiversity.
+- if 'medium' is selected, the conservation target is set to 30% for each NVIS group at 2050.
+- if 'high' is selected, the conservation target is set to 50% for each NVIS group at 2050.
+- if 'USER_DEFINED' is selected, the conservation target is reading from `input.BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx`.
+
 '''
 
-NVIS_TARGET_CLASS  = 'MVS'                  # 'MVG', 'MVS', 'MVG_IBRA', 'MVS_IBRA'
+GBF3_TARGET_CLASS  = 'MVS'                  # 'MVG', 'MVS', 'MVG_IBRA', 'MVS_IBRA'
 '''
 The National Vegetation Information System (NVIS) provides the 100m resolution information on
 the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers) across Australia.
@@ -636,6 +650,17 @@ the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers
 - If 'MVG/MVS' is selected, use need to define conservation target for each NVIS group across the whole study area.
 - If 'MVS_IBRA/MVG_IBRA' is selected, use need to define conservation target for each NVIS group for selected the IBRA region.
 '''
+
+match BIODIVERSTIY_TARGET_GBF_3:
+    case 'USER_DEFINED' | 'off':
+        GBF3_TARGET_PERCENT = None
+    case 'medium':
+        GBF3_TARGET_PERCENT = 30
+    case 'high':
+        GBF3_TARGET_PERCENT = 50
+    case _:
+        raise ValueError(f"BIODIVERSTIY_TARGET_GBF_3 must be one of 'USER_DEFINED', 'Medium', or 'High', not {BIODIVERSTIY_TARGET_GBF_3}.")
+
 
 
 # ------------------------------- Species parameters -------------------------------

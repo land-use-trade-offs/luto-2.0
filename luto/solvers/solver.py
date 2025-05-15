@@ -881,59 +881,56 @@ class LutoSolver:
             print("    ...Biodiversity GBF 2 (conservation priority) constraints TURNED OFF ...")
             return
 
+        print("    ...Biodiversity GBF 2 (conservation priority) constraints...")
         
-        elif settings.BIODIVERSTIY_TARGET_GBF_2 == "on":
-            
-            bio_ag_contr = gp.quicksum(
-                gp.quicksum(
-                    self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.priority_degraded_mask_idx)]
-                    * self._input_data.biodiv_contr_ag_j[j]
-                    * self.X_ag_dry_vars_jr[j, np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.priority_degraded_mask_idx)]
-                )
-                + gp.quicksum(
-                    self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.priority_degraded_mask_idx)]
-                    * self._input_data.biodiv_contr_ag_j[j]
-                    * self.X_ag_irr_vars_jr[j, np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.priority_degraded_mask_idx)]
-                )  
-                for j in range(self._input_data.n_ag_lus)
+        bio_ag_contr = gp.quicksum(
+            gp.quicksum(
+                self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.priority_degraded_mask_idx)]
+                * self._input_data.biodiv_contr_ag_j[j]
+                * self.X_ag_dry_vars_jr[j, np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.priority_degraded_mask_idx)]
             )
-            bio_ag_man_contr = gp.quicksum(
-                gp.quicksum(
-                    self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)]
-                    * self._input_data.biodiv_contr_ag_man[am][j_idx][np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)]
-                    * self.X_ag_man_dry_vars_jr[am][j_idx, np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)]
-                )  
-                + gp.quicksum(
-                    self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)]
-                    * self._input_data.biodiv_contr_ag_man[am][j_idx][np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)]
-                    * self.X_ag_man_irr_vars_jr[am][j_idx, np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)]
-                )  
-                for am, am_j_list in self._input_data.am2j.items()
-                for j_idx in range(len(am_j_list))
+            + gp.quicksum(
+                self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.priority_degraded_mask_idx)]
+                * self._input_data.biodiv_contr_ag_j[j]
+                * self.X_ag_irr_vars_jr[j, np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.priority_degraded_mask_idx)]
+            )  
+            for j in range(self._input_data.n_ag_lus)
+        )
+        bio_ag_man_contr = gp.quicksum(
+            gp.quicksum(
+                self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)]
+                * self._input_data.biodiv_contr_ag_man[am][j_idx][np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)]
+                * self.X_ag_man_dry_vars_jr[am][j_idx, np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)]
+            )  
+            + gp.quicksum(
+                self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)]
+                * self._input_data.biodiv_contr_ag_man[am][j_idx][np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)]
+                * self.X_ag_man_irr_vars_jr[am][j_idx, np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)]
+            )  
+            for am, am_j_list in self._input_data.am2j.items()
+            for j_idx in range(len(am_j_list))
+        )
+        bio_non_ag_contr = gp.quicksum(
+            gp.quicksum(
+                self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.non_ag_lu2cells[k], self._input_data.priority_degraded_mask_idx)]
+                * self._input_data.biodiv_contr_non_ag_k[k]
+                * self.X_non_ag_vars_kr[k, np.intersect1d(self._input_data.non_ag_lu2cells[k], self._input_data.priority_degraded_mask_idx)]
             )
-            bio_non_ag_contr = gp.quicksum(
-                gp.quicksum(
-                    self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.non_ag_lu2cells[k], self._input_data.priority_degraded_mask_idx)]
-                    * self._input_data.biodiv_contr_non_ag_k[k]
-                    * self.X_non_ag_vars_kr[k, np.intersect1d(self._input_data.non_ag_lu2cells[k], self._input_data.priority_degraded_mask_idx)]
-                )
-                for k in range(self._input_data.n_non_ag_lus)
-            )
-            
-            # Get the biodiversity contribution expression
-            self.bio_GBF2_priority_degraded_area_expr = bio_ag_contr + bio_ag_man_contr + bio_non_ag_contr
-            biodiversity_limits = self._input_data.limits["GBF2_priority_degrade_areas"]
-            
-            print(f"    ...Biodiversity GBF 2 (conservation priority): {biodiversity_limits:,.0f}")
-            
-            if settings.GBF2_CONSTRAINT_TYPE == "hard":
-                constr = self.bio_GBF2_priority_degraded_area_expr >= biodiversity_limits
-                self.bio_GBF2_priority_degraded_area_limit_constraint_hard = self.gurobi_model.addConstr(constr)
-
-            elif settings.GBF2_CONSTRAINT_TYPE == "soft":
-                constr = self.gurobi_model.addConstr(biodiversity_limits - self.bio_GBF2_priority_degraded_area_expr <= self.B)
-                self.bio_GBF2_priority_degraded_area_limit_constraint_soft.append(constr)
-
+            for k in range(self._input_data.n_non_ag_lus)
+        )
+        
+        # Get the biodiversity contribution expression
+        self.bio_GBF2_priority_degraded_area_expr = bio_ag_contr + bio_ag_man_contr + bio_non_ag_contr
+        biodiversity_limits = self._input_data.limits["GBF2_priority_degrade_areas"]
+        
+        print(f"    ...Biodiversity GBF 2 (conservation priority): {biodiversity_limits:,.0f}")
+        
+        if settings.GBF2_CONSTRAINT_TYPE == "hard":
+            constr = self.bio_GBF2_priority_degraded_area_expr >= biodiversity_limits
+            self.bio_GBF2_priority_degraded_area_limit_constraint_hard = self.gurobi_model.addConstr(constr)
+        elif settings.GBF2_CONSTRAINT_TYPE == "soft":
+            constr = self.gurobi_model.addConstr(biodiversity_limits - self.bio_GBF2_priority_degraded_area_expr <= self.B)
+            self.bio_GBF2_priority_degraded_area_limit_constraint_soft.append(constr)
         else:
             raise ValueError(
                 f"Unknown value of GBF2_CONSTRAINT_TYPE. "
@@ -942,7 +939,7 @@ class LutoSolver:
 
 
     def _add_GBF3_major_vegetation_group_limit_constraints(self) -> None:
-        if settings.BIODIVERSTIY_TARGET_GBF_3 != "on":
+        if settings.BIODIVERSTIY_TARGET_GBF_3 == "off":
             print("    ...biodiversity GBF 3 (major vegetation group) constraints TURNED OFF ...")
             return
 
@@ -1737,10 +1734,10 @@ class LutoSolver:
                 "GHG Deviation (tCO2e)":            (self.E.X                                                                        if settings.GHG_CONSTRAINT_TYPE == "soft" else 0),
                 "GHG Penalty":                      (self.penalty_ghg.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA)                 if settings.GHG_CONSTRAINT_TYPE == "soft" else 0),
             
-                "BIO (GBF2) value (ha)":            (self.bio_GBF2_priority_degraded_area_expr.getValue()                            if settings.BIODIVERSTIY_TARGET_GBF_2 == "on" else 0),
+                "BIO (GBF2) value (ha)":            (0                                                                               if settings.BIODIVERSTIY_TARGET_GBF_2 == "off" else self.bio_GBF2_priority_degraded_area_expr.getValue()),
                 "BIO (GBF2) Deviation (ha)":        (self.B.X                                                                        if settings.GBF2_CONSTRAINT_TYPE == "soft" else 0),
                 "BIO (GBF2) Penalty":               (self.penalty_biodiv.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA)              if settings.GBF2_CONSTRAINT_TYPE == "soft" else 0),
-                "BIO (GBF3) value (ha)":            ({k: v.getValue() for k,v in self.bio_GBF3_major_vegetation_exprs.items()}       if settings.BIODIVERSTIY_TARGET_GBF_3 == "on" else 0),
+                "BIO (GBF3) value (ha)":            (0                                                                               if settings.BIODIVERSTIY_TARGET_GBF_3 == "off" else {k: v.getValue() for k,v in self.bio_GBF3_major_vegetation_exprs.items()}),
                 "BIO (GBF4) SNES value (ha)":       ({k: v.getValue() for k,v in self.bio_GBF4_SNES_exprs.items()}                   if settings.BIODIVERSTIY_TARGET_GBF_4_SNES == "on" else 0),
                 "BIO (GBF4) ECNES value (ha)":      ({k: v.getValue() for k,v in self.bio_GBF4_ECNES_exprs.items()}                  if settings.BIODIVERSTIY_TARGET_GBF_4_ECNES == "on" else 0),
                 "BIO (GBF8) value (ha)":            ({k: v.getValue() for k,v in self.bio_GBF8_species_conservation_exprs.items()}   if settings.BIODIVERSTIY_TARGET_GBF_8 == "on" else 0),

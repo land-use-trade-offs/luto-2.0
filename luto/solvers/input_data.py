@@ -265,14 +265,14 @@ def get_ag_man_biodiv_impacts(data: Data, target_year: int) -> dict[str, dict[st
     return ag_biodiversity.get_ag_management_biodiversity_contribution(data, target_year)
 
 def get_GBF2_priority_degrade_area_r(data: Data) -> np.ndarray:
-    if settings.BIODIVERSTIY_TARGET_GBF_2 != "on":
+    if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
         return np.empty(0)
     print('Getting priority degrade area matrices...', flush = True)
     output = ag_biodiversity.get_GBF2_bio_priority_degraded_areas_r(data)
     return output
 
 def get_GBF3_MVG_area_vr(data: Data):
-    if settings.BIODIVERSTIY_TARGET_GBF_3 != "on":
+    if settings.BIODIVERSTIY_TARGET_GBF_3 == "off":
         return np.empty(0)
     print('Getting agricultural major vegetation groups matrices...', flush = True)
     output = ag_biodiversity.get_GBF3_major_vegetation_matrices_vr(data)
@@ -598,15 +598,15 @@ def get_limits(
 
     # If biodiversity limits are not turned on, set the limit to 0.
     limits["GBF2_priority_degrade_areas"] = (
-        ag_biodiversity.get_GBF2_biodiversity_limits(data, yr_cal)
-        if settings.BIODIVERSTIY_TARGET_GBF_2 == 'on'
-        else 0
+        0
+        if settings.BIODIVERSTIY_TARGET_GBF_2 == 'off'
+        else ag_biodiversity.get_GBF2_biodiversity_limits(data, yr_cal)
     )
 
     limits["GBF_3_major_vegetation_groups"] = (
-        ag_biodiversity.get_GBF3_major_vegetation_group_limits(data, yr_cal)
-        if settings.BIODIVERSTIY_TARGET_GBF_3 == 'on'
-        else 0
+        0
+        if settings.BIODIVERSTIY_TARGET_GBF_3 == 'off'
+        else ag_biodiversity.get_GBF3_major_vegetation_group_limits(data, yr_cal)
     )
 
     limits["GBF4_SNES"] = ag_biodiversity.get_GBF4_SNES_limits(data, yr_cal)

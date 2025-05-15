@@ -1461,8 +1461,9 @@ def save_report_data(raw_data_dir:str):
     
         
     # ---------------- (GBF2) Biodiversity priority score  ----------------
-    if settings.BIODIVERSTIY_TARGET_GBF_2 == 'on':
-        
+    if settings.BIODIVERSTIY_TARGET_GBF_2 == 'off':
+        pass
+    else:
         # get biodiversity dataframe
         filter_str = '''
             category == "biodiversity" 
@@ -1539,8 +1540,9 @@ def save_report_data(raw_data_dir:str):
             
             
     # ---------------- (GBF3) Biodiversity Major Vegetation Group score  ----------------
-    if settings.BIODIVERSTIY_TARGET_GBF_3 == 'on':
-        
+    if settings.BIODIVERSTIY_TARGET_GBF_3 == 'off':
+        pass
+    else:
         filter_str = '''
             category == "biodiversity" 
             and year_types == "single_year" 
