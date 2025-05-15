@@ -1057,7 +1057,7 @@ def write_biodiversity_overall_priority_scores(data: Data, yr_cal, path):
 def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 
     # Do nothing if biodiversity limits are off and no need to report
-    if not settings.BIODIVERSTIY_TARGET_GBF_2 == 'off':
+    if settings.BIODIVERSTIY_TARGET_GBF_2 == 'off':
         return
 
     print(f'Writing biodiversity GBF2 scores (PRIORITY) for {yr_cal}')
