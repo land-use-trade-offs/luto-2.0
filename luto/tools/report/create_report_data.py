@@ -1606,6 +1606,7 @@ def save_report_data(raw_data_dir:str):
             df.columns = ['name','data']
             df = df.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index().dropna()
             df['type'] = 'column'
+            bio_df_group_records.append({'name':idx,'data':df.to_dict(orient='records')})
             
         with open(f'{SAVE_DIR}/biodiversity_GBF3_3_contribution_group_score_by_landuse.json', 'w') as outfile:
             json.dump(bio_df_group_records, outfile)
@@ -1878,6 +1879,7 @@ def save_report_data(raw_data_dir:str):
             
         # Plot_GBF8_5: Biodiversity contribution score (group) by non-agricultural landuse
         bio_group_non_ag_sum = bio_df\
+            .query('Type == "Non-Agricultural land-use"')\
             .groupby(['Year','Landuse','Group'])\
             .sum(numeric_only=True)\
             .reset_index()
@@ -1993,6 +1995,7 @@ def save_report_data(raw_data_dir:str):
             
         # Plot_GBF8_10: Biodiversity contribution score (species) by non-agricultural landuse
         bio_species_non_ag_sum = bio_df\
+            .query('Type == "Non-Agricultural land-use"')\
             .groupby(['Year','Landuse','Species'])\
             .sum(numeric_only=True)\
             .reset_index()

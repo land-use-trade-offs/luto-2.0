@@ -630,7 +630,7 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- Vegetation parameters ----------------------
 
-BIODIVERSTIY_TARGET_GBF_3  = 'medium'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+BIODIVERSTIY_TARGET_GBF_3  = 'USER_DEFINED'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.
@@ -664,7 +664,7 @@ match BIODIVERSTIY_TARGET_GBF_3:
 
 
 # ------------------------------- Species parameters -------------------------------
-BIODIVERSTIY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_4_SNES =  'on'           # 'on' or 'off'.
 BIODIVERSTIY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
 
 '''
@@ -676,7 +676,7 @@ and manage human-wildlife interactions
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------
-BIODIVERSTIY_TARGET_GBF_8 = 'off'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_8 = 'on'           # 'on' or 'off'.
 '''
 Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
 reduce the impacts of climate change on biodiversity and ecosystems.
@@ -716,13 +716,6 @@ BIODIVERSITY_BIG_CONSTR_DIV_FACTOR = 1e4
 6: 'Beef Carbon Plantings (Belt)'
 7: 'BECCS'
 8: 'Destocked - natural land'
-
-
-AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)
-0: (None)
-1: 'Asparagopsis taxiformis'
-2: 'Precision Agriculture'
-3: 'Ecological Grazing'
 
 
 DRAINAGE DIVISIONS
