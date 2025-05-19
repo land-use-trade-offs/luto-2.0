@@ -318,7 +318,6 @@ def get_report_df(json_dir_path, run_paras):
     ]).assign(**run_paras).reset_index(drop=True)
 
     report_df['GHG_LIMITS_FIELD'] = report_df['GHG_LIMITS_FIELD'].replace(GHG_ORDER)
-    report_df['GBF2_TARGET_DICT'] = report_df['GBF2_TARGET_DICT'].replace(BIO_TARGET_ORDER)
 
     return report_df
 

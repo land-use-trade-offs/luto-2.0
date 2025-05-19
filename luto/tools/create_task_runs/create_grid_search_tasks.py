@@ -26,7 +26,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250512_DCCEEW_REPORT_02_GBF3_MVS_ON_OFF' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250512_DCCEEW_REPORT_06_HCAS_50TH_CUSTOM' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -77,7 +77,8 @@ grid_search = {
     'WATER_PENALTY': [1],
     'INCLUDE_WATER_LICENSE_COSTS': [0],
     
-    # --------------- Biodiversity priority zone ---------------
+    # --------------- Biodiversity overall ---------------
+    'HABITAT_CONDITION': ['HCAS', 'USER_DEFINED', 'LUTO_ORIGINAL'],                
     'CONNECTIVITY_SOURCE': ['NCI'],
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
     

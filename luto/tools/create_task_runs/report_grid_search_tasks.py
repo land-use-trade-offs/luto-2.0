@@ -429,5 +429,73 @@ fig.show()
 
 
 
+####################### BIO DIFF HCAS  #######################
+task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20250512_DCCEEW_REPORT_06_HCAS_50TH_CUSTOM/"
+report_data = process_task_root_dirs(task_root_dir)
+print(report_data['Type'].unique())
 
+
+# Get jitter and hatch values
+area_landuse = report_data.query('Type == "Area_ag_man_million_km2"').copy()
+jitter_map = {'USER_DEFINED': -0.5, 'HCAS': 0.5}
+hatch_map = {'USER_DEFINED': '////', 'HCAS': r'\\\\'}
+area_landuse['jitter_val'] = area_landuse['HABITAT_CONDITION'].map(jitter_map)
+
+# Group by HABITAT_CONDITION and prepare data for rectangle plotting
+rectangles = pd.DataFrame()
+for (name, year), group in area_landuse.groupby(['HABITAT_CONDITION', 'year']):
+    rectangle = pd.DataFrame({
+        'name': name,
+        'year': year,
+        'rect_x_start': year + group['jitter_val'] - 0.4,
+        'rect_x_end': year + group['jitter_val'] + 0.4,
+        'rect_y_start': 0,
+        'rect_y_end': group['val'].sum()
+    })
+    rectangles = pd.concat([rectangle, rectangles], ignore_index=True)
+    
+p = (
+    p9.ggplot(area_landuse) 
+    + p9.geom_col(p9.aes(x='year + jitter_val', y='val', fill='name'), position='stack', alpha=0.8)  # stack columns by CONNECTIVITY_SOURCE
+    + p9.theme_bw()
+    + p9.labs(
+        x='Year',
+        y='Area (million km2)',
+        fill='Agriculture Management Type'  
+    )
+    + p9.guides(fill=p9.guide_legend(ncol=1))  # Reduce legend icon size further
+    + p9.theme(
+        legend_key=p9.element_rect(color=''),  # Set legend key background to white
+    )
+)
+
+
+# Export to matplotlib
+fig = p.draw()
+
+# Now you can access the underlying matplotlib axes and modify them
+ax = fig.axes[0]
+# Plot rectangles from the prepared data
+for _, row in rectangles.iterrows():
+    rect = patches.Rectangle(
+        (row['rect_x_start'], row['rect_y_start']),
+        row['rect_x_end'] - row['rect_x_start'],
+        row['rect_y_end'] - row['rect_y_start'],
+        hatch=hatch_map[row['name']],
+        fill=False, 
+        edgecolor='gray', 
+        linewidth=0.01,
+        alpha=0.5,  # Adjust transparency
+        zorder=0  # Set zorder to a lower value to place the patch below other elements
+    )
+    ax.add_patch(rect)
+
+# Add legend for the hatches
+legend_patches = [
+    patches.Patch(facecolor='none', edgecolor='grey', hatch=hatch, label=label)
+    for label, hatch in hatch_map.items()
+]
+ax.legend(handles=legend_patches, title='', loc=(1.045, 0.12), fontsize=10, frameon=False, labels=['USER_DEFINED', 'HCAS'])
+# Show the final plot
+fig.show()
 
