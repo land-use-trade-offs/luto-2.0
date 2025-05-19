@@ -555,8 +555,8 @@ def calc_water_net_yield_BASE_YR(data) -> np.ndarray:
     Returns
     - water_net_yield: The water net yield for all regions.
     """
-    if data.WATER_YIELD_RR_BASE_YR is not None:
-        return data.WATER_YIELD_RR_BASE_YR
+    if data.water_yield_regions_BASE_YR is not None:
+        return data.water_yield_regions_BASE_YR
     
     # Get the water yield matrices
     w_mrj = get_water_net_yield_matrices(data, 0)
@@ -588,18 +588,15 @@ def get_water_net_yield_limit_values(
     Return water net yield limits for regions (River Regions or Drainage Divisions as specified in luto.settings.py).
 
     Parameters
+    ----------
     - data: The data object containing the necessary input data.
 
     Returns
-    water_net_yield_limits: A dictionary of tuples containing the water use limits for each region\n
-      region index:(
-      - region name
-      - water yield limit
-      - indices of cells in the region
-      )
-
-    Raises:
-    - None
+    -------
+    water_net_yield_limits: dict(int, tuple[str, float, np.ndarray])
+        A dictionary with the following structure:
+        - key: region ID
+        - value: 0) region name, 1) water yield limit (ML/cell), 2) indices of cells in the region
 
     """
     # Get the water limit from data to avoid recalculating
@@ -622,14 +619,56 @@ def get_water_net_yield_limit_values(
     for region, name in region_names.items():
         hist_yield = wny_region_hist[region]
         ind = np.flatnonzero(region_id == region).astype(np.int32)
-        # Water yield limit calculated as a proportial of historical level based on planetary boundary theory
-        limit_hist_level = hist_yield * (1 - settings.WATER_STRESS * settings.AG_SHARE_OF_WATER_USE)   
-        limits_by_region[region] = (name, limit_hist_level, ind)    
+        limits_by_region[region] = (name, hist_yield, ind)    
 
     # Save the results in data to avoid recalculating
     data.WATER_YIELD_LIMITS = limits_by_region
     
     return limits_by_region
+
+
+def get_wreq_domestic_regions(data) -> np.ndarray:
+    """
+    Return water requirements for regions (River Regions or Drainage Divisions as specified in luto.settings.py) at the BASE_YR.
+
+    Parameters
+        data (object): The data object containing the required data.
+
+    Returns
+        dict[int, float]: A dictionary with the following structure:
+            - key: region ID
+            - value: water requirement for domestic use in this region (ML)
+    """
+    if data.WREQ_DOMESTIC_REGIONS is not None:
+        return data.WREQ_DOMESTIC_REGIONS
+    
+    # Get the water requirement matrices at the YR_CAL_BASE
+    w_req_mrj = get_wreq_matrices(data, data.YR_CAL_BASE)
+    w_req_r = np.einsum('mrj->r', w_req_mrj)
+    
+    if settings.WATER_REGION_DEF == 'River Region':
+        w_req_r = np.bincount(data.RIVREG_ID, w_req_r)
+        w_req_r = {region: w_req for region, w_req in enumerate(w_req_r) if region != 0}
+    elif settings.WATER_REGION_DEF == 'Drainage Division':
+        w_req_r = np.bincount(data.DRAINDIV_ID, w_req_r)
+        w_req_r = {region: w_req for region, w_req in enumerate(w_req_r) if region != 0}
+    else:
+        raise ValueError(
+            f"Invalid value for setting WATER_REGION_DEF: '{settings.WATER_REGION_DEF}' "
+            f"(must be either 'River Region' or 'Drainage Division')."
+        )
+        
+    # Get the water requirement for domestic use
+    w_req_domestic = {
+        k: (v * settings.WATER_USE_SHARE_DOMESTIC / settings.WATER_USE_SHARE_AG) 
+        for k, v in w_req_r.items() 
+    }
+        
+    # Save the results in data to avoid recalculating
+    if data.WREQ_DOMESTIC_REGIONS is None:
+        data.WREQ_DOMESTIC_REGIONS = w_req_domestic
+
+    return w_req_domestic
     
 
 

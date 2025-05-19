@@ -75,8 +75,9 @@ class SolverInputData:
     ag_man_limits: dict                                                 # Agricultural management options' adoption limits.
     ag_man_lb_mrj: dict                                                 # Agricultural management options' lower bounds.
 
-    water_yield_RR_BASE_YR: dict                                        # Water yield for the BASE_YR based on historical water yield layers .
+    water_yield_regions_BASE_YR: dict                                   # Water yield for the BASE_YR based on historical water yield layers .
     water_yield_outside_study_area: dict[int, float]                    # Water yield from outside LUTO study area -> dict. Key: region.
+    water_required_domestic_regions: dict[int, float]                   # Water yield from domestic requirement region -> dict. Key: region.
       
     biodiv_contr_ag_j: np.ndarray                                       # Biodiversity contribution scale from agricultural land uses.
     biodiv_contr_non_ag_k: dict[int, float]                             # Biodiversity contribution scale from non-agricultural land uses.
@@ -238,6 +239,10 @@ def get_ag_w_mrj(data: Data, target_index, water_dr_yield: Optional[np.ndarray] 
 def get_w_outside_luto(data: Data, yr_cal: int):
     print('Getting water yield from outside LUTO study area...', flush = True)
     return ag_water.get_water_outside_luto_study_area_from_hist_level(data)
+
+def get_w_domestic_req_region(data: Data):
+    print('Getting water yield from domestic requirement region...', flush = True)
+    return ag_water.get_wreq_domestic_regions(data)
 
 def get_w_BASE_YR(data: Data):
     print('Getting water yield for the BASE_YR based on historical water yield layers...', flush = True)
@@ -691,8 +696,9 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_limits=get_ag_man_limits(data, target_index),                            
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
         
-        water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Use the water net yield outside LUTO study area for the YR_CAL_BASE year
-        water_yield_RR_BASE_YR=get_w_BASE_YR(data),                                     # Calculate water net yield for the BASE_YR (2010) based on historical water yield layers
+        water_yield_regions_BASE_YR=get_w_BASE_YR(data),                                # Water net yield for the BASE_YR (2010) based on historical water yield layers
+        water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Water net yield outside LUTO study area for the YR_CAL_BASE year
+        water_required_domestic_regions=get_w_domestic_req_region(data),                # Water required for domestic use for each region
         
         biodiv_contr_ag_j=get_ag_biodiv_contr_j(data),
         biodiv_contr_non_ag_k=get_non_ag_biodiv_impact_k(data),

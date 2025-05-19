@@ -690,106 +690,56 @@ class LutoSolver:
             for k in range(self._input_data.n_non_ag_lus)
         )
 
-        # Get the water yield outside the study area in the Base Year (2010) of the whole simulation
-        outside_luto_study_contr = self._input_data.water_yield_outside_study_area[region]
 
         # Sum of all water yield contributions
-        return ag_contr + ag_man_contr + non_ag_contr + outside_luto_study_contr
+        return ag_contr + ag_man_contr + non_ag_contr
 
-    def _add_hard_water_usage_limit_constraints(self) -> None:
-        """
-        Adds constraints to handle water usage limits.
-        If `cells` is provided, only adds constraints for regions containing at least one of the
-        provided cells.
-        """
-
-        print(f"  ...water net yield constraints by {settings.WATER_REGION_DEF}...")
-
-        if settings.WATER_LIMITS == "off":
-            print("  ...TURNING OFF water usage constraints ...")
-            return
-
-        # Ensure water use remains below limit for each region
-        for region, (reg_name, limit_hist_level, ind) in self._input_data.limits["water"].items():
-            self.water_nyiled_exprs[region] = self._get_water_net_yield_expr_for_region(ind, region)
-
-            # Under River Regions, we need to update the water constraint when the wny_hist_level < wny_BASE_YR_level
-            if settings.WATER_REGION_DEF == "Drainage Division":
-                water_yield_constraint = limit_hist_level
-            elif settings.WATER_REGION_DEF == "River Region":
-                wny_BASE_YR_level = self._input_data.water_yield_RR_BASE_YR[region]
-                water_yield_constraint = min(limit_hist_level, wny_BASE_YR_level)
-            else:
-                raise ValueError(
-                    f"Unknown choice for `WATER_REGION_DEF` setting: must be either 'River Region' or 'Drainage Division'"
-                )
-
-            # Add the constraint that the water yield in the region must be greater than the limit
-            constr = self.gurobi_model.addConstr(self.water_nyiled_exprs[region] >= water_yield_constraint)
-            self.water_limit_constraints.append(constr)
-
-            # Report on the water yield in the region
-            if settings.VERBOSE == 1:
-                print(
-                    f"     |-- net water yield in {reg_name} >= {limit_hist_level:.2f} ML"
-                )
-            if water_yield_constraint != limit_hist_level:
-                print(
-                    f"        ... updating water constraint to >= {water_yield_constraint:.2f} ML"
-                )
-
-    def _add_soft_water_usage_limit_constraints(self) -> None:
-        for region_idx, region_data in enumerate(
-            self._input_data.limits["water"].items()
-        ):
-            region, (reg_name, limit_hist_level, ind) = region_data
-            self.water_nyiled_exprs[region] = self._get_water_net_yield_expr_for_region(ind, region)
-
-            # Under River Regions, we need to update the water constraint when the wny_hist_level < wny_BASE_YR_level
-            if settings.WATER_REGION_DEF == "Drainage Division":
-                water_yield_constraint = limit_hist_level
-            elif settings.WATER_REGION_DEF == "River Region":
-                wny_BASE_YR_level = self._input_data.water_yield_RR_BASE_YR[region]
-                water_yield_constraint = min(limit_hist_level, wny_BASE_YR_level)
-            else:
-                raise ValueError(
-                    f"Unknown choice for `WATER_REGION_DEF` setting: must be either 'River Region' or 'Drainage Division'"
-                )
-
-            # Bound the self.W variables to the difference between the desired and actual net yields
-            constr = self.gurobi_model.addConstr(
-                water_yield_constraint - self.water_nyiled_exprs[region] <= self.W[region_idx]
-            )
-            self.water_limit_constraints.append(constr)
-
-            # Report on the water yield in the region
-            if settings.VERBOSE == 1:
-                print(
-                    f"    ...net water yield goal in {reg_name}: {limit_hist_level:.2f} ML"
-                )
-            if water_yield_constraint != limit_hist_level:
-                print(
-                    f"        ... updating net water yield goal to {water_yield_constraint:.2f} ML"
-                )
 
     def _add_water_usage_limit_constraints(self) -> None:
-        if settings.WATER_CONSTRAINT_TYPE == "hard":
-            print(
-                f"  ...Hard water net yield constraints by {settings.WATER_REGION_DEF}..."
-            )
-            self._add_hard_water_usage_limit_constraints()
+        
+        # Ensure water use remains below limit for each region
+        for idx, (reg_name, hist_level, ind) in self._input_data.limits["water"].items():
+            
+            self.water_nyiled_exprs[idx] = self._get_water_net_yield_expr_for_region(ind, idx)      # Water net yield inside LUTO study area
+            wny_outside_LUTO = self._input_data.water_yield_outside_study_area[idx]                 # Water net yield outside LUTO study area
+            wrq_domestic_region = self._input_data.water_required_domestic_regions[idx]             # Water required for domestic use of this region
 
-        elif settings.WATER_CONSTRAINT_TYPE == "soft":
-            print(
-                f"  ...Soft water net yield constraints by {settings.WATER_REGION_DEF}..."
-            )
-            self._add_soft_water_usage_limit_constraints()
+            # Under River Regions, we need to update the water constraint when the wny_hist_level < wny_BASE_YR_level
+            if settings.WATER_REGION_DEF == "Drainage Division":
+                water_yield_base_level = hist_level 
+            elif settings.WATER_REGION_DEF == "River Region":
+                wny_BASE_YR_level = self._input_data.water_yield_regions_BASE_YR[idx]
+                water_yield_base_level = min(hist_level, wny_BASE_YR_level)
+            else:
+                raise ValueError(
+                    f"Unknown choice for `WATER_REGION_DEF` setting: must be either 'River Region' or 'Drainage Division'"
+                )
+                
+            water_yield_total = (
+                self.water_nyiled_exprs[idx]     # Water yield from inside LUTO study area
+                + wny_outside_LUTO                  # Water yield from outside LUTO study area
+                - wrq_domestic_region               # Water consumption required for domestic regions
+            )  
 
-        else:
-            raise ValueError(
-                f"Unknown value of WATER_CONSTRAINT_TYPE setting: {settings.WATER_CONSTRAINT_TYPE}. "
-                f"Must be either 'hard' or 'soft'."
+            # Add the constraint that the water yield in the region must be greater than the limit
+            water_yield_constraint = water_yield_base_level * (1 - settings.WATER_STRESS)
+            constr = (
+                self.gurobi_model.addConstr(water_yield_total >= water_yield_constraint) 
+                if settings.WATER_CONSTRAINT_TYPE == "hard" else
+                self.gurobi_model.addConstr(water_yield_constraint - self.water_nyiled_exprs[idx] <= self.W[idx - 1])   # region index starts from 1, minus 1 to get its position in the self.W array
             )
+            self.water_limit_constraints.append(constr)
+                        
+            # Report on the water yield in the region
+            if settings.VERBOSE == 1:
+                print(
+                    f"     |-- net water yield in {reg_name} >= {water_yield_constraint:.2f} ML"
+                )
+            if water_yield_base_level != hist_level:
+                print(
+                    f"        ... updating water constraint to BASE_YR level >= {wny_BASE_YR_level * (1 - settings.WATER_STRESS):.2f} ML"
+                )
+
 
     def _get_total_ghg_emissions_expr(self) -> gp.LinExpr:
         # Pre-calculate the coefficients for each variable,

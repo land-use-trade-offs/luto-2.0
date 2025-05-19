@@ -842,6 +842,7 @@ class Data:
         
         # Initialize water constraints to avoid recalculating them every time.
         self.WATER_YIELD_LIMITS = None
+        self.WREQ_DOMESTIC_REGIONS = None
 
         # Water requirements by land use -- LVSTK.
         wreq_lvstk_dry = pd.DataFrame()
@@ -958,7 +959,7 @@ class Data:
             self.WATER_UNDER_NATURAL_LAND_DD = dd_natural_land
             
         # Place holder for Water Yield under River Region to avoid recalculating it every time.
-        self.WATER_YIELD_RR_BASE_YR = None
+        self.water_yield_regions_BASE_YR = None
         
         
         ###############################################################
