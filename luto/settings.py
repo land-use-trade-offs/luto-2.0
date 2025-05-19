@@ -495,8 +495,9 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
     https://chinawaterrisk.org/resources/analysis-reviews/aqueduct-global-water-stress-rankings/ 
 """
 
-WATER_STRESS = 0.4          # Aqueduct limit catchments not under high stress
-AG_SHARE_OF_WATER_USE = 0.7 # Ag share is 70% across all catchments, could be updated for each specific catchment based on actual data
+WATER_STRESS = 0.4                                      # Aqueduct limit catchments not under high stress
+WATER_USE_SHARE_AG = 0.7                                # Ag share is 70% across all catchments, could be updated for each specific catchment based on actual data
+WATER_USE_SHARE_DOMESTIC  = 1 - WATER_USE_SHARE_AG      # Domestic share is 30% across all catchments, could be updated for each specific catchment based on actual data
 
 
 # Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water can cause infeasibility issues with water constraint in Pilbara
@@ -630,7 +631,7 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- Vegetation parameters ----------------------
 
-BIODIVERSTIY_TARGET_GBF_3  = 'USER_DEFINED'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+BIODIVERSTIY_TARGET_GBF_3  = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.
@@ -664,7 +665,7 @@ match BIODIVERSTIY_TARGET_GBF_3:
 
 
 # ------------------------------- Species parameters -------------------------------
-BIODIVERSTIY_TARGET_GBF_4_SNES =  'on'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
 BIODIVERSTIY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
 
 '''
@@ -676,7 +677,7 @@ and manage human-wildlife interactions
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------
-BIODIVERSTIY_TARGET_GBF_8 = 'on'           # 'on' or 'off'.
+BIODIVERSTIY_TARGET_GBF_8 = 'off'           # 'on' or 'off'.
 '''
 Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
 reduce the impacts of climate change on biodiversity and ecosystems.
