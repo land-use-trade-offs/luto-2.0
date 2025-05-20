@@ -128,7 +128,7 @@ if __name__ == '__main__':
     grid_search_settings_df = get_grid_search_settings_df(TASK_ROOT_DIR, default_settings_df, grid_search_param_df)
 
     # 1) Submit task to a single linux machine, and run simulations parallely
-    # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
+    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
 
     # 2) Submit task to multiple linux computation nodes
     create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster')

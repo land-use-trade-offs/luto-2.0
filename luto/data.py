@@ -1157,6 +1157,8 @@ class Data:
                 bio_HCAS_contribution_lookup = {int(k):v*(1/unallow_nat_scale) for k,v in bio_HCAS_contribution_lookup.items()}                     # Normalise the biodiversity degradation score to the unallocated natural land score
             case 'USER_DEFINED':
                 bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[ 'USER_DEFINED'].to_dict()
+            case 'LUTO_ORIGINAL':
+                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[ 'LUTO_ORIGINAL'].to_dict()
             case _:
                 print(f"WARNING!! Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
         

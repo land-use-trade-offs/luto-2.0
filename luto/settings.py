@@ -539,12 +539,14 @@ The constraint type for the biodiversity target.
 match BIODIVERSTIY_TARGET_GBF_2:
     case 'off':
         GBF2_TARGET_DICT = None
+    case 'low':
+        GBF2_TARGET_DICT = {2030: 0,    2050: 0,    2100: 0}
     case 'medium':
         GBF2_TARGET_DICT = {2030: 0.15, 2050: 0.15, 2100: 0.15}
     case 'high':
         GBF2_TARGET_DICT = {2030: 0.15, 2050: 0.25, 2100: 0.25}
     case _:
-        raise ValueError(f"Invalid value for BIODIVERSTIY_TARGET_GBF_2: {BIODIVERSTIY_TARGET_GBF_2}. Must be 'off', 'medium', or 'high'.")  
+        raise ValueError(f"Invalid value for BIODIVERSTIY_TARGET_GBF_2: {BIODIVERSTIY_TARGET_GBF_2}. Must be 'off', 'low', 'medium', or 'high'.")  
 
 
 GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
