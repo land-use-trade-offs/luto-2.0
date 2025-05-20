@@ -452,7 +452,7 @@ class LutoSolver:
             + x_non_ag_vars.sum(axis=0)
         )
         for r, expr in zip(cells, X_sum_r):
-            self.cell_usage_constraint_r[r] = self.gurobi_model.addConstr(expr == 1)
+            self.cell_usage_constraint_r[r] = self.gurobi_model.addConstr(expr == 1, name=f"const_cell_usage_{r}")
 
     def _add_agricultural_management_constraints(
         self, cells: Optional[np.array] = None
@@ -479,13 +479,15 @@ class LutoSolver:
                 for r in lm_dry_r_vals:
                     constr = self.gurobi_model.addConstr(
                         self.X_ag_man_dry_vars_jr[am][j_idx, r]
-                        <= self.X_ag_dry_vars_jr[j, r]
+                        <= self.X_ag_dry_vars_jr[j, r],
+                        name=f"const_ag_mam_dry_usage_{am}_{j}_{r}",
                     )
                     self.ag_management_constraints_r[r].append(constr)
                 for r in lm_irr_r_vals:
                     constr = self.gurobi_model.addConstr(
                         self.X_ag_man_irr_vars_jr[am][j_idx, r]
-                        <= self.X_ag_irr_vars_jr[j, r]
+                        <= self.X_ag_irr_vars_jr[j, r],
+                        name=f"const_ag_mam_irr_usage_{am}_{j}_{r}",
                     )
                     self.ag_management_constraints_r[r].append(constr)
 
@@ -508,7 +510,8 @@ class LutoSolver:
                     self.X_ag_irr_vars_jr[j, :]
                 )
                 constr = self.gurobi_model.addConstr(
-                    ag_man_vars_sum <= adoption_limit * all_vars_sum
+                    ag_man_vars_sum <= adoption_limit * all_vars_sum,
+                    name=f"const_ag_mam_adoption_limit_{am}_{j}",
                 )
 
                 self.adoption_limit_constraints.append(constr)
@@ -628,12 +631,11 @@ class LutoSolver:
 
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             upper_bound_constraints = self.gurobi_model.addConstrs(
-                (self.d_c[c] - self.total_q_exprs_c[c]) <= self.V[c]
-                for c in range(self.ncms)
-            )
+                ((self.d_c[c] - self.total_q_exprs_c[c]) <= self.V[c] for c in range(self.ncms)),
+                name="demand_soft_bound_upper")
             lower_bound_constraints = self.gurobi_model.addConstrs(
-                (self.total_q_exprs_c[c] - self.d_c[c]) <= self.V[c]
-                for c in range(self.ncms)
+                ((self.total_q_exprs_c[c] - self.d_c[c]) <= self.V[c] for c in range(self.ncms)),
+                name="demand_soft_bound_lower"
             )
 
             self.demand_penalty_constraints.extend(upper_bound_constraints.values())
@@ -641,7 +643,8 @@ class LutoSolver:
 
         elif settings.DEMAND_CONSTRAINT_TYPE == "hard":
             quantity_meets_demand_constraints = self.gurobi_model.addConstrs(
-                (self.total_q_exprs_c[c] >= self.d_c[c]) for c in range(self.ncms)
+                ((self.total_q_exprs_c[c] >= self.d_c[c]) for c in range(self.ncms)),
+                name="demand_meets_demand"
             )
             self.demand_penalty_constraints.extend(
                 quantity_meets_demand_constraints.values()
@@ -724,9 +727,15 @@ class LutoSolver:
             # Add the constraint that the water yield in the region must be greater than the limit
             water_yield_constraint = water_yield_base_level * settings.WATER_STRESS
             constr = (
-                self.gurobi_model.addConstr(water_yield_total >= water_yield_constraint) 
+                self.gurobi_model.addConstr(
+                    water_yield_total >= water_yield_constraint, 
+                    name=f"water_yield_limit_{idx}"
+                ) 
                 if settings.WATER_CONSTRAINT_TYPE == "hard" else
-                self.gurobi_model.addConstr(water_yield_constraint - self.water_nyiled_exprs[idx] <= self.W[idx - 1])   # region index starts from 1, minus 1 to get its position in the self.W array
+                self.gurobi_model.addConstr(
+                    water_yield_constraint - self.water_nyiled_exprs[idx] <= self.W[idx - 1], 
+                    name=f"water_yield_limit_{idx}"
+                )   # region index starts from 1, minus 1 to get its position in the self.W array
             )
             self.water_limit_constraints.append(constr)
                         
@@ -796,18 +805,21 @@ class LutoSolver:
                 f"    ...GHG emissions reduction target UB: {ghg_limit_ub:,.0f} tCO2e"
             )
             self.ghg_emissions_limit_constraint_ub = self.gurobi_model.addConstr(
-                self.ghg_emissions_expr <= ghg_limit_ub
+                self.ghg_emissions_expr <= ghg_limit_ub,
+                name="ghg_emissions_limit_ub",
             )
         elif settings.GHG_CONSTRAINT_TYPE == "soft":
             print(f"  ...GHG emissions reduction target: {ghg_limit_ub:,.0f} tCO2e")
             self.ghg_emissions_reduction_soft_constraints.append(
                 self.gurobi_model.addConstr(
-                    self.ghg_emissions_expr - ghg_limit_ub <= self.E
+                    self.ghg_emissions_expr - ghg_limit_ub <= self.E,
+                    name="ghg_emissions_limit_soft_ub",
                 )
             )
             self.ghg_emissions_reduction_soft_constraints.append(
                 self.gurobi_model.addConstr(
-                    ghg_limit_ub - self.ghg_emissions_expr <= self.E
+                    ghg_limit_ub - self.ghg_emissions_expr <= self.E,
+                    name="ghg_emissions_limit_soft_lb",
                 )
             )
         else:
@@ -877,9 +889,9 @@ class LutoSolver:
         
         if settings.GBF2_CONSTRAINT_TYPE == "hard":
             constr = self.bio_GBF2_priority_degraded_area_expr >= biodiversity_limits
-            self.bio_GBF2_priority_degraded_area_limit_constraint_hard = self.gurobi_model.addConstr(constr)
+            self.bio_GBF2_priority_degraded_area_limit_constraint_hard = self.gurobi_model.addConstr(constr, name="bio_GBF2_priority_degraded_area_limit_hard")
         elif settings.GBF2_CONSTRAINT_TYPE == "soft":
-            constr = self.gurobi_model.addConstr(biodiversity_limits - self.bio_GBF2_priority_degraded_area_expr <= self.B)
+            constr = self.gurobi_model.addConstr(biodiversity_limits - self.bio_GBF2_priority_degraded_area_expr <= self.B, name="bio_GBF2_priority_degraded_area_limit_soft")
             self.bio_GBF2_priority_degraded_area_limit_constraint_soft.append(constr)
         else:
             raise ValueError(
@@ -949,7 +961,8 @@ class LutoSolver:
 
             print(f"       |-- vegetation class {v_names[v]} target area: {v_area_lb:,.0f}")
             self.bio_GBF3_major_vegetation_limit_constraints[v] = self.gurobi_model.addConstr(
-                self.bio_GBF3_major_vegetation_exprs[v] >= v_area_lb
+                self.bio_GBF3_major_vegetation_exprs[v] >= v_area_lb,
+                name=f"bio_GBF3_major_vegetation_limit_{v}",
             )
 
 
@@ -1013,7 +1026,8 @@ class LutoSolver:
 
             print(f"       |-- SNES species {x_names[x]} target: {x_area_lb:,.0f}")
             self.bio_GBF4_SNES_constrs[x] = self.gurobi_model.addConstr(
-                self.bio_GBF4_SNES_exprs[x] >= constr_lb
+                self.bio_GBF4_SNES_exprs[x] >= constr_lb,
+                name=f"bio_GBF4_SNES_limit_{x}",
             )
 
     def _add_GBF4_ecnes_constraints(self) -> None:
@@ -1076,7 +1090,8 @@ class LutoSolver:
 
             print(f"       |-- ECNES community {x_names[x]} target: {x_area_lb:,.0f}")
             self.bio_GBF4_ECNES_constrs[x] = self.gurobi_model.addConstr(
-                self.bio_GBF4_ECNES_exprs[x] >= constr_lb
+                self.bio_GBF4_ECNES_exprs[x] >= constr_lb,
+                name=f"bio_GBF4_ECNES_limit_{x}",
             )
 
 
@@ -1139,7 +1154,8 @@ class LutoSolver:
 
             print(f"       |-- species {s_names[s]} conservation target area: {s_area_lb:,.0f}")
             self.bio_GBF8_species_conservation_constrs[s] = self.gurobi_model.addConstr(
-                self.bio_GBF8_species_conservation_exprs[s] >= constr_area
+                self.bio_GBF8_species_conservation_exprs[s] >= constr_area,
+                name=f"bio_GBF8_species_conservation_limit_{s}",
             )
 
         
@@ -1161,14 +1177,14 @@ class LutoSolver:
                   gp.quicksum(self._input_data.real_area[reg_ind] * self.X_ag_dry_vars_jr[j, reg_ind])
                 + gp.quicksum(self._input_data.real_area[reg_ind] * self.X_ag_irr_vars_jr[j, reg_ind])
             )
-            self.regional_adoption_constrs.append(self.gurobi_model.addConstr(reg_expr <= reg_area_limit))
+            self.regional_adoption_constrs.append(self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_ag_{lu_name}_{reg_id}"))
         
         # Add adoption constraints for non-agricultural land uses
         reg_adopt_limits = self._input_data.limits["non_ag_regional_adoption"]
         for reg_id, k, lu_name, reg_ind, reg_area_limit in reg_adopt_limits:
             print(f"     |-- adding adoption limit for {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} >= {reg_area_limit:,.0f} HA...")
             reg_expr = gp.quicksum(self._input_data.real_area[reg_ind] * self.X_non_ag_vars_kr[k, reg_ind])
-            self.regional_adoption_constrs.append(self.gurobi_model.addConstr(reg_expr <= reg_area_limit))
+            self.regional_adoption_constrs.append(self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_non_ag_{lu_name}_{reg_id}"))
 
 
 
