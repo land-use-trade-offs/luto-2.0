@@ -401,7 +401,7 @@ GHG_LIMITS = {
              }
 
 # Take data from 'GHG_targets.xlsx', 
-GHG_LIMITS_FIELD = '1.8C (67%) excl. avoided emis SCOPE1'
+GHG_LIMITS_FIELD = '1.5C (50%) excl. avoided emis SCOPE1'
 '''
 options include: 
 - Assuming agriculture is responsible to sequester 100% of the carbon emissions
@@ -468,7 +468,7 @@ WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield lim
 # WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
 WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
 
-WATER_PENALTY = 1
+WATER_PENALTY = 1e-5
 
 # Regionalisation to enforce water use limits by
 WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
@@ -591,7 +591,7 @@ I.e., the lower bound of the connectivity score for weighting the raw biodiversi
 
 
 # Habitat condition data source
-HABITAT_CONDITION = 'HCAS'                  # 'HCAS', 'USER_DEFINED', or 'NONE'
+HABITAT_CONDITION = 'USER_DEFINED'                  # 'HCAS', 'USER_DEFINED', or 'NONE'
 '''
 Used to calculate the level of degradation of biodiversity under agricultural land uses (i.e., multiplier of the impact of ag on biodiversity).
 - If 'HCAS' is selected, the habitat condition is calculated using the Habitat Condition Assessment System (HCAS)
