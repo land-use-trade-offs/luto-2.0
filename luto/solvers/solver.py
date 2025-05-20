@@ -716,13 +716,13 @@ class LutoSolver:
                 )
                 
             water_yield_total = (
-                self.water_nyiled_exprs[idx]     # Water yield from inside LUTO study area
+                self.water_nyiled_exprs[idx]        # Water yield from inside LUTO study area
                 + wny_outside_LUTO                  # Water yield from outside LUTO study area
                 - wrq_domestic_region               # Water consumption required for domestic regions
             )  
 
             # Add the constraint that the water yield in the region must be greater than the limit
-            water_yield_constraint = water_yield_base_level * (1 - settings.WATER_STRESS)
+            water_yield_constraint = water_yield_base_level * settings.WATER_STRESS
             constr = (
                 self.gurobi_model.addConstr(water_yield_total >= water_yield_constraint) 
                 if settings.WATER_CONSTRAINT_TYPE == "hard" else
@@ -737,7 +737,7 @@ class LutoSolver:
                 )
             if water_yield_base_level != hist_level:
                 print(
-                    f"        ... updating water constraint to BASE_YR level >= {wny_BASE_YR_level * (1 - settings.WATER_STRESS):.2f} ML"
+                    f"        ... updating water constraint to BASE_YR level >= {(wny_BASE_YR_level * settings.WATER_STRESS):.2f} ML"
                 )
 
 

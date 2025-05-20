@@ -660,7 +660,7 @@ def get_wreq_domestic_regions(data) -> np.ndarray:
         
     # Get the water requirement for domestic use
     w_req_domestic = {
-        k: (v * settings.WATER_USE_SHARE_DOMESTIC / settings.WATER_USE_SHARE_AG) 
+        k: (v / settings.WATER_USE_SHARE_AG * settings.WATER_USE_SHARE_DOMESTIC ) 
         for k, v in w_req_r.items() 
     }
         
