@@ -73,7 +73,7 @@ grid_search = {
     
     # --------------- Water constraints ---------------
     'WATER_LIMITS': ['on'],                     # 'on' or 'off'
-    'WATER_CONSTRAINT_TYPE': ['hard'],          # 'hard' or 'soft'
+    'WATER_CONSTRAINT_TYPE': ['soft'],          # 'hard' or 'soft'
     'WATER_PENALTY': [1],
     'INCLUDE_WATER_LICENSE_COSTS': [0],
     
