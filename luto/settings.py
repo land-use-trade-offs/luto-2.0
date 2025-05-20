@@ -60,7 +60,7 @@ SSP = '245'
 RCP = 'rcp' + SSP[1] + 'p' + SSP[2] # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
 # Set demand parameters which define requirements for Australian production of agricultural commodities
-SCENARIO = SSP_NUM = 'SSP' + SSP[0] # SSP1, SSP2, SSP3, SSP4, SSP5
+SCENARIO = 'SSP' + SSP[0] # SSP1, SSP2, SSP3, SSP4, SSP5
 DIET_DOM = 'BAU'                    # 'BAU', 'FLX', 'VEG', 'VGN' - domestic diets in Australia
 DIET_GLOB = 'BAU'                   # 'BAU', 'FLX', 'VEG', 'VGN' - global diets
 CONVERGENCE = 2050                  # 2050 or 2100 - date at which dietary transformation is completed (velocity of transformation)
@@ -99,10 +99,10 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 13       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 7       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS = list(range(2010,2051,10)) # range(2020,2050)
+SIM_YEARS = list(range(2020,2051,5)) # range(2020,2050)
 
 
 # Define the objective function
