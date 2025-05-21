@@ -1212,95 +1212,93 @@ def save_report_data(raw_data_dir:str):
         and ~base_name.str.contains("limits_and_public")').reset_index(drop=True)
     
     water_df_separate = pd.concat([pd.read_csv(path) for path in water_df_separate['path']], ignore_index=True)
-    water_df_separate = water_df_separate.replace(RENAME_AM_NON_AG)
+    water_df_separate = water_df_separate.replace(RENAME_AM_NON_AG).query('`Water Net Yield (ML)` > 0')
     
     
     water_hist_and_public_land_yield = files.query('category == "water" \
         and year_types == "single_year" \
         and base_name.str.contains("limits_and_public")').reset_index(drop=True)
     water_hist_and_public_land_yield = pd.concat([pd.read_csv(path) for path in water_hist_and_public_land_yield['path']], ignore_index=True)
+    water_hist_and_public_land_yield = water_hist_and_public_land_yield\
+        .set_index(['Year','Region'])\
+        .stack()\
+        .reset_index()\
+        .rename(columns={0:'Water Net Yield (ML)', 'level_2':'Type'})
 
 
-    water_outside_LUTO = water_hist_and_public_land_yield.query('Type == "WNY Pubulic"').copy()
-    water_limit = water_hist_and_public_land_yield.query('Type == "WNY LIMIT"')
-    
 
     # Plot_5-1: Water total yield by broad categories (ML)
-    water_outside_LUTO_total = water_outside_LUTO\
-        .query('`CCI Existence` == "HIST (ML)"')\
-        .groupby('Year')\
-        .sum(numeric_only=True)\
-        .reset_index()
-    water_outside_LUTO_total_wide = list(map(list,zip(water_outside_LUTO_total['Year'], water_outside_LUTO_total['Value (ML)'])))
-  
     water_inside_LUTO_broad_cat_sum = water_df_separate\
-        .query('`Climate Change existence` == "With CCI"')\
-        .groupby(['Year','Landuse Type'])[['Value (ML)']]\
+        .groupby(['Year','Type'])[['Water Net Yield (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()
     water_inside_LUTO_broad_cat_sum_wide = water_inside_LUTO_broad_cat_sum\
-        .groupby('Landuse Type')[['Year','Value (ML)']]\
-        .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
+        .groupby('Type')[['Year','Water Net Yield (ML)']]\
+        .apply(lambda x: list(map(list,zip(x['Year'],x['Water Net Yield (ML)']))))\
         .reset_index()
+    water_inside_LUTO_broad_cat_sum_wide.columns = ['name','data']
+    water_inside_LUTO_broad_cat_sum_wide['type'] = 'column'
     
-    water_yield_no_CCI = water_inside_LUTO_broad_cat_sum_wide.copy()
-    water_yield_no_CCI.loc[len(water_yield_no_CCI)] = ['Public land', water_outside_LUTO_total_wide, ]
-    water_yield_no_CCI.columns = ['name','data']
-    water_yield_no_CCI['type'] = 'column'   
         
-
-    
-    water_CCI_outside_LUTO = water_outside_LUTO\
-        .pivot(index=['Year', 'REGION', 'Type'], columns='CCI Existence', values='Value (ML)')\
-        .reset_index()\
-        .groupby(['Year','Type'])[['HIST (ML)','HIST + CCI (ML)']]\
-        .sum(numeric_only=True)\
-        .reset_index()\
-        .eval('CCI_outside = `HIST + CCI (ML)` - `HIST (ML)`')[['Year','CCI_outside']]
-        
-    water_CCI_inside_LUTO = water_df_separate\
-        .groupby(['Year','Climate Change existence'])\
-        .sum(numeric_only=True)\
-        .reset_index()\
-        .pivot(index=['Year'],columns='Climate Change existence', values='Value (ML)')\
-        .reset_index()\
-        .eval('CCI_inside = `With CCI` - `Without CCI`')[['Year','CCI_inside']]
-        
-    water_CCI = water_CCI_outside_LUTO.merge(water_CCI_inside_LUTO, on='Year', how='outer')
-    water_CCI['CCI_total'] = water_CCI['CCI_outside'] + water_CCI['CCI_inside']
-    water_CCI_wide = water_CCI[['Year','CCI_total']].values.tolist()
-    
-    water_total_no_CCI = water_inside_LUTO_broad_cat_sum\
+    water_outside_LUTO = water_hist_and_public_land_yield.query('Type == "Water yield outside LUTO (ML)"').copy()    
+    water_outside_LUTO_total = water_outside_LUTO\
         .groupby('Year')\
         .sum(numeric_only=True)\
-        .reset_index()\
-        .merge(water_outside_LUTO_total, on='Year', how='outer')\
-        .eval('Water_no_CCI = `Value (ML)_x` + `Value (ML)_y`')[['Year','Water_no_CCI']]
-        
-    water_total_with_CCI = water_total_no_CCI.merge(water_CCI, on='Year', how='outer')\
-        .eval('water_total_with_cci = Water_no_CCI + CCI_total')[['Year','water_total_with_cci']]
-    water_total_with_CCI_wide = water_total_with_CCI.values.tolist()
-
+        .reset_index()
+    water_outside_LUTO_total_wide = list(map(list,zip(
+        water_outside_LUTO_total['Year'], water_outside_LUTO_total['Water Net Yield (ML)']
+    )))
     
-    water_yield_df = water_yield_no_CCI.copy()
+    
+    water_CCI = water_hist_and_public_land_yield.query('Type == "Climate Change Impact (ML)"').copy()\
+        .groupby('Year')\
+        .sum(numeric_only=True)\
+        .reset_index()
+    water_CCI_wide = list(map(list,zip(
+        water_CCI['Year'], water_CCI['Water Net Yield (ML)']
+    )))
+    
+    water_domestic = water_hist_and_public_land_yield.query('Type == "Domestic Water Use (ML)"').copy()\
+        .groupby('Year')\
+        .sum(numeric_only=True)\
+        .reset_index()
+    water_domestic_wide = (-water_domestic[['Year','Water Net Yield (ML)']].values).tolist()  # Domestic water use is negative, indicating a water loss (consumption)
+    
+    water_yield_sum = water_hist_and_public_land_yield.query('Type == "Water Net Yield (ML)"').copy()\
+        .groupby('Year')\
+        .sum(numeric_only=True)\
+        .reset_index()
+    water_yield_sum_wide = list(map(list,zip(
+        water_yield_sum['Year'], water_yield_sum['Water Net Yield (ML)']
+    )))
+    
+    water_limit = water_hist_and_public_land_yield.query('Type == "Water Yield Limit (ML)"').copy()\
+        .groupby('Year')\
+        .sum(numeric_only=True)\
+        .reset_index()
+    water_limit_wide = list(map(list,zip(
+        water_limit['Year'], water_limit['Water Net Yield (ML)']
+    )))
+  
+    
+    water_yield_df = water_inside_LUTO_broad_cat_sum_wide.copy()
+    water_yield_df.loc[len(water_yield_df)] = ['Outside LUTO Study Area', water_outside_LUTO_total_wide,  'column']
     water_yield_df.loc[len(water_yield_df)] = ['Climate Change Impact', water_CCI_wide,  'column']
-    water_yield_df.loc[len(water_yield_df)] = ['Water Net Yield', water_total_with_CCI_wide, 'spline']
+    water_yield_df.loc[len(water_yield_df)] = ['Domestic Water Use', water_CCI_wide,  'column']
+    water_yield_df.loc[len(water_yield_df)] = ['Water Net Yield', water_yield_sum_wide, 'spline']
+    water_yield_df.loc[len(water_yield_df)] = ['Water Limit', water_limit_wide, 'spline']
     water_yield_df.to_json(f'{SAVE_DIR}/water_1_water_net_use_by_broader_category.json', orient='records')
     
-    
-
 
     # Plot_5-2: Water net yield by specific land-use (ML)
     water_inside_LUTO_specific_lu_sum = water_df_separate\
-        .query('`Climate Change existence` == "With CCI"')\
-        .groupby(['Year','Landuse'])[['Value (ML)']]\
+        .groupby(['Year','Landuse'])[['Water Net Yield (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()
-       
-        
+            
     water_inside_LUTO_specific_lu_sum_wide = water_inside_LUTO_specific_lu_sum\
-        .groupby(['Landuse'])[['Year','Value (ML)']]\
-        .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
+        .groupby(['Landuse'])[['Year','Water Net Yield (ML)']]\
+        .apply(lambda x: list(map(list,zip(x['Year'],x['Water Net Yield (ML)']))))\
         .reset_index()\
         .set_index('Landuse')\
         .reindex(LANDUSE_ALL_RENAMED)\
@@ -1313,75 +1311,41 @@ def save_report_data(raw_data_dir:str):
     
     # Plot_5-3: Water net yield by region (ML)
     water_yield_region = []
-    for region in water_df_separate['region'].unique():
+    for reg_name in water_df_separate['Region'].unique():
         
-        water_outside_LUTO_region = water_outside_LUTO.query('REGION == @region').copy()
-        water_outside_yiled = water_outside_LUTO_region.query('`CCI Existence` == "HIST (ML)"').copy()
-        water_outside_yiled_wide = list(map(list,zip(water_outside_yiled['Year'], water_outside_yiled['Value (ML)'])))
-    
-        water_inside_LUTO_region = water_df_separate.query('region == @region').copy()
-        water_inside_yield = water_inside_LUTO_region.query('`Climate Change existence` == "Without CCI"').copy()
-        water_inside_yield_sum = water_inside_yield.groupby(['Year'])[['Value (ML)']].sum(numeric_only=True).reset_index()
-        
-        water_inside_yield_wide = water_inside_yield\
-            .groupby(['Year','Landuse Type'])[['Value (ML)']]\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .groupby('Landuse Type')[['Year','Value (ML)']]\
-            .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
-            .reset_index()
+        water_inside_LUTO_region = water_df_separate.query('Region == @reg_name').copy()
+        water_inside_yield_sum = water_inside_LUTO_region.groupby(['Year'])[['Water Net Yield (ML)']].sum(numeric_only=True).reset_index()
+        water_inside_yield_wide = list(map(list,zip(water_inside_yield_sum['Year'], water_inside_yield_sum['Water Net Yield (ML)'])))
             
-        water_outside_CCI = water_outside_LUTO_region\
-            .pivot(index=['Year', 'REGION', 'Type'], columns='CCI Existence', values='Value (ML)')\
-            .reset_index()\
-            .eval('CCI_outside = `HIST + CCI (ML)` - `HIST (ML)`')[['Year','CCI_outside']]
-            
-        water_inside_CCI = water_inside_LUTO_region\
-            .groupby(['Year', 'Climate Change existence'])[['Value (ML)']]\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .pivot(index=['Year'],columns='Climate Change existence', values='Value (ML)')\
-            .reset_index()\
-            .eval('CCI_inside = `With CCI` - `Without CCI`')[['Year','CCI_inside']]
-            
-        water_CCI = water_outside_CCI.merge(water_inside_CCI, on='Year', how='outer')
-        water_CCI['CCI_total'] = water_CCI['CCI_outside'] + water_CCI['CCI_inside']
-        water_CCI_wide = water_CCI[['Year','CCI_total']].values.tolist()
+        water_outside_LUTO_region = water_outside_LUTO.query('Region == @reg_name').copy()
+        water_outside_yiled_wide = list(map(list,zip(water_outside_LUTO_region['Year'], water_outside_LUTO_region['Water Net Yield (ML)'])))
+
+        water_CCI = water_hist_and_public_land_yield.query('Type == "Climate Change Impact (ML)" and Region == @reg_name').copy()
+        water_CCI_wide = list(map(list,zip(water_CCI['Year'], water_CCI['Water Net Yield (ML)'])))
         
+        water_domestic = water_hist_and_public_land_yield.query('Type == "Domestic Water Use (ML)" and Region == @reg_name').copy()
+        water_domestic_wide = list(map(list,zip(water_domestic['Year'], -water_domestic['Water Net Yield (ML)'])))  # Domestic water use is negative, indicating a water loss (consumption)
         
-        water_yield_net = water_inside_yield_sum\
-            .merge(water_outside_yiled, on='Year', how='outer')\
-            .merge(water_CCI, on='Year', how='outer')\
-            .eval('Net_yield = `Value (ML)_x` + `Value (ML)_y` + CCI_total')[['Year','Net_yield']]
-        water_yield_net_wide = water_yield_net.values.tolist()
+        water_yield_sum = water_hist_and_public_land_yield.query('Type == "Water Net Yield (ML)" and Region == @reg_name').copy()
+        water_yield_sum_wide = list(map(list,zip(water_yield_sum['Year'], water_yield_sum['Water Net Yield (ML)'])))
         
-        
-        water_limit_region = water_limit.query('REGION == @region').copy()
-        water_limit_region_wide = water_limit_region\
-            .pivot(index=['Year'], columns='CCI Existence', values='Value (ML)')\
-            .reset_index()
-        water_limit_region_hist = list(map(list,zip(water_limit_region_wide['Year'], water_limit_region_wide['HIST (ML)'])))
-        
-    
-        water_inside_yield_wide.columns = ['name','data']
-        water_inside_yield_wide['type'] = 'column'
-        water_inside_yield_wide['color'] = None
-        
+        water_limit = water_hist_and_public_land_yield.query('Type == "Water Yield Limit (ML)" and Region == @reg_name').copy()
+        water_limit_wide = list(map(list,zip(water_limit['Year'], water_limit['Water Net Yield (ML)'])))
+
+
         water_df = pd.DataFrame([
-            ['Public land', water_outside_yiled_wide, 'column', None],
+            ['Water Yield Inside LUTO Study Area', water_inside_yield_wide, 'column', None],
+            ['Water Yield Out LUTO Study Area', water_outside_yiled_wide, 'column', None],
             ['Climate Change Impact', water_CCI_wide, 'column', None],
-            ['Water Net Yield', water_yield_net_wide, 'spline', None],
-            ['Historical Limit', water_limit_region_hist, 'spline', 'black'],
-            ],
-            columns=['name','data','type','color']
+            ['Domestic Water Use', water_domestic_wide, 'column', None],
+            ['Water Net Yield', water_yield_sum_wide, 'spline', None],
+            ['Water Limit', water_limit_wide, 'spline', 'black']],  columns=['name','data','type','color']
         )
 
-        water_df = pd.concat([water_inside_yield_wide, water_df], ignore_index=True)
-
-
         water_yield_region.append({
-            'name': region,
-            'data': water_df.to_dict(orient='records')})
+            'name': reg_name,
+            'data': water_df.to_dict(orient='records')}
+        )
                 
     with open(f'{SAVE_DIR}/water_3_water_net_yield_by_region.json', 'w') as outfile:
         json.dump(water_yield_region, outfile)

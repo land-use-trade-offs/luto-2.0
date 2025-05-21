@@ -125,6 +125,7 @@ SPATIAL_MAP_DICT = {
 
 # Get the non-agricultural land uses raw names
 NON_AG_LANDUSE_RAW = list(settings.NON_AG_LAND_USES.keys())
+NON_AG_LANDUSE_RAW = [i for i in NON_AG_LANDUSE_RAW if settings.NON_AG_LAND_USES[i]]
 
 
 # Merge the land uses

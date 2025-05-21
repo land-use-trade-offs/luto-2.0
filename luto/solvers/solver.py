@@ -726,17 +726,22 @@ class LutoSolver:
 
             # Add the constraint that the water yield in the region must be greater than the limit
             water_yield_constraint = water_yield_base_level * settings.WATER_STRESS
-            constr = (
-                self.gurobi_model.addConstr(
+            
+            if settings.WATER_CONSTRAINT_TYPE == "hard":
+                constr = self.gurobi_model.addConstr(
                     water_yield_total >= water_yield_constraint, 
                     name=f"water_yield_limit_{idx}"
-                ) 
-                if settings.WATER_CONSTRAINT_TYPE == "hard" else
-                self.gurobi_model.addConstr(
+                )
+            elif settings.WATER_CONSTRAINT_TYPE == "soft":
+                constr = self.gurobi_model.addConstr(
                     water_yield_constraint - self.water_nyiled_exprs[idx] <= self.W[idx - 1], 
-                    name=f"water_yield_limit_{idx}"
-                )   # region index starts from 1, minus 1 to get its position in the self.W array
-            )
+                    name=f"water_yield_limit_{idx}"     # region index starts from 1, minus 1 to get its position in the self.W array
+                )
+            else:
+                raise ValueError(
+                    "Unknown choice for `WATER_CONSTRAINT_TYPE` setting: must be either 'hard' or 'soft'"
+                ) 
+                
             self.water_limit_constraints.append(constr)
                         
             # Report on the water yield in the region
@@ -796,7 +801,7 @@ class LutoSolver:
             print("...GHG emissions constraints TURNED OFF ...")
             return
 
-        ghg_limit_ub = self._input_data.limits["ghg_ub"]
+        ghg_limit_ub = self._input_data.limits["ghg"]
         self.ghg_emissions_expr = self._get_total_ghg_emissions_expr()
 
         if settings.GHG_CONSTRAINT_TYPE == "hard":
@@ -905,7 +910,7 @@ class LutoSolver:
             print("    ...biodiversity GBF 3 (major vegetation group) constraints TURNED OFF ...")
             return
 
-        v_limits, v_names, v_ind = self._input_data.limits["GBF_3_major_vegetation_groups"]
+        v_limits, v_names, v_ind = self._input_data.limits["GBF3_major_vegetation_groups"]
 
         print(f"    ...Biodiversity GBF 3 (major vegetation groups) constraints...")
 

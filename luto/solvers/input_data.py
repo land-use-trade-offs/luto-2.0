@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, Optional
 import numpy as np
+import pandas as pd
 
 from luto import settings
 from luto.economics import land_use_culling
@@ -583,7 +584,8 @@ def get_priority_degraded_mask_idx(data: Data) -> np.ndarray:
 
 
 def get_limits(
-    data: Data, yr_cal: int,
+    data: Data, 
+    yr_cal: int,
 ) -> dict[str, Any]:
     """
     Gets the following limits for the solve:
@@ -593,36 +595,123 @@ def get_limits(
     - Regional adoption limits
     """
     print('Getting environmental limits...', flush = True)
-    # Limits is a dictionary with heterogeneous value sets.
-    limits = {}
-
-    limits['water'] = ag_water.get_water_net_yield_limit_values(data)
+    
+    limits = {
+        'water': None,
+        'ghg': None,
+        'GBF2_priority_degrade_areas': None,
+        'GBF3_major_vegetation_groups': None,
+        'GBF4_SNES': None,
+        'GBF4_ECNES': None,
+        'GBF8_species_conservation': None,
+        'ag_regional_adoption': None,
+        'non_ag_regional_adoption': None,
+    }
+    
+    if settings.WATER_LIMITS == 'on':
+        limits['water'] = ag_water.get_water_net_yield_hist_level(data)
 
     if settings.GHG_EMISSIONS_LIMITS == 'on':
-        limits['ghg_ub'] = ag_ghg.get_ghg_limits(data, yr_cal)
+        limits['ghg'] = ag_ghg.get_ghg_limits(data, yr_cal)
 
-    # If biodiversity limits are not turned on, set the limit to 0.
-    limits["GBF2_priority_degrade_areas"] = (
-        0
-        if settings.BIODIVERSTIY_TARGET_GBF_2 == 'off'
-        else ag_biodiversity.get_GBF2_biodiversity_limits(data, yr_cal)
-    )
+    if settings.BIODIVERSTIY_TARGET_GBF_2 != 'off':
+        limits["GBF2_priority_degrade_areas"] = ag_biodiversity.get_GBF2_biodiversity_limits(data, yr_cal)
 
-    limits["GBF_3_major_vegetation_groups"] = (
-        0
-        if settings.BIODIVERSTIY_TARGET_GBF_3 == 'off'
-        else ag_biodiversity.get_GBF3_major_vegetation_group_limits(data, yr_cal)
-    )
+    if settings.BIODIVERSTIY_TARGET_GBF_3 != 'off':
+        limits["GBF3_major_vegetation_groups"] = ag_biodiversity.get_GBF3_major_vegetation_group_limits(data, yr_cal)
+        
+    if settings.BIODIVERSTIY_TARGET_GBF_4_SNES == "on":
+        limits["GBF4_SNES"] = ag_biodiversity.get_GBF4_SNES_limits(data, yr_cal)
+        
+    if settings.BIODIVERSTIY_TARGET_GBF_4_ECNES == "on":
+        limits["GBF4_ECNES"] = ag_biodiversity.get_GBF4_ECNES_limits(data, yr_cal)
+        
+    if settings.BIODIVERSTIY_TARGET_GBF_8 == "on":
+        limits["GBF8_species_conservation"] = ag_biodiversity.get_GBF8_species_conservation_limits(data, yr_cal)
 
-    limits["GBF4_SNES"] = ag_biodiversity.get_GBF4_SNES_limits(data, yr_cal)
-    limits["GBF4_ECNES"] = ag_biodiversity.get_GBF4_ECNES_limits(data, yr_cal)
-    limits["GBF8_species_conservation"] = ag_biodiversity.get_GBF8_species_conservation_limits(data, yr_cal)
-
-    ag_reg_adoption, non_ag_reg_adoption = ag_transition.get_regional_adoption_limits(data, yr_cal)
-    limits["ag_regional_adoption"] = ag_reg_adoption
-    limits["non_ag_regional_adoption"] = non_ag_reg_adoption
+    if settings.REGIONAL_ADOPTION_CONSTRAINTS == 'on':
+        ag_reg_adoption, non_ag_reg_adoption = ag_transition.get_regional_adoption_limits(data, yr_cal)
+        limits["ag_regional_adoption"] = ag_reg_adoption
+        limits["non_ag_regional_adoption"] = non_ag_reg_adoption
 
     return limits
+
+
+def set_limits(data: Data, yr_cal) -> None:
+    """
+    Set the limits in the data object.
+    """
+    limit_water = pd.DataFrame()
+    limit_GHG = pd.DataFrame()
+    limit_GBF_2 = pd.DataFrame()
+    limit_GBF_3 = pd.DataFrame()
+    limit_GBF_4_SNES = pd.DataFrame()
+    limit_GBF_4_ECNES = pd.DataFrame()
+    limit_GBF_8 = pd.DataFrame()
+    limit_ag_adop = pd.DataFrame()
+    limit_non_ag_adop = pd.DataFrame()
+
+    if settings.WATER_LIMITS == 'on':
+        limit_water = pd.DataFrame([{
+            'Type': 'Water', 'code': k, 'target': v[1]} 
+            for k, v in ag_water.get_water_net_yield_hist_level(data).items()])
+
+    if settings.GHG_EMISSIONS_LIMITS == 'on':
+        limit_GHG = pd.DataFrame([{'Type': 'GHG', 'target': ag_ghg.get_ghg_limits(data, yr_cal)}])
+        
+    if settings.BIODIVERSTIY_TARGET_GBF_2 == 'on':
+        limit_GBF_2= pd.DataFrame([{'Type': 'GBF-2',  'target': ag_biodiversity.get_GBF2_biodiversity_limits(data, yr_cal)}])
+
+    if settings.BIODIVERSTIY_TARGET_GBF_3 == 'off':
+        limit_GBF_3 = pd.DataFrame([{
+            'Type': 'GBF-3', 
+            'code': ag_biodiversity.get_GBF3_major_vegetation_group_limits(data, yr_cal)[1], 
+            'target': ag_biodiversity.get_GBF3_major_vegetation_group_limits(data, yr_cal)[0]}])
+
+    if settings.BIODIVERSTIY_TARGET_GBF_4_SNES == "on":
+        val, codes = ag_biodiversity.get_GBF4_SNES_limits(data, yr_cal)
+        limit_GBF_4_SNES = pd.DataFrame({
+            'Type': 'GBF-4-SNES',
+            'code': codes.keys(),
+            'target': val})
+
+    if settings.BIODIVERSTIY_TARGET_GBF_4_ECNES == "on":
+        val, codes = ag_biodiversity.get_GBF4_ECNES_limits(data, yr_cal)
+        limit_GBF_4_ECNES = pd.DataFrame({
+            'Type': 'GBF-4-ECNES',
+            'code': codes.keys(),
+            'target': val})
+
+    if settings.BIODIVERSTIY_TARGET_GBF_8 == "on":
+        val, codes = ag_biodiversity.get_GBF8_species_conservation_limits(data, yr_cal)
+        limit_GBF_8 = pd.DataFrame({
+            'Type': 'GBF-8',
+            'code': codes.keys(),
+            'target': val})
+
+    if settings.REGIONAL_ADOPTION_CONSTRAINTS == 'on':
+        ag_reg_adoption, non_ag_reg_adoption = ag_transition.get_regional_adoption_limits(data, yr_cal)
+        limit_ag_adop = pd.DataFrame([{
+            'Type': 'AG_Adoption', 
+            'code': f'{ag_reg_adoption[0]}-{ag_reg_adoption[1]}', 
+            'target': ag_reg_adoption[1]}])
+        limit_non_ag_adop = pd.DataFrame([{
+            'Type': 'AG_Adoption', 
+            'code': f'{non_ag_reg_adoption[0]}-{non_ag_reg_adoption[1]}', 
+            'target': non_ag_reg_adoption[1]}])
+        
+    # Combine all limits into a single dataframe
+    limits = pd.concat([
+        limit_water,
+        limit_GHG,
+        limit_GBF_2,
+        limit_GBF_3,
+        limit_GBF_4_SNES,
+        limit_GBF_4_ECNES,
+        limit_GBF_8,
+        limit_ag_adop,
+        limit_non_ag_adop
+    ], ignore_index=True)
 
 
 def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputData:

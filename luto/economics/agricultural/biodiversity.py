@@ -249,7 +249,7 @@ def get_agricultural_management_biodiversity_matrices(data:Data, ag_b_mrj: np.nd
     }
 
 
-def get_GBF2_biodiversity_limits(data:Data, yr_cal: int):
+def get_GBF2_biodiversity_limits(data:Data, yr_cal: int)-> float:
     """
     Calculate the biodiversity limits for a given year used as a constraint.
 
@@ -268,7 +268,7 @@ def get_GBF2_biodiversity_limits(data:Data, yr_cal: int):
 
 
 
-def get_GBF2_bio_priority_degraded_areas_r(data:Data):
+def get_GBF2_bio_priority_degraded_areas_r(data:Data) -> np.ndarray:
     return np.where(
         data.SAVBURN_ELIGIBLE,
         data.REAL_AREA * data.BIO_PRIORITY_DEGRADED_AREAS_MASK * settings.BIO_CONTRIBUTION_LDS ,
@@ -280,7 +280,7 @@ def get_GBF3_major_vegetation_matrices_vr(data:Data) -> np.ndarray:
     return data.NVIS_LAYERS_LDS * data.REAL_AREA
 
 
-def get_GBF3_major_vegetation_group_limits(data:Data, yr_cal: int) -> tuple[np.ndarray, dict[int, str]]:
+def get_GBF3_major_vegetation_group_limits(data:Data, yr_cal: int) -> list[np.ndarray, dict[int, str]]:
     """
     Gets the correct major vegetation group targets for the given year (yr_cal).
 
@@ -294,7 +294,7 @@ def get_GBF3_major_vegetation_group_limits(data:Data, yr_cal: int) -> tuple[np.n
         that the group applies to.
     """
     
-    return data.get_GBF3_limit_score_inside_LUTO_by_yr(yr_cal), data.BIO_GBF3_ID2DESC, data.MAJOR_VEG_INDECES
+    return [data.get_GBF3_limit_score_inside_LUTO_by_yr(yr_cal), data.BIO_GBF3_ID2DESC, data.MAJOR_VEG_INDECES]
 
 
 def get_GBF4_SNES_matrix_sr(data:Data) -> np.ndarray:
@@ -329,7 +329,7 @@ def get_GBF4_ECNES_matrix_sr(data:Data) -> np.ndarray:
     ).astype(np.float32)
     
 
-def get_GBF4_SNES_limits(data:Data, target_year: int) -> tuple[np.ndarray, dict[int, str]]:
+def get_GBF4_SNES_limits(data:Data, target_year: int) -> list[np.ndarray, dict[int, str]]:
     """
     Get species of national environmental significance limits.
 
@@ -345,11 +345,11 @@ def get_GBF4_SNES_limits(data:Data, target_year: int) -> tuple[np.ndarray, dict[
         
     species_targets = data.get_GBF4_SNES_target_inside_LUTO_by_year(target_year)
     species_names = {x: name for x, name in enumerate(data.BIO_GBF4_SNES_SEL_ALL)}
-    return species_targets, species_names
+    return [species_targets, species_names]
     
 
 
-def get_GBF4_ECNES_limits(data:Data, target_year: int) -> tuple[np.ndarray, dict[int, str]]:
+def get_GBF4_ECNES_limits(data:Data, target_year: int) -> list[np.ndarray, dict[int, str]]:
     """
     Get ecological communities of national environmental significance limits.
 
@@ -365,7 +365,7 @@ def get_GBF4_ECNES_limits(data:Data, target_year: int) -> tuple[np.ndarray, dict
 
     species_targets = data.get_GBF4_ECNES_target_inside_LUTO_by_year(target_year)
     species_names = {x: name for x, name in enumerate(data.BIO_GBF4_ECNES_SEL_ALL)}
-    return species_targets, species_names
+    return [species_targets, species_names]
 
 
 def get_GBF8_species_conservation_matrix_sr(data:Data, target_year: int):
@@ -379,7 +379,7 @@ def get_GBF8_species_conservation_matrix_sr(data:Data, target_year: int):
 def get_GBF8_species_conservation_limits(
     data:Data,
     yr_cal: int,
-) -> tuple[np.ndarray, dict[int, str], dict[int, np.ndarray]]:
+) -> list[np.ndarray, dict[int, str], dict[int, np.ndarray]]:
     """
     Gets the correct species conservation targets for the given year (yr_cal).
     
@@ -388,7 +388,7 @@ def get_GBF8_species_conservation_limits(
         - yr_cal: The calendar year for which to calculate the species conservation limits.
     
     Returns
-        Tuple containing:
+        list containing:
         - np.ndarray
             An array containing the limits of each species for the given yr_cal
         - dict[int, str]
@@ -400,7 +400,7 @@ def get_GBF8_species_conservation_limits(
     species_names = {s: spec_name for s, spec_name in enumerate(data.BIO_GBF8_SEL_SPECIES)}
     species_matrix = data.get_GBF8_bio_layers_by_yr(yr_cal)
     species_inds = {s: np.where(species_matrix[s] > 0)[0] for s in range(data.N_GBF8_SPECIES)}
-    return species_limits, species_names, species_inds
+    return [species_limits, species_names, species_inds]
 
 
 def get_ag_biodiversity_contribution(data:Data) -> np.ndarray:

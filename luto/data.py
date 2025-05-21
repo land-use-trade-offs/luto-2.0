@@ -896,7 +896,7 @@ class Data:
         self.RIVREG_DICT = dict(
             zip(rr.HR_RIVREG_ID, rr.HR_RIVREG_NAME)
         )  # River region ID to Name lookup table
-        self.RIVREG_LIMITS = dict(
+        self.RIVREG_HIST_LEVEL = dict(
             zip(rr.HR_RIVREG_ID, rr.WATER_YIELD_HIST_BASELINE_ML)
         )  # River region ID and water use limits
 
@@ -907,7 +907,7 @@ class Data:
         self.DRAINDIV_DICT = dict(
             zip(dd.HR_DRAINDIV_ID, dd.HR_DRAINDIV_NAME)
         )  # Drainage div ID to Name lookup table
-        self.DRAINDIV_LIMITS = dict(
+        self.DRAINDIV_HIST_LEVEL = dict(
             zip(dd.HR_DRAINDIV_ID, dd.WATER_YIELD_HIST_BASELINE_ML)
         )  # Drainage div ID and water use limits
 

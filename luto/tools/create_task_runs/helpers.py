@@ -26,11 +26,7 @@ from typing import Literal
 from joblib import delayed, Parallel
 
 from luto import settings
-from luto.tools.create_task_runs.parameters import (
-    BIO_TARGET_ORDER, 
-    EXCLUDE_DIRS, 
-    GHG_ORDER
-)
+from luto.tools.create_task_runs.parameters import EXCLUDE_DIRS, SERVER_PARAMS
 
 
 def get_settings_df(task_root_dir:str) -> pd.DataFrame:
@@ -179,7 +175,7 @@ def write_settings(task_dir:str, settings_dict:dict):
 def write_terminal_vars(task_dir:str, col:str, settings_dict:dict):
     with open(f'{task_dir}/luto/settings_bash.py', 'w') as bash_file:
         for key, value in settings_dict.items():
-            if key not in ['MEM', 'NCPUS', 'TIME', 'QUEUE', 'JOB_NAME']:
+            if key not in SERVER_PARAMS:
                 continue
             if isinstance(value, str):
                 bash_file.write(f'export {key}="{value}"\n')
@@ -316,8 +312,6 @@ def get_report_df(json_dir_path, run_paras):
         df_ghg_deviation[['year', 'name', 'val']].assign(Type='GHG_Deviation_pct'),
         df_bio_objective[['year', 'name', 'val']].assign(Type='Biodiversity_obj_score'),
     ]).assign(**run_paras).reset_index(drop=True)
-
-    report_df['GHG_LIMITS_FIELD'] = report_df['GHG_LIMITS_FIELD'].replace(GHG_ORDER)
 
     return report_df
 

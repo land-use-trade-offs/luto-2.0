@@ -452,11 +452,11 @@ def get_regional_adoption_limits(data: Data, yr_cal: int):
 
         if lu_name in data.DESC2AGLU:
             lu_code = data.DESC2AGLU[lu_name]
-            ag_reg_adoption_constrs.append((reg_id, lu_code, lu_name, reg_ind, area_limit_ha))
+            ag_reg_adoption_constrs.append([reg_id, lu_code, lu_name, reg_ind, area_limit_ha])
 
         elif lu_name in data.DESC2NONAGLU:
             lu_code = data.DESC2NONAGLU[lu_name] - settings.NON_AGRICULTURAL_LU_BASE_CODE
-            non_ag_reg_adoption_constrs.append((reg_id, lu_code, lu_name, reg_ind, area_limit_ha))
+            non_ag_reg_adoption_constrs.append([reg_id, lu_code, lu_name, reg_ind, area_limit_ha])
 
         else:
             raise ValueError(f"Regional adoption constraint exists for unrecognised land use: {lu_name}")

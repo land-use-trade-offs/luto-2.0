@@ -116,7 +116,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       itemStyle: {
-        fontSize: "11px",
+        fontSize: "10px",
       },
       align: "right",
       layout: "vertical",
@@ -124,7 +124,7 @@ document.addEventListener("DOMContentLoaded", function () {
       y: -10,
       verticalAlign: "middle",
       itemMarginTop: 0,
-      itemMarginBottom: 1,
+      itemMarginBottom: 0.5,
     },
 
     tooltip: {
