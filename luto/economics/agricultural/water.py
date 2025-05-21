@@ -643,7 +643,7 @@ def get_wreq_domestic_regions(data) -> dict[int, float]:
     }
     
     # TODO: this is a temporary fix to get the water requirement for domestic use
-    w_req_domestic = pd.read_csv(f'{settings.INPUT_DIR}/water_consumption_DR.csv', index_col=0)['Water Consumption (ML/year)'].to_dict()
+    # w_req_domestic = pd.read_csv(f'{settings.INPUT_DIR}/water_consumption_DR.csv', index_col=0)['Water Consumption (ML/year)'].to_dict()
         
     # Save the results in data to avoid recalculating
     if data.WREQ_DOMESTIC_REGIONS is None:
