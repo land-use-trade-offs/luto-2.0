@@ -102,7 +102,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS = list(range(2020,2051,5)) # range(2020,2050)
+SIM_YEARS = list(range(2020,2051,10)) # range(2020,2050)
 
 
 # Define the objective function
@@ -389,7 +389,7 @@ EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 # ---------------------------------------------------------------------------- #
 
 # Greenhouse gas emissions limits and parameters *******************************
-GHG_EMISSIONS_LIMITS = 'on'        # 'off', 'low', 'medium', or 'high'
+GHG_EMISSIONS_LIMITS = 'medium'        # 'off', 'low', 'medium', or 'high'
 
 GHG_LIMITS_TYPE = 'file' # 'dict' or 'file'
 
