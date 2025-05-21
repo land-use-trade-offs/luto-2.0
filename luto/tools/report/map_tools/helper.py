@@ -134,7 +134,7 @@ def get_scenario(data_root_dir:str):
     """
     with open(f'{data_root_dir}/model_run_settings.txt', 'r') as f:
         for line in f:
-            if 'GHG_LIMITS_FIELD' in line:
+            if 'GHG_EMISSIONS_LIMITS' in line:
                 return line.split(':')[-1].strip()
 
 

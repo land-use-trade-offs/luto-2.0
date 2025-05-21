@@ -63,13 +63,11 @@ grid_search = {
        
     
     # --------------- GHG settings ---------------
+    'GHG_EMISSIONS_LIMITS': ['low'],            # 'off', 'low', 'medium', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],            # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                  # True or False
-    'GHG_LIMITS_FIELD': [
-        '1.5C (50%) excl. avoided emis SCOPE1', 
-        '1.8C (67%) excl. avoided emis SCOPE1'
-    ],
+
     
     # --------------- Water constraints ---------------
     'WATER_LIMITS': ['on'],                     # 'on' or 'off'
