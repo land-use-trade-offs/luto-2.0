@@ -861,7 +861,7 @@ def save_report_data(raw_data_dir:str):
     ####################################################
     #                       4) GHGs                    #
     ####################################################
-    if settings.GHG_EMISSIONS_LIMITS == 'on':
+    if settings.GHG_EMISSIONS_LIMITS != 'off':
         GHG_files_onland = files.query('category == "GHG" and base_name.str.contains("GHG_emissions_separate") and year_types != "begin_end_year"').reset_index(drop=True)
         GHG_files_onland = pd.concat([pd.read_csv(path) for path in GHG_files_onland['path']], ignore_index=True)
         GHG_files_onland['CO2_type'] = GHG_files_onland['CO2_type'].replace(GHG_NAMES)

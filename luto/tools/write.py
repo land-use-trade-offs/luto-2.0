@@ -1637,7 +1637,7 @@ def write_ghg(data: Data, yr_cal, path):
         Takes a simulation object, a target calendar year (e.g., 2030),
         and an output path as input."""
 
-    if not settings.GHG_EMISSIONS_LIMITS == 'on':
+    if settings.GHG_EMISSIONS_LIMITS == 'off':
         return
 
     print(f'Writing GHG outputs for {yr_cal}')
@@ -1667,7 +1667,7 @@ def write_ghg(data: Data, yr_cal, path):
 
 def write_ghg_separate(data: Data, yr_cal, path):
 
-    if not settings.GHG_EMISSIONS_LIMITS == 'on':
+    if settings.GHG_EMISSIONS_LIMITS == 'off':
         return
 
     print(f'Writing GHG emissions_Separate for {yr_cal}')
@@ -1827,7 +1827,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
 def write_ghg_offland_commodity(data: Data, yr_cal, path):
     """Write out offland commodity GHG emissions"""
 
-    if not settings.GHG_EMISSIONS_LIMITS == 'on':
+    if settings.GHG_EMISSIONS_LIMITS == 'off':
         return
 
     print(f'Writing offland commodity GHG emissions for {yr_cal}')

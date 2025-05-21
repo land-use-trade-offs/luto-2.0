@@ -611,7 +611,7 @@ def get_limits(
     if settings.WATER_LIMITS == 'on':
         limits['water'] = ag_water.get_water_net_yield_hist_level(data)
 
-    if settings.GHG_EMISSIONS_LIMITS == 'on':
+    if settings.GHG_EMISSIONS_LIMITS != 'off':
         limits['ghg'] = ag_ghg.get_ghg_limits(data, yr_cal)
 
     if settings.BIODIVERSTIY_TARGET_GBF_2 != 'off':
@@ -656,7 +656,7 @@ def set_limits(data: Data, yr_cal) -> None:
             'Type': 'Water', 'code': k, 'target': v[1]} 
             for k, v in ag_water.get_water_net_yield_hist_level(data).items()])
 
-    if settings.GHG_EMISSIONS_LIMITS == 'on':
+    if settings.GHG_EMISSIONS_LIMITS != 'off':
         limit_GHG = pd.DataFrame([{'Type': 'GHG', 'target': ag_ghg.get_ghg_limits(data, yr_cal)}])
         
     if settings.BIODIVERSTIY_TARGET_GBF_2 == 'on':

@@ -389,7 +389,7 @@ EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 # ---------------------------------------------------------------------------- #
 
 # Greenhouse gas emissions limits and parameters *******************************
-GHG_EMISSIONS_LIMITS = 'on'        # 'on' or 'off'
+GHG_EMISSIONS_LIMITS = 'on'        # 'off', 'low', 'medium', or 'high'
 
 GHG_LIMITS_TYPE = 'file' # 'dict' or 'file'
 
@@ -401,9 +401,20 @@ GHG_LIMITS = {
              }
 
 # Take data from 'GHG_targets.xlsx', 
-GHG_LIMITS_FIELD = '1.5C (50%) excl. avoided emis SCOPE1'
+match GHG_EMISSIONS_LIMITS:
+    case 'off':
+        GHG_LIMITS_FIELD = None
+    case 'low':
+        GHG_LIMITS_FIELD = '1.8C (67%) excl. avoided emis SCOPE1'
+    case 'medium':
+        GHG_LIMITS_FIELD = '1.5C (50%) excl. avoided emis SCOPE1'
+    case 'high':
+        GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis SCOPE1'
+    case _:
+        raise ValueError(f"Invalid GHG_EMISSIONS_LIMITS value: {GHG_EMISSIONS_LIMITS}. Must be 'off', 'low', 'medium', or 'high'.")
+
 '''
-options include: 
+`GHG_LIMITS_FIELD` options include: 
 - Assuming agriculture is responsible to sequester 100% of the carbon emissions
     - '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)' 
 - Assuming agriculture is responsible to sequester carbon emissions not including electricity emissions and  off-land emissions 

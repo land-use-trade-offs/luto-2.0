@@ -26,7 +26,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250512_DCCEEW_REPORT_06_HCAS_50TH_CUSTOM' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250521_XINHAO_GRIDSEARCH' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -44,10 +44,10 @@ grid_search = {
     # Working settings for the model run
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                 # 'maxprofit' or 'maxutility'
-    'RESFACTOR': [7],
-    'SIM_YEARS': [list(range(2020,2051,5))],   # Years to run the model 
+    'RESFACTOR': [13],
+    'SIM_YEARS': [list(range(2020,2051,10))],   # Years to run the model 
     'WRITE_THREADS': [2],
-    'WRITE_OUTPUT_GEOTIFFS': [True],
+    'WRITE_OUTPUT_GEOTIFFS': [False],
     'KEEP_OUTPUTS': [False],                    # If False, only keep report HTML
     
  
@@ -68,7 +68,7 @@ grid_search = {
     'USE_GHG_SCOPE_1': [True],                  # True or False
     'GHG_LIMITS_FIELD': [
         '1.5C (50%) excl. avoided emis SCOPE1', 
-        # '1.8C (67%) excl. avoided emis SCOPE1'
+        '1.8C (67%) excl. avoided emis SCOPE1'
     ],
     
     # --------------- Water constraints ---------------
