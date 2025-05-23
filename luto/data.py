@@ -842,7 +842,6 @@ class Data:
         
         # Initialize water constraints to avoid recalculating them every time.
         self.WATER_YIELD_LIMITS = None
-        self.WREQ_DOMESTIC_REGIONS = None
 
         # Water requirements by land use -- LVSTK.
         wreq_lvstk_dry = pd.DataFrame()
@@ -958,9 +957,15 @@ class Data:
             self.WATER_OUTSIDE_LUTO_DD_HIST = water_yield_oustide_luto_hist.query('Region_Type == "Drainage Division"').set_index('Region_ID')['Water Yield (ML)'].to_dict()
             self.WATER_UNDER_NATURAL_LAND_DD = dd_natural_land
             
-        # Place holder for Water Yield under River Region to avoid recalculating it every time.
+        # Place holder for Water Yield to avoid recalculating it every time.
         self.water_yield_regions_BASE_YR = None
         
+        # Water use for domestic and industrial sectors.
+        water_use_domestic = pd.read_csv(os.path.join(settings.INPUT_DIR, "Water_Use_Domestic.csv")).query('REGION_TYPE == @settings.WATER_REGION_DEF')
+        self.WATER_USE_DOMESTIC = water_use_domestic.set_index('REGION_ID')['DOMESTIC_INDUSTRIAL_WATER_USE_ML'].to_dict()
+        
+        
+
         
         ###############################################################
         # Carbon sequestration by natural lands.

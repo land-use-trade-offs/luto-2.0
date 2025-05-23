@@ -55,6 +55,7 @@ def create_new_dataset():
     luto_4D_inpath = 'N:/Data-Master/LUTO_2.0_input_data/Input_data/4D_Spatial_SSP_Timeseries/'
     fdh_inpath = 'N:/LUF-Modelling/fdh-archive/data/neoluto-data/new-data-and-domain/'
     profit_map_inpath = 'N:/Data-Master/Profit_map/'
+    water_domestic_use = 'N:/Data-Master/Water/Water_account/'
     nlum_inpath = 'N:/Data-Master/National_Landuse_Map/'
     BECCS_inpath = 'N:/Data-Master/BECCS/From_CSIRO/20211124_as_submitted/'
     GHG_off_land_inpath = 'N:/LUF-Modelling/Food_demand_AU/au.food.demand/Inputs/Off_land_GHG_emissions'
@@ -129,6 +130,10 @@ def create_new_dataset():
         pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp585_2010-2100_DR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp585_2010-2100_dr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
     with h5py.File(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp585_2010-2100_SR_ML_HA_mean.h5', 'r') as f:
         pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp585_2010-2100_SR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp585_2010-2100_sr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
+        
+    # Save water use from domestic and industrial sectors for each watershed
+    shutil.copyfile(water_domestic_use + 'Water_Use_Agriculture_ML.csv', outpath + 'Water_Use_Agriculture_ML.csv')
+    shutil.copyfile(water_domestic_use + 'Water_Use_Domestic.csv', outpath + 'Water_Use_Domestic.csv')
   
 
     # Copy agricultural management datafiles

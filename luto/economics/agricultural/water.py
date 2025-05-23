@@ -614,42 +614,8 @@ def get_wreq_domestic_regions(data) -> dict[int, float]:
         - key: region ID
         - value: water requirement for domestic use in this region (ML)
     """
-    if data.WREQ_DOMESTIC_REGIONS is not None:
-        return data.WREQ_DOMESTIC_REGIONS
-    
-    # Get the water requirement matrices at the YR_CAL_BASE
-    w_req_mrj = get_wreq_matrices(data, data.YR_CAL_BASE)
-    w_req_r = np.einsum('mrj,mrj->r', w_req_mrj, data.AG_L_MRJ)
-    
-    # Keep only the positive values as water requirements
-    w_req_r = np.where(w_req_r > 0, w_req_r, 0)
-    
-    if settings.WATER_REGION_DEF == 'River Region':
-        w_req_r = np.bincount(data.RIVREG_ID, w_req_r)
-        w_req_r = {region: w_req for region, w_req in enumerate(w_req_r) if region != 0}
-    elif settings.WATER_REGION_DEF == 'Drainage Division':
-        w_req_r = np.bincount(data.DRAINDIV_ID, w_req_r)
-        w_req_r = {region: w_req for region, w_req in enumerate(w_req_r) if region != 0}
-    else:
-        raise ValueError(
-            f"Invalid value for setting WATER_REGION_DEF: '{settings.WATER_REGION_DEF}' "
-            f"(must be either 'River Region' or 'Drainage Division')."
-        )
-        
-    # Get the water requirement for domestic use
-    w_req_domestic = {
-        k: (v / settings.WATER_USE_SHARE_AG * settings.WATER_USE_SHARE_DOMESTIC) 
-        for k, v in w_req_r.items() 
-    }
-    
-    # TODO: this is a temporary fix to get the water requirement for domestic use
-    # w_req_domestic = pd.read_csv(f'{settings.INPUT_DIR}/water_consumption_DR.csv', index_col=0)['Water Consumption (ML/year)'].to_dict()
-        
-    # Save the results in data to avoid recalculating
-    if data.WREQ_DOMESTIC_REGIONS is None:
-        data.WREQ_DOMESTIC_REGIONS = w_req_domestic
 
-    return w_req_domestic
+    return data.WATER_USE_DOMESTIC
     
 
 
