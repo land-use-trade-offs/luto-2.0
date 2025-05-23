@@ -474,7 +474,7 @@ The weight of the deviations from target in the objective function.
 
 
 # Water use yield and parameters *******************************
-WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
+WATER_LIMITS = 'off'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 
 WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
 # WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)

@@ -890,7 +890,7 @@ class LutoSolver:
         self.bio_GBF2_priority_degraded_area_expr = bio_ag_contr + bio_ag_man_contr + bio_non_ag_contr
         biodiversity_limits = self._input_data.limits["GBF2_priority_degrade_areas"]
         
-        print(f"    ...Biodiversity GBF 2 (conservation priority): {biodiversity_limits:,.0f}")
+        print(f"       |-- Biodiversity GBF 2 (conservation priority): {biodiversity_limits:,.0f}")
         
         if settings.GBF2_CONSTRAINT_TYPE == "hard":
             constr = self.bio_GBF2_priority_degraded_area_expr >= biodiversity_limits
