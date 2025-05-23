@@ -658,7 +658,6 @@ class LutoSolver:
     def _get_water_net_yield_expr_for_region(
         self,
         ind: np.ndarray,
-        region: int,
     ) -> gp.LinExpr:
         """
         Get the Gurobi linear expression for the net water yield of a given region.
@@ -701,17 +700,20 @@ class LutoSolver:
     def _add_water_usage_limit_constraints(self) -> None:
         
         # Ensure water use remains below limit for each region
-        for idx, (reg_name, hist_level, ind) in self._input_data.limits["water"].items():
+        for reg_idx, hist_level in self._input_data.limits["water"].items():
             
-            self.water_nyiled_exprs[idx] = self._get_water_net_yield_expr_for_region(ind, idx)      # Water net yield inside LUTO study area
-            wny_outside_LUTO = self._input_data.water_yield_outside_study_area[idx]                 # Water net yield outside LUTO study area
-            wrq_domestic_region = self._input_data.water_required_domestic_regions[idx]             # Water required for domestic use of this region
+            ind = self._input_data.water_region_indices[reg_idx]
+            reg_name = self._input_data.water_region_names[reg_idx]
+            
+            wny_outside_LUTO = self._input_data.water_yield_outside_study_area[reg_idx]                 # Water net yield outside LUTO study area
+            wrq_domestic_region = self._input_data.water_required_domestic_regions[reg_idx]             # Water required for domestic use of this region
+            self.water_nyiled_exprs[reg_idx] = self._get_water_net_yield_expr_for_region(ind)      # Water net yield inside LUTO study area
 
             # Under River Regions, we need to update the water constraint when the wny_hist_level < wny_BASE_YR_level
             if settings.WATER_REGION_DEF == "Drainage Division":
                 water_yield_base_level = hist_level 
             elif settings.WATER_REGION_DEF == "River Region":
-                wny_BASE_YR_level = self._input_data.water_yield_regions_BASE_YR[idx]
+                wny_BASE_YR_level = self._input_data.water_yield_regions_BASE_YR[reg_idx]
                 water_yield_base_level = min(hist_level, wny_BASE_YR_level)
             else:
                 raise ValueError(
@@ -719,7 +721,7 @@ class LutoSolver:
                 )
                 
             water_yield_total = (
-                self.water_nyiled_exprs[idx]        # Water yield from inside LUTO study area
+                self.water_nyiled_exprs[reg_idx]        # Water yield from inside LUTO study area
                 + wny_outside_LUTO                  # Water yield from outside LUTO study area
                 - wrq_domestic_region               # Water consumption required for domestic regions
             )  
@@ -730,12 +732,12 @@ class LutoSolver:
             if settings.WATER_CONSTRAINT_TYPE == "hard":
                 constr = self.gurobi_model.addConstr(
                     water_yield_total >= water_yield_constraint, 
-                    name=f"water_yield_limit_{idx}"
+                    name=f"water_yield_limit_{reg_idx}"
                 )
             elif settings.WATER_CONSTRAINT_TYPE == "soft":
                 constr = self.gurobi_model.addConstr(
-                    water_yield_constraint - self.water_nyiled_exprs[idx] <= self.W[idx - 1], 
-                    name=f"water_yield_limit_{idx}"     # region index starts from 1, minus 1 to get its position in the self.W array
+                    water_yield_constraint - self.water_nyiled_exprs[reg_idx] <= self.W[reg_idx - 1], 
+                    name=f"water_yield_limit_{reg_idx}"     # region index starts from 1, minus 1 to get its position in the self.W array
                 )
             else:
                 raise ValueError(
@@ -910,7 +912,9 @@ class LutoSolver:
             print("    ...biodiversity GBF 3 (major vegetation group) constraints TURNED OFF ...")
             return
 
-        v_limits, v_names, v_ind = self._input_data.limits["GBF3_major_vegetation_groups"]
+        v_limits = self._input_data.limits["GBF3_major_vegetation_groups"]
+        v_names = self._input_data.GBF3_major_vegetation_groups_names
+        v_ind = self._input_data.GBF3_major_vegetation_groups_ind
 
         print(f"    ...Biodiversity GBF 3 (major vegetation groups) constraints...")
 
@@ -976,12 +980,13 @@ class LutoSolver:
             print('    ...Biodiversity GBF 4 (Species of National Environmental Significance) constraints TURNED OFF ...')
             return
         
-        x_limits, x_names = self._input_data.limits["GBF4_SNES"]
+        x_limits = self._input_data.limits["GBF4_SNES"]
+        x_names = self._input_data.GBF4_SNES_names
 
         print(f"    ...Biodiversity GBF 4 (Species of National Environmental Significance) constraints...")
         
         for x, x_area_lb in enumerate(x_limits):
-            ind = np.where(self._input_data.GBF4_snes_xr[x] > 0)[0]
+            ind = np.where(self._input_data.GBF4_SNES_xr[x] > 0)[0]
 
             if ind.size == 0:
                 print(
@@ -990,12 +995,12 @@ class LutoSolver:
             
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4_snes_xr[x, ind]
+                    self._input_data.GBF4_SNES_xr[x, ind]
                     * self._input_data.biodiv_contr_ag_j[j]
                     * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
-                    self._input_data.GBF4_snes_xr[x, ind]
+                    self._input_data.GBF4_SNES_xr[x, ind]
                     * self._input_data.biodiv_contr_ag_j[j]
                     * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
@@ -1004,12 +1009,12 @@ class LutoSolver:
 
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4_snes_xr[x, ind]
+                    self._input_data.GBF4_SNES_xr[x, ind]
                     * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
                 )  # Dryland alt. ag. management contributions
                 + gp.quicksum(
-                    self._input_data.GBF4_snes_xr[x, ind]
+                    self._input_data.GBF4_SNES_xr[x, ind]
                     * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
                 )  # Irrigated alt. ag. management contributions
@@ -1019,7 +1024,7 @@ class LutoSolver:
 
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4_snes_xr[x, ind]
+                    self._input_data.GBF4_SNES_xr[x, ind]
                     * self._input_data.biodiv_contr_non_ag_k[k]
                     * self.X_non_ag_vars_kr[k, ind]
                 )  # Non-agricultural contribution
@@ -1045,7 +1050,7 @@ class LutoSolver:
         print(f"    ...Biodiversity GBF 4 (Ecological Communities of National Environmental Significance) constraints...")
         
         for x, x_area_lb in enumerate(x_limits):
-            ind = np.where(self._input_data.GBF4_ecnes_xr[x] > 0)[0]
+            ind = np.where(self._input_data.GBF4_ECNES_xr[x] > 0)[0]
 
             if ind.size == 0:
                 print(
@@ -1054,12 +1059,12 @@ class LutoSolver:
             
             ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4_ecnes_xr[x, ind]
+                    self._input_data.GBF4_ECNES_xr[x, ind]
                     * self._input_data.biodiv_contr_ag_j[j]
                     * self.X_ag_dry_vars_jr[j, ind]
                 )  # Dryland agriculture contribution
                 + gp.quicksum(
-                    self._input_data.GBF4_ecnes_xr[x, ind]
+                    self._input_data.GBF4_ECNES_xr[x, ind]
                     * self._input_data.biodiv_contr_ag_j[j]
                     * self.X_ag_irr_vars_jr[j, ind]
                 )  # Irrigated agriculture contribution
@@ -1068,12 +1073,12 @@ class LutoSolver:
 
             ag_man_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4_ecnes_xr[x, ind]
+                    self._input_data.GBF4_ECNES_xr[x, ind]
                     * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
                 )  # Dryland alt. ag. management contributions
                 + gp.quicksum(
-                    self._input_data.GBF4_ecnes_xr[x, ind]
+                    self._input_data.GBF4_ECNES_xr[x, ind]
                     * self._input_data.biodiv_contr_ag_man[am][j_idx][ind]
                     * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
                 )  # Irrigated alt. ag. management contributions
@@ -1083,7 +1088,7 @@ class LutoSolver:
 
             non_ag_contr = gp.quicksum(
                 gp.quicksum(
-                    self._input_data.GBF4_ecnes_xr[x, ind]
+                    self._input_data.GBF4_ECNES_xr[x, ind]
                     * self._input_data.biodiv_contr_non_ag_k[k]
                     * self.X_non_ag_vars_kr[k, ind]
                 )  # Non-agricultural contribution
@@ -1106,7 +1111,9 @@ class LutoSolver:
             print('    ...Biodiversity GBF 8 (climate change impact on species conservation) constraints TURNED OFF ...')
             return
         
-        s_limits, s_names, s_ind = self._input_data.limits["GBF8_species_conservation"]
+        s_limits = self._input_data.limits["GBF8_species_conservation"]
+        s_names = self._input_data.GBF8_species_names
+        s_ind = self._input_data.GBF8_species_indices
 
         print(f"    ...Biodiversity GBF 8 (climate change impact on species conservation) constraints...")
         

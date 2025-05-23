@@ -79,6 +79,8 @@ class SolverInputData:
     water_yield_regions_BASE_YR: dict                                   # Water yield for the BASE_YR based on historical water yield layers .
     water_yield_outside_study_area: dict[int, float]                    # Water yield from outside LUTO study area -> dict. Key: region.
     water_required_domestic_regions: dict[int, float]                   # Water yield from domestic requirement region -> dict. Key: region.
+    water_region_indices: dict[int, np.ndarray]                         # Water region indices -> dict. Key: region.
+    water_region_names: dict[int, str]                                  # Water yield for the BASE_YR based on historical water yield layers.
       
     biodiv_contr_ag_j: np.ndarray                                       # Biodiversity contribution scale from agricultural land uses.
     biodiv_contr_non_ag_k: dict[int, float]                             # Biodiversity contribution scale from non-agricultural land uses.
@@ -86,13 +88,19 @@ class SolverInputData:
     
     GBF2_raw_priority_degraded_area_r: np.ndarray                       # Raw areas (GBF2) from priority degrade areas - indexed by cell (r).
     GBF3_raw_MVG_area_vr: np.ndarray                                    # Raw areas (GBF3) from Major vegetation group - indexed by veg. group (v) and cell (r)
-    GBF4_snes_xr: np.ndarray                                            # Raw areas (GBF4) Species NES contribution data - indexed by species/ecological community (x) and cell (r).
-    GBF4_ecnes_xr: np.ndarray                                           # Raw areas (GBF4) Ecological community NES contribution data - indexed by species/ecological community (x) and cell (r).
+    GBF3_major_vegetation_groups_names: dict[int, str]                  # Major vegetation groups names - indexed by major vegetation group (v).
+    GBF3_major_vegetation_groups_ind: dict[str, int]                    # Major vegetation groups indices - indexed by major vegetation group (v).
+    GBF4_SNES_xr: np.ndarray                                            # Raw areas (GBF4) Species NES contribution data - indexed by species/ecological community (x) and cell (r).
+    GBF4_SNES_names: dict[int, str]                                     # Species NES names - indexed by species/ecological community (x).
+    GBF4_ECNES_xr: np.ndarray                                           # Raw areas (GBF4) Ecological community NES contribution data - indexed by species/ecological community (x) and cell (r).
+    GBF4_ECNES_names: dict[int, str]                                    # Ecological community NES names - indexed by species/ecological community (x).
     GBF8_raw_species_area_sr: np.ndarray                                # Raw areas (GBF8) Species data - indexed by species (s) and cell (r).
+    GBF8_species_names: dict[int, str]                                  # Species names - indexed by species (s).
+    GBF8_species_indices: dict[int, float]                              # Species indices - indexed by species (s).
 
     savanna_eligible_r: np.ndarray                                      # Cells that are eligible for savanna burnining land use.
     hir_eligible_r: np.ndarray                                          # Cells that are eligible for the HIR agricultural management option. 
-    priority_degraded_mask_idx: np.ndarray                                # Mask of priority degraded areas - indexed by cell (r).
+    priority_degraded_mask_idx: np.ndarray                              # Mask of priority degraded areas - indexed by cell (r).
 
     economic_contr_mrj: float                                           # base year economic contribution matrix.
     economic_BASE_YR_prices: np.ndarray                                 # base year commodity prices.
@@ -243,7 +251,15 @@ def get_w_outside_luto(data: Data, yr_cal: int):
 
 def get_w_domestic_req_region(data: Data):
     print('Getting water yield from domestic requirement region...', flush = True)
-    return ag_water.get_wreq_domestic_regions(data)
+    return data.WATER_USE_DOMESTIC
+
+def get_w_region_indices(data: Data):
+    print('Getting water region indices...', flush = True)
+    return data.WATER_REGION_ID
+
+def get_w_region_names(data: Data):
+    print('Getting water region names...', flush = True)
+    return data.WATER_REGION_NAMES
 
 def get_w_BASE_YR(data: Data):
     print('Getting water yield for the BASE_YR based on historical water yield layers...', flush = True)
@@ -284,23 +300,54 @@ def get_GBF3_MVG_area_vr(data: Data):
     output = ag_biodiversity.get_GBF3_major_vegetation_matrices_vr(data)
     return output
 
+def get_GBF3_major_vegetation_names(data: Data) -> dict[int,str]:
+    print('Getting agricultural major vegetation groups names...', flush = True)
+    return data.BIO_GBF3_ID2DESC
 
-def get_GBF4_snes_xr(data: Data) -> np.ndarray:
+def get_GBF3_major_indices(data: Data) -> dict[str, int]:
+    print('Getting agricultural major vegetation groups indices...', flush = True)
+    return data.MAJOR_VEG_INDECES
+
+def get_GBF4_SNES_xr(data: Data) -> np.ndarray:
     if settings.BIODIVERSTIY_TARGET_GBF_4_SNES != "on":
         return np.empty(0)
     return ag_biodiversity.get_GBF4_SNES_matrix_sr(data)
 
+def get_GBF4_SNES_names(data: Data) -> dict[int,str]:
+    if settings.BIODIVERSTIY_TARGET_GBF_4_SNES != "on":
+        return np.empty(0)
+    print('Getting agricultural species NES names...', flush = True)
+    return {x: name for x, name in enumerate(data.BIO_GBF4_SNES_SEL_ALL)}
 
-def get_GBF4_ecnes_xr(data: Data) -> np.ndarray:
+def get_GBF4_ECNES_xr(data: Data) -> np.ndarray:
     if settings.BIODIVERSTIY_TARGET_GBF_4_ECNES != "on":
         return np.empty(0)
     return ag_biodiversity.get_GBF4_ECNES_matrix_sr(data)
+
+def get_GBF4_ECNES_names(data: Data) -> dict[int,str]:
+    if settings.BIODIVERSTIY_TARGET_GBF_4_ECNES != "on":
+        return np.empty(0)
+    print('Getting agricultural ecological community NES names...', flush = True)
+    return {x: name for x, name in enumerate(data.BIO_GBF4_ECNES_SEL_ALL)}
 
 def get_GBF8_species_area_sr(data: Data, target_year: int) -> np.ndarray:
     if settings.BIODIVERSTIY_TARGET_GBF_8 != "on":
         return np.empty(0)
     print('Getting species conservation cell data...', flush = True)
     return ag_biodiversity.get_GBF8_species_conservation_matrix_sr(data, target_year)
+
+def get_GBF8_species_names(data: Data) -> dict[int,str]:
+    if settings.BIODIVERSTIY_TARGET_GBF_8 != "on":
+        return np.empty(0)
+    print('Getting species conservation names...', flush = True)
+    return {s: spec_name for s, spec_name in enumerate(data.BIO_GBF8_SEL_SPECIES)}
+
+def get_GBF8_species_conservation_indices(data: Data, yr_cal) -> dict[int, float]:
+    if settings.BIODIVERSTIY_TARGET_GBF_8 != "on":
+        return np.empty(0)
+    print('Getting species conservation indices...', flush = True)
+    species_matrix = data.get_GBF8_bio_layers_by_yr(yr_cal)
+    return {s: np.where(species_matrix[s] > 0)[0] for s in range(data.N_GBF8_SPECIES)}
 
 
 def get_non_ag_w_rk(
@@ -609,25 +656,25 @@ def get_limits(
     }
     
     if settings.WATER_LIMITS == 'on':
-        limits['water'] = ag_water.get_water_net_yield_hist_level(data)
-
+        limits['water'] = data.WATER_REGION_HIST_LEVEL
+        
     if settings.GHG_EMISSIONS_LIMITS != 'off':
-        limits['ghg'] = ag_ghg.get_ghg_limits(data, yr_cal)
+        limits['ghg'] = data.GHG_TARGETS[yr_cal]
 
     if settings.BIODIVERSTIY_TARGET_GBF_2 != 'off':
-        limits["GBF2_priority_degrade_areas"] = ag_biodiversity.get_GBF2_biodiversity_limits(data, yr_cal)
+        limits["GBF2_priority_degrade_areas"] = data.get_GBF2_target_for_yr_cal(yr_cal)
 
     if settings.BIODIVERSTIY_TARGET_GBF_3 != 'off':
-        limits["GBF3_major_vegetation_groups"] = ag_biodiversity.get_GBF3_major_vegetation_group_limits(data, yr_cal)
+        limits["GBF3_major_vegetation_groups"] = data.get_GBF3_limit_score_inside_LUTO_by_yr(yr_cal)
         
     if settings.BIODIVERSTIY_TARGET_GBF_4_SNES == "on":
-        limits["GBF4_SNES"] = ag_biodiversity.get_GBF4_SNES_limits(data, yr_cal)
+        limits["GBF4_SNES"] = data.get_GBF4_SNES_target_inside_LUTO_by_year(yr_cal)
         
     if settings.BIODIVERSTIY_TARGET_GBF_4_ECNES == "on":
-        limits["GBF4_ECNES"] = ag_biodiversity.get_GBF4_ECNES_limits(data, yr_cal)
+        limits["GBF4_ECNES"] = data.get_GBF4_ECNES_target_inside_LUTO_by_year(yr_cal)
         
     if settings.BIODIVERSTIY_TARGET_GBF_8 == "on":
-        limits["GBF8_species_conservation"] = ag_biodiversity.get_GBF8_species_conservation_limits(data, yr_cal)
+        limits["GBF8_species_conservation"] = data.get_GBF8_target_inside_LUTO_by_yr(yr_cal)
 
     if settings.REGIONAL_ADOPTION_CONSTRAINTS == 'on':
         ag_reg_adoption, non_ag_reg_adoption = ag_transition.get_regional_adoption_limits(data, yr_cal)
@@ -652,42 +699,40 @@ def set_limits(data: Data, yr_cal) -> None:
     limit_non_ag_adop = pd.DataFrame()
 
     if settings.WATER_LIMITS == 'on':
-        limit_water = pd.DataFrame([{
-            'Type': 'Water', 'code': k, 'target': v[1]} 
-            for k, v in ag_water.get_water_net_yield_hist_level(data).items()])
+        limit_water = pd.DataFrame({
+            'Type': 'Water', 
+            'code': data.WATER_REGION_NAMES.keys(), 
+            'target':data.WATER_REGION_HIST_LEVEL.values()})
 
     if settings.GHG_EMISSIONS_LIMITS != 'off':
-        limit_GHG = pd.DataFrame([{'Type': 'GHG', 'target': ag_ghg.get_ghg_limits(data, yr_cal)}])
+        limit_GHG = pd.DataFrame([{'Type': 'GHG', 'target': data.GHG_TARGETS[yr_cal]}])
         
-    if settings.BIODIVERSTIY_TARGET_GBF_2 == 'on':
-        limit_GBF_2= pd.DataFrame([{'Type': 'GBF-2',  'target': ag_biodiversity.get_GBF2_biodiversity_limits(data, yr_cal)}])
+    if settings.BIODIVERSTIY_TARGET_GBF_2 != 'off':
+        limit_GBF_2= pd.DataFrame([{'Type': 'GBF-2',  'target': data.get_GBF2_target_for_yr_cal(yr_cal)}])
 
-    if settings.BIODIVERSTIY_TARGET_GBF_3 == 'off':
+    if settings.BIODIVERSTIY_TARGET_GBF_3 != 'off':
         limit_GBF_3 = pd.DataFrame([{
             'Type': 'GBF-3', 
-            'code': ag_biodiversity.get_GBF3_major_vegetation_group_limits(data, yr_cal)[1], 
-            'target': ag_biodiversity.get_GBF3_major_vegetation_group_limits(data, yr_cal)[0]}])
+            'code': get_GBF3_major_vegetation_names(data), 
+            'target': get_GBF3_major_indices(data)}])
 
     if settings.BIODIVERSTIY_TARGET_GBF_4_SNES == "on":
-        val, codes = ag_biodiversity.get_GBF4_SNES_limits(data, yr_cal)
         limit_GBF_4_SNES = pd.DataFrame({
             'Type': 'GBF-4-SNES',
-            'code': codes.keys(),
-            'target': val})
+            'code': get_GBF4_SNES_names(data).keys(),
+            'target': data.get_GBF4_SNES_target_inside_LUTO_by_year(yr_cal)})
 
     if settings.BIODIVERSTIY_TARGET_GBF_4_ECNES == "on":
-        val, codes = ag_biodiversity.get_GBF4_ECNES_limits(data, yr_cal)
         limit_GBF_4_ECNES = pd.DataFrame({
             'Type': 'GBF-4-ECNES',
-            'code': codes.keys(),
-            'target': val})
+            'code': get_GBF4_SNES_names(data).keys(),
+            'target': data.get_GBF4_ECNES_target_inside_LUTO_by_year(yr_cal)})
 
     if settings.BIODIVERSTIY_TARGET_GBF_8 == "on":
-        val, codes = ag_biodiversity.get_GBF8_species_conservation_limits(data, yr_cal)
         limit_GBF_8 = pd.DataFrame({
             'Type': 'GBF-8',
-            'code': codes.keys(),
-            'target': val})
+            'code': get_GBF8_species_names(data).keys(),
+            'target': get_GBF8_species_conservation_indices(data, yr_cal)})
 
     if settings.REGIONAL_ADOPTION_CONSTRAINTS == 'on':
         ag_reg_adoption, non_ag_reg_adoption = ag_transition.get_regional_adoption_limits(data, yr_cal)
@@ -712,6 +757,8 @@ def set_limits(data: Data, yr_cal) -> None:
         limit_ag_adop,
         limit_non_ag_adop
     ], ignore_index=True)
+    
+    return limits
 
 
 def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputData:
@@ -788,6 +835,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         water_yield_regions_BASE_YR=get_w_BASE_YR(data),                                # Water net yield for the BASE_YR (2010) based on historical water yield layers
         water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Water net yield outside LUTO study area for the YR_CAL_BASE year
         water_required_domestic_regions=get_w_domestic_req_region(data),                # Water required for domestic use for each region
+        water_region_indices=get_w_region_indices(data),                                # Indices for each watershed region
+        water_region_names=get_w_region_names(data),                                    # Names for each watershed region
         
         biodiv_contr_ag_j=get_ag_biodiv_contr_j(data),
         biodiv_contr_non_ag_k=get_non_ag_biodiv_impact_k(data),
@@ -795,9 +844,15 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
 
         GBF2_raw_priority_degraded_area_r = get_GBF2_priority_degrade_area_r(data),
         GBF3_raw_MVG_area_vr=get_GBF3_MVG_area_vr(data),
-        GBF4_snes_xr=get_GBF4_snes_xr(data),
-        GBF4_ecnes_xr=get_GBF4_ecnes_xr(data),
+        GBF3_major_vegetation_groups_names=get_GBF3_major_vegetation_names(data),
+        GBF3_major_vegetation_groups_ind=get_GBF3_major_indices(data),
+        GBF4_SNES_xr=get_GBF4_SNES_xr(data),
+        GBF4_SNES_names=get_GBF4_SNES_names(data),
+        GBF4_ECNES_xr=get_GBF4_ECNES_xr(data),
+        GBF4_ECNES_names=get_GBF4_SNES_names(data),
         GBF8_raw_species_area_sr=get_GBF8_species_area_sr(data, target_year),
+        GBF8_species_names=get_GBF8_species_names(data),
+        GBF8_species_indices=get_GBF8_species_conservation_indices(data,target_year),
 
         savanna_eligible_r=get_savanna_eligible_r(data),
         hir_eligible_r=get_hir_eligible_r(data),

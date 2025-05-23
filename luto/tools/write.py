@@ -904,8 +904,8 @@ def write_water(data: Data, yr_cal, path):
         raise ValueError(f"Unknown water region definition: {settings.WATER_REGION_DEF}")
     
     # Get water water yield historical level, and the domestic water use
-    w_hist_yield = ag_water.get_water_net_yield_hist_level(data)
-    domestic_water_use = ag_water.get_wreq_domestic_regions(data)
+    w_hist_yield = data.WATER_REGION_HIST_LEVEL
+    domestic_water_use = data.WATER_USE_DOMESTIC
 
 
     # Get the decision variables
@@ -932,7 +932,10 @@ def write_water(data: Data, yr_cal, path):
 
     water_yields_inside_luto = pd.DataFrame()
     water_other_records = pd.DataFrame()
-    for reg_idx, (reg_name, wny_hist_level, ind) in w_hist_yield.items():
+    for reg_idx, wny_hist_level in w_hist_yield.items():
+        
+        ind = data.WATER_REGION_INDEX_R[reg_idx]
+        reg_name = data.WATER_REGION_NAMES[reg_idx]
 
         # Get the water net yield for ag, non-ag, and ag-man
         ag_wny = (ag_w_mrj_base_yr.isel(cell=ind) * ag_dvar_mrj.isel(cell=ind)
@@ -958,7 +961,7 @@ def write_water(data: Data, yr_cal, path):
             + wny_outside_luto_study_area_CCI.sel(region=reg_name)
         )
         
-        wny_limit = (wny_hist_level - domestic_water_use[reg_idx]) * settings.WATER_STRESS
+        wny_limit = wny_hist_level * settings.WATER_STRESS
         
         wny_sum = (
              water_yields_inside_luto.query('Region == @reg_name')['Water Net Yield (ML)'].sum() 
@@ -1645,7 +1648,7 @@ def write_ghg(data: Data, yr_cal, path):
     yr_idx = yr_cal - data.YR_CAL_BASE
 
     # Get GHG emissions limits used as constraints in model
-    ghg_limits = ag_ghg.get_ghg_limits(data, yr_cal)
+    ghg_limits = data.GHG_TARGETS[yr_cal]
 
     # Get GHG emissions from model
     if yr_cal >= data.YR_CAL_BASE + 1:

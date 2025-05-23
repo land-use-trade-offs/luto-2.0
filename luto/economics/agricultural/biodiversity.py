@@ -249,24 +249,6 @@ def get_agricultural_management_biodiversity_matrices(data:Data, ag_b_mrj: np.nd
     }
 
 
-def get_GBF2_biodiversity_limits(data:Data, yr_cal: int)-> float:
-    """
-    Calculate the biodiversity limits for a given year used as a constraint.
-
-    The biodiversity score target timeline is specified in data.BIO_GBF2_TARGET_SCORES.
-
-    Parameters
-    - data: The data object containing relevant information.
-    - yr_cal: The calendar year for which to calculate the biodiversity limits.
-
-    Returns
-    - The biodiversity limit for the given year.
-
-    """
-
-    return data.get_GBF2_target_for_yr_cal(yr_cal)
-
-
 
 def get_GBF2_bio_priority_degraded_areas_r(data:Data) -> np.ndarray:
     return np.where(
@@ -278,23 +260,6 @@ def get_GBF2_bio_priority_degraded_areas_r(data:Data) -> np.ndarray:
 
 def get_GBF3_major_vegetation_matrices_vr(data:Data) -> np.ndarray:
     return data.NVIS_LAYERS_LDS * data.REAL_AREA
-
-
-def get_GBF3_major_vegetation_group_limits(data:Data, yr_cal: int) -> list[np.ndarray, dict[int, str]]:
-    """
-    Gets the correct major vegetation group targets for the given year (yr_cal).
-
-    Returns
-    - np.ndarray
-        An array containing the limits of each NVIS class for the given yr_cal
-    - dict[int, str]
-        A dictionary mapping of vegetation group index to name
-    - dict[int, np.ndarray]
-        A dictionary mapping of each vegetation group index to the cells
-        that the group applies to.
-    """
-    
-    return [data.get_GBF3_limit_score_inside_LUTO_by_yr(yr_cal), data.BIO_GBF3_ID2DESC, data.MAJOR_VEG_INDECES]
 
 
 def get_GBF4_SNES_matrix_sr(data:Data) -> np.ndarray:
@@ -329,44 +294,6 @@ def get_GBF4_ECNES_matrix_sr(data:Data) -> np.ndarray:
     ).astype(np.float32)
     
 
-def get_GBF4_SNES_limits(data:Data, target_year: int) -> list[np.ndarray, dict[int, str]]:
-    """
-    Get species of national environmental significance limits.
-
-    Returns
-    -------
-    species_targets: np.ndarray
-        Array containing all selected species' limits
-    species_names: dict[int, str]
-        Mapping of each species' ID to string format name
-    """
-    if settings.BIODIVERSTIY_TARGET_GBF_4_SNES != "on":
-        return np.empty(0), {}, {}
-        
-    species_targets = data.get_GBF4_SNES_target_inside_LUTO_by_year(target_year)
-    species_names = {x: name for x, name in enumerate(data.BIO_GBF4_SNES_SEL_ALL)}
-    return [species_targets, species_names]
-    
-
-
-def get_GBF4_ECNES_limits(data:Data, target_year: int) -> list[np.ndarray, dict[int, str]]:
-    """
-    Get ecological communities of national environmental significance limits.
-
-    Returns
-    -------
-    species_targets: np.ndarray
-        Array containing all selected species' limits
-    species_names: dict[int, str]
-        Mapping of each species' ID to string format name
-    """
-    if settings.BIODIVERSTIY_TARGET_GBF_4_ECNES != "on":
-        return np.empty(0), {}, {}
-
-    species_targets = data.get_GBF4_ECNES_target_inside_LUTO_by_year(target_year)
-    species_names = {x: name for x, name in enumerate(data.BIO_GBF4_ECNES_SEL_ALL)}
-    return [species_targets, species_names]
-
 
 def get_GBF8_species_conservation_matrix_sr(data:Data, target_year: int):
     return np.where(
@@ -374,33 +301,6 @@ def get_GBF8_species_conservation_matrix_sr(data:Data, target_year: int):
         data.get_GBF8_bio_layers_by_yr(target_year) * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
         data.get_GBF8_bio_layers_by_yr(target_year) * data.REAL_AREA
     )
-
-
-def get_GBF8_species_conservation_limits(
-    data:Data,
-    yr_cal: int,
-) -> list[np.ndarray, dict[int, str], dict[int, np.ndarray]]:
-    """
-    Gets the correct species conservation targets for the given year (yr_cal).
-    
-    Parameters
-        - data: The data object containing relevant information.
-        - yr_cal: The calendar year for which to calculate the species conservation limits.
-    
-    Returns
-        list containing:
-        - np.ndarray
-            An array containing the limits of each species for the given yr_cal
-        - dict[int, str]
-            A dictionary mapping of species index to name
-        - dict[int, np.ndarray]
-            A dictionary mapping of each species index to the cells that the species applies to.
-    """
-    species_limits = data.get_GBF8_target_inside_LUTO_by_yr(yr_cal)
-    species_names = {s: spec_name for s, spec_name in enumerate(data.BIO_GBF8_SEL_SPECIES)}
-    species_matrix = data.get_GBF8_bio_layers_by_yr(yr_cal)
-    species_inds = {s: np.where(species_matrix[s] > 0)[0] for s in range(data.N_GBF8_SPECIES)}
-    return [species_limits, species_names, species_inds]
 
 
 def get_ag_biodiversity_contribution(data:Data) -> np.ndarray:

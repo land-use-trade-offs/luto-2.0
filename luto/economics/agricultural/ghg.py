@@ -375,21 +375,6 @@ def get_ghg_transition_emissions(data:Data, lumap, separate=False) -> np.ndarray
     return ghg_trainsition_penalties
     
     
-    
-def get_ghg_limits(data:Data, target):
-    """
-    Return greenhouse gas emissions limits in tonnes CO2e from year target.
-
-    Parameters
-    - data: The data containing greenhouse gas emissions targets.
-    - target: The target year for which the emissions limit is requested.
-
-    Returns
-    - The greenhouse gas emissions limit in tonnes CO2e for the specified target year.
-    """
-    return data.GHG_TARGETS[target]
-
-
 
 
 def get_asparagopsis_effect_g_mrj(data:Data, yr_idx):
