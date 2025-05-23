@@ -904,7 +904,7 @@ def write_water(data: Data, yr_cal, path):
         raise ValueError(f"Unknown water region definition: {settings.WATER_REGION_DEF}")
     
     # Get water water yield historical level, and the domestic water use
-    w_net_yield_limits = ag_water.get_water_net_yield_hist_level(data)
+    w_hist_yield = ag_water.get_water_net_yield_hist_level(data)
     domestic_water_use = ag_water.get_wreq_domestic_regions(data)
 
 
@@ -932,7 +932,7 @@ def write_water(data: Data, yr_cal, path):
 
     water_yields_inside_luto = pd.DataFrame()
     water_other_records = pd.DataFrame()
-    for reg_idx, (reg_name, wny_hist_level, ind) in w_net_yield_limits.items():
+    for reg_idx, (reg_name, wny_hist_level, ind) in w_hist_yield.items():
 
         # Get the water net yield for ag, non-ag, and ag-man
         ag_wny = (ag_w_mrj_base_yr.isel(cell=ind) * ag_dvar_mrj.isel(cell=ind)
