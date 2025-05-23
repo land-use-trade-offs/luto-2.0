@@ -18,6 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 
+import numpy as np
 from luto.tools.create_task_runs.helpers import (
     get_settings_df,
     get_grid_search_param_df,
@@ -26,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250521_XINHAO_GRIDSEARCH' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250523_XINHAO_GRIDSEARCH' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -63,7 +64,7 @@ grid_search = {
        
     
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['low'],            # 'off', 'low', 'medium', 'high'
+    'GHG_EMISSIONS_LIMITS': ['low', 'medium', 'high'],            # 'off', 'low', 'medium', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],            # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                  # True or False
@@ -71,7 +72,7 @@ grid_search = {
     
     # --------------- Water constraints ---------------
     'WATER_LIMITS': ['on'],                     # 'on' or 'off'
-    'WATER_CONSTRAINT_TYPE': ['soft'],          # 'hard' or 'soft'
+    'WATER_CONSTRAINT_TYPE': ['hard'],          # 'hard' or 'soft'
     'WATER_PENALTY': [1e-5],
     'INCLUDE_WATER_LICENSE_COSTS': [1],
     
@@ -98,8 +99,8 @@ grid_search = {
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
-    'SOLVE_WEIGHT_ALPHA': [0.1],
-    'SOLVE_WEIGHT_BETA': [0.9], 
+    'SOLVE_WEIGHT_ALPHA': [1],                  # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
+    'SOLVE_WEIGHT_BETA': np.arange(0, 1, 0.005),         
     
     
     #-------------------- Diet BAU --------------------
@@ -129,5 +130,9 @@ if __name__ == '__main__':
     # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
 
     # 2) Submit task to multiple linux computation nodes
-    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster')
+    split_chunks = len(grid_search_param_df) // 100
+    for search_df in np.array_split(grid_search_settings_df, split_chunks, 1):
+        if 'Name' not in search_df.columns:
+            search_df['Name'] = grid_search_settings_df['Name']
+        create_task_runs(TASK_ROOT_DIR, search_df, mode='cluster')
 
