@@ -731,7 +731,7 @@ def save_report_data(raw_data_dir:str):
     
     # Save the transition matrix cost
     cost_transition_ag2ag_trans_mat = cost_transition_ag2ag_df.groupby(['Year','From land-use', 'To land-use']).sum(numeric_only=True).reset_index()
-    cost_transition_ag2ag_trans_mat = cost_transition_ag2ag_trans_mat.set_index(['Year','From land-use', 'To land-use'])
+    cost_transition_ag2ag_trans_mat = cost_transition_ag2ag_trans_mat.set_index(['Year','From land-use', 'To land-use']).query('abs(`Value (million)`) > 1')
     cost_transition_ag2ag_trans_mat = cost_transition_ag2ag_trans_mat\
                                         .reindex(index = pd.MultiIndex.from_product([years, AG_LANDUSE, AG_LANDUSE], 
                                                  names = ['Year','From land-use', 'To land-use'])).reset_index()
@@ -777,7 +777,7 @@ def save_report_data(raw_data_dir:str):
     # Get the transition matrix cost
     cost_transition_ag2non_ag_trans_mat = cost_transition_ag2non_ag_df\
                                             .groupby(['Year','From land-use', 'To land-use'])\
-                                            .sum(numeric_only=True).reset_index()
+                                            .sum(numeric_only=True).reset_index().query('abs(`Value (million)`) > 1')
                                             
     cost_transition_ag2non_ag_trans_mat = cost_transition_ag2non_ag_trans_mat\
                                            .set_index(['Year','From land-use', 'To land-use'])\
@@ -826,7 +826,7 @@ def save_report_data(raw_data_dir:str):
     # Get the transition matrix cost
     cost_transition_non_ag2ag_trans_mat = cost_transition_non_ag2ag_df\
                                             .groupby(['Year','From land-use', 'To land-use'])\
-                                            .sum(numeric_only=True).reset_index()
+                                            .sum(numeric_only=True).reset_index().query('abs(`Value (million)`) > 1')
                                             
     cost_transition_non_ag2ag_trans_mat = cost_transition_non_ag2ag_trans_mat\
                                              .set_index(['Year','From land-use', 'To land-use'])\
