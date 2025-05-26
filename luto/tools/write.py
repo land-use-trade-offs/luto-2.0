@@ -895,7 +895,7 @@ def write_water(data: Data, yr_cal, path):
     yr_idx = yr_cal - data.YR_CAL_BASE
     
     # Get water water yield historical level, and the domestic water use
-    w_limit_inside_luto = ag_water.get_water_net_yield_limit_for_regions(data)
+    w_limit_inside_luto = ag_water.get_water_net_yield_limit_for_regions_inside_LUTO(data)
     domestic_water_use = data.WATER_USE_DOMESTIC
 
     # Get the decision variables
@@ -924,6 +924,7 @@ def write_water(data: Data, yr_cal, path):
     water_other_records = pd.DataFrame()
     for reg_idx, w_limit_inside in w_limit_inside_luto.items():
         
+
         ind = data.WATER_REGION_INDEX_R[reg_idx]
         reg_name = data.WATER_REGION_NAMES[reg_idx]
 
@@ -958,10 +959,10 @@ def write_water(data: Data, yr_cal, path):
             - domestic_water_use[reg_idx]
         )
         
-        wny_limit = (
+        wny_limit_region = (
             w_limit_inside
             + wny_outside_luto_study_area_base_yr.sel(region=reg_name).values
-            - domestic_water_use[reg_idx]
+            - domestic_water_use[reg_idx]   
         )
         
         water_other_records = pd.concat([water_other_records, pd.DataFrame([{
@@ -970,7 +971,7 @@ def write_water(data: Data, yr_cal, path):
             'Water yield outside LUTO (ML)': wny_outside_luto_study_area_base_yr.sel(region=reg_name).values,
             'Climate Change Impact (ML)': CCI_impact.values,
             'Domestic Water Use (ML)': domestic_water_use[reg_idx],
-            'Water Yield Limit (ML)': wny_limit,
+            'Water Yield Limit (ML)': wny_limit_region,
             'Water Net Yield (ML)': wny_sum,
         }])], ignore_index=True)
         

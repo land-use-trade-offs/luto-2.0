@@ -640,7 +640,7 @@ def get_limits(
     }
     
     if settings.WATER_LIMITS == 'on':
-        limits['water'] = ag_water.get_water_net_yield_limit_for_regions(data)
+        limits['water'] = ag_water.get_water_net_yield_limit_for_regions_inside_LUTO(data)
         
     if settings.GHG_EMISSIONS_LIMITS != 'off':
         limits['ghg'] = data.GHG_TARGETS[yr_cal]

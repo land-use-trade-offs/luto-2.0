@@ -520,7 +520,7 @@ def get_water_outside_luto_study_area_from_hist_level(data) -> dict[int, float]:
 
 
 
-def calc_water_net_yield_inside_LUTO_BASE_YR(data) -> np.ndarray:
+def calc_water_net_yield_inside_LUTO_BASE_YR_hist_water_lyr(data) -> np.ndarray:
     """
     Calculate the water net yield for the base year (2010) for all regions.
 
@@ -536,7 +536,7 @@ def calc_water_net_yield_inside_LUTO_BASE_YR(data) -> np.ndarray:
         return data.water_yield_regions_BASE_YR
     
     # Get the water yield matrices
-    w_mrj = get_water_net_yield_matrices(data, 0)
+    w_mrj = get_water_net_yield_matrices(data, 0, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
     
     # Get the ag decision variables for the base year
     ag_dvar_mrj = data.AG_L_MRJ
@@ -582,7 +582,7 @@ def get_wny_for_watershed_regions_for_base_yr(data):
     return wny_sum
 
 
-def get_water_net_yield_limit_for_regions(data):
+def get_water_net_yield_limit_for_regions_inside_LUTO(data):
     """
     Calculate the water net yield limit for each region based on historical levels.
     
@@ -613,7 +613,7 @@ def get_water_net_yield_limit_for_regions(data):
     }
     
     # Get the water net yield for the base year (2010)
-    wny_limit_base_yr = calc_water_net_yield_inside_LUTO_BASE_YR(data)
+    wny_limit_base_yr = calc_water_net_yield_inside_LUTO_BASE_YR_hist_water_lyr(data)
     
     # Update the water net yield limit for each region
     for reg_idx, limit in wny_limit_base_yr.items():
