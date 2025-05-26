@@ -98,6 +98,8 @@ def update_settings(settings_dict:dict, job_name:str):
     settings_dict['INPUT_DIR'] = os.path.abspath(settings_dict['INPUT_DIR']).replace('\\','/')
     settings_dict['RAW_DATA'] = os.path.abspath(settings_dict['RAW_DATA']).replace('\\','/')
     settings_dict['THREADS'] = settings_dict['NCPUS']
+    settings_dict['KEEP_OUTPUTS'] = eval(settings_dict['KEEP_OUTPUTS'])  # Convert string to boolean
+
     return settings_dict
 
 
