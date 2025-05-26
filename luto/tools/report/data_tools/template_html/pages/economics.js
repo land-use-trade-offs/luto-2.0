@@ -1058,7 +1058,7 @@ document.addEventListener("DOMContentLoaded", function () {
           pointFormatter: function () {
             return `${data_ag2ag["categories"][this.x]} 
                     <b>==></b> ${data_ag2ag["categories"][this.y]}: 
-                    <b>${this.value.toFixed(2)} (billion $)</b>`;
+                    <b>${this.value.toFixed(2)} (million $)</b>`;
           }
         },
       }],
@@ -1216,7 +1216,7 @@ document.addEventListener("DOMContentLoaded", function () {
           pointFormatter: function () {
             return `${data_ag2non_ag["categories_from"][this.x]} 
                     <b>==></b> ${data_ag2non_ag["categories_to"][this.y]}: 
-                    <b>${this.value.toFixed(2)} (billion $)</b>`;
+                    <b>${this.value.toFixed(2)} (million $)</b>`;
           }
         },
       }],
@@ -1511,7 +1511,7 @@ document.addEventListener("DOMContentLoaded", function () {
           pointFormatter: function () {
             return `${data_non_ag2ag["categories_from"][this.x]} 
                     <b>==></b> ${data_non_ag2ag["categories_to"][this.y]}: 
-                    <b>${this.value.toFixed(2)} (billion $)</b>`;
+                    <b>${this.value.toFixed(2)} (million $)</b>`;
           }
         },
       }],
