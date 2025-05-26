@@ -1262,7 +1262,8 @@ def save_report_data(raw_data_dir:str):
         .groupby('Year')\
         .sum(numeric_only=True)\
         .reset_index()
-    water_domestic_wide = (-water_domestic[['Year','Water Net Yield (ML)']].values).tolist()  # Domestic water use is negative, indicating a water loss (consumption)
+    water_domestic['Water Net Yield (ML)'] = -water_domestic['Water Net Yield (ML)']  # Domestic water use is negative, indicating a water loss (consumption)
+    water_domestic_wide = (water_domestic[['Year','Water Net Yield (ML)']].values).tolist() 
     
     water_yield_sum = water_hist_and_public_land_yield.query('Type == "Water Net Yield (ML)"').copy()\
         .groupby('Year')\
@@ -1284,7 +1285,7 @@ def save_report_data(raw_data_dir:str):
     water_yield_df = water_inside_LUTO_broad_cat_sum_wide.copy()
     water_yield_df.loc[len(water_yield_df)] = ['Outside LUTO Study Area', water_outside_LUTO_total_wide,  'column']
     water_yield_df.loc[len(water_yield_df)] = ['Climate Change Impact', water_CCI_wide,  'column']
-    water_yield_df.loc[len(water_yield_df)] = ['Domestic Water Use', water_CCI_wide,  'column']
+    water_yield_df.loc[len(water_yield_df)] = ['Domestic Water Use', water_domestic_wide,  'column']
     water_yield_df.loc[len(water_yield_df)] = ['Water Net Yield', water_yield_sum_wide, 'spline']
     water_yield_df.loc[len(water_yield_df)] = ['Water Limit', water_limit_wide, 'spline']
     water_yield_df.to_json(f'{SAVE_DIR}/water_1_water_net_use_by_broader_category.json', orient='records')
