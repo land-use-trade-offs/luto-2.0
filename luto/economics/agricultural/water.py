@@ -520,7 +520,7 @@ def get_water_outside_luto_study_area_from_hist_level(data) -> dict[int, float]:
 
 
 
-def calc_water_net_yield_BASE_YR(data) -> np.ndarray:
+def calc_water_net_yield_inside_LUTO_BASE_YR(data) -> np.ndarray:
     """
     Calculate the water net yield for the base year (2010) for all regions.
 
@@ -528,7 +528,9 @@ def calc_water_net_yield_BASE_YR(data) -> np.ndarray:
     - data: The data object containing the necessary input data.
 
     Returns
-    - water_net_yield: The water net yield for all regions.
+    - dict[int, float]: A dictionary with the following structure:
+        - key: region ID
+        - value: water net yield for this region (ML)
     """
     if data.water_yield_regions_BASE_YR is not None:
         return data.water_yield_regions_BASE_YR
@@ -543,16 +545,10 @@ def calc_water_net_yield_BASE_YR(data) -> np.ndarray:
     ag_w_r = np.einsum('mrj,mrj->r', w_mrj, ag_dvar_mrj)
     
     # Get water net yield for each region
-    wny_inside_LUTO_regions = np.bincount(data.RIVREG_ID, ag_w_r)
+    wny_inside_LUTO_regions = np.bincount(data.WATER_REGION_ID, ag_w_r)
     wny_inside_LUTO_regions = {region: wny for region, wny in enumerate(wny_inside_LUTO_regions) if region != 0}
-    
-    # Get water yield from outside the LUTO study area
-    wny_outside_LUTO_regions = get_water_outside_luto_study_area_from_hist_level(data)
-    
-    return {
-        region: wny_inside_LUTO_regions[region]  + wny_outside_LUTO_regions[region] 
-        for region in wny_outside_LUTO_regions
-    } 
+
+    return wny_inside_LUTO_regions
 
 
 
@@ -568,11 +564,10 @@ def get_wny_for_watershed_regions_for_base_yr(data):
         - key: region ID
         - value: water net yield for this region (ML)
     """
-    watershed_regions_r = data.DRAINDIV_ID if settings.WATER_REGION_DEF else data.RIVREG_ID
     wny_inside_mrj = get_water_net_yield_matrices(data, data.YR_CAL_BASE, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
     wny_base_yr_inside_r = np.einsum('mrj,mrj->r', wny_inside_mrj, data.AG_L_MRJ)
     
-    wny_base_yr_inside_regions = {k:v for k,v in enumerate(np.bincount(watershed_regions_r, wny_base_yr_inside_r))}
+    wny_base_yr_inside_regions = {k:v for k,v in enumerate(np.bincount(data.WATER_REGION_ID, wny_base_yr_inside_r))}
     wny_base_yr_outside_regions = get_water_outside_luto_study_area_from_hist_level(data)
     w_use_domestic_regions = data.WATER_USE_DOMESTIC
     
@@ -585,6 +580,51 @@ def get_wny_for_watershed_regions_for_base_yr(data):
         )
         
     return wny_sum
+
+
+def get_water_net_yield_limit_for_regions(data):
+    """
+    Calculate the water net yield limit for each region based on historical levels.
+    
+    The limit is calculated as:
+        - Water net yield limit for the whole region
+        - Plus domestic water use
+        - Minus water net yield from outside the LUTO study area
+        
+    Parameters
+        data (object): The data object containing the required data.
+        
+    Returns
+        dict[int, float]: A dictionary with the following structure:
+        - key: region ID
+        - value: water net yield limit for this region (ML)
+    """
+    
+    wny_outside_LUTO_regions = get_water_outside_luto_study_area_from_hist_level(data)
+    
+    # Get the water net yield limit INSIDE LUTO study area
+    wny_limit_stress = {
+        reg_idx: (
+            hist_level * settings.WATER_STRESS      # Water net yield limit for the whole region
+            + data.WATER_USE_DOMESTIC[reg_idx]      # Domestic water use
+            - wny_outside_LUTO_regions[reg_idx]     # Water net yield from outside the LUTO study area
+        )
+        for reg_idx, hist_level in data.WATER_REGION_HIST_LEVEL.items()
+    }
+    
+    # Get the water net yield for the base year (2010)
+    wny_limit_base_yr = calc_water_net_yield_inside_LUTO_BASE_YR(data)
+    
+    # Update the water net yield limit for each region
+    for reg_idx, limit in wny_limit_base_yr.items():
+        if limit < wny_limit_stress[reg_idx]:       # If the base year water net yield is lower than the historical stress limit
+            print(
+                f"\t"
+                f"Water net yield limit was updated to {limit:10.2f} ML (from {wny_limit_stress[reg_idx]:10.2f} ML) for {data.WATER_REGION_NAMES[reg_idx]}"
+            )
+            wny_limit_stress[reg_idx] = limit
+
+    return wny_limit_stress
         
     
 

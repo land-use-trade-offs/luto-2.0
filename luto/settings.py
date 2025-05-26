@@ -102,7 +102,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS = list(range(2020,2051,10)) # range(2020,2050)
+SIM_YEARS = list(range(2010,2051,10)) # range(2020,2050)
 
 
 # Define the objective function

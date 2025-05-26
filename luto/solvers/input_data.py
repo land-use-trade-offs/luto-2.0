@@ -76,9 +76,6 @@ class SolverInputData:
     ag_man_limits: dict                                                 # Agricultural management options' adoption limits.
     ag_man_lb_mrj: dict                                                 # Agricultural management options' lower bounds.
 
-    water_yield_regions_BASE_YR: dict                                   # Water yield for the BASE_YR based on historical water yield layers .
-    water_yield_outside_study_area: dict[int, float]                    # Water yield from outside LUTO study area -> dict. Key: region.
-    water_required_domestic_regions: dict[int, float]                   # Water yield from domestic requirement region -> dict. Key: region.
     water_region_indices: dict[int, np.ndarray]                         # Water region indices -> dict. Key: region.
     water_region_names: dict[int, str]                                  # Water yield for the BASE_YR based on historical water yield layers.
       
@@ -244,26 +241,13 @@ def get_ag_w_mrj(data: Data, target_index, water_dr_yield: Optional[np.ndarray] 
     output = ag_water.get_water_net_yield_matrices(data, target_index, water_dr_yield, water_sr_yield)
     return output.astype(np.float32)
 
-
-def get_w_outside_luto(data: Data, yr_cal: int):
-    print('Getting water yield from outside LUTO study area...', flush = True)
-    return ag_water.get_water_outside_luto_study_area_from_hist_level(data)
-
-def get_w_domestic_req_region(data: Data):
-    print('Getting water yield from domestic requirement region...', flush = True)
-    return data.WATER_USE_DOMESTIC
-
 def get_w_region_indices(data: Data):
     print('Getting water region indices...', flush = True)
-    return data.WATER_REGION_ID
+    return data.WATER_REGION_INDEX_R
 
 def get_w_region_names(data: Data):
     print('Getting water region names...', flush = True)
     return data.WATER_REGION_NAMES
-
-def get_w_BASE_YR(data: Data):
-    print('Getting water yield for the BASE_YR based on historical water yield layers...', flush = True)
-    return ag_water.calc_water_net_yield_BASE_YR(data)
 
 
 def get_ag_b_mrj(data: Data):
@@ -656,7 +640,7 @@ def get_limits(
     }
     
     if settings.WATER_LIMITS == 'on':
-        limits['water'] = data.WATER_REGION_HIST_LEVEL
+        limits['water'] = ag_water.get_water_net_yield_limit_for_regions(data)
         
     if settings.GHG_EMISSIONS_LIMITS != 'off':
         limits['ghg'] = data.GHG_TARGETS[yr_cal]
@@ -832,11 +816,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_limits=get_ag_man_limits(data, target_index),                            
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
         
-        water_yield_regions_BASE_YR=get_w_BASE_YR(data),                                # Water net yield for the BASE_YR (2010) based on historical water yield layers
-        water_yield_outside_study_area=get_w_outside_luto(data, data.YR_CAL_BASE),      # Water net yield outside LUTO study area for the YR_CAL_BASE year
-        water_required_domestic_regions=get_w_domestic_req_region(data),                # Water required for domestic use for each region
-        water_region_indices=get_w_region_indices(data),                                # Indices for each watershed region
-        water_region_names=get_w_region_names(data),                                    # Names for each watershed region
+        water_region_indices=get_w_region_indices(data),        # Indices for each watershed region
+        water_region_names=get_w_region_names(data),            # Names for each watershed region
         
         biodiv_contr_ag_j=get_ag_biodiv_contr_j(data),
         biodiv_contr_non_ag_k=get_non_ag_biodiv_impact_k(data),

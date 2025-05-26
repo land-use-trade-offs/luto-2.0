@@ -962,15 +962,15 @@ class Data:
         if settings.WATER_REGION_DEF == 'River Region':
             self.WATER_REGION_NAMES = self.RIVREG_DICT
             self.WATER_REGION_HIST_LEVEL = self.RIVREG_HIST_LEVEL
-            self.WATER_REGION_ID = {k:(self.RIVREG_ID == k) for k in self.RIVREG_DICT.keys()}
+            self.WATER_REGION_ID = self.RIVREG_ID
             
         elif settings.WATER_REGION_DEF == 'Drainage Division':
             self.WATER_REGION_NAMES = self.DRAINDIV_DICT
             self.WATER_REGION_HIST_LEVEL = self.DRAINDIV_HIST_LEVEL
-            self.WATER_REGION_ID = {k:(self.DRAINDIV_ID == k) for k in self.DRAINDIV_DICT.keys()}
+            self.WATER_REGION_ID = self.DRAINDIV_ID
             
 
-        # Calculate the water yield limits for each region
+        # Get the water region index for each region
         self.WATER_REGION_INDEX_R = {k:(self.WATER_REGION_ID == k) for k in self.WATER_REGION_NAMES.keys()}
 
 
