@@ -894,19 +894,9 @@ def write_water(data: Data, yr_cal, path):
 
     yr_idx = yr_cal - data.YR_CAL_BASE
     
-    
-    # Get the idx-name mapping for the water regions
-    if settings.WATER_REGION_DEF == 'Drainage Division':
-        region_dict = data.DRAINDIV_DICT 
-    elif settings.WATER_REGION_DEF == 'River Region':
-        region_dict = data.RIVREG_DICT
-    else:
-        raise ValueError(f"Unknown water region definition: {settings.WATER_REGION_DEF}")
-    
     # Get water water yield historical level, and the domestic water use
-    w_hist_yield = data.WATER_REGION_HIST_LEVEL
+    w_limit_inside_luto = ag_water.get_water_net_yield_limit_for_regions(data)
     domestic_water_use = data.WATER_USE_DOMESTIC
-
 
     # Get the decision variables
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
@@ -919,7 +909,7 @@ def write_water(data: Data, yr_cal, path):
     wny_outside_luto_study_area_base_yr = xr.DataArray(
         list(ag_water.get_water_outside_luto_study_area_from_hist_level(data).values()),
         dims=['region'],
-        coords={'region': [region_dict[k] for k in ag_water.get_water_outside_luto_study_area_from_hist_level(data)]},
+        coords={'region': [data.WATER_REGION_NAMES[k] for k in ag_water.get_water_outside_luto_study_area_from_hist_level(data)]},
     )
 
     # Get water use under climate change impact; i.e., not providing 'water_dr_yield' and 'water_sr_yield' arguments
@@ -932,7 +922,7 @@ def write_water(data: Data, yr_cal, path):
 
     water_yields_inside_luto = pd.DataFrame()
     water_other_records = pd.DataFrame()
-    for reg_idx, wny_hist_level in w_hist_yield.items():
+    for reg_idx, w_limit_inside in w_limit_inside_luto.items():
         
         ind = data.WATER_REGION_INDEX_R[reg_idx]
         reg_name = data.WATER_REGION_NAMES[reg_idx]
@@ -961,10 +951,15 @@ def write_water(data: Data, yr_cal, path):
             + wny_outside_luto_study_area_CCI.sel(region=reg_name)
         )
         
-        wny_limit = wny_hist_level * settings.WATER_STRESS
-        
+
         wny_sum = (
              water_yields_inside_luto.query('Region == @reg_name')['Water Net Yield (ML)'].sum() 
+            + wny_outside_luto_study_area_base_yr.sel(region=reg_name).values
+            - domestic_water_use[reg_idx]
+        )
+        
+        wny_limit = (
+            w_limit_inside
             + wny_outside_luto_study_area_base_yr.sel(region=reg_name).values
             - domestic_water_use[reg_idx]
         )
