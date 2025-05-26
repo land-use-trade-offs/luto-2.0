@@ -100,7 +100,7 @@ grid_search = {
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_WEIGHT_ALPHA': [1],                  # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
-    'SOLVE_WEIGHT_BETA': np.arange(0, 1, 0.005),         
+    'SOLVE_WEIGHT_BETA': [0.5] ,#np.arange(0, 1, 0.005),         
     
     
     #-------------------- Diet BAU --------------------
@@ -119,6 +119,7 @@ grid_search = {
 
 
 
+
 if __name__ == '__main__':
     
     # Create the grid settings parameters
@@ -129,6 +130,9 @@ if __name__ == '__main__':
     # # 1) Submit task to a single linux machine, and run simulations parallely
     # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
 
+    
+    create_task_runs(TASK_ROOT_DIR, grid_search_param_df, mode='cluster')
+    
     # 2) Submit task to multiple linux computation nodes
     split_chunks = len(grid_search_param_df) // 100
     for search_df in np.array_split(grid_search_settings_df, split_chunks, 1):

@@ -99,7 +99,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 15       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 7      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
 SIM_YEARS = list(range(2010,2051,10)) # range(2020,2050)
@@ -388,33 +388,18 @@ EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 # Environmental parameters
 # ---------------------------------------------------------------------------- #
 
+# Take data from 'GHG_targets.xlsx', 
+GHG_TARGETS_DICT = {
+    'off':      None,
+    'low':      '1.8C (67%) excl. avoided emis SCOPE1',
+    'medium':   '1.5C (50%) excl. avoided emis SCOPE1',
+    'high':     '1.5C (67%) excl. avoided emis SCOPE1',
+}
+
 # Greenhouse gas emissions limits and parameters *******************************
 GHG_EMISSIONS_LIMITS = 'medium'        # 'off', 'low', 'medium', or 'high'
-
-GHG_LIMITS_TYPE = 'file' # 'dict' or 'file'
-
-# Set emissions limits in dictionary below (i.e., year: tonnes)
-GHG_LIMITS = {
-              2010: 90 * 1e6,    # Agricultural emissions in 2010 in tonnes CO2e
-              2050: -100 * 1e6,  # GHG emissions target and year (can add more years/targets)
-              2100: -100 * 1e6   # GHG emissions target and year (can add more years/targets)
-             }
-
-# Take data from 'GHG_targets.xlsx', 
-match GHG_EMISSIONS_LIMITS:
-    case 'off':
-        GHG_LIMITS_FIELD = None
-    case 'low':
-        GHG_LIMITS_FIELD = '1.8C (67%) excl. avoided emis SCOPE1'
-    case 'medium':
-        GHG_LIMITS_FIELD = '1.5C (50%) excl. avoided emis SCOPE1'
-    case 'high':
-        GHG_LIMITS_FIELD = '1.5C (67%) excl. avoided emis SCOPE1'
-    case _:
-        raise ValueError(f"Invalid GHG_EMISSIONS_LIMITS value: {GHG_EMISSIONS_LIMITS}. Must be 'off', 'low', 'medium', or 'high'.")
-
 '''
-`GHG_LIMITS_FIELD` options include: 
+`GHG_EMISSIONS_LIMITS` options include: 
 - Assuming agriculture is responsible to sequester 100% of the carbon emissions
     - '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)' 
 - Assuming agriculture is responsible to sequester carbon emissions not including electricity emissions and  off-land emissions 
@@ -432,7 +417,7 @@ CARBON_PRICES_FIELD = 'CONSTANT'
 
 # Automatically update the carbon price field if it is set to 'AS_GHG'
 if CARBON_PRICES_FIELD == 'AS_GHG':
-    CARBON_PRICES_FIELD = GHG_LIMITS_FIELD[:9].replace('(','')  # '1.5C (67%) excl. avoided emis' -> '1.5C 67%'
+    CARBON_PRICES_FIELD = GHG_TARGETS_DICT[GHG_EMISSIONS_LIMITS][:9].replace('(','')  # '1.5C (67%) excl. avoided emis' -> '1.5C 67%'
 
 if CARBON_PRICES_FIELD == 'CONSTANT':
     CARBON_PRICE_COSTANT = 0.0  # The constant value to add to the carbon price (e.g., $10/tonne CO2e).
@@ -524,20 +509,6 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 # ------------------- Agricultural biodiversity parameters -------------------
 
-
-# Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-BIODIVERSTIY_TARGET_GBF_2 = 'medium'            # 'off', 'low', 'medium', or 'high'
-'''
-Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
-in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
-
-- 'off' will turn off the GBF-3 target. 
-- 'low' is the low level of biodiversity target (i.e., restore 0% of degreaded biodiversity socore in the 'priority degraded land').
-- 'medium' is the medium level of biodiversity target (i.e., restore 15% of degreaded biodiversity socore in the 'priority degraded land').
-- 'high' is the high level of biodiversity target (i.e., restore 25% of degreaded biodiversity socore in the 'priority degraded land').
-'''
-
 GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
 # GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 '''
@@ -546,19 +517,28 @@ The constraint type for the biodiversity target.
 - 'soft' adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 '''
 
-
 # Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
-match BIODIVERSTIY_TARGET_GBF_2:
-    case 'off':
-        GBF2_TARGET_DICT = None
-    case 'low':
-        GBF2_TARGET_DICT = {2030: 0,    2050: 0,    2100: 0}
-    case 'medium':
-        GBF2_TARGET_DICT = {2030: 0.15, 2050: 0.15, 2100: 0.15}
-    case 'high':
-        GBF2_TARGET_DICT = {2030: 0.15, 2050: 0.25, 2100: 0.25}
-    case _:
-        raise ValueError(f"Invalid value for BIODIVERSTIY_TARGET_GBF_2: {BIODIVERSTIY_TARGET_GBF_2}. Must be 'off', 'low', 'medium', or 'high'.")  
+GBF2_TARGETS_DICT = {
+    'off':     None,
+    'low':    {2030: 0,    2050: 0,    2100: 0},
+    'medium': {2030: 0.15, 2050: 0.15, 2100: 0.15},
+    'high':   {2030: 0.15, 2050: 0.25, 2100: 0.25},
+}
+
+# Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
+BIODIVERSTIY_TARGET_GBF_2 = 'medium'            # 'off', 'low', 'medium', or 'high'
+'''
+Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
+Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
+in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
+ - 'off' will turn off the GBF-3 target. 
+ - 'low' is the low level of biodiversity target (i.e., restore 0% of degreaded biodiversity socore in the 'priority degraded land').
+ - 'medium' is the medium level of biodiversity target (i.e., restore 15% of degreaded biodiversity socore in the 'priority degraded land').
+ - 'high' is the high level of biodiversity target (i.e., restore 25% of degreaded biodiversity socore in the 'priority degraded land').
+'''
+
+
+
 
 
 GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
@@ -645,18 +625,6 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- Vegetation parameters ----------------------
 
-BIODIVERSTIY_TARGET_GBF_3  = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
-'''
-Target 3 of the Kunming-Montreal Global Biodiversity Framework:
-protect and manage 30% of the world's land, water, and coastal areas by 2030.
-
-- if 'off' is selected, turn off the GBF-3 target for biodiversity.
-- if 'medium' is selected, the conservation target is set to 30% for each NVIS group at 2050.
-- if 'high' is selected, the conservation target is set to 50% for each NVIS group at 2050.
-- if 'USER_DEFINED' is selected, the conservation target is reading from `input.BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx`.
-
-'''
-
 GBF3_TARGET_CLASS  = 'MVS'                  # 'MVG', 'MVS', 'MVG_IBRA', 'MVS_IBRA'
 '''
 The National Vegetation Information System (NVIS) provides the 100m resolution information on
@@ -666,15 +634,23 @@ the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers
 - If 'MVS_IBRA/MVG_IBRA' is selected, use need to define conservation target for each NVIS group for selected the IBRA region.
 '''
 
-match BIODIVERSTIY_TARGET_GBF_3:
-    case 'USER_DEFINED' | 'off':
-        GBF3_TARGET_PERCENT = None
-    case 'medium':
-        GBF3_TARGET_PERCENT = 30
-    case 'high':
-        GBF3_TARGET_PERCENT = 50
-    case _:
-        raise ValueError(f"BIODIVERSTIY_TARGET_GBF_3 must be one of 'USER_DEFINED', 'Medium', or 'High', not {BIODIVERSTIY_TARGET_GBF_3}.")
+GBF3_TARGETS_DICT = {
+    'off':     None,
+    'medium':  30,
+    'high':    50,
+    'USER_DEFINED': None
+}
+
+BIODIVERSTIY_TARGET_GBF_3  = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+'''
+Target 3 of the Kunming-Montreal Global Biodiversity Framework:
+protect and manage 30% of the world's land, water, and coastal areas by 2030.
+
+- if 'off' is selected, turn off the GBF-3 target for biodiversity.
+- if 'medium' is selected, the conservation target is set to 30% for each NVIS group at 2050.
+- if 'high' is selected, the conservation target is set to 50% for each NVIS group at 2050.
+- if 'USER_DEFINED' is selected, the conservation target is reading from `input.BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx`.
+'''
 
 
 

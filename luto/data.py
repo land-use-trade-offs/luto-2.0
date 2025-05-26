@@ -1095,29 +1095,11 @@ class Data:
         ###############################################################
         print("\tLoading GHG targets data...", flush=True)
 
-        # If GHG_LIMITS_TYPE == 'file' then import the Excel spreadsheet and import the results to a python dictionary {year: target (tCO2e), ...}
-        if settings.GHG_LIMITS_TYPE == "file":
-            self.GHG_TARGETS = pd.read_excel(
-                os.path.join(settings.INPUT_DIR, "GHG_targets.xlsx"), sheet_name="Data", index_col="YEAR"
-            )
-            self.GHG_TARGETS = self.GHG_TARGETS[settings.GHG_LIMITS_FIELD].to_dict()
+        self.GHG_TARGETS = pd.read_excel(
+            os.path.join(settings.INPUT_DIR, "GHG_targets.xlsx"), sheet_name="Data", index_col="YEAR"
+        )
+        self.GHG_TARGETS = self.GHG_TARGETS[settings.GHG_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS]].to_dict()
 
-        # If settings.GHG_LIMITS_TYPE == 'dict' then import the Excel spreadsheet and import the results to a python dictionary {year: target (tCO2e), ...}
-        elif settings.GHG_LIMITS_TYPE == "dict":
-
-            # Create a dictionary to hold the GHG target data
-            self.GHG_TARGETS = {}  # pd.DataFrame(columns = ['TOTAL_GHG_TCO2E'])
-
-            # # Create linear function f and interpolate
-            f = interp1d(
-                list(settings.GHG_LIMITS.keys()),
-                list(settings.GHG_LIMITS.values()),
-                kind="linear",
-                fill_value="extrapolate",
-            )
-            # keys = range(2010, 2101)
-            for yr in range(2010, 2101):
-                self.GHG_TARGETS[yr] = f(yr)
 
 
         ###############################################################
@@ -1240,7 +1222,7 @@ class Data:
             self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS[[
                 'USER_DEFINED_TARGET_PERCENT_2030',
                 'USER_DEFINED_TARGET_PERCENT_2050', 
-                'USER_DEFINED_TARGET_PERCENT_2100']] = settings.GBF3_TARGET_PERCENT
+                'USER_DEFINED_TARGET_PERCENT_2100']] = settings.GBF3_TARGETS_DICT[settings.BIODIVERSTIY_TARGET_GBF_3]
             
 
         self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
@@ -1576,12 +1558,12 @@ class Data:
 
         bio_habitat_target_proportion = [
             bio_habitat_score_base_yr_proportion + ((1 - bio_habitat_score_base_yr_proportion) * i)
-            for i in settings.GBF2_TARGET_DICT.values()
+            for i in settings.GBF2_TARGETS_DICT[settings.GBF2_CONSTRAINT_TYPE].values()
         ]
 
         targets_key_years = {
             self.YR_CAL_BASE: bio_habitat_score_base_yr_sum, 
-            **dict(zip(settings.GBF2_TARGET_DICT.keys(), bio_habitat_score_baseline_sum * np.array(bio_habitat_target_proportion)))
+            **dict(zip(settings.GBF2_TARGETS_DICT[settings.GBF2_CONSTRAINT_TYPE].keys(), bio_habitat_score_baseline_sum * np.array(bio_habitat_target_proportion)))
         }
 
         f = interp1d(
