@@ -1558,12 +1558,12 @@ class Data:
 
         bio_habitat_target_proportion = [
             bio_habitat_score_base_yr_proportion + ((1 - bio_habitat_score_base_yr_proportion) * i)
-            for i in settings.GBF2_TARGETS_DICT[settings.GBF2_CONSTRAINT_TYPE].values()
+            for i in settings.GBF2_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS].values()
         ]
 
         targets_key_years = {
             self.YR_CAL_BASE: bio_habitat_score_base_yr_sum, 
-            **dict(zip(settings.GBF2_TARGETS_DICT[settings.GBF2_CONSTRAINT_TYPE].keys(), bio_habitat_score_baseline_sum * np.array(bio_habitat_target_proportion)))
+            **dict(zip(settings.GBF2_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS].keys(), bio_habitat_score_baseline_sum * np.array(bio_habitat_target_proportion)))
         }
 
         f = interp1d(
