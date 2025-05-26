@@ -18,7 +18,6 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 
-import numpy as np
 from luto.tools.create_task_runs.helpers import (
     get_settings_df,
     get_grid_search_param_df,
@@ -35,8 +34,8 @@ grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['40GB'],
-    'NCPUS':[10],
+    'MEM': ['20GB'],
+    'NCPUS':[5],
     'TIME': ['4:00:00'],
     'QUEUE': ['normalsr'],
     
@@ -130,13 +129,6 @@ if __name__ == '__main__':
     # # 1) Submit task to a single linux machine, and run simulations parallely
     # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
 
-    
-    create_task_runs(TASK_ROOT_DIR, grid_search_param_df, mode='cluster')
-    
     # 2) Submit task to multiple linux computation nodes
-    split_chunks = len(grid_search_param_df) // 100
-    for search_df in np.array_split(grid_search_settings_df, split_chunks, 1):
-        if 'Name' not in search_df.columns:
-            search_df['Name'] = grid_search_settings_df['Name']
-        create_task_runs(TASK_ROOT_DIR, search_df, mode='cluster')
+    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 500)
 

@@ -19,6 +19,7 @@
 
 import os, re, json
 import shutil, itertools, subprocess, zipfile
+import numpy as np
 import pandas as pd
 
 from tqdm.auto import tqdm
@@ -154,9 +155,9 @@ def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster']='si
     with open(f'{task_root_dir}/{col}/run_std.log', 'w') as std_file, \
          open(f'{task_root_dir}/{col}/run_err.log', 'w') as err_file:
         if mode == 'single': 
-            subprocess.run(['python', 'python_script.py'], cwd=f'{task_root_dir}/{col}', stdout=std_file, stderr=err_file)
+            subprocess.run(['python', 'python_script.py'], cwd=f'{task_root_dir}/{col}', stdout=std_file, stderr=err_file, check=True)
         elif mode == 'cluster' and os.name == 'posix':
-            subprocess.run(['bash', 'task_cmd.sh'], cwd=f'{task_root_dir}/{col}', stdout=std_file, stderr=err_file)
+            subprocess.run(['bash', 'task_cmd.sh'], cwd=f'{task_root_dir}/{col}', stdout=std_file, stderr=err_file, check=True)
         else:
             raise ValueError('Mode must be either "single" or "cluster"!')
         
@@ -188,7 +189,8 @@ def create_task_runs(
     task_root_dir:str, 
     custom_settings:pd.DataFrame, 
     mode:Literal['single','cluster']='single', 
-    n_workers:int=4
+    n_workers:int=4,
+    max_concurrent_tasks:int=300,
 ) -> None:
     '''
     Submit the tasks to the cluster using the custom settings.\n
@@ -216,16 +218,28 @@ def create_task_runs(
         custom_settings.loc[eval_vars] = custom_settings.loc[eval_vars].map(str).map(eval)
     
     # Create tasks
-    tasks = []  
     for col in custom_settings.columns:
         settings_dict = custom_settings.loc[:, col].copy()
         create_run_folders(task_root_dir, col, n_workers)
         write_settings(f'{task_root_dir}/{col}', settings_dict)
         write_terminal_vars(f'{task_root_dir}/{col}', col, settings_dict)
-        tasks.append(delayed(submit_task)(task_root_dir, col, mode=mode))
- 
-    for msg in Parallel(n_jobs=min(n_workers, len(tasks)), return_as='generator')(tasks):
-        print(msg)
+
+        # Wait until the number of running jobs is less than max_concurrent_tasks
+        while True:
+            try:
+                running_jobs = int(subprocess.run('qselect | wc -l', shell=True, capture_output=True, text=True).stdout.strip())
+            except Exception as e:
+                print(f"Error checking running jobs: {e}")
+            if running_jobs < max_concurrent_tasks:
+                break
+            else:
+                print(f"Max concurrent tasks reached ({running_jobs}/{max_concurrent_tasks}), waiting to submit {col}...")
+                import time; time.sleep(10)
+
+        # Submit the task
+        submit_task(task_root_dir, col, mode=mode)
+
+
 
 
    
