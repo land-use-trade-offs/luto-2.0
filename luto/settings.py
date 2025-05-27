@@ -93,7 +93,7 @@ DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 # Set amortisation period
 AMORTISATION_PERIOD = 30 # years
 
-TRANSITION_HURDEL_FACTOR = 1
+TRANSITION_HURDEL_FACTOR = 10
 '''
 The transition hurdle factor is an additional factor applied to the transition costs matrix to determine the hurdle rate for land-use transitions.
 
@@ -120,8 +120,8 @@ OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires sof
 # OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
 # Specify how demand for agricultural commodity production should be met in the solver
-# DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
-DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
+DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
+# DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
 
 
 # ---------------------------------------------------------------------------- #

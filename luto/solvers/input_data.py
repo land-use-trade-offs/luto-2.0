@@ -540,7 +540,7 @@ def get_economic_mrj(
     return [ag_obj_mrj, non_ag_obj_rk, ag_man_objs]
 
 
-def get_commodity_prices_BASE_YR(data: Data, target_year: int) -> np.ndarray:
+def get_commodity_prices_BASE_YR(data: Data) -> np.ndarray:
     """
     Get the commodity prices for the target year.
     """

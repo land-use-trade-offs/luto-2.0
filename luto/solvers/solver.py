@@ -304,10 +304,7 @@ class LutoSolver:
         # Get objectives 
         self.obj_economy = self._setup_economy_objective() / self._input_data.base_yr_prod["BASE_YR Economy(AUD)"]              # Normalise to the base year economy value
         self.obj_biodiv = self._setup_biodiversity_objective() / self._input_data.base_yr_prod["BASE_YR Biodiversity (score)"]  # Normalise to the base year biodiversity value
-        self.obj_penalties = (
-            (self._setup_penalty_objectives() + self._input_data.base_yr_prod["BASE_YR Production (t)"]) 
-            / self._input_data.base_yr_prod["BASE_YR Production (t)"]
-        )                                                                                                                       # Normalise to the base year production value
+        self.obj_penalties = self._setup_penalty_objectives()                                                                   # Normalise to the base year production value
  
         # Set the objective function
         if settings.OBJECTIVE == "mincost":
@@ -422,7 +419,10 @@ class LutoSolver:
             #     v * price
             #     for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices)
             # )
-            gp.quicksum(v for v in self.V)
+            (
+                (gp.quicksum(v for v in self.V) + self._input_data.base_yr_prod["BASE_YR Production (t)"]) 
+                / self._input_data.base_yr_prod["BASE_YR Production (t)"]
+            )
             if settings.DEMAND_CONSTRAINT_TYPE == "soft"
             else 0
         )
