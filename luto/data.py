@@ -1061,9 +1061,9 @@ class Data:
         self.D_CY = self.DEMAND_C.to_numpy(dtype = np.float32).T
         
         # Adjust demand data to the production data calculated using the base year layers;
-        # The mismatch is caused by resfactoring spatial layers. Demand targets for Land uses 
-        # of small size (i.e., other non-cereal crops) are distorted more under higher resfactoring.
-        self.D_CY *= (yr_cal_base_prod_data[None,:] / self.D_CY)
+        # The mismatch is caused by resfactoring spatial layers. Land uses of small size (i.e., other non-cereal crops) 
+        # are distorted more under higher resfactoring.
+        self.D_CY *= (yr_cal_base_prod_data / self.D_CY[0])[None, :]
 
 
         ###############################################################
