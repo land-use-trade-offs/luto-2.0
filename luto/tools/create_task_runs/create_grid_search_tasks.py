@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250523_XINHAO_GRIDSEARCH' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250523_XINHAO_GRIDSEARCH_gt_0.97' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -64,7 +64,7 @@ grid_search = {
        
     
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['low', 'medium', 'high'],            # 'off', 'low', 'medium', 'high'
+    'GHG_EMISSIONS_LIMITS': ['medium'],            # 'off', 'low', 'medium', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],            # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                  # True or False
@@ -82,7 +82,7 @@ grid_search = {
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSTIY_TARGET_GBF_2': ['low', 'medium', 'high'],    # 'off', 'low', 'medium', 'high'
+    'BIODIVERSTIY_TARGET_GBF_2': ['medium'],    # 'off', 'low', 'medium', 'high'
     'GBF2_CONSTRAINT_TYPE': ['hard'],           # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
@@ -100,7 +100,7 @@ grid_search = {
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_WEIGHT_ALPHA': [1],                  # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
-    'SOLVE_WEIGHT_BETA': np.arange(0, 1, 0.005),         
+    'SOLVE_WEIGHT_BETA': np.arange(0.97, 1, 0.0001),         
     
     
     #-------------------- Diet BAU --------------------
