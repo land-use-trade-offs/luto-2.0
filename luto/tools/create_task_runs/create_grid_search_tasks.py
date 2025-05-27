@@ -18,6 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 
+import numpy as np
 from luto.tools.create_task_runs.helpers import (
     get_settings_df,
     get_grid_search_param_df,
@@ -45,7 +46,7 @@ grid_search = {
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                 # 'maxprofit' or 'maxutility'
     'RESFACTOR': [13],
-    'SIM_YEARS': [list(range(2020,2051,10))],   # Years to run the model 
+    'SIM_YEARS': [list(range(2010,2051,10))],   # Years to run the model 
     'WRITE_THREADS': [2],
     'WRITE_OUTPUT_GEOTIFFS': [False],
     'KEEP_OUTPUTS': [False],                    # If False, only keep report HTML
@@ -76,12 +77,12 @@ grid_search = {
     'INCLUDE_WATER_LICENSE_COSTS': [1],
     
     # --------------- Biodiversity overall ---------------
-    'HABITAT_CONDITION': ['HCAS', 'USER_DEFINED', 'LUTO_ORIGINAL'],                
+    'HABITAT_CONDITION': ['HCAS'],                
     'CONNECTIVITY_SOURCE': ['NCI'],
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSTIY_TARGET_GBF_2': ['medium'],    # 'off', 'medium', 'high'
+    'BIODIVERSTIY_TARGET_GBF_2': ['low', 'medium', 'high'],    # 'off', 'low', 'medium', 'high'
     'GBF2_CONSTRAINT_TYPE': ['hard'],           # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
@@ -99,7 +100,7 @@ grid_search = {
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_WEIGHT_ALPHA': [1],                  # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
-    'SOLVE_WEIGHT_BETA': [0.5] ,#np.arange(0, 1, 0.005),         
+    'SOLVE_WEIGHT_BETA': np.arange(0, 1, 0.005),         
     
     
     #-------------------- Diet BAU --------------------

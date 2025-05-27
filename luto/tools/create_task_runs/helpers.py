@@ -239,7 +239,7 @@ def create_task_runs(
                 import time; time.sleep(10)
 
         # Submit the task
-        submit_task(task_root_dir, col, mode=mode)
+        print(submit_task(task_root_dir, col, mode=mode))
 
 
 
@@ -262,9 +262,7 @@ def return_plain_df(json_dir_path, filename):
         return pd.json_normalize(json.load(f), 'data', ['name']).rename(columns={0: 'year', 1: 'val'})
 
 def load_json_data(json_dir_path, filename):
-    if not os.path.exists(os.path.join(json_dir_path)):
-        return return_empty_df(json_dir_path, filename)
-    elif filename.endswith('.zip'):
+    if json_dir_path.endswith('.zip'):
         return return_zipped_df(json_dir_path, filename)
     else:
         return return_plain_df(json_dir_path, filename)
@@ -280,9 +278,9 @@ def process_area_non_ag_lu(json_dir_path):
 def process_area_ag_man(json_dir_path):
     return load_json_data(json_dir_path, 'area_4_am_total_area_wide.json')
 
-def process_profit_data(json_dir_path):
+def process_economic_data(json_dir_path):
     df = load_json_data(json_dir_path, 'economics_0_rev_cost_all_wide.json')
-    return df.query('name == "Profit"')
+    return df
 
 def process_production_quantity_data(json_dir_path):
     return load_json_data(json_dir_path, 'production_5_6_demand_Production_commodity_from_LUTO.json')
@@ -314,7 +312,7 @@ def get_report_df(json_dir_path, run_paras):
     df_area_all_lu = process_area_all_lu(json_dir_path)
     df_area_non_ag_lu = process_area_non_ag_lu(json_dir_path)
     df_area_ag_man = process_area_ag_man(json_dir_path)
-    df_profit = process_profit_data(json_dir_path)
+    df_economy = process_economic_data(json_dir_path)
     df_ghg_deviation = process_GHG_deviation_data(json_dir_path)
     df_demand_deviation = process_production_deviation_data(json_dir_path)
     df_bio_objective = process_bio_obj_data(json_dir_path)
@@ -323,7 +321,7 @@ def get_report_df(json_dir_path, run_paras):
         df_area_all_lu[['year', 'name', 'val']].assign(Type='Area_all_lu_million_km2'),
         df_area_non_ag_lu[['year', 'name', 'val']].assign(Type='Area_non_ag_lu_million_km2'),
         df_area_ag_man[['year', 'name', 'val']].assign(Type='Area_ag_man_million_km2'),
-        df_profit[['year', 'name', 'val']].assign(Type='Profit_billion_AUD'),
+        df_economy[['year', 'name', 'val']].assign(Type='Economic_billion_AUD'),
         df_demand_deviation[['year', 'name', 'val']].assign(Type='Production_deviation_pct'),
         df_ghg_deviation[['year', 'name', 'val']].assign(Type='GHG_Deviation_pct'),
         df_bio_objective[['year', 'name', 'val']].assign(Type='Biodiversity_obj_score'),
@@ -335,34 +333,35 @@ def get_report_df(json_dir_path, run_paras):
 
 def process_task_root_dirs(task_root_dir, n_workers=10):
     
-    grid_search_params = pd.read_csv(f"{task_root_dir}/grid_search_parameters.csv")
+    grid_search_params = pd.read_csv(f"{task_root_dir}/grid_search_parameters_unique.csv")
     run_dirs = [i for i in os.listdir(task_root_dir) if os.path.isdir(os.path.join(task_root_dir, i))]
-    run_dirs = [i for i in run_dirs if 'Run_' in i]
+    run_dirs = sorted([i for i in run_dirs if 'Run_' in i])
     
     tasks = []
-    for dir in run_dirs:
-        run_idx = int(dir.split('_')[-1])
+    for run_dir in run_dirs:
+        run_idx = int(run_dir.split('_')[-1])
         run_paras = grid_search_params.query(f'run_idx == {int(run_idx)}').to_dict(orient='records')[0]
 
-        # First try to find the JSON data in tht zip file
-        json_dir_path = os.path.join(task_root_dir, dir, 'DATA_REPORT.zip')
-        
-        # Then try to find the JSON data in the unzipped `output` folder
-        output_dir = os.path.join(task_root_dir, dir, 'output')
-        if (not os.path.exists(json_dir_path)) and os.path.exists(output_dir):
-            last_dir = sorted([d for d in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, d))])[-1]
-            json_dir_path = os.path.join(output_dir, last_dir, 'DATA_REPORT', 'data')
-        else:
-            print(f'{dir}: No outputs found in Run_{run_idx}!')
-            continue
-        
-        # If the JSON data path still does not exist, skip this run
+        # Depending on output structure, the report can be found in different places
+        output_dir = os.path.join(task_root_dir, run_dir, 'output')
+        json_dir_path = os.path.join(task_root_dir, run_dir, 'DATA_REPORT.zip')
+
+        if os.path.exists(output_dir):
+            out_dirs = [d for d in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, d))]
+            if not out_dirs:
+                print(f'{run_dir}: No output directories found in Run_{run_idx}!')
+                continue
+            else:
+                last_dir = sorted([d for d in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, d))])[-1]
+                json_dir_path = os.path.join(output_dir, last_dir, 'DATA_REPORT', 'data')
+
         if not os.path.exists(json_dir_path):
-            print(f'{dir}: DATA_REPORT not found in Run_{run_idx}!')
+            print(f'{run_dir}: DATA_REPORT not found in Run_{run_idx}!')
             continue
         
         # Json to df
         tasks.append(delayed(get_report_df)(json_dir_path, run_paras))
+        
         
     # Concatenate the results, only keep the columns with more than 1 unique value
     out_df = pd.concat(tqdm(Parallel(n_jobs=n_workers, return_as='generator')(tasks), total=len(tasks)), ignore_index=True)
