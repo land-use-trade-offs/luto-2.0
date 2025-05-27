@@ -1018,6 +1018,16 @@ class Data:
         )
         
         
+        ###############################################################
+        # Calculate base year production 
+        ###############################################################
+
+        self.AG_MAN_L_MRJ_DICT = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
+        self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
+        
+        print(f"\tCalculating base year productivity...", flush=True)
+        yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)        
+        self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
 
 
 
@@ -1048,8 +1058,12 @@ class Data:
         self.DEMAND_C = self.DEMAND_DATA.loc[self.DEMAND_DATA.query("COMMODITY not in @settings.OFF_LAND_COMMODITIES").index, 'PRODUCTION'].copy()
 
         # Convert to numpy array of shape (91, 26)
-        self.DEMAND_C = self.DEMAND_C.to_numpy(dtype = np.float32).T
-        self.D_CY = self.DEMAND_C # new demand is in tonnes rather than deltas
+        self.D_CY = self.DEMAND_C.to_numpy(dtype = np.float32).T
+        
+        # Adjust demand data to the production data calculated using the base year layers;
+        # The mismatch is caused by resfactoring spatial layers. Land uses of small size (i.e., other non-cereal crops) 
+        # are distorted more under higher resfactoring.
+        self.D_CY *= (yr_cal_base_prod_data[None,:] / self.D_CY)
 
 
         ###############################################################
@@ -1384,22 +1398,11 @@ class Data:
         # HIR data.
         ###############################################################
         print("\tLoading HIR data...", flush=True)
-
+        
         self.HIR_MASK = np.load(os.path.join(settings.INPUT_DIR, "hir_mask.npy"))[self.MASK].astype(bool)
 
 
-        ###############################################################
-        # Calculate base year production 
-        ###############################################################
-
-        self.AG_MAN_L_MRJ_DICT = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
-        self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
-        
-        print(f"\tCalculating base year productivity...", flush=True)
-        yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)        
-        self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
-
-
+ 
         print("Data loading complete\n")     
         
            

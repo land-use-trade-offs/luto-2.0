@@ -197,7 +197,7 @@ class SolverInputData:
 
         return dict(cells2non_ag_lu) 
     
-def get_demand_c(data, target_year):
+def get_demand_c(data: Data, target_year):
     return data.D_CY[target_year - data.YR_CAL_BASE]
     
 def get_ag_c_mrj(data: Data, target_index):
@@ -595,10 +595,7 @@ def get_priority_degraded_mask_idx(data: Data) -> np.ndarray:
     return np.where(data.BIO_PRIORITY_DEGRADED_AREAS_MASK)[0]
 
 
-def get_limits(
-    data: Data, 
-    yr_cal: int,
-) -> dict[str, Any]:
+def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
     """
     Gets the following limits for the solve:
     - Water net yield limits
