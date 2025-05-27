@@ -661,10 +661,11 @@ def set_limits(data: Data, yr_cal) -> None:
     limit_non_ag_adop = pd.DataFrame()
 
     if settings.WATER_LIMITS == 'on':
+        water_limits = ag_water.get_water_net_yield_limit_for_regions_inside_LUTO(data)
         limit_water = pd.DataFrame({
             'Type': 'Water', 
-            'code': data.WATER_REGION_NAMES.keys(), 
-            'target':data.WATER_REGION_HIST_LEVEL.values()})
+            'code': water_limits.keys(), 
+            'target':water_limits.values()})
 
     if settings.GHG_EMISSIONS_LIMITS != 'off':
         limit_GHG = pd.DataFrame([{'Type': 'GHG', 'target': data.GHG_TARGETS[yr_cal]}])
@@ -719,7 +720,7 @@ def set_limits(data: Data, yr_cal) -> None:
         limit_ag_adop,
         limit_non_ag_adop
     ], ignore_index=True)
-    
+        
     return limits
 
 

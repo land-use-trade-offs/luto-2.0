@@ -93,7 +93,7 @@ DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 # Set amortisation period
 AMORTISATION_PERIOD = 30 # years
 
-TRANSITION_HURDEL_FACTOR = 0
+TRANSITION_HURDEL_FACTOR = 1
 '''
 The transition hurdle factor is an additional factor applied to the transition costs matrix to determine the hurdle rate for land-use transitions.
 
