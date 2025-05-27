@@ -62,7 +62,7 @@ plot_landscape_demand = (
         )
     ) +
     p9.geom_line() +
-    p9.facet_grid('BIODIVERSTIY_TARGET_GBF_2~GHG_EMISSIONS_LIMITS') +
+    # p9.facet_grid('BIODIVERSTIY_TARGET_GBF_2~GHG_EMISSIONS_LIMITS') +
     p9.theme_bw() +
     p9.theme(
         strip_text=p9.element_text(size=8), 

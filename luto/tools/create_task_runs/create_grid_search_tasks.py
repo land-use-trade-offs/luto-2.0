@@ -100,7 +100,7 @@ grid_search = {
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_WEIGHT_ALPHA': [1],                  # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
-    'SOLVE_WEIGHT_BETA': np.arange(0.97, 1, 0.0001),         
+    'SOLVE_WEIGHT_BETA': np.arange(0.95, 1, 0.0001),         
     
     
     #-------------------- Diet BAU --------------------
