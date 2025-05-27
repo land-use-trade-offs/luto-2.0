@@ -208,6 +208,36 @@ def get_rev_matrices(data, yr_idx, aggregate:bool = True):
     return np.einsum('jmr->mrj', arr_jmr)
 
 
+def get_commodity_prices(data: Data) -> np.ndarray:
+    '''
+    Get the prices of commodities in the base year. These prices will be used as multiplier
+    to weight deviatios of commodity production from the target.
+    '''
+    
+    commodity_lookup = {
+        ('P1','BEEF'): 'beef meat',
+        ('P3','BEEF'): 'beef lexp',
+        ('P1','SHEEP'): 'sheep meat',
+        ('P2','SHEEP'): 'sheep wool',
+        ('P3','SHEEP'): 'sheep lexp',
+        ('P1','DAIRY'): 'dairy',
+    }
+
+    commodity_prices = {}
+
+    # Get the median price of each commodity
+    for names, commodity in commodity_lookup.items():
+        prices = np.nanpercentile(data.AGEC_LVSTK[names[0], names[1]], 50)
+        prices = prices * 1000 if commodity == 'dairy' else prices # convert to per tonne for dairy
+        commodity_prices[commodity] = prices
+
+    # Get the median price of each crop; here need to use 'irr' because dry-Rice does exist in the data
+    for name, col in data.AGEC_CROPS['P1','irr'].items():
+        commodity_prices[name.lower()] = np.nanpercentile(col, 50)
+
+    return np.array([commodity_prices[k] for k in data.COMMODITIES])
+
+
 def get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx):
     """
     Applies the effects of using asparagopsis to the revenue data

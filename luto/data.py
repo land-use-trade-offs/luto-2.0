@@ -291,11 +291,22 @@ class Data:
 
         # List of products. Everything upper case to avoid mistakes.
         self.PR_CROPS = [s.upper() for s in self.LU_CROPS]
-        self.PR_LVSTK = [ s.upper() + ' ' + p
-                          for s in self.LU_LVSTK if 'DAIRY' not in s.upper()
-                          for p in ['LEXP', 'MEAT'] ]
-        self.PR_LVSTK += [s.upper() for s in self.LU_LVSTK if 'DAIRY' in s.upper()]
-        self.PR_LVSTK += [s.upper() + ' WOOL' for s in self.LU_LVSTK if 'SHEEP' in s.upper()]
+        self.PR_LVSTK = [
+            'BEEF - MODIFIED LAND LEXP',
+            'BEEF - MODIFIED LAND MEAT',
+            'BEEF - NATURAL LAND LEXP',
+            'BEEF - NATURAL LAND MEAT',
+            
+            'DAIRY - MODIFIED LAND',
+            'DAIRY - NATURAL LAND',
+            
+            'SHEEP - MODIFIED LAND LEXP',
+            'SHEEP - MODIFIED LAND MEAT',
+            'SHEEP - MODIFIED LAND WOOL',
+            'SHEEP - NATURAL LAND LEXP',
+            'SHEEP - NATURAL LAND MEAT',
+            'SHEEP - NATURAL LAND WOOL'
+        ]
         self.PRODUCTS = self.PR_CROPS + self.PR_LVSTK
         self.PRODUCTS.sort() # Ensure lexicographic order.
 

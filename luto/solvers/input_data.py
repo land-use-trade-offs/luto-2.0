@@ -380,6 +380,10 @@ def get_ag_t_mrj(data: Data, target_index, base_year):
         target_index, 
         base_year
     ).astype(np.float32)
+    
+    # Double the cost to simulate the hurdle of the transition
+    ag_t_mrj *= (1 + settings.TRANSITION_HURDEL_FACTOR)
+    
     # Transition costs occures if the base year is not the target year
     return ag_t_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(ag_t_mrj).astype(np.float32)
 
@@ -536,37 +540,14 @@ def get_economic_mrj(
     return [ag_obj_mrj, non_ag_obj_rk, ag_man_objs]
 
 
+def get_commodity_prices_BASE_YR(data: Data, target_year: int) -> np.ndarray:
+    """
+    Get the commodity prices for the target year.
+    """
+    print('Getting commodity prices...', flush = True)
+    return ag_revenue.get_commodity_prices(data)
 
-def get_commodity_prices(data: Data) -> np.ndarray:
-    '''
-    Get the prices of commodities in the base year. These prices will be used as multiplier
-    to weight deviatios of commodity production from the target.
-    '''
-    
-    commodity_lookup = {
-        ('P1','BEEF'): 'beef meat',
-        ('P3','BEEF'): 'beef lexp',
-        ('P1','SHEEP'): 'sheep meat',
-        ('P2','SHEEP'): 'sheep wool',
-        ('P3','SHEEP'): 'sheep lexp',
-        ('P1','DAIRY'): 'dairy',
-    }
 
-    commodity_prices = {}
-
-    # Get the median price of each commodity
-    for names, commodity in commodity_lookup.items():
-        prices = np.nanpercentile(data.AGEC_LVSTK[names[0], names[1]], 50)
-        prices = prices * 1000 if commodity == 'dairy' else prices # convert to per tonne for dairy
-        commodity_prices[commodity] = prices
-
-    # Get the median price of each crop; here need to use 'irr' because dry-Rice does exist in the data
-    for name, col in data.AGEC_CROPS['P1','irr'].items():
-        commodity_prices[name.lower()] = np.nanpercentile(col, 50)
-
-    return np.array([commodity_prices[k] for k in data.COMMODITIES])
-    
-    
 def get_target_yr_carbon_price(data: Data, target_year: int) -> float:
     return data.CARBON_PRICES[target_year]
 
@@ -816,8 +797,8 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         ag_man_limits=get_ag_man_limits(data, target_index),                            
         ag_man_lb_mrj=get_ag_man_lb_mrj(data, base_year),
         
-        water_region_indices=get_w_region_indices(data),        # Indices for each watershed region
-        water_region_names=get_w_region_names(data),            # Names for each watershed region
+        water_region_indices=get_w_region_indices(data),
+        water_region_names=get_w_region_names(data),
         
         biodiv_contr_ag_j=get_ag_biodiv_contr_j(data),
         biodiv_contr_non_ag_k=get_non_ag_biodiv_impact_k(data),
@@ -840,7 +821,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         priority_degraded_mask_idx=get_priority_degraded_mask_idx(data),
 
         economic_contr_mrj=(ag_obj_mrj, non_ag_obj_rk,  ag_man_objs),
-        economic_BASE_YR_prices=get_commodity_prices(data),
+        economic_BASE_YR_prices=get_commodity_prices_BASE_YR(data),
         economic_target_yr_carbon_price=get_target_yr_carbon_price(data, target_year), 
         
         base_yr_prod = {

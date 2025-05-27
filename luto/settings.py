@@ -93,13 +93,23 @@ DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 # Set amortisation period
 AMORTISATION_PERIOD = 30 # years
 
+TRANSITION_HURDEL_FACTOR = 1
+'''
+The transition hurdle factor is an additional factor applied to the transition costs matrix to determine the hurdle rate for land-use transitions.
+
+The hurdled_costs  = original_transition_costs * (1 + TRANSITION_HURDEL_FACTOR)
+ - A value of 0 means that the original transition costs is used.
+ - A value of 1 means that the transition costs are are doubled.
+
+'''
+
 
 # ---------------------------------------------------------------------------- #
 # Model parameters
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 7      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 15      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
 SIM_YEARS = list(range(2010,2051,10)) # range(2020,2050)
@@ -443,14 +453,14 @@ GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (l
 # GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
 # Weight for the GHG/Demand deviation in the objective function
-SOLVE_WEIGHT_ALPHA = 0.1  
+SOLVE_WEIGHT_ALPHA = 1  
 ''' 
 Range from 0 to 1 that balances the relative important between economic values and biodiversity scores.
  - if approaching 0, the model will focus on maximising biodiversity scores.
  - if approaching 1, the model will focus on maximising prifit (or minimising cost).
 '''
 
-SOLVE_WEIGHT_BETA = 0.9
+SOLVE_WEIGHT_BETA = 0.975
 '''
 The weight of the deviations from target in the objective function.
  - if approaching 0, the model will ignore the deviations from target.
