@@ -819,53 +819,64 @@ class LutoSolver:
 
         print("    ...Biodiversity GBF 2 (conservation priority) constraints...")
         
-        bio_ag_contr = gp.quicksum(
-            gp.quicksum(
-                self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.priority_degraded_mask_idx)]
-                * self._input_data.biodiv_contr_ag_j[j]
-                * self.X_ag_dry_vars_jr[j, np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.priority_degraded_mask_idx)]
-            )
-            + gp.quicksum(
-                self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.priority_degraded_mask_idx)]
-                * self._input_data.biodiv_contr_ag_j[j]
-                * self.X_ag_irr_vars_jr[j, np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.priority_degraded_mask_idx)]
-            )  
-            for j in range(self._input_data.n_ag_lus)
-        )
-        bio_ag_man_contr = gp.quicksum(
-            gp.quicksum(
-                self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)]
-                * self._input_data.biodiv_contr_ag_man[am][j_idx][np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)]
-                * self.X_ag_man_dry_vars_jr[am][j_idx, np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)]
-            )  
-            + gp.quicksum(
-                self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)]
-                * self._input_data.biodiv_contr_ag_man[am][j_idx][np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)]
-                * self.X_ag_man_irr_vars_jr[am][j_idx, np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)]
-            )  
-            for am, am_j_list in self._input_data.am2j.items()
-            for j_idx in range(len(am_j_list))
-        )
-        bio_non_ag_contr = gp.quicksum(
-            gp.quicksum(
-                self._input_data.GBF2_raw_priority_degraded_area_r[np.intersect1d(self._input_data.non_ag_lu2cells[k], self._input_data.priority_degraded_mask_idx)]
-                * self._input_data.biodiv_contr_non_ag_k[k]
-                * self.X_non_ag_vars_kr[k, np.intersect1d(self._input_data.non_ag_lu2cells[k], self._input_data.priority_degraded_mask_idx)]
-            )
-            for k in range(self._input_data.n_non_ag_lus)
-        )
+        bio_ag_exprs = []
+        bio_ag_man_exprs = []
+        bio_non_ag_exprs = []
         
-        # Get the biodiversity contribution expression
-        self.bio_GBF2_priority_degraded_area_expr = bio_ag_contr + bio_ag_man_contr + bio_non_ag_contr
-        biodiversity_limits = self._input_data.limits["GBF2_priority_degrade_areas"]
+        for j in range(self._input_data.n_ag_lus):
+            ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j], self._input_data.priority_degraded_mask_idx)
+            ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j], self._input_data.priority_degraded_mask_idx)
+            bio_ag_exprs.append(
+                gp.quicksum(
+                    self._input_data.GBF2_raw_priority_degraded_area_r[ind_dry]
+                    * self._input_data.biodiv_contr_ag_j[j]
+                    * self.X_ag_dry_vars_jr[j, ind_dry]
+                )
+                + gp.quicksum(
+                    self._input_data.GBF2_raw_priority_degraded_area_r[ind_irr]
+                    * self._input_data.biodiv_contr_ag_j[j]
+                    * self.X_ag_irr_vars_jr[j, ind_irr]
+                ) 
+            )
+        for am, am_j_list in self._input_data.am2j.items():
+            for j_idx in range(len(am_j_list)):
+                
+                ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)
+                ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)
+                bio_ag_man_exprs.append(
+                    self._input_data.GBF2_raw_priority_degraded_area_r[ind_dry]
+                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind_dry]
+                    * self.X_ag_man_dry_vars_jr[am][j_idx, ind_dry]
+                )  
+                + gp.quicksum(
+                    self._input_data.GBF2_raw_priority_degraded_area_r[ind_irr]
+                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind_irr]
+                    * self.X_ag_man_irr_vars_jr[am][j_idx, ind_irr]
+                )  
+        for k in range(self._input_data.n_non_ag_lus):
+            ind = np.intersect1d(self._input_data.non_ag_lu2cells[k], self._input_data.priority_degraded_mask_idx)
+            bio_non_ag_exprs.append(
+                gp.quicksum(
+                    self._input_data.GBF2_raw_priority_degraded_area_r[ind]
+                    * self._input_data.biodiv_contr_non_ag_k[k]
+                    * self.X_non_ag_vars_kr[k, ind]
+                )
+            )
+
+        self.bio_GBF2_priority_degraded_area_expr = gp.quicksum(bio_ag_exprs) + gp.quicksum(bio_ag_man_exprs) + gp.quicksum(bio_non_ag_exprs)
         
-        print(f"       |-- Biodiversity GBF 2 (conservation priority): {biodiversity_limits:,.0f}")
+        print(f"       |-- Biodiversity GBF 2 (conservation priority): {self._input_data.limits["GBF2_priority_degrade_areas"]:,.0f}")
         
         if settings.GBF2_CONSTRAINT_TYPE == "hard":
-            constr = self.bio_GBF2_priority_degraded_area_expr >= biodiversity_limits
-            self.bio_GBF2_priority_degraded_area_limit_constraint_hard = self.gurobi_model.addConstr(constr, name="bio_GBF2_priority_degraded_area_limit_hard")
+            self.bio_GBF2_priority_degraded_area_limit_constraint_hard = self.gurobi_model.addConstr(
+                self.bio_GBF2_priority_degraded_area_expr >= self._input_data.limits["GBF2_priority_degrade_areas"], 
+                name="bio_GBF2_priority_degraded_area_limit_hard"
+            )
         elif settings.GBF2_CONSTRAINT_TYPE == "soft":
-            constr = self.gurobi_model.addConstr(biodiversity_limits - self.bio_GBF2_priority_degraded_area_expr <= self.B, name="bio_GBF2_priority_degraded_area_limit_soft")
+            constr = self.gurobi_model.addConstr(
+                self._input_data.limits["GBF2_priority_degrade_areas"] - self.bio_GBF2_priority_degraded_area_expr <= self.B, 
+                name="bio_GBF2_priority_degraded_area_limit_soft"
+            )
             self.bio_GBF2_priority_degraded_area_limit_constraint_soft.append(constr)
         else:
             raise ValueError(
