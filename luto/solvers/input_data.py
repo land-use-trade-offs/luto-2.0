@@ -289,10 +289,14 @@ def get_GBF3_MVG_area_vr(data: Data):
     return output
 
 def get_GBF3_major_vegetation_names(data: Data) -> dict[int,str]:
+    if settings.BIODIVERSTIY_TARGET_GBF_3 == "off":
+        return np.empty(0)
     print('Getting agricultural major vegetation groups names...', flush = True)
     return data.BIO_GBF3_ID2DESC
 
 def get_GBF3_major_indices(data: Data) -> dict[str, int]:
+    if settings.BIODIVERSTIY_TARGET_GBF_3 == "off":
+        return np.empty(0)
     print('Getting agricultural major vegetation groups indices...', flush = True)
     return data.MAJOR_VEG_INDECES
 

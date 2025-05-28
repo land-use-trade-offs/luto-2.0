@@ -844,14 +844,14 @@ class LutoSolver:
                 ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)
                 ind_irr = np.intersect1d(self._input_data.ag_lu2cells[1, j_idx], self._input_data.priority_degraded_mask_idx)
                 bio_ag_man_exprs.append(
-                    self._input_data.GBF2_raw_priority_degraded_area_r[ind_dry]
-                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind_dry]
-                    * self.X_ag_man_dry_vars_jr[am][j_idx, ind_dry]
-                )  
-                + gp.quicksum(
-                    self._input_data.GBF2_raw_priority_degraded_area_r[ind_irr]
-                    * self._input_data.biodiv_contr_ag_man[am][j_idx][ind_irr]
-                    * self.X_ag_man_irr_vars_jr[am][j_idx, ind_irr]
+                    gp.quicksum(self._input_data.GBF2_raw_priority_degraded_area_r[ind_dry]
+                        * self._input_data.biodiv_contr_ag_man[am][j_idx][ind_dry]
+                        * self.X_ag_man_dry_vars_jr[am][j_idx, ind_dry])
+                    + gp.quicksum(
+                        self._input_data.GBF2_raw_priority_degraded_area_r[ind_irr]
+                        * self._input_data.biodiv_contr_ag_man[am][j_idx][ind_irr]
+                        * self.X_ag_man_irr_vars_jr[am][j_idx, ind_irr]
+                    )
                 )  
         for k in range(self._input_data.n_non_ag_lus):
             ind = np.intersect1d(self._input_data.non_ag_lu2cells[k], self._input_data.priority_degraded_mask_idx)
