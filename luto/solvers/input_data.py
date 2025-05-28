@@ -203,9 +203,7 @@ class SolverInputData:
 
         return dict(cells2non_ag_lu) 
     
-def get_demand_c(data: Data, target_year):
-    return data.D_CY[target_year - data.YR_CAL_BASE]
-    
+
 def get_ag_c_mrj(data: Data, target_index):
     print('Getting agricultural cost matrices...', flush = True)
     output = ag_cost.get_cost_matrices(data, target_index)
@@ -625,7 +623,7 @@ def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
     }
     
     if True:    # Always set demand limits
-        limits['demand'] = get_demand_c(data, yr_cal)
+        limits['demand'] = data.D_CY[yr_cal - data.YR_CAL_BASE]
     
     if settings.WATER_LIMITS == 'on':
         limits['water'] = ag_water.get_water_net_yield_limit_for_regions_inside_LUTO(data)
@@ -676,7 +674,7 @@ def set_limits(data: Data, yr_cal) -> None:
             'Type': 'Demand', 
             'name': data.COMMODITIES,
             'code': range(data.NCMS),
-            'target': get_demand_c(data, yr_cal)
+            'target': data.D_CY[yr_cal - data.YR_CAL_BASE]
         })
     
 
