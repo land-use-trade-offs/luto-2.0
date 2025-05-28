@@ -18,10 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 
-import pandas as pd
-import numpy as np
 import plotnine as p9
-import plotly.express as px
 from luto.tools.create_task_runs.create_grid_search_tasks import TASK_ROOT_DIR
 from luto.tools.create_task_runs.helpers import process_task_root_dirs
 
@@ -45,7 +42,7 @@ query_str = '''
 df_economics = report_data.query(query_str).copy()
 
 valid_runs_demand = set(report_data['run_idx']) - set(
-    df_economics.query('abs(val) >= 40')['run_idx']
+    df_economics.query('abs(val) >= 30')['run_idx']
 )
 
 df_economics = df_economics.query('run_idx.isin(@valid_runs_demand)')
@@ -62,7 +59,7 @@ plot_landscape_demand = (
         )
     ) +
     p9.geom_line() +
-    # p9.facet_grid('BIODIVERSTIY_TARGET_GBF_2~GHG_EMISSIONS_LIMITS') +
+    p9.facet_wrap('TRANSITION_HURDEL_FACTOR') +
     p9.theme_bw() +
     p9.theme(
         strip_text=p9.element_text(size=8), 

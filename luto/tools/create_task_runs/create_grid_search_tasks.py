@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250523_XINHAO_GRIDSEARCH_gt_0.97' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250523_XINHAO_GRIDSEARCH_HURDLE_BETA' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -55,6 +55,9 @@ grid_search = {
     ###############################################################
     # Model run settings
     ###############################################################
+    
+    # --------------- Economic settings --------------- 
+    'TRANSITION_HURDEL_FACTOR': np.arange(0,15,1),         # Between 0 and 1, the higher the value, the more difficult it is to transition land use
     
     # --------------- Demand settings ---------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],         # 'hard' or 'soft' 
@@ -100,7 +103,7 @@ grid_search = {
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_WEIGHT_ALPHA': [1],                  # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
-    'SOLVE_WEIGHT_BETA': np.arange(0.95, 1, 0.0001),         
+    'SOLVE_WEIGHT_BETA': np.arange(0.97,1,0.001),         
     
     
     #-------------------- Diet BAU --------------------
