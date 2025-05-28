@@ -17,12 +17,14 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
+
+import numpy as np
+import pandas as pd
+
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, Optional
-import numpy as np
-import pandas as pd
 
 from luto import settings
 from luto.economics import land_use_culling
@@ -53,7 +55,6 @@ class SolverInputData:
     """   
     base_year: int                                                      # The base year of this solving process
     target_year: int                                                    # The target year of this solving process
-    demand_c: np.ndarray                                                # The commodity demand of the target year
 
     ag_g_mrj: np.ndarray                                                # Agricultural greenhouse gas emissions matrices.
     ag_w_mrj: np.ndarray                                                # Agricultural water yields matrices.
@@ -114,6 +115,11 @@ class SolverInputData:
     resmult: float                                                      # Resolution factor multiplier from data.RESMULT
     real_area: np.ndarray                                               # Area of each cell, indexed by cell (r)
                 
+    @property
+    def ncms(self):
+        # Number of commodities
+        return self.pr2cm_cp.shape[0]           
+    
     @property
     def n_ag_lms(self):
         # Number of agricultural landmans
@@ -606,6 +612,7 @@ def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
     print('Getting environmental limits...', flush = True)
     
     limits = {
+        'demand': None,
         'water': None,
         'ghg': None,
         'GBF2_priority_degrade_areas': None,
@@ -616,6 +623,9 @@ def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
         'ag_regional_adoption': None,
         'non_ag_regional_adoption': None,
     }
+    
+    if True:    # Always set demand limits
+        limits['demand'] = get_demand_c(data, yr_cal)
     
     if settings.WATER_LIMITS == 'on':
         limits['water'] = ag_water.get_water_net_yield_limit_for_regions_inside_LUTO(data)
@@ -650,6 +660,7 @@ def set_limits(data: Data, yr_cal) -> None:
     """
     Set the limits in the data object.
     """
+    limit_demand = pd.DataFrame()
     limit_water = pd.DataFrame()
     limit_GHG = pd.DataFrame()
     limit_GBF_2 = pd.DataFrame()
@@ -659,12 +670,22 @@ def set_limits(data: Data, yr_cal) -> None:
     limit_GBF_8 = pd.DataFrame()
     limit_ag_adop = pd.DataFrame()
     limit_non_ag_adop = pd.DataFrame()
+    
+    if True:  # Always set demand limits
+        limit_demand = pd.DataFrame({
+            'Type': 'Demand', 
+            'name': data.COMMODITIES,
+            'code': range(data.NCMS),
+            'target': get_demand_c(data, yr_cal)
+        })
+    
 
     if settings.WATER_LIMITS == 'on':
         water_limits = ag_water.get_water_net_yield_limit_for_regions_inside_LUTO(data)
         limit_water = pd.DataFrame({
             'Type': 'Water', 
-            'code': water_limits.keys(), 
+            'name': data.WATER_REGION_NAMES.values(),
+            'code': data.WATER_REGION_NAMES.keys(), 
             'target':water_limits.values()})
 
     if settings.GHG_EMISSIONS_LIMITS != 'off':
@@ -676,24 +697,28 @@ def set_limits(data: Data, yr_cal) -> None:
     if settings.BIODIVERSTIY_TARGET_GBF_3 != 'off':
         limit_GBF_3 = pd.DataFrame([{
             'Type': 'GBF-3', 
-            'code': get_GBF3_major_vegetation_names(data), 
+            'name': get_GBF3_major_vegetation_names(data).values(),
+            'code': get_GBF3_major_vegetation_names(data).keys(), 
             'target': get_GBF3_major_indices(data)}])
 
     if settings.BIODIVERSTIY_TARGET_GBF_4_SNES == "on":
         limit_GBF_4_SNES = pd.DataFrame({
             'Type': 'GBF-4-SNES',
+            'name': get_GBF4_SNES_names(data).values(),
             'code': get_GBF4_SNES_names(data).keys(),
             'target': data.get_GBF4_SNES_target_inside_LUTO_by_year(yr_cal)})
 
     if settings.BIODIVERSTIY_TARGET_GBF_4_ECNES == "on":
         limit_GBF_4_ECNES = pd.DataFrame({
             'Type': 'GBF-4-ECNES',
+            'name': get_GBF4_ECNES_names(data).values(),
             'code': get_GBF4_SNES_names(data).keys(),
             'target': data.get_GBF4_ECNES_target_inside_LUTO_by_year(yr_cal)})
 
     if settings.BIODIVERSTIY_TARGET_GBF_8 == "on":
         limit_GBF_8 = pd.DataFrame({
             'Type': 'GBF-8',
+            'name': get_GBF8_species_names(data).values(),
             'code': get_GBF8_species_names(data).keys(),
             'target': get_GBF8_species_conservation_indices(data, yr_cal)})
 
@@ -710,6 +735,7 @@ def set_limits(data: Data, yr_cal) -> None:
         
     # Combine all limits into a single dataframe
     limits = pd.concat([
+        limit_demand,
         limit_water,
         limit_GHG,
         limit_GBF_2,
@@ -772,7 +798,6 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     return SolverInputData(
         base_year=base_year,
         target_year=target_year,
-        demand_c=get_demand_c(data, target_year),
         
         ag_g_mrj=ag_g_mrj,
         ag_w_mrj=ag_w_mrj,

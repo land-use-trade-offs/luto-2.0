@@ -82,8 +82,6 @@ class LutoSolver:
     ):
 
         self._input_data = input_data
-        self.d_c = input_data.demand_c
-        self.ncms = self.d_c.shape[0]
         self.gurobi_model = gp.Model(f"LUTO {settings.VERSION}", env=gurenv)
 
         # Initialise variable stores
@@ -281,7 +279,7 @@ class LutoSolver:
         4) [B] A single penalty scalar for biodiversity, minimises its deviation from the target.
         """
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
-            self.V = self.gurobi_model.addMVar(self.ncms, name="V")
+            self.V = self.gurobi_model.addMVar(self._input_data.ncms, name="V")
 
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             self.E = self.gurobi_model.addVar(name="E")
@@ -553,7 +551,7 @@ class LutoSolver:
                 for p in range(self._input_data.nprs)
                 if self._input_data.pr2cm_cp[c, p]
             )
-            for c in range(self.ncms)
+            for c in range(self._input_data.ncms)
         ]
         self.ag_q_irr_c = [
             gp.quicksum(
@@ -561,13 +559,13 @@ class LutoSolver:
                 for p in range(self._input_data.nprs)
                 if self._input_data.pr2cm_cp[c, p]
             )
-            for c in range(self.ncms)
+            for c in range(self._input_data.ncms)
         ]
 
         # Repeat to get contributions of alternative agr. management options
         # Convert variables to PR/p representation
-        self.ag_man_q_dry_c = [gp.LinExpr(0) for _ in range(self.ncms)]
-        self.ag_man_q_irr_c = [gp.LinExpr(0) for _ in range(self.ncms)]
+        self.ag_man_q_dry_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
+        self.ag_man_q_irr_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
         
         for am, am_j_list in self._input_data.am2j.items():
             X_ag_man_dry_pr = np.zeros(
@@ -596,7 +594,7 @@ class LutoSolver:
                 for p in range(self._input_data.nprs)
             ]
 
-            for c in range(self.ncms):
+            for c in range(self._input_data.ncms):
                 self.ag_man_q_dry_c[c] += (
                     gp.quicksum(
                         ag_man_q_dry_p[p]
@@ -621,20 +619,20 @@ class LutoSolver:
                 )
                 for k in range(self._input_data.n_non_ag_lus)
             )
-            for c in range(self.ncms)
+            for c in range(self._input_data.ncms)
         ]
 
         # Total quantities in CM/c representation.
         self.total_q_exprs_c = [
-            self.ag_q_dry_c[c] + self.ag_q_irr_c[c] + self.ag_man_q_dry_c[c] + self.ag_man_q_irr_c[c] + self.non_ag_q_c[c] for c in range(self.ncms)
+            self.ag_q_dry_c[c] + self.ag_q_irr_c[c] + self.ag_man_q_dry_c[c] + self.ag_man_q_irr_c[c] + self.non_ag_q_c[c] for c in range(self._input_data.ncms)
         ]
 
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             upper_bound_constraints = self.gurobi_model.addConstrs(
-                ((self.d_c[c] - self.total_q_exprs_c[c]) <= self.V[c] for c in range(self.ncms)),
+                ((self._input_data.limits['demand'][c] - self.total_q_exprs_c[c]) <= self.V[c] for c in range(self._input_data.ncms)),
                 name="demand_soft_bound_upper")
             lower_bound_constraints = self.gurobi_model.addConstrs(
-                ((self.total_q_exprs_c[c] - self.d_c[c]) <= self.V[c] for c in range(self.ncms)),
+                ((self.total_q_exprs_c[c] - self._input_data.limits['demand'][c]) <= self.V[c] for c in range(self._input_data.ncms)),
                 name="demand_soft_bound_lower"
             )
 
@@ -643,7 +641,7 @@ class LutoSolver:
 
         elif settings.DEMAND_CONSTRAINT_TYPE == "hard":
             quantity_meets_demand_constraints = self.gurobi_model.addConstrs(
-                ((self.total_q_exprs_c[c] >= self.d_c[c]) for c in range(self.ncms)),
+                ((self.total_q_exprs_c[c] >= self._input_data.limits['demand'][c]) for c in range(self._input_data.ncms)),
                 name="demand_meets_demand"
             )
             self.demand_penalty_constraints.extend(
@@ -1187,7 +1185,7 @@ class LutoSolver:
         Dynamically updates the existing formulation based on new input data and demands.
         """
         self._input_data = input_data
-        self.d_c = d_c
+        self._input_data.limits['demand'] = d_c
 
         print("Updating variables...", flush=True)
         updated_cells = self._update_variables(
@@ -1617,7 +1615,7 @@ class LutoSolver:
                     ammaps[am][r] = 1
 
         # Process production amount for each commodity
-        prod_data["Production"] = [self.total_q_exprs_c[c].getValue() for c in range(self.ncms)]
+        prod_data["Production"] = [self.total_q_exprs_c[c].getValue() for c in range(self._input_data.ncms)]
         if self.ghg_emissions_expr:
             prod_data["GHG Emissions"] = self.ghg_emissions_expr.getValue()
         if self.bio_GBF2_priority_degraded_area_expr:
@@ -1665,9 +1663,9 @@ class LutoSolver:
                 "Penalties Value (AUD)": self.obj_penalties.getValue(),
                 "Penalties Objective": self.obj_penalties.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA),
                 
-                "Production Ag Value (t)":          {c:(self.ag_q_dry_c[c] + self.ag_q_irr_c[c]).getValue() for c in range(self.ncms)},
-                "Production Non-Ag Value (t)":      {c:self.non_ag_q_c[c].getValue() for c in range(self.ncms)},
-                "Production Ag-Mam Value (t)":      {c:(self.ag_man_q_dry_c[c] + self.ag_man_q_irr_c[c]).getValue() for c in range(self.ncms)},
+                "Production Ag Value (t)":          {c:(self.ag_q_dry_c[c] + self.ag_q_irr_c[c]).getValue() for c in range(self._input_data.ncms)},
+                "Production Non-Ag Value (t)":      {c:self.non_ag_q_c[c].getValue() for c in range(self._input_data.ncms)},
+                "Production Ag-Mam Value (t)":      {c:(self.ag_man_q_dry_c[c] + self.ag_man_q_irr_c[c]).getValue() for c in range(self._input_data.ncms)},
                 "Production Deviation (t)":         (self.V.X if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0),
                 "Production Penalty":               (self.penalty_demand.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA)              if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0),
                             
