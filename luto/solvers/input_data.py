@@ -590,7 +590,7 @@ def get_BASE_YR_production_t(data: Data):
     Calculate the production of each commodity in the base year.
     """
     # Get the revenue and cost matrices
-    return data.get_production(data.YR_CAL_BASE, data.LUMAP, data.LMMAP).sum()
+    return data.get_production(data.YR_CAL_BASE, data.LUMAP, data.LMMAP)
 
 
 def get_savanna_eligible_r(data: Data) -> np.ndarray:
