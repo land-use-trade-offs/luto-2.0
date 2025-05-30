@@ -21,6 +21,7 @@
 import plotnine as p9
 from luto.tools.create_task_runs.create_grid_search_tasks import TASK_ROOT_DIR
 from luto.tools.create_task_runs.helpers import process_task_root_dirs
+from tqdm.auto import tqdm
 
 
 # Plot settings
@@ -32,8 +33,45 @@ p9.options.dpi = 100
 task_root_dir = TASK_ROOT_DIR.rstrip('/')       # Or replace with the desired task run root dir
 report_data = process_task_root_dirs(task_root_dir)
 
+print(report_data['Type'].unique())
 
-# -------------- Plot the transition cost (Demand's deviation) ----------------------
+
+
+
+
+# -------------- Plot demand deviation ----------------------
+demand_df = report_data.query('Type == "Production_deviation_pct"').copy()
+
+df_demand_avg = demand_df.eval('val = abs(val)'
+    ).groupby(['TRANSITION_HURDEL_FACTOR', 'SOLVE_WEIGHT_BETA']
+    )[['val','run_idx']].agg(val=('val', 'mean'), run_idx=('run_idx', 'first')
+    ).reset_index()
+
+
+
+# Plot profit landscape without filtering
+plot_landscape_profit = (
+    p9.ggplot(
+        df_demand_avg,
+        p9.aes(
+            x='SOLVE_WEIGHT_BETA', 
+            y='val', 
+        )
+    ) +
+    p9.geom_point(size=3,stroke=0) +
+    p9.theme_bw() +
+    p9.facet_wrap('name') +
+    p9.theme(
+        strip_text=p9.element_text(size=8), 
+        legend_position='bottom',
+        legend_title=p9.element_blank(),
+        legend_box='horizontal'
+    ) 
+)
+
+
+
+# -------------- Plot total transition cost ----------------------
 query_str = '''
     name == "Transition cost (Ag2Ag)" 
     and year != 2010
@@ -41,11 +79,11 @@ query_str = '''
     
 df_economics = report_data.query(query_str).copy()
 
-valid_runs_demand = set(report_data['run_idx']) - set(
+valid_runs_profit = set(report_data['run_idx']) - set(
     df_economics.query('abs(val) >= 30')['run_idx']
 )
 
-df_economics = df_economics.query('run_idx.isin(@valid_runs_demand)')
+df_economics = df_economics.query('run_idx.isin(@valid_runs_profit)')
 
 # Plot economic's deviation landscape without filtering
 plot_landscape_demand = (
@@ -69,6 +107,74 @@ plot_landscape_demand = (
     ) 
 )
 
+
+
+
+
+# -------------- Plot individual transition cost ----------------------
+
+query_str = '''
+    Type == "Transition_cost_million_AUD" 
+    and year == 2020
+    '''.replace('\n', ' ').replace('  ', ' ')
+
+
+df_trans_costs = report_data.query(query_str).copy()
+df_trans_costs['val'] = -df_trans_costs['val'] 
+df_trans_costs['name_str'] = df_trans_costs['name'].map(lambda x: f'{x[0]} -> {x[1]}')
+
+
+df_trans_costs_avg_beta = df_trans_costs.groupby(['name_str','SOLVE_WEIGHT_BETA']
+    ).agg(val=('val','mean')).reset_index().query('val > 10')
+
+df_trans_costs_avg_hurdel = df_trans_costs.groupby(['name_str','TRANSITION_HURDEL_FACTOR']
+    ).agg(val=('val','mean')).reset_index().query('val > 100')
+
+
+valid_trans = df_trans_costs_avg_hurdel.groupby('name_str')['val'].apply(
+    lambda x: x.abs().max() > 500
+).reset_index().query('val')['name_str'].tolist()
+
+
+# Plot economic's deviation landscape without filtering
+fig = (
+    p9.ggplot(
+        df_trans_costs_avg_beta.query('name_str.isin(@valid_trans)'),
+        p9.aes(
+            x='SOLVE_WEIGHT_BETA',
+            y='val', 
+        )
+    ) +
+    p9.geom_line() +
+    p9.theme_bw() +
+    p9.facet_wrap('name_str') +
+    p9.theme(
+        strip_text=p9.element_text(size=6), 
+        legend_position='bottom',
+        legend_title=p9.element_blank(),
+        legend_box='horizontal'
+    ) 
+)
+
+
+fig = (
+    p9.ggplot(
+        df_trans_costs_avg_hurdel.query('name_str.isin(@valid_trans)'),
+        p9.aes(
+            x='TRANSITION_HURDEL_FACTOR',
+            y='val', 
+        )
+    ) +
+    p9.geom_line() +
+    p9.theme_bw() +
+    p9.facet_wrap('name_str') +
+    p9.theme(
+        strip_text=p9.element_text(size=6), 
+        legend_position='bottom',
+        legend_title=p9.element_blank(),
+        legend_box='horizontal'
+    ) 
+)
 
 
 

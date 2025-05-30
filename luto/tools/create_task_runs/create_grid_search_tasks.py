@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250523_XINHAO_GRIDSEARCH_HURDLE_BETA' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250530_GRIDSEARCH_ALPHAT_BETA' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -57,7 +57,7 @@ grid_search = {
     ###############################################################
     
     # --------------- Economic settings --------------- 
-    'TRANSITION_HURDEL_FACTOR': np.arange(0,15,1),         # Between 0 and 1, the higher the value, the more difficult it is to transition land use
+    'TRANSITION_HURDEL_FACTOR': [0],         # Between 0 and 1, the higher the value, the more difficult it is to transition land use
     
     # --------------- Demand settings ---------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],         # 'hard' or 'soft' 
@@ -67,7 +67,7 @@ grid_search = {
        
     
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['medium'],            # 'off', 'low', 'medium', 'high'
+    'GHG_EMISSIONS_LIMITS': ['medium', 'high'],            # 'off', 'low', 'medium', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],            # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                  # True or False
@@ -85,7 +85,7 @@ grid_search = {
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSTIY_TARGET_GBF_2': ['medium'],    # 'off', 'low', 'medium', 'high'
+    'BIODIVERSTIY_TARGET_GBF_2': [ 'medium', 'high'],    # 'off', 'low', 'medium', 'high'
     'GBF2_CONSTRAINT_TYPE': ['hard'],           # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
@@ -103,7 +103,7 @@ grid_search = {
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_WEIGHT_ALPHA': [1],                  # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
-    'SOLVE_WEIGHT_BETA': np.arange(0.97,1,0.001),         
+    'SOLVE_WEIGHT_BETA': np.arange(0.5,1,0.001),         
     
     
     #-------------------- Diet BAU --------------------

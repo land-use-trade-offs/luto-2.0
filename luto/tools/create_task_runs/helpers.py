@@ -19,7 +19,6 @@
 
 import os, re, json
 import shutil, itertools, subprocess, zipfile
-import numpy as np
 import pandas as pd
 
 from tqdm.auto import tqdm
@@ -245,8 +244,6 @@ def create_task_runs(
 
 
 
-   
-   
       
 def return_empty_df(json_dir_path, filename):
     run_idx = re.compile(r'(Run_\d+)').findall(json_dir_path)[0]
@@ -283,6 +280,32 @@ def process_economic_data(json_dir_path):
     df = load_json_data(json_dir_path, 'economics_0_rev_cost_all_wide.json')
     return df
 
+def process_transition_cost_data(json_dir_path):
+    if json_dir_path.endswith('.zip'):
+        with zipfile.ZipFile(os.path.join(json_dir_path), 'r') as zip_ref:
+            with zip_ref.open(f'data/economics_8_transition_ag2ag_cost_4_transition_matrix.json') as f:
+                transition_data = json.load(f)
+    else:
+        with open(os.path.join(json_dir_path, 'economics_8_transition_ag2ag_cost_4_transition_matrix.json'), 'r') as f:
+            transition_data = json.load(f)
+            
+    categories = dict(enumerate(transition_data["categories"]))
+
+    # Extract matrix to DataFrame
+    data_df = pd.DataFrame()
+    for data in transition_data["series"]:
+        df_yr = pd.DataFrame(data["data"], columns=['from', 'to', 'val'])
+        df_yr['val'] = df_yr['val'].astype(float)   # Ensure 'val' is float
+        df_yr[['from', 'to']] = df_yr[['from', 'to']].map(lambda x: categories.get(x, x))
+        df_yr['year'] = data['Year']
+        df_yr = df_yr.fillna(0.0)                   # Fill NaN values with 0 and infer types
+        data_df = pd.concat([data_df, df_yr], ignore_index=True)
+            
+    # Combine 'from' and 'to' columns into a single 'name' column
+    data_df['name'] = data_df.apply(lambda x: [x['from'], x['to']], axis=1)  
+    return data_df
+
+
 def process_production_quantity_data(json_dir_path):
     return load_json_data(json_dir_path, 'production_5_6_demand_Production_commodity_from_LUTO.json')
 
@@ -314,6 +337,7 @@ def get_report_df(json_dir_path, run_paras):
     df_area_non_ag_lu = process_area_non_ag_lu(json_dir_path)
     df_area_ag_man = process_area_ag_man(json_dir_path)
     df_economy = process_economic_data(json_dir_path)
+    df_transition_cost = process_transition_cost_data(json_dir_path)
     df_ghg_deviation = process_GHG_deviation_data(json_dir_path)
     df_demand_deviation = process_production_deviation_data(json_dir_path)
     df_bio_objective = process_bio_obj_data(json_dir_path)
@@ -323,6 +347,7 @@ def get_report_df(json_dir_path, run_paras):
         df_area_non_ag_lu[['year', 'name', 'val']].assign(Type='Area_non_ag_lu_million_km2'),
         df_area_ag_man[['year', 'name', 'val']].assign(Type='Area_ag_man_million_km2'),
         df_economy[['year', 'name', 'val']].assign(Type='Economic_billion_AUD'),
+        df_transition_cost[['year', 'name', 'val']].assign(Type='Transition_cost_million_AUD'),
         df_demand_deviation[['year', 'name', 'val']].assign(Type='Production_deviation_pct'),
         df_ghg_deviation[['year', 'name', 'val']].assign(Type='GHG_Deviation_pct'),
         df_bio_objective[['year', 'name', 'val']].assign(Type='Biodiversity_obj_score'),
@@ -366,7 +391,6 @@ def process_task_root_dirs(task_root_dir, n_workers=10):
         
     # Concatenate the results, only keep the columns with more than 1 unique value
     out_df = pd.concat(tqdm(Parallel(n_jobs=n_workers, return_as='generator')(tasks), total=len(tasks)), ignore_index=True)
-    out_df =  out_df.loc[:, out_df.nunique() > 1]
     
     return out_df
 
