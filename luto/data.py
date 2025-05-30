@@ -1904,15 +1904,10 @@ class Data:
         Includes the impacts of land-use change, productivity increases, and
         climate change on yield.
         """
-        if yr_cal == self.YR_CAL_BASE:
-            ag_X_mrj = self.AG_L_MRJ
-            non_ag_X_rk = self.NON_AG_L_RK
-            ag_man_X_mrj = self.AG_MAN_L_MRJ_DICT
-            
-        else:
-            ag_X_mrj = lumap2ag_l_mrj(lumap, lmmap)
-            non_ag_X_rk = lumap2non_ag_l_mk(lumap, len(settings.NON_AG_LAND_USES.keys()))
-            ag_man_X_mrj = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
+ 
+        ag_X_mrj = lumap2ag_l_mrj(lumap, lmmap)
+        non_ag_X_rk = lumap2non_ag_l_mk(lumap, len(settings.NON_AG_LAND_USES.keys()))
+        ag_man_X_mrj = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
 
         # Calculate year index (i.e., number of years since 2010)
         yr_idx = yr_cal - self.YR_CAL_BASE
@@ -1953,7 +1948,7 @@ class Data:
             ag_man_q_c += np.einsum('cp,p->c', self.PR2CM.astype(bool), ag_man_q_p)
 
         # Return total commodity production as numpy array.
-        total_q_c = ag_q_c + non_ag_q_c + ag_man_q_c
+        total_q_c = ag_q_c + non_ag_q_c + ag_man_q_c + 1 # Add 1 to avoid zero production; When using high resfactor, some commodities will have 0 production.
         return total_q_c
 
 

@@ -115,7 +115,7 @@ def get_cost_crop(data:Data, lu, lm, yr_idx):
                 f"WARNING: Multiplier for {lu} not found in the 'FDC_multiplier' sheet of "
                 f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
             
-        costs_f = ( data.AGEC_CROPS['FLC', lm, lu] * flc_multiplier    # Fixed labour costs.
+        costs_f = ( data.AGEC_CROPS['FLC', lm, lu] * flc_multiplier      # Fixed labour costs.
                     + data.AGEC_CROPS['FOC', lm, lu] * foc_multiplier    # Fixed operating costs.
                     + data.AGEC_CROPS['FDC', lm, lu] * fdc_multiplier )  # Fixed depreciation costs.
 
