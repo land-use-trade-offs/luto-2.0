@@ -54,7 +54,6 @@ def get_to_ag_exclude_matrices(data: Data, lumap: np.ndarray):
 
     Returns
     -------
-
     numpy.ndarray
         x_mrj exclude matrix. The m-slices correspond to the
         different land-management versions of the land-use `j` to switch _to_.
@@ -94,8 +93,8 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
         lmmap (np.ndarray): Land management map of the base year for the transitions.
         separate (bool, optional): Whether to return separate cost matrices for each cost component.
                                    Defaults to False.
-    Returns
-        numpy.ndarray or dict: The transition matrices for land-use and land management transitions.
+    Returns:
+            numpy.ndarray or dict: The transition matrices for land-use and land management transitions.
                                If `separate` is False, returns a numpy array representing the total costs.
                                If `separate` is True, returns a dictionary with separate cost matrices for
                                establishment costs, Water license cost, and carbon releasing costs.

@@ -18,6 +18,7 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 
+
 import os
 import xarray as xr
 import numpy as np
@@ -32,11 +33,13 @@ import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
 
+from math import ceil
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Literal, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
+from scipy.ndimage import distance_transform_edt
 
 from luto.tools.spatializers import upsample_array
 
@@ -159,8 +162,8 @@ class Data:
         # NLUM mask.
         with rasterio.open(os.path.join(settings.INPUT_DIR, "NLUM_2010-11_mask.tif")) as rst:
             self.NLUM_MASK = rst.read(1).astype(np.int8)                                                                # 2D map,  0 for ocean, 1 for land
-            self.LUMAP_2D_FULLRES = np.full_like(self.NLUM_MASK, self.NODATA, dtype=np.int16)                                   # 2D map,  full of nodata (-9999)
-            np.place(self.LUMAP_2D_FULLRES, self.NLUM_MASK == 1, self.LUMAP_NO_RESFACTOR)                                       # 2D map,  -9999 for ocean; -1 for desert, urban, water, etc; 0-27 for land uses
+            self.LUMAP_2D_FULLRES = np.full_like(self.NLUM_MASK, self.NODATA, dtype=np.int16)                           # 2D map,  full of nodata (-9999)
+            np.place(self.LUMAP_2D_FULLRES, self.NLUM_MASK == 1, self.LUMAP_NO_RESFACTOR)                               # 2D map,  -9999 for ocean; -1 for desert, urban, water, etc; 0-27 for land uses
             self.GEO_META_FULLRES = rst.meta                                                                            # dict,  key-value pairs of geospatial metadata for the full resolution land-use map
             self.GEO_META_FULLRES['dtype'] = 'float32'                                                                  # Set the data type to float32
             self.GEO_META_FULLRES['nodata'] = self.NODATA                                                               # Set the nodata value to -9999
@@ -411,7 +414,13 @@ class Data:
         self.add_ag_dvars(self.YR_CAL_BASE, self.AG_L_MRJ)
 
         # Initial (2010) land-use map, mapped as lexicographic land-use class indices.
-        self.LUMAP = self.AG_L_MRJ.sum(axis=0).argmax(axis=1).astype("int8")
+        # self.LUMAP = self.AG_L_MRJ.sum(axis=0).argmax(axis=1).astype("int8")
+        self.LU_RESFACTOR_CELLS = pd.DataFrame({
+            'lu_code': list(self.DESC2AGLU.values()),
+            'res_size': [ceil((self.LUMAP_NO_RESFACTOR == lu_code).sum() / self.RESMULT) for _,lu_code in self.DESC2AGLU.items()
+            ]}).sort_values('res_size').reset_index(drop=True)
+        
+        self.LUMAP = self.get_resfactored_lumap() if settings.RESFACTOR > 1 else self.LUMAP_NO_RESFACTOR[self.MASK]
         self.add_lumap(self.YR_CAL_BASE, self.LUMAP)
 
         # Initial (2010) land management map.
@@ -1558,8 +1567,53 @@ class Data:
             
         # Reshape the 1D avg array to 2D array
         cell_avg_2d = cell_avg.reshape(self.LUMAP_2D_RESFACTORED.shape)
-    
         return cell_avg_2d[np.nonzero(mask_arr_2d_resfactor)]
+
+    
+    def get_resfactored_lumap(self) -> np.ndarray:
+        """
+        Coarsens the LUMAP to the specified resolution factor.
+        """
+
+        lumap_resfactored = np.zeros(self.NCELLS, dtype=np.int8) - 1
+        resfactored_mask_2d = ~np.isin(self.LUMAP_2D_RESFACTORED, [self.NODATA, self.MASK_LU_CODE])
+        fill_mask = np.ones(self.NCELLS, dtype=bool)
+
+        # Fill resfactored land-use map with the land-use codes given their resfactored size
+        for _,(lu_code, res_size) in self.LU_RESFACTOR_CELLS.iterrows():
+            
+            lu_res_avg_2d = xr.DataArray(
+                    (self.LUMAP_2D_FULLRES == lu_code) & (~np.isin(self.LUMAP_2D_FULLRES, [self.NODATA, self.MASK_LU_CODE])), 
+                    dims=['y','x']
+                ).coarsen(
+                    y=settings.RESFACTOR, 
+                    x=settings.RESFACTOR, 
+                    boundary='pad'
+                ).mean()[:self.LUMAP_2D_RESFACTORED.shape[0],:self.LUMAP_2D_RESFACTORED.shape[1]]
+                
+        
+            lu_res_avg_1d = lu_res_avg_2d.values[resfactored_mask_2d]
+            p_choice = lu_res_avg_1d[fill_mask] / lu_res_avg_1d[fill_mask].sum()
+            res_size = min(res_size, (p_choice>0).sum())
+            
+            lu_fill_idx = np.random.choice(
+                np.where(fill_mask)[0], 
+                size=res_size, 
+                replace=False, 
+                p=p_choice
+            )
+            
+            lumap_resfactored[lu_fill_idx] = lu_code
+            fill_mask[lu_fill_idx] = False
+            
+        # Fill -1 with nearest neighbour values
+        nearst_ind = distance_transform_edt(
+            (lumap_resfactored == -1).astype(np.float32),
+            return_distances=False,
+            return_indices=True
+        )
+                    
+        return lumap_resfactored[*nearst_ind]
  
     # Get the habitat condition score within priority degraded areas for base year (2010)
     def get_GBF2_target_for_yr_cal(self, yr_cal:int) -> float:
@@ -1948,7 +2002,7 @@ class Data:
             ag_man_q_c += np.einsum('cp,p->c', self.PR2CM.astype(bool), ag_man_q_p)
 
         # Return total commodity production as numpy array.
-        total_q_c = ag_q_c + non_ag_q_c + ag_man_q_c + 1 # Add 1 to avoid zero production; When using high resfactor, some commodities will have 0 production.
+        total_q_c = ag_q_c + non_ag_q_c + ag_man_q_c
         return total_q_c
 
 

@@ -26,11 +26,12 @@ from tqdm.auto import tqdm
 
 # Plot settings
 p9.options.figure_size = (12, 6)
-p9.options.dpi = 100
+p9.options.dpi = 300
 
 
 # Get the data
 task_root_dir = TASK_ROOT_DIR.rstrip('/')       # Or replace with the desired task run root dir
+task_root_dir = 'N:/LUF-Modelling/LUTO2_JZ/Custom_runs/20250530_GRIDSEARCH_ALPHAT_BETA'
 report_data = process_task_root_dirs(task_root_dir)
 
 print(report_data['Type'].unique())
@@ -43,7 +44,7 @@ print(report_data['Type'].unique())
 demand_df = report_data.query('Type == "Production_deviation_pct"').copy()
 
 df_demand_avg = demand_df.eval('val = abs(val)'
-    ).groupby(['TRANSITION_HURDEL_FACTOR', 'SOLVE_WEIGHT_BETA']
+    ).groupby(['GHG_EMISSIONS_LIMITS', 'BIODIVERSTIY_TARGET_GBF_2', 'SOLVE_WEIGHT_BETA']
     )[['val','run_idx']].agg(val=('val', 'mean'), run_idx=('run_idx', 'first')
     ).reset_index()
 
@@ -60,7 +61,7 @@ plot_landscape_profit = (
     ) +
     p9.geom_point(size=3,stroke=0) +
     p9.theme_bw() +
-    p9.facet_wrap('name') +
+    p9.facet_grid('GHG_EMISSIONS_LIMITS~BIODIVERSTIY_TARGET_GBF_2') +
     p9.theme(
         strip_text=p9.element_text(size=8), 
         legend_position='bottom',
@@ -68,6 +69,87 @@ plot_landscape_profit = (
         legend_box='horizontal'
     ) 
 )
+
+# Plot individual demand landscape 
+query_str = '''
+    year == 2050 
+    and GHG_EMISSIONS_LIMITS == "medium" 
+    and BIODIVERSTIY_TARGET_GBF_2 == "medium"
+    and abs(val) < 30
+    '''.replace('\n', ' ').replace('  ', ' ')
+    
+demand_df_individual = demand_df.query(query_str).copy()
+
+plot_landscape_profit = (
+    p9.ggplot(
+        demand_df_individual,
+        p9.aes(
+            x='SOLVE_WEIGHT_BETA', 
+            y='val', 
+        )
+    ) +
+    p9.geom_point(size=0.1) +
+    p9.geom_vline(xintercept=0.9,color='red') +
+    p9.theme_bw() +
+    p9.facet_wrap('name', scales='free_y') +
+    p9.theme(
+        strip_text=p9.element_text(size=8), 
+        legend_position='bottom',
+        legend_title=p9.element_blank(),
+        legend_box='horizontal'
+    ) +
+    p9.labs(
+        x='Beta (B)', 
+        y='Demand deviation (%)',
+    )
+)
+
+
+# -------------- Plot profit ----------------------
+query_str = '''
+    name == "Profit" 
+    and year != 2010
+    '''.replace('\n', ' ').replace('  ', ' ')
+    
+df_profit = report_data.query(query_str).copy()
+
+
+
+# Plot individual profit landscape 
+query_str = '''
+    GHG_EMISSIONS_LIMITS == "medium" 
+    and BIODIVERSTIY_TARGET_GBF_2 == "medium"
+    and val < 100
+    '''.replace('\n', ' ').replace('  ', ' ')
+    
+df_profit_individual = df_profit.query(query_str).copy()
+
+plot_landscape_profit = (
+    p9.ggplot(
+        df_profit_individual,
+        p9.aes(
+            x='SOLVE_WEIGHT_BETA', 
+            y='val', 
+        )
+    ) +
+    p9.geom_point(size=0.1) +
+    p9.geom_vline(xintercept=0.9,color='red') +
+    p9.theme_bw() +
+    p9.facet_wrap('year', scales='free_y') +
+    p9.theme(
+        strip_text=p9.element_text(size=8), 
+        legend_position='bottom',
+        legend_title=p9.element_blank(),
+        legend_box='horizontal'
+    ) +
+    p9.labs(
+        x='Beta (B)', 
+        y='Profit (million AUD)',
+    )
+)
+
+
+
 
 
 
@@ -77,18 +159,18 @@ query_str = '''
     and year != 2010
     '''.replace('\n', ' ').replace('  ', ' ')
     
-df_economics = report_data.query(query_str).copy()
+df_profit = report_data.query(query_str).copy()
 
 valid_runs_profit = set(report_data['run_idx']) - set(
-    df_economics.query('abs(val) >= 30')['run_idx']
+    df_profit.query('abs(val) >= 30')['run_idx']
 )
 
-df_economics = df_economics.query('run_idx.isin(@valid_runs_profit)')
+df_profit = df_profit.query('run_idx.isin(@valid_runs_profit)')
 
 # Plot economic's deviation landscape without filtering
 plot_landscape_demand = (
     p9.ggplot(
-        df_economics,
+        df_profit,
         p9.aes(
             x='year',
             y='val', 
