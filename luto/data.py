@@ -2002,7 +2002,7 @@ class Data:
             ag_man_q_c += np.einsum('cp,p->c', self.PR2CM.astype(bool), ag_man_q_p)
 
         # Return total commodity production as numpy array.
-        total_q_c = ag_q_c + non_ag_q_c + ag_man_q_c
+        total_q_c = ag_q_c + non_ag_q_c + ag_man_q_c + 1 # Add 1 to avoid zero production
         return total_q_c
 
 
