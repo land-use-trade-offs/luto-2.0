@@ -36,7 +36,7 @@ grid_search = {
     # Task run settings for submitting the job to the cluster
     ###############################################################
     'MEM': ['20GB'],
-    'NCPUS':[5],
+    'NCPUS':[10],
     'TIME': ['4:00:00'],
     'QUEUE': ['normalsr'],
     
@@ -67,15 +67,15 @@ grid_search = {
        
     
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['low', 'medium', 'high'],            # 'off', 'low', 'medium', 'high'
+    'GHG_EMISSIONS_LIMITS': ['low', 'medium', 'high'],              # 'off', 'low', 'medium', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
-    'GHG_CONSTRAINT_TYPE': ['hard'],            # 'hard' or 'soft'
-    'USE_GHG_SCOPE_1': [True],                  # True or False
+    'GHG_CONSTRAINT_TYPE': ['hard'],                                # 'hard' or 'soft'
+    'USE_GHG_SCOPE_1': [True],                                      # True or False
 
     
     # --------------- Water constraints ---------------
-    'WATER_LIMITS': ['on'],                     # 'on' or 'off'
-    'WATER_CONSTRAINT_TYPE': ['hard'],          # 'hard' or 'soft'
+    'WATER_LIMITS': ['on'],                                         # 'on' or 'off'
+    'WATER_CONSTRAINT_TYPE': ['hard'],                              # 'hard' or 'soft'
     'WATER_PENALTY': [1e-5],
     'INCLUDE_WATER_LICENSE_COSTS': [1],
     
@@ -85,15 +85,15 @@ grid_search = {
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSTIY_TARGET_GBF_2': ['low', 'medium', 'high'],    # 'off', 'low', 'medium', 'high'
+    'BIODIVERSTIY_TARGET_GBF_2': ['low', 'medium', 'high'],         # 'off', 'low', 'medium', 'high'
     'GBF2_CONSTRAINT_TYPE': ['hard'],           # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
-    'BIODIVERSTIY_TARGET_GBF_3': ['on'],       # 'off', 'medium', 'high', 'USER_DEFINED'
+    'BIODIVERSTIY_TARGET_GBF_3': ['medium'],         # 'off', 'medium', 'high', 'USER_DEFINED'
     
     # --------------- Biodiversity settings - GBF 4 ---------------
-    'BIODIVERSTIY_TARGET_GBF_4_SNES' : ['on'],             # 'on' or 'off'.
-    'BIODIVERSTIY_TARGET_GBF_4_ECNES' : ['on'],            # 'on' or 'off'.
+    'BIODIVERSTIY_TARGET_GBF_4_SNES' : ['on'],                      # 'on' or 'off'.
+    'BIODIVERSTIY_TARGET_GBF_4_ECNES' : ['on'],                     # 'on' or 'off'.
     
     # --------------- Biodiversity settings - GBF 8 ---------------
     'BIODIVERSTIY_TARGET_GBF_8': ['on'],       # 'on' or 'off'

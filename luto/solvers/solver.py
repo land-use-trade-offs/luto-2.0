@@ -712,12 +712,13 @@ class LutoSolver:
         # Ensure water use remains below limit for each region
         for reg_idx, water_limit in self._input_data.limits["water"].items():
             
-            if water_limit == 0:
-                print(f"     |-- target is {water_limit:15.2f} ML for region {reg_idx} (skipped in constraints)")
-                continue
-            
             ind = self._input_data.water_region_indices[reg_idx]
             reg_name = self._input_data.water_region_names[reg_idx]
+            
+            if water_limit == 0:
+                print(f"     |-- target is {water_limit:15.2f} ML for {reg_name} (skipped in constraints)")
+                continue
+
             print(f"     |-- target is {water_limit:15.2f} ML for {reg_name}")
 
             self.water_nyiled_exprs[reg_idx] = self._get_water_net_yield_expr_for_region(ind)           # Water net yield inside LUTO study area
