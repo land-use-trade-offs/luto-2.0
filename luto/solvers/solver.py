@@ -699,14 +699,14 @@ class LutoSolver:
 
     def _add_water_usage_limit_constraints(self) -> None:
         
-        print("  ...water usage constraints...")
+        print("  ... water usage constraints...")
         
         # Ensure water use remains below limit for each region
         for reg_idx, water_limit in self._input_data.limits["water"].items():
             
             ind = self._input_data.water_region_indices[reg_idx]
             reg_name = self._input_data.water_region_names[reg_idx]
-            print(f"     |-- net water yield target is {water_limit:15.2f} ML for {reg_name}")
+            print(f"      |-- net water yield target is {water_limit:15.2f} ML for {reg_name}")
 
             self.water_nyiled_exprs[reg_idx] = self._get_water_net_yield_expr_for_region(ind)           # Water net yield inside LUTO study area
 
@@ -903,7 +903,7 @@ class LutoSolver:
         for v, v_area_lb in enumerate(v_limits):
             
             if v_limits[v] == 0:
-                print(f"       |-- vegetation class {v_names[v]} target area: {v_area_lb:,.0f} (skipped in the solver)")
+                print(f"       |-- vegetation class (skipped in the solver) target area: {v_area_lb:,.0f} for {v_names[v]}")
                 continue
             
             ind = v_ind[v]
@@ -950,7 +950,7 @@ class LutoSolver:
 
             self.bio_GBF3_major_vegetation_exprs[v] = ag_contr + ag_man_contr + non_ag_contr 
 
-            print(f"       |-- vegetation class {v_names[v]} target area: {v_area_lb:,.0f}")
+            print(f"       |-- vegetation class target area: {v_area_lb:13,.0f} for {v_names[v]} ")
             self.bio_GBF3_major_vegetation_limit_constraints[v] = self.gurobi_model.addConstr(
                 self.bio_GBF3_major_vegetation_exprs[v] >= v_area_lb,
                 name=f"bio_GBF3_major_vegetation_limit_{v}",
@@ -972,7 +972,7 @@ class LutoSolver:
 
             if ind.size == 0:
                 print(
-                    f"        |-- WARNING: SNES species {x_names[x]} target was NOT added: no cells can contribute to species target area ")
+                    f"        |-- WARNING: SNES species NOT added because of empty layer for {x_names[x]}")
                 continue
             
             ag_contr = gp.quicksum(
@@ -1013,10 +1013,10 @@ class LutoSolver:
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            self.bio_GBF4_SNES_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR
-            constr_lb = x_area_lb / (settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR)
+            self.bio_GBF4_SNES_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / x_limits.max()  
+            constr_lb = x_area_lb / x_limits.max()  
 
-            print(f"       |-- SNES species {x_names[x]} target: {x_area_lb:,.0f}")
+            print(f"       |-- SNES species target is {x_area_lb:15,.0f} for {x_names[x]}")
             self.bio_GBF4_SNES_constrs[x] = self.gurobi_model.addConstr(
                 self.bio_GBF4_SNES_exprs[x] >= constr_lb,
                 name=f"bio_GBF4_SNES_limit_{x}",
@@ -1037,7 +1037,7 @@ class LutoSolver:
 
             if ind.size == 0:
                 print(
-                    f"       |-- WARNING: ECNES species {x_names[x]} target was NOT added: no cells can contribute to species target area.")
+                    f"       |-- WARNING: ECNES species was NOT added because of empty layer for {x_names[x]}")
                 continue
             
             ag_contr = gp.quicksum(
@@ -1078,10 +1078,10 @@ class LutoSolver:
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            self.bio_GBF4_ECNES_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR
-            constr_lb = x_area_lb / (settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR * 1000)
+            self.bio_GBF4_ECNES_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / x_limits.max()  
+            constr_lb = x_area_lb / x_limits.max()
 
-            print(f"       |-- ECNES community {x_names[x]} target: {x_area_lb:,.0f}")
+            print(f"       |-- ECNES community target is {x_area_lb:15,.0f} for {x_names[x]} ")
             self.bio_GBF4_ECNES_constrs[x] = self.gurobi_model.addConstr(
                 self.bio_GBF4_ECNES_exprs[x] >= constr_lb,
                 name=f"bio_GBF4_ECNES_limit_{x}",
@@ -1144,8 +1144,8 @@ class LutoSolver:
             )
 
             # Divide by constant to reduce strain on the constraint matrix range
-            self.bio_GBF8_species_conservation_exprs[s] = (ag_contr + ag_man_contr + non_ag_contr) / settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR
-            constr_area = s_area_lb / settings.BIODIVERSITY_BIG_CONSTR_DIV_FACTOR
+            self.bio_GBF8_species_conservation_exprs[s] = (ag_contr + ag_man_contr + non_ag_contr) / s_limits.max()
+            constr_area = s_area_lb / s_limits.max()
 
             print(f"       |-- species {s_names[s]} conservation target area: {s_area_lb:,.0f}")
             self.bio_GBF8_species_conservation_constrs[s] = self.gurobi_model.addConstr(

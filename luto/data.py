@@ -1666,7 +1666,7 @@ class Data:
         return np.where(limit_score_inside_LUTO < 0, 0, limit_score_inside_LUTO)
 
     
-    def get_GBF4_SNES_target_inside_LUTO_by_year(self, yr:int):
+    def get_GBF4_SNES_target_inside_LUTO_by_year(self, yr:int) -> np.ndarray:
         
         # Check the layer name
         snes_df_likely = self.BIO_GBF4_SNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY
@@ -1690,8 +1690,7 @@ class Data:
         return np.array(targets).astype(np.float32)
 
         
-    def get_GBF4_ECNES_target_inside_LUTO_by_year(self, yr:int):
-        
+    def get_GBF4_ECNES_target_inside_LUTO_by_year(self, yr:int) -> np.ndarray:
         # Check the layer name
         ecnes_df_likely = self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY
         ecnes_df_likely_maybe = self.BIO_GBF4_ECNES_BASELINE_SCORE_TARGET_PERCENT_LIKELY_AND_MAYBE
@@ -1763,7 +1762,7 @@ class Data:
         return current_species_val.astype(np.float32)
     
 
-    def get_GBF8_target_inside_LUTO_by_yr(self, yr: int):
+    def get_GBF8_target_inside_LUTO_by_yr(self, yr: int) -> np.ndarray:
         '''
         Get the biodiversity suitability score (area weighted [ha]) for each species at the given year for the Inside LUTO natural land.
         '''
