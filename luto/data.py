@@ -1576,43 +1576,26 @@ class Data:
         """
 
         lumap_resfactored = np.zeros(self.NCELLS, dtype=np.int8) - 1
-        resfactored_mask_2d = ~np.isin(self.LUMAP_2D_RESFACTORED, [self.NODATA, self.MASK_LU_CODE])
         fill_mask = np.ones(self.NCELLS, dtype=bool)
 
         # Fill resfactored land-use map with the land-use codes given their resfactored size
         for _,(lu_code, res_size) in self.LU_RESFACTOR_CELLS.iterrows():
             
-            lu_res_avg_2d = xr.DataArray(
-                    (self.LUMAP_2D_FULLRES == lu_code) & (~np.isin(self.LUMAP_2D_FULLRES, [self.NODATA, self.MASK_LU_CODE])), 
-                    dims=['y','x']
-                ).coarsen(
-                    y=settings.RESFACTOR, 
-                    x=settings.RESFACTOR, 
-                    boundary='pad'
-                ).mean()[:self.LUMAP_2D_RESFACTORED.shape[0],:self.LUMAP_2D_RESFACTORED.shape[1]]
-                
-        
-            lu_res_avg_1d = lu_res_avg_2d.values[resfactored_mask_2d]
-            p_choice = lu_res_avg_1d[fill_mask] / lu_res_avg_1d[fill_mask].sum()
-            res_size = min(res_size, (p_choice>0).sum())
+            lu_avg = self.AG_L_MRJ[:,:,lu_code].sum(0) * fill_mask
+            res_size = min(res_size, (lu_avg > 0).sum())
             
-            lu_fill_idx = np.random.choice(
-                np.where(fill_mask)[0], 
-                size=res_size, 
-                replace=False, 
-                p=p_choice
-            )
-            
-            lumap_resfactored[lu_fill_idx] = lu_code
-            fill_mask[lu_fill_idx] = False
+            # Assign the n-largets cells with the land-use code
+            lu_idx = np.argsort(lu_avg)[-res_size:]  
+            lumap_resfactored[lu_idx] = lu_code
+            fill_mask[lu_idx] = False
             
         # Fill -1 with nearest neighbour values
         nearst_ind = distance_transform_edt(
-            (lumap_resfactored == -1).astype(np.float32),
+            (lumap_resfactored == -1),
             return_distances=False,
             return_indices=True
         )
-                    
+      
         return lumap_resfactored[*nearst_ind]
  
     # Get the habitat condition score within priority degraded areas for base year (2010)
@@ -1958,10 +1941,15 @@ class Data:
         Includes the impacts of land-use change, productivity increases, and
         climate change on yield.
         """
- 
-        ag_X_mrj = lumap2ag_l_mrj(lumap, lmmap)
-        non_ag_X_rk = lumap2non_ag_l_mk(lumap, len(settings.NON_AG_LAND_USES.keys()))
-        ag_man_X_mrj = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
+        if yr_cal == self.YR_CAL_BASE:
+            ag_X_mrj = self.AG_L_MRJ
+            non_ag_X_rk = self.NON_AG_L_RK
+            ag_man_X_mrj = self.AG_MAN_L_MRJ_DICT
+            
+        else:
+            ag_X_mrj = lumap2ag_l_mrj(lumap, lmmap)
+            non_ag_X_rk = lumap2non_ag_l_mk(lumap, len(settings.NON_AG_LAND_USES.keys()))
+            ag_man_X_mrj = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
 
         # Calculate year index (i.e., number of years since 2010)
         yr_idx = yr_cal - self.YR_CAL_BASE
@@ -2002,7 +1990,7 @@ class Data:
             ag_man_q_c += np.einsum('cp,p->c', self.PR2CM.astype(bool), ag_man_q_p)
 
         # Return total commodity production as numpy array.
-        total_q_c = ag_q_c + non_ag_q_c + ag_man_q_c + 1 # Add 1 to avoid zero production
+        total_q_c = ag_q_c + non_ag_q_c + ag_man_q_c
         return total_q_c
 
 

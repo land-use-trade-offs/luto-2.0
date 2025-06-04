@@ -154,17 +154,18 @@ def submit_task(task_root_dir:str, col:str, mode:Literal['single','cluster'], ma
     shutil.copyfile('luto/tools/create_task_runs/bash_scripts/python_script.py', f'{task_root_dir}/{col}/python_script.py')
     
     # Wait until the number of running jobs is less than max_concurrent_tasks
-    while True:
-        try:
-            running_jobs = int(subprocess.run('qselect | wc -l', shell=True, capture_output=True, text=True).stdout.strip())
-        except Exception as e:
-            print(f"Error checking running jobs: {e}")
-        if running_jobs < max_concurrent_tasks:
-            break
-        else:
-            print(f"Max concurrent tasks reached ({running_jobs}/{max_concurrent_tasks}), waiting to submit {col}...")
-            import time; time.sleep(10)
-    
+    if os.name == 'posix':
+        while True:
+            try:
+                running_jobs = int(subprocess.run('qselect | wc -l', shell=True, capture_output=True, text=True).stdout.strip())
+            except Exception as e:
+                print(f"Error checking running jobs: {e}")
+            if running_jobs < max_concurrent_tasks:
+                break
+            else:
+                print(f"Max concurrent tasks reached ({running_jobs}/{max_concurrent_tasks}), waiting to submit {col}...")
+                import time; time.sleep(10)
+        
     # Open log files for the task run
     with open(f'{task_root_dir}/{col}/run_std.log', 'w') as std_file, \
          open(f'{task_root_dir}/{col}/run_err.log', 'w') as err_file:
