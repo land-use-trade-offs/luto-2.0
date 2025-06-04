@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250602_RES1_AG2AG_T_COST' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250604_RES5_DCCEEW_RUNS' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -44,12 +44,12 @@ grid_search = {
     ###############################################################
     # Working settings for the model run
     ###############################################################
-    'OBJECTIVE': ['maxprofit'],                 # 'maxprofit' or 'maxutility'
-    'RESFACTOR': [1],
-    'SIM_YEARS': [list(range(2010,2013,1))],   # Years to run the model 
+    'OBJECTIVE': ['maxprofit'],                 # 'maxprofit' or 'mincost'
+    'RESFACTOR': [3],
+    'SIM_YEARS': [list(range(2020,2051,5))],   # Years to run the model 
     'WRITE_THREADS': [2],
-    'WRITE_OUTPUT_GEOTIFFS': [False],
-    'KEEP_OUTPUTS': [False],                    # If False, only keep report HTML
+    'WRITE_OUTPUT_GEOTIFFS': [True],
+    'KEEP_OUTPUTS': [True],                    # If False, only keep report HTML
     
  
     ###############################################################
@@ -67,7 +67,7 @@ grid_search = {
        
     
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['medium'],            # 'off', 'low', 'medium', 'high'
+    'GHG_EMISSIONS_LIMITS': ['low', 'medium', 'high'],            # 'off', 'low', 'medium', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],            # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                  # True or False
@@ -85,18 +85,18 @@ grid_search = {
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSTIY_TARGET_GBF_2': [ 'medium'],    # 'off', 'low', 'medium', 'high'
+    'BIODIVERSTIY_TARGET_GBF_2': ['low', 'medium', 'high'],    # 'off', 'low', 'medium', 'high'
     'GBF2_CONSTRAINT_TYPE': ['hard'],           # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
-    'BIODIVERSTIY_TARGET_GBF_3': ['off'],       # 'off', 'medium', 'high', 'USER_DEFINED'
+    'BIODIVERSTIY_TARGET_GBF_3': ['on'],       # 'off', 'medium', 'high', 'USER_DEFINED'
     
     # --------------- Biodiversity settings - GBF 4 ---------------
-    'BIODIVERSTIY_TARGET_GBF_4_SNES' : ['off'],             # 'on' or 'off'.
-    'BIODIVERSTIY_TARGET_GBF_4_ECNES' : ['off'],            # 'on' or 'off'.
+    'BIODIVERSTIY_TARGET_GBF_4_SNES' : ['on'],             # 'on' or 'off'.
+    'BIODIVERSTIY_TARGET_GBF_4_ECNES' : ['on'],            # 'on' or 'off'.
     
     # --------------- Biodiversity settings - GBF 8 ---------------
-    'BIODIVERSTIY_TARGET_GBF_8': ['off'],       # 'on' or 'off'
+    'BIODIVERSTIY_TARGET_GBF_8': ['on'],       # 'on' or 'off'
 
  
     ###############################################################

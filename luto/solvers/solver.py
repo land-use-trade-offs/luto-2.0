@@ -707,14 +707,18 @@ class LutoSolver:
 
     def _add_water_usage_limit_constraints(self) -> None:
         
-        print("  ... water usage constraints...")
+        print(" ... water usage constraints...")
         
         # Ensure water use remains below limit for each region
         for reg_idx, water_limit in self._input_data.limits["water"].items():
             
+            if water_limit == 0:
+                print(f"     |-- target is {water_limit:15.2f} ML for region {reg_idx} (skipped in constraints)")
+                continue
+            
             ind = self._input_data.water_region_indices[reg_idx]
             reg_name = self._input_data.water_region_names[reg_idx]
-            print(f"      |-- net water yield target is {water_limit:15.2f} ML for {reg_name}")
+            print(f"     |-- target is {water_limit:15.2f} ML for {reg_name}")
 
             self.water_nyiled_exprs[reg_idx] = self._get_water_net_yield_expr_for_region(ind)           # Water net yield inside LUTO study area
 
@@ -877,7 +881,7 @@ class LutoSolver:
 
         self.bio_GBF2_priority_degraded_area_expr = gp.quicksum(bio_ag_exprs) + gp.quicksum(bio_ag_man_exprs) + gp.quicksum(bio_non_ag_exprs)
         
-        print(f"       |-- Biodiversity GBF 2 (conservation priority): {self._input_data.limits["GBF2_priority_degrade_areas"]:,.0f}")
+        print(f"       |-- target is {self._input_data.limits["GBF2_priority_degrade_areas"]:,.0f}")
         
         if settings.GBF2_CONSTRAINT_TYPE == "hard":
             self.bio_GBF2_priority_degraded_area_limit_constraint_hard = self.gurobi_model.addConstr(
@@ -911,7 +915,7 @@ class LutoSolver:
         for v, v_area_lb in enumerate(v_limits):
             
             if v_limits[v] == 0:
-                print(f"       |-- vegetation class target area is {v_area_lb:13,.0f} (skipped modelling) for {v_names[v]} ")
+                print(f"       |-- target is {v_area_lb:13,.0f} (skipped modelling) for {v_names[v]} ")
                 continue
             
             ind = v_ind[v]
@@ -1023,7 +1027,7 @@ class LutoSolver:
 
             self.bio_GBF4_SNES_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / x_area_lb  
 
-            print(f"       |-- SNES species target is {x_area_lb:15,.0f} for {x_names[x]}")
+            print(f"       |-- target is {x_area_lb:15,.0f} for {x_names[x]}")
             self.bio_GBF4_SNES_constrs[x] = self.gurobi_model.addConstr(
                 self.bio_GBF4_SNES_exprs[x] >= 1,
                 name=f"bio_GBF4_SNES_limit_{x}",
@@ -1088,7 +1092,7 @@ class LutoSolver:
             self.bio_GBF4_ECNES_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / x_area_lb
 
 
-            print(f"       |-- ECNES community target is {x_area_lb:15,.0f} for {x_names[x]} ")
+            print(f"       |-- target is {x_area_lb:15,.0f} for {x_names[x]} ")
             self.bio_GBF4_ECNES_constrs[x] = self.gurobi_model.addConstr(
                 self.bio_GBF4_ECNES_exprs[x] >= 1,
                 name=f"bio_GBF4_ECNES_limit_{x}",
@@ -1153,7 +1157,7 @@ class LutoSolver:
             # Divide by constant to reduce strain on the constraint matrix range
             self.bio_GBF8_species_conservation_exprs[s] = (ag_contr + ag_man_contr + non_ag_contr) / s_area_lb
     
-            print(f"       |-- species conservation target area is {s_area_lb:15,.0f} for {s_names[s]}")
+            print(f"       |-- target area is {s_area_lb:15,.0f} for {s_names[s]}")
             self.bio_GBF8_species_conservation_constrs[s] = self.gurobi_model.addConstr(
                 self.bio_GBF8_species_conservation_exprs[s] >= 1,
                 name=f"bio_GBF8_species_conservation_limit_{s}",
@@ -1165,7 +1169,7 @@ class LutoSolver:
     def _add_regional_adoption_constraints(self) -> None:
 
         if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
-            print("  ... regional adoption constraints TURNED OFF...")
+            print("  ...regional adoption constraints TURNED OFF...")
             return
         
         print("  ...regional adoption constraints...")
