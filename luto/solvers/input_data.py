@@ -714,7 +714,7 @@ def set_limits(data: Data, yr_cal) -> None:
         limit_GBF_4_ECNES = pd.DataFrame({
             'Type': 'GBF-4-ECNES',
             'name': get_GBF4_ECNES_names(data).values(),
-            'code': get_GBF4_SNES_names(data).keys(),
+            'code': get_GBF4_ECNES_names(data).keys(),
             'target': data.get_GBF4_ECNES_target_inside_LUTO_by_year(yr_cal)})
 
     if settings.BIODIVERSTIY_TARGET_GBF_8 == "on":

@@ -699,6 +699,8 @@ class LutoSolver:
 
     def _add_water_usage_limit_constraints(self) -> None:
         
+        print("  ...water usage constraints...")
+        
         # Ensure water use remains below limit for each region
         for reg_idx, water_limit in self._input_data.limits["water"].items():
             
@@ -1025,7 +1027,8 @@ class LutoSolver:
             print('    ...Biodiversity GBF 4 (Ecological Communities of National Environmental Significance) constraints TURNED OFF ...')
             return
         
-        x_limits, x_names = self._input_data.limits["GBF4_ECNES"]
+        x_limits = self._input_data.limits["GBF4_ECNES"]
+        x_names = self._input_data.GBF4_ECNES_names
 
         print(f"    ...Biodiversity GBF 4 (Ecological Communities of National Environmental Significance) constraints...")
         

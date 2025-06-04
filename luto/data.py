@@ -1311,7 +1311,7 @@ class Data:
                                                             row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE']>0,
                                                             row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE']>0])]
             
-            if len(self.BIO_GBF4_SNES_LIKELY_SEL) == 0 or len(self.BIO_GBF4_ECNES_LIKELY_SEL) == 0:
+            if len(self.BIO_GBF4_SNES_LIKELY_SEL) == 0:
                 raise ValueError("At least one of 'LIKELY' layers should be selected!")
 
             likely_maybe_union = set(self.BIO_GBF4_SNES_LIKELY_SEL).intersection(self.BIO_GBF4_SNES_LIKELY_AND_MAYBE_SEL)
@@ -1347,6 +1347,9 @@ class Data:
                                                     if all([row['USER_DEFINED_TARGET_PERCENT_2030_LIKELY_MAYBE']>0,
                                                             row['USER_DEFINED_TARGET_PERCENT_2050_LIKELY_MAYBE']>0,
                                                             row['USER_DEFINED_TARGET_PERCENT_2100_LIKELY_MAYBE']>0])]
+            
+            if len(self.BIO_GBF4_ECNES_LIKELY_SEL) == 0:
+                raise ValueError("At least one of 'LIKELY' layers should be selected!")
   
             likely_maybe_union = set(self.BIO_GBF4_ECNES_LIKELY_SEL).intersection(self.BIO_GBF4_ECNES_LIKELY_AND_MAYBE_SEL)
             if likely_maybe_union:
