@@ -25,6 +25,7 @@ Pure helper functions and other tools.
 
 import sys
 import os.path
+import threading
 import time
 import traceback
 import functools
@@ -618,3 +619,30 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1):
             file.write(f'{timestamp}\t{memory_usage:.2f}\n')
             file.flush()  # Ensure data is written to the file immediately
             time.sleep(interval)
+            
+
+# Memory monitoring helper functions            
+# memory_log = []
+# monitoring = False  # Flag to control monitoring
+# monitor_thread = None
+
+# def monitor_memory(interval=0.01):
+#     """Runs in a thread, logs memory usage every `interval` seconds."""
+#     process = psutil.Process(os.getpid())
+#     while monitoring:
+#         mem_mb = process.memory_info().rss / 1024 ** 2
+#         memory_log.append((time.time(), mem_mb))
+#         time.sleep(interval)
+
+# def start_memory_monitor():
+#     global monitoring, monitor_thread
+#     memory_log.clear()  # Clear previous log
+#     monitoring = True
+#     monitor_thread = threading.Thread(target=monitor_memory)
+#     monitor_thread.start()
+
+# def stop_memory_monitor():
+#     global monitoring
+#     monitoring = False
+#     if monitor_thread:
+#         monitor_thread.join()
