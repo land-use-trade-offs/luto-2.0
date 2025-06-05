@@ -265,14 +265,15 @@ def get_sheep_hir_effect_t_mrj(data):
 
 
 def get_agricultural_management_transition_matrices(data: Data, t_mrj, yr_idx) -> Dict[str, np.ndarray]:
-    asparagopsis_data = get_asparagopsis_effect_t_mrj(data) if AG_MANAGEMENTS['Asparagopsis taxiformis'] else 0
-    precision_agriculture_data = get_precision_agriculture_effect_t_mrj(data) if AG_MANAGEMENTS['Precision Agriculture'] else 0
-    eco_grazing_data = get_ecological_grazing_effect_t_mrj(data) if AG_MANAGEMENTS['Ecological Grazing'] else 0
-    sav_burning_data = get_savanna_burning_effect_t_mrj(data) if AG_MANAGEMENTS['Savanna Burning'] else 0
-    agtech_ei_data = get_agtech_ei_effect_t_mrj(data) if AG_MANAGEMENTS['AgTech EI'] else 0
-    biochar_data = get_biochar_effect_t_mrj(data) if AG_MANAGEMENTS['Biochar'] else 0
-    beef_hir_data = get_beef_hir_effect_t_mrj(data) if AG_MANAGEMENTS['HIR - Beef'] else 0
-    sheep_hir_data = get_sheep_hir_effect_t_mrj(data) if AG_MANAGEMENTS['HIR - Sheep'] else 0
+    
+    asparagopsis_data = get_asparagopsis_effect_t_mrj(data)                     
+    precision_agriculture_data = get_precision_agriculture_effect_t_mrj(data)   
+    eco_grazing_data = get_ecological_grazing_effect_t_mrj(data)                
+    sav_burning_data = get_savanna_burning_effect_t_mrj(data)                   
+    agtech_ei_data = get_agtech_ei_effect_t_mrj(data)                           
+    biochar_data = get_biochar_effect_t_mrj(data)                               
+    beef_hir_data = get_beef_hir_effect_t_mrj(data)                             
+    sheep_hir_data = get_sheep_hir_effect_t_mrj(data)                           
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -392,29 +393,16 @@ def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str,
     An adoption limit represents the maximum percentage of cells (for each land use) that can utilise
     each agricultural management option.
     """
-    # Initialise by setting all options/land uses to zero adoption limits, and replace
-    # enabled options with the correct values.
-    ag_management_data = {
-        ag_man_option: {data.DESC2AGLU[lu]: 0 for lu in land_uses}
-        for ag_man_option, land_uses in AG_MANAGEMENTS_TO_LAND_USES.items()
-    }
+    ag_management_data = {}
 
-    if AG_MANAGEMENTS['Asparagopsis taxiformis']:
-        ag_management_data['Asparagopsis taxiformis'] = get_asparagopsis_adoption_limits(data, yr_idx)
-    if AG_MANAGEMENTS['Precision Agriculture']:
-        ag_management_data['Precision Agriculture'] = get_precision_agriculture_adoption_limit(data, yr_idx)
-    if AG_MANAGEMENTS['Ecological Grazing']:
-        ag_management_data['Ecological Grazing'] = get_ecological_grazing_adoption_limit(data, yr_idx)
-    if AG_MANAGEMENTS['Savanna Burning']:
-        ag_management_data['Savanna Burning'] = get_savanna_burning_adoption_limit(data)
-    if AG_MANAGEMENTS['AgTech EI']:
-        ag_management_data['AgTech EI'] = get_agtech_ei_adoption_limit(data, yr_idx)
-    if AG_MANAGEMENTS['Biochar']:
-        ag_management_data['Biochar'] = get_biochar_adoption_limit(data, yr_idx)
-    if AG_MANAGEMENTS['HIR - Beef']:
-        ag_management_data['HIR - Beef'] = get_beef_hir_adoption_limit(data)
-    if AG_MANAGEMENTS['HIR - Sheep']:
-        ag_management_data['HIR - Sheep'] = get_sheep_hir_adoption_limit(data)
+    ag_management_data['Asparagopsis taxiformis'] = get_asparagopsis_adoption_limits(data, yr_idx)          if AG_MANAGEMENTS['Asparagopsis taxiformis'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis']}
+    ag_management_data['Precision Agriculture'] = get_precision_agriculture_adoption_limit(data, yr_idx)    if AG_MANAGEMENTS['Precision Agriculture'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']}
+    ag_management_data['Ecological Grazing'] = get_ecological_grazing_adoption_limit(data, yr_idx)          if AG_MANAGEMENTS['Ecological Grazing'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']}
+    ag_management_data['Savanna Burning'] = get_savanna_burning_adoption_limit(data)                        if AG_MANAGEMENTS['Savanna Burning'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning']}
+    ag_management_data['AgTech EI'] = get_agtech_ei_adoption_limit(data, yr_idx)                            if AG_MANAGEMENTS['AgTech EI'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']}
+    ag_management_data['Biochar'] = get_biochar_adoption_limit(data, yr_idx)                                if AG_MANAGEMENTS['Biochar'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['Biochar']}
+    ag_management_data['HIR - Beef'] = get_beef_hir_adoption_limit(data)                                    if AG_MANAGEMENTS['HIR - Beef'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']}
+    ag_management_data['HIR - Sheep'] = get_sheep_hir_adoption_limit(data)                                  if AG_MANAGEMENTS['HIR - Sheep'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']}
 
     return ag_management_data
 
@@ -428,6 +416,7 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> d
         return {
             am: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
             for am in AG_MANAGEMENTS_TO_LAND_USES
+            if AG_MANAGEMENTS[am]
         }
 
     return {
@@ -436,6 +425,7 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> d
             , 10 ** settings.ROUND_DECMIALS
         )
         for am in AG_MANAGEMENTS_TO_LAND_USES
+        if AG_MANAGEMENTS[am]
     }
 
 

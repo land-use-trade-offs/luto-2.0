@@ -353,14 +353,6 @@ and agricultural management combination in all subsequent years.
 WARNING: changing to False will result in 'locking in' land uses on cells that utilise the agricultural management option for
 the rest of the simulation. This may be an unintended side effect.
 """
-# Update AG_MANAGEMENTS_TO_LAND_USES to remove any land uses that are not enabled
-REMOVED_DICT = {}
-for am in list(AG_MANAGEMENTS_TO_LAND_USES.keys()):  # Iterate over a copy of the keys
-    if not AG_MANAGEMENTS[am]:
-        REMOVED_DICT[am] = AG_MANAGEMENTS_TO_LAND_USES[am] 
-        AG_MANAGEMENTS_TO_LAND_USES.pop(am)
-        AG_MANAGEMENTS_REVERSIBLE.pop(am)
-
 
 
 # The cost for removing and establishing irrigation infrastructure ($ per hectare)

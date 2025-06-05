@@ -26,10 +26,9 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, Optional
 
+from luto.data import Data
 from luto import settings
 from luto.economics import land_use_culling
-from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
-from luto.data import Data
 
 import luto.economics.agricultural.cost as ag_cost
 import luto.economics.agricultural.ghg as ag_ghg
@@ -150,8 +149,8 @@ class SolverInputData:
         # Map of agricultural management options to land use codes
         return {
             am: [self.desc2aglu[lu] for lu in am_lus]
-            for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items()
-            if AG_MANAGEMENTS[am]
+            for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items()
+            if settings.AG_MANAGEMENTS[am]
         }
 
     @cached_property
@@ -524,7 +523,7 @@ def get_economic_mrj(
         # Get effects of alternative agr. management options (stored in a dict)
         ag_man_objs = {
             am: ag_man_r_mrj[am] - (ag_man_c_mrj[am] + ag_man_t_mrj[am]) 
-            for am in AG_MANAGEMENTS_TO_LAND_USES
+            for am in settings.AG_MANAGEMENTS_TO_LAND_USES
         }
 
     elif settings.OBJECTIVE == "mincost":
@@ -535,7 +534,7 @@ def get_economic_mrj(
         # Store calculations for each agricultural management option in a dict
         ag_man_objs = {
             am: (ag_man_c_mrj[am] + ag_man_t_mrj[am])      
-            for am in AG_MANAGEMENTS_TO_LAND_USES
+            for am in settings.AG_MANAGEMENTS_TO_LAND_USES
         }
 
     else:

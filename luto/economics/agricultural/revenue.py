@@ -31,7 +31,7 @@ from luto.data import Data
 from luto.economics.agricultural.quantity import get_yield_pot, get_quantity, lvs_veg_types
 from luto.economics.agricultural.ghg import get_savanna_burning_effect_g_mrj
 
-def get_rev_crop( data         # Data object.
+def get_rev_crop( data:Data         # Data object.
                 , lu           # Land use.
                 , lm           # Land management.
                 , yr_idx       # Number of years post base-year ('YR_CAL_BASE').
@@ -63,7 +63,7 @@ def get_rev_crop( data         # Data object.
     # Return revenue as MultiIndexed DataFrame.
     return pd.DataFrame(rev_t, columns=pd.MultiIndex.from_product([[lu],[lm],['Revenue']]))
 
-def get_rev_lvstk( data   # Data object.
+def get_rev_lvstk( data:Data   # Data object.
                  , lu           # Land use.
                  , lm           # Land management.
                  , yr_idx       # Number of years post base-year ('YR_CAL_BASE').
@@ -157,7 +157,7 @@ def get_rev_lvstk( data   # Data object.
     return rev_seperate
 
 
-def get_rev( data    # Data object.
+def get_rev( data:Data    # Data object.
             , lu           # Land use.
             , lm           # Land management.
             , yr_idx       # Number of years post base-year ('YR_CAL_BASE')
@@ -184,7 +184,7 @@ def get_rev( data    # Data object.
         raise KeyError(f"Land-use '{lu}' not found in data.LANDUSES")
 
 
-def get_rev_matrix(data, lm, yr_idx):
+def get_rev_matrix(data:Data, lm, yr_idx):
     """Return r_rj matrix of revenue/cell per lu under `lm` in `yr_idx`."""
     
     # Concatenate the revenue from each land use into a single Multiindex DataFrame.
@@ -193,7 +193,7 @@ def get_rev_matrix(data, lm, yr_idx):
     return r_rjs
 
 
-def get_rev_matrices(data, yr_idx, aggregate:bool = True):
+def get_rev_matrices(data:Data, yr_idx, aggregate:bool = True):
     """Return r_mrj matrix of revenue per cell as 3D Numpy array."""
 
     # Concatenate the revenue from each land management into a single Multiindex DataFrame.
@@ -238,7 +238,7 @@ def get_commodity_prices(data: Data) -> np.ndarray:
     return np.array([commodity_prices[k] for k in data.COMMODITIES])
 
 
-def get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx):
+def get_asparagopsis_effect_r_mrj(data:Data, r_mrj, yr_idx):
     """
     Applies the effects of using asparagopsis to the revenue data
     for all relevant agr. land uses.
@@ -265,7 +265,7 @@ def get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx):
+def get_precision_agriculture_effect_r_mrj(data:Data, r_mrj, yr_idx):
     """
     Applies the effects of using precision agriculture to the revenue data
     for all relevant agr. land uses.
@@ -290,7 +290,7 @@ def get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx):
+def get_ecological_grazing_effect_r_mrj(data:Data, r_mrj, yr_idx):
     """
     Applies the effects of using ecologiacl grazing to the revenue data
     for all relevant agr. land uses.
@@ -315,7 +315,7 @@ def get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_savanna_burning_effect_r_mrj(data, yr_idx: int):
+def get_savanna_burning_effect_r_mrj(data:Data, yr_idx: int):
     """
     Applies the effects of using EDS savanna burning to the revenue data
     for all relevant agr. land uses.
@@ -326,7 +326,7 @@ def get_savanna_burning_effect_r_mrj(data, yr_idx: int):
     return ghg_effect * data.get_carbon_price_by_yr_idx(yr_idx)
 
 
-def get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx):
+def get_agtech_ei_effect_r_mrj(data:Data, r_mrj, yr_idx):
     """
     Applies the effects of using AgTech EI to the revenue data
     for all relevant agr. land uses.
@@ -351,7 +351,7 @@ def get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx):
     return new_r_mrj
 
 
-def get_biochar_effect_r_mrj(data, r_mrj, yr_idx):
+def get_biochar_effect_r_mrj(data:Data, r_mrj, yr_idx):
     """
     Applies the effects of using Biochar to the revenue data
     for all relevant agr. land uses.
@@ -419,7 +419,7 @@ def get_sheep_hir_effect_r_mrj(data: Data, r_mrj):
     return r_mrj_effect
 
 
-def get_agricultural_management_revenue_matrices(data, r_mrj, yr_idx) -> dict[str, np.ndarray]:
+def get_agricultural_management_revenue_matrices(data:Data, r_mrj, yr_idx) -> dict[str, np.ndarray]:
     """
     Calculate the revenue matrices for different agricultural management practices.
 
@@ -433,22 +433,15 @@ def get_agricultural_management_revenue_matrices(data, r_mrj, yr_idx) -> dict[st
         The keys of the dictionary represent the management practices, and the values are numpy arrays.
 
     """
-    asparagopsis_data = get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx) if settings.AG_MANAGEMENTS['Asparagopsis taxiformis'] else 0
-    precision_agriculture_data = get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx) if settings.AG_MANAGEMENTS['Precision Agriculture'] else 0
-    eco_grazing_data = get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx) if settings.AG_MANAGEMENTS['Ecological Grazing'] else 0
-    sav_burning_data = get_savanna_burning_effect_r_mrj(data, yr_idx) if settings.AG_MANAGEMENTS['Savanna Burning'] else 0
-    agtech_ei_data = get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx) if settings.AG_MANAGEMENTS['AgTech EI'] else 0
-    biochar_data = get_biochar_effect_r_mrj(data, r_mrj, yr_idx) if settings.AG_MANAGEMENTS['Biochar'] else 0
-    beef_hir_data = get_beef_hir_effect_r_mrj(data, r_mrj) if settings.AG_MANAGEMENTS['HIR - Beef'] else 0
-    sheep_hir_data = get_sheep_hir_effect_r_mrj(data, r_mrj) if settings.AG_MANAGEMENTS['HIR - Sheep'] else 0
+    ag_mam_r_mrj = {}
 
-    return {
-        'Asparagopsis taxiformis': asparagopsis_data,
-        'Precision Agriculture': precision_agriculture_data,
-        'Ecological Grazing': eco_grazing_data,
-        'Savanna Burning': sav_burning_data,
-        'AgTech EI': agtech_ei_data,
-        'Biochar': biochar_data,
-        'HIR - Beef': beef_hir_data,
-        'HIR - Sheep': sheep_hir_data,       
-    }
+    ag_mam_r_mrj['Asparagopsis taxiformis'] = get_asparagopsis_effect_r_mrj(data, r_mrj, yr_idx)           
+    ag_mam_r_mrj['Precision Agriculture'] = get_precision_agriculture_effect_r_mrj(data, r_mrj, yr_idx)  
+    ag_mam_r_mrj['Ecological Grazing'] = get_ecological_grazing_effect_r_mrj(data, r_mrj, yr_idx)          
+    ag_mam_r_mrj['Savanna Burning'] = get_savanna_burning_effect_r_mrj(data, yr_idx)                       
+    ag_mam_r_mrj['AgTech EI'] = get_agtech_ei_effect_r_mrj(data, r_mrj, yr_idx)                            
+    ag_mam_r_mrj['Biochar'] = get_biochar_effect_r_mrj(data, r_mrj, yr_idx)                                
+    ag_mam_r_mrj['HIR - Beef'] = get_beef_hir_effect_r_mrj(data, r_mrj)                                    
+    ag_mam_r_mrj['HIR - Sheep'] = get_sheep_hir_effect_r_mrj(data, r_mrj)                                  
+
+    return ag_mam_r_mrj

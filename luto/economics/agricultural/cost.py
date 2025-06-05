@@ -361,7 +361,7 @@ def get_ecological_grazing_effect_c_mrj(data:Data, yr_idx):
     - new_c_mrj: The matrix containing the updated cost <unit: $/cell>.
     """
 
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing'] if AG_MANAGEMENTS['Ecological Grazing'] else settings.REMOVED_DICT['Ecological Grazing']
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']
     yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Set up the effects matrix
@@ -530,22 +530,15 @@ def get_agricultural_management_cost_matrices(data: Data, c_mrj, yr_idx):
         dict: A dictionary containing the cost matrices for different agricultural management practices.
             The keys are the names of the practices and the values are the corresponding cost matrices.
     """
-    asparagopsis_data = get_asparagopsis_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Asparagopsis taxiformis'] else 0
-    precision_agriculture_data = get_precision_agriculture_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Precision Agriculture'] else 0
-    eco_grazing_data = get_ecological_grazing_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Ecological Grazing'] else 0
-    sav_burning_data = get_savanna_burning_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Savanna Burning'] else 0
-    agtech_ei_data = get_agtech_ei_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['AgTech EI'] else 0
-    biochar_data = get_biochar_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['Biochar'] else 0
-    beef_hir_data = get_beef_hir_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['HIR - Beef'] else 0
-    sheep_hir_data = get_sheep_hir_effect_c_mrj(data, yr_idx) if AG_MANAGEMENTS['HIR - Sheep'] else 0
+    ag_mam_c_mrj = {}
 
-    return {
-        'Asparagopsis taxiformis': asparagopsis_data,
-        'Precision Agriculture': precision_agriculture_data,
-        'Ecological Grazing': eco_grazing_data,
-        'Savanna Burning': sav_burning_data,
-        'AgTech EI': agtech_ei_data,
-        'Biochar': biochar_data,
-        'HIR - Beef': beef_hir_data,
-        'HIR - Sheep': sheep_hir_data,
-    }
+    ag_mam_c_mrj['Asparagopsis taxiformis'] = get_asparagopsis_effect_c_mrj(data, yr_idx)           
+    ag_mam_c_mrj['Precision Agriculture'] = get_precision_agriculture_effect_c_mrj(data, yr_idx)    
+    ag_mam_c_mrj['Ecological Grazing'] = get_ecological_grazing_effect_c_mrj(data, yr_idx)          
+    ag_mam_c_mrj['Savanna Burning'] = get_savanna_burning_effect_c_mrj(data, yr_idx)                
+    ag_mam_c_mrj['AgTech EI'] = get_agtech_ei_effect_c_mrj(data, yr_idx)                            
+    ag_mam_c_mrj['Biochar'] = get_biochar_effect_c_mrj(data, yr_idx)                                
+    ag_mam_c_mrj['HIR - Beef'] = get_beef_hir_effect_c_mrj(data, yr_idx)                            
+    ag_mam_c_mrj['HIR - Sheep'] = get_sheep_hir_effect_c_mrj(data, yr_idx)                          
+
+    return ag_mam_c_mrj

@@ -216,30 +216,24 @@ def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
 
-    env_plantings_biodiv = get_biodiv_environmental_plantings(data)
-    rip_plantings_biodiv = get_biodiv_riparian_plantings(data)
-    sheep_agroforestry_biodiv = get_biodiv_sheep_agroforestry(data, ag_b_mrj, agroforestry_x_r)
-    beef_agroforestry_biodiv = get_biodiv_beef_agroforestry(data, ag_b_mrj, agroforestry_x_r)
-    carbon_plantings_block_biodiv = get_biodiv_carbon_plantings_block(data)
-    sheep_carbon_plantings_belt_biodiv = get_biodiv_sheep_carbon_plantings_belt(data, ag_b_mrj, cp_belt_x_r)
-    beef_carbon_plantings_belt_biodiv = get_biodiv_beef_carbon_plantings_belt(data, ag_b_mrj, cp_belt_x_r)
-    beccs_biodiv = get_biodiv_beccs(data)
-    destocked_biodiv = get_biodiv_destocked_land(data, lumap)
-
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     non_agr_b_matrices = [
-        env_plantings_biodiv.reshape((data.NCELLS, 1)),
-        rip_plantings_biodiv.reshape((data.NCELLS, 1)),
-        sheep_agroforestry_biodiv.reshape((data.NCELLS, 1)),
-        beef_agroforestry_biodiv.reshape((data.NCELLS, 1)),
-        carbon_plantings_block_biodiv.reshape((data.NCELLS, 1)),
-        sheep_carbon_plantings_belt_biodiv.reshape((data.NCELLS, 1)),
-        beef_carbon_plantings_belt_biodiv.reshape((data.NCELLS, 1)),
-        beccs_biodiv.reshape((data.NCELLS, 1)),
-        destocked_biodiv.reshape((data.NCELLS, 1)),
+        get_biodiv_environmental_plantings(data),
+        get_biodiv_riparian_plantings(data),
+        get_biodiv_sheep_agroforestry(data, ag_b_mrj, agroforestry_x_r),
+        get_biodiv_beef_agroforestry(data, ag_b_mrj, agroforestry_x_r),
+        get_biodiv_carbon_plantings_block(data),
+        get_biodiv_sheep_carbon_plantings_belt(data, ag_b_mrj, cp_belt_x_r),
+        get_biodiv_beef_carbon_plantings_belt(data, ag_b_mrj, cp_belt_x_r),
+        get_biodiv_beccs(data),                                               
+        get_biodiv_destocked_land(data, lumap)
     ]
 
-    return np.concatenate(non_agr_b_matrices, axis=1)
+    return np.concatenate([
+        arr.reshape((data.NCELLS, 1)) for arr in non_agr_b_matrices], 
+        axis=1
+    )
+
 
 
 def get_non_ag_lu_biodiv_contribution(data: Data) -> dict[int, float]:

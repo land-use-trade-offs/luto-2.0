@@ -21,6 +21,7 @@ import numpy as np
 
 from luto import tools
 from copy import deepcopy
+from luto import settings
 
 
 def get_sheep_q_cr(data, ag_q_mrp: np.ndarray) -> np.ndarray:
@@ -320,27 +321,20 @@ def get_quantity_matrix(data, ag_q_mrp: np.ndarray, lumap: np.ndarray) -> np.nda
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
     
-    env_plantings_quantity_matrix = get_quantity_env_plantings(data)
-    rip_plantings_quantity_matrix = get_quantity_rip_plantings(data)
-    sheep_agroforestry_quantity_matrix = get_quantity_sheep_agroforestry(data, ag_q_mrp, agroforestry_x_r)
-    sheep_carbon_plantings_belt_quantity_matrix = get_quantity_sheep_carbon_plantings_belt(data, ag_q_mrp, cp_belt_x_r)
-    carbon_plantings_block_quantity_matrix = get_quantity_carbon_plantings_block(data)
-    beef_carbon_plantings_belt_quantity_matrix = get_quantity_beef_carbon_plantings_belt(data, ag_q_mrp, cp_belt_x_r)
-    beef_agroforestry_quantity_matrix = get_quantity_beef_agroforestry(data, ag_q_mrp, agroforestry_x_r)
-    beccs_quantity_matrix = get_quantity_beccs(data)
-    destocked_quantity_matrix = get_quantity_destocked(data)
-
-    # reshape each matrix to be indexed (c, r, k) and concatenate on the k indexing
+    # reshape each non-agricultural quantity matrix to be indexed (c, r, 1) and concatenate on the k indexing
     non_agr_quantity_matrices = [
-        env_plantings_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
-        rip_plantings_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
-        sheep_agroforestry_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
-        beef_agroforestry_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
-        carbon_plantings_block_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
-        sheep_carbon_plantings_belt_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
-        beef_carbon_plantings_belt_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
-        beccs_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
-        destocked_quantity_matrix.reshape((data.NCMS, data.NCELLS, 1)),
+        get_quantity_env_plantings(data)                                       ,
+        get_quantity_rip_plantings(data)                                       ,
+        get_quantity_sheep_agroforestry(data, ag_q_mrp, agroforestry_x_r)      ,
+        get_quantity_beef_agroforestry(data, ag_q_mrp, agroforestry_x_r)       ,
+        get_quantity_carbon_plantings_block(data)                              ,
+        get_quantity_sheep_carbon_plantings_belt(data, ag_q_mrp, cp_belt_x_r)  ,
+        get_quantity_beef_carbon_plantings_belt(data, ag_q_mrp, cp_belt_x_r)   ,
+        get_quantity_beccs(data)                                               ,
+        get_quantity_destocked(data)                                           ,
     ]
 
-    return np.concatenate(non_agr_quantity_matrices, axis=2)
+    return np.concatenate(
+        [arr.reshape((data.NCMS, data.NCELLS, 1)) for arr in non_agr_quantity_matrices], 
+        axis=2
+    )

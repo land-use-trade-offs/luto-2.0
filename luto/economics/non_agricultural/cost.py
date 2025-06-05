@@ -275,35 +275,20 @@ def get_cost_matrix(data: Data, ag_c_mrj: np.ndarray, lumap, yr_cal):
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
 
-    non_agr_c_matrices = {use: np.zeros((data.NCELLS, 1)).astype(np.float32) for use in NON_AG_LAND_USES}
-
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-    if NON_AG_LAND_USES['Environmental Plantings']:
-        non_agr_c_matrices['Environmental Plantings'] = get_cost_env_plantings(data, yr_cal).reshape((data.NCELLS, 1))
+    non_agr_c_matrices = [
+        get_cost_env_plantings(data, yr_cal),
+        get_cost_rip_plantings(data, yr_cal),
+        get_cost_sheep_agroforestry(data, yr_cal, ag_c_mrj, agroforestry_x_r),
+        get_cost_beef_agroforestry(data, yr_cal, ag_c_mrj, agroforestry_x_r),
+        get_cost_carbon_plantings_block(data, yr_cal),
+        get_cost_sheep_carbon_plantings_belt(data, yr_cal, ag_c_mrj, cp_belt_x_r),
+        get_cost_beef_carbon_plantings_belt(data, yr_cal, ag_c_mrj, cp_belt_x_r),
+        get_cost_beccs(data, yr_cal),                                               
+        get_cost_destocked(data, ag_c_mrj)
+    ]
 
-    if NON_AG_LAND_USES['Riparian Plantings']:
-        non_agr_c_matrices['Riparian Plantings'] = get_cost_rip_plantings(data, yr_cal).reshape((data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['Sheep Agroforestry']:
-        non_agr_c_matrices['Sheep Agroforestry'] = get_cost_sheep_agroforestry(data, yr_cal, ag_c_mrj, agroforestry_x_r).reshape((data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['Beef Agroforestry']:
-        non_agr_c_matrices['Beef Agroforestry'] = get_cost_beef_agroforestry(data, yr_cal, ag_c_mrj, agroforestry_x_r).reshape((data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['Carbon Plantings (Block)']:
-        non_agr_c_matrices['Carbon Plantings (Block)'] = get_cost_carbon_plantings_block(data, yr_cal).reshape((data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['Sheep Carbon Plantings (Belt)']:
-        non_agr_c_matrices['Sheep Carbon Plantings (Belt)'] = get_cost_sheep_carbon_plantings_belt(data, yr_cal, ag_c_mrj, cp_belt_x_r).reshape((data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['Beef Carbon Plantings (Belt)']:
-        non_agr_c_matrices['Beef Carbon Plantings (Belt)'] = get_cost_beef_carbon_plantings_belt(data, yr_cal, ag_c_mrj, cp_belt_x_r).reshape((data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['BECCS']:
-        non_agr_c_matrices['BECCS'] = get_cost_beccs(data, yr_cal).reshape((data.NCELLS, 1))
-
-    if NON_AG_LAND_USES['Destocked - natural land']:
-        non_agr_c_matrices['Destocked - natural land'] = get_cost_destocked(data, ag_c_mrj).reshape((data.NCELLS, 1))
-
-    non_agr_c_matrices = list(non_agr_c_matrices.values())
-    return np.concatenate(non_agr_c_matrices, axis=1)
+    return np.concatenate(
+        [arr.reshape((data.NCELLS, 1)) for arr in non_agr_c_matrices],
+        axis=1
+    )

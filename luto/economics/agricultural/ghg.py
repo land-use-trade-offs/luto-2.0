@@ -752,14 +752,14 @@ def get_agricultural_management_ghg_matrices(data:Data, yr_idx) -> dict[str, np.
         The keys of the dictionary represent the management practices, and the values are numpy arrays.
 
     """
-    asparagopsis_data = get_asparagopsis_effect_g_mrj(data, yr_idx) if settings.AG_MANAGEMENTS['Asparagopsis taxiformis'] else 0
-    precision_agriculture_data = get_precision_agriculture_effect_g_mrj(data, yr_idx) if settings.AG_MANAGEMENTS['Precision Agriculture'] else 0
-    eco_grazing_data = get_ecological_grazing_effect_g_mrj(data, yr_idx) if settings.AG_MANAGEMENTS['Ecological Grazing'] else 0
-    sav_burning_ghg_impact = get_savanna_burning_effect_g_mrj(data) if settings.AG_MANAGEMENTS['Savanna Burning'] else 0
-    agtech_ei_ghg_impact = get_agtech_ei_effect_g_mrj(data, yr_idx) if settings.AG_MANAGEMENTS['AgTech EI'] else 0
-    biochar_ghg_impact = get_biochar_effect_g_mrj(data, yr_idx) if settings.AG_MANAGEMENTS['Biochar'] else 0
-    beef_hir_ghg_impact = get_beef_hir_effect_g_mrj(data) if settings.AG_MANAGEMENTS['HIR - Beef'] else 0
-    sheep_hir_ghg_impact = get_sheep_hir_effect_g_mrj(data) if settings.AG_MANAGEMENTS['HIR - Sheep'] else 0
+    asparagopsis_data = get_asparagopsis_effect_g_mrj(data, yr_idx)                         
+    precision_agriculture_data = get_precision_agriculture_effect_g_mrj(data, yr_idx)       
+    eco_grazing_data = get_ecological_grazing_effect_g_mrj(data, yr_idx)                    
+    sav_burning_ghg_impact = get_savanna_burning_effect_g_mrj(data)                         
+    agtech_ei_ghg_impact = get_agtech_ei_effect_g_mrj(data, yr_idx)                         
+    biochar_ghg_impact = get_biochar_effect_g_mrj(data, yr_idx)                             
+    beef_hir_ghg_impact = get_beef_hir_effect_g_mrj(data)                                   
+    sheep_hir_ghg_impact = get_sheep_hir_effect_g_mrj(data)                                 
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,

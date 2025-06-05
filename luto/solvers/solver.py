@@ -36,7 +36,6 @@ from luto.solvers.input_data import SolverInputData
 from luto.settings import (
     AG_MANAGEMENTS, 
     AG_MANAGEMENTS_REVERSIBLE, 
-    AG_MANAGEMENTS_TO_LAND_USES,
     NON_AG_LAND_USES, 
     NON_AG_LAND_USES_REVERSIBLE
 )
@@ -184,15 +183,15 @@ class LutoSolver:
                     ub=1, name=f"X_ag_irr_{j}_{r}"
                 )
 
-        for k, non_ag_lu_desc in enumerate(NON_AG_LAND_USES):
-            if not NON_AG_LAND_USES[non_ag_lu_desc]:
+        for k, k_name in enumerate(NON_AG_LAND_USES):
+            if not NON_AG_LAND_USES[k_name]:
                 continue
 
             lu_cells = self._input_data.non_ag_lu2cells[k]
             for r in lu_cells:
                 x_lb = (
                     0
-                    if NON_AG_LAND_USES_REVERSIBLE[non_ag_lu_desc]
+                    if NON_AG_LAND_USES_REVERSIBLE[k_name]
                     else self._input_data.non_ag_lb_rk[r, k]
                 )
                 self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
@@ -248,12 +247,10 @@ class LutoSolver:
                         if AG_MANAGEMENTS_REVERSIBLE[am]
                         else self._input_data.ag_man_lb_mrj[am][0, r, j]
                     )
-                    dry_var_name = f"X_ag_man_dry_{am_name}_{j}_{r}"
-
                     self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                         lb=dry_x_lb,
                         ub=1,
-                        name=dry_var_name,
+                        name=f"X_ag_man_dry_{am_name}_{j}_{r}",
                     )
                 
                 for r in irr_lu_cells:
@@ -262,12 +259,10 @@ class LutoSolver:
                         if AG_MANAGEMENTS_REVERSIBLE[am]
                         else self._input_data.ag_man_lb_mrj[am][1, r, j]
                     )
-                    irr_var_name = f"X_ag_man_irr_{am_name}_{j}_{r}"
-
                     self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                         lb=irr_x_lb,
                         ub=1,
-                        name=irr_var_name,
+                        name=f"X_ag_man_irr_{am_name}_{j}_{r}",
                     )
 
     def _setup_deviation_penalties(self):
@@ -335,61 +330,87 @@ class LutoSolver:
         
         # Get economic contributions
         ag_obj_mrj, non_ag_obj_rk, ag_man_objs = self._input_data.economic_contr_mrj
+
+        ag_exprs = []
+        for j in range(self._input_data.n_ag_lus):
+            ag_exprs.append(
+                ag_obj_mrj[0, self._input_data.ag_lu2cells[0, j], j]
+                @ self.X_ag_dry_vars_jr[j, self._input_data.ag_lu2cells[0, j]]
+                + ag_obj_mrj[1, self._input_data.ag_lu2cells[1, j], j]
+                @ self.X_ag_irr_vars_jr[j, self._input_data.ag_lu2cells[1, j]]
+            )
+
+        ag_mam_exprs = []
+        for am, am_j_list in self._input_data.am2j.items():
+            if not AG_MANAGEMENTS[am]:
+                continue
+            for j_idx, j in enumerate(am_j_list):
+                ag_mam_exprs.append(
+                    ag_man_objs[am][0, self._input_data.ag_lu2cells[0, j], j_idx]
+                    @ self.X_ag_man_dry_vars_jr[am][j_idx, self._input_data.ag_lu2cells[0, j]]
+                    + ag_man_objs[am][1, self._input_data.ag_lu2cells[1, j], j_idx]
+                    @ self.X_ag_man_irr_vars_jr[am][j_idx, self._input_data.ag_lu2cells[1, j]]
+                )
+
+        non_ag_exprs = []
+        for k, k_name in enumerate(NON_AG_LAND_USES):
+            if not NON_AG_LAND_USES[k_name]:
+                continue
+            non_ag_exprs.append(
+                non_ag_obj_rk[:, k][self._input_data.non_ag_lu2cells[k]]
+                @ self.X_non_ag_vars_kr[k, self._input_data.non_ag_lu2cells[k]]
+            )
         
-        self.economy_ag_contr = gp.quicksum(
-            ag_obj_mrj[0, self._input_data.ag_lu2cells[0, j], j]
-            @ self.X_ag_dry_vars_jr[j, self._input_data.ag_lu2cells[0, j]]
-            + ag_obj_mrj[1, self._input_data.ag_lu2cells[1, j], j]
-            @ self.X_ag_irr_vars_jr[j, self._input_data.ag_lu2cells[1, j]]
-            for j in range(self._input_data.n_ag_lus)
-        )
-        self.economy_ag_man_contr = gp.quicksum(
-            ag_man_objs[am][0, self._input_data.ag_lu2cells[0, j], j_idx]
-            @ self.X_ag_man_dry_vars_jr[am][j_idx, self._input_data.ag_lu2cells[0, j]]
-            + ag_man_objs[am][1, self._input_data.ag_lu2cells[1, j], j_idx]
-            @ self.X_ag_man_irr_vars_jr[am][j_idx, self._input_data.ag_lu2cells[1, j]]
-            for am, am_j_list in self._input_data.am2j.items()
-            for j_idx, j in enumerate(am_j_list)
-        )
-        self.economy_non_ag_contr = gp.quicksum(
-            non_ag_obj_rk[:, k][self._input_data.non_ag_lu2cells[k]]
-            @ self.X_non_ag_vars_kr[k, self._input_data.non_ag_lu2cells[k]]
-            for k in range(self._input_data.n_non_ag_lus)
-        )
-        
+        self.economy_ag_contr = gp.quicksum(ag_exprs)
+        self.economy_ag_man_contr = gp.quicksum(ag_mam_exprs)
+        self.economy_non_ag_contr = gp.quicksum(non_ag_exprs)
         return self.economy_ag_contr + self.economy_ag_man_contr + self.economy_non_ag_contr
     
     def _setup_biodiversity_objective(self):
         print("  ...setting up biodiversity objective...")
         
-        # Get biodiversity contributions
-        self.bio_ag_contr = gp.quicksum(
-            gp.quicksum(
-                self._input_data.ag_b_mrj[0, :, j] * self.X_ag_dry_vars_jr[j, :]
-            )  # Dryland agriculture contribution
-            + gp.quicksum(
-                self._input_data.ag_b_mrj[1, :, j] * self.X_ag_irr_vars_jr[j, :]
-            )  # Irrigated agriculture contribution
-            for j in range(self._input_data.n_ag_lus)
-        )
-        self.bio_ag_man_contr = gp.quicksum(
-            gp.quicksum(
-                self._input_data.ag_man_b_mrj[am][0, :, j_idx]
-                * self.X_ag_man_dry_vars_jr[am][j_idx, :]
-            )  # Dryland alt. ag. management contributions
-            + gp.quicksum(
-                self._input_data.ag_man_b_mrj[am][1, :, j_idx]
-                * self.X_ag_man_irr_vars_jr[am][j_idx, :]
-            )  # Irrigated alt. ag. management contributions
-            for am, am_j_list in self._input_data.am2j.items()
-            for j_idx in range(len(am_j_list))
-        )
-        self.bio_non_ag_contr = gp.quicksum(
-            gp.quicksum(
-                self._input_data.non_ag_b_rk[:, k] * self.X_non_ag_vars_kr[k, :]
-            )  # Non-agricultural contribution
-            for k in range(self._input_data.n_non_ag_lus)
-        )
+        ag_exprs = []
+        for j in range(self._input_data.n_ag_lus):
+            ag_exprs.append(
+                gp.quicksum(
+                    self._input_data.ag_b_mrj[0, :, j] * self.X_ag_dry_vars_jr[j, :]
+                )  
+                + gp.quicksum(
+                    self._input_data.ag_b_mrj[1, :, j] * self.X_ag_irr_vars_jr[j, :]
+                )
+                
+            )
+ 
+        ag_mam_exprs = []
+        for am, am_j_list in self._input_data.am2j.items():
+            if not AG_MANAGEMENTS[am]:
+                continue
+                
+            for j_idx in range(len(am_j_list)):
+                ag_mam_exprs.append(
+                    gp.quicksum(
+                        self._input_data.ag_man_b_mrj[am][0, :, j_idx]
+                        * self.X_ag_man_dry_vars_jr[am][j_idx, :]
+                    )  # Dryland alt. ag. management contributions
+                    + gp.quicksum(
+                        self._input_data.ag_man_b_mrj[am][1, :, j_idx]
+                        * self.X_ag_man_irr_vars_jr[am][j_idx, :]
+                    )  # Irrigated alt. ag. management contributions   
+                )
+    
+        non_ag_exprs = []
+        for k,k_name in enumerate(NON_AG_LAND_USES):
+            if not NON_AG_LAND_USES[k_name]:
+                continue
+            non_ag_exprs.append(
+                gp.quicksum(
+                    self._input_data.non_ag_b_rk[:, k] * self.X_non_ag_vars_kr[k, :]
+                )
+            )
+        
+        self.bio_ag_contr = gp.quicksum(ag_exprs)
+        self.bio_ag_man_contr = gp.quicksum(ag_mam_exprs)
+        self.bio_non_ag_contr = gp.quicksum(non_ag_exprs)
         
         return self.bio_ag_contr + self.bio_non_ag_contr + self.bio_ag_man_contr
         
@@ -419,7 +440,8 @@ class LutoSolver:
             # )
             (
                 gp.quicksum(
-                    self.V[c] / self._input_data.base_yr_prod["BASE_YR Production (t)"][c] 
+                    (self.V[c] + self._input_data.base_yr_prod["BASE_YR Production (t)"][c]) 
+                    / self._input_data.base_yr_prod["BASE_YR Production (t)"][c] 
                     for c in range(self._input_data.ncms)
                 ) / self._input_data.ncms
             )
@@ -452,7 +474,10 @@ class LutoSolver:
             + x_non_ag_vars.sum(axis=0)
         )
         for r, expr in zip(cells, X_sum_r):
-            self.cell_usage_constraint_r[r] = self.gurobi_model.addConstr(expr == 1, name=f"const_cell_usage_{r}")
+            self.cell_usage_constraint_r[r] = self.gurobi_model.addConstr(
+                expr == 1, 
+                name=f"const_cell_usage_{r}"
+            )
 
     def _add_agricultural_management_constraints(
         self, cells: Optional[np.array] = None
@@ -521,112 +546,74 @@ class LutoSolver:
         Constraints to penalise under and over production compared to demand.
         """
         print("  ...demand constraints...")
-
-        # Quantities in PR/p representation by land-management (dry/irr).
-
-        X_dry_pr = [
-            self.X_ag_dry_vars_jr[j, :]
-            for p in range(self._input_data.nprs)
-            for j in range(self._input_data.n_ag_lus)
-            if self._input_data.lu2pr_pj[p, j]
-        ]
-        X_irr_pr = [
-            self.X_ag_irr_vars_jr[j, :]
-            for p in range(self._input_data.nprs)
-            for j in range(self._input_data.n_ag_lus)
-            if self._input_data.lu2pr_pj[p, j]
-        ]
-
-        ag_q_dry_p = [
-            gp.quicksum(self._input_data.ag_q_mrp[0, :, p] * X_dry_pr[p])
-            for p in range(self._input_data.nprs)
-        ]
-        ag_q_irr_p = [
-            gp.quicksum(self._input_data.ag_q_mrp[1, :, p] * X_irr_pr[p])
-            for p in range(self._input_data.nprs)
-        ]
-
-        # Transform quantities to CM/c representation by land management (dry/irr).
-        self.ag_q_dry_c = [
-            gp.quicksum(
-                ag_q_dry_p[p]
-                for p in range(self._input_data.nprs)
-                if self._input_data.pr2cm_cp[c, p]
-            )
-            for c in range(self._input_data.ncms)
-        ]
-        self.ag_q_irr_c = [
-            gp.quicksum(
-                ag_q_irr_p[p]
-                for p in range(self._input_data.nprs)
-                if self._input_data.pr2cm_cp[c, p]
-            )
-            for c in range(self._input_data.ncms)
-        ]
-
-        # Repeat to get contributions of alternative agr. management options
-        # Convert variables to PR/p representation
-        self.ag_man_q_dry_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
-        self.ag_man_q_irr_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
         
-        for am, am_j_list in self._input_data.am2j.items():
-            X_ag_man_dry_pr = np.zeros(
-                (self._input_data.nprs, self._input_data.ncells), dtype=object
-            )
-            X_ag_man_irr_pr = np.zeros(
-                (self._input_data.nprs, self._input_data.ncells), dtype=object
-            )
-
-            for j_idx, j in enumerate(am_j_list):
-                for p in self._input_data.j2p[j]:
-                    if self._input_data.lu2pr_pj[p, j]:
-                        X_ag_man_dry_pr[p, :] = self.X_ag_man_dry_vars_jr[am][j_idx, :]
-                        X_ag_man_irr_pr[p, :] = self.X_ag_man_irr_vars_jr[am][j_idx, :]
-
-            ag_man_q_dry_p = [
-                gp.quicksum(
-                    self._input_data.ag_man_q_mrp[am][0, :, p] * X_ag_man_dry_pr[p, :]
-                )
-                for p in range(self._input_data.nprs)
-            ]
-            ag_man_q_irr_p = [
-                gp.quicksum(
-                    self._input_data.ag_man_q_mrp[am][1, :, p] * X_ag_man_irr_pr[p, :]
-                )
-                for p in range(self._input_data.nprs)
-            ]
-
-            for c in range(self._input_data.ncms):
-                self.ag_man_q_dry_c[c] += (
+        self.ag_q_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
+        for j in range(self._input_data.n_ag_lus):
+            X_ag_dry_r = self.X_ag_dry_vars_jr[j, :]
+            X_ag_irr_r = self.X_ag_irr_vars_jr[j, :]
+            
+            for p in range(self._input_data.nprs):
+                if not self._input_data.lu2pr_pj[p, j]:
+                    continue
+                ag_q_p = (
                     gp.quicksum(
-                        ag_man_q_dry_p[p]
-                        for p in range(self._input_data.nprs)
-                        if self._input_data.pr2cm_cp[c, p]
-                    )   
-                )
-                self.ag_man_q_irr_c[c] += (
-                    gp.quicksum(
-                        ag_man_q_irr_p[p]
-                        for p in range(self._input_data.nprs)
-                        if self._input_data.pr2cm_cp[c, p]
-                    )
-                )
+                        self._input_data.ag_q_mrp[0, :, p] * X_ag_dry_r
+                    ) 
+                    + gp.quicksum(
+                        self._input_data.ag_q_mrp[1, :, p] * X_ag_irr_r
+                    ) 
+                )  
                 
+                for c in range(self._input_data.ncms):
+                    if not self._input_data.pr2cm_cp[c, p]:
+                        continue
+                    self.ag_q_c[c] += ag_q_p
+                        
+                        
+        self.ag_man_q_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
+        for am, am_j_list in self._input_data.am2j.items():
+            if not AG_MANAGEMENTS[am]:
+                continue
+            
+            for j_idx,j in enumerate(am_j_list):
+                X_ag_mam_dry_r = self.X_ag_man_dry_vars_jr[am][j_idx, :]
+                X_ag_mam_irr_r = self.X_ag_man_irr_vars_jr[am][j_idx, :]
+                
+                for p in range(self._input_data.nprs):
+                    if not self._input_data.lu2pr_pj[p, j]:
+                        continue
+                    ag_mam_q_p = (
+                        gp.quicksum(
+                            self._input_data.ag_man_q_mrp[am][0, :, p] * X_ag_mam_dry_r
+                        ) 
+                        + gp.quicksum(
+                            self._input_data.ag_man_q_mrp[am][1, :, p] * X_ag_mam_irr_r
+                        ) 
+                    )  
+                    
+                    for c in range(self._input_data.ncms):
+                        if not self._input_data.pr2cm_cp[c, p]:
+                            continue
+                        self.ag_man_q_c[c] += ag_mam_q_p
 
-        # Calculate non-agricultural commodity contributions
-        self.non_ag_q_c = [
-            gp.quicksum(
-                gp.quicksum(
+
+        self.non_ag_q_c = [gp.LinExpr(0) for _ in range(self._input_data.ncms)]
+        for k,k_name in enumerate(NON_AG_LAND_USES):
+            if not NON_AG_LAND_USES[k_name]:
+                continue
+            
+            for c in range(self._input_data.ncms):
+                self.non_ag_q_c[c] += gp.quicksum(
                     self._input_data.non_ag_q_crk[c, :, k] * self.X_non_ag_vars_kr[k, :]
                 )
-                for k in range(self._input_data.n_non_ag_lus)
-            )
-            for c in range(self._input_data.ncms)
-        ]
+            
 
         # Total quantities in CM/c representation.
         self.total_q_exprs_c = [
-            self.ag_q_dry_c[c] + self.ag_q_irr_c[c] + self.ag_man_q_dry_c[c] + self.ag_man_q_irr_c[c] + self.non_ag_q_c[c] for c in range(self._input_data.ncms)
+            self.ag_q_c[c]
+            + self.ag_man_q_c[c] 
+            + self.non_ag_q_c[c] 
+            for c in range(self._input_data.ncms)
         ]
 
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
@@ -670,38 +657,46 @@ class LutoSolver:
         """
         Get the Gurobi linear expression for the net water yield of a given region.
         """
-        ag_contr = gp.quicksum(
-            gp.quicksum(
-                self._input_data.ag_w_mrj[0, ind, j] * self.X_ag_dry_vars_jr[j, ind]
-            )  # Dryland agriculture contribution
-            + gp.quicksum(
-                self._input_data.ag_w_mrj[1, ind, j] * self.X_ag_irr_vars_jr[j, ind]
-            )  # Irrigated agriculture contribution
-            for j in range(self._input_data.n_ag_lus)
-        )
+        
+        ag_exprs = []
+        for j in range(self._input_data.n_ag_lus):
+            ag_exprs.append(
+                gp.quicksum(
+                    self._input_data.ag_w_mrj[0, ind, j] * self.X_ag_dry_vars_jr[j, ind]
+                )  # Dryland agriculture contribution
+                + gp.quicksum(
+                    self._input_data.ag_w_mrj[1, ind, j] * self.X_ag_irr_vars_jr[j, ind]
+                )  # Irrigated agriculture contribution
+            )
+ 
+        ag_mam_exprs = []
+        for am, am_j_list in self._input_data.am2j.items():
+            if not AG_MANAGEMENTS[am]:
+                continue
+            
+            for j_idx in range(len(am_j_list)):
+                ag_mam_exprs.append(
+                    gp.quicksum(
+                        self._input_data.ag_man_w_mrj[am][0, ind, j_idx]
+                        * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
+                    )  # Dryland alt. ag. management contributions
+                    + gp.quicksum(
+                        self._input_data.ag_man_w_mrj[am][1, ind, j_idx]
+                        * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
+                    )  # Irrigated alt. ag. management contributions
+                )
 
-        ag_man_contr = gp.quicksum(
-            gp.quicksum(
-                self._input_data.ag_man_w_mrj[am][0, ind, j_idx]
-                * self.X_ag_man_dry_vars_jr[am][j_idx, ind]
-            )  # Dryland alt. ag. management contributions
-            + gp.quicksum(
-                self._input_data.ag_man_w_mrj[am][1, ind, j_idx]
-                * self.X_ag_man_irr_vars_jr[am][j_idx, ind]
-            )  # Irrigated alt. ag. management contributions
-            for am, am_j_list in self._input_data.am2j.items()
-            for j_idx in range(len(am_j_list))
-        )
-
-        non_ag_contr = gp.quicksum(
-            gp.quicksum(
-                self._input_data.non_ag_w_rk[ind, k] * self.X_non_ag_vars_kr[k, ind]
-            )  # Non-agricultural contribution
-            for k in range(self._input_data.n_non_ag_lus)
-        )
-
-
-        # Sum of all water yield contributions
+        non_ag_exprs = []
+        for k in range(self._input_data.n_non_ag_lus):
+            non_ag_exprs.append(
+                gp.quicksum(
+                    self._input_data.non_ag_w_rk[ind, k] * self.X_non_ag_vars_kr[k, ind]
+                )  # Non-agricultural contribution
+            )
+        
+        ag_contr = gp.quicksum(ag_exprs) 
+        ag_man_contr = gp.quicksum(ag_mam_exprs)
+        non_ag_contr = gp.quicksum(non_ag_exprs)
         return ag_contr + ag_man_contr + non_ag_contr
 
 
@@ -716,10 +711,10 @@ class LutoSolver:
             reg_name = self._input_data.water_region_names[reg_idx]
             
             if water_limit == 0:
-                print(f"     |-- target is {water_limit:15.2f} ML for {reg_name} (skipped in constraints)")
+                print(f"     |-- target is {water_limit:15,.0f} ML for {reg_name} (skipped modelling)")
                 continue
 
-            print(f"     |-- target is {water_limit:15.2f} ML for {reg_name}")
+            print(f"     |-- target is {water_limit:15,.0f} ML for {reg_name}")
 
             self.water_nyiled_exprs[reg_idx] = self._get_water_net_yield_expr_for_region(ind)           # Water net yield inside LUTO study area
 
@@ -750,33 +745,49 @@ class LutoSolver:
         g_irr_coeff = (
             self._input_data.ag_g_mrj[1, :, :] + self._input_data.ag_ghg_t_mrj[1, :, :]
         )
-        self.ghg_ag_contr = gp.quicksum(
-            gp.quicksum(
-                g_dry_coeff[:, j] * self.X_ag_dry_vars_jr[j, :]
-            )  # Dryland agriculture contribution
-            + gp.quicksum(
-                g_irr_coeff[:, j] * self.X_ag_irr_vars_jr[j, :]
-            )  # Irrigated agriculture contribution
-            for j in range(self._input_data.n_ag_lus)
-        )
-        self.ghg_ag_man_contr = gp.quicksum(
-            gp.quicksum(
-                self._input_data.ag_man_g_mrj[am][0, :, j_idx]
-                * self.X_ag_man_dry_vars_jr[am][j_idx, :]
-            )  # Dryland alt. ag. management contributions
-            + gp.quicksum(
-                self._input_data.ag_man_g_mrj[am][1, :, j_idx]
-                * self.X_ag_man_irr_vars_jr[am][j_idx, :]
-            )  # Irrigated alt. ag. management contributions
-            for am, am_j_list in self._input_data.am2j.items()
-            for j_idx in range(len(am_j_list))
-        )
-        self.ghg_non_ag_contr = gp.quicksum(
-            gp.quicksum(
-                self._input_data.non_ag_g_rk[:, k] * self.X_non_ag_vars_kr[k, :]
-            )  # Non-agricultural contribution
-            for k in range(self._input_data.n_non_ag_lus)
-        )
+
+        ghg_ag_exprs =[]
+        for j in range(self._input_data.n_ag_lus):
+            ghg_ag_exprs.append(
+                gp.quicksum(
+                    g_dry_coeff[:, j] * self.X_ag_dry_vars_jr[j, :]
+                )
+                + gp.quicksum(
+                    g_irr_coeff[:, j] * self.X_ag_irr_vars_jr[j, :]
+                )
+            )
+            
+        ghg_ag_man_exprs = []
+        for am, am_j_list in self._input_data.am2j.items():
+            if not AG_MANAGEMENTS[am]:
+                continue
+            
+            for j_idx in range(len(am_j_list)):
+                ghg_ag_man_exprs.append(
+                    gp.quicksum(
+                        self._input_data.ag_man_g_mrj[am][0, :, j_idx]
+                        * self.X_ag_man_dry_vars_jr[am][j_idx, :]
+                    )  
+                    + gp.quicksum(
+                        self._input_data.ag_man_g_mrj[am][1, :, j_idx]
+                        * self.X_ag_man_irr_vars_jr[am][j_idx, :]
+                    )  
+                )
+                
+        ghg_non_ag_exprs = []
+        for k,k_name in enumerate(NON_AG_LAND_USES):
+            if not NON_AG_LAND_USES[k_name]:
+                continue
+            ghg_non_ag_exprs.append(
+                gp.quicksum(
+                    self._input_data.non_ag_g_rk[:, k] * self.X_non_ag_vars_kr[k, :]
+                )
+            )
+            
+        self.ghg_ag_contr = gp.quicksum(ghg_ag_exprs)
+        self.ghg_ag_man_contr = gp.quicksum(ghg_ag_man_exprs)
+        self.ghg_non_ag_contr = gp.quicksum(ghg_non_ag_exprs)    
+        
         return self.ghg_ag_contr + self.ghg_ag_man_contr + self.ghg_non_ag_contr + self._input_data.offland_ghg
 
     def _add_ghg_emissions_limit_constraints(self):
@@ -856,6 +867,8 @@ class LutoSolver:
                 ) 
             )
         for am, am_j_list in self._input_data.am2j.items():
+            if not AG_MANAGEMENTS[am]:
+                continue
             for j_idx in range(len(am_j_list)):
                 
                 ind_dry = np.intersect1d(self._input_data.ag_lu2cells[0, j_idx], self._input_data.priority_degraded_mask_idx)
@@ -882,7 +895,7 @@ class LutoSolver:
 
         self.bio_GBF2_priority_degraded_area_expr = gp.quicksum(bio_ag_exprs) + gp.quicksum(bio_ag_man_exprs) + gp.quicksum(bio_non_ag_exprs)
         
-        print(f"       |-- target is {self._input_data.limits["GBF2_priority_degrade_areas"]:,.0f}")
+        print(f"       |-- target is {self._input_data.limits["GBF2_priority_degrade_areas"]:15,.0f}")
         
         if settings.GBF2_CONSTRAINT_TYPE == "hard":
             self.bio_GBF2_priority_degraded_area_limit_constraint_hard = self.gurobi_model.addConstr(
@@ -916,7 +929,7 @@ class LutoSolver:
         for v, v_area_lb in enumerate(v_limits):
             
             if v_limits[v] == 0:
-                print(f"       |-- target is {v_area_lb:13,.0f} (skipped modelling) for {v_names[v]} ")
+                print(f"       |-- target is {v_area_lb:15,.0f} for {v_names[v]} (skipped modelling)  ")
                 continue
             
             ind = v_ind[v]
@@ -963,7 +976,7 @@ class LutoSolver:
 
             self.bio_GBF3_major_vegetation_exprs[v] = ag_contr + ag_man_contr + non_ag_contr 
 
-            print(f"       |-- vegetation class target area is {v_area_lb:13,.0f} for {v_names[v]} ")
+            print(f"       |-- target is {v_area_lb:15,.0f} for {v_names[v]} ")
             self.bio_GBF3_major_vegetation_limit_constraints[v] = self.gurobi_model.addConstr(
                 self.bio_GBF3_major_vegetation_exprs[v] >= v_area_lb,
                 name=f"bio_GBF3_major_vegetation_limit_{v}",
@@ -1263,12 +1276,12 @@ class LutoSolver:
                 and (old_non_ag_x_rk[r, :] == self._input_data.non_ag_x_rk[r, :]).all()
                 and all(
                     old_non_ag_lb_rk[r, k] == self._input_data.non_ag_lb_rk[r, k]
-                    for k, non_ag_desc in enumerate(NON_AG_LAND_USES)
-                    if not NON_AG_LAND_USES_REVERSIBLE[non_ag_desc]
+                    for k, k_name in enumerate(NON_AG_LAND_USES)
+                    if not NON_AG_LAND_USES_REVERSIBLE[k_name]
                 )
                 and all(
                     (old_ag_man_lb_mrj.get(am)[:, r, :] == self._input_data.ag_man_lb_mrj.get(am)[:, r, :]).all()
-                    for am in AG_MANAGEMENTS_TO_LAND_USES
+                    for am in (i for i in AG_MANAGEMENTS if AG_MANAGEMENTS[i])
                     if not AG_MANAGEMENTS_REVERSIBLE[am]
                 )
             ):
@@ -1301,16 +1314,14 @@ class LutoSolver:
                 list(self.X_non_ag_vars_kr[:, r][np.where(self.X_non_ag_vars_kr[:, r])])
             )
             self.X_non_ag_vars_kr[:, r] = np.zeros(self._input_data.n_non_ag_lus)
-            for k, non_ag_lu_desc in zip(
-                range(self._input_data.n_non_ag_lus), NON_AG_LAND_USES
-            ):
-                if not NON_AG_LAND_USES[non_ag_lu_desc]:
+            for k, k_name in enumerate(NON_AG_LAND_USES):
+                if not NON_AG_LAND_USES[k_name]:
                     continue
 
                 if self._input_data.non_ag_x_rk[r, k]:
                     x_lb = (
                         0
-                        if NON_AG_LAND_USES_REVERSIBLE[non_ag_lu_desc]
+                        if NON_AG_LAND_USES_REVERSIBLE[k_name]
                         else self._input_data.non_ag_lb_rk[r, k]
                     )
                     self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
@@ -1499,9 +1510,7 @@ class LutoSolver:
                 X_irr_sol_rj[r, j] = self.X_ag_irr_vars_jr[j, r].X
 
         # Get non-agricultural results
-        for k, lu in zip(
-            range(self._input_data.n_non_ag_lus), settings.NON_AG_LAND_USES
-        ):
+        for k, lu in enumerate(settings.NON_AG_LAND_USES):
             if not settings.NON_AG_LAND_USES[lu]:
                 non_ag_X_sol_rk[:, k] = np.zeros(self._input_data.ncells)
                 continue
@@ -1622,7 +1631,7 @@ class LutoSolver:
         # separate ammap for each agricultural management option, because they can be stacked.
         ammaps = {
             am: np.zeros(self._input_data.ncells, dtype=np.int8)
-            for am in AG_MANAGEMENTS_TO_LAND_USES
+            for am in AG_MANAGEMENTS
         }
         for r in range(self._input_data.ncells):
             cell_j = lumap[r]
@@ -1690,9 +1699,9 @@ class LutoSolver:
                 "Penalties Value (AUD)": self.obj_penalties.getValue(),
                 "Penalties Objective": self.obj_penalties.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA),
                 
-                "Production Ag Value (t)":          {c:(self.ag_q_dry_c[c] + self.ag_q_irr_c[c]).getValue() for c in range(self._input_data.ncms)},
+                "Production Ag Value (t)":          {c:self.ag_q_c[c].getValue() for c in range(self._input_data.ncms)},
                 "Production Non-Ag Value (t)":      {c:self.non_ag_q_c[c].getValue() for c in range(self._input_data.ncms)},
-                "Production Ag-Mam Value (t)":      {c:(self.ag_man_q_dry_c[c] + self.ag_man_q_irr_c[c]).getValue() for c in range(self._input_data.ncms)},
+                "Production Ag-Mam Value (t)":      {c:self.ag_man_q_c[c] .getValue() for c in range(self._input_data.ncms)},
                 "Production Deviation (t)":         (self.V.X if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0),
                 "Production Penalty":               (self.penalty_demand.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA)              if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0),
                             
