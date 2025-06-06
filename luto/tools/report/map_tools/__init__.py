@@ -39,6 +39,7 @@ from rasterio.warp import (calculate_default_transform,
                            reproject, 
                            Resampling)
 
+from luto.tools.report.data_tools.parameters import AM_NON_AG_CODES, AM_NON_AG_REMOVED_DESC
 from luto.tools.report.map_tools.helper import get_legend_elemet
 
 
@@ -387,6 +388,14 @@ def process_raster(
     # Get the metadata for making map with the tif    
     color_df = pd.read_csv(color_csv)
     color_df['lu_color_numeric'] = color_df['lu_color_HEX'].apply(hex_color_to_numeric)
+    
+    # Update the lu_code in in the cause some AM/Non-ag are deselected
+    for idx,row in color_df.iterrows():
+        if row['lu_desc'] in AM_NON_AG_REMOVED_DESC:
+            color_df.drop(idx, inplace=True)
+        elif row['lu_desc'] in AM_NON_AG_CODES:
+            color_df.at[idx, 'lu_code'] = AM_NON_AG_CODES[row['lu_desc']]
+
     val_color_dict = color_df.set_index('lu_code')['lu_color_numeric'].to_dict()
     
     # Get the color-description dictionary, if the data type is integer

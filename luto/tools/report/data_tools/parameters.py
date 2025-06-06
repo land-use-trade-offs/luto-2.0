@@ -71,6 +71,18 @@ COMMODITIES_OFF_LAND = ['Aquaculture', 'Chicken', 'Eggs', 'Pork' ]
 COMMODITIES_ALL = COMMODITIES_ON_LAND + COMMODITIES_OFF_LAND
 
 
+# Define land use code for am and non-ag land uses
+AM_SELECT = [i for i in settings.AG_MANAGEMENTS if settings.AG_MANAGEMENTS[i]]
+AM_DESELECT = [i for i in settings.AG_MANAGEMENTS if not settings.AG_MANAGEMENTS[i]]
+AM_MAP_CODES = {i:(AM_SELECT.index(i) + 1) for i in AM_SELECT}
+
+NON_AG_SELECT = [i for i in settings.NON_AG_LAND_USES if settings.NON_AG_LAND_USES[i]]
+NON_AG_DESELECT = [i for i in settings.NON_AG_LAND_USES if not settings.NON_AG_LAND_USES[i]]
+NON_AG_MAP_CODES = {i:(NON_AG_SELECT.index(i) + 1) for i in NON_AG_SELECT}
+
+AM_NON_AG_CODES = {**AM_MAP_CODES, **NON_AG_MAP_CODES}
+AM_NON_AG_REMOVED_DESC = AM_DESELECT + NON_AG_DESELECT
+
 
 # Define the file name patterns for each category
 GHG_FNAME2TYPE = {'GHG_emissions_separate_agricultural_landuse': 'Agricultural Landuse',
