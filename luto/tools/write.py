@@ -57,7 +57,6 @@ import luto.economics.non_agricultural.water as non_ag_water
 import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
 from luto.settings import NON_AG_LAND_USES
-
 from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_html import data2html
 from luto.tools.report.create_static_maps import TIF2MAP
@@ -68,23 +67,19 @@ timestamp = tools.write_timestamp()
           
 def write_outputs(data: Data):
     """Write model outputs to file"""
-    
     memory_thread = threading.Thread(target=tools.log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1), daemon=True)
     memory_thread.start()
     
-    # Write the model outputs to file
     write_data(data)
-    # Move the log files to the output directory
     move_logs(data)
+
 
 
 @tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{timestamp}")
 def write_data(data: Data):
 
-
     years = settings.SIM_YEARS
     paths = [f"{data.path}/out_{yr}" for yr in years]
-
     write_settings(data.path)
     write_area_transition_start_end(data, f'{data.path}/out_{years[-1]}')
 
@@ -111,21 +106,19 @@ def write_data(data: Data):
 
 
 def move_logs(data: Data):
-    # Move the log files to the output directory
-    logs = [f"{settings.OUTPUT_DIR}/run_{timestamp}_stdout.log",
-            f"{settings.OUTPUT_DIR}/run_{timestamp}_stderr.log",
-            f"{settings.OUTPUT_DIR}/write_{timestamp}_stdout.log",
-            f"{settings.OUTPUT_DIR}/write_{timestamp}_stderr.log",
-            f'{settings.OUTPUT_DIR}/RES_{settings.RESFACTOR}_mem_log.txt',
-            f'{settings.OUTPUT_DIR}/.timestamp']
+    
+    logs = [
+        f"{settings.OUTPUT_DIR}/run_{timestamp}_stdout.log",
+        f"{settings.OUTPUT_DIR}/run_{timestamp}_stderr.log",
+        f"{settings.OUTPUT_DIR}/write_{timestamp}_stdout.log",
+        f"{settings.OUTPUT_DIR}/write_{timestamp}_stderr.log",
+        f'{settings.OUTPUT_DIR}/RES_{settings.RESFACTOR}_mem_log.txt',
+        f'{settings.OUTPUT_DIR}/.timestamp'
+    ]
 
     for log in logs:
-        try:
-            shutil.move(log, f"{data.path}/{os.path.basename(log)}")
-        except:
-            pass
-    
-    return None
+        try: shutil.move(log, f"{data.path}/{os.path.basename(log)}")
+        except: pass
 
 
 
@@ -162,30 +155,21 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
 
 
 def get_settings(setting_path:str):
-
-    # Open the settings.py file
     with open(setting_path, 'r') as file:
         lines = file.readlines()
-
         # Regex patterns that matches variable assignments from settings
         parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=")
         settings_order = [match[1].strip() for line in lines if (match := parameter_reg.match(line))]
-
-        # Reorder the settings dictionary to match the order in the settings.py file
+        
         settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
         settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
-
+        
     return settings_dict
 
 
 
 def write_settings(path):
-    # sourcery skip: extract-method, swap-nested-ifs, use-named-expression
-    """Write model run settings"""
-
     settings_dict = get_settings('luto/settings.py')
-
-    # Write the settings to a file
     with open(os.path.join(path, 'model_run_settings.txt'), 'w') as f:
         f.writelines(f'{k}:{v}\n' for k, v in settings_dict.items())
         
