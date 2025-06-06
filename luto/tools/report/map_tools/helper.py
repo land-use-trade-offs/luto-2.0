@@ -24,11 +24,13 @@ import matplotlib as mpl
 
 from branca.colormap import LinearColormap
 
-from luto.tools.report.map_tools.parameters import (color_types,
-                                                    data_types,
-                                                    legend_params,
-                                                    map_basename_rename,
-                                                    extra_color_float_tif)
+from luto.tools.report.map_tools.parameters import (
+    COLOR_TYPES,
+    DATA_TYPES,
+    LEGEND_PARAMS,
+    MAP_BASENAME_RENAME,
+    MAP_BACKGROUND_COLORS_FLOAT
+)
 
 
 # Function to download a basemap image
@@ -54,7 +56,7 @@ def download_basemap(bounds_mercator: list[str]):
 
 def create_color_csv_1_100(color_scheme:str='YlOrRd',
                            save_path:str='luto/tools/report/Assets/float_img_colors.csv',
-                           extra_color:dict=extra_color_float_tif):
+                           extra_color:dict=MAP_BACKGROUND_COLORS_FLOAT):
     """
     Create a CSV file contains the value(1-100)-color(HEX) records.
 
@@ -92,16 +94,18 @@ def get_map_meta():
     Get the map making metadata.
 
     Returns
-        map_meta (DataFrame): DataFrame containing map metadata with columns 'map_type', 'csv_path', 'legend_type', and 'legend_position'.
+        map_meta (DataFrame): DataFrame containing map metadata with columns 'category', 'csv_path', 'legend_type', and 'legend_position'.
     """
     
-    # Create a DataFrame from the color_types dictionary
-    map_meta = pd.DataFrame(color_types.items(), 
-                            columns=['map_type', 'color_csv'])
+    # Create a DataFrame from the COLOR_TYPES dictionary
+    map_meta = pd.DataFrame(
+        COLOR_TYPES.items(), 
+        columns=['category', 'color_csv']
+    )
  
     # Add other metadata columns to the DataFrame
-    map_meta['data_type'] = map_meta['map_type'].map(data_types)
-    map_meta['legend_params'] = map_meta['map_type'].map(legend_params)
+    map_meta['data_type'] = map_meta['category'].map(DATA_TYPES)
+    map_meta['legend_params'] = map_meta['category'].map(LEGEND_PARAMS)
     
     
     return map_meta.reset_index(drop=True)
@@ -117,7 +121,7 @@ def get_map_fullname(path:str):
     Returns
         str: The full name of the map.
     """
-    for k,v in map_basename_rename.items():
+    for k,v in MAP_BASENAME_RENAME.items():
         if k in path:
             return v
 
@@ -132,18 +136,26 @@ def get_scenario(data_root_dir:str):
     Returns
         str: The scenario name.
     """
+    GHG_scenario = ''
+    bio_scenario = ''
     with open(f'{data_root_dir}/model_run_settings.txt', 'r') as f:
         for line in f:
             if 'GHG_EMISSIONS_LIMITS' in line:
-                return line.split(':')[-1].strip()
+                GHG_scenario = line.split(':')[-1].strip()
+            if 'BIODIVERSTIY_TARGET_GBF_2' in line:
+                bio_scenario = line.split(':')[-1].strip()
+        
+    return f'GHG {GHG_scenario} - Biodiversity {bio_scenario}'
 
 
 def get_legend_elemet(color_desc_dict:dict, map_dtype:str='float'):
     
     if map_dtype == 'integer':
 
-        legend_css_list = [f'<p><a style="color:transparent;background-color:rgba{color_rgba};">__   </a>&emsp;{color_desc}</p>\n'
-                        for color_rgba, color_desc in color_desc_dict.items()]
+        legend_css_list = [
+            f'<p><a style="color:transparent;background-color:rgba{color_rgba};">__   </a>&emsp;{color_desc}</p>\n'
+            for color_rgba, color_desc in color_desc_dict.items()
+        ]
         
         legend_css = "".join(legend_css_list)
 

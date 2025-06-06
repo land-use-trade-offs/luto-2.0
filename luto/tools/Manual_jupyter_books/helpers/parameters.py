@@ -19,7 +19,7 @@
 
 
 # Define the legend parameters
-legend_params = {
+LEGEND_PARAMS = {
     'bbox_to_anchor': (0.15, 0.22),
     'loc': 'upper left',
     'ncol': 1,

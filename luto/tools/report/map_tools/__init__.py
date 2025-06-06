@@ -367,9 +367,11 @@ def process_float_raster(initial_tif:str=None,
 
 
 # Get the tif path
-def process_raster(tif_path: str, 
-                   color_csv: str, 
-                   data_type: str) -> tuple:
+def process_raster(
+    tif_path: str, 
+    color_csv: str, 
+    data_type: str
+    ) -> tuple:
     """
     Process a raster image and return the center, bounds, and mercator bbox.
 
@@ -408,12 +410,14 @@ def process_raster(tif_path: str,
 
 
 
-def save_map_to_html(tif_path:str = None, 
-                     shapefile_path: str = 'luto/tools/report/Assets/AUS_adm/STE11aAust_mercator_simplified.shp',
-                     map_dtype:str = None,
-                     center:list = None,
-                     bounds_for_folium:list = None,
-                     color_desc_dict:dict = None):
+def save_map_to_html(
+    tif_path:str = None, 
+    shapefile_path: str = 'luto/tools/report/Assets/AUS_adm/STE11aAust_mercator_simplified.shp',
+    map_dtype:str = None,
+    center:list = None,
+    bounds_for_folium:list = None,
+    color_desc_dict:dict = None
+    ):
             
     # Get the input image path
     out_base = os.path.splitext(tif_path)[0]
@@ -425,9 +429,11 @@ def save_map_to_html(tif_path:str = None,
     
     
     # Initialize the map
-    m = folium.Map(center, 
-                   zoom_start=5,
-                   zoom_control=False)
+    m = folium.Map(
+        center, 
+        zoom_start=5,
+        zoom_control=False
+    )
     
     # Add ESRI Satellite base map 
     tile = folium.TileLayer(
@@ -440,14 +446,14 @@ def save_map_to_html(tif_path:str = None,
 
     # Overlay the image on folium base map
     img = folium.raster_layers.ImageOverlay(
-            name=os.path.basename(out_base),
-            image=in_mercator_png,
-            bounds=bounds_for_folium,
-            opacity=0.75,
-            interactive=True,
-            cross_origin=False,
-            zindex=1,
-        ).add_to(m)
+        name=os.path.basename(out_base),
+        image=in_mercator_png,
+        bounds=bounds_for_folium,
+        opacity=0.75,
+        interactive=True,
+        cross_origin=False,
+        zindex=1,
+    ).add_to(m)
     
     # Add the Shapefile
     gdf = gpd.read_file(shapefile_path).to_crs(epsg=4283)   # Read the shapefile and convert to GDA 1994
@@ -482,11 +488,7 @@ def save_map_to_html(tif_path:str = None,
     """
     # Create a new Element containing the CSS
     css_element = Element(css)
-    # Add the CSS to the map
     m.get_root().html.add_child(css_element)
-    
-    
-    # Save the map to interactive html
     m.save(html_save_path)
     
     # Delete the in_mercator_png, reanme the input_mercator_png to input.png

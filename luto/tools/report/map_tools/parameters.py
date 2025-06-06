@@ -27,7 +27,7 @@ DPI = 300
 
 
 # The val-color(HEX) records for each map type
-color_types ={
+COLOR_TYPES ={
             # Integer rasters
             'lumap':  'luto/tools/report/Assets/lumap_colors_grouped.csv',
             'lmmap': 'luto/tools/report/Assets/lm_colors.csv',
@@ -55,23 +55,23 @@ map_single_lucc = {k:k for k in map_single_lucc}
 
 # Dictionary {k:v} for renaming the map names
 # if <k> exists in the map name, the map full name will be <v>
-map_basename_rename = map_multiple_lucc | map_single_lucc | RENAME_AM_NON_AG
+MAP_BASENAME_RENAME = map_multiple_lucc | map_single_lucc | RENAME_AM_NON_AG
 
 
 # The extra colors for the float rasters
-extra_color_float_tif = {
+MAP_BACKGROUND_COLORS_FLOAT = {
   0:(200, 200, 200, 255),     # 0 is the non-Agriculture land in the raw tif file
   -100:(225, 225, 225, 255)   # -100 refers to the nodata pixels in the raw tif file
 } 
 
-extra_desc_float_tif = {
+MAP_BACKGROUND_DESC_FLOAT = {
   0: 'Agricultural land',
   -100: 'Non-Agriculture land'
 }  
 
 
 # The data types for each map type
-data_types = {'lumap': 'integer',
+DATA_TYPES = {'lumap': 'integer',
               'lmmap': 'integer',
               'ammap': 'integer',
               'non_ag': 'integer',
@@ -83,7 +83,7 @@ data_types = {'lumap': 'integer',
 
 
 # The parameters for legend
-legend_params = {'lumap': {'bbox_to_anchor': (0.02, 0.19),
+LEGEND_PARAMS = {'lumap': {'bbox_to_anchor': (0.02, 0.19),
                             'loc': 'upper left',
                             'ncol': 2,
                             'fontsize': 10,
