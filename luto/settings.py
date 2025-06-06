@@ -109,7 +109,7 @@ The hurdled_costs  = original_transition_costs * (1 + TRANSITION_HURDEL_FACTOR)
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 9      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
 SIM_YEARS = list(range(2010,2051,10)) # range(2020,2050)
@@ -127,7 +127,7 @@ DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in th
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
-WRITE_OUTPUT_GEOTIFFS = False   # Write GeoTiffs to output directory: True or False
+WRITE_OUTPUT_GEOTIFFS = True   # Write GeoTiffs to output directory: True or False
 PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
 WRITE_THREADS = 5               # The Threads to use for map making, only work with PARALLEL_WRITE = True
 

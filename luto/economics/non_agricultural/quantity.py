@@ -323,15 +323,15 @@ def get_quantity_matrix(data, ag_q_mrp: np.ndarray, lumap: np.ndarray) -> np.nda
     
     # reshape each non-agricultural quantity matrix to be indexed (c, r, 1) and concatenate on the k indexing
     non_agr_quantity_matrices = [
-        get_quantity_env_plantings(data)                                       ,
-        get_quantity_rip_plantings(data)                                       ,
-        get_quantity_sheep_agroforestry(data, ag_q_mrp, agroforestry_x_r)      ,
-        get_quantity_beef_agroforestry(data, ag_q_mrp, agroforestry_x_r)       ,
-        get_quantity_carbon_plantings_block(data)                              ,
-        get_quantity_sheep_carbon_plantings_belt(data, ag_q_mrp, cp_belt_x_r)  ,
-        get_quantity_beef_carbon_plantings_belt(data, ag_q_mrp, cp_belt_x_r)   ,
-        get_quantity_beccs(data)                                               ,
-        get_quantity_destocked(data)                                           ,
+        get_quantity_env_plantings(data),
+        get_quantity_rip_plantings(data),
+        get_quantity_sheep_agroforestry(data, ag_q_mrp, agroforestry_x_r),
+        get_quantity_beef_agroforestry(data, ag_q_mrp, agroforestry_x_r),
+        get_quantity_carbon_plantings_block(data),
+        get_quantity_sheep_carbon_plantings_belt(data, ag_q_mrp, cp_belt_x_r),
+        get_quantity_beef_carbon_plantings_belt(data, ag_q_mrp, cp_belt_x_r),
+        get_quantity_beccs(data),
+        get_quantity_destocked(data),
     ]
 
     return np.concatenate(

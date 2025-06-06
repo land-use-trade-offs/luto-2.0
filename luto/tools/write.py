@@ -29,6 +29,7 @@ import shutil
 import threading
 import numpy as np
 import pandas as pd
+import rasterio
 import xarray as xr
 
 from joblib import Parallel, delayed
@@ -36,7 +37,7 @@ from joblib import Parallel, delayed
 from luto import settings
 from luto import tools
 from luto.data import Data
-from luto.tools.spatializers import create_2d_map, write_gtiff
+from luto.tools.spatializers import create_2d_map
 from luto.tools.compmap import lumap_crossmap, lmmap_crossmap, crossmap_irrstat, crossmap_amstat
 
 import luto.economics.agricultural.quantity as ag_quantity                      # ag_quantity has already been calculated and stored in <sim.prod_data>
@@ -80,33 +81,23 @@ def write_outputs(data: Data):
 @tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{timestamp}")
 def write_data(data: Data):
 
-    # Write model run settings
-    if not data.path:
-        raise ValueError(
-            "Cannot write outputs: 'path' attribute of Data object has not been set "
-            "(has the simulation been run?)"
-        )
-        
-    write_settings(data.path)
 
-    # Get the years to write
     years = settings.SIM_YEARS
     paths = [f"{data.path}/out_{yr}" for yr in years]
 
-    ###############################################################
-    #                     Create raw outputs                      #
-    ###############################################################
-
-    # Write tasks only once
+    write_settings(data.path)
     write_area_transition_start_end(data, f'{data.path}/out_{years[-1]}')
-    # write_objetive(data)
 
-    # Write outputs for each year
+    # Wrap write to a list of delayed jobs
     jobs = [delayed(write_output_single_year)(data, yr, path_yr, None) for (yr, path_yr) in zip(years, paths)]
     jobs += [delayed(write_output_single_year)(data, years[-1], f"{data.path_begin_end_compare}/out_{years[-1]}", years[0])]
 
     # Parallel write the outputs for each year
-    num_jobs = min(len(jobs), settings.WRITE_THREADS) if settings.PARALLEL_WRITE else 1   # Use the minimum between jobs_num and threads for parallel writing
+    num_jobs = (
+        min(len(jobs), settings.WRITE_THREADS) 
+        if settings.PARALLEL_WRITE 
+        else 1   
+    )
     Parallel(n_jobs=num_jobs)(jobs)
 
     # Copy the base-year outputs to the path_begin_end_compare
@@ -146,15 +137,10 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     if not os.path.isdir(path_yr):
         os.mkdir(path_yr)
 
-    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CAUTION !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    # The area here was calculated from lumap/lmmap, which {are not accurate !!!}
-    # compared to the area calculated from dvars
-    write_crosstab(data, yr_cal, path_yr, yr_cal_sim_pre)
-
-    # Write the reset outputs
     write_files(data, yr_cal, path_yr)
     write_files_separate(data, yr_cal, path_yr) if settings.WRITE_OUTPUT_GEOTIFFS else None
     write_dvar_area(data, yr_cal, path_yr)
+    write_crosstab(data, yr_cal, path_yr, yr_cal_sim_pre)
     write_quantity(data, yr_cal, path_yr, yr_cal_sim_pre)
     write_revenue_cost_ag(data, yr_cal, path_yr)
     write_revenue_cost_ag_management(data, yr_cal, path_yr)
@@ -256,10 +242,8 @@ def write_files(data: Data, yr_cal, path):
     # Write out raw numpy arrays for land-use and land management
     lumap_fname = f'lumap_{yr_cal}.npy'
     lmmap_fname = f'lmmap_{yr_cal}.npy'
-
     np.save(os.path.join(path, lumap_fname), data.lumaps[yr_cal])
     np.save(os.path.join(path, lmmap_fname), data.lmmaps[yr_cal])
-
 
     # Get the Agricultural Management applied to each pixel
     ag_man_dvar = np.stack([np.einsum('mrj -> r', v) for _,v in data.ag_man_dvars[yr_cal].items()]).T   # (r, am)
@@ -267,60 +251,55 @@ def write_files(data: Data, yr_cal, path):
     ag_man_dvar = np.argmax(ag_man_dvar, axis=1) + 1        # Start from 1
     ag_man_dvar_argmax = np.where(ag_man_dvar_mask, ag_man_dvar, 0).astype(np.float32)
 
-
     # Get the non-agricultural landuse for each pixel
     non_ag_dvar = data.non_ag_dvars[yr_cal]                 # (r, k)
     non_ag_dvar_mask = non_ag_dvar.sum(1) > 0.01            # Meaning that they have at least 1% of non-agricultural landuse applied
     non_ag_dvar = np.argmax(non_ag_dvar, axis=1) + settings.NON_AGRICULTURAL_LU_BASE_CODE    # Start from 100
     non_ag_dvar_argmax = np.where(non_ag_dvar_mask, non_ag_dvar, 0).astype(np.float32)
 
-    # Put the excluded land-use and land management types back in the array.
-    lumap = create_2d_map(data, data.lumaps[yr_cal])
-    lmmap = create_2d_map(data, data.lmmaps[yr_cal])
-    ammap = create_2d_map(data, ag_man_dvar_argmax)
-    non_ag = create_2d_map(data, non_ag_dvar_argmax)
-
-    lumap_fname = f'lumap_{yr_cal}.tiff'
-    lmmap_fname = f'lmmap_{yr_cal}.tiff'
-    ammap_fname = f'ammap_{yr_cal}.tiff'
-    non_ag_fname = f'non_ag_{yr_cal}.tiff'
-
-    write_gtiff(lumap, os.path.join(path, lumap_fname), data=data)
-    write_gtiff(lmmap, os.path.join(path, lmmap_fname), data=data)
-    write_gtiff(ammap, os.path.join(path, ammap_fname), data=data)
-    write_gtiff(non_ag, os.path.join(path, non_ag_fname), data=data)
+    with rasterio.open(os.path.join(path, f'lumap_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_lumap,\
+         rasterio.open(os.path.join(path, f'lmmap_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_lmmap,\
+         rasterio.open(os.path.join(path, f'ammap_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_ammap,\
+         rasterio.open(os.path.join(path, f'non_ag_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_non_ag:
+             
+        dst_lumap.write_band(1, create_2d_map(data, data.lumaps[yr_cal]))
+        dst_lmmap.write_band(1, create_2d_map(data, data.lmmaps[yr_cal]))
+        dst_ammap.write_band(1, create_2d_map(data, ag_man_dvar_argmax))
+        dst_non_ag.write_band(1, create_2d_map(data, non_ag_dvar_argmax))
 
 
 
-def write_files_separate(data: Data, yr_cal, path, ammap_separate=False):
+
+def write_files_separate(data: Data, yr_cal, path):
     '''Write raw decision variables to separate GeoTiffs'''
 
     print(f'Write raw decision variables to separate GeoTiffs for {yr_cal}')
 
     # Collapse the land management dimension (m -> [dry, irr])
-    ag_dvar_rj = np.einsum('mrj -> rj', data.ag_dvars[yr_cal])   # To compute the landuse map
-    ag_dvar_rm = np.einsum('mrj -> rm', data.ag_dvars[yr_cal])   # To compute the land management (dry/irr) map
-    non_ag_rk = np.einsum('rk -> rk', data.non_ag_dvars[yr_cal]) # Do nothing, just for code consistency
+    ag_dvar_rj = np.einsum('mrj -> rj', data.ag_dvars[yr_cal])    
+    ag_dvar_rm = np.einsum('mrj -> rm', data.ag_dvars[yr_cal])    
+    non_ag_rk = np.einsum('rk -> rk', data.non_ag_dvars[yr_cal])  
     ag_man_rj_dict = {am: np.einsum('mrj -> rj', ammap) for am, ammap in data.ag_man_dvars[yr_cal].items()}
 
     # Get the desc2dvar table.
-    ag_dvar_map = tools.map_desc_to_dvar_index('Ag_LU', data.DESC2AGLU, ag_dvar_rj)
-    non_ag_dvar_map = tools.map_desc_to_dvar_index('Non-Ag_LU', {v:k for k,v in enumerate(NON_AG_LAND_USES.keys())}, non_ag_rk)
-    lm_dvar_map = tools.map_desc_to_dvar_index('Land_Mgt', {v:k for k,v in enumerate(data.LANDMANS)}, ag_dvar_rm)
-
-    # Get the desc2dvar table for agricultural management
-    ag_man_maps = [
-        tools.map_desc_to_dvar_index(am, {desc: data.DESC2AGLU[desc] for desc in data.AG_MAN_LU_DESC[am]}, am_dvar.sum(1)[:, np.newaxis])
-        if ammap_separate else
-        tools.map_desc_to_dvar_index('Ag_Mgt', {am: 0}, am_dvar.sum(1)[:, np.newaxis])
-        for am, am_dvar in ag_man_rj_dict.items()
-    ]
-    ag_man_map = pd.concat(ag_man_maps)
-
-    # Combine the desc2dvar table for agricultural land-use, agricultural management, and non-agricultural land-use
-    desc2dvar_df = pd.concat([ag_dvar_map, ag_man_map, non_ag_dvar_map, lm_dvar_map])
+    ag_dvar_map = pd.DataFrame({'Category': 'Ag_LU','lu_desc': data.AGRICULTURAL_LANDUSES,'dvar_idx': range(data.N_AG_LUS)}
+        ).assign(dvar=[ag_dvar_rj[:, j] for j in range(data.N_AG_LUS)]
+        ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+    non_ag_dvar_map = pd.DataFrame({'Category': 'Non-Ag_LU','lu_desc': data.NON_AGRICULTURAL_LANDUSES,'dvar_idx': range(data.N_NON_AG_LUS)}
+        ).assign(dvar=[non_ag_rk[:, k] for k in range(data.N_NON_AG_LUS)]
+        ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+    lm_dvar_map = pd.DataFrame({'Category': 'Land_Mgt','lu_desc': data.LANDMANS,'dvar_idx': range(data.NLMS)}
+        ).assign(dvar=[ag_dvar_rm[:, j] for j in range(data.NLMS)]
+        ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+    ag_man_map = pd.concat([
+        pd.DataFrame({'Category': 'Ag_Mgt', 'lu_desc': am, 'dvar_idx': [0]}
+        ).assign(dvar=[np.einsum('rj -> r', am_dvar_rj)]
+        ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+        for am, am_dvar_rj in ag_man_rj_dict.items()
+    ])
 
     # Export to GeoTiff
+    desc2dvar_df = pd.concat([ag_dvar_map, ag_man_map, non_ag_dvar_map, lm_dvar_map])
     lucc_separate_dir = os.path.join(path, 'lucc_separate')
     os.makedirs(lucc_separate_dir, exist_ok=True)
     for _, row in desc2dvar_df.iterrows():
@@ -330,7 +309,9 @@ def write_files_separate(data: Data, yr_cal, path, ammap_separate=False):
         dvar = create_2d_map(data, row['dvar'].astype(np.float32))
         fname = f'{category}_{dvar_idx:02}_{desc}_{yr_cal}.tiff'
         lucc_separate_path = os.path.join(lucc_separate_dir, fname)
-        write_gtiff(dvar, lucc_separate_path, data=data)
+        
+        with rasterio.open(lucc_separate_path, 'w+', **data.GEO_META) as dst:
+            dst.write_band(1, dvar)
 
 
 
@@ -380,9 +361,9 @@ def write_quantity(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         production_years['Year'] = yr_cal
         production_years.to_csv(os.path.join(path, f'quantity_production_kt_{yr_cal}.csv'), index=False)
 
-    # --------------------------------------------------------------------------------------------
-    # NOTE:Non-agricultural production are all zeros, therefore skip the calculation
-    # --------------------------------------------------------------------------------------------
+        # --------------------------------------------------------------------------------------------
+        # NOTE: non_ag_quantity is already calculated and stored in <sim.prod_data>
+        # --------------------------------------------------------------------------------------------
 
 
 
