@@ -465,15 +465,15 @@ def non_ag_rk_to_xr(data, arr):
 
 def am_mrj_to_xr(data, am_mrj_dict):
     emp_arr_xr = xr.DataArray(
-        np.full((len(settings.AG_MANAGEMENTS_TO_LAND_USES), len(data.LANDMANS), data.NCELLS, len(data.AGRICULTURAL_LANDUSES)), np.nan),
+        np.full((data.N_AG_MANS, data.NLMS, data.NCELLS, data.N_AG_LUS), np.nan),
         dims=['am', 'lm', 'cell', 'lu'],
-        coords={'am': list(settings.AG_MANAGEMENTS_TO_LAND_USES.keys()),
+        coords={'am': data.AG_MAN_DESC,
                 'lm': data.LANDMANS,
                 'cell': np.arange(data.NCELLS),
                 'lu': data.AGRICULTURAL_LANDUSES}
     )
 
-    for am,lu in settings.AG_MANAGEMENTS_TO_LAND_USES.items():
+    for am,lu in data.AG_MAN_LU_DESC.items():
         if emp_arr_xr.loc[am, :, :, lu].shape == am_mrj_dict[am].shape:
             # If the shape is the same, just assign the value
             emp_arr_xr.loc[am, :, :, lu] = am_mrj_dict[am]  

@@ -1171,7 +1171,7 @@ class LutoSolver:
             # Divide by constant to reduce strain on the constraint matrix range
             self.bio_GBF8_species_conservation_exprs[s] = (ag_contr + ag_man_contr + non_ag_contr) / s_area_lb
     
-            print(f"       |-- target area is {s_area_lb:15,.0f} for {s_names[s]}")
+            print(f"       |-- target is {s_area_lb:15,.0f} for {s_names[s]}")
             self.bio_GBF8_species_conservation_constrs[s] = self.gurobi_model.addConstr(
                 self.bio_GBF8_species_conservation_exprs[s] >= 1,
                 name=f"bio_GBF8_species_conservation_limit_{s}",

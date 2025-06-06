@@ -454,9 +454,7 @@ def write_revenue_cost_ag_management(data: Data, yr_cal, path):
     revenue_am_dfs = []
     cost_am_dfs = []
     # Loop through the agricultural managements
-    for am, am_desc in AG_MANAGEMENTS_TO_LAND_USES.items():
-        if not AG_MANAGEMENTS[am]:
-            continue
+    for am, am_desc in data.AG_MAN_LU_DESC.items():
 
         # Get the land use codes for the agricultural management
         am_code = [data.DESC2AGLU[desc] for desc in am_desc]
@@ -1049,7 +1047,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     print(f'Writing biodiversity GBF2 scores (PRIORITY) for {yr_cal}')
     
     # Unpack the ag managements and land uses
-    am_lu_unpack = [(am, l) for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items() for l in lus]
+    am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
     # Get decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
@@ -1146,7 +1144,7 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
         return
     
     # Unpack the agricultural management land-use
-    am_lu_unpack = [(am, l) for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items() for l in lus]
+    am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
     # Get decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
@@ -1242,7 +1240,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     print(f"Writing species of national environmental significance scores (GBF4 SNES) for {yr_cal}")
     
     # Unpack the agricultural management land-use
-    am_lu_unpack = [(am, l) for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items() for l in lus]
+    am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
     # Get decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
@@ -1343,7 +1341,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     print(f"Writing ecological communities of national environmental significance scores (GBF4 ECNES) for {yr_cal}")
     
     # Unpack the agricultural management land-use
-    am_lu_unpack = [(am, l) for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items() for l in lus]
+    am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
     # Get decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
@@ -1443,7 +1441,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
     print(f'Writing biodiversity GBF8 scores (GROUPS) for {yr_cal}')
     
     # Unpack the agricultural management land-use
-    am_lu_unpack = [(am, l) for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items() for l in lus]
+    am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
     # Get decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
@@ -1539,7 +1537,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
     print(f'Writing biodiversity GBF8 scores (SPECIES) for {yr_cal}')
     
     # Unpack the agricultural management land-use
-    am_lu_unpack = [(am, l) for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items() for l in lus]
+    am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
     # Get decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
@@ -1554,7 +1552,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
         coords={
             'species': data.BIO_GBF8_SEL_SPECIES,
             'cell': np.arange(data.NCELLS)}
-    ).chunk({'cell': min(4096, data.NCELLS), 'group': 1})  # Chunking to save mem use
+    ).chunk({'cell': min(4096, data.NCELLS), 'species': 1})  # Chunking to save mem use
 
     # Get the habitat contribution for ag/non-ag/am land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
@@ -1793,7 +1791,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
     ag_man_g_mrj = ag_ghg.get_agricultural_management_ghg_matrices(data, yr_idx)
 
     am_dfs = []
-    for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():
+    for am, am_lus in data.AG_MAN_LU_DESC.items():
 
         # Get the lucc_code for this the agricultural management in this loop
         am_j = np.array([data.DESC2AGLU[lu] for lu in am_lus])

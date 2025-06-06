@@ -429,10 +429,11 @@ class Data:
 
         # Initial (2010) agricutural management maps - no cells are used for alternative agricultural management options.
         # Includes a separate AM map for each agricultural management option, because they can be stacked.
-        self.AMMAP_DICT = {
-            am: np.zeros(self.NCELLS).astype("int8") for am in settings.AG_MANAGEMENTS_TO_LAND_USES
-        }
-        self.add_ammaps(self.YR_CAL_BASE, self.AMMAP_DICT)
+        self.AG_MAN_DESC = [am for am in settings.AG_MANAGEMENTS if settings.AG_MANAGEMENTS[am]]
+        self.AG_MAN_LU_DESC = {am:settings.AG_MANAGEMENTS_TO_LAND_USES[am] for am in self.AG_MAN_DESC}
+        self.AG_MAN_MAP = {am: np.zeros(self.NCELLS).astype("int8") for am in self.AG_MAN_DESC}
+        self.N_AG_MANS = len(self.AG_MAN_DESC)
+        self.add_ammaps(self.YR_CAL_BASE, self.AG_MAN_MAP)
 
         
 
