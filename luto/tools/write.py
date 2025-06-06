@@ -55,7 +55,7 @@ import luto.economics.non_agricultural.ghg as non_ag_ghg
 import luto.economics.non_agricultural.water as non_ag_water
 import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
-from luto.settings import AG_MANAGEMENTS, NON_AG_LAND_USES, AG_MANAGEMENTS_TO_LAND_USES
+from luto.settings import NON_AG_LAND_USES
 
 from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_html import data2html
@@ -248,10 +248,7 @@ def write_files(data: Data, yr_cal, path):
     np.save(os.path.join(path, non_ag_X_rk_fname), data.non_ag_dvars[yr_cal])
 
     # Save raw agricultural management decision variables (float array).
-    for am in AG_MANAGEMENTS_TO_LAND_USES:
-        if not AG_MANAGEMENTS[am]:
-            continue
-
+    for am in data.AG_MAN_DESC:
         snake_case_am = tools.am_name_snake_case(am)
         am_X_mrj_fname = f'ag_man_X_mrj_{snake_case_am}_{yr_cal}.npy'
         np.save(os.path.join(path, am_X_mrj_fname), data.ag_man_dvars[yr_cal][am])
@@ -313,7 +310,7 @@ def write_files_separate(data: Data, yr_cal, path, ammap_separate=False):
 
     # Get the desc2dvar table for agricultural management
     ag_man_maps = [
-        tools.map_desc_to_dvar_index(am, {desc: data.DESC2AGLU[desc] for desc in AG_MANAGEMENTS_TO_LAND_USES[am]}, am_dvar.sum(1)[:, np.newaxis])
+        tools.map_desc_to_dvar_index(am, {desc: data.DESC2AGLU[desc] for desc in data.AG_MAN_LU_DESC[am]}, am_dvar.sum(1)[:, np.newaxis])
         if ammap_separate else
         tools.map_desc_to_dvar_index('Ag_Mgt', {am: 0}, am_dvar.sum(1)[:, np.newaxis])
         for am, am_dvar in ag_man_rj_dict.items()
@@ -850,7 +847,7 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
         ctass = {}
         swass = {}
-        for am in AG_MANAGEMENTS_TO_LAND_USES:
+        for am in data.AG_MAN_DESC:
             ctas, swas = crossmap_amstat( am
                                         , data.lumaps[yr_cal_sim_pre]
                                         , data.ammaps[yr_cal_sim_pre][am]
@@ -873,7 +870,7 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         cthp.to_csv(os.path.join(path, f'crosstab-irrstat_{yr_cal}.csv'), index=False)
         swhp.to_csv(os.path.join(path, f'switches-irrstat_{yr_cal}.csv'), index=False)
 
-        for am in AG_MANAGEMENTS_TO_LAND_USES:
+        for am in data.AG_MAN_DESC:
             am_snake_case = tools.am_name_snake_case(am).replace("_", "-")
             ctass[am]['Year'] = yr_cal
             ctass[am].to_csv(os.path.join(path, f'crosstab-amstat-{am_snake_case}_{yr_cal}.csv'), index=False)
