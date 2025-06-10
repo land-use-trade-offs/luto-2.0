@@ -472,7 +472,7 @@ Range from 0 to 1 that balances the relative important between economic values a
  - if approaching 1, the model will focus on maximising prifit (or minimising cost).
 '''
 
-SOLVE_WEIGHT_BETA = 0.98
+SOLVE_WEIGHT_BETA = 0.999
 '''
 The weight of the deviations from target in the objective function.
  - if approaching 0, the model will ignore the deviations from target.

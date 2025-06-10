@@ -428,36 +428,36 @@ class LutoSolver:
                 gp.quicksum(v for v in self.V) 
                 / self._input_data.base_yr_prod["BASE_YR Production (t)"].sum()
                 + 1 
-            ) / self._input_data.ncms * settings.SOLVER_DEVIATION_WEIGHTS['SOLVER_WEIGHT_DEMAND']
+            ) / self._input_data.ncms
             
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             self.penalty_ghg = (
                 self.E 
                 / self._input_data.base_yr_prod["BASE_YR GHG (tCO2e)"]
                 + 1
-            ) * settings.SOLVER_DEVIATION_WEIGHTS['SOLVER_WEIGHT_GHG']
+            ) 
         
         if settings.WATER_CONSTRAINT_TYPE == "soft":
             self.penalty_water = (
                 gp.quicksum(v for v in self.W)
                 / self._input_data.base_yr_prod["BASE_YR Water (ML)"].sum()
                 + 1
-            ) / len(self._input_data.limits["water"].keys()) * settings.SOLVER_DEVIATION_WEIGHTS['SOLVER_WEIGHT_WATER']
+            ) / len(self._input_data.limits["water"].keys()) 
             
         if settings.GBF2_CONSTRAINT_TYPE == "soft":
             self.penalty_biodiv = (
                 self.B 
                 / self._input_data.base_yr_prod["BASE_YR GBF_2 (score)"].sum()
                 + 1
-            ) * settings.SOLVER_DEVIATION_WEIGHTS['SOLVER_WEIGHT_GBF2']
+            ) 
       
         return (
-            self.penalty_demand 
-            + self.penalty_ghg 
-            + self.penalty_water 
-            + self.penalty_biodiv 
+            self.penalty_demand   * settings.SOLVER_DEVIATION_WEIGHTS['SOLVER_WEIGHT_DEMAND']
+            + self.penalty_ghg    * settings.SOLVER_DEVIATION_WEIGHTS['SOLVER_WEIGHT_GHG']
+            + self.penalty_water  * settings.SOLVER_DEVIATION_WEIGHTS['SOLVER_WEIGHT_WATER']
+            + self.penalty_biodiv * settings.SOLVER_DEVIATION_WEIGHTS['SOLVER_WEIGHT_GBF2']
             + gp.LinExpr(0)
-        )
+        ) / sum(settings.SOLVER_DEVIATION_WEIGHTS.values())
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
         """
@@ -900,18 +900,22 @@ class LutoSolver:
                 )
             )
 
-        self.bio_GBF2_priority_degraded_area_expr = gp.quicksum(bio_ag_exprs) + gp.quicksum(bio_ag_man_exprs) + gp.quicksum(bio_non_ag_exprs)
+        self.bio_GBF2_priority_degraded_area_expr = (
+            gp.quicksum(bio_ag_exprs) 
+            + gp.quicksum(bio_ag_man_exprs) 
+            + gp.quicksum(bio_non_ag_exprs)
+        ) / self._input_data.limits["GBF2_priority_degrade_areas"]
         
         print(f"       |-- target is {self._input_data.limits["GBF2_priority_degrade_areas"]:15,.0f}")
         
         if settings.GBF2_CONSTRAINT_TYPE == "hard":
             self.bio_GBF2_priority_degraded_area_limit_constraint_hard = self.gurobi_model.addConstr(
-                self.bio_GBF2_priority_degraded_area_expr >= self._input_data.limits["GBF2_priority_degrade_areas"], 
+                self.bio_GBF2_priority_degraded_area_expr >= 1, 
                 name="bio_GBF2_priority_degraded_area_limit_hard"
             )
         elif settings.GBF2_CONSTRAINT_TYPE == "soft":
             constr = self.gurobi_model.addConstr(
-                self._input_data.limits["GBF2_priority_degrade_areas"] - self.bio_GBF2_priority_degraded_area_expr <= self.B, 
+                1 - self.bio_GBF2_priority_degraded_area_expr <= self.B, 
                 name="bio_GBF2_priority_degraded_area_limit_soft"
             )
             self.bio_GBF2_priority_degraded_area_limit_constraint_soft.append(constr)
@@ -981,11 +985,11 @@ class LutoSolver:
             )
 
 
-            self.bio_GBF3_major_vegetation_exprs[v] = ag_contr + ag_man_contr + non_ag_contr 
+            self.bio_GBF3_major_vegetation_exprs[v] = (ag_contr + ag_man_contr + non_ag_contr) / v_area_lb
 
             print(f"       |-- target is {v_area_lb:15,.0f} for {v_names[v]} ")
             self.bio_GBF3_major_vegetation_limit_constraints[v] = self.gurobi_model.addConstr(
-                self.bio_GBF3_major_vegetation_exprs[v] >= v_area_lb,
+                self.bio_GBF3_major_vegetation_exprs[v] >= 1,
                 name=f"bio_GBF3_major_vegetation_limit_{v}",
             )
 
