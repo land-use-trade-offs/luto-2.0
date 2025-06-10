@@ -2112,6 +2112,13 @@ def save_report_data(raw_data_dir:str):
     # Create the directory to save map_html if it does not exist
     if  not os.path.exists(map_save_dir):
         os.makedirs(map_save_dir)
+        
+    # Remove any existing map files in the save directory
+    if os.path.exists(map_save_dir):
+        for file in os.listdir(map_save_dir):
+            file_path = os.path.join(map_save_dir, file)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
     
     # Function to move a file from one location to another if the file exists
     def move_html(path_from, path_to):
@@ -2119,8 +2126,10 @@ def save_report_data(raw_data_dir:str):
             shutil.move(path_from, path_to)
     
     # Move the map files to the save directory
-    tasks = [delayed(move_html)(row['path'], map_save_dir)
-                for _,row in map_files.iterrows()]
+    tasks = [
+        delayed(move_html)(row['path'], map_save_dir)
+        for _,row in map_files.iterrows()
+    ]
     
     worker = min(settings.WRITE_THREADS, len(tasks)) if len(tasks) > 0 else 1
     

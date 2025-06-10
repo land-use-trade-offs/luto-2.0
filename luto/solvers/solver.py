@@ -296,7 +296,7 @@ class LutoSolver:
         
         # Get objectives 
         self.obj_economy = self._setup_economy_objective() / self._input_data.base_yr_prod["BASE_YR Economy(AUD)"]              # Normalise to the base year economy value
-        self.obj_biodiv = self._setup_biodiversity_objective() / self._input_data.base_yr_prod["BASE_YR Biodiversity (score)"]  # Normalise to the base year biodiversity value
+        self.obj_biodiv = self._setup_biodiversity_objective() / self._input_data.base_yr_prod["BASE_YR Overall Bio (score)"]  # Normalise to the base year biodiversity value
         self.obj_penalties = self._setup_penalty_objectives()                                                                   
  
         # Set the objective function
@@ -416,41 +416,48 @@ class LutoSolver:
         
     def _setup_penalty_objectives(self):
         print("  ...setting up penalty objectives...")
-        
-        # Get the penalty values for each sector
-        self.penalty_biodiv = (
-            self.B * settings.GBF2_PENALTY
-            if settings.GBF2_CONSTRAINT_TYPE == "soft"
-            else 0
-        )
-        self.penalty_ghg = (
-            self.E * self._input_data.economic_target_yr_carbon_price
-            if settings.GHG_CONSTRAINT_TYPE == "soft"
-            else 0
-        )
-        self.penalty_water = (
-            self.W.sum() * settings.WATER_PENALTY
-            if settings.WATER_CONSTRAINT_TYPE == "soft"
-            else 0
-        )
-        self.penalty_demand = (
-            # gp.quicksum(
-            #     v * price
-            #     for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices)
-            # )
-            (
-                gp.quicksum(
-                    (self.V[c] + self._input_data.base_yr_prod["BASE_YR Production (t)"][c]) 
-                    / self._input_data.base_yr_prod["BASE_YR Production (t)"][c] 
-                    for c in range(self._input_data.ncms)
-                ) / self._input_data.ncms
-            )
-            if settings.DEMAND_CONSTRAINT_TYPE == "soft"
-            else 0
-        )
 
-        return self.penalty_demand + self.penalty_ghg + self.penalty_water + self.penalty_biodiv + gp.LinExpr(0)
+        self.penalty_demand = 0
+        self.penalty_ghg = 0
+        self.penalty_water = 0
+        self.penalty_biodiv = 0
+ 
+        # Get the penalty values for each sector
+        if settings.DEMAND_CONSTRAINT_TYPE == "soft":
+            self.penalty_demand = (
+                gp.quicksum(v for v in self.V) 
+                / self._input_data.base_yr_prod["BASE_YR Production (t)"].sum()
+                + 1 
+            ) / self._input_data.ncms * settings.SOLVER_DEVIATION_WEIGHTS['SOLVER_WEIGHT_DEMAND']
+            
+        if settings.GHG_CONSTRAINT_TYPE == "soft":
+            self.penalty_ghg = (
+                self.E 
+                / self._input_data.base_yr_prod["BASE_YR GHG (tCO2e)"]
+                + 1
+            ) * settings.SOLVER_DEVIATION_WEIGHTS['SOLVER_WEIGHT_GHG']
         
+        if settings.WATER_CONSTRAINT_TYPE == "soft":
+            self.penalty_water = (
+                gp.quicksum(v for v in self.W)
+                / self._input_data.base_yr_prod["BASE_YR Water (ML)"].sum()
+                + 1
+            ) / len(self._input_data.limits["water"].keys()) * settings.SOLVER_DEVIATION_WEIGHTS['SOLVER_WEIGHT_WATER']
+            
+        if settings.GBF2_CONSTRAINT_TYPE == "soft":
+            self.penalty_biodiv = (
+                self.B 
+                / self._input_data.base_yr_prod["BASE_YR GBF_2 (score)"].sum()
+                + 1
+            ) * settings.SOLVER_DEVIATION_WEIGHTS['SOLVER_WEIGHT_GBF2']
+      
+        return (
+            self.penalty_demand 
+            + self.penalty_ghg 
+            + self.penalty_water 
+            + self.penalty_biodiv 
+            + gp.LinExpr(0)
+        )
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
         """

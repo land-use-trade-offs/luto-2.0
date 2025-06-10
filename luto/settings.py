@@ -109,7 +109,7 @@ The hurdled_costs  = original_transition_costs * (1 + TRANSITION_HURDEL_FACTOR)
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 9      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
 SIM_YEARS = list(range(2010,2051,10)) # range(2020,2050)
@@ -124,12 +124,33 @@ OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires sof
 DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
 
 
+SOLVER_DEVIATION_WEIGHTS = {
+    'SOLVER_WEIGHT_DEMAND': 1,
+    'SOLVER_WEIGHT_GHG': 1,
+    'SOLVER_WEIGHT_WATER': 1,
+    'SOLVER_WEIGHT_GBF2': 1
+}  
+"""
+If any of the targets are set to 'soft':
+    Then they will have a deviation from target (normalised to near 1
+    by dividing their BASE_YR (2010) sum) in the objective function.
+
+    Here the weights determine the relative importance of each target 
+    in the objective function.E.g., if SOLVER_WEIGHT_GHG = 2 and the 
+    rest are 1, then reducing GHG deviation from target will be twice 
+    as important as the other targets in the objective function.
+
+If the target is set to 'hard' or 'off': 
+    Then the deviation from target will be 0 and the weight will not be used.
+"""
+
+
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
 WRITE_OUTPUT_GEOTIFFS = True   # Write GeoTiffs to output directory: True or False
-PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = 5               # The Threads to use for map making, only work with PARALLEL_WRITE = True
+PARALLEL_WRITE = True          # If to use parallel processing to write GeoTiffs: True or False
+WRITE_THREADS = 32             # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
@@ -377,7 +398,6 @@ HIR_EFFECT_YEARS = 91
 
 
 
-
 # ---------------------------------------------------------------------------- #
 # Off-land commodity parameters
 # ---------------------------------------------------------------------------- #
@@ -452,7 +472,7 @@ Range from 0 to 1 that balances the relative important between economic values a
  - if approaching 1, the model will focus on maximising prifit (or minimising cost).
 '''
 
-SOLVE_WEIGHT_BETA = 0.90
+SOLVE_WEIGHT_BETA = 0.98
 '''
 The weight of the deviations from target in the objective function.
  - if approaching 0, the model will ignore the deviations from target.
@@ -466,7 +486,6 @@ WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield lim
 WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
 # WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
 
-WATER_PENALTY = 1e-5
 
 # Regionalisation to enforce water use limits by
 WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
@@ -559,8 +578,6 @@ If set to 100, all cells will be considered as priority degraded areas, equal to
 '''
 
 
-GBF2_PENALTY = 1e4
-'''The penalty multiplier for not meeting the biodiversity target, only applies when undershooting the target'''
 
 
 # Connectivity source source

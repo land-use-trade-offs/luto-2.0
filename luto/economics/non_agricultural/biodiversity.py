@@ -226,7 +226,7 @@ def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
         get_biodiv_sheep_carbon_plantings_belt(data, ag_b_mrj, cp_belt_x_r),
         get_biodiv_beef_carbon_plantings_belt(data, ag_b_mrj, cp_belt_x_r),
         get_biodiv_beccs(data),                                               
-        get_biodiv_destocked_land(data, lumap)
+        get_biodiv_destocked_land(data, lumap) * 0
     ]
 
     return np.concatenate([

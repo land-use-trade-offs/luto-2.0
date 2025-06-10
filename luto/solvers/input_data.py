@@ -574,16 +574,7 @@ def get_BASE_YR_economic_value(data: Data):
     else:
         raise ValueError("Invalid `settings.OBJECTIVE`. Use 'maxprofit' or 'maxcost'.")
     return np.einsum('mrj,mrj->', e_mrj, data.AG_L_MRJ)
-    
-    
-def get_BASE_YR_biodiv_value(data: Data):
-    """
-    Calculate the economic value of the agricultural sector.
-    """
-    # Get the revenue and cost matrices
-    ag_b_mrj = ag_biodiversity.get_bio_overall_priority_score_matrices_mrj(data)
-    return np.einsum('mrj,mrj->', ag_b_mrj, data.AG_L_MRJ)
-    
+
 def get_BASE_YR_production_t(data: Data):
     """
     Calculate the production of each commodity in the base year.
@@ -591,6 +582,46 @@ def get_BASE_YR_production_t(data: Data):
     # Get the revenue and cost matrices
     return data.get_production(data.YR_CAL_BASE, data.LUMAP, data.LMMAP)
 
+def get_BASE_YR_GHG_t(data: Data):
+    """
+    Calculate the GHG emissions of the agricultural sector.
+    """
+    # Get the GHG matrices
+    ag_g_mrj = get_ag_g_mrj(data, 0)
+    return np.einsum('mrj,mrj->', ag_g_mrj, data.AG_L_MRJ)
+    
+def get_BASE_YR_overall_bio_value(data: Data):
+    """
+    Calculate the economic value of the agricultural sector.
+    """
+    # Get the revenue and cost matrices
+    ag_b_mrj = ag_biodiversity.get_bio_overall_priority_score_matrices_mrj(data)
+    return np.einsum('mrj,mrj->', ag_b_mrj, data.AG_L_MRJ)
+
+def get_BASE_YR_GBF2_score(data: Data) -> np.ndarray:
+    if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
+        return np.empty(0)
+    print('Getting priority degrade area base year score...', flush = True)
+    GBF2_ly_r = get_GBF2_priority_degrade_area_r(data)
+    GBF2_contr_j = get_ag_biodiv_contr_j(data)
+    base_yr_dvar_mrj = data.AG_L_MRJ
+    return np.einsum('r,j,mrj->', GBF2_ly_r, GBF2_contr_j, base_yr_dvar_mrj)
+
+def get_BASE_YR_water_ML(data: Data) -> np.ndarray:
+    """
+    Calculate the water net yield of the agricultural sector.
+    """
+    # Get the water matrices
+    ag_w_mrj = get_ag_w_mrj(data, 0)
+    ag_w_index = get_w_region_indices(data)
+    
+    water_ML = []
+    for reg,idx in ag_w_index.items():
+        water_ML.append(
+            np.einsum('mrj, mrj->', ag_w_mrj[:, idx, :], data.AG_L_MRJ[:, idx, :])
+        )
+    return np.array(water_ML)
+    
 
 def get_savanna_eligible_r(data: Data) -> np.ndarray:
     return np.where(data.SAVBURN_ELIGIBLE == 1)[0]
@@ -850,8 +881,11 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         
         base_yr_prod = {
             "BASE_YR Economy(AUD)": get_BASE_YR_economic_value(data),
-            "BASE_YR Biodiversity (score)": get_BASE_YR_biodiv_value(data),
             "BASE_YR Production (t)": get_BASE_YR_production_t(data),
+            "BASE_YR GHG (tCO2e)": get_BASE_YR_GHG_t(data),
+            "BASE_YR Water (ML)": get_BASE_YR_water_ML(data),
+            "BASE_YR Overall Bio (score)": get_BASE_YR_overall_bio_value(data),
+            "BASE_YR GBF_2 (score)": get_BASE_YR_GBF2_score(data),
         },
         
         offland_ghg=data.OFF_LAND_GHG_EMISSION_C[target_index],
