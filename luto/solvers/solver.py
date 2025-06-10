@@ -433,10 +433,19 @@ class LutoSolver:
             weight_demand = settings.SOLVER_WEIGHT_DEMAND
             
             self.penalty_demand = (
-                gp.quicksum(v for v in self.V) 
-                / self._input_data.base_yr_prod["BASE_YR Production (t)"].sum()
+                gp.quicksum(
+                    v * price
+                    for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices)
+                ) 
+                / self._input_data.base_yr_prod["BASE_YR Economy(AUD)"]
                 + 1 
-            ) / self._input_data.ncms
+            )
+            
+            # self.penalty_demand = (
+            #     gp.quicksum(v for v in self.V) 
+            #     / self._input_data.base_yr_prod["BASE_YR Production (t)"].sum()
+            #     + 1 
+            # ) / self._input_data.ncms
             
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             weight_ghg = settings.SOLVER_WEIGHT_GHG
