@@ -421,9 +421,17 @@ class LutoSolver:
         self.penalty_ghg = 0
         self.penalty_water = 0
         self.penalty_biodiv = 0
+        
+        weight_demand = 0
+        weight_ghg = 0
+        weight_water = 0
+        weight_biodiv = 0
+        
  
         # Get the penalty values for each sector
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
+            weight_demand = settings.SOLVER_WEIGHT_DEMAND
+            
             self.penalty_demand = (
                 gp.quicksum(v for v in self.V) 
                 / self._input_data.base_yr_prod["BASE_YR Production (t)"].sum()
@@ -431,6 +439,8 @@ class LutoSolver:
             ) / self._input_data.ncms
             
         if settings.GHG_CONSTRAINT_TYPE == "soft":
+            weight_ghg = settings.SOLVER_WEIGHT_GHG
+            
             self.penalty_ghg = (
                 self.E 
                 / self._input_data.base_yr_prod["BASE_YR GHG (tCO2e)"]
@@ -438,6 +448,7 @@ class LutoSolver:
             ) 
         
         if settings.WATER_CONSTRAINT_TYPE == "soft":
+            weight_water = settings.SOLVER_WEIGHT_WATER
             self.penalty_water = (
                 gp.quicksum(v for v in self.W)
                 / self._input_data.base_yr_prod["BASE_YR Water (ML)"].sum()
@@ -445,6 +456,7 @@ class LutoSolver:
             ) / len(self._input_data.limits["water"].keys()) 
             
         if settings.GBF2_CONSTRAINT_TYPE == "soft":
+            weight_biodiv = settings.SOLVER_WEIGHT_GBF2
             self.penalty_biodiv = (
                 self.B 
                 / self._input_data.base_yr_prod["BASE_YR GBF_2 (score)"].sum()
@@ -452,12 +464,12 @@ class LutoSolver:
             ) 
       
         return (
-            self.penalty_demand   * settings.SOLVER_DEVIATION_WEIGHTS['SOLVER_WEIGHT_DEMAND']
-            + self.penalty_ghg    * settings.SOLVER_DEVIATION_WEIGHTS['SOLVER_WEIGHT_GHG']
-            + self.penalty_water  * settings.SOLVER_DEVIATION_WEIGHTS['SOLVER_WEIGHT_WATER']
-            + self.penalty_biodiv * settings.SOLVER_DEVIATION_WEIGHTS['SOLVER_WEIGHT_GBF2']
+            self.penalty_demand   * weight_demand
+            + self.penalty_ghg    * weight_ghg
+            + self.penalty_water  * weight_water
+            + self.penalty_biodiv * weight_biodiv
             + gp.LinExpr(0)
-        ) / sum(settings.SOLVER_DEVIATION_WEIGHTS.values())
+        ) / sum([ weight_demand, weight_ghg, weight_water, weight_biodiv]) 
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
         """
