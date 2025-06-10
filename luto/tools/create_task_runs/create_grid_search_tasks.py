@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250610_RES13_TEST_BETA' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250611_RES3_DCCEEW' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -35,9 +35,9 @@ grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['20GB'],
-    'NCPUS':[5],
-    'TIME': ['4:00:00'],
+    'MEM': ['160GB'],
+    'NCPUS':[40],
+    'TIME': ['6:00:00'],
     'QUEUE': ['normalsr'],
     
  
@@ -45,11 +45,11 @@ grid_search = {
     # Working settings for the model run
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                 # 'maxprofit' or 'mincost'
-    'RESFACTOR': [13],
+    'RESFACTOR': [3],
     'SIM_YEARS': [list(range(2020,2051,5))],   # Years to run the model 
-    'WRITE_THREADS': [10],
-    'WRITE_OUTPUT_GEOTIFFS': [False],
-    'KEEP_OUTPUTS': [False],                    # If False, only keep report HTML
+    'WRITE_THREADS': [2],
+    'WRITE_OUTPUT_GEOTIFFS': [True],
+    'KEEP_OUTPUTS': [True],                    # If False, only keep report HTML
     
  
     ###############################################################
@@ -57,13 +57,10 @@ grid_search = {
     ###############################################################
     
     # --------------- Target deviation weight ---------------
-    'SOLVER_WEIGHT_DEMAND': range(1, 11),  # Range from 1 to 10, inclusive
+    'SOLVER_WEIGHT_DEMAND': [1], 
     'SOLVER_WEIGHT_GHG': [1],
     'SOLVER_WEIGHT_WATER': [1],
     'SOLVER_WEIGHT_GBF2': [1],
-    
-    # --------------- Economic settings --------------- 
-    'TRANSITION_HURDEL_FACTOR': [0],         # Between 0 and 1, the higher the value, the more difficult it is to transition land use
     
     # --------------- Demand settings ---------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],         # 'hard' or 'soft' 
@@ -109,7 +106,7 @@ grid_search = {
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_WEIGHT_ALPHA': [1],                  # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
-    'SOLVE_WEIGHT_BETA': np.arange(0.99,1,0.0005),         
+    'SOLVE_WEIGHT_BETA': np.arange(0.8,1,0.0025),         
     
     
     #-------------------- Diet BAU --------------------
@@ -140,5 +137,5 @@ if __name__ == '__main__':
     # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
 
     # 2) Submit task to multiple linux computation nodes
-    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 200)
+    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 300)
 
