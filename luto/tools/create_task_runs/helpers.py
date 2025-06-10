@@ -311,12 +311,9 @@ def process_production_quantity_data(json_dir_path):
     return load_json_data(json_dir_path, 'production_5_6_demand_Production_commodity_from_LUTO.json')
 
 def process_production_deviation_data(json_dir_path):
-    df_demand = load_json_data(json_dir_path, 'production_5_6_demand_Production_commodity_from_LUTO.json')
-    df_luto = load_json_data(json_dir_path, 'production_5_5_demand_Production_commodity.json')
-    df_delta = df_demand.merge(df_luto, on=['year', 'name'], suffixes=('_luto', '_demand'))
-    # df_delta['deviation_t'] = df_delta.eval('val_luto - val_demand')
-    df_delta['val'] = df_delta.eval('(val_luto - val_demand) / val_demand * 100')
-    return df_delta
+    df = load_json_data(json_dir_path, 'production_6_demand_achievement_commodity.json')
+    df['val'] = df['val'] - 100 # Achiment percent to deviation percent
+    return df
 
 def process_GHG_deviation_data(json_dir_path):
     df = load_json_data(json_dir_path, 'GHG_2_individual_emission_Mt.json')

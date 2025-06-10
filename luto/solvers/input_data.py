@@ -388,9 +388,6 @@ def get_ag_t_mrj(data: Data, target_index, base_year):
         base_year
     ).astype(np.float32)
     
-    # Double the cost to simulate the hurdle of the transition
-    ag_t_mrj *= (1 + settings.TRANSITION_HURDEL_FACTOR)
-    
     # Transition costs occures if the base year is not the target year
     return ag_t_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(ag_t_mrj).astype(np.float32)
 
