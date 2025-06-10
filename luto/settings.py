@@ -137,7 +137,7 @@ If any of the targets are set to 'soft':
 If the target is set to 'hard' or 'off': 
     Then the deviation from target will be 0 and the weight will not be used.
 """
-SOLVER_WEIGHT_DEMAND = 10
+SOLVER_WEIGHT_DEMAND = 1
 SOLVER_WEIGHT_GHG = 1
 SOLVER_WEIGHT_WATER = 1
 SOLVER_WEIGHT_GBF2 = 1
@@ -471,7 +471,7 @@ Range from 0 to 1 that balances the relative important between economic values a
  - if approaching 1, the model will focus on maximising prifit (or minimising cost).
 '''
 
-SOLVE_WEIGHT_BETA = 0.995
+SOLVE_WEIGHT_BETA = 0.9
 '''
 The weight of the deviations from target in the objective function.
  - if approaching 0, the model will ignore the deviations from target.

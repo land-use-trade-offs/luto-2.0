@@ -80,7 +80,7 @@ def create_new_dataset():
     # Copy raw data files from their source into raw_data folder for further processing
 
     shutil.copyfile(fdh_inpath + 'tmatrix-cat2lus.csv', raw_data + 'tmatrix_cat2lus.csv')
-    shutil.copyfile(fdh_inpath + 'transitions_costs_20250430.xlsx', raw_data + 'transitions_costs_20250430.xlsx')
+    shutil.copyfile(fdh_inpath + 'transitions_costs_20250606.xlsx', raw_data + 'transitions_costs_20250606.xlsx')
 
     shutil.copyfile(profit_map_inpath + 'NLUM_SPREAD_LU_ID_Mapped_Concordance.h5', raw_data + 'NLUM_SPREAD_LU_ID_Mapped_Concordance.h5')
 
@@ -188,7 +188,7 @@ def create_new_dataset():
 
     # Read in from-to costs in category-to-category format
     # tmcat = pd.read_csv(raw_data + 'tmatrix_categories.csv', index_col = 0)
-    tmcat = pd.read_excel( raw_data + 'transitions_costs_20250430.xlsx'
+    tmcat = pd.read_excel( raw_data + 'transitions_costs_20250606.xlsx'
                           , sheet_name = 'Current'
                           , usecols = 'B:M'
                           , skiprows = 5
@@ -196,14 +196,21 @@ def create_new_dataset():
                           , index_col = 0)
 
     # Read transition costs from agricultural land to environmental plantings
-    ag_to_new_land_uses = pd.read_excel( raw_data + 'transitions_costs_20250430.xlsx'
+    ag_to_new_land_uses = pd.read_excel( raw_data + 'transitions_costs_20250606.xlsx'
                                        , sheet_name = 'Ag_to_new_land-uses'
                                        , usecols = 'B,C'
                                        , index_col = 0 )
     
+    # Read transition costs of ag to destocked natural land
+    ag_to_natural_land = pd.read_excel( raw_data + 'transitions_costs_20250606.xlsx'
+                                        , sheet_name = 'Ag_to_destock_natural'
+                                        , index_col = 0 
+                                        ).sort_values(by = 'LU_DESC', ascending = True)
+    np.save(outpath + 'ag_to_destock_tmatrix.npy', ag_to_natural_land['Cost per ha'].values)
+    
     # Read land clearing costs for non-agricultural land to unallocated modified land
     tmat_clear_data = pd.read_excel(
-        raw_data + 'transitions_costs_20250430.xlsx',
+        raw_data + 'transitions_costs_20250606.xlsx',
         sheet_name='Current',
         usecols='F',
         skiprows=19,
@@ -270,7 +277,6 @@ def create_new_dataset():
 
     # Read in ag-landuse, which is a lexicographically ordered list
     ag_landuses = pd.read_csv(outpath + 'ag_landuses.csv', header = None)[0].to_list()
-    ag_desc2lu = dict(zip(ag_landuses, range(len(ag_landuses))))
 
     # Create a non-agricultural landuses file
     # Do not sort the whole list alphabetically when adding new landuses to the model.
