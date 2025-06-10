@@ -56,6 +56,12 @@ grid_search = {
     # Model run settings
     ###############################################################
     
+    # --------------- Target deviation weight ---------------
+    'SOLVER_WEIGHT_DEMAND': range(1, 11),  # Range from 1 to 10, inclusive
+    'SOLVER_WEIGHT_GHG': [1],
+    'SOLVER_WEIGHT_WATER': [1],
+    'SOLVER_WEIGHT_GBF2': [1],
+    
     # --------------- Economic settings --------------- 
     'TRANSITION_HURDEL_FACTOR': [0],         # Between 0 and 1, the higher the value, the more difficult it is to transition land use
     
@@ -103,7 +109,7 @@ grid_search = {
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_WEIGHT_ALPHA': [1],                  # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
-    'SOLVE_WEIGHT_BETA': np.arange(0.999,1,0.00005),         
+    'SOLVE_WEIGHT_BETA': np.arange(0.99,1,0.0005),         
     
     
     #-------------------- Diet BAU --------------------
@@ -134,5 +140,5 @@ if __name__ == '__main__':
     # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
 
     # 2) Submit task to multiple linux computation nodes
-    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 500)
+    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 200)
 
