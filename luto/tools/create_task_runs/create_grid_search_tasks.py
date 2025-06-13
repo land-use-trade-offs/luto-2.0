@@ -88,18 +88,18 @@ grid_search = {
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSTIY_TARGET_GBF_2': ['medium'],         # 'off', 'low', 'medium', 'high'
-    'GBF2_CONSTRAINT_TYPE': ['hard'],           # 'hard' or 'soft'
+    'BIODIVERSTIY_TARGET_GBF_2': ['medium'],                        # 'off', 'low', 'medium', 'high'
+    'GBF2_CONSTRAINT_TYPE': ['hard'],                               # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
-    'BIODIVERSTIY_TARGET_GBF_3': ['medium'],         # 'off', 'medium', 'high', 'USER_DEFINED'
+    'BIODIVERSTIY_TARGET_GBF_3': ['medium'],                        # 'off', 'medium', 'high', 'USER_DEFINED'
     
     # --------------- Biodiversity settings - GBF 4 ---------------
     'BIODIVERSTIY_TARGET_GBF_4_SNES' : ['on'],                      # 'on' or 'off'.
     'BIODIVERSTIY_TARGET_GBF_4_ECNES' : ['on'],                     # 'on' or 'off'.
     
     # --------------- Biodiversity settings - GBF 8 ---------------
-    'BIODIVERSTIY_TARGET_GBF_8': ['on'],       # 'on' or 'off'
+    'BIODIVERSTIY_TARGET_GBF_8': ['on'],                            # 'on' or 'off'
 
  
     ###############################################################

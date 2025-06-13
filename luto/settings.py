@@ -532,12 +532,12 @@ The constraint type for the biodiversity target.
 GBF2_TARGETS_DICT = {
     'off':     None,
     'low':    {2030: 0,    2050: 0,    2100: 0},
-    'medium': {2030: 0.15, 2050: 0.15, 2100: 0.15},
-    'high':   {2030: 0.15, 2050: 0.25, 2100: 0.25},
+    'medium': {2030: 0.30, 2050: 0.30, 2100: 0.30},
+    'high':   {2030: 0.30, 2050: 0.50, 2100: 0.50},
 }
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-BIODIVERSTIY_TARGET_GBF_2 = 'medium'            # 'off', 'low', 'medium', or 'high'
+BIODIVERSTIY_TARGET_GBF_2 = 'medium'            # 'off', 'low', 'medium', 'high', or 'USER_DEFINED'
 '''
 Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -547,9 +547,6 @@ in order to enhance biodiversity and ecosystem functions and services, ecologica
  - 'medium' is the medium level of biodiversity target (i.e., restore 15% of degreaded biodiversity socore in the 'priority degraded land').
  - 'high' is the high level of biodiversity target (i.e., restore 25% of degreaded biodiversity socore in the 'priority degraded land').
 '''
-
-
-
 
 
 GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
@@ -568,10 +565,8 @@ If set to 100, all cells will be considered as priority degraded areas, equal to
 '''
 
 
-
-
 # Connectivity source source
-CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
+CONNECTIVITY_SOURCE = 'DCCEEW_NCI'                 # 'DCCEEW_NCI', 'NATURAL_AREA_CONNECTIVITY' or 'NONE'
 '''
 The connectivity source is the source of the connectivity score used to weigh the raw biodiversity priority score.
 This score is normalised between 0 (fartherst) and 1 (closest).
@@ -583,8 +578,7 @@ Can be either 'NCI' or 'DWI'.
 '''
 
 # Connectivity score importance
-connectivity_importance = 0.3                    # Weighting of connectivity score in biodiversity calculation (0 [not important] - 1 [very important])
-CONNECTIVITY_LB = 1 - connectivity_importance    # Sets the lower bound of the connectivity multiplier for bioidversity
+CONNECTIVITY_LB = 0.7                       # Avaliable values are [0.5, 0.6, 0.7, 0.8, 0.9]
 '''
 The relative importance of the connectivity score in the biodiversity calculation. Used to scale the raw biodiversity score.
 I.e., the lower bound of the connectivity score for weighting the raw biodiversity priority score is CONNECTIVITY_LB.
@@ -592,7 +586,7 @@ I.e., the lower bound of the connectivity score for weighting the raw biodiversi
 
 
 # Habitat condition data source
-HABITAT_CONDITION = 'USER_DEFINED'                  # 'HCAS', 'USER_DEFINED', or 'NONE'
+HABITAT_CONDITION = 'HCAS'                  # 'HCAS', 'USER_DEFINED', or 'NONE'
 '''
 Used to calculate the level of degradation of biodiversity under agricultural land uses (i.e., multiplier of the impact of ag on biodiversity).
 - If 'HCAS' is selected, the habitat condition is calculated using the Habitat Condition Assessment System (HCAS)

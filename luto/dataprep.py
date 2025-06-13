@@ -32,8 +32,11 @@ import numpy as np
 import pandas as pd
 import shutil, os, time, h5py
 
+from luto import settings
+
 
 from joblib import Parallel, delayed
+from itertools import product
 from luto.settings import INPUT_DIR, RAW_DATA
 
 
@@ -295,7 +298,6 @@ def create_new_dataset():
     natural_cells = np.logical_not(bioph['NATURAL_AREA_INC_WATER'].values)          # 0 is natural, 1 is non-natural; so we flip the values to make 1 natural
     idx_inside_LUTO = (lumap != -1).values                                          # shape=6956407, sum=4218733
     idx_outside_LUTO = (lumap == -1).values                                         # shape=6956407, sum=2737674
-    idx_inside_LUTO_natural = np.logical_and(idx_inside_LUTO, natural_cells)        # shape=6956407, sum=3267523
     idx_outside_LUTO_natural = np.logical_and(idx_outside_LUTO, natural_cells)      # shape=6956407, sum=2677065
     
 
@@ -655,11 +657,122 @@ def create_new_dataset():
         'BIODIV_PRIORITY_SSP370',
         'BIODIV_PRIORITY_SSP585',
         'NATURAL_AREA_CONNECTIVITY',
-        'DCCEEW_NCI']].copy()
+        'DCCEEW_NCI',
+    ]].copy()
+    
+    bio_PRIORITY_RANK_AND_AREA_CONNECTIVITY.to_hdf(
+        outpath + 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5',
+        key='bio_PRIORITY_RANK_AND_AREA_CONNECTIVITY', 
+        mode='w', 
+        format='table', 
+        index=False, 
+        complevel=9
+    )
+    
+    
+    ############### Get biodiversity contribution scale for each land-use
 
-    # Save to file
-    bio_PRIORITY_RANK_AND_AREA_CONNECTIVITY.to_hdf(outpath + 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5', key='bio_PRIORITY_RANK_AND_AREA_CONNECTIVITY', mode='w', format='table', index=False, complevel=9)
+    biodiv_contribution_lookup = pd.read_csv(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv'))
+    biodiv_contribution_cols = [i for i in biodiv_contribution_lookup.columns if 'PERCENTILE' in i]
+    
+    for col in biodiv_contribution_cols:
+        # Rescale the biodiversity contribution values by Unallocated - natural land (code 23)
+        biodiv_contribution_lookup[col] = biodiv_contribution_lookup[col] / biodiv_contribution_lookup[col][23]
+    
+    biodiv_contribution_lookup.to_csv(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv'), index=False)
+    
+    
+    ############## Get the biodiversity (GBF2) achievement percentages for BASE YEAR (2010)
 
+    # Use ssp245 to calculate the biodiversity contribution; different SSPs are not so different (less than 0.01 percent) in 2010
+    bio_rank_vs_area = pd.read_excel(f'{settings.INPUT_DIR}/BIODIVERSITY_GBF2_conservation_performance.xlsx', sheet_name='ssp245')
+    rank_ly = bio_PRIORITY_RANK_AND_AREA_CONNECTIVITY[f'BIODIV_PRIORITY_SSP245'].values 
+    
+    tasks = []
+
+    for conect_score, connect_lb in product(['NATURAL_AREA_CONNECTIVITY', 'DCCEEW_NCI'], np.arange(0.5,1,0.1).round(2)):
+        
+        interp_low_high = (connect_lb, 1) if conect_score == 'DCCEEW_NCI' else (1, connect_lb)  # Higher NCI is better, this is opposite for natural connectivity (distance to natural areas)
+        connectivity_score = bio_PRIORITY_RANK_AND_AREA_CONNECTIVITY[conect_score].to_numpy(dtype=np.float32)
+        
+        connectivity_score = np.interp( 
+            connectivity_score, 
+            (connectivity_score.min(), connectivity_score.max()), 
+            interp_low_high
+        ).astype('float32')
+
+        for HCAS_percentile in biodiv_contribution_cols:
+            
+            biodiv_degrade_lookup = biodiv_contribution_lookup[HCAS_percentile].to_dict()
+            biodiv_degrade_lookup[-1] = 1  # Assuming that cells outside the LUTO study area have full biodiversity contribution
+            biodiv_degrade_ly = np.vectorize(biodiv_degrade_lookup.get, otypes=[np.float32])(lumap.values).astype(np.float32)
+
+            for _,row in bio_rank_vs_area.iterrows():
+                
+                # task wrap function must be self-contained; all arguments must be passed rather than using variables from the outer scope
+                def task_wrap(
+                    row,
+                    rank_ly,
+                    biodiv_degrade_ly,
+                    connectivity_score,
+                    idx_inside_LUTO,
+                    ):
+                    
+                    ly_pct_cells = rank_ly >= row['PRIORITY_RANK']
+                    ly_pct_cells_inside_LUTO = np.logical_and(ly_pct_cells, idx_inside_LUTO)
+                    
+                    bio_score_pre_1750 = (zones['CELL_HA'] * connectivity_score)[ly_pct_cells_inside_LUTO].sum()
+                    bio_score_base_year = (biodiv_degrade_ly * connectivity_score * zones['CELL_HA'])[ly_pct_cells_inside_LUTO].sum()
+                    bio_percent_base_year = (bio_score_base_year / bio_score_pre_1750) * 100
+
+                    return (
+                        row['conect_score'], 
+                        row['connect_lb'], 
+                        row['HCAS_percentile'], 
+                        row['AREA_COVERAGE_PERCENT'], 
+                        bio_percent_base_year,
+                        bio_score_base_year,
+                        bio_score_pre_1750
+                    )
+                
+                row['conect_score'] = conect_score
+                row['connect_lb'] = connect_lb
+                row['HCAS_percentile'] = int(HCAS_percentile.split('_')[-1])  
+        
+                tasks.append(delayed(task_wrap)(
+                    row, 
+                    rank_ly, 
+                    biodiv_degrade_ly, 
+                    connectivity_score, 
+                    idx_inside_LUTO, 
+                    )
+                )
+                
+    output = Parallel(n_jobs=32)(tasks)
+    
+    GBF2_biodiv_achieve = pd.DataFrame(
+        output,
+        columns=[
+            'CONNECTIVITY_SOURCE', 
+            'CONNECTIVITY_LB', 
+            'HCAS_PERCENTILE',
+            'TOP_RANK_CELL_AREA_COVERAGE_PERCENT',
+            'TOP_RANK_CELL_BIO_COVERAGE_BASE_YEAR',
+            'TOP_RANK_CELL_BIO_SCORE_BASE_YEAR',
+            'TOP_RANK_CELL_BIO_SCORE_PRE_1750'
+        ]
+    )
+    
+    GBF2_biodiv_achieve.insert(4, 'TARGET_PERCENT_2100', np.nan)  
+    GBF2_biodiv_achieve.insert(4, 'TARGET_PERCENT_2050', np.nan)
+    GBF2_biodiv_achieve.insert(4, 'TARGET_PERCENT_2030', np.nan)
+    
+    GBF2_biodiv_achieve = GBF2_biodiv_achieve.query('TOP_RANK_CELL_AREA_COVERAGE_PERCENT < 100 and TOP_RANK_CELL_AREA_COVERAGE_PERCENT >0')
+    GBF2_biodiv_achieve.to_csv(
+        os.path.join(outpath, 'BIODIVERSITY_GBF2_TOP_RANK_CELL_BIO_SCORES_AND_TARGET.csv'),
+        index=False,
+        float_format='%.2f'
+    )
     
 
 

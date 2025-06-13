@@ -480,6 +480,7 @@ class LutoSolver:
             + gp.LinExpr(0)
         ) / sum([ weight_demand, weight_ghg, weight_water, weight_biodiv]) 
 
+
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
         """
         Constraint that all of every cell is used for some land use.
