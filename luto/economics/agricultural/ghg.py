@@ -704,10 +704,10 @@ def get_beef_hir_effect_g_mrj(data: Data):
     g_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses)))
 
     lvstck_penalty_r = np.zeros(data.NCELLS)
-    lvstck_penalty_r[data.HIR_MASK] = (
-        data.CO2E_STOCK_UNALL_NATURAL[data.HIR_MASK]      
+    lvstck_penalty_r = (
+        data.CO2E_STOCK_UNALL_NATURAL      
         * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU['Beef - natural land']] - 1)
-        * data.REAL_AREA[data.HIR_MASK]
+        * data.REAL_AREA
         / settings.HIR_EFFECT_YEARS    # Annualise carbon sequestration capacity to align the full grwoth span of a tree
     )
     
@@ -726,10 +726,10 @@ def get_sheep_hir_effect_g_mrj(data: Data):
     g_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses)))
 
     lvstck_penalty_r = np.zeros(data.NCELLS)
-    lvstck_penalty_r[data.HIR_MASK] = (
-        data.CO2E_STOCK_UNALL_NATURAL[data.HIR_MASK]     
+    lvstck_penalty_r = (
+        data.CO2E_STOCK_UNALL_NATURAL     
         * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU['Sheep - natural land']] - 1)
-        * data.REAL_AREA[data.HIR_MASK]
+        * data.REAL_AREA
         / settings.HIR_EFFECT_YEARS    # Annualise carbon sequestration capacity to align the full grwoth span of a tree
     )
 

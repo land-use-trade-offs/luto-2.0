@@ -724,9 +724,6 @@ class Data:
         # Non-agricultural data.
         ###############################################################
         print("\tLoading non-agricultural data...", flush=True)
-        
-        # Load HIR mask
-        self.HIR_MASK = np.load(os.path.join(settings.INPUT_DIR, "hir_mask.npy"))
 
         # Load plantings economic data
         self.EP_EST_COST_HA = pd.read_hdf(os.path.join(settings.INPUT_DIR, "ep_est_cost_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32)
@@ -1426,20 +1423,7 @@ class Data:
         self.BECCS_TCO2E_HA_YR = beccs_df['BECCS_TCO2E_HA_YR'].to_numpy()
         self.BECCS_MWH_HA_YR = beccs_df['BECCS_MWH_HA_YR'].to_numpy()
 
-
-
-        ###############################################################
-        # HIR data.
-        ###############################################################
-        print("\tLoading HIR data...", flush=True)
-        
-        self.HIR_MASK = np.load(os.path.join(settings.INPUT_DIR, "hir_mask.npy"))[self.MASK].astype(bool)
-
-
  
-        print("Data loading complete\n")     
-        
-           
 
     def get_coord(self, index_ij: np.ndarray, trans):
         """

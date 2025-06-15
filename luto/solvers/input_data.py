@@ -96,7 +96,6 @@ class SolverInputData:
     GBF8_species_indices: dict[int, float]                              # Species indices - indexed by species (s).
 
     savanna_eligible_r: np.ndarray                                      # Cells that are eligible for savanna burnining land use.
-    hir_eligible_r: np.ndarray                                          # Cells that are eligible for the HIR agricultural management option. 
     priority_degraded_mask_idx: np.ndarray                              # Mask of priority degraded areas - indexed by cell (r).
 
     economic_contr_mrj: float                                           # base year economic contribution matrix.
@@ -623,8 +622,6 @@ def get_BASE_YR_water_ML(data: Data) -> np.ndarray:
 def get_savanna_eligible_r(data: Data) -> np.ndarray:
     return np.where(data.SAVBURN_ELIGIBLE == 1)[0]
 
-def get_hir_eligible_r(data: Data) -> np.ndarray:
-    return np.where(data.HIR_MASK == 1)[0]
 
 def get_priority_degraded_mask_idx(data: Data) -> np.ndarray:
     return np.where(data.BIO_PRIORITY_DEGRADED_AREAS_MASK)[0]
@@ -869,7 +866,6 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         GBF8_species_indices=get_GBF8_species_conservation_indices(data,target_year),
 
         savanna_eligible_r=get_savanna_eligible_r(data),
-        hir_eligible_r=get_hir_eligible_r(data),
         priority_degraded_mask_idx=get_priority_degraded_mask_idx(data),
 
         economic_contr_mrj=(ag_obj_mrj, non_ag_obj_rk,  ag_man_objs),

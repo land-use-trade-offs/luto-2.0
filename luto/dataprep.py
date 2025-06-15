@@ -839,9 +839,9 @@ def create_new_dataset():
     s.to_hdf(outpath + 'hir_block_avg_t_co2_ha_yr.h5', key='hir_block_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
     
 
-    # MASK for Human Induced Regrowth; only allow planting where average annual precipitation is less than 300mm
-    hir_mask = zones['HIR_MASK'].copy().values
-    np.save(outpath + 'hir_mask.npy', hir_mask)  # shape: (6956407,)
+    # # MASK for Human Induced Regrowth; stop using HIR mask at 2025-06-16 after meeting with Carbon Market Institute (CMI)
+    # hir_mask = zones['HIR_MASK'].copy().values
+    # np.save(outpath + 'hir_mask.npy', hir_mask)  # shape: (6956407,)
 
     # Fire risk low, medium, and high and save to file
     s = bioph[['FD_RISK_PERC_5TH', 'FD_RISK_MEDIAN', 'FD_RISK_PERC_95TH']].copy()
