@@ -516,7 +516,7 @@ WATER_USE_SHARE_DOMESTIC  = 1 - WATER_USE_SHARE_AG      # Domestic share is 30% 
 LIVESTOCK_DRINKING_WATER = 1
 
 # Consider water license costs (0 [off] or 1 [on]) of land-use transition ***** If on then there is a noticeable water sell-off by irrigators in the MDB when maximising profit
-INCLUDE_WATER_LICENSE_COSTS = 0
+INCLUDE_WATER_LICENSE_COSTS = 1
 
 
 

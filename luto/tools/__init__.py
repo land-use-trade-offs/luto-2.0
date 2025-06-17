@@ -63,8 +63,10 @@ def read_timestamp():
 
 def amortise(cost, rate=settings.DISCOUNT_RATE, horizon=settings.AMORTISATION_PERIOD):
     """Return NPV of future `cost` amortised to annual value at discount `rate` over `horizon` years."""
-    if settings.AMORTISE_UPFRONT_COSTS: return -1 * npf.pmt(rate, horizon, pv=cost, fv=0, when='begin')
-    else: return cost
+    if settings.AMORTISE_UPFRONT_COSTS: 
+        return -1 * npf.pmt(rate, horizon, pv=cost, fv=0, when='begin')
+    else: 
+        return cost
 
 
 def lumap2ag_l_mrj(lumap, lmmap):
