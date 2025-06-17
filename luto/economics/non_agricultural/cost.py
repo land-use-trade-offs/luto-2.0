@@ -246,7 +246,7 @@ def get_cost_beccs(data: Data, yr_cal: int) -> np.ndarray:
     return np.nan_to_num(data.BECCS_COSTS_AUD_HA_YR) * data.BECCS_COST_MULTS[yr_cal] * data.REAL_AREA
 
 
-def get_cost_destocked(data: Data, ag_c_mrj: np.ndarray) -> np.ndarray:
+def get_cost_destocked(data: Data, yr_cal: int) -> np.ndarray:
     """
     Parameters
     ----------
@@ -255,14 +255,14 @@ def get_cost_destocked(data: Data, ag_c_mrj: np.ndarray) -> np.ndarray:
     Returns
     -------
     np.ndarray
-        Cost of maintaining destocked land for each cell. Equivalent to maintaining unallocated land.
+        Cost of maintaining destocked land for each cell. Equivalent to maintaining environmental plantings.
+    Returns
         1-D array Indexed by cell.
     """
-    unallocated_j = tools.get_unallocated_natural_land_code(data)
-    return ag_c_mrj[0, :, unallocated_j]
+    return settings.EP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR * data.MAINT_COST_MULTS[yr_cal] * data.REAL_AREA
 
 
-def get_cost_matrix(data: Data, ag_c_mrj: np.ndarray, lumap, yr_cal):
+def get_cost_matrix(data:Data, ag_c_mrj:np.ndarray, lumap:np.ndarray, yr_cal:int) -> np.ndarray:
     """
     Returns non-agricultural c_rk matrix of costs per cell and land use.
 
@@ -285,7 +285,7 @@ def get_cost_matrix(data: Data, ag_c_mrj: np.ndarray, lumap, yr_cal):
         get_cost_sheep_carbon_plantings_belt(data, yr_cal, ag_c_mrj, cp_belt_x_r),
         get_cost_beef_carbon_plantings_belt(data, yr_cal, ag_c_mrj, cp_belt_x_r),
         get_cost_beccs(data, yr_cal),                                               
-        get_cost_destocked(data, ag_c_mrj)
+        get_cost_destocked(data, yr_cal)
     ]
 
     return np.concatenate(

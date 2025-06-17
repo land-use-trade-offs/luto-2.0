@@ -450,15 +450,18 @@ def get_destocked_from_ag(
     yr_cal = data.YR_CAL_BASE + yr_idx
     cells = np.isin(lumap, data.LU_LVSTK_NATURAL)
     
-    # Establishment costs
-    pass # No establishment costs for destocked land
-
-    # Transition costs
-    ag2destock_j = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Destocked - natural land').values
-    ag_to_destock_t_r = np.vectorize(dict(enumerate(ag2destock_j)).get, otypes=['float32'])(lumap)
-    ag_to_destock_t_r = np.nan_to_num(ag_to_destock_t_r)
-    ag_to_destock_t_r = tools.amortise(ag_to_destock_t_r * data.REAL_AREA)
-    ag_to_destock_t_r[~cells] = 0.0
+    # Establishment costs; If destocking brings 30% of bio/GHG benefits, then it takes 30% of establishment costs as Environmental Plantings
+    HCAS_benefit_mult = {lu:1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu] for lu in data.LU_LVSTK_NATURAL}
+    est_costs_r = np.vectorize(HCAS_benefit_mult.get, otypes=[np.float32])(lumap) * data.EP_EST_COST_HA
+    est_costs_r = np.nan_to_num(est_costs_r)
+    est_costs_r = tools.amortise(est_costs_r * data.REAL_AREA)
+    
+    # # Transition costs
+    # ag2destock_j = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Destocked - natural land').values
+    # ag_to_destock_t_r = np.vectorize(dict(enumerate(ag2destock_j)).get, otypes=['float32'])(lumap)
+    # ag_to_destock_t_r = np.nan_to_num(ag_to_destock_t_r)
+    # ag_to_destock_t_r = tools.amortise(ag_to_destock_t_r * data.REAL_AREA)
+    # ag_to_destock_t_r[~cells] = 0.0
     
     # Water costs; Assume destocked land is dryland
     w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA
@@ -466,11 +469,11 @@ def get_destocked_from_ag(
     
     if separate:
         return {
-            'Transition cost (Ag2Non-Ag)': ag_to_destock_t_r,
+            'Establishment cost (Ag2Non-Ag)': est_costs_r,
             'Remove irrigation cost (Ag2Non-Ag)': w_rm_irrig_cost_r
         }
     else:
-        return ag_to_destock_t_r + w_rm_irrig_cost_r
+        return est_costs_r + w_rm_irrig_cost_r
     
     
 def get_transition_matrix_ag2nonag(
