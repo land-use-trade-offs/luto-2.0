@@ -1019,7 +1019,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 
     # Get the priority degraded areas score
     priority_degraded_area_score_r = xr.DataArray(
-        ag_biodiversity.get_GBF2_bio_priority_degraded_areas_r(data),
+        data.BIO_PRIORITY_DEGRADED_AREAS_R,
         dims=['cell'],
         coords={'cell':range(data.NCELLS)}
     ).chunk({'cell': min(4096, data.NCELLS)}) # Chunking to save mem use
@@ -1044,8 +1044,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     )
 
     # Get the total area of the priority degraded areas
-    total_priority_degraded_area = (data.BIO_PRIORITY_DEGRADED_AREAS_MASK * data.REAL_AREA).sum()
-    real_area_xr = xr.DataArray(data.REAL_AREA, dims=['cell'],coords={'cell': range(data.NCELLS)})
+    total_priority_degraded_area = data.BIO_PRIORITY_DEGRADED_AREAS_R.sum()
 
     GBF2_score_ag = (priority_degraded_area_score_r * ag_impact_j * ag_dvar_mrj
         ).sum(['cell','lm']

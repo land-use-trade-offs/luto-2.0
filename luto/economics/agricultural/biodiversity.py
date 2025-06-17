@@ -249,15 +249,6 @@ def get_agricultural_management_biodiversity_matrices(data:Data, ag_b_mrj: np.nd
     }
 
 
-
-def get_GBF2_bio_priority_degraded_areas_r(data:Data) -> np.ndarray:
-    return np.where(
-        data.SAVBURN_ELIGIBLE,
-        data.REAL_AREA * data.BIO_PRIORITY_DEGRADED_AREAS_MASK * settings.BIO_CONTRIBUTION_LDS ,
-        data.REAL_AREA * data.BIO_PRIORITY_DEGRADED_AREAS_MASK
-    ).astype(np.float32)
-
-
 def get_GBF3_major_vegetation_matrices_vr(data:Data) -> np.ndarray:
     return data.NVIS_LAYERS_LDS * data.REAL_AREA
 

@@ -277,7 +277,7 @@ def get_GBF2_priority_degrade_area_r(data: Data) -> np.ndarray:
     if settings.BIODIVERSITY_TARGET_GBF_2 == "off":
         return np.empty(0)
     print('Getting priority degrade area matrices...', flush = True)
-    output = ag_biodiversity.get_GBF2_bio_priority_degraded_areas_r(data)
+    output = data.BIO_PRIORITY_DEGRADED_AREAS_R
     return output
 
 def get_GBF3_MVG_area_vr(data: Data):

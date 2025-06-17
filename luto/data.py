@@ -1221,15 +1221,19 @@ class Data:
             conservation_performance_curve = pd.read_excel(os.path.join(settings.INPUT_DIR, 'BIODIVERSITY_GBF2_conservation_performance.xlsx'), sheet_name=f'ssp{settings.SSP}'
             ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
             
-            self.BIO_PRIORITY_DEGRADED_AREAS_MASK = (
-                bio_contribution_raw >= conservation_performance_curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]
+            priority_degraded_areas_mask = bio_contribution_raw >= conservation_performance_curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]
+            
+            self.BIO_PRIORITY_DEGRADED_AREAS_R = np.where(
+                self.SAVBURN_ELIGIBLE,
+                priority_degraded_areas_mask * self.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
+                priority_degraded_areas_mask * self.REAL_AREA
             )
             
-            self.BIO_PRIORITY_DEGRADED_AREAS_LY_BASE_YR = np.einsum(
+            self.BIO_PRIORITY_DEGRADED_CONTRIBUTION_WEIGHTED_AREAS_BASE_YR_R = np.einsum(
                 'j,mrj,r->r',
                 np.array(list(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values())),
                 self.AG_L_MRJ,
-                self.BIO_PRIORITY_DEGRADED_AREAS_MASK
+                self.BIO_PRIORITY_DEGRADED_AREAS_R
             )
 
         
@@ -1633,8 +1637,8 @@ class Data:
             The priority degrade areas conservation target for the given year.
         """
  
-        bio_habitat_score_baseline_sum = (self.BIO_PRIORITY_DEGRADED_AREAS_MASK * self.REAL_AREA).sum()
-        bio_habitat_score_base_yr_sum = (self.BIO_PRIORITY_DEGRADED_AREAS_LY_BASE_YR * self.REAL_AREA).sum()
+        bio_habitat_score_baseline_sum = self.BIO_PRIORITY_DEGRADED_AREAS_R.sum()
+        bio_habitat_score_base_yr_sum = self.BIO_PRIORITY_DEGRADED_CONTRIBUTION_WEIGHTED_AREAS_BASE_YR_R.sum()
         bio_habitat_score_base_yr_proportion = bio_habitat_score_base_yr_sum / bio_habitat_score_baseline_sum
 
         bio_habitat_target_proportion = [
@@ -2010,16 +2014,6 @@ class Data:
         # Return total commodity production as numpy array.
         total_q_c = ag_q_c + non_ag_q_c + ag_man_q_c
         return total_q_c
-    
-    def get_GBF2_base_yr(self) -> float:
-        """
-        Get the baseline habitat condition score for priority degraded areas conservation.
-        
-        Returns
-        -------
-        float: The baseline habitat condition score for priority degraded areas conservation.
-        """
-        return (self.BIO_PRIORITY_DEGRADED_AREAS_LY_BASE_YR * self.REAL_AREA).sum() / (self.BIO_PRIORITY_DEGRADED_AREAS_MASK * self.REAL_AREA).sum()
 
 
     def get_carbon_price_by_yr_idx(self, yr_idx: int) -> float:
