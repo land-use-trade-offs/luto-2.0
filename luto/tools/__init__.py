@@ -241,7 +241,7 @@ def get_ag_and_non_ag_natural_lu_cells(data, lumap) -> np.ndarray:
 
 def get_ag_cells(lumap) -> np.ndarray:
     """
-    Get an array containing the index of all non-agricultural cells
+    Get an array containing the index of all agricultural cells
     """
     return np.nonzero(lumap < settings.NON_AGRICULTURAL_LU_BASE_CODE)[0]
 
@@ -311,7 +311,6 @@ def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.nd
      lmmap (numpy.ndarray): Land management map.
     
     Returns
-     w_license_cost_r (numpy.ndarray) : Water license cost for each cell.
      w_rm_irrig_cost_r (numpy.ndarray) : Cost of removing irrigation for each cell.
      
      
@@ -328,12 +327,8 @@ def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.nd
     
     w_license_cost_r = w_delta_r * data.WATER_LICENCE_PRICE * data.WATER_LICENSE_COST_MULTS[yr_cal] * settings.INCLUDE_WATER_LICENSE_COSTS     # <unit: $/CELL>
     w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA                   # <unit: $/CELL>
-    
-    # Amortise upfront costs to annualised costs
-    w_license_cost_r = amortise(w_license_cost_r)
-    w_rm_irrig_cost_r = amortise(w_rm_irrig_cost_r)
-    
-    return w_license_cost_r, w_rm_irrig_cost_r
+
+    return w_rm_irrig_cost_r
 
 
 def am_name_snake_case(am_name):

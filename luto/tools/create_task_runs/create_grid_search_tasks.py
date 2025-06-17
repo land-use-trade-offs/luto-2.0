@@ -62,6 +62,10 @@ grid_search = {
     'SOLVER_WEIGHT_WATER': [1],
     'SOLVER_WEIGHT_GBF2': [1],
     
+    
+    # --------------- Economic setting ---------------
+    'AMORTISE_UPFRONT_COSTS': [False],         # True or False, if True, will amortise the upfront costs over the simulation years
+    
     # --------------- Demand settings ---------------
     'DEMAND_CONSTRAINT_TYPE': ['soft'],         # 'hard' or 'soft' 
     

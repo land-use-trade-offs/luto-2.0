@@ -67,27 +67,7 @@ def get_base_am_vars(ncells, ncms, n_ag_lus):
     return am_vars
 
 
-def lumap2ag_l_mrj(lumap, lmmap):
-    """
-    Return land-use maps in decision-variable (X_mrj) format.
-    Where 'm' is land mgt, 'r' is cell, and 'j' is agricultural land-use.
 
-    Cells used for non-agricultural land uses will have value 0 for all agricultural
-    land uses, i.e. all r.
-    """
-    # Set up a container array of shape m, r, j.
-    x_mrj = np.zeros((2, lumap.shape[0], 28), dtype=bool)   # TODO - remove 2
-
-    # Populate the 3D land-use, land mgt mask.
-    for j in range(28):
-        # One boolean map for each land use.
-        jmap = np.where(lumap == j, True, False).astype(bool)
-        # Keep only dryland version.
-        x_mrj[0, :, j] = np.where(lmmap == False, jmap, False)
-        # Keep only irrigated version.
-        x_mrj[1, :, j] = np.where(lmmap == True, jmap, False)
-
-    return x_mrj.astype(bool)
 
 
 def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
@@ -403,7 +383,7 @@ class Data:
 
         # Actual hectares per cell, including projection corrections.
         self.REAL_AREA_NO_RESFACTOR = pd.read_hdf(os.path.join(settings.INPUT_DIR, "real_area.h5")).to_numpy()
-        self.REAL_AREA = self.REAL_AREA_NO_RESFACTOR[self.MASK] * self.RESMULT
+        self.REAL_AREA = self.REAL_AREA_NO_RESFACTOR[self.MASK] * self.RESMULT  # TODO: adjusting using 
 
         # Derive NCELLS (number of spatial cells) from the area array.
         self.NCELLS = self.REAL_AREA.shape[0]
@@ -414,11 +394,10 @@ class Data:
         self.add_ag_dvars(self.YR_CAL_BASE, self.AG_L_MRJ)
 
         # Initial (2010) land-use map, mapped as lexicographic land-use class indices.
-        # self.LUMAP = self.AG_L_MRJ.sum(axis=0).argmax(axis=1).astype("int8")
         self.LU_RESFACTOR_CELLS = pd.DataFrame({
             'lu_code': list(self.DESC2AGLU.values()),
-            'res_size': [ceil((self.LUMAP_NO_RESFACTOR == lu_code).sum() / self.RESMULT) for _,lu_code in self.DESC2AGLU.items()
-            ]}).sort_values('res_size').reset_index(drop=True)
+            'res_size': [ceil((self.LUMAP_NO_RESFACTOR == lu_code).sum() / self.RESMULT) for _,lu_code in self.DESC2AGLU.items()]
+        }).sort_values('res_size').reset_index(drop=True)
         
         self.LUMAP = self.get_resfactored_lumap() if settings.RESFACTOR > 1 else self.LUMAP_NO_RESFACTOR[self.MASK]
         self.add_lumap(self.YR_CAL_BASE, self.LUMAP)
@@ -727,6 +706,8 @@ class Data:
 
         # Load plantings economic data
         self.EP_EST_COST_HA = pd.read_hdf(os.path.join(settings.INPUT_DIR, "ep_est_cost_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32)
+        self.RP_EST_COST_HA = self.EP_EST_COST_HA.copy()   # Riparian plantings have the same cost as environmental plantings
+        self.AF_EST_COST_HA = self.EP_EST_COST_HA.copy()   # Agroforestry plantings have the same cost as environmental plantings
         self.CP_EST_COST_HA = pd.read_hdf(os.path.join(settings.INPUT_DIR, "cp_est_cost_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32)
 
         # Load fire risk data (reduced carbon sequestration by this amount)
@@ -1019,7 +1000,7 @@ class Data:
         
         # Get the carbon stock of unallowcated natural land
         self.CO2E_STOCK_UNALL_NATURAL = np.array(
-            nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * fire_risk.to_numpy() / 100),
+            nat_land_CO2['NATURAL_LAND_TREES_DEBRIS_SOIL_TCO2_HA'] - (nat_land_CO2['NATURAL_LAND_AGB_DEBRIS_TCO2_HA'] * (100 - fire_risk).to_numpy() / 100),  # everyting minus the fire DAMAGE
         )
         
         
@@ -1188,12 +1169,12 @@ class Data:
 
         # Get the HCAS contribution scale (0-1)
         match settings.HABITAT_CONDITION:
-            case 'HCAS':
-                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[f'PERCENTILE_{settings.HCAS_PERCENTILE}'].to_dict()       
+            case 10 | 25 | 50 | 75 | 90:
+                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[f'PERCENTILE_{settings.HABITAT_CONDITION}'].to_dict()       
             case 'USER_DEFINED':
-                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[ 'USER_DEFINED'].to_dict()
+                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[ 'USER_DEFINED'].to_dict()       
             case _:
-                print(f"WARNING!! Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
+                print(f"WARNING!! Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be one of [10, 25, 50, 75, 90] or 'USER_DEFINED'")
         
         self.BIO_HABITAT_CONTRIBUTION_LOOK_UP = {j: round(x, settings.ROUND_DECMIALS) for j, x in bio_HCAS_contribution_lookup.items()}             # Round to the specified decimal places to avoid numerical issues in the GUROBI solver
         
@@ -1227,15 +1208,15 @@ class Data:
                 self.BIO_PRIORITY_DEGRADED_AREAS_MASK
             )
             
-            query_str = '''
-            CONNECTIVITY_SOURCE == @settings.CONNECTIVITY_SOURCE 
-            and CONNECTIVITY_LB == @settings.CONNECTIVITY_LB 
-            and TOP_RANK_CELL_AREA_COVERAGE_PERCENT == @settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT
-            and HCAS_PERCENTILE == @settings.HCAS_PERCENTILE'''.replace('\n', ' ')
+            # query_str = '''
+            # CONNECTIVITY_SOURCE == @settings.CONNECTIVITY_SOURCE 
+            # and CONNECTIVITY_LB == @settings.CONNECTIVITY_LB 
+            # and TOP_RANK_CELL_AREA_COVERAGE_PERCENT == @settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT
+            # and HCAS_PERCENTILE == @settings.HCAS_PERCENTILE'''.replace('\n', ' ')
             
-            self.BIO_GBF2_BASE_YR_SCORE_PERCENTAGE = pd.read_csv(
-                os.path.join(settings.INPUT_DIR, 'BIODIVERSITY_GBF2_TOP_RANK_CELL_BIO_SCORES_AND_TARGET.csv')
-                ).query(query_str)
+            # self.BIO_GBF2_BASE_YR_SCORE_PERCENTAGE = pd.read_csv(
+            #     os.path.join(settings.INPUT_DIR, 'BIODIVERSITY_GBF2_TOP_RANK_CELL_BIO_SCORES_AND_TARGET.csv')
+            #     ).query(query_str)
                 
                 
                 
@@ -1510,7 +1491,7 @@ class Data:
         
         """
         if settings.RESFACTOR == 1:
-            return lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)[:, self.MASK, :]
+            return tools.lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)[:, self.MASK, :]
 
         lumap_mrj = np.zeros((self.NLMS, self.NCELLS, self.N_AG_LUS), dtype=np.float32)
         for idx_lu in self.DESC2AGLU.values():
@@ -1938,7 +1919,7 @@ class Data:
             ag_man_X_mrj = self.AG_MAN_L_MRJ_DICT
             
         else:
-            ag_X_mrj = lumap2ag_l_mrj(lumap, lmmap)
+            ag_X_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
             non_ag_X_rk = lumap2non_ag_l_mk(lumap, len(settings.NON_AG_LAND_USES.keys()))
             ag_man_X_mrj = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
 

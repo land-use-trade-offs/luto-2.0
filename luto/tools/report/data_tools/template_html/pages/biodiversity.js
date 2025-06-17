@@ -3,7 +3,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Set the default color palette for Highcharts
     var colors = eval(document.getElementById("colors").innerHTML);
-    Highcharts.setOptions({colors: colors});
+    Highcharts.setOptions({ colors: colors });
 
     // Set the title alignment to left
     Highcharts.setOptions({
@@ -184,9 +184,6 @@ document.addEventListener("DOMContentLoaded", function () {
             verticalAlign: "middle",
         },
         credits: {
-            enabled: false,
-        },
-        legend: {
             enabled: false,
         },
     });

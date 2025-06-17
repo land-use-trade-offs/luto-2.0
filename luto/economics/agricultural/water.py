@@ -582,7 +582,7 @@ def get_water_net_yield_limit_for_regions_inside_LUTO(data):
         if limit < wny_limit_stress[reg_idx]:       # If the base year water net yield is lower than the historical stress limit
             print(
                 f"\t"
-                f"Water net yield limit was updated to {limit:10.2f} ML (from {wny_limit_stress[reg_idx]:10.2f} ML) for {data.WATER_REGION_NAMES[reg_idx]}"
+                f"Water net yield limit was relaxed to {limit:10.2f} ML (from {wny_limit_stress[reg_idx]:10.2f} ML) for {data.WATER_REGION_NAMES[reg_idx]}"
             )
             wny_limit_stress[reg_idx] = limit
 

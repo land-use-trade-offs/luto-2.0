@@ -25,9 +25,8 @@ Data about transitions costs.
 
 import numpy as np
 from typing import Dict
-from copy import deepcopy
 
-from luto.data import Data, lumap2ag_l_mrj
+from luto.data import Data
 from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.economics.agricultural.water import get_wreq_matrices
 import luto.economics.agricultural.ghg as ag_ghg
@@ -83,7 +82,7 @@ def get_to_ag_exclude_matrices(data: Data, lumap: np.ndarray):
     return (x_mrj * t_rj * no_go_x_mrj).astype(np.int8)
 
 
-def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray, lmmap: np.ndarray, separate=False):
+def get_transition_matrices_ag2ag(data: Data, yr_idx: int, lumap: np.ndarray, lmmap: np.ndarray, separate=False):
     """
     Calculate the transition matrices for land-use and land management transitions.
     Args:
@@ -102,7 +101,7 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
     yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Return l_mrj (Boolean) for current land-use and land management
-    l_mrj = lumap2ag_l_mrj(lumap, lmmap)
+    l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
     l_mrj_not = np.logical_not(l_mrj)
 
     # Get the exclusion matrix
@@ -149,7 +148,7 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
     # Apply the cost of carbon released by transitioning natural land to modified land
     ghg_transition = ag_ghg.get_ghg_transition_emissions(data, lumap, separate=True)        # <unit: t/ha>
     
-    # ghg_transition *= data.REAL_AREA[:, np.newaxis]                                         # <unit: $/cell>  TODO: check if this is needed
+    # ghg_transition *= data.REAL_AREA[:, np.newaxis]                                       # <unit: $/cell>  TODO: check if this is needed
     
     ghg_transition = {
         k:np.einsum('mrj,mrj,mrj->mrj', v, x_mrj, l_mrj_not).astype(np.float32)             # No GHG penalty for cells that remain the same, or are prohibited from transitioning
@@ -157,8 +156,8 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
     }
     
     ghg_transition = {
-    k:tools.amortise(v * data.get_carbon_price_by_yr_idx(yr_idx))                       # Amortise the GHG penalties
-    for k,v in ghg_transition.items()
+        k:tools.amortise(v * data.get_carbon_price_by_yr_idx(yr_idx))                       # Amortise the GHG penalties
+        for k,v in ghg_transition.items()
     }
     
     ghg_t_types = ghg_transition.keys()
@@ -173,13 +172,10 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
         return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, **ghg_transition}
     else:
         t_mrj = e_mrj + w_delta_mrj + ghg_t_mrj
-        # Ensure transition costs for destocked land cells are zero - already handled in 'non_ag_to_ag_t_mrj' in input_data.py
-        destocked_cells = tools.get_destocked_land_cells(lumap)
-        t_mrj[:, destocked_cells, :] = 0
         return t_mrj
 
 
-def get_transition_matrices_from_base_year(data: Data, yr_idx, base_year, separate=False):
+def get_transition_matrices_ag2ag_from_base_year(data: Data, yr_idx, base_year, separate=False):
     """
     Calculate the transition matrices for land-use and land management transitions.
     Args:
@@ -196,7 +192,7 @@ def get_transition_matrices_from_base_year(data: Data, yr_idx, base_year, separa
     """
     lumap = data.lumaps[base_year]
     lmmap = data.lmmaps[base_year]
-    return get_transition_matrices_from_maps(data, yr_idx, lumap, lmmap, separate)
+    return get_transition_matrices_ag2ag(data, yr_idx, lumap, lmmap, separate)
     
 
 

@@ -501,7 +501,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ag_transitions_cost_mat = {'Establishment cost': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)}
     else:
         # Get the transition cost matrices for agricultural land-use
-        ag_transitions_cost_mat = ag_transitions.get_transition_matrices_from_base_year(data, yr_idx, yr_cal_sim_pre, separate=True)
+        ag_transitions_cost_mat = ag_transitions.get_transition_matrices_ag2ag_from_base_year(data, yr_idx, yr_cal_sim_pre, separate=True)
 
     # Convert the transition cost matrices to a DataFrame
     cost_dfs = []
@@ -558,9 +558,9 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             for k in NON_AG_LAND_USES.keys()
         }
     else:
-        ag_t_mrj = ag_transitions.get_transition_matrices_from_base_year(data, yr_idx, yr_cal_sim_pre, separate=True)
-        non_ag_transitions_cost_mat = non_ag_transitions.get_from_ag_transition_matrix(
-            data,yr_idx, yr_cal_sim_pre, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], ag_t_mrj, separate=True
+        ag_t_mrj = ag_transitions.get_transition_matrices_ag2ag_from_base_year(data, yr_idx, yr_cal_sim_pre, separate=True)
+        non_ag_transitions_cost_mat = non_ag_transitions.get_transition_matrix_ag2nonag(
+            data, yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], separate=True
         )
     
     # Get all land use decision variables
@@ -615,7 +615,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         non_ag_transitions_cost_mat = {k:{'Transition cost':np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)}
                                         for k in NON_AG_LAND_USES.keys()}
     else:
-        non_ag_transitions_cost_mat = non_ag_transitions.get_to_ag_transition_matrix(data,
+        non_ag_transitions_cost_mat = non_ag_transitions.get_transition_matrix_nonag2ag(data,
                                                                                     yr_idx,
                                                                                     data.lumaps[yr_cal_sim_pre],
                                                                                     data.lmmaps[yr_cal_sim_pre],

@@ -109,7 +109,7 @@ d = {0:'Dryland', 1:'Irrigated'}
 
 # Calculate the exclude, transistions costs, and cost of production matrices
 x_mrj = ag_transition.get_to_ag_exclude_matrices(data, 2010, lumaps)
-t_mrj = ag_transition.get_transition_matrices_from_base_year(data, 20, 2010)
+t_mrj = ag_transition.get_transition_matrices_ag2ag_from_base_year(data, 20, 2010)
 gct_mrj = get_ghg_transition_emissions(data, lumap) * data.get_carbon_price_by_yr_idx(0)
 c_mrj = ag_cost.get_cost_matrices(data, 0, lumap) - gct_mrj
 r_mrj = ag_revenue.get_rev_matrices(data, 0)

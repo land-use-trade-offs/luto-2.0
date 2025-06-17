@@ -259,12 +259,11 @@ EP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 EP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
 # Carbon Plantings Block Parameters
-CP_BLOCK_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
+CP_BLOCK_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 CP_BLOCK_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
-
 # Carbon Plantings Belt Parameters
-CP_BELT_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
+CP_BELT_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 CP_BELT_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
 CP_BELT_ROW_WIDTH = 20
@@ -274,14 +273,14 @@ cp_no_alleys_per_ha = 100 / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
 CP_BELT_FENCING_LENGTH = 100 * cp_no_alleys_per_ha * 2     # Length (average) of fencing required per ha in metres
 
 # Riparian Planting Parameters
-RP_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
+RP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 RP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
 RIPARIAN_PLANTING_BUFFER_WIDTH = 30
 RIPARIAN_PLANTING_TORTUOSITY_FACTOR = 0.5
 
 # Agroforestry Parameters
-AF_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
+AF_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 AF_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
 AGROFORESTRY_ROW_WIDTH = 20
@@ -289,6 +288,12 @@ AGROFORESTRY_ROW_SPACING = 40
 AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
 no_belts_per_ha = 100 / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
 AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per ha in metres
+
+# Destocked natural land Parameters
+#   NOTE: Must be the same as F38/F44 in the 'luto/input/transitions_costs_********.xlsx' file
+DESTOCKED_COST_REMOVING_PREVIOUS_LIVESTOCK_HA = 1500
+DESTOCKED_COST_ESTABLISHING_NATURAL_HA = 2000
+
 
 
 
@@ -537,7 +542,7 @@ GBF2_TARGETS_DICT = {
 }
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-BIODIVERSTIY_TARGET_GBF_2 = 'medium'            # 'off', 'low', 'medium', 'high', or 'USER_DEFINED'
+BIODIVERSTIY_TARGET_GBF_2 = 'medium'            # 'off', 'low', 'medium', or 'high'
 '''
 Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -586,23 +591,15 @@ I.e., the lower bound of the connectivity score for weighting the raw biodiversi
 
 
 # Habitat condition data source
-HABITAT_CONDITION = 'HCAS'                  # 'HCAS', 'USER_DEFINED', or 'NONE'
+HABITAT_CONDITION = 'USER_DEFINED'                  # One of [10, 25, 50, 75, 90], or 'NONE'
 '''
-Used to calculate the level of degradation of biodiversity under agricultural land uses (i.e., multiplier of the impact of ag on biodiversity).
-- If 'HCAS' is selected, the habitat condition is calculated using the Habitat Condition Assessment System (HCAS)
-- If 'USER_DEFINED' is selected, the habitat condition is calculated using the user defined values in the 'HCAS_USER_DEFINED' dictionary.
-'''
-
-
-# HCAS percentile for each land-use type
-HCAS_PERCENTILE = 50
-''' 
 Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the
 suitability for wild animals ranging between 0-1) for each land-use type.Avaliable percentiles is one of [10, 25, 50, 75, 90].
 
 For example, the 50th percentile for 'Beef - Modified land' is 0.22, meaning this land retains 22% biodiversity score compared
 to undisturbed natural land.
 '''
+
 
 # Biodiversity value under default late dry season savanna fire regime
 BIO_CONTRIBUTION_LDS = 0.8
