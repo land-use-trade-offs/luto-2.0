@@ -63,7 +63,7 @@ plot_landscape_profit = (
     ) +
     p9.geom_point(size=3,stroke=0) +
     p9.theme_bw() +
-    # p9.facet_grid('GHG_EMISSIONS_LIMITS~BIODIVERSTIY_TARGET_GBF_2') +
+    # p9.facet_grid('GHG_EMISSIONS_LIMITS~BIODIVERSITY_TARGET_GBF_2') +
     p9.theme(
         strip_text=p9.element_text(size=8), 
         legend_position='bottom',

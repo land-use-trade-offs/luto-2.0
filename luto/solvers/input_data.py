@@ -274,7 +274,7 @@ def get_ag_man_biodiv_impacts(data: Data, target_year: int) -> dict[str, dict[st
     return ag_biodiversity.get_ag_management_biodiversity_contribution(data, target_year)
 
 def get_GBF2_priority_degrade_area_r(data: Data) -> np.ndarray:
-    if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
+    if settings.BIODIVERSITY_TARGET_GBF_2 == "off":
         return np.empty(0)
     print('Getting priority degrade area matrices...', flush = True)
     output = ag_biodiversity.get_GBF2_bio_priority_degraded_areas_r(data)
@@ -596,7 +596,7 @@ def get_BASE_YR_overall_bio_value(data: Data):
     return np.einsum('mrj,mrj->', ag_b_mrj, data.AG_L_MRJ)
 
 def get_BASE_YR_GBF2_score(data: Data) -> np.ndarray:
-    if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
+    if settings.BIODIVERSITY_TARGET_GBF_2 == "off":
         return np.empty(0)
     print('Getting priority degrade area base year score...', flush = True)
     GBF2_ly_r = get_GBF2_priority_degrade_area_r(data)
@@ -662,7 +662,7 @@ def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
     if settings.GHG_EMISSIONS_LIMITS != 'off':
         limits['ghg'] = data.GHG_TARGETS[yr_cal]
 
-    if settings.BIODIVERSTIY_TARGET_GBF_2 != 'off':
+    if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
         limits["GBF2_priority_degrade_areas"] = data.get_GBF2_target_for_yr_cal(yr_cal)
 
     if settings.BIODIVERSTIY_TARGET_GBF_3 != 'off':
@@ -720,7 +720,7 @@ def set_limits(data: Data, yr_cal) -> None:
     if settings.GHG_EMISSIONS_LIMITS != 'off':
         limit_GHG = pd.DataFrame([{'Type': 'GHG', 'target': data.GHG_TARGETS[yr_cal]}])
         
-    if settings.BIODIVERSTIY_TARGET_GBF_2 != 'off':
+    if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
         limit_GBF_2= pd.DataFrame([{'Type': 'GBF-2',  'target': data.get_GBF2_target_for_yr_cal(yr_cal)}])
 
     if settings.BIODIVERSTIY_TARGET_GBF_3 != 'off':

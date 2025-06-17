@@ -869,7 +869,7 @@ class LutoSolver:
 
     def _add_GBF2_priority_degrade_areas_constraints(self) -> None:
         
-        if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
+        if settings.BIODIVERSITY_TARGET_GBF_2 == "off":
             print("    ...Biodiversity GBF 2 (conservation priority) constraints TURNED OFF ...")
             return
 
@@ -1747,7 +1747,7 @@ class LutoSolver:
                 "GHG Deviation (tCO2e)":            (self.E.X                                                                        if settings.GHG_CONSTRAINT_TYPE == "soft" else 0),
                 "GHG Penalty":                      (self.penalty_ghg.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA)                 if settings.GHG_CONSTRAINT_TYPE == "soft" else 0),
             
-                "BIO (GBF2) value (ha)":            (0                                                                               if settings.BIODIVERSTIY_TARGET_GBF_2 == "off" else self.bio_GBF2_priority_degraded_area_expr.getValue()),
+                "BIO (GBF2) value (ha)":            (0                                                                               if settings.BIODIVERSITY_TARGET_GBF_2 == "off" else self.bio_GBF2_priority_degraded_area_expr.getValue()),
                 "BIO (GBF2) Deviation (ha)":        (self.B.X                                                                        if settings.GBF2_CONSTRAINT_TYPE == "soft" else 0),
                 "BIO (GBF2) Penalty":               (self.penalty_biodiv.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA)              if settings.GBF2_CONSTRAINT_TYPE == "soft" else 0),
                 "BIO (GBF3) value (ha)":            (0                                                                               if settings.BIODIVERSTIY_TARGET_GBF_3 == "off" else {k: v.getValue() for k,v in self.bio_GBF3_major_vegetation_exprs.items()}),
