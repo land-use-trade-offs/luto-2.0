@@ -1169,7 +1169,7 @@ class Data:
         """
 
         biodiv_raw = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5'), where=self.MASK)
-        biodiv_contribution_lookup = pd.read_csv(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv'))                              # TODO: rename: degrade -> AG_BIO_CONTRIBUTION
+        biodiv_contribution_lookup = pd.read_csv(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv'))                              
         
         
         # ------------- Biodiversity priority scores for maximising overall biodiversity conservation in Australia ----------------------------
