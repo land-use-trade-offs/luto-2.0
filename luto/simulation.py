@@ -57,7 +57,8 @@ def load_data() -> Data:
     Load the Data object containing all required data to run a LUTO simulation.
     """
     # Thread to log memory usage
-    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'w',1), daemon=True)
+    stop_event = threading.Event()
+    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'w',1, stop_event))
     memory_thread.start()
     
     # Remove previous log files
@@ -66,6 +67,10 @@ def load_data() -> Data:
             [os.remove(f) if  not read_timestamp() in f else None]
         except:
             print(f"Error removing file {f}")
+            
+    # Signal the logging thread to stop and wait for it to finish
+    stop_event.set()
+    memory_thread.join()
 
     return Data()
 
@@ -84,7 +89,8 @@ def run(
             use the default years from settings.SIM_YEARS.
     """
     # Start recording memory usage
-    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1), daemon=True)
+    stop_event = threading.Event()
+    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1, stop_event))
     memory_thread.start()
     
     
@@ -100,6 +106,10 @@ def run(
     # Solve and write output
     solve_timeseries(data, years)
     write_outputs(data)
+    
+    # Signal the logging thread to stop and wait for it to finish
+    stop_event.set()
+    memory_thread.join()
     
 
 

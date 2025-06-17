@@ -67,11 +67,18 @@ timestamp = tools.write_timestamp()
           
 def write_outputs(data: Data):
     """Write model outputs to file"""
-    memory_thread = threading.Thread(target=tools.log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1), daemon=True)
+    
+   # Start recording memory usage
+    stop_event = threading.Event()
+    memory_thread = threading.Thread(target=tools.log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1, stop_event))
     memory_thread.start()
     
     write_data(data)
     move_logs(data)
+    
+    # Signal the logging thread to stop and wait for it to finish
+    stop_event.set()
+    memory_thread.join()
 
 
 

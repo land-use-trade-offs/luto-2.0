@@ -627,7 +627,7 @@ def get_hir_eligible_r(data: Data) -> np.ndarray:
     return np.where(data.HIR_MASK == 1)[0]
 
 def get_priority_degraded_mask_idx(data: Data) -> np.ndarray:
-    return np.where(data.BIO_PRIORITY_DEGRADED_AREAS_MASK)[0]
+    return np.where(data.BIO_PRIORITY_DEGRADED_AREAS_R)[0]
 
 
 def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:

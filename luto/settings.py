@@ -542,7 +542,7 @@ GBF2_TARGETS_DICT = {
 }
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-BIODIVERSITY_TARGET_GBF_2 = 'medium'            # 'off', 'low', 'medium', or 'high'
+BIODIVERSITY_TARGET_GBF_2 = 'high'            # 'off', 'low', 'medium', or 'high'
 '''
 Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -554,7 +554,7 @@ in order to enhance biodiversity and ecosystem functions and services, ecologica
 '''
 
 
-GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
+GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 50
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 
