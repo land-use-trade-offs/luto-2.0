@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250618_RES3_CMI' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250618_RES10_CMI' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -45,7 +45,7 @@ grid_search = {
     # Working settings for the model run
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                         # 'maxprofit' or 'mincost'
-    'RESFACTOR': [3],
+    'RESFACTOR': [10],
     'SIM_YEARS': [list(range(2020,2051,5))],                            # Years to run the model 
     'WRITE_THREADS': [2],
     'WRITE_OUTPUT_GEOTIFFS': [True],
@@ -88,7 +88,7 @@ grid_search = {
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSITY_TARGET_GBF_2': ['off', 'medium', 'high'],             # 'off', 'low', 'medium', 'high'
+    'BIODIVERSITY_TARGET_GBF_2': ['low', 'medium', 'high'],             # 'off', 'low', 'medium', 'high'
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                   # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------

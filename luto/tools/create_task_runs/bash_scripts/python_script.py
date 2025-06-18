@@ -39,11 +39,6 @@ write_outputs(data)
 '''
 KEEP_OUTPUTS is not originally defined in the settings, but will be added by `create_gridu_search_task.py`.
 '''
-# Thread to log memory usage
-stop_event = threading.Event()
-memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a', 1, stop_event), daemon=True)
-memory_thread.start()
-
 
 if settings.KEEP_OUTPUTS:
     
@@ -77,10 +72,3 @@ else:
             except Exception as e:
                 print(f"Failed to delete {item}. Reason: {e}")
                 
-                
-# Signal the logging thread to stop
-stop_event.set()
-memory_thread.join()
-                
-    
-    
