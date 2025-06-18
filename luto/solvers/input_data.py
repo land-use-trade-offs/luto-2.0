@@ -627,6 +627,8 @@ def get_hir_eligible_r(data: Data) -> np.ndarray:
     return np.where(data.HIR_MASK == 1)[0]
 
 def get_priority_degraded_mask_idx(data: Data) -> np.ndarray:
+    if settings.BIODIVERSITY_TARGET_GBF_2 == "off":
+        return np.empty(0)
     return np.where(data.BIO_PRIORITY_DEGRADED_AREAS_R)[0]
 
 

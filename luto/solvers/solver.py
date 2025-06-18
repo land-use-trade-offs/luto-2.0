@@ -197,7 +197,7 @@ class LutoSolver:
                 self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
                     lb=x_lb,
                     ub=self._input_data.non_ag_x_rk[r, k],
-                    name=f"X_non_ag_{k}_{r}",
+                    name=f"X_non_ag_{k}_{r}".replace(" ", "_")
                 )
 
     def _setup_ag_management_variables(self):
@@ -250,7 +250,7 @@ class LutoSolver:
                     self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                         lb=dry_x_lb,
                         ub=1,
-                        name=f"X_ag_man_dry_{am_name}_{j}_{r}",
+                        name=f"X_ag_man_dry_{am_name}_{j}_{r}".replace(" ", "_"),
                     )
                 
                 for r in irr_lu_cells:
@@ -262,7 +262,7 @@ class LutoSolver:
                     self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                         lb=irr_x_lb,
                         ub=1,
-                        name=f"X_ag_man_irr_{am_name}_{j}_{r}",
+                        name=f"X_ag_man_irr_{am_name}_{j}_{r}".replace(" ", "_"),
                     )
 
     def _setup_deviation_penalties(self):
@@ -533,14 +533,14 @@ class LutoSolver:
                     constr = self.gurobi_model.addConstr(
                         self.X_ag_man_dry_vars_jr[am][j_idx, r]
                         <= self.X_ag_dry_vars_jr[j, r],
-                        name=f"const_ag_mam_dry_usage_{am}_{j}_{r}",
+                        name=f"const_ag_mam_dry_usage_{am}_{j}_{r}".replace(" ", "_"),
                     )
                     self.ag_management_constraints_r[r].append(constr)
                 for r in lm_irr_r_vals:
                     constr = self.gurobi_model.addConstr(
                         self.X_ag_man_irr_vars_jr[am][j_idx, r]
                         <= self.X_ag_irr_vars_jr[j, r],
-                        name=f"const_ag_mam_irr_usage_{am}_{j}_{r}",
+                        name=f"const_ag_mam_irr_usage_{am}_{j}_{r}".replace(" ", "_"),
                     )
                     self.ag_management_constraints_r[r].append(constr)
 
@@ -564,7 +564,7 @@ class LutoSolver:
                 )
                 constr = self.gurobi_model.addConstr(
                     ag_man_vars_sum <= adoption_limit * all_vars_sum,
-                    name=f"const_ag_mam_adoption_limit_{am}_{j}",
+                    name=f"const_ag_mam_adoption_limit_{am}_{j}".replace(" ", "_"),
                 )
 
                 self.adoption_limit_constraints.append(constr)
@@ -749,12 +749,12 @@ class LutoSolver:
             if settings.WATER_CONSTRAINT_TYPE == "hard":
                 constr = self.gurobi_model.addConstr(
                     self.water_nyiled_exprs[reg_idx] >= water_limit, 
-                    name=f"water_yield_limit_{reg_idx}"
+                    name=f"water_yield_limit_{reg_name}".replace(" ", "_")
                 )
             elif settings.WATER_CONSTRAINT_TYPE == "soft":
                 constr = self.gurobi_model.addConstr(
                     water_limit - self.water_nyiled_exprs[reg_idx] <= self.W[reg_idx - 1],     # region index starts from 1
-                    name=f"water_yield_limit_{reg_idx}"     
+                    name=f"water_yield_limit_{reg_name.replace(' ', '_')}"
                 )
             else:
                 raise ValueError(
@@ -1011,7 +1011,7 @@ class LutoSolver:
             print(f"       |-- target is {v_area_lb:15,.0f} for {v_names[v]} ")
             self.bio_GBF3_major_vegetation_limit_constraints[v] = self.gurobi_model.addConstr(
                 self.bio_GBF3_major_vegetation_exprs[v] >= 1,
-                name=f"bio_GBF3_major_vegetation_limit_{v}",
+                name=f"bio_GBF3_major_vegetation_limit_{v_names[v]}".replace(" ", "_")
             )
 
 
@@ -1076,7 +1076,7 @@ class LutoSolver:
             print(f"       |-- target is {x_area_lb:15,.0f} for {x_names[x]}")
             self.bio_GBF4_SNES_constrs[x] = self.gurobi_model.addConstr(
                 self.bio_GBF4_SNES_exprs[x] >= 1,
-                name=f"bio_GBF4_SNES_limit_{x}",
+                name=f"bio_GBF4_SNES_limit_{x_names[x]}".replace(" ", "_"),
             )
 
     def _add_GBF4_ecnes_constraints(self) -> None:
@@ -1141,7 +1141,7 @@ class LutoSolver:
             print(f"       |-- target is {x_area_lb:15,.0f} for {x_names[x]} ")
             self.bio_GBF4_ECNES_constrs[x] = self.gurobi_model.addConstr(
                 self.bio_GBF4_ECNES_exprs[x] >= 1,
-                name=f"bio_GBF4_ECNES_limit_{x}",
+                name=f"bio_GBF4_ECNES_limit_{x_names[x]}".replace(" ", "_")
             )
 
 
@@ -1206,7 +1206,7 @@ class LutoSolver:
             print(f"       |-- target is {s_area_lb:15,.0f} for {s_names[s]}")
             self.bio_GBF8_species_conservation_constrs[s] = self.gurobi_model.addConstr(
                 self.bio_GBF8_species_conservation_exprs[s] >= 1,
-                name=f"bio_GBF8_species_conservation_limit_{s}",
+                name=f"bio_GBF8_species_conservation_limit_{s_names[s]}".replace(" ", "_"),
             )
 
         
