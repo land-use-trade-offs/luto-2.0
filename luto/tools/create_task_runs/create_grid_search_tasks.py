@@ -92,11 +92,11 @@ grid_search = {
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                   # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
-    'BIODIVERSTIY_TARGET_GBF_3': ['off'],                            # 'off', 'medium', 'high', 'USER_DEFINED'
+    'BIODIVERSTIY_TARGET_GBF_3': ['off'],                               # 'off', 'medium', 'high', 'USER_DEFINED'
     
     # --------------- Biodiversity settings - GBF 4 ---------------
-    'BIODIVERSTIY_TARGET_GBF_4_SNES': ['off'],                           # 'on' or 'off'.
-    'BIODIVERSTIY_TARGET_GBF_4_ECNES': ['off'],                          # 'on' or 'off'.
+    'BIODIVERSTIY_TARGET_GBF_4_SNES': ['off'],                          # 'on' or 'off'.
+    'BIODIVERSTIY_TARGET_GBF_4_ECNES': ['off'],                         # 'on' or 'off'.
 
     # --------------- Biodiversity settings - GBF 8 ---------------
     'BIODIVERSTIY_TARGET_GBF_8': ['off'],       # 'on' or 'off'
@@ -105,7 +105,7 @@ grid_search = {
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
-    'SOLVE_WEIGHT_ALPHA': [1],                  # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
+    'SOLVE_WEIGHT_ALPHA': [1],                                          # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
     'SOLVE_WEIGHT_BETA': [0.9],         
     
     

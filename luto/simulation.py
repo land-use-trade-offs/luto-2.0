@@ -170,7 +170,7 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
 
 
 
-def save_data_to_disk(data: Data, path: str, compress_level=9) -> None:
+def save_data_to_disk(data: Data, path: str, compress_level=6) -> None:
     """Save the Data object to disk with gzip compression.
     Arguments:
         data: `Data` object.

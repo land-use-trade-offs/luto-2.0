@@ -41,7 +41,7 @@ KEEP_OUTPUTS is not originally defined in the settings, but will be added by `cr
 '''
 # Thread to log memory usage
 stop_event = threading.Event()
-memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'w',1, stop_event))
+memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a', 1, stop_event))
 memory_thread.start()
 
 
@@ -51,6 +51,10 @@ if settings.KEEP_OUTPUTS:
     sim.save_data_to_disk(data, f"{data.path}/DATA_REPORT/Data_RES{settings.RESFACTOR}.gz")
     
 else:
+    
+    data = None  # Clear the data object to free memory
+    sim = None   # Clear the simulation module to free memory
+    
     report_dir = f"{data.path}/DATA_REPORT"
     archive_path ='./DATA_REPORT.zip'
     
