@@ -41,8 +41,11 @@ if settings.KEEP_OUTPUTS:
     
     # Save the data object to disk
     sim.save_data_to_disk(data, f"{data.path}/DATA_REPORT/Data_RES{settings.RESFACTOR}.gz")
-    
+ 
 else:
+    data = None     # Clear the data object to free up memory
+    sim = None      # Clear the simulation module to free up memory
+    
     report_dir = f"{data.path}/DATA_REPORT"
     archive_path ='./DATA_REPORT.zip'
     

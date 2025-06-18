@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250611_RES3_DCCEEW' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250617_RES13_NEW_TRANS_COST' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -35,26 +35,46 @@ grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['160GB'],
-    'NCPUS':[40],
-    'TIME': ['6:00:00'],
+    'MEM': ['64GB'],
+    'NCPUS':[16],
+    'TIME': ['1:00:00'],
     'QUEUE': ['normalsr'],
     
  
     ###############################################################
     # Working settings for the model run
     ###############################################################
-    'OBJECTIVE': ['maxprofit'],                 # 'maxprofit' or 'mincost'
-    'RESFACTOR': [3],
-    'SIM_YEARS': [list(range(2020,2051,5))],   # Years to run the model 
+    'OBJECTIVE': ['maxprofit'],                                         # 'maxprofit' or 'mincost'
+    'RESFACTOR': [13],
+    'SIM_YEARS': [list(range(2020,2051,5))],                            # Years to run the model 
     'WRITE_THREADS': [2],
     'WRITE_OUTPUT_GEOTIFFS': [True],
-    'KEEP_OUTPUTS': [True],                    # If False, only keep report HTML
+    'KEEP_OUTPUTS': [False],                                            # If False, only keep report HTML
     
  
     ###############################################################
     # Model run settings
     ###############################################################
+
+    # --------------- Economic setting ---------------
+    'AMORTISE_UPFRONT_COSTS': [False],                                  # True or False, if True, will amortise the upfront costs over the simulation years
+    
+    # --------------- Demand settings ---------------
+    'DEMAND_CONSTRAINT_TYPE': ['soft'],                                 # 'hard' or 'soft' 
+       
+    # --------------- GHG settings ---------------
+    'GHG_EMISSIONS_LIMITS': ['low', 'high'],                            # 'off', 'low', 'medium', 'high'
+    'CARBON_PRICES_FIELD': ['CONSTANT'],
+    'GHG_CONSTRAINT_TYPE': ['hard'],                                    # 'hard' or 'soft'
+    'USE_GHG_SCOPE_1': [True],                                          # True or False
+
+    # --------------- Water constraints ---------------
+    'WATER_LIMITS': ['on'],                                             # 'on' or 'off'
+    'WATER_CONSTRAINT_TYPE': ['hard'],                                  # 'hard' or 'soft'
+    'INCLUDE_WATER_LICENSE_COSTS': [1],
+    
+    # ---------- Excluding no-go land use---------------
+    'EXCLUDE_NO_GO_LU': [False],                                        # True or False
     
     # --------------- Target deviation weight ---------------
     'SOLVER_WEIGHT_DEMAND': [1], 
@@ -62,48 +82,24 @@ grid_search = {
     'SOLVER_WEIGHT_WATER': [1],
     'SOLVER_WEIGHT_GBF2': [1],
     
-    
-    # --------------- Economic setting ---------------
-    'AMORTISE_UPFRONT_COSTS': [False],         # True or False, if True, will amortise the upfront costs over the simulation years
-    
-    # --------------- Demand settings ---------------
-    'DEMAND_CONSTRAINT_TYPE': ['soft'],         # 'hard' or 'soft' 
-    
-    # --------------- Land use settings ---------------
-    'EXCLUDE_NO_GO_LU': [False],         # True or False
-       
-    
-    # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['medium'],              # 'off', 'low', 'medium', 'high'
-    'CARBON_PRICES_FIELD': ['CONSTANT'],
-    'GHG_CONSTRAINT_TYPE': ['hard'],                                # 'hard' or 'soft'
-    'USE_GHG_SCOPE_1': [True],                                      # True or False
-
-    
-    # --------------- Water constraints ---------------
-    'WATER_LIMITS': ['on'],                                         # 'on' or 'off'
-    'WATER_CONSTRAINT_TYPE': ['hard'],                              # 'hard' or 'soft'
-    'WATER_PENALTY': [1e-5],
-    'INCLUDE_WATER_LICENSE_COSTS': [1],
-    
     # --------------- Biodiversity overall ---------------
-    'HABITAT_CONDITION': ['HCAS'],                
-    'CONNECTIVITY_SOURCE': ['NCI'],
+    'HABITAT_CONDITION': ['USER_DEFINED'],                              # One of [10, 25, 50, 75, 90], or 'NONE' 
+    'CONNECTIVITY_SOURCE': ['DCCEEW_NCI'],                              # 'DCCEEW_NCI', 'NATURAL_AREA_CONNECTIVITY' or 'NONE'
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSTIY_TARGET_GBF_2': ['medium'],                        # 'off', 'low', 'medium', 'high'
-    'GBF2_CONSTRAINT_TYPE': ['hard'],                               # 'hard' or 'soft'
+    'BIODIVERSTIY_TARGET_GBF_2': ['medium', 'high'],                    # 'off', 'low', 'medium', 'high'
+    'GBF2_CONSTRAINT_TYPE': ['hard'],                                   # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
-    'BIODIVERSTIY_TARGET_GBF_3': ['medium'],                        # 'off', 'medium', 'high', 'USER_DEFINED'
+    'BIODIVERSTIY_TARGET_GBF_3': ['off'],                               # 'off', 'medium', 'high', 'USER_DEFINED'
     
     # --------------- Biodiversity settings - GBF 4 ---------------
-    'BIODIVERSTIY_TARGET_GBF_4_SNES' : ['on'],                      # 'on' or 'off'.
-    'BIODIVERSTIY_TARGET_GBF_4_ECNES' : ['on'],                     # 'on' or 'off'.
+    'BIODIVERSTIY_TARGET_GBF_4_SNES' : ['off'],                         # 'on' or 'off'.
+    'BIODIVERSTIY_TARGET_GBF_4_ECNES' : ['off'],                        # 'on' or 'off'.
     
     # --------------- Biodiversity settings - GBF 8 ---------------
-    'BIODIVERSTIY_TARGET_GBF_8': ['on'],                            # 'on' or 'off'
+    'BIODIVERSTIY_TARGET_GBF_8': ['off'],                               # 'on' or 'off'
 
  
     ###############################################################
@@ -141,5 +137,5 @@ if __name__ == '__main__':
     # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
 
     # 2) Submit task to multiple linux computation nodes
-    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 300)
+    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 100)
 
