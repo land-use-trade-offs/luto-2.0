@@ -61,10 +61,12 @@ def load_data() -> Data:
     memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'w',1, stop_event), daemon=True)
     memory_thread.start()
     
+    data = Data()
+    
     # Remove previous log files
     for f in glob(f'{settings.OUTPUT_DIR}/*.log') + glob(f'{settings.OUTPUT_DIR}/*.txt'):
         try:
-            [os.remove(f) if  not read_timestamp() in f else None]
+            [os.remove(f) if not read_timestamp() in f else None]
         except:
             print(f"Error removing file {f}")
             
@@ -72,7 +74,7 @@ def load_data() -> Data:
     stop_event.set()
     memory_thread.join()
 
-    return Data()
+    return data
 
 
 @LogToFile(f"{settings.OUTPUT_DIR}/run_{read_timestamp()}", 'a')
