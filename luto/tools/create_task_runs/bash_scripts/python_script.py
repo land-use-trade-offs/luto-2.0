@@ -19,9 +19,12 @@
 
 import os
 import shutil
+import threading
 import zipfile
 import luto.simulation as sim
 import luto.settings as settings
+
+from luto.tools import log_memory_usage
 from luto.tools.write import write_outputs
 
 
@@ -34,8 +37,13 @@ write_outputs(data)
 
 # Remove all files except the report directory if settings.KEEP_OUTPUTS is False
 '''
-KEEP_OUTPUTS is not originally defined in the settings, but will be added in the `luto/tools/create_task_runs/create_running_tasks.py` file.
+KEEP_OUTPUTS is not originally defined in the settings, but will be added by `create_gridu_search_task.py`.
 '''
+# Thread to log memory usage
+stop_event = threading.Event()
+memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'w',1, stop_event))
+memory_thread.start()
+
 
 if settings.KEEP_OUTPUTS:
     
@@ -64,6 +72,11 @@ else:
                     shutil.rmtree(item)  # Remove the directory
             except Exception as e:
                 print(f"Failed to delete {item}. Reason: {e}")
+                
+                
+# Signal the logging thread to stop
+stop_event.set()
+memory_thread.join()
                 
     
     
