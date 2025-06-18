@@ -58,7 +58,7 @@ def load_data() -> Data:
     """
     # Thread to log memory usage
     stop_event = threading.Event()
-    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'w',1, stop_event))
+    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'w',1, stop_event), daemon=True)
     memory_thread.start()
     
     # Remove previous log files
@@ -90,7 +90,7 @@ def run(
     """
     # Start recording memory usage
     stop_event = threading.Event()
-    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1, stop_event))
+    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1, stop_event), daemon=True)
     memory_thread.start()
     
     

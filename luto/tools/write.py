@@ -70,7 +70,7 @@ def write_outputs(data: Data):
     
    # Start recording memory usage
     stop_event = threading.Event()
-    memory_thread = threading.Thread(target=tools.log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1, stop_event))
+    memory_thread = threading.Thread(target=tools.log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1, stop_event), daemon=True)
     memory_thread.start()
     
     write_data(data)

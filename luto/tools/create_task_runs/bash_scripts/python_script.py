@@ -41,7 +41,7 @@ KEEP_OUTPUTS is not originally defined in the settings, but will be added by `cr
 '''
 # Thread to log memory usage
 stop_event = threading.Event()
-memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a', 1, stop_event))
+memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a', 1, stop_event), daemon=True)
 memory_thread.start()
 
 
