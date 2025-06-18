@@ -289,13 +289,6 @@ AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_
 no_belts_per_ha = 100 / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
 AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per ha in metres
 
-# Destocked natural land Parameters
-#   NOTE: Must be the same as F38/F44 in the 'luto/input/transitions_costs_********.xlsx' file
-DESTOCKED_COST_REMOVING_PREVIOUS_LIVESTOCK_HA = 1500
-DESTOCKED_COST_ESTABLISHING_NATURAL_HA = 2000
-
-
-
 
 # ---------------------------------------------------------------------------- #
 # Agricultural management parameters

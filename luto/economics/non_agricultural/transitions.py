@@ -340,7 +340,9 @@ def get_beccs_from_ag(data, yr_idx, lumap, w_license_cost_r, w_rm_irrig_cost_r, 
 
 
 
-def get_destocked_from_ag(data: Data, ag_t_mrj: np.ndarray | dict, separate: bool = False) -> np.ndarray | dict:
+def get_destocked_from_ag(
+    data: Data, yr_idx, lumap, lmmap, separate=False
+) -> np.ndarray | dict:
     """
     Get transition costs from agricultural land uses to destocked land for each cell.
 
@@ -353,20 +355,33 @@ def get_destocked_from_ag(data: Data, ag_t_mrj: np.ndarray | dict, separate: boo
         dict
             Separated dictionary of transition cost arrays.
     """
-    unallocated_j = tools.get_unallocated_natural_land_code(data)
-
-    if separate == False:
-        return ag_t_mrj[0, :, unallocated_j]
+    yr_cal = data.YR_CAL_BASE + yr_idx
+    cells = np.isin(lumap, data.LU_LVSTK_NATURAL)
     
-    elif separate == True:
+    # Establishment costs; If destocking brings 30% of bio/GHG benefits, then it takes 30% of establishment costs as Environmental Plantings
+    HCAS_benefit_mult = {lu:1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[lu] for lu in data.LU_LVSTK_NATURAL}
+    est_costs_r = np.vectorize(HCAS_benefit_mult.get, otypes=[np.float32])(lumap) * data.EP_EST_COST_HA
+    est_costs_r = np.nan_to_num(est_costs_r)
+    est_costs_r = tools.amortise(est_costs_r * data.REAL_AREA)
+    
+    # # Transition costs
+    # ag2destock_j = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Destocked - natural land').values
+    # ag_to_destock_t_r = np.vectorize(dict(enumerate(ag2destock_j)).get, otypes=['float32'])(lumap)
+    # ag_to_destock_t_r = np.nan_to_num(ag_to_destock_t_r)
+    # ag_to_destock_t_r = tools.amortise(ag_to_destock_t_r * data.REAL_AREA)
+    # ag_to_destock_t_r[~cells] = 0.0
+    
+    # Water costs; Assume destocked land is dryland
+    w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA
+    w_rm_irrig_cost_r[~cells] = 0.0
+    
+    if separate:
         return {
-            k: v[0, :, unallocated_j] for k, v in ag_t_mrj.items()
+            'Establishment cost (Ag2Non-Ag)': est_costs_r,
+            'Remove irrigation cost (Ag2Non-Ag)': w_rm_irrig_cost_r
         }
-
-    raise ValueError(
-        f"Incorrect value for 'separate' when calling get_destocked_from_ag: {separate}. "
-        f"should be either True or False."
-    )
+    else:
+        return est_costs_r + w_rm_irrig_cost_r
 
 
 def get_from_ag_transition_matrix(
@@ -424,7 +439,7 @@ def get_from_ag_transition_matrix(
     beef_carbon_plantings_belt_transitions_from_ag = get_beef_carbon_plantings_belt_from_ag( data, cp_belt_x_r, cp_belt_costs, ag_t_costs, lumap, separate)         # Base CP transition plus CP fencing costs + beef grazing
     
     beccs_transitions_from_ag = get_beccs_from_ag(data, yr_idx, lumap, w_license_cost_r, w_rm_irrig_cost_r, separate)                                               # Base EP transition (the same)
-    destocked_from_ag = get_destocked_from_ag(data, ag_t_mrj, separate)
+    destocked_from_ag = get_destocked_from_ag(data, yr_idx, lumap, lmmap, separate)
 
     if separate:
         # IMPORTANT: The order of the keys in the dictionary must match the order of the non-agricultural land uses

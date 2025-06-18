@@ -699,43 +699,46 @@ def get_biochar_effect_g_mrj(data:Data, yr_idx):
     return new_g_mrj
 
 
-def get_beef_hir_effect_g_mrj(data: Data):
+def get_beef_hir_effect_g_mrj(data: Data, yr_idx):
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     g_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses)))
+    
+    # GHG abatement from Land Use Change 
+    for j_idx, lu in enumerate(land_uses):
+        g_mrj_effect[:, :, j_idx] -= (
+            data.CO2E_STOCK_UNALL_NATURAL      
+            * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
+            * data.REAL_AREA
+            / settings.HIR_EFFECT_YEARS    
+        )
 
-    lvstck_penalty_r = np.zeros(data.NCELLS)
-    lvstck_penalty_r[data.HIR_MASK] = (
-        data.CO2E_STOCK_UNALL_NATURAL[data.HIR_MASK]      
-        * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU['Beef - natural land']] - 1)
-        * data.REAL_AREA[data.HIR_MASK]
-        / settings.HIR_EFFECT_YEARS    # Annualise carbon sequestration capacity to align the full grwoth span of a tree
-    )
-    
-    # ag_g_mrj['unall'] - ag_g_mrj['beef']   -> ag_g_mrj['beef'] * settings.HIR_PRODUCTIVITY_CONTRIBUTION TODO: 
-    
-    
-
-    for idx in range(len(land_uses)):
-        g_mrj_effect[:, :, idx] = lvstck_penalty_r 
+    # GHG abatement from livestock density reduction
+    for lm_idx, lm in enumerate(data.LANDMANS):         
+        for j_idx, lu in enumerate(land_uses):
+            g_mrj_effect[lm_idx, :, j_idx] -= get_ghg_lvstk(data, lu, lm, yr_idx, True) * settings.HIR_PRODUCTIVITY_CONTRIBUTION
 
     return g_mrj_effect
 
 
-def get_sheep_hir_effect_g_mrj(data: Data):
+def get_sheep_hir_effect_g_mrj(data: Data, yr_idx):
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     g_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses)))
-
-    lvstck_penalty_r = np.zeros(data.NCELLS)
-    lvstck_penalty_r[data.HIR_MASK] = (
-        data.CO2E_STOCK_UNALL_NATURAL[data.HIR_MASK]     
-        * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU['Sheep - natural land']] - 1)
-        * data.REAL_AREA[data.HIR_MASK]
-        / settings.HIR_EFFECT_YEARS    # Annualise carbon sequestration capacity to align the full grwoth span of a tree
-    )
-
-    for idx in range(len(land_uses)):
-        g_mrj_effect[:, :, idx] = lvstck_penalty_r 
+    
+    # GHG abatement from Land Use Change
+    for j_idx, lu in enumerate(land_uses):
+        g_mrj_effect[:, :, j_idx] -= (
+            data.CO2E_STOCK_UNALL_NATURAL      
+            * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
+            * data.REAL_AREA
+            / settings.HIR_EFFECT_YEARS    # Annualise carbon sequestration capacity to align the full growth span of a tree
+        )
         
+    # GHG abatement from livestock density reduction
+    for lm_idx, lm in enumerate(data.LANDMANS):
+        for j_idx, lu in enumerate(land_uses):
+            g_mrj_effect[lm_idx, :, j_idx] -= get_ghg_lvstk(data, lu, lm, yr_idx, True) * settings.HIR_PRODUCTIVITY_CONTRIBUTION
+
+
     return g_mrj_effect
 
 
@@ -758,8 +761,8 @@ def get_agricultural_management_ghg_matrices(data:Data, yr_idx) -> dict[str, np.
     sav_burning_ghg_impact = get_savanna_burning_effect_g_mrj(data)                         
     agtech_ei_ghg_impact = get_agtech_ei_effect_g_mrj(data, yr_idx)                         
     biochar_ghg_impact = get_biochar_effect_g_mrj(data, yr_idx)                             
-    beef_hir_ghg_impact = get_beef_hir_effect_g_mrj(data)                                   
-    sheep_hir_ghg_impact = get_sheep_hir_effect_g_mrj(data)                                 
+    beef_hir_ghg_impact = get_beef_hir_effect_g_mrj(data, yr_idx)                                   
+    sheep_hir_ghg_impact = get_sheep_hir_effect_g_mrj(data, yr_idx)                                 
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
