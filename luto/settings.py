@@ -535,7 +535,7 @@ GBF2_TARGETS_DICT = {
 }
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-BIODIVERSITY_TARGET_GBF_2 = 'high'            # 'off', 'low', 'medium', or 'high'
+BIODIVERSITY_TARGET_GBF_2 = 'low'            # 'off', 'low', 'medium', or 'high'
 '''
 Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -584,7 +584,7 @@ I.e., the lower bound of the connectivity score for weighting the raw biodiversi
 
 
 # Habitat condition data source
-HABITAT_CONDITION = 'USER_DEFINED'                  # One of [10, 25, 50, 75, 90], or 'NONE'
+HABITAT_CONDITION = 'USER_DEFINED'                  # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'
 '''
 Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the
 suitability for wild animals ranging between 0-1) for each land-use type.Avaliable percentiles is one of [10, 25, 50, 75, 90].

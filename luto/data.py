@@ -1190,14 +1190,14 @@ class Data:
 
         # Get the HCAS contribution scale (0-1)
         match settings.HABITAT_CONDITION:
-            case 'HCAS':
-                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[f'PERCENTILE_{settings.HCAS_PERCENTILE}'].to_dict()       # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
-                unallow_nat_scale = bio_HCAS_contribution_lookup[self.DESC2AGLU['Unallocated - natural land']]                                      # Get the biodiversity degradation score for unallocated natural land (float)
-                bio_HCAS_contribution_lookup = {int(k):v*(1/unallow_nat_scale) for k,v in bio_HCAS_contribution_lookup.items()}                     # Normalise the biodiversity degradation score to the unallocated natural land score
+            case 10 | 25 | 50 | 75 | 90:
+                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[f'PERCENTILE_{settings.HABITAT_CONDITION}'].to_dict()         # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
+                unallow_nat_scale = bio_HCAS_contribution_lookup[self.DESC2AGLU['Unallocated - natural land']]                                          # Get the biodiversity degradation score for unallocated natural land (float)
+                bio_HCAS_contribution_lookup = {int(k): v * (1 / unallow_nat_scale) for k, v in bio_HCAS_contribution_lookup.items()}                   # Normalise the biodiversity degradation score to the unallocated natural land score
             case 'USER_DEFINED':
-                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[ 'USER_DEFINED'].to_dict()
+                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')['USER_DEFINED'].to_dict()
             case _:
-                print(f"WARNING!! Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be 'HCAS' or 'USER_DEFINED'")
+                print(f"WARNING!! Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be one of [10, 25, 50, 75, 90], or 'USER_DEFINED'")
         
         self.BIO_HABITAT_CONTRIBUTION_LOOK_UP = {j: round(x, settings.ROUND_DECMIALS) for j, x in bio_HCAS_contribution_lookup.items()}             # Round to the specified decimal places to avoid numerical issues in the GUROBI solver
         
