@@ -20,7 +20,7 @@
 import numpy as np
 
 from luto import settings
-from luto.data import Data, lumap2ag_l_mrj
+from luto.data import Data
 import luto.tools as tools
 import luto.economics.agricultural.water as ag_water
 import luto.economics.agricultural.ghg as ag_ghg
@@ -481,7 +481,7 @@ def get_env_plantings_to_ag(data: Data, yr_idx, lumap, lmmap, separate=False) ->
         3-D array, indexed by (m, r, j).
     """
     yr_cal = data.YR_CAL_BASE + yr_idx
-    l_mrj = lumap2ag_l_mrj(lumap, lmmap)
+    l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
     l_mrj_not = np.logical_not(l_mrj)           # This ensures the lu remains the same has 0 cost
 
     # Get base transition costs: add cost of installing irrigation
@@ -561,7 +561,7 @@ def get_sheep_to_ag_base(data: Data, yr_idx: int, lumap, separate=False) -> np.n
 
     all_sheep_lumap = (np.ones(data.NCELLS) * sheep_j).astype(np.int8)
     all_dry_lmmap = np.zeros(data.NCELLS).astype(np.float32)
-    l_mrj = lumap2ag_l_mrj(all_sheep_lumap, all_dry_lmmap)
+    l_mrj = tools.lumap2ag_l_mrj(all_sheep_lumap, all_dry_lmmap)
     l_mrj_not = np.logical_not(l_mrj)
 
     t_ij = data.AG_TMATRIX * data.TRANS_COST_MULTS[yr_cal]
@@ -623,7 +623,7 @@ def get_beef_to_ag_base(data: Data, yr_idx, lumap, separate) -> np.ndarray|dict:
 
     all_beef_lumap = (np.ones(data.NCELLS) * beef_j).astype(np.int8)
     all_dry_lmmap = np.zeros(data.NCELLS).astype(np.float32)
-    l_mrj = lumap2ag_l_mrj(all_beef_lumap, all_dry_lmmap)
+    l_mrj = tools.lumap2ag_l_mrj(all_beef_lumap, all_dry_lmmap)
     l_mrj_not = np.logical_not(l_mrj)
 
     t_ij = data.AG_TMATRIX * data.TRANS_COST_MULTS[yr_cal]

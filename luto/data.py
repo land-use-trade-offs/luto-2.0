@@ -67,28 +67,6 @@ def get_base_am_vars(ncells, ncms, n_ag_lus):
     return am_vars
 
 
-def lumap2ag_l_mrj(lumap, lmmap):
-    """
-    Return land-use maps in decision-variable (X_mrj) format.
-    Where 'm' is land mgt, 'r' is cell, and 'j' is agricultural land-use.
-
-    Cells used for non-agricultural land uses will have value 0 for all agricultural
-    land uses, i.e. all r.
-    """
-    # Set up a container array of shape m, r, j.
-    x_mrj = np.zeros((2, lumap.shape[0], 28), dtype=bool)   # TODO - remove 2
-
-    # Populate the 3D land-use, land mgt mask.
-    for j in range(28):
-        # One boolean map for each land use.
-        jmap = np.where(lumap == j, True, False).astype(bool)
-        # Keep only dryland version.
-        x_mrj[0, :, j] = np.where(lmmap == False, jmap, False)
-        # Keep only irrigated version.
-        x_mrj[1, :, j] = np.where(lmmap == True, jmap, False)
-
-    return x_mrj.astype(bool)
-
 
 def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
     """
@@ -1520,7 +1498,7 @@ class Data:
         
         """
         if settings.RESFACTOR == 1:
-            return lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)[:, self.MASK, :]
+            return tools.lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)[:, self.MASK, :]
 
 
         lumap_resample_avg = np.zeros((len(self.LANDMANS), self.NCELLS, self.N_AG_LUS), dtype=np.float32)  
@@ -1542,7 +1520,7 @@ class Data:
         
         """
         if settings.RESFACTOR == 1:
-            return lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)[:, self.MASK, :]
+            return tools.lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)[:, self.MASK, :]
 
         lumap_mrj = np.zeros((self.NLMS, self.NCELLS, self.N_AG_LUS), dtype=np.float32)
         for idx_lu in self.DESC2AGLU.values():
@@ -1969,7 +1947,7 @@ class Data:
             ag_man_X_mrj = self.AG_MAN_L_MRJ_DICT
             
         else:
-            ag_X_mrj = lumap2ag_l_mrj(lumap, lmmap)
+            ag_X_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
             non_ag_X_rk = lumap2non_ag_l_mk(lumap, len(settings.NON_AG_LAND_USES.keys()))
             ag_man_X_mrj = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
 
