@@ -82,7 +82,6 @@ def get_rip_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
     # Establishment costs
     est_costs_r = tools.amortise(data.RP_EST_COST_HA * data.REAL_AREA * data.EST_COST_MULTS[yr_cal]).astype(np.float32)
     est_costs_r[~cells] = 0.0
-    est_costs_r *= data.RP_PROPORTION  # Apply proportion of riparian plantings
     
     # Transition costs
     ag_to_ep_j = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Riparian Plantings').values
@@ -90,13 +89,11 @@ def get_rip_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
     ag_to_ep_t_r = np.nan_to_num(ag_to_ep_t_r)
     ag_to_ep_t_r = tools.amortise(ag_to_ep_t_r * data.REAL_AREA)
     ag_to_ep_t_r[~cells] = 0.0
-    ag_to_ep_t_r *= data.RP_PROPORTION  # Apply proportion of riparian plantings
     
     
     # Water costs; Assume riparian plantings are dryland
     w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA
     w_rm_irrig_cost_r[~cells] = 0.0
-    w_rm_irrig_cost_r *= data.RP_PROPORTION  # Apply proportion of riparian plantings
 
     # Fencing costs
     fencing_cost_r = (
@@ -106,7 +103,6 @@ def get_rip_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
         * data.REAL_AREA
     ).astype(np.float32)
     fencing_cost_r[~cells] = 0.0
-    fencing_cost_r *= data.RP_PROPORTION  # Apply proportion of riparian plantings
     
     if separate:
         return {
@@ -162,13 +158,12 @@ def get_sheep_agroforestry_transitions_from_ag(
 
     # Fencing costs
     fencing_cost_r = (
-        settings.AF_FENCING_LENGTH
+        settings.AF_FENCING_LENGTH_HA
         * settings.FENCING_COST_PER_M
         * data.FENCE_COST_MULTS[yr_cal]
         * data.REAL_AREA 
     ).astype(np.float32)
     fencing_cost_r[~cells] = 0.0
-    fencing_cost_r *= settings.AF_PROPORTION
     
     if separate:
         return {
@@ -225,13 +220,12 @@ def get_beef_agroforestry_transitions_from_ag(
     
     # Fencing costs
     fencing_cost_r = (
-        settings.AF_FENCING_LENGTH
+        settings.AF_FENCING_LENGTH_HA
         * settings.FENCING_COST_PER_M
         * data.FENCE_COST_MULTS[data.YR_CAL_BASE + yr_idx]
         * data.REAL_AREA
     ).astype(np.float32)
     fencing_cost_r[~cells] = 0.0
-    fencing_cost_r *= settings.AF_PROPORTION
     
     if separate:
         return {
@@ -282,8 +276,6 @@ def get_carbon_plantings_block_from_ag(data: Data, yr_idx, lumap, lmmap, separat
         return est_costs_CP_r + ag_to_cp_t_r + w_rm_irrig_cost_r
 
 
-
-
 def get_sheep_carbon_plantings_belt_from_ag(
     data: Data, yr_idx, lumap, lmmap, separate=False
 ):
@@ -332,7 +324,6 @@ def get_sheep_carbon_plantings_belt_from_ag(
         * data.REAL_AREA
     ).astype(np.float32)
     fencing_cost_r[~cells] = 0.0
-    fencing_cost_r *= settings.CP_BELT_PROPORTION
 
     if separate:
         return {
@@ -394,7 +385,6 @@ def get_beef_carbon_plantings_belt_from_ag(
         * data.REAL_AREA
     ).astype(np.float32)
     fencing_cost_r[~cells] = 0.0
-    fencing_cost_r *= settings.CP_BELT_PROPORTION
 
     if separate:
         return {
