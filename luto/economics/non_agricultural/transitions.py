@@ -466,7 +466,7 @@ def get_destocked_from_ag(
         return est_costs_r + w_rm_irrig_cost_r
 
 
-def get_from_ag_transition_matrix(
+def get_transition_matrix_ag2nonag(
     data: Data,
     yr_idx: int,
     lumap: np.ndarray,

@@ -394,7 +394,7 @@ def get_ag_t_mrj(data: Data, target_index, base_year):
 
 def get_ag_to_non_ag_t_rk(data: Data, target_index, base_year, ag_t_mrj):
     print('Getting agricultural to non-agricultural transition cost matrices...', flush = True)
-    non_ag_t_mrj = non_ag_transition.get_from_ag_transition_matrix( 
+    non_ag_t_mrj = non_ag_transition.get_transition_matrix_ag2nonag( 
         data, 
         target_index, 
         data.lumaps[base_year], 
