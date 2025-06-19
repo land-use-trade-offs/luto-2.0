@@ -28,6 +28,7 @@ model that has 'global' varying state.
 
 import os
 import gzip
+import pickle
 import time
 import dill
 import threading
@@ -181,7 +182,7 @@ def save_data_to_disk(data: Data, path: str, compress_level=6) -> None:
     """
     # Save with gzip compression
     with gzip.open(path, 'wb', compresslevel=compress_level) as f:
-        dill.dump(data, f)
+        dill.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
     
 
 def load_data_from_disk(path: str) -> Data:
