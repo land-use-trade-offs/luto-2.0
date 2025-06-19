@@ -928,7 +928,7 @@ def get_destocked_to_ag(data: Data, yr_idx: int, lumap: np.ndarray, separate: bo
         return np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS))
     
     # Get transition costs from destocked cells by using transition costs from unallocated land
-    unallocated_t_mrj = ag_transitions.get_transition_matrices_from_maps(
+    unallocated_t_mrj = ag_transitions.get_transition_matrices_ag2ag(
         data, yr_idx, all_unallocated_lumap, all_dry_lmmap, separate=separate
     )
 

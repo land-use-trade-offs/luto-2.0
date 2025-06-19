@@ -81,7 +81,7 @@ def get_to_ag_exclude_matrices(data: Data, lumap: np.ndarray):
     return (x_mrj * t_rj * no_go_x_mrj).astype(np.int8)
 
 
-def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray, lmmap: np.ndarray, separate=False):
+def get_transition_matrices_ag2ag(data: Data, yr_idx: int, lumap: np.ndarray, lmmap: np.ndarray, separate=False):
     """
     Calculate the transition matrices for land-use and land management transitions.
     Args:
@@ -115,7 +115,7 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
     # -------------------------------------------------------------- #
 
     # Raw transition-cost matrix is in $/ha and lexigraphically ordered (shape: land-use x land-use).
-    t_ij = data.AG_TMATRIX * data.TRANS_COST_MULTS[yr_cal]
+    t_ij = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values * data.TRANS_COST_MULTS[yr_cal]
 
     # Non-irrigation related transition costs for cell r to change to land-use j calculated based on lumap (in $/ha).
     # Only consider for cells currently being used for agriculture.
@@ -146,9 +146,7 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
 
     # Apply the cost of carbon released by transitioning natural land to modified land
     ghg_transition = ag_ghg.get_ghg_transition_emissions(data, lumap, separate=True)        # <unit: t/ha>
-    
-    # ghg_transition *= data.REAL_AREA[:, np.newaxis]                                       # <unit: $/cell>  TODO: check if this is needed
-    
+        
     ghg_transition = {
         k:np.einsum('mrj,mrj,mrj->mrj', v, x_mrj, l_mrj_not).astype(np.float32)             # No GHG penalty for cells that remain the same, or are prohibited from transitioning
         for k, v in ghg_transition.items()
@@ -191,7 +189,7 @@ def get_transition_matrices_from_base_year(data: Data, yr_idx, base_year, separa
     """
     lumap = data.lumaps[base_year]
     lmmap = data.lmmaps[base_year]
-    return get_transition_matrices_from_maps(data, yr_idx, lumap, lmmap, separate)
+    return get_transition_matrices_ag2ag(data, yr_idx, lumap, lmmap, separate)
     
 
 
