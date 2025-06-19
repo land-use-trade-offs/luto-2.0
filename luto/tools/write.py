@@ -567,7 +567,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     else:
         ag_t_mrj = ag_transitions.get_transition_matrices_from_base_year(data, yr_idx, yr_cal_sim_pre, separate=True)
         non_ag_transitions_cost_mat = non_ag_transitions.get_from_ag_transition_matrix(
-            data,yr_idx, yr_cal_sim_pre, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], ag_t_mrj, separate=True
+            data,yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], separate=True
         )
     
     # Get all land use decision variables

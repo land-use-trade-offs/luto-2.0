@@ -397,10 +397,9 @@ def get_ag_to_non_ag_t_rk(data: Data, target_index, base_year, ag_t_mrj):
     non_ag_t_mrj = non_ag_transition.get_from_ag_transition_matrix( 
         data, 
         target_index, 
-        base_year, 
         data.lumaps[base_year], 
-        data.lmmaps[base_year],
-        ag_t_mrj).astype(np.float32)
+        data.lmmaps[base_year]
+    ).astype(np.float32)
     # Transition costs occures if the base year is not the target year
     return non_ag_t_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(non_ag_t_mrj).astype(np.float32)
 

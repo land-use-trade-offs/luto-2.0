@@ -111,7 +111,7 @@ def get_transition_matrices_ag2ag(data: Data, yr_idx: int, lumap: np.ndarray, lm
     n_ag_lms, ncells, n_ag_lus = data.AG_L_MRJ.shape
 
     # -------------------------------------------------------------- #
-    # Establishment costs (upfront, amortised to annual, per cell).  #
+    # Transition costs (upfront, amortised to annual, per cell).  #
     # -------------------------------------------------------------- #
 
     # Raw transition-cost matrix is in $/ha and lexigraphically ordered (shape: land-use x land-use).
@@ -125,7 +125,7 @@ def get_transition_matrices_ag2ag(data: Data, yr_idx: int, lumap: np.ndarray, lm
     # Amortise upfront costs to annualised costs and converted to $ per cell via REAL_AREA
     e_rj = tools.amortise(e_rj) * data.REAL_AREA[:, np.newaxis]
 
-    # Repeat the establishment costs into dryland and irrigated land management types
+    # Repeat the transition costs into dryland and irrigated land management types
     e_mrj = np.stack([e_rj, e_rj], axis=0)
 
     # Update the cost matrix with exclude matrices; the transition cost for a cell that remain the same is 0.
