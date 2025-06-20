@@ -82,6 +82,7 @@ def get_rip_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
     # Establishment costs
     est_costs_r = tools.amortise(data.RP_EST_COST_HA * data.REAL_AREA * data.EST_COST_MULTS[yr_cal]).astype(np.float32)
     est_costs_r[~cells] = 0.0
+    # est_costs_r *= data.RP_PROPORTION
     
     # Transition costs
     ag_to_ep_j = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu='Riparian Plantings').values
@@ -89,6 +90,7 @@ def get_rip_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
     ag_to_ep_t_r = np.nan_to_num(ag_to_ep_t_r)
     ag_to_ep_t_r = tools.amortise(ag_to_ep_t_r * data.REAL_AREA)
     ag_to_ep_t_r[~cells] = 0.0
+    # ag_to_ep_t_r *= data.RP_PROPORTION
     
     
     # Water costs; Assume riparian plantings are dryland
@@ -103,6 +105,8 @@ def get_rip_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
         * data.REAL_AREA
     ).astype(np.float32)
     fencing_cost_r[~cells] = 0.0
+    # fencing_cost_r *= data.RP_PROPORTION
+    
     
     if separate:
         return {
@@ -1099,7 +1103,7 @@ def get_to_non_ag_exclude_matrices(data: Data, lumap) -> np.ndarray:
     """
 
     # Get transition costs for to_non_ag 2D array (r, k)
-    t_ik = data.T_MAT.loc[:,data.NON_AGRICULTURAL_LANDUSES].copy()
+    t_ik = data.T_MAT.sel(to_lu=data.NON_AGRICULTURAL_LANDUSES).copy()
     lumap2desc = np.vectorize(data.ALLLU2DESC.get, otypes=[str])
     ag_cells, non_ag_cells = tools.get_ag_and_non_ag_cells(lumap)                            
     
@@ -1118,7 +1122,10 @@ def get_to_non_ag_exclude_matrices(data: Data, lumap) -> np.ndarray:
             
     # Assign non-ag maximum land-use proportions
     no_go_x_rk = (t_rk * no_go_x_rk).astype(np.float32)
-    no_go_x_rk[:, 1] *= data.RP_PROPORTION                  # Riparian Plantings can not exceed its proportion to the cell
+    
+    # Riparian Plantings can not exceed its proportion to the cell
+    RP_j = data.NON_AGRICULTURAL_LANDUSES.index('Riparian Plantings')
+    no_go_x_rk[:, RP_j] *= data.RP_PROPORTION                  
 
     return no_go_x_rk
 

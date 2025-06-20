@@ -882,7 +882,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
             "BASE_YR Production (t)": get_BASE_YR_production_t(data),
             "BASE_YR GHG (tCO2e)": get_BASE_YR_GHG_t(data),
             "BASE_YR Water (ML)": get_BASE_YR_water_ML(data),
-            "BASE_YR Overall Bio (score)": get_BASE_YR_overall_bio_value(data),
+            "BASE_YR Bio quality (score)": get_BASE_YR_overall_bio_value(data),
             "BASE_YR GBF_2 (score)": get_BASE_YR_GBF2_score(data),
         },
         

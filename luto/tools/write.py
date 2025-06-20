@@ -70,25 +70,31 @@ def write_outputs(data: Data):
     
    # Start recording memory usage
     stop_event = threading.Event()
-    memory_thread = threading.Thread(target=tools.log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1, stop_event), daemon=True)
+    memory_thread = threading.Thread(target=tools.log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1, stop_event))
     memory_thread.start()
     
-    write_data(data)
-    move_logs(data)
-    
-    # Signal the logging thread to stop and wait for it to finish
-    stop_event.set()
-    memory_thread.join()
+    try:
+        write_data(data)
+        move_logs(data)
+    except Exception as e:
+        print(f"An error occurred while writing outputs: {e}")
+        raise e
+    finally:
+        # Ensure the memory logging thread is stopped
+        stop_event.set()
+        memory_thread.join()
 
 
 
 @tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{timestamp}")
 def write_data(data: Data):
 
-    years = settings.SIM_YEARS
+    years = [i for i in settings.SIM_YEARS if i<=data.last_year]
+    data.set_path(years)
     paths = [f"{data.path}/out_{yr}" for yr in years]
+    
     write_settings(data.path)
-    write_area_transition_start_end(data, f'{data.path}/out_{years[-1]}')
+    write_area_transition_start_end(data, f'{data.path}/out_{years[-1]}', data.last_year)
 
     # Wrap write to a list of delayed jobs
     jobs = [delayed(write_output_single_year)(data, yr, path_yr, None) for (yr, path_yr) in zip(years, paths)]
@@ -738,13 +744,12 @@ def write_dvar_area(data: Data, yr_cal, path):
     df_am_area.to_csv(os.path.join(path, f'area_agricultural_management_{yr_cal}.csv'), index = False)
 
 
-def write_area_transition_start_end(data: Data, path):
+def write_area_transition_start_end(data: Data, path, yr_cal_end):
 
     print(f'Save transition matrix between start and end year\n')
 
     # Get the end year
     yr_cal_start = data.YR_CAL_BASE
-    yr_cal_end = settings.SIM_YEARS[-1]
 
     # Get the decision variables for the start year
     dvar_base = tools.lumap2ag_l_mrj(data.lumaps[yr_cal_start], data.lmmaps[yr_cal_start])
