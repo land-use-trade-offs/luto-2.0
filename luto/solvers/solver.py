@@ -927,18 +927,18 @@ class LutoSolver:
             gp.quicksum(bio_ag_exprs) 
             + gp.quicksum(bio_ag_man_exprs) 
             + gp.quicksum(bio_non_ag_exprs)
-        ) / self._input_data.limits["GBF2_priority_degrade_areas"]
+        ) 
         
         print(f"       |-- target is {self._input_data.limits["GBF2_priority_degrade_areas"]:15,.0f}")
         
         if settings.GBF2_CONSTRAINT_TYPE == "hard":
             self.bio_GBF2_priority_degraded_area_limit_constraint_hard = self.gurobi_model.addConstr(
-                self.bio_GBF2_priority_degraded_area_expr >= 1, 
+                self.bio_GBF2_priority_degraded_area_expr >= self._input_data.limits["GBF2_priority_degrade_areas"], 
                 name="bio_GBF2_priority_degraded_area_limit_hard"
             )
         elif settings.GBF2_CONSTRAINT_TYPE == "soft":
             constr = self.gurobi_model.addConstr(
-                1 - self.bio_GBF2_priority_degraded_area_expr <= self.B, 
+                self._input_data.limits["GBF2_priority_degrade_areas"] - self.bio_GBF2_priority_degraded_area_expr <= self.B, 
                 name="bio_GBF2_priority_degraded_area_limit_soft"
             )
             self.bio_GBF2_priority_degraded_area_limit_constraint_soft.append(constr)

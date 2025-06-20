@@ -166,8 +166,9 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
         if luto_solver.gurobi_model.Status != GRB.OPTIMAL:
             print('!' * 100)
             print(f"Warning: Gurobi solver did not find an optimal solution for year {target_year}. Status: {luto_solver.gurobi_model.Status}")
-            print( '         The results are still written to disk, but will not be optimal.')
+            print(f'Warning: The results are still written to disk, but will not be optimal.')
             print('!' * 100)
+            print('\n')
             break
 
 
