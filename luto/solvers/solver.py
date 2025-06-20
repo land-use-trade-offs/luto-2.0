@@ -1008,11 +1008,11 @@ class LutoSolver:
             )
 
 
-            self.bio_GBF3_major_vegetation_exprs[v] = (ag_contr + ag_man_contr + non_ag_contr) / v_area_lb
+            self.bio_GBF3_major_vegetation_exprs[v] = (ag_contr + ag_man_contr + non_ag_contr)
 
             print(f"       |-- target is {v_area_lb:15,.0f} for {v_names[v]} ")
             self.bio_GBF3_major_vegetation_limit_constraints[v] = self.gurobi_model.addConstr(
-                self.bio_GBF3_major_vegetation_exprs[v] >= 1,
+                self.bio_GBF3_major_vegetation_exprs[v] >= v_area_lb,
                 name=f"bio_GBF3_major_vegetation_limit_{v_names[v]}".replace(" ", "_")
             )
 
@@ -1073,11 +1073,11 @@ class LutoSolver:
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            self.bio_GBF4_SNES_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / x_area_lb  
+            self.bio_GBF4_SNES_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr)
 
             print(f"       |-- target is {x_area_lb:15,.0f} for {x_names[x]}")
             self.bio_GBF4_SNES_constrs[x] = self.gurobi_model.addConstr(
-                self.bio_GBF4_SNES_exprs[x] >= 1,
+                self.bio_GBF4_SNES_exprs[x] >= x_area_lb,
                 name=f"bio_GBF4_SNES_limit_{x_names[x]}".replace(" ", "_"),
             )
 
@@ -1137,12 +1137,12 @@ class LutoSolver:
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            self.bio_GBF4_ECNES_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / x_area_lb
+            self.bio_GBF4_ECNES_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr)
 
 
             print(f"       |-- target is {x_area_lb:15,.0f} for {x_names[x]} ")
             self.bio_GBF4_ECNES_constrs[x] = self.gurobi_model.addConstr(
-                self.bio_GBF4_ECNES_exprs[x] >= 1,
+                self.bio_GBF4_ECNES_exprs[x] >= x_area_lb,
                 name=f"bio_GBF4_ECNES_limit_{x_names[x]}".replace(" ", "_")
             )
 
@@ -1203,11 +1203,11 @@ class LutoSolver:
             )
 
             # Divide by constant to reduce strain on the constraint matrix range
-            self.bio_GBF8_species_conservation_exprs[s] = (ag_contr + ag_man_contr + non_ag_contr) / s_area_lb
+            self.bio_GBF8_species_conservation_exprs[s] = (ag_contr + ag_man_contr + non_ag_contr)
     
             print(f"       |-- target is {s_area_lb:15,.0f} for {s_names[s]}")
             self.bio_GBF8_species_conservation_constrs[s] = self.gurobi_model.addConstr(
-                self.bio_GBF8_species_conservation_exprs[s] >= 1,
+                self.bio_GBF8_species_conservation_exprs[s] >= s_area_lb,
                 name=f"bio_GBF8_species_conservation_limit_{s_names[s]}".replace(" ", "_"),
             )
 

@@ -138,9 +138,9 @@ SOLVER_WEIGHT_GBF2 = 1
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
-WRITE_OUTPUT_GEOTIFFS = True   # Write GeoTiffs to output directory: True or False
-PARALLEL_WRITE = True          # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = 32             # The Threads to use for map making, only work with PARALLEL_WRITE = True
+WRITE_OUTPUT_GEOTIFFS = False               # Write GeoTiffs to output directory: True or False
+PARALLEL_WRITE = True                       # If to use parallel processing to write GeoTiffs: True or False
+WRITE_THREADS = min(32, os.cpu_count())     # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters

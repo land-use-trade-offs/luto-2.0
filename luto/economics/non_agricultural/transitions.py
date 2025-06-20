@@ -90,7 +90,7 @@ def get_rip_plant_transitions_from_ag(data: Data, yr_idx, lumap, lmmap, separate
     ag_to_ep_t_r = np.nan_to_num(ag_to_ep_t_r)
     ag_to_ep_t_r = tools.amortise(ag_to_ep_t_r * data.REAL_AREA)
     ag_to_ep_t_r[~cells] = 0.0
-    ag_to_ep_t_r *= data.RP_PROPORTION
+    # ag_to_ep_t_r *= data.RP_PROPORTION
     
     
     # Water costs; Assume riparian plantings are dryland
