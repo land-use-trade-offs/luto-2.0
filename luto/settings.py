@@ -531,7 +531,7 @@ GBF2_TARGETS_DICT = {
     'off':     None,
     'low':    {2030: 0,    2050: 0,    2100: 0},
     'medium': {2030: 0.15, 2050: 0.15, 2100: 0.15},
-    'high':   {2030: 0.15, 2050: 0.20, 2100: 0.20},
+    'high':   {2030: 0.15, 2050: 0.25, 2100: 0.25},
 }
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
@@ -564,7 +564,7 @@ If set to 100, all cells will be considered as priority degraded areas, equal to
 
 
 # Connectivity source source
-CONNECTIVITY_SOURCE = 'DCCEEW_NCI'                 # 'DCCEEW_NCI', 'NATURAL_AREA_CONNECTIVITY' or 'NONE'
+CONNECTIVITY_SOURCE = 'NCI'                 # 'DCCEEW_NCI', 'NATURAL_AREA_CONNECTIVITY' or 'NONE'
 '''
 The connectivity source is the source of the connectivity score used to weigh the raw biodiversity priority score.
 This score is normalised between 0 (fartherst) and 1 (closest).

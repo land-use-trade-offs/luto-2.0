@@ -1152,10 +1152,10 @@ class Data:
         
         # Get connectivity score
         match settings.CONNECTIVITY_SOURCE:
-            case 'DCCEEW_NCI':
+            case 'NCI':
                 connectivity_score = biodiv_raw['DCCEEW_NCI'].to_numpy(dtype=np.float32)
                 connectivity_score = np.interp( biodiv_raw['DCCEEW_NCI'], (connectivity_score.min(), connectivity_score.max()), (settings.CONNECTIVITY_LB, 1)).astype('float32')
-            case 'NATURAL_AREA_CONNECTIVITY':
+            case 'DWI':
                 connectivity_score = biodiv_raw['NATURAL_AREA_CONNECTIVITY'].to_numpy(dtype=np.float32)
                 connectivity_score = np.interp(connectivity_score, (connectivity_score.min(), connectivity_score.max()), (1, settings.CONNECTIVITY_LB)).astype('float32')
             case 'NONE':

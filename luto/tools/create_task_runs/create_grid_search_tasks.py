@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250618_RES3_CMI_CUT40' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250618_RES3_CMI_CUT40_GBF2_15_25_NUMERIC_FOCUS_2' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -56,6 +56,9 @@ grid_search = {
     # Model run settings
     ###############################################################
     
+    # --------------- Solver settings ---------------
+    'NUMERIC_FOCUS': [2],                                               # Integer between 0 and 3, higher value means more focus on numeric precision, requiring more time
+    
     # --------------- Target deviation weight ---------------
     'SOLVER_WEIGHT_DEMAND': [1], 
     'SOLVER_WEIGHT_GHG': [1],
@@ -70,7 +73,7 @@ grid_search = {
        
     
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['low', 'medium', 'high'],                  # 'off', 'low', 'medium', 'high'
+    'GHG_EMISSIONS_LIMITS': ['low', 'high'],                            # 'off', 'low', 'medium', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],                                    # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                                          # True or False
@@ -88,7 +91,7 @@ grid_search = {
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSITY_TARGET_GBF_2': ['low', 'medium', 'high'],             # 'off', 'low', 'medium', 'high'
+    'BIODIVERSITY_TARGET_GBF_2': ['off', 'medium', 'high'],             # 'off', 'low', 'medium', 'high'
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                   # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
