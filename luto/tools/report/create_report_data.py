@@ -1426,7 +1426,7 @@ def save_report_data(raw_data_dir:str):
     
         
     # ---------------- (GBF2) Biodiversity priority score  ----------------
-    if settings.BIODIVERSTIY_TARGET_GBF_2 == 'off':
+    if settings.BIODIVERSITY_TARGET_GBF_2 == 'off':
         pass
     else:
         # get biodiversity dataframe

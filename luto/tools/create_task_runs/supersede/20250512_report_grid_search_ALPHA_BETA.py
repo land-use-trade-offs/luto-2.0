@@ -47,7 +47,7 @@ query_str = '''
 df_demand = report_data.query(query_str).copy()
 
 df_demand_avg = df_demand.eval('val = abs(val)'
-    ).groupby(['year', 'GHG_EMISSIONS_LIMITS', 'BIODIVERSTIY_TARGET_GBF_2', 'SOLVE_WEIGHT_ALPHA', 'SOLVE_WEIGHT_BETA']
+    ).groupby(['year', 'GHG_EMISSIONS_LIMITS', 'BIODIVERSITY_TARGET_GBF_2', 'SOLVE_WEIGHT_ALPHA', 'SOLVE_WEIGHT_BETA']
     )[['val','run_idx']].agg(val=('val', 'mean'), run_idx=('run_idx', 'first')
     ).reset_index()
 
@@ -64,7 +64,7 @@ plot_landscape_demand = (
     ) +
     p9.geom_point(stroke=0) +
     # p9.facet_wrap('name') +
-    p9.facet_grid('BIODIVERSTIY_TARGET_GBF_2~GHG_EMISSIONS_LIMITS') +
+    p9.facet_grid('BIODIVERSITY_TARGET_GBF_2~GHG_EMISSIONS_LIMITS') +
     p9.theme_bw() +
     p9.theme(
         strip_text=p9.element_text(size=8), 
@@ -93,7 +93,7 @@ valid_runs_demand = set(report_data['run_idx']) - set(
 
 df_demand_avg = df_demand.query('run_idx.isin(@valid_runs_demand)'
     ).eval('val = abs(val)'
-    ).groupby(['year', 'GHG_EMISSIONS_LIMITS', 'BIODIVERSTIY_TARGET_GBF_2', 'SOLVE_WEIGHT_ALPHA', 'SOLVE_WEIGHT_BETA']
+    ).groupby(['year', 'GHG_EMISSIONS_LIMITS', 'BIODIVERSITY_TARGET_GBF_2', 'SOLVE_WEIGHT_ALPHA', 'SOLVE_WEIGHT_BETA']
     )[['val','run_idx']].agg(val=('val', 'mean'), run_idx=('run_idx', 'first')
     ).reset_index()
 
@@ -108,7 +108,7 @@ plot_landscape_demand = (
     ) +
     p9.geom_point(stroke=0) +
     # p9.facet_wrap('name') +
-    p9.facet_grid('BIODIVERSTIY_TARGET_GBF_2~GHG_EMISSIONS_LIMITS') +
+    p9.facet_grid('BIODIVERSITY_TARGET_GBF_2~GHG_EMISSIONS_LIMITS') +
     p9.theme_bw() +
     p9.theme(
         strip_text=p9.element_text(size=8), 
@@ -141,7 +141,7 @@ plot_landscape_profit = (
     ) +
     p9.geom_point(size=3,stroke=0) +
     # p9.facet_wrap('name') +
-    p9.facet_grid('BIODIVERSTIY_TARGET_GBF_2~GHG_EMISSIONS_LIMITS') +
+    p9.facet_grid('BIODIVERSITY_TARGET_GBF_2~GHG_EMISSIONS_LIMITS') +
     p9.theme_bw() +
     p9.theme(
         strip_text=p9.element_text(size=8), 
@@ -171,7 +171,7 @@ plot_landscape_profit = (
     ) +
     p9.geom_point(size=3,stroke=0) +
     # p9.facet_wrap('name') +
-    p9.facet_grid('BIODIVERSTIY_TARGET_GBF_2~GHG_EMISSIONS_LIMITS') +
+    p9.facet_grid('BIODIVERSITY_TARGET_GBF_2~GHG_EMISSIONS_LIMITS') +
     p9.theme_bw() +
     p9.theme(
         strip_text=p9.element_text(size=8), 
@@ -191,7 +191,7 @@ query_str = '''
 df_bio = report_data.query(query_str).query('run_idx.isin(@valid_runs_demand_profit)').copy()
 
 df_bio_sum = df_bio.eval('val = val / 1e3'
-    ).groupby(['year', 'GHG_EMISSIONS_LIMITS', 'BIODIVERSTIY_TARGET_GBF_2', 'SOLVE_WEIGHT_ALPHA', 'SOLVE_WEIGHT_BETA']
+    ).groupby(['year', 'GHG_EMISSIONS_LIMITS', 'BIODIVERSITY_TARGET_GBF_2', 'SOLVE_WEIGHT_ALPHA', 'SOLVE_WEIGHT_BETA']
     )['val'].sum().reset_index().query('year == 2050')
 
 
@@ -207,7 +207,7 @@ plot_landscape_bio = (
     ) +
     p9.geom_point(size=3,stroke=0) +
     # p9.facet_wrap('name') +
-    p9.facet_grid('BIODIVERSTIY_TARGET_GBF_2~GHG_EMISSIONS_LIMITS') +
+    p9.facet_grid('BIODIVERSITY_TARGET_GBF_2~GHG_EMISSIONS_LIMITS') +
     p9.theme_bw() +
     p9.theme(
         strip_text=p9.element_text(size=8), 
@@ -378,7 +378,7 @@ p_weight_vs_profit = (
             group='run_idx'
         )
     ) +
-    p9.facet_grid('GHG_EMISSIONS_LIMITS~BIODIVERSTIY_TARGET_GBF_2') +
+    p9.facet_grid('GHG_EMISSIONS_LIMITS~BIODIVERSITY_TARGET_GBF_2') +
     p9.geom_line(size=0.3) +
     p9.theme_bw() +
     p9.theme(
@@ -396,7 +396,7 @@ p_weight_vs_profit = (
         p9.aes(
             x='year', 
             y='val', 
-            color='BIODIVERSTIY_TARGET_GBF_2',
+            color='BIODIVERSITY_TARGET_GBF_2',
             group='run_idx'
         )
     ) +
@@ -438,7 +438,7 @@ p_weight_vs_demand = (
             group='run_idx'   
         )
     ) +
-    p9.facet_grid('BIODIVERSTIY_TARGET_GBF_2~GHG_EMISSIONS_LIMITS') +
+    p9.facet_grid('BIODIVERSITY_TARGET_GBF_2~GHG_EMISSIONS_LIMITS') +
     p9.geom_col(position='jitter') +
     p9.theme_bw() +
     p9.theme(strip_text=p9.element_text(size=8)) +
@@ -458,7 +458,7 @@ p_weight_vs_demand = (
             group='run_idx'   
         )
     ) +
-    p9.facet_grid('BIODIVERSTIY_TARGET_GBF_2~GHG_EMISSIONS_LIMITS') +
+    p9.facet_grid('BIODIVERSITY_TARGET_GBF_2~GHG_EMISSIONS_LIMITS') +
     p9.geom_col(position='jitter') +
     p9.theme_bw() +
     p9.theme(strip_text=p9.element_text(size=8)) +
@@ -484,7 +484,7 @@ query_str_optim = '''
     
 df_bio = report_data.query(query_str).copy()
 
-df_bio_sum = df_bio.groupby(['year', 'GHG_EMISSIONS_LIMITS', 'BIODIVERSTIY_TARGET_GBF_2', 'SOLVE_WEIGHT_ALPHA', 'SOLVE_WEIGHT_BETA']
+df_bio_sum = df_bio.groupby(['year', 'GHG_EMISSIONS_LIMITS', 'BIODIVERSITY_TARGET_GBF_2', 'SOLVE_WEIGHT_ALPHA', 'SOLVE_WEIGHT_BETA']
     )[['val','run_idx']].agg(val=('val', 'mean'), run_idx=('run_idx', 'first')
     ).reset_index()
 
@@ -500,7 +500,7 @@ p_weight_vs_bio = (
             group='run_idx',
         )
     ) +
-    p9.facet_grid('BIODIVERSTIY_TARGET_GBF_2~GHG_EMISSIONS_LIMITS') +
+    p9.facet_grid('BIODIVERSITY_TARGET_GBF_2~GHG_EMISSIONS_LIMITS') +
     p9.geom_line(size=0.3) +
     p9.theme_bw() +
     p9.theme(strip_text=p9.element_text(size=8)) +
@@ -517,7 +517,7 @@ p_weight_vs_bio = (
         p9.aes(
             x='year', 
             y='val', 
-            color='BIODIVERSTIY_TARGET_GBF_2',
+            color='BIODIVERSITY_TARGET_GBF_2',
             group='run_idx',
         )
     ) +

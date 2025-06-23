@@ -68,8 +68,6 @@ def get_base_am_vars(ncells, ncms, n_ag_lus):
 
 
 
-
-
 def lumap2non_ag_l_mk(lumap, num_non_ag_land_uses: int):
     """
     Convert the land-use map to a decision variable X_rk, where 'r' indexes cell and
@@ -706,8 +704,8 @@ class Data:
 
         # Load plantings economic data
         self.EP_EST_COST_HA = pd.read_hdf(os.path.join(settings.INPUT_DIR, "ep_est_cost_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32)
-        self.RP_EST_COST_HA = self.EP_EST_COST_HA.copy()   # Riparian plantings have the same cost as environmental plantings
-        self.AF_EST_COST_HA = self.EP_EST_COST_HA.copy()   # Agroforestry plantings have the same cost as environmental plantings
+        self.RP_EST_COST_HA = self.EP_EST_COST_HA.copy()  # Riparian plantings have the same establishment cost as environmental plantings
+        self.AF_EST_COST_HA = self.EP_EST_COST_HA.copy()  # Agroforestry plantings have the same establishment cost as environmental plantings
         self.CP_EST_COST_HA = pd.read_hdf(os.path.join(settings.INPUT_DIR, "cp_est_cost_ha.h5"), where=self.MASK).to_numpy(dtype=np.float32)
 
         # Load fire risk data (reduced carbon sequestration by this amount)
@@ -1105,11 +1103,11 @@ class Data:
         # GHG targets data.
         ###############################################################
         print("\tLoading GHG targets data...", flush=True)
-
-        self.GHG_TARGETS = pd.read_excel(
-            os.path.join(settings.INPUT_DIR, "GHG_targets.xlsx"), sheet_name="Data", index_col="YEAR"
-        )
-        self.GHG_TARGETS = self.GHG_TARGETS[settings.GHG_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS]].to_dict()
+        if settings.GHG_EMISSIONS_LIMITS != 'off':
+            self.GHG_TARGETS = pd.read_excel(
+                os.path.join(settings.INPUT_DIR, "GHG_targets.xlsx"), sheet_name="Data", index_col="YEAR"
+            )
+            self.GHG_TARGETS = self.GHG_TARGETS[settings.GHG_TARGETS_DICT[settings.GHG_EMISSIONS_LIMITS]].to_dict()
 
 
 
@@ -1146,7 +1144,7 @@ class Data:
         in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
         """
 
-        biodiv_raw = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5'), where=self.MASK)  
+        biodiv_raw = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5'), where=self.MASK)
         biodiv_contribution_lookup = pd.read_csv(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv'))                              
         
 
@@ -1170,11 +1168,13 @@ class Data:
         # Get the HCAS contribution scale (0-1)
         match settings.HABITAT_CONDITION:
             case 10 | 25 | 50 | 75 | 90:
-                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[f'PERCENTILE_{settings.HABITAT_CONDITION}'].to_dict()       
+                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[f'PERCENTILE_{settings.HABITAT_CONDITION}'].to_dict()         # Get the biodiversity degradation score at specified percentile (pd.DataFrame)
+                unallow_nat_scale = bio_HCAS_contribution_lookup[self.DESC2AGLU['Unallocated - natural land']]                                          # Get the biodiversity degradation score for unallocated natural land (float)
+                bio_HCAS_contribution_lookup = {int(k): v * (1 / unallow_nat_scale) for k, v in bio_HCAS_contribution_lookup.items()}                   # Normalise the biodiversity degradation score to the unallocated natural land score
             case 'USER_DEFINED':
-                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')[ 'USER_DEFINED'].to_dict()       
+                bio_HCAS_contribution_lookup = biodiv_contribution_lookup.set_index('lu')['USER_DEFINED'].to_dict()
             case _:
-                print(f"WARNING!! Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be one of [10, 25, 50, 75, 90] or 'USER_DEFINED'")
+                print(f"WARNING!! Invalid habitat condition source: {settings.HABITAT_CONDITION}, must be one of [10, 25, 50, 75, 90], or 'USER_DEFINED'")
         
         self.BIO_HABITAT_CONTRIBUTION_LOOK_UP = {j: round(x, settings.ROUND_DECMIALS) for j, x in bio_HCAS_contribution_lookup.items()}             # Round to the specified decimal places to avoid numerical issues in the GUROBI solver
         
@@ -1190,36 +1190,27 @@ class Data:
         
   
         # ------------------ Habitat condition impacts for habitat conservation (GBF2) in 'priority degraded areas' regions ---------------
-        
-        if settings.BIODIVERSTIY_TARGET_GBF_2 != 'off':
+        if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
         
             # Get the mask of 'priority degraded areas' for habitat conservation
             conservation_performance_curve = pd.read_excel(os.path.join(settings.INPUT_DIR, 'BIODIVERSITY_GBF2_conservation_performance.xlsx'), sheet_name=f'ssp{settings.SSP}'
             ).set_index('AREA_COVERAGE_PERCENT')['PRIORITY_RANK'].to_dict()
             
-            self.BIO_PRIORITY_DEGRADED_AREAS_MASK = (
-                bio_contribution_raw >= conservation_performance_curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]
+            priority_degraded_areas_mask = bio_contribution_raw >= conservation_performance_curve[settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT]
+            
+            self.BIO_PRIORITY_DEGRADED_AREAS_R = np.where(
+                self.SAVBURN_ELIGIBLE,
+                priority_degraded_areas_mask * self.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
+                priority_degraded_areas_mask * self.REAL_AREA
             )
             
-            self.BIO_PRIORITY_DEGRADED_AREAS_LY_BASE_YR = np.einsum(
+            self.BIO_PRIORITY_DEGRADED_CONTRIBUTION_WEIGHTED_AREAS_BASE_YR_R = np.einsum(
                 'j,mrj,r->r',
                 np.array(list(self.BIO_HABITAT_CONTRIBUTION_LOOK_UP.values())),
                 self.AG_L_MRJ,
-                self.BIO_PRIORITY_DEGRADED_AREAS_MASK
+                self.BIO_PRIORITY_DEGRADED_AREAS_R
             )
-            
-            # query_str = '''
-            # CONNECTIVITY_SOURCE == @settings.CONNECTIVITY_SOURCE 
-            # and CONNECTIVITY_LB == @settings.CONNECTIVITY_LB 
-            # and TOP_RANK_CELL_AREA_COVERAGE_PERCENT == @settings.GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT
-            # and HCAS_PERCENTILE == @settings.HCAS_PERCENTILE'''.replace('\n', ' ')
-            
-            # self.BIO_GBF2_BASE_YR_SCORE_PERCENTAGE = pd.read_csv(
-            #     os.path.join(settings.INPUT_DIR, 'BIODIVERSITY_GBF2_TOP_RANK_CELL_BIO_SCORES_AND_TARGET.csv')
-            #     ).query(query_str)
-                
-                
-                
+
         
         ###############################################################
         # Vegetation data (GBF3).
@@ -1493,6 +1484,28 @@ class Data:
         if settings.RESFACTOR == 1:
             return tools.lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)[:, self.MASK, :]
 
+
+        lumap_resample_avg = np.zeros((len(self.LANDMANS), self.NCELLS, self.N_AG_LUS), dtype=np.float32)  
+        for idx_lu in self.DESC2AGLU.values():
+            for idx_w, _ in enumerate(self.LANDMANS):
+                arr_lu_lm = self.LUMAP_NO_RESFACTOR * self.LMMAP_NO_RESFACTOR
+                lumap_resample_avg[idx_w, :, idx_lu] = self.get_exact_resfactored_average_arr_consider_lu_mask(arr_lu_lm)
+                
+        return lumap_resample_avg
+    
+    
+    def get_exact_resfactored_lumap_mrj(self):
+        """
+        Rather than picking the center cell when resfactoring the lumap, this function
+        calculate the exact value of each land-use cell based from lumap to create dvars.
+        
+        E.g., given a resfactor of 5, then each resfactored dvar cell will cover a 5x5 area.
+        If there are 9 Apple cells in the 5x5 area, then the dvar cell for it will be 9/25. 
+        
+        """
+        if settings.RESFACTOR == 1:
+            return tools.lumap2ag_l_mrj(self.LUMAP_NO_RESFACTOR, self.LMMAP_NO_RESFACTOR)[:, self.MASK, :]
+
         lumap_mrj = np.zeros((self.NLMS, self.NCELLS, self.N_AG_LUS), dtype=np.float32)
         for idx_lu in self.DESC2AGLU.values():
             for idx_w, _ in enumerate(self.LANDMANS):
@@ -1541,7 +1554,6 @@ class Data:
         return arr_2d_xr_resfactored[mask_arr_2d_resfactor]
     
 
-
     
     def get_resfactored_lumap(self) -> np.ndarray:
         """
@@ -1587,18 +1599,18 @@ class Data:
             The priority degrade areas conservation target for the given year.
         """
  
-        bio_habitat_score_pre_1750_sum = (self.BIO_PRIORITY_DEGRADED_AREAS_MASK * self.CONNECTIVITY_SCORE * self.REAL_AREA).sum()
-        bio_habitat_score_base_yr_sum = (self.BIO_PRIORITY_DEGRADED_AREAS_LY_BASE_YR * self.CONNECTIVITY_SCORE * self.REAL_AREA).sum()
-        bio_habitat_score_base_yr_proportion = bio_habitat_score_base_yr_sum / bio_habitat_score_pre_1750_sum
+        bio_habitat_score_baseline_sum = self.BIO_PRIORITY_DEGRADED_AREAS_R.sum()
+        bio_habitat_score_base_yr_sum = self.BIO_PRIORITY_DEGRADED_CONTRIBUTION_WEIGHTED_AREAS_BASE_YR_R.sum()
+        bio_habitat_score_base_yr_proportion = bio_habitat_score_base_yr_sum / bio_habitat_score_baseline_sum
 
         bio_habitat_target_proportion = [
             bio_habitat_score_base_yr_proportion + ((1 - bio_habitat_score_base_yr_proportion) * i)
-            for i in settings.GBF2_TARGETS_DICT[settings.BIODIVERSTIY_TARGET_GBF_2].values()
+            for i in settings.GBF2_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_2].values()
         ]
 
         targets_key_years = {
             self.YR_CAL_BASE: bio_habitat_score_base_yr_sum, 
-            **dict(zip(settings.GBF2_TARGETS_DICT[settings.BIODIVERSTIY_TARGET_GBF_2].keys(), bio_habitat_score_pre_1750_sum * np.array(bio_habitat_target_proportion)))
+            **dict(zip(settings.GBF2_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_2].keys(), bio_habitat_score_baseline_sum * np.array(bio_habitat_target_proportion)))
         }
 
         f = interp1d(
@@ -1964,8 +1976,7 @@ class Data:
         # Return total commodity production as numpy array.
         total_q_c = ag_q_c + non_ag_q_c + ag_man_q_c
         return total_q_c
-    
-    
+
 
     def get_carbon_price_by_yr_idx(self, yr_idx: int) -> float:
         """

@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250617_RES13_NEW_TRANS_COST' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250618_RES3_CMI_CUT40' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -37,7 +37,7 @@ grid_search = {
     ###############################################################
     'MEM': ['64GB'],
     'NCPUS':[16],
-    'TIME': ['1:00:00'],
+    'TIME': ['6:00:00'],
     'QUEUE': ['normalsr'],
     
  
@@ -45,36 +45,16 @@ grid_search = {
     # Working settings for the model run
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                         # 'maxprofit' or 'mincost'
-    'RESFACTOR': [13],
+    'RESFACTOR': [3],
     'SIM_YEARS': [list(range(2020,2051,5))],                            # Years to run the model 
     'WRITE_THREADS': [2],
     'WRITE_OUTPUT_GEOTIFFS': [True],
-    'KEEP_OUTPUTS': [False],                                            # If False, only keep report HTML
+    'KEEP_OUTPUTS': [True],                                             # If False, only keep report HTML
     
  
     ###############################################################
     # Model run settings
     ###############################################################
-
-    # --------------- Economic setting ---------------
-    'AMORTISE_UPFRONT_COSTS': [False],                                  # True or False, if True, will amortise the upfront costs over the simulation years
-    
-    # --------------- Demand settings ---------------
-    'DEMAND_CONSTRAINT_TYPE': ['soft'],                                 # 'hard' or 'soft' 
-       
-    # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['low', 'high'],                            # 'off', 'low', 'medium', 'high'
-    'CARBON_PRICES_FIELD': ['CONSTANT'],
-    'GHG_CONSTRAINT_TYPE': ['hard'],                                    # 'hard' or 'soft'
-    'USE_GHG_SCOPE_1': [True],                                          # True or False
-
-    # --------------- Water constraints ---------------
-    'WATER_LIMITS': ['on'],                                             # 'on' or 'off'
-    'WATER_CONSTRAINT_TYPE': ['hard'],                                  # 'hard' or 'soft'
-    'INCLUDE_WATER_LICENSE_COSTS': [1],
-    
-    # ---------- Excluding no-go land use---------------
-    'EXCLUDE_NO_GO_LU': [False],                                        # True or False
     
     # --------------- Target deviation weight ---------------
     'SOLVER_WEIGHT_DEMAND': [1], 
@@ -82,31 +62,51 @@ grid_search = {
     'SOLVER_WEIGHT_WATER': [1],
     'SOLVER_WEIGHT_GBF2': [1],
     
+    # --------------- Demand settings ---------------
+    'DEMAND_CONSTRAINT_TYPE': ['soft'],                                 # 'hard' or 'soft' 
+    
+    # --------------- Land use settings ---------------
+    'EXCLUDE_NO_GO_LU': [False],         # True or False
+       
+    
+    # --------------- GHG settings ---------------
+    'GHG_EMISSIONS_LIMITS': ['low', 'high'],                            # 'off', 'low', 'medium', 'high'
+    'CARBON_PRICES_FIELD': ['CONSTANT'],
+    'GHG_CONSTRAINT_TYPE': ['hard'],                                    # 'hard' or 'soft'
+    'USE_GHG_SCOPE_1': [True],                                          # True or False
+
+    
+    # --------------- Water constraints ---------------
+    'WATER_LIMITS': ['on'],                                             # 'on' or 'off'
+    'WATER_CONSTRAINT_TYPE': ['hard'],                                  # 'hard' or 'soft'
+    'WATER_PENALTY': [1e-5],
+    'INCLUDE_WATER_LICENSE_COSTS': [1],
+    
     # --------------- Biodiversity overall ---------------
-    'HABITAT_CONDITION': ['USER_DEFINED'],                              # One of [10, 25, 50, 75, 90], or 'NONE' 
-    'CONNECTIVITY_SOURCE': ['DCCEEW_NCI'],                              # 'DCCEEW_NCI', 'NATURAL_AREA_CONNECTIVITY' or 'NONE'
+    'HABITAT_CONDITION': ['USER_DEFINED'],                              # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
+    'CONNECTIVITY_SOURCE': ['NCI'],
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSTIY_TARGET_GBF_2': ['medium', 'high'],                    # 'off', 'low', 'medium', 'high'
+    'BIODIVERSITY_TARGET_GBF_2': ['low', 'medium', 'high'],             # 'off', 'low', 'medium', 'high'
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                   # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
     'BIODIVERSTIY_TARGET_GBF_3': ['off'],                               # 'off', 'medium', 'high', 'USER_DEFINED'
     
     # --------------- Biodiversity settings - GBF 4 ---------------
-    'BIODIVERSTIY_TARGET_GBF_4_SNES' : ['off'],                         # 'on' or 'off'.
-    'BIODIVERSTIY_TARGET_GBF_4_ECNES' : ['off'],                        # 'on' or 'off'.
-    
+    'BIODIVERSTIY_TARGET_GBF_4_SNES': ['off'],                          # 'on' or 'off'.
+    'BIODIVERSTIY_TARGET_GBF_4_ECNES': ['off'],                         # 'on' or 'off'.
+
     # --------------- Biodiversity settings - GBF 8 ---------------
-    'BIODIVERSTIY_TARGET_GBF_8': ['off'],                               # 'on' or 'off'
+    'BIODIVERSTIY_TARGET_GBF_8': ['off'],       # 'on' or 'off'
 
  
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
-    'SOLVE_WEIGHT_ALPHA': [1],                  # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
-    'SOLVE_WEIGHT_BETA': np.arange(0.8,1,0.0025),         
+    'SOLVE_WEIGHT_ALPHA': [1],                                          # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
+    'SOLVE_WEIGHT_BETA': [0.9],         
     
     
     #-------------------- Diet BAU --------------------

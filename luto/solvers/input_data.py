@@ -273,10 +273,10 @@ def get_ag_man_biodiv_impacts(data: Data, target_year: int) -> dict[str, dict[st
     return ag_biodiversity.get_ag_management_biodiversity_contribution(data, target_year)
 
 def get_GBF2_priority_degrade_area_r(data: Data) -> np.ndarray:
-    if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
+    if settings.BIODIVERSITY_TARGET_GBF_2 == "off":
         return np.empty(0)
     print('Getting priority degrade area matrices...', flush = True)
-    output = ag_biodiversity.get_GBF2_bio_priority_degraded_areas_r(data)
+    output = data.BIO_PRIORITY_DEGRADED_AREAS_R
     return output
 
 def get_GBF3_MVG_area_vr(data: Data):
@@ -397,7 +397,7 @@ def get_ag_to_non_ag_t_rk(data: Data, target_index, base_year, ag_t_mrj):
         data, 
         target_index, 
         data.lumaps[base_year], 
-        data.lmmaps[base_year],
+        data.lmmaps[base_year]
     ).astype(np.float32)
     # Transition costs occures if the base year is not the target year
     return non_ag_t_mrj if (base_year - data.YR_CAL_BASE != target_index) else np.zeros_like(non_ag_t_mrj).astype(np.float32)
@@ -594,7 +594,7 @@ def get_BASE_YR_overall_bio_value(data: Data):
     return np.einsum('mrj,mrj->', ag_b_mrj, data.AG_L_MRJ)
 
 def get_BASE_YR_GBF2_score(data: Data) -> np.ndarray:
-    if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
+    if settings.BIODIVERSITY_TARGET_GBF_2 == "off":
         return np.empty(0)
     print('Getting priority degrade area base year score...', flush = True)
     GBF2_ly_r = get_GBF2_priority_degrade_area_r(data)
@@ -623,7 +623,9 @@ def get_savanna_eligible_r(data: Data) -> np.ndarray:
 
 
 def get_priority_degraded_mask_idx(data: Data) -> np.ndarray:
-    return np.where(data.BIO_PRIORITY_DEGRADED_AREAS_MASK)[0]
+    if settings.BIODIVERSITY_TARGET_GBF_2 == "off":
+        return np.empty(0)
+    return np.where(data.BIO_PRIORITY_DEGRADED_AREAS_R)[0]
 
 
 def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
@@ -658,7 +660,7 @@ def get_limits(data: Data, yr_cal: int) -> dict[str, Any]:
     if settings.GHG_EMISSIONS_LIMITS != 'off':
         limits['ghg'] = data.GHG_TARGETS[yr_cal]
 
-    if settings.BIODIVERSTIY_TARGET_GBF_2 != 'off':
+    if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
         limits["GBF2_priority_degrade_areas"] = data.get_GBF2_target_for_yr_cal(yr_cal)
 
     if settings.BIODIVERSTIY_TARGET_GBF_3 != 'off':
@@ -716,7 +718,7 @@ def set_limits(data: Data, yr_cal) -> None:
     if settings.GHG_EMISSIONS_LIMITS != 'off':
         limit_GHG = pd.DataFrame([{'Type': 'GHG', 'target': data.GHG_TARGETS[yr_cal]}])
         
-    if settings.BIODIVERSTIY_TARGET_GBF_2 != 'off':
+    if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
         limit_GBF_2= pd.DataFrame([{'Type': 'GBF-2',  'target': data.get_GBF2_target_for_yr_cal(yr_cal)}])
 
     if settings.BIODIVERSTIY_TARGET_GBF_3 != 'off':
@@ -876,7 +878,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
             "BASE_YR Production (t)": get_BASE_YR_production_t(data),
             "BASE_YR GHG (tCO2e)": get_BASE_YR_GHG_t(data),
             "BASE_YR Water (ML)": get_BASE_YR_water_ML(data),
-            "BASE_YR Overall Bio (score)": get_BASE_YR_overall_bio_value(data),
+            "BASE_YR Bio quality (score)": get_BASE_YR_overall_bio_value(data),
             "BASE_YR GBF_2 (score)": get_BASE_YR_GBF2_score(data),
         },
         

@@ -174,13 +174,13 @@ class LutoSolver:
             dry_lu_cells = self._input_data.ag_lu2cells[0, j]
             for r in dry_lu_cells:
                 self.X_ag_dry_vars_jr[j, r] = self.gurobi_model.addVar(
-                    ub=1, name=f"X_ag_dry_{j}_{r}"
+                    ub=1, name=f"X_ag_dry_{j}_{r}".replace(" ", "_")
                 )
 
             irr_lu_cells = self._input_data.ag_lu2cells[1, j]
             for r in irr_lu_cells:
                 self.X_ag_irr_vars_jr[j, r] = self.gurobi_model.addVar(
-                    ub=1, name=f"X_ag_irr_{j}_{r}"
+                    ub=1, name=f"X_ag_irr_{j}_{r}".replace(" ", "_")
                 )
 
         for k, k_name in enumerate(NON_AG_LAND_USES):
@@ -197,7 +197,7 @@ class LutoSolver:
                 self.X_non_ag_vars_kr[k, r] = self.gurobi_model.addVar(
                     lb=x_lb,
                     ub=self._input_data.non_ag_x_rk[r, k],
-                    name=f"X_non_ag_{k}_{r}",
+                    name=f"X_non_ag_{k}_{r}".replace(" ", "_")
                 )
 
     def _setup_ag_management_variables(self):
@@ -242,7 +242,7 @@ class LutoSolver:
                     self.X_ag_man_dry_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                         lb=dry_x_lb,
                         ub=1,
-                        name=f"X_ag_man_dry_{am_name}_{j}_{r}",
+                        name=f"X_ag_man_dry_{am_name}_{j}_{r}".replace(" ", "_"),
                     )
                 
                 for r in irr_lu_cells:
@@ -254,7 +254,7 @@ class LutoSolver:
                     self.X_ag_man_irr_vars_jr[am][j_idx, r] = self.gurobi_model.addVar(
                         lb=irr_x_lb,
                         ub=1,
-                        name=f"X_ag_man_irr_{am_name}_{j}_{r}",
+                        name=f"X_ag_man_irr_{am_name}_{j}_{r}".replace(" ", "_"),
                     )
 
     def _setup_deviation_penalties(self):
@@ -288,7 +288,7 @@ class LutoSolver:
         
         # Get objectives 
         self.obj_economy = self._setup_economy_objective() / self._input_data.base_yr_prod["BASE_YR Economy(AUD)"]              # Normalise to the base year economy value
-        self.obj_biodiv = self._setup_biodiversity_objective() / self._input_data.base_yr_prod["BASE_YR Overall Bio (score)"]  # Normalise to the base year biodiversity value
+        self.obj_biodiv = self._setup_biodiversity_objective() / self._input_data.base_yr_prod["BASE_YR Bio quality (score)"]   # Normalise to the base year biodiversity value
         self.obj_penalties = self._setup_penalty_objectives()                                                                   
  
         # Set the objective function
@@ -356,7 +356,9 @@ class LutoSolver:
         self.economy_ag_contr = gp.quicksum(ag_exprs)
         self.economy_ag_man_contr = gp.quicksum(ag_mam_exprs)
         self.economy_non_ag_contr = gp.quicksum(non_ag_exprs)
+        
         return self.economy_ag_contr + self.economy_ag_man_contr + self.economy_non_ag_contr
+    
     
     def _setup_biodiversity_objective(self):
         print("  ...setting up biodiversity objective...")
@@ -418,12 +420,11 @@ class LutoSolver:
         weight_ghg = 0
         weight_water = 0
         weight_biodiv = 0
-        
- 
+
         # Get the penalty values for each sector
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             weight_demand = settings.SOLVER_WEIGHT_DEMAND
-            
+
             self.penalty_demand = (
                 gp.quicksum(
                     v * price
@@ -469,8 +470,9 @@ class LutoSolver:
             + self.penalty_ghg    * weight_ghg
             + self.penalty_water  * weight_water
             + self.penalty_biodiv * weight_biodiv
-            + gp.LinExpr(0)
-        ) / sum([ weight_demand, weight_ghg, weight_water, weight_biodiv]) 
+            + gp.LinExpr(0)         # Empty term in case no penalties are set
+        ) / (weight_demand + weight_ghg + weight_water + weight_biodiv) 
+
 
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
@@ -526,14 +528,14 @@ class LutoSolver:
                     constr = self.gurobi_model.addConstr(
                         self.X_ag_man_dry_vars_jr[am][j_idx, r]
                         <= self.X_ag_dry_vars_jr[j, r],
-                        name=f"const_ag_mam_dry_usage_{am}_{j}_{r}",
+                        name=f"const_ag_mam_dry_usage_{am}_{j}_{r}".replace(" ", "_"),
                     )
                     self.ag_management_constraints_r[r].append(constr)
                 for r in lm_irr_r_vals:
                     constr = self.gurobi_model.addConstr(
                         self.X_ag_man_irr_vars_jr[am][j_idx, r]
                         <= self.X_ag_irr_vars_jr[j, r],
-                        name=f"const_ag_mam_irr_usage_{am}_{j}_{r}",
+                        name=f"const_ag_mam_irr_usage_{am}_{j}_{r}".replace(" ", "_"),
                     )
                     self.ag_management_constraints_r[r].append(constr)
 
@@ -557,7 +559,7 @@ class LutoSolver:
                 )
                 constr = self.gurobi_model.addConstr(
                     ag_man_vars_sum <= adoption_limit * all_vars_sum,
-                    name=f"const_ag_mam_adoption_limit_{am}_{j}",
+                    name=f"const_ag_mam_adoption_limit_{am}_{j}".replace(" ", "_"),
                 )
 
                 self.adoption_limit_constraints.append(constr)
@@ -742,12 +744,12 @@ class LutoSolver:
             if settings.WATER_CONSTRAINT_TYPE == "hard":
                 constr = self.gurobi_model.addConstr(
                     self.water_nyiled_exprs[reg_idx] >= water_limit, 
-                    name=f"water_yield_limit_{reg_idx}"
+                    name=f"water_yield_limit_{reg_name}".replace(" ", "_")
                 )
             elif settings.WATER_CONSTRAINT_TYPE == "soft":
                 constr = self.gurobi_model.addConstr(
                     water_limit - self.water_nyiled_exprs[reg_idx] <= self.W[reg_idx - 1],     # region index starts from 1
-                    name=f"water_yield_limit_{reg_idx}"     
+                    name=f"water_yield_limit_{reg_name.replace(' ', '_')}"
                 )
             else:
                 raise ValueError(
@@ -862,7 +864,7 @@ class LutoSolver:
 
     def _add_GBF2_priority_degrade_areas_constraints(self) -> None:
         
-        if settings.BIODIVERSTIY_TARGET_GBF_2 == "off":
+        if settings.BIODIVERSITY_TARGET_GBF_2 == "off":
             print("    ...Biodiversity GBF 2 (conservation priority) constraints TURNED OFF ...")
             return
 
@@ -918,18 +920,18 @@ class LutoSolver:
             gp.quicksum(bio_ag_exprs) 
             + gp.quicksum(bio_ag_man_exprs) 
             + gp.quicksum(bio_non_ag_exprs)
-        ) / self._input_data.limits["GBF2_priority_degrade_areas"]
+        ) 
         
         print(f"       |-- target is {self._input_data.limits["GBF2_priority_degrade_areas"]:15,.0f}")
         
         if settings.GBF2_CONSTRAINT_TYPE == "hard":
             self.bio_GBF2_priority_degraded_area_limit_constraint_hard = self.gurobi_model.addConstr(
-                self.bio_GBF2_priority_degraded_area_expr >= 1, 
+                self.bio_GBF2_priority_degraded_area_expr >= self._input_data.limits["GBF2_priority_degrade_areas"], 
                 name="bio_GBF2_priority_degraded_area_limit_hard"
             )
         elif settings.GBF2_CONSTRAINT_TYPE == "soft":
             constr = self.gurobi_model.addConstr(
-                1 - self.bio_GBF2_priority_degraded_area_expr <= self.B, 
+                self._input_data.limits["GBF2_priority_degrade_areas"] - self.bio_GBF2_priority_degraded_area_expr <= self.B, 
                 name="bio_GBF2_priority_degraded_area_limit_soft"
             )
             self.bio_GBF2_priority_degraded_area_limit_constraint_soft.append(constr)
@@ -999,12 +1001,12 @@ class LutoSolver:
             )
 
 
-            self.bio_GBF3_major_vegetation_exprs[v] = (ag_contr + ag_man_contr + non_ag_contr) / v_area_lb
+            self.bio_GBF3_major_vegetation_exprs[v] = (ag_contr + ag_man_contr + non_ag_contr)
 
             print(f"       |-- target is {v_area_lb:15,.0f} for {v_names[v]} ")
             self.bio_GBF3_major_vegetation_limit_constraints[v] = self.gurobi_model.addConstr(
-                self.bio_GBF3_major_vegetation_exprs[v] >= 1,
-                name=f"bio_GBF3_major_vegetation_limit_{v}",
+                self.bio_GBF3_major_vegetation_exprs[v] >= v_area_lb,
+                name=f"bio_GBF3_major_vegetation_limit_{v_names[v]}".replace(" ", "_")
             )
 
 
@@ -1064,12 +1066,12 @@ class LutoSolver:
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            self.bio_GBF4_SNES_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / x_area_lb  
+            self.bio_GBF4_SNES_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr)
 
             print(f"       |-- target is {x_area_lb:15,.0f} for {x_names[x]}")
             self.bio_GBF4_SNES_constrs[x] = self.gurobi_model.addConstr(
-                self.bio_GBF4_SNES_exprs[x] >= 1,
-                name=f"bio_GBF4_SNES_limit_{x}",
+                self.bio_GBF4_SNES_exprs[x] >= x_area_lb,
+                name=f"bio_GBF4_SNES_limit_{x_names[x]}".replace(" ", "_"),
             )
 
     def _add_GBF4_ecnes_constraints(self) -> None:
@@ -1128,13 +1130,13 @@ class LutoSolver:
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            self.bio_GBF4_ECNES_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr) / x_area_lb
+            self.bio_GBF4_ECNES_exprs[x] = (ag_contr + ag_man_contr + non_ag_contr)
 
 
             print(f"       |-- target is {x_area_lb:15,.0f} for {x_names[x]} ")
             self.bio_GBF4_ECNES_constrs[x] = self.gurobi_model.addConstr(
-                self.bio_GBF4_ECNES_exprs[x] >= 1,
-                name=f"bio_GBF4_ECNES_limit_{x}",
+                self.bio_GBF4_ECNES_exprs[x] >= x_area_lb,
+                name=f"bio_GBF4_ECNES_limit_{x_names[x]}".replace(" ", "_")
             )
 
 
@@ -1194,12 +1196,12 @@ class LutoSolver:
             )
 
             # Divide by constant to reduce strain on the constraint matrix range
-            self.bio_GBF8_species_conservation_exprs[s] = (ag_contr + ag_man_contr + non_ag_contr) / s_area_lb
+            self.bio_GBF8_species_conservation_exprs[s] = (ag_contr + ag_man_contr + non_ag_contr)
     
             print(f"       |-- target is {s_area_lb:15,.0f} for {s_names[s]}")
             self.bio_GBF8_species_conservation_constrs[s] = self.gurobi_model.addConstr(
-                self.bio_GBF8_species_conservation_exprs[s] >= 1,
-                name=f"bio_GBF8_species_conservation_limit_{s}",
+                self.bio_GBF8_species_conservation_exprs[s] >= s_area_lb,
+                name=f"bio_GBF8_species_conservation_limit_{s_names[s]}".replace(" ", "_"),
             )
 
         
@@ -1699,46 +1701,44 @@ class LutoSolver:
             ag_man_X_mrj=ag_man_X_mrj_processed,
             prod_data=prod_data,
             obj_val={
-                "ObjVal": self.gurobi_model.ObjVal,
+                "ObjVal":                           (None if self.gurobi_model.Status != GRB.OPTIMAL else self.gurobi_model.ObjVal),
                 
-                "Economy Total Value (AUD)": self.obj_economy.getValue(),
-                'Economy Ag Value (AUD)': self.economy_ag_contr.getValue(),
-                'Economy Non-Ag Value (AUD)': self.economy_non_ag_contr.getValue(),
-                'Economy Ag-Man Value (AUD)': self.economy_ag_man_contr.getValue(),
-                "Economy Total Objective": self.obj_economy.getValue() * settings.SOLVE_WEIGHT_ALPHA,
+                "Obj Economy":                      self.obj_economy.getValue(),
+                "Obj Biodiversity":                 self.obj_biodiv.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA),
+                "Obj Penalties":                    self.obj_penalties.getValue() * settings.SOLVE_WEIGHT_BETA,
                 
-                "Biodiversity Total Priority Score (score)": self.obj_biodiv.getValue(),
-                "Biodiversity Ag Priority Score (score)": self.bio_ag_contr.getValue(),
-                "Biodiversity Non-Ag Priority Score (score)": self.bio_non_ag_contr.getValue(),
-                "Biodiversity Ag-Man Priority Score (score)": self.bio_ag_man_contr.getValue(),
-                "Biodiversity Total Objective": self.obj_biodiv.getValue() * settings.SOLVE_WEIGHT_BETA,
+                'Economy (AUD) Ag':                 self.economy_ag_contr.getValue(),
+                'Economy (AUD) Non-Ag Value':       self.economy_non_ag_contr.getValue(),
+                'Economy (AUD) Ag-Man Value':       self.economy_ag_man_contr.getValue(),                
                 
-                "Penalties Value (AUD)": self.obj_penalties.getValue(),
-                "Penalties Objective": self.obj_penalties.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA),
+                "Bio quality (score) Ag":           self.bio_ag_contr.getValue(),
+                "Bio quality (score) Non-Ag":       self.bio_non_ag_contr.getValue(),
+                "Bio quality (score) Ag-Man":       self.bio_ag_man_contr.getValue(),
+
+                "Production (t) Ag":                {c:self.ag_q_c[c].getValue() for c in range(self._input_data.ncms)},
+                "Production (t) Non-Ag":            {c:self.non_ag_q_c[c].getValue() for c in range(self._input_data.ncms)},
+                "Production (t) Ag-Man":            {c:self.ag_man_q_c[c].getValue() for c in range(self._input_data.ncms)},
                 
-                "Production Ag Value (t)":          {c:self.ag_q_c[c].getValue() for c in range(self._input_data.ncms)},
-                "Production Non-Ag Value (t)":      {c:self.non_ag_q_c[c].getValue() for c in range(self._input_data.ncms)},
-                "Production Ag-Mam Value (t)":      {c:self.ag_man_q_c[c] .getValue() for c in range(self._input_data.ncms)},
                 "Production Deviation (t)":         (self.V.X if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0),
-                "Production Penalty":               (self.penalty_demand.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA)              if settings.DEMAND_CONSTRAINT_TYPE == "soft" else 0),
+                "Production Penalty":               (self.penalty_demand.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA)              if settings.DEMAND_CONSTRAINT_TYPE == "soft"           else 0),
                             
-                "Water value (ML)":                 ({k: v.getValue() for k,v in self.water_nyiled_exprs.items()}                    if settings.WATER_LIMITS == "on" else 0),
-                "Water Deviation (ML)":             (self.W.X                                                                        if settings.WATER_CONSTRAINT_TYPE == "soft" else 0),
-                "Water Penalty":                    (self.penalty_water.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA)               if settings.WATER_CONSTRAINT_TYPE == "soft" else 0),
+                "Water value (ML)":                 ({k: v.getValue() for k,v in self.water_nyiled_exprs.items()}                    if settings.WATER_LIMITS == "on"                       else 0),
+                "Water Deviation (ML)":             (self.W.X                                                                        if settings.WATER_CONSTRAINT_TYPE == "soft"            else 0),
+                "Water Penalty":                    (self.penalty_water.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA)               if settings.WATER_CONSTRAINT_TYPE == "soft"            else 0),
                             
-                "GHG Ag Value (tCO2e)":             (self.ghg_ag_contr.getValue()                                                    if settings.GHG_EMISSIONS_LIMITS != "off" else 0),
-                "GHG Non-Ag Value (tCO2e)":         (self.ghg_non_ag_contr.getValue()                                                if settings.GHG_EMISSIONS_LIMITS != "off" else 0),
-                "GHG Ag-Mam Value t(CO2e)":         (self.ghg_ag_man_contr.getValue()                                                if settings.GHG_EMISSIONS_LIMITS != "off" else 0),    
-                "GHG Deviation (tCO2e)":            (self.E.X                                                                        if settings.GHG_CONSTRAINT_TYPE == "soft" else 0),
-                "GHG Penalty":                      (self.penalty_ghg.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA)                 if settings.GHG_CONSTRAINT_TYPE == "soft" else 0),
+                "GHG Ag Value (tCO2e)":             (self.ghg_ag_contr.getValue()                                                    if settings.GHG_EMISSIONS_LIMITS != "off"              else 0),
+                "GHG Non-Ag Value (tCO2e)":         (self.ghg_non_ag_contr.getValue()                                                if settings.GHG_EMISSIONS_LIMITS != "off"              else 0),
+                "GHG Ag-Man Value (tCO2e)":         (self.ghg_ag_man_contr.getValue()                                                if settings.GHG_EMISSIONS_LIMITS != "off"              else 0),    
+                "GHG Deviation (tCO2e)":            (self.E.X                                                                        if settings.GHG_CONSTRAINT_TYPE == "soft"              else 0),
+                "GHG Penalty":                      (self.penalty_ghg.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA)                 if settings.GHG_CONSTRAINT_TYPE == "soft"              else 0),
             
-                "BIO (GBF2) value (ha)":            (0                                                                               if settings.BIODIVERSTIY_TARGET_GBF_2 == "off" else self.bio_GBF2_priority_degraded_area_expr.getValue()),
-                "BIO (GBF2) Deviation (ha)":        (self.B.X                                                                        if settings.GBF2_CONSTRAINT_TYPE == "soft" else 0),
-                "BIO (GBF2) Penalty":               (self.penalty_biodiv.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA)              if settings.GBF2_CONSTRAINT_TYPE == "soft" else 0),
-                "BIO (GBF3) value (ha)":            (0                                                                               if settings.BIODIVERSTIY_TARGET_GBF_3 == "off" else {k: v.getValue() for k,v in self.bio_GBF3_major_vegetation_exprs.items()}),
-                "BIO (GBF4) SNES value (ha)":       ({k: v.getValue() for k,v in self.bio_GBF4_SNES_exprs.items()}                   if settings.BIODIVERSTIY_TARGET_GBF_4_SNES == "on" else 0),
-                "BIO (GBF4) ECNES value (ha)":      ({k: v.getValue() for k,v in self.bio_GBF4_ECNES_exprs.items()}                  if settings.BIODIVERSTIY_TARGET_GBF_4_ECNES == "on" else 0),
-                "BIO (GBF8) value (ha)":            ({k: v.getValue() for k,v in self.bio_GBF8_species_conservation_exprs.items()}   if settings.BIODIVERSTIY_TARGET_GBF_8 == "on" else 0),
+                "BIO (GBF2) value (ha)":            (0                                                                               if settings.BIODIVERSITY_TARGET_GBF_2 == "off"         else self.bio_GBF2_priority_degraded_area_expr.getValue()),
+                "BIO (GBF2) Deviation (ha)":        (self.B.X                                                                        if settings.GBF2_CONSTRAINT_TYPE == "soft"             else 0),
+                "BIO (GBF2) Penalty":               (self.penalty_biodiv.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA)              if settings.GBF2_CONSTRAINT_TYPE == "soft"             else 0),
+                "BIO (GBF3) value (ha)":            (0                                                                               if settings.BIODIVERSTIY_TARGET_GBF_3 == "off"         else {k: v.getValue() for k,v in self.bio_GBF3_major_vegetation_exprs.items()}),
+                "BIO (GBF4) SNES value (ha)":       ({k: v.getValue() for k,v in self.bio_GBF4_SNES_exprs.items()}                   if settings.BIODIVERSTIY_TARGET_GBF_4_SNES == "on"     else 0),
+                "BIO (GBF4) ECNES value (ha)":      ({k: v.getValue() for k,v in self.bio_GBF4_ECNES_exprs.items()}                  if settings.BIODIVERSTIY_TARGET_GBF_4_ECNES == "on"    else 0),
+                "BIO (GBF8) value (ha)":            ({k: v.getValue() for k,v in self.bio_GBF8_species_conservation_exprs.items()}   if settings.BIODIVERSTIY_TARGET_GBF_8 == "on"          else 0),
             },
         )
 

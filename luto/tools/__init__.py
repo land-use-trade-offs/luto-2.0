@@ -594,7 +594,7 @@ class LogToFile:
             
             
 
-def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1):
+def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1, stop_event=None):
     '''
     Log the memory usage of the current process to a file.
     Parameters
@@ -604,7 +604,7 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1):
     '''
     
     with open(f'{output_dir}/RES_{settings.RESFACTOR}_mem_log.txt', mode=mode) as file:
-        while True:
+        while not stop_event.is_set():
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             process = psutil.Process(os.getpid())
             memory_usage = process.memory_info().rss

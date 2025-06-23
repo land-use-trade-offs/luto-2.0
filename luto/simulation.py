@@ -26,15 +26,14 @@ model that has 'global' varying state.
 """
 
 
-import os
 import gzip
+import pickle
 import time
 import dill
 import threading
 import time
 
-from glob import glob
-
+from gurobipy import GRB
 from luto.data import Data
 from luto.solvers.input_data import get_input_data
 from luto.solvers.solver import LutoSolver
@@ -57,49 +56,53 @@ def load_data() -> Data:
     Load the Data object containing all required data to run a LUTO simulation.
     """
     # Thread to log memory usage
-    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'w',1), daemon=True)
+    stop_event = threading.Event()
+    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'w',1, stop_event))
     memory_thread.start()
     
-    # Remove previous log files
-    for f in glob(f'{settings.OUTPUT_DIR}/*.log') + glob(f'{settings.OUTPUT_DIR}/*.txt'):
-        try:
-            [os.remove(f) if  not read_timestamp() in f else None]
-        except:
-            print(f"Error removing file {f}")
+    try:
+        data = Data()
+    except Exception as e:
+        print(f"An error occurred while loading data: {e}")
+        raise e
+    finally:
+        # Ensure the memory logging thread is stopped
+        stop_event.set()
+        memory_thread.join()
 
-    return Data()
+    return data
 
 
 @LogToFile(f"{settings.OUTPUT_DIR}/run_{read_timestamp()}", 'a')
 def run(
     data: Data, 
-    years = settings.SIM_YEARS,
+    years = sorted(settings.SIM_YEARS),
 ) -> None:
     """
     Run the simulation.
-
-    Parameters
-        - data: is a Data object which is previously loaded using load_data(),
-        - years: is a list of years to run the simulation for. If not provided, it will
-            use the default years from settings.SIM_YEARS.
     """
+    
     # Start recording memory usage
-    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1), daemon=True)
+    stop_event = threading.Event()
+    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1, stop_event))
     memory_thread.start()
     
-    
-    # Update the simulation years in the data object  
-    years = sorted(years)
-    data.set_path(years)
-    print('\n')
-    print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]} at RES-{settings.RESFACTOR}, total {len(years)} runs!\n", flush=True)
-        
-    # Insert the base year at the beginning of the years list if not already present
-    if data.YR_CAL_BASE not in years: years.insert(0, data.YR_CAL_BASE)
-
-    # Solve and write output
-    solve_timeseries(data, years)
-    write_outputs(data)
+    try:
+        print('\n')
+        print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]} at RES-{settings.RESFACTOR}, total {len(years)} runs!\n", flush=True)
+        # Insert the base year at the beginning of the years list if not already present
+        if data.YR_CAL_BASE not in years: 
+            years.insert(0, data.YR_CAL_BASE)
+        # Solve and write outputs
+        solve_timeseries(data, years)
+        write_outputs(data)
+    except Exception as e:
+        print(f"An error occurred during the simulation: {e}")
+        raise e
+    finally:
+        # Ensure the memory logging thread is stopped
+        stop_event.set()
+        memory_thread.join()
     
 
 
@@ -111,9 +114,9 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
 
         print( "-------------------------------------------------")
         print( f"Running for year {target_year}"   )
-        print( "-------------------------------------------------\n" )
+        print( "-------------------------------------------------\n")
+        
         start_time = time.time()
-
         input_data = get_input_data(data, base_year, target_year)
 
         # if step == 0:
@@ -155,12 +158,22 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
 
         for data_type, prod_data in solution.prod_data.items():
             data.add_production_data(target_year, data_type, prod_data)
+            
+        data.last_year = target_year
 
         print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' )
+        
+        if luto_solver.gurobi_model.Status != GRB.OPTIMAL:
+            print('!' * 100)
+            print(f"Warning: Gurobi solver did not find an optimal solution for year {target_year}. Status: {luto_solver.gurobi_model.Status}")
+            print(f'Warning: The results are still written to disk, but will not be optimal.')
+            print('!' * 100)
+            print('\n')
+            break
 
 
 
-def save_data_to_disk(data: Data, path: str, compress_level=9) -> None:
+def save_data_to_disk(data: Data, path: str, compress_level=6) -> None:
     """Save the Data object to disk with gzip compression.
     Arguments:
         data: `Data` object.
@@ -169,7 +182,7 @@ def save_data_to_disk(data: Data, path: str, compress_level=9) -> None:
     """
     # Save with gzip compression
     with gzip.open(path, 'wb', compresslevel=compress_level) as f:
-        dill.dump(data, f)
+        dill.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
     
 
 def load_data_from_disk(path: str) -> Data:

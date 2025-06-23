@@ -33,7 +33,6 @@ import luto.economics.agricultural.ghg as ag_ghg
 from luto import settings
 import luto.tools as tools
 
-
 def get_to_ag_exclude_matrices(data: Data, lumap: np.ndarray):
     """Return x_mrj exclude matrices.
 
@@ -112,11 +111,11 @@ def get_transition_matrices_ag2ag(data: Data, yr_idx: int, lumap: np.ndarray, lm
     n_ag_lms, ncells, n_ag_lus = data.AG_L_MRJ.shape
 
     # -------------------------------------------------------------- #
-    # Establishment costs (upfront, amortised to annual, per cell).  #
+    # Transition costs (upfront, amortised to annual, per cell).  #
     # -------------------------------------------------------------- #
 
     # Raw transition-cost matrix is in $/ha and lexigraphically ordered (shape: land-use x land-use).
-    t_ij = data.AG_TMATRIX * data.TRANS_COST_MULTS[yr_cal]
+    t_ij = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values * data.TRANS_COST_MULTS[yr_cal]
 
     # Non-irrigation related transition costs for cell r to change to land-use j calculated based on lumap (in $/ha).
     # Only consider for cells currently being used for agriculture.
@@ -126,7 +125,7 @@ def get_transition_matrices_ag2ag(data: Data, yr_idx: int, lumap: np.ndarray, lm
     # Amortise upfront costs to annualised costs and converted to $ per cell via REAL_AREA
     e_rj = tools.amortise(e_rj) * data.REAL_AREA[:, np.newaxis]
 
-    # Repeat the establishment costs into dryland and irrigated land management types
+    # Repeat the transition costs into dryland and irrigated land management types
     e_mrj = np.stack([e_rj, e_rj], axis=0)
 
     # Update the cost matrix with exclude matrices; the transition cost for a cell that remain the same is 0.
@@ -147,9 +146,7 @@ def get_transition_matrices_ag2ag(data: Data, yr_idx: int, lumap: np.ndarray, lm
 
     # Apply the cost of carbon released by transitioning natural land to modified land
     ghg_transition = ag_ghg.get_ghg_transition_emissions(data, lumap, separate=True)        # <unit: t/ha>
-    
-    # ghg_transition *= data.REAL_AREA[:, np.newaxis]                                       # <unit: $/cell>  TODO: check if this is needed
-    
+        
     ghg_transition = {
         k:np.einsum('mrj,mrj,mrj->mrj', v, x_mrj, l_mrj_not).astype(np.float32)             # No GHG penalty for cells that remain the same, or are prohibited from transitioning
         for k, v in ghg_transition.items()

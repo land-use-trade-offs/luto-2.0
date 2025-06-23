@@ -700,7 +700,6 @@ def get_biochar_effect_g_mrj(data:Data, yr_idx):
 
 
 def get_beef_hir_effect_g_mrj(data: Data, yr_idx):
-
     land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     g_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses)))
     

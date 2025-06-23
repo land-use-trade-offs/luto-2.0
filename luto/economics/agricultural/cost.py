@@ -516,7 +516,7 @@ def get_beef_hir_effect_c_mrj(data: Data, yr_idx: int):
             q_costs = data.AGEC_LVSTK['QC', lvstype] * yield_pot * data.QC_COST_MULTS.loc[yr_cal, lvstype_capital] * data.REAL_AREA
             c_mrj_effects[m, :, j_idx] += (settings.HIR_PRODUCTIVITY_CONTRIBUTION - 1) * q_costs
 
-    return c_mrj_effects + (settings.BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:, None]
+    return c_mrj_effects + (settings.BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR * data.REAL_AREA)[:,None]
 
 
 def get_sheep_hir_effect_c_mrj(data: Data, yr_idx: int):

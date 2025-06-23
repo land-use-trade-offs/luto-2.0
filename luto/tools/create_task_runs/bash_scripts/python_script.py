@@ -19,9 +19,12 @@
 
 import os
 import shutil
+import threading
 import zipfile
 import luto.simulation as sim
 import luto.settings as settings
+
+from luto.tools import log_memory_usage
 from luto.tools.write import write_outputs
 
 
@@ -34,7 +37,7 @@ write_outputs(data)
 
 # Remove all files except the report directory if settings.KEEP_OUTPUTS is False
 '''
-KEEP_OUTPUTS is not originally defined in the settings, but will be added in the `luto/tools/create_task_runs/create_running_tasks.py` file.
+KEEP_OUTPUTS is not originally defined in the settings, but will be added by `create_gridu_search_task.py`.
 '''
 
 if settings.KEEP_OUTPUTS:
@@ -43,8 +46,9 @@ if settings.KEEP_OUTPUTS:
     sim.save_data_to_disk(data, f"{data.path}/DATA_REPORT/Data_RES{settings.RESFACTOR}.gz")
  
 else:
-    data = None     # Clear the data object to free up memory
-    sim = None      # Clear the simulation module to free up memory
+    
+    data = None  # Clear the data object to free memory
+    sim = None   # Clear the simulation module to free memory
     
     report_dir = f"{data.path}/DATA_REPORT"
     archive_path ='./DATA_REPORT.zip'
@@ -68,5 +72,3 @@ else:
             except Exception as e:
                 print(f"Failed to delete {item}. Reason: {e}")
                 
-    
-    

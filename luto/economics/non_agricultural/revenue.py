@@ -267,15 +267,15 @@ def get_rev_matrix(data: Data, yr_cal: int, ag_r_mrj, lumap) -> np.ndarray:
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
     non_agr_rev_matrices = [
-        get_rev_env_plantings(data, yr_cal)                                        ,
-        get_rev_rip_plantings(data, yr_cal)                                        ,
-        get_rev_sheep_agroforestry(data, yr_cal, ag_r_mrj, agroforestry_x_r)       ,
-        get_rev_beef_agroforestry(data, yr_cal, ag_r_mrj, agroforestry_x_r)        ,
-        get_rev_carbon_plantings_block(data, yr_cal)                               ,
-        get_rev_sheep_carbon_plantings_belt(data, yr_cal, ag_r_mrj, cp_belt_x_r)   ,
-        get_rev_beef_carbon_plantings_belt(data, yr_cal, ag_r_mrj, cp_belt_x_r)    ,
-        get_rev_beccs(data, yr_cal)                                                ,
-        get_rev_destocked(data, ag_r_mrj)                                          ,
+        get_rev_env_plantings(data, yr_cal),
+        get_rev_rip_plantings(data, yr_cal),
+        get_rev_sheep_agroforestry(data, yr_cal, ag_r_mrj, agroforestry_x_r),
+        get_rev_beef_agroforestry(data, yr_cal, ag_r_mrj, agroforestry_x_r),
+        get_rev_carbon_plantings_block(data, yr_cal),
+        get_rev_sheep_carbon_plantings_belt(data, yr_cal, ag_r_mrj, cp_belt_x_r),
+        get_rev_beef_carbon_plantings_belt(data, yr_cal, ag_r_mrj, cp_belt_x_r),
+        get_rev_beccs(data, yr_cal),
+        get_rev_destocked(data, ag_r_mrj),
     ]
 
     return np.concatenate(

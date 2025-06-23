@@ -138,9 +138,9 @@ SOLVER_WEIGHT_GBF2 = 1
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
-WRITE_OUTPUT_GEOTIFFS = True   # Write GeoTiffs to output directory: True or False
-PARALLEL_WRITE = True          # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = 32             # The Threads to use for map making, only work with PARALLEL_WRITE = True
+WRITE_OUTPUT_GEOTIFFS = False               # Write GeoTiffs to output directory: True or False
+PARALLEL_WRITE = True                       # If to use parallel processing to write GeoTiffs: True or False
+WRITE_THREADS = min(32, os.cpu_count())     # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
@@ -287,14 +287,7 @@ AGROFORESTRY_ROW_WIDTH = 20
 AGROFORESTRY_ROW_SPACING = 40
 AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
 no_belts_per_ha = 100 / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
-AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per ha in metres
-
-# Destocked natural land Parameters
-#   NOTE: Must be the same as F38/F44 in the 'luto/input/transitions_costs_********.xlsx' file
-DESTOCKED_COST_REMOVING_PREVIOUS_LIVESTOCK_HA = 1500
-DESTOCKED_COST_ESTABLISHING_NATURAL_HA = 2000
-
-
+AF_FENCING_LENGTH_HA = 100 * no_belts_per_ha * 2 # Length of fencing required per ha in metres
 
 
 # ---------------------------------------------------------------------------- #
@@ -542,7 +535,7 @@ GBF2_TARGETS_DICT = {
 }
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-BIODIVERSTIY_TARGET_GBF_2 = 'high'            # 'off', 'low', 'medium', or 'high'
+BIODIVERSITY_TARGET_GBF_2 = 'high'            # 'off', 'low', 'medium', or 'high'
 '''
 Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -591,7 +584,7 @@ I.e., the lower bound of the connectivity score for weighting the raw biodiversi
 
 
 # Habitat condition data source
-HABITAT_CONDITION = 'USER_DEFINED'                  # One of [10, 25, 50, 75, 90], or 'NONE'
+HABITAT_CONDITION = 'USER_DEFINED'                  # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'
 '''
 Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the
 suitability for wild animals ranging between 0-1) for each land-use type.Avaliable percentiles is one of [10, 25, 50, 75, 90].
