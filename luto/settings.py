@@ -133,6 +133,14 @@ SOLVER_WEIGHT_GHG = 1
 SOLVER_WEIGHT_WATER = 1
 SOLVER_WEIGHT_GBF2 = 1
 
+RESCALE_FACTOR = 1e3
+'''
+All input data before feeding into the solver is rescaled in the range between 0 and this factor.
+This is to avoid numerical issues with the solver when dealing with very small/large numbers. 
+E.g., the water yield for some cells is 10t but the Biodiversity-score is 1e-7, making the 
+the model sensitive to variations in input data. 
+'''
+
 
 
 # ---------------------------------------------------------------------------- #
@@ -166,7 +174,7 @@ CROSSOVER = 0
 
 # Parameters for dealing with numerical issues. NUMERIC_FOCUS = 2 fixes most things but roughly doubles solve time.
 SCALE_FLAG = -1     # Scales the rows and columns of the model to improve the numerical properties of the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each row to make its largest nonzero entry to be magnitude one, then scale each column to max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing revealed that 1 tripled solve time, 3 led to numerical problems.
-NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect and manage numerical issues. Default (0) makes an automatic choice, with a slight preference for speed. Settings 1-3 increasingly shift the focus towards being more careful in numerical computations. NUMERIC_FOCUS = 1 is ok, but 2 increases solve time by ~4x
+NUMERIC_FOCUS = 2   # Controls the degree to which the code attempts to detect and manage numerical issues. Default (0) makes an automatic choice, with a slight preference for speed. Settings 1-3 increasingly shift the focus towards being more careful in numerical computations. NUMERIC_FOCUS = 1 is ok, but 2 increases solve time by ~4x
 BARHOMOGENOUS = 1   # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
@@ -407,7 +415,7 @@ GHG_TARGETS_DICT = {
 }
 
 # Greenhouse gas emissions limits and parameters *******************************
-GHG_EMISSIONS_LIMITS = 'medium'        # 'off', 'low', 'medium', or 'high'
+GHG_EMISSIONS_LIMITS = 'low'        # 'off', 'low', 'medium', or 'high'
 '''
 `GHG_EMISSIONS_LIMITS` options include: 
 - Assuming agriculture is responsible to sequester 100% of the carbon emissions
@@ -535,7 +543,7 @@ GBF2_TARGETS_DICT = {
 }
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-BIODIVERSITY_TARGET_GBF_2 = 'high'            # 'off', 'low', 'medium', or 'high'
+BIODIVERSITY_TARGET_GBF_2 = 'medium'            # 'off', 'low', 'medium', or 'high'
 '''
 Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -547,7 +555,7 @@ in order to enhance biodiversity and ecosystem functions and services, ecologica
 '''
 
 
-GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 50
+GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 
@@ -634,7 +642,7 @@ GBF3_TARGETS_DICT = {
     'USER_DEFINED': None
 }
 
-BIODIVERSTIY_TARGET_GBF_3  = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+BIODIVERSITY_TARGET_GBF_3  = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.
@@ -648,8 +656,8 @@ protect and manage 30% of the world's land, water, and coastal areas by 2030.
 
 
 # ------------------------------- Species parameters -------------------------------
-BIODIVERSTIY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
-BIODIVERSTIY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
 
 '''
 Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
@@ -660,7 +668,7 @@ and manage human-wildlife interactions
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------
-BIODIVERSTIY_TARGET_GBF_8 = 'off'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_8 = 'off'           # 'on' or 'off'.
 '''
 Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
 reduce the impacts of climate change on biodiversity and ecosystems.

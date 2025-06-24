@@ -1012,8 +1012,16 @@ class Data:
         print(f"\tCalculating base year productivity...", flush=True)
         yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)        
         self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
-
-
+        
+        
+        
+        # Place holders for base year values; will be filled in the input_data module.
+        self.BASE_YR_economic_value = None
+        self.BASE_YR_production_t = yr_cal_base_prod_data
+        self.BASE_YR_GHG_t = None
+        self.BASE_YR_water_ML = None
+        self.BASE_YR_overall_bio_value = None
+        self.BASE_YR_GBF2_score = None
 
         ###############################################################
         # Demand data.
@@ -1215,7 +1223,7 @@ class Data:
         ###############################################################
         # Vegetation data (GBF3).
         ###############################################################
-        if settings.BIODIVERSTIY_TARGET_GBF_3 != 'off':
+        if settings.BIODIVERSITY_TARGET_GBF_3 != 'off':
         
             print("\tLoading vegetation data...", flush=True)
             
@@ -1226,7 +1234,7 @@ class Data:
             ).sort_values(by='group', ascending=True)
             
             
-            if settings.BIODIVERSTIY_TARGET_GBF_3 == 'USER_DEFINED':
+            if settings.BIODIVERSITY_TARGET_GBF_3 == 'USER_DEFINED':
                 self.GBF3_GROUPS_SEL = [row['group'] for _,row in GBF3_targets_df.iterrows()
                     if all([
                         row['USER_DEFINED_TARGET_PERCENT_2030']>0,
@@ -1240,7 +1248,7 @@ class Data:
                 self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS[[
                     'USER_DEFINED_TARGET_PERCENT_2030',
                     'USER_DEFINED_TARGET_PERCENT_2050', 
-                    'USER_DEFINED_TARGET_PERCENT_2100']] = settings.GBF3_TARGETS_DICT[settings.BIODIVERSTIY_TARGET_GBF_3]
+                    'USER_DEFINED_TARGET_PERCENT_2100']] = settings.GBF3_TARGETS_DICT[settings.BIODIVERSITY_TARGET_GBF_3]
                 
 
             self.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA = self.GBF3_BASELINE_AREA_AND_USERDEFINE_TARGETS['AREA_WEIGHTED_SCORE_ALL_AUSTRALIA_HA'].to_numpy()
@@ -1274,7 +1282,7 @@ class Data:
         ##########################################################################
         #  Biodiersity environmental significance (GBF4)                         #
         ##########################################################################
-        if settings.BIODIVERSTIY_TARGET_GBF_4_SNES != 'off':
+        if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
 
             print("\tLoading environmental significance data (SNES)...", flush=True)
             
@@ -1312,7 +1320,7 @@ class Data:
             self.BIO_GBF4_SPECIES_LAYERS = np.array([self.get_exact_resfactored_average_arr_without_lu_mask(arr) for arr in snes_arr]) 
         
         
-        if settings.BIODIVERSTIY_TARGET_GBF_4_SNES != 'off':
+        if settings.BIODIVERSITY_TARGET_GBF_4_SNES != 'off':
             print("\tLoading environmental significance data (ECNES)...", flush=True)
         
         
@@ -1354,7 +1362,7 @@ class Data:
         # Biodiersity species suitability under climate change (GBF8)            #
         ##########################################################################
         
-        if settings.BIODIVERSTIY_TARGET_GBF_8 != 'off':
+        if settings.BIODIVERSITY_TARGET_GBF_8 != 'off':
             
             print("\tLoading Species suitability data...", flush=True)
             
@@ -1623,7 +1631,7 @@ class Data:
         return f(yr_cal).item()  # Convert the interpolated value to a scalar
     
     
-    def get_GBF3_limit_score_inside_LUTO_by_yr(self, yr:int):
+    def get_GBF3_limit_score_inside_LUTO_by_yr(self, yr:int) -> np.ndarray:
         '''
         Interpolate the user-defined targets to get target at the given year
         '''

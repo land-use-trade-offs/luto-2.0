@@ -95,14 +95,14 @@ grid_search = {
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                   # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
-    'BIODIVERSTIY_TARGET_GBF_3': ['off'],                               # 'off', 'medium', 'high', 'USER_DEFINED'
+    'BIODIVERSITY_TARGET_GBF_3': ['off'],                               # 'off', 'medium', 'high', 'USER_DEFINED'
     
     # --------------- Biodiversity settings - GBF 4 ---------------
-    'BIODIVERSTIY_TARGET_GBF_4_SNES': ['off'],                          # 'on' or 'off'.
-    'BIODIVERSTIY_TARGET_GBF_4_ECNES': ['off'],                         # 'on' or 'off'.
+    'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],                          # 'on' or 'off'.
+    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off'],                         # 'on' or 'off'.
 
     # --------------- Biodiversity settings - GBF 8 ---------------
-    'BIODIVERSTIY_TARGET_GBF_8': ['off'],       # 'on' or 'off'
+    'BIODIVERSITY_TARGET_GBF_8': ['off'],       # 'on' or 'off'
 
  
     ###############################################################

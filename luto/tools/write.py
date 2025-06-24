@@ -1112,7 +1112,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
         
     # Do nothing if biodiversity limits are off and no need to report
-    if settings.BIODIVERSTIY_TARGET_GBF_3 == 'off':
+    if settings.BIODIVERSITY_TARGET_GBF_3 == 'off':
         return
     
     # Unpack the agricultural management land-use
@@ -1206,7 +1206,7 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
 
 
 def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
-    if not settings.BIODIVERSTIY_TARGET_GBF_4_SNES == "on":
+    if not settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on":
         return
     
     print(f"Writing species of national environmental significance scores (GBF4 SNES) for {yr_cal}")
@@ -1307,7 +1307,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
 
 def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     
-    if not settings.BIODIVERSTIY_TARGET_GBF_4_ECNES == "on":
+    if not settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on":
         return
     
     print(f"Writing ecological communities of national environmental significance scores (GBF4 ECNES) for {yr_cal}")
@@ -1407,7 +1407,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
 def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
     
     # Do nothing if biodiversity limits are off and no need to report
-    if not settings.BIODIVERSTIY_TARGET_GBF_8 == 'on':
+    if not settings.BIODIVERSITY_TARGET_GBF_8 == 'on':
         return
 
     print(f'Writing biodiversity GBF8 scores (GROUPS) for {yr_cal}')
@@ -1503,7 +1503,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
 
 def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
     # Caculate the biodiversity scores for species, if user selected any species
-    if (not settings.BIODIVERSTIY_TARGET_GBF_8 == 'on') or (len(data.BIO_GBF8_SEL_SPECIES) == 0):
+    if (not settings.BIODIVERSITY_TARGET_GBF_8 == 'on') or (len(data.BIO_GBF8_SEL_SPECIES) == 0):
         return
     
     print(f'Writing biodiversity GBF8 scores (SPECIES) for {yr_cal}')
@@ -1616,7 +1616,7 @@ def write_ghg(data: Data, yr_cal, path):
 
     # Get GHG emissions from model
     if yr_cal >= data.YR_CAL_BASE + 1:
-        ghg_emissions = data.prod_data[yr_cal]['GHG Emissions']
+        ghg_emissions = data.prod_data[yr_cal]['GHG']
     else:
         ghg_emissions = (ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True) * data.ag_dvars[settings.SIM_YEARS[0]]).sum()
 

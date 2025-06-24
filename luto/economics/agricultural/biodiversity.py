@@ -286,7 +286,7 @@ def get_GBF4_ECNES_matrix_sr(data:Data) -> np.ndarray:
     
 
 
-def get_GBF8_species_conservation_matrix_sr(data:Data, target_year: int):
+def get_GBF8_matrix_sr(data:Data, target_year: int):
     return np.where(
         data.SAVBURN_ELIGIBLE,
         data.get_GBF8_bio_layers_by_yr(target_year) * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,

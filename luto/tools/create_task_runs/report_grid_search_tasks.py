@@ -131,11 +131,11 @@ print(report_data['Type'].unique())
 area_landuse = report_data.query('Type == "Area_non_ag_lu_million_km2"').copy()
 jitter_map = {'on': -0.5, 'off': 0.5}
 hatch_map = {'on': '////', 'off': r'\\\\'}
-area_landuse['jitter_val'] = area_landuse['BIODIVERSTIY_TARGET_GBF_3'].map(jitter_map)
+area_landuse['jitter_val'] = area_landuse['BIODIVERSITY_TARGET_GBF_3'].map(jitter_map)
 
-# Group by BIODIVERSTIY_TARGET_GBF_3 and prepare data for rectangle plotting
+# Group by BIODIVERSITY_TARGET_GBF_3 and prepare data for rectangle plotting
 rectangles = pd.DataFrame()
-for (name, year), group in area_landuse.groupby(['BIODIVERSTIY_TARGET_GBF_3', 'year']):
+for (name, year), group in area_landuse.groupby(['BIODIVERSITY_TARGET_GBF_3', 'year']):
     rectangle = pd.DataFrame({
         'name': name,
         'year': year,
@@ -288,11 +288,11 @@ print(report_data['Type'].unique())
 area_landuse = report_data.query('Type == "Area_non_ag_lu_million_km2"').copy()
 jitter_map = {'on': -0.5, 'off': 0.5}
 hatch_map = {'on': '////', 'off': r'\\\\'}
-area_landuse['jitter_val'] = area_landuse['BIODIVERSTIY_TARGET_GBF_8'].map(jitter_map)
+area_landuse['jitter_val'] = area_landuse['BIODIVERSITY_TARGET_GBF_8'].map(jitter_map)
 
-# Group by BIODIVERSTIY_TARGET_GBF_8 and prepare data for rectangle plotting
+# Group by BIODIVERSITY_TARGET_GBF_8 and prepare data for rectangle plotting
 rectangles = pd.DataFrame()
-for (name, year), group in area_landuse.groupby(['BIODIVERSTIY_TARGET_GBF_8', 'year']):
+for (name, year), group in area_landuse.groupby(['BIODIVERSITY_TARGET_GBF_8', 'year']):
     rectangle = pd.DataFrame({
         'name': name,
         'year': year,

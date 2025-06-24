@@ -482,7 +482,7 @@ def get_water_outside_luto_study_area_from_hist_level(data) -> dict[int, float]:
 
 
 
-def calc_water_net_yield_inside_LUTO_BASE_YR_hist_water_lyr(data) -> np.ndarray:
+def calc_water_net_yield_inside_LUTO_BASE_YR_hist_water_lyr(data) -> dict[int, float]:
     """
     Calculate the water net yield for the base year (2010) for all regions.
 
