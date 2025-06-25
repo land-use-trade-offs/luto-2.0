@@ -287,9 +287,9 @@ class LutoSolver:
 
         
         # Get objectives 
-        self.obj_economy = self._setup_economy_objective() / self._input_data.base_yr_prod["RESCALE BASE_YR Economy(AUD)"]              # Normalise to the base year economy value
-        self.obj_biodiv = self._setup_biodiversity_objective() / self._input_data.base_yr_prod["RESCALE BASE_YR Bio quality (score)"]   # Normalise to the base year biodiversity value
-        self.obj_penalties = self._setup_penalty_objectives()                                                                   
+        self.obj_economy = self._setup_economy_objective()    
+        self.obj_biodiv = self._setup_biodiversity_objective()   
+        self.obj_penalties = self._setup_penalty_objectives()                                                                    
  
         # Set the objective function
         if settings.OBJECTIVE == "mincost":
@@ -301,7 +301,7 @@ class LutoSolver:
             objective = (
                 obj_wrap * (1 - settings.SOLVE_WEIGHT_BETA) + 
                 self.obj_penalties * settings.SOLVE_WEIGHT_BETA
-            ) * settings.RESCALE_FACTOR
+            )
         elif settings.OBJECTIVE == "maxprofit":
             sense = GRB.MAXIMIZE
             obj_wrap = (
@@ -311,11 +311,12 @@ class LutoSolver:
             objective = (
                 obj_wrap * (1 - settings.SOLVE_WEIGHT_BETA) 
                 - self.obj_penalties * settings.SOLVE_WEIGHT_BETA
-            )* settings.RESCALE_FACTOR
+            )
         else:
             raise ValueError(f"Unknown objective function: {settings.OBJECTIVE}")
 
         self.gurobi_model.setObjective(objective, sense)
+        
         
     def _setup_economy_objective(self):
         print("  ...setting up economy objective...")
@@ -357,7 +358,12 @@ class LutoSolver:
         self.economy_ag_man_contr = gp.quicksum(ag_mam_exprs)
         self.economy_non_ag_contr = gp.quicksum(non_ag_exprs)
         
-        return self.economy_ag_contr + self.economy_ag_man_contr + self.economy_non_ag_contr
+        return (
+            (self.economy_ag_contr + self.economy_ag_man_contr + self.economy_non_ag_contr) 
+            * self._input_data.scale_factors['Economy'] 
+            / self._input_data.base_yr_prod["BASE_YR Economy(AUD)"]
+            * settings.RESCALE_FACTOR
+        )  
     
     
     def _setup_biodiversity_objective(self):
@@ -406,7 +412,13 @@ class LutoSolver:
         self.bio_ag_man_contr = gp.quicksum(ag_mam_exprs)
         self.bio_non_ag_contr = gp.quicksum(non_ag_exprs)
         
-        return self.bio_ag_contr + self.bio_non_ag_contr + self.bio_ag_man_contr
+        return (
+            (self.bio_ag_contr + self.bio_non_ag_contr + self.bio_ag_man_contr) 
+            * self._input_data.scale_factors['Biodiversity']
+            / self._input_data.base_yr_prod["BASE_YR Bio quality (score)"]
+            * settings.RESCALE_FACTOR
+        )
+        
         
     def _setup_penalty_objectives(self):
         print("  ...setting up penalty objectives...")
@@ -428,49 +440,52 @@ class LutoSolver:
             weight_demand = settings.SOLVER_WEIGHT_DEMAND
             self.penalty_demand = (
                 gp.quicksum(
-                    v * price
+                    v * self._input_data.scale_factors['Demand'] * price
                     for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices)
                 ) 
-                * weight_demand
-                / self._input_data.base_yr_prod["RESCALE BASE_YR Economy(AUD)"]
-                + 1 
+                 * weight_demand
+                 / self._input_data.base_yr_prod["BASE_YR Economy(AUD)"]
+                 + 1 
             )
             
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             weight_ghg = settings.SOLVER_WEIGHT_GHG
             self.penalty_ghg = (
                 self.E 
-                * weight_ghg
-                / self._input_data.base_yr_prod["RESCALE BASE_YR GHG (tCO2e)"]
-                + 1
+                 * self._input_data.scale_factors['GHG']
+                 * weight_ghg
+                 / self._input_data.base_yr_prod["BASE_YR GHG (tCO2e)"]
+                 + 1
             ) 
         
         if settings.WATER_CONSTRAINT_TYPE == "soft":
             weight_water = settings.SOLVER_WEIGHT_WATER
             self.penalty_water = (
                 gp.quicksum(v for v in self.W)
-                * weight_water
-                / self._input_data.base_yr_prod["RESCALE BASE_YR Water (ML)"].sum()
-                + 1
+                 * self._input_data.scale_factors['Water']
+                 * weight_water
+                 / self._input_data.base_yr_prod["BASE_YR Water (ML)"].sum()
+                 + 1
             ) / len(self._input_data.limits["water"].keys()) 
             
         if settings.GBF2_CONSTRAINT_TYPE == "soft":
             weight_biodiv = settings.SOLVER_WEIGHT_GBF2
             self.penalty_biodiv = (
                 self.B 
-                * weight_biodiv
-                / self._input_data.base_yr_prod["RESCALE BASE_YR GBF_2 (score)"].sum()
-                + 1
+                 * self._input_data.scale_factors['GBF2']
+                 * weight_biodiv
+                 / self._input_data.base_yr_prod["BASE_YR GBF_2 (score)"].sum()
+                 + 1
             ) 
+        
             
         self.penalty_weight_sum = (weight_demand + weight_biodiv + weight_ghg + weight_water)
       
-        return (
-            self.penalty_demand   
-            + self.penalty_ghg    
-            + self.penalty_water  
-            + self.penalty_biodiv 
-        ) / self.penalty_weight_sum
+        return(
+            (self.penalty_demand + self.penalty_ghg + self.penalty_water+ self.penalty_biodiv)
+             / self.penalty_weight_sum
+             * settings.RESCALE_FACTOR   
+        )
 
 
 
@@ -1721,9 +1736,9 @@ class LutoSolver:
                     else self.gurobi_model.ObjVal
                 ),
                 
-                "Obj Economy":                      self.obj_economy.getValue() * settings.SOLVE_WEIGHT_ALPHA * settings.RESCALE_FACTOR,
-                "Obj Biodiversity":                 self.obj_biodiv.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA) * settings.RESCALE_FACTOR,
-                "Obj Penalties":                    self.obj_penalties.getValue() * settings.SOLVE_WEIGHT_BETA * settings.RESCALE_FACTOR,
+                "Obj Economy":                      self.obj_economy.getValue() * settings.SOLVE_WEIGHT_ALPHA,
+                "Obj Biodiversity":                 self.obj_biodiv.getValue() * (1 - settings.SOLVE_WEIGHT_ALPHA),
+                "Obj Penalties":                    self.obj_penalties.getValue() * settings.SOLVE_WEIGHT_BETA,
                 
                 'Economy (AUD) Ag':                 self.economy_ag_contr.getValue() * self._input_data.scale_factors['Economy'],
                 'Economy (AUD) Non-Ag Value':       self.economy_non_ag_contr.getValue() * self._input_data.scale_factors['Economy'],
@@ -1745,18 +1760,11 @@ class LutoSolver:
                     c:self.ag_man_q_c[c].getValue() * self._input_data.scale_factors['Demand'] 
                     for c in range(self._input_data.ncms)
                 },
-                
                 "Production Deviation (t)":(
                     [i * self._input_data.scale_factors['Demand'] for i in self.V.X] 
                     if settings.DEMAND_CONSTRAINT_TYPE == "soft"
                     else 0
-                ),
-                "Production Penalty":(
-                    self.penalty_demand.getValue() * settings.SOLVE_WEIGHT_BETA / self.penalty_weight_sum  * settings.RESCALE_FACTOR         
-                    if settings.DEMAND_CONSTRAINT_TYPE == "soft"           
-                    else 0
-                ),
-                            
+                ),   
                 "Water value (ML)":(
                     {
                         k: v.getValue() * self._input_data.scale_factors['Water'] 
@@ -1772,13 +1780,7 @@ class LutoSolver:
                     ]                                                                        
                     if settings.WATER_CONSTRAINT_TYPE == "soft"            
                     else 0
-                ),
-                "Water Penalty":(
-                    self.penalty_water.getValue() * settings.SOLVE_WEIGHT_BETA / self.penalty_weight_sum             
-                    if settings.WATER_CONSTRAINT_TYPE == "soft"            
-                    else 0
-                ),
-                            
+                ),         
                 "GHG Ag Value (tCO2e)":(
                     self.ghg_ag_contr.getValue() * self._input_data.scale_factors['GHG']                                                  
                     if settings.GHG_EMISSIONS_LIMITS != "off"              
@@ -1802,11 +1804,6 @@ class LutoSolver:
                     if settings.GHG_CONSTRAINT_TYPE == "soft"              
                     else 0
                 ),
-                "GHG Penalty":(
-                    self.penalty_ghg.getValue() * settings.SOLVE_WEIGHT_BETA / self.penalty_weight_sum                
-                    if settings.GHG_CONSTRAINT_TYPE == "soft"              
-                    else 0
-                ),
             
                 "BIO (GBF2) value (ha)":(
                     0                                                                               
@@ -1815,11 +1812,6 @@ class LutoSolver:
                 ),
                 "BIO (GBF2) Deviation (ha)":(
                     [i * self._input_data.scale_factors['GBF2'] for i in self.B.X]                                                                        
-                    if settings.GBF2_CONSTRAINT_TYPE == "soft"             
-                    else 0
-                ),
-                "BIO (GBF2) Penalty":(
-                    self.penalty_biodiv.getValue() * settings.SOLVE_WEIGHT_BETA / self.penalty_weight_sum             
                     if settings.GBF2_CONSTRAINT_TYPE == "soft"             
                     else 0
                 ),

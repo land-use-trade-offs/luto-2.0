@@ -865,19 +865,12 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     }
 
     base_yr_prod = {
-        "BASE_YR Economy(AUD)":                 get_BASE_YR_economic_value(data),
-        "BASE_YR Production (t)":               get_BASE_YR_production_t(data),
-        "BASE_YR GHG (tCO2e)":                  get_BASE_YR_GHG_t(data),
-        "BASE_YR Water (ML)":                   get_BASE_YR_water_ML(data),
-        "BASE_YR Bio quality (score)":          get_BASE_YR_overall_bio_value(data),
-        "BASE_YR GBF_2 (score)":                get_BASE_YR_GBF2_score(data),
-        
-        "RESCALE BASE_YR Economy(AUD)":         get_BASE_YR_economic_value(data) / scale_factors["Economy"],
-        "RESCALE BASE_YR Production (t)":       get_BASE_YR_production_t(data) / scale_factors["Demand"],
-        "RESCALE BASE_YR GHG (tCO2e)":          get_BASE_YR_GHG_t(data) / scale_factors["GHG"],
-        "RESCALE BASE_YR Water (ML)":           get_BASE_YR_water_ML(data) / scale_factors["Water"],
-        "RESCALE BASE_YR Bio quality (score)":  get_BASE_YR_overall_bio_value(data) / scale_factors["Biodiversity"],
-        "RESCALE BASE_YR GBF_2 (score)":        get_BASE_YR_GBF2_score(data) / scale_factors["GBF2"],
+        "BASE_YR Economy(AUD)":        get_BASE_YR_economic_value(data),
+        "BASE_YR Production (t)":      get_BASE_YR_production_t(data),
+        "BASE_YR GHG (tCO2e)":         get_BASE_YR_GHG_t(data),
+        "BASE_YR Water (ML)":          get_BASE_YR_water_ML(data),
+        "BASE_YR Bio quality (score)": get_BASE_YR_overall_bio_value(data),
+        "BASE_YR GBF_2 (score)":       get_BASE_YR_GBF2_score(data),
     }
 
     economic_contr_mrj=(ag_obj_mrj, non_ag_obj_rk,  ag_man_objs)
