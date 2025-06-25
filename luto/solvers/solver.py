@@ -1019,7 +1019,7 @@ class LutoSolver:
             )
 
 
-            self.bio_GBF3_exprs[v] = gp.quicksum(ag_contr + ag_man_contr + non_ag_contr)
+            self.bio_GBF3_exprs[v] = ag_contr + ag_man_contr + non_ag_contr
 
             print(f"       |-- target is {v_area_lb_raw:15,.0f} for {v_names[v]} ")
             self.bio_GBF3_constrs[v] = self.gurobi_model.addConstr(
@@ -1085,7 +1085,7 @@ class LutoSolver:
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            self.bio_GBF4_SNES_exprs[x] = gp.quicksum(ag_contr + ag_man_contr + non_ag_contr)
+            self.bio_GBF4_SNES_exprs[x] = ag_contr + ag_man_contr + non_ag_contr
 
             print(f"       |-- target is {x_area_lb_raw:15,.0f} for {x_names[x]}")
             self.bio_GBF4_SNES_constrs[x] = self.gurobi_model.addConstr(
@@ -1150,7 +1150,7 @@ class LutoSolver:
                 for k in range(self._input_data.n_non_ag_lus)
             )
 
-            self.bio_GBF4_ECNES_exprs[x] = gp.quicksum(ag_contr + ag_man_contr + non_ag_contr)
+            self.bio_GBF4_ECNES_exprs[x] = ag_contr + ag_man_contr + non_ag_contr
 
 
             print(f"       |-- target is {x_area_lb_raw:15,.0f} for {x_names[x]} ")
@@ -1166,7 +1166,7 @@ class LutoSolver:
             print('    ...Biodiversity GBF 8 (climate change impact on species conservation) constraints TURNED OFF ...')
             return
         
-        s_limits = self._input_data.limits["GBF8"]
+        s_limits = self._input_data.limits["GBF8_rescale"]
         s_names = self._input_data.GBF8_species_names
         s_ind = self._input_data.GBF8_species_indices
 
@@ -1217,15 +1217,13 @@ class LutoSolver:
             )
 
             # Divide by constant to reduce strain on the constraint matrix range
-            self.bio_GBF8_exprs[s] = gp.quicksum(ag_contr + ag_man_contr + non_ag_contr)
+            self.bio_GBF8_exprs[s] = ag_contr + ag_man_contr + non_ag_contr
     
             print(f"       |-- target is {s_area_lb_raw:15,.0f} for {s_names[s]}")
             self.bio_GBF8_constrs[s] = self.gurobi_model.addConstr(
                 self.bio_GBF8_exprs[s] >= s_area_lb_rescale,
                 name=f"bio_GBF8_limit_{s_names[s]}".replace(" ", "_"),
             )
-
-        
 
 
     def _add_regional_adoption_constraints(self) -> None:
