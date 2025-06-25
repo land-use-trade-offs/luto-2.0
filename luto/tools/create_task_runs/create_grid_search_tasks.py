@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250618_RES3_CMI_CUT40_GBF2_15_25_NUMERIC_FOCUS_2' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250625_RES3_RESCALE_INPUT_GBF248' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -57,7 +57,7 @@ grid_search = {
     ###############################################################
     
     # --------------- Solver settings ---------------
-    'NUMERIC_FOCUS': [2],                                               # Integer between 0 and 3, higher value means more focus on numeric precision, requiring more time
+    'NUMERIC_FOCUS': [0],                                               # Integer between 0 and 3, higher value means more focus on numeric precision, requiring more time
     
     # --------------- Target deviation weight ---------------
     'SOLVER_WEIGHT_DEMAND': [1], 
@@ -98,11 +98,11 @@ grid_search = {
     'BIODIVERSITY_TARGET_GBF_3': ['off'],                               # 'off', 'medium', 'high', 'USER_DEFINED'
     
     # --------------- Biodiversity settings - GBF 4 ---------------
-    'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],                          # 'on' or 'off'.
-    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off'],                         # 'on' or 'off'.
+    'BIODIVERSITY_TARGET_GBF_4_SNES': ['on'],                          # 'on' or 'off'.
+    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['on'],                         # 'on' or 'off'.
 
     # --------------- Biodiversity settings - GBF 8 ---------------
-    'BIODIVERSITY_TARGET_GBF_8': ['off'],       # 'on' or 'off'
+    'BIODIVERSITY_TARGET_GBF_8': ['on'],       # 'on' or 'off'
 
  
     ###############################################################

@@ -847,12 +847,12 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
             if settings.BIODIVERSITY_TARGET_GBF_3 != "off"
             else 1.0
         ),
-        "GBF4 SNES":(
+        "GBF4_SNES":(
             rescale_solver_input_data([GBF4_SNES_xr])
             if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on"
             else 1.0
         ),
-        "GBF4 ECNES":(
+        "GBF4_ECNES":(
             rescale_solver_input_data([GBF4_ECNES_xr])
             if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on"
             else 1.0
