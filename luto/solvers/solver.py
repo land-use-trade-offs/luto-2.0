@@ -1824,12 +1824,12 @@ class LutoSolver:
                     }
                 ),
                 "BIO (GBF4) SNES value (ha)":(
-                    {k: v.getValue() * self._input_data.scale_factors['GBF4 SNES'] for k,v in self.bio_GBF4_SNES_exprs.items()}                   
+                    {k: v.getValue() * self._input_data.scale_factors['GBF4_SNES'] for k,v in self.bio_GBF4_SNES_exprs.items()}                   
                     if settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on"     
                     else 0
                 ),
                 "BIO (GBF4) ECNES value (ha)":(
-                    {k: v.getValue() * self._input_data.scale_factors['GBF4 ECNES'] for k,v in self.bio_GBF4_ECNES_exprs.items()}                  
+                    {k: v.getValue() * self._input_data.scale_factors['GBF4_ECNES'] for k,v in self.bio_GBF4_ECNES_exprs.items()}                  
                     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on"    
                     else 0
                 ),
