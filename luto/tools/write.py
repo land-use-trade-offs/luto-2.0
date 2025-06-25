@@ -186,35 +186,6 @@ def write_settings(path):
     with open(os.path.join(path, 'model_run_settings.txt'), 'w') as f:
         f.writelines(f'{k}:{v}\n' for k, v in settings_dict.items())
         
-        
-        
-# def write_objetive(data):
-#     """Save the objective values to a CSV file.
-#     Arguments:
-#         data: `Data` object.
-#     """
-#     print(f'Writing objective values to file')
-    
-#     names_d = {
-#             'Production': [i.capitalize() for i in data.COMMODITIES],
-#             'Water': list(data.RIVREG_DICT.values()) if settings.WATER_REGION_DEF == 'River Region' else list(data.DRAINDIV_DICT.values()),
-#             'BIO (GBF3)': list(data.BIO_GBF3_ID2DESC.values()),
-#             'BIO (GBF4) SNES': data.BIO_GBF4_SNES_SEL_ALL,
-#             'BIO (GBF4) ECNES': data.BIO_GBF4_ECNES_SEL_ALL,
-#             'BIO (GBF8)': data.BIO_GBF8_SEL_SPECIES,
-#     }
-
-#     records = []
-#     for yr_cal in data.obj_vals.keys():
-#         for k,v in data.obj_vals[yr_cal].items():
-#             if isinstance(v, dict):
-#                 rename_k = [i for i in names_d.keys() if i in k][0]
-#                 records.extend([{"year": yr_cal,"type": k,"name": names_d[rename_k][kk],"value": vv,} for kk, vv in enumerate(v.values())])
-#             else:
-#                 records.append({"year": yr_cal,"type": k,"name": None,"value": v,})
-            
-#     pd.DataFrame(records).to_csv(f'{data.path}/DATA_REPORT/objectives.csv', index=False)
-
 
 
 def write_files(data: Data, yr_cal, path):
@@ -1650,8 +1621,6 @@ def write_ghg_separate(data: Data, yr_cal, path):
     # Get greenhouse gas emissions from agricultural landuse #
     # -------------------------------------------------------#
 
-    # Get ghg array
-    ag_g_mrj = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True)
     # Get the ghg_df
     ag_g_df = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=False)
 
@@ -1698,7 +1667,10 @@ def write_ghg_separate(data: Data, yr_cal, path):
     # -----------------------------------------------------------#
     # Get greenhouse gas emissions from non-agricultural landuse #
     # -----------------------------------------------------------#
-
+    
+    # Get ghg array
+    ag_g_mrj = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True)
+    
     # Get the non_ag GHG reduction
     non_ag_g_rk = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj, data.lumaps[yr_cal])
 
