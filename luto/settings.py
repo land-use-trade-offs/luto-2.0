@@ -103,7 +103,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS = list(range(2020,2051,10)) # range(2020,2050)
+SIM_YEARS = list(range(2010,2051,10)) # range(2020,2050)
 
 
 # Define the objective function
@@ -538,12 +538,12 @@ The constraint type for the biodiversity target.
 GBF2_TARGETS_DICT = {
     'off':     None,
     'low':    {2030: 0,    2050: 0,    2100: 0},
-    'medium': {2030: 0.15, 2050: 0.15, 2100: 0.15},
-    'high':   {2030: 0.15, 2050: 0.25, 2100: 0.25},
+    'medium': {2030: 0.30, 2050: 0.30, 2100: 0.30},
+    'high':   {2030: 0.50, 2050: 0.50, 2100: 0.50},
 }
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-BIODIVERSITY_TARGET_GBF_2 = 'medium'            # 'off', 'low', 'medium', or 'high'
+BIODIVERSITY_TARGET_GBF_2 = 'high'            # 'off', 'low', 'medium', or 'high'
 '''
 Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
 Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
@@ -555,7 +555,7 @@ in order to enhance biodiversity and ecosystem functions and services, ecologica
 '''
 
 
-GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
+GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 50
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 
