@@ -209,7 +209,7 @@ class Data:
         
         # Combine ag and non-ag landuses
         self.ALL_LANDUSES = self.AGRICULTURAL_LANDUSES + self.NON_AGRICULTURAL_LANDUSES
-        self.ALLDESC2LU = {**self.AGLU2DESC, **self.DESC2NONAGLU}
+        self.ALLDESC2LU = {**self.DESC2AGLU, **self.DESC2NONAGLU}
         self.ALLLU2DESC = {**self.AGLU2DESC, **self.NONAGLU2DESC}
 
         # Some useful sub-sets of the land uses.
