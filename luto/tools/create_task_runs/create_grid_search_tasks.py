@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250625_RES3_RESCALE_INPUT_GBF248' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250627_RES3_GBF248_DEMAND_HARD' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -37,7 +37,7 @@ grid_search = {
     ###############################################################
     'MEM': ['64GB'],
     'NCPUS':[16],
-    'TIME': ['12:00:00'],
+    'TIME': ['6:00:00'],
     'QUEUE': ['normalsr'],
     
  
@@ -66,7 +66,7 @@ grid_search = {
     'SOLVER_WEIGHT_GBF2': [1],
     
     # --------------- Demand settings ---------------
-    'DEMAND_CONSTRAINT_TYPE': ['soft'],                                 # 'hard' or 'soft' 
+    'DEMAND_CONSTRAINT_TYPE': ['hard'],                                 # 'hard' or 'soft' 
     
     # --------------- Land use settings ---------------
     'EXCLUDE_NO_GO_LU': [False],         # True or False
@@ -88,7 +88,7 @@ grid_search = {
     # --------------- Biodiversity overall ---------------
     'HABITAT_CONDITION': ['USER_DEFINED'],                              # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
     'CONNECTIVITY_SOURCE': ['NCI'],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSITY_TARGET_GBF_2': ['off', 'medium', 'high'],             # 'off', 'low', 'medium', 'high'

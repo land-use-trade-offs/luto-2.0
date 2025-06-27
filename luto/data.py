@@ -1883,13 +1883,13 @@ class Data:
         """
         self.obj_vals[yr] = obj_val
 
-    def set_path(self, years) -> str:
+    def set_path(self) -> str:
         """Create a folder for storing outputs and return folder name."""
 
-
         # Create path name
+        years = [i for i in settings.SIM_YEARS if i<=self.last_year]
         self.path = f"{settings.OUTPUT_DIR}/{self.timestamp}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}"
-
+        
         # Get all paths
         paths = (
             [self.path]

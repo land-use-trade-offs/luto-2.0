@@ -90,7 +90,7 @@ def write_outputs(data: Data):
 def write_data(data: Data):
 
     years = [i for i in settings.SIM_YEARS if i<=data.last_year]
-    data.set_path(years)
+    data.set_path()
     paths = [f"{data.path}/out_{yr}" for yr in years]
     
     write_settings(data.path)
