@@ -470,10 +470,14 @@ class LutoSolver:
             
         self.penalty_weight_sum = (weight_demand + weight_biodiv + weight_ghg + weight_water)
       
-        return(
-            (self.penalty_demand + self.penalty_ghg + self.penalty_water+ self.penalty_biodiv)
-             / self.penalty_weight_sum
-             * settings.RESCALE_FACTOR   
+        return (
+            (
+                (self.penalty_demand + self.penalty_ghg + self.penalty_water + self.penalty_biodiv)
+                / self.penalty_weight_sum
+                * settings.RESCALE_FACTOR   
+            )
+            if self.penalty_weight_sum > 0 
+            else gp.LinExpr(0.0)  # Avoid division by zero if no penalties are set
         )
 
 

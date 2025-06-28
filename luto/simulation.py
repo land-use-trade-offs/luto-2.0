@@ -76,11 +76,12 @@ def load_data() -> Data:
 @LogToFile(f"{settings.OUTPUT_DIR}/run_{read_timestamp()}", 'a')
 def run(
     data: Data, 
-    years = sorted(settings.SIM_YEARS),
 ) -> None:
     """
     Run the simulation.
     """
+    # Get the years to run
+    years = sorted(settings.SIM_YEARS).copy()
     
     # Start recording memory usage
     stop_event = threading.Event()

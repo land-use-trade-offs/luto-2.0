@@ -45,7 +45,7 @@ grid_search = {
     # Working settings for the model run
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                         # 'maxprofit' or 'mincost'
-    'RESFACTOR': [3],
+    'RESFACTOR': [13],
     'SIM_YEARS': [list(range(2020,2051,5))],                            # Years to run the model 
     'WRITE_THREADS': [2],
     'WRITE_OUTPUT_GEOTIFFS': [True],
@@ -98,11 +98,11 @@ grid_search = {
     'BIODIVERSITY_TARGET_GBF_3': ['off'],                               # 'off', 'medium', 'high', 'USER_DEFINED'
     
     # --------------- Biodiversity settings - GBF 4 ---------------
-    'BIODIVERSITY_TARGET_GBF_4_SNES': ['on'],                          # 'on' or 'off'.
-    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['on'],                         # 'on' or 'off'.
+    'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],                          # 'on' or 'off'.
+    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off'],                         # 'on' or 'off'.
 
     # --------------- Biodiversity settings - GBF 8 ---------------
-    'BIODIVERSITY_TARGET_GBF_8': ['on'],       # 'on' or 'off'
+    'BIODIVERSITY_TARGET_GBF_8': ['off'],       # 'on' or 'off'
 
  
     ###############################################################
@@ -137,8 +137,8 @@ if __name__ == '__main__':
     grid_search_settings_df = get_grid_search_settings_df(TASK_ROOT_DIR, default_settings_df, grid_search_param_df)
 
     # # 1) Submit task to a single linux machine, and run simulations parallely
-    # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
+    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
 
     # 2) Submit task to multiple linux computation nodes
-    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 100)
+    # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 100)
 

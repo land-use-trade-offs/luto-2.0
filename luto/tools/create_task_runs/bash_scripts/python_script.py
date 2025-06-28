@@ -19,18 +19,15 @@
 
 import os
 import shutil
-import threading
 import zipfile
 import luto.simulation as sim
 import luto.settings as settings
 
-from luto.tools import log_memory_usage
-from luto.tools.write import write_outputs
 
 
 # Run the simulation
 data = sim.load_data()
-sim.run(data=data, years=settings.SIM_YEARS)
+sim.run(data=data)
 
 # Remove all files except the report directory if settings.KEEP_OUTPUTS is False
 '''
