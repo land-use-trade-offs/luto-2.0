@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250627_RES3_GBF248_DEMAND_HARD' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250628_RES13_GBF2_GRID_RUNS' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -37,7 +37,7 @@ grid_search = {
     ###############################################################
     'MEM': ['64GB'],
     'NCPUS':[16],
-    'TIME': ['6:00:00'],
+    'TIME': ['2:00:00'],
     'QUEUE': ['normalsr'],
     
  
@@ -48,8 +48,8 @@ grid_search = {
     'RESFACTOR': [13],
     'SIM_YEARS': [list(range(2020,2051,5))],                            # Years to run the model 
     'WRITE_THREADS': [2],
-    'WRITE_OUTPUT_GEOTIFFS': [True],
-    'KEEP_OUTPUTS': [True],                                             # If False, only keep report HTML
+    'WRITE_OUTPUT_GEOTIFFS': [False],
+    'KEEP_OUTPUTS': [False],                                             # If False, only keep report HTML
     
  
     ###############################################################
@@ -73,7 +73,7 @@ grid_search = {
        
     
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['low', 'high'],                            # 'off', 'low', 'medium', 'high'
+    'GHG_EMISSIONS_LIMITS': ['high'],                            # 'off', 'low', 'medium', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],                                    # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                                          # True or False
@@ -91,7 +91,7 @@ grid_search = {
     'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSITY_TARGET_GBF_2': ['off', 'medium', 'high'],             # 'off', 'low', 'medium', 'high'
+    'BIODIVERSITY_TARGET_GBF_2': ['medium'],             # 'off', 'low', 'medium', 'high'
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                   # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
@@ -109,7 +109,7 @@ grid_search = {
     # Scenario settings for the model run
     ###############################################################
     'SOLVE_WEIGHT_ALPHA': [1],                                          # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
-    'SOLVE_WEIGHT_BETA': [0.9],         
+    'SOLVE_WEIGHT_BETA': np.arange(0.5, 0.95, 0.0025),         
     
     
     #-------------------- Diet BAU --------------------

@@ -256,7 +256,7 @@ class LutoSolver:
         print("    |__ Setting up decision variables for soft constraints...")
         
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
-            self.V = self.gurobi_model.addMVar(self._input_data.ncms, name="V")
+            self.V = self.gurobi_model.addMVar(self._input_data.ncms, lb=0, name="V") # force lb=0 to make sure demand penalties are positive; i.e., demand must be met or exceeded
 
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             self.E = self.gurobi_model.addVar(name="E")
@@ -425,18 +425,29 @@ class LutoSolver:
         self.penalty_weight_sum = 0
 
         # Get the penalty values for each sector
-        if settings.DEMAND_CONSTRAINT_TYPE == "soft":
-            weight_demand = settings.SOLVER_WEIGHT_DEMAND
-            self.penalty_demand = (
-                gp.quicksum(
-                    v * self._input_data.scale_factors['Demand'] * price
-                    for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices)
-                ) 
-                 * weight_demand
-                 / self._input_data.base_yr_prod["BASE_YR Economy(AUD)"]
-                 + 1 
-            )
-            
+        # if settings.DEMAND_CONSTRAINT_TYPE == "soft":
+            # weight_demand = settings.SOLVER_WEIGHT_DEMAND
+            # self.penalty_demand = (
+            #     gp.quicksum(
+            #         v * self._input_data.scale_factors['Demand'] * price
+            #         for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices)
+            #     ) 
+            #         * weight_demand
+            #         / self._input_data.base_yr_prod["BASE_YR Economy(AUD)"]
+            #         + 1 
+            # )
+        
+        weight_demand = settings.SOLVER_WEIGHT_DEMAND
+        self.penalty_demand = (
+            gp.quicksum(
+                v * self._input_data.scale_factors['Demand'] * price
+                for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices)
+            ) 
+            * weight_demand
+            / self._input_data.base_yr_prod["BASE_YR Economy(AUD)"]
+            + 1 
+        )
+        
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             weight_ghg = settings.SOLVER_WEIGHT_GHG
             self.penalty_ghg = (
@@ -479,8 +490,6 @@ class LutoSolver:
             if self.penalty_weight_sum > 0 
             else gp.LinExpr(0.0)  # Avoid division by zero if no penalties are set
         )
-
-
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
         """
@@ -646,39 +655,48 @@ class LutoSolver:
             for c in range(self._input_data.ncms)
         ]
 
-        if settings.DEMAND_CONSTRAINT_TYPE == "soft":
-            upper_bound_constraints = self.gurobi_model.addConstrs(
+        self.demand_penalty_constraints.extend(
+            self.gurobi_model.addConstrs(
                 (
-                    (self._input_data.limits['demand_rescale'][c] - self.total_q_exprs_c[c]) <= self.V[c] 
+                    (self.total_q_exprs_c[c] - self._input_data.limits['demand_rescale'][c]) >= self.V[c] 
                     for c in range(self._input_data.ncms)
                 ),  name="demand_soft_bound_upper"
-                )
-            lower_bound_constraints = self.gurobi_model.addConstrs(
-                (
-                    (self.total_q_exprs_c[c] - self._input_data.limits['demand_rescale'][c]) <= self.V[c] 
-                    for c in range(self._input_data.ncms)
-                ),  name="demand_soft_bound_lower"
             )
+        )
 
-            self.demand_penalty_constraints.extend(upper_bound_constraints.values())
-            self.demand_penalty_constraints.extend(lower_bound_constraints.values())
+        # if settings.DEMAND_CONSTRAINT_TYPE == "soft":
+        #     upper_bound_constraints = self.gurobi_model.addConstrs(
+        #         (
+        #             (self._input_data.limits['demand_rescale'][c] - self.total_q_exprs_c[c]) <= self.V[c] 
+        #             for c in range(self._input_data.ncms)
+        #         ),  name="demand_soft_bound_upper"
+        #         )
+        #     lower_bound_constraints = self.gurobi_model.addConstrs(
+        #         (
+        #             (self.total_q_exprs_c[c] - self._input_data.limits['demand_rescale'][c]) <= self.V[c] 
+        #             for c in range(self._input_data.ncms)
+        #         ),  name="demand_soft_bound_lower"
+        #     )
 
-        elif settings.DEMAND_CONSTRAINT_TYPE == "hard":
-            quantity_meets_demand_constraints = self.gurobi_model.addConstrs(
-                (
-                    (self.total_q_exprs_c[c] >= self._input_data.limits['demand_rescale'][c]) 
-                    for c in range(self._input_data.ncms)
-                ),
-                    name="demand_meets_demand"
-            )
-            self.demand_penalty_constraints.extend(
-                quantity_meets_demand_constraints.values()
-            )
+        #     self.demand_penalty_constraints.extend(upper_bound_constraints.values())
+        #     self.demand_penalty_constraints.extend(lower_bound_constraints.values())
 
-        else:
-            raise ValueError(
-                'DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"'
-            )
+        # elif settings.DEMAND_CONSTRAINT_TYPE == "hard":
+        #     quantity_meets_demand_constraints = self.gurobi_model.addConstrs(
+        #         (
+        #             (self.total_q_exprs_c[c] >= self._input_data.limits['demand_rescale'][c]) 
+        #             for c in range(self._input_data.ncms)
+        #         ),
+        #             name="demand_meets_demand"
+        #     )
+        #     self.demand_penalty_constraints.extend(
+        #         quantity_meets_demand_constraints.values()
+        #     )
+
+        # else:
+        #     raise ValueError(
+        #         'DEMAND_CONSTRAINT_TYPE not specified in settings, needs to be "hard" or "soft"'
+        #     )
 
     def _get_water_net_yield_expr_for_region(
         self,
