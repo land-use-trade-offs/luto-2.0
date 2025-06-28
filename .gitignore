@@ -13,6 +13,9 @@ pyproject.toml
 # Virtual environments
 venv
 
+# History files
+.history/
+
 # Input/output data
 input/**
 output/**
