@@ -412,22 +412,22 @@ class LutoSolver:
     def _setup_penalty_objectives(self):
         print("    |__ setting up objective for soft constraints...")
 
-        self.penalty_demand = 0
-        self.penalty_ghg = 0
-        self.penalty_water = 0
-        self.penalty_biodiv = 0
+        penalty_demand = 0
+        penalty_ghg = 0
+        penalty_water = 0
+        penalty_biodiv = 0
         
         weight_demand = 0
         weight_ghg = 0
         weight_water = 0
         weight_biodiv = 0
         
-        self.penalty_weight_sum = 0
+        penalty_weight_sum = 0
 
         # Get the penalty values for each sector
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
             weight_demand = settings.SOLVER_WEIGHT_DEMAND
-            self.penalty_demand = (
+            penalty_demand = (
                 gp.quicksum(
                     v * self._input_data.scale_factors['Demand'] * price
                     for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices)
@@ -440,7 +440,7 @@ class LutoSolver:
         
         if settings.GHG_CONSTRAINT_TYPE == "soft":
             weight_ghg = settings.SOLVER_WEIGHT_GHG
-            self.penalty_ghg = (
+            penalty_ghg = (
                 self.E 
                  * self._input_data.scale_factors['GHG']
                  * weight_ghg
@@ -450,7 +450,7 @@ class LutoSolver:
         
         if settings.WATER_CONSTRAINT_TYPE == "soft":
             weight_water = settings.SOLVER_WEIGHT_WATER
-            self.penalty_water = (
+            penalty_water = (
                 gp.quicksum(v for v in self.W)
                  * self._input_data.scale_factors['Water']
                  * weight_water
@@ -460,7 +460,7 @@ class LutoSolver:
             
         if settings.GBF2_CONSTRAINT_TYPE == "soft":
             weight_biodiv = settings.SOLVER_WEIGHT_GBF2
-            self.penalty_biodiv = (
+            penalty_biodiv = (
                 self.B 
                  * self._input_data.scale_factors['GBF2']
                  * weight_biodiv
@@ -469,16 +469,16 @@ class LutoSolver:
             ) 
         
             
-        self.penalty_weight_sum = (weight_demand + weight_biodiv + weight_ghg + weight_water)
+        penalty_weight_sum = (weight_demand + weight_biodiv + weight_ghg + weight_water)
       
         return (
             (
-                (self.penalty_demand + self.penalty_ghg + self.penalty_water + self.penalty_biodiv)
-                / self.penalty_weight_sum
+                (penalty_demand + penalty_ghg + penalty_water + penalty_biodiv)
+                / penalty_weight_sum
                 * settings.RESCALE_FACTOR   
             )
-            if self.penalty_weight_sum > 0 
-            else gp.LinExpr(0.0)  # Avoid division by zero if no penalties are set
+            if penalty_weight_sum > 0 
+            else gp.LinExpr(0.0)  # Avoid null objective if no penalties are set
         )
 
     def _add_cell_usage_constraints(self, cells: Optional[np.array] = None):
@@ -646,20 +646,20 @@ class LutoSolver:
         ]
 
         if settings.DEMAND_CONSTRAINT_TYPE == "soft":
-            upper_bound_constraints = self.gurobi_model.addConstrs(
-                (
-                    (self._input_data.limits['demand_rescale'][c] - self.total_q_exprs_c[c]) <= self.V[c] 
-                    for c in range(self._input_data.ncms)
-                ),  name="demand_soft_bound_upper"
-                )
+            # upper_bound_constraints = self.gurobi_model.addConstrs(
+            #     (
+            #         (self._input_data.limits['demand_rescale'][c] - self.total_q_exprs_c[c]) <= self.V[c] 
+            #         for c in range(self._input_data.ncms)
+            #     ),  name="demand_soft_bound_upper"
+            #     )
             lower_bound_constraints = self.gurobi_model.addConstrs(
                 (
-                    (self.total_q_exprs_c[c] - self._input_data.limits['demand_rescale'][c]) <= self.V[c] 
+                    (self.total_q_exprs_c[c] - self._input_data.limits['demand_rescale'][c]) == self.V[c] 
                     for c in range(self._input_data.ncms)
                 ),  name="demand_soft_bound_lower"
             )
 
-            self.demand_penalty_constraints.extend(upper_bound_constraints.values())
+            # self.demand_penalty_constraints.extend(upper_bound_constraints.values())
             self.demand_penalty_constraints.extend(lower_bound_constraints.values())
 
         elif settings.DEMAND_CONSTRAINT_TYPE == "hard":
