@@ -31,12 +31,15 @@ p9.options.dpi = 300
 # Get the data
 task_root_dir = TASK_ROOT_DIR.rstrip('/')       # Or replace with the desired task run root dir
 
-task_root_dir = '../Custom_runs/20250610_RES13_TEST_BETA_DEVIATION_AUD'
-task_root_dir = '/g/data/jk53/jinzhu/LUTO/Custom_runs/20250610_RES13_TEST_BETA_DEVIATION_T'
+# task_root_dir = '../Custom_runs/20250610_RES13_TEST_BETA_DEVIATION_AUD'
+# task_root_dir = '/g/data/jk53/jinzhu/LUTO/Custom_runs/20250610_RES13_TEST_BETA_DEVIATION_T'
 
 report_data = process_task_root_dirs(task_root_dir)
 
 print(report_data['Type'].unique())
+
+
+# Get valid runs
 
 
 
@@ -45,11 +48,14 @@ print(report_data['Type'].unique())
 # -------------- Plot demand deviation ----------------------
 demand_df = report_data.query('Type == "Production_deviation_pct"').copy()
 
+invalid_runs = demand_df.query('name == "Other non-cereal crops" and val > 10').copy()
+valid_idx = set(demand_df['run_idx']) - set(invalid_runs['run_idx'])
+
+
 df_demand_avg = demand_df.eval('val = abs(val)'
     ).groupby(['SOLVE_WEIGHT_BETA']
     )[['val','run_idx']].agg(val=('val', 'mean'), run_idx=('run_idx', 'first')
     ).reset_index()
-
 
 
 # Plot profit landscape without filtering
@@ -74,7 +80,7 @@ plot_landscape_profit = (
 
 # Plot individual demand landscape 
 query_str = '''
-    year == 2050
+    year == 2030
     '''.replace('\n', ' ').replace('  ', ' ')
 
 demand_df_individual = demand_df.query(query_str).copy()
@@ -88,7 +94,7 @@ plot_landscape_profit = (
         )
     ) +
     p9.geom_point(size=0.1) +
-    p9.geom_vline(xintercept=0.9,color='red') +
+    p9.geom_vline(xintercept=0.36,color='red') +
     p9.theme_bw() +
     p9.facet_wrap('name', scales='free_y') +
     p9.theme(
@@ -115,7 +121,7 @@ df_profit = report_data.query(query_str).copy()
 
 # Plot individual profit landscape 
 query_str = '''
-    abs(val) < 30
+    SOLVE_WEIGHT_BETA < 1
     '''.replace('\n', ' ').replace('  ', ' ')
     
 df_profit_individual = df_profit.query(query_str).copy()
@@ -129,7 +135,7 @@ plot_landscape_profit = (
         )
     ) +
     p9.geom_point(size=0.1) +
-    p9.geom_vline(xintercept=0.9, color='red') +
+    p9.geom_vline(xintercept=0.36, color='red') +
     p9.theme_bw() +
     p9.facet_wrap('year', scales='free_y') +
     p9.theme(
@@ -151,11 +157,13 @@ plot_landscape_profit = (
 
 # -------------- Plot total transition cost ----------------------
 query_str = '''
-    name == "Transition cost (Ag2Ag)" 
+    name == "Transition cost (Ag2Non-Ag)" 
     and year != 2010
     '''.replace('\n', ' ').replace('  ', ' ')
     
 df_profit = report_data.query(query_str).copy()
+
+report_data.query('Type == "Transition_cost_million_AUD"').copy()
 
 valid_runs_profit = set(report_data['run_idx']) - set(
     df_profit.query('abs(val) >= 30')['run_idx']
@@ -175,7 +183,6 @@ plot_landscape_demand = (
         )
     ) +
     p9.geom_line() +
-    p9.facet_wrap('TRANSITION_HURDEL_FACTOR') +
     p9.theme_bw() +
     p9.theme(
         strip_text=p9.element_text(size=8), 

@@ -37,11 +37,12 @@ p9.options.dpi = 100
 task_root_dir = TASK_ROOT_DIR.rstrip('/')       # Or replace with the desired task run root dir
 report_data = process_task_root_dirs(task_root_dir)
 
+# task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20250512_DCCEEW_REPORT_01_CONNECTIVITY_ONF_OFF/"
+# report_data = process_task_root_dirs(task_root_dir)
 
 
 ####################### Area #######################
-task_root_dir = "/g/data/jk53/jinzhu/LUTO/Custom_runs/20250512_DCCEEW_REPORT_01_CONNECTIVITY_ONF_OFF/"
-report_data = process_task_root_dirs(task_root_dir)
+
 print(report_data['Type'].unique())
 
 
