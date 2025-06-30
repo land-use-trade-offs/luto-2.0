@@ -429,8 +429,8 @@ class LutoSolver:
             weight_demand = settings.SOLVER_WEIGHT_DEMAND
             penalty_demand = (
                 gp.quicksum(
-                    v * self._input_data.scale_factors['Demand'] * price
-                    for v, price in zip(self.V, self._input_data.economic_BASE_YR_prices)
+                    self.V[c] * self._input_data.scale_factors['Demand'] * price
+                    for c, price in enumerate(self._input_data.economic_BASE_YR_prices)
                 ) 
                 * weight_demand
                 / self._input_data.base_yr_prod["BASE_YR Economy(AUD)"]
@@ -938,7 +938,7 @@ class LutoSolver:
         elif settings.GBF2_CONSTRAINT_TYPE == "soft":
             print(f'      |__ Adding constraints <soft> for biodiversity GBF 2: {self._input_data.limits["GBF2"]:15,.0f}')
             constr = self.gurobi_model.addConstr(
-                self._input_data.limits["GBF2_rescale"] - self.bio_GBF2_expr <= self.B, 
+                self.bio_GBF2_expr - self._input_data.limits["GBF2_rescale"] == self.B, 
                 name="bio_GBF2_priority_degraded_area_limit_soft"
             )
             self.bio_GBF2_constrs_soft.append(constr)
