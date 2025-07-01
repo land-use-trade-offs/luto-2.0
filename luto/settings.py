@@ -539,7 +539,7 @@ GBF2_TARGETS_DICT = {
     'off':     None,
     'low':    {2030: 0,    2050: 0,    2100: 0},
     'medium': {2030: 0.30, 2050: 0.30, 2100: 0.30},
-    'high':   {2030: 0.50, 2050: 0.50, 2100: 0.50},
+    'high':   {2030: 0.30, 2050: 0.50, 2100: 0.50},
 }
 
 # Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
