@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250630_RES13_GRIDSEARCH_BETA' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250630_RES13_GRIDSEARCH_BETA_CUT' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -37,7 +37,7 @@ grid_search = {
     ###############################################################
     'MEM': ['64GB'],
     'NCPUS':[16],
-    'TIME': ['2:00:00'],
+    'TIME': ['0:20:00'],
     'QUEUE': ['normalsr'],
     
  
@@ -45,9 +45,9 @@ grid_search = {
     # Working settings for the model run
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                         # 'maxprofit' or 'mincost'
-    'RESFACTOR': [13],
+    'RESFACTOR': [3],
     'SIM_YEARS': [list(range(2010,2051,10))],                            # Years to run the model 
-    'WRITE_THREADS': [2],
+    'WRITE_THREADS': [6],
     'WRITE_OUTPUT_GEOTIFFS': [False],
     'KEEP_OUTPUTS': [False],                                             # If False, only keep report HTML
     
@@ -55,10 +55,7 @@ grid_search = {
     ###############################################################
     # Model run settings
     ###############################################################
-    
-    # --------------- Solver settings ---------------
-    'NUMERIC_FOCUS': [0],                                               # Integer between 0 and 3, higher value means more focus on numeric precision, requiring more time
-    
+
     # --------------- Target deviation weight ---------------
     'SOLVER_WEIGHT_DEMAND': [1], 
     'SOLVER_WEIGHT_GHG': [1],
@@ -73,7 +70,7 @@ grid_search = {
        
     
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['medium'],                                 # 'off', 'low', 'medium', 'high'
+    'GHG_EMISSIONS_LIMITS': ['high'],                                   # 'off', 'low', 'medium', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],                                    # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                                          # True or False
@@ -88,7 +85,7 @@ grid_search = {
     # --------------- Biodiversity overall ---------------
     'HABITAT_CONDITION': ['USER_DEFINED'],                              # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
     'CONNECTIVITY_SOURCE': ['NCI'],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': np.arange(10, 50, 5),
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSITY_TARGET_GBF_2': ['high'],                              # 'off', 'low', 'medium', 'high'
@@ -140,5 +137,5 @@ if __name__ == '__main__':
     # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
 
     # 2) Submit task to multiple linux computation nodes
-    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 100)
+    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 200)
 

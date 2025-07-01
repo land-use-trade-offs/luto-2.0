@@ -39,11 +39,6 @@ report_data = process_task_root_dirs(task_root_dir)
 print(report_data['Type'].unique())
 
 
-# Get valid runs
-
-
-
-
 
 # -------------- Plot demand deviation ----------------------
 demand_df = report_data.query('Type == "Production_deviation_pct"').copy()
@@ -80,7 +75,8 @@ plot_landscape_profit = (
 
 # Plot individual demand landscape 
 query_str = '''
-    year == 2030
+    year == 2050
+
     '''.replace('\n', ' ').replace('  ', ' ')
 
 demand_df_individual = demand_df.query(query_str).copy()
@@ -91,21 +87,22 @@ plot_landscape_profit = (
         p9.aes(
             x='SOLVE_WEIGHT_BETA', 
             y='val', 
+            color='GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT'
         )
     ) +
     p9.geom_point(size=0.1) +
-    p9.geom_vline(xintercept=0.36,color='red') +
+    p9.geom_vline(xintercept=0.99,color='red') +
     p9.theme_bw() +
     p9.facet_wrap('name', scales='free_y') +
     p9.theme(
         strip_text=p9.element_text(size=8), 
         legend_position='bottom',
-        legend_title=p9.element_blank(),
         legend_box='horizontal'
     ) +
     p9.labs(
         x='Beta (B)', 
         y='Demand deviation (%)',
+        color='Aus Land Coverage (%)'
     )
 )
 
@@ -121,7 +118,7 @@ df_profit = report_data.query(query_str).copy()
 
 # Plot individual profit landscape 
 query_str = '''
-    SOLVE_WEIGHT_BETA < 1
+    SOLVE_WEIGHT_BETA > 0.40
     '''.replace('\n', ' ').replace('  ', ' ')
     
 df_profit_individual = df_profit.query(query_str).copy()
@@ -132,21 +129,22 @@ plot_landscape_profit = (
         p9.aes(
             x='SOLVE_WEIGHT_BETA', 
             y='val', 
+            color='GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT'
         )
     ) +
     p9.geom_point(size=0.1) +
-    p9.geom_vline(xintercept=0.36, color='red') +
+    p9.geom_vline(xintercept=0.99, color='red') +
     p9.theme_bw() +
     p9.facet_wrap('year', scales='free_y') +
     p9.theme(
         strip_text=p9.element_text(size=8), 
         legend_position='bottom',
-        legend_title=p9.element_blank(),
-        legend_box='horizontal'
+        legend_box='horizontal',
     ) +
     p9.labs(
         x='Beta (B)', 
         y='Profit (million AUD)',
+        color='Aus Land Coverage (%)'
     )
 )
 
@@ -159,17 +157,11 @@ plot_landscape_profit = (
 query_str = '''
     name == "Transition cost (Ag2Non-Ag)" 
     and year != 2010
+    and SOLVE_WEIGHT_BETA > 0.33
     '''.replace('\n', ' ').replace('  ', ' ')
     
 df_profit = report_data.query(query_str).copy()
 
-report_data.query('Type == "Transition_cost_million_AUD"').copy()
-
-valid_runs_profit = set(report_data['run_idx']) - set(
-    df_profit.query('abs(val) >= 30')['run_idx']
-)
-
-df_profit = df_profit.query('run_idx.isin(@valid_runs_profit)')
 
 # Plot economic's deviation landscape without filtering
 plot_landscape_demand = (
@@ -179,11 +171,11 @@ plot_landscape_demand = (
             x='year',
             y='val', 
             color='SOLVE_WEIGHT_BETA',
-            group='run_idx',
         )
     ) +
     p9.geom_line() +
     p9.theme_bw() +
+    p9.facet_wrap('GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT') +
     p9.theme(
         strip_text=p9.element_text(size=8), 
         legend_position='bottom',

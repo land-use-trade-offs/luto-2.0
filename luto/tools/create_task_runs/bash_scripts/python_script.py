@@ -41,11 +41,11 @@ if settings.KEEP_OUTPUTS:
  
 else:
     
-    data = None  # Clear the data object to free memory
-    sim = None   # Clear the simulation module to free memory
-    
     report_dir = f"{data.path}/DATA_REPORT"
     archive_path ='./DATA_REPORT.zip'
+    
+    data = None  # Clear the data object to free memory
+    sim = None   # Clear the simulation module to free memory
     
     # Zip the output directory, and remove the original directory
     with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
