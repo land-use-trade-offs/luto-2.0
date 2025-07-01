@@ -37,7 +37,7 @@ grid_search = {
     ###############################################################
     'MEM': ['64GB'],
     'NCPUS':[16],
-    'TIME': ['2:00:00'],
+    'TIME': ['0:20:00'],
     'QUEUE': ['normalsr'],
     
  
@@ -55,10 +55,7 @@ grid_search = {
     ###############################################################
     # Model run settings
     ###############################################################
-    
-    # --------------- Solver settings ---------------
-    'NUMERIC_FOCUS': [0],                                               # Integer between 0 and 3, higher value means more focus on numeric precision, requiring more time
-    
+
     # --------------- Target deviation weight ---------------
     'SOLVER_WEIGHT_DEMAND': [1], 
     'SOLVER_WEIGHT_GHG': [1],
@@ -88,7 +85,7 @@ grid_search = {
     # --------------- Biodiversity overall ---------------
     'HABITAT_CONDITION': ['USER_DEFINED'],                              # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
     'CONNECTIVITY_SOURCE': ['NCI'],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [50],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': np.arange(10, 50, 5),
     
     # --------------- Biodiversity settings - GBF 2 ---------------
     'BIODIVERSITY_TARGET_GBF_2': ['off', 'medium','high'],                              # 'off', 'low', 'medium', 'high'
@@ -140,5 +137,5 @@ if __name__ == '__main__':
     # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
 
     # 2) Submit task to multiple linux computation nodes
-    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 100)
+    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 200)
 
