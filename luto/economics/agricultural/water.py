@@ -566,11 +566,11 @@ def get_water_net_yield_limit_for_regions_inside_LUTO(data):
     
     # Get the water net yield limit INSIDE LUTO study area
     wny_limit_stress = {
-        reg_idx: max( 0,                            # Ensure non-negative limit
+        reg_idx: (                            
             hist_level * settings.WATER_STRESS      # Water net yield limit for the whole region
             + data.WATER_USE_DOMESTIC[reg_idx]      # Domestic water use
             - wny_outside_LUTO_regions[reg_idx]     # Water net yield from outside the LUTO study area
-            )
+        )
         for reg_idx, hist_level in data.WATER_REGION_HIST_LEVEL.items()
     }
     

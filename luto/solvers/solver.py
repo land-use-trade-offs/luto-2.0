@@ -682,10 +682,6 @@ class LutoSolver:
             w_limit_raw = water_limit_rescale * self._input_data.scale_factors['Water']
             ind = self._input_data.water_region_indices[reg_idx]
             reg_name = self._input_data.water_region_names[reg_idx]
-            
-            if w_limit_raw == 0:
-                print(f"      |__ target is {w_limit_raw:15,.0f} ML for {reg_name} (skipped modelling)")
-                continue
 
             print(f"      |__ target is {w_limit_raw:15,.0f} ML for {reg_name}")
 
