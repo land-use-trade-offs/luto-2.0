@@ -372,35 +372,18 @@ def get_ghg_matrix(data: Data, ag_g_mrj, lumap, aggregate=True) -> np.ndarray:
     agroforestry_x_r = tools.get_exclusions_agroforestry_base(data, lumap)
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
 
-    non_agr_ghg_matrices = {use: np.zeros((data.NCELLS, 1)).astype(np.float32) for use in settings.NON_AG_LAND_USES}
+    non_agr_ghg_matrices = {}
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
-    if settings.NON_AG_LAND_USES['Environmental Plantings']:
-        non_agr_ghg_matrices['Environmental Plantings'] = get_ghg_env_plantings(data, aggregate)
-
-    if settings.NON_AG_LAND_USES['Riparian Plantings']:
-        non_agr_ghg_matrices['Riparian Plantings'] = get_ghg_rip_plantings(data, aggregate)
-
-    if settings.NON_AG_LAND_USES['Sheep Agroforestry']:
-        non_agr_ghg_matrices['Sheep Agroforestry'] = get_ghg_sheep_agroforestry(data, ag_g_mrj, agroforestry_x_r, aggregate)
-
-    if settings.NON_AG_LAND_USES['Beef Agroforestry']:
-        non_agr_ghg_matrices['Beef Agroforestry'] = get_ghg_beef_agroforestry(data, ag_g_mrj, agroforestry_x_r, aggregate)
-
-    if settings.NON_AG_LAND_USES['Carbon Plantings (Block)']:
-        non_agr_ghg_matrices['Carbon Plantings (Block)'] = get_ghg_carbon_plantings_block(data, aggregate)
-
-    if settings.NON_AG_LAND_USES['Sheep Carbon Plantings (Belt)']:
-        non_agr_ghg_matrices['Sheep Carbon Plantings (Belt)'] = get_ghg_sheep_carbon_plantings_belt(data, ag_g_mrj, cp_belt_x_r, aggregate)
-
-    if settings.NON_AG_LAND_USES['Beef Carbon Plantings (Belt)']:
-        non_agr_ghg_matrices['Beef Carbon Plantings (Belt)'] = get_ghg_beef_carbon_plantings_belt(data, ag_g_mrj, cp_belt_x_r, aggregate)
-
-    if settings.NON_AG_LAND_USES['BECCS']:
-        non_agr_ghg_matrices['BECCS'] = get_ghg_beccs(data, aggregate)
-
-    if settings.NON_AG_LAND_USES['Destocked - natural land']:
-        non_agr_ghg_matrices['Destocked - natural land'] = get_ghg_destocked_land(data, lumap, aggregate)
+    non_agr_ghg_matrices['Environmental Plantings'] = get_ghg_env_plantings(data, aggregate)                                                
+    non_agr_ghg_matrices['Riparian Plantings'] = get_ghg_rip_plantings(data, aggregate)                                                     
+    non_agr_ghg_matrices['Sheep Agroforestry'] = get_ghg_sheep_agroforestry(data, ag_g_mrj, agroforestry_x_r, aggregate)                    
+    non_agr_ghg_matrices['Beef Agroforestry'] = get_ghg_beef_agroforestry(data, ag_g_mrj, agroforestry_x_r, aggregate)                      
+    non_agr_ghg_matrices['Carbon Plantings (Block)'] = get_ghg_carbon_plantings_block(data, aggregate)                                      
+    non_agr_ghg_matrices['Sheep Carbon Plantings (Belt)'] = get_ghg_sheep_carbon_plantings_belt(data, ag_g_mrj, cp_belt_x_r, aggregate) 
+    non_agr_ghg_matrices['Beef Carbon Plantings (Belt)'] = get_ghg_beef_carbon_plantings_belt(data, ag_g_mrj, cp_belt_x_r, aggregate)       
+    non_agr_ghg_matrices['BECCS'] = get_ghg_beccs(data, aggregate)                                                                          
+    non_agr_ghg_matrices['Destocked - natural land'] = get_ghg_destocked_land(data, lumap, aggregate)                                       
       
     if aggregate==True:
         # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing
@@ -412,5 +395,5 @@ def get_ghg_matrix(data: Data, ag_g_mrj, lumap, aggregate=True) -> np.ndarray:
     elif aggregate==False:
         return pd.concat(list(non_agr_ghg_matrices.values()), axis=1)
     else:
-    # If the aggregate arguments is not in [True,False]. That must be someting wrong
+        # If the aggregate arguments is not in [True,False]. That must be someting wrong
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )

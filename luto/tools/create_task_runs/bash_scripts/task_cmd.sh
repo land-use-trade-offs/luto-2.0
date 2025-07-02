@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Read the settings_bash file ==> JOBNAME, QUEUE, NCPUS, MEM, NCPUS, QUEUE, TIME
+# Read the settings_bash file ==> JOB_NAME, QUEUE, NCPUS, MEM, TIME
 source luto/settings_bash.py
 
 # Activate the Conda environment and get the path to the Python executable

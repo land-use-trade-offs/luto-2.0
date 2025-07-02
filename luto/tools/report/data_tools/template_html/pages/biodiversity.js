@@ -1,19 +1,9 @@
 // Create Chart
 document.addEventListener("DOMContentLoaded", function () {
-    Highcharts.setOptions({
-        colors: [
-            "#7cb5ec",
-            "#434348",
-            "#90ed7d",
-            "#f7a35c",
-            "#8085e9",
-            "#f15c80",
-            "#e4d354",
-            "#2b908f",
-            "#f45b5b",
-            "#91e8e1",
-        ],
-    });
+
+    // Set the default color palette for Highcharts
+    var colors = eval(document.getElementById("colors").innerHTML);
+    Highcharts.setOptions({ colors: colors });
 
     // Set the title alignment to left
     Highcharts.setOptions({
@@ -371,6 +361,9 @@ document.addEventListener("DOMContentLoaded", function () {
         credits: {
             enabled: false,
         },
+        legend: {
+            enabled: false,
+        },
     });
 
     // biodiversity_GBF3_1_contribution_group_score_total
@@ -618,8 +611,507 @@ document.addEventListener("DOMContentLoaded", function () {
             credits: {
                 enabled: false,
             },
+            legend: {
+                enabled: false,
+            },
         });
     });
+
+
+    // biodiversity_GBF4_SNES_1_contribution_species_score_total
+    Highcharts.chart("biodiversity_GBF4_SNES_1_contribution_species_score_total", {
+        chart: {
+            type: "column",
+            marginRight: 380,
+        },
+        title: {
+            text: "Total Biodiversity Suitability Score (GBF4-SNES-species)",
+        },
+        series: JSON.parse(
+            document.getElementById(
+                "biodiversity_GBF4_SNES_1_contribution_species_score_total_csv"
+            ).innerHTML
+        ).concat({
+            name: " ",
+            data: [[2010, 0]],
+            visible: false,
+            showInLegend: false,
+        }),
+        yAxis: {
+            title: {
+                text: "Suitability Relative to Pre-1750 Level (%)",
+            },
+        },
+        plotOptions: {
+            column: {
+                stacking: "normal",
+            },
+        },
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                    }:</b>${this.y.toFixed(2)}<br/>`;
+            },
+        },
+        legend: {
+            align: "right",
+            layout: "vertical",
+            x: -100,
+            y: -10,
+            verticalAlign: "middle",
+        },
+        credits: {
+            enabled: false,
+        },
+    });
+
+
+    // biodiversity_GBF4_SNES_2_contribution_species_score_by_type
+    const chartContainer1 = document.getElementById(
+        "biodiversity_GBF4_SNES_2_contribution_species_score_by_type"
+    );
+    const chartData1 = JSON.parse(
+        document.getElementById(
+            "biodiversity_GBF4_SNES_2_contribution_species_score_by_type_csv"
+        ).innerHTML
+    );
+
+    // Create blocks and render Highcharts in each block
+    chartData1.forEach((chart, index) => {
+        // Create a new div for each chart
+        const chartBlock1 = document.createElement("div");
+        chartBlock1.classList.add("chart-block");
+        chartBlock1.id = `chart1-${index + 1}`;
+        chartContainer1.appendChild(chartBlock1);
+
+        Highcharts.chart(chartBlock1.id, {
+            plotOptions: {
+                showInLegend: false,
+                column: {
+                    stacking: "normal",
+                },
+            },
+            title: {
+                text: chart.name,
+                align: "center",
+            },
+            series: chart.data,
+
+            yAxis: {
+                title: {
+                    text: "Suitability Relative to Pre-1750 Level (%)",
+                },
+            },
+            tooltip: {
+                formatter: function () {
+                    return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                        }:</b>${this.y.toFixed(2)}<br/>`;
+                },
+            },
+            credits: {
+                enabled: false,
+            },
+        });
+    });
+
+
+    // biodiversity_GBF4_SNES_3_contribution_species_score_by_landuse
+    const chartContainer13 = document.getElementById(
+        "biodiversity_GBF4_SNES_3_contribution_species_score_by_landuse"
+    );
+    const chartData13 = JSON.parse(
+        document.getElementById(
+            "biodiversity_GBF4_SNES_3_contribution_species_score_by_landuse_csv"
+        ).innerHTML
+    );
+
+    // Create blocks and render Highcharts in each block
+    chartData13.forEach((chart, index) => {
+        // Create a new div for each chart
+        const chartBlock13 = document.createElement("div");
+        chartBlock13.classList.add("chart-block");
+        chartBlock13.id = `chart13-${index + 1}`;
+        chartContainer13.appendChild(chartBlock13);
+
+        Highcharts.chart(chartBlock13.id, {
+            plotOptions: {
+                showInLegend: false,
+                column: {
+                    stacking: "normal",
+                },
+            },
+            title: {
+                text: chart.name,
+                align: "center",
+            },
+            series: chart.data,
+
+            yAxis: {
+                title: {
+                    text: "Suitability Relative to Pre-1750 Level (%)",
+                },
+            },
+            tooltip: {
+                formatter: function () {
+                    return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                        }:</b>${this.y.toFixed(2)}<br/>`;
+                },
+            },
+            credits: {
+                enabled: false,
+            },
+            legend: {
+                enabled: false,
+            },
+        });
+    });
+
+    // biodiversity_GBF4_SNES_4_contribution_species_score_by_agri_management
+    const chartContainer14 = document.getElementById(
+        "biodiversity_GBF4_SNES_4_contribution_species_score_by_agri_management"
+    );
+    const chartData14 = JSON.parse(
+        document.getElementById(
+            "biodiversity_GBF4_SNES_4_contribution_species_score_by_agri_management_csv"
+        ).innerHTML
+    );
+
+    // Create blocks and render Highcharts in each block
+    chartData14.forEach((chart, index) => {
+        // Create a new div for each chart
+        const chartBlock14 = document.createElement("div");
+        chartBlock14.classList.add("chart-block");
+        chartBlock14.id = `chart14-${index + 1}`;
+        chartContainer14.appendChild(chartBlock14);
+
+        Highcharts.chart(chartBlock14.id, {
+            plotOptions: {
+                showInLegend: false,
+                column: {
+                    stacking: "normal",
+                },
+            },
+            title: {
+                text: chart.name,
+                align: "center",
+            },
+            series: chart.data,
+
+            yAxis: {
+                title: {
+                    text: "Suitability Relative to Pre-1750 Level (%)",
+                },
+            },
+            tooltip: {
+                formatter: function () {
+                    return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                        }:</b>${this.y.toFixed(2)}<br/>`;
+                },
+            },
+            credits: {
+                enabled: false,
+            },
+        });
+    });
+
+    // biodiversity_GBF4_SNES_5_contribution_species_score_by_non_agri_landuse
+    const chartContainer15 = document.getElementById(
+        "biodiversity_GBF4_SNES_5_contribution_species_score_by_non_agri_landuse"
+    );
+    const chartData15 = JSON.parse(
+        document.getElementById(
+            "biodiversity_GBF4_SNES_5_contribution_species_score_by_non_agri_landuse_csv"
+        ).innerHTML
+    );
+
+    // Create blocks and render Highcharts in each block
+    chartData15.forEach((chart, index) => {
+        // Create a new div for each chart
+        const chartBlock15 = document.createElement("div");
+        chartBlock15.classList.add("chart-block");
+        chartBlock15.id = `chart15-${index + 1}`;
+        chartContainer15.appendChild(chartBlock15);
+
+        Highcharts.chart(chartBlock15.id, {
+            plotOptions: {
+                showInLegend: false,
+                column: {
+                    stacking: "normal",
+                },
+            },
+            title: {
+                text: chart.name,
+                align: "center",
+            },
+            series: chart.data,
+
+            yAxis: {
+                title: {
+                    text: "Suitability Relative to Pre-1750 Level (%)",
+                },
+            },
+            tooltip: {
+                formatter: function () {
+                    return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                        }:</b>${this.y.toFixed(2)}<br/>`;
+                },
+            },
+            credits: {
+                enabled: false,
+            },
+            legend: {
+                enabled: false,
+            },
+        });
+    });
+
+
+    // biodiversity_GBF4_ECNES_1_contribution_species_score_total
+    Highcharts.chart("biodiversity_GBF4_ECNES_1_contribution_species_score_total", {
+        chart: {
+            type: "column",
+            marginRight: 380,
+        },
+        title: {
+            text: "Total Biodiversity Suitability Score (GBF4-ECNES-species)",
+        },
+        series: JSON.parse(
+            document.getElementById(
+                "biodiversity_GBF4_ECNES_1_contribution_species_score_total_csv"
+            ).innerHTML
+        ).concat({
+            name: " ",
+            data: [[2010, 0]],
+            visible: false,
+            showInLegend: false,
+        }),
+        yAxis: {
+            title: {
+                text: "Suitability Relative to Pre-1750 Level (%)",
+            },
+        },
+        plotOptions: {
+            column: {
+                stacking: "normal",
+            },
+        },
+        tooltip: {
+            formatter: function () {
+                return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                    }:</b>${this.y.toFixed(2)}<br/>`;
+            },
+        },
+        legend: {
+            align: "right",
+            layout: "vertical",
+            x: -100,
+            y: -10,
+            verticalAlign: "middle",
+        },
+        credits: {
+            enabled: false,
+        },
+    });
+
+    // biodiversity_GBF4_ECNES_2_contribution_species_score_by_type
+    const chartContainer16 = document.getElementById(
+        "biodiversity_GBF4_ECNES_2_contribution_species_score_by_type"
+    );
+    const chartData16 = JSON.parse(
+        document.getElementById(
+            "biodiversity_GBF4_ECNES_2_contribution_species_score_by_type_csv"
+        ).innerHTML
+    );
+
+    // Create blocks and render Highcharts in each block
+    chartData16.forEach((chart, index) => {
+        // Create a new div for each chart
+        const chartBlock16 = document.createElement("div");
+        chartBlock16.classList.add("chart-block");
+        chartBlock16.id = `chart16-${index + 1}`;
+        chartContainer16.appendChild(chartBlock16);
+
+        Highcharts.chart(chartBlock16.id, {
+            plotOptions: {
+                showInLegend: false,
+                column: {
+                    stacking: "normal",
+                },
+            },
+            title: {
+                text: chart.name,
+                align: "center",
+            },
+            series: chart.data,
+
+            yAxis: {
+                title: {
+                    text: "Suitability Relative to Pre-1750 Level (%)",
+                },
+            },
+            tooltip: {
+                formatter: function () {
+                    return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                        }:</b>${this.y.toFixed(2)}<br/>`;
+                },
+            },
+            credits: {
+                enabled: false,
+            },
+        });
+    });
+
+    // biodiversity_GBF4_ECNES_3_contribution_species_score_by_landuse
+    const chartContainer17 = document.getElementById(
+        "biodiversity_GBF4_ECNES_3_contribution_species_score_by_landuse"
+    );
+    const chartData17 = JSON.parse(
+        document.getElementById(
+            "biodiversity_GBF4_ECNES_3_contribution_species_score_by_landuse_csv"
+        ).innerHTML
+    );
+
+    // Create blocks and render Highcharts in each block
+    chartData17.forEach((chart, index) => {
+        // Create a new div for each chart
+        const chartBlock17 = document.createElement("div");
+        chartBlock17.classList.add("chart-block");
+        chartBlock17.id = `chart17-${index + 1}`;
+        chartContainer17.appendChild(chartBlock17);
+
+        Highcharts.chart(chartBlock17.id, {
+            plotOptions: {
+                showInLegend: false,
+                column: {
+                    stacking: "normal",
+                },
+            },
+            title: {
+                text: chart.name,
+                align: "center",
+            },
+            series: chart.data,
+
+            yAxis: {
+                title: {
+                    text: "Suitability Relative to Pre-1750 Level (%)",
+                },
+            },
+            tooltip: {
+                formatter: function () {
+                    return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                        }:</b>${this.y.toFixed(2)}<br/>`;
+                },
+            },
+            credits: {
+                enabled: false,
+            },
+            legend: {
+                enabled: false,
+            },
+        });
+    });
+
+    // biodiversity_GBF4_ECNES_4_contribution_species_score_by_agri_management
+    const chartContainer18 = document.getElementById(
+        "biodiversity_GBF4_ECNES_4_contribution_species_score_by_agri_management"
+    );
+    const chartData18 = JSON.parse(
+        document.getElementById(
+            "biodiversity_GBF4_ECNES_4_contribution_species_score_by_agri_management_csv"
+        ).innerHTML
+    );
+
+    // Create blocks and render Highcharts in each block
+    chartData18.forEach((chart, index) => {
+        // Create a new div for each chart
+        const chartBlock18 = document.createElement("div");
+        chartBlock18.classList.add("chart-block");
+        chartBlock18.id = `chart18-${index + 1}`;
+        chartContainer18.appendChild(chartBlock18);
+
+        Highcharts.chart(chartBlock18.id, {
+            plotOptions: {
+                showInLegend: false,
+                column: {
+                    stacking: "normal",
+                },
+            },
+            title: {
+                text: chart.name,
+                align: "center",
+            },
+            series: chart.data,
+
+            yAxis: {
+                title: {
+                    text: "Suitability Relative to Pre-1750 Level (%)",
+                },
+            },
+            tooltip: {
+                formatter: function () {
+                    return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                        }:</b>${this.y.toFixed(2)}<br/>`;
+                },
+            },
+            credits: {
+                enabled: false,
+            },
+        });
+    });
+
+    // biodiversity_GBF4_ECNES_5_contribution_species_score_by_non_agri_landuse
+    const chartContainer19 = document.getElementById(
+        "biodiversity_GBF4_ECNES_5_contribution_species_score_by_non_agri_landuse"
+    );
+    const chartData19 = JSON.parse(
+        document.getElementById(
+            "biodiversity_GBF4_ECNES_5_contribution_species_score_by_non_agri_landuse_csv"
+        ).innerHTML
+    );
+
+    // Create blocks and render Highcharts in each block
+    chartData19.forEach((chart, index) => {
+        // Create a new div for each chart
+        const chartBlock19 = document.createElement("div");
+        chartBlock19.classList.add("chart-block");
+        chartBlock19.id = `chart19-${index + 1}`;
+        chartContainer19.appendChild(chartBlock19);
+
+        Highcharts.chart(chartBlock19.id, {
+            plotOptions: {
+                showInLegend: false,
+                column: {
+                    stacking: "normal",
+                },
+            },
+            title: {
+                text: chart.name,
+                align: "center",
+            },
+            series: chart.data,
+
+            yAxis: {
+                title: {
+                    text: "Suitability Relative to Pre-1750 Level (%)",
+                },
+            },
+            tooltip: {
+                formatter: function () {
+                    return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+                        }:</b>${this.y.toFixed(2)}<br/>`;
+                },
+            },
+            credits: {
+                enabled: false,
+            },
+            legend: {
+                enabled: false,
+            },
+        });
+    });
+
+
 
     // biodiversity_GBF8_1_contribution_group_score_total
     Highcharts.chart("biodiversity_GBF8_1_contribution_group_score_total", {
@@ -859,6 +1351,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 },
             },
             credits: {
+                enabled: false,
+            },
+            legend: {
                 enabled: false,
             },
         });
@@ -1102,6 +1597,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 },
             },
             credits: {
+                enabled: false,
+            },
+            legend: {
                 enabled: false,
             },
         });

@@ -35,7 +35,7 @@ from luto.economics.agricultural.quantity import get_yield_pot
 from luto.economics.agricultural.quantity import lvs_veg_types
 
 
-def get_ghg_crop(data, lu, lm, aggregate):
+def get_ghg_crop(data:Data, lu, lm, aggregate):
     """Return crop GHG emissions <unit: t/cell>  of `lu`+`lm` in `yr_idx` 
     as (np array|pd.DataFrame) depending on aggregate (True|False).
 
@@ -88,7 +88,7 @@ def get_ghg_crop(data, lu, lm, aggregate):
 
 
 
-def get_ghg_lvstk( data  # Data object.
+def get_ghg_lvstk( data:Data    # Data object.
                  , lu          # Land use.
                  , lm          # Land management.
                  , yr_idx      # Number of years post base-year ('YR_CAL_BASE').
@@ -161,7 +161,7 @@ def get_ghg_lvstk( data  # Data object.
        
 
 
-def get_ghg(data, lu, lm, yr_idx, aggregate):
+def get_ghg(data:Data, lu, lm, yr_idx, aggregate):
     """Return GHG emissions [tCO2e/cell] of `lu`+`lm` in `yr_idx` 
     as (np array|pd.DataFrame) depending on aggregate (True|False).
 
@@ -194,7 +194,7 @@ def get_ghg(data, lu, lm, yr_idx, aggregate):
 
 
 
-def get_ghg_matrix(data, lm, yr_idx, aggregate):
+def get_ghg_matrix(data:Data, lm, yr_idx, aggregate):
     """
     Return g_rj matrix <unit: t/cell> per lu under `lm` in `yr_idx`.
 
@@ -225,7 +225,7 @@ def get_ghg_matrix(data, lm, yr_idx, aggregate):
         
 
 
-def get_ghg_matrices(data, yr_idx, aggregate=True):
+def get_ghg_matrices(data:Data, yr_idx, aggregate=True):
     """
     Return g_mrj matrix <unit: t/cell> as 3D Numpy array.
     
@@ -375,24 +375,9 @@ def get_ghg_transition_emissions(data:Data, lumap, separate=False) -> np.ndarray
     return ghg_trainsition_penalties
     
     
-    
-def get_ghg_limits(data, target):
-    """
-    Return greenhouse gas emissions limits in tonnes CO2e from year target.
-
-    Parameters
-    - data: The data containing greenhouse gas emissions targets.
-    - target: The target year for which the emissions limit is requested.
-
-    Returns
-    - The greenhouse gas emissions limit in tonnes CO2e for the specified target year.
-    """
-    return data.GHG_TARGETS[target]
 
 
-
-
-def get_asparagopsis_effect_g_mrj(data, yr_idx):
+def get_asparagopsis_effect_g_mrj(data:Data, yr_idx):
     """
     Applies the effects of using asparagopsis to the GHG data
     for all relevant agricultural land uses.
@@ -440,7 +425,7 @@ def get_asparagopsis_effect_g_mrj(data, yr_idx):
     return new_g_mrj
 
 
-def get_precision_agriculture_effect_g_mrj(data, yr_idx):
+def get_precision_agriculture_effect_g_mrj(data:Data, yr_idx):
     """
     Applies the effects of using precision agriculture to the GHG data
     for all relevant agr. land uses.
@@ -495,7 +480,7 @@ def get_precision_agriculture_effect_g_mrj(data, yr_idx):
     return new_g_mrj
 
 
-def get_ecological_grazing_effect_g_mrj(data, yr_idx):
+def get_ecological_grazing_effect_g_mrj(data:Data, yr_idx):
     """
     Applies the effects of using ecological grazing to the GHG data
     for all relevant agricultural land uses.
@@ -552,7 +537,7 @@ def get_ecological_grazing_effect_g_mrj(data, yr_idx):
     return new_g_mrj
 
 
-def get_savanna_burning_effect_g_mrj(data):
+def get_savanna_burning_effect_g_mrj(data:Data):
     """
     Applies the effects of using savanna burning to the GHG data
     for all relevant agr. land uses.
@@ -579,7 +564,7 @@ def get_savanna_burning_effect_g_mrj(data):
     return sb_g_mrj
 
 
-def get_agtech_ei_effect_g_mrj(data, yr_idx):
+def get_agtech_ei_effect_g_mrj(data:Data, yr_idx):
     """
     Applies the effects of using AgTech EI to the GHG data
     for all relevant agr. land uses.
@@ -651,7 +636,7 @@ def get_agtech_ei_effect_g_mrj(data, yr_idx):
     return new_g_mrj
 
 
-def get_biochar_effect_g_mrj(data, yr_idx):
+def get_biochar_effect_g_mrj(data:Data, yr_idx):
     """
     Applies the effects of using Biochar to the GHG data
     for all relevant agr. land uses.
@@ -714,49 +699,55 @@ def get_biochar_effect_g_mrj(data, yr_idx):
     return new_g_mrj
 
 
-def get_beef_hir_effect_g_mrj(data: Data):
-    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
+def get_beef_hir_effect_g_mrj(data: Data, yr_idx):
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     g_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses)))
+    
+    # GHG abatement from Land Use Change 
+    for j_idx, lu in enumerate(land_uses):
+        g_mrj_effect[:, :, j_idx] -= (
+            data.CO2E_STOCK_UNALL_NATURAL      
+            * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
+            * data.REAL_AREA
+            / settings.HIR_EFFECT_YEARS    
+        )
 
-    lvstck_penalty_r = np.zeros(data.NCELLS)
-    lvstck_penalty_r[data.HIR_MASK] = (
-        data.CO2E_STOCK_UNALL_NATURAL[data.HIR_MASK]      
-        * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU['Beef - natural land']] - 1)
-        * data.REAL_AREA[data.HIR_MASK]
-        / settings.HIR_EFFECT_YEARS    # Annualise carbon sequestration capacity to align the full grwoth span of a tree
-    )
-
-    for idx in range(len(land_uses)):
-        g_mrj_effect[:, :, idx] = lvstck_penalty_r 
+    # GHG abatement from livestock density reduction
+    for lm_idx, lm in enumerate(data.LANDMANS):         
+        for j_idx, lu in enumerate(land_uses):
+            g_mrj_effect[lm_idx, :, j_idx] -= get_ghg_lvstk(data, lu, lm, yr_idx, True) * settings.HIR_PRODUCTIVITY_CONTRIBUTION
 
     return g_mrj_effect
 
 
-def get_sheep_hir_effect_g_mrj(data: Data):
-    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
+def get_sheep_hir_effect_g_mrj(data: Data, yr_idx):
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     g_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses)))
-
-    lvstck_penalty_r = np.zeros(data.NCELLS)
-    lvstck_penalty_r[data.HIR_MASK] = (
-        data.CO2E_STOCK_UNALL_NATURAL[data.HIR_MASK]     
-        * (data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU['Sheep - natural land']] - 1)
-        * data.REAL_AREA[data.HIR_MASK]
-        / settings.HIR_EFFECT_YEARS    # Annualise carbon sequestration capacity to align the full grwoth span of a tree
-    )
-
-    for idx in range(len(land_uses)):
-        g_mrj_effect[:, :, idx] = lvstck_penalty_r 
+    
+    # GHG abatement from Land Use Change
+    for j_idx, lu in enumerate(land_uses):
+        g_mrj_effect[:, :, j_idx] -= (
+            data.CO2E_STOCK_UNALL_NATURAL      
+            * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[data.DESC2AGLU[lu]])
+            * data.REAL_AREA
+            / settings.HIR_EFFECT_YEARS    # Annualise carbon sequestration capacity to align the full growth span of a tree
+        )
         
+    # GHG abatement from livestock density reduction
+    for lm_idx, lm in enumerate(data.LANDMANS):
+        for j_idx, lu in enumerate(land_uses):
+            g_mrj_effect[lm_idx, :, j_idx] -= get_ghg_lvstk(data, lu, lm, yr_idx, True) * settings.HIR_PRODUCTIVITY_CONTRIBUTION
+
+
     return g_mrj_effect
 
 
-def get_agricultural_management_ghg_matrices(data, g_mrj, yr_idx) -> dict[str, np.ndarray]:
+def get_agricultural_management_ghg_matrices(data:Data, yr_idx) -> dict[str, np.ndarray]:
     """
     Calculate the greenhouse gas (GHG) matrices for different agricultural management practices.
 
     Args:
         data: The input data for the calculations.
-        g_mrj: The g_mrj parameter.
         yr_idx: The year index.
 
     Returns
@@ -764,14 +755,14 @@ def get_agricultural_management_ghg_matrices(data, g_mrj, yr_idx) -> dict[str, n
         The keys of the dictionary represent the management practices, and the values are numpy arrays.
 
     """
-    asparagopsis_data = get_asparagopsis_effect_g_mrj(data, yr_idx) if settings.AG_MANAGEMENTS['Asparagopsis taxiformis'] else 0
-    precision_agriculture_data = get_precision_agriculture_effect_g_mrj(data, yr_idx) if settings.AG_MANAGEMENTS['Precision Agriculture'] else 0
-    eco_grazing_data = get_ecological_grazing_effect_g_mrj(data, yr_idx) if settings.AG_MANAGEMENTS['Ecological Grazing'] else 0
-    sav_burning_ghg_impact = get_savanna_burning_effect_g_mrj(data) if settings.AG_MANAGEMENTS['Savanna Burning'] else 0
-    agtech_ei_ghg_impact = get_agtech_ei_effect_g_mrj(data, yr_idx) if settings.AG_MANAGEMENTS['AgTech EI'] else 0
-    biochar_ghg_impact = get_biochar_effect_g_mrj(data, yr_idx) if settings.AG_MANAGEMENTS['Biochar'] else 0
-    beef_hir_ghg_impact = get_beef_hir_effect_g_mrj(data) if settings.AG_MANAGEMENTS['Beef - HIR'] else 0
-    sheep_hir_ghg_impact = get_sheep_hir_effect_g_mrj(data) if settings.AG_MANAGEMENTS['Sheep - HIR'] else 0
+    asparagopsis_data = get_asparagopsis_effect_g_mrj(data, yr_idx)                         
+    precision_agriculture_data = get_precision_agriculture_effect_g_mrj(data, yr_idx)       
+    eco_grazing_data = get_ecological_grazing_effect_g_mrj(data, yr_idx)                    
+    sav_burning_ghg_impact = get_savanna_burning_effect_g_mrj(data)                         
+    agtech_ei_ghg_impact = get_agtech_ei_effect_g_mrj(data, yr_idx)                         
+    biochar_ghg_impact = get_biochar_effect_g_mrj(data, yr_idx)                             
+    beef_hir_ghg_impact = get_beef_hir_effect_g_mrj(data, yr_idx)                                   
+    sheep_hir_ghg_impact = get_sheep_hir_effect_g_mrj(data, yr_idx)                                 
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -780,6 +771,6 @@ def get_agricultural_management_ghg_matrices(data, g_mrj, yr_idx) -> dict[str, n
         'Savanna Burning': sav_burning_ghg_impact,
         'AgTech EI': agtech_ei_ghg_impact,
         'Biochar': biochar_ghg_impact,
-        'Beef - HIR': beef_hir_ghg_impact,
-        'Sheep - HIR': sheep_hir_ghg_impact,
+        'HIR - Beef': beef_hir_ghg_impact,
+        'HIR - Sheep': sheep_hir_ghg_impact,
     }

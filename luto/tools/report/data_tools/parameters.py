@@ -23,6 +23,21 @@ import luto.settings as settings
 # Get the root directory of the data
 YR_BASE = 2010
 
+# Colors for reporting HTML to loop through
+COLORS = [
+    "#8085e9",
+    "#f15c80",
+    "#e4d354",
+    "#2b908f",
+    "#f45b5b",
+    "#7cb5ec",
+    "#434348",
+    "#90ed7d",
+    "#f7a35c",
+    "#91e8e1",
+]
+
+
 # Define crop-lvstk land uses
 LU_CROPS = ['Apples','Citrus','Cotton','Grapes','Hay','Nuts','Other non-cereal crops',
             'Pears','Plantation fruit','Rice','Stone fruit','Sugar','Summer cereals',
@@ -55,6 +70,18 @@ COMMODITIES_OFF_LAND = ['Aquaculture', 'Chicken', 'Eggs', 'Pork' ]
 
 COMMODITIES_ALL = COMMODITIES_ON_LAND + COMMODITIES_OFF_LAND
 
+
+# Define land use code for am and non-ag land uses
+AM_SELECT = [i for i in settings.AG_MANAGEMENTS if settings.AG_MANAGEMENTS[i]]
+AM_DESELECT = [i for i in settings.AG_MANAGEMENTS if not settings.AG_MANAGEMENTS[i]]
+AM_MAP_CODES = {i:(AM_SELECT.index(i) + 1) for i in AM_SELECT}
+
+NON_AG_SELECT = [i for i in settings.NON_AG_LAND_USES if settings.NON_AG_LAND_USES[i]]
+NON_AG_DESELECT = [i for i in settings.NON_AG_LAND_USES if not settings.NON_AG_LAND_USES[i]]
+NON_AG_MAP_CODES = {i:(NON_AG_SELECT.index(i) + 1) for i in NON_AG_SELECT}
+
+AM_NON_AG_CODES = {**AM_MAP_CODES, **NON_AG_MAP_CODES}
+AM_NON_AG_REMOVED_DESC = AM_DESELECT + NON_AG_DESELECT
 
 
 # Define the file name patterns for each category
@@ -110,6 +137,7 @@ SPATIAL_MAP_DICT = {
 
 # Get the non-agricultural land uses raw names
 NON_AG_LANDUSE_RAW = list(settings.NON_AG_LAND_USES.keys())
+NON_AG_LANDUSE_RAW = [i for i in NON_AG_LANDUSE_RAW if settings.NON_AG_LAND_USES[i]]
 
 
 # Merge the land uses

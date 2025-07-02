@@ -26,7 +26,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from luto.tools.report.map_tools.helper import download_basemap
-from luto.tools.report.map_tools.parameters import  DPI, FIG_SIZE, extra_desc_float_tif
+from luto.tools.report.map_tools.parameters import  DPI, FIG_SIZE, MAP_BACKGROUND_DESC_FLOAT
 
 
 
@@ -139,7 +139,7 @@ def create_png_map(tif_path: str,
 def decorate_float_plot(color_desc_dict, legend_params, fig):
     # Add a legend
     legend_val = {
-        extra_desc_float_tif[v]: tuple(value / 255 for value in k)
+        MAP_BACKGROUND_DESC_FLOAT[v]: tuple(value / 255 for value in k)
         for k, v in color_desc_dict.items()
         if v < 1 or v > 100
     }

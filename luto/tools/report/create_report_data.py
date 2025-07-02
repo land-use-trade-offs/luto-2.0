@@ -30,7 +30,6 @@ from luto.economics.off_land_commodity import get_demand_df
 from luto.tools.report.data_tools import   get_all_files, get_quantity_df        
 from luto.tools.report.data_tools.helper_func import select_years
 
-from luto.tools.report.data_tools.colors import LANDUSE_ALL_COLORS, COMMODITIES_ALL_COLORS 
 from luto.tools.report.data_tools.parameters import (
     AG_LANDUSE, 
     COMMODITIES_ALL,
@@ -132,7 +131,6 @@ def save_report_data(raw_data_dir:str):
     lu_area_dvar['type'] = 'column'
     lu_area_dvar['sort_index'] = lu_area_dvar['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
     lu_area_dvar = lu_area_dvar.sort_values('sort_index').drop('sort_index', axis=1)
-    lu_area_dvar['color'] = lu_area_dvar['name'].apply(lambda x: LANDUSE_ALL_COLORS[x])
     
     lu_area_dvar.to_json(f'{SAVE_DIR}/area_1_total_area_wide.json', orient='records')
 
@@ -197,13 +195,12 @@ def save_report_data(raw_data_dir:str):
         
     am_dvar_area_lu.columns = ['name','data']
     am_dvar_area_lu['type'] = 'column'
-    am_dvar_area_lu['color'] = am_dvar_area_lu['name'].apply(lambda x: LANDUSE_ALL_COLORS[x])
     am_dvar_area_lu.to_json(f'{SAVE_DIR}/area_5_am_lu_area_wide.json', orient='records')
 
 
     # Plot_1-6/7: Area (km2) Transition by Land use
     transition_path = files.query('category =="transition_matrix"')
-    transition_df_area = pd.read_csv(transition_path['path'].values[0], index_col=0).reset_index()
+    transition_df_area = pd.read_csv(transition_path['path'].values[0], index_col=0).reset_index() 
     transition_df_area['Area (km2)'] = transition_df_area['Area (ha)'] / 100   
     transition_df_area = transition_df_area.replace(RENAME_AM_NON_AG)
 
@@ -332,7 +329,6 @@ def save_report_data(raw_data_dir:str):
                                     
     DEMAND_DATA_commodity_series.columns = ['name','data']
     DEMAND_DATA_commodity_series['type'] = 'column' 
-    DEMAND_DATA_commodity_series['color'] = DEMAND_DATA_commodity_series['name'].apply(lambda x: COMMODITIES_ALL_COLORS[x])
     
     DEMAND_DATA_commodity_series = DEMAND_DATA_commodity_series.set_index('name').reindex(COMMODITIES_ALL).reset_index()
     DEMAND_DATA_commodity_series = DEMAND_DATA_commodity_series.dropna()
@@ -367,7 +363,6 @@ def save_report_data(raw_data_dir:str):
             
         DEMAND_DATA_on_off_commodity_wide.columns = ['name','data']
         DEMAND_DATA_on_off_commodity_wide['type'] = 'column'
-        DEMAND_DATA_on_off_commodity_wide['color'] = DEMAND_DATA_on_off_commodity_wide['name'].apply(lambda x: COMMODITIES_ALL_COLORS[x])
 
         DEMAND_DATA_on_off_commodity_wide.to_json(f'{SAVE_DIR}/production_4_{idx+1}_demand_domestic_{on_off_land}_commodity.json', orient='records')
         
@@ -385,7 +380,6 @@ def save_report_data(raw_data_dir:str):
             
         DEMAND_DATA_commodity_wide.columns = ['name','data']
         DEMAND_DATA_commodity_wide['type'] = 'column'
-        DEMAND_DATA_commodity_wide['color'] = DEMAND_DATA_commodity_wide['name'].apply(lambda x: COMMODITIES_ALL_COLORS[x])
         
         DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity_wide.set_index('name').reindex(COMMODITIES_ALL).reset_index()
         DEMAND_DATA_commodity_wide = DEMAND_DATA_commodity_wide.dropna()
@@ -412,7 +406,6 @@ def save_report_data(raw_data_dir:str):
         
     quantity_df_wide.columns = ['name','data']
     quantity_df_wide['type'] = 'column'
-    quantity_df_wide['color'] = quantity_df_wide['name'].apply(lambda x: COMMODITIES_ALL_COLORS[x])
     
     quantity_df_wide = quantity_df_wide.set_index('name').reindex(COMMODITIES_ALL).reset_index()
     quantity_df_wide = quantity_df_wide.dropna()
@@ -738,7 +731,7 @@ def save_report_data(raw_data_dir:str):
     
     # Save the transition matrix cost
     cost_transition_ag2ag_trans_mat = cost_transition_ag2ag_df.groupby(['Year','From land-use', 'To land-use']).sum(numeric_only=True).reset_index()
-    cost_transition_ag2ag_trans_mat = cost_transition_ag2ag_trans_mat.set_index(['Year','From land-use', 'To land-use'])
+    cost_transition_ag2ag_trans_mat = cost_transition_ag2ag_trans_mat.set_index(['Year','From land-use', 'To land-use']).query('abs(`Value (million)`) > 1')
     cost_transition_ag2ag_trans_mat = cost_transition_ag2ag_trans_mat\
                                         .reindex(index = pd.MultiIndex.from_product([years, AG_LANDUSE, AG_LANDUSE], 
                                                  names = ['Year','From land-use', 'To land-use'])).reset_index()
@@ -784,7 +777,7 @@ def save_report_data(raw_data_dir:str):
     # Get the transition matrix cost
     cost_transition_ag2non_ag_trans_mat = cost_transition_ag2non_ag_df\
                                             .groupby(['Year','From land-use', 'To land-use'])\
-                                            .sum(numeric_only=True).reset_index()
+                                            .sum(numeric_only=True).reset_index().query('abs(`Value (million)`) > 1')
                                             
     cost_transition_ag2non_ag_trans_mat = cost_transition_ag2non_ag_trans_mat\
                                            .set_index(['Year','From land-use', 'To land-use'])\
@@ -833,7 +826,7 @@ def save_report_data(raw_data_dir:str):
     # Get the transition matrix cost
     cost_transition_non_ag2ag_trans_mat = cost_transition_non_ag2ag_df\
                                             .groupby(['Year','From land-use', 'To land-use'])\
-                                            .sum(numeric_only=True).reset_index()
+                                            .sum(numeric_only=True).reset_index().query('abs(`Value (million)`) > 1')
                                             
     cost_transition_non_ag2ag_trans_mat = cost_transition_non_ag2ag_trans_mat\
                                              .set_index(['Year','From land-use', 'To land-use'])\
@@ -868,7 +861,7 @@ def save_report_data(raw_data_dir:str):
     ####################################################
     #                       4) GHGs                    #
     ####################################################
-    if settings.GHG_EMISSIONS_LIMITS == 'on':
+    if settings.GHG_EMISSIONS_LIMITS != 'off':
         GHG_files_onland = files.query('category == "GHG" and base_name.str.contains("GHG_emissions_separate") and year_types != "begin_end_year"').reset_index(drop=True)
         GHG_files_onland = pd.concat([pd.read_csv(path) for path in GHG_files_onland['path']], ignore_index=True)
         GHG_files_onland['CO2_type'] = GHG_files_onland['CO2_type'].replace(GHG_NAMES)
@@ -1219,95 +1212,94 @@ def save_report_data(raw_data_dir:str):
         and ~base_name.str.contains("limits_and_public")').reset_index(drop=True)
     
     water_df_separate = pd.concat([pd.read_csv(path) for path in water_df_separate['path']], ignore_index=True)
-    water_df_separate = water_df_separate.replace(RENAME_AM_NON_AG)
+    water_df_separate = water_df_separate.replace(RENAME_AM_NON_AG).query('`Water Net Yield (ML)` > 0')
     
     
     water_hist_and_public_land_yield = files.query('category == "water" \
         and year_types == "single_year" \
         and base_name.str.contains("limits_and_public")').reset_index(drop=True)
     water_hist_and_public_land_yield = pd.concat([pd.read_csv(path) for path in water_hist_and_public_land_yield['path']], ignore_index=True)
+    water_hist_and_public_land_yield = water_hist_and_public_land_yield\
+        .set_index(['Year','Region'])\
+        .stack()\
+        .reset_index()\
+        .rename(columns={0:'Water Net Yield (ML)', 'level_2':'Type'})
 
 
-    water_outside_LUTO = water_hist_and_public_land_yield.query('Type == "WNY Pubulic"').copy()
-    water_limit = water_hist_and_public_land_yield.query('Type == "WNY LIMIT"')
-    
 
     # Plot_5-1: Water total yield by broad categories (ML)
-    water_outside_LUTO_total = water_outside_LUTO\
-        .query('`CCI Existence` == "HIST (ML)"')\
-        .groupby('Year')\
-        .sum(numeric_only=True)\
-        .reset_index()
-    water_outside_LUTO_total_wide = list(map(list,zip(water_outside_LUTO_total['Year'], water_outside_LUTO_total['Value (ML)'])))
-  
     water_inside_LUTO_broad_cat_sum = water_df_separate\
-        .query('`Climate Change existence` == "With CCI"')\
-        .groupby(['Year','Landuse Type'])[['Value (ML)']]\
+        .groupby(['Year','Type'])[['Water Net Yield (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()
     water_inside_LUTO_broad_cat_sum_wide = water_inside_LUTO_broad_cat_sum\
-        .groupby('Landuse Type')[['Year','Value (ML)']]\
-        .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
+        .groupby('Type')[['Year','Water Net Yield (ML)']]\
+        .apply(lambda x: list(map(list,zip(x['Year'],x['Water Net Yield (ML)']))))\
         .reset_index()
+    water_inside_LUTO_broad_cat_sum_wide.columns = ['name','data']
+    water_inside_LUTO_broad_cat_sum_wide['type'] = 'column'
     
-    water_yield_no_CCI = water_inside_LUTO_broad_cat_sum_wide.copy()
-    water_yield_no_CCI.loc[len(water_yield_no_CCI)] = ['Public land', water_outside_LUTO_total_wide, ]
-    water_yield_no_CCI.columns = ['name','data']
-    water_yield_no_CCI['type'] = 'column'   
         
-
-    
-    water_CCI_outside_LUTO = water_outside_LUTO\
-        .pivot(index=['Year', 'REGION', 'Type'], columns='CCI Existence', values='Value (ML)')\
-        .reset_index()\
-        .groupby(['Year','Type'])[['HIST (ML)','HIST + CCI (ML)']]\
-        .sum(numeric_only=True)\
-        .reset_index()\
-        .eval('CCI_outside = `HIST + CCI (ML)` - `HIST (ML)`')[['Year','CCI_outside']]
-        
-    water_CCI_inside_LUTO = water_df_separate\
-        .groupby(['Year','Climate Change existence'])\
-        .sum(numeric_only=True)\
-        .reset_index()\
-        .pivot(index=['Year'],columns='Climate Change existence', values='Value (ML)')\
-        .reset_index()\
-        .eval('CCI_inside = `With CCI` - `Without CCI`')[['Year','CCI_inside']]
-        
-    water_CCI = water_CCI_outside_LUTO.merge(water_CCI_inside_LUTO, on='Year', how='outer')
-    water_CCI['CCI_total'] = water_CCI['CCI_outside'] + water_CCI['CCI_inside']
-    water_CCI_wide = water_CCI[['Year','CCI_total']].values.tolist()
-    
-    water_total_no_CCI = water_inside_LUTO_broad_cat_sum\
+    water_outside_LUTO = water_hist_and_public_land_yield.query('Type == "Water yield outside LUTO (ML)"').copy()    
+    water_outside_LUTO_total = water_outside_LUTO\
         .groupby('Year')\
         .sum(numeric_only=True)\
-        .reset_index()\
-        .merge(water_outside_LUTO_total, on='Year', how='outer')\
-        .eval('Water_no_CCI = `Value (ML)_x` + `Value (ML)_y`')[['Year','Water_no_CCI']]
-        
-    water_total_with_CCI = water_total_no_CCI.merge(water_CCI, on='Year', how='outer')\
-        .eval('water_total_with_cci = Water_no_CCI + CCI_total')[['Year','water_total_with_cci']]
-    water_total_with_CCI_wide = water_total_with_CCI.values.tolist()
-
+        .reset_index()
+    water_outside_LUTO_total_wide = list(map(list,zip(
+        water_outside_LUTO_total['Year'], water_outside_LUTO_total['Water Net Yield (ML)']
+    )))
     
-    water_yield_df = water_yield_no_CCI.copy()
+    
+    water_CCI = water_hist_and_public_land_yield.query('Type == "Climate Change Impact (ML)"').copy()\
+        .groupby('Year')\
+        .sum(numeric_only=True)\
+        .reset_index()
+    water_CCI_wide = list(map(list,zip(
+        water_CCI['Year'], water_CCI['Water Net Yield (ML)']
+    )))
+    
+    water_domestic = water_hist_and_public_land_yield.query('Type == "Domestic Water Use (ML)"').copy()\
+        .groupby('Year')\
+        .sum(numeric_only=True)\
+        .reset_index()
+    water_domestic['Water Net Yield (ML)'] = -water_domestic['Water Net Yield (ML)']  # Domestic water use is negative, indicating a water loss (consumption)
+    water_domestic_wide = (water_domestic[['Year','Water Net Yield (ML)']].values).tolist() 
+    
+    water_yield_sum = water_hist_and_public_land_yield.query('Type == "Water Net Yield (ML)"').copy()\
+        .groupby('Year')\
+        .sum(numeric_only=True)\
+        .reset_index()
+    water_yield_sum_wide = list(map(list,zip(
+        water_yield_sum['Year'], water_yield_sum['Water Net Yield (ML)']
+    )))
+    
+    water_limit = water_hist_and_public_land_yield.query('Type == "Water Yield Limit (ML)"').copy()\
+        .groupby('Year')\
+        .sum(numeric_only=True)\
+        .reset_index()
+    water_limit_wide = list(map(list,zip(
+        water_limit['Year'], water_limit['Water Net Yield (ML)']
+    )))
+  
+    
+    water_yield_df = water_inside_LUTO_broad_cat_sum_wide.copy()
+    water_yield_df.loc[len(water_yield_df)] = ['Outside LUTO Study Area', water_outside_LUTO_total_wide,  'column']
     water_yield_df.loc[len(water_yield_df)] = ['Climate Change Impact', water_CCI_wide,  'column']
-    water_yield_df.loc[len(water_yield_df)] = ['Water Net Yield', water_total_with_CCI_wide, 'spline']
+    water_yield_df.loc[len(water_yield_df)] = ['Domestic Water Use', water_domestic_wide,  'column']
+    water_yield_df.loc[len(water_yield_df)] = ['Water Net Yield', water_yield_sum_wide, 'spline']
+    water_yield_df.loc[len(water_yield_df)] = ['Water Limit', water_limit_wide, 'spline']
     water_yield_df.to_json(f'{SAVE_DIR}/water_1_water_net_use_by_broader_category.json', orient='records')
     
-    
-
 
     # Plot_5-2: Water net yield by specific land-use (ML)
     water_inside_LUTO_specific_lu_sum = water_df_separate\
-        .query('`Climate Change existence` == "With CCI"')\
-        .groupby(['Year','Landuse'])[['Value (ML)']]\
+        .groupby(['Year','Landuse'])[['Water Net Yield (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()
-       
-        
+            
     water_inside_LUTO_specific_lu_sum_wide = water_inside_LUTO_specific_lu_sum\
-        .groupby(['Landuse'])[['Year','Value (ML)']]\
-        .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
+        .groupby(['Landuse'])[['Year','Water Net Yield (ML)']]\
+        .apply(lambda x: list(map(list,zip(x['Year'],x['Water Net Yield (ML)']))))\
         .reset_index()\
         .set_index('Landuse')\
         .reindex(LANDUSE_ALL_RENAMED)\
@@ -1320,75 +1312,41 @@ def save_report_data(raw_data_dir:str):
     
     # Plot_5-3: Water net yield by region (ML)
     water_yield_region = []
-    for region in water_df_separate['region'].unique():
+    for reg_name in water_df_separate['Region'].unique():
         
-        water_outside_LUTO_region = water_outside_LUTO.query('REGION == @region').copy()
-        water_outside_yiled = water_outside_LUTO_region.query('`CCI Existence` == "HIST (ML)"').copy()
-        water_outside_yiled_wide = list(map(list,zip(water_outside_yiled['Year'], water_outside_yiled['Value (ML)'])))
-    
-        water_inside_LUTO_region = water_df_separate.query('region == @region').copy()
-        water_inside_yield = water_inside_LUTO_region.query('`Climate Change existence` == "Without CCI"').copy()
-        water_inside_yield_sum = water_inside_yield.groupby(['Year'])[['Value (ML)']].sum(numeric_only=True).reset_index()
-        
-        water_inside_yield_wide = water_inside_yield\
-            .groupby(['Year','Landuse Type'])[['Value (ML)']]\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .groupby('Landuse Type')[['Year','Value (ML)']]\
-            .apply(lambda x: list(map(list,zip(x['Year'],x['Value (ML)']))))\
-            .reset_index()
+        water_inside_LUTO_region = water_df_separate.query('Region == @reg_name').copy()
+        water_inside_yield_sum = water_inside_LUTO_region.groupby(['Year'])[['Water Net Yield (ML)']].sum(numeric_only=True).reset_index()
+        water_inside_yield_wide = list(map(list,zip(water_inside_yield_sum['Year'], water_inside_yield_sum['Water Net Yield (ML)'])))
             
-        water_outside_CCI = water_outside_LUTO_region\
-            .pivot(index=['Year', 'REGION', 'Type'], columns='CCI Existence', values='Value (ML)')\
-            .reset_index()\
-            .eval('CCI_outside = `HIST + CCI (ML)` - `HIST (ML)`')[['Year','CCI_outside']]
-            
-        water_inside_CCI = water_inside_LUTO_region\
-            .groupby(['Year', 'Climate Change existence'])[['Value (ML)']]\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .pivot(index=['Year'],columns='Climate Change existence', values='Value (ML)')\
-            .reset_index()\
-            .eval('CCI_inside = `With CCI` - `Without CCI`')[['Year','CCI_inside']]
-            
-        water_CCI = water_outside_CCI.merge(water_inside_CCI, on='Year', how='outer')
-        water_CCI['CCI_total'] = water_CCI['CCI_outside'] + water_CCI['CCI_inside']
-        water_CCI_wide = water_CCI[['Year','CCI_total']].values.tolist()
+        water_outside_LUTO_region = water_outside_LUTO.query('Region == @reg_name').copy()
+        water_outside_yiled_wide = list(map(list,zip(water_outside_LUTO_region['Year'], water_outside_LUTO_region['Water Net Yield (ML)'])))
+
+        water_CCI = water_hist_and_public_land_yield.query('Type == "Climate Change Impact (ML)" and Region == @reg_name').copy()
+        water_CCI_wide = list(map(list,zip(water_CCI['Year'], water_CCI['Water Net Yield (ML)'])))
         
+        water_domestic = water_hist_and_public_land_yield.query('Type == "Domestic Water Use (ML)" and Region == @reg_name').copy()
+        water_domestic_wide = list(map(list,zip(water_domestic['Year'], -water_domestic['Water Net Yield (ML)'])))  # Domestic water use is negative, indicating a water loss (consumption)
         
-        water_yield_net = water_inside_yield_sum\
-            .merge(water_outside_yiled, on='Year', how='outer')\
-            .merge(water_CCI, on='Year', how='outer')\
-            .eval('Net_yield = `Value (ML)_x` + `Value (ML)_y` + CCI_total')[['Year','Net_yield']]
-        water_yield_net_wide = water_yield_net.values.tolist()
+        water_yield_sum = water_hist_and_public_land_yield.query('Type == "Water Net Yield (ML)" and Region == @reg_name').copy()
+        water_yield_sum_wide = list(map(list,zip(water_yield_sum['Year'], water_yield_sum['Water Net Yield (ML)'])))
         
-        
-        water_limit_region = water_limit.query('REGION == @region').copy()
-        water_limit_region_wide = water_limit_region\
-            .pivot(index=['Year'], columns='CCI Existence', values='Value (ML)')\
-            .reset_index()
-        water_limit_region_hist = list(map(list,zip(water_limit_region_wide['Year'], water_limit_region_wide['HIST (ML)'])))
-        
-    
-        water_inside_yield_wide.columns = ['name','data']
-        water_inside_yield_wide['type'] = 'column'
-        water_inside_yield_wide['color'] = None
-        
+        water_limit = water_hist_and_public_land_yield.query('Type == "Water Yield Limit (ML)" and Region == @reg_name').copy()
+        water_limit_wide = list(map(list,zip(water_limit['Year'], water_limit['Water Net Yield (ML)'])))
+
+
         water_df = pd.DataFrame([
-            ['Public land', water_outside_yiled_wide, 'column', None],
+            ['Water Yield Inside LUTO Study Area', water_inside_yield_wide, 'column', None],
+            ['Water Yield Out LUTO Study Area', water_outside_yiled_wide, 'column', None],
             ['Climate Change Impact', water_CCI_wide, 'column', None],
-            ['Water Net Yield', water_yield_net_wide, 'spline', None],
-            ['Historical Limit', water_limit_region_hist, 'spline', 'black'],
-            ],
-            columns=['name','data','type','color']
+            ['Domestic Water Use', water_domestic_wide, 'column', None],
+            ['Water Net Yield', water_yield_sum_wide, 'spline', None],
+            ['Water Limit', water_limit_wide, 'spline', 'black']],  columns=['name','data','type','color']
         )
 
-        water_df = pd.concat([water_inside_yield_wide, water_df], ignore_index=True)
-
-
         water_yield_region.append({
-            'name': region,
-            'data': water_df.to_dict(orient='records')})
+            'name': reg_name,
+            'data': water_df.to_dict(orient='records')}
+        )
                 
     with open(f'{SAVE_DIR}/water_3_water_net_yield_by_region.json', 'w') as outfile:
         json.dump(water_yield_region, outfile)
@@ -1468,8 +1426,9 @@ def save_report_data(raw_data_dir:str):
     
         
     # ---------------- (GBF2) Biodiversity priority score  ----------------
-    if settings.BIODIVERSTIY_TARGET_GBF_2 == 'on':
-        
+    if settings.BIODIVERSITY_TARGET_GBF_2 == 'off':
+        pass
+    else:
         # get biodiversity dataframe
         filter_str = '''
             category == "biodiversity" 
@@ -1500,7 +1459,10 @@ def save_report_data(raw_data_dir:str):
         
         
         # Plot_GBF2_2: Biodiversity total by landuse
-        bio_df_landuse = bio_df.groupby(['Year','Landuse']).sum(numeric_only=True).reset_index()
+        bio_df_landuse = bio_df\
+            .query('Type == "Agricultural Landuse"')\
+            .groupby(['Year','Landuse'])\
+            .sum(numeric_only=True).reset_index()
         bio_df_landuse = bio_df_landuse\
             .groupby('Landuse')[['Year','Contribution Relative to Pre-1750 Level (%)']]\
             .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
@@ -1546,8 +1508,9 @@ def save_report_data(raw_data_dir:str):
             
             
     # ---------------- (GBF3) Biodiversity Major Vegetation Group score  ----------------
-    if settings.BIODIVERSTIY_TARGET_GBF_3 == 'on':
-        
+    if settings.BIODIVERSITY_TARGET_GBF_3 == 'off':
+        pass
+    else:
         filter_str = '''
             category == "biodiversity" 
             and year_types == "single_year" 
@@ -1595,6 +1558,7 @@ def save_report_data(raw_data_dir:str):
             
         # Plot_GBF3_3: Biodiversity contribution score (group) by landuse
         bio_group_lu_sum = bio_df\
+            .query('Type == "Agricultural Landuse"')\
             .groupby(['Year','Landuse','Vegetation Group'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -1611,7 +1575,6 @@ def save_report_data(raw_data_dir:str):
             df.columns = ['name','data']
             df = df.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index().dropna()
             df['type'] = 'column'
-            df['color'] = df['name'].apply(lambda x: LANDUSE_ALL_COLORS.get(x,'grey'))
             bio_df_group_records.append({'name':idx,'data':df.to_dict(orient='records')})
             
         with open(f'{SAVE_DIR}/biodiversity_GBF3_3_contribution_group_score_by_landuse.json', 'w') as outfile:
@@ -1667,7 +1630,7 @@ def save_report_data(raw_data_dir:str):
             
             
     # ---------------- (GBF4) Biodiversity National Significance score  ----------------
-    if settings.BIODIVERSTIY_TARGET_GBF_4_SNES == 'on':
+    if settings.BIODIVERSITY_TARGET_GBF_4_SNES == 'on':
         
         # Get biodiversity dataframe
         filter_str = '''
@@ -1681,7 +1644,7 @@ def save_report_data(raw_data_dir:str):
         bio_df = bio_df.replace(RENAME_AM_NON_AG)  # Rename the landuse
         
         
-        # Plot_GBF4_1: Biodiversity contribution score for each species
+        # Plot_GBF4_SNES_1: Biodiversity contribution score for each species
         bio_df_species = bio_df.groupby(['Year','species']).sum(numeric_only=True).reset_index()
         bio_df_species = bio_df_species\
             .groupby(['species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
@@ -1690,10 +1653,10 @@ def save_report_data(raw_data_dir:str):
             
         bio_df_species.columns = ['name','data']
         bio_df_species['type'] = 'spline'
-        bio_df_species.to_json(f'{SAVE_DIR}/biodiversity_GBF4_1_contribution_species_score_total.json', orient='records')
+        bio_df_species.to_json(f'{SAVE_DIR}/biodiversity_GBF4_SNES_1_contribution_species_score_total.json', orient='records')
         
         
-        # Plot_GBF4_2: Biodiversity contribution score (species) by Type
+        # Plot_GBF4_SNES_2: Biodiversity contribution score (species) by Type
         bio_df_species_type_sum = bio_df\
             .groupby(['Year','Type','species'])\
             .sum(numeric_only=True)\
@@ -1711,12 +1674,13 @@ def save_report_data(raw_data_dir:str):
             df['type'] = 'column'
             bio_df_species_type_records.append({'name': idx, 'data': df.to_dict(orient='records')})
 
-        with open(f'{SAVE_DIR}/biodiversity_GBF4_2_contribution_species_score_by_type.json', 'w') as outfile:
+        with open(f'{SAVE_DIR}/biodiversity_GBF4_SNES_2_contribution_species_score_by_type.json', 'w') as outfile:
             json.dump(bio_df_species_type_records, outfile)
         
         
-        # Plot_GBF4_3: Biodiversity contribution score (species) by landuse
+        # Plot_GBF4_SNES_3: Biodiversity contribution score (species) by landuse
         bio_species_lu_sum = bio_df\
+            .query('Type == "Agricultural Landuse"')\
             .groupby(['Year','Landuse','species'])\
             .sum(numeric_only=True)\
             .reset_index()
@@ -1734,11 +1698,11 @@ def save_report_data(raw_data_dir:str):
             df = df.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index().dropna()
             bio_df_species_records.append({'name': idx, 'data': df.to_dict(orient='records')})
             
-        with open(f'{SAVE_DIR}/biodiversity_GBF4_3_contribution_species_score_by_landuse.json', 'w') as outfile:
+        with open(f'{SAVE_DIR}/biodiversity_GBF4_SNES_3_contribution_species_score_by_landuse.json', 'w') as outfile:
             json.dump(bio_df_species_records, outfile)
         
         
-        # Plot_GBF4_4: Biodiversity contribution score (species) by agricultural management
+        # Plot_GBF4_SNES_4: Biodiversity contribution score (species) by agricultural management
         bio_species_am_sum = bio_df\
             .groupby(['Year','Agri-Management','species'])\
             .sum(numeric_only=True)\
@@ -1756,12 +1720,13 @@ def save_report_data(raw_data_dir:str):
             df['type'] = 'column'
             bio_df_species_records.append({'name': idx, 'data': df.to_dict(orient='records')})
             
-        with open(f'{SAVE_DIR}/biodiversity_GBF4_4_contribution_species_score_by_agri_management.json', 'w') as outfile:
+        with open(f'{SAVE_DIR}/biodiversity_GBF4_SNES_4_contribution_species_score_by_agri_management.json', 'w') as outfile:
             json.dump(bio_df_species_records, outfile)
         
         
-        # Plot_GBF4_5: Biodiversity contribution score (species) by non-agricultural landuse
+        # Plot_GBF4_SNES_5: Biodiversity contribution score (species) by non-agricultural landuse
         bio_species_non_ag_sum = bio_df\
+            .query('Type == "Non-Agricultural land-use"')\
             .groupby(['Year','Landuse','species'])\
             .sum(numeric_only=True)\
             .reset_index()
@@ -1778,17 +1743,128 @@ def save_report_data(raw_data_dir:str):
             df['type'] = 'column'
             bio_df_species_records.append({'name': idx, 'data': df.to_dict(orient='records')})
             
-        with open(f'{SAVE_DIR}/biodiversity_GBF4_5_contribution_species_score_by_non_agri_landuse.json', 'w') as outfile:
+        with open(f'{SAVE_DIR}/biodiversity_GBF4_SNES_5_contribution_species_score_by_non_agri_landuse.json', 'w') as outfile:
             json.dump(bio_df_species_records, outfile)
-    
-    
-    
-    
-    
+            
+            
+            
+    if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == 'on':
+        # Get biodiversity dataframe
+        filter_str = '''
+            category == "biodiversity" 
+            and year_types == "single_year" 
+            and base_name.str.contains("biodiversity_GBF4_ECNES_scores")
+        '''.strip().replace('\n', '')
+        
+        bio_paths = files.query(filter_str).reset_index(drop=True)
+        bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
+        bio_df = bio_df.replace(RENAME_AM_NON_AG)
+        
+        
+        # Plot_GBF4_ECNES_1: Biodiversity contribution score for each species
+        bio_df_species = bio_df.groupby(['Year','species']).sum(numeric_only=True).reset_index()
+        bio_df_species = bio_df_species\
+            .groupby(['species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .apply(lambda x: list(map(list, zip(x['Year'], x['Contribution Relative to Pre-1750 Level (%)']))))\
+            .reset_index()
+        bio_df_species.columns = ['name', 'data']
+        bio_df_species['type'] = 'spline'
+        bio_df_species.to_json(f'{SAVE_DIR}/biodiversity_GBF4_ECNES_1_contribution_species_score_total.json', orient='records')
+        
+        
+        # Plot_GBF4_ECNES_2: Biodiversity contribution score (species) by Type
+        bio_df_species_type_sum = bio_df\
+            .groupby(['Year','Type','species'])\
+            .sum(numeric_only=True)\
+            .reset_index()
+
+        bio_df_species_type_sum = bio_df_species_type_sum\
+            .groupby(['Type','species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .apply(lambda x: list(map(list, zip(x['Year'], x['Contribution Relative to Pre-1750 Level (%)']))))\
+            .reset_index()
+
+        bio_df_species_type_records = []
+        for idx, df in bio_df_species_type_sum.groupby('species'):
+            df = df.drop('species', axis=1)
+            df.columns = ['name', 'data']
+            df['type'] = 'column'
+            bio_df_species_type_records.append({'name': idx, 'data': df.to_dict(orient='records')})
+
+        with open(f'{SAVE_DIR}/biodiversity_GBF4_ECNES_2_contribution_species_score_by_type.json', 'w') as outfile:
+            json.dump(bio_df_species_type_records, outfile)
+
+        # Plot_GBF4_ECNES_3: Biodiversity contribution score (species) by agri landuse
+        bio_species_lu_sum = bio_df\
+            .query('Type == "Agricultural Landuse"')\
+            .groupby(['Year','Landuse','species'])\
+            .sum(numeric_only=True)\
+            .reset_index()
+
+        bio_species_lu_sum = bio_species_lu_sum\
+            .groupby(['Landuse','species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .apply(lambda x: list(map(list, zip(x['Year'], x['Contribution Relative to Pre-1750 Level (%)']))))\
+            .reset_index()
+
+        bio_df_species_records = []
+        for idx, df in bio_species_lu_sum.groupby('species'):
+            df = df.drop('species', axis=1)
+            df.columns = ['name', 'data']
+            df['type'] = 'column'
+            df = df.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index().dropna()
+            bio_df_species_records.append({'name': idx, 'data': df.to_dict(orient='records')})
+
+        with open(f'{SAVE_DIR}/biodiversity_GBF4_ECNES_3_contribution_species_score_by_landuse.json', 'w') as outfile:
+            json.dump(bio_df_species_records, outfile)
+
+        # Plot_GBF4_ECNES_4: Biodiversity contribution score (species) by agricultural management
+        bio_species_am_sum = bio_df\
+            .groupby(['Year','Agri-Management','species'])\
+            .sum(numeric_only=True)\
+            .reset_index()
+
+        bio_species_am_sum = bio_species_am_sum\
+            .groupby(['Agri-Management','species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .apply(lambda x: list(map(list, zip(x['Year'], x['Contribution Relative to Pre-1750 Level (%)']))))\
+            .reset_index()
+
+        bio_df_species_records = []
+        for idx, df in bio_species_am_sum.groupby('species'):
+            df = df.drop('species', axis=1)
+            df.columns = ['name', 'data']
+            df['type'] = 'column'
+            bio_df_species_records.append({'name': idx, 'data': df.to_dict(orient='records')})
+
+        with open(f'{SAVE_DIR}/biodiversity_GBF4_ECNES_4_contribution_species_score_by_agri_management.json', 'w') as outfile:
+            json.dump(bio_df_species_records, outfile)
+
+        # Plot_GBF4_ECNES_5: Biodiversity contribution score (species) by non-agricultural landuse
+        bio_species_non_ag_sum = bio_df\
+            .query('Type == "Non-Agricultural land-use"')\
+            .groupby(['Year','Landuse','species'])\
+            .sum(numeric_only=True)\
+            .reset_index()
+
+        bio_species_non_ag_sum = bio_species_non_ag_sum\
+            .groupby(['Landuse','species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
+            .apply(lambda x: list(map(list, zip(x['Year'], x['Contribution Relative to Pre-1750 Level (%)']))))\
+            .reset_index()
+
+        bio_df_species_records = []
+        for idx, df in bio_species_non_ag_sum.groupby('species'):
+            df = df.drop('species', axis=1)
+            df.columns = ['name', 'data']
+            df['type'] = 'column'
+            bio_df_species_records.append({'name': idx, 'data': df.to_dict(orient='records')})
+
+        with open(f'{SAVE_DIR}/biodiversity_GBF4_ECNES_5_contribution_species_score_by_non_agri_landuse.json', 'w') as outfile:
+            json.dump(bio_df_species_records, outfile)
+        
+        
+        
     # ---------------- (GBF8) Biodiversity suitability under differen climate change  ----------------
     
     # 1) Biodiversity suitability scores (GBF8) by group
-    if settings.BIODIVERSTIY_TARGET_GBF_8 == 'on':
+    if settings.BIODIVERSITY_TARGET_GBF_8 == 'on':
         
         # Get biodiversity dataframe
         filter_str = '''
@@ -1839,6 +1915,7 @@ def save_report_data(raw_data_dir:str):
         
         # Plot_GBF8_3: Biodiversity contribution score (group) by landuse
         bio_group_lu_sum = bio_df\
+            .query('Type == "Agricultural Landuse"')\
             .groupby(['Year','Landuse','Group'])\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -1855,7 +1932,6 @@ def save_report_data(raw_data_dir:str):
             df.columns = ['name','data']
             df = df.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index().dropna()
             df['type'] = 'column'
-            df['color'] = df['name'].apply(lambda x: LANDUSE_ALL_COLORS.get(x,'grey'))
             bio_df_group_records.append({'name':idx,'data':df.to_dict(orient='records')})
             
         with open(f'{SAVE_DIR}/biodiversity_GBF8_3_contribution_group_score_by_landuse.json', 'w') as outfile:
@@ -1886,6 +1962,7 @@ def save_report_data(raw_data_dir:str):
             
         # Plot_GBF8_5: Biodiversity contribution score (group) by non-agricultural landuse
         bio_group_non_ag_sum = bio_df\
+            .query('Type == "Non-Agricultural land-use"')\
             .groupby(['Year','Landuse','Group'])\
             .sum(numeric_only=True)\
             .reset_index()
@@ -1954,8 +2031,9 @@ def save_report_data(raw_data_dir:str):
             json.dump(bio_df_species_type_records, outfile)
             
             
-        # Plot_GBF8_8: Biodiversity contribution score (species) by landuse
+        # Plot_GBF8_8: Biodiversity contribution score (species) by agri landuse
         bio_species_lu_sum = bio_df\
+            .query('Type == "Agricultural Landuse"')\
             .groupby(['Year','Landuse','Species'])\
             .sum(numeric_only=True)\
             .reset_index()
@@ -1970,7 +2048,7 @@ def save_report_data(raw_data_dir:str):
             df = df.drop('Species',axis=1)
             df.columns = ['name','data']
             df['type'] = 'column'
-            df = df.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index()
+            df = df.set_index('name').reindex(AG_LANDUSE).reset_index()
             bio_df_species_records.append({'name':idx,'data':df.to_dict(orient='records')})
             
         with open(f'{SAVE_DIR}/biodiversity_GBF8_8_contribution_species_score_by_landuse.json', 'w') as outfile:
@@ -2001,6 +2079,7 @@ def save_report_data(raw_data_dir:str):
             
         # Plot_GBF8_10: Biodiversity contribution score (species) by non-agricultural landuse
         bio_species_non_ag_sum = bio_df\
+            .query('Type == "Non-Agricultural land-use"')\
             .groupby(['Year','Landuse','Species'])\
             .sum(numeric_only=True)\
             .reset_index()
@@ -2033,6 +2112,13 @@ def save_report_data(raw_data_dir:str):
     # Create the directory to save map_html if it does not exist
     if  not os.path.exists(map_save_dir):
         os.makedirs(map_save_dir)
+        
+    # Remove any existing map files in the save directory
+    if os.path.exists(map_save_dir):
+        for file in os.listdir(map_save_dir):
+            file_path = os.path.join(map_save_dir, file)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
     
     # Function to move a file from one location to another if the file exists
     def move_html(path_from, path_to):
@@ -2040,8 +2126,10 @@ def save_report_data(raw_data_dir:str):
             shutil.move(path_from, path_to)
     
     # Move the map files to the save directory
-    tasks = [delayed(move_html)(row['path'], map_save_dir)
-                for _,row in map_files.iterrows()]
+    tasks = [
+        delayed(move_html)(row['path'], map_save_dir)
+        for _,row in map_files.iterrows()
+    ]
     
     worker = min(settings.WRITE_THREADS, len(tasks)) if len(tasks) > 0 else 1
     

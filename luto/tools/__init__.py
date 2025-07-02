@@ -25,11 +25,14 @@ Pure helper functions and other tools.
 
 import sys
 import os.path
+import threading
+import time
 import traceback
 import functools
 
 import pandas as pd
 import numpy as np
+import psutil
 import xarray as xr
 import numpy_financial as npf
 import matplotlib.patches as patches
@@ -60,8 +63,10 @@ def read_timestamp():
 
 def amortise(cost, rate=settings.DISCOUNT_RATE, horizon=settings.AMORTISATION_PERIOD):
     """Return NPV of future `cost` amortised to annual value at discount `rate` over `horizon` years."""
-    if settings.AMORTISE_UPFRONT_COSTS: return -1 * npf.pmt(rate, horizon, pv=cost, fv=0, when='begin')
-    else: return cost
+    if settings.AMORTISE_UPFRONT_COSTS: 
+        return -1 * npf.pmt(rate, horizon, pv=cost, fv=0, when='begin')
+    else: 
+        return cost
 
 
 def lumap2ag_l_mrj(lumap, lmmap):
@@ -238,7 +243,7 @@ def get_ag_and_non_ag_natural_lu_cells(data, lumap) -> np.ndarray:
 
 def get_ag_cells(lumap) -> np.ndarray:
     """
-    Get an array containing the index of all non-agricultural cells
+    Get an array containing the index of all agricultural cells
     """
     return np.nonzero(lumap < settings.NON_AGRICULTURAL_LU_BASE_CODE)[0]
 
@@ -308,7 +313,6 @@ def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.nd
      lmmap (numpy.ndarray): Land management map.
     
     Returns
-     w_license_cost_r (numpy.ndarray) : Water license cost for each cell.
      w_rm_irrig_cost_r (numpy.ndarray) : Cost of removing irrigation for each cell.
      
      
@@ -325,12 +329,8 @@ def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.nd
     
     w_license_cost_r = w_delta_r * data.WATER_LICENCE_PRICE * data.WATER_LICENSE_COST_MULTS[yr_cal] * settings.INCLUDE_WATER_LICENSE_COSTS     # <unit: $/CELL>
     w_rm_irrig_cost_r = np.where(lmmap == 1, settings.REMOVE_IRRIG_COST * data.IRRIG_COST_MULTS[yr_cal], 0) * data.REAL_AREA                   # <unit: $/CELL>
-    
-    # Amortise upfront costs to annualised costs
-    w_license_cost_r = amortise(w_license_cost_r)
-    w_rm_irrig_cost_r = amortise(w_rm_irrig_cost_r)
-    
-    return w_license_cost_r, w_rm_irrig_cost_r
+
+    return w_rm_irrig_cost_r
 
 
 def am_name_snake_case(am_name):
@@ -462,15 +462,15 @@ def non_ag_rk_to_xr(data, arr):
 
 def am_mrj_to_xr(data, am_mrj_dict):
     emp_arr_xr = xr.DataArray(
-        np.full((len(settings.AG_MANAGEMENTS_TO_LAND_USES), len(data.LANDMANS), data.NCELLS, len(data.AGRICULTURAL_LANDUSES)), np.nan),
+        np.full((data.N_AG_MANS, data.NLMS, data.NCELLS, data.N_AG_LUS), np.nan),
         dims=['am', 'lm', 'cell', 'lu'],
-        coords={'am': list(settings.AG_MANAGEMENTS_TO_LAND_USES.keys()),
+        coords={'am': data.AG_MAN_DESC,
                 'lm': data.LANDMANS,
                 'cell': np.arange(data.NCELLS),
                 'lu': data.AGRICULTURAL_LANDUSES}
     )
 
-    for am,lu in settings.AG_MANAGEMENTS_TO_LAND_USES.items():
+    for am,lu in data.AG_MAN_LU_DESC.items():
         if emp_arr_xr.loc[am, :, :, lu].shape == am_mrj_dict[am].shape:
             # If the shape is the same, just assign the value
             emp_arr_xr.loc[am, :, :, lu] = am_mrj_dict[am]  
@@ -539,134 +539,6 @@ def plot_t_mat(t_mat:xr.DataArray):
                 ax.add_patch(rect)
 
 
-def get_out_resfactor(dvar_path:str):
-    # Get the number of pixels in the output decision variable
-    dvar = np.load(dvar_path)
-    dvar_size = dvar.shape[1]
-
-    # Get the number of pixels in full resolution LUMASK
-    full_lumap = pd.read_hdf(os.path.join(settings.INPUT_DIR, "lumap.h5")).to_numpy() 
-    full_size = (full_lumap > 0).sum()
-
-    # Return the resfactor
-    return round((full_size/dvar_size)**0.5)
-
-
-    
-def calc_water(
-    data, 
-    ind:np.ndarray, 
-    ag_w_mrj:np.ndarray, 
-    non_ag_w_rk:np.ndarray, 
-    ag_man_w_mrj:np.ndarray, 
-    ag_dvar:np.ndarray, 
-    non_ag_dvar:np.ndarray, 
-    am_dvar:np.ndarray
-) -> pd.DataFrame:
-    
-    '''
-    Note
-        This function is only used for the `write_water` in the `luto.tools.write` module.
-        Calculate water yields for year given the index. 
-    
-    Return
-     pd.DataFrame, the water yields for year and region.
-    '''
-    
-    # Calculate water yields for year and region.
-    index_levels = ['Landuse Type', 'Landuse', 'Water_supply',  'Water Net Yield (ML)']
-
-    # Agricultural contribution
-    ag_mrj = ag_w_mrj[:, ind, :] * ag_dvar[:, ind, :]   
-    ag_jm = np.einsum('mrj->jm', ag_mrj)                             
-    ag_df = pd.DataFrame(
-        ag_jm.reshape(-1).tolist(),
-        index=pd.MultiIndex.from_product(
-            [['Agricultural Landuse'],
-                data.AGRICULTURAL_LANDUSES,
-                data.LANDMANS])).reset_index()
-    ag_df.columns = index_levels
-
-    # Non-agricultural contribution
-    non_ag_rk = non_ag_w_rk[ind, :] * non_ag_dvar[ind, :]  # Non-agricultural contribution
-    non_ag_k = np.einsum('rk->k', non_ag_rk)                             # Sum over cells
-    non_ag_df = pd.DataFrame(
-        non_ag_k, 
-        index= pd.MultiIndex.from_product([
-                ['Non-agricultural Landuse'],
-                settings.NON_AG_LAND_USES.keys() ,
-                ['dry']  # non-agricultural land is always dry
-    ])).reset_index()
-    non_ag_df.columns = index_levels
-
-    # Agricultural managements contribution
-    AM_dfs = []
-    for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items():  # Agricultural managements contribution
-        am_j = np.array([data.DESC2AGLU[lu] for lu in am_lus])
-        am_mrj = ag_man_w_mrj[am][:, ind, :] * am_dvar[am][:, ind, :][:, :, am_j] 
-        am_jm = np.einsum('mrj->jm', am_mrj)
-        # water yields for each agricultural management in long dataframe format
-        df_am = pd.DataFrame(
-            am_jm.reshape(-1).tolist(),
-            index=pd.MultiIndex.from_product([
-                ['Agricultural Management'],
-                am_lus,
-                data.LANDMANS
-                ])).reset_index()
-        df_am.columns = index_levels
-        AM_dfs.append(df_am)
-    AM_df = pd.concat(AM_dfs)
-    
-    return pd.concat([ag_df, non_ag_df, AM_df])
-
-
-def calc_major_vegetation_group_ag_area_for_year(
-    GBF3_raw_MVG_area_vr: np.ndarray, lumap: np.ndarray, biodiv_contr_ag_rj: dict[int, float]
-) -> dict[int, float]:
-    prod_data = {}
-
-    ag_biodiv_impacts_j = {j: 1 - x for j, x in biodiv_contr_ag_rj.items()}
-
-    # Numpy magic
-    ag_biodiv_degr_r = np.vectorize(ag_biodiv_impacts_j.get)(lumap)
-    
-    for v in range(GBF3_raw_MVG_area_vr.shape[0]):
-        prod_data[v] = GBF3_raw_MVG_area_vr[v, :] * ag_biodiv_degr_r
-
-    return prod_data
-
-
-def calc_species_ag_area_for_year(
-    GBF8_raw_species_area_sr: np.ndarray, lumap: np.ndarray, biodiv_contr_ag_rj: dict[int, float]
-) -> dict[int, float]:
-    prod_data = {}
-
-    ag_biodiv_impacts_j = {j: 1 - x for j, x in biodiv_contr_ag_rj.items()}
-
-    # Numpy magic
-    ag_biodiv_degr_r = np.vectorize(ag_biodiv_impacts_j.get)(lumap)
-    
-    for s in range(GBF8_raw_species_area_sr.shape[0]):
-        prod_data[s] = GBF8_raw_species_area_sr[s, :] * ag_biodiv_degr_r
-
-    return prod_data
-
-
-def calc_nes_ag_area_for_year(
-    nes_xr: np.ndarray, lumap: np.ndarray, ag_biodiv_degr_j: dict[int, float]
-) -> dict[int, float]:
-    prod_data = {}
-
-    ag_biodiv_impacts_j = {j: 1 - x for j, x in ag_biodiv_degr_j.items()}
-
-    # Numpy magic
-    ag_biodiv_degr_r = np.vectorize(ag_biodiv_impacts_j.get)(lumap)
-    
-    for x in range(nes_xr.shape[0]):
-        prod_data[x] = nes_xr[x, :] * ag_biodiv_degr_r
-
-    return prod_data
-
 
 class LogToFile:
     def __init__(self, log_path, mode:str='w'):
@@ -719,3 +591,55 @@ class LogToFile:
         def flush(self):
             # Ensure content is written to disk
             self.file.flush()
+            
+            
+
+def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1, stop_event=None):
+    '''
+    Log the memory usage of the current process to a file.
+    Parameters
+        output_dir (str): The directory to save the memory log file.
+        mode (str): The mode to open the file. Default is 'a' (append).
+        interval (int): The interval in seconds to log the memory usage.
+    '''
+    
+    with open(f'{output_dir}/RES_{settings.RESFACTOR}_mem_log.txt', mode=mode) as file:
+        while not stop_event.is_set():
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            process = psutil.Process(os.getpid())
+            memory_usage = process.memory_info().rss
+            children = process.children(recursive=True)
+            # Include the memory usage of the child processes to get accurate memory usage under parallel processing
+            if children:
+                memory_usage += sum(child.memory_info().rss for child in children)
+            memory_usage /= (1024 * 1024 * 1024)
+            file.write(f'{timestamp}\t{memory_usage:.2f}\n')
+            file.flush()  # Ensure data is written to the file immediately
+            time.sleep(interval)
+            
+
+# Memory monitoring helper functions            
+# memory_log = []
+# monitoring = False  # Flag to control monitoring
+# monitor_thread = None
+
+# def monitor_memory(interval=0.01):
+#     """Runs in a thread, logs memory usage every `interval` seconds."""
+#     process = psutil.Process(os.getpid())
+#     while monitoring:
+#         mem_mb = process.memory_info().rss / 1024 ** 2
+#         memory_log.append((time.time(), mem_mb))
+#         time.sleep(interval)
+
+# def start_memory_monitor():
+#     global monitoring, monitor_thread
+#     memory_log.clear()  # Clear previous log
+#     monitoring = True
+#     monitor_thread = threading.Thread(target=monitor_memory)
+#     monitor_thread.start()
+
+# def stop_memory_monitor():
+#     global monitoring
+#     monitoring = False
+#     if monitor_thread:
+#         monitor_thread.join()

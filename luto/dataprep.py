@@ -32,8 +32,11 @@ import numpy as np
 import pandas as pd
 import shutil, os, time, h5py
 
+from luto import settings
+
 
 from joblib import Parallel, delayed
+from itertools import product
 from luto.settings import INPUT_DIR, RAW_DATA
 
 
@@ -55,13 +58,14 @@ def create_new_dataset():
     luto_4D_inpath = 'N:/Data-Master/LUTO_2.0_input_data/Input_data/4D_Spatial_SSP_Timeseries/'
     fdh_inpath = 'N:/LUF-Modelling/fdh-archive/data/neoluto-data/new-data-and-domain/'
     profit_map_inpath = 'N:/Data-Master/Profit_map/'
+    water_domestic_use = 'N:/Data-Master/Water/Water_account/'
     nlum_inpath = 'N:/Data-Master/National_Landuse_Map/'
     BECCS_inpath = 'N:/Data-Master/BECCS/From_CSIRO/20211124_as_submitted/'
     GHG_off_land_inpath = 'N:/LUF-Modelling/Food_demand_AU/au.food.demand/Inputs/Off_land_GHG_emissions'
     bio_HACS_inpath = 'N:/Data-Master/Habitat_condition_assessment_system/Data/Processed/'
     bio_GBF2_inpath = 'N:/Data-Master/Biodiversity/Environmental-suitability/Annual-species-suitability_20-year_snapshots_5km_to_NetCDF/'
     bio_GBF3_NVIS_inpath = 'N:/Data-Master/NVIS/Processed'
-    bio_GBF4_inpath = 'N:/Data-Master/Biodiversity/DCCEEW/SNES_GEOTIFF/To_NetCDF/'
+    bio_GBF4_inpath = 'N:/Data-Master/Biodiversity/DCCEEW/SNES_ECNES/Processed/'
     bio_GBF8_inpath = bio_GBF2_inpath
     
 
@@ -79,7 +83,7 @@ def create_new_dataset():
     # Copy raw data files from their source into raw_data folder for further processing
 
     shutil.copyfile(fdh_inpath + 'tmatrix-cat2lus.csv', raw_data + 'tmatrix_cat2lus.csv')
-    shutil.copyfile(fdh_inpath + 'transitions_costs_20250430.xlsx', raw_data + 'transitions_costs_20250430.xlsx')
+    shutil.copyfile(fdh_inpath + 'transitions_costs_20250606.xlsx', raw_data + 'transitions_costs_20250606.xlsx')
 
     shutil.copyfile(profit_map_inpath + 'NLUM_SPREAD_LU_ID_Mapped_Concordance.h5', raw_data + 'NLUM_SPREAD_LU_ID_Mapped_Concordance.h5')
 
@@ -129,6 +133,10 @@ def create_new_dataset():
         pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp585_2010-2100_DR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp585_2010-2100_dr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
     with h5py.File(luto_4D_inpath + 'Water_yield_GCM-Ensemble_ssp585_2010-2100_SR_ML_HA_mean.h5', 'r') as f:
         pd.DataFrame(f['Water_yield_GCM-Ensemble_ssp585_2010-2100_SR_ML_HA_mean'][:]).T.to_hdf(outpath + 'water_yield_ssp585_2010-2100_sr_ml_ha.h5', key='water', mode='w', format='table', index=False, complevel=9)
+        
+    # Save water use from domestic and industrial sectors for each watershed
+    shutil.copyfile(water_domestic_use + 'Water_Use_Agriculture_ML.csv', outpath + 'Water_Use_Agriculture_ML.csv')
+    shutil.copyfile(water_domestic_use + 'Water_Use_Domestic.csv', outpath + 'Water_Use_Domestic.csv')
   
 
     # Copy agricultural management datafiles
@@ -153,7 +161,7 @@ def create_new_dataset():
     # Copy biodiversity GBF-4 files
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES.nc', outpath + 'bio_GBF4_SNES.nc')
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES.nc', outpath + 'bio_GBF4_ECNES.nc')
-
+    
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_SNES_target.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_SNES.csv')
     shutil.copyfile(bio_GBF4_inpath + 'bio_DCCEEW_ECNES_target.csv', outpath + 'BIODIVERSITY_GBF4_TARGET_ECNES.csv')
     
@@ -183,7 +191,7 @@ def create_new_dataset():
 
     # Read in from-to costs in category-to-category format
     # tmcat = pd.read_csv(raw_data + 'tmatrix_categories.csv', index_col = 0)
-    tmcat = pd.read_excel( raw_data + 'transitions_costs_20250430.xlsx'
+    tmcat = pd.read_excel( raw_data + 'transitions_costs_20250606.xlsx'
                           , sheet_name = 'Current'
                           , usecols = 'B:M'
                           , skiprows = 5
@@ -191,14 +199,21 @@ def create_new_dataset():
                           , index_col = 0)
 
     # Read transition costs from agricultural land to environmental plantings
-    ag_to_new_land_uses = pd.read_excel( raw_data + 'transitions_costs_20250430.xlsx'
+    ag_to_new_land_uses = pd.read_excel( raw_data + 'transitions_costs_20250606.xlsx'
                                        , sheet_name = 'Ag_to_new_land-uses'
                                        , usecols = 'B,C'
                                        , index_col = 0 )
     
+    # Read transition costs of ag to destocked natural land
+    ag_to_natural_land = pd.read_excel( raw_data + 'transitions_costs_20250606.xlsx'
+                                        , sheet_name = 'Ag_to_destock_natural'
+                                        , index_col = 0 
+                                        ).sort_values(by = 'LU_DESC', ascending = True)
+    np.save(outpath + 'ag_to_destock_tmatrix.npy', ag_to_natural_land['Cost per ha'].values)
+    
     # Read land clearing costs for non-agricultural land to unallocated modified land
     tmat_clear_data = pd.read_excel(
-        raw_data + 'transitions_costs_20250430.xlsx',
+        raw_data + 'transitions_costs_20250606.xlsx',
         sheet_name='Current',
         usecols='F',
         skiprows=19,
@@ -265,7 +280,6 @@ def create_new_dataset():
 
     # Read in ag-landuse, which is a lexicographically ordered list
     ag_landuses = pd.read_csv(outpath + 'ag_landuses.csv', header = None)[0].to_list()
-    ag_desc2lu = dict(zip(ag_landuses, range(len(ag_landuses))))
 
     # Create a non-agricultural landuses file
     # Do not sort the whole list alphabetically when adding new landuses to the model.
@@ -284,7 +298,6 @@ def create_new_dataset():
     natural_cells = np.logical_not(bioph['NATURAL_AREA_INC_WATER'].values)          # 0 is natural, 1 is non-natural; so we flip the values to make 1 natural
     idx_inside_LUTO = (lumap != -1).values                                          # shape=6956407, sum=4218733
     idx_outside_LUTO = (lumap == -1).values                                         # shape=6956407, sum=2737674
-    idx_inside_LUTO_natural = np.logical_and(idx_inside_LUTO, natural_cells)        # shape=6956407, sum=3267523
     idx_outside_LUTO_natural = np.logical_and(idx_outside_LUTO, natural_cells)      # shape=6956407, sum=2677065
     
 
@@ -644,11 +657,122 @@ def create_new_dataset():
         'BIODIV_PRIORITY_SSP370',
         'BIODIV_PRIORITY_SSP585',
         'NATURAL_AREA_CONNECTIVITY',
-        'DCCEEW_NCI']].copy()
+        'DCCEEW_NCI',
+    ]].copy()
+    
+    bio_PRIORITY_RANK_AND_AREA_CONNECTIVITY.to_hdf(
+        outpath + 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5',
+        key='bio_PRIORITY_RANK_AND_AREA_CONNECTIVITY', 
+        mode='w', 
+        format='table', 
+        index=False, 
+        complevel=9
+    )
+    
+    
+    ############### Get biodiversity contribution scale for each land-use
 
-    # Save to file
-    bio_PRIORITY_RANK_AND_AREA_CONNECTIVITY.to_hdf(outpath + 'bio_OVERALL_PRIORITY_RANK_AND_AREA_CONNECTIVITY.h5', key='bio_PRIORITY_RANK_AND_AREA_CONNECTIVITY', mode='w', format='table', index=False, complevel=9)
+    biodiv_contribution_lookup = pd.read_csv(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv'))
+    biodiv_contribution_cols = [i for i in biodiv_contribution_lookup.columns if 'PERCENTILE' in i]
+    
+    for col in biodiv_contribution_cols:
+        # Rescale the biodiversity contribution values by Unallocated - natural land (code 23)
+        biodiv_contribution_lookup[col] = biodiv_contribution_lookup[col] / biodiv_contribution_lookup[col][23]
+    
+    biodiv_contribution_lookup.to_csv(os.path.join(settings.INPUT_DIR, 'bio_OVERALL_CONTRIBUTION_OF_LANDUSES.csv'), index=False)
+    
+    
+    ############## Get the biodiversity (GBF2) achievement percentages for BASE YEAR (2010)
 
+    # Use ssp245 to calculate the biodiversity contribution; different SSPs are not so different (less than 0.01 percent) in 2010
+    bio_rank_vs_area = pd.read_excel(f'{settings.INPUT_DIR}/BIODIVERSITY_GBF2_conservation_performance.xlsx', sheet_name='ssp245')
+    rank_ly = bio_PRIORITY_RANK_AND_AREA_CONNECTIVITY[f'BIODIV_PRIORITY_SSP245'].values 
+    
+    tasks = []
+
+    for conect_score, connect_lb in product(['NATURAL_AREA_CONNECTIVITY', 'DCCEEW_NCI'], np.arange(0.5,1,0.1).round(2)):
+        
+        interp_low_high = (connect_lb, 1) if conect_score == 'DCCEEW_NCI' else (1, connect_lb)  # Higher NCI is better, this is opposite for natural connectivity (distance to natural areas)
+        connectivity_score = bio_PRIORITY_RANK_AND_AREA_CONNECTIVITY[conect_score].to_numpy(dtype=np.float32)
+        
+        connectivity_score = np.interp( 
+            connectivity_score, 
+            (connectivity_score.min(), connectivity_score.max()), 
+            interp_low_high
+        ).astype('float32')
+
+        for HCAS_percentile in biodiv_contribution_cols:
+            
+            biodiv_degrade_lookup = biodiv_contribution_lookup[HCAS_percentile].to_dict()
+            biodiv_degrade_lookup[-1] = 1  # Assuming that cells outside the LUTO study area have full biodiversity contribution
+            biodiv_degrade_ly = np.vectorize(biodiv_degrade_lookup.get, otypes=[np.float32])(lumap.values).astype(np.float32)
+
+            for _,row in bio_rank_vs_area.iterrows():
+                
+                # task wrap function must be self-contained; all arguments must be passed rather than using variables from the outer scope
+                def task_wrap(
+                    row,
+                    rank_ly,
+                    biodiv_degrade_ly,
+                    connectivity_score,
+                    idx_inside_LUTO,
+                    ):
+                    
+                    ly_pct_cells = rank_ly >= row['PRIORITY_RANK']
+                    ly_pct_cells_inside_LUTO = np.logical_and(ly_pct_cells, idx_inside_LUTO)
+                    
+                    bio_score_pre_1750 = (zones['CELL_HA'] * connectivity_score)[ly_pct_cells_inside_LUTO].sum()
+                    bio_score_base_year = (biodiv_degrade_ly * connectivity_score * zones['CELL_HA'])[ly_pct_cells_inside_LUTO].sum()
+                    bio_percent_base_year = (bio_score_base_year / bio_score_pre_1750) * 100
+
+                    return (
+                        row['conect_score'], 
+                        row['connect_lb'], 
+                        row['HCAS_percentile'], 
+                        row['AREA_COVERAGE_PERCENT'], 
+                        bio_percent_base_year,
+                        bio_score_base_year,
+                        bio_score_pre_1750
+                    )
+                
+                row['conect_score'] = conect_score
+                row['connect_lb'] = connect_lb
+                row['HCAS_percentile'] = int(HCAS_percentile.split('_')[-1])  
+        
+                tasks.append(delayed(task_wrap)(
+                    row, 
+                    rank_ly, 
+                    biodiv_degrade_ly, 
+                    connectivity_score, 
+                    idx_inside_LUTO, 
+                    )
+                )
+                
+    output = Parallel(n_jobs=32)(tasks)
+    
+    GBF2_biodiv_achieve = pd.DataFrame(
+        output,
+        columns=[
+            'CONNECTIVITY_SOURCE', 
+            'CONNECTIVITY_LB', 
+            'HCAS_PERCENTILE',
+            'TOP_RANK_CELL_AREA_COVERAGE_PERCENT',
+            'TOP_RANK_CELL_BIO_COVERAGE_BASE_YEAR',
+            'TOP_RANK_CELL_BIO_SCORE_BASE_YEAR',
+            'TOP_RANK_CELL_BIO_SCORE_PRE_1750'
+        ]
+    )
+    
+    GBF2_biodiv_achieve.insert(4, 'TARGET_PERCENT_2100', np.nan)  
+    GBF2_biodiv_achieve.insert(4, 'TARGET_PERCENT_2050', np.nan)
+    GBF2_biodiv_achieve.insert(4, 'TARGET_PERCENT_2030', np.nan)
+    
+    GBF2_biodiv_achieve = GBF2_biodiv_achieve.query('TOP_RANK_CELL_AREA_COVERAGE_PERCENT < 100 and TOP_RANK_CELL_AREA_COVERAGE_PERCENT >0')
+    GBF2_biodiv_achieve.to_csv(
+        os.path.join(outpath, 'BIODIVERSITY_GBF2_TOP_RANK_CELL_BIO_SCORES_AND_TARGET.csv'),
+        index=False,
+        float_format='%.2f'
+    )
     
 
 
@@ -715,9 +839,9 @@ def create_new_dataset():
     s.to_hdf(outpath + 'hir_block_avg_t_co2_ha_yr.h5', key='hir_block_avg_t_co2_ha_yr', mode='w', format='table', index=False, complevel=9)
     
 
-    # MASK for Human Induced Regrowth; only allow planting where average annual precipitation is less than 300mm
-    hir_mask = zones['HIR_MASK'].copy().values
-    np.save(outpath + 'hir_mask.npy', hir_mask)  # shape: (6956407,)
+    # # MASK for Human Induced Regrowth; stop using HIR mask at 2025-06-16 after meeting with Carbon Market Institute (CMI)
+    # hir_mask = zones['HIR_MASK'].copy().values
+    # np.save(outpath + 'hir_mask.npy', hir_mask)  # shape: (6956407,)
 
     # Fire risk low, medium, and high and save to file
     s = bioph[['FD_RISK_PERC_5TH', 'FD_RISK_MEDIAN', 'FD_RISK_PERC_95TH']].copy()

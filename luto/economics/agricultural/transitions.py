@@ -25,15 +25,13 @@ Data about transitions costs.
 
 import numpy as np
 from typing import Dict
-from copy import deepcopy
 
-from luto.data import Data, lumap2ag_l_mrj
+from luto.data import Data
 from luto.settings import AG_MANAGEMENTS, AG_MANAGEMENTS_TO_LAND_USES
 from luto.economics.agricultural.water import get_wreq_matrices
 import luto.economics.agricultural.ghg as ag_ghg
 from luto import settings
 import luto.tools as tools
-
 
 def get_to_ag_exclude_matrices(data: Data, lumap: np.ndarray):
     """Return x_mrj exclude matrices.
@@ -54,7 +52,6 @@ def get_to_ag_exclude_matrices(data: Data, lumap: np.ndarray):
 
     Returns
     -------
-
     numpy.ndarray
         x_mrj exclude matrix. The m-slices correspond to the
         different land-management versions of the land-use `j` to switch _to_.
@@ -84,7 +81,7 @@ def get_to_ag_exclude_matrices(data: Data, lumap: np.ndarray):
     return (x_mrj * t_rj * no_go_x_mrj).astype(np.int8)
 
 
-def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray, lmmap: np.ndarray, separate=False):
+def get_transition_matrices_ag2ag(data: Data, yr_idx: int, lumap: np.ndarray, lmmap: np.ndarray, separate=False):
     """
     Calculate the transition matrices for land-use and land management transitions.
     Args:
@@ -94,8 +91,8 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
         lmmap (np.ndarray): Land management map of the base year for the transitions.
         separate (bool, optional): Whether to return separate cost matrices for each cost component.
                                    Defaults to False.
-    Returns
-        numpy.ndarray or dict: The transition matrices for land-use and land management transitions.
+    Returns:
+            numpy.ndarray or dict: The transition matrices for land-use and land management transitions.
                                If `separate` is False, returns a numpy array representing the total costs.
                                If `separate` is True, returns a dictionary with separate cost matrices for
                                establishment costs, Water license cost, and carbon releasing costs.
@@ -103,7 +100,7 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
     yr_cal = data.YR_CAL_BASE + yr_idx
 
     # Return l_mrj (Boolean) for current land-use and land management
-    l_mrj = lumap2ag_l_mrj(lumap, lmmap)
+    l_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
     l_mrj_not = np.logical_not(l_mrj)
 
     # Get the exclusion matrix
@@ -114,11 +111,11 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
     n_ag_lms, ncells, n_ag_lus = data.AG_L_MRJ.shape
 
     # -------------------------------------------------------------- #
-    # Establishment costs (upfront, amortised to annual, per cell).  #
+    # Transition costs (upfront, amortised to annual, per cell).  #
     # -------------------------------------------------------------- #
 
     # Raw transition-cost matrix is in $/ha and lexigraphically ordered (shape: land-use x land-use).
-    t_ij = data.AG_TMATRIX * data.TRANS_COST_MULTS[yr_cal]
+    t_ij = data.T_MAT.sel(from_lu=data.AGRICULTURAL_LANDUSES, to_lu=data.AGRICULTURAL_LANDUSES).values * data.TRANS_COST_MULTS[yr_cal]
 
     # Non-irrigation related transition costs for cell r to change to land-use j calculated based on lumap (in $/ha).
     # Only consider for cells currently being used for agriculture.
@@ -128,7 +125,7 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
     # Amortise upfront costs to annualised costs and converted to $ per cell via REAL_AREA
     e_rj = tools.amortise(e_rj) * data.REAL_AREA[:, np.newaxis]
 
-    # Repeat the establishment costs into dryland and irrigated land management types
+    # Repeat the transition costs into dryland and irrigated land management types
     e_mrj = np.stack([e_rj, e_rj], axis=0)
 
     # Update the cost matrix with exclude matrices; the transition cost for a cell that remain the same is 0.
@@ -149,15 +146,15 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
 
     # Apply the cost of carbon released by transitioning natural land to modified land
     ghg_transition = ag_ghg.get_ghg_transition_emissions(data, lumap, separate=True)        # <unit: t/ha>
-    
+        
     ghg_transition = {
         k:np.einsum('mrj,mrj,mrj->mrj', v, x_mrj, l_mrj_not).astype(np.float32)             # No GHG penalty for cells that remain the same, or are prohibited from transitioning
         for k, v in ghg_transition.items()
     }
     
     ghg_transition = {
-    k:tools.amortise(v * data.get_carbon_price_by_yr_idx(yr_idx))                       # Amortise the GHG penalties
-    for k,v in ghg_transition.items()
+        k:tools.amortise(v * data.get_carbon_price_by_yr_idx(yr_idx))                       # Amortise the GHG penalties
+        for k,v in ghg_transition.items()
     }
     
     ghg_t_types = ghg_transition.keys()
@@ -172,13 +169,10 @@ def get_transition_matrices_from_maps(data: Data, yr_idx: int, lumap: np.ndarray
         return {'Establishment cost': e_mrj, 'Water license cost': w_delta_mrj, **ghg_transition}
     else:
         t_mrj = e_mrj + w_delta_mrj + ghg_t_mrj
-        # Ensure transition costs for destocked land cells are zero - already handled in 'non_ag_to_ag_t_mrj' in input_data.py
-        destocked_cells = tools.get_destocked_land_cells(lumap)
-        t_mrj[:, destocked_cells, :] = 0
         return t_mrj
 
 
-def get_transition_matrices_from_base_year(data: Data, yr_idx, base_year, separate=False):
+def get_transition_matrices_ag2ag_from_base_year(data: Data, yr_idx, base_year, separate=False):
     """
     Calculate the transition matrices for land-use and land management transitions.
     Args:
@@ -195,7 +189,7 @@ def get_transition_matrices_from_base_year(data: Data, yr_idx, base_year, separa
     """
     lumap = data.lumaps[base_year]
     lmmap = data.lmmaps[base_year]
-    return get_transition_matrices_from_maps(data, yr_idx, lumap, lmmap, separate)
+    return get_transition_matrices_ag2ag(data, yr_idx, lumap, lmmap, separate)
     
 
 
@@ -254,24 +248,25 @@ def get_biochar_effect_t_mrj(data):
 
 
 def get_beef_hir_effect_t_mrj(data):
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
 def get_sheep_hir_effect_t_mrj(data):
-    land_uses = AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
+    land_uses = AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     return np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
 
 def get_agricultural_management_transition_matrices(data: Data, t_mrj, yr_idx) -> Dict[str, np.ndarray]:
-    asparagopsis_data = get_asparagopsis_effect_t_mrj(data) if AG_MANAGEMENTS['Asparagopsis taxiformis'] else 0
-    precision_agriculture_data = get_precision_agriculture_effect_t_mrj(data) if AG_MANAGEMENTS['Precision Agriculture'] else 0
-    eco_grazing_data = get_ecological_grazing_effect_t_mrj(data) if AG_MANAGEMENTS['Ecological Grazing'] else 0
-    sav_burning_data = get_savanna_burning_effect_t_mrj(data) if AG_MANAGEMENTS['Savanna Burning'] else 0
-    agtech_ei_data = get_agtech_ei_effect_t_mrj(data) if AG_MANAGEMENTS['AgTech EI'] else 0
-    biochar_data = get_biochar_effect_t_mrj(data) if AG_MANAGEMENTS['Biochar'] else 0
-    beef_hir_data = get_beef_hir_effect_t_mrj(data) if AG_MANAGEMENTS['Beef - HIR'] else 0
-    sheep_hir_data = get_sheep_hir_effect_t_mrj(data) if AG_MANAGEMENTS['Sheep - HIR'] else 0
+    
+    asparagopsis_data = get_asparagopsis_effect_t_mrj(data)                     
+    precision_agriculture_data = get_precision_agriculture_effect_t_mrj(data)   
+    eco_grazing_data = get_ecological_grazing_effect_t_mrj(data)                
+    sav_burning_data = get_savanna_burning_effect_t_mrj(data)                   
+    agtech_ei_data = get_agtech_ei_effect_t_mrj(data)                           
+    biochar_data = get_biochar_effect_t_mrj(data)                               
+    beef_hir_data = get_beef_hir_effect_t_mrj(data)                             
+    sheep_hir_data = get_sheep_hir_effect_t_mrj(data)                           
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -280,8 +275,8 @@ def get_agricultural_management_transition_matrices(data: Data, t_mrj, yr_idx) -
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
         'Biochar': biochar_data,
-        'Beef - HIR': beef_hir_data,
-        'Sheep - HIR': sheep_hir_data,
+        'HIR - Beef': beef_hir_data,
+        'HIR - Sheep': sheep_hir_data,
     }
 
 
@@ -364,10 +359,10 @@ def get_biochar_adoption_limit(data, yr_idx):
 
 def get_beef_hir_adoption_limit(data: Data):
     """
-    Gets the adoption limit of Beef - HIR for each possible land use.
+    Gets the adoption limit of HIR - Beef for each possible land use.
     """
     hir_limits = {}
-    for lu in AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']:
+    for lu in AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']:
         j = data.DESC2AGLU[lu]
         hir_limits[j] = 1
 
@@ -376,10 +371,10 @@ def get_beef_hir_adoption_limit(data: Data):
 
 def get_sheep_hir_adoption_limit(data: Data):
     """
-    Gets the adoption limit of Sheep - HIR for each possible land use.
+    Gets the adoption limit of HIR - Sheep for each possible land use.
     """
     hir_limits = {}
-    for lu in AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']:
+    for lu in AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']:
         j = data.DESC2AGLU[lu]
         hir_limits[j] = 1
 
@@ -391,29 +386,16 @@ def get_agricultural_management_adoption_limits(data: Data, yr_idx) -> Dict[str,
     An adoption limit represents the maximum percentage of cells (for each land use) that can utilise
     each agricultural management option.
     """
-    # Initialise by setting all options/land uses to zero adoption limits, and replace
-    # enabled options with the correct values.
-    ag_management_data = {
-        ag_man_option: {data.DESC2AGLU[lu]: 0 for lu in land_uses}
-        for ag_man_option, land_uses in AG_MANAGEMENTS_TO_LAND_USES.items()
-    }
+    ag_management_data = {}
 
-    if AG_MANAGEMENTS['Asparagopsis taxiformis']:
-        ag_management_data['Asparagopsis taxiformis'] = get_asparagopsis_adoption_limits(data, yr_idx)
-    if AG_MANAGEMENTS['Precision Agriculture']:
-        ag_management_data['Precision Agriculture'] = get_precision_agriculture_adoption_limit(data, yr_idx)
-    if AG_MANAGEMENTS['Ecological Grazing']:
-        ag_management_data['Ecological Grazing'] = get_ecological_grazing_adoption_limit(data, yr_idx)
-    if AG_MANAGEMENTS['Savanna Burning']:
-        ag_management_data['Savanna Burning'] = get_savanna_burning_adoption_limit(data)
-    if AG_MANAGEMENTS['AgTech EI']:
-        ag_management_data['AgTech EI'] = get_agtech_ei_adoption_limit(data, yr_idx)
-    if AG_MANAGEMENTS['Biochar']:
-        ag_management_data['Biochar'] = get_biochar_adoption_limit(data, yr_idx)
-    if AG_MANAGEMENTS['Beef - HIR']:
-        ag_management_data['Beef - HIR'] = get_beef_hir_adoption_limit(data)
-    if AG_MANAGEMENTS['Sheep - HIR']:
-        ag_management_data['Sheep - HIR'] = get_sheep_hir_adoption_limit(data)
+    ag_management_data['Asparagopsis taxiformis'] = get_asparagopsis_adoption_limits(data, yr_idx)          if AG_MANAGEMENTS['Asparagopsis taxiformis'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['Asparagopsis taxiformis']}
+    ag_management_data['Precision Agriculture'] = get_precision_agriculture_adoption_limit(data, yr_idx)    if AG_MANAGEMENTS['Precision Agriculture'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['Precision Agriculture']}
+    ag_management_data['Ecological Grazing'] = get_ecological_grazing_adoption_limit(data, yr_idx)          if AG_MANAGEMENTS['Ecological Grazing'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['Ecological Grazing']}
+    ag_management_data['Savanna Burning'] = get_savanna_burning_adoption_limit(data)                        if AG_MANAGEMENTS['Savanna Burning'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['Savanna Burning']}
+    ag_management_data['AgTech EI'] = get_agtech_ei_adoption_limit(data, yr_idx)                            if AG_MANAGEMENTS['AgTech EI'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['AgTech EI']}
+    ag_management_data['Biochar'] = get_biochar_adoption_limit(data, yr_idx)                                if AG_MANAGEMENTS['Biochar'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['Biochar']}
+    ag_management_data['HIR - Beef'] = get_beef_hir_adoption_limit(data)                                    if AG_MANAGEMENTS['HIR - Beef'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']}
+    ag_management_data['HIR - Sheep'] = get_sheep_hir_adoption_limit(data)                                  if AG_MANAGEMENTS['HIR - Sheep'] else {data.DESC2AGLU[lu]: 0 for lu in AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']}
 
     return ag_management_data
 
@@ -427,6 +409,7 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> d
         return {
             am: np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS), dtype=np.float32)
             for am in AG_MANAGEMENTS_TO_LAND_USES
+            if AG_MANAGEMENTS[am]
         }
 
     return {
@@ -435,6 +418,7 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> d
             , 10 ** settings.ROUND_DECMIALS
         )
         for am in AG_MANAGEMENTS_TO_LAND_USES
+        if AG_MANAGEMENTS[am]
     }
 
 
@@ -450,11 +434,11 @@ def get_regional_adoption_limits(data: Data, yr_cal: int):
 
         if lu_name in data.DESC2AGLU:
             lu_code = data.DESC2AGLU[lu_name]
-            ag_reg_adoption_constrs.append((reg_id, lu_code, lu_name, reg_ind, area_limit_ha))
+            ag_reg_adoption_constrs.append([reg_id, lu_code, lu_name, reg_ind, area_limit_ha])
 
         elif lu_name in data.DESC2NONAGLU:
             lu_code = data.DESC2NONAGLU[lu_name] - settings.NON_AGRICULTURAL_LU_BASE_CODE
-            non_ag_reg_adoption_constrs.append((reg_id, lu_code, lu_name, reg_ind, area_limit_ha))
+            non_ag_reg_adoption_constrs.append([reg_id, lu_code, lu_name, reg_ind, area_limit_ha])
 
         else:
             raise ValueError(f"Regional adoption constraint exists for unrecognised land use: {lu_name}")

@@ -1,19 +1,9 @@
 // create chart
 document.addEventListener("DOMContentLoaded", function () {
-  Highcharts.setOptions({
-    colors: [
-      "#7cb5ec",
-      "#434348",
-      "#90ed7d",
-      "#f7a35c",
-      "#8085e9",
-      "#f15c80",
-      "#e4d354",
-      "#2b908f",
-      "#f45b5b",
-      "#91e8e1",
-    ],
-  });
+  
+  // Set the default color palette for Highcharts
+  var colors = eval(document.getElementById("colors").innerHTML);
+  Highcharts.setOptions({colors: colors});
 
   // Get the available years for plotting
   var years = eval(document.getElementById("model_years").innerHTML).map(function (x) { return parseInt(x); });
@@ -126,7 +116,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     legend: {
       itemStyle: {
-        fontSize: "11px",
+        fontSize: "10px",
       },
       align: "right",
       layout: "vertical",
@@ -134,7 +124,7 @@ document.addEventListener("DOMContentLoaded", function () {
       y: -10,
       verticalAlign: "middle",
       itemMarginTop: 0,
-      itemMarginBottom: 1,
+      itemMarginBottom: 0.5,
     },
 
     tooltip: {

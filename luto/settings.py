@@ -48,7 +48,6 @@ pd.set_option('display.float_format', '{:,.4f}'.format)
 
 INPUT_DIR = 'input'
 OUTPUT_DIR = 'output'
-DATA_DIR = 'input'
 RAW_DATA = '../raw_data'
 
 
@@ -61,7 +60,7 @@ SSP = '245'
 RCP = 'rcp' + SSP[1] + 'p' + SSP[2] # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
 # Set demand parameters which define requirements for Australian production of agricultural commodities
-SCENARIO = SSP_NUM = 'SSP' + SSP[0] # SSP1, SSP2, SSP3, SSP4, SSP5
+SCENARIO = 'SSP' + SSP[0] # SSP1, SSP2, SSP3, SSP4, SSP5
 DIET_DOM = 'BAU'                    # 'BAU', 'FLX', 'VEG', 'VGN' - domestic diets in Australia
 DIET_GLOB = 'BAU'                   # 'BAU', 'FLX', 'VEG', 'VGN' - global diets
 CONVERGENCE = 2050                  # 2050 or 2100 - date at which dietary transformation is completed (velocity of transformation)
@@ -95,34 +94,57 @@ DISCOUNT_RATE = 0.07     # 0.05 = 5% pa.
 AMORTISATION_PERIOD = 30 # years
 
 
+
 # ---------------------------------------------------------------------------- #
 # Model parameters
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 5       # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS = list(range(2010,2051,10)) # range(2020,2050)
+SIM_YEARS = list(range(2010,2051,5)) # range(2020,2050)
 
 
 # Define the objective function
 OBJECTIVE = 'maxprofit'   # maximise profit (revenue - costs)  **** Requires soft demand constraints otherwise agriculture over-produces
 # OBJECTIVE = 'mincost'  # minimise cost (transitions costs + annual production costs)
 
-# Specify how demand for agricultural commodity production should be met in the solver
-# DEMAND_CONSTRAINT_TYPE = 'hard'  # Adds demand as a constraint in the solver (linear programming approach)
-DEMAND_CONSTRAINT_TYPE = 'soft'  # Adds demand as a type of slack variable in the solver (goal programming approach)
+
+
+"""
+If any of the targets are set to 'soft':
+    Then they will have a deviation from target (normalised to near 1
+    by dividing their BASE_YR (2010) sum) in the objective function.
+
+    Here the weights determine the relative importance of each target 
+    in the objective function.E.g., if SOLVER_WEIGHT_GHG = 2 and the 
+    rest are 1, then reducing GHG deviation from target will be twice 
+    as important as the other targets in the objective function.
+
+If the target is set to 'hard' or 'off': 
+    Then the deviation from target will be 0 and the weight will not be used.
+"""
+SOLVER_WEIGHT_DEMAND = 1
+SOLVER_WEIGHT_GHG = 1
+SOLVER_WEIGHT_WATER = 1
+
+RESCALE_FACTOR = 1e3
+'''
+All input data before feeding into the solver is rescaled in the range between 0 and this factor.
+This is to avoid numerical issues with the solver when dealing with very small/large numbers. 
+E.g., the water yield for some cells is 10t but the Biodiversity-score is 1e-7, making the 
+the model sensitive to variations in input data. 
+'''
+
 
 
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
-WRITE_OUTPUT_GEOTIFFS = False   # Write GeoTiffs to output directory: True or False
-WRITE_FULL_RES_MAPS = False     # Write GeoTiffs at full or resfactored resolution: True or False
-
-PARALLEL_WRITE = True           # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = 5               # The Threads to use for map making, only work with PARALLEL_WRITE = True
+WRITE_OUTPUT_GEOTIFFS = False               # Write GeoTiffs to output directory: True or False
+PARALLEL_WRITE = True                       # If to use parallel processing to write GeoTiffs: True or False
+WRITE_THREADS = min(32, os.cpu_count())     # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
@@ -149,7 +171,7 @@ CROSSOVER = 0
 # Parameters for dealing with numerical issues. NUMERIC_FOCUS = 2 fixes most things but roughly doubles solve time.
 SCALE_FLAG = -1     # Scales the rows and columns of the model to improve the numerical properties of the constraint matrix. -1: Auto, 0: No scaling, 1: equilibrium scaling (First scale each row to make its largest nonzero entry to be magnitude one, then scale each column to max-norm 1), 2: geometric scaling, 3: multi-pass equilibrium scaling. Testing revealed that 1 tripled solve time, 3 led to numerical problems.
 NUMERIC_FOCUS = 0   # Controls the degree to which the code attempts to detect and manage numerical issues. Default (0) makes an automatic choice, with a slight preference for speed. Settings 1-3 increasingly shift the focus towards being more careful in numerical computations. NUMERIC_FOCUS = 1 is ok, but 2 increases solve time by ~4x
-BARHOMOGENOUS = 1  # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
+BARHOMOGENOUS = 1   # Useful for recognizing infeasibility or unboundedness. At the default setting (-1), it is only used when barrier solves a node relaxation for a MIP model. 0 = off, 1 = on. It is a bit slower than the default algorithm (3x slower in testing).
 
 # Number of threads to use in parallel algorithms (e.g., barrier)
 THREADS = min(32, os.cpu_count())
@@ -162,8 +184,8 @@ THREADS = min(32, os.cpu_count())
 
 EXCLUDE_NO_GO_LU = False
 NO_GO_VECTORS = {
-    'Winter cereals':           os.path.join(INPUT_DIR, 'no_go_areas', 'no_go_Winter_cereals.shp'),
-    'Environmental Plantings':  os.path.join(INPUT_DIR, 'no_go_areas', 'no_go_Enviornmental_Plantings.shp')
+    'Winter cereals':           os.path.join(os.path.abspath(INPUT_DIR), 'no_go_areas', 'no_go_Winter_cereals.shp'),
+    'Environmental Plantings':  os.path.join(os.path.abspath(INPUT_DIR), 'no_go_areas', 'no_go_Enviornmental_Plantings.shp')
 }
 '''
 Land-use and vector file pairs to exclude land-use from being utilised in that area. 
@@ -234,19 +256,18 @@ This is expected behaviour and the user must choose how to deal with it.
 """
 
 # Cost of fencing per linear metre
-FENCING_COST_PER_M = 10
+FENCING_COST_PER_M = 2
 
 # Environmental Plantings Parameters
 EP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 EP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
 # Carbon Plantings Block Parameters
-CP_BLOCK_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
+CP_BLOCK_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 CP_BLOCK_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
-
 # Carbon Plantings Belt Parameters
-CP_BELT_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
+CP_BELT_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 CP_BELT_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
 CP_BELT_ROW_WIDTH = 20
@@ -256,22 +277,21 @@ cp_no_alleys_per_ha = 100 / (CP_BELT_ROW_WIDTH + CP_BELT_ROW_SPACING)
 CP_BELT_FENCING_LENGTH = 100 * cp_no_alleys_per_ha * 2     # Length (average) of fencing required per ha in metres
 
 # Riparian Planting Parameters
-RP_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
+RP_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 RP_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
 RIPARIAN_PLANTING_BUFFER_WIDTH = 30
 RIPARIAN_PLANTING_TORTUOSITY_FACTOR = 0.5
 
 # Agroforestry Parameters
-AF_ANNUAL_MAINTENNANCE_COST_PER_HA_PER_YEAR = 100
+AF_ANNUAL_MAINTENANCE_COST_PER_HA_PER_YEAR = 100
 AF_ANNUAL_ECOSYSTEM_SERVICES_BENEFIT_PER_HA_PER_YEAR = 0
 
 AGROFORESTRY_ROW_WIDTH = 20
 AGROFORESTRY_ROW_SPACING = 40
 AF_PROPORTION = AGROFORESTRY_ROW_WIDTH / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
 no_belts_per_ha = 100 / (AGROFORESTRY_ROW_WIDTH + AGROFORESTRY_ROW_SPACING)
-AF_FENCING_LENGTH = 100 * no_belts_per_ha * 2 # Length of fencing required per ha in metres
-
+AF_FENCING_LENGTH_HA = 100 * no_belts_per_ha * 2 # Length of fencing required per ha in metres
 
 
 # ---------------------------------------------------------------------------- #
@@ -305,8 +325,8 @@ AG_MANAGEMENTS_TO_LAND_USES = {
                                 # Horticulture:
                                 'Apples', 'Citrus', 'Grapes', 'Nuts', 'Pears', 'Plantation fruit', 'Stone fruit', 'Tropical stone fruit'],
 
-    'Beef - HIR':               ['Beef - natural land'],
-    'Sheep - HIR':              ['Sheep - natural land'],
+    'HIR - Beef':               ['Beef - natural land'],
+    'HIR - Sheep':              ['Sheep - natural land'],
 }
 
 
@@ -317,8 +337,8 @@ AG_MANAGEMENTS = {
     'Savanna Burning': True,
     'AgTech EI': True,
     'Biochar': True,
-    'Beef - HIR': True,
-    'Sheep - HIR': True,
+    'HIR - Beef': True,
+    'HIR - Sheep': True,
 }
 """
 The dictionary below contains a master list of all agricultural management options and
@@ -334,8 +354,8 @@ AG_MANAGEMENTS_REVERSIBLE = {
     'Savanna Burning': True,
     'AgTech EI': True,
     'Biochar': True,
-    'Beef - HIR': True,
-    'Sheep - HIR': True,
+    'HIR - Beef': True,
+    'HIR - Sheep': True,
 }
 """
 The values of the below dictionary determine whether the model is allowed to abandon agricultural
@@ -346,14 +366,6 @@ and agricultural management combination in all subsequent years.
 WARNING: changing to False will result in 'locking in' land uses on cells that utilise the agricultural management option for
 the rest of the simulation. This may be an unintended side effect.
 """
-# Update AG_MANAGEMENTS_TO_LAND_USES to remove any land uses that are not enabled
-REMOVED_DICT = {}
-for am in list(AG_MANAGEMENTS_TO_LAND_USES.keys()):  # Iterate over a copy of the keys
-    if not AG_MANAGEMENTS[am]:
-        REMOVED_DICT[am] = AG_MANAGEMENTS_TO_LAND_USES[am] 
-        AG_MANAGEMENTS_TO_LAND_USES.pop(am)
-        AG_MANAGEMENTS_REVERSIBLE.pop(am)
-
 
 
 # The cost for removing and establishing irrigation infrastructure ($ per hectare)
@@ -361,7 +373,7 @@ REMOVE_IRRIG_COST = 5000
 NEW_IRRIG_COST = 10000
 
 # Savanna burning cost per hectare per year ($/ha/yr)
-SAVBURN_COST_HA_YR = 100
+SAVBURN_COST_HA_YR = 10
 
 # The minimum value an agricultural management variable must take for the write_output function to consider it being used on a cell
 AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1
@@ -370,12 +382,11 @@ AGRICULTURAL_MANAGEMENT_USE_THRESHOLD = 0.1
 HIR_PRODUCTIVITY_CONTRIBUTION = 0.5
 
 # Maintainace cost for HIR
-BEEF_HIR_MAINTAINANCE_COST_PER_HA_PER_YEAR = 0
-SHEEP_HIR_MAINTAINANCE_COST_PER_HA_PER_YEAR = 0
+BEEF_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 0
+SHEEP_HIR_MAINTENANCE_COST_PER_HA_PER_YEAR = 0
 
 # HIR effecting years
 HIR_EFFECT_YEARS = 91
-
 
 
 
@@ -391,22 +402,18 @@ EGGS_AVG_WEIGHT = 60  # Average weight of an egg in grams
 # Environmental parameters
 # ---------------------------------------------------------------------------- #
 
-# Greenhouse gas emissions limits and parameters *******************************
-GHG_EMISSIONS_LIMITS = 'on'        # 'on' or 'off'
-
-GHG_LIMITS_TYPE = 'file' # 'dict' or 'file'
-
-# Set emissions limits in dictionary below (i.e., year: tonnes)
-GHG_LIMITS = {
-              2010: 90 * 1e6,    # Agricultural emissions in 2010 in tonnes CO2e
-              2050: -100 * 1e6,  # GHG emissions target and year (can add more years/targets)
-              2100: -100 * 1e6   # GHG emissions target and year (can add more years/targets)
-             }
-
 # Take data from 'GHG_targets.xlsx', 
-GHG_LIMITS_FIELD = '1.8C (67%) excl. avoided emis SCOPE1'
+GHG_TARGETS_DICT = {
+    'off':      None,
+    'low':      '1.8C (67%) excl. avoided emis SCOPE1',
+    'medium':   '1.5C (50%) excl. avoided emis SCOPE1',
+    'high':     '1.5C (67%) excl. avoided emis SCOPE1',
+}
+
+# Greenhouse gas emissions limits and parameters *******************************
+GHG_EMISSIONS_LIMITS = 'high'        # 'off', 'low', 'medium', or 'high'
 '''
-options include: 
+`GHG_EMISSIONS_LIMITS` options include: 
 - Assuming agriculture is responsible to sequester 100% of the carbon emissions
     - '1.5C (67%)', '1.5C (50%)', or '1.8C (67%)' 
 - Assuming agriculture is responsible to sequester carbon emissions not including electricity emissions and  off-land emissions 
@@ -424,7 +431,7 @@ CARBON_PRICES_FIELD = 'CONSTANT'
 
 # Automatically update the carbon price field if it is set to 'AS_GHG'
 if CARBON_PRICES_FIELD == 'AS_GHG':
-    CARBON_PRICES_FIELD = GHG_LIMITS_FIELD[:9].replace('(','')  # '1.5C (67%) excl. avoided emis' -> '1.5C 67%'
+    CARBON_PRICES_FIELD = GHG_TARGETS_DICT[GHG_EMISSIONS_LIMITS][:9].replace('(','')  # '1.5C (67%) excl. avoided emis' -> '1.5C 67%'
 
 if CARBON_PRICES_FIELD == 'CONSTANT':
     CARBON_PRICE_COSTANT = 0.0  # The constant value to add to the carbon price (e.g., $10/tonne CO2e).
@@ -450,14 +457,14 @@ GHG_CONSTRAINT_TYPE = 'hard'  # Adds GHG limits as a constraint in the solver (l
 # GHG_CONSTRAINT_TYPE = 'soft'  # Adds GHG usage as a type of slack variable in the solver (goal programming approach)
 
 # Weight for the GHG/Demand deviation in the objective function
-SOLVE_WEIGHT_ALPHA = 0.1  
+SOLVE_WEIGHT_ALPHA = 1  
 ''' 
 Range from 0 to 1 that balances the relative important between economic values and biodiversity scores.
  - if approaching 0, the model will focus on maximising biodiversity scores.
  - if approaching 1, the model will focus on maximising prifit (or minimising cost).
 '''
 
-SOLVE_WEIGHT_BETA = 0.9
+SOLVE_WEIGHT_BETA = 0.5
 '''
 The weight of the deviations from target in the objective function.
  - if approaching 0, the model will ignore the deviations from target.
@@ -468,10 +475,9 @@ The weight of the deviations from target in the objective function.
 # Water use yield and parameters *******************************
 WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
 
-# WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
-WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
+WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
+# WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
 
-WATER_PENALTY = 1
 
 # Regionalisation to enforce water use limits by
 WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
@@ -498,15 +504,16 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
     https://chinawaterrisk.org/resources/analysis-reviews/aqueduct-global-water-stress-rankings/ 
 """
 
-WATER_STRESS = 0.4          # Aqueduct limit catchments not under high stress
-AG_SHARE_OF_WATER_USE = 0.7 # Ag share is 70% across all catchments, could be updated for each specific catchment based on actual data
+WATER_STRESS = 0.6                                      # Aqueduct limit catchments, 0.6 means the water yield in a region must be >= 60% of the historical water yield
+WATER_USE_SHARE_AG = 0.7                                # Ag share is 70% across all catchments, could be updated for each specific catchment based on actual data
+WATER_USE_SHARE_DOMESTIC  = 1 - WATER_USE_SHARE_AG      # Domestic share is 30% across all catchments, could be updated for each specific catchment based on actual data
 
 
 # Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water can cause infeasibility issues with water constraint in Pilbara
 LIVESTOCK_DRINKING_WATER = 1
 
 # Consider water license costs (0 [off] or 1 [on]) of land-use transition ***** If on then there is a noticeable water sell-off by irrigators in the MDB when maximising profit
-INCLUDE_WATER_LICENSE_COSTS = 0
+INCLUDE_WATER_LICENSE_COSTS = 1
 
 
 
@@ -515,33 +522,36 @@ INCLUDE_WATER_LICENSE_COSTS = 0
 
 # ------------------- Agricultural biodiversity parameters -------------------
 
-
-# Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-BIODIVERSTIY_TARGET_GBF_2 = 'on'            # 'on' or 'off', if 'off' the biodiversity target will be set as zero.
-
-# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
-BIODIV_GBF_TARGET_2_DICT = {
-              2030: 0.15,  # Proportion of degraded land restored in year 2030 - GBF Target 2
-              2050: 0.15,  # Principle from GBF 2050 Goals and Vision and LeClere et al. Bending the Curve - need to arrest biodiversity decline then begin improving over time.
-              2100: 0.15   # Stays at 2050 level
-             }            # (can add more years/targets)\
-""" Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
-    Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
-    in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
-"""
-
-
-# GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
-GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
-
-
+GBF2_CONSTRAINT_TYPE = 'hard' # Adds biodiversity limits as a constraint in the solver (linear programming approach)
+# GBF2_CONSTRAINT_TYPE = 'soft'  # Adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 '''
 The constraint type for the biodiversity target.
 - 'hard' adds biodiversity limits as a constraint in the solver (linear programming approach)
 - 'soft' adds biodiversity usage as a type of slack variable in the solver (goal programming approach)
 '''
 
-GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 40
+# Set biodiversity target (0 - 1 e.g., 0.3 = 30% of total achievable Zonation biodiversity benefit)
+GBF2_TARGETS_DICT = {
+    'off':     None,
+    'low':    {2030: 0,    2050: 0,    2100: 0},
+    'medium': {2030: 0.30, 2050: 0.30, 2100: 0.30},
+    'high':   {2030: 0.30, 2050: 0.50, 2100: 0.50},
+}
+
+# Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
+BIODIVERSITY_TARGET_GBF_2 = 'high'            # 'off', 'low', 'medium', or 'high'
+'''
+Kunming-Montreal Global Biodiversity Framework Target 2: Restore 30% of all Degraded Ecosystems
+Ensure that by 2030 at least 30 per cent of areas of degraded terrestrial, inland water, and coastal and marine ecosystems are under effective restoration,
+in order to enhance biodiversity and ecosystem functions and services, ecological integrity and connectivity.
+ - 'off' will turn off the GBF-3 target. 
+ - 'low' is the low level of biodiversity target (i.e., restore 0% of degreaded biodiversity socore in the 'priority degraded land').
+ - 'medium' is the medium level of biodiversity target (i.e., restore 15% of degreaded biodiversity socore in the 'priority degraded land').
+ - 'high' is the high level of biodiversity target (i.e., restore 25% of degreaded biodiversity socore in the 'priority degraded land').
+'''
+
+
+GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT = 20
 '''
 Based on Zonation alogrithm, the biodiversity feature coverage (an indicator of overall biodiversity benifits) is 
 more attached to high rank cells (rank is an indicator of importance/priority in biodiversity conservation). 
@@ -557,12 +567,8 @@ If set to 100, all cells will be considered as priority degraded areas, equal to
 '''
 
 
-GBF2_PENALTY = 1e4
-'''The penalty multiplier for not meeting the biodiversity target, only applies when undershooting the target'''
-
-
 # Connectivity source source
-CONNECTIVITY_SOURCE = 'NCI'                 # 'NCI', 'DWI' or 'NONE'
+CONNECTIVITY_SOURCE = 'NCI'                 # 'DCCEEW_NCI', 'NATURAL_AREA_CONNECTIVITY' or 'NONE'
 '''
 The connectivity source is the source of the connectivity score used to weigh the raw biodiversity priority score.
 This score is normalised between 0 (fartherst) and 1 (closest).
@@ -574,8 +580,7 @@ Can be either 'NCI' or 'DWI'.
 '''
 
 # Connectivity score importance
-connectivity_importance = 0.3                    # Weighting of connectivity score in biodiversity calculation (0 [not important] - 1 [very important])
-CONNECTIVITY_LB = 1 - connectivity_importance    # Sets the lower bound of the connectivity multiplier for bioidversity
+CONNECTIVITY_LB = 0.7                       # Avaliable values are [0.5, 0.6, 0.7, 0.8, 0.9]
 '''
 The relative importance of the connectivity score in the biodiversity calculation. Used to scale the raw biodiversity score.
 I.e., the lower bound of the connectivity score for weighting the raw biodiversity priority score is CONNECTIVITY_LB.
@@ -583,23 +588,15 @@ I.e., the lower bound of the connectivity score for weighting the raw biodiversi
 
 
 # Habitat condition data source
-HABITAT_CONDITION = 'HCAS'                  # 'HCAS', 'USER_DEFINED', or 'NONE'
+HABITAT_CONDITION = 'USER_DEFINED'                  # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'
 '''
-Used to calculate the level of degradation of biodiversity under agricultural land uses (i.e., multiplier of the impact of ag on biodiversity).
-- If 'HCAS' is selected, the habitat condition is calculated using the Habitat Condition Assessment System (HCAS)
-- If 'USER_DEFINED' is selected, the habitat condition is calculated using the user defined values in the 'HCAS_USER_DEFINED' dictionary.
-'''
-
-
-# HCAS percentile for each land-use type
-HCAS_PERCENTILE = 50
-''' 
 Different land-use types have different biodiversity degradation impacts. We calculated the percentiles values of HCAS (indicating the
 suitability for wild animals ranging between 0-1) for each land-use type.Avaliable percentiles is one of [10, 25, 50, 75, 90].
 
 For example, the 50th percentile for 'Beef - Modified land' is 0.22, meaning this land retains 22% biodiversity score compared
 to undisturbed natural land.
 '''
+
 
 # Biodiversity value under default late dry season savanna fire regime
 BIO_CONTRIBUTION_LDS = 0.8
@@ -625,13 +622,7 @@ will be 0.6 * 0.8 = 0.48.
 
 # ---------------------- Vegetation parameters ----------------------
 
-BIODIVERSTIY_TARGET_GBF_3  = 'off'           # 'on' or 'off'.
-'''
-Target 3 of the Kunming-Montreal Global Biodiversity Framework:
-protect and manage 30% of the world's land, water, and coastal areas by 2030.
-'''
-
-NVIS_TARGET_CLASS  = 'MVS'                  # 'MVG', 'MVS', 'MVG_IBRA', 'MVS_IBRA'
+GBF3_TARGET_CLASS  = 'MVS'                  # 'MVG', 'MVS', 'MVG_IBRA', 'MVS_IBRA'
 '''
 The National Vegetation Information System (NVIS) provides the 100m resolution information on
 the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers) across Australia.
@@ -640,10 +631,29 @@ the distribution of vegetation (~30 primary group layers, or ~90 subgroup layers
 - If 'MVS_IBRA/MVG_IBRA' is selected, use need to define conservation target for each NVIS group for selected the IBRA region.
 '''
 
+GBF3_TARGETS_DICT = {
+    'off':     None,
+    'medium':  30,
+    'high':    50,
+    'USER_DEFINED': None
+}
+
+BIODIVERSITY_TARGET_GBF_3  = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+'''
+Target 3 of the Kunming-Montreal Global Biodiversity Framework:
+protect and manage 30% of the world's land, water, and coastal areas by 2030.
+
+- if 'off' is selected, turn off the GBF-3 target for biodiversity.
+- if 'medium' is selected, the conservation target is set to 30% for each NVIS group at 2050.
+- if 'high' is selected, the conservation target is set to 50% for each NVIS group at 2050.
+- if 'USER_DEFINED' is selected, the conservation target is reading from `input.BIODIVERSITY_GBF3_SCORES_AND_TARGETS.xlsx`.
+'''
+
+
 
 # ------------------------------- Species parameters -------------------------------
-BIODIVERSTIY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
-BIODIVERSTIY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
 
 '''
 Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
@@ -654,7 +664,7 @@ and manage human-wildlife interactions
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------
-BIODIVERSTIY_TARGET_GBF_8 = 'off'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_8 = 'off'           # 'on' or 'off'.
 '''
 Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
 reduce the impacts of climate change on biodiversity and ecosystems.
@@ -681,8 +691,6 @@ NON_AGRICULTURAL_LU_BASE_CODE = 100
 # Number of decimals to round the lower bound matrices to for non-agricultural land uses and agricultural management options.
 ROUND_DECMIALS = 6
 
-BIODIVERSITY_BIG_CONSTR_DIV_FACTOR = 1e4
-
 
 """ NON-AGRICULTURAL LAND USES (indexed by k)
 0: 'Environmental Plantings'
@@ -694,13 +702,6 @@ BIODIVERSITY_BIG_CONSTR_DIV_FACTOR = 1e4
 6: 'Beef Carbon Plantings (Belt)'
 7: 'BECCS'
 8: 'Destocked - natural land'
-
-
-AGRICULTURAL MANAGEMENT OPTIONS (indexed by a)
-0: (None)
-1: 'Asparagopsis taxiformis'
-2: 'Precision Agriculture'
-3: 'Ecological Grazing'
 
 
 DRAINAGE DIVISIONS

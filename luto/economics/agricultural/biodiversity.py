@@ -30,7 +30,7 @@ from luto import tools
 from luto.data import Data
 
 
-def get_bio_overall_priority_score_matrices_mrj(data):
+def get_bio_overall_priority_score_matrices_mrj(data:Data):
     """
     Return b_mrj biodiversity score matrices by land management, cell, and land-use type.
 
@@ -51,7 +51,7 @@ def get_bio_overall_priority_score_matrices_mrj(data):
     return b_mrj
 
 
-def get_asparagopsis_effect_b_mrj(data):
+def get_asparagopsis_effect_b_mrj(data:Data):
     """
     Gets biodiversity impacts of using Asparagopsis taxiformis (no effect)
 
@@ -65,7 +65,7 @@ def get_asparagopsis_effect_b_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
-def get_precision_agriculture_effect_b_mrj(data):
+def get_precision_agriculture_effect_b_mrj(data:Data):
     """
     Gets biodiversity impacts of using Precision Agriculture (no effect)
 
@@ -79,7 +79,7 @@ def get_precision_agriculture_effect_b_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
-def get_ecological_grazing_effect_b_mrj(data):
+def get_ecological_grazing_effect_b_mrj(data:Data):
     """
     Gets biodiversity impacts of using Ecological Grazing (no effect)
 
@@ -93,7 +93,7 @@ def get_ecological_grazing_effect_b_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
-def get_savanna_burning_effect_b_mrj(data):
+def get_savanna_burning_effect_b_mrj(data:Data):
     """
     Gets biodiversity impacts of using Savanna Burning.
 
@@ -123,7 +123,7 @@ def get_savanna_burning_effect_b_mrj(data):
     return new_b_mrj
 
 
-def get_agtech_ei_effect_b_mrj(data):
+def get_agtech_ei_effect_b_mrj(data:Data):
     """
     Gets biodiversity impacts of using AgTech EI (no effect)
 
@@ -137,7 +137,7 @@ def get_agtech_ei_effect_b_mrj(data):
     return np.zeros((data.NLMS, data.NCELLS, nlus), dtype=np.float32)
 
 
-def get_biochar_effect_b_mrj(data, ag_b_mrj: np.ndarray, yr_idx):
+def get_biochar_effect_b_mrj(data:Data, ag_b_mrj: np.ndarray, yr_idx):
     """
     Gets biodiversity impacts of using Biochar
 
@@ -178,7 +178,7 @@ def get_beef_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
     Returns:
     - b_mrj_effect: A numpy array representing the biodiversity impacts of using Biochar.
     """
-    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
@@ -202,7 +202,7 @@ def get_sheep_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
     Returns:
     - b_mrj_effect: A numpy array representing the biodiversity impacts of using Biochar.
     """
-    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
     b_mrj_effect = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
 
@@ -216,7 +216,7 @@ def get_sheep_hir_effect_b_mrj(data: Data, ag_b_mrj: np.ndarray) -> np.ndarray:
     return b_mrj_effect
 
 
-def get_agricultural_management_biodiversity_matrices(data, ag_b_mrj: np.ndarray, yr_idx: int):
+def get_agricultural_management_biodiversity_matrices(data:Data, ag_b_mrj: np.ndarray, yr_idx: int):
     """
     Calculate the biodiversity matrices for different agricultural management practices.
 
@@ -228,14 +228,14 @@ def get_agricultural_management_biodiversity_matrices(data, ag_b_mrj: np.ndarray
     The keys of the dictionary represent the management practices, and the values represent the corresponding biodiversity matrices.
     """
 
-    asparagopsis_data = get_asparagopsis_effect_b_mrj(data) if settings.AG_MANAGEMENTS['Asparagopsis taxiformis'] else 0
-    precision_agriculture_data = get_precision_agriculture_effect_b_mrj(data) if settings.AG_MANAGEMENTS['Precision Agriculture'] else 0
-    eco_grazing_data = get_ecological_grazing_effect_b_mrj(data) if settings.AG_MANAGEMENTS['Ecological Grazing'] else 0
-    sav_burning_data = get_savanna_burning_effect_b_mrj(data) if settings.AG_MANAGEMENTS['Savanna Burning'] else 0
-    agtech_ei_data = get_agtech_ei_effect_b_mrj(data) if settings.AG_MANAGEMENTS['AgTech EI'] else 0
-    biochar_data = get_biochar_effect_b_mrj(data, ag_b_mrj, yr_idx) if settings.AG_MANAGEMENTS['Biochar'] else 0
-    beef_hir_data = get_beef_hir_effect_b_mrj(data, ag_b_mrj) if settings.AG_MANAGEMENTS['Beef - HIR'] else 0
-    sheep_hir_data = get_sheep_hir_effect_b_mrj(data, ag_b_mrj) if settings.AG_MANAGEMENTS['Sheep - HIR'] else 0
+    asparagopsis_data = get_asparagopsis_effect_b_mrj(data)                       
+    precision_agriculture_data = get_precision_agriculture_effect_b_mrj(data)     
+    eco_grazing_data = get_ecological_grazing_effect_b_mrj(data)                   
+    sav_burning_data = get_savanna_burning_effect_b_mrj(data)                       
+    agtech_ei_data = get_agtech_ei_effect_b_mrj(data)                               
+    biochar_data = get_biochar_effect_b_mrj(data, ag_b_mrj, yr_idx)                 
+    beef_hir_data = get_beef_hir_effect_b_mrj(data, ag_b_mrj)                       
+    sheep_hir_data = get_sheep_hir_effect_b_mrj(data, ag_b_mrj)                     
 
     return {
         'Asparagopsis taxiformis': asparagopsis_data,
@@ -244,60 +244,16 @@ def get_agricultural_management_biodiversity_matrices(data, ag_b_mrj: np.ndarray
         'Savanna Burning': sav_burning_data,
         'AgTech EI': agtech_ei_data,
         'Biochar': biochar_data,
-        'Beef - HIR': beef_hir_data,
-        'Sheep - HIR': sheep_hir_data,
+        'HIR - Beef': beef_hir_data,
+        'HIR - Sheep': sheep_hir_data,
     }
 
 
-def get_GBF2_biodiversity_limits(data, yr_cal: int):
-    """
-    Calculate the biodiversity limits for a given year used as a constraint.
-
-    The biodiversity score target timeline is specified in data.BIO_GBF2_TARGET_SCORES.
-
-    Parameters
-    - data: The data object containing relevant information.
-    - yr_cal: The calendar year for which to calculate the biodiversity limits.
-
-    Returns
-    - The biodiversity limit for the given year.
-
-    """
-
-    return data.get_GBF2_target_for_yr_cal(yr_cal)
-
-
-
-def get_GBF2_bio_priority_degraded_areas_r(data):
-    return np.where(
-        data.SAVBURN_ELIGIBLE,
-        data.REAL_AREA * data.BIO_PRIORITY_DEGRADED_AREAS_MASK * settings.BIO_CONTRIBUTION_LDS ,
-        data.REAL_AREA * data.BIO_PRIORITY_DEGRADED_AREAS_MASK
-    ).astype(np.float32)
-
-
-def get_GBF3_major_vegetation_matrices_vr(data) -> np.ndarray:
+def get_GBF3_major_vegetation_matrices_vr(data:Data) -> np.ndarray:
     return data.NVIS_LAYERS_LDS * data.REAL_AREA
 
 
-def get_GBF3_major_vegetation_group_limits(data, yr_cal: int) -> tuple[np.ndarray, dict[int, str]]:
-    """
-    Gets the correct major vegetation group targets for the given year (yr_cal).
-
-    Returns
-    - np.ndarray
-        An array containing the limits of each NVIS class for the given yr_cal
-    - dict[int, str]
-        A dictionary mapping of vegetation group index to name
-    - dict[int, np.ndarray]
-        A dictionary mapping of each vegetation group index to the cells
-        that the group applies to.
-    """
-    
-    return data.get_GBF3_limit_score_inside_LUTO_by_yr(yr_cal), data.BIO_GBF3_ID2DESC, data.MAJOR_VEG_INDECES
-
-
-def get_GBF4_SNES_matrix_sr(data) -> np.ndarray:
+def get_GBF4_SNES_matrix_sr(data:Data) -> np.ndarray:
     """
     Gets the SNES contributions  matrix.
     
@@ -313,7 +269,7 @@ def get_GBF4_SNES_matrix_sr(data) -> np.ndarray:
     ).astype(np.float32)
     
 
-def get_GBF4_ECNES_matrix_sr(data) -> np.ndarray:
+def get_GBF4_ECNES_matrix_sr(data:Data) -> np.ndarray:
     """
     Gets the ECNES contributions  matrix.
     
@@ -329,46 +285,8 @@ def get_GBF4_ECNES_matrix_sr(data) -> np.ndarray:
     ).astype(np.float32)
     
 
-def get_GBF4_SNES_limits(data, target_year: int) -> tuple[np.ndarray, dict[int, str]]:
-    """
-    Get species of national environmental significance limits.
 
-    Returns
-    -------
-    species_targets: np.ndarray
-        Array containing all selected species' limits
-    species_names: dict[int, str]
-        Mapping of each species' ID to string format name
-    """
-    if settings.BIODIVERSTIY_TARGET_GBF_4_SNES != "on":
-        return np.empty(0), {}, {}
-        
-    species_targets = data.get_GBF4_SNES_target_inside_LUTO_by_year(target_year)
-    species_names = {x: name for x, name in enumerate(data.BIO_GBF4_SNES_SEL_ALL)}
-    return species_targets, species_names
-    
-
-
-def get_GBF4_ECNES_limits(data, target_year: int) -> tuple[np.ndarray, dict[int, str]]:
-    """
-    Get ecological communities of national environmental significance limits.
-
-    Returns
-    -------
-    species_targets: np.ndarray
-        Array containing all selected species' limits
-    species_names: dict[int, str]
-        Mapping of each species' ID to string format name
-    """
-    if settings.BIODIVERSTIY_TARGET_GBF_4_ECNES != "on":
-        return np.empty(0), {}, {}
-
-    species_targets = data.get_GBF4_ECNES_target_inside_LUTO_by_year(target_year)
-    species_names = {x: name for x, name in enumerate(data.BIO_GBF4_ECNES_SEL_ALL)}
-    return species_targets, species_names
-
-
-def get_GBF8_species_conservation_matrix_sr(data, target_year: int):
+def get_GBF8_matrix_sr(data:Data, target_year: int):
     return np.where(
         data.SAVBURN_ELIGIBLE,
         data.get_GBF8_bio_layers_by_yr(target_year) * data.REAL_AREA * settings.BIO_CONTRIBUTION_LDS,
@@ -376,34 +294,7 @@ def get_GBF8_species_conservation_matrix_sr(data, target_year: int):
     )
 
 
-def get_GBF8_species_conservation_limits(
-    data,
-    yr_cal: int,
-) -> tuple[np.ndarray, dict[int, str], dict[int, np.ndarray]]:
-    """
-    Gets the correct species conservation targets for the given year (yr_cal).
-    
-    Parameters
-        - data: The data object containing relevant information.
-        - yr_cal: The calendar year for which to calculate the species conservation limits.
-    
-    Returns
-        Tuple containing:
-        - np.ndarray
-            An array containing the limits of each species for the given yr_cal
-        - dict[int, str]
-            A dictionary mapping of species index to name
-        - dict[int, np.ndarray]
-            A dictionary mapping of each species index to the cells that the species applies to.
-    """
-    species_limits = data.get_GBF8_target_inside_LUTO_by_yr(yr_cal)
-    species_names = {s: spec_name for s, spec_name in enumerate(data.BIO_GBF8_SEL_SPECIES)}
-    species_matrix = data.get_GBF8_bio_layers_by_yr(yr_cal)
-    species_inds = {s: np.where(species_matrix[s] > 0)[0] for s in range(data.N_GBF8_SPECIES)}
-    return species_limits, species_names, species_inds
-
-
-def get_ag_biodiversity_contribution(data) -> np.ndarray:
+def get_ag_biodiversity_contribution(data:Data) -> np.ndarray:
     """
     Return b_rj biodiversity contribution matrices by land-use type.
 
@@ -417,7 +308,7 @@ def get_ag_biodiversity_contribution(data) -> np.ndarray:
 
 
 def get_ag_management_biodiversity_contribution(
-    data,
+    data:Data,
     yr_cal: int,
 ) -> dict[str, dict[int, np.ndarray]]:
     
@@ -453,21 +344,21 @@ def get_ag_management_biodiversity_contribution(
             j_idx: (data.BIOCHAR_DATA[lu].loc[yr_cal, 'Biodiversity_impact'] - 1) * np.ones(data.NCELLS).astype(np.float32)
             for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Biochar'])
         }
-    if settings.AG_MANAGEMENTS['Beef - HIR']:
-        am_contr_dict['Beef - HIR'] = {
+    if settings.AG_MANAGEMENTS['HIR - Beef']:
+        am_contr_dict['HIR - Beef'] = {
             j_idx: (
                 np.ones(data.NCELLS).astype(np.float32) 
                 * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_natural_beef_code(data)])    # The proportional gap of biodiversity between beef-natural to full-natural
             )
-            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR'])
+            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef'])
         }
-    if settings.AG_MANAGEMENTS['Sheep - HIR']:
-        am_contr_dict['Sheep - HIR'] = {
+    if settings.AG_MANAGEMENTS['HIR - Sheep']:
+        am_contr_dict['HIR - Sheep'] = {
             j_idx: (
                 np.ones(data.NCELLS).astype(np.float32)
                 * (1 - data.BIO_HABITAT_CONTRIBUTION_LOOK_UP[tools.get_natural_sheep_code(data)])   # The proportional gap of biodiversity between sheep-natural to full-natural
             )
-            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR'])
+            for j_idx, lu in enumerate(settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep'])
         }
     
     return am_contr_dict

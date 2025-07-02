@@ -18,36 +18,14 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 
-TASK_ROOT_DIR = '../Custom_runs/20250505_RES15_YR5_START_10_TEST_RUNS'  
-# Remove possible trailing slash
-if TASK_ROOT_DIR[-1] == '/':
-    TASK_ROOT_DIR = TASK_ROOT_DIR[:-1]
-
-
-
 EXCLUDE_DIRS = [
     'input', 
     'output', 
     '.git', 
     '.vscode', 
     '__pycache__', 
-    'jinzhu_inspect_code'
+    'jinzhu_inspect_code',
+    'docs',
 ]
 
-GHG_ORDER = {
-    '1.5C (67%) excl. avoided emis': '1.5C (67%)', 
-    '1.5C (50%) excl. avoided emis': '1.5C (50%)', 
-    '1.8C (67%) excl. avoided emis': '1.8C (67%)',
-    '1.5C (67%) excl. avoided emis SCOPE1': '1.5C (67%)', 
-    '1.5C (50%) excl. avoided emis SCOPE1': '1.5C (50%)', 
-    '1.8C (67%) excl. avoided emis SCOPE1': '1.8C (67%)',}
-    
-
-
-BIO_TARGET_ORDER = {
-    '{2010: 0, 2030: 0.3, 2050: 0.3, 2100: 0.3}':'30*30', 
-    '{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.5}':'50*50',
-    '{2010: 0, 2030: 0.15, 2050: 0.3, 2100: 0.3}':'30*15',
-    '{2010: 0, 2030: 0.3, 2050: 0.5, 2100: 0.3}':'50*50'
-    
-}
+SERVER_PARAMS = ['MEM', 'NCPUS', 'TIME', 'QUEUE', 'JOB_NAME']

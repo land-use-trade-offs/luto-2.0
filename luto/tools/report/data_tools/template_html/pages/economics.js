@@ -1,19 +1,9 @@
 // create chart
 document.addEventListener("DOMContentLoaded", function () {
-  Highcharts.setOptions({
-    colors: [
-      "#7cb5ec",
-      "#434348",
-      "#90ed7d",
-      "#f7a35c",
-      "#8085e9",
-      "#f15c80",
-      "#e4d354",
-      "#2b908f",
-      "#f45b5b",
-      "#91e8e1",
-    ],
-  });
+  
+  // Set the default color palette for Highcharts
+  var colors = eval(document.getElementById("colors").innerHTML);
+  Highcharts.setOptions({colors: colors});
 
   // Get the available years for plotting
   var years = eval(document.getElementById("model_years").innerHTML).map(function (x) { return parseInt(x); });
@@ -1068,7 +1058,7 @@ document.addEventListener("DOMContentLoaded", function () {
           pointFormatter: function () {
             return `${data_ag2ag["categories"][this.x]} 
                     <b>==></b> ${data_ag2ag["categories"][this.y]}: 
-                    <b>${this.value.toFixed(2)} (billion $)</b>`;
+                    <b>${this.value.toFixed(2)} (million $)</b>`;
           }
         },
       }],
@@ -1226,7 +1216,7 @@ document.addEventListener("DOMContentLoaded", function () {
           pointFormatter: function () {
             return `${data_ag2non_ag["categories_from"][this.x]} 
                     <b>==></b> ${data_ag2non_ag["categories_to"][this.y]}: 
-                    <b>${this.value.toFixed(2)} (billion $)</b>`;
+                    <b>${this.value.toFixed(2)} (million $)</b>`;
           }
         },
       }],
@@ -1521,7 +1511,7 @@ document.addEventListener("DOMContentLoaded", function () {
           pointFormatter: function () {
             return `${data_non_ag2ag["categories_from"][this.x]} 
                     <b>==></b> ${data_non_ag2ag["categories_to"][this.y]}: 
-                    <b>${this.value.toFixed(2)} (billion $)</b>`;
+                    <b>${this.value.toFixed(2)} (million $)</b>`;
           }
         },
       }],

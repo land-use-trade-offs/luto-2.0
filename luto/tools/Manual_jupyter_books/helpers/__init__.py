@@ -72,7 +72,7 @@ def arr_to_xr(data, arr:np.ndarray) -> xr.DataArray:
     '''
     
     # Check if the array is full resolution raw
-    full_res_raw = arr.size == data.LUMAP_NO_RESFACTOR.size
+    full_res_raw = (arr.size == data.LUMAP_NO_RESFACTOR.size)
     
     # Get the geo metadata of the array
     geo_meta = data.GEO_META_FULLRES if full_res_raw else data.GEO_META

@@ -44,8 +44,8 @@ def extract_dtype_from_path(path):
                             'ag_man_X_mrj_ecological_grazing',
                             'ag_man_X_mrj_precision_agriculture',
                             'ag_man_X_mrj_savanna_burning',
-                            'ag_man_X_mrj_beef_-_hir',
-                            'ag_man_X_mrj_sheep_-_hir',
+                            'ag_man_X_mrj_hir_-_beef',
+                            'ag_man_X_mrj_hir_-_sheep',
                             ],
             'non_ag_X_rk':['non_ag_X_rk'],
             # CSVs

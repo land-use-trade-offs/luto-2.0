@@ -29,6 +29,7 @@ import shutil
 import threading
 import numpy as np
 import pandas as pd
+import rasterio
 import xarray as xr
 
 from joblib import Parallel, delayed
@@ -36,8 +37,7 @@ from joblib import Parallel, delayed
 from luto import settings
 from luto import tools
 from luto.data import Data
-from luto.tools.create_task_runs.helpers import log_memory_usage
-from luto.tools.spatializers import create_2d_map, write_gtiff
+from luto.tools.spatializers import create_2d_map
 from luto.tools.compmap import lumap_crossmap, lmmap_crossmap, crossmap_irrstat, crossmap_amstat
 
 import luto.economics.agricultural.quantity as ag_quantity                      # ag_quantity has already been calculated and stored in <sim.prod_data>
@@ -56,8 +56,7 @@ import luto.economics.non_agricultural.ghg as non_ag_ghg
 import luto.economics.non_agricultural.water as non_ag_water
 import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
-from luto.settings import AG_MANAGEMENTS, NON_AG_LAND_USES, AG_MANAGEMENTS_TO_LAND_USES
-
+from luto.settings import NON_AG_LAND_USES
 from luto.tools.report.create_report_data import save_report_data
 from luto.tools.report.create_html import data2html
 from luto.tools.report.create_static_maps import TIF2MAP
@@ -69,45 +68,44 @@ timestamp = tools.write_timestamp()
 def write_outputs(data: Data):
     """Write model outputs to file"""
     
-    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1), daemon=True)
+   # Start recording memory usage
+    stop_event = threading.Event()
+    memory_thread = threading.Thread(target=tools.log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1, stop_event))
     memory_thread.start()
     
-    # Write the model outputs to file
-    write_data(data)
-    # Move the log files to the output directory
-    move_logs(data)
+    try:
+        write_data(data)
+        move_logs(data)
+    except Exception as e:
+        print(f"An error occurred while writing outputs: {e}")
+        raise e
+    finally:
+        # Ensure the memory logging thread is stopped
+        stop_event.set()
+        memory_thread.join()
+
 
 
 @tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{timestamp}")
 def write_data(data: Data):
 
-    # Write model run settings
-    if not data.path:
-        raise ValueError(
-            "Cannot write outputs: 'path' attribute of Data object has not been set "
-            "(has the simulation been run?)"
-        )
-        
-    write_settings(data.path)
-
-    # Get the years to write
-    years = settings.SIM_YEARS
+    years = [i for i in settings.SIM_YEARS if i<=data.last_year]
+    data.set_path()
     paths = [f"{data.path}/out_{yr}" for yr in years]
+    
+    write_settings(data.path)
+    write_area_transition_start_end(data, f'{data.path}/out_{years[-1]}', data.last_year)
 
-    ###############################################################
-    #                     Create raw outputs                      #
-    ###############################################################
-
-    # Write tasks only once
-    write_area_transition_start_end(data, f'{data.path}/out_{years[-1]}')
-    # write_objetive(data)
-
-    # Write outputs for each year
+    # Wrap write to a list of delayed jobs
     jobs = [delayed(write_output_single_year)(data, yr, path_yr, None) for (yr, path_yr) in zip(years, paths)]
     jobs += [delayed(write_output_single_year)(data, years[-1], f"{data.path_begin_end_compare}/out_{years[-1]}", years[0])]
 
     # Parallel write the outputs for each year
-    num_jobs = min(len(jobs), settings.WRITE_THREADS) if settings.PARALLEL_WRITE else 1   # Use the minimum between jobs_num and threads for parallel writing
+    num_jobs = (
+        min(len(jobs), settings.WRITE_THREADS) 
+        if settings.PARALLEL_WRITE 
+        else 1   
+    )
     Parallel(n_jobs=num_jobs)(jobs)
 
     # Copy the base-year outputs to the path_begin_end_compare
@@ -121,21 +119,19 @@ def write_data(data: Data):
 
 
 def move_logs(data: Data):
-    # Move the log files to the output directory
-    logs = [f"{settings.OUTPUT_DIR}/run_{timestamp}_stdout.log",
-            f"{settings.OUTPUT_DIR}/run_{timestamp}_stderr.log",
-            f"{settings.OUTPUT_DIR}/write_{timestamp}_stdout.log",
-            f"{settings.OUTPUT_DIR}/write_{timestamp}_stderr.log",
-            f'{settings.OUTPUT_DIR}/RES_{settings.RESFACTOR}_mem_log.txt',
-            f'{settings.OUTPUT_DIR}/.timestamp']
+    
+    logs = [
+        f"{settings.OUTPUT_DIR}/run_{timestamp}_stdout.log",
+        f"{settings.OUTPUT_DIR}/run_{timestamp}_stderr.log",
+        f"{settings.OUTPUT_DIR}/write_{timestamp}_stdout.log",
+        f"{settings.OUTPUT_DIR}/write_{timestamp}_stderr.log",
+        f'{settings.OUTPUT_DIR}/RES_{settings.RESFACTOR}_mem_log.txt',
+        f'{settings.OUTPUT_DIR}/.timestamp'
+    ]
 
     for log in logs:
-        try:
-            shutil.move(log, f"{data.path}/{os.path.basename(log)}")
-        except:
-            pass
-    
-    return None
+        try: shutil.move(log, f"{data.path}/{os.path.basename(log)}")
+        except: pass
 
 
 
@@ -147,15 +143,10 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
     if not os.path.isdir(path_yr):
         os.mkdir(path_yr)
 
-    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CAUTION !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    # The area here was calculated from lumap/lmmap, which {are not accurate !!!}
-    # compared to the area calculated from dvars
-    write_crosstab(data, yr_cal, path_yr, yr_cal_sim_pre)
-
-    # Write the reset outputs
     write_files(data, yr_cal, path_yr)
     write_files_separate(data, yr_cal, path_yr) if settings.WRITE_OUTPUT_GEOTIFFS else None
     write_dvar_area(data, yr_cal, path_yr)
+    write_crosstab(data, yr_cal, path_yr, yr_cal_sim_pre)
     write_quantity(data, yr_cal, path_yr, yr_cal_sim_pre)
     write_revenue_cost_ag(data, yr_cal, path_yr)
     write_revenue_cost_ag_management(data, yr_cal, path_yr)
@@ -177,66 +168,24 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
 
 
 def get_settings(setting_path:str):
-
-    # Open the settings.py file
     with open(setting_path, 'r') as file:
         lines = file.readlines()
-
         # Regex patterns that matches variable assignments from settings
         parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=")
         settings_order = [match[1].strip() for line in lines if (match := parameter_reg.match(line))]
-
-        # Reorder the settings dictionary to match the order in the settings.py file
+        
         settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
         settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
-
-        # Set unused variables to None
-        settings_dict['GHG_LIMITS_FIELD'] = 'None'         if settings.GHG_LIMITS_TYPE == 'dict' else settings_dict['GHG_LIMITS_FIELD']
-        settings_dict['GHG_LIMITS'] = 'None'               if settings.GHG_LIMITS_TYPE == 'file' else settings_dict['GHG_LIMITS']
-
+        
     return settings_dict
 
 
 
 def write_settings(path):
-    # sourcery skip: extract-method, swap-nested-ifs, use-named-expression
-    """Write model run settings"""
-
     settings_dict = get_settings('luto/settings.py')
-
-    # Write the settings to a file
     with open(os.path.join(path, 'model_run_settings.txt'), 'w') as f:
         f.writelines(f'{k}:{v}\n' for k, v in settings_dict.items())
         
-        
-        
-# def write_objetive(data):
-#     """Save the objective values to a CSV file.
-#     Arguments:
-#         data: `Data` object.
-#     """
-#     print(f'Writing objective values to file')
-    
-#     names_d = {
-#             'Production': [i.capitalize() for i in data.COMMODITIES],
-#             'Water': list(data.RIVREG_DICT.values()) if settings.WATER_REGION_DEF == 'River Region' else list(data.DRAINDIV_DICT.values()),
-#             'BIO (GBF3)': list(data.BIO_GBF3_ID2DESC.values()),
-#             'BIO (GBF4) SNES': data.BIO_GBF4_SNES_SEL_ALL,
-#             'BIO (GBF4) ECNES': data.BIO_GBF4_ECNES_SEL_ALL,
-#             'BIO (GBF8)': data.BIO_GBF8_SEL_SPECIES,
-#     }
-
-#     records = []
-#     for yr_cal in data.obj_vals.keys():
-#         for k,v in data.obj_vals[yr_cal].items():
-#             if isinstance(v, dict):
-#                 rename_k = [i for i in names_d.keys() if i in k][0]
-#                 records.extend([{"year": yr_cal,"type": k,"name": names_d[rename_k][kk],"value": vv,} for kk, vv in enumerate(v.values())])
-#             else:
-#                 records.append({"year": yr_cal,"type": k,"name": None,"value": v,})
-            
-#     pd.DataFrame(records).to_csv(f'{data.path}/DATA_REPORT/objectives.csv', index=False)
-
 
 
 def write_files(data: Data, yr_cal, path):
@@ -253,10 +202,7 @@ def write_files(data: Data, yr_cal, path):
     np.save(os.path.join(path, non_ag_X_rk_fname), data.non_ag_dvars[yr_cal])
 
     # Save raw agricultural management decision variables (float array).
-    for am in AG_MANAGEMENTS_TO_LAND_USES:
-        if not AG_MANAGEMENTS[am]:
-            continue
-
+    for am in data.AG_MAN_DESC:
         snake_case_am = tools.am_name_snake_case(am)
         am_X_mrj_fname = f'ag_man_X_mrj_{snake_case_am}_{yr_cal}.npy'
         np.save(os.path.join(path, am_X_mrj_fname), data.ag_man_dvars[yr_cal][am])
@@ -264,10 +210,8 @@ def write_files(data: Data, yr_cal, path):
     # Write out raw numpy arrays for land-use and land management
     lumap_fname = f'lumap_{yr_cal}.npy'
     lmmap_fname = f'lmmap_{yr_cal}.npy'
-
     np.save(os.path.join(path, lumap_fname), data.lumaps[yr_cal])
     np.save(os.path.join(path, lmmap_fname), data.lmmaps[yr_cal])
-
 
     # Get the Agricultural Management applied to each pixel
     ag_man_dvar = np.stack([np.einsum('mrj -> r', v) for _,v in data.ag_man_dvars[yr_cal].items()]).T   # (r, am)
@@ -275,70 +219,67 @@ def write_files(data: Data, yr_cal, path):
     ag_man_dvar = np.argmax(ag_man_dvar, axis=1) + 1        # Start from 1
     ag_man_dvar_argmax = np.where(ag_man_dvar_mask, ag_man_dvar, 0).astype(np.float32)
 
-
     # Get the non-agricultural landuse for each pixel
     non_ag_dvar = data.non_ag_dvars[yr_cal]                 # (r, k)
     non_ag_dvar_mask = non_ag_dvar.sum(1) > 0.01            # Meaning that they have at least 1% of non-agricultural landuse applied
     non_ag_dvar = np.argmax(non_ag_dvar, axis=1) + settings.NON_AGRICULTURAL_LU_BASE_CODE    # Start from 100
     non_ag_dvar_argmax = np.where(non_ag_dvar_mask, non_ag_dvar, 0).astype(np.float32)
 
-    # Put the excluded land-use and land management types back in the array.
-    lumap = create_2d_map(data, data.lumaps[yr_cal], filler=data.MASK_LU_CODE)
-    lmmap = create_2d_map(data, data.lmmaps[yr_cal], filler=data.MASK_LU_CODE)
-    ammap = create_2d_map(data, ag_man_dvar_argmax, filler=data.MASK_LU_CODE)
-    non_ag = create_2d_map(data, non_ag_dvar_argmax, filler=data.MASK_LU_CODE)
-
-    lumap_fname = f'lumap_{yr_cal}.tiff'
-    lmmap_fname = f'lmmap_{yr_cal}.tiff'
-    ammap_fname = f'ammap_{yr_cal}.tiff'
-    non_ag_fname = f'non_ag_{yr_cal}.tiff'
-
-    write_gtiff(lumap, os.path.join(path, lumap_fname), data=data)
-    write_gtiff(lmmap, os.path.join(path, lmmap_fname), data=data)
-    write_gtiff(ammap, os.path.join(path, ammap_fname), data=data)
-    write_gtiff(non_ag, os.path.join(path, non_ag_fname), data=data)
+    with rasterio.open(os.path.join(path, f'lumap_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_lumap,\
+         rasterio.open(os.path.join(path, f'lmmap_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_lmmap,\
+         rasterio.open(os.path.join(path, f'ammap_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_ammap,\
+         rasterio.open(os.path.join(path, f'non_ag_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_non_ag:
+             
+        dst_lumap.write_band(1, create_2d_map(data, data.lumaps[yr_cal]))
+        dst_lmmap.write_band(1, create_2d_map(data, data.lmmaps[yr_cal]))
+        dst_ammap.write_band(1, create_2d_map(data, ag_man_dvar_argmax))
+        dst_non_ag.write_band(1, create_2d_map(data, non_ag_dvar_argmax))
 
 
 
-def write_files_separate(data: Data, yr_cal, path, ammap_separate=False):
+
+def write_files_separate(data: Data, yr_cal, path):
     '''Write raw decision variables to separate GeoTiffs'''
 
     print(f'Write raw decision variables to separate GeoTiffs for {yr_cal}')
 
     # Collapse the land management dimension (m -> [dry, irr])
-    ag_dvar_rj = np.einsum('mrj -> rj', data.ag_dvars[yr_cal])   # To compute the landuse map
-    ag_dvar_rm = np.einsum('mrj -> rm', data.ag_dvars[yr_cal])   # To compute the land management (dry/irr) map
-    non_ag_rk = np.einsum('rk -> rk', data.non_ag_dvars[yr_cal]) # Do nothing, just for code consistency
+    ag_dvar_rj = np.einsum('mrj -> rj', data.ag_dvars[yr_cal])    
+    ag_dvar_rm = np.einsum('mrj -> rm', data.ag_dvars[yr_cal])    
+    non_ag_rk = np.einsum('rk -> rk', data.non_ag_dvars[yr_cal])  
     ag_man_rj_dict = {am: np.einsum('mrj -> rj', ammap) for am, ammap in data.ag_man_dvars[yr_cal].items()}
 
     # Get the desc2dvar table.
-    ag_dvar_map = tools.map_desc_to_dvar_index('Ag_LU', data.DESC2AGLU, ag_dvar_rj)
-    non_ag_dvar_map = tools.map_desc_to_dvar_index('Non-Ag_LU', {v:k for k,v in enumerate(NON_AG_LAND_USES.keys())}, non_ag_rk)
-    lm_dvar_map = tools.map_desc_to_dvar_index('Land_Mgt', {v:k for k,v in enumerate(data.LANDMANS)}, ag_dvar_rm)
-
-    # Get the desc2dvar table for agricultural management
-    ag_man_maps = [
-        tools.map_desc_to_dvar_index(am, {desc: data.DESC2AGLU[desc] for desc in AG_MANAGEMENTS_TO_LAND_USES[am]}, am_dvar.sum(1)[:, np.newaxis])
-        if ammap_separate else
-        tools.map_desc_to_dvar_index('Ag_Mgt', {am: 0}, am_dvar.sum(1)[:, np.newaxis])
-        for am, am_dvar in ag_man_rj_dict.items()
-    ]
-    ag_man_map = pd.concat(ag_man_maps)
-
-    # Combine the desc2dvar table for agricultural land-use, agricultural management, and non-agricultural land-use
-    desc2dvar_df = pd.concat([ag_dvar_map, ag_man_map, non_ag_dvar_map, lm_dvar_map])
+    ag_dvar_map = pd.DataFrame({'Category': 'Ag_LU','lu_desc': data.AGRICULTURAL_LANDUSES,'dvar_idx': range(data.N_AG_LUS)}
+        ).assign(dvar=[ag_dvar_rj[:, j] for j in range(data.N_AG_LUS)]
+        ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+    non_ag_dvar_map = pd.DataFrame({'Category': 'Non-Ag_LU','lu_desc': data.NON_AGRICULTURAL_LANDUSES,'dvar_idx': range(data.N_NON_AG_LUS)}
+        ).assign(dvar=[non_ag_rk[:, k] for k in range(data.N_NON_AG_LUS)]
+        ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+    lm_dvar_map = pd.DataFrame({'Category': 'Land_Mgt','lu_desc': data.LANDMANS,'dvar_idx': range(data.NLMS)}
+        ).assign(dvar=[ag_dvar_rm[:, j] for j in range(data.NLMS)]
+        ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+    ag_man_map = pd.concat([
+        pd.DataFrame({'Category': 'Ag_Mgt', 'lu_desc': am, 'dvar_idx': [0]}
+        ).assign(dvar=[np.einsum('rj -> r', am_dvar_rj)]
+        ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
+        for am, am_dvar_rj in ag_man_rj_dict.items()
+    ])
 
     # Export to GeoTiff
+    desc2dvar_df = pd.concat([ag_dvar_map, ag_man_map, non_ag_dvar_map, lm_dvar_map])
     lucc_separate_dir = os.path.join(path, 'lucc_separate')
     os.makedirs(lucc_separate_dir, exist_ok=True)
     for _, row in desc2dvar_df.iterrows():
         category = row['Category']
         dvar_idx = row['dvar_idx']
         desc = row['lu_desc']
-        dvar = create_2d_map(data, row['dvar'].astype(np.float32), filler=data.MASK_LU_CODE)
+        dvar = create_2d_map(data, row['dvar'].astype(np.float32))
         fname = f'{category}_{dvar_idx:02}_{desc}_{yr_cal}.tiff'
         lucc_separate_path = os.path.join(lucc_separate_dir, fname)
-        write_gtiff(dvar, lucc_separate_path, data=data)
+        
+        with rasterio.open(lucc_separate_path, 'w+', **data.GEO_META) as dst:
+            dst.write_band(1, dvar)
 
 
 
@@ -388,9 +329,9 @@ def write_quantity(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         production_years['Year'] = yr_cal
         production_years.to_csv(os.path.join(path, f'quantity_production_kt_{yr_cal}.csv'), index=False)
 
-    # --------------------------------------------------------------------------------------------
-    # NOTE:Non-agricultural production are all zeros, therefore skip the calculation
-    # --------------------------------------------------------------------------------------------
+        # --------------------------------------------------------------------------------------------
+        # NOTE: non_ag_quantity is already calculated and stored in <sim.prod_data>
+        # --------------------------------------------------------------------------------------------
 
 
 
@@ -459,9 +400,7 @@ def write_revenue_cost_ag_management(data: Data, yr_cal, path):
     revenue_am_dfs = []
     cost_am_dfs = []
     # Loop through the agricultural managements
-    for am, am_desc in AG_MANAGEMENTS_TO_LAND_USES.items():
-        if not AG_MANAGEMENTS[am]:
-            continue
+    for am, am_desc in data.AG_MAN_LU_DESC.items():
 
         # Get the land use codes for the agricultural management
         am_code = [data.DESC2AGLU[desc] for desc in am_desc]
@@ -546,7 +485,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         ag_transitions_cost_mat = {'Establishment cost': np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)}
     else:
         # Get the transition cost matrices for agricultural land-use
-        ag_transitions_cost_mat = ag_transitions.get_transition_matrices_from_base_year(data, yr_idx, yr_cal_sim_pre, separate=True)
+        ag_transitions_cost_mat = ag_transitions.get_transition_matrices_ag2ag_from_base_year(data, yr_idx, yr_cal_sim_pre, separate=True)
 
     # Convert the transition cost matrices to a DataFrame
     cost_dfs = []
@@ -603,9 +542,8 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
             for k in NON_AG_LAND_USES.keys()
         }
     else:
-        ag_t_mrj = ag_transitions.get_transition_matrices_from_base_year(data, yr_idx, yr_cal_sim_pre, separate=True)
-        non_ag_transitions_cost_mat = non_ag_transitions.get_from_ag_transition_matrix(
-            data,yr_idx, yr_cal_sim_pre, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], ag_t_mrj, separate=True
+        non_ag_transitions_cost_mat = non_ag_transitions.get_transition_matrix_ag2nonag(
+            data, yr_idx, data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre], separate=True
         )
     
     # Get all land use decision variables
@@ -660,7 +598,7 @@ def write_cost_transition(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         non_ag_transitions_cost_mat = {k:{'Transition cost':np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)}
                                         for k in NON_AG_LAND_USES.keys()}
     else:
-        non_ag_transitions_cost_mat = non_ag_transitions.get_to_ag_transition_matrix(data,
+        non_ag_transitions_cost_mat = non_ag_transitions.get_transition_matrix_nonag2ag(data,
                                                                                     yr_idx,
                                                                                     data.lumaps[yr_cal_sim_pre],
                                                                                     data.lmmaps[yr_cal_sim_pre],
@@ -697,11 +635,9 @@ def write_revenue_cost_non_ag(data: Data, yr_cal, path):
 
     # Get the non-agricultural revenue/cost matrices
     ag_r_mrj = ag_revenue.get_rev_matrices(data, yr_idx)
-    non_ag_rev_mat = non_ag_revenue.get_rev_matrix(data, yr_cal, ag_r_mrj, data.lumaps[yr_cal])    # rk
     ag_c_mrj = ag_cost.get_cost_matrices(data, yr_idx)
+    non_ag_rev_mat = non_ag_revenue.get_rev_matrix(data, yr_cal, ag_r_mrj, data.lumaps[yr_cal])    # rk
     non_ag_cost_mat = non_ag_cost.get_cost_matrix(data, ag_c_mrj, data.lumaps[yr_cal], yr_cal)     # rk
-
-    # Replace nan with 0
     non_ag_rev_mat = np.nan_to_num(non_ag_rev_mat)
     non_ag_cost_mat = np.nan_to_num(non_ag_cost_mat)
 
@@ -779,13 +715,12 @@ def write_dvar_area(data: Data, yr_cal, path):
     df_am_area.to_csv(os.path.join(path, f'area_agricultural_management_{yr_cal}.csv'), index = False)
 
 
-def write_area_transition_start_end(data: Data, path):
+def write_area_transition_start_end(data: Data, path, yr_cal_end):
 
     print(f'Save transition matrix between start and end year\n')
 
     # Get the end year
     yr_cal_start = data.YR_CAL_BASE
-    yr_cal_end = settings.SIM_YEARS[-1]
 
     # Get the decision variables for the start year
     dvar_base = tools.lumap2ag_l_mrj(data.lumaps[yr_cal_start], data.lmmaps[yr_cal_start])
@@ -859,7 +794,7 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 
         ctass = {}
         swass = {}
-        for am in AG_MANAGEMENTS_TO_LAND_USES:
+        for am in data.AG_MAN_DESC:
             ctas, swas = crossmap_amstat( am
                                         , data.lumaps[yr_cal_sim_pre]
                                         , data.ammaps[yr_cal_sim_pre][am]
@@ -882,7 +817,7 @@ def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
         cthp.to_csv(os.path.join(path, f'crosstab-irrstat_{yr_cal}.csv'), index=False)
         swhp.to_csv(os.path.join(path, f'switches-irrstat_{yr_cal}.csv'), index=False)
 
-        for am in AG_MANAGEMENTS_TO_LAND_USES:
+        for am in data.AG_MAN_DESC:
             am_snake_case = tools.am_name_snake_case(am).replace("_", "-")
             ctass[am]['Year'] = yr_cal
             ctass[am].to_csv(os.path.join(path, f'crosstab-amstat-{am_snake_case}_{yr_cal}.csv'), index=False)
@@ -894,113 +829,103 @@ def write_water(data: Data, yr_cal, path):
     """Calculate water yield totals. Takes a Data Object, a calendar year (e.g., 2030), and an output path as input."""
 
     print(f'Writing water outputs for {yr_cal}')
-    
-    # Convert calendar year to year index.
+
     yr_idx = yr_cal - data.YR_CAL_BASE
-   
-    # Set up data for river regions or drainage divisions
-    if settings.WATER_REGION_DEF == 'Drainage Division':
-        region_limits = data.DRAINDIV_LIMITS
-        region_id = data.DRAINDIV_ID
-        region_dict = data.DRAINDIV_DICT
-
-    elif settings.WATER_REGION_DEF == 'River Region':
-        region_limits = data.RIVREG_LIMITS
-        region_id = data.RIVREG_ID
-        region_dict = data.RIVREG_DICT
-
-    else:
-        raise ValueError(
-            f"Incorrect option for WATER_REGION_DEF in settings: {settings.WATER_REGION_DEF} "
-            f"(must be either 'Drainage Division' or 'River Region')."
-        ) 
-
-    # Get water use for year in mrj format
-    ag_w_mrj_CCI = ag_water.get_water_net_yield_matrices(data, yr_idx)
-    non_ag_w_rk_CCI = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj_CCI, data.lumaps[yr_cal], yr_idx)
-    wny_outside_luto_study_area_CCI = ag_water.get_water_outside_luto_study_area(data, yr_cal)
     
-    ag_w_mrj_base_yr = ag_water.get_water_net_yield_matrices(data, yr_idx, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
-    non_ag_w_rk_base_yr = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj_base_yr, data.lumaps[yr_cal], yr_idx, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
-    wny_outside_luto_study_area_base_yr = ag_water.get_water_outside_luto_study_area_from_hist_level(data)
-    
-    # Water yield from agricultural management is a multiple of the area of the water requirement, 
-    # so it is not affected by the climate change impact.
-    ag_man_w_mrj = ag_water.get_agricultural_management_water_matrices(data, yr_idx) 
-    
-    # Get water use limits used as constraints in model
-    w_net_yield_limits = ag_water.get_water_net_yield_limit_values(data)
+    # Get water water yield historical level, and the domestic water use
+    w_limit_inside_luto = ag_water.get_water_net_yield_limit_for_regions_inside_LUTO(data)
+    domestic_water_use = data.WATER_USE_DOMESTIC
 
+    # Get the decision variables
+    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+    non_ag_dvar_rj = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+    am_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
 
-    # Loop through specified water regions
-    df_water_seperate_dfs = []
-    df_water_limits_and_public_land_dfs = []
-    for region, (reg_name, limit_hist_level, ind) in w_net_yield_limits.items():
-        
-
-        # Get the water yield limits and public land water yield
-        water_limit_pub = pd.DataFrame({
-            ('WNY LIMIT','HIST (ML)'):[limit_hist_level],
-            ('WNY Pubulic','HIST (ML)'):[wny_outside_luto_study_area_base_yr[region]],
-            ('WNY Pubulic','HIST + CCI (ML)'):[wny_outside_luto_study_area_CCI[region]]},
-            index=[reg_name]).unstack().reset_index()
-        
-        water_limit_pub.columns = ['Type','CCI Existence','REGION','Value (ML)']
-        water_limit_pub = water_limit_pub[['REGION','Type','CCI Existence','Value (ML)']]
-        water_limit_pub.insert(0, 'Year', yr_cal)
-    
-        
-        # Calculate water yield for region and save to dataframe
-        df_region = tools.calc_water(
-            data,
-            ind,
-            ag_w_mrj_base_yr,
-            non_ag_w_rk_base_yr,
-            ag_man_w_mrj,
-            data.ag_dvars[yr_cal],
-            data.non_ag_dvars[yr_cal],
-            data.ag_man_dvars[yr_cal])
-        
-
-        # Fix the land-use to the base year
-        # so that we can calculate water-yield only under climate change impact.
-        df_region_CCI = tools.calc_water(
-            data,
-            ind,
-            ag_w_mrj_CCI,
-            non_ag_w_rk_CCI,
-            ag_man_w_mrj,
-            data.ag_dvars[yr_cal],
-            data.non_ag_dvars[yr_cal],
-            data.ag_man_dvars[yr_cal])
-
-        # Calculate the water yield under different impacts
-        df_region['Without CCI'] = df_region['Water Net Yield (ML)']
-        df_region['With CCI'] = df_region_CCI['Water Net Yield (ML)']
-        
-        # Add the region name and year to the dataframe
-        df_region.insert(0, 'region', region_dict[region])
-        df_region.insert(0, 'Year', yr_cal)
-        
-        # Add dfs to list
-        df_water_seperate_dfs.append(df_region)
-        df_water_limits_and_public_land_dfs.append(water_limit_pub)
-
-    
-    # Write the water limits and public land water yield to CSV
-    df_water_limits_and_public_land = pd.concat(df_water_limits_and_public_land_dfs)
-    df_water_limits_and_public_land.to_csv( os.path.join(path, f'water_yield_limits_and_public_land_{yr_cal}.csv'), index=False)
-
-    # Write the separate water use to CSV
-    df_water_seperate = pd.concat(df_water_seperate_dfs)
-    df_water_seperate = df_water_seperate.melt(
-        id_vars=['Year','region','Landuse Type','Landuse','Water_supply'],
-        value_vars=['Without CCI', 'With CCI'],
-        var_name='Climate Change existence',
-        value_name='Value (ML)'
+    # Get water use without climate change impact; i.e., providing 'water_dr_yield' and 'water_sr_yield' as with historical layers
+    ag_w_mrj_base_yr = tools.ag_mrj_to_xr(data, ag_water.get_water_net_yield_matrices(data, yr_idx, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR))
+    non_ag_w_rk_base_yr = tools.non_ag_rk_to_xr(data, non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj_base_yr.values, data.lumaps[yr_cal], yr_idx, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR))
+    wny_outside_luto_study_area_base_yr = xr.DataArray(
+        list(ag_water.get_water_outside_luto_study_area_from_hist_level(data).values()),
+        dims=['region'],
+        coords={'region': [data.WATER_REGION_NAMES[k] for k in ag_water.get_water_outside_luto_study_area_from_hist_level(data)]},
     )
-    df_water_seperate['Water_supply'] = df_water_seperate['Water_supply'].replace({'dry':'Dryland', 'irr':'Irrigated'})
-    df_water_seperate.to_csv( os.path.join(path, f'water_yield_separate_{yr_cal}.csv'), index=False)
+
+    # Get water use under climate change impact; i.e., not providing 'water_dr_yield' and 'water_sr_yield' arguments
+    ag_w_mrj_CCI = ag_water.get_water_net_yield_matrices(data, yr_idx) - ag_w_mrj_base_yr
+    non_ag_w_rk_CCI = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj_CCI.values, data.lumaps[yr_cal], yr_idx) - non_ag_w_rk_base_yr
+    wny_outside_luto_study_area_CCI = np.array(list(ag_water.get_water_outside_luto_study_area(data, yr_cal).values())) - wny_outside_luto_study_area_base_yr
+
+    # Water yield from agricultural management is a multiple agricultural water use, not affected by the climate change impact.
+    ag_man_w_mrj = tools.am_mrj_to_xr(data, ag_water.get_agricultural_management_water_matrices(data, yr_idx) )
+
+    water_yields_inside_luto = pd.DataFrame()
+    water_other_records = pd.DataFrame()
+    for reg_idx, w_limit_inside in w_limit_inside_luto.items():
+        
+
+        ind = data.WATER_REGION_INDEX_R[reg_idx]
+        reg_name = data.WATER_REGION_NAMES[reg_idx]
+
+        # Get the water net yield for ag, non-ag, and ag-man
+        ag_wny = (ag_w_mrj_base_yr.isel(cell=ind) * ag_dvar_mrj.isel(cell=ind)
+            ).sum('cell'
+            ).to_dataframe('Water Net Yield (ML)'
+            ).reset_index(
+            ).assign(Type='Agricultural Landuse', Year=yr_cal, Region=reg_name)
+        non_ag_wny = (non_ag_w_rk_base_yr.isel(cell=ind) * non_ag_dvar_rj.isel(cell=ind)
+            ).sum('cell'
+            ).to_dataframe('Water Net Yield (ML)'
+            ).reset_index(
+            ).assign(Type='Non-Agricultural Landuse', Year=yr_cal, Region=reg_name)
+        am_wny = (am_dvar_mrj.isel(cell=ind) * ag_man_w_mrj.isel(cell=ind)).sum('cell').to_dataframe('Water Net Yield (ML)'
+            ).reset_index(
+            ).assign(Type='Agricultural Management', Year=yr_cal, Region=reg_name)
+            
+        water_yields_inside_luto = pd.concat([water_yields_inside_luto, ag_wny, non_ag_wny, am_wny], ignore_index=True)
+            
+        # Get the climate change impact, limit, and outside water yield for the region
+        CCI_impact = (
+            (ag_w_mrj_CCI.isel(cell=ind) * ag_dvar_mrj.isel(cell=ind)).sum() 
+            + (non_ag_w_rk_CCI.isel(cell=ind) * non_ag_dvar_rj.isel(cell=ind)).sum()
+            + wny_outside_luto_study_area_CCI.sel(region=reg_name)
+        )
+        
+
+        wny_sum = (
+             water_yields_inside_luto.query('Region == @reg_name')['Water Net Yield (ML)'].sum() 
+            + wny_outside_luto_study_area_base_yr.sel(region=reg_name).values
+            - domestic_water_use[reg_idx]
+        )
+        
+        wny_limit_region = (
+            w_limit_inside
+            + wny_outside_luto_study_area_base_yr.sel(region=reg_name).values
+            - domestic_water_use[reg_idx]   
+        )
+        
+        water_other_records = pd.concat([water_other_records, pd.DataFrame([{
+            'Year': yr_cal,
+            'Region': reg_name,
+            'Water yield outside LUTO (ML)': wny_outside_luto_study_area_base_yr.sel(region=reg_name).values,
+            'Climate Change Impact (ML)': CCI_impact.values,
+            'Domestic Water Use (ML)': domestic_water_use[reg_idx],
+            'Water Yield Limit (ML)': wny_limit_region,
+            'Water Net Yield (ML)': wny_sum,
+        }])], ignore_index=True)
+        
+        
+    # Save the water yield data
+    water_yields_inside_luto.rename(columns={
+        'lu':'Landuse',
+        'am':'Agri-Management',
+        'lm':'Water Supply'}
+        ).replace({'dry':'Dryland', 'irr':'Irrigated'}
+        ).dropna(axis=0, how='all'
+        ).to_csv(os.path.join(path, f'water_yield_separate_{yr_cal}.csv'), index=False)
+        
+    water_other_records.to_csv(os.path.join(path, f'water_yield_limits_and_public_land_{yr_cal}.csv'), index=False)
+            
+        
     
 
 def write_biodiversity_overall_priority_scores(data: Data, yr_cal, path):
@@ -1060,13 +985,13 @@ def write_biodiversity_overall_priority_scores(data: Data, yr_cal, path):
 def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 
     # Do nothing if biodiversity limits are off and no need to report
-    if not settings.BIODIVERSTIY_TARGET_GBF_2 == 'on':
+    if settings.BIODIVERSITY_TARGET_GBF_2 == 'off':
         return
 
     print(f'Writing biodiversity GBF2 scores (PRIORITY) for {yr_cal}')
     
     # Unpack the ag managements and land uses
-    am_lu_unpack = [(am, l) for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items() for l in lus]
+    am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
     # Get decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
@@ -1076,10 +1001,10 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 
     # Get the priority degraded areas score
     priority_degraded_area_score_r = xr.DataArray(
-        ag_biodiversity.get_GBF2_bio_priority_degraded_areas_r(data),
+        data.BIO_PRIORITY_DEGRADED_AREAS_R,
         dims=['cell'],
         coords={'cell':range(data.NCELLS)}
-    )
+    ).chunk({'cell': min(4096, data.NCELLS)}) # Chunking to save mem use
 
     # Get the impacts of each ag/non-ag/am to vegetation matrices
     ag_impact_j = xr.DataArray(
@@ -1101,8 +1026,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     )
 
     # Get the total area of the priority degraded areas
-    total_priority_degraded_area = (data.BIO_PRIORITY_DEGRADED_AREAS_MASK * data.REAL_AREA).sum()
-    real_area_xr = xr.DataArray(data.REAL_AREA, dims=['cell'],coords={'cell': range(data.NCELLS)})
+    total_priority_degraded_area = data.BIO_PRIORITY_DEGRADED_AREAS_R.sum()
 
     GBF2_score_ag = (priority_degraded_area_score_r * ag_impact_j * ag_dvar_mrj
         ).sum(['cell','lm']
@@ -1159,11 +1083,11 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
 def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
         
     # Do nothing if biodiversity limits are off and no need to report
-    if not settings.BIODIVERSTIY_TARGET_GBF_3 == 'on':
+    if settings.BIODIVERSITY_TARGET_GBF_3 == 'off':
         return
     
     # Unpack the agricultural management land-use
-    am_lu_unpack = [(am, l) for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items() for l in lus]
+    am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
     # Get decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
@@ -1177,7 +1101,7 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
         ag_biodiversity.get_GBF3_major_vegetation_matrices_vr(data), 
         dims=['group','cell'], 
         coords={'group':list(data.BIO_GBF3_ID2DESC.values()),  'cell':range(data.NCELLS)}
-    )
+    ).chunk({'cell': min(4096, data.NCELLS), 'group': 1})
 
     # Get the impacts of each ag/non-ag/am to vegetation matrices
     ag_impact_j = xr.DataArray(
@@ -1232,7 +1156,11 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
         ).assign(Type='Non-Agricultural land-use', Year=yr_cal)
 
     # Concatenate the dataframes, rename the columns, and reset the index, then save to a csv file
-    veg_base_score_score = veg_base_score_score.assign(Type='Outside LUTO study area', Year=yr_cal, lu='Outside LUTO study area')
+    veg_base_score_score = veg_base_score_score.assign(
+        Type='Outside LUTO study area', 
+        Year=yr_cal, 
+        lu='Outside LUTO study area'
+    )
     pd.concat([
         GBF3_score_ag, 
         GBF3_score_am, 
@@ -1249,13 +1177,13 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
 
 
 def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
-    if not settings.BIODIVERSTIY_TARGET_GBF_4_SNES == "on":
+    if not settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on":
         return
     
     print(f"Writing species of national environmental significance scores (GBF4 SNES) for {yr_cal}")
     
     # Unpack the agricultural management land-use
-    am_lu_unpack = [(am, l) for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items() for l in lus]
+    am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
     # Get decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
@@ -1268,7 +1196,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         ag_biodiversity.get_GBF4_SNES_matrix_sr(data), 
         dims=['species','cell'], 
         coords={'species':data.BIO_GBF4_SNES_SEL_ALL, 'cell':np.arange(data.NCELLS)}
-    )
+    ).chunk({'cell': min(4096, data.NCELLS), 'species': 1})
 
     # Apply habitat contribution from ag/am/non-ag land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
@@ -1330,7 +1258,8 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         
     
     # Concatenate the dataframes, rename the columns, and reset the index, then save to a csv file
-    base_yr_score = base_yr_score.assign(Type='Outside LUTO study area', Year=yr_cal, lu='Outside LUTO study area')
+    base_yr_score = base_yr_score.assign(Type='Outside LUTO study area', Year=yr_cal, lu='Outside LUTO study area'
+        ).eval('Relative_Contribution_Percentage = BASE_OUTSIDE_SCORE / BASE_TOTAL_SCORE * 100')
     
     pd.concat([
             GBF4_score_ag, 
@@ -1349,13 +1278,13 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
 
 def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     
-    if not settings.BIODIVERSTIY_TARGET_GBF_4_ECNES == "on":
+    if not settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on":
         return
     
     print(f"Writing ecological communities of national environmental significance scores (GBF4 ECNES) for {yr_cal}")
     
     # Unpack the agricultural management land-use
-    am_lu_unpack = [(am, l) for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items() for l in lus]
+    am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
     # Get decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
@@ -1368,7 +1297,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         ag_biodiversity.get_GBF4_ECNES_matrix_sr(data), 
         dims=['species','cell'], 
         coords={'species':data.BIO_GBF4_ECNES_SEL_ALL, 'cell':np.arange(data.NCELLS)}
-    )
+    ).chunk({'cell': min(4096, data.NCELLS), 'species': 1})
 
     # Apply habitat contribution from ag/am/non-ag land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
@@ -1428,7 +1357,8 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         ).assign(Type='Non-Agricultural land-use', Year=yr_cal)
 
     # Concatenate the dataframes, rename the columns, and reset the index, then save to a csv file
-    base_yr_score = base_yr_score.assign(Type='Outside LUTO study area', Year=yr_cal, lu='Outside LUTO study area')
+    base_yr_score = base_yr_score.assign(Type='Outside LUTO study area', Year=yr_cal, lu='Outside LUTO study area'
+        ).eval('Relative_Contribution_Percentage = BASE_OUTSIDE_SCORE / BASE_TOTAL_SCORE * 100')
     
     pd.concat([
             GBF4_score_ag,
@@ -1448,13 +1378,13 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
 def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
     
     # Do nothing if biodiversity limits are off and no need to report
-    if not settings.BIODIVERSTIY_TARGET_GBF_8 == 'on':
+    if not settings.BIODIVERSITY_TARGET_GBF_8 == 'on':
         return
 
     print(f'Writing biodiversity GBF8 scores (GROUPS) for {yr_cal}')
     
     # Unpack the agricultural management land-use
-    am_lu_unpack = [(am, l) for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items() for l in lus]
+    am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
     # Get decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
@@ -1469,7 +1399,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
         coords={
             'group': data.BIO_GBF8_GROUPS_NAMES,
             'cell': np.arange(data.NCELLS)}
-    )
+    ).chunk({'cell': min(4096, data.NCELLS), 'group': 1})  # Chunking to save mem use
         
     # Get the habitat contribution for ag/non-ag/am land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
@@ -1544,13 +1474,13 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
 
 def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
     # Caculate the biodiversity scores for species, if user selected any species
-    if (not settings.BIODIVERSTIY_TARGET_GBF_8 == 'on') or (len(data.BIO_GBF8_SEL_SPECIES) == 0):
+    if (not settings.BIODIVERSITY_TARGET_GBF_8 == 'on') or (len(data.BIO_GBF8_SEL_SPECIES) == 0):
         return
     
     print(f'Writing biodiversity GBF8 scores (SPECIES) for {yr_cal}')
     
     # Unpack the agricultural management land-use
-    am_lu_unpack = [(am, l) for am, lus in AG_MANAGEMENTS_TO_LAND_USES.items() for l in lus]
+    am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
     # Get decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
@@ -1565,7 +1495,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
         coords={
             'species': data.BIO_GBF8_SEL_SPECIES,
             'cell': np.arange(data.NCELLS)}
-    )
+    ).chunk({'cell': min(4096, data.NCELLS), 'species': 1})  # Chunking to save mem use
 
     # Get the habitat contribution for ag/non-ag/am land-use to biodiversity scores
     ag_impact_j = xr.DataArray(
@@ -1645,7 +1575,7 @@ def write_ghg(data: Data, yr_cal, path):
         Takes a simulation object, a target calendar year (e.g., 2030),
         and an output path as input."""
 
-    if not settings.GHG_EMISSIONS_LIMITS == 'on':
+    if settings.GHG_EMISSIONS_LIMITS == 'off':
         return
 
     print(f'Writing GHG outputs for {yr_cal}')
@@ -1653,11 +1583,11 @@ def write_ghg(data: Data, yr_cal, path):
     yr_idx = yr_cal - data.YR_CAL_BASE
 
     # Get GHG emissions limits used as constraints in model
-    ghg_limits = ag_ghg.get_ghg_limits(data, yr_cal)
+    ghg_limits = data.GHG_TARGETS[yr_cal]
 
     # Get GHG emissions from model
     if yr_cal >= data.YR_CAL_BASE + 1:
-        ghg_emissions = data.prod_data[yr_cal]['GHG Emissions']
+        ghg_emissions = data.prod_data[yr_cal]['GHG']
     else:
         ghg_emissions = (ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True) * data.ag_dvars[settings.SIM_YEARS[0]]).sum()
 
@@ -1675,7 +1605,7 @@ def write_ghg(data: Data, yr_cal, path):
 
 def write_ghg_separate(data: Data, yr_cal, path):
 
-    if not settings.GHG_EMISSIONS_LIMITS == 'on':
+    if settings.GHG_EMISSIONS_LIMITS == 'off':
         return
 
     print(f'Writing GHG emissions_Separate for {yr_cal}')
@@ -1691,8 +1621,6 @@ def write_ghg_separate(data: Data, yr_cal, path):
     # Get greenhouse gas emissions from agricultural landuse #
     # -------------------------------------------------------#
 
-    # Get ghg array
-    ag_g_mrj = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True)
     # Get the ghg_df
     ag_g_df = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=False)
 
@@ -1739,7 +1667,10 @@ def write_ghg_separate(data: Data, yr_cal, path):
     # -----------------------------------------------------------#
     # Get greenhouse gas emissions from non-agricultural landuse #
     # -----------------------------------------------------------#
-
+    
+    # Get ghg array
+    ag_g_mrj = ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=True)
+    
     # Get the non_ag GHG reduction
     non_ag_g_rk = non_ag_ghg.get_ghg_matrix(data, ag_g_mrj, data.lumaps[yr_cal])
 
@@ -1801,10 +1732,10 @@ def write_ghg_separate(data: Data, yr_cal, path):
     # -------------------------------------------------------------------#
 
     # Get the ag_man_g_mrj
-    ag_man_g_mrj = ag_ghg.get_agricultural_management_ghg_matrices(data, ag_g_mrj, yr_idx)
+    ag_man_g_mrj = ag_ghg.get_agricultural_management_ghg_matrices(data, yr_idx)
 
     am_dfs = []
-    for am, am_lus in AG_MANAGEMENTS_TO_LAND_USES.items():
+    for am, am_lus in data.AG_MAN_LU_DESC.items():
 
         # Get the lucc_code for this the agricultural management in this loop
         am_j = np.array([data.DESC2AGLU[lu] for lu in am_lus])
@@ -1835,7 +1766,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
 def write_ghg_offland_commodity(data: Data, yr_cal, path):
     """Write out offland commodity GHG emissions"""
 
-    if not settings.GHG_EMISSIONS_LIMITS == 'on':
+    if settings.GHG_EMISSIONS_LIMITS == 'off':
         return
 
     print(f'Writing offland commodity GHG emissions for {yr_cal}')

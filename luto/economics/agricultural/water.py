@@ -24,8 +24,9 @@ Pure functions to calculate water net yield by lm, lu and water limits.
 """
 
 import numpy as np
-from typing import Optional
+import pandas as pd
 
+from typing import Optional
 import luto.settings as settings
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
 
@@ -349,7 +350,7 @@ def get_beef_hir_effect_w_mrj(data, yr_idx):
     Returns:
     - w_mrj_effects <unit:ML/cell>: The updated water net yield data with Biochar applied.
     """
-    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
 
     w_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
     base_w_req_mrj = np.stack(( data.WREQ_DRY_RJ, data.WREQ_IRR_RJ ))
@@ -386,7 +387,7 @@ def get_sheep_hir_effect_w_mrj(data, yr_idx):
     Returns:
     - w_mrj_effects <unit:ML/cell>: The updated water net yield data with Biochar applied.
     """
-    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
 
     w_mrj_effects = np.zeros((data.NLMS, data.NCELLS, len(land_uses))).astype(np.float32)
     base_w_req_mrj = np.stack(( data.WREQ_DRY_RJ, data.WREQ_IRR_RJ ))
@@ -413,57 +414,19 @@ def get_sheep_hir_effect_w_mrj(data, yr_idx):
 
 
 def get_agricultural_management_water_matrices(data, yr_idx) -> dict[str, np.ndarray]:
-    asparagopsis_data = (
-        get_asparagopsis_effect_w_mrj(data, yr_idx)
-        if settings.AG_MANAGEMENTS['Asparagopsis taxiformis']
-        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['Asparagopsis taxiformis']))).astype(np.float32)
-    )
-    precision_agriculture_data = (
-        get_precision_agriculture_effect_w_mrj(data, yr_idx)
-        if settings.AG_MANAGEMENTS['Precision Agriculture']
-        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['Precision Agriculture']))).astype(np.float32)
-    )
-    eco_grazing_data = (
-        get_ecological_grazing_effect_w_mrj(data, yr_idx)
-        if settings.AG_MANAGEMENTS['Ecological Grazing']
-        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['Ecological Grazing']))).astype(np.float32)
-    )
-    sav_burning_data = (
-        get_savanna_burning_effect_w_mrj(data)
-        if settings.AG_MANAGEMENTS['Savanna Burning']
-        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['Savanna Burning']))).astype(np.float32)
-    )
-    agtech_ei_data = (
-        get_agtech_ei_effect_w_mrj(data, yr_idx)
-        if settings.AG_MANAGEMENTS['AgTech EI']
-        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['AgTech EI']))).astype(np.float32)
-    )
-    biochar_data = (
-        get_biochar_effect_w_mrj(data, yr_idx)
-        if settings.AG_MANAGEMENTS['Biochar']
-        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['Biochar']))).astype(np.float32)
-    )
-    beef_hir_data = (
-        get_beef_hir_effect_w_mrj(data, yr_idx)
-        if settings.AG_MANAGEMENTS['Beef - HIR']
-        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['Beef - HIR']))).astype(np.float32)
-    )
-    sheep_hir_data = (
-        get_sheep_hir_effect_w_mrj(data, yr_idx)
-        if settings.AG_MANAGEMENTS['Sheep - HIR']
-        else np.zeros((data.NLMS, data.NCELLS, len(settings.REMOVED_DICT['Sheep - HIR']))).astype(np.float32)
-    )
+    
+    ag_mam_w_mrj ={}
+    
+    ag_mam_w_mrj['Asparagopsis taxiformis'] = get_asparagopsis_effect_w_mrj(data, yr_idx)           
+    ag_mam_w_mrj['Precision Agriculture'] = get_precision_agriculture_effect_w_mrj(data, yr_idx)    
+    ag_mam_w_mrj['Ecological Grazing'] = get_ecological_grazing_effect_w_mrj(data, yr_idx)          
+    ag_mam_w_mrj['Savanna Burning'] = get_savanna_burning_effect_w_mrj(data)                        
+    ag_mam_w_mrj['AgTech EI'] = get_agtech_ei_effect_w_mrj(data, yr_idx)                            
+    ag_mam_w_mrj['Biochar'] = get_biochar_effect_w_mrj(data, yr_idx)                                
+    ag_mam_w_mrj['HIR - Beef'] = get_beef_hir_effect_w_mrj(data, yr_idx)                            
+    ag_mam_w_mrj['HIR - Sheep'] = get_sheep_hir_effect_w_mrj(data, yr_idx)                          
 
-    return {
-        'Asparagopsis taxiformis': asparagopsis_data,
-        'Precision Agriculture': precision_agriculture_data,
-        'Ecological Grazing': eco_grazing_data,
-        'Savanna Burning': sav_burning_data,
-        'AgTech EI': agtech_ei_data,
-        'Biochar': biochar_data,
-        'Beef - HIR': beef_hir_data,
-        'Sheep - HIR': sheep_hir_data,
-    }
+    return ag_mam_w_mrj
 
 
 def get_water_outside_luto_study_area(data, yr_cal:int) ->  dict[int, float]:
@@ -518,34 +481,8 @@ def get_water_outside_luto_study_area_from_hist_level(data) -> dict[int, float]:
     return water_yield_arr
 
 
-def calc_water_net_yield_for_region(
-    region_ind: np.ndarray,
-    am2j: dict[str, list[int]],
-    ag_dvars: np.ndarray,
-    non_ag_dvars: np.ndarray,
-    ag_man_dvars: dict[str, np.ndarray],
-    ag_w_mrj: np.ndarray,
-    non_ag_w_rk: np.ndarray,
-    ag_man_w_mrj: dict[str, np.ndarray],
-    water_yield_outside_luto_study_area: float,
-) -> float:
-    '''
-    This function calculates the net water yield for a given region. \n
 
-    `Water_yield` = `ag_contr` + `non_ag_contr` + `ag_mam_contr` + `water_yield_outside_luto_study_area`
-    '''
-    
-    ag_contr = (ag_w_mrj[:, region_ind, :] * ag_dvars[:, region_ind, :]).sum()
-    non_ag_contr = (non_ag_w_rk[region_ind, :] * non_ag_dvars[region_ind, :]).sum()
-    ag_man_contr = sum(
-        (ag_man_w_mrj[am][:, region_ind, j_idx] * ag_man_dvars[am][:, region_ind, j]).sum()
-        for am, am_j_list in am2j.items()
-        for j_idx, j in enumerate(am_j_list)
-    )
-    return ag_contr + non_ag_contr + ag_man_contr + water_yield_outside_luto_study_area
-
-
-def calc_water_net_yield_BASE_YR(data) -> np.ndarray:
+def calc_water_net_yield_inside_LUTO_BASE_YR_hist_water_lyr(data) -> dict[int, float]:
     """
     Calculate the water net yield for the base year (2010) for all regions.
 
@@ -553,13 +490,15 @@ def calc_water_net_yield_BASE_YR(data) -> np.ndarray:
     - data: The data object containing the necessary input data.
 
     Returns
-    - water_net_yield: The water net yield for all regions.
+    - dict[int, float]: A dictionary with the following structure:
+        - key: region ID
+        - value: water net yield for this region (ML)
     """
-    if data.WATER_YIELD_RR_BASE_YR is not None:
-        return data.WATER_YIELD_RR_BASE_YR
+    if data.water_yield_regions_BASE_YR is not None:
+        return data.water_yield_regions_BASE_YR
     
     # Get the water yield matrices
-    w_mrj = get_water_net_yield_matrices(data, 0)
+    w_mrj = get_water_net_yield_matrices(data, 0, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
     
     # Get the ag decision variables for the base year
     ag_dvar_mrj = data.AG_L_MRJ
@@ -568,68 +507,87 @@ def calc_water_net_yield_BASE_YR(data) -> np.ndarray:
     ag_w_r = np.einsum('mrj,mrj->r', w_mrj, ag_dvar_mrj)
     
     # Get water net yield for each region
-    wny_inside_LUTO_regions = np.bincount(data.RIVREG_ID, ag_w_r)
+    wny_inside_LUTO_regions = np.bincount(data.WATER_REGION_ID, ag_w_r)
     wny_inside_LUTO_regions = {region: wny for region, wny in enumerate(wny_inside_LUTO_regions) if region != 0}
-    
-    # Get water yield from outside the LUTO study area
-    wny_outside_LUTO_regions = get_water_outside_luto_study_area_from_hist_level(data)
-    
-    return {
-        region: wny_inside_LUTO_regions[region]  + wny_outside_LUTO_regions[region] 
-        for region in wny_outside_LUTO_regions
-    } 
+
+    return wny_inside_LUTO_regions
 
 
 
-def get_water_net_yield_limit_values(
-    data,
-) -> dict[int, tuple[str, float, np.ndarray]]:
+def get_wny_for_watershed_regions_for_base_yr(data):
     """
-    Return water net yield limits for regions (River Regions or Drainage Divisions as specified in luto.settings.py).
+    Return water net yield for watershed regions at the BASE_YR.
 
     Parameters
-    - data: The data object containing the necessary input data.
+        data (object): The data object containing the required data.
 
     Returns
-    water_net_yield_limits: A dictionary of tuples containing the water use limits for each region\n
-      region index:(
-      - region name
-      - water yield limit
-      - indices of cells in the region
-      )
-
-    Raises:
-    - None
-
+        dict[int, float]: A dictionary with the following structure:
+        - key: region ID
+        - value: water net yield for this region (ML)
     """
-    # Get the water limit from data to avoid recalculating
-    if data.WATER_YIELD_LIMITS is not None:
-        return data.WATER_YIELD_LIMITS
+    wny_inside_mrj = get_water_net_yield_matrices(data, data.YR_CAL_BASE, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
+    wny_base_yr_inside_r = np.einsum('mrj,mrj->r', wny_inside_mrj, data.AG_L_MRJ)
     
-    # Get historical yields of regions, stored in data.RIVREG_LIMITS and data.DRAINDIV_LIMITS
-    if settings.WATER_REGION_DEF == 'River Region':
-        wny_region_hist = data.RIVREG_LIMITS
-        region_id = data.RIVREG_ID
-        region_names = data.RIVREG_DICT
-
-    elif settings.WATER_REGION_DEF == 'Drainage Division':
-        wny_region_hist = data.DRAINDIV_LIMITS
-        region_id = data.DRAINDIV_ID
-        region_names = data.DRAINDIV_DICT
-
-    # Calculate the water yield limits for each region
-    limits_by_region = {}
-    for region, name in region_names.items():
-        hist_yield = wny_region_hist[region]
-        ind = np.flatnonzero(region_id == region).astype(np.int32)
-        # Water yield limit calculated as a proportial of historical level based on planetary boundary theory
-        limit_hist_level = hist_yield * (1 - settings.WATER_STRESS * settings.AG_SHARE_OF_WATER_USE)   
-        limits_by_region[region] = (name, limit_hist_level, ind)    
-
-    # Save the results in data to avoid recalculating
-    data.WATER_YIELD_LIMITS = limits_by_region
+    wny_base_yr_inside_regions = {k:v for k,v in enumerate(np.bincount(data.WATER_REGION_ID, wny_base_yr_inside_r))}
+    wny_base_yr_outside_regions = get_water_outside_luto_study_area_from_hist_level(data)
+    w_use_domestic_regions = data.WATER_USE_DOMESTIC
     
-    return limits_by_region
+    wny_sum = {}
+    for reg_id in wny_base_yr_outside_regions:
+        wny_sum[reg_id] = (
+            wny_base_yr_inside_regions[reg_id] +
+            wny_base_yr_outside_regions[reg_id] -
+            w_use_domestic_regions[reg_id]
+        )
+        
+    return wny_sum
+
+
+def get_water_net_yield_limit_for_regions_inside_LUTO(data):
+    """
+    Calculate the water net yield limit for each region based on historical levels.
+    
+    The limit is calculated as:
+        - Water net yield limit for the whole region
+        - Plus domestic water use
+        - Minus water net yield from outside the LUTO study area
+        
+    Parameters
+        data (object): The data object containing the required data.
+        
+    Returns
+        dict[int, float]: A dictionary with the following structure:
+        - key: region ID
+        - value: water net yield limit for this region (ML)
+    """
+    
+    wny_outside_LUTO_regions = get_water_outside_luto_study_area_from_hist_level(data)
+    
+    # Get the water net yield limit INSIDE LUTO study area
+    wny_limit_stress = {
+        reg_idx: (                            
+            hist_level * settings.WATER_STRESS      # Water net yield limit for the whole region
+            + data.WATER_USE_DOMESTIC[reg_idx]      # Domestic water use
+            - wny_outside_LUTO_regions[reg_idx]     # Water net yield from outside the LUTO study area
+        )
+        for reg_idx, hist_level in data.WATER_REGION_HIST_LEVEL.items()
+    }
+    
+    # Get the water net yield for the base year (2010)
+    wny_limit_base_yr = calc_water_net_yield_inside_LUTO_BASE_YR_hist_water_lyr(data)
+    
+    # Update the water net yield limit for each region
+    for reg_idx, limit in wny_limit_base_yr.items():
+        if limit < wny_limit_stress[reg_idx]:       # If the base year water net yield is lower than the historical stress limit
+            print(
+                f"\t"
+                f"Water net yield limit was relaxed to {limit:10.2f} ML (from {wny_limit_stress[reg_idx]:10.2f} ML) for {data.WATER_REGION_NAMES[reg_idx]}"
+            )
+            wny_limit_stress[reg_idx] = limit
+
+    return wny_limit_stress
+        
     
 
 

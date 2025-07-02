@@ -523,13 +523,13 @@ def get_biochar_effect_q_mrp(data, q_mrp, yr_idx):
 
 
 def get_beef_hir_effect_q_mrp(data, q_mrp):
-    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Beef - HIR']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Beef']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
 
     # Set up the effects matrix
     q_mrp_effect = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
 
-    if not settings.AG_MANAGEMENTS['Beef - HIR']:
+    if not settings.AG_MANAGEMENTS['HIR - Beef']:
         return q_mrp_effect
     
     # Update values in the new matrix    
@@ -543,13 +543,13 @@ def get_beef_hir_effect_q_mrp(data, q_mrp):
 
 
 def get_sheep_hir_effect_q_mrp(data, q_mrp):
-    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['Sheep - HIR']
+    land_uses = settings.AG_MANAGEMENTS_TO_LAND_USES['HIR - Sheep']
     lu_codes = [data.DESC2AGLU[lu] for lu in land_uses]
 
     # Set up the effects matrix
     q_mrp_effect = np.zeros((data.NLMS, data.NCELLS, data.NPRS)).astype(np.float32)
 
-    if not settings.AG_MANAGEMENTS['Sheep - HIR']:
+    if not settings.AG_MANAGEMENTS['HIR - Sheep']:
         return q_mrp_effect
     
     # Update values in the new matrix    
@@ -575,22 +575,15 @@ def get_agricultural_management_quantity_matrices(data, q_mrp, yr_idx) -> Dict[s
         A dictionary containing the quantity matrices for different agricultural management practices.
         The keys of the dictionary represent the names of the practices, and the values are the corresponding quantity matrices.
     """
-    asparagopsis_data = get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx)
-    precision_agriculture_data = get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx)
-    eco_grazing_data = get_ecological_grazing_effect_q_mrp(data, q_mrp, yr_idx)
-    sav_burning_data = get_savanna_burning_effect_q_mrp(data)
-    agtech_ei_data = get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx)
-    biochar_data = get_biochar_effect_q_mrp(data, q_mrp, yr_idx)
-    beef_hir_data = get_beef_hir_effect_q_mrp(data, q_mrp)
-    sheep_hir_data = get_sheep_hir_effect_q_mrp(data, q_mrp)
+    ag_mam_q_mrp = {}
 
-    return {
-        'Asparagopsis taxiformis': asparagopsis_data,
-        'Precision Agriculture': precision_agriculture_data,
-        'Ecological Grazing': eco_grazing_data,
-        'Savanna Burning': sav_burning_data,
-        'AgTech EI': agtech_ei_data,
-        'Biochar': biochar_data,
-        'Beef - HIR': beef_hir_data,
-        'Sheep - HIR': sheep_hir_data,
-    }
+    ag_mam_q_mrp['Asparagopsis taxiformis'] = get_asparagopsis_effect_q_mrp(data, q_mrp, yr_idx)            
+    ag_mam_q_mrp['Precision Agriculture'] = get_precision_agriculture_effect_q_mrp(data, q_mrp, yr_idx)     
+    ag_mam_q_mrp['Ecological Grazing'] = get_ecological_grazing_effect_q_mrp(data, q_mrp, yr_idx)           
+    ag_mam_q_mrp['Savanna Burning'] = get_savanna_burning_effect_q_mrp(data)                                
+    ag_mam_q_mrp['AgTech EI'] = get_agtech_ei_effect_q_mrp(data, q_mrp, yr_idx)                             
+    ag_mam_q_mrp['Biochar'] = get_biochar_effect_q_mrp(data, q_mrp, yr_idx)                                 
+    ag_mam_q_mrp['HIR - Beef'] = get_beef_hir_effect_q_mrp(data, q_mrp)                                     
+    ag_mam_q_mrp['HIR - Sheep'] = get_sheep_hir_effect_q_mrp(data, q_mrp)                                   
+
+    return ag_mam_q_mrp
