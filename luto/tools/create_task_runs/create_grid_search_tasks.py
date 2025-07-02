@@ -61,10 +61,8 @@ grid_search = {
     'SOLVER_WEIGHT_GHG': [1],
     'SOLVER_WEIGHT_WATER': [1],
     'SOLVER_WEIGHT_GBF2': [1],
-    
-    # --------------- Demand settings ---------------
-    'DEMAND_CONSTRAINT_TYPE': ['soft'],                                 # 'hard' or 'soft' 
-    
+
+
     # --------------- Land use settings ---------------
     'EXCLUDE_NO_GO_LU': [False],         # True or False
        
