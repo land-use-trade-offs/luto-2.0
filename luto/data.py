@@ -427,6 +427,15 @@ class Data:
         self.CLIMATE_CHANGE_IMPACT = pd.read_hdf(
             os.path.join(settings.INPUT_DIR, "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".h5"), where=self.MASK
         )
+        
+        
+        ###############################################################
+        # Regional coverage layers, mainly for regional reporting.
+        ###############################################################
+        self.REGION_NRM_R = pd.read_hdf(
+            os.path.join(settings.INPUT_DIR, "REGION_NRM_r.h5"), where=self.MASK
+        ).to_numpy()
+        
 
         ###############################################################
         # No-Go areas; Regional adoption constraints.
