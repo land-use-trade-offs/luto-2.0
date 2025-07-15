@@ -61,7 +61,7 @@ def get_rev_crop( data:Data         # Data object.
                 ).values
     
     # Return revenue as MultiIndexed DataFrame.
-    return pd.DataFrame(rev_t, columns=pd.MultiIndex.from_product([[lu],[lm],['Revenue']]))
+    return pd.DataFrame(rev_t, columns=pd.MultiIndex.from_tuples([(lu, lm, 'Revenue')]))
 
 def get_rev_lvstk( data:Data   # Data object.
                  , lu           # Land use.
@@ -147,11 +147,13 @@ def get_rev_lvstk( data:Data   # Data object.
         raise KeyError(f"Unknown {lvstype} livestock type. Check `lvstype`.")   
 
     # Put the revenues into a MultiIndex DataFrame
-    rev_seperate = pd.DataFrame(np.stack((rev_meat, rev_wool, rev_lexp, rev_milk), axis=1), 
-                                columns=pd.MultiIndex.from_product([[lu], [lm], ['Meat', 'Wool', 'Live Exports', 'Milk']]))
+    rev_seperate = pd.DataFrame(
+        np.stack((rev_meat, rev_wool, rev_lexp, rev_milk), axis=1), 
+        columns=pd.MultiIndex.from_product([[lu], [lm], ['Meat', 'Wool', 'Live Exports', 'Milk']])
+    )
 
     # Revenue so far in AUD/ha. Now convert to AUD/cell including resfactor.
-    rev_seperate = rev_seperate * data.REAL_AREA.reshape(-1,1) # Convert to AUD/cell
+    rev_seperate = rev_seperate * data.REAL_AREA.reshape(-1, 1) # Convert to AUD/cell
 
     # Return revenue as numpy array.
     return rev_seperate
@@ -177,9 +179,10 @@ def get_rev( data:Data    # Data object.
         return get_rev_lvstk(data, lu, lm, yr_idx)
 
     elif lu in data.AGRICULTURAL_LANDUSES:
-        return  pd.DataFrame(np.zeros((data.NCELLS, 1)).astype(np.float32),
-                             columns=pd.MultiIndex.from_product([[lu],[lm],['Revenue']]))
-
+        return pd.DataFrame(
+            np.zeros((data.NCELLS, 1)).astype(np.float32),
+            columns=pd.MultiIndex.from_tuples([(lu, lm, 'Revenue')])
+        )
     else:
         raise KeyError(f"Land-use '{lu}' not found in data.LANDUSES")
 
@@ -188,7 +191,10 @@ def get_rev_matrix(data:Data, lm, yr_idx):
     """Return r_rj matrix of revenue/cell per lu under `lm` in `yr_idx`."""
     
     # Concatenate the revenue from each land use into a single Multiindex DataFrame.
-    r_rjs = pd.concat([get_rev(data, lu, lm, yr_idx) for lu in data.AGRICULTURAL_LANDUSES], axis=1)
+    r_rjs = pd.concat(
+        [get_rev(data, lu, lm, yr_idx) for lu in data.AGRICULTURAL_LANDUSES], 
+        axis=1
+    )
     r_rjs = r_rjs.fillna(0)
     return r_rjs
 
@@ -197,7 +203,10 @@ def get_rev_matrices(data:Data, yr_idx, aggregate:bool = True):
     """Return r_mrj matrix of revenue per cell as 3D Numpy array."""
 
     # Concatenate the revenue from each land management into a single Multiindex DataFrame.
-    rev_rjms = pd.concat([get_rev_matrix(data, lm, yr_idx) for lm in data.LANDMANS], axis=1)
+    rev_rjms = pd.concat(
+        [get_rev_matrix(data, lm, yr_idx) for lm in data.LANDMANS], 
+        axis=1
+    )
 
     if not aggregate:
         # Concatenate the revenue from each land management into a single Multiindex DataFrame.

@@ -296,7 +296,7 @@ def get_GBF8_matrix_sr(data:Data, target_year: int):
 
 def get_ag_biodiversity_contribution(data:Data) -> np.ndarray:
     """
-    Return b_rj biodiversity contribution matrices by land-use type.
+    Return b_j biodiversity contribution matrices by land-use type.
 
     Parameters
     - data: The data object containing information about land management, cells, and land-use types.

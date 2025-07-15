@@ -38,8 +38,8 @@ def lumap_crossmap(oldmap, newmap, ag_landuses, non_ag_landuses, real_area):
 
     # Need to make sure each land use (both agricultural and non-agricultural) appears in the index/columns
     reindex = (
-            list(range(len(ag_landuses)))
-        + [ settings.NON_AGRICULTURAL_LU_BASE_CODE + lu for lu in range(len(non_ag_landuses)) ]
+        list(range(len(ag_landuses)))
+        + [settings.NON_AGRICULTURAL_LU_BASE_CODE + lu for lu in range(len(non_ag_landuses))]
     )
     
     crosstab = crosstab.reindex(reindex, axis = 0, fill_value = 0)
@@ -52,11 +52,9 @@ def lumap_crossmap(oldmap, newmap, ag_landuses, non_ag_landuses, real_area):
     
     # Calculate net switches to land use (negative means switch away).
     switches = crosstab.sum(0) - crosstab.sum(1)
-    nswitches = np.abs(switches).sum()
-    switches['Total [km2]'] = nswitches
-    switches['Total [%]'] = np.around(100 * nswitches / (real_area.sum()/100), decimals=2)
-    switches = pd.DataFrame(switches)
-    
+    switches = pd.DataFrame(switches).reset_index()
+    switches.columns = ['Land-use', 'Area [km2]']
+        
     # Stack the crosstab to a long format.
     crosstab = crosstab.stack().reset_index()
     crosstab.columns = ['From land-use', 'To land-use', 'Area [km2]']
@@ -76,10 +74,8 @@ def lmmap_crossmap(oldmap, newmap, real_area, lm):
 
     # Calculate net switches to land use (negative means switch away).
     switches = crosstab.sum(0) - crosstab.sum(1)
-    nswitches = np.abs(switches).sum()
-    switches['Total [km2]'] = nswitches
-    switches['Total [%]'] = np.around(100 * nswitches / (real_area.sum()/100),decimals=2)
-    switches = pd.DataFrame(switches)
+    switches = pd.DataFrame(switches).reset_index()
+    switches.columns = ['Land-use', 'Area [km2]']
 
     # Stack the crosstab to a long format.
     crosstab = crosstab.stack().reset_index()

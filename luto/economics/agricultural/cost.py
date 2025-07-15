@@ -60,71 +60,35 @@ def get_cost_crop(data:Data, lu, lm, yr_idx):
     if lu not in data.AGEC_CROPS['AC', lm].columns:
         costs_t = np.zeros((data.NCELLS))
         # The column name is irrelevant and only used to make the out df the same shape as the rest of crops.
-        return pd.DataFrame(costs_t,
-                            columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost']]))
+        return pd.DataFrame(
+            costs_t,
+            columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost']])
+        )
 
     else: # Calculate the total costs 
         yr_cal = data.YR_CAL_BASE + yr_idx
-        # Variable costs (quantity costs and area costs)        
         
-        qc_multiplier = 1
-        if lu in data.QC_COST_MULTS.columns:
-            qc_multiplier = data.QC_COST_MULTS.loc[yr_cal, lu]
-        else:
-            print(
-                f"WARNING: Multiplier for {lu} not found in the 'QC_multiplier' sheet of "
-                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
-            
-        # Quantity costs (calculated as cost per tonne x tonne per cell x resfactor)
-        costs_q = ( data.AGEC_CROPS['QC', lm, lu] 
-                    * qc_multiplier
-                    * get_quantity(data, lu.upper(), lm, yr_idx))  # lu.upper() only for crops as needs to be in product format in get_quantity().  
+        # Quantity costs
+        costs_q = (
+            data.AGEC_CROPS['QC', lm, lu] 
+            * data.QC_COST_MULTS.loc[yr_cal, lu]
+            * get_quantity(data, lu.upper(), lm, yr_idx)
+        )  # lu.upper() only for crops as needs to be in product format in get_quantity().  
 
         # Area costs.
-        ac_multiplier = 1
-        if lu in data.AC_COST_MULTS.columns:
-            ac_multiplier = data.AC_COST_MULTS.loc[yr_cal, lu]
-        else:
-            print(
-                f"WARNING: Multiplier for {lu} not found in the 'AC_multiplier' sheet of "
-                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
-        costs_a = data.AGEC_CROPS['AC', lm, lu] * ac_multiplier
+        costs_a = data.AGEC_CROPS['AC', lm, lu] * data.AC_COST_MULTS.loc[yr_cal, lu]  # Area costs per hectare.
 
         # Fixed costs
-        flc_multiplier = 1
-        if lu in data.FLC_COST_MULTS.columns:
-            flc_multiplier = data.FLC_COST_MULTS.loc[yr_cal, lu]
-        else:
-            print(
-                f"WARNING: Multiplier for {lu} not found in the 'FLC_multiplier' sheet of "
-                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
-            
-        foc_multiplier = 1
-        if lu in data.FOC_COST_MULTS.columns:
-            foc_multiplier = data.FOC_COST_MULTS.loc[yr_cal, lu]
-        else:
-            print(
-                f"WARNING: Multiplier for {lu} not found in the 'FOC_multiplier' sheet of "
-                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
-            
-        fdc_multiplier = 1
-        if lu in data.FDC_COST_MULTS.columns:
-            fdc_multiplier = data.FDC_COST_MULTS.loc[yr_cal, lu]
-        else:
-            print(
-                f"WARNING: Multiplier for {lu} not found in the 'FDC_multiplier' sheet of "
-                f"cost_multipliers.xlsx. Defaulting to 1.", flush=True)
-            
-        costs_f = ( data.AGEC_CROPS['FLC', lm, lu] * flc_multiplier      # Fixed labour costs.
-                    + data.AGEC_CROPS['FOC', lm, lu] * foc_multiplier    # Fixed operating costs.
-                    + data.AGEC_CROPS['FDC', lm, lu] * fdc_multiplier )  # Fixed depreciation costs.
+        costs_flc = data.AGEC_CROPS['FLC', lm, lu] * data.FLC_COST_MULTS.loc[yr_cal, lu]  # Fixed labour costs.
+        costs_foc = data.AGEC_CROPS['FOC', lm, lu] * data.FOC_COST_MULTS.loc[yr_cal, lu]  # Fixed operating costs.
+        costs_fdc = data.AGEC_CROPS['FDC', lm, lu] * data.FDC_COST_MULTS.loc[yr_cal, lu]  # Fixed depreciation costs.
 
         # Water costs as water required in ML per hectare x delivery price per ML.
         if lm == 'irr':
             costs_w = (
-                data.AGEC_CROPS['WR', lm, lu] 
-                * data.AGEC_CROPS['WP', lm, lu] 
-                * data.WP_COST_MULTS[yr_cal]
+            data.AGEC_CROPS['WR', lm, lu] 
+            * data.AGEC_CROPS['WP', lm, lu] 
+            * data.WP_COST_MULTS[yr_cal]
             )
         elif lm == 'dry':
             costs_w = 0
@@ -133,18 +97,27 @@ def get_cost_crop(data:Data, lu, lm, yr_idx):
 
         # Convert to $/cell including resfactor.
         # Quantity costs which has already been adjusted for REAL_AREA/resfactor via get_quantity
-        costs_a, costs_f, costs_w = (
-            costs_a * data.REAL_AREA, 
-            costs_f * data.REAL_AREA, 
-            costs_w * data.REAL_AREA
-        )
+        costs_q *= 1
+        costs_a *= data.REAL_AREA
+        costs_flc *= data.REAL_AREA
+        costs_foc *= data.REAL_AREA
+        costs_fdc *= data.REAL_AREA
+        costs_w *= data.REAL_AREA
 
-        costs_t = np.stack([(costs_a), (costs_f), (costs_w), (costs_q)]).T
-
+        costs_t = np.stack([costs_q, costs_a, costs_flc, costs_foc, costs_fdc, costs_w]).T
 
         # Return costs as numpy array.
-        return pd.DataFrame(costs_t,
-                            columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost', 'Fixed cost', 'Water cost', 'Quantity cost']]))
+        return pd.DataFrame(
+            costs_t,
+            columns=pd.MultiIndex.from_product(
+                [
+                    [lu], 
+                    [lm], 
+                    ['Quantity cost', 'Area cost', 'Fixed labour cost', 'Fixed operating cost', 'Fixed depreciation cost', 'Water cost']
+                ]
+            )
+        )
+
 
 
 def get_cost_lvstk(data:Data, lu, lm, yr_idx):
@@ -179,9 +152,9 @@ def get_cost_lvstk(data:Data, lu, lm, yr_idx):
     costs_a = data.AGEC_LVSTK['AC', lvstype] * data.AC_COST_MULTS.loc[yr_cal, lvstype_capital]
 
     # Fixed costs
-    costs_f = ( data.AGEC_LVSTK['FOC', lvstype] * data.FOC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed operating costs.
-              + data.AGEC_LVSTK['FLC', lvstype] * data.FLC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed labour costs.
-              + data.AGEC_LVSTK['FDC', lvstype] * data.FDC_COST_MULTS.loc[yr_cal, lvstype_capital] ) # Fixed depreciation costs.
+    costs_flc = data.AGEC_LVSTK['FLC', lvstype] * data.FLC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed labour costs.
+    costs_foc = data.AGEC_LVSTK['FOC', lvstype] * data.FOC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed operating costs.
+    costs_fdc = data.AGEC_LVSTK['FDC', lvstype] * data.FDC_COST_MULTS.loc[yr_cal, lvstype_capital]   # Fixed depreciation costs.
 
     # Water costs in $/ha calculated as water requirements (ML/head) x heads per hectare x delivery price ($/ML)
     if lm == 'irr': # Irrigation water if required.
@@ -196,19 +169,25 @@ def get_cost_lvstk(data:Data, lu, lm, yr_idx):
     costs_w *= data.WATER_DELIVERY_PRICE * data.WP_COST_MULTS[yr_cal]  # $/ha
 
     # Convert costs to $ per cell including resfactor.
-    cost_a, cost_f, cost_w, cost_q = (
-        costs_a * data.REAL_AREA, 
-        costs_f * data.REAL_AREA,
-        costs_w * data.REAL_AREA, 
-        costs_q * data.REAL_AREA
-    ) 
+    costs_a *= data.REAL_AREA
+    costs_flc *= data.REAL_AREA
+    costs_foc *= data.REAL_AREA
+    costs_fdc *= data.REAL_AREA
+    costs_w *= data.REAL_AREA
+    costs_q *= data.REAL_AREA
 
-    costs = np.stack([(cost_a), (cost_f), (cost_w), (cost_q)]).T
+    costs = np.stack([costs_a, costs_flc, costs_foc, costs_fdc, costs_w, costs_q]).T
 
     # Return costs as numpy array.
     return pd.DataFrame(
         costs,
-        columns=pd.MultiIndex.from_product([[lu], [lm], ['Area cost', 'Fixed cost', 'Water cost', 'Quantity cost']])
+        columns=pd.MultiIndex.from_product(
+            [
+                [lu], 
+                [lm], 
+                ['Area cost', 'Fixed labour cost', 'Fixed operating cost', 'Fixed depreciation cost', 'Water cost', 'Quantity cost']
+            ]
+        )
     )
 
 
