@@ -105,6 +105,10 @@ RENAME_AM = {
     "Ecological Grazing": "Regenerative agriculture (livestock)", 
     "Savanna Burning": "Early dry-season savanna burning",
     "AgTech EI": "Agricultural technology (energy)",
+    'Biochar': "Biochar (soil amendment)",
+    'HIR - Beef': "Human-induced regeneration (Beef)",
+    'HIR - Sheep': "Human-induced regeneration (Sheep)",
+
 }
 
 RENAME_NON_AG = {

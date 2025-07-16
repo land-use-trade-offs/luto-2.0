@@ -1167,13 +1167,13 @@ def write_ghg_separate(data: Data, yr_cal, path):
         if ghg_e.sum() == 0:
             continue
         df = ghg_e.groupby('region'
-                ).sum('cell'
-                ).to_dataframe('Value (t CO2e)'
-                ).reset_index(
-                ).rename(columns={'lu':'Land-use', 'lm':'Water_supply'}
-                ).assign(Year=yr_cal, Type='Agricultural land-use',
-                ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-                ).query('abs(`Value (t CO2e)`) > 1e-3') 
+            ).sum('cell'
+            ).to_dataframe('Value (t CO2e)'
+            ).reset_index(
+            ).rename(columns={'lu':'Land-use', 'lm':'Water_supply'}
+            ).assign(Year=yr_cal, Type='Agricultural land-use', Source=GHG_source
+            ).replace({'dry':'Dryland', 'irr':'Irrigated'}
+            ).query('abs(`Value (t CO2e)`) > 1e-3') 
                   
         ghg_df = pd.concat([ghg_df, df])
     
@@ -1325,10 +1325,10 @@ def write_water(data: Data, yr_cal, path):
     )
 
     # Get the decision variables
-    ag_dvar_mrj = tools.ag_mrj_to_xr(data, tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
+    ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
         ).assign_coords(region_water=('cell', data.WATER_REGION_ID), region_NRM=('cell', data.REGION_NRM_NAME)
         ).chunk({'cell': min(4096, data.NCELLS)})
-    non_ag_dvar_rj = tools.non_ag_rk_to_xr(data, tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal])
+    non_ag_dvar_rj = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
         ).assign_coords(region_water=('cell', data.WATER_REGION_ID), region_NRM=('cell', data.REGION_NRM_NAME)
         ).chunk({'cell': min(4096, data.NCELLS)})
     am_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
