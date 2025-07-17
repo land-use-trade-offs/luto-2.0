@@ -17,25 +17,12 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
+from itertools import cycle
 import luto.settings as settings
 
 
 # Get the root directory of the data
 YR_BASE = 2010
-
-# Colors for reporting HTML to loop through
-COLORS = [
-    "#8085e9",
-    "#f15c80",
-    "#e4d354",
-    "#2b908f",
-    "#f45b5b",
-    "#7cb5ec",
-    "#434348",
-    "#90ed7d",
-    "#f7a35c",
-    "#91e8e1",
-]
 
 
 # Define crop-lvstk land uses
@@ -195,3 +182,51 @@ GHG_CATEGORY = {'Agricultural soils: Animal production, dung and urine': {"CH4":
                 'Ecological Grazing':{'Ecological Grazing':1}}
 
 
+
+# Colors for reporting HTML to loop through
+COLORS = [
+    "#8085e9",
+    "#f15c80",
+    "#e4d354",
+    "#2b908f",
+    "#f45b5b",
+    "#7cb5ec",
+    "#434348",
+    "#90ed7d",
+    "#f7a35c",
+    "#91e8e1",
+]
+
+pattern_path = {
+    'path': 
+        {
+            'd': "M 0 0 L 10 10 M 10 0 L 0 10", 
+            'stroke': "#cccccc", 
+            'strokeWidth': 1,
+        },
+    'width': 10,
+    'height': 10,
+}
+
+COLORS_LU = dict(zip(LANDUSE_ALL_RENAMED, cycle(COLORS)))
+COLORS_LM = dict(zip(['Dryland', 'Irrigated'], ["#f7a35c", "#7cb5ec"]))
+COLORS_COMMODITIES = dict(zip(COMMODITIES_ALL, cycle(COLORS)))
+COLORS_AM_NONAG = dict(zip(RENAME_AM_NON_AG.values(), cycle(COLORS)))
+COLORS_GHG = dict(zip(GHG_NAMES.values(), cycle(COLORS)))
+
+COLORS_ECONOMY_TYPE = dict(zip(
+    [
+        'Live Exports', 'Meat', 'Milk', 'Wool', 'Crop', 'Area cost', 
+        'Fixed depreciation cost', 'Fixed labour cost','Fixed operating cost', 
+        'Quantity cost', 'Water cost'
+    ],
+     cycle(COLORS)
+))
+
+
+PATTERNS_LU = {k:{**pattern_path, 'backgroundColor': v } for k,v in COLORS_LU.items()}
+PATTERNS_LM = {k: {**pattern_path, 'backgroundColor': v} for k, v in COLORS_LM.items()}
+PATTERNS_COMMODITIES = {k: {**pattern_path, 'backgroundColor': v} for k, v in COLORS_COMMODITIES.items()}
+PATTERNS_AM_NONAG = {k: {**pattern_path, 'backgroundColor': v} for k, v in COLORS_AM_NONAG.items()}
+PATTERNS_GHG = {k: {**pattern_path, 'backgroundColor': v} for k, v in COLORS_GHG.items()}
+PATTERNS_ECONOMY_TYPE = {k: {**pattern_path, 'backgroundColor': v} for k, v in COLORS_ECONOMY_TYPE.items()}

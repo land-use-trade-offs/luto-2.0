@@ -524,7 +524,7 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
             'dry': 'Dryland',
             'irr': 'Irrigated'
         }).assign(Year=yr_cal)
-
+        
     # Save to disk
     ag_rev_jms.to_csv(os.path.join(path, f'revenue_agricultural_commodity_{yr_cal}.csv'), index=False)
     ag_cost_jms.to_csv(os.path.join(path, f'cost_agricultural_commodity_{yr_cal}.csv'), index=False)
@@ -542,8 +542,7 @@ def write_revenue_cost_ag_management(data: Data, yr_cal, path):
 
     # Get the ag-man dvars
     am_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
-        ).assign_coords(
-            region = ('cell', data.REGION_NRM_NAME),
+        ).assign_coords(region = ('cell', data.REGION_NRM_NAME),
         ).chunk({'cell': min(4096, data.NCELLS)})
 
     # Get the revenue/cost matrices for each agricultural land-use
@@ -652,9 +651,7 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
 
     # Get the decision variables for agricultural land-use
-    ag_dvar = tools.ag_mrj_to_xr(data, tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-
+    ag_dvar =  tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]).assign_coords(region=('cell', data.REGION_NRM_NAME))
     base_mrj = tools.lumap2ag_l_mrj(data.lumaps[yr_cal_sim_pre], data.lmmaps[yr_cal_sim_pre])
 
     # Get the transition cost matrices for agricultural land-use
@@ -804,8 +801,7 @@ def write_transition_cost_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None
     yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
 
     # Get the decision variables for agricultural land-use
-    ag_dvar = tools.ag_mrj_to_xr(data, tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal])
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+    ag_dvar = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]).assign_coords(region=('cell', data.REGION_NRM_NAME))
 
     # Get the transition cost matrices for non-agricultural land-use
     if yr_idx == 0:

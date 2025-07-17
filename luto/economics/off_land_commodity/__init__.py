@@ -67,9 +67,4 @@ def get_demand_df(egg_weight=EGGS_AVG_WEIGHT) -> pd.DataFrame:
     DEMAND_DATA_long['Commodity'] = DEMAND_DATA_long['Commodity'] \
         .apply(lambda x: x[0].upper() + x[1:].lower())
 
-    # Sort the dataframe by year, commodity, and type,
-    # where the commodity is sorted by the order in COMMODITIES_ALL
-    DEMAND_DATA_long = DEMAND_DATA_long.set_index(['Year', 'Commodity', 'Type'])
-
-
     return DEMAND_DATA_long

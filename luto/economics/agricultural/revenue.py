@@ -61,7 +61,7 @@ def get_rev_crop( data:Data         # Data object.
                 ).values
     
     # Return revenue as MultiIndexed DataFrame.
-    return pd.DataFrame(rev_t, columns=pd.MultiIndex.from_tuples([(lu, lm, 'Revenue')]))
+    return pd.DataFrame(rev_t, columns=pd.MultiIndex.from_tuples([(lu, lm, 'Crop')]))
 
 def get_rev_lvstk( data:Data   # Data object.
                  , lu           # Land use.
@@ -181,7 +181,7 @@ def get_rev( data:Data    # Data object.
     elif lu in data.AGRICULTURAL_LANDUSES:
         return pd.DataFrame(
             np.zeros((data.NCELLS, 1)).astype(np.float32),
-            columns=pd.MultiIndex.from_tuples([(lu, lm, 'Revenue')])
+            columns=pd.MultiIndex.from_tuples([(lu, lm, 'Unallocated Land')])
         )
     else:
         raise KeyError(f"Land-use '{lu}' not found in data.LANDUSES")
