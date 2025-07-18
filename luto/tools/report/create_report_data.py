@@ -94,19 +94,21 @@ def save_report_data(raw_data_dir:str):
     
     ag_dvar_dfs = area_dvar_paths.query('base_name == "area_agricultural_landuse"').reset_index(drop=True)
     ag_dvar_area = pd.concat([pd.read_csv(path) for path in ag_dvar_dfs['path']], ignore_index=True)
-    ag_dvar_area['Type'] = 'Agricultural landuse'
+    ag_dvar_area['Source'] = 'Agricultural landuse'
     ag_dvar_area['Area (ha)'] = ag_dvar_area['Area (ha)'].round(2)
 
     non_ag_dvar_dfs = area_dvar_paths.query('base_name == "area_non_agricultural_landuse"').reset_index(drop=True)
     non_ag_dvar_area = pd.concat([pd.read_csv(path) for path in non_ag_dvar_dfs['path'] if not pd.read_csv(path).empty], ignore_index=True)
-    non_ag_dvar_area['Type'] = 'Non-agricultural landuse'
+    non_ag_dvar_area['Land-use'] = non_ag_dvar_area['Land-use'].replace(RENAME_NON_AG)
+    non_ag_dvar_area['Source'] = 'Non-agricultural landuse'
     non_ag_dvar_area['Area (ha)'] = non_ag_dvar_area['Area (ha)'].round(2)
 
     am_dvar_dfs = area_dvar_paths.query('base_name == "area_agricultural_management"').reset_index(drop=True)
     am_dvar_area = pd.concat([pd.read_csv(path) for path in am_dvar_dfs['path'] if not pd.read_csv(path).empty], ignore_index=True)
     am_dvar_area = am_dvar_area.replace(RENAME_AM_NON_AG)
+    am_dvar_area['Source'] = 'Agricultural management'
     am_dvar_area['Area (ha)'] = am_dvar_area['Area (ha)'].round(2)
-
+    
 
     lu_group_raw = pd.read_csv('luto/tools/report/Assets/lu_group.csv')
     colors_lu_category = lu_group_raw.set_index('Category')['color_HEX'].to_dict()
@@ -115,12 +117,12 @@ def save_report_data(raw_data_dir:str):
         .reset_index()
         
 
-    # Ag and NonAg (ha) split by different subcategories
+    # Area overview
     area_ag_nonag = pd.concat([ag_dvar_area, non_ag_dvar_area], ignore_index=True)
     area_ag_nonag = area_ag_nonag.replace(RENAME_AM_NON_AG)    
     area_ag_nonag = area_ag_nonag.merge(lu_group, left_on='Land-use', right_on='Land-use', how='left')
     
-    group_cols = ['Water_supply', 'Land-use', 'Type', 'Category']
+    group_cols = ['Land-use', 'Category']
     
     for idx, col in enumerate(group_cols):
 
@@ -169,12 +171,117 @@ def save_report_data(raw_data_dir:str):
             df = df.drop('region', axis=1)
             out_dict[region] = df.to_dict(orient='records')
 
-        with open(f'{SAVE_DIR}/Area_Ag_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+        with open(f'{SAVE_DIR}/Area_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+            json.dump(out_dict, f)
+    
+    
+    area_df = pd.concat([ag_dvar_area, non_ag_dvar_area, am_dvar_area], ignore_index=True)
+    group_cols = ['Source']
+    for _, col in enumerate(group_cols):
+
+        df_AUS = area_df\
+            .groupby(['Year', col])[['Area (ha)']]\
+            .sum()\
+            .reset_index()\
+            .round({'Area (ha)': 2})
+        df_AUS_wide = df_AUS.groupby([col])[['Year','Area (ha)']]\
+            .apply(lambda x: x[['Year','Area (ha)']].values.tolist())\
+            .reset_index()\
+            .assign(region='AUSTRALIA')
+        df_AUS_wide.columns = ['name','data','region']
+        df_AUS_wide['type'] = 'column'
+        
+        
+        df_region = area_df\
+            .groupby(['Year', 'region', col])\
+            .sum()\
+            .reset_index()\
+            .round({'Area (ha)': 2})
+        df_region_wide = df_region.groupby([col, 'region'])[['Year','Area (ha)']]\
+            .apply(lambda x: x[['Year','Area (ha)']].values.tolist())\
+            .reset_index()
+        df_region_wide.columns = ['name', 'region','data']
+        df_region_wide['type'] = 'column'
+        
+        
+        df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+        
+        if col == "Land-use":
+            df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_LU[x])
+            df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+        elif col == 'Water_supply':
+            df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_LM[x])
+        elif col.lower() == 'commodity':
+            df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_COMMODITIES[x])
+            df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+        elif col == 'Category':
+            df_wide['color'] = df_wide['name'].apply(lambda x: colors_lu_category[x])
+
+        out_dict = {}
+        for region, df in df_wide.groupby('region'):
+            df = df.drop('region', axis=1)
+            out_dict[region] = df.to_dict(orient='records')
+
+        with open(f'{SAVE_DIR}/Area_overview_3_{col.replace(" ", "_")}.json', 'w') as f:
             json.dump(out_dict, f)
             
+    
+    # Area by Agricultural land
+    group_cols = ['Land-use', 'Water_supply']
+    for idx, col in enumerate(group_cols):
+
+        df_AUS = ag_dvar_area\
+            .groupby(['Year', col])[['Area (ha)']]\
+            .sum()\
+            .reset_index()\
+            .round({'Area (ha)': 2})
+        df_AUS_wide = df_AUS.groupby([col])[['Year','Area (ha)']]\
+            .apply(lambda x: x[['Year','Area (ha)']].values.tolist())\
+            .reset_index()\
+            .assign(region='AUSTRALIA')
+        df_AUS_wide.columns = ['name','data','region']
+        df_AUS_wide['type'] = 'column'
+        
+        
+        df_region = ag_dvar_area\
+            .groupby(['Year', 'region', col])\
+            .sum()\
+            .reset_index()\
+            .round({'Area (ha)': 2})
+        df_region_wide = df_region.groupby([col, 'region'])[['Year','Area (ha)']]\
+            .apply(lambda x: x[['Year','Area (ha)']].values.tolist())\
+            .reset_index()
+        df_region_wide.columns = ['name', 'region','data']
+        df_region_wide['type'] = 'column'
+        
+        
+        df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+        
+        if col == "Land-use":
+            df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_LU[x])
+            df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+        elif col == 'Water_supply':
+            df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_LM[x])
+        elif col.lower() == 'commodity':
+            df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_COMMODITIES[x])
+            df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+        elif col == 'Category':
+            df_wide['color'] = df_wide['name'].apply(lambda x: colors_lu_category[x])
+
+        out_dict = {}
+        for region, df in df_wide.groupby('region'):
+            df = df.drop('region', axis=1)
+            out_dict[region] = df.to_dict(orient='records')
+            
+        with open(f'{SAVE_DIR}/Area_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+            json.dump(out_dict, f)
 
 
-    # Agricultural management Area (ha) Land use
+    # Area by Agricultural management Area (ha) Land use
     group_cols = ['Type', 'Water_supply', 'Land-use']
     
     for idx, col in enumerate(group_cols):
@@ -225,6 +332,60 @@ def save_report_data(raw_data_dir:str):
             out_dict[region] = df.to_dict(orient='records')
             
         with open(f'{SAVE_DIR}/Area_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+            json.dump(out_dict, f)
+            
+            
+    # Area by Non-Agricultural landuse
+    group_cols = ['Land-use']
+    
+    for idx, col in enumerate(group_cols):
+
+        df_AUS = non_ag_dvar_area\
+            .groupby(['Year', col])[['Area (ha)']]\
+            .sum()\
+            .reset_index()\
+            .round({'Area (ha)': 2})
+        df_AUS_wide = df_AUS.groupby([col])[['Year','Area (ha)']]\
+            .apply(lambda x: x[['Year','Area (ha)']].values.tolist())\
+            .reset_index()\
+            .assign(region='AUSTRALIA')
+        df_AUS_wide.columns = ['name','data','region']
+        df_AUS_wide['type'] = 'column'
+        
+        
+        df_region = non_ag_dvar_area\
+            .groupby(['Year', 'region', col])\
+            .sum()\
+            .reset_index()\
+            .round({'Area (ha)': 2})
+        df_region_wide = df_region.groupby([col, 'region'])[['Year','Area (ha)']]\
+            .apply(lambda x: x[['Year','Area (ha)']].values.tolist())\
+            .reset_index()
+        df_region_wide.columns = ['name', 'region','data']
+        df_region_wide['type'] = 'column'
+        
+        
+        df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+        
+        if col == "Land-use":
+            df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_AM_NONAG[x])
+            df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+        elif col == 'Water_supply':
+            df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_LM[x])
+        elif col.lower() == 'commodity':
+            df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_COMMODITIES[x])
+            df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+        elif col == 'Category':
+            df_wide['color'] = df_wide['name'].apply(lambda x: colors_lu_category[x])
+
+        out_dict = {}
+        for region, df in df_wide.groupby('region'):
+            df = df.drop('region', axis=1)
+            out_dict[region] = df.to_dict(orient='records')
+            
+        with open(f'{SAVE_DIR}/Area_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
             json.dump(out_dict, f)
             
             
@@ -422,8 +583,12 @@ def save_report_data(raw_data_dir:str):
     quantity_diff_wide_AUS['type'] = 'spline'
     quantity_diff_wide_AUS['showInLegend'] = True
     quantity_diff_wide_AUS.columns = ['name','data', 'type', 'showInLegend']
-    quantity_diff_wide_AUS.to_json(f'{SAVE_DIR}/Production_achive_percent.json', orient='records')
     
+    quantity_diff_wide_AUS_data = {
+        'AUSTRALIA': quantity_diff_wide_AUS.to_dict(orient='records')
+    }
+    with open(f'{SAVE_DIR}/Production_achive_percent.json', 'w') as f:
+        json.dump(quantity_diff_wide_AUS_data, f)    
     
     
     # Plot commodity production for ag, non-ag, and agricultural management

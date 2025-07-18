@@ -20,8 +20,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
-  // Chart:area_0_grouped_lu_area_wide
-  Highcharts.chart("area_0_grouped_lu_area_wide", {
+  // Chart:Area_overview_2_Category
+  Highcharts.chart("Area_overview_2_Category_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -30,8 +30,8 @@ document.addEventListener("DOMContentLoaded", function () {
       text: "Total Area in Each Land-use Group",
     },
     series: JSON.parse(
-      document.getElementById("area_0_grouped_lu_area_wide_csv").innerHTML
-    ),
+      document.getElementById("Area_overview_2_Category").innerHTML
+    ).AUSTRALIA,
     credits: {
       enabled: false,
     },
@@ -40,7 +40,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Area (million km2)",
+        text: "Area (ha)",
       },
     },
 
@@ -73,19 +73,18 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  
-  // Chart:area_1_total_area_wide
-  Highcharts.chart("area_1_total_area_wide", {
+  // Chart:Area_overview_1_Land-use
+  Highcharts.chart("Area_overview_1_Land-use_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
     title: {
-      text: "Total Area by Land-use and Agricultural Commodity",
+      text: "Total Area by Specific Land-use Type",
     },
     series: JSON.parse(
-      document.getElementById("area_1_total_area_wide_csv").innerHTML
-    ),
+      document.getElementById("Area_overview_1_Land-use").innerHTML
+    ).AUSTRALIA,
     credits: {
       enabled: false,
     },
@@ -94,7 +93,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Area (million km2)",
+        text: "Area (ha)",
       },
     },
 
@@ -130,18 +129,18 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:area_2_Water_supply_area_wide
-  Highcharts.chart("area_2_Water_supply_area_wide", {
+  // Chart:Area_overview_3_Source-use
+  Highcharts.chart("Area_overview_3_Source_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
     title: {
-      text: "Total Area by Irrigation Type",
+      text: "Total Area by Broad Land-use Type",
     },
     series: JSON.parse(
-      document.getElementById("area_2_Water_supply_area_wide_csv").innerHTML
-    ),
+      document.getElementById("Area_overview_3_Source").innerHTML
+    ).AUSTRALIA,
     credits: {
       enabled: false,
     },
@@ -150,14 +149,14 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Area (million km2)",
+        text: "Area (ha)",
       },
     },
 
     legend: {
       align: "right",
       layout: "vertical",
-      x: -250,
+      x: -10,
       verticalAlign: "middle",
     },
 
@@ -180,18 +179,18 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // area_3_non_ag_lu_area_wide
-  Highcharts.chart("area_3_non_ag_lu_area_wide", {
+  // Area_Ag_1_Land-use
+  Highcharts.chart("Area_Ag_1_Land-use_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
     title: {
-      text: "Non-Agricultural Land-Use Area",
+      text: "Agricultural Land-Use Area",
     },
     series: JSON.parse(
-      document.getElementById("area_3_non_ag_lu_area_wide_csv").innerHTML,
-    ),
+      document.getElementById("Area_Ag_1_Land-use").innerHTML,
+    ).AUSTRALIA,
     credits: {
       enabled: false,
     },
@@ -200,7 +199,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Area (million km2)",
+        text: "Area (ha)",
       },
     },
 
@@ -230,18 +229,18 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // area_4_am_total_area_wide
-  Highcharts.chart("area_4_am_total_area_wide", {
+  // Area_NonAg_1_Land-use
+  Highcharts.chart("Area_NonAg_1_Land-use_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
     title: {
-      text: "Agricultural Management Area by Type",
+      text: "Non-Agricultural Land-use Area",
     },
     series: JSON.parse(
-      document.getElementById("area_4_am_total_area_wide_csv").innerHTML
-    ),
+      document.getElementById("Area_NonAg_1_Land-use").innerHTML
+    ).AUSTRALIA,
     credits: {
       enabled: false,
     },
@@ -250,14 +249,14 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Area (million km2)",
+        text: "Area (ha)",
       },
     },
 
     legend: {
       align: "right",
       layout: "vertical",
-      x: -100,
+      x: -50,
       verticalAlign: "middle",
     },
 
@@ -280,18 +279,17 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // area_5_am_lu_area_wide
-  Highcharts.chart("area_5_am_lu_area_wide", {
+  // Area_Am_1_Type
+  Highcharts.chart("Area_Am_1_Type_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
     title: {
-      text: "Agricultural Management Area by Land-use Type",
+      text: "Agricultural Management Area by BroadLand-use Type",
     },
     series:
-      JSON.parse(document.getElementById("area_5_am_lu_area_wide_csv").innerHTML)
-    ,
+      JSON.parse(document.getElementById("Area_Am_1_Type").innerHTML).AUSTRALIA,
     credits: {
       enabled: false,
     },
@@ -300,14 +298,14 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Area (million km2)",
+        text: "Area (ha)",
       },
     },
 
     legend: {
       align: "right",
       layout: "vertical",
-      x: -150,
+      x: -50,
       verticalAlign: "middle",
     },
 
@@ -330,14 +328,64 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // area_6_begin_end_area
-  document.getElementById("area_6_begin_end_area").innerHTML = document.getElementById(
-    "area_6_begin_end_area_csv"
-  ).innerText;
+  // Area_Am_3_Land-use
+  Highcharts.chart("Area_Am_3_Land-use_chart", {
+    chart: {
+      type: "column",
+      marginRight: 380,
+    },
+    title: {
+      text: "Agricultural Management Area by BroadLand-use Type",
+    },
+    series:
+      JSON.parse(document.getElementById("Area_Am_3_Land-use").innerHTML).AUSTRALIA,
+    credits: {
+      enabled: false,
+    },
+    xAxis: {
+      tickPositions: year_ticks,
+    },
+    yAxis: {
+      title: {
+        text: "Area (ha)",
+      },
+    },
 
-  // area_7_begin_end_pct
-  document.getElementById("area_7_begin_end_pct").innerHTML = document.getElementById(
-    "area_7_begin_end_pct_csv"
-  ).innerText;
+    legend: {
+      layout: 'vertical',
+      align: 'right',
+      verticalAlign: 'middle',
+      x: -150, 
+      floating: true
+    },
+
+    tooltip: {
+      formatter: function () {
+        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+          }:</b>${this.y.toFixed(2)}<br/>`;
+      },
+    },
+
+    plotOptions: {
+      column: {
+        stacking: "normal",
+      },
+    },
+
+    exporting: {
+      sourceWidth: 1200,
+      sourceHeight: 600,
+    },
+  });
+
+  // area_begin_end_area
+  document.getElementById("area_begin_end_area").innerHTML = JSON.parse(document.getElementById(
+    "Area_transition"
+  ).innerText).AUSTRALIA.area;
+
+  // area_begin_end_pct
+  document.getElementById("area_begin_end_pct").innerHTML = JSON.parse(document.getElementById(
+    "Area_transition"
+  ).innerText).AUSTRALIA.pct;
 });
 
