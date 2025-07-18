@@ -31,29 +31,29 @@ from luto.tools.report.data_tools import get_all_files
 from luto.tools.report.data_tools.helper_func import select_years
 
 from luto.tools.report.data_tools.parameters import (
-    AG_LANDUSE, 
-    COMMODITIES_ALL,
-    COMMODITIES_OFF_LAND, 
-    COLORS_LU,
-    COLORS_LM,
-    COLORS_COMMODITIES,
+    AG_LANDUSE,
     COLORS_AM_NONAG,
-    COLORS_GHG,
+    COLORS_COMMODITIES,
     COLORS_ECONOMY_TYPE,
-    PATTERNS_LU,
-    PATTERNS_LM,
-    PATTERNS_COMMODITIES,
-    PATTERNS_AM_NONAG,
-    PATTERNS_GHG,
-    PATTERNS_ECONOMY_TYPE,
-    GHG_CATEGORY, 
+    COLORS_GHG,
+    COLORS_LM,
+    COLORS_LU,
+    COMMODITIES_ALL,
+    COMMODITIES_OFF_LAND,
+    GHG_CATEGORY,
     GHG_NAMES,
     LANDUSE_ALL_RENAMED,
-    LU_CROPS, 
-    LVSTK_MODIFIED, 
-    LVSTK_NATURAL, 
-    RENAME_NON_AG,
-    RENAME_AM_NON_AG
+    LU_CROPS,
+    LVSTK_MODIFIED,
+    LVSTK_NATURAL,
+    PATTERNS_AM_NONAG,
+    PATTERNS_COMMODITIES,
+    PATTERNS_ECONOMY_TYPE,
+    PATTERNS_GHG,
+    PATTERNS_LM,
+    PATTERNS_LU,
+    RENAME_AM_NON_AG,
+    RENAME_NON_AG
 )
 
 
@@ -734,14 +734,8 @@ def save_report_data(raw_data_dir:str):
             df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
         elif col == 'Water_supply':
             df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
-        elif col.lower() == 'commodity':
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']] if x['Rev_Cost'] == 'Revenue' else PATTERNS_COMMODITIES[x['name']], axis=1)
-            df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
-            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-        elif col == 'Type':
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_ECONOMY_TYPE[x['name']] if x['Rev_Cost'] == 'Revenue' else PATTERNS_ECONOMY_TYPE[x['name']], axis=1)
         elif col == 'Management Type':
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']] if x['Rev_Cost'] == 'Revenue' else PATTERNS_AM_NONAG[x['name']], axis=1)
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
         
         
         out_dict = {}
@@ -791,22 +785,10 @@ def save_report_data(raw_data_dir:str):
         
         
         df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
-        
-        if col == "Land-use":
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
-            df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-        elif col == 'Water_supply':
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
-        elif col.lower() == 'commodity':
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']] if x['Rev_Cost'] == 'Revenue' else PATTERNS_COMMODITIES[x['name']], axis=1)
-            df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
-            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-        elif col == 'Type':
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_ECONOMY_TYPE[x['name']] if x['Rev_Cost'] == 'Revenue' else PATTERNS_ECONOMY_TYPE[x['name']], axis=1)
-        elif col == 'Management Type':
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']] if x['Rev_Cost'] == 'Revenue' else PATTERNS_AM_NONAG[x['name']], axis=1)
-        
+        df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+        df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+        df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
         
         out_dict = {}
         for region, df in df_wide.groupby('region'):
@@ -1311,6 +1293,8 @@ def save_report_data(raw_data_dir:str):
                 df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
             elif col == 'Agricultural Management Type':
                 df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+            elif col == 'Source':
+                df_wide['color'] = df_wide.apply(lambda x: COLORS_GHG[x['name']], axis=1)
             
             
             out_dict = {}
@@ -1735,9 +1719,9 @@ def save_report_data(raw_data_dir:str):
     #########################################################
     #                   6) Biodiversity                     #
     #########################################################
-    
-    
-    # ---------------- Biodiversity priority total score  ----------------
+
+
+    # ---------------- Biodiversity quality overview  ----------------
     filter_str = '''
         category == "biodiversity"
         and year_types == "single_year"
@@ -1745,67 +1729,222 @@ def save_report_data(raw_data_dir:str):
     '''.strip().replace('\n','')
     
     bio_paths = files.query(filter_str).reset_index(drop=True)
-    bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
-    bio_df = bio_df.replace(RENAME_AM_NON_AG)
-    
-    # Plot_BIO_priority_1: Biodiversity total score by Type
-    bio_df_type = bio_df.groupby(['Year','Type']).sum(numeric_only=True).reset_index()
-    bio_df_type = bio_df_type\
-        .groupby('Type')[['Year','Contribution Relative to Base Year Level (%)']]\
-        .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Base Year Level (%)']))))\
-        .reset_index()
+    bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])\
+        .replace(RENAME_AM_NON_AG)\
+        .rename(columns={'Contribution Relative to Base Year Level (%)': 'Value (%)'})\
+        .query('`Value (%)` > 1e-6')\
+        .round({'Value (%)': 6})
+
+    group_cols = ['Type']
+    for idx, col in enumerate(group_cols):
+        df_AUS = bio_df\
+            .groupby(['Year', col])[['Value (%)']]\
+            .sum()\
+            .reset_index()
+        df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+            .reset_index()\
+            .assign(region='AUSTRALIA')
+        df_AUS_wide.columns = ['name', 'data','region']
+        df_AUS_wide['type'] = 'column'
+
+        df_region = bio_df\
+            .groupby(['Year', 'region', col])\
+            .sum()\
+            .reset_index()\
+            .query('`Value (%)` > 0')
+        df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+            .reset_index()
+        df_region_wide.columns = ['name', 'region', 'data']
+        df_region_wide['type'] = 'column'
         
-    bio_df_type.columns = ['name','data']
-    bio_df_type['type'] = 'column'
-    bio_df_type.to_json(f'{SAVE_DIR}/biodiversity_priority_1_total_score_by_type.json', orient='records')
-    
-    
-    # Plot_BIO_priority_2: Biodiversity total score by landuse
-    bio_df_landuse = bio_df.groupby(['Year','Landuse']).sum(numeric_only=True).reset_index()
-    bio_df_landuse = bio_df_landuse\
-        .groupby('Landuse')[['Year','Contribution Relative to Base Year Level (%)']]\
-        .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Base Year Level (%)']))))\
-        .reset_index()
         
-    bio_df_landuse.columns = ['name','data']
-    bio_df_landuse['type'] = 'column'
-    bio_df_landuse = bio_df_landuse.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index()
-    bio_df_landuse.to_json(f'{SAVE_DIR}/biodiversity_priority_2_total_score_by_landuse.json', orient='records')
+        df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+        
+        if col == "Landuse":
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+            df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+        elif col == 'Water_supply':
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+        elif col.lower() == 'commodity':
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+            df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+        elif col == 'Agricultural Management Type':
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+        
+        
+        out_dict = {}
+        for region, df in df_wide.groupby('region'):
+            df = df.drop(['region'], axis=1)
+            out_dict[region] = df.to_dict(orient='records')
+
+        with open(f'{SAVE_DIR}/BIO_quality_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+            json.dump(out_dict, f)
     
     
-    # Plot_BIO_priority_3: Biodiversity total score by Agricultural Management
+    
+    # ---------------- Biodiversity quality by Agricultural landuse  ----------------
+    bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
+    group_cols = ['Landuse']
+    for idx, col in enumerate(group_cols):
+        df_AUS = bio_df_ag\
+            .groupby(['Year', col])[['Value (%)']]\
+            .sum()\
+            .reset_index()
+        df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+            .reset_index()\
+            .assign(region='AUSTRALIA')
+        df_AUS_wide.columns = ['name', 'data','region']
+        df_AUS_wide['type'] = 'column'
+
+        df_region = bio_df_ag\
+            .groupby(['Year', 'region', col])\
+            .sum()\
+            .reset_index()\
+            .query('`Value (%)` > 0')
+        df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+            .reset_index()
+        df_region_wide.columns = ['name', 'region', 'data']
+        df_region_wide['type'] = 'column'
+        
+        
+        df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+        
+        if col == "Landuse":
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+            df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+        elif col == 'Water_supply':
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+        elif col.lower() == 'commodity':
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+            df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+        elif col == 'Agricultural Management Type':
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+        
+        
+        out_dict = {}
+        for region, df in df_wide.groupby('region'):
+            df = df.drop(['region'], axis=1)
+            out_dict[region] = df.to_dict(orient='records')
+            
+        with open(f'{SAVE_DIR}/BIO_quality_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+            json.dump(out_dict, f)
+            
+    # ---------------- Biodiversity quality by Agricultural Management  ----------------
     bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
-    bio_df_am = bio_df_am.groupby(['Year','Agri-Management']).sum(numeric_only=True).reset_index()
-    
-    bio_df_am = bio_df_am\
-        .groupby('Agri-Management')[['Year','Contribution Relative to Base Year Level (%)']]\
-        .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Base Year Level (%)']))))\
-        .reset_index()
+    group_cols = ['Landuse','Agri-Management']
+    for idx, col in enumerate(group_cols):
+        df_AUS = bio_df_am\
+            .groupby(['Year', col])[['Value (%)']]\
+            .sum()\
+            .reset_index()
+        df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+            .reset_index()\
+            .assign(region='AUSTRALIA')
+        df_AUS_wide.columns = ['name', 'data','region']
+        df_AUS_wide['type'] = 'column'
+
+        df_region = bio_df_am\
+            .groupby(['Year', 'region', col])\
+            .sum()\
+            .reset_index()\
+            .query('`Value (%)` > 0')
+        df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+            .reset_index()
+        df_region_wide.columns = ['name', 'region', 'data']
+        df_region_wide['type'] = 'column'
         
-    bio_df_am.columns = ['name','data']
-    bio_df_am['type'] = 'column'
-    bio_df_am.to_json(f'{SAVE_DIR}/biodiversity_priority_3_total_score_by_agri_management.json', orient='records')
-    
-    
-    # Plot_BIO_priority_4: Biodiversity total score by Non-Agricultural Land-use
-    bio_df_non_ag = bio_df.query('Type == "Non-Agricultural land-use"').copy()
-    bio_df_non_ag = bio_df_non_ag.groupby(['Year','Landuse']).sum(numeric_only=True).reset_index()
-    
-    bio_df_non_ag = bio_df_non_ag\
-        .groupby('Landuse')[['Year','Contribution Relative to Base Year Level (%)']]\
-        .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Base Year Level (%)']))))\
-        .reset_index()
         
-    bio_df_non_ag.columns = ['name','data']
-    bio_df_non_ag['type'] = 'column'
-    bio_df_non_ag.to_json(f'{SAVE_DIR}/biodiversity_priority_4_total_score_by_non_agri_landuse.json', orient='records')
+        df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+        
+        if col == "Landuse":
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+            df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+        elif col == 'Water_supply':
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+        elif col.lower() == 'commodity':
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+            df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+        elif col == 'Agricultural Management Type':
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+        
+        
+        out_dict = {}
+        for region, df in df_wide.groupby('region'):
+            df = df.drop(['region'], axis=1)
+            out_dict[region] = df.to_dict(orient='records')
+            
+        with open(f'{SAVE_DIR}/BIO_quality_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+            json.dump(out_dict, f)
+
+
+    # ---------------- Biodiversity quality by Non-Agricultural  ----------------
+    bio_df_nonag = bio_df.query('Type == "Non-Agricultural land-use"').copy()
+    group_cols = ['Landuse']
+    for idx, col in enumerate(group_cols):
+        df_AUS = bio_df_nonag\
+            .groupby(['Year', col])[['Value (%)']]\
+            .sum()\
+            .reset_index()
+        df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+            .reset_index()\
+            .assign(region='AUSTRALIA')
+        df_AUS_wide.columns = ['name', 'data','region']
+        df_AUS_wide['type'] = 'column'
+
+        df_region = bio_df_nonag\
+            .groupby(['Year', 'region', col])\
+            .sum()\
+            .reset_index()\
+            .query('`Value (%)` > 0')
+        df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+            .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+            .reset_index()
+        df_region_wide.columns = ['name', 'region', 'data']
+        df_region_wide['type'] = 'column'
+        
+        
+        df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+        
+        if col == "Landuse":
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+            df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+        elif col == 'Water_supply':
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+        elif col.lower() == 'commodity':
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+            df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+        elif col == 'Agricultural Management Type':
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+        
+        
+        out_dict = {}
+        for region, df in df_wide.groupby('region'):
+            df = df.drop(['region'], axis=1)
+            out_dict[region] = df.to_dict(orient='records')
+            
+        with open(f'{SAVE_DIR}/BIO_quality_split_{idx+1}_NonAg_{col.replace(" ", "_")}.json', 'w') as f:
+            json.dump(out_dict, f)
     
     
         
-    # ---------------- (GBF2) Biodiversity priority score  ----------------
-    if settings.BIODIVERSITY_TARGET_GBF_2 == 'off':
-        pass
-    else:
+    
+    if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
+
         # get biodiversity dataframe
         filter_str = '''
             category == "biodiversity" 
@@ -1815,79 +1954,232 @@ def save_report_data(raw_data_dir:str):
         
         bio_paths = files.query(filter_str).reset_index(drop=True)
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
-        bio_df = bio_df.replace(RENAME_AM_NON_AG)
+        bio_df = bio_df.replace(RENAME_AM_NON_AG)\
+            .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
+            .query('`Value (%)` > 1e-6')\
+            .round(6)
         
 
-        # Plot_GBF2_1: Biodiversity total by Type
+        # ---------------- (GBF2) overview  ----------------
         bio_df_target = bio_df.groupby(['Year'])[['Priority Target (%)']].agg('first').reset_index()
-        bio_df_target_json = list(map(list,zip(bio_df_target['Year'],bio_df_target['Priority Target (%)'])))
-        
-        bio_df_type = bio_df.groupby(['Year','Type']).sum(numeric_only=True).reset_index()
-        bio_df_type = bio_df_type\
-            .groupby('Type')[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
+        bio_df_target = bio_df_target[['Year','Priority Target (%)']].values.tolist()
 
-        bio_df_type.columns = ['name','data']
-        bio_df_type['type'] = 'column'
-        bio_df_type.loc[len(bio_df_type)] = ['Priority Target (%)', bio_df_target_json, 'spline']
-        bio_df_type.to_json(f'{SAVE_DIR}/biodiversity_GBF2_1_total_score_by_type.json', orient='records')
-        
-        
-        
-        # Plot_GBF2_2: Biodiversity total by landuse
-        bio_df_landuse = bio_df\
-            .query('Type == "Agricultural land-use"')\
-            .groupby(['Year','Landuse'])\
-            .sum(numeric_only=True).reset_index()
-        bio_df_landuse = bio_df_landuse\
-            .groupby('Landuse')[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
+        group_cols = ['Type']
+        for idx, col in enumerate(group_cols):
+            df_AUS = bio_df\
+                .groupby(['Year', col])[['Value (%)']]\
+                .sum()\
+                .reset_index()
+            df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                .reset_index()\
+                .assign(region='AUSTRALIA')
+            df_AUS_wide.columns = ['name', 'data','region']
+            df_AUS_wide['type'] = 'column'
+            df_AUS_wide.loc[len(df_AUS_wide)] = ['Target (%)', bio_df_target, 'spline', None]
+
+            df_region = bio_df\
+                .groupby(['Year', 'region', col])\
+                .sum()\
+                .reset_index()\
+                .query('`Value (%)` > 0')
+            df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                .reset_index()
+            df_region_wide.columns = ['name', 'region', 'data']
+            df_region_wide['type'] = 'column'
             
-        bio_df_landuse.columns = ['name','data']
-        bio_df_landuse['type'] = 'column'
-        bio_df_landuse = bio_df_landuse.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index()
-        
-        bio_df_landuse.to_json(f'{SAVE_DIR}/biodiversity_GBF2_2_total_score_by_landuse.json', orient='records')
+            
+            df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+            
+            if col == "Landuse":
+                df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+            elif col == 'Water_supply':
+                df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+            elif col.lower() == 'commodity':
+                df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+            elif col == 'Agricultural Management Type':
+                df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+            
+            
+            out_dict = {}
+            for region, df in df_wide.groupby('region'):
+                df = df.drop(['region'], axis=1)
+                out_dict[region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF2_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+
+
+        # ---------------- (GBF2) Agricultural landuse  ----------------
+        bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
+
+        group_cols = ['Landuse']
+        for idx, col in enumerate(group_cols):
+            df_AUS = bio_df_ag\
+                .groupby(['Year', col])[['Value (%)']]\
+                .sum()\
+                .reset_index()
+            df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                .reset_index()\
+                .assign(region='AUSTRALIA')
+            df_AUS_wide.columns = ['name', 'data','region']
+            df_AUS_wide['type'] = 'column'
+
+            df_region = bio_df_ag\
+                .groupby(['Year', 'region', col])\
+                .sum()\
+                .reset_index()\
+                .query('`Value (%)` > 0')
+            df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                .reset_index()
+            df_region_wide.columns = ['name', 'region', 'data']
+            df_region_wide['type'] = 'column'
+            
+            
+            df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+            
+            if col == "Landuse":
+                df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+            elif col == 'Water_supply':
+                df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+            elif col.lower() == 'commodity':
+                df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+            elif col == 'Agricultural Management Type':
+                df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+            
+            
+            out_dict = {}
+            for region, df in df_wide.groupby('region'):
+                df = df.drop(['region'], axis=1)
+                out_dict[region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF2_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+                
+        # ---------------- (GBF2) Agricultural Management  ----------------
+        bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
+
+        group_cols = ['Agri-Management']
+        for idx, col in enumerate(group_cols):
+            df_AUS = bio_df_am\
+                .groupby(['Year', col])[['Value (%)']]\
+                .sum()\
+                .reset_index()
+            df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                .reset_index()\
+                .assign(region='AUSTRALIA')
+            df_AUS_wide.columns = ['name', 'data','region']
+            df_AUS_wide['type'] = 'column'
+
+            df_region = bio_df_am\
+                .groupby(['Year', 'region', col])\
+                .sum()\
+                .reset_index()\
+                .query('`Value (%)` > 0')
+            df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                .reset_index()
+            df_region_wide.columns = ['name', 'region', 'data']
+            df_region_wide['type'] = 'column'
+            
+            
+            df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+            
+            if col == "Landuse":
+                df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+            elif col == 'Water_supply':
+                df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+            elif col.lower() == 'commodity':
+                df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+            elif col == 'Agricultural Management Type':
+                df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+            
+            
+            out_dict = {}
+            for region, df in df_wide.groupby('region'):
+                df = df.drop(['region'], axis=1)
+                out_dict[region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF2_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+                
+                
+        # ---------------- (GBF2) Agricultural Management  ----------------
+        bio_df_nonag = bio_df.query('Type == "Non-Agricultural land-use"').copy()
+
+        group_cols = ['Landuse']
+        for idx, col in enumerate(group_cols):
+            df_AUS = bio_df_nonag\
+                .groupby(['Year', col])[['Value (%)']]\
+                .sum()\
+                .reset_index()
+            df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                .reset_index()\
+                .assign(region='AUSTRALIA')
+            df_AUS_wide.columns = ['name', 'data','region']
+            df_AUS_wide['type'] = 'column'
+
+            df_region = bio_df_nonag\
+                .groupby(['Year', 'region', col])\
+                .sum()\
+                .reset_index()\
+                .query('`Value (%)` > 0')
+            df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                .reset_index()
+            df_region_wide.columns = ['name', 'region', 'data']
+            df_region_wide['type'] = 'column'
+            
+            
+            df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+            
+            if col == "Landuse":
+                df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+            elif col == 'Water_supply':
+                df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+            elif col.lower() == 'commodity':
+                df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+            elif col == 'Agricultural Management Type':
+                df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+            
+            
+            out_dict = {}
+            for region, df in df_wide.groupby('region'):
+                df = df.drop(['region'], axis=1)
+                out_dict[region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF2_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
         
         
  
-        # Plot_GBF2_3: Biodiversity total by Agricultural Management
-        bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
-        bio_df_am = bio_df_am.groupby(['Year','Agri-Management']).sum(numeric_only=True).reset_index()
         
-        bio_df_am = bio_df_am\
-            .groupby('Agri-Management')[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-            
-        bio_df_am.columns = ['name','data']
-        bio_df_am['type'] = 'column'
-        bio_df_am.to_json(f'{SAVE_DIR}/biodiversity_GBF2_3_total_score_by_agri_management.json', orient='records')
-        
-        
-        
-        
-        # Plot_GBF2_4: Biodiversity total by Non-Agricultural Land-use
-        bio_df_non_ag = bio_df.query('Type == "Non-Agricultural land-use"').copy()
-        bio_df_non_ag = bio_df_non_ag.groupby(['Year','Landuse']).sum(numeric_only=True).reset_index()
-        
-        bio_df_non_ag = bio_df_non_ag\
-            .groupby('Landuse')[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-            
-        bio_df_non_ag.columns = ['name','data']
-        bio_df_non_ag['type'] = 'column'
-        bio_df_non_ag.to_json(f'{SAVE_DIR}/biodiversity_GBF2_4_total_score_by_non_agri_landuse.json', orient='records')
         
             
             
-    # ---------------- (GBF3) Biodiversity Major Vegetation Group score  ----------------
-    if settings.BIODIVERSITY_TARGET_GBF_3 == 'off':
-        pass
-    else:
+    
+    if settings.BIODIVERSITY_TARGET_GBF_3 != 'off':
         filter_str = '''
             category == "biodiversity" 
             and year_types == "single_year" 
@@ -1895,118 +2187,243 @@ def save_report_data(raw_data_dir:str):
         '''.strip().replace('\n','')
         
         bio_paths = files.query(filter_str).reset_index(drop=True)
-        bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
-        bio_df = bio_df.replace(RENAME_AM_NON_AG)
+        bio_df = pd.concat([pd.read_csv(path, low_memory=False) for path in bio_paths['path']])
+        bio_df = bio_df.replace(RENAME_AM_NON_AG)\
+            .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Vegetation Group': 'species'})\
+            .query('`Value (%)` > 1e-6')\
+            .round(6)
         
         
-        # Plot_GBF3_1: Biodiversity contribution score (group) total
-        bio_df_group = bio_df.groupby(['Vegetation Group','Year']).sum(numeric_only=True).reset_index()
-        bio_df_group = bio_df_group\
-            .groupby(['Vegetation Group'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-            
-        bio_df_group.columns = ['name','data']
-        bio_df_group['type'] = 'spline'
-        bio_df_group.to_json(f'{SAVE_DIR}/biodiversity_GBF3_1_contribution_group_score_total.json', orient='records')
-        
-        
-        # Plot_GBF3_2: Biodiversity contribution score (group) by Type
-        bio_df_group_type_sum = bio_df\
-            .groupby(['Year','Type','Vegetation Group'])\
-            .sum(numeric_only=True)\
-            .reset_index()
-            
-        bio_df_group_type_sum = bio_df_group_type_sum\
-            .groupby(['Type','Vegetation Group'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-            
-        bio_df_group_type_records = []
-        for idx,df in bio_df_group_type_sum.groupby('Vegetation Group'):
-            df = df.drop('Vegetation Group',axis=1)
-            df.columns = ['name','data']
-            df['type'] = 'column'
-            bio_df_group_type_records.append({'name':idx,'data':df.to_dict(orient='records')})
-            
-        with open(f'{SAVE_DIR}/biodiversity_GBF3_2_contribution_group_score_by_type.json', 'w') as outfile:
-            json.dump(bio_df_group_type_records, outfile)
-            
-            
-        # Plot_GBF3_3: Biodiversity contribution score (group) by landuse
-        bio_group_lu_sum = bio_df\
-            .query('Type == "Agricultural land-use"')\
-            .groupby(['Year','Landuse','Vegetation Group'])\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .query('`Contribution Relative to Pre-1750 Level (%)` >1')
-            
-        bio_group_lu_sum = bio_group_lu_sum\
-            .groupby(['Landuse','Vegetation Group'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-            
-        bio_df_group_records = []
-        for idx,df in bio_group_lu_sum.groupby('Vegetation Group'):
-            df = df.drop('Vegetation Group',axis=1)
-            df.columns = ['name','data']
-            df = df.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index().dropna()
-            df['type'] = 'column'
-            bio_df_group_records.append({'name':idx,'data':df.to_dict(orient='records')})
-            
-        with open(f'{SAVE_DIR}/biodiversity_GBF3_3_contribution_group_score_by_landuse.json', 'w') as outfile:
-            json.dump(bio_df_group_records, outfile)
-            
-            
-        # Plot_GBF3_4: Biodiversity contribution score (group) by agricultural management
-        bio_group_am_sum = bio_df\
-            .query('Type == "Agricultural Management"')\
-            .groupby(['Year','Agri-Management','Vegetation Group'])\
-            .sum(numeric_only=True)\
-            .reset_index()
+        # ---------------- (GBF3) Overview  ----------------
+        bio_df_target = bio_df.groupby(['Year', 'species'])[['Target_by_Percent']].agg('first').reset_index()
+
+        group_cols = ['Type']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df['species'].unique():
+                target_species = bio_df_target.query('species == @species')[['Year', 'Target_by_Percent']].values.tolist()
+                scores_species = bio_df.query('species == @species')
+                out_dict[species] = {}
                 
-        bio_group_am_sum = bio_group_am_sum\
-            .groupby(['Agri-Management','Vegetation Group'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
+                df_AUS_wide.loc[len(df_AUS_wide)] = ['Target (%)', target_species, 'AUSTRALIA',  'spline']
+
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF3_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+                
+                
+                
+        # ---------------- (GBF3) Agricultural landuse  ----------------
+        bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
+        
+        group_cols = ['Landuse']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df_ag['species'].unique():
+                scores_species = bio_df_ag.query('species == @species')
+                out_dict[species] = {}
+                
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
+
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF3_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+
+
+        # ---------------- (GBF3) Agricultural management  ----------------
+        bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
+
+        group_cols = ['Landuse', 'Agri-Management']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df_am['species'].unique():
+                scores_species = bio_df_am.query('species == @species')
+                out_dict[species] = {}
+                
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
+
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF3_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+
+
+        # ---------------- (GBF3) Non-agricultural management  ----------------
+        bio_df_nonag = bio_df.query('Type == "Non-Agricultural land-use"').copy()
+
+        group_cols = ['Landuse']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df_nonag['species'].unique():
+                scores_species = bio_df_nonag.query('species == @species')
+                out_dict[species] = {}
+                
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
+
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF3_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
             
-        bio_df_group_records = []
-        for idx,df in bio_group_am_sum.groupby('Vegetation Group'):
-            df = df.drop('Vegetation Group',axis=1)
-            df.columns = ['name','data']
-            df['type'] = 'column'
-            bio_df_group_records.append({'name':idx,'data':df.to_dict(orient='records')})
-            
-        with open(f'{SAVE_DIR}/biodiversity_GBF3_4_contribution_group_score_by_agri_management.json', 'w') as outfile:
-            json.dump(bio_df_group_records, outfile)
-            
-            
-        # Plot_GBF3_5: Biodiversity contribution score (group) by non-Agricultural land-use
-        bio_group_non_ag_sum = bio_df\
-            .query('Type == "Non-Agricultural land-use"')\
-            .groupby(['Year','Landuse','Vegetation Group'])\
-            .sum(numeric_only=True)\
-            .reset_index()
-            
-        bio_group_non_ag_sum = bio_group_non_ag_sum\
-            .groupby(['Landuse','Vegetation Group'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-            
-        bio_df_group_records = []
-        for idx,df in bio_group_non_ag_sum.groupby('Vegetation Group'):
-            df = df.drop('Vegetation Group',axis=1)
-            df.columns = ['name','data']
-            df['type'] = 'column'
-            bio_df_group_records.append({'name':idx,'data':df.to_dict(orient='records')})
-            
-        with open(f'{SAVE_DIR}/biodiversity_GBF3_5_contribution_group_score_by_non_agri_landuse.json', 'w') as outfile:
-            json.dump(bio_df_group_records, outfile)
             
             
             
-            
-    # ---------------- (GBF4) Biodiversity National Significance score  ----------------
+    
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES == 'on':
         
         # Get biodiversity dataframe
@@ -2018,110 +2435,235 @@ def save_report_data(raw_data_dir:str):
         
         bio_paths = files.query(filter_str).reset_index(drop=True)
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
-        bio_df = bio_df.replace(RENAME_AM_NON_AG)  # Rename the landuse
+        bio_df = bio_df.replace(RENAME_AM_NON_AG)\
+            .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
+            .query('`Value (%)` > 1e-6')\
+            .round(6)
         
-        
-        # Plot_GBF4_SNES_1: Biodiversity contribution score for each species
-        bio_df_species = bio_df.groupby(['Year','species']).sum(numeric_only=True).reset_index()
-        bio_df_species = bio_df_species\
-            .groupby(['species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-            
-        bio_df_species.columns = ['name','data']
-        bio_df_species['type'] = 'spline'
-        bio_df_species.to_json(f'{SAVE_DIR}/biodiversity_GBF4_SNES_1_contribution_species_score_total.json', orient='records')
-        
-        
-        # Plot_GBF4_SNES_2: Biodiversity contribution score (species) by Type
-        bio_df_species_type_sum = bio_df\
-            .groupby(['Year','Type','species'])\
-            .sum(numeric_only=True)\
-            .reset_index()
+        # ---------------- (GBF4 SNES) Overview  ----------------
+        bio_df_target = bio_df.groupby(['Year', 'species'])[['Target by Percent (%)']].agg('first').reset_index()
 
-        bio_df_species_type_sum = bio_df_species_type_sum\
-            .groupby(['Type','species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x: list(map(list, zip(x['Year'], x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
+        group_cols = ['Type']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df['species'].unique():
+                target_species = bio_df_target.query('species == @species')[['Year', 'Target by Percent (%)']].values.tolist()
+                scores_species = bio_df.query('species == @species')
+                out_dict[species] = {}
+                
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
+                df_AUS_wide.loc[len(df_AUS_wide)] = ['Target (%)', target_species, 'AUSTRALIA',  'spline']
 
-        bio_df_species_type_records = []
-        for idx, df in bio_df_species_type_sum.groupby('species'):
-            df = df.drop('species', axis=1)
-            df.columns = ['name', 'data']
-            df['type'] = 'column'
-            bio_df_species_type_records.append({'name': idx, 'data': df.to_dict(orient='records')})
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
 
-        with open(f'{SAVE_DIR}/biodiversity_GBF4_SNES_2_contribution_species_score_by_type.json', 'w') as outfile:
-            json.dump(bio_df_species_type_records, outfile)
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF4_SNES_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+                
+                
+                
+        # ---------------- (GBF4 SNES) Agricultural landuse  ----------------
+        bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
         
-        
-        # Plot_GBF4_SNES_3: Biodiversity contribution score (species) by landuse
-        bio_species_lu_sum = bio_df\
-            .query('Type == "Agricultural land-use"')\
-            .groupby(['Year','Landuse','species'])\
-            .sum(numeric_only=True)\
-            .reset_index()
-            
-        bio_species_lu_sum = bio_species_lu_sum\
-            .groupby(['Landuse','species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-            
-        bio_df_species_records = []
-        for idx, df in bio_species_lu_sum.groupby('species'):
-            df = df.drop('species', axis=1)
-            df.columns = ['name', 'data']
-            df['type'] = 'column'
-            df = df.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index().dropna()
-            bio_df_species_records.append({'name': idx, 'data': df.to_dict(orient='records')})
-            
-        with open(f'{SAVE_DIR}/biodiversity_GBF4_SNES_3_contribution_species_score_by_landuse.json', 'w') as outfile:
-            json.dump(bio_df_species_records, outfile)
-        
-        
-        # Plot_GBF4_SNES_4: Biodiversity contribution score (species) by agricultural management
-        bio_species_am_sum = bio_df\
-            .groupby(['Year','Agri-Management','species'])\
-            .sum(numeric_only=True)\
-            .reset_index()
-            
-        bio_species_am_sum = bio_species_am_sum\
-            .groupby(['Agri-Management','species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-            
-        bio_df_species_records = []
-        for idx, df in bio_species_am_sum.groupby('species'):
-            df = df.drop('species', axis=1)
-            df.columns = ['name', 'data']
-            df['type'] = 'column'
-            bio_df_species_records.append({'name': idx, 'data': df.to_dict(orient='records')})
-            
-        with open(f'{SAVE_DIR}/biodiversity_GBF4_SNES_4_contribution_species_score_by_agri_management.json', 'w') as outfile:
-            json.dump(bio_df_species_records, outfile)
-        
-        
-        # Plot_GBF4_SNES_5: Biodiversity contribution score (species) by non-Agricultural land-use
-        bio_species_non_ag_sum = bio_df\
-            .query('Type == "Non-Agricultural land-use"')\
-            .groupby(['Year','Landuse','species'])\
-            .sum(numeric_only=True)\
-            .reset_index()
-            
-        bio_species_non_ag_sum = bio_species_non_ag_sum\
-            .groupby(['Landuse','species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-            
-        bio_df_species_records = []
-        for idx, df in bio_species_non_ag_sum.groupby('species'):
-            df = df.drop('species', axis=1)
-            df.columns = ['name', 'data']
-            df['type'] = 'column'
-            bio_df_species_records.append({'name': idx, 'data': df.to_dict(orient='records')})
-            
-        with open(f'{SAVE_DIR}/biodiversity_GBF4_SNES_5_contribution_species_score_by_non_agri_landuse.json', 'w') as outfile:
-            json.dump(bio_df_species_records, outfile)
+        group_cols = ['Landuse']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df_ag['species'].unique():
+                scores_species = bio_df_ag.query('species == @species')
+                out_dict[species] = {}
+                
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
+
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF4_SNES_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+
+
+        # ---------------- (GBF4 SNES) Agricultural management  ----------------
+        bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
+
+        group_cols = ['Landuse', 'Agri-Management']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df_am['species'].unique():
+                scores_species = bio_df_am.query('species == @species')
+                out_dict[species] = {}
+                
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
+
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF4_SNES_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+
+        # ---------------- (GBF4 SNES) Non-agricultural management  ----------------
+        bio_df_nonag = bio_df.query('Type == "Non-Agricultural land-use"').copy()
+
+        group_cols = ['Landuse']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df_nonag['species'].unique():
+                scores_species = bio_df_nonag.query('species == @species')
+                out_dict[species] = {}
+                
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
+
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF4_SNES_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
             
             
             
@@ -2135,113 +2677,482 @@ def save_report_data(raw_data_dir:str):
         
         bio_paths = files.query(filter_str).reset_index(drop=True)
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
-        bio_df = bio_df.replace(RENAME_AM_NON_AG)
+        bio_df = bio_df.replace(RENAME_AM_NON_AG)\
+            .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
+            .query('`Value (%)` > 1e-6')\
+            .round(6)
         
         
-        # Plot_GBF4_ECNES_1: Biodiversity contribution score for each species
-        bio_df_species = bio_df.groupby(['Year','species']).sum(numeric_only=True).reset_index()
-        bio_df_species = bio_df_species\
-            .groupby(['species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x: list(map(list, zip(x['Year'], x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-        bio_df_species.columns = ['name', 'data']
-        bio_df_species['type'] = 'spline'
-        bio_df_species.to_json(f'{SAVE_DIR}/biodiversity_GBF4_ECNES_1_contribution_species_score_total.json', orient='records')
+        # ---------------- (GBF4 ECNES) Overview  ----------------
+        bio_df_target = bio_df.groupby(['Year', 'species'])[['Target by Percent (%)']].agg('first').reset_index()
+
+        group_cols = ['Type']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df['species'].unique():
+                target_species = bio_df_target.query('species == @species')[['Year', 'Target by Percent (%)']].values.tolist()
+                scores_species = bio_df.query('species == @species')
+                out_dict[species] = {}
+                
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
+                df_AUS_wide.loc[len(df_AUS_wide)] = ['Target (%)', target_species, 'AUSTRALIA',  'spline']
+
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF4_ECNES_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+                
+                
+                
+        # ---------------- (GBF4 ECNES) Agricultural landuse  ----------------
+        bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
+        
+        group_cols = ['Landuse']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df_ag['species'].unique():
+                scores_species = bio_df_ag.query('species == @species')
+                out_dict[species] = {}
+                
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
+
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF4_ECNES_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+
+
+        # ---------------- (GBF4 ECNES) Agricultural management  ----------------
+        bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
+
+        group_cols = ['Landuse', 'Agri-Management']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df_am['species'].unique():
+                scores_species = bio_df_am.query('species == @species')
+                out_dict[species] = {}
+                
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
+
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF4_ECNES_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+
+        # ---------------- (GBF4 ECNES) Non-agricultural management  ----------------
+        bio_df_nonag = bio_df.query('Type == "Non-Agricultural land-use"').copy()
+
+        group_cols = ['Landuse']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df_nonag['species'].unique():
+                scores_species = bio_df_nonag.query('species == @species')
+                out_dict[species] = {}
+                
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
+
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF4_ECNES_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
         
         
-        # Plot_GBF4_ECNES_2: Biodiversity contribution score (species) by Type
-        bio_df_species_type_sum = bio_df\
-            .groupby(['Year','Type','species'])\
-            .sum(numeric_only=True)\
-            .reset_index()
-
-        bio_df_species_type_sum = bio_df_species_type_sum\
-            .groupby(['Type','species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x: list(map(list, zip(x['Year'], x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-
-        bio_df_species_type_records = []
-        for idx, df in bio_df_species_type_sum.groupby('species'):
-            df = df.drop('species', axis=1)
-            df.columns = ['name', 'data']
-            df['type'] = 'column'
-            bio_df_species_type_records.append({'name': idx, 'data': df.to_dict(orient='records')})
-
-        with open(f'{SAVE_DIR}/biodiversity_GBF4_ECNES_2_contribution_species_score_by_type.json', 'w') as outfile:
-            json.dump(bio_df_species_type_records, outfile)
-
-        # Plot_GBF4_ECNES_3: Biodiversity contribution score (species) by agri landuse
-        bio_species_lu_sum = bio_df\
-            .query('Type == "Agricultural land-use"')\
-            .groupby(['Year','Landuse','species'])\
-            .sum(numeric_only=True)\
-            .reset_index()
-
-        bio_species_lu_sum = bio_species_lu_sum\
-            .groupby(['Landuse','species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x: list(map(list, zip(x['Year'], x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-
-        bio_df_species_records = []
-        for idx, df in bio_species_lu_sum.groupby('species'):
-            df = df.drop('species', axis=1)
-            df.columns = ['name', 'data']
-            df['type'] = 'column'
-            df = df.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index().dropna()
-            bio_df_species_records.append({'name': idx, 'data': df.to_dict(orient='records')})
-
-        with open(f'{SAVE_DIR}/biodiversity_GBF4_ECNES_3_contribution_species_score_by_landuse.json', 'w') as outfile:
-            json.dump(bio_df_species_records, outfile)
-
-        # Plot_GBF4_ECNES_4: Biodiversity contribution score (species) by agricultural management
-        bio_species_am_sum = bio_df\
-            .groupby(['Year','Agri-Management','species'])\
-            .sum(numeric_only=True)\
-            .reset_index()
-
-        bio_species_am_sum = bio_species_am_sum\
-            .groupby(['Agri-Management','species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x: list(map(list, zip(x['Year'], x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-
-        bio_df_species_records = []
-        for idx, df in bio_species_am_sum.groupby('species'):
-            df = df.drop('species', axis=1)
-            df.columns = ['name', 'data']
-            df['type'] = 'column'
-            bio_df_species_records.append({'name': idx, 'data': df.to_dict(orient='records')})
-
-        with open(f'{SAVE_DIR}/biodiversity_GBF4_ECNES_4_contribution_species_score_by_agri_management.json', 'w') as outfile:
-            json.dump(bio_df_species_records, outfile)
-
-        # Plot_GBF4_ECNES_5: Biodiversity contribution score (species) by non-Agricultural land-use
-        bio_species_non_ag_sum = bio_df\
-            .query('Type == "Non-Agricultural land-use"')\
-            .groupby(['Year','Landuse','species'])\
-            .sum(numeric_only=True)\
-            .reset_index()
-
-        bio_species_non_ag_sum = bio_species_non_ag_sum\
-            .groupby(['Landuse','species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x: list(map(list, zip(x['Year'], x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-
-        bio_df_species_records = []
-        for idx, df in bio_species_non_ag_sum.groupby('species'):
-            df = df.drop('species', axis=1)
-            df.columns = ['name', 'data']
-            df['type'] = 'column'
-            bio_df_species_records.append({'name': idx, 'data': df.to_dict(orient='records')})
-
-        with open(f'{SAVE_DIR}/biodiversity_GBF4_ECNES_5_contribution_species_score_by_non_agri_landuse.json', 'w') as outfile:
-            json.dump(bio_df_species_records, outfile)
         
-        
-        
-    # ---------------- (GBF8) Biodiversity suitability under differen climate change  ----------------
-    
-    # 1) Biodiversity suitability scores (GBF8) by group
+
     if settings.BIODIVERSITY_TARGET_GBF_8 == 'on':
+        
+        filter_str = '''
+            category == "biodiversity" 
+            and year_types == "single_year" 
+            and base_name.str.contains("biodiversity_GBF8_species_scores")
+        '''.strip().replace('\n','')
+        
+        bio_paths = files.query(filter_str).reset_index(drop=True)
+        bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
+        bio_df = bio_df.replace(RENAME_AM_NON_AG)\
+            .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Species':'species'})\
+            .query('`Value (%)` > 1e-6')\
+            .round(6)
+        
+        # ---------------- (GBF8 SPECIES) Overview  ----------------
+        bio_df_target = bio_df.groupby(['Year', 'species'])[['Target_by_Percent']].agg('first').reset_index()
+
+        group_cols = ['Type']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df['species'].unique():
+                target_species = bio_df_target.query('species == @species')[['Year', 'Target_by_Percent']].values.tolist()
+                scores_species = bio_df.query('species == @species')
+                out_dict[species] = {}
+                
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
+                df_AUS_wide.loc[len(df_AUS_wide)] = ['Target (%)', target_species, 'AUSTRALIA',  'spline']
+
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF8_SPECIES_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+                
+                
+                
+        # ---------------- (GBF8 SPECIES) Agricultural landuse  ----------------
+        bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
+        
+        group_cols = ['Landuse']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df_ag['species'].unique():
+                scores_species = bio_df_ag.query('species == @species')
+                out_dict[species] = {}
+                
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
+
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF8_SPECIES_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+
+
+        # ---------------- (GBF8 SPECIES) Agricultural management  ----------------
+        bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
+
+        group_cols = ['Landuse', 'Agri-Management']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df_am['species'].unique():
+                scores_species = bio_df_am.query('species == @species')
+                out_dict[species] = {}
+                
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
+
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF8_SPECIES_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+
+        # ---------------- (GBF8 SPECIES) Non-agricultural management  ----------------
+        bio_df_nonag = bio_df.query('Type == "Non-Agricultural land-use"').copy()
+
+        group_cols = ['Landuse']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df_nonag['species'].unique():
+                scores_species = bio_df_nonag.query('species == @species')
+                out_dict[species] = {}
+                
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
+
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF8_SPECIES_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+        
+        
+        
         
         # Get biodiversity dataframe
         filter_str = '''
@@ -2252,232 +3163,234 @@ def save_report_data(raw_data_dir:str):
         
         bio_paths = files.query(filter_str).reset_index(drop=True)
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
-        bio_df = bio_df.replace(RENAME_AM_NON_AG)                   # Rename the landuse
+        bio_df = bio_df.replace(RENAME_AM_NON_AG)\
+            .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Group':'species'})\
+            .query('`Value (%)` > 1e-6')\
+            .round(6)
 
-        # Plot_GBF8_1: Biodiversity contribution score (group) total
-        bio_df_group = bio_df.groupby(['Group','Year']).sum(numeric_only=True).reset_index()
-        
-        bio_df_group = bio_df_group\
-            .groupby(['Group'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-            
-        bio_df_group.columns = ['name','data']
-        bio_df_group['type'] = 'spline'
-        bio_df_group.to_json(f'{SAVE_DIR}/biodiversity_GBF8_1_contribution_group_score_total.json', orient='records')
-        
-        
-        # Plot_GBF8_2: Biodiversity contribution score (group) by Type
-        bio_df_group_type_sum = bio_df\
-            .groupby(['Year','Type','Group'])\
-            .sum(numeric_only=True)\
-            .reset_index()
-            
-        bio_df_group_type_sum = bio_df_group_type_sum\
-            .groupby(['Type','Group'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-            
-        bio_df_group_type_records = []
-        for idx,df in bio_df_group_type_sum.groupby('Group'):
-            df = df.drop('Group',axis=1)
-            df.columns = ['name','data']
-            df['type'] = 'column'
-            bio_df_group_type_records.append({'name':idx,'data':df.to_dict(orient='records')})
-        
-        with open(f'{SAVE_DIR}/biodiversity_GBF8_2_contribution_group_score_by_type.json', 'w') as outfile:
-            json.dump(bio_df_group_type_records, outfile)
-        
-        
-        
-        # Plot_GBF8_3: Biodiversity contribution score (group) by landuse
-        bio_group_lu_sum = bio_df\
-            .query('Type == "Agricultural land-use"')\
-            .groupby(['Year','Landuse','Group'])\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .query('`Contribution Relative to Pre-1750 Level (%)` >1')
-        
-        bio_group_lu_sum = bio_group_lu_sum\
-            .groupby(['Landuse','Group'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-
-        bio_df_group_records = []
-        for idx,df in bio_group_lu_sum.groupby('Group'):
-            df = df.drop('Group',axis=1)
-            df.columns = ['name','data']
-            df = df.set_index('name').reindex(LANDUSE_ALL_RENAMED).reset_index().dropna()
-            df['type'] = 'column'
-            bio_df_group_records.append({'name':idx,'data':df.to_dict(orient='records')})
-            
-        with open(f'{SAVE_DIR}/biodiversity_GBF8_3_contribution_group_score_by_landuse.json', 'w') as outfile:
-            json.dump(bio_df_group_records, outfile)
-            
-        
-        # Plot_GBF8_4: Biodiversity contribution score (group) by agricultural management
-        bio_group_am_sum = bio_df\
-            .groupby(['Year','Agri-Management','Group'])\
-            .sum(numeric_only=True)\
-            .reset_index()
-            
-        bio_group_am_sum = bio_group_am_sum\
-            .groupby(['Agri-Management','Group'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-            
-        bio_df_group_records = []
-        for idx,df in bio_group_am_sum.groupby('Group'):
-            df = df.drop('Group',axis=1)
-            df.columns = ['name','data']
-            df['type'] = 'column'
-            bio_df_group_records.append({'name':idx,'data':df.to_dict(orient='records')})
-            
-        with open(f'{SAVE_DIR}/biodiversity_GBF8_4_contribution_group_score_by_agri_management.json', 'w') as outfile:
-            json.dump(bio_df_group_records, outfile)
-            
-            
-        # Plot_GBF8_5: Biodiversity contribution score (group) by non-Agricultural land-use
-        bio_group_non_ag_sum = bio_df\
-            .query('Type == "Non-Agricultural land-use"')\
-            .groupby(['Year','Landuse','Group'])\
-            .sum(numeric_only=True)\
-            .reset_index()
+        # ---------------- (GBF8 GROUP) Overview  ----------------
+        group_cols = ['Type']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df['species'].unique():
+                scores_species = bio_df.query('species == @species')
+                out_dict[species] = {}
                 
-        bio_group_non_ag_sum = bio_group_non_ag_sum\
-            .groupby(['Landuse','Group'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-            
-        bio_df_group_records = []
-        for idx,df in bio_group_non_ag_sum.groupby('Group'):
-            df = df.drop('Group',axis=1)
-            df.columns = ['name','data']
-            df['type'] = 'column'
-            bio_df_group_records.append({'name':idx,'data':df.to_dict(orient='records')})
-            
-        with open(f'{SAVE_DIR}/biodiversity_GBF8_5_contribution_group_score_by_non_agri_landuse.json', 'w') as outfile:
-            json.dump(bio_df_group_records, outfile)
-            
-            
-            
-        # Plot Species level biodiversity contribution score 
-        filter_str = '''
-            category == "biodiversity" 
-            and year_types == "single_year" 
-            and base_name.str.contains("biodiversity_GBF8_species_scores")
-        '''.strip().replace('\n','')
-        
-        bio_paths = files.query(filter_str).reset_index(drop=True)
-        bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
-        bio_df = bio_df.replace(RENAME_AM_NON_AG)                   # Rename the landuse
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
 
-        # Plot_GBF8_6: Biodiversity contribution score (species) total
-        bio_df_species = bio_df.groupby(['Species','Year']).sum(numeric_only=True).reset_index()
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF8_GROUP_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+                
+                
+                
+        # ---------------- (GBF8 GROUP) Agricultural landuse  ----------------
+        bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
         
-        bio_df_species = bio_df_species\
-            .groupby(['Species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-            
-        bio_df_species.columns = ['name','data']
-        bio_df_species['type'] = 'spline'
-        bio_df_species.to_json(f'{SAVE_DIR}/biodiversity_GBF8_6_contribution_species_score_total.json', orient='records')
-        
-        
-        
-        # Plot_GBF8_7: Biodiversity contribution score (species) by Type
-        bio_df_species_type_sum = bio_df\
-            .groupby(['Year','Type','Species'])\
-            .sum(numeric_only=True)\
-            .reset_index()
-            
-        bio_df_species_type_sum = bio_df_species_type_sum\
-            .groupby(['Type','Species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-            
-        bio_df_species_type_records = []
-        for idx,df in bio_df_species_type_sum.groupby('Species'):
-            df = df.drop('Species',axis=1)
-            df.columns = ['name','data']
-            df['type'] = 'column'
-            bio_df_species_type_records.append({'name':idx,'data':df.to_dict(orient='records')})
-            
-        with open(f'{SAVE_DIR}/biodiversity_GBF8_7_contribution_species_score_by_type.json', 'w') as outfile:
-            json.dump(bio_df_species_type_records, outfile)
-            
-            
-        # Plot_GBF8_8: Biodiversity contribution score (species) by agri landuse
-        bio_species_lu_sum = bio_df\
-            .query('Type == "Agricultural land-use"')\
-            .groupby(['Year','Landuse','Species'])\
-            .sum(numeric_only=True)\
-            .reset_index()
-            
-        bio_species_lu_sum = bio_species_lu_sum\
-            .groupby(['Landuse','Species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-            
-        bio_df_species_records = []
-        for idx,df in bio_species_lu_sum.groupby('Species'):
-            df = df.drop('Species',axis=1)
-            df.columns = ['name','data']
-            df['type'] = 'column'
-            df = df.set_index('name').reindex(AG_LANDUSE).reset_index()
-            bio_df_species_records.append({'name':idx,'data':df.to_dict(orient='records')})
-            
-        with open(f'{SAVE_DIR}/biodiversity_GBF8_8_contribution_species_score_by_landuse.json', 'w') as outfile:
-            json.dump(bio_df_species_records, outfile)
-            
-            
-        # Plot_GBF8_9: Biodiversity contribution score (species) by agricultural management
-        bio_species_am_sum = bio_df\
-            .groupby(['Year','Agri-Management','Species'])\
-            .sum(numeric_only=True)\
-            .reset_index()
-            
-        bio_species_am_sum = bio_species_am_sum\
-            .groupby(['Agri-Management','Species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-            
-        bio_df_species_records = []
-        for idx,df in bio_species_am_sum.groupby('Species'):
-            df = df.drop('Species',axis=1)
-            df.columns = ['name','data']
-            df['type'] = 'column'
-            bio_df_species_records.append({'name':idx,'data':df.to_dict(orient='records')})
-            
-        with open(f'{SAVE_DIR}/biodiversity_GBF8_9_contribution_species_score_by_agri_management.json', 'w') as outfile:
-            json.dump(bio_df_species_records, outfile)
-            
-            
-        # Plot_GBF8_10: Biodiversity contribution score (species) by non-agricultural landuse
-        bio_species_non_ag_sum = bio_df\
-            .query('Type == "Non-Agricultural land-use"')\
-            .groupby(['Year','Landuse','Species'])\
-            .sum(numeric_only=True)\
-            .reset_index()
-            
-        bio_species_non_ag_sum = bio_species_non_ag_sum\
-            .groupby(['Landuse','Species'])[['Year','Contribution Relative to Pre-1750 Level (%)']]\
-            .apply(lambda x:list(map(list,zip(x['Year'],x['Contribution Relative to Pre-1750 Level (%)']))))\
-            .reset_index()
-            
-        bio_df_species_records = []
-        for idx,df in bio_species_non_ag_sum.groupby('Species'):
-            df = df.drop('Species',axis=1)
-            df.columns = ['name','data']
-            df['type'] = 'column'
-            bio_df_species_records.append({'name':idx,'data':df.to_dict(orient='records')})
-            
-        with open(f'{SAVE_DIR}/biodiversity_GBF8_10_contribution_species_score_by_non_agri_landuse.json', 'w') as outfile:
-            json.dump(bio_df_species_records, outfile)
-        
-        
- 
+        group_cols = ['Landuse']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df_ag['species'].unique():
+                scores_species = bio_df_ag.query('species == @species')
+                out_dict[species] = {}
+                
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
+
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF8_GROUP_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+
+
+        # ---------------- (GBF8 GROUP) Agricultural management  ----------------
+        bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
+
+        group_cols = ['Landuse', 'Agri-Management']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df_am['species'].unique():
+                scores_species = bio_df_am.query('species == @species')
+                out_dict[species] = {}
+                
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
+
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF8_GROUP_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+
+        # ---------------- (GBF8 GROUP) Non-agricultural management  ----------------
+        bio_df_nonag = bio_df.query('Type == "Non-Agricultural land-use"').copy()
+
+        group_cols = ['Landuse']
+        for idx, col in enumerate(group_cols):
+            out_dict = {}
+            for species in bio_df_nonag['species'].unique():
+                scores_species = bio_df_nonag.query('species == @species')
+                out_dict[species] = {}
+                
+                df_AUS = scores_species\
+                    .groupby(['Year', col])[['Value (%)']]\
+                    .sum()\
+                    .reset_index()
+                df_AUS_wide = df_AUS.groupby([col])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()\
+                    .assign(region='AUSTRALIA')
+                df_AUS_wide.columns = ['name', 'data','region']
+                df_AUS_wide['type'] = 'column'
+
+                df_region = scores_species\
+                    .groupby(['Year', 'region', col])\
+                    .sum()\
+                    .reset_index()\
+                    .query('`Value (%)` > 1e-6')
+                df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
+                    .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
+                    .reset_index()
+                df_region_wide.columns = ['name', 'region', 'data']
+                df_region_wide['type'] = 'column'
+                
+                
+                df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+                
+                if col == "Landuse":
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Water_supply':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+                elif col.lower() == 'commodity':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
+                    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+                    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+                elif col == 'Agricultural Management Type':
+                    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+
+                for region, df in df_wide.groupby('region'):
+                    df = df.drop(['region'], axis=1)
+                    out_dict[species][region] = df.to_dict(orient='records')
+
+            with open(f'{SAVE_DIR}/BIO_GBF8_GROUP_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
+                json.dump(out_dict, f)
+                
+  
+
     
     
     #########################################################

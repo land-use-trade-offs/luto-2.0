@@ -185,6 +185,7 @@ def get_biodiv_destocked_land(data: Data, lumap: np.ndarray):
     ------
     data: Data object.
     ag_b_mrj: agricultural biodiversity matrix.
+    lumap: Land use map of the previous year.
 
     Returns
     ------
@@ -209,6 +210,8 @@ def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
 
     Parameters
     - data: The input data object containing necessary information.
+    - ag_b_mrj: Agricultural biodiversity matrix.
+    - lumap: Land use map of the previous year.
 
     Returns
     - numpy.ndarray: The non-agricultural c_rk matrix of costs per cell and land use.
@@ -226,7 +229,7 @@ def get_breq_matrix(data: Data, ag_b_mrj: np.ndarray, lumap: np.ndarray):
         get_biodiv_sheep_carbon_plantings_belt(data, ag_b_mrj, cp_belt_x_r),
         get_biodiv_beef_carbon_plantings_belt(data, ag_b_mrj, cp_belt_x_r),
         get_biodiv_beccs(data),                                               
-        get_biodiv_destocked_land(data, lumap) * 0
+        get_biodiv_destocked_land(data, lumap)
     ]
 
     return np.concatenate([

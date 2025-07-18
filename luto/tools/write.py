@@ -166,7 +166,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
         delayed(write_ghg)(data, yr_cal, path_yr),
         delayed(write_ghg_separate)(data, yr_cal, path_yr),
         delayed(write_ghg_offland_commodity)(data, yr_cal, path_yr),
-        delayed(write_biodiversity_overall_priority_scores)(data, yr_cal, path_yr),
+        delayed(write_biodiversity_overall_quanlity_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF2_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF3_scores)(data, yr_cal, path_yr),
         delayed(write_biodiversity_GBF4_SNES_scores)(data, yr_cal, path_yr),
@@ -1464,12 +1464,24 @@ def write_water(data: Data, yr_cal, path):
         
     
 
-def write_biodiversity_overall_priority_scores(data: Data, yr_cal, path):
+def write_biodiversity_overall_quanlity_scores(data: Data, yr_cal, path):
     
     print(f'Writing biodiversity priority scores for {yr_cal}')
     
-    yr_cal_previouse = sorted(data.lumaps.keys())[sorted(data.lumaps.keys()).index(yr_cal) - 1]
+    yr_idx_previouse = sorted(data.lumaps.keys()).index(yr_cal) - 1
+    yr_cal_previouse = sorted(data.lumaps.keys())[yr_idx_previouse]
     yr_idx = yr_cal - data.YR_CAL_BASE
+
+
+    # Get the biodiversity scores b_mrj
+    bio_ag_priority_mrj =  tools.ag_mrj_to_xr(data, ag_biodiversity.get_bio_overall_priority_score_matrices_mrj(data))   
+    bio_am_priority_tmrj = tools.am_mrj_to_xr(data, ag_biodiversity.get_agricultural_management_biodiversity_matrices(data, bio_ag_priority_mrj.values, yr_idx))
+    bio_non_ag_priority_rk = tools.non_ag_rk_to_xr(data, non_ag_biodiversity.get_breq_matrix(data,bio_ag_priority_mrj.values, data.lumaps[yr_cal_previouse]))
+
+    if yr_idx_previouse < 0: # this means now is the base year, hence no ag-man and non-ag applied
+        bio_am_priority_tmrj *= 0.0
+        bio_non_ag_priority_rk *= 0.0
+
 
     # Get the decision variables for the year
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
@@ -1482,13 +1494,9 @@ def write_biodiversity_overall_priority_scores(data: Data, yr_cal, path):
         ).chunk({'cell': min(4096, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
 
-    # Get the biodiversity scores b_mrj
-    bio_ag_priority_mrj =  tools.ag_mrj_to_xr(data, ag_biodiversity.get_bio_overall_priority_score_matrices_mrj(data))   
-    bio_am_priority_tmrj = tools.am_mrj_to_xr(data, ag_biodiversity.get_agricultural_management_biodiversity_matrices(data, bio_ag_priority_mrj.values, yr_idx))
-    bio_non_ag_priority_rk = tools.non_ag_rk_to_xr(data, non_ag_biodiversity.get_breq_matrix(data,bio_ag_priority_mrj.values, data.lumaps[yr_cal_previouse]))
 
     # Calculate the biodiversity scores
-    base_yr_score = np.einsum('j,mrj,r->', ag_biodiversity.get_ag_biodiversity_contribution(data), data.AG_L_MRJ, data.REAL_AREA)
+    base_yr_score = base_yr_score = np.einsum('mrj,mrj->', bio_ag_priority_mrj, data.AG_L_MRJ)
 
     priority_ag = (ag_dvar_mrj * bio_ag_priority_mrj
         ).groupby('region'
@@ -1517,13 +1525,12 @@ def write_biodiversity_overall_priority_scores(data: Data, yr_cal, path):
 
 
     # Save the biodiversity scores
-    pd.concat([ priority_ag, priority_non_ag, priority_am], axis=0
+    df = pd.concat([ priority_ag, priority_non_ag, priority_am], axis=0
         ).rename(columns={
             'lu':'Landuse',
             'am':'Agri-Management',
             'Relative_Contribution_Percentage':'Contribution Relative to Base Year Level (%)'}
-        ).reset_index(drop=True
-        ).to_csv( os.path.join(path, f'biodiversity_overall_priority_scores_{yr_cal}.csv'), index=False)
+        ).reset_index(drop=True).to_csv( os.path.join(path, f'biodiversity_overall_priority_scores_{yr_cal}.csv'), index=False)
     
     return None
 
@@ -1645,6 +1652,8 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
     if settings.BIODIVERSITY_TARGET_GBF_3 == 'off':
         return None
     
+    print(f'Writing biodiversity GBF3 scores (VEGETATION) for {yr_cal}')
+    
     # Unpack the agricultural management land-use
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
@@ -1691,8 +1700,9 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
     veg_base_score_score = pd.DataFrame({
             'group': data.BIO_GBF3_ID2DESC.values(), 
             'BASE_OUTSIDE_SCORE': data.BIO_GBF3_BASELINE_SCORE_OUTSIDE_LUTO, 
-            'BASE_TOTAL_SCORE': data.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA}
-        ).eval('Relative_Contribution_Percentage = BASE_OUTSIDE_SCORE / BASE_TOTAL_SCORE * 100')
+            'BASE_TOTAL_SCORE': data.BIO_GBF3_BASELINE_SCORE_ALL_AUSTRALIA,
+            'TARGET_INSIDE_SCORE': data.get_GBF3_limit_score_inside_LUTO_by_yr(yr_cal)}
+        ).eval('Target_by_Percent = (TARGET_INSIDE_SCORE + BASE_OUTSIDE_SCORE) / BASE_TOTAL_SCORE * 100')
 
     GBF3_score_ag = (vegetation_score_vr * ag_impact_j * ag_dvar_mrj
         ).groupby('region'
@@ -1727,7 +1737,8 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
     veg_base_score_score = veg_base_score_score.assign(
         Type='Outside LUTO study area', 
         Year=yr_cal, 
-        lu='Outside LUTO study area'
+        lu='Outside LUTO study area',
+        relative_contribution_percentage=veg_base_score_score['Target_by_Percent']
     )
     pd.concat([
         GBF3_score_ag, 
@@ -2135,7 +2146,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
             'BASE_OUTSIDE_SCORE': data.get_GBF8_score_outside_natural_LUTO_by_yr(yr_cal),
             'BASE_TOTAL_SCORE': data.BIO_GBF8_BASELINE_SCORE_AND_TARGET_PERCENT_SPECIES['HABITAT_SUITABILITY_BASELINE_SCORE_ALL_AUSTRALIA'],
             'TARGET_INSIDE_SCORE': data.get_GBF8_target_inside_LUTO_by_yr(yr_cal),}
-        ).eval('Relative_Contribution_Percentage = BASE_OUTSIDE_SCORE / BASE_TOTAL_SCORE * 100')
+        ).eval('Target_by_Percent = (TARGET_INSIDE_SCORE + BASE_OUTSIDE_SCORE) / BASE_TOTAL_SCORE * 100')
 
     # Calculate GBF8 scores for species
     GBF8_scores_species_ag = (bio_scores_sr * ag_impact_j * ag_dvar_mrj
@@ -2168,7 +2179,8 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
         ).assign(Type='Non-Agricultural land-use', Year=yr_cal)
 
     # Concatenate the dataframes, rename the columns, and reset the index, then save to a csv file
-    base_yr_score = base_yr_score.assign(Type='Outside LUTO study area', Year=yr_cal)
+    base_yr_score = base_yr_score.assign(Type='Outside LUTO study area', Year=yr_cal, lu='Outside LUTO study area'
+        ).eval('Relative_Contribution_Percentage = BASE_OUTSIDE_SCORE / BASE_TOTAL_SCORE * 100')
 
     pd.concat([
         GBF8_scores_species_ag,
