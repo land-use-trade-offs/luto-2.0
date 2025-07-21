@@ -87,10 +87,9 @@ def data2html(raw_data_dir):
         add_data_2_html(html_path, data_pathes)
         
 
-    
-    
     # Add settings to the home page
     add_txt_2_html(f"{report_dir}/REPORT_HTML/index.html", f"{raw_data_dir}/model_run_settings.txt", "settingsTxt")
+
 
     # Write avaliable years to each page .content[#model_years pre]
     for page in glob(f"{report_dir}/REPORT_HTML/pages/*.html"):

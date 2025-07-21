@@ -73,13 +73,14 @@ def add_txt_2_html(html_path:str, txt:str, id:str)->None:
     pre_element.text = txt
     
     # Write changes to the html
-    index_tree.write(html_path, 
-                    pretty_print=True,
-                    encoding='utf-8',
-                    method='html')
-        
-    
-    
+    index_tree.write(
+        html_path, 
+        pretty_print=True,
+        encoding='utf-8',
+        method='html'
+    )
+
+
 
 def add_data_2_html(html_path:str, data_pathes:list)->None:
     """

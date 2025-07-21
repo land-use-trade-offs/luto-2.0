@@ -380,12 +380,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // area_begin_end_area
   document.getElementById("area_begin_end_area").innerHTML = JSON.parse(document.getElementById(
-    "Area_transition"
-  ).innerText).AUSTRALIA.area;
+    "Area_transition_area"
+  ).innerText).AUSTRALIA;
 
   // area_begin_end_pct
   document.getElementById("area_begin_end_pct").innerHTML = JSON.parse(document.getElementById(
-    "Area_transition"
-  ).innerText).AUSTRALIA.pct;
+    "Area_transition_pct"
+  ).innerText).AUSTRALIA;
 });
 

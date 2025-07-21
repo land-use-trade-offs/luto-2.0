@@ -69,11 +69,11 @@ def save_report_data(raw_data_dir:str):
     """
     # Set the save directory
     SAVE_DIR = f'{raw_data_dir}/DATA_REPORT/data'
-    
+
     # Select the years to reduce the column number to avoid cluttering in the multi-level axis graphing
     years = sorted(settings.SIM_YEARS)
     years_select = select_years(years)
-    
+
     # Create the directory if it does not exist
     if not os.path.exists(SAVE_DIR):
         os.makedirs(SAVE_DIR)
@@ -117,7 +117,7 @@ def save_report_data(raw_data_dir:str):
         .reset_index()
         
 
-    # Area overview
+    # -------------------- Area overview --------------------
     area_ag_nonag = pd.concat([ag_dvar_area, non_ag_dvar_area], ignore_index=True)
     area_ag_nonag = area_ag_nonag.replace(RENAME_AM_NON_AG)    
     area_ag_nonag = area_ag_nonag.merge(lu_group, left_on='Land-use', right_on='Land-use', how='left')
@@ -228,7 +228,7 @@ def save_report_data(raw_data_dir:str):
             json.dump(out_dict, f)
             
     
-    # Area by Agricultural land
+    # -------------------- Area by Agricultural land --------------------
     group_cols = ['Land-use', 'Water_supply']
     for idx, col in enumerate(group_cols):
 
@@ -281,7 +281,7 @@ def save_report_data(raw_data_dir:str):
             json.dump(out_dict, f)
 
 
-    # Area by Agricultural management Area (ha) Land use
+    # -------------------- Area by Agricultural management Area (ha) Land use --------------------
     group_cols = ['Type', 'Water_supply', 'Land-use']
     
     for idx, col in enumerate(group_cols):
@@ -335,7 +335,7 @@ def save_report_data(raw_data_dir:str):
             json.dump(out_dict, f)
             
             
-    # Area by Non-Agricultural landuse
+    # -------------------- Area by Non-Agricultural landuse --------------------
     group_cols = ['Land-use']
     
     for idx, col in enumerate(group_cols):
@@ -391,7 +391,7 @@ def save_report_data(raw_data_dir:str):
             
 
 
-    # Transition areas
+    # -------------------- Transition areas --------------------
     transition_path = files.query('category =="transition_matrix"')
     transition_df_area = pd.read_csv(transition_path['path'].values[0], index_col=0).reset_index() 
     transition_df_area = transition_df_area.replace(RENAME_AM_NON_AG)
@@ -405,7 +405,8 @@ def save_report_data(raw_data_dir:str):
     ]
     
     
-    out_dict = {}
+    out_dict_area = {}
+    out_dict_pct = {}
     for (region, df) in transition_regions:
         transition_mat = df.pivot(index='From Land-use', columns='To Land-use', values='Area (ha)')
         transition_mat = transition_mat.reindex(index=AG_LANDUSE, columns=LANDUSE_ALL_RENAMED)
@@ -438,13 +439,14 @@ def save_report_data(raw_data_dir:str):
         heat_area_html = re.sub(r'(?<!\d)0(?!\d)', '-', heat_area_html)
         heat_pct_html = re.sub(r'(?<!\d)0.00(?!\d)', '-', heat_pct_html)
 
-        out_dict[region] = {
-            'area': heat_area_html,
-            'pct': heat_pct_html
-        }
-        
-    with open(f'{SAVE_DIR}/Area_transition.json', 'w') as f:
-        json.dump(out_dict, f)
+        out_dict_area[region] = heat_area_html
+        out_dict_pct[region] = heat_pct_html
+
+    with open(f'{SAVE_DIR}/Area_transition_area.json', 'w') as f:
+        json.dump(out_dict_area, f, ensure_ascii=True)
+
+    with open(f'{SAVE_DIR}/Area_transition_pct.json', 'w') as f:
+        json.dump(out_dict_pct, f, ensure_ascii=True)
 
 
 
@@ -473,7 +475,7 @@ def save_report_data(raw_data_dir:str):
         .assign(on_off_land=lambda x: np.where(x['Commodity'].isin(COMMODITIES_OFF_LAND), 'Off-land', 'On-land'))
     
 
-    # Plot_demand.
+    # -------------------- Demand --------------------
     group_cols = ['Type', 'on_off_land', 'Commodity']
 
     for idx, col in enumerate(group_cols):
@@ -501,7 +503,7 @@ def save_report_data(raw_data_dir:str):
         df_AUS_wide.to_json(f'{SAVE_DIR}/Production_demand_{idx+1}_{col.replace(" ", "_")}.json', orient='records')
 
 
-    # Plot production limit.
+    # -------------------- Production limit. --------------------
     demand_limit = DEMAND_DATA_long.query('Type == "Domestic" and on_off_land == "On-land"')
     demand_limit_wide = demand_limit.groupby(['Commodity', 'Year'])[['Quantity (tonnes, KL)']]\
         .sum()\
@@ -515,7 +517,7 @@ def save_report_data(raw_data_dir:str):
 
 
 
-    # Plot the sum of commodity production
+    # -------------------- Sum of commodity production --------------------
     group_cols = ['Commodity', 'Type']
     for idx, col in enumerate(group_cols):
 
@@ -565,7 +567,7 @@ def save_report_data(raw_data_dir:str):
 
 
 
-    # Plot demand achievement in the final target year (%)
+    # -------------------- Demand achievement in the final target year (%) --------------------
     quantity_diff = demand_files.query('base_name == "quantity_comparison"').reset_index(drop=True)
     quantity_diff = pd.concat([pd.read_csv(path) for path in quantity_diff['path']], ignore_index=True)
     quantity_diff = quantity_diff.replace({'Sheep lexp': 'Sheep live export', 'Beef lexp': 'Beef live export'})
@@ -591,7 +593,7 @@ def save_report_data(raw_data_dir:str):
         json.dump(quantity_diff_wide_AUS_data, f)    
     
     
-    # Plot commodity production for ag, non-ag, and agricultural management
+    # -------------------- Commodity production for ag, non-ag, and agricultural management --------------------
     for idx, _type in enumerate(quantity_LUTO['Type'].unique()):
         _df = quantity_LUTO.query(f'Type == "{_type}"').query('`Production (t/KL)` > 0').copy()
 
@@ -650,7 +652,7 @@ def save_report_data(raw_data_dir:str):
     #                  3) Economics                    #
     ####################################################
     
-    # Get the revenue and cost data
+    # -------------------- Get the revenue and cost data --------------------
     revenue_ag_df = files.query('base_name == "revenue_agricultural_commodity" and year_types != "begin_end_year"').reset_index(drop=True)
     revenue_ag_df = pd.concat([pd.read_csv(path) for path in revenue_ag_df['path']], ignore_index=True)
     revenue_ag_df = revenue_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural land-use (revenue)')
@@ -732,7 +734,7 @@ def save_report_data(raw_data_dir:str):
     ]
 
 
-    # Plot economy overview
+    # -------------------- Economy overview --------------------
     economics_df_AUS = economics_df.groupby(['Year','Source']
         ).sum(numeric_only=True
         ).reset_index()
@@ -791,7 +793,7 @@ def save_report_data(raw_data_dir:str):
  
  
  
-    # Plot economics for ag
+    # -------------------- Economics for ag --------------------
     revenue_ag_df = revenue_ag_df.assign(Rev_Cost='Revenue')
     cost_ag_df = cost_ag_df.assign(Rev_Cost='Cost')
 
@@ -853,7 +855,7 @@ def save_report_data(raw_data_dir:str):
     
 
 
-    # Plot economics for ag-management
+    # -------------------- Economics for ag-management --------------------
     revenue_am_df = revenue_am_df.assign(Rev_Cost='Revenue')
     cost_am_df = cost_am_df.assign(Rev_Cost='Cost')
 
@@ -912,7 +914,7 @@ def save_report_data(raw_data_dir:str):
             json.dump(out_dict, f)
 
 
-    # Plot economics for non-agriculture
+    # -------------------- Economics for non-agriculture --------------------
     revenue_non_ag_df = revenue_non_ag_df.assign(Rev_Cost='Revenue')
     cost_non_ag_df = cost_non_ag_df.assign(Rev_Cost='Cost')
 
@@ -964,7 +966,7 @@ def save_report_data(raw_data_dir:str):
             json.dump(out_dict, f)
 
 
-    # Plot transition cost for Ag2Ag
+    # -------------------- Transition cost for Ag2Ag --------------------
     cost_transition_ag2ag_df['Value ($)'] = cost_transition_ag2ag_df['Value ($)'] * -1  # Convert from negative to positive
     group_cols = ['Type', 'From land-use', 'To land-use']
     
@@ -1065,7 +1067,7 @@ def save_report_data(raw_data_dir:str):
 
 
 
-    # Plot transition cost for Ag2Non-Ag
+    # -------------------- Transition cost for Ag2Non-Ag --------------------
     cost_transition_ag2non_ag_df['Value ($)'] = cost_transition_ag2non_ag_df['Value ($)'] * -1  # Convert from negative to positive
     keep_cols = ['Year', 'region', 'Value ($)']
     group_cols = ['Cost type', 'From land-use', 'To land-use']
@@ -1161,7 +1163,7 @@ def save_report_data(raw_data_dir:str):
     
     
 
-    # Plot transition cost for Non-Ag to Ag
+    # -------------------- Transition cost for Non-Ag to Ag --------------------
     cost_transition_non_ag2ag_df['Value ($)'] = cost_transition_non_ag2ag_df['Value ($)'] * -1  # Convert from negative to positive
     keep_cols = ['Year', 'region', 'Value ($)']
     group_cols = ['Cost type', 'From land-use', 'To land-use']
@@ -1329,7 +1331,7 @@ def save_report_data(raw_data_dir:str):
         
         
 
-        # GHG from individual emission sectors
+        # -------------------- GHG from individual emission sectors --------------------
         net_offland_AUS = GHG_off_land.groupby('Year')[['Value (t CO2e)']].sum(numeric_only=True).reset_index()
         net_offland_AUS_wide = net_offland_AUS[['Year','Value (t CO2e)']].values.tolist()
         
@@ -1397,7 +1399,7 @@ def save_report_data(raw_data_dir:str):
             
             
 
-        # GHG emission for agricultural land-use  
+        # -------------------- GHG emission for agricultural land-use --------------------
         GHG_ag = GHG_land.query('Type == "Agricultural land-use"') 
         GHG_CO2 = GHG_ag.query('~Source.isin(@GHG_CATEGORY.keys())').copy()
         GHG_CO2['GHG Category'] = 'CO2'
@@ -1472,7 +1474,7 @@ def save_report_data(raw_data_dir:str):
 
      
             
-        # GHG emission (off-land) by commodity
+        # -------------------- GHG emission (off-land) by commodity --------------------
         group_cols = ['Emission Type', 'Emission Source', 'Commodity']
 
         for idx, col in enumerate(group_cols):
@@ -1498,7 +1500,7 @@ def save_report_data(raw_data_dir:str):
     
 
 
-        # GHG abatement by Non-Agricultural sector
+        # -------------------- GHG abatement by Non-Agricultural sector --------------------
         Non_ag_reduction_long = GHG_land.query('Type == "Non-Agricultural land-use"').reset_index(drop=True)
         group_cols = ['Land-use']
         for idx, col in enumerate(group_cols):
@@ -1541,7 +1543,7 @@ def save_report_data(raw_data_dir:str):
 
 
 
-        # GHG reductions by Agricultural managements
+        # -------------------- GHG reductions by Agricultural managements --------------------
         Ag_man_sequestration_long = GHG_land.query('Type == "Agricultural Management"').reset_index(drop=True)
         group_cols = ['Land-use', 'Land-use type', 'Agricultural Management Type', 'Water_supply']
         for idx, col in enumerate(group_cols):
@@ -1638,7 +1640,7 @@ def save_report_data(raw_data_dir:str):
 
 
 
-    # Water yield overview for Australia
+    # -------------------- Water yield overview for Australia --------------------
     water_inside_LUTO_sum = water_net_yield_water_region\
         .groupby(['Year','Type'])[['Value (ML)']]\
         .sum(numeric_only=True)\
@@ -1689,7 +1691,7 @@ def save_report_data(raw_data_dir:str):
     water_yield_df_AUS.to_json(f'{SAVE_DIR}/Water_overview_AUSTRALIA.json', orient='records')
     
 
-    # Water yield overview for Australia by landuse
+    # -------------------- Water yield overview for Australia by landuse --------------------
     water_inside_LUTO_lu_sum = water_net_yield_water_region\
         .groupby(['Year','Landuse'])[['Value (ML)']]\
         .sum(numeric_only=True)\
@@ -1710,7 +1712,7 @@ def save_report_data(raw_data_dir:str):
     water_inside_LUTO_lu_sum_wide.to_json(f'{SAVE_DIR}/Water_overview_landuse.json', orient='records')
 
 
-    # Water yield overview for Australia by watershed region
+    # -------------------- Water yield overview for Australia by watershed region --------------------
     water_yield_region = {}
     for reg_name in water_net_yield['Region'].unique():
 
@@ -1749,7 +1751,7 @@ def save_report_data(raw_data_dir:str):
         
         
         
-    # Water yield overview by NRM region
+    # -------------------- Water yield overview by NRM region --------------------
     group_cols = ['Landuse', 'Type']
     for idx, col in enumerate(group_cols):
 
@@ -1778,7 +1780,7 @@ def save_report_data(raw_data_dir:str):
 
 
 
-    # Water yield for agricultural landuse by NRM region
+    # -------------------- Water yield for agricultural landuse by NRM region --------------------
     water_ag = water_net_yield_NRM_region.query('Type == "Agricultural Landuse"').copy()
     group_cols = ['Landuse', 'Water Supply']
     
@@ -1811,7 +1813,7 @@ def save_report_data(raw_data_dir:str):
             json.dump(out_dict, f)
             
             
-    # Water yield for agricultural management by NRM region
+    # -------------------- Water yield for agricultural management by NRM region --------------------
     water_am = water_net_yield_NRM_region.query('Type == "Agricultural Management"').copy()
     group_cols = ['Water Supply', 'Landuse', 'Agri-Management']
     
@@ -1848,7 +1850,7 @@ def save_report_data(raw_data_dir:str):
             json.dump(out_dict, f)
             
             
-    # Water yield for non-agricultural landuse by NRM region
+    # -------------------- Water yield for non-agricultural landuse by NRM region --------------------
     water_nonag = water_net_yield_NRM_region.query('Type == "Non-Agricultural Landuse"').copy()
     group_cols = ['Landuse']
     
@@ -2110,7 +2112,7 @@ def save_report_data(raw_data_dir:str):
     
     if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
 
-        # get biodiversity dataframe
+        # -------------------- get biodiversity dataframe --------------------
         filter_str = '''
             category == "biodiversity" 
             and year_types == "single_year" 
@@ -2591,7 +2593,7 @@ def save_report_data(raw_data_dir:str):
     
     if settings.BIODIVERSITY_TARGET_GBF_4_SNES == 'on':
         
-        # Get biodiversity dataframe
+        # -------------------- Get biodiversity dataframe --------------------
         filter_str = '''
             category == "biodiversity" 
             and year_types == "single_year" 
@@ -2833,7 +2835,7 @@ def save_report_data(raw_data_dir:str):
             
             
     if settings.BIODIVERSITY_TARGET_GBF_4_ECNES == 'on':
-        # Get biodiversity dataframe
+        # -------------------- Get biodiversity dataframe --------------------
         filter_str = '''
             category == "biodiversity" 
             and year_types == "single_year" 
@@ -3319,7 +3321,7 @@ def save_report_data(raw_data_dir:str):
         
         
         
-        # Get biodiversity dataframe
+        # -------------------- Get biodiversity dataframe --------------------
         filter_str = '''
             category == "biodiversity" 
             and year_types == "single_year" 
@@ -3567,19 +3569,19 @@ def save_report_data(raw_data_dir:str):
     # Create the directory to save map_html if it does not exist
     if  not os.path.exists(map_save_dir):
         os.makedirs(map_save_dir)
-        
+
     # Remove any existing map files in the save directory
     if os.path.exists(map_save_dir):
         for file in os.listdir(map_save_dir):
             file_path = os.path.join(map_save_dir, file)
             if os.path.isfile(file_path):
                 os.remove(file_path)
-    
+
     # Function to move a file from one location to another if the file exists
     def move_html(path_from, path_to):
         if os.path.exists(path_from):
             shutil.move(path_from, path_to)
-    
+
     # Move the map files to the save directory
     tasks = [
         delayed(move_html)(row['path'], map_save_dir)
@@ -3594,7 +3596,7 @@ def save_report_data(raw_data_dir:str):
 
 
     #########################################################
-    #              Report success info                      #
+    # Report success info                     
     #########################################################
 
     print('Report data created successfully!\n')
