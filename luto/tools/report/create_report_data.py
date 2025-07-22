@@ -32,6 +32,7 @@ from luto.tools.report.data_tools.helper_func import select_years
 
 from luto.tools.report.data_tools.parameters import (
     AG_LANDUSE,
+    COLORS,
     COLORS_AM_NONAG,
     COLORS_COMMODITIES,
     COLORS_ECONOMY_TYPE,
@@ -46,14 +47,9 @@ from luto.tools.report.data_tools.parameters import (
     LU_CROPS,
     LVSTK_MODIFIED,
     LVSTK_NATURAL,
-    PATTERNS_AM_NONAG,
-    PATTERNS_COMMODITIES,
-    PATTERNS_ECONOMY_TYPE,
-    PATTERNS_GHG,
-    PATTERNS_LM,
-    PATTERNS_LU,
     RENAME_AM_NON_AG,
-    RENAME_NON_AG
+    RENAME_NON_AG,
+    SPATIAL_MAP_DICT
 )
 
 
@@ -456,7 +452,10 @@ def save_report_data(raw_data_dir:str):
     
     demand_files = files.query('category == "quantity" and year_types == "single_year"')
     
-    quantity_LUTO = demand_files.query('base_name == "quantity_production_t_separate"').reset_index(drop=True).query('Year.isin(@years)')
+    quantity_LUTO = demand_files\
+        .query('base_name == "quantity_production_t_separate"')\
+        .reset_index(drop=True)\
+        .query('Year.isin(@years)')
     quantity_LUTO = pd.concat(
             [pd.read_csv(path).assign(Year=Year) for Year,path in quantity_LUTO[['Year','path']].values.tolist()],
             ignore_index=True)\
@@ -466,7 +465,6 @@ def save_report_data(raw_data_dir:str):
         
         
     DEMAND_DATA_long = get_demand_df()\
-        .query(f'Year.isin({years_select})')\
         .replace({'Beef lexp': 'Beef live export', 'Sheep lexp': 'Sheep live export'})\
         .set_index(['Commodity', 'Type', 'Year'])\
         .reindex(COMMODITIES_ALL, level=0)\
@@ -480,7 +478,12 @@ def save_report_data(raw_data_dir:str):
 
     for idx, col in enumerate(group_cols):
 
-        df_AUS = DEMAND_DATA_long\
+        if col == 'Type':
+            _df = DEMAND_DATA_long.query(f'Year.isin({years_select})')
+        else:
+            _df = DEMAND_DATA_long.query(f'Year.isin({years})')
+            
+        df_AUS = _df\
             .groupby(['Year', col])[['Quantity (tonnes, KL)']]\
             .sum()\
             .reset_index()\
@@ -499,12 +502,12 @@ def save_report_data(raw_data_dir:str):
             df_AUS_wide['color'] = df_AUS_wide['name'].apply(lambda x: COLORS_COMMODITIES[x])
             df_AUS_wide['name_order'] = df_AUS_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
             df_AUS_wide = df_AUS_wide.sort_values('name_order').drop(columns=['name_order'])
-            
+ 
         df_AUS_wide.to_json(f'{SAVE_DIR}/Production_demand_{idx+1}_{col.replace(" ", "_")}.json', orient='records')
 
 
     # -------------------- Production limit. --------------------
-    demand_limit = DEMAND_DATA_long.query('Type == "Domestic" and on_off_land == "On-land"')
+    demand_limit = DEMAND_DATA_long.query('Type == "Domestic" and on_off_land == "On-land" and Year.isin(@years)')
     demand_limit_wide = demand_limit.groupby(['Commodity', 'Year'])[['Quantity (tonnes, KL)']]\
         .sum()\
         .reset_index()\
@@ -582,10 +585,9 @@ def save_report_data(raw_data_dir:str):
         .apply(lambda x: list(map(list,zip(x['Year'],x['Demand Achievement (%)']))))\
         .reset_index()
         
-    quantity_diff_wide_AUS['type'] = 'spline'
-    quantity_diff_wide_AUS['showInLegend'] = True
-    quantity_diff_wide_AUS.columns = ['name','data', 'type', 'showInLegend']
-    
+    quantity_diff_wide_AUS['type'] = 'line'
+    quantity_diff_wide_AUS.columns = ['name','data', 'type']
+
     quantity_diff_wide_AUS_data = {
         'AUSTRALIA': quantity_diff_wide_AUS.to_dict(orient='records')
     }
@@ -750,7 +752,7 @@ def save_report_data(raw_data_dir:str):
     economics_df_AUS_wide.loc[len(economics_df_AUS_wide)] = [
         'Profit', 
         economics_df_AUS.groupby('Year')['Value ($)'].sum().reset_index().values.tolist(), 
-        'spline', 
+        'line', 
         'AUSTRALIA'
     ]
 
@@ -770,7 +772,7 @@ def save_report_data(raw_data_dir:str):
         df_col.loc[len(df_col)] = [
             'Profit',
             df.groupby(['Year'])[['Value ($)']].sum(numeric_only=True).reset_index().values.tolist(),
-            'spline',
+            'line',
         ]
         df_col['region'] = region
         rev_cost_net_wide_region = pd.concat([rev_cost_net_wide_region, df_col])
@@ -832,18 +834,26 @@ def save_report_data(raw_data_dir:str):
         df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
         
         if col == "Land-use":
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']] if x['Rev_Cost'] == 'Revenue' else PATTERNS_LU[x['name']], axis=1)
-            df_wide['showInLegend'] = df_wide['Rev_Cost'].apply(lambda x: True if x == 'Revenue' else False)
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
             df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
             df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+            df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
+            df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
         elif col == 'Water_supply':
             df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+            df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
+            df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
         elif col.lower() == 'commodity':
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']] if x['Rev_Cost'] == 'Revenue' else PATTERNS_COMMODITIES[x['name']], axis=1)
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
             df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
             df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+            df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
+            df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
         elif col == 'Type':
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_ECONOMY_TYPE[x['name']] if x['Rev_Cost'] == 'Revenue' else PATTERNS_ECONOMY_TYPE[x['name']], axis=1)
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_ECONOMY_TYPE[x['name']], axis=1)
+            df_wide['name_order'] = df_wide['name'].apply(lambda x: list(COLORS_ECONOMY_TYPE.keys()).index(x) if x in COLORS_ECONOMY_TYPE else -1)
+            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
 
         out_dict = {}
         for region, df in df_wide.groupby('region'):
@@ -895,14 +905,21 @@ def save_report_data(raw_data_dir:str):
         df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
         
         if col == "Land-use":
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']] if x['Rev_Cost'] == 'Revenue' else PATTERNS_LU[x['name']], axis=1)
-            df_wide['showInLegend'] = df_wide['Rev_Cost'].apply(lambda x: True if x == 'Revenue' else False)
+            df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
             df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
             df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+            df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
+            df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
+            df_wide.loc[df_wide['name'] == 'Unallocated - natural land', 'linkedTo'] = None
         elif col == 'Water_supply':
             df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
+            df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
+            df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
         elif col == 'Management Type':
             df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+            df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
+            df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
+            df_wide.loc[df_wide['name'] == 'Early dry-season savanna burning', 'linkedTo'] = None
         
         
         out_dict = {}
@@ -950,11 +967,19 @@ def save_report_data(raw_data_dir:str):
         df_region_wide.columns = ['name', 'region','Rev_Cost', 'data']
         df_region_wide['type'] = 'column'
         
-        
         df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+        
         df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
         df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
         df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+        df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
+        df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
+        df_wide.loc[df_wide['name'].isin([
+            'Environmental plantings (mixed species)',
+            'Riparian buffer restoration (mixed species)',
+            'Carbon plantings (monoculture)',
+            'Destocked - natural land'
+            ]), 'linkedTo'] = None
 
         
         out_dict = {}
@@ -1006,62 +1031,55 @@ def save_report_data(raw_data_dir:str):
             json.dump(out_dict, f)
       
 
-    
+    # -------------------- Transition cost matrix for Ag2Ag --------------------
     cost_transition_ag2ag_trans_mat_AUS = cost_transition_ag2ag_df\
         .groupby(['Year','From land-use', 'To land-use'])\
         .sum(numeric_only=True)\
         .reset_index()\
         .round({'Value ($)': 2})\
-        .query('abs(`Value ($)`) > 0')
-    cost_transition_ag2ag_trans_mat_AUS['idx_from'] = cost_transition_ag2ag_trans_mat_AUS['From land-use']\
-        .apply(lambda x: AG_LANDUSE.index(x))
-    cost_transition_ag2ag_trans_mat_AUS['idx_to'] = cost_transition_ag2ag_trans_mat_AUS['To land-use']\
-        .apply(lambda x: AG_LANDUSE.index(x))
-    cost_transition_ag2ag_trans_mat_AUS_data = cost_transition_ag2ag_trans_mat_AUS\
-        .groupby(['Year'])[['idx_from','idx_to', 'Value ($)']]\
-        .apply(lambda x: x[['idx_from', 'idx_to', 'Value ($)']].values.tolist())\
-        .reset_index()                             
-    cost_transition_ag2ag_trans_mat_AUS_data.columns = ['Year','data']
-    
-    cost_transition_ag2ag_trans_mat_AUS = {
-        'AUSTRALIA': json.loads(cost_transition_ag2ag_trans_mat_AUS_data.to_json(orient='records'))
-    }
-    
-
+        .query('abs(`Value ($)`) > 0')\
+        .assign(region='AUSTRALIA')
 
     cost_transition_ag2ag_trans_mat_region_df = cost_transition_ag2ag_df\
         .groupby(['Year','From land-use', 'To land-use', 'region'])\
         .sum(numeric_only=True)\
         .reset_index()\
         .round({'Value ($)': 2})
-    cost_transition_ag2ag_trans_mat_region_df = cost_transition_ag2ag_trans_mat_region_df\
-        .set_index(['Year','From land-use', 'To land-use', 'region'])\
-        .query('abs(`Value ($)`) > 0')\
-        .reset_index()
-    cost_transition_ag2ag_trans_mat_region_df['idx_from'] = cost_transition_ag2ag_trans_mat_region_df['From land-use']\
-        .apply(lambda x: AG_LANDUSE.index(x))
-    cost_transition_ag2ag_trans_mat_region_df['idx_to'] = cost_transition_ag2ag_trans_mat_region_df['To land-use']\
-        .apply(lambda x: AG_LANDUSE.index(x))
         
+        
+    cost_transition_ag2ag_trans_mat = pd.concat([
+        cost_transition_ag2ag_trans_mat_AUS,
+        cost_transition_ag2ag_trans_mat_region_df
+    ])
 
-    cost_transition_ag2ag_trans_mat_region = {}
-    for region,df in cost_transition_ag2ag_trans_mat_region_df.groupby('region'):
-        df = df.groupby('Year')[['idx_from', 'idx_to', 'Value ($)']]\
-            .apply(lambda x: x[['idx_from','idx_to', 'Value ($)']].values.tolist())\
-            .reset_index()
-        df.columns = ['Year','data']
 
-        cost_transition_ag2ag_trans_mat_region[region] = json.loads(df.to_json(orient='records'))
+    out_dict_area = {}
+    for (region,year),df in cost_transition_ag2ag_trans_mat.groupby(['region', 'Year']):
         
+        out_dict_area.setdefault(region, {})
         
+        transition_mat = df.pivot(index='From land-use', columns='To land-use', values='Value ($)')
+        transition_mat = transition_mat.reindex(index=AG_LANDUSE, columns=AG_LANDUSE)
+        transition_mat = transition_mat.fillna(0)
+        total_area_from = transition_mat.sum(axis=1).values.reshape(-1, 1)
         
-    with open(f'{SAVE_DIR}/Economics_transition_mat_ag2ag.json', 'w') as outfile:
-        outfile.write(json.dumps({
-            'categories_from': AG_LANDUSE,
-            'categories_to': AG_LANDUSE,
-            **cost_transition_ag2ag_trans_mat_AUS,
-            **cost_transition_ag2ag_trans_mat_region
-        }))
+        transition_mat['SUM'] = transition_mat.sum(axis=1)
+        transition_mat.loc['SUM'] = transition_mat.sum(axis=0)
+
+        heat_area = transition_mat.style.background_gradient(
+            cmap='Oranges',
+            axis=1,
+            subset=pd.IndexSlice[:transition_mat.index[-2], :transition_mat.columns[-2]]
+        ).format('{:,.0f}')
+
+        heat_area_html = heat_area.to_html()
+        heat_area_html = re.sub(r'(?<!\d)0(?!\d)', '-', heat_area_html)
+
+        out_dict_area[region][str(year)] = rf'{heat_area_html}'
+
+    with open(f'{SAVE_DIR}/Economics_transition_mat_ag2ag.json', 'w', encoding='utf-8') as f:
+        json.dump(out_dict_area, f, ensure_ascii=False, indent=2)
+
 
 
 
@@ -1069,7 +1087,6 @@ def save_report_data(raw_data_dir:str):
 
     # -------------------- Transition cost for Ag2Non-Ag --------------------
     cost_transition_ag2non_ag_df['Value ($)'] = cost_transition_ag2non_ag_df['Value ($)'] * -1  # Convert from negative to positive
-    keep_cols = ['Year', 'region', 'Value ($)']
     group_cols = ['Cost type', 'From land-use', 'To land-use']
     
     for idx, col in enumerate(group_cols):
@@ -1107,57 +1124,54 @@ def save_report_data(raw_data_dir:str):
         with open(f'{SAVE_DIR}/Economics_transition_split_Ag2NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
             json.dump(out_dict, f)
         
-        
-    cost_transition_ag2non_ag_trans_mat_AUS = cost_transition_ag2non_ag_df\
+  
+    # -------------------- Transition cost matrix for Ag2Non-Ag --------------------
+    cost_transition_ag2nonag_trans_mat_AUS = cost_transition_ag2non_ag_df\
         .groupby(['Year','From land-use', 'To land-use'])\
         .sum(numeric_only=True)\
         .reset_index()\
-        .query('abs(`Value ($)`) > 0')\
-        .round({'Value ($)': 2})
-    cost_transition_ag2non_ag_trans_mat_AUS['idx_from'] = cost_transition_ag2non_ag_trans_mat_AUS['From land-use']\
-        .apply(lambda x: AG_LANDUSE.index(x))
-    cost_transition_ag2non_ag_trans_mat_AUS['idx_to'] = cost_transition_ag2non_ag_trans_mat_AUS['To land-use']\
-        .apply(lambda x: list(RENAME_NON_AG.values()).index(x))
-                                                    
-    cost_transition_ag2non_ag_trans_mat_AUS_data = cost_transition_ag2non_ag_trans_mat_AUS\
-        .groupby(['Year'])[['idx_from','idx_to', 'Value ($)']]\
-        .apply(lambda x: x[['idx_from', 'idx_to', 'Value ($)']].values.tolist())\
-        .reset_index()                             
-    cost_transition_ag2non_ag_trans_mat_AUS_data.columns = ['Year','data']
-    
-    cost_transition_ag2nonag_trans_mat_AUS = {'AUSTRALIA':json.loads(cost_transition_ag2non_ag_trans_mat_AUS_data.to_json(orient='records'))}
+        .round({'Value ($)': 2})\
+        .assign(region='AUSTRALIA')
 
-        
     cost_transition_ag2nonag_trans_mat_region_df = cost_transition_ag2non_ag_df\
         .groupby(['Year','From land-use', 'To land-use', 'region'])\
         .sum(numeric_only=True)\
         .reset_index()\
-        .round({'Value ($)': 2})\
-        .query('abs(`Value ($)`) > 0')
-    cost_transition_ag2nonag_trans_mat_region_df['idx_from'] = cost_transition_ag2nonag_trans_mat_region_df['From land-use']\
-        .apply(lambda x: AG_LANDUSE.index(x))
-    cost_transition_ag2nonag_trans_mat_region_df['idx_to'] = cost_transition_ag2nonag_trans_mat_region_df['To land-use']\
-        .apply(lambda x: list(RENAME_NON_AG.values()).index(x))
-
-
-    cost_transition_ag2nonag_trans_mat_region = {}
-    for region,df in cost_transition_ag2nonag_trans_mat_region_df.groupby('region'):
-        df = df.groupby('Year')[['idx_from', 'idx_to', 'Value ($)']]\
-            .apply(lambda x: x[['idx_from','idx_to', 'Value ($)']].values.tolist())\
-            .reset_index()
-        df.columns = ['Year','data']
-
-        cost_transition_ag2nonag_trans_mat_region[region] = json.loads(df.to_json(orient='records'))
+        .round({'Value ($)': 2})
         
         
+    cost_transition_ag2nonag_trans_mat = pd.concat([
+        cost_transition_ag2nonag_trans_mat_AUS,
+        cost_transition_ag2nonag_trans_mat_region_df
+    ])
+
+
+    out_dict_area = {}
+    for (region,year),df in cost_transition_ag2nonag_trans_mat.groupby(['region', 'Year']):
         
-    with open(f'{SAVE_DIR}/Economics_transition_mat_ag2nonag.json', 'w') as outfile:
-        outfile.write(json.dumps({
-            'categories_from': AG_LANDUSE,
-            'categories_to': list(RENAME_NON_AG.values()),
-            **cost_transition_ag2nonag_trans_mat_AUS,
-            **cost_transition_ag2nonag_trans_mat_region
-        }))
+        out_dict_area.setdefault(region, {})
+        
+        transition_mat = df.pivot(index='From land-use', columns='To land-use', values='Value ($)')
+        transition_mat = transition_mat.reindex(index=AG_LANDUSE, columns=RENAME_NON_AG.values())
+        transition_mat = transition_mat.fillna(0)
+        total_area_from = transition_mat.sum(axis=1).values.reshape(-1, 1)
+        
+        transition_mat['SUM'] = transition_mat.sum(axis=1)
+        transition_mat.loc['SUM'] = transition_mat.sum(axis=0)
+
+        heat_area = transition_mat.style.background_gradient(
+            cmap='Oranges',
+            axis=1,
+            subset=pd.IndexSlice[:transition_mat.index[-2], :transition_mat.columns[-2]]
+        ).format('{:,.0f}')
+
+        heat_area_html = heat_area.to_html()
+        heat_area_html = re.sub(r'(?<!\d)0(?!\d)', '-', heat_area_html)
+
+        out_dict_area[region][str(year)] = rf'{heat_area_html}'
+
+    with open(f'{SAVE_DIR}/Economics_transition_mat_ag2nonag.json', 'w', encoding='utf-8') as f:
+        json.dump(out_dict_area, f, ensure_ascii=False, indent=2)
     
     
     
@@ -1165,7 +1179,6 @@ def save_report_data(raw_data_dir:str):
 
     # -------------------- Transition cost for Non-Ag to Ag --------------------
     cost_transition_non_ag2ag_df['Value ($)'] = cost_transition_non_ag2ag_df['Value ($)'] * -1  # Convert from negative to positive
-    keep_cols = ['Year', 'region', 'Value ($)']
     group_cols = ['Cost type', 'From land-use', 'To land-use']
     
     for idx, col in enumerate(group_cols):
@@ -1205,52 +1218,53 @@ def save_report_data(raw_data_dir:str):
     
     
     
+    # -------------------- Transition cost matrix for Non-Ag to Ag --------------------
     cost_transition_nonag2ag_trans_mat_AUS = cost_transition_non_ag2ag_df\
         .groupby(['Year','From land-use', 'To land-use'])\
-        .sum()[['Value ($)']]\
+        .sum(numeric_only=True)\
         .reset_index()\
-        .round({'Value ($)': 2})
-    cost_transition_nonag2ag_trans_mat_AUS['idx_from'] = cost_transition_nonag2ag_trans_mat_AUS['From land-use']\
-        .apply(lambda x: list(RENAME_NON_AG.values()).index(x))
-    cost_transition_nonag2ag_trans_mat_AUS['idx_to'] = cost_transition_nonag2ag_trans_mat_AUS['To land-use']\
-        .apply(lambda x: AG_LANDUSE.index(x))
-                                                    
-    cost_transition_nonag2ag_trans_mat_AUS_data = cost_transition_nonag2ag_trans_mat_AUS\
-        .groupby(['Year'])[['idx_from','idx_to', 'Value ($)']]\
-        .apply(lambda x: x[['idx_from', 'idx_to', 'Value ($)']].values.tolist())\
-        .reset_index()                             
-    cost_transition_nonag2ag_trans_mat_AUS_data.columns = ['Year','data']
-    
-    cost_transition_nonag2ag_trans_mat_AUS = {'AUSTRALIA':json.loads(cost_transition_nonag2ag_trans_mat_AUS_data.to_json(orient='records'))}
-                                             
-                                                
+        .round({'Value ($)': 2})\
+        .assign(region='AUSTRALIA')
+
     cost_transition_nonag2ag_trans_mat_region_df = cost_transition_non_ag2ag_df\
         .groupby(['Year','From land-use', 'To land-use', 'region'])\
-        .sum()[['Value ($)']]\
+        .sum(numeric_only=True)\
         .reset_index()\
         .round({'Value ($)': 2})
-    cost_transition_nonag2ag_trans_mat_region_df['idx_from'] = cost_transition_nonag2ag_trans_mat_region_df['From land-use']\
-        .apply(lambda x: list(RENAME_NON_AG.values()).index(x))
-    cost_transition_nonag2ag_trans_mat_region_df['idx_to'] = cost_transition_nonag2ag_trans_mat_region_df['To land-use']\
-        .apply(lambda x: AG_LANDUSE.index(x))
-
-    cost_transition_nonag2ag_trans_mat_region = {}
-    for region,df in cost_transition_nonag2ag_trans_mat_region_df.groupby('region'):
-        df = df.groupby('Year')[['idx_from', 'idx_to', 'Value ($)']]\
-            .apply(lambda x: x[['idx_from','idx_to', 'Value ($)']].values.tolist())\
-            .reset_index()
-        df.columns = ['Year','data']
-
-        cost_transition_nonag2ag_trans_mat_region[region] = json.loads(df.to_json(orient='records'))
         
         
-    with open(f'{SAVE_DIR}/Economics_transition_mat_nonag2ag.json', 'w') as outfile:
-        outfile.write(json.dumps({
-            'categories_from': list(RENAME_NON_AG.values()),
-            'categories_to': AG_LANDUSE,
-            **cost_transition_nonag2ag_trans_mat_AUS,
-            **cost_transition_nonag2ag_trans_mat_region
-        }))
+    cost_transition_nonag2ag_trans_mat = pd.concat([
+        cost_transition_nonag2ag_trans_mat_AUS,
+        cost_transition_nonag2ag_trans_mat_region_df
+    ])
+
+
+    out_dict_area = {}
+    for (region,year),df in cost_transition_nonag2ag_trans_mat.groupby(['region', 'Year']):
+        
+        out_dict_area.setdefault(region, {})
+        
+        transition_mat = df.pivot(index='From land-use', columns='To land-use', values='Value ($)')
+        transition_mat = transition_mat.reindex(index=RENAME_NON_AG.values(), columns=AG_LANDUSE)
+        transition_mat = transition_mat.fillna(0)
+        total_area_from = transition_mat.sum(axis=1).values.reshape(-1, 1)
+        
+        transition_mat['SUM'] = transition_mat.sum(axis=1)
+        transition_mat.loc['SUM'] = transition_mat.sum(axis=0)
+
+        heat_area = transition_mat.style.background_gradient(
+            cmap='Oranges',
+            axis=1,
+            subset=pd.IndexSlice[:transition_mat.index[-2], :transition_mat.columns[-2]]
+        ).format('{:,.0f}')
+
+        heat_area_html = heat_area.to_html()
+        heat_area_html = re.sub(r'(?<!\d)0(?!\d)', '-', heat_area_html)
+
+        out_dict_area[region][str(year)] = rf'{heat_area_html}'
+
+    with open(f'{SAVE_DIR}/Economics_transition_mat_nonag2ag.json', 'w', encoding='utf-8') as f:
+        json.dump(out_dict_area, f, ensure_ascii=False, indent=2)
 
 
 
@@ -1353,12 +1367,12 @@ def save_report_data(raw_data_dir:str):
         net_land_AUS_wide.loc[len(net_land_AUS_wide)] = [
             'Net emissions',
             list(zip(years, (net_land['Value (t CO2e)'] + net_offland_AUS['Value (t CO2e)']))),
-            'spline'
+            'line'
         ]
         net_land_AUS_wide.loc[len(net_land_AUS_wide)] = [
             'GHG emission limit',
             GHG_limit_wide,
-            'spline'
+            'line'
         ]
 
         
@@ -1384,7 +1398,7 @@ def save_report_data(raw_data_dir:str):
             df_reg.loc[len(df_reg)] = [
                 'Net emissions', 
                 list(zip(years, (df.groupby('Year')['Value (t CO2e)'].sum().values))),
-                'spline'
+                'line'
             ]
 
             df_reg['name_order'] = df_reg['name'].apply(lambda x: order_GHG.index(x))
@@ -1685,8 +1699,8 @@ def save_report_data(raw_data_dir:str):
     water_yield_df_AUS.loc[len(water_yield_df_AUS)] = ['Outside LUTO Study Area', water_outside_LUTO_total,  'column']
     water_yield_df_AUS.loc[len(water_yield_df_AUS)] = ['Climate Change Impact', water_CCI,  'column']
     water_yield_df_AUS.loc[len(water_yield_df_AUS)] = ['Domestic Water Use', water_domestic,  'column']
-    water_yield_df_AUS.loc[len(water_yield_df_AUS)] = ['Water Net Yield', water_net_yield_sum, 'spline']
-    water_yield_df_AUS.loc[len(water_yield_df_AUS)] = ['Water Limit', water_limit, 'spline']
+    water_yield_df_AUS.loc[len(water_yield_df_AUS)] = ['Water Net Yield', water_net_yield_sum, 'line']
+    water_yield_df_AUS.loc[len(water_yield_df_AUS)] = ['Water Limit', water_limit, 'line']
 
     water_yield_df_AUS.to_json(f'{SAVE_DIR}/Water_overview_AUSTRALIA.json', orient='records')
     
@@ -1740,8 +1754,8 @@ def save_report_data(raw_data_dir:str):
             ['Water Yield Outside LUTO Study Area', water_outside_yield_wide, 'column', None],
             ['Climate Change Impact', water_CCI_wide, 'column', None],
             ['Domestic Water Use', water_domestic_wide, 'column', None],
-            ['Water Net Yield', water_net_yield_sum_wide, 'spline', None],
-            ['Water Limit', water_limit_wide, 'spline', 'black']],  columns=['name','data','type','color']
+            ['Water Net Yield', water_net_yield_sum_wide, 'line', None],
+            ['Water Limit', water_limit_wide, 'line', 'black']],  columns=['name','data','type','color']
         )
 
         water_yield_region[reg_name] = water_df.to_dict(orient='records')
@@ -2143,7 +2157,7 @@ def save_report_data(raw_data_dir:str):
                 .assign(region='AUSTRALIA')
             df_AUS_wide.columns = ['name', 'data','region']
             df_AUS_wide['type'] = 'column'
-            df_AUS_wide.loc[len(df_AUS_wide)] = ['Target (%)', bio_df_target, 'spline', None]
+            df_AUS_wide.loc[len(df_AUS_wide)] = ['Target (%)', bio_df_target, 'line', None]
 
             df_region = bio_df\
                 .groupby(['Year', 'region', col])\
@@ -2382,7 +2396,7 @@ def save_report_data(raw_data_dir:str):
                     .assign(region='AUSTRALIA')
                 df_AUS_wide.columns = ['name', 'data','region']
                 df_AUS_wide['type'] = 'column'
-                df_AUS_wide.loc[len(df_AUS_wide)] = ['Target (%)', target_species, 'AUSTRALIA',  'spline']
+                df_AUS_wide.loc[len(df_AUS_wide)] = ['Target (%)', target_species, 'AUSTRALIA',  'line']
 
                 df_region = scores_species\
                     .groupby(['Year', 'region', col])\
@@ -2628,7 +2642,7 @@ def save_report_data(raw_data_dir:str):
                     .assign(region='AUSTRALIA')
                 df_AUS_wide.columns = ['name', 'data','region']
                 df_AUS_wide['type'] = 'column'
-                df_AUS_wide.loc[len(df_AUS_wide)] = ['Target (%)', target_species, 'AUSTRALIA',  'spline']
+                df_AUS_wide.loc[len(df_AUS_wide)] = ['Target (%)', target_species, 'AUSTRALIA',  'line']
 
                 df_region = scores_species\
                     .groupby(['Year', 'region', col])\
@@ -2871,7 +2885,7 @@ def save_report_data(raw_data_dir:str):
                     .assign(region='AUSTRALIA')
                 df_AUS_wide.columns = ['name', 'data','region']
                 df_AUS_wide['type'] = 'column'
-                df_AUS_wide.loc[len(df_AUS_wide)] = ['Target (%)', target_species, 'AUSTRALIA',  'spline']
+                df_AUS_wide.loc[len(df_AUS_wide)] = ['Target (%)', target_species, 'AUSTRALIA',  'line']
 
                 df_region = scores_species\
                     .groupby(['Year', 'region', col])\
@@ -3114,7 +3128,7 @@ def save_report_data(raw_data_dir:str):
                     .assign(region='AUSTRALIA')
                 df_AUS_wide.columns = ['name', 'data','region']
                 df_AUS_wide['type'] = 'column'
-                df_AUS_wide.loc[len(df_AUS_wide)] = ['Target (%)', target_species, 'AUSTRALIA',  'spline']
+                df_AUS_wide.loc[len(df_AUS_wide)] = ['Target (%)', target_species, 'AUSTRALIA',  'line']
 
                 df_region = scores_species\
                     .groupby(['Year', 'region', col])\
@@ -3592,6 +3606,27 @@ def save_report_data(raw_data_dir:str):
     
     Parallel(n_jobs=worker)(tasks)
     
+    
+    #########################################################
+    # Supporting information               
+    #########################################################
+    with open(f"{raw_data_dir}/model_run_settings.txt", 'r') as f:
+        settings_str = f.read()
+        
+    with open(f'{raw_data_dir}/model_run_settings.txt', 'r', encoding='utf-8') as src_file:
+        settings = {i.split(':')[0].strip(): ''.join(i.split(':')[1:]).strip() for i in src_file.readlines()}
+        settings = [{'parameter': k, 'val': v} for k, v in settings.items()]
+
+    supporting = {
+        'model_run_settings': settings,
+        'years': years,
+        'colors': COLORS,
+        'RENAME_AM_NON_AG': RENAME_AM_NON_AG,
+        'SPATIAL_MAP_DICT': SPATIAL_MAP_DICT
+    }
+    
+    with open(f"{SAVE_DIR}/Supporting_info.json", 'w') as f:
+        json.dump(supporting, f, indent=2)
     
 
 

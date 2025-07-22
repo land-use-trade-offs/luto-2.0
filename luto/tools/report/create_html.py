@@ -69,36 +69,22 @@ def data2html(raw_data_dir):
         ["Area",f"{report_dir}/REPORT_HTML/pages/land-use_area.html"],
         ["GHG",f"{report_dir}/REPORT_HTML/pages/GHG_emissions.html"],
         ["Water",f"{report_dir}/REPORT_HTML/pages/water_usage.html"],
-        ['BIO',f"{report_dir}/REPORT_HTML/pages/biodiversity.html"]
+        ['BIO',f"{report_dir}/REPORT_HTML/pages/biodiversity.html"],
+        ['Index',f"{report_dir}/REPORT_HTML/index.html"]
     ], columns=['name','HTML_path'])
 
     # Get all data files
     all_data_files = glob(f"{report_dir}/data/*")
     # Add data path to html_df
-    html_df['data_path'] = html_df.apply(
-        lambda x: [i for i in all_data_files if os.path.basename(i).startswith(x['name'])], axis=1
-    )
+    html_df['data_path'] = html_df.apply(lambda x: [i for i in all_data_files if os.path.basename(i).startswith(x['name'])], axis=1)
+    # Add the supporting info file to each html
+    html_df['data_path'] = html_df['data_path'].apply(lambda x: x + [f"{report_dir}/data/Supporting_info.json"])
 
-    # Parse html files
+    # Parse each HTML file and add data
     for _,row in html_df.iterrows():
-        html_path = row['HTML_path']
-        data_pathes  = row['data_path']
-        # Add data to html
-        add_data_2_html(html_path, data_pathes)
+        add_data_2_html(row['HTML_path'], row['data_path'])
         
 
-    # Add settings to the home page
-    add_txt_2_html(f"{report_dir}/REPORT_HTML/index.html", f"{raw_data_dir}/model_run_settings.txt", "settingsTxt")
-
-
-    # Write avaliable years to each page .content[#model_years pre]
-    for page in glob(f"{report_dir}/REPORT_HTML/pages/*.html"):
-        add_txt_2_html(page, years_str, "model_years")
-        add_txt_2_html(page, str(COLORS), "colors")
-        add_txt_2_html(page, str(RENAME_AM_NON_AG), "RENAME_AM_NON_AG") 
-        add_txt_2_html(page, str(SPATIAL_MAP_DICT), "SPATIAL_MAP_DICT") 
-    
-        
         
     #########################################################
     #              Report success info                      #

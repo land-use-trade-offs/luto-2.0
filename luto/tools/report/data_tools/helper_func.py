@@ -62,15 +62,15 @@ def add_txt_2_html(html_path:str, txt:str, id:str)->None:
     # Check if txt is a file path
     if os.path.exists(os.path.abspath(txt)):
         # If it is, read the file
-        with open(txt,'r') as f:
-            txt = f.read()
+        with open(txt, 'r', encoding='utf-8') as f:
+            txt = f.read().lstrip('\ufeff')
     
     # Add a new div element to the page      
     data_container_div = index_tree.find('.//div[@id="data_container"]')
 
     pre_element = etree.SubElement(data_container_div, "pre")
     pre_element.set("id", id)
-    pre_element.text = txt
+    pre_element.text = txt.lstrip('\ufeff')
     
     # Write changes to the html
     index_tree.write(
@@ -120,9 +120,10 @@ def add_data_2_html(html_path:str, data_pathes:list)->None:
         with open(data_path) as file:
             json_data = json.load(file)
 
-        pre_element = etree.SubElement(new_div, "pre")
-        pre_element.set("id", f"{data_name}")
-        pre_element.text = json.dumps(json_data, indent=2, ensure_ascii=False)
+        script_element = etree.SubElement(new_div, "script")
+        script_element.set("id", f"{data_name}")
+        script_element.set("type", "application/json")
+        script_element.text = json.dumps(json_data, ensure_ascii=False)
 
 
     # Step 5: Insert the new div

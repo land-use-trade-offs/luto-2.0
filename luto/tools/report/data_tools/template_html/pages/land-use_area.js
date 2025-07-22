@@ -1,24 +1,25 @@
 document.addEventListener("DOMContentLoaded", function () {
 
-  // Set the default color palette for Highcharts
-  var colors = eval(document.getElementById("colors").innerHTML);
-  Highcharts.setOptions({colors: colors});
 
-
+  const support_info = JSON.parse(document.getElementById('Supporting_info').innerText);
+  const colors = support_info.colors;
+  const model_years = support_info.years;
+  
 
   // Get the available years for plotting
-  var years = eval(document.getElementById("model_years").innerHTML).map(function (x) {return parseInt(x);});
-  // Sort the years
+  var years = model_years.map(function (x) {return parseInt(x);});
   years.sort(function (a, b) {return a - b;});
-  // Get the year ticks and interval
   var year_ticks = years.length == 2 ? years : null;
 
+  
   // Set the title alignment to left
   Highcharts.setOptions({
+    colors: colors,
     title: {
         align: 'left'
     }
   });
+
 
   // Chart:Area_overview_2_Category
   Highcharts.chart("Area_overview_2_Category_chart", {

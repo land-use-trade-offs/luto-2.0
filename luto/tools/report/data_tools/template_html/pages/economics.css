@@ -2,3 +2,25 @@ div.fig {
     height: 600px;
     margin-bottom: 100px;
 };
+
+div.mat {
+    margin-top: 10px;
+    margin-bottom: 800px;
+    width: 100%;
+    height: auto;
+}
+
+table, th, td{
+    font-size: 7px;
+    font-family: Helvetica, Arial, sans-serif;
+}
+
+table {
+    width: 100%;
+    padding-bottom: 100px;
+}
+
+td{
+    text-align: right
+}
+

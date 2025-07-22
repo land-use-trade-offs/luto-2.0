@@ -225,9 +225,9 @@ COLORS_ECONOMY_TYPE = dict(zip(
 ))
 
 
-PATTERNS_LU = {k:{**pattern_path, 'backgroundColor': v } for k,v in COLORS_LU.items()}
-PATTERNS_LM = {k: {**pattern_path, 'backgroundColor': v} for k, v in COLORS_LM.items()}
-PATTERNS_COMMODITIES = {k: {**pattern_path, 'backgroundColor': v} for k, v in COLORS_COMMODITIES.items()}
-PATTERNS_AM_NONAG = {k: {**pattern_path, 'backgroundColor': v} for k, v in COLORS_AM_NONAG.items()}
-PATTERNS_GHG = {k: {**pattern_path, 'backgroundColor': v} for k, v in COLORS_GHG.items()}
-PATTERNS_ECONOMY_TYPE = {k: {**pattern_path, 'backgroundColor': v} for k, v in COLORS_ECONOMY_TYPE.items()}
+PATTERNS_LU = {k:{'pattern':{**pattern_path, 'backgroundColor': v} } for k,v in COLORS_LU.items()}
+PATTERNS_LM = {k: {'pattern': {**pattern_path, 'backgroundColor': v}} for k, v in COLORS_LM.items()}
+PATTERNS_COMMODITIES = {k: {'pattern': {**pattern_path, 'backgroundColor': v}} for k, v in COLORS_COMMODITIES.items()}
+PATTERNS_AM_NONAG = {k: {'pattern': {**pattern_path, 'backgroundColor': v}} for k, v in COLORS_AM_NONAG.items()}
+PATTERNS_GHG = {k: {'pattern': {**pattern_path, 'backgroundColor': v}} for k, v in COLORS_GHG.items()}
+PATTERNS_ECONOMY_TYPE = {k: {'pattern': {**pattern_path, 'backgroundColor': v}} for k, v in COLORS_ECONOMY_TYPE.items()}

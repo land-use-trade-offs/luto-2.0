@@ -12,6 +12,7 @@
     <script src="../src/Highcharts-12.3.0/export-data.js"></script>
     <script src="../src/Highcharts-12.3.0/highcharts-more.js"></script>
     <script src="../src/Highcharts-12.3.0/heatmap.js"></script>
+    <script src="../src/Highcharts-12.3.0/pattern-fill.js"></script>
     <script src="https://blacklabel.github.io/grouped_categories/grouped-categories.js"></script>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 
@@ -39,50 +40,29 @@
     <div class="content">
       <h1>Revenue and Cost</h1>
 
-      <!-- Chart:economics_0_rev_cost_all_wide -->
-      <div class="fig" id="economics_0_rev_cost_all_wide"></div>
+      <!-- Chart:Economics_overview -->
+      <div class="fig" id="Economics_overview_chart"></div>
 
-      <!-- Chart:economics_1_ag_revenue_3_Water_supply_wide -->
-      <div class="fig" id="economics_1_ag_revenue_3_Water_supply_wide"></div>
+      <!-- Chart:Economics_split_Ag_1_Land-use -->
+      <div class="fig" id="Economics_split_Ag_1_Land-use_chart"></div>
 
-      <!-- Chart:economics_1_ag_revenue_1_Land-use_wide -->
-      <div class="fig" id="economics_1_ag_revenue_1_Land-use_wide"></div>
+      <!-- Chart:Economics_split_Ag_2_Type -->
+      <div class="fig" id="Economics_split_Ag_2_Type_chart"></div>
 
-      <!-- Chart:economics_1_ag_revenue_2_Type_wide -->
-      <div class="fig" id="economics_1_ag_revenue_2_Type_wide"></div>
+      <!-- Chart:Economics_split_Ag_3_Water_supply -->
+      <div class="fig" id="Economics_split_Ag_3_Water_supply_chart"></div>
 
-      <!-- Chart:economics_2_ag_cost_3_Water_supply_wide -->
-      <div class="fig" id="economics_2_ag_cost_3_Water_supply_wide"></div>
+      <!-- Chart:Economics_split_AM_1_Management_Type -->
+      <div class="fig" id="Economics_split_AM_1_Management_Type_chart"></div>
 
-      <!-- Chart:economics_2_ag_cost_1_Land-use_wide -->
-      <div class="fig" id="economics_2_ag_cost_1_Land-use_wide"></div>
+      <!-- Chart:Economics_split_AM_3_Land-use -->
+      <div class="fig" id="Economics_split_AM_3_Land-use_chart"></div>
 
-      <!-- Chart:economics_2_ag_cost_2_Type_wide -->
-      <div class="fig" id="economics_2_ag_cost_2_Type_wide"></div>
+      <!-- Chart:Economics_split_AM_2_Water_supply -->
+      <div class="fig" id="Economics_split_AM_2_Water_supply_chart"></div>
 
-      <!-- Chart:economics_4_am_revenue_1_Land-use_wide -->
-      <div class="fig" id="economics_4_am_revenue_1_Land-use_wide"></div>
-
-      <!-- Chart:economics_4_am_revenue_2_Management Type_wide -->
-      <div class="fig" id="economics_4_am_revenue_2_Management Type_wide"></div>
-
-      <!-- Chart:economics_4_am_revenue_3_Water_supply_wide -->
-      <div class="fig" id="economics_4_am_revenue_3_Water_supply_wide"></div>
-
-      <!-- Chart:economics_5_am_cost_1_Land-use_wide -->
-      <div class="fig" id="economics_5_am_cost_1_Land-use_wide"></div>
-
-      <!-- Chart:economics_5_am_cost_2_Management Type_wide -->
-      <div class="fig" id="economics_5_am_cost_2_Management Type_wide"></div>
-
-      <!-- Chart:economics_5_am_cost_3_Water_supply_wide -->
-      <div class="fig" id="economics_5_am_cost_3_Water_supply_wide"></div>
-
-      <!-- Chart:economics_6_non_ag_revenue_1_Land-use_wide -->
-      <div class="fig" id="economics_6_non_ag_revenue_1_Land-use_wide"></div>
-
-      <!-- Chart:economics_7_non_ag_cost_1_Land-use_wide -->
-      <div class="fig" id="economics_7_non_ag_cost_1_Land-use_wide"></div>
+      <!-- Chart:Economics_split_NonAg_1_Land-use -->
+      <div class="fig" id="Economics_split_NonAg_1_Land-use_chart"></div>
 
       <!-- The dropdown to select the year of the map: -->
       <div class="selection" style="text-align: center">
@@ -110,25 +90,22 @@
         </label>
       </div>
 
-      <!-- Chart:economics_8_transition_ag2ag_cost_4_transition_matrix -->
+      <!-- Chart:Economics_transition_mat_ag2ag -->
+      <div class="mat" id="Economics_transition_mat_ag2ag_chart"></div>
+
+      <!-- Chart:Economics_transition_split_ag2ag_1_Type -->
+      <div class="fig" id="Economics_transition_split_ag2ag_1_Type_chart"></div>
+
+      <!-- Chart:Economics_transition_split_ag2ag_2_From_land-use -->
       <div
         class="fig"
-        id="economics_8_transition_ag2ag_cost_4_transition_matrix"
+        id="Economics_transition_split_ag2ag_2_From_land-use_chart"
       ></div>
 
-      <!-- Chart:economics_8_transition_ag2ag_cost_1_Type_wide -->
-      <div class="fig" id="economics_8_transition_ag2ag_cost_1_Type_wide"></div>
-
-      <!-- Chart:economics_8_transition_ag2ag_cost_2_From land-use_wide -->
+      <!-- Chart:Economics_transition_split_ag2ag_3_To_land-use -->
       <div
         class="fig"
-        id="economics_8_transition_ag2ag_cost_2_From land-use_wide"
-      ></div>
-
-      <!-- Chart:economics_8_transition_ag2ag_cost_3_To land-use_wide -->
-      <div
-        class="fig"
-        id="economics_8_transition_ag2ag_cost_3_To land-use_wide"
+        id="Economics_transition_split_ag2ag_3_To_land-use_chart"
       ></div>
 
       <!-- The dropdown to select the year of the map: -->
@@ -157,28 +134,25 @@
         </label>
       </div>
 
-      <!-- Chart:economics_9_transition_ag2non_cost_4_transition_matrix -->
+      <!-- Chart:Economics_transition_mat_ag2nonag -->
+      <div class="mat" id="Economics_transition_mat_ag2nonag_chart"></div>
+
+      <!-- Chart:Economics_transition_split_Ag2NonAg_1_Cost_type -->
       <div
         class="fig"
-        id="economics_9_transition_ag2non_cost_4_transition_matrix"
+        id="Economics_transition_split_Ag2NonAg_1_Cost_type_chart"
       ></div>
 
-      <!-- Chart:economics_9_transition_ag2non_cost_1_Cost type_wide -->
+      <!-- Chart:Economics_transition_split_Ag2NonAg_2_From_land-use -->
       <div
         class="fig"
-        id="economics_9_transition_ag2non_cost_1_Cost type_wide"
+        id="Economics_transition_split_Ag2NonAg_2_From_land-use_chart"
       ></div>
 
-      <!-- Chart:economics_9_transition_ag2non_cost_2_From land-use_wide -->
+      <!-- Chart:Economics_transition_split_Ag2NonAg_3_To_land-use -->
       <div
         class="fig"
-        id="economics_9_transition_ag2non_cost_2_From land-use_wide"
-      ></div>
-
-      <!-- Chart:economics_9_transition_ag2non_cost_3_To land-use_wide -->
-      <div
-        class="fig"
-        id="economics_9_transition_ag2non_cost_3_To land-use_wide"
+        id="Economics_transition_split_Ag2NonAg_3_To_land-use_chart"
       ></div>
 
       <!-- The dropdown to select the year of the map: -->
@@ -207,31 +181,26 @@
         </label>
       </div>
 
-      <!-- Chart:economics_10_transition_non_ag2ag_cost_4_transition_matrix -->
+      <!-- Chart:Economics_transition_mat_nonag2ag -->
+      <div class="mat" id="Economics_transition_mat_nonag2ag_chart"></div>
+
+      <!-- Chart:Economics_transition_split_NonAg2Ag_1_Cost_type -->
       <div
         class="fig"
-        id="economics_10_transition_non_ag2ag_cost_4_transition_matrix"
+        id="Economics_transition_split_NonAg2Ag_1_Cost_type_chart"
       ></div>
 
-      <!-- Chart:economics_10_transition_non_ag2ag_cost_1_Cost type_wide -->
+      <!-- Chart:Economics_transition_split_NonAg2Ag_2_From_land-use -->
       <div
         class="fig"
-        id="economics_10_transition_non_ag2ag_cost_1_Cost type_wide"
+        id="Economics_transition_split_NonAg2Ag_2_From_land-use_chart"
       ></div>
 
-      <!-- Chart:economics_10_transition_non_ag2ag_cost_2_From land-use_wide -->
+      <!-- Chart:Economics_transition_split_NonAg2Ag_3_To_land-use -->
       <div
         class="fig"
-        id="economics_10_transition_non_ag2ag_cost_2_From land-use_wide"
-      ></div>
-
-      <!-- Chart:economics_10_transition_non_ag2ag_cost_3_To land-use_wide -->
-      <div
-        class="fig"
-        id="economics_10_transition_non_ag2ag_cost_3_To land-use_wide"
+        id="Economics_transition_split_NonAg2Ag_3_To_land-use_chart"
       ></div>
     </div>
-
-    <div id="data_container" style="display: none"></div>
   </body>
 </html>

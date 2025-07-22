@@ -1,15 +1,23 @@
 // Create Chart
 document.addEventListener("DOMContentLoaded", function () {
 
-    // Set the default color palette for Highcharts
-    var colors = eval(document.getElementById("colors").innerHTML);
-    Highcharts.setOptions({ colors: colors });
+    const support_info = JSON.parse(document.getElementById('Supporting_info').innerText);
+    const colors = support_info.colors;
+    const model_years = support_info.years;
+
+
+    // Get the available years for plotting
+    var years = model_years.map(function (x) { return parseInt(x); });
+    years.sort(function (a, b) { return a - b; });
+    var year_ticks = years.length == 2 ? years : null;
+
 
     // Set the title alignment to left
     Highcharts.setOptions({
+        colors: colors,
         title: {
-            align: "left",
-        },
+            align: 'left'
+        }
     });
 
     // biodiversity_priority_1_total_score_by_type

@@ -11,15 +11,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Load the selected data to report HTML
     load_data(get_dataDir() + '/data/Map_data/lumap_2010.html');
+
    
     // Get the names (original) and renames (rename for reporting)
-    let lucc_names = document.getElementById('SPATIAL_MAP_DICT').innerText;
-    lucc_names = lucc_names.replace(/'/g, '"');       // JSON.parse() does not accept single quotes
-    lucc_names = JSON.parse(lucc_names);
-
-    let lucc_rename = document.getElementById('RENAME_AM_NON_AG').innerText;
-    lucc_rename = lucc_rename.replace(/'/g, '"');       // JSON.parse() does not accept single quotes
-    lucc_rename = JSON.parse(lucc_rename);
+    const support_info = JSON.parse(document.getElementById('Supporting_info').innerText);
+    const lucc_names = support_info.SPATIAL_MAP_DICT;
+    const lucc_rename = support_info.RENAME_AM_NON_AG;
 
     // Initialize the select_2 dropdown
     let int_map_names = {

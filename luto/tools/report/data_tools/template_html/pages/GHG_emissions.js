@@ -1,32 +1,29 @@
 // make charts
 document.addEventListener("DOMContentLoaded", function () {
   
-  // Set the default color palette for Highcharts
-  var colors = eval(document.getElementById("colors").innerHTML);
-  Highcharts.setOptions({colors: colors});
+  const support_info = JSON.parse(document.getElementById('Supporting_info').innerText);
+  const colors = support_info.colors;
+  const model_years = support_info.years;
+  
 
   // Get the available years for plotting
-  var years = eval(document.getElementById("model_years").innerHTML).map(
-    function (x) {
-      return parseInt(x);
-    }
-  );
-  // Sort the years
-  years.sort(function (a, b) {
-    return a - b;
-  });
-  // Get the year ticks and interval
+  var years = model_years.map(function (x) {return parseInt(x);});
+  years.sort(function (a, b) {return a - b;});
   var year_ticks = years.length == 2 ? years : null;
 
+  
   // Set the title alignment to left
   Highcharts.setOptions({
+    colors: colors,
     title: {
-      align: "left",
-    },
+        align: 'left'
+    }
   });
 
-  // Chart:GHG_1_cunsum_emission_Mt
-  Highcharts.chart("GHG_1_cunsum_emission_Mt", {
+
+
+  // Chart:GHG_overview
+  Highcharts.chart("GHG_overview_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -41,8 +38,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_1_cunsum_emission_Mt_csv").innerHTML
-    ),
+      document.getElementById("GHG_overview").innerHTML
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
@@ -54,12 +51,12 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     legend: {
-      enabled: false,
-      // align: 'right',
-      // verticalAlign: 'top',
-      // layout: 'vertical',
-      // x: 0,
-      // y: 50
+      // enabled: false,
+      align: 'right',
+      verticalAlign: 'middle',
+      layout: 'vertical',
+      x: 0,
+      y: 50
     },
 
     tooltip: {
@@ -85,8 +82,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_2_individual_emission_Mt
-  Highcharts.chart("GHG_2_individual_emission_Mt", {
+  // Chart:GHG_split_Ag_2_Land-use
+  Highcharts.chart("GHG_split_Ag_2_Land-use_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -116,8 +113,8 @@ document.addEventListener("DOMContentLoaded", function () {
       },
     },
     series: JSON.parse(
-      document.getElementById("GHG_2_individual_emission_Mt_csv").innerHTML
-    ),
+      document.getElementById("GHG_split_Ag_2_Land-use").innerHTML
+    ).AUSTRALIA,
     credits: {
       enabled: false,
     },
@@ -135,8 +132,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_4_3_1_crop_lvstk_emission_Mt
-  Highcharts.chart("GHG_4_3_1_crop_lvstk_emission_Mt", {
+  // Chart:GHG_split_Ag_3_Land-use_type
+  Highcharts.chart("GHG_split_Ag_3_Land-use_type_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -151,8 +148,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_4_3_1_crop_lvstk_emission_Mt_csv").innerHTML
-    ),
+      document.getElementById("GHG_split_Ag_3_Land-use_type").innerHTML
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
@@ -193,8 +190,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_4_3_2_dry_irr_emission_Mt
-  Highcharts.chart("GHG_4_3_2_dry_irr_emission_Mt", {
+  // Chart:GHG_split_Ag_5_Water_supply
+  Highcharts.chart("GHG_split_Ag_5_Water_supply_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -209,8 +206,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_4_3_2_dry_irr_emission_Mt_csv").innerHTML
-    ),
+      document.getElementById("GHG_split_Ag_5_Water_supply").innerHTML
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
@@ -251,8 +248,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_4_3_3_category_emission_Mt
-  Highcharts.chart("GHG_4_3_3_category_emission_Mt", {
+  // Chart:GHG_split_Ag_1_GHG_Category
+  Highcharts.chart("GHG_split_Ag_1_GHG_Category_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -267,8 +264,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_4_3_3_category_emission_Mt_csv").innerHTML
-    ),
+      document.getElementById("GHG_split_Ag_1_GHG_Category").innerHTML
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
@@ -309,8 +306,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_4_3_4_sources_emission_Mt
-  Highcharts.chart("GHG_4_3_4_sources_emission_Mt", {
+  // Chart:GHG_split_Ag_4_Source
+  Highcharts.chart("GHG_split_Ag_4_Source_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -325,8 +322,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_4_3_4_sources_emission_Mt_csv").innerHTML
-    ),
+      document.getElementById("GHG_split_Ag_4_Source").innerHTML
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
@@ -367,126 +364,9 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_4_3_5_lu_lm_emission_Mt_wide
-  Highcharts.chart("GHG_4_3_5_lu_lm_emission_Mt_wide", {
-    chart: {
-      renderTo: "GHG_4_3_5_lu_lm_emission_Mt_wide",
-      marginRight: 380,
-    },
-    title: {
-      text: "GHG Emissions (on-land) - Start and End Year",
-    },
 
-    xAxis: {
-      tickWidth: 0.05,
 
-      categories: JSON.parse(
-        document.getElementById("GHG_4_3_5_lu_lm_emission_Mt_wide_csv")
-          .innerHTML
-      )["categories"],
-
-      labels: {
-        y: 10,
-        rotation: -90,
-        align: "right",
-      },
-    },
-
-    series: JSON.parse(
-      document.getElementById("GHG_4_3_5_lu_lm_emission_Mt_wide_csv").innerHTML
-    )["series"],
-
-    yAxis: {
-      title: {
-        text: "Greenhouse Gas (t CO2e/ha)",
-      },
-    },
-    legend: {
-      align: "right",
-      layout: "vertical",
-      x: -180,
-      verticalAlign: "middle",
-    },
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${
-          this.series.name
-        }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-
-    credits: {
-      enabled: false,
-    },
-
-    plotOptions: {
-      column: {
-        stacking: "normal",
-        dataLabels: {
-          enabled: false,
-        },
-      },
-    },
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-  // Chart:GHG_4_3_6_lu_source_emission_Mt
-  Highcharts.chart("GHG_4_3_6_lu_source_emission_Mt", {
-    chart: {
-      type: "packedbubble",
-    },
-    title: {
-      text: "GHG Emissions (on-land) in the target year",
-    },
-    tooltip: {
-      useHTML: true,
-      pointFormat: "<b>{point.name}:</b> {point.value} Mt CO<sub>2</sub>",
-    },
-    plotOptions: {
-      packedbubble: {
-        useSimulation: true,
-        splitSeries: false,
-        minSize: "1%",
-        maxSize: "1000%",
-        dataLabels: {
-          enabled: true,
-          format: "{point.name}",
-          filter: {
-            property: "y",
-            operator: ">",
-            value: 1,
-          },
-        },
-      },
-    },
-
-    series: JSON.parse($("#GHG_4_3_6_lu_source_emission_Mt_csv").html()),
-
-    credits: {
-      enabled: false,
-    },
-    tooltip: {
-      formatter: function () {
-        return `<b>${this.series.name}:</b>${this.y.toFixed(3)}<br/>`;
-      },
-    },
-
-    legend: {
-      align: "right",
-      layout: "vertical",
-      x: 0,
-      verticalAlign: "middle",
-    },
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-  Highcharts.chart("GHG_4_3_7_off_land_commodity_emission_Mt", {
+  Highcharts.chart("GHG_split_off_land_3_Commodity_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -501,9 +381,9 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_4_3_7_off_land_commodity_emission_Mt_csv")
+      document.getElementById("GHG_split_off_land_3_Commodity")
         .innerHTML
-    ),
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
@@ -544,7 +424,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  Highcharts.chart("GHG_4_3_8_off_land_sources_emission_Mt", {
+  Highcharts.chart("GHG_split_off_land_2_Emission_Source_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -559,9 +439,9 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_4_3_8_off_land_sources_emission_Mt_csv")
+      document.getElementById("GHG_split_off_land_2_Emission_Source")
         .innerHTML
-    ),
+    ).AUSTRALIA,
     xAxis: {
       tickPositions: year_ticks,
     },
@@ -601,7 +481,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  Highcharts.chart("GHG_4_3_9_off_land_type_emission_Mt", {
+  Highcharts.chart("GHG_split_off_land_1_Emission_Type_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -616,9 +496,9 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_4_3_9_off_land_type_emission_Mt_csv")
+      document.getElementById("GHG_split_off_land_1_Emission_Type")
         .innerHTML
-    ),
+    ).AUSTRALIA,
     xAxis: {
       tickPositions: year_ticks,
     },
@@ -658,8 +538,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_4_4_ag_reduction_source_wide_Mt
-  Highcharts.chart("GHG_4_4_ag_reduction_source_wide_Mt", {
+  // Chart:GHG_split_NonAg_1_Land-use
+  Highcharts.chart("GHG_split_NonAg_1_Land-use_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -674,9 +554,9 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_4_4_ag_reduction_source_wide_Mt_csv")
+      document.getElementById("GHG_split_NonAg_1_Land-use")
         .innerHTML
-    ),
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
@@ -717,8 +597,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_4_5_1_GHG_ag_man_df_wide_Mt
-  Highcharts.chart("GHG_4_5_1_GHG_ag_man_df_wide_Mt", {
+  // Chart:GHG_split_Am_3_Agricultural_Management_Type
+  Highcharts.chart("GHG_split_Am_3_Agricultural_Management_Type_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -733,8 +613,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_4_5_1_GHG_ag_man_df_wide_Mt_csv").innerHTML
-    ),
+      document.getElementById("GHG_split_Am_3_Agricultural_Management_Type").innerHTML
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
@@ -775,8 +655,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_4_5_2_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt
-  Highcharts.chart("GHG_4_5_2_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt", {
+  // Chart:GHG_split_Am_1_Land-use
+  Highcharts.chart("GHG_split_Am_1_Land-use_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -792,9 +672,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     series: JSON.parse(
       document.getElementById(
-        "GHG_4_5_2_GHG_ag_man_GHG_crop_lvstk_df_wide_Mt_csv"
+        "GHG_split_Am_1_Land-use"
       ).innerHTML
-    ),
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
@@ -835,8 +715,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_4_5_3_GHG_ag_man_dry_irr_df_wide_Mt
-  Highcharts.chart("GHG_4_5_3_GHG_ag_man_dry_irr_df_wide_Mt", {
+  // Chart:GHG_split_Am_4_Water_supply
+  Highcharts.chart("GHG_split_Am_4_Water_supply_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -851,9 +731,9 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("GHG_4_5_3_GHG_ag_man_dry_irr_df_wide_Mt_csv")
+      document.getElementById("GHG_split_Am_4_Water_supply")
         .innerHTML
-    ),
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
