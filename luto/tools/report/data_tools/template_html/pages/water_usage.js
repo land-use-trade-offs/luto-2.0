@@ -1,26 +1,27 @@
 // create chart
 document.addEventListener("DOMContentLoaded", function () {
   
-  // Set the default color palette for Highcharts
-  var colors = eval(document.getElementById("colors").innerHTML);
-  Highcharts.setOptions({colors: colors});
+  const support_info = JSON.parse(document.getElementById('Supporting_info').innerText);
+  const colors = support_info.colors;
+  const model_years = support_info.years;
+  
 
   // Get the available years for plotting
-  var years = eval(document.getElementById("model_years").innerHTML).map(function (x) { return parseInt(x); });
-  // Sort the years
-  years.sort(function (a, b) { return a - b; });
-  // Get the year ticks and interval
+  var years = model_years.map(function (x) {return parseInt(x);});
+  years.sort(function (a, b) {return a - b;});
   var year_ticks = years.length == 2 ? years : null;
 
-  // Global options
+  
+  // Set the title alignment to left
   Highcharts.setOptions({
+    colors: colors,
     title: {
-      align: 'left' // Align the title to the left
-    },
+        align: 'left'
+    }
   });
 
-  // Chart:water_1_water_net_use_by_broader_category
-  Highcharts.chart("water_1_water_net_use_by_broader_category", {
+  // Chart:Water_overview_AUSTRALIA
+  Highcharts.chart("Water_overview_AUSTRALIA_chart", {
     chart: {
       marginRight: 380,
     },
@@ -35,7 +36,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     title: {
-      text: "Water Net Yield by Broader Land-use and Management Type",
+      text: "Water Net Yield Overview",
     },
 
     credits: {
@@ -43,7 +44,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("water_1_water_net_use_by_broader_category_csv").innerHTML
+      document.getElementById("Water_overview_AUSTRALIA").innerHTML
     ),
     xAxis: {
       tickPositions: year_ticks,
@@ -75,8 +76,8 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
 
-  // Chart:water_2_water_net_yield_by_specific_landuse
-  Highcharts.chart("water_2_water_net_yield_by_specific_landuse", {
+  // Chart:Water_overview_landuse
+  Highcharts.chart("Water_overview_landuse_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -95,7 +96,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     title: {
-      text: "Water Net Yield by Broader Land-use and Management Type",
+      text: "Water Net Yield by Land Use",
     },
 
     credits: {
@@ -103,7 +104,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("water_2_water_net_yield_by_specific_landuse_csv").innerHTML
+      document.getElementById("Water_overview_landuse").innerHTML
     ),
     xAxis: {
       tickPositions: year_ticks,
@@ -140,17 +141,18 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:water_3_water_net_yield_by_region
-  const chartContainer = document.getElementById('water_3_water_net_yield_by_region');
-  chartData = JSON.parse(document.getElementById("water_3_water_net_yield_by_region_csv").innerHTML);
+  // Chart:Water_overview_by_watershed_region
+  const chartContainer = document.getElementById('Water_overview_by_watershed_region_chart');
+  const chartData = JSON.parse(document.getElementById("Water_overview_by_watershed_region").innerHTML);
 
   // Create blocks and render Highcharts in each block
-  chartData.forEach((chart, index) => {
+  Object.entries(chartData).forEach(([region, series], index) => {
     // Create a new div for each chart
     const chartBlock = document.createElement('div');
     chartBlock.classList.add('chart-block');
     chartBlock.id = `chart-${index + 1}`;
     chartContainer.appendChild(chartBlock);
+
 
     Highcharts.chart(chartBlock.id, {
 
@@ -193,7 +195,7 @@ document.addEventListener("DOMContentLoaded", function () {
       },
 
       title: {
-        text: chart.name,
+        text: region,
         align: 'center',
       },
 
@@ -201,7 +203,7 @@ document.addEventListener("DOMContentLoaded", function () {
         enabled: false,
       },
 
-      series: chart.data,
+      series: series,
 
       xAxis: {
         tickPositions: year_ticks,

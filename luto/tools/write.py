@@ -1735,11 +1735,11 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
 
     # Concatenate the dataframes, rename the columns, and reset the index, then save to a csv file
     veg_base_score_score = veg_base_score_score.assign(
-        Type='Outside LUTO study area', 
-        Year=yr_cal, 
-        lu='Outside LUTO study area',
-        relative_contribution_percentage=veg_base_score_score['Target_by_Percent']
-    )
+            Type='Outside LUTO study area', 
+            Year=yr_cal, 
+            lu='Outside LUTO study area',
+        ).eval('Relative_Contribution_Percentage = BASE_OUTSIDE_SCORE / BASE_TOTAL_SCORE * 100')
+    
     pd.concat([
         GBF3_score_ag, 
         GBF3_score_am, 
@@ -1751,6 +1751,7 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
             'group':'Vegetation Group',
             'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)'}
         ).reset_index(drop=True
+        ).query('`Area Weighted Score (ha)` > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF3_scores_{yr_cal}.csv'), index=False)
         
     return None
@@ -1862,6 +1863,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
             'am':'Agri-Management',
             'Relative_Contribution_Percentage':'Contribution Relative to Pre-1750 Level (%)',
             'Target_by_Percent':'Target by Percent (%)'}).reset_index(drop=True
+        ).query('`Area Weighted Score (ha)` > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF4_SNES_scores_{yr_cal}.csv'), index=False)
             
     return None
@@ -1974,6 +1976,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
             'Relative_Contribution_Percentage': 'Contribution Relative to Pre-1750 Level (%)',
             'Target_by_Percent': 'Target by Percent (%)'}
         ).reset_index(drop=True
+        ).query('`Area Weighted Score (ha)` > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF4_ECNES_scores_{yr_cal}.csv'), index=False)
         
     return None
@@ -2083,6 +2086,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
             'am': 'Agri-Management',
             'Relative_Contribution_Percentage': 'Contribution Relative to Pre-1750 Level (%)'}
         ).reset_index(drop=True
+        ).query('`Area Weighted Score (ha)` > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF8_groups_scores_{yr_cal}.csv'), index=False)
 
     return None
@@ -2193,6 +2197,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
             'am': 'Agri-Management',
             'Relative_Contribution_Percentage': 'Contribution Relative to Pre-1750 Level (%)'}
         ).reset_index(drop=True
+        ).query('`Area Weighted Score (ha)` > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF8_species_scores_{yr_cal}.csv'), index=False)
         
     return None

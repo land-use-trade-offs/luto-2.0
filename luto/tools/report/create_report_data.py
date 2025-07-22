@@ -44,9 +44,6 @@ from luto.tools.report.data_tools.parameters import (
     GHG_CATEGORY,
     GHG_NAMES,
     LANDUSE_ALL_RENAMED,
-    LU_CROPS,
-    LVSTK_MODIFIED,
-    LVSTK_NATURAL,
     RENAME_AM_NON_AG,
     RENAME_NON_AG,
     SPATIAL_MAP_DICT
@@ -1308,20 +1305,12 @@ def save_report_data(raw_data_dir:str):
                 'CH4': 'Methane (CH4)',
                 'N2O': 'Nitrous Oxide (N2O)'
             })
-            
-            
-        def get_landuse_type(x):
-            if x in LU_CROPS:
-                return 'Crop'
-            elif x in LVSTK_NATURAL:
-                return 'Livestock - natural land'
-            elif x in LVSTK_MODIFIED:
-                return 'Livestock - modified land'
-            else:
-                return 'Unallocated land'
+
+        
+
             
         GHG_land = pd.concat([GHG_ag, GHG_non_ag, GHG_ag_man, GHG_transition], axis=0).query('abs(`Value (t CO2e)`) > 0').reset_index(drop=True)
-        GHG_land['Land-use type'] = GHG_land['Land-use'].apply(get_landuse_type)
+        GHG_land['Land-use type'] = GHG_land['Land-use'].apply(lu_group.set_index('Land-use')['Category'].to_dict().get)
         net_land = GHG_land.groupby('Year')[['Value (t CO2e)']].sum(numeric_only=True).reset_index()
 
 
@@ -1516,6 +1505,7 @@ def save_report_data(raw_data_dir:str):
 
         # -------------------- GHG abatement by Non-Agricultural sector --------------------
         Non_ag_reduction_long = GHG_land.query('Type == "Non-Agricultural land-use"').reset_index(drop=True)
+        Non_ag_reduction_long['Value (t CO2e)'] = Non_ag_reduction_long['Value (t CO2e)'] * -1  # Convert from negative to positive
         group_cols = ['Land-use']
         for idx, col in enumerate(group_cols):
             df_AUS = Non_ag_reduction_long\
@@ -1559,6 +1549,7 @@ def save_report_data(raw_data_dir:str):
 
         # -------------------- GHG reductions by Agricultural managements --------------------
         Ag_man_sequestration_long = GHG_land.query('Type == "Agricultural Management"').reset_index(drop=True)
+        Ag_man_sequestration_long['Value (t CO2e)'] = Ag_man_sequestration_long['Value (t CO2e)'] * -1  # Convert from negative to positive
         group_cols = ['Land-use', 'Land-use type', 'Agricultural Management Type', 'Water_supply']
         for idx, col in enumerate(group_cols):
             df_AUS = Ag_man_sequestration_long\
@@ -1643,8 +1634,9 @@ def save_report_data(raw_data_dir:str):
         columns={'Climate Change Impact (ML)': 'Value (ML)'}
     )
     water_domestic_use = hist_and_public_wny_water_region[['Year','Region', 'Domestic Water Use (ML)']].rename(
-        columns={'Domestic Water Use (ML)': 'Value (ML)'}
-    ).eval('`Value (ML)` = -`Value (ML)`')  # Domestic water use is negative, indicating a water loss (consumption)
+        columns={'Domestic Water Use (ML)': 'Value (ML)'})
+    water_domestic_use['Value (ML)'] *= -1  # Domestic water use is negative, indicating a water loss (consumption)
+    
     water_yield_limit = hist_and_public_wny_water_region[['Year','Region', 'Water Yield Limit (ML)']].rename(
         columns={'Water Yield Limit (ML)': 'Value (ML)'}
     )
@@ -1760,7 +1752,7 @@ def save_report_data(raw_data_dir:str):
 
         water_yield_region[reg_name] = water_df.to_dict(orient='records')
 
-    with open(f'{SAVE_DIR}/water_overview_by_watershed_region.json', 'w') as outfile:
+    with open(f'{SAVE_DIR}/Water_overview_by_watershed_region.json', 'w') as outfile:
         json.dump(water_yield_region, outfile)
         
         
@@ -1901,8 +1893,6 @@ def save_report_data(raw_data_dir:str):
     #                   6) Biodiversity                     #
     #########################################################
 
-
-    # ---------------- Biodiversity quality overview  ----------------
     filter_str = '''
         category == "biodiversity"
         and year_types == "single_year"
@@ -1915,7 +1905,10 @@ def save_report_data(raw_data_dir:str):
         .rename(columns={'Contribution Relative to Base Year Level (%)': 'Value (%)'})\
         .query('`Value (%)` > 1e-6')\
         .round({'Value (%)': 6})
-
+        
+        
+        
+    # ---------------- Biodiversity quality overview  ----------------
     group_cols = ['Type']
     for idx, col in enumerate(group_cols):
         df_AUS = bio_df\
@@ -2118,7 +2111,7 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        with open(f'{SAVE_DIR}/BIO_quality_split_{idx+1}_NonAg_{col.replace(" ", "_")}.json', 'w') as f:
+        with open(f'{SAVE_DIR}/BIO_quality_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
             json.dump(out_dict, f)
     
     
@@ -2126,7 +2119,6 @@ def save_report_data(raw_data_dir:str):
     
     if settings.BIODIVERSITY_TARGET_GBF_2 != 'off':
 
-        # -------------------- get biodiversity dataframe --------------------
         filter_str = '''
             category == "biodiversity" 
             and year_types == "single_year" 
@@ -2251,7 +2243,7 @@ def save_report_data(raw_data_dir:str):
         # ---------------- (GBF2) Agricultural Management  ----------------
         bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
 
-        group_cols = ['Agri-Management']
+        group_cols = ['Landuse', 'Agri-Management']
         for idx, col in enumerate(group_cols):
             df_AUS = bio_df_am\
                 .groupby(['Year', col])[['Value (%)']]\
@@ -2380,11 +2372,11 @@ def save_report_data(raw_data_dir:str):
 
         group_cols = ['Type']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df['species'].unique():
                 target_species = bio_df_target.query('species == @species')[['Year', 'Target_by_Percent']].values.tolist()
                 scores_species = bio_df.query('species == @species')
-                out_dict[species] = {}
                 
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
@@ -2427,7 +2419,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF3_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -2439,10 +2431,11 @@ def save_report_data(raw_data_dir:str):
         
         group_cols = ['Landuse']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df_ag['species'].unique():
                 scores_species = bio_df_ag.query('species == @species')
-                out_dict[species] = {}
+                
                 
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
@@ -2484,7 +2477,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF3_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -2495,10 +2488,11 @@ def save_report_data(raw_data_dir:str):
 
         group_cols = ['Landuse', 'Agri-Management']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df_am['species'].unique():
                 scores_species = bio_df_am.query('species == @species')
-                out_dict[species] = {}
+                
                 
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
@@ -2540,7 +2534,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF3_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -2551,10 +2545,11 @@ def save_report_data(raw_data_dir:str):
 
         group_cols = ['Landuse']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df_nonag['species'].unique():
                 scores_species = bio_df_nonag.query('species == @species')
-                out_dict[species] = {}
+                
                 
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
@@ -2596,7 +2591,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF3_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -2626,12 +2621,11 @@ def save_report_data(raw_data_dir:str):
 
         group_cols = ['Type']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df['species'].unique():
                 target_species = bio_df_target.query('species == @species')[['Year', 'Target by Percent (%)']].values.tolist()
-                scores_species = bio_df.query('species == @species')
-                out_dict[species] = {}
-                
+                scores_species = bio_df.query('species == @species')                
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
                     .sum()\
@@ -2673,7 +2667,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF4_SNES_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -2685,10 +2679,11 @@ def save_report_data(raw_data_dir:str):
         
         group_cols = ['Landuse']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df_ag['species'].unique():
                 scores_species = bio_df_ag.query('species == @species')
-                out_dict[species] = {}
+                
                 
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
@@ -2730,7 +2725,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF4_SNES_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -2741,10 +2736,11 @@ def save_report_data(raw_data_dir:str):
 
         group_cols = ['Landuse', 'Agri-Management']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df_am['species'].unique():
                 scores_species = bio_df_am.query('species == @species')
-                out_dict[species] = {}
+                
                 
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
@@ -2786,7 +2782,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF4_SNES_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -2796,10 +2792,11 @@ def save_report_data(raw_data_dir:str):
 
         group_cols = ['Landuse']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df_nonag['species'].unique():
                 scores_species = bio_df_nonag.query('species == @species')
-                out_dict[species] = {}
+                
                 
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
@@ -2841,7 +2838,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF4_SNES_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -2869,11 +2866,12 @@ def save_report_data(raw_data_dir:str):
 
         group_cols = ['Type']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df['species'].unique():
                 target_species = bio_df_target.query('species == @species')[['Year', 'Target by Percent (%)']].values.tolist()
                 scores_species = bio_df.query('species == @species')
-                out_dict[species] = {}
+                
                 
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
@@ -2916,7 +2914,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF4_ECNES_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -2928,10 +2926,11 @@ def save_report_data(raw_data_dir:str):
         
         group_cols = ['Landuse']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df_ag['species'].unique():
                 scores_species = bio_df_ag.query('species == @species')
-                out_dict[species] = {}
+                
                 
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
@@ -2973,7 +2972,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF4_ECNES_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -2984,10 +2983,11 @@ def save_report_data(raw_data_dir:str):
 
         group_cols = ['Landuse', 'Agri-Management']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df_am['species'].unique():
                 scores_species = bio_df_am.query('species == @species')
-                out_dict[species] = {}
+                
                 
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
@@ -3029,7 +3029,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF4_ECNES_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -3039,10 +3039,11 @@ def save_report_data(raw_data_dir:str):
 
         group_cols = ['Landuse']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df_nonag['species'].unique():
                 scores_species = bio_df_nonag.query('species == @species')
-                out_dict[species] = {}
+                
                 
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
@@ -3084,7 +3085,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF4_ECNES_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -3112,11 +3113,12 @@ def save_report_data(raw_data_dir:str):
 
         group_cols = ['Type']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df['species'].unique():
                 target_species = bio_df_target.query('species == @species')[['Year', 'Target_by_Percent']].values.tolist()
                 scores_species = bio_df.query('species == @species')
-                out_dict[species] = {}
+                
                 
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
@@ -3159,7 +3161,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF8_SPECIES_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -3171,10 +3173,11 @@ def save_report_data(raw_data_dir:str):
         
         group_cols = ['Landuse']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df_ag['species'].unique():
                 scores_species = bio_df_ag.query('species == @species')
-                out_dict[species] = {}
+                
                 
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
@@ -3216,7 +3219,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF8_SPECIES_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -3227,10 +3230,11 @@ def save_report_data(raw_data_dir:str):
 
         group_cols = ['Landuse', 'Agri-Management']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df_am['species'].unique():
                 scores_species = bio_df_am.query('species == @species')
-                out_dict[species] = {}
+                
                 
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
@@ -3272,7 +3276,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF8_SPECIES_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -3282,10 +3286,11 @@ def save_report_data(raw_data_dir:str):
 
         group_cols = ['Landuse']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df_nonag['species'].unique():
                 scores_species = bio_df_nonag.query('species == @species')
-                out_dict[species] = {}
+                
                 
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
@@ -3327,7 +3332,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF8_SPECIES_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -3352,10 +3357,11 @@ def save_report_data(raw_data_dir:str):
         # ---------------- (GBF8 GROUP) Overview  ----------------
         group_cols = ['Type']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df['species'].unique():
                 scores_species = bio_df.query('species == @species')
-                out_dict[species] = {}
+                
                 
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
@@ -3397,7 +3403,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF8_GROUP_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -3409,10 +3415,11 @@ def save_report_data(raw_data_dir:str):
         
         group_cols = ['Landuse']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df_ag['species'].unique():
                 scores_species = bio_df_ag.query('species == @species')
-                out_dict[species] = {}
+                
                 
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
@@ -3454,7 +3461,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF8_GROUP_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -3465,10 +3472,11 @@ def save_report_data(raw_data_dir:str):
 
         group_cols = ['Landuse', 'Agri-Management']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df_am['species'].unique():
                 scores_species = bio_df_am.query('species == @species')
-                out_dict[species] = {}
+                
                 
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
@@ -3510,7 +3518,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF8_GROUP_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -3520,10 +3528,11 @@ def save_report_data(raw_data_dir:str):
 
         group_cols = ['Landuse']
         for idx, col in enumerate(group_cols):
-            out_dict = {}
+            out_dict = {region: {} for region in bio_df['region'].unique()}
+            out_dict['AUSTRALIA'] = {}
             for species in bio_df_nonag['species'].unique():
                 scores_species = bio_df_nonag.query('species == @species')
-                out_dict[species] = {}
+                
                 
                 df_AUS = scores_species\
                     .groupby(['Year', col])[['Value (%)']]\
@@ -3565,7 +3574,7 @@ def save_report_data(raw_data_dir:str):
 
                 for region, df in df_wide.groupby('region'):
                     df = df.drop(['region'], axis=1)
-                    out_dict[species][region] = df.to_dict(orient='records')
+                    out_dict[region][species] = df.to_dict(orient='records')
 
             with open(f'{SAVE_DIR}/BIO_GBF8_GROUP_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
                 json.dump(out_dict, f)
@@ -3609,10 +3618,7 @@ def save_report_data(raw_data_dir:str):
     
     #########################################################
     # Supporting information               
-    #########################################################
-    with open(f"{raw_data_dir}/model_run_settings.txt", 'r') as f:
-        settings_str = f.read()
-        
+    #########################################################       
     with open(f'{raw_data_dir}/model_run_settings.txt', 'r', encoding='utf-8') as src_file:
         settings = {i.split(':')[0].strip(): ''.join(i.split(':')[1:]).strip() for i in src_file.readlines()}
         settings = [{'parameter': k, 'val': v} for k, v in settings.items()]

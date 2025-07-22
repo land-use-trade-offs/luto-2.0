@@ -24,28 +24,6 @@ import luto.settings as settings
 # Get the root directory of the data
 YR_BASE = 2010
 
-
-# Define crop-lvstk land uses
-LU_CROPS = ['Apples','Citrus','Cotton','Grapes','Hay','Nuts','Other non-cereal crops',
-            'Pears','Plantation fruit','Rice','Stone fruit','Sugar','Summer cereals',
-            'Summer legumes','Summer oilseeds','Tropical stone fruit','Vegetables',
-            'Winter cereals','Winter legumes','Winter oilseeds']
-
-LVSTK_NATURAL = ['Beef - natural land','Dairy - natural land','Sheep - natural land']
-
-LVSTK_MODIFIED = ['Beef - modified land','Dairy - modified land','Sheep - modified land']
-
-LU_LVSTKS = LVSTK_NATURAL + LVSTK_MODIFIED
-
-LU_UNALLOW = ['Unallocated - modified land','Unallocated - natural land']
-
-
-LU_NATURAL = ['Beef - natural land',
-              'Dairy - natural land',
-              'Sheep - natural land',
-              'Unallocated - natural land']
-
-
 # Define the commodity categories
 COMMODITIES_ON_LAND = ['Apples','Beef live export','Beef meat','Citrus','Cotton','Dairy','Grapes',
                        'Hay','Nuts','Other non-cereal crops', 'Pears', 'Plantation fruit',

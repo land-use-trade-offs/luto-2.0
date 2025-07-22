@@ -37,18 +37,6 @@ def data2html(raw_data_dir):
 
     # Set the save directory    
     report_dir = f'{raw_data_dir}/DATA_REPORT'
-    
-    # Check if the report directory exists
-    if not os.path.exists(os.path.normpath(report_dir)):
-        raise FileNotFoundError(f"Report directory not found: {report_dir}") 
-    
-    # Get the avaliable years for the model
-    years_str = str(sorted(settings.SIM_YEARS))
-        
-        
-    ####################################################
-    #        Copy report html to the report_dir        #
-    ####################################################  
 
     # Copy the html template to the report directory
     shutil.copytree(
@@ -56,11 +44,6 @@ def data2html(raw_data_dir):
         f'{report_dir}/REPORT_HTML',
         dirs_exist_ok=True
     )
-
-
-    ####################################################
-    #                Write data to HTML                #
-    #################################################### 
     
     # Get all html files needs data insertion
     html_df = pd.DataFrame([

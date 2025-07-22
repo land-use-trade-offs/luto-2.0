@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     title: {
-      text: "Cumulative GHG Emissions",
+      text: "GHG Emissions Overview",
     },
 
     credits: {
@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Greenhouse Gas (Mt CO2e)",
+        text: "Greenhouse Gas (t CO2e)",
       },
     },
     xAxis: {
@@ -82,56 +82,6 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_split_Ag_2_Land-use
-  Highcharts.chart("GHG_split_Ag_2_Land-use_chart", {
-    chart: {
-      type: "column",
-      marginRight: 380,
-    },
-    title: {
-      text: "GHG Emissions by Land-use/Management Type",
-    },
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-    yAxis: {
-      title: {
-        text: "Greenhouse Gas (Mt CO2e)",
-      },
-    },
-    legend: {
-      align: "right",
-      layout: "vertical",
-      x: -100,
-      verticalAlign: "middle",
-    },
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${
-          this.series.name
-        }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-    series: JSON.parse(
-      document.getElementById("GHG_split_Ag_2_Land-use").innerHTML
-    ).AUSTRALIA,
-    credits: {
-      enabled: false,
-    },
-    plotOptions: {
-      column: {
-        stacking: "normal",
-        dataLabels: {
-          enabled: false,
-        },
-      },
-    },
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
   // Chart:GHG_split_Ag_3_Land-use_type
   Highcharts.chart("GHG_split_Ag_3_Land-use_type_chart", {
     chart: {
@@ -140,7 +90,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     title: {
-      text: "GHG Emissions (on-land) by Crop/Livestock",
+      text: "Agricultural GHG Emissions by Broad Land-use Type",
     },
 
     credits: {
@@ -153,7 +103,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Greenhouse Gas (Mt CO2e)",
+        text: "Greenhouse Gas (t CO2e)",
       },
     },
     xAxis: {
@@ -190,41 +140,29 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:GHG_split_Ag_5_Water_supply
-  Highcharts.chart("GHG_split_Ag_5_Water_supply_chart", {
+  // Chart:GHG_split_Ag_2_Land-use
+  Highcharts.chart("GHG_split_Ag_2_Land-use_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
-
     title: {
-      text: "GHG Emissions (on-land) by Irrigation Type",
-    },
-
-    credits: {
-      enabled: false,
-    },
-
-    series: JSON.parse(
-      document.getElementById("GHG_split_Ag_5_Water_supply").innerHTML
-    ).AUSTRALIA,
-
-    yAxis: {
-      title: {
-        text: "Greenhouse Gas (Mt CO2e)",
-      },
+      text: "Agricultural GHG Emissions by Specific Land-use",
     },
     xAxis: {
       tickPositions: year_ticks,
     },
-
+    yAxis: {
+      title: {
+        text: "Greenhouse Gas (t CO2e)",
+      },
+    },
     legend: {
       align: "right",
       layout: "vertical",
-      x: -180,
+      x: -100,
       verticalAlign: "middle",
     },
-
     tooltip: {
       formatter: function () {
         return `<b>Year:</b> ${this.x}<br><b>${
@@ -232,7 +170,12 @@ document.addEventListener("DOMContentLoaded", function () {
         }:</b>${this.y.toFixed(2)}<br/>`;
       },
     },
-
+    series: JSON.parse(
+      document.getElementById("GHG_split_Ag_2_Land-use").innerHTML
+    ).AUSTRALIA,
+    credits: {
+      enabled: false,
+    },
     plotOptions: {
       column: {
         stacking: "normal",
@@ -241,7 +184,6 @@ document.addEventListener("DOMContentLoaded", function () {
         },
       },
     },
-
     exporting: {
       sourceWidth: 1200,
       sourceHeight: 600,
@@ -256,7 +198,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     title: {
-      text: "GHG Emissions (on-land) by Gas",
+      text: "Agricultural GHG Emissions by GHG Category",
     },
 
     credits: {
@@ -269,7 +211,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Greenhouse Gas (Mt CO2e)",
+        text: "Greenhouse Gas (t CO2e)",
       },
     },
     xAxis: {
@@ -314,7 +256,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     title: {
-      text: "GHG Emissions (on-land) by Source",
+      text: "Agricultural GHG Emissions by Source",
     },
 
     credits: {
@@ -327,7 +269,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Emissions (Mt CO2e)",
+        text: "Emissions (t CO2e)",
       },
     },
     xAxis: {
@@ -364,8 +306,65 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
+  // Chart:GHG_split_Ag_5_Water_supply
+  Highcharts.chart("GHG_split_Ag_5_Water_supply_chart", {
+    chart: {
+      type: "column",
+      marginRight: 380,
+    },
 
+    title: {
+      text: "Agricultural GHG Emissions by Irrigation Type",
+    },
 
+    credits: {
+      enabled: false,
+    },
+
+    series: JSON.parse(
+      document.getElementById("GHG_split_Ag_5_Water_supply").innerHTML
+    ).AUSTRALIA,
+
+    yAxis: {
+      title: {
+        text: "Greenhouse Gas (t CO2e)",
+      },
+    },
+    xAxis: {
+      tickPositions: year_ticks,
+    },
+
+    legend: {
+      align: "right",
+      layout: "vertical",
+      x: -180,
+      verticalAlign: "middle",
+    },
+
+    tooltip: {
+      formatter: function () {
+        return `<b>Year:</b> ${this.x}<br><b>${
+          this.series.name
+        }:</b>${this.y.toFixed(2)}<br/>`;
+      },
+    },
+
+    plotOptions: {
+      column: {
+        stacking: "normal",
+        dataLabels: {
+          enabled: false,
+        },
+      },
+    },
+
+    exporting: {
+      sourceWidth: 1200,
+      sourceHeight: 600,
+    },
+  });
+
+  // Chart:GHG_split_off_land_3_Commodity
   Highcharts.chart("GHG_split_off_land_3_Commodity_chart", {
     chart: {
       type: "column",
@@ -387,7 +386,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Greenhouse Gas (Mt CO2e)",
+        text: "Greenhouse Gas (t CO2e)",
       },
     },
     xAxis: {
@@ -424,6 +423,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
+  // Chart:GHG_split_off_land_2_Emission_Source
   Highcharts.chart("GHG_split_off_land_2_Emission_Source_chart", {
     chart: {
       type: "column",
@@ -447,7 +447,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Greenhouse Gas (Mt CO2e)",
+        text: "Greenhouse Gas (t CO2e)",
       },
     },
 
@@ -481,6 +481,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
+  // Chart:GHG_split_off_land_1_Emission_Type
   Highcharts.chart("GHG_split_off_land_1_Emission_Type_chart", {
     chart: {
       type: "column",
@@ -504,7 +505,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Greenhouse Gas (Mt CO2e)",
+        text: "Greenhouse Gas (t CO2e)",
       },
     },
 
@@ -546,7 +547,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     title: {
-      text: "GHG Emissions Abatement by Non-agricultural Land-use Type",
+      text: "Non-agricultural GHG Emissions Abatement by Land-use Type",
     },
 
     credits: {
@@ -560,7 +561,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Greenhouse Gas (Mt CO2e)",
+        text: "Greenhouse Gas (t CO2e)",
       },
     },
     xAxis: {
@@ -618,7 +619,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Greenhouse Gas (Mt CO2e)",
+        text: "Greenhouse Gas (t CO2e)",
       },
     },
     xAxis: {
@@ -655,6 +656,66 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
+  // Chart:GHG_split_Am_2_Land-use_type
+  Highcharts.chart("GHG_split_Am_2_Land-use_type_chart", {
+    chart: {
+      type: "column",
+      marginRight: 380,
+    },
+
+    title: {
+      text: "GHG Emissions Abatement by Broad Land-use Type",
+    },
+
+    credits: {
+      enabled: false,
+    },
+
+    series: JSON.parse(
+      document.getElementById(
+        "GHG_split_Am_2_Land-use_type"
+      ).innerHTML
+    ).AUSTRALIA,
+
+    yAxis: {
+      title: {
+        text: "Greenhouse Gas (t CO2e)",
+      },
+    },
+    xAxis: {
+      tickPositions: year_ticks,
+    },
+
+    legend: {
+      align: "right",
+      layout: "vertical",
+      x: -150,
+      verticalAlign: "middle",
+    },
+
+    tooltip: {
+      formatter: function () {
+        return `<b>Year:</b> ${this.x}<br><b>${
+          this.series.name
+        }:</b>${this.y.toFixed(2)}<br/>`;
+      },
+    },
+
+    plotOptions: {
+      column: {
+        stacking: "normal",
+        dataLabels: {
+          enabled: false,
+        },
+      },
+    },
+
+    exporting: {
+      sourceWidth: 1200,
+      sourceHeight: 600,
+    },
+  });
+
   // Chart:GHG_split_Am_1_Land-use
   Highcharts.chart("GHG_split_Am_1_Land-use_chart", {
     chart: {
@@ -663,7 +724,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     title: {
-      text: "GHG Emissions Abatement by Crop/Livestock",
+      text: "GHG Emissions Abatement by Specific Land-use",
     },
 
     credits: {
@@ -678,7 +739,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Greenhouse Gas (Mt CO2e)",
+        text: "Greenhouse Gas (t CO2e)",
       },
     },
     xAxis: {
@@ -737,7 +798,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Greenhouse Gas (Mt CO2e)",
+        text: "Greenhouse Gas (t CO2e)",
       },
     },
     xAxis: {
