@@ -39,8 +39,8 @@
 
       <!-- The dropdown to select the category of the map: -->
       <div class="selection">
-        <label for="select_1" class="label">Select a category:</label>
-        <select id="select_1">
+        <label for="category_select" class="label">Select a category:</label>
+        <select id="category_select">
           <option value="Int_Map" selected>Broad land-use</option>
           <option value="Ag_LU">Agricultural land-use</option>
           <option value="Ag_Mgt">Agricultural management</option>
@@ -50,8 +50,8 @@
 
       <!-- The dropdown to select the specific map: -->
       <div class="selection">
-        <label for="select_2" class="label">Select a map:</label>
-        <select id="select_2"></select>
+        <label for="map_select" class="label">Select a map:</label>
+        <select id="map_select"></select>
       </div>
 
       <!-- The dropdown to select the year of the map: -->
@@ -63,7 +63,6 @@
           id="year"
           name="year"
           step="1"
-          value="2010"
           oninput="yearOutput.value = year.value"
         />
         <button id="increment">+</button>

@@ -53,7 +53,8 @@ def data2html(raw_data_dir):
         ["GHG",f"{report_dir}/REPORT_HTML/pages/GHG_emissions.html"],
         ["Water",f"{report_dir}/REPORT_HTML/pages/water_usage.html"],
         ['BIO',f"{report_dir}/REPORT_HTML/pages/biodiversity.html"],
-        ['Index',f"{report_dir}/REPORT_HTML/index.html"]
+        ['Index',f"{report_dir}/REPORT_HTML/index.html"],
+        ['Map',f"{report_dir}/REPORT_HTML/pages/spatial_maps.html"],
     ], columns=['name','HTML_path'])
 
     # Get all data files
