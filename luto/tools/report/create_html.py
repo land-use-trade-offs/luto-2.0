@@ -58,7 +58,7 @@ def data2html(raw_data_dir):
     ], columns=['name','HTML_path'])
 
     # Get all data files
-    all_data_files = glob(f"{report_dir}/data/*")
+    all_data_files = glob(f"{report_dir}/data/*.json")
     # Add data path to html_df
     html_df['data_path'] = html_df.apply(lambda x: [i for i in all_data_files if os.path.basename(i).startswith(x['name'])], axis=1)
     # Add the supporting info file to each html

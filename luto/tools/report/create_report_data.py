@@ -1320,9 +1320,9 @@ def save_report_data(raw_data_dir:str):
         net_land = GHG_land.groupby('Year')[['Value (t CO2e)']].sum(numeric_only=True).reset_index()
 
 
-        GHG_limit = GHG_files.query('base_name == "GHG_emissions"').copy()
+        GHG_limit = GHG_files.query('base_name == "GHG_emissions"')
         GHG_limit = pd.concat([pd.read_csv(path) for path in GHG_limit['path']], ignore_index=True)
-        GHG_limit = GHG_limit.query('Variable == "GHG_EMISSIONS_LIMIT_TCO2e"')
+        GHG_limit = GHG_limit.query('Variable == "GHG_EMISSIONS_LIMIT_TCO2e"').copy()
         GHG_limit['Value (t CO2e)'] = GHG_limit['Emissions (t CO2e)']
         GHG_limit_wide = list(map(list,zip(GHG_limit['Year'],GHG_limit['Value (t CO2e)'])))
         
