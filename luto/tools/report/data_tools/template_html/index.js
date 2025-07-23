@@ -2,21 +2,14 @@ document.addEventListener("DOMContentLoaded", function () {
     
     // Select the container to insert the table
     const container = document.getElementById('settingsTable');
-    const data = document.getElementById('settingsTxt').innerText;
+    const data = JSON.parse(document.getElementById('Supporting_info').innerText).model_run_settings;
 
 
-    data.split('\n').forEach(line => {
-        let label, value;
+   for (let i = 0; i < data.length; i++) {
+        const line = data[i];
 
-        if (line.includes(':')) {
-            // Split the line into label and value if a colon is present
-            [label, ...value] = line.split(':');
-            value = value.join(':'); // Join the value array into a string and split it into an array
-        } else {
-            // Use the entire line as the label if no colon is present
-            label = String(line).trim();
-            value = '';
-        }
+        label = line.parameter;
+        value = line.val;
 
         const rowDiv = document.createElement('div');
         rowDiv.classList.add('row');
@@ -39,7 +32,7 @@ document.addEventListener("DOMContentLoaded", function () {
         rowDiv.appendChild(valueSpan);
 
         container.appendChild(rowDiv);
-    });
+    }
 });
 
 

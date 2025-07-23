@@ -70,7 +70,7 @@ def get_ghg_rip_plantings(data: Data, aggregate) -> np.ndarray|pd.DataFrame:
     if aggregate==True:
         return -data.EP_RIP_AVG_T_CO2_HA * data.REAL_AREA
     elif aggregate==False:
-        return pd.DataFrame(-data.EP_RIP_AVG_T_CO2_HA * data.REAL_AREA,columns=['RIP_PLANTINGS'])
+        return pd.DataFrame(-data.EP_RIP_AVG_T_CO2_HA * data.REAL_AREA, columns=['RIP_PLANTINGS'])
     else:
         raise KeyError(f"Aggregate '{aggregate} can be only specified as [True,False]" )
 

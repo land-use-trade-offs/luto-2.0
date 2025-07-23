@@ -17,47 +17,12 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
+from itertools import cycle
 import luto.settings as settings
 
 
 # Get the root directory of the data
 YR_BASE = 2010
-
-# Colors for reporting HTML to loop through
-COLORS = [
-    "#8085e9",
-    "#f15c80",
-    "#e4d354",
-    "#2b908f",
-    "#f45b5b",
-    "#7cb5ec",
-    "#434348",
-    "#90ed7d",
-    "#f7a35c",
-    "#91e8e1",
-]
-
-
-# Define crop-lvstk land uses
-LU_CROPS = ['Apples','Citrus','Cotton','Grapes','Hay','Nuts','Other non-cereal crops',
-            'Pears','Plantation fruit','Rice','Stone fruit','Sugar','Summer cereals',
-            'Summer legumes','Summer oilseeds','Tropical stone fruit','Vegetables',
-            'Winter cereals','Winter legumes','Winter oilseeds']
-
-LVSTK_NATURAL = ['Beef - natural land','Dairy - natural land','Sheep - natural land']
-
-LVSTK_MODIFIED = ['Beef - modified land','Dairy - modified land','Sheep - modified land']
-
-LU_LVSTKS = LVSTK_NATURAL + LVSTK_MODIFIED
-
-LU_UNALLOW = ['Unallocated - modified land','Unallocated - natural land']
-
-
-LU_NATURAL = ['Beef - natural land',
-              'Dairy - natural land',
-              'Sheep - natural land',
-              'Unallocated - natural land']
-
 
 # Define the commodity categories
 COMMODITIES_ON_LAND = ['Apples','Beef live export','Beef meat','Citrus','Cotton','Dairy','Grapes',
@@ -105,6 +70,10 @@ RENAME_AM = {
     "Ecological Grazing": "Regenerative agriculture (livestock)", 
     "Savanna Burning": "Early dry-season savanna burning",
     "AgTech EI": "Agricultural technology (energy)",
+    'Biochar': "Biochar (soil amendment)",
+    'HIR - Beef': "Human-induced regeneration (Beef)",
+    'HIR - Sheep': "Human-induced regeneration (Sheep)",
+
 }
 
 RENAME_NON_AG = {
@@ -142,7 +111,7 @@ NON_AG_LANDUSE_RAW = [i for i in NON_AG_LANDUSE_RAW if settings.NON_AG_LAND_USES
 
 # Merge the land uses
 LANDUSE_ALL_RAW = AG_LANDUSE + NON_AG_LANDUSE_RAW
-LANDUSE_ALL_RENAMED = AG_LANDUSE + list(RENAME_NON_AG.values()) 
+LANDUSE_ALL_RENAMED = AG_LANDUSE + list(RENAME_NON_AG.values())  + ['Outside LUTO study area']
 
 
 
@@ -191,3 +160,52 @@ GHG_CATEGORY = {'Agricultural soils: Animal production, dung and urine': {"CH4":
                 'Ecological Grazing':{'Ecological Grazing':1}}
 
 
+
+# Colors for reporting HTML to loop through
+COLORS = [
+    "#8085e9",
+    "#f15c80",
+    "#e4d354",
+    "#2b908f",
+    "#f45b5b",
+    "#7cb5ec",
+    "#434348",
+    "#90ed7d",
+    "#f7a35c",
+    "#91e8e1",
+]
+
+pattern_path = {
+    'path': 
+        {
+            'd': "M 0 0 L 10 10 M 10 0 L 0 10", 
+            'stroke': "#cccccc", 
+            'strokeWidth': 1,
+        },
+    'width': 10,
+    'height': 10,
+}
+
+COLORS_LU = dict(zip(LANDUSE_ALL_RENAMED, cycle(COLORS)))
+COLORS_LU.update({'Outside LUTO study area': "#C7BFBF"})
+COLORS_LM = dict(zip(['Dryland', 'Irrigated'], ["#f7a35c", "#7cb5ec"]))
+COLORS_COMMODITIES = dict(zip(COMMODITIES_ALL, cycle(COLORS)))
+COLORS_AM_NONAG = dict(zip(RENAME_AM_NON_AG.values(), cycle(COLORS)))
+COLORS_GHG = dict(zip(GHG_NAMES.values(), cycle(COLORS)))
+
+COLORS_ECONOMY_TYPE = dict(zip(
+    [
+        'Live Exports', 'Meat', 'Milk', 'Wool', 'Crop', 'Area cost',
+        'Fixed depreciation cost', 'Fixed labour cost', 'Fixed operating cost',
+        'Quantity cost', 'Water cost'
+    ],
+     cycle(COLORS)
+))
+
+
+PATTERNS_LU = {k:{'pattern':{**pattern_path, 'backgroundColor': v} } for k,v in COLORS_LU.items()}
+PATTERNS_LM = {k: {'pattern': {**pattern_path, 'backgroundColor': v}} for k, v in COLORS_LM.items()}
+PATTERNS_COMMODITIES = {k: {'pattern': {**pattern_path, 'backgroundColor': v}} for k, v in COLORS_COMMODITIES.items()}
+PATTERNS_AM_NONAG = {k: {'pattern': {**pattern_path, 'backgroundColor': v}} for k, v in COLORS_AM_NONAG.items()}
+PATTERNS_GHG = {k: {'pattern': {**pattern_path, 'backgroundColor': v}} for k, v in COLORS_GHG.items()}
+PATTERNS_ECONOMY_TYPE = {k: {'pattern': {**pattern_path, 'backgroundColor': v}} for k, v in COLORS_ECONOMY_TYPE.items()}

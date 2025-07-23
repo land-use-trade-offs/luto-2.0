@@ -1,37 +1,37 @@
 // create chart
 document.addEventListener("DOMContentLoaded", function () {
   
-  // Set the default color palette for Highcharts
-  var colors = eval(document.getElementById("colors").innerHTML);
-  Highcharts.setOptions({colors: colors});
-
+  const support_info = JSON.parse(document.getElementById('Supporting_info').innerText);
+  const colors = support_info.colors;
+  const model_years = support_info.years;
+  
 
   // Get the available years for plotting
-  var years = eval(document.getElementById("model_years").innerHTML).map(function (x) { return parseInt(x); });
-  // Sort the years
-  years.sort(function (a, b) { return a - b; });
-  // Get the year ticks and interval
+  var years = model_years.map(function (x) {return parseInt(x);});
+  years.sort(function (a, b) {return a - b;});
   var year_ticks = years.length == 2 ? years : null;
 
+  
   // Set the title alignment to left
   Highcharts.setOptions({
+    colors: colors,
     title: {
-      align: 'left'
+        align: 'left'
     }
   });
 
 
-  // Chart:production_1_demand_type_wide
-  Highcharts.chart("production_1_demand_type_wide", {
+  // Chart:Production_demand_1_Type
+  Highcharts.chart("Production_demand_1_Type_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
     title: {
-      text: "Demand, Trade, and Production of Agricultural Commodities",
+      text: "Agricultural Commodities Demand by Broad Type",
     },
     series: JSON.parse(
-      document.getElementById("production_1_demand_type_wide_csv").innerHTML
+      document.getElementById("Production_demand_1_Type").innerHTML
     ),
     credits: {
       enabled: false,
@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", function () {
       endOnTick: false,
       maxPadding: 0.1,
       title: {
-        text: "Quantity (million tonnes, million kilolitres [milk])",
+        text: "Quantity (tonnes, kilolitres [milk])",
       },
     },
 
@@ -74,42 +74,25 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:production_2_demand_on_off_wide
-  Highcharts.chart("production_2_demand_on_off_wide", {
+  // Chart:Production_demand_2_on_off_land
+  Highcharts.chart("Production_demand_2_on_off_land_chart", {
 
     chart: {
       marginRight: 380,
     },
 
     title: {
-      text: "Demand for Agricultural Commodities",
+      text: "Agricultural Commodities by On/Off Land",
     },
 
     xAxis: {
-      tickWidth: 0.05,
-
-      categories: JSON.parse(
-        document.getElementById("production_2_demand_on_off_wide_csv").innerHTML
-      )['categories'],
-
-      labels: {
-        verticalAlign: "middle",
-        groupedOptions: [
-          {
-            rotation: -90, // rotate labels for a 2st-level
-            align: "center",
-          },
-        ],
-        rotation: -90, // rotate labels for a 1st-level
-        align: "center",
-      },
+      tickPositions: year_ticks,
     },
-
     yAxis: {
       endOnTick: false,
       maxPadding: 0.1,
       title: {
-        text: "Quantity (million tonnes, million kilolitres [milk])",
+        text: "Quantity (tonnes, kilolitres [milk])",
       },
     },
 
@@ -121,7 +104,6 @@ document.addEventListener("DOMContentLoaded", function () {
       },
     },
 
-
     legend: {
       align: 'right', // Aligns the legend to the right side of the chart container
       verticalAlign: 'middle', // Centers the legend vertically
@@ -131,7 +113,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
     series: JSON.parse(
-      document.getElementById("production_2_demand_on_off_wide_csv").innerHTML)['series'],
+      document.getElementById("Production_demand_2_on_off_land").innerHTML
+    ),
 
     credits: {
       enabled: false,
@@ -152,8 +135,8 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
 
-  // Chart:production_3_demand_commodity
-  Highcharts.chart("production_3_demand_commodity", {
+  // Chart:Production_demand_3_Commodity
+  Highcharts.chart("Production_demand_3_Commodity_chart", {
 
     chart: {
       marginRight: 380,
@@ -163,29 +146,14 @@ document.addEventListener("DOMContentLoaded", function () {
       text: "Agricultural Demand by Commodity",
     },
 
-    xAxis: {
-      tickWidth: 0.05,
-      categories: JSON.parse(
-        document.getElementById("production_3_demand_commodity_csv").innerHTML
-      )['categories'],
-      labels: {
-        verticalAlign: "middle",
-        groupedOptions: [
-          {
-            rotation: -90, // rotate labels for a 2st-level
-            align: "center",
-          },
-        ],
-        rotation: -90, // rotate labels for a 1st-level
-        align: "center",
-      },
+     xAxis: {
+      tickPositions: year_ticks,
     },
-
     yAxis: {
       endOnTick: false,
       maxPadding: 0.1,
       title: {
-        text: "Quantity (million tonnes, million kilolitres [milk])",
+        text: "Quantity (tonnes, kilolitres [milk])",
       },
     },
 
@@ -201,8 +169,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("production_3_demand_commodity_csv").innerHTML
-    )['series'],
+      document.getElementById("Production_demand_3_Commodity").innerHTML
+    ),
 
     credits: {
       enabled: false,
@@ -224,17 +192,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 
-  // Chart:production_4_1_demand_domestic_On-land_commodity
-  Highcharts.chart("production_4_1_demand_domestic_On-land_commodity", {
+  // Chart:Production_demand_4_Limit
+  Highcharts.chart("Production_demand_4_Limit_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
     title: {
-      text: "Domestic Consumption (Food) - On-land Commodities",
+      text: "Agricultural Production Targets",
     },
     series: JSON.parse(
-      document.getElementById("production_4_1_demand_domestic_On-land_commodity_csv").innerHTML
+      document.getElementById("Production_demand_4_Limit").innerHTML
     ),
     credits: {
       enabled: false,
@@ -243,8 +211,10 @@ document.addEventListener("DOMContentLoaded", function () {
       tickPositions: year_ticks,
     },
     yAxis: {
+      endOnTick: false,
+      maxPadding: 0.1,
       title: {
-        text: "Quantity (million tonnes, million kilolitres [milk])",
+        text: "Quantity (tonnes, kilolitres [milk])",
       },
     },
 
@@ -274,191 +244,18 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:production_4_2_demand_domestic_Off-land_commodity
-  Highcharts.chart("production_4_2_demand_domestic_Off-land_commodity", {
+  // Chart:Production_LUTO_1_Agricultural
+  Highcharts.chart("Production_LUTO_1_Agricultural_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
     title: {
-      text: "Domestic Consumption (Food) - Off-land Commodities",
+      text: "Production from Agricultural Land Use",
     },
     series: JSON.parse(
-      document.getElementById("production_4_2_demand_domestic_Off-land_commodity_csv").innerHTML
-    ),
-    credits: {
-      enabled: false,
-    },
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-    yAxis: {
-      title: {
-        text: "Quantity (million tonnes, million kilolitres [milk])",
-      },
-    },
-
-    legend: {
-      align: "right",
-      layout: "vertical",
-      x: -150,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-
-    plotOptions: {
-      column: {
-        stacking: "normal",
-      },
-    },
-
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-  // Chart:production_5_2_demand_Exports_commodity
-  Highcharts.chart("production_5_2_demand_Exports_commodity", {
-    chart: {
-      type: "column",
-      marginRight: 380,
-    },
-
-    title: {
-      text: "Exports by Agricultural Commodity",
-    },
-
-    series: JSON.parse(
-      document.getElementById("production_5_2_demand_Exports_commodity_csv").innerHTML
-    ),
-
-    credits: {
-      enabled: false,
-    },
-
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-
-    yAxis: {
-      title: {
-        text: "Quantity (million tonnes, million kilolitres [milk])",
-      },
-    },
-
-    legend: {
-      itemStyle: {
-        fontSize: "11px",
-      },
-      align: "right",
-      layout: "vertical",
-      x: -150,
-      y: -10,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-
-    plotOptions: {
-      column: {
-        stacking: "normal",
-      },
-    },
-
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-  // Chart:production_5_3_demand_Imports_commodity
-  new Highcharts.Chart("production_5_3_demand_Imports_commodity", {
-    chart: {
-      type: "column",
-      marginRight: 380,
-    },
-    title: {
-      text: "Imports by Agricultural Commodity",
-    },
-    series: JSON.parse(
-      document.getElementById("production_5_3_demand_Imports_commodity_csv").innerHTML
-    ),
-
-    credits: {
-      enabled: false,
-    },
-
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-
-    yAxis: {
-      title: {
-        text: "Quantity (million tonnes, million kilolitres [milk])",
-      },
-    },
-
-    legend: {
-      itemStyle: {
-        fontSize: "11px",
-      },
-      align: "right",
-      layout: "vertical",
-      x: -150,
-      y: -10,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-
-    plotOptions: {
-      column: {
-        stacking: "normal",
-      },
-    },
-
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-
-  // Chart:production_5_4_demand_Feed_commodity
-  new Highcharts.Chart({
-    chart: {
-      renderTo: "production_5_4_demand_Feed_commodity",
-      type: "column",
-      marginRight: 380,
-    },
-    title: {
-      text: "Domestic Consumption (Feed) by Agricultural Commodity",
-    },
-
-    series: JSON.parse(
-      document.getElementById("production_5_4_demand_Feed_commodity_csv").innerHTML
-    ),
-
+      document.getElementById("Production_LUTO_1_Agricultural").innerHTML
+    ).AUSTRALIA,
     credits: {
       enabled: false,
     },
@@ -467,119 +264,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Quantity (million tonnes, million kilolitres [milk])",
-      },
-    },
-
-    legend: {
-      itemStyle: {
-        fontSize: "11px",
-      },
-      align: "right",
-      layout: "vertical",
-      x: -150,
-      y: -10,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-
-    plotOptions: {
-      column: {
-        stacking: "normal",
-      },
-    },
-
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-
-  // Chart:production_5_5_demand_Production_commodity
-  Highcharts.chart("production_5_5_demand_Production_commodity", {
-    chart: {
-      type: "column",
-      marginRight: 380,
-    },
-    title: {
-      text: "Total Production Requirement by Agricultural Commodity (inputs into LUTO)",
-    },
-    series: JSON.parse(
-      document.getElementById("production_5_5_demand_Production_commodity_csv").innerHTML
-    ),
-
-    credits: {
-      enabled: false,
-    },
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-    yAxis: {
-      title: {
-        text: "Quantity (million tonnes, million kilolitres [milk])",
-      },
-    },
-
-    legend: {
-      itemStyle: {
-        fontSize: "11px",
-      },
-      align: "right",
-      layout: "vertical",
-      x: -150,
-      y: -10,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-
-    plotOptions: {
-      column: {
-        stacking: "normal",
-      },
-    },
-
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-  // Chart:production_5_6_demand_Production_commodity_from_LUTO
-  Highcharts.chart("production_5_6_demand_Production_commodity_from_LUTO", {
-    chart: {
-      type: "column",
-      marginRight: 380,
-    },
-    title: {
-      text: "Total Production by Agricultural Commodity (outputs from LUTO)",
-    },
-
-    series: JSON.parse(
-      document.getElementById("production_5_6_demand_Production_commodity_from_LUTO_csv").innerHTML
-    ),
-
-    credits: {
-      enabled: false,
-    },
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-    yAxis: {
-      title: {
-        text: "Quantity (million tonnes, million kilolitres [milk])",
+        text: "Quantity (tonnes, kilolitres [milk])",
       },
     },
 
@@ -609,18 +294,218 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:production_6_demand_achievement_commodity
-  Highcharts.chart("production_6_demand_achievement_commodity", {
+  // Chart:Production_LUTO_2_Non-Agricultural
+  Highcharts.chart("Production_LUTO_2_Non-Agricultural_chart", {
+    chart: {
+      type: "column",
+      marginRight: 380,
+    },
+    title: {
+      text: "Production from Non-Agricultural Land Use",
+    },
+    series: JSON.parse(
+      document.getElementById("Production_LUTO_2_Non-Agricultural").innerHTML
+    ).AUSTRALIA,
+    credits: {
+      enabled: false,
+    },
+    xAxis: {
+      tickPositions: year_ticks,
+    },
+    yAxis: {
+      title: {
+        text: "Quantity (tonnes, kilolitres [milk])",
+      },
+    },
+
+    legend: {
+      align: "right",
+      layout: "vertical",
+      x: -100,
+      verticalAlign: "middle",
+    },
+
+    tooltip: {
+      formatter: function () {
+        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+          }:</b>${this.y.toFixed(2)}<br/>`;
+      },
+    },
+
+    plotOptions: {
+      column: {
+        stacking: "normal",
+      },
+    },
+
+    exporting: {
+      sourceWidth: 1200,
+      sourceHeight: 600,
+    },
+  });
+
+  // Chart:Production_LUTO_3_Agricultural_Management
+  Highcharts.chart("Production_LUTO_3_Agricultural_Management_chart", {
+    chart: {
+      type: "column",
+      marginRight: 380,
+    },
+    title: {
+      text: "Production from Agricultural Management",
+    },
+    series: JSON.parse(
+      document.getElementById("Production_LUTO_3_Agricultural_Management").innerHTML
+    ).AUSTRALIA,
+    credits: {
+      enabled: false,
+    },
+    xAxis: {
+      tickPositions: year_ticks,
+    },
+    yAxis: {
+      title: {
+        text: "Quantity (tonnes, kilolitres [milk])",
+      },
+    },
+
+    legend: {
+      align: "right",
+      layout: "vertical",
+      x: -100,
+      verticalAlign: "middle",
+    },
+
+    tooltip: {
+      formatter: function () {
+        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+          }:</b>${this.y.toFixed(2)}<br/>`;
+      },
+    },
+
+    plotOptions: {
+      column: {
+        stacking: "normal",
+      },
+    },
+
+    exporting: {
+      sourceWidth: 1200,
+      sourceHeight: 600,
+    },
+  });
+  
+  // Chart:Production_sum_1_Commodity
+  Highcharts.chart("Production_sum_1_Commodity_chart", {
+    chart: {
+      type: "column",
+      marginRight: 380,
+    },
+    title: {
+      text: "Total Production by Commodity",
+    },
+    series: JSON.parse(
+      document.getElementById("Production_sum_1_Commodity").innerHTML
+    ).AUSTRALIA,
+    credits: {
+      enabled: false,
+    },
+    xAxis: {
+      tickPositions: year_ticks,
+    },
+    yAxis: {
+      title: {
+        text: "Quantity (tonnes, kilolitres [milk])",
+      },
+    },
+
+    legend: {
+      align: "right",
+      layout: "vertical",
+      x: -100,
+      verticalAlign: "middle",
+    },
+
+    tooltip: {
+      formatter: function () {
+        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+          }:</b>${this.y.toFixed(2)}<br/>`;
+      },
+    },
+
+    plotOptions: {
+      column: {
+        stacking: "normal",
+      },
+    },
+
+    exporting: {
+      sourceWidth: 1200,
+      sourceHeight: 600,
+    },
+  });
+
+  // Chart:Production_sum_2_Type
+  Highcharts.chart("Production_sum_2_Type_chart", {
+    chart: {
+      type: "column",
+      marginRight: 380,
+    },
+    title: {
+      text: "Total Production by Broad Type",
+    },
+    series: JSON.parse(
+      document.getElementById("Production_sum_2_Type").innerHTML
+    ).AUSTRALIA,
+    credits: {
+      enabled: false,
+    },
+    xAxis: {
+      tickPositions: year_ticks,
+    },
+    yAxis: {
+      title: {
+        text: "Quantity (tonnes, kilolitres [milk])",
+      },
+    },
+
+    legend: {
+      align: "right",
+      layout: "vertical",
+      x: -100,
+      verticalAlign: "middle",
+    },
+
+    tooltip: {
+      formatter: function () {
+        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+          }:</b>${this.y.toFixed(2)}<br/>`;
+      },
+    },
+
+    plotOptions: {
+      column: {
+        stacking: "normal",
+      },
+    },
+
+    exporting: {
+      sourceWidth: 1200,
+      sourceHeight: 600,
+    },
+  });
+  
+  // Chart:Production_achive_percent
+  Highcharts.chart("Production_achive_percent_chart", {
     chart: {
       type: "spline",
       marginRight: 380,
     },
     title: {
-      text: "Commodities not Meeting Targets",
+      text: "Off-target Commodities Achievement (%)",
     },
     series: JSON.parse(
-      document.getElementById("production_6_demand_achievement_commodity_csv").innerHTML
-    ).concat({
+      document.getElementById("Production_achive_percent").innerHTML
+    ).AUSTRALIA.concat({
       name: ' ',
       data: [[2010, 0]],
       type: 'column',

@@ -246,9 +246,12 @@ def get_ghg_matrices(data:Data, yr_idx, aggregate=True):
                 for lm in data.LANDMANS
             )
         )
-    elif aggregate == False:   
-        return pd.concat([get_ghg_matrix(data, lu, yr_idx, aggregate) 
-                          for lu in data.LANDMANS], axis=1)
+    elif aggregate == False:
+        ghg_df = pd.concat([get_ghg_matrix(data, lu, yr_idx, aggregate) for lu in data.LANDMANS], axis=1).replace('CO2E_KG_HA','TCO2E')
+        column_rename = [(i[0].replace('CO2E_KG_HA','TCO2E'),i[1],i[2]) for i in ghg_df.columns]
+        column_rename = [(i[0].replace('CO2E_KG_HEAD','TCO2E'),i[1],i[2]) for i in column_rename]
+        ghg_df.columns = pd.MultiIndex.from_tuples(column_rename)
+        return ghg_df
 
 
 def get_ghg_unall_natural_to_lvstk_natural(data:Data, lumap) -> np.ndarray:

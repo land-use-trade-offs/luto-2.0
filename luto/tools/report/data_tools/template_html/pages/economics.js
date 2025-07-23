@@ -1,46 +1,27 @@
-// create chart
+﻿// create chart
 document.addEventListener("DOMContentLoaded", function () {
-  
-  // Set the default color palette for Highcharts
-  var colors = eval(document.getElementById("colors").innerHTML);
-  Highcharts.setOptions({colors: colors});
+
+  const support_info = JSON.parse(document.getElementById('Supporting_info').innerText);
+  const colors = support_info.colors;
+  const model_years = support_info.years;
+
 
   // Get the available years for plotting
-  var years = eval(document.getElementById("model_years").innerHTML).map(function (x) { return parseInt(x); });
-  // Sort the years
+  var years = model_years.map(function (x) { return parseInt(x); });
   years.sort(function (a, b) { return a - b; });
-  // Get the year ticks and interval
   var year_ticks = years.length == 2 ? years : null;
 
 
-  // Update the year scrolls for the transition matrix graphs
-  window.onload = function () {
-    let modelYears = eval(document.getElementById('model_years').innerText);
+  // Set the title alignment to left
+  Highcharts.setOptions({
+    colors: colors,
+    title: {
+      align: 'left'
+    }
+  });
 
-    // Sort the modelYears array in ascending order
-    modelYears.sort(function (a, b) { return a - b; });
 
-    // Initialize the first scroll bar
-    let yearInput_ag2ag = document.getElementById('year_ag2ag');
-    let yearOutput_ag2ag = document.getElementById('yearOutput_ag2ag');
 
-    let yearInput_ag2non_ag = document.getElementById('year_ag2non_ag');
-    let yearOutput_ag2non_ag = document.getElementById('yearOutput_ag2non_ag');
-
-    let yearInput_non_ag2ag = document.getElementById('year_non_ag2ag');
-    let yearOutput_non_ag2ag = document.getElementById('yearOutput_non_ag2ag');
-
-    yearInput_ag2ag.min = yearInput_ag2non_ag.min = yearInput_non_ag2ag.min = modelYears[0];
-    yearInput_ag2ag.max = yearInput_ag2non_ag.max = yearInput_non_ag2ag.max = modelYears[modelYears.length - 1];
-    yearInput_ag2ag.step = yearInput_ag2non_ag.step = yearInput_non_ag2ag.step = modelYears[1] - modelYears[0];
-    yearInput_ag2ag.value = yearInput_ag2non_ag.value = yearInput_non_ag2ag.value = modelYears[0];
-    yearOutput_ag2ag.value = yearOutput_ag2non_ag.value = yearOutput_non_ag2ag.value = modelYears[0];
-
-    // Call the draw functions for the transition matrix graphs
-    draw_cost_ag2ag();
-    draw_cost_ag2non_ag();
-    draw_cost_non_ag2ag();
-  }
 
   // Set the title alignment to left
   Highcharts.setOptions({
@@ -49,8 +30,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
-  // Chart:economics_0_rev_cost_all_wide.json
-  Highcharts.chart("economics_0_rev_cost_all_wide", {
+  // Chart:Economics_overview.json
+  Highcharts.chart("Economics_overview_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -65,8 +46,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_0_rev_cost_all_wide_csv").innerHTML
-    ),
+      document.getElementById("Economics_overview").innerHTML
+    ).AUSTRALIA,
 
     xAxis: {
       tickPositions: year_ticks,
@@ -74,7 +55,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Value (billion AU$)",
+        text: "Value (AUD)",
       },
     },
 
@@ -85,7 +66,7 @@ document.addEventListener("DOMContentLoaded", function () {
           this.series.name +
           "</b>: " +
           Highcharts.numberFormat(this.y, 2) +
-          " (billion AU$)"
+          " (AUD)"
         );
       },
     },
@@ -111,15 +92,15 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
 
-  // Chart:economics_1_ag_revenue_3_Water_supply_wide
-  Highcharts.chart("economics_1_ag_revenue_3_Water_supply_wide", {
+  // Chart:Economics_split_Ag_3_Water_supply
+  Highcharts.chart("Economics_split_Ag_3_Water_supply_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
 
     title: {
-      text: "Agricultural Revenue by Irrigation Status",
+      text: "Agricultural Revenue/Cost by Irrigation Status",
     },
 
     credits: {
@@ -127,8 +108,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_1_ag_revenue_3_Water_supply_wide_csv").innerHTML
-    ),
+      document.getElementById("Economics_split_Ag_3_Water_supply").innerHTML
+    ).AUSTRALIA,
 
     xAxis: {
       tickPositions: year_ticks,
@@ -136,7 +117,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Revenue (billion AU$)",
+        text: "Revenue (AUD)",
       },
     },
 
@@ -168,15 +149,15 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
 
-  // Chart:economics_1_ag_revenue_1_Land-use_wide
-  Highcharts.chart("economics_1_ag_revenue_1_Land-use_wide", {
+  // Chart:Economics_split_Ag_1_Land-use
+  Highcharts.chart("Economics_split_Ag_1_Land-use_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
 
     title: {
-      text: "Agricultural Revenue by Commodity",
+      text: "Agricultural Revenue/Cost by Commodity",
     },
 
     credits: {
@@ -184,12 +165,12 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_1_ag_revenue_1_Land-use_wide_csv").innerHTML
-    ),
+      document.getElementById("Economics_split_Ag_1_Land-use").innerHTML
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
-        text: "Revenue (billion AU$)",
+        text: "Revenue (AUD)",
       },
     },
 
@@ -225,15 +206,15 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
 
-  // Chart:economics_1_ag_revenue_2_Type_wide
-  Highcharts.chart("economics_1_ag_revenue_2_Type_wide", {
+  // Chart:Economics_split_Ag_2_Type
+  Highcharts.chart("Economics_split_Ag_2_Type_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
 
     title: {
-      text: "Agricultural Revenue by Commodity Type",
+      text: "Agricultural Revenue/Cost by Commodity Type",
     },
 
     credits: {
@@ -241,8 +222,8 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_1_ag_revenue_2_Type_wide_csv").innerHTML
-    ),
+      document.getElementById("Economics_split_Ag_2_Type").innerHTML
+    ).AUSTRALIA,
 
     xAxis: {
       tickPositions: year_ticks,
@@ -250,7 +231,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     yAxis: {
       title: {
-        text: "Revenue (billion AU$)",
+        text: "Revenue (AUD)",
       },
     },
 
@@ -282,15 +263,15 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
 
-  // Chart:economics_2_ag_cost_3_Water_supply_wide
-  Highcharts.chart("economics_2_ag_cost_3_Water_supply_wide", {
+  // Chart:Economics_split_Ag_3_Water_supply (Cost)
+  Highcharts.chart("Economics_split_AM_2_Water_supply_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
 
     title: {
-      text: "Agricultural Cost by Irrigation Status",
+      text: "Agricultural Management Revenue/Cost by Irrigation Status",
     },
 
     credits: {
@@ -298,12 +279,12 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_2_ag_cost_3_Water_supply_wide_csv").innerHTML
-    ),
+      document.getElementById("Economics_split_AM_2_Water_supply").innerHTML
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
-        text: "Cost (billion AU$)",
+        text: "Cost (AUD)",
       },
     },
     xAxis: {
@@ -337,15 +318,15 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:economics_2_ag_cost_1_Land-use_wide
-  Highcharts.chart("economics_2_ag_cost_1_Land-use_wide", {
+  // Chart:Economics_split_AM_3_Land-use
+  Highcharts.chart("Economics_split_AM_3_Land-use_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
 
     title: {
-      text: "Agricultural Cost by Land-use",
+      text: "Agricultural Management Revenue/Cost by Land-use",
     },
 
     credits: {
@@ -353,12 +334,12 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_2_ag_cost_1_Land-use_wide_csv").innerHTML
-    ),
+      document.getElementById("Economics_split_AM_3_Land-use").innerHTML
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
-        text: "Cost (billion AU$)",
+        text: "Cost (AUD)",
       },
     },
     xAxis: {
@@ -393,15 +374,15 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
 
-  // Chart:economics_2_ag_cost_2_Type_wide
-  Highcharts.chart("economics_2_ag_cost_2_Type_wide", {
+  // Chart:Economics_split_AM_1_Management_Type
+  Highcharts.chart("Economics_split_AM_1_Management_Type_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
 
     title: {
-      text: "Agricultural Cost by Cost Type",
+      text: "Agricultural Management Revenue/Cost by Management Type",
     },
 
     credits: {
@@ -409,12 +390,12 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_2_ag_cost_2_Type_wide_csv").innerHTML
-    ),
+      document.getElementById("Economics_split_AM_1_Management_Type").innerHTML
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
-        text: "Cost (billion AU$)",
+        text: "Cost (AUD)",
       },
     },
     xAxis: {
@@ -450,343 +431,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 
-  // Chart:economics_4_am_revenue_1_Land-use_wide
-  Highcharts.chart("economics_4_am_revenue_1_Land-use_wide", {
-    chart: {
-      type: "column",
-      marginRight: 380,
-    },
-
-    title: {
-      text: "Agricultural Management Revenue by Land-use",
-    },
-
-    credits: {
-      enabled: false,
-    },
-
-    series: JSON.parse(
-      document.getElementById("economics_4_am_revenue_1_Land-use_wide_csv").innerHTML
-    ),
-
-    yAxis: {
-      title: {
-        text: "Revenue (billion AU$)",
-      },
-    },
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-
-    legend: {
-      align: "right",
-      verticalalign: "left",
-      layout: "vertical",
-      x: -100,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-
-    plotOptions: {
-      column: {
-        stacking: "normal",
-      },
-    },
-
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-
-  // Chart:economics_4_am_revenue_2_Management Type_wide
-  Highcharts.chart("economics_4_am_revenue_2_Management Type_wide", {
-    chart: {
-      type: "column",
-      marginRight: 380,
-    },
-
-    title: {
-      text: "Agricultural Management Revenue by Management Type",
-    },
-
-    credits: {
-      enabled: false,
-    },
-
-    series: JSON.parse(
-      document.getElementById("economics_4_am_revenue_2_Management Type_wide_csv").innerHTML
-    ),
-
-    yAxis: {
-      title: {
-        text: "Revenue (billion AU$)",
-      },
-    },
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-
-    legend: {
-      align: "right",
-      verticalalign: "left",
-      layout: "vertical",
-      x: -80,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-
-    plotOptions: {
-      column: {
-        stacking: "normal",
-      },
-    },
-
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-  // Chart:economics_4_am_revenue_3_Water_supply_wide
-  Highcharts.chart("economics_4_am_revenue_3_Water_supply_wide", {
-    chart: {
-      type: "column",
-      marginRight: 380,
-    },
-
-    title: {
-      text: "Agricultural Management Revenue by Water Source",
-    },
-
-    credits: {
-      enabled: false,
-    },
-
-    series: JSON.parse(
-      document.getElementById("economics_4_am_revenue_3_Water_supply_wide_csv").innerHTML
-    ),
-
-    yAxis: {
-      title: {
-        text: "Revenue (billion AU$)",
-      },
-    },
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-
-    legend: {
-      align: "right",
-      verticalalign: "left",
-      layout: "vertical",
-      x: -180,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-
-    plotOptions: {
-      column: {
-        stacking: "normal",
-      },
-    },
-
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-
-  // Chart:economics_5_am_cost_1_Land-use_wide
-  Highcharts.chart("economics_5_am_cost_1_Land-use_wide", {
-    chart: {
-      type: "column",
-      marginRight: 380,
-    },
-
-    title: {
-      text: "Agricultural Management Cost by Land-use",
-    },
-
-    credits: {
-      enabled: false,
-    },
-
-    series: JSON.parse(
-      document.getElementById("economics_5_am_cost_1_Land-use_wide_csv").innerHTML
-    ),
-
-    yAxis: {
-      title: {
-        text: "Cost (billion AU$)",
-      },
-    },
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-
-    legend: {
-      align: "right",
-      verticalalign: "left",
-      layout: "vertical",
-      x: -100,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-
-    plotOptions: {
-      column: {
-        stacking: "normal",
-      },
-    },
-
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-
-  // Chart:economics_5_am_cost_2_Management Type_wide
-  Highcharts.chart("economics_5_am_cost_2_Management Type_wide", {
-    chart: {
-      type: "column",
-      marginRight: 380,
-    },
-
-    title: {
-      text: "Agricultural Management Cost by Management Type",
-    },
-
-    credits: {
-      enabled: false,
-    },
-
-    series: JSON.parse(
-      document.getElementById("economics_5_am_cost_2_Management Type_wide_csv").innerHTML
-    ),
-
-    yAxis: {
-      title: {
-        text: "Cost (billion AU$)",
-      },
-    },
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-
-    legend: {
-      align: "right",
-      verticalalign: "left",
-      layout: "vertical",
-      x: -80,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-
-    plotOptions: {
-      column: {
-        stacking: "normal",
-      },
-    },
-
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-
-  // Chart:economics_5_am_cost_3_Water_supply_wide
-  Highcharts.chart("economics_5_am_cost_3_Water_supply_wide", {
-    chart: {
-      type: "column",
-      marginRight: 380,
-    },
-
-    title: {
-      text: "Agricultural Management Cost by Water Source",
-    },
-
-    credits: {
-      enabled: false,
-    },
-
-    series: JSON.parse(
-      document.getElementById("economics_5_am_cost_3_Water_supply_wide_csv").innerHTML
-    ),
-
-    yAxis: {
-      title: {
-        text: "Cost (billion AU$)",
-      },
-    },
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-
-    legend: {
-      align: "right",
-      verticalalign: "left",
-      layout: "vertical",
-      x: -180,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-
-    plotOptions: {
-      column: {
-        stacking: "normal",
-      },
-    },
-
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-
-  // Chart:economics_6_non_ag_revenue_1_Land-use_wide
-  Highcharts.chart("economics_6_non_ag_revenue_1_Land-use_wide", {
+  // Chart:Economics_split_NonAg_1_Land-use
+  Highcharts.chart("Economics_split_NonAg_1_Land-use_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -801,120 +447,12 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_6_non_ag_revenue_1_Land-use_wide_csv").innerHTML
-    ),
+      document.getElementById("Economics_split_NonAg_1_Land-use").innerHTML
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
-        text: "Revenue (billion AU$)",
-      },
-    },
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-
-    legend: {
-      align: "right",
-      verticalalign: "left",
-      layout: "vertical",
-      x: 0,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-    plotOptions: {
-      column: {
-        stacking: "normal",
-      },
-    },
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-
-  // Chart:economics_7_non_ag_cost_1_Land-use_wide
-  Highcharts.chart("economics_7_non_ag_cost_1_Land-use_wide", {
-    chart: {
-      type: "column",
-      marginRight: 380,
-    },
-
-    title: {
-      text: "Non-Agricultural Cost by Land-use",
-    },
-
-    credits: {
-      enabled: false,
-    },
-
-    series: JSON.parse(
-      document.getElementById("economics_7_non_ag_cost_1_Land-use_wide_csv").innerHTML
-    ),
-
-    yAxis: {
-      title: {
-        text: "Cost (billion AU$)",
-      },
-    },
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-
-    legend: {
-      align: "right",
-      verticalalign: "left",
-      layout: "vertical",
-      x: 0,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-    plotOptions: {
-      column: {
-        stacking: "normal",
-      },
-    },
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-
-  // Chart:economics_8_transition_ag2ag_cost_2_From land-use_wide
-  Highcharts.chart("economics_8_transition_ag2ag_cost_2_From land-use_wide", {
-    chart: {
-      type: "column",
-      marginRight: 380,
-    },
-
-    title: {
-      text: "Transition Cost (Agricultural to Agricultural) from base-year-prespective",
-    },
-
-    credits: {
-      enabled: false,
-    },
-
-    series: JSON.parse(
-      document.getElementById("economics_8_transition_ag2ag_cost_2_From land-use_wide_csv").innerHTML
-    ),
-
-    yAxis: {
-      title: {
-        text: "Cost (million AU$)",
+        text: "Revenue (AUD)",
       },
     },
     xAxis: {
@@ -935,19 +473,29 @@ document.addEventListener("DOMContentLoaded", function () {
           }:</b>${this.y.toFixed(2)}<br/>`;
       },
     },
+
     plotOptions: {
       column: {
         stacking: "normal",
       },
     },
+
     exporting: {
       sourceWidth: 1200,
       sourceHeight: 600,
     },
   });
 
-  // Chart:economics_8_transition_ag2ag_cost_3_To land-use_wide
-  Highcharts.chart("economics_8_transition_ag2ag_cost_3_To land-use_wide", {
+
+
+
+  // Chart:Economics_transition_mat_ag2ag
+  document.getElementById("Economics_transition_mat_ag2ag_chart").innerHTML = JSON.parse(
+    document.getElementById("Economics_transition_mat_ag2ag").innerHTML
+  );
+
+  // Chart:Economics_transition_split_ag2ag_3_To_land-use
+  Highcharts.chart("Economics_transition_split_ag2ag_3_To_land-use_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -962,12 +510,12 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_8_transition_ag2ag_cost_3_To land-use_wide_csv").innerHTML
-    ),
+      document.getElementById("Economics_transition_split_ag2ag_3_To_land-use").innerHTML
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
-        text: "Cost (million AU$)",
+        text: "Cost (AUD)",
       },
     },
     xAxis: {
@@ -1001,126 +549,65 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 
-  // economics_8_transition_ag2ag_cost_4_transition_matrix
-  let data_ag2ag = JSON.parse(
-    document.getElementById("economics_8_transition_ag2ag_cost_4_transition_matrix_csv").innerHTML
-  );
-
   // Get the slider_ag2ag and the year span
+  let data_ag2ag = JSON.parse(
+    document.getElementById("Economics_transition_mat_ag2ag").innerHTML
+  ).AUSTRALIA;
+
   let slider_ag2ag = document.getElementById("year_ag2ag");
   let incrementButton_ag2ag = document.getElementById("increment_ag2ag");
   let decrementButton_ag2ag = document.getElementById("decrement_ag2ag");
+  let yearOutput_ag2ag = document.getElementById('yearOutput_ag2ag');
+  
+  // Get available years from the data and sort them
+  let availableYears_ag2ag = Object.keys(data_ag2ag).sort((a, b) => a - b);
+  
+  // Set up the slider with correct range
+  slider_ag2ag.min = availableYears_ag2ag[0];
+  slider_ag2ag.max = availableYears_ag2ag[availableYears_ag2ag.length - 1];
+  slider_ag2ag.step = availableYears_ag2ag.length > 1 ? availableYears_ag2ag[1] - availableYears_ag2ag[0] : 1;
+  slider_ag2ag.value = availableYears_ag2ag[0];
+  yearOutput_ag2ag.innerHTML = String(slider_ag2ag.value - slider_ag2ag.step) + ' - ' + String(slider_ag2ag.value);
 
   // Add event listeners to the buttons
   slider_ag2ag.addEventListener("input", function () {
-    yearOutput_ag2ag.innerHTML = this.value;
+    yearOutput_ag2ag.innerHTML = String(slider_ag2ag.value - slider_ag2ag.step) + ' - ' + String(slider_ag2ag.value);
     draw_cost_ag2ag();
-  });
-
-  incrementButton_ag2ag.addEventListener("click", function () {
-    slider_ag2ag.value = parseInt(slider_ag2ag.value) + 1;
-    slider_ag2ag.dispatchEvent(new Event('input'));
-  });
-
-  decrementButton_ag2ag.addEventListener("click", function () {
-    slider_ag2ag.value = parseInt(slider_ag2ag.value) - 1;
-    slider_ag2ag.dispatchEvent(new Event('input'));
   });
 
   // Function to draw the chart
   draw_cost_ag2ag = function () {
-
-    let values = data_ag2ag['series'].find(item => item.Year == slider_ag2ag.value)['data'];
-    let lastElements = values.map(sublist => sublist[sublist.length - 1]);
-    let val_min = Math.min(...lastElements.flat());
-    let val_max = Math.max(...lastElements.flat());
-
-    Highcharts.chart("economics_8_transition_ag2ag_cost_4_transition_matrix", {
-      chart: {
-        type: "heatmap",
-        marginRight: 380,
-        inverted: true,
-      },
-
-      title: {
-        text: null,
-      },
-
-      credits: {
-        enabled: false,
-      },
-
-      series: [{
-        data: values,
-        borderWidth: 0.2,
-        tooltip: {
-          headerFormat: '',
-          pointFormatter: function () {
-            return `${data_ag2ag["categories"][this.x]} 
-                    <b>==></b> ${data_ag2ag["categories"][this.y]}: 
-                    <b>${this.value.toFixed(2)} (million $)</b>`;
-          }
-        },
-      }],
-
-      yAxis: {
-        min: 0,
-        max: data_ag2ag["categories"].length - 1,
-        categories: data_ag2ag["categories"],
-        title: {
-          text: "To Land-use",
-        },
-        labels: {
-          rotation: -25,
-        },
-      },
-
-      xAxis: {
-        categories: data_ag2ag["categories"],
-        title: {
-          text: "From Land-use",
-        },
-      },
-
-      colorAxis: {
-        stops: [
-          [0, '#3060cf'],
-          [0.5, '#fffbbc'],
-          [0.9, '#c4463a'],
-          [1, '#c4463a']
-        ],
-        min: val_min,
-        max: val_max,
-        startOnTick: false,
-        endOnTick: false,
-        reversed: false,
-        labels: {
-          formatter: function () {
-            return this.value.toFixed(0);
-          }
-        }
-      },
-
-      legend: {
-        align: "right",
-        verticalalign: "left",
-        layout: "vertical",
-        x: -180,
-        verticalAlign: "middle",
-      },
-
-      exporting: {
-        sourceWidth: 1200,
-        sourceHeight: 600,
-      },
-    });
+    document.getElementById("Economics_transition_mat_ag2ag_chart").innerHTML = data_ag2ag[slider_ag2ag.value];
   };
 
+  // Initial draw of the chart
+  draw_cost_ag2ag();
+
+  incrementButton_ag2ag.addEventListener("click", function () {
+    let currentValue = slider_ag2ag.value;
+    let currentIndex = availableYears_ag2ag.indexOf(currentValue);
+    if (currentIndex < availableYears_ag2ag.length - 1) {
+      slider_ag2ag.value = availableYears_ag2ag[currentIndex + 1];
+      slider_ag2ag.dispatchEvent(new Event('input'));
+    }
+  });
+
+  decrementButton_ag2ag.addEventListener("click", function () {
+    let currentValue = slider_ag2ag.value;
+    let currentIndex = availableYears_ag2ag.indexOf(currentValue);
+    if (currentIndex > 0) {
+      slider_ag2ag.value = availableYears_ag2ag[currentIndex - 1];
+      slider_ag2ag.dispatchEvent(new Event('input'));
+    }
+  });
+
+  
 
 
 
-  // Chart:economics_8_transition_ag2ag_cost_1_Type_wide
-  Highcharts.chart("economics_8_transition_ag2ag_cost_1_Type_wide", {
+
+  // Chart:Economics_transition_split_ag2ag_1_Type
+  Highcharts.chart("Economics_transition_split_ag2ag_1_Type_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -1135,12 +622,12 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_8_transition_ag2ag_cost_1_Type_wide_csv").innerHTML
-    ),
+      document.getElementById("Economics_transition_split_ag2ag_1_Type").innerHTML
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
-        text: "Cost (million AU$)",
+        text: "Cost (AUD)",
       },
     },
     xAxis: {
@@ -1172,128 +659,108 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
- 
 
 
-  // Chart:economics_9_transition_ag2non_cost_4_transition_matrix
-  let data_ag2non_ag = JSON.parse(
-    document.getElementById("economics_9_transition_ag2non_cost_4_transition_matrix_csv").innerHTML
-  );
 
-  // Get the slider_ag2ag and the year span
+  // Chart:Economics_transition_mat_ag2nonag  
+  // Get the slider_ag2non_ag and the year span
   let slider_ag2non_ag = document.getElementById("year_ag2non_ag");
   let incrementButton_ag2non_ag = document.getElementById("increment_ag2non_ag");
   let decrementButton_ag2non_ag = document.getElementById("decrement_ag2non_ag");
+  let yearOutput_ag2non_ag = document.getElementById('yearOutput_ag2non_ag');
+  
+  let data_ag2non_ag = JSON.parse(
+    document.getElementById("Economics_transition_mat_ag2nonag").innerHTML
+  ).AUSTRALIA;
+
+  // Get available years from the data and sort them
+  let availableYears_ag2non_ag = Object.keys(data_ag2non_ag).sort((a, b) => a - b);
+  
+  // Set up the slider with correct range
+  slider_ag2non_ag.min = availableYears_ag2non_ag[0];
+  slider_ag2non_ag.max = availableYears_ag2non_ag[availableYears_ag2non_ag.length - 1];
+  slider_ag2non_ag.step = availableYears_ag2non_ag.length > 1 ? availableYears_ag2non_ag[1] - availableYears_ag2non_ag[0] : 1;
+  slider_ag2non_ag.value = availableYears_ag2non_ag[0];
+  yearOutput_ag2non_ag.innerHTML = String(slider_ag2non_ag.value - slider_ag2non_ag.step) + ' - ' + String(slider_ag2non_ag.value);
 
   // Function to draw the chart
   draw_cost_ag2non_ag = function () {
-
-    values = data_ag2non_ag['series'].find(item => item.Year == slider_ag2non_ag.value)['data'];
-    lastElements = values.map(sublist => sublist[sublist.length - 1]);
-    val_min = Math.min(...lastElements.flat());
-    val_max = Math.max(...lastElements.flat());
-
-    Highcharts.chart("economics_9_transition_ag2non_cost_4_transition_matrix", {
-      chart: {
-        type: "heatmap",
-        marginRight: 380,
-        inverted: true,
-      },
-
-      title: {
-        text: null,
-      },
-
-      credits: {
-        enabled: false,
-      },
-
-      series: [{
-        data: values,
-        borderWidth: 0.2,
-        tooltip: {
-          headerFormat: '',
-          pointFormatter: function () {
-            return `${data_ag2non_ag["categories_from"][this.x]} 
-                    <b>==></b> ${data_ag2non_ag["categories_to"][this.y]}: 
-                    <b>${this.value.toFixed(2)} (million $)</b>`;
-          }
-        },
-      }],
-
-      yAxis: {
-        min: 0,
-        max: data_ag2non_ag["categories_to"].length - 1,
-        categories: data_ag2non_ag["categories_to"],
-        title: {
-          text: "To Land-use",
-        },
-      },
-
-      xAxis: {
-        min: 0,
-        max: data_ag2non_ag["categories_from"].length - 1,
-        categories: data_ag2non_ag["categories_from"],
-        title: {
-          text: "From Land-use",
-        },
-      },
-
-      colorAxis: {
-        stops: [
-          [0, '#3060cf'],
-          [0.5, '#fffbbc'],
-          [0.9, '#c4463a'],
-          [1, '#c4463a']
-        ],
-        min: val_min,
-        max: val_max,
-        startOnTick: false,
-        endOnTick: false,
-        reversed: false,
-        labels: {
-          formatter: function () {
-            return this.value.toFixed(2);
-          }
-        }
-      },
-
-      legend: {
-        align: "right",
-        verticalalign: "left",
-        layout: "vertical",
-        x: -180,
-        verticalAlign: "middle",
-      },
-
-      exporting: {
-        sourceWidth: 1200,
-        sourceHeight: 600,
-      },
-    });
+    document.getElementById("Economics_transition_mat_ag2nonag_chart").innerHTML = data_ag2non_ag[slider_ag2non_ag.value];
   };
 
   // Add event listeners to the buttons
   slider_ag2non_ag.addEventListener("input", function () {
-    yearOutput_ag2non_ag.innerHTML = this.value;
+    yearOutput_ag2non_ag.innerHTML = String(this.value - this.step) + ' - ' + String(this.value);
     draw_cost_ag2non_ag();
   });
 
   incrementButton_ag2non_ag.addEventListener("click", function () {
-    slider_ag2non_ag.value = parseInt(slider_ag2non_ag.value) + 1;
-    slider_ag2non_ag.dispatchEvent(new Event('input'));
+    let currentValue = slider_ag2non_ag.value;
+    let currentIndex = availableYears_ag2non_ag.indexOf(currentValue);
+    if (currentIndex < availableYears_ag2non_ag.length - 1) {
+      slider_ag2non_ag.value = availableYears_ag2non_ag[currentIndex + 1];
+      slider_ag2non_ag.dispatchEvent(new Event('input'));
+    }
   });
 
   decrementButton_ag2non_ag.addEventListener("click", function () {
-    slider_ag2non_ag.value = parseInt(slider_ag2non_ag.value) - 1;
-    slider_ag2non_ag.dispatchEvent(new Event('input'));
+    let currentValue = slider_ag2non_ag.value;
+    let currentIndex = availableYears_ag2non_ag.indexOf(currentValue);
+    if (currentIndex > 0) {
+      slider_ag2non_ag.value = availableYears_ag2non_ag[currentIndex - 1];
+      slider_ag2non_ag.dispatchEvent(new Event('input'));
+    }
   });
 
-  
+  // Economics_transition_split_ag2ag_2_From_land-use
+  Highcharts.chart("Economics_transition_split_ag2ag_2_From_land-use_chart", {
+    chart: {
+      type: "column",
+      marginRight: 380,
+    },
+    title: {
+      text: "Transition Cost (Agricultural to Agricultural) from Base-Year-Perspective",
+    },
+    credits: {
+      enabled: false,
+    },
+    series: JSON.parse(
+      document.getElementById("Economics_transition_split_ag2ag_2_From_land-use").innerHTML
+    ).AUSTRALIA,
+    yAxis: {
+      title: {
+        text: "Cost (AUD)",
+      },
+    },
+    xAxis: {
+      tickPositions: year_ticks,
+    },
+    legend: {
+      align: "right",
+      verticalalign: "left",
+      layout: "vertical",
+      x: -100,
+      verticalAlign: "middle",
+    },
+    tooltip: {
+      formatter: function () {
+        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+          }:</b>${this.y.toFixed(2)}<br/>`;
+      },
+    },
+    plotOptions: {
+      column: {
+        stacking: "normal",
+      },
+    },
+    exporting: {
+      sourceWidth: 1200,
+      sourceHeight: 600,
+    },
+  });
 
-
-  // Chart:economics_9_transition_ag2non_cost_1_Cost type_wide
-  Highcharts.chart("economics_9_transition_ag2non_cost_1_Cost type_wide", {
+  // Chart:Economics_transition_split_Ag2NonAg_1_Cost_type
+  Highcharts.chart("Economics_transition_split_Ag2NonAg_1_Cost_type_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -1308,12 +775,12 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_9_transition_ag2non_cost_1_Cost type_wide_csv").innerHTML
-    ),
+      document.getElementById("Economics_transition_split_Ag2NonAg_1_Cost_type").innerHTML
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
-        text: "Cost (million AU$)",
+        text: "Cost (AUD)",
       },
     },
     xAxis: {
@@ -1346,8 +813,8 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
 
-  // Chart:economics_9_transition_ag2non_cost_2_From land-use_wide
-  Highcharts.chart("economics_9_transition_ag2non_cost_2_From land-use_wide", {
+  // Chart:Economics_transition_split_Ag2NonAg_2_From_land-use
+  Highcharts.chart("Economics_transition_split_Ag2NonAg_2_From_land-use_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -1362,12 +829,12 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_9_transition_ag2non_cost_2_From land-use_wide_csv").innerHTML
-    ),
+      document.getElementById("Economics_transition_split_Ag2NonAg_2_From_land-use").innerHTML
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
-        text: "Cost (million AU$)",
+        text: "Cost (AUD)",
       },
     },
     xAxis: {
@@ -1400,8 +867,8 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
 
-  // Chart:economics_9_transition_ag2non_cost_3_To land-use_wide
-  Highcharts.chart("economics_9_transition_ag2non_cost_3_To land-use_wide", {
+  // Chart:Economics_transition_split_Ag2NonAg_3_To_land-use
+  Highcharts.chart("Economics_transition_split_Ag2NonAg_3_To_land-use_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -1416,12 +883,12 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_9_transition_ag2non_cost_3_To land-use_wide_csv").innerHTML
-    ),
+      document.getElementById("Economics_transition_split_Ag2NonAg_3_To_land-use").innerHTML
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
-        text: "Cost (million AU$)",
+        text: "Cost (AUD)",
       },
     },
     xAxis: {
@@ -1455,122 +922,59 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 
-  // Chart:economics_10_transition_non_ag2ag_cost_4_transition_matrix
-  let data_non_ag2ag = JSON.parse(
-    document.getElementById("economics_10_transition_non_ag2ag_cost_4_transition_matrix_csv").innerHTML
-  );
-
+  // Chart:Economics_transition_mat_nonag2ag
   // Get the slider_non_ag2ag and the year span
   let slider_non_ag2ag = document.getElementById("year_non_ag2ag");
   let incrementButton_non_ag2ag = document.getElementById("increment_non_ag2ag");
   let decrementButton_non_ag2ag = document.getElementById("decrement_non_ag2ag");
+  let yearOutput_non_ag2ag = document.getElementById('yearOutput_non_ag2ag');
+  
+  let data_non_ag2ag = JSON.parse(
+    document.getElementById("Economics_transition_mat_nonag2ag").innerHTML
+  ).AUSTRALIA;
+
+  // Get available years from the data and sort them
+  let availableYears_non_ag2ag = Object.keys(data_non_ag2ag).sort((a, b) => a - b);
+  
+  // Set up the slider with correct range
+  slider_non_ag2ag.min = availableYears_non_ag2ag[0];
+  slider_non_ag2ag.max = availableYears_non_ag2ag[availableYears_non_ag2ag.length - 1];
+  slider_non_ag2ag.step = availableYears_non_ag2ag.length > 1 ? availableYears_non_ag2ag[1] - availableYears_non_ag2ag[0] : 1;
+  slider_non_ag2ag.value = availableYears_non_ag2ag[0];
+  yearOutput_non_ag2ag.innerHTML = String(slider_non_ag2ag.value - slider_non_ag2ag.step) + ' - ' + String(slider_non_ag2ag.value);
 
   // Add event listeners to the buttons
   slider_non_ag2ag.addEventListener("input", function () {
-    yearOutput_non_ag2ag.innerHTML = this.value;
+    yearOutput_non_ag2ag.innerHTML = String(this.value - this.step) + ' - ' + String(this.value);
     draw_cost_non_ag2ag();
   });
 
   incrementButton_non_ag2ag.addEventListener("click", function () {
-    slider_non_ag2ag.value = parseInt(slider_non_ag2ag.value) + 1;
-    slider_non_ag2ag.dispatchEvent(new Event('input'));
+    let currentValue = slider_non_ag2ag.value;
+    let currentIndex = availableYears_non_ag2ag.indexOf(currentValue);
+    if (currentIndex < availableYears_non_ag2ag.length - 1) {
+      slider_non_ag2ag.value = availableYears_non_ag2ag[currentIndex + 1];
+      slider_non_ag2ag.dispatchEvent(new Event('input'));
+    }
   });
 
   decrementButton_non_ag2ag.addEventListener("click", function () {
-    slider_non_ag2ag.value = parseInt(slider_non_ag2ag.value) - 1;
-    slider_non_ag2ag.dispatchEvent(new Event('input'));
+    let currentValue = slider_non_ag2ag.value;
+    let currentIndex = availableYears_non_ag2ag.indexOf(currentValue);
+    if (currentIndex > 0) {
+      slider_non_ag2ag.value = availableYears_non_ag2ag[currentIndex - 1];
+      slider_non_ag2ag.dispatchEvent(new Event('input'));
+    }
   });
 
   // Function to draw the chart
   draw_cost_non_ag2ag = function () {
-    let values = data_non_ag2ag['series'].find(item => item.Year == slider_non_ag2ag.value)['data'];
-    let lastElements = values.map(sublist => sublist[sublist.length - 1]);
-    let val_min = Math.min(...lastElements.flat());
-    let val_max = Math.max(...lastElements.flat());
-
-    Highcharts.chart("economics_10_transition_non_ag2ag_cost_4_transition_matrix", {
-      chart: {
-        type: "heatmap",
-        marginRight: 380,
-        inverted: true,
-      },
-
-      title: {
-        text: null,
-      },
-
-      credits: {
-        enabled: false,
-      },
-
-      series: [{
-        data: values,
-        borderWidth: 0.2,
-        tooltip: {
-          headerFormat: '',
-          pointFormatter: function () {
-            return `${data_non_ag2ag["categories_from"][this.x]} 
-                    <b>==></b> ${data_non_ag2ag["categories_to"][this.y]}: 
-                    <b>${this.value.toFixed(2)} (million $)</b>`;
-          }
-        },
-      }],
-
-      yAxis: {
-        min: 0,
-        max: data_non_ag2ag["categories_to"].length - 1,
-        categories: data_non_ag2ag["categories_to"],
-        title: {
-          text: "To Land-use",
-        },
-      },
-
-      xAxis: {
-        min: 0,
-        max: data_non_ag2ag["categories_from"].length - 1,
-        categories: data_non_ag2ag["categories_from"],
-        title: {
-          text: "From Land-use",
-        },
-      },
-
-      colorAxis: {
-        stops: [
-          [0, '#3060cf'],
-          [0.5, '#fffbbc'],
-          [0.9, '#c4463a'],
-          [1, '#c4463a']
-        ],
-        min: val_min,
-        max: val_max,
-        startOnTick: false,
-        endOnTick: false,
-        reversed: false,
-        labels: {
-          formatter: function () {
-            return this.value.toFixed(2);
-          }
-        }
-      },
-
-      legend: {
-        align: "right",
-        verticalalign: "left",
-        layout: "vertical",
-        x: -180,
-        verticalAlign: "middle",
-      },
-
-      exporting: {
-        sourceWidth: 1200,
-        sourceHeight: 600,
-      },
-    });
+    document.getElementById("Economics_transition_mat_nonag2ag_chart").innerHTML = data_non_ag2ag[slider_non_ag2ag.value];
   };
 
 
-  // Chart:economics_10_transition_non_ag2ag_cost_1_Cost type_wide
-  Highcharts.chart("economics_10_transition_non_ag2ag_cost_1_Cost type_wide", {
+  // Chart:Economics_transition_split_NonAg2Ag_1_Cost_type
+  Highcharts.chart("Economics_transition_split_NonAg2Ag_1_Cost_type_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -1585,12 +989,12 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_10_transition_non_ag2ag_cost_1_Cost type_wide_csv").innerHTML
-    ),
+      document.getElementById("Economics_transition_split_NonAg2Ag_1_Cost_type").innerHTML
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
-        text: "Cost (billion AU$)",
+        text: "Cost (AUD)",
       },
     },
     xAxis: {
@@ -1623,8 +1027,8 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
 
-  // Chart:economics_10_transition_non_ag2ag_cost_2_From land-use_wide
-  Highcharts.chart("economics_10_transition_non_ag2ag_cost_2_From land-use_wide", {
+  // Chart:Economics_transition_split_NonAg2Ag_2_From_land-use
+  Highcharts.chart("Economics_transition_split_NonAg2Ag_2_From_land-use_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -1639,12 +1043,12 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_10_transition_non_ag2ag_cost_2_From land-use_wide_csv").innerHTML
-    ),
+      document.getElementById("Economics_transition_split_NonAg2Ag_2_From_land-use").innerHTML
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
-        text: "Cost (billion AU$)",
+        text: "Cost (AUD)",
       },
     },
     xAxis: {
@@ -1677,8 +1081,8 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
 
-  // Chart:economics_10_transition_non_ag2ag_cost_3_To land-use_wide
-  Highcharts.chart("economics_10_transition_non_ag2ag_cost_3_To land-use_wide", {
+  // Chart:Economics_transition_split_NonAg2Ag_3_To_land-use
+  Highcharts.chart("Economics_transition_split_NonAg2Ag_3_To_land-use_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -1693,12 +1097,12 @@ document.addEventListener("DOMContentLoaded", function () {
     },
 
     series: JSON.parse(
-      document.getElementById("economics_10_transition_non_ag2ag_cost_3_To land-use_wide_csv").innerHTML
-    ),
+      document.getElementById("Economics_transition_split_NonAg2Ag_3_To_land-use").innerHTML
+    ).AUSTRALIA,
 
     yAxis: {
       title: {
-        text: "Cost (billion AU$)",
+        text: "Cost (AUD)",
       },
     },
     xAxis: {
@@ -1730,62 +1134,11 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-
-  // Chart:economics_10_transition_non_ag2ag_cost_5_Water supply_wide
-  Highcharts.chart("economics_10_transition_non_ag2ag_cost_5_Water supply_wide", {
-    chart: {
-      type: "column",
-      marginRight: 380,
-    },
-
-    title: {
-      text: "Cost by Irritation Status",
-    },
-
-    credits: {
-      enabled: false,
-    },
-
-    series: JSON.parse(
-      document.getElementById("economics_10_transition_non_ag2ag_cost_5_Water supply_wide_csv").innerHTML
-    ),
-
-    yAxis: {
-      title: {
-        text: "Cost (billion AU$)",
-      },
-    },
-    xAxis: {
-      tickPositions: year_ticks,
-    },
-
-    legend: {
-      align: "right",
-      verticalalign: "left",
-      layout: "vertical",
-      x: -150,
-      verticalAlign: "middle",
-    },
-
-    tooltip: {
-      formatter: function () {
-        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
-          }:</b>${this.y.toFixed(2)}<br/>`;
-      },
-    },
-    plotOptions: {
-      column: {
-        stacking: "normal",
-      },
-    },
-    exporting: {
-      sourceWidth: 1200,
-      sourceHeight: 600,
-    },
-  });
-
-
-
+  // Initialize the transition charts after all data is loaded
+  draw_cost_ag2ag();
+  if (data_ag2non_ag) draw_cost_ag2non_ag();
+  if (data_non_ag2ag) draw_cost_non_ag2ag();
 
 });
+
 

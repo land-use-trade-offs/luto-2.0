@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
+import json
 import os
 from lxml import etree
 from  lxml.etree import Element
@@ -61,24 +62,25 @@ def add_txt_2_html(html_path:str, txt:str, id:str)->None:
     # Check if txt is a file path
     if os.path.exists(os.path.abspath(txt)):
         # If it is, read the file
-        with open(txt,'r') as f:
-            txt = f.read()
+        with open(txt, 'r', encoding='utf-8') as f:
+            txt = f.read().lstrip('\ufeff')
     
     # Add a new div element to the page      
-    data_csv_div = index_tree.find('.//div[@id="data_csv"]')
+    data_container_div = index_tree.find('.//div[@id="data_container"]')
 
-    pre_element = etree.SubElement(data_csv_div, "pre")
+    pre_element = etree.SubElement(data_container_div, "pre")
     pre_element.set("id", id)
-    pre_element.text = txt
+    pre_element.text = txt.lstrip('\ufeff')
     
     # Write changes to the html
-    index_tree.write(html_path, 
-                    pretty_print=True,
-                    encoding='utf-8',
-                    method='html')
-        
-    
-    
+    index_tree.write(
+        html_path, 
+        pretty_print=True,
+        encoding='utf-8',
+        method='html'
+    )
+
+
 
 def add_data_2_html(html_path:str, data_pathes:list)->None:
     """
@@ -97,31 +99,31 @@ def add_data_2_html(html_path:str, data_pathes:list)->None:
     tree = etree.parse(html_path, parser)
     name = os.path.basename(html_path)
 
-    # Step 2: Remove the data_csv if it exists
-    data_csv_div = tree.find('.//div[@id="data_csv"]')
+    # Step 2: Remove the data_container if it exists
+    data_container_div = tree.find('.//div[@id="data_container"]')
 
-    if data_csv_div is not None:
-        data_csv_div.getparent().remove(data_csv_div)
+    if data_container_div is not None:
+        data_container_div.getparent().remove(data_container_div)
 
-    # Step 3: Append a div[id="data_csv"] to the div[class="content"]
+    # Step 3: Append a div[id="data_container"] to the div[class="content"]
     content_div = tree.xpath('.//div[@class="content"]')[0]
 
     new_div = Element("div",)
-    new_div.set("id", "data_csv")
+    new_div.set("id", "data_container")
     new_div.set("style", "display: none;")
 
-    # Step 4: Create and append five <pre> elements
+    # Step 4: Create and append <pre> elements with JSON pretty-print
     for data_path in data_pathes:
-
         # get the base name of the file
         data_name = os.path.basename(data_path).split('.')[0]
 
-        with open(data_path, 'r') as file:
-            raw_string = file.read()
+        with open(data_path) as file:
+            json_data = json.load(file)
 
-        pre_element = etree.SubElement(new_div, "pre")
-        pre_element.set("id", f"{data_name}_csv")
-        pre_element.text = raw_string
+        script_element = etree.SubElement(new_div, "script")
+        script_element.set("id", f"{data_name}")
+        script_element.set("type", "application/json")
+        script_element.text = json.dumps(json_data, ensure_ascii=False)
 
 
     # Step 5: Insert the new div
@@ -130,10 +132,9 @@ def add_data_2_html(html_path:str, data_pathes:list)->None:
     # Step 6: Save the changes
     tree.write(html_path, method="html")
 
-    print(f"Data of {name} has successfully added to HTML!")
-    
-    
-    
+    print(f"Data of {name:<{20}} has successfully added to HTML!")
+
+
 def select_years(year_list):
     """
     Selects a subset of years from the given year_list. The selected years will 

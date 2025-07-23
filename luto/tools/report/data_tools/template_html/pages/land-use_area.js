@@ -1,27 +1,28 @@
 document.addEventListener("DOMContentLoaded", function () {
 
-  // Set the default color palette for Highcharts
-  var colors = eval(document.getElementById("colors").innerHTML);
-  Highcharts.setOptions({colors: colors});
 
-
+  const support_info = JSON.parse(document.getElementById('Supporting_info').innerText);
+  const colors = support_info.colors;
+  const model_years = support_info.years;
+  
 
   // Get the available years for plotting
-  var years = eval(document.getElementById("model_years").innerHTML).map(function (x) {return parseInt(x);});
-  // Sort the years
+  var years = model_years.map(function (x) {return parseInt(x);});
   years.sort(function (a, b) {return a - b;});
-  // Get the year ticks and interval
   var year_ticks = years.length == 2 ? years : null;
 
+  
   // Set the title alignment to left
   Highcharts.setOptions({
+    colors: colors,
     title: {
         align: 'left'
     }
   });
 
-  // Chart:area_0_grouped_lu_area_wide
-  Highcharts.chart("area_0_grouped_lu_area_wide", {
+
+  // Chart:Area_overview_2_Category
+  Highcharts.chart("Area_overview_2_Category_chart", {
     chart: {
       type: "column",
       marginRight: 380,
@@ -30,8 +31,8 @@ document.addEventListener("DOMContentLoaded", function () {
       text: "Total Area in Each Land-use Group",
     },
     series: JSON.parse(
-      document.getElementById("area_0_grouped_lu_area_wide_csv").innerHTML
-    ),
+      document.getElementById("Area_overview_2_Category").innerHTML
+    ).AUSTRALIA,
     credits: {
       enabled: false,
     },
@@ -40,7 +41,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Area (million km2)",
+        text: "Area (ha)",
       },
     },
 
@@ -73,19 +74,18 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  
-  // Chart:area_1_total_area_wide
-  Highcharts.chart("area_1_total_area_wide", {
+  // Chart:Area_overview_1_Land-use
+  Highcharts.chart("Area_overview_1_Land-use_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
     title: {
-      text: "Total Area by Land-use and Agricultural Commodity",
+      text: "Total Area by Specific Land-use Type",
     },
     series: JSON.parse(
-      document.getElementById("area_1_total_area_wide_csv").innerHTML
-    ),
+      document.getElementById("Area_overview_1_Land-use").innerHTML
+    ).AUSTRALIA,
     credits: {
       enabled: false,
     },
@@ -94,7 +94,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Area (million km2)",
+        text: "Area (ha)",
       },
     },
 
@@ -130,18 +130,18 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // Chart:area_2_Water_supply_area_wide
-  Highcharts.chart("area_2_Water_supply_area_wide", {
+  // Chart:Area_overview_3_Source-use
+  Highcharts.chart("Area_overview_3_Source_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
     title: {
-      text: "Total Area by Irrigation Type",
+      text: "Total Area by Broad Land-use Type",
     },
     series: JSON.parse(
-      document.getElementById("area_2_Water_supply_area_wide_csv").innerHTML
-    ),
+      document.getElementById("Area_overview_3_Source").innerHTML
+    ).AUSTRALIA,
     credits: {
       enabled: false,
     },
@@ -150,14 +150,14 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Area (million km2)",
+        text: "Area (ha)",
       },
     },
 
     legend: {
       align: "right",
       layout: "vertical",
-      x: -250,
+      x: -10,
       verticalAlign: "middle",
     },
 
@@ -180,18 +180,18 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // area_3_non_ag_lu_area_wide
-  Highcharts.chart("area_3_non_ag_lu_area_wide", {
+  // Area_Ag_1_Land-use
+  Highcharts.chart("Area_Ag_1_Land-use_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
     title: {
-      text: "Non-Agricultural Land-Use Area",
+      text: "Agricultural Land-Use Area",
     },
     series: JSON.parse(
-      document.getElementById("area_3_non_ag_lu_area_wide_csv").innerHTML,
-    ),
+      document.getElementById("Area_Ag_1_Land-use").innerHTML,
+    ).AUSTRALIA,
     credits: {
       enabled: false,
     },
@@ -200,7 +200,7 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Area (million km2)",
+        text: "Area (ha)",
       },
     },
 
@@ -230,18 +230,18 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // area_4_am_total_area_wide
-  Highcharts.chart("area_4_am_total_area_wide", {
+  // Area_NonAg_1_Land-use
+  Highcharts.chart("Area_NonAg_1_Land-use_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
     title: {
-      text: "Agricultural Management Area by Type",
+      text: "Non-Agricultural Land-use Area",
     },
     series: JSON.parse(
-      document.getElementById("area_4_am_total_area_wide_csv").innerHTML
-    ),
+      document.getElementById("Area_NonAg_1_Land-use").innerHTML
+    ).AUSTRALIA,
     credits: {
       enabled: false,
     },
@@ -250,14 +250,14 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Area (million km2)",
+        text: "Area (ha)",
       },
     },
 
     legend: {
       align: "right",
       layout: "vertical",
-      x: -100,
+      x: -50,
       verticalAlign: "middle",
     },
 
@@ -280,18 +280,17 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // area_5_am_lu_area_wide
-  Highcharts.chart("area_5_am_lu_area_wide", {
+  // Area_Am_1_Type
+  Highcharts.chart("Area_Am_1_Type_chart", {
     chart: {
       type: "column",
       marginRight: 380,
     },
     title: {
-      text: "Agricultural Management Area by Land-use Type",
+      text: "Agricultural Management Area by BroadLand-use Type",
     },
     series:
-      JSON.parse(document.getElementById("area_5_am_lu_area_wide_csv").innerHTML)
-    ,
+      JSON.parse(document.getElementById("Area_Am_1_Type").innerHTML).AUSTRALIA,
     credits: {
       enabled: false,
     },
@@ -300,14 +299,14 @@ document.addEventListener("DOMContentLoaded", function () {
     },
     yAxis: {
       title: {
-        text: "Area (million km2)",
+        text: "Area (ha)",
       },
     },
 
     legend: {
       align: "right",
       layout: "vertical",
-      x: -150,
+      x: -50,
       verticalAlign: "middle",
     },
 
@@ -330,14 +329,167 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  // area_6_begin_end_area
-  document.getElementById("area_6_begin_end_area").innerHTML = document.getElementById(
-    "area_6_begin_end_area_csv"
-  ).innerText;
+  // Area_Am_3_Land-use
+  Highcharts.chart("Area_Am_3_Land-use_chart", {
+    chart: {
+      type: "column",
+      marginRight: 380,
+    },
+    title: {
+      text: "Agricultural Management Area by BroadLand-use Type",
+    },
+    series:
+      JSON.parse(document.getElementById("Area_Am_3_Land-use").innerHTML).AUSTRALIA,
+    credits: {
+      enabled: false,
+    },
+    xAxis: {
+      tickPositions: year_ticks,
+    },
+    yAxis: {
+      title: {
+        text: "Area (ha)",
+      },
+    },
 
-  // area_7_begin_end_pct
-  document.getElementById("area_7_begin_end_pct").innerHTML = document.getElementById(
-    "area_7_begin_end_pct_csv"
-  ).innerText;
+    legend: {
+      layout: 'vertical',
+      align: 'right',
+      verticalAlign: 'middle',
+      x: -150, 
+      floating: true
+    },
+
+    tooltip: {
+      formatter: function () {
+        return `<b>Year:</b> ${this.x}<br><b>${this.series.name
+          }:</b>${this.y.toFixed(2)}<br/>`;
+      },
+    },
+
+    plotOptions: {
+      column: {
+        stacking: "normal",
+      },
+    },
+
+    exporting: {
+      sourceWidth: 1200,
+      sourceHeight: 600,
+    },
+  });
+
+  // area_begin_end_area
+  document.getElementById("area_begin_end_area").innerHTML = JSON.parse(document.getElementById(
+    "Area_transition_start_end"
+  ).innerText).AUSTRALIA.area;
+
+  // area_begin_end_pct
+  document.getElementById("area_begin_end_pct").innerHTML = JSON.parse(document.getElementById(
+    "Area_transition_start_end"
+  ).innerText).AUSTRALIA.pct;
+
+  // area_year_to_year transitions
+  let data_area_transition = JSON.parse(
+    document.getElementById("Area_transition_year_to_year").innerText
+  ).AUSTRALIA;
+
+  // Get area transitions selectors and buttons
+  let slider_transition = document.getElementById("year_transition");
+  let incrementButton_transition = document.getElementById("increment_transition");
+  let decrementButton_transition = document.getElementById("decrement_transition");
+  let yearOutput_transition = document.getElementById('yearOutput_transition');
+  
+  // Get pct transitions selectors and buttons
+  let slider_transition_pct = document.getElementById("year_transition_pct");
+  let incrementButton_transition_pct = document.getElementById("increment_transition_pct");
+  let decrementButton_transition_pct = document.getElementById("decrement_transition_pct");
+  let yearOutput_transition_pct = document.getElementById('yearOutput_transition_pct');
+  
+  // Get available years from the data and sort them
+  let availableYears_transition = Object.keys(data_area_transition.area).sort((a, b) => a - b);
+  
+  // Set up the sliders with correct range for area transition
+  if (availableYears_transition.length > 0) {
+    // Area transition slider
+    slider_transition.min = availableYears_transition[0];
+    slider_transition.max = availableYears_transition[availableYears_transition.length - 1];
+    slider_transition.step = availableYears_transition.length > 1 ? 
+      availableYears_transition[1] - availableYears_transition[0] : 1;
+    slider_transition.value = availableYears_transition[0];
+    yearOutput_transition.innerHTML = slider_transition.value;
+
+    // Percent transition slider
+    slider_transition_pct.min = availableYears_transition[0];
+    slider_transition_pct.max = availableYears_transition[availableYears_transition.length - 1];
+    slider_transition_pct.step = availableYears_transition.length > 1 ? 
+      availableYears_transition[1] - availableYears_transition[0] : 1;
+    slider_transition_pct.value = availableYears_transition[0];
+    yearOutput_transition_pct.innerHTML = slider_transition_pct.value;
+
+    // Add event listeners for area transitions
+    slider_transition.addEventListener("input", function () {
+      yearOutput_transition.innerHTML = slider_transition.value;
+      update_area_transition();
+    });
+
+    incrementButton_transition.addEventListener("click", function () {
+      let currentValue = slider_transition.value;
+      let currentIndex = availableYears_transition.indexOf(parseInt(currentValue));
+      if (currentIndex < availableYears_transition.length - 1) {
+        slider_transition.value = availableYears_transition[currentIndex + 1];
+        slider_transition.dispatchEvent(new Event('input'));
+      }
+    });
+
+    decrementButton_transition.addEventListener("click", function () {
+      let currentValue = slider_transition.value;
+      let currentIndex = availableYears_transition.indexOf(parseInt(currentValue));
+      if (currentIndex > 0) {
+        slider_transition.value = availableYears_transition[currentIndex - 1];
+        slider_transition.dispatchEvent(new Event('input'));
+      }
+    });
+
+    // Add event listeners for pct transitions
+    slider_transition_pct.addEventListener("input", function () {
+      yearOutput_transition_pct.innerHTML = slider_transition_pct.value;
+      update_pct_transition();
+    });
+
+    incrementButton_transition_pct.addEventListener("click", function () {
+      let currentValue = slider_transition_pct.value;
+      let currentIndex = availableYears_transition.indexOf(parseInt(currentValue));
+      if (currentIndex < availableYears_transition.length - 1) {
+        slider_transition_pct.value = availableYears_transition[currentIndex + 1];
+        slider_transition_pct.dispatchEvent(new Event('input'));
+      }
+    });
+
+    decrementButton_transition_pct.addEventListener("click", function () {
+      let currentValue = slider_transition_pct.value;
+      let currentIndex = availableYears_transition.indexOf(parseInt(currentValue));
+      if (currentIndex > 0) {
+        slider_transition_pct.value = availableYears_transition[currentIndex - 1];
+        slider_transition_pct.dispatchEvent(new Event('input'));
+      }
+    });
+
+    // Function to update area transition matrix
+    function update_area_transition() {
+      document.getElementById("area_year_to_year_area").innerHTML = 
+        data_area_transition.area[slider_transition.value];
+    }
+
+    // Function to update percent transition matrix
+    function update_pct_transition() {
+      document.getElementById("area_year_to_year_pct").innerHTML = 
+        data_area_transition.pct[slider_transition_pct.value];
+    }
+
+    // Initial update of the transition matrices
+    update_area_transition();
+    update_pct_transition();
+  }
 });
 

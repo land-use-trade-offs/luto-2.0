@@ -101,9 +101,8 @@ class Data:
         """
         # Path for write module - overwrite when provided with a base and target year
         self.path = None
-        self.path_begin_end_compare = None
         
-        # Timestamp of simulation to which this object belongs.
+        # Read the timestamp of simulation, which is created by `luto.simulation.load_data`
         with open(os.path.join(settings.OUTPUT_DIR, '.timestamp'), 'r') as f:
             self.timestamp = f.read().strip()
 
@@ -174,7 +173,7 @@ class Data:
         
 
         ###############################################################
-        # Load agricultural crop and livestock data.
+        # Load agricultural crop and livestock economic and yield data.
         ###############################################################
         print("\tLoading agricultural crop and livestock data...", flush=True)
         self.AGEC_CROPS = pd.read_hdf(os.path.join(settings.INPUT_DIR, "agec_crops.h5"), where=self.MASK)
@@ -427,6 +426,18 @@ class Data:
         self.CLIMATE_CHANGE_IMPACT = pd.read_hdf(
             os.path.join(settings.INPUT_DIR, "climate_change_impacts_" + settings.RCP + "_CO2_FERT_" + settings.CO2_FERT.upper() + ".h5"), where=self.MASK
         )
+        
+        
+        ###############################################################
+        # Regional coverage layers, mainly for regional reporting.
+        ###############################################################
+        REGION_NRM_r = pd.read_hdf(
+            os.path.join(settings.INPUT_DIR, "REGION_NRM_r.h5"), where=self.MASK
+        )        
+        
+        self.REGION_NRM_CODE = REGION_NRM_r['NRM_CODE']
+        self.REGION_NRM_NAME = REGION_NRM_r['NRM_NAME']
+        
 
         ###############################################################
         # No-Go areas; Regional adoption constraints.
@@ -675,9 +686,9 @@ class Data:
 
 
         ###############################################################
-        # Additional agricultural economic data.
+        # Additional agricultural GHG data.
         ###############################################################
-        print("\tLoading additional agricultural economic data...", flush=True)
+        print("\tLoading additional agricultural GHG data...", flush=True)
 
 
         # Load greenhouse gas emissions from agriculture
@@ -1010,7 +1021,7 @@ class Data:
         self.add_ag_man_dvars(self.YR_CAL_BASE, self.AG_MAN_L_MRJ_DICT)
         
         print(f"\tCalculating base year productivity...", flush=True)
-        yr_cal_base_prod_data = self.get_production(self.YR_CAL_BASE, self.LUMAP, self.LMMAP)        
+        yr_cal_base_prod_data = self.get_production()        
         self.add_production_data(self.YR_CAL_BASE, "Production", yr_cal_base_prod_data)
         
         
@@ -1897,17 +1908,6 @@ class Data:
             + [f"{self.path}/out_{yr}/lucc_separate" for yr in years[1:]]
         )  # Skip creating lucc_separate for base year
 
-        # Add the path for the comparison between base-year and target-year if in the timeseries mode
-        self.path_begin_end_compare = f"{self.path}/begin_end_compare_{years[0]}_{years[-1]}"
-        paths = (
-            paths
-            + [self.path_begin_end_compare]
-            + [
-                f"{self.path_begin_end_compare}/out_{years[0]}",
-                f"{self.path_begin_end_compare}/out_{years[-1]}",
-                f"{self.path_begin_end_compare}/out_{years[-1]}/lucc_separate",
-            ]
-        )
 
         # Create all paths
         for p in paths:
@@ -1916,37 +1916,17 @@ class Data:
 
         return self.path
 
-    def get_production(
-        self,
-        yr_cal: int,
-        lumap: np.ndarray,
-        lmmap: np.ndarray,
-    ) -> np.ndarray:
+    def get_production(self) -> np.ndarray:
         """
-        Return total production of commodities for a specific year...
-
-        'yr_cal' is calendar year
-
-        Can return base year production (e.g., year = 2010) or can return production for
-        a simulated year if one exists (i.e., year = 2030).
-
-        Includes the impacts of land-use change, productivity increases, and
-        climate change on yield.
+        Return total production of commodities for YR_CAL_BASE...
         """
-        if yr_cal == self.YR_CAL_BASE:
-            ag_X_mrj = self.AG_L_MRJ
-            non_ag_X_rk = self.NON_AG_L_RK
-            ag_man_X_mrj = self.AG_MAN_L_MRJ_DICT
-            
-        else:
-            ag_X_mrj = tools.lumap2ag_l_mrj(lumap, lmmap)
-            non_ag_X_rk = lumap2non_ag_l_mk(lumap, len(settings.NON_AG_LAND_USES.keys()))
-            ag_man_X_mrj = get_base_am_vars(self.NCELLS, self.NLMS, self.N_AG_LUS)
+        ag_X_mrj = self.AG_L_MRJ
+        non_ag_X_rk = self.NON_AG_L_RK
+        ag_man_X_mrj = self.AG_MAN_L_MRJ_DICT
 
-        # Calculate year index (i.e., number of years since 2010)
-        yr_idx = yr_cal - self.YR_CAL_BASE
+        # The year index for the base year (2010) is 0.
+        yr_idx = 0
 
-        # Get the quantity of each commodity produced by agricultural land uses
         ag_q_mrp = ag_quantity.get_quantity_matrices(self, yr_idx)
 
         # Convert map of land-use in mrj format to mrp format using vectorization
@@ -1959,31 +1939,31 @@ class Data:
         ag_q_c = np.einsum('cp,p->c', self.PR2CM.astype(bool), ag_q_p)
 
         # Get the quantity of each commodity produced by non-agricultural land uses
-        q_crk = non_ag_quantity.get_quantity_matrix(self, ag_q_mrp, lumap)
+        q_crk = non_ag_quantity.get_quantity_matrix(self, ag_q_mrp, self.LUMAP)
         non_ag_q_c = np.einsum('crk,rk->c', q_crk, non_ag_X_rk)
 
         # Get quantities produced by agricultural management options
         ag_man_q_mrp = ag_quantity.get_agricultural_management_quantity_matrices(self, ag_q_mrp, yr_idx)
         ag_man_q_c = np.zeros(self.NCMS)
-
-        j2p = {j: [p for p in range(self.NPRS) if self.LU2PR[p, j]]
-                        for j in range(self.N_AG_LUS)}
         for am, am_lus in settings.AG_MANAGEMENTS_TO_LAND_USES.items():
             if not settings.AG_MANAGEMENTS[am]:
                 continue
             
             am_j_list = [self.DESC2AGLU[lu] for lu in am_lus]
-            current_ag_man_X_mrp = np.zeros(ag_q_mrp.shape, dtype=np.float32)
             for j in am_j_list:
-                for p in j2p[j]:
-                    current_ag_man_X_mrp[:, :, p] = ag_man_X_mrj[am][:, :, j]
-
-            ag_man_q_p = np.einsum('mrp,mrp->p', ag_man_q_mrp[am], current_ag_man_X_mrp)
-            ag_man_q_c += np.einsum('cp,p->c', self.PR2CM.astype(bool), ag_man_q_p)
-
-        # Return total commodity production as numpy array.
-        total_q_c = ag_q_c + non_ag_q_c + ag_man_q_c
-        return total_q_c
+                for p in range(self.NPRS):
+                    if self.LU2PR[p, j] ==0:
+                        continue
+                    dvar_mr = ag_man_X_mrj[am][:, :, j]
+                    ag_q_mr = ag_man_q_mrp[am][:, :, p]
+                    q_mr = dvar_mr * ag_q_mr
+                    
+                    for c in range(self.NCMS):
+                        if self.PR2CM[c, p] == 0:
+                            continue
+                        ag_man_q_c[c] += q_mr.sum()
+            
+        return ag_q_c + non_ag_q_c + ag_man_q_c
 
 
     def get_carbon_price_by_yr_idx(self, yr_idx: int) -> float:

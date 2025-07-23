@@ -3,7 +3,7 @@ div.fig {
     margin-bottom: 100px;
 }
 
-#water_3_water_net_yield_by_region {
+.block-container {
     display: grid;
     height: auto;
     grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));

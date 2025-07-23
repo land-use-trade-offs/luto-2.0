@@ -1,186 +1,79 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script src="https://cdn.jsdelivr.net/npm/danfojs@1.1.2/lib/bundle.min.js"></script>
 
-    <script src="https://code.highcharts.com/highcharts.js"></script>
-    <script src="https://code.highcharts.com/modules/accessibility.js"></script>
-    <script src="https://code.highcharts.com/modules/data.js"></script>
-    <script src="https://code.highcharts.com/modules/exporting.js"></script>
-    <script src="https://code.highcharts.com/modules/offline-exporting.js"></script>
-    <script src="https://code.highcharts.com/modules/export-data.js"></script>
-    <script src="https://code.highcharts.com/highcharts-more.js"></script>
-    <script src="https://blacklabel.github.io/grouped_categories/grouped-categories.js"></script>
+    <script src="../src/Highcharts-12.3.0/highcharts.js"></script>
+    <script src="../src/Highcharts-12.3.0/accessibility.js"></script>
+    <script src="../src/Highcharts-12.3.0/data.js"></script>
+    <script src="../src/Highcharts-12.3.0/exporting.js"></script>
+    <script src="../src/Highcharts-12.3.0/offline-exporting.js"></script>
+    <script src="../src/Highcharts-12.3.0/export-data.js"></script>
+    <script src="../src/Highcharts-12.3.0/highcharts-more.js"></script>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 
     <title>Biodiversity</title>
-    <link rel="stylesheet" href="../style.css">
-    <link rel="stylesheet" href="biodiversity.css">
-</head>
-<body>
-    <script src="biodiversity.js">
-    </script>
+    <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="biodiversity.css" />
+  </head>
+
+  <body>
+    <script src="biodiversity.js"></script>
 
     <!-- The sidebar -->
     <div class="sidebar">
-        <a href="../index.html">Scenario Settings</a>
-        <a href="./land-use_area.html">Land-use Area</a>
-        <a href="./production.html">Demand and Production</a>
-        <a href="./economics.html">Economics</a>         
-        <a href="./GHG_emissions.html">GHG Emissions</a>
-        <a href="./water_usage.html">Water Use</a>        
-        <a class="active" href="./biodiversity.html">Biodiversity</a>  
-        <a href="./spatial_maps.html">Maps</a>       
-
-
+      <a href="../index.html">Scenario Settings</a>
+      <a href="./land-use_area.html">Land-use Area</a>
+      <a href="./production.html">Demand and Production</a>
+      <a href="./economics.html">Economics</a>
+      <a href="./GHG_emissions.html">GHG Emissions</a>
+      <a href="./water_usage.html">Water Use</a>
+      <a class="active" href="./biodiversity.html">Biodiversity</a>
+      <a href="./spatial_maps.html">Maps</a>
+      
+      <!-- Add a line to separate the sidebar from the rest of the content -->
+      <div id="sidebarLine" class="NoHover"></div>
+      
+      <!-- The dropdown to select the biodiversity type: -->
+      <div class="selection">
+        <label for="bio_type" class="label">Select biodiversity type:</label>
+        <select id="bio_type">
+          <option value="BIO_quality" selected>Biodiversity Quality</option>
+          <option value="BIO_GBF2">GBF Target 2</option>
+          <option value="BIO_GBF3">GBF Target 3 (NVIS)</option>
+          <option value="BIO_GBF4_ECNES">GBF Target 4 (ECNES)</option>
+          <option value="BIO_GBF4_SNES">GBF Target 4 (SNES)</option>
+          <option value="BIO_GBF8_GROUP">GBF Target 8 (Group)</option>
+          <option value="BIO_GBF8_SPECIES">GBF Target 8 (Species)</option>
+        </select>
+      </div>
+      
+      <!-- The dropdown to select the metrics view: -->
+      <div class="selection">
+        <label for="metrics_view" class="label">Select metrics view:</label>
+        <select id="metrics_view">
+          <option value="overview_1_Type" selected>Overview</option>
+          <option value="split_Ag_1_Landuse">Agricultural Land-use</option>
+          <option value="split_Am_2_Agri-Management">Agricultural Management</option>
+          <option value="split_Am_1_Landuse">Agricultural Management by Land-use</option>
+          <option value="split_NonAg_1_Landuse">Non-Agricultural Land-use</option>
+        </select>
+      </div>
+      
     </div>
 
+    <!-- The main content -->
     <div class="content">
-        <h1>Biodiversity</h1>
-
-
-        <!-- biodiversity_priority_1_total_score_by_type -->
-        <div class="fig" id="biodiversity_priority_1_total_score_by_type"></div>
-
-        <!-- biodiversity_priority_2_total_score_by_landuse -->
-        <div class="fig" id="biodiversity_priority_2_total_score_by_landuse"></div>
-
-        <!-- biodiversity_priority_3_total_score_by_agri_management -->
-        <div class="fig" id="biodiversity_priority_3_total_score_by_agri_management"></div>
-
-        <!-- biodiversity_priority_4_total_score_by_non_agri_landuse -->
-        <div class="fig" id="biodiversity_priority_4_total_score_by_non_agri_landuse"></div>
-
-
-
-
-        <!-- biodiversity_GBF2_1_total_score_by_type -->
-        <div class="fig" id="biodiversity_GBF2_1_total_score_by_type"></div>
-
-        <!-- biodiversity_GBF2_2_total_score_by_landuse -->
-        <div class="fig" id="biodiversity_GBF2_2_total_score_by_landuse"></div>
-
-        <!-- biodiversity_GBF2_3_total_score_by_agri_management -->
-        <div class="fig" id="biodiversity_GBF2_3_total_score_by_agri_management"></div>
-
-        <!-- biodiversity_GBF2_4_total_score_by_non_agri_landuse -->
-        <div class="fig" id="biodiversity_GBF2_4_total_score_by_non_agri_landuse"></div>
-
-
-
-
-        <!-- biodiversity_GBF3_1_contribution_group_score_total -->
-        <div class="fig" id="biodiversity_GBF3_1_contribution_group_score_total"></div>
-
-        <!-- biodiversity_GBF3_2_contribution_group_score_by_type -->
-        <p>National Vegetation Area-Weighted Score (GBF3) by Group</p>
-        <div class="chart-container"  id="biodiversity_GBF3_2_contribution_group_score_by_type"></div>
-
-        <!-- biodiversity_GBF3_3_contribution_group_score_by_landuse -->
-        <p>National Vegetation Area-Weighted Score (GBF3) by Agri Land-use</p>
-        <div class="chart-container"  id="biodiversity_GBF3_3_contribution_group_score_by_landuse"></div>
-
-        <!-- biodiversity_GBF3_4_contribution_group_score_by_agri_management -->
-         <p>National Vegetation Area-Weighted Score (GBF3) by Agri Management</p>
-        <div class="chart-container"  id="biodiversity_GBF3_4_contribution_group_score_by_agri_management"></div>
-
-        <!-- biodiversity_GBF3_5_contribution_group_score_by_non_agri_landuse -->
-        <p>National Vegetation Area-Weighted Score (GBF3) by Non Agri Landuse</p>    
-        <div class="chart-container"  id="biodiversity_GBF3_5_contribution_group_score_by_non_agri_landuse"></div>
-
-
-
-
-        <!-- biodiversity_GBF4_SNES_1_contribution_species_score_total -->
-        <div class="fig" id="biodiversity_GBF4_SNES_1_contribution_species_score_total"></div>
-
-        <!-- biodiversity_GBF4_SNES_2_contribution_species_score_by_type -->
-        <p>National Species Area-Weighted Score (GBF4-SNES) by Species</p>
-        <div class="chart-container"  id="biodiversity_GBF4_SNES_2_contribution_species_score_by_type"></div>
-
-        <!-- biodiversity_GBF4_SNES_3_contribution_species_score_by_landuse -->
-        <p>National Species Area-Weighted Score (GBF4-SNES) by Agri Land-use</p>
-        <div class="chart-container"  id="biodiversity_GBF4_SNES_3_contribution_species_score_by_landuse"></div>
-
-        <!-- biodiversity_GBF4_SNES_4_contribution_species_score_by_agri_management -->
-        <p>National Species Area-Weighted Score (GBF4-SNES) by Agri Management</p>
-        <div class="chart-container"  id="biodiversity_GBF4_SNES_4_contribution_species_score_by_agri_management"></div>
-
-        <!-- biodiversity_GBF4_SNES_5_contribution_species_score_by_non_agri_landuse -->
-        <p>National Species Area-Weighted Score (GBF4-SNES) by Non Agri Landuse</p>
-        <div class="chart-container"  id="biodiversity_GBF4_SNES_5_contribution_species_score_by_non_agri_landuse"></div>
-
-
-        <!-- biodiversity_GBF4_ECNES_1_contribution_species_score_total -->
-        <div class="fig" id="biodiversity_GBF4_ECNES_1_contribution_species_score_total"></div>
-        
-        <!-- biodiversity_GBF4_ECNES_2_contribution_species_score_by_type -->
-        <p>National Species Area-Weighted Score (GBF4-ECNES) by Community</p>
-        <div class="chart-container"  id="biodiversity_GBF4_ECNES_2_contribution_species_score_by_type"></div>
-
-        <!-- biodiversity_GBF4_ECNES_3_contribution_species_score_by_landuse -->
-        <p>National Species Area-Weighted Score (GBF4-ECNES) by Agri Land-use</p>
-        <div class="chart-container"  id="biodiversity_GBF4_ECNES_3_contribution_species_score_by_landuse"></div>
-
-        <!-- biodiversity_GBF4_ECNES_4_contribution_species_score_by_agri_management -->
-        <p>National Species Area-Weighted Score (GBF4-ECNES) by Agri Management</p>
-        <div class="chart-container"  id="biodiversity_GBF4_ECNES_4_contribution_species_score_by_agri_management"></div>
-
-        <!-- biodiversity_GBF4_ECNES_5_contribution_species_score_by_non_agri_landuse -->
-        <p>National Species Area-Weighted Score (GBF4-ECNES) by Non Agri Landuse</p>
-        <div class="chart-container"  id="biodiversity_GBF4_ECNES_5_contribution_species_score_by_non_agri_landuse"></div>
-
-
-
-
-        <!-- biodiversity_GBF8_1_contribution_group_score_total -->
-        <div class="fig" id="biodiversity_GBF8_1_contribution_group_score_total"></div>
-
-        <!-- biodiversity_GBF8_2_contribution_group_score_by_type -->
-        <p>Biodiversity Suitability Score (GBF8-group) by Broad Landuse</p>
-        <div class="chart-container"  id="biodiversity_GBF8_2_contribution_group_score_by_type"></div>
-
-        <!-- biodiversity_GBF8_3_contribution_group_score_by_landuse -->
-        <p>Biodiversity Suitability Score (GBF8-group) by Agri Land-use</p>
-        <div class="chart-container"  id="biodiversity_GBF8_3_contribution_group_score_by_landuse"></div>
-
-        <!-- biodiversity_GBF8_4_contribution_group_score_by_agri_management -->
-        <p>Biodiversity Suitability Score (GBF8-group) by Agri Management</p>
-        <div class="chart-container"  id="biodiversity_GBF8_4_contribution_group_score_by_agri_management"></div>
-
-        <!-- biodiversity_GBF8_5_contribution_group_score_by_non_agri_landuse -->
-        <p>Biodiversity Suitability Score (GBF8-group) by Non Agri Landuse</p>
-        <div class="chart-container"  id="biodiversity_GBF8_5_contribution_group_score_by_non_agri_landuse"></div>
-        
-        <!-- biodiversity_GBF8_6_contribution_species_score_total -->
-        <div class="fig" id="biodiversity_GBF8_6_contribution_species_score_total"></div>
-
-        <!-- biodiversity_GBF8_7_contribution_species_score_by_type -->
-        <p>Biodiversity Suitability Score (GBF8-species) by Broad Landuse</p>
-        <div class="chart-container"  id="biodiversity_GBF8_7_contribution_species_score_by_type"></div>
-
-        <!-- biodiversity_GBF8_8_contribution_species_score_by_landuse -->
-        <p>Biodiversity Suitability Score (GBF8-species) by Agri Land-use</p>
-        <div class="chart-container"  id="biodiversity_GBF8_8_contribution_species_score_by_landuse"></div>
-
-        <!-- biodiversity_GBF8_9_contribution_species_score_by_agri_management -->
-        <p>Biodiversity Suitability Score (GBF8-species) by Agri Management</p>
-        <div class="chart-container"  id="biodiversity_GBF8_9_contribution_species_score_by_agri_management"></div>
-
-        <!-- biodiversity_GBF8_10_contribution_species_score_by_non_agri_landuse -->
-        <p>Biodiversity Suitability Score (GBF8-species) by Non Agri Landuse</p>
-        <div class="chart-container"  id="biodiversity_GBF8_10_contribution_species_score_by_non_agri_landuse"></div>
-
-
+      <h1 id="biodiversity_title">Biodiversity Quality</h1>
+      <div id="chart_container" class="chart-container">
+        <!-- Chart will be displayed here -->
+      </div>
+      
+      <!-- Chart will be created dynamically by JavaScript -->
     </div>
 
-
-    <div id="data_csv" style="display: none;"></div>
-    
-</body>
+    <div id="data_container" style="display: none"></div>
+  </body>
 </html>

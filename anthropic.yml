@@ -1,0 +1,42 @@
+version: "1.0"
+
+# Anthropic configuration file based on .gitignore settings
+project:
+  description: "LUTO2 - Version 2 of the Australian Land-Use Trade-Offs model"
+
+# Files and directories to ignore (based on .gitignore)
+exclude_patterns:
+  - ".spyproject/"
+  - "**/__pycache__/"
+  - ".vscode/**"
+  - ".vscode-upload.json"
+  - "/jinzhu_inspect_code/*"
+  - "/jinzhu_inspect_code"
+  - "luto/.ipynb_checkpoints/*"
+  - "pyproject.toml"
+  - "venv"
+  - ".history/"
+  - "input/**"
+  - "output/**"
+  - "gurobi.env"
+  - "gurobi.log"
+  - ".hypothesis"
+  - "*.zip"
+  - "*.dat"
+  - "*.log"
+  - "/docs/manual/*"
+  - "*.tmp"
+  - "**/*.7z"
+
+# Include Claude-specific settings
+claude:
+  # Maximum token context to consider
+  max_context_tokens: 100000
+  
+  # Directories to prioritize when analyzing the codebase
+  priority_paths:
+    - "luto/"
+    
+  # Files to ignore during analysis that may be too large or not useful
+  ignore_large_files: true
+  max_file_size_kb: 5000

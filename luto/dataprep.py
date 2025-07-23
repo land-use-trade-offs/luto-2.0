@@ -310,6 +310,11 @@ def create_new_dataset():
     lmap['IRRIGATION'].to_hdf(outpath + 'lmmap.h5', key='lmmap', mode='w', format='table', index=False, complevel=9)
     
     
+    ################# Spatial coverage for regional reporting
+    REGION_NRM_r = zones[['NRM_CODE', 'NRM_NAME']]  # NRM regions
+    REGION_NRM_r.to_hdf(outpath + 'REGION_NRM_r.h5', key='REGION_NRM_r', mode='w', format='table', index=False, complevel=9)
+    
+    
 
     ################# Regional adoption constraints
     

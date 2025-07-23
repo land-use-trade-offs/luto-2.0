@@ -11,33 +11,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Load the selected data to report HTML
     load_data(get_dataDir() + '/data/Map_data/lumap_2010.html');
-   
-    // Get the names (original) and renames (rename for reporting)
-    let lucc_names = document.getElementById('SPATIAL_MAP_DICT').innerText;
-    lucc_names = lucc_names.replace(/'/g, '"');       // JSON.parse() does not accept single quotes
-    lucc_names = JSON.parse(lucc_names);
 
-    let lucc_rename = document.getElementById('RENAME_AM_NON_AG').innerText;
-    lucc_rename = lucc_rename.replace(/'/g, '"');       // JSON.parse() does not accept single quotes
-    lucc_rename = JSON.parse(lucc_rename);
+
+    // Get the names (original) and renames (rename for reporting)
+    const support_info = JSON.parse(document.getElementById('Supporting_info').innerText);
+    const model_years = support_info.years.map(function (x) { return parseInt(x); });
+    const lucc_names = support_info.SPATIAL_MAP_DICT;
+    const lucc_rename = support_info.RENAME_AM_NON_AG;
+
 
     // Initialize the select_2 dropdown
     let int_map_names = {
-        'lumap':'All Land-use',
-        'non_ag':'Non Agricultural', 
-        'ammap':'Agricultural Management', 
-        'lmmap':'Water Management',
+        'lumap': 'All Land-use',
+        'non_ag': 'Non Agricultural',
+        'ammap': 'Agricultural Management',
+        'lmmap': 'Water Management',
     };
     init_select_2();
 
     // Listen for changes in the lucc dropdown
-    document.getElementById("select_1").addEventListener("change", function () {
+    document.getElementById("category_select").addEventListener("change", function () {
         lucc = this.value;
 
         console.log(lucc)
 
-        // Get the select_2 element
-        let select_2 = document.getElementById("select_2");
+        // Get the map_select element
+        let select_2 = document.getElementById("map_select");
 
         // Clear any existing options in select_2
         select_2.innerHTML = "";
@@ -61,8 +60,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-    // Listen for changes in the select_2 dropdown
-    document.getElementById("select_2").addEventListener("change", function () {
+    // Listen for changes in the map_select dropdown
+    document.getElementById("map_select").addEventListener("change", function () {
         // Load the selected data to report HTML
         load_data(update_fname());
     });
@@ -109,8 +108,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
     function init_select_2() {
-        // Get the select_2 element
-        let select_2 = document.getElementById("select_2");
+        // Get the map_select element
+        let select_2 = document.getElementById("map_select");
 
         // Clear any existing options in select_2
         select_2.innerHTML = "";
@@ -129,8 +128,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function update_fname() {
 
         // Get the selected values
-        lucc = document.getElementById("select_1").value;
-        map_name = document.getElementById("select_2").value;
+        lucc = document.getElementById("category_select").value;
+        map_name = document.getElementById("map_select").value;
         year = document.getElementById("year").value;
         names = lucc_names[lucc];
 
@@ -165,20 +164,19 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Update the year range selection input and output values
-    window.onload = function () {
+    function updateYearRangeFromModelYears() {
         let yearInput = document.getElementById('year');
         let yearOutput = document.getElementById('yearOutput');
-        let modelYears = eval(document.getElementById('model_years').innerText);
 
-        // Sort the modelYears array in ascending order
-        modelYears.sort(function (a, b) { return a - b; });
-
-        yearInput.min = modelYears[0];
-        yearInput.max = modelYears[modelYears.length - 1];
-        yearInput.step = modelYears[1] - modelYears[0];   // The step is the difference between the first two elements
-        yearInput.value = modelYears[0];
-        yearOutput.value = modelYears[0];
+        yearInput.min = model_years[0];
+        yearInput.max = model_years[model_years.length - 1];
+        yearInput.step = model_years[1] - model_years[0];   // The step is the difference between the first two elements
+        yearInput.value = model_years[0];
+        yearOutput.value = model_years[0];
     }
+
+    // Call the function to update year range on DOM content loaded
+    updateYearRangeFromModelYears();
 
 
 });

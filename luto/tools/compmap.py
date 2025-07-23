@@ -28,47 +28,39 @@ import pandas as pd
 import luto.settings as settings
 
 
-def lumap_crossmap(oldmap, newmap, ag_landuses, non_ag_landuses, real_area):
-    # Produce the cross-tabulation matrix with optional labels.
-    crosstab = pd.crosstab(oldmap, 
-                           newmap, 
-                           values = real_area, 
-                           aggfunc = lambda x:x.sum()/100 , # {sum/100} -> convert {ha} to {km2}
-                           margins = False)                 
-
-    # Need to make sure each land use (both agricultural and non-agricultural) appears in the index/columns
-    reindex = (
-            list(range(len(ag_landuses)))
-        + [ settings.NON_AGRICULTURAL_LU_BASE_CODE + lu for lu in range(len(non_ag_landuses)) ]
-    )
+def lumap_crossmap(data, oldmap, newmap):
     
-    crosstab = crosstab.reindex(reindex, axis = 0, fill_value = 0)
-    crosstab = crosstab.reindex(reindex, axis = 1, fill_value = 0)
-    
-    lus = list(ag_landuses) + list(non_ag_landuses)
-    crosstab.columns = lus
-    crosstab.index = lus
-    crosstab = crosstab.fillna(0)
-    
-    # Calculate net switches to land use (negative means switch away).
-    switches = crosstab.sum(0) - crosstab.sum(1)
-    nswitches = np.abs(switches).sum()
-    switches['Total [km2]'] = nswitches
-    switches['Total [%]'] = np.around(100 * nswitches / (real_area.sum()/100), decimals=2)
-    switches = pd.DataFrame(switches)
-    
-    # Stack the crosstab to a long format.
-    crosstab = crosstab.stack().reset_index()
-    crosstab.columns = ['From land-use', 'To land-use', 'Area [km2]']
+    crosstab = pd.crosstab(
+            oldmap, 
+            [newmap, data.REGION_NRM_NAME], 
+            values = data.REAL_AREA, 
+            aggfunc = lambda x:x.sum() , 
+            margins = False
+        ).unstack(
+        ).reset_index(
+        ).rename(
+            columns={
+                'row_0': 'From land-use', 
+                'NRM_NAME': 'region', 
+                'col_0':'To land-use', 
+                0: 'Area (ha)'
+            }
+        ).dropna(
+        ).replace({'From land-use': data.ALLLU2DESC, 'To land-use': data.ALLLU2DESC})
+        
+    switches = (crosstab.groupby('From land-use')['Area (ha)'].sum() - crosstab.groupby('To land-use')['Area (ha)'].sum()
+        ).reset_index(
+        ).rename(columns={'index':'Landuse'})
 
     return crosstab, switches
+
 
 def lmmap_crossmap(oldmap, newmap, real_area, lm):
     # Produce the cross-tabulation matrix with optional labels.
     crosstab = pd.crosstab(oldmap, 
                             newmap,
                             values = real_area, 
-                            aggfunc = lambda x:x.sum()/100 , # {sum/100} -> convert {ha} to {km2}
+                            aggfunc = lambda x:x.sum() , 
                             margins = False)
 
     crosstab = crosstab.reindex(range(len(lm)), axis=0, fill_value=0)
@@ -76,14 +68,12 @@ def lmmap_crossmap(oldmap, newmap, real_area, lm):
 
     # Calculate net switches to land use (negative means switch away).
     switches = crosstab.sum(0) - crosstab.sum(1)
-    nswitches = np.abs(switches).sum()
-    switches['Total [km2]'] = nswitches
-    switches['Total [%]'] = np.around(100 * nswitches / (real_area.sum()/100),decimals=2)
-    switches = pd.DataFrame(switches)
+    switches = pd.DataFrame(switches).reset_index()
+    switches.columns = ['Land-use', 'Area (ha)']
 
     # Stack the crosstab to a long format.
     crosstab = crosstab.stack().reset_index()
-    crosstab.columns = ['From water_supply', 'To water_supply', 'Area [km2]']
+    crosstab.columns = ['From water_supply', 'To water_supply', 'Area (ha)']
     crosstab = crosstab.replace({0:'Dryland',1:'Irrigated'})
 
     return crosstab, switches
@@ -122,7 +112,7 @@ def crossmap_irrstat( lumap_old
     crosstab = pd.crosstab(highpos_old,         
                             highpos_new,        
                             values = real_area,        
-                            aggfunc = lambda x:x.sum()/100, # {sum/100} -> convert {ha} to {km2}        
+                            aggfunc = lambda x:x.sum(),         
                             margins=False)
 
     # Make sure the cross-tabulation matrix is square.
@@ -189,7 +179,7 @@ def crossmap_amstat( am
     crosstab = pd.crosstab(highpos_old, 
                            highpos_new,
                            values=real_area, 
-                           aggfunc=lambda x:x.sum()/100 , # {sum/100} -> convert {ha} to {km2}
+                           aggfunc=lambda x:x.sum() , 
                            margins=False)
 
     # Include all land uses and AM versions of land uses in the crosstab
