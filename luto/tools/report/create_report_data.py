@@ -23,7 +23,7 @@ import re
 import shutil
 import pandas as pd
 import numpy as np
-import luto.settings as settings
+from luto import settings
 from joblib import Parallel, delayed
 
 from luto.economics.off_land_commodity import get_demand_df
@@ -83,7 +83,7 @@ def save_report_data(raw_data_dir:str):
     ####################################################
     #                    1) Area Change                #
     ####################################################
-    area_dvar_paths = files.query('category == "area" and year_types == "single_year"').reset_index(drop=True)
+    area_dvar_paths = files.query('category == "area"').reset_index(drop=True)
     
     ag_dvar_dfs = area_dvar_paths.query('base_name == "area_agricultural_landuse"').reset_index(drop=True)
     ag_dvar_area = pd.concat([pd.read_csv(path) for path in ag_dvar_dfs['path']], ignore_index=True)
@@ -384,23 +384,21 @@ def save_report_data(raw_data_dir:str):
             
 
 
-    # -------------------- Transition areas --------------------
+    # -------------------- Transition areas (start-end) --------------------
     transition_path = files.query('category =="transition_matrix"')
-    transition_df_area = pd.read_csv(transition_path['path'].values[0], index_col=0).reset_index() 
-    transition_df_area = transition_df_area.replace(RENAME_AM_NON_AG)
+    transition_df_region = pd.read_csv(transition_path['path'].values[0], index_col=0).reset_index() 
+    transition_df_region = transition_df_region.replace(RENAME_AM_NON_AG)
 
-    transition_regions = list(transition_df_area.groupby('region'))
-    transition_regions += [
-        (
-            'AUSTRALIA', 
-            transition_df_area.groupby(['From Land-use', 'To Land-use'])[['Area (ha)']].sum().reset_index()
-        )
-    ]
-    
-    
-    out_dict_area = {}
-    out_dict_pct = {}
-    for (region, df) in transition_regions:
+    transition_df_AUS = transition_df_region.groupby(['From Land-use', 'To Land-use'])[['Area (ha)']].sum().reset_index()
+    transition_df_AUS['region'] = 'AUSTRALIA'
+
+    transition_df = pd.concat([transition_df_AUS, transition_df_region], ignore_index=True)
+
+
+    out_dict = {}
+    for (region, df) in transition_df.groupby('region'):
+        out_dict[region] = {}
+        
         transition_mat = df.pivot(index='From Land-use', columns='To Land-use', values='Area (ha)')
         transition_mat = transition_mat.reindex(index=AG_LANDUSE, columns=LANDUSE_ALL_RENAMED)
         transition_mat = transition_mat.fillna(0)
@@ -432,14 +430,22 @@ def save_report_data(raw_data_dir:str):
         heat_area_html = re.sub(r'(?<!\d)0(?!\d)', '-', heat_area_html)
         heat_pct_html = re.sub(r'(?<!\d)0.00(?!\d)', '-', heat_pct_html)
 
-        out_dict_area[region] = heat_area_html
-        out_dict_pct[region] = heat_pct_html
+        out_dict[region]['area'] = heat_area_html
+        out_dict[region]['pct'] = heat_pct_html
 
-    with open(f'{SAVE_DIR}/Area_transition_area.json', 'w') as f:
-        json.dump(out_dict_area, f, ensure_ascii=True)
+    with open(f'{SAVE_DIR}/Area_transition_start_end.json', 'w') as f:
+        json.dump(out_dict, f, indent=2)
+        
+        
+    # -------------------- Transition areas (year-to-year) --------------------
+    transition_path = files.query('base_name =="crosstab-lumap"')
+    transition_df_region = pd.concat([pd.read_csv(path) for path in transition_path['path']], ignore_index=True)
+    transition_df_region = transition_df_region.replace(RENAME_AM_NON_AG)
 
-    with open(f'{SAVE_DIR}/Area_transition_pct.json', 'w') as f:
-        json.dump(out_dict_pct, f, ensure_ascii=True)
+    transition_df_AUS = transition_df_region.groupby(['From Land-use', 'To Land-use'])[['Area (ha)']].sum().reset_index()
+    transition_df_AUS['region'] = 'AUSTRALIA'
+
+    transition_df = pd.concat([transition_df_AUS, transition_df_region], ignore_index=True)
 
 
 
@@ -447,7 +453,7 @@ def save_report_data(raw_data_dir:str):
     #                   2) Demand                      #
     ####################################################
     
-    demand_files = files.query('category == "quantity" and year_types == "single_year"')
+    demand_files = files.query('category == "quantity"')
     
     quantity_LUTO = demand_files\
         .query('base_name == "quantity_production_t_separate"')\
@@ -652,29 +658,29 @@ def save_report_data(raw_data_dir:str):
     ####################################################
     
     # -------------------- Get the revenue and cost data --------------------
-    revenue_ag_df = files.query('base_name == "revenue_agricultural_commodity" and year_types != "begin_end_year"').reset_index(drop=True)
+    revenue_ag_df = files.query('base_name == "revenue_agricultural_commodity"').reset_index(drop=True)
     revenue_ag_df = pd.concat([pd.read_csv(path) for path in revenue_ag_df['path']], ignore_index=True)
     revenue_ag_df = revenue_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural land-use (revenue)')
     
-    cost_ag_df = files.query('base_name == "cost_agricultural_commodity" and year_types != "begin_end_year"').reset_index(drop=True)
+    cost_ag_df = files.query('base_name == "cost_agricultural_commodity"').reset_index(drop=True)
     cost_ag_df = pd.concat([pd.read_csv(path) for path in cost_ag_df['path']], ignore_index=True)
     cost_ag_df = cost_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural land-use (cost)')
     cost_ag_df['Value ($)'] = cost_ag_df['Value ($)'] * -1          # Convert cost to negative value
     
-    revenue_am_df = files.query('base_name == "revenue_agricultural_management" and year_types != "begin_end_year"').reset_index(drop=True)
+    revenue_am_df = files.query('base_name == "revenue_agricultural_management"').reset_index(drop=True)
     revenue_am_df = pd.concat([pd.read_csv(path) for path in revenue_am_df['path']], ignore_index=True)
     revenue_am_df = revenue_am_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural management (revenue)')
     
-    cost_am_df = files.query('base_name == "cost_agricultural_management" and year_types != "begin_end_year"').reset_index(drop=True)
+    cost_am_df = files.query('base_name == "cost_agricultural_management"').reset_index(drop=True)
     cost_am_df = pd.concat([pd.read_csv(path) for path in cost_am_df['path']], ignore_index=True)
     cost_am_df = cost_am_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural management (cost)')
     cost_am_df['Value ($)'] = cost_am_df['Value ($)'] * -1          # Convert cost to negative value
 
-    revenue_non_ag_df = files.query('base_name == "revenue_non_ag" and year_types != "begin_end_year"').reset_index(drop=True)
+    revenue_non_ag_df = files.query('base_name == "revenue_non_ag"').reset_index(drop=True)
     revenue_non_ag_df = pd.concat([pd.read_csv(path) for path in revenue_non_ag_df['path']], ignore_index=True)
     revenue_non_ag_df = revenue_non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Non-agricultural land-use (revenue)')
 
-    cost_non_ag_df = files.query('base_name == "cost_non_ag" and year_types != "begin_end_year"').reset_index(drop=True)
+    cost_non_ag_df = files.query('base_name == "cost_non_ag"').reset_index(drop=True)
     cost_non_ag_df = pd.concat([pd.read_csv(path) for path in cost_non_ag_df['path']], ignore_index=True)
     cost_non_ag_df = cost_non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Non-agricultural land-use (cost)')
     cost_non_ag_df['Value ($)'] = cost_non_ag_df['Value ($)'] * -1  # Convert cost to negative value
@@ -688,17 +694,17 @@ def save_report_data(raw_data_dir:str):
     net_non_ag_df = revenue_non_ag_df.groupby('Year')[['Value ($)']].sum().reset_index()
     net_non_ag_df['Value ($)'] = net_non_ag_df['Value ($)'] + cost_non_ag_df.groupby('Year')[['Value ($)']].sum().reset_index()['Value ($)']
     
-    cost_transition_ag2ag_df = files.query('base_name == "cost_transition_ag2ag" and year_types != "begin_end_year"').reset_index(drop=True)
+    cost_transition_ag2ag_df = files.query('base_name == "cost_transition_ag2ag"').reset_index(drop=True)
     cost_transition_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_ag2ag_df = cost_transition_ag2ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Ag2Ag)')
     cost_transition_ag2ag_df['Value ($)'] = cost_transition_ag2ag_df['Cost ($)']  * -1          # Convert cost to negative value
 
-    cost_transition_ag2non_ag_df = files.query('base_name == "cost_transition_ag2non_ag" and year_types != "begin_end_year"').reset_index(drop=True)
+    cost_transition_ag2non_ag_df = files.query('base_name == "cost_transition_ag2non_ag"').reset_index(drop=True)
     cost_transition_ag2non_ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2non_ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_ag2non_ag_df = cost_transition_ag2non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Ag2Non-Ag)')
     cost_transition_ag2non_ag_df['Value ($)'] = cost_transition_ag2non_ag_df['Cost ($)'] * -1   # Convert cost to negative value
 
-    cost_transition_non_ag2ag_df = files.query('base_name == "cost_transition_non_ag2_ag" and year_types != "begin_end_year"').reset_index(drop=True)
+    cost_transition_non_ag2ag_df = files.query('base_name == "cost_transition_non_ag2_ag"').reset_index(drop=True)
     cost_transition_non_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_non_ag2ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_non_ag2ag_df = cost_transition_non_ag2ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Non-Ag2Ag)').dropna(subset=['Cost ($)'])
     cost_transition_non_ag2ag_df['Value ($)'] = cost_transition_non_ag2ag_df['Cost ($)'] * -1   # Convert cost to negative value
@@ -1273,7 +1279,7 @@ def save_report_data(raw_data_dir:str):
         filter_str = '''
         category == "GHG" 
         and base_name.str.contains("GHG_emissions") 
-        and year_types != "begin_end_year"
+       
         '''.replace('\n', ' ').replace('  ', ' ')
 
         GHG_files = files.query(filter_str).reset_index(drop=True)
@@ -1606,7 +1612,7 @@ def save_report_data(raw_data_dir:str):
     #                     5) Water                     #
     ####################################################
     
-    water_files = files.query('category == "water" and year_types == "single_year"').reset_index(drop=True)
+    water_files = files.query('category == "water"').reset_index(drop=True)
 
     water_net_yield_water_region = water_files.query('base_name == "water_yield_separate"')
     water_net_yield_water_region = pd.concat([pd.read_csv(path) for path in water_net_yield_water_region['path']], ignore_index=True)
@@ -1895,7 +1901,7 @@ def save_report_data(raw_data_dir:str):
 
     filter_str = '''
         category == "biodiversity"
-        and year_types == "single_year"
+       
         and base_name == "biodiversity_overall_priority_scores"
     '''.strip().replace('\n','')
     
@@ -2121,7 +2127,7 @@ def save_report_data(raw_data_dir:str):
 
         filter_str = '''
             category == "biodiversity" 
-            and year_types == "single_year" 
+            
             and base_name == "biodiversity_GBF2_priority_scores"
         '''.strip('').replace('\n','')
         
@@ -2355,7 +2361,7 @@ def save_report_data(raw_data_dir:str):
     if settings.BIODIVERSITY_TARGET_GBF_3 != 'off':
         filter_str = '''
             category == "biodiversity" 
-            and year_types == "single_year" 
+            
             and base_name.str.contains("biodiversity_GBF3")
         '''.strip().replace('\n','')
         
@@ -2605,7 +2611,7 @@ def save_report_data(raw_data_dir:str):
         # -------------------- Get biodiversity dataframe --------------------
         filter_str = '''
             category == "biodiversity" 
-            and year_types == "single_year" 
+            
             and base_name.str.contains("biodiversity_GBF4_SNES_scores")
         '''.strip().replace('\n', '')
         
@@ -2849,7 +2855,7 @@ def save_report_data(raw_data_dir:str):
         # -------------------- Get biodiversity dataframe --------------------
         filter_str = '''
             category == "biodiversity" 
-            and year_types == "single_year" 
+            
             and base_name.str.contains("biodiversity_GBF4_ECNES_scores")
         '''.strip().replace('\n', '')
         
@@ -3097,7 +3103,7 @@ def save_report_data(raw_data_dir:str):
         
         filter_str = '''
             category == "biodiversity" 
-            and year_types == "single_year" 
+            
             and base_name.str.contains("biodiversity_GBF8_species_scores")
         '''.strip().replace('\n','')
         
@@ -3343,7 +3349,7 @@ def save_report_data(raw_data_dir:str):
         # -------------------- Get biodiversity dataframe --------------------
         filter_str = '''
             category == "biodiversity" 
-            and year_types == "single_year" 
+            
             and base_name.str.contains("biodiversity_GBF8_groups_scores")
         '''.strip().replace('\n','')
         
@@ -3586,7 +3592,7 @@ def save_report_data(raw_data_dir:str):
     #########################################################
     #                         7) Maps                       #
     #########################################################
-    map_files = files.query('base_ext == ".html" and year_types != "begin_end_year"')
+    map_files = files.query('base_ext == ".html"')
     map_save_dir = f"{SAVE_DIR}/Map_data/"
     
     # Create the directory to save map_html if it does not exist
@@ -3620,11 +3626,11 @@ def save_report_data(raw_data_dir:str):
     # Supporting information               
     #########################################################       
     with open(f'{raw_data_dir}/model_run_settings.txt', 'r', encoding='utf-8') as src_file:
-        settings = {i.split(':')[0].strip(): ''.join(i.split(':')[1:]).strip() for i in src_file.readlines()}
-        settings = [{'parameter': k, 'val': v} for k, v in settings.items()]
+        settings_dict = {i.split(':')[0].strip(): ''.join(i.split(':')[1:]).strip() for i in src_file.readlines()}
+        settings_dict = [{'parameter': k, 'val': v} for k, v in settings_dict.items()]
 
     supporting = {
-        'model_run_settings': settings,
+        'model_run_settings': settings_dict,
         'years': years,
         'colors': COLORS,
         'RENAME_AM_NON_AG': RENAME_AM_NON_AG,

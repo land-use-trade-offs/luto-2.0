@@ -92,14 +92,12 @@ def write_data(data: Data):
     years = [i for i in settings.SIM_YEARS if i<=data.last_year]
     data.set_path()
     paths = [f"{data.path}/out_{yr}" for yr in years]
-    
     write_settings(data.path)
-    write_area_transition_start_end(data, f'{data.path}/out_{years[-1]}', data.last_year)
 
     # Wrap write to a list of delayed jobs
-    jobs = write_output_single_year(data, years[-1], f"{data.path_begin_end_compare}/out_{years[-1]}", years[0])
+    jobs = [delayed(write_area_transition_start_end)(data, f'{data.path}/out_{years[-1]}'), years[-1]]
     for (yr, path_yr) in zip(years, paths):
-        jobs += write_output_single_year(data, yr, path_yr, None)
+        jobs += write_output_single_year(data, yr, path_yr)
 
     # Filter out None values from the jobs list
     jobs = [job for job in jobs if job is not None]
@@ -107,15 +105,11 @@ def write_data(data: Data):
     # Parallel write the outputs for each year
     num_jobs = (
         min(len(jobs), settings.WRITE_THREADS) 
-        if settings.PARALLEL_WRITE 
-        else 1   
+        if settings.PARALLEL_WRITE else 1
     )
     
     Parallel(n_jobs=num_jobs)(jobs)
 
-    # Copy the base-year outputs to the path_begin_end_compare
-    shutil.copytree(f"{data.path}/out_{years[0]}", f"{data.path_begin_end_compare}/out_{years[0]}", dirs_exist_ok = True)
-    
     # Create the report HTML and png maps
     TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
     save_report_data(data.path)
@@ -140,7 +134,7 @@ def move_logs(data: Data):
 
 
 
-def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
+def write_output_single_year(data: Data, yr_cal, path_yr):
     """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
 
     years = sorted(list(data.lumaps.keys()))
@@ -152,8 +146,8 @@ def write_output_single_year(data: Data, yr_cal, path_yr, yr_cal_sim_pre=None):
         delayed(write_files)(data, yr_cal, path_yr),
         delayed(write_files_separate)(data, yr_cal, path_yr) if settings.WRITE_OUTPUT_GEOTIFFS else None,
         delayed(write_dvar_area)(data, yr_cal, path_yr),
-        delayed(write_crosstab)(data, yr_cal, path_yr, yr_cal_sim_pre),
-        delayed(write_quantity)(data, yr_cal, path_yr, yr_cal_sim_pre),
+        delayed(write_crosstab)(data, yr_cal, path_yr),
+        delayed(write_quantity)(data, yr_cal, path_yr),
         delayed(write_quantity_separate)(data, yr_cal, path_yr),
         delayed(write_revenue_cost_ag)(data, yr_cal, path_yr),
         delayed(write_revenue_cost_ag_management)(data, yr_cal, path_yr),
@@ -297,7 +291,7 @@ def write_files_separate(data: Data, yr_cal, path):
     return None
 
 
-def write_quantity(data: Data, yr_cal, path, yr_cal_sim_pre=None):
+def write_quantity(data: Data, yr_cal, path):
     '''Write quantity comparison between base year and target year.'''
 
     print(f'Writing quantity outputs for {yr_cal}')
@@ -305,7 +299,7 @@ def write_quantity(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     simulated_year_list = sorted(list(data.lumaps.keys()))
     yr_idx = yr_cal - data.YR_CAL_BASE
     yr_idx_sim = sorted(list(data.lumaps.keys())).index(yr_cal)
-    yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
+    yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
 
     # Calculate data for quantity comparison between base year and target year
     if yr_cal > data.YR_CAL_BASE:
@@ -970,50 +964,48 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
 
     # Write the transition matrix to a csv file
     pd.concat([transition_ag2ag, transition_ag2non_ag]
-        ).to_csv(os.path.join(path, f'transition_matrix_{yr_cal_start}_{yr_cal_end}.csv'), index=False)
-    
+        ).to_csv(os.path.join(path, f'transition_matrix_start_end.csv'), index=False)
+
     return None
 
 
 
 
 
-def write_crosstab(data: Data, yr_cal, path, yr_cal_sim_pre=None):
+def write_crosstab(data: Data, yr_cal, path):
     """Write out land-use and production data"""
 
-    print(f'Writing area transition outputs for {yr_cal}')
-
-    simulated_year_list = sorted(list(data.lumaps.keys()))
-    yr_idx_sim = simulated_year_list.index(yr_cal)
-    yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1] if yr_cal_sim_pre is None else yr_cal_sim_pre
-
-
-    lumap_pre = data.lumaps[yr_cal_sim_pre]
-    lmmap_pre = data.lmmaps[yr_cal_sim_pre]
-    am_map_pre = data.ammaps[yr_cal_sim_pre]
-
-    lumap = data.lumaps[yr_cal]
-    lmmap = data.lmmaps[yr_cal]
-    am_map = data.ammaps[yr_cal]
-
-
-    ctlus = pd.DataFrame()
-    swlus = pd.DataFrame()
-    ctlms = pd.DataFrame()
-    swlms = pd.DataFrame()
-    cthps = pd.DataFrame()
-    swhps = pd.DataFrame()
-    ctasses = pd.DataFrame()
-    swasses = pd.DataFrame()
-    # Only perform the calculation if the yr_cal is not the base year
     if yr_cal > data.YR_CAL_BASE:
 
+        print(f'Writing area transition outputs for {yr_cal}')
+
+        simulated_year_list = sorted(list(data.lumaps.keys()))
+        yr_idx_sim = simulated_year_list.index(yr_cal)
+        yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
+        
         # Check if yr_cal_sim_pre meets the requirement
         assert yr_cal_sim_pre >= data.YR_CAL_BASE and yr_cal_sim_pre < yr_cal,\
             f"yr_cal_sim_pre ({yr_cal_sim_pre}) must be >= {data.YR_CAL_BASE} and < {yr_cal}"
 
-        print(f'Writing crosstab data for {yr_cal}')
-        
+        lumap_pre = data.lumaps[yr_cal_sim_pre]
+        lmmap_pre = data.lmmaps[yr_cal_sim_pre]
+        am_map_pre = data.ammaps[yr_cal_sim_pre]
+
+        lumap = data.lumaps[yr_cal]
+        lmmap = data.lmmaps[yr_cal]
+        am_map = data.ammaps[yr_cal]
+
+
+        ctlus = pd.DataFrame()
+        swlus = pd.DataFrame()
+        ctlms = pd.DataFrame()
+        swlms = pd.DataFrame()
+        cthps = pd.DataFrame()
+        swhps = pd.DataFrame()
+        ctasses = pd.DataFrame()
+        swasses = pd.DataFrame()
+
+   
         for region in data.REGION_NRM_NAME.unique():
             
             cell_idx = data.REGION_NRM_NAME == region

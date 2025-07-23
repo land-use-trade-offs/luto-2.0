@@ -38,15 +38,16 @@ def extract_dtype_from_path(path):
     f_cat = {
             # decision variables (npy files)
             'ag_X_mrj':['ag_X_mrj'],
-            'ag_man_X_mrj':['ag_man_X_mrj_asparagopsis_taxiformis',
-                            'ag_man_X_mrj_agtech_ei',
-                            'ag_man_X_mrj_biochar',
-                            'ag_man_X_mrj_ecological_grazing',
-                            'ag_man_X_mrj_precision_agriculture',
-                            'ag_man_X_mrj_savanna_burning',
-                            'ag_man_X_mrj_hir_-_beef',
-                            'ag_man_X_mrj_hir_-_sheep',
-                            ],
+            'ag_man_X_mrj':[
+                'ag_man_X_mrj_asparagopsis_taxiformis',
+                'ag_man_X_mrj_agtech_ei',
+                'ag_man_X_mrj_biochar',
+                'ag_man_X_mrj_ecological_grazing',
+                'ag_man_X_mrj_precision_agriculture',
+                'ag_man_X_mrj_savanna_burning',
+                'ag_man_X_mrj_hir_-_beef',
+                'ag_man_X_mrj_hir_-_sheep'
+                ],
             'non_ag_X_rk':['non_ag_X_rk'],
             # CSVs
             'GHG':['GHG'],
@@ -87,10 +88,7 @@ def extract_dtype_from_path(path):
         else:
             ftype = 'Unknown'
 
-
-    # Check if this comes from the begin_end_compare folder
-    yr_type = 'begin_end_year' if 'begin_end_compare' in path else 'single_year'
-    return yr_type, ftype
+    return ftype
 
 
 
@@ -124,17 +122,15 @@ def get_all_files(data_root):
     file_paths.insert(0, 'Year', [re.compile(r'out_(\d{4})').findall(i)[0] for i in file_paths['path']])
 
     # Try to get the year type and category from the file path
-    yr_types, f_cats = zip(*[extract_dtype_from_path(i) for i in file_paths['path']])
-
+    f_cats = [extract_dtype_from_path(i) for i in file_paths['path']]
 
     # Append the year type and category to the file paths
-    file_paths.insert(1, 'year_types', yr_types)
-    file_paths.insert(2, 'category', f_cats)
+    file_paths.insert(1, 'category', f_cats)
 
     # Get the base name and extension of the file path
     file_paths[['base_name','base_ext']] = [os.path.splitext(os.path.basename(i)) for i in file_paths['path']]
-    file_paths = file_paths.reindex(columns=['Year','year_types','category','base_name','base_ext','path'])
-    
+    file_paths = file_paths.reindex(columns=['Year','category','base_name','base_ext','path'])
+
     # Remove the datatime stamp <YYYY_MM_DD__HH_mm_SS> from the base_name
     file_paths['base_name'] = file_paths['base_name'].apply(lambda x: re.sub(r'_\d{4}','',x))
     

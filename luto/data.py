@@ -101,9 +101,8 @@ class Data:
         """
         # Path for write module - overwrite when provided with a base and target year
         self.path = None
-        self.path_begin_end_compare = None
         
-        # Timestamp of simulation to which this object belongs.
+        # Read the timestamp of simulation, which is created by `luto.simulation.load_data`
         with open(os.path.join(settings.OUTPUT_DIR, '.timestamp'), 'r') as f:
             self.timestamp = f.read().strip()
 
@@ -1909,17 +1908,6 @@ class Data:
             + [f"{self.path}/out_{yr}/lucc_separate" for yr in years[1:]]
         )  # Skip creating lucc_separate for base year
 
-        # Add the path for the comparison between base-year and target-year if in the timeseries mode
-        self.path_begin_end_compare = f"{self.path}/begin_end_compare_{years[0]}_{years[-1]}"
-        paths = (
-            paths
-            + [self.path_begin_end_compare]
-            + [
-                f"{self.path_begin_end_compare}/out_{years[0]}",
-                f"{self.path_begin_end_compare}/out_{years[-1]}",
-                f"{self.path_begin_end_compare}/out_{years[-1]}/lucc_separate",
-            ]
-        )
 
         # Create all paths
         for p in paths:
