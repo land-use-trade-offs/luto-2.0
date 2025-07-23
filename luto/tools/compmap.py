@@ -28,38 +28,32 @@ import pandas as pd
 import luto.settings as settings
 
 
-def lumap_crossmap(oldmap, newmap, ag_landuses, non_ag_landuses, real_area):
-    # Produce the cross-tabulation matrix with optional labels.
-    crosstab = pd.crosstab(oldmap, 
-                           newmap, 
-                           values = real_area, 
-                           aggfunc = lambda x:x.sum() , 
-                           margins = False)                 
-
-    # Need to make sure each land use (both agricultural and non-agricultural) appears in the index/columns
-    reindex = (
-        list(range(len(ag_landuses)))
-        + [settings.NON_AGRICULTURAL_LU_BASE_CODE + lu for lu in range(len(non_ag_landuses))]
-    )
+def lumap_crossmap(data, oldmap, newmap):
     
-    crosstab = crosstab.reindex(reindex, axis = 0, fill_value = 0)
-    crosstab = crosstab.reindex(reindex, axis = 1, fill_value = 0)
-    
-    lus = list(ag_landuses) + list(non_ag_landuses)
-    crosstab.columns = lus
-    crosstab.index = lus
-    crosstab = crosstab.fillna(0)
-    
-    # Calculate net switches to land use (negative means switch away).
-    switches = crosstab.sum(0) - crosstab.sum(1)
-    switches = pd.DataFrame(switches).reset_index()
-    switches.columns = ['Land-use', 'Area (ha)']
+    crosstab = pd.crosstab(
+            oldmap, 
+            [newmap, data.REGION_NRM_NAME], 
+            values = data.REAL_AREA, 
+            aggfunc = lambda x:x.sum() , 
+            margins = False
+        ).unstack(
+        ).reset_index(
+        ).rename(
+            columns={
+                'row_0': 'From land-use', 
+                'NRM_NAME': 'region', 
+                'col_0':'To land-use', 
+                0: 'Area (ha)'
+            }
+        ).dropna(
+        ).replace({'From land-use': data.ALLLU2DESC, 'To land-use': data.ALLLU2DESC})
         
-    # Stack the crosstab to a long format.
-    crosstab = crosstab.stack().reset_index()
-    crosstab.columns = ['From land-use', 'To land-use', 'Area (ha)']
+    switches = (crosstab.groupby('From land-use')['Area (ha)'].sum() - crosstab.groupby('To land-use')['Area (ha)'].sum()
+        ).reset_index(
+        ).rename(columns={'index':'Landuse'})
 
     return crosstab, switches
+
 
 def lmmap_crossmap(oldmap, newmap, real_area, lm):
     # Produce the cross-tabulation matrix with optional labels.
