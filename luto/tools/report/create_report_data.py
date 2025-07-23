@@ -438,14 +438,14 @@ def save_report_data(raw_data_dir:str):
         
         
     # -------------------- Transition areas (year-to-year) --------------------
-    transition_path = files.query('base_name =="crosstab-lumap"')
-    transition_df_region = pd.concat([pd.read_csv(path) for path in transition_path['path']], ignore_index=True)
-    transition_df_region = transition_df_region.replace(RENAME_AM_NON_AG)
+    # transition_path = files.query('base_name =="crosstab-lumap"')
+    # transition_df_region = pd.concat([pd.read_csv(path) for path in transition_path['path']], ignore_index=True)
+    # transition_df_region = transition_df_region.replace(RENAME_AM_NON_AG)
 
-    transition_df_AUS = transition_df_region.groupby(['From Land-use', 'To Land-use'])[['Area (ha)']].sum().reset_index()
-    transition_df_AUS['region'] = 'AUSTRALIA'
+    # transition_df_AUS = transition_df_region.groupby(['From Land-use', 'To Land-use'])[['Area (ha)']].sum().reset_index()
+    # transition_df_AUS['region'] = 'AUSTRALIA'
 
-    transition_df = pd.concat([transition_df_AUS, transition_df_region], ignore_index=True)
+    # transition_df = pd.concat([transition_df_AUS, transition_df_region], ignore_index=True)
 
 
 
@@ -1320,7 +1320,7 @@ def save_report_data(raw_data_dir:str):
         net_land = GHG_land.groupby('Year')[['Value (t CO2e)']].sum(numeric_only=True).reset_index()
 
 
-        GHG_limit = GHG_files.query('base_name == "GHG_emissions"')
+        GHG_limit = GHG_files.query('base_name == "GHG_emissions"').copy()
         GHG_limit = pd.concat([pd.read_csv(path) for path in GHG_limit['path']], ignore_index=True)
         GHG_limit = GHG_limit.query('Variable == "GHG_EMISSIONS_LIMIT_TCO2e"')
         GHG_limit['Value (t CO2e)'] = GHG_limit['Emissions (t CO2e)']
