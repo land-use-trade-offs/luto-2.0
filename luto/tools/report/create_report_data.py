@@ -438,14 +438,14 @@ def save_report_data(raw_data_dir:str):
         
         
     # -------------------- Transition areas (year-to-year) --------------------
-    transition_path = files.query('base_name =="crosstab-lumap"')
-    transition_df_region = pd.concat([pd.read_csv(path) for path in transition_path['path']], ignore_index=True)
-    transition_df_region = transition_df_region.replace(RENAME_AM_NON_AG)
+    # transition_path = files.query('base_name =="crosstab-lumap"')
+    # transition_df_region = pd.concat([pd.read_csv(path) for path in transition_path['path']], ignore_index=True)
+    # transition_df_region = transition_df_region.replace(RENAME_AM_NON_AG)
 
-    transition_df_AUS = transition_df_region.groupby(['From Land-use', 'To Land-use'])[['Area (ha)']].sum().reset_index()
-    transition_df_AUS['region'] = 'AUSTRALIA'
+    # transition_df_AUS = transition_df_region.groupby(['From Land-use', 'To Land-use'])[['Area (ha)']].sum().reset_index()
+    # transition_df_AUS['region'] = 'AUSTRALIA'
 
-    transition_df = pd.concat([transition_df_AUS, transition_df_region], ignore_index=True)
+    # transition_df = pd.concat([transition_df_AUS, transition_df_region], ignore_index=True)
 
 
 
