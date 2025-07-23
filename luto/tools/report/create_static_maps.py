@@ -40,7 +40,7 @@ from luto.tools.report.map_tools.helper import (
 def TIF2MAP(raw_data_dir:str):
 
     files = get_all_files(raw_data_dir)
-    tif_files = files.query('base_ext == ".tiff" and year_types != "begin_end_year"')
+    tif_files = files.query('base_ext == ".tiff"')
     
     # Get metadata for map making
     map_meta = get_map_meta()
