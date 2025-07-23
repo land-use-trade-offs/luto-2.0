@@ -76,9 +76,7 @@ def save_report_data(raw_data_dir:str):
     files['Year'] = files['Year'].astype(int)
     files = files.query('Year.isin(@years)')
     
-    
-    
-    
+
 
     ####################################################
     #                    1) Area Change                #
@@ -438,16 +436,56 @@ def save_report_data(raw_data_dir:str):
         
         
     # -------------------- Transition areas (year-to-year) --------------------
-    # transition_path = files.query('base_name =="crosstab-lumap"')
-    # transition_df_region = pd.concat([pd.read_csv(path) for path in transition_path['path']], ignore_index=True)
-    # transition_df_region = transition_df_region.replace(RENAME_AM_NON_AG)
+    transition_path = files.query('base_name =="crosstab-lumap"')
+    transition_df_region = pd.concat([pd.read_csv(path) for path in transition_path['path']], ignore_index=True)
+    transition_df_region = transition_df_region.replace(RENAME_AM_NON_AG)
 
-    # transition_df_AUS = transition_df_region.groupby(['From Land-use', 'To Land-use'])[['Area (ha)']].sum().reset_index()
-    # transition_df_AUS['region'] = 'AUSTRALIA'
+    transition_df_AUS = transition_df_region.groupby(['Year', 'From land-use', 'To land-use'])[['Area (ha)']].sum().reset_index()
+    transition_df_AUS['region'] = 'AUSTRALIA'
 
-    # transition_df = pd.concat([transition_df_AUS, transition_df_region], ignore_index=True)
+    transition_df = pd.concat([transition_df_AUS, transition_df_region], ignore_index=True)
+    
+    out_dict = {region: {'area': {}, 'pct':{}} for region in transition_df['region'].unique()}
+    for (year, region), df in transition_df.groupby(['Year', 'region']):
+        
+        transition_mat = df.pivot(index='From land-use', columns='To land-use', values='Area (ha)')
+        transition_mat = transition_mat.reindex(index=AG_LANDUSE, columns=LANDUSE_ALL_RENAMED)
+        transition_mat = transition_mat.fillna(0)
+        total_area_from = transition_mat.sum(axis=1).values.reshape(-1, 1)
+        
+        transition_df_pct = transition_mat / total_area_from * 100
+        transition_df_pct = transition_df_pct.fillna(0).replace([np.inf, -np.inf], 0)
 
+        transition_mat['SUM'] = transition_mat.sum(axis=1)
+        transition_mat.loc['SUM'] = transition_mat.sum(axis=0)
 
+        heat_area = transition_mat.style.background_gradient(
+            cmap='Oranges',
+            axis=1,
+            subset=pd.IndexSlice[:transition_mat.index[-2], :transition_mat.columns[-2]]
+        ).format('{:,.0f}')
+
+        heat_pct = transition_df_pct.style.background_gradient(
+            cmap='Oranges',
+            axis=1,
+            vmin=0,
+            vmax=100
+        ).format('{:,.2f}')
+
+        heat_area_html = heat_area.to_html()
+        heat_pct_html = heat_pct.to_html()
+
+        # Replace '0.00' with '-' in the html
+        heat_area_html = re.sub(r'(?<!\d)0(?!\d)', '-', heat_area_html)
+        heat_pct_html = re.sub(r'(?<!\d)0.00(?!\d)', '-', heat_pct_html)
+
+        out_dict[region]['area'][str(year)] = heat_area_html
+        out_dict[region]['pct'][str(year)] = heat_pct_html
+        
+    with open(f'{SAVE_DIR}/Area_transition_year_to_year.json', 'w') as f:
+        json.dump(out_dict, f, indent=2)
+        
+        
 
     ####################################################
     #                   2) Demand                      #
@@ -1311,10 +1349,7 @@ def save_report_data(raw_data_dir:str):
                 'CH4': 'Methane (CH4)',
                 'N2O': 'Nitrous Oxide (N2O)'
             })
-
-        
-
-            
+   
         GHG_land = pd.concat([GHG_ag, GHG_non_ag, GHG_ag_man, GHG_transition], axis=0).query('abs(`Value (t CO2e)`) > 0').reset_index(drop=True)
         GHG_land['Land-use type'] = GHG_land['Land-use'].apply(lu_group.set_index('Land-use')['Category'].to_dict().get)
         net_land = GHG_land.groupby('Year')[['Value (t CO2e)']].sum(numeric_only=True).reset_index()

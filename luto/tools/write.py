@@ -108,7 +108,8 @@ def write_data(data: Data):
         if settings.PARALLEL_WRITE else 1
     )
     
-    Parallel(n_jobs=num_jobs)(jobs)
+    for out in Parallel(n_jobs=num_jobs, return_as='generator')(jobs):
+        print(out)
 
     # Create the report HTML and png maps
     TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
@@ -191,7 +192,7 @@ def write_settings(path):
     with open(os.path.join(path, 'model_run_settings.txt'), 'w') as f:
         f.writelines(f'{k}:{v}\n' for k, v in settings_dict.items())
         
-    return None
+    return "Settings written successfully"
         
 
 
@@ -242,7 +243,7 @@ def write_files(data: Data, yr_cal, path):
         dst_ammap.write_band(1, create_2d_map(data, ag_man_dvar_argmax))
         dst_non_ag.write_band(1, create_2d_map(data, non_ag_dvar_argmax))
         
-    return None
+    return f"Files written for year {yr_cal}"
 
 
 def write_files_separate(data: Data, yr_cal, path):
@@ -288,7 +289,7 @@ def write_files_separate(data: Data, yr_cal, path):
         with rasterio.open(lucc_separate_path, 'w+', **data.GEO_META) as dst:
             dst.write_band(1, dvar)
 
-    return None
+    return f"Separate files written for year {yr_cal}"
 
 
 def write_quantity(data: Data, yr_cal, path):
@@ -333,7 +334,7 @@ def write_quantity(data: Data, yr_cal, path):
         # NOTE: non_ag_quantity is already calculated and stored in <data.prod_data>
         # --------------------------------------------------------------------------------------------
         
-    return None
+    return f"Quantity comparison written for year {yr_cal}"
         
 def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     """
@@ -449,7 +450,7 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     quantity_df = pd.concat([ag_q_rc_df, non_ag_p_rc_df, am_p_rc_df], ignore_index=True)
     quantity_df.to_csv(os.path.join(path, f'quantity_production_t_separate_{yr_cal}.csv'), index=False)
 
-    return None
+    return f"Separate quantity production written for year {yr_cal}"
 
 
 def write_revenue_cost_ag(data: Data, yr_cal, path):
@@ -523,7 +524,7 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
     ag_rev_jms.to_csv(os.path.join(path, f'revenue_agricultural_commodity_{yr_cal}.csv'), index=False)
     ag_cost_jms.to_csv(os.path.join(path, f'cost_agricultural_commodity_{yr_cal}.csv'), index=False)
 
-    return None
+    return f"Agricultural revenue and cost written for year {yr_cal}"
 
 
 
@@ -585,7 +586,7 @@ def write_revenue_cost_ag_management(data: Data, yr_cal, path):
     revenue_am_df.to_csv(os.path.join(path, f'revenue_agricultural_management_{yr_cal}.csv'), index=False)
     cost_am_df.to_csv(os.path.join(path, f'cost_agricultural_management_{yr_cal}.csv'), index=False)
     
-    return None
+    return f"Agricultural management revenue and cost written for year {yr_cal}"
 
 
 def write_revenue_cost_non_ag(data: Data, yr_cal, path):
@@ -627,7 +628,7 @@ def write_revenue_cost_non_ag(data: Data, yr_cal, path):
     rev_non_ag_df.to_csv(os.path.join(path, f'revenue_non_ag_{yr_cal}.csv'), index = False)
     cost_non_ag_df.to_csv(os.path.join(path, f'cost_non_ag_{yr_cal}.csv'), index = False)
 
-    return None
+    return f"Non-agricultural revenue and cost written for year {yr_cal}"
 
 
 
@@ -691,7 +692,7 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     cost_df = cost_df.replace({'dry':'Dryland', 'irr':'Irrigated'})
     cost_df.to_csv(os.path.join(path, f'cost_transition_ag2ag_{yr_cal}.csv'), index=False)
 
-    return None
+    return f"Agricultural to agricultural transition cost written for year {yr_cal}"
 
 
 
@@ -770,7 +771,7 @@ def write_transition_cost_to_nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None
         
     cost_df.to_csv(os.path.join(path, f'cost_transition_ag2non_ag_{yr_cal}.csv'), index=False)
     
-    return None
+    return f"Agricultural to non-agricultural transition cost written for year {yr_cal}"
 
 
 
@@ -779,7 +780,7 @@ def write_transition_cost_apply_ag_man(data: Data):
     # The agricultural management transition cost are all zeros, so skip the calculation here
     # am_cost = ag_transitions.get_agricultural_management_transition_matrices(data)
     
-    return None
+    return "Agricultural management transition cost processing completed"
 
 
 def write_transition_cost_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
@@ -860,7 +861,7 @@ def write_transition_cost_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None
     cost_df = cost_df.replace({'dry':'Dryland', 'irr':'Irrigated'})
     cost_df.to_csv(os.path.join(path, f'cost_transition_non_ag2_ag_{yr_cal}.csv'), index=False)
 
-    return None
+    return f"Non-agricultural to agricultural transition cost written for year {yr_cal}"
 
 
 
@@ -914,7 +915,7 @@ def write_dvar_area(data: Data, yr_cal, path):
     df_non_ag_area.to_csv(os.path.join(path, f'area_non_agricultural_landuse_{yr_cal}.csv'), index = False)
     df_am_area.to_csv(os.path.join(path, f'area_agricultural_management_{yr_cal}.csv'), index = False)
 
-    return None
+    return f"Decision variable areas written for year {yr_cal}"
 
 
 
@@ -966,7 +967,7 @@ def write_area_transition_start_end(data: Data, path, yr_cal_end):
     pd.concat([transition_ag2ag, transition_ag2non_ag]
         ).to_csv(os.path.join(path, f'transition_matrix_start_end.csv'), index=False)
 
-    return None
+    return f"Area transition matrix written from year {data.YR_CAL_BASE} to {yr_cal_end}"
 
 
 
@@ -988,108 +989,15 @@ def write_crosstab(data: Data, yr_cal, path):
             f"yr_cal_sim_pre ({yr_cal_sim_pre}) must be >= {data.YR_CAL_BASE} and < {yr_cal}"
 
         lumap_pre = data.lumaps[yr_cal_sim_pre]
-        lmmap_pre = data.lmmaps[yr_cal_sim_pre]
-        am_map_pre = data.ammaps[yr_cal_sim_pre]
-
         lumap = data.lumaps[yr_cal]
-        lmmap = data.lmmaps[yr_cal]
-        am_map = data.ammaps[yr_cal]
-
-
-        ctlus = pd.DataFrame()
-        swlus = pd.DataFrame()
-        ctlms = pd.DataFrame()
-        swlms = pd.DataFrame()
-        cthps = pd.DataFrame()
-        swhps = pd.DataFrame()
-        ctasses = pd.DataFrame()
-        swasses = pd.DataFrame()
-
+        ctlu, swlu = lumap_crossmap(data, lumap_pre, lumap)
+        ctlu['Year'] = yr_cal
+        swlu['Year'] = yr_cal
    
-        for region in data.REGION_NRM_NAME.unique():
-            
-            cell_idx = data.REGION_NRM_NAME == region
-
-            # LUS = ['Non-agricultural land'] + data.AGRICULTURAL_LANDUSES + NON_AG_LAND_USES.keys()
-            ctlu, swlu = lumap_crossmap( 
-                lumap_pre[cell_idx], 
-                lumap[cell_idx],
-                data.AGRICULTURAL_LANDUSES,
-                NON_AG_LAND_USES.keys(),
-                data.REAL_AREA[cell_idx]
-            )
-
-            ctlm, swlm = lmmap_crossmap( 
-                lmmap_pre[cell_idx], 
-                lmmap[cell_idx],
-                data.REAL_AREA[cell_idx],
-                data.LANDMANS
-            )
-
-            cthp, swhp = crossmap_irrstat( 
-                lumap_pre[cell_idx],
-                lmmap_pre[cell_idx],
-                lumap[cell_idx], 
-                lmmap[cell_idx],
-                data.AGRICULTURAL_LANDUSES,
-                NON_AG_LAND_USES.keys(),
-                data.REAL_AREA[cell_idx]
-            )
-            
-            ctlu['Year'] = yr_cal
-            ctlm['Year'] = yr_cal
-            cthp['Year'] = yr_cal
-            
-            ctlu['region'] = region
-            swlu['region'] = region
-            ctlm['region'] = region
-            swlm['region'] = region
-            cthp['region'] = region
-            swhp['region'] = region
-
-            ctlus = pd.concat([ctlus, ctlu])
-            swlus = pd.concat([swlus, swlu])
-            ctlms = pd.concat([ctlms, ctlm])
-            swlms = pd.concat([swlms, swlm])
-            cthps = pd.concat([cthps, cthp])
-            swhps = pd.concat([swhps, swhp])
-
-
-            for am in data.AG_MAN_DESC:
-                ctas, swas = crossmap_amstat( 
-                    am,
-                    lumap_pre[cell_idx],
-                    am_map_pre[am][cell_idx],
-                    lumap[cell_idx],
-                    am_map[am][cell_idx],
-                    data.AGRICULTURAL_LANDUSES,
-                    NON_AG_LAND_USES.keys(),
-                    data.REAL_AREA[cell_idx]
-                )
-                
-                ctas['Year'] = yr_cal
-                swas['Year'] = yr_cal
-                
-                ctas['region'] = region
-                swas['region'] = region
-                
-                ctas['Ag-man'] = am
-                swas['Ag-man'] = am
-
-                ctasses = pd.concat([ctasses, ctas])
-                swasses = pd.concat([swasses, swas])
-                
         ctlu.to_csv(os.path.join(path, f'crosstab-lumap_{yr_cal}.csv'), index=False)
-        ctlm.to_csv(os.path.join(path, f'crosstab-lmmap_{yr_cal}.csv'), index=False)
         swlu.to_csv(os.path.join(path, f'switches-lumap_{yr_cal}.csv'), index=False)
-        swlm.to_csv(os.path.join(path, f'switches-lmmap_{yr_cal}.csv'), index=False)
-        cthp.to_csv(os.path.join(path, f'crosstab-irrstat_{yr_cal}.csv'), index=False)
-        swhp.to_csv(os.path.join(path, f'switches-irrstat_{yr_cal}.csv'), index=False)
-        
-        ctasses.to_csv(os.path.join(path, f'crosstab-amstat_{yr_cal}.csv'), index=False)
-        swasses.to_csv(os.path.join(path, f'switches-amstat_{yr_cal}.csv'), index=False)
-                
-    return None
+
+    return f"Land-use cross-tabulation and switches written for year {yr_cal}"
 
 
 
@@ -1123,7 +1031,7 @@ def write_ghg(data: Data, yr_cal, path):
     df['Year'] = yr_cal
     df.to_csv(os.path.join(path, f'GHG_emissions_{yr_cal}.csv'), index=False)
     
-    return None
+    return f"GHG emissions written for year {yr_cal}"
 
 
 
@@ -1268,7 +1176,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
         # Save table to disk
         ghg_df.to_csv(os.path.join(path, f'GHG_emissions_separate_transition_penalty_{yr_cal}.csv'), index=False)
 
-    return None
+    return f"Separate GHG emissions written for year {yr_cal}"
 
 
 
@@ -1287,7 +1195,7 @@ def write_ghg_offland_commodity(data: Data, yr_cal, path):
     # Save to disk
     offland_ghg.to_csv(os.path.join(path, f'GHG_emissions_offland_commodity_{yr_cal}.csv'), index = False)
 
-    return None
+    return f"Offland commodity GHG emissions written for year {yr_cal}"
 
 
 
@@ -1450,7 +1358,7 @@ def write_water(data: Data, yr_cal, path):
         
     wny_NRM.to_csv(os.path.join(path, f'water_yield_separate_NRM_{yr_cal}.csv'), index=False)
             
-    return None
+    return f"Water yield data written for year {yr_cal}"
 
 
         
@@ -1524,7 +1432,7 @@ def write_biodiversity_overall_quanlity_scores(data: Data, yr_cal, path):
             'Relative_Contribution_Percentage':'Contribution Relative to Base Year Level (%)'}
         ).reset_index(drop=True).to_csv( os.path.join(path, f'biodiversity_overall_priority_scores_{yr_cal}.csv'), index=False)
     
-    return None
+    return f"Biodiversity overall priority scores written for year {yr_cal}"
 
 
 
@@ -1634,7 +1542,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
         ).reset_index(drop=True
         ).to_csv(os.path.join(path, f'biodiversity_GBF2_priority_scores_{yr_cal}.csv'), index=False)
 
-    return None
+    return f"Biodiversity GBF2 priority scores written for year {yr_cal}"
 
 
 
@@ -1642,7 +1550,7 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
         
     # Do nothing if biodiversity limits are off and no need to report
     if settings.BIODIVERSITY_TARGET_GBF_3 == 'off':
-        return None
+        return "Biodiversity GBF3 scores skipped (target is off)"
     
     print(f'Writing biodiversity GBF3 scores (VEGETATION) for {yr_cal}')
     
@@ -1746,14 +1654,14 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
         ).query('`Area Weighted Score (ha)` > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF3_scores_{yr_cal}.csv'), index=False)
         
-    return None
+    return f"Biodiversity GBF3 scores written for year {yr_cal}"
 
 
 
 
 def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     if not settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on":
-        return None
+        return "Biodiversity GBF4 SNES scores skipped (target is off)"
 
     print(f"Writing species of national environmental significance scores (GBF4 SNES) for {yr_cal}")
     
@@ -1858,7 +1766,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
         ).query('`Area Weighted Score (ha)` > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF4_SNES_scores_{yr_cal}.csv'), index=False)
             
-    return None
+    return f"Biodiversity GBF4 SNES scores written for year {yr_cal}"
 
 
 
@@ -1867,7 +1775,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
 def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     
     if not settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on":
-        return None
+        return "Biodiversity GBF4 ECNES scores skipped (target is off)"
     
     print(f"Writing ecological communities of national environmental significance scores (GBF4 ECNES) for {yr_cal}")
     
@@ -1971,7 +1879,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
         ).query('`Area Weighted Score (ha)` > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF4_ECNES_scores_{yr_cal}.csv'), index=False)
         
-    return None
+    return f"Biodiversity GBF4 ECNES scores written for year {yr_cal}"
 
 
 
@@ -1980,7 +1888,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
     
     # Do nothing if biodiversity limits are off and no need to report
     if not settings.BIODIVERSITY_TARGET_GBF_8 == 'on':
-        return None
+        return "Biodiversity GBF8 groups scores skipped (target is off)"
 
     print(f'Writing biodiversity GBF8 scores (GROUPS) for {yr_cal}')
     
@@ -2081,7 +1989,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
         ).query('`Area Weighted Score (ha)` > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF8_groups_scores_{yr_cal}.csv'), index=False)
 
-    return None
+    return f"Biodiversity GBF8 groups scores written for year {yr_cal}"
 
 
 
@@ -2192,7 +2100,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
         ).query('`Area Weighted Score (ha)` > 0'
         ).to_csv(os.path.join(path, f'biodiversity_GBF8_species_scores_{yr_cal}.csv'), index=False)
         
-    return None
+    return f"Biodiversity GBF8 species scores written for year {yr_cal}"
 
 
 

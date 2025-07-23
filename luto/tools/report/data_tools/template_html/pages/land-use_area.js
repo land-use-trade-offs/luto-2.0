@@ -388,5 +388,108 @@ document.addEventListener("DOMContentLoaded", function () {
   document.getElementById("area_begin_end_pct").innerHTML = JSON.parse(document.getElementById(
     "Area_transition_start_end"
   ).innerText).AUSTRALIA.pct;
+
+  // area_year_to_year transitions
+  let data_area_transition = JSON.parse(
+    document.getElementById("Area_transition_year_to_year").innerText
+  ).AUSTRALIA;
+
+  // Get area transitions selectors and buttons
+  let slider_transition = document.getElementById("year_transition");
+  let incrementButton_transition = document.getElementById("increment_transition");
+  let decrementButton_transition = document.getElementById("decrement_transition");
+  let yearOutput_transition = document.getElementById('yearOutput_transition');
+  
+  // Get pct transitions selectors and buttons
+  let slider_transition_pct = document.getElementById("year_transition_pct");
+  let incrementButton_transition_pct = document.getElementById("increment_transition_pct");
+  let decrementButton_transition_pct = document.getElementById("decrement_transition_pct");
+  let yearOutput_transition_pct = document.getElementById('yearOutput_transition_pct');
+  
+  // Get available years from the data and sort them
+  let availableYears_transition = Object.keys(data_area_transition.area).sort((a, b) => a - b);
+  
+  // Set up the sliders with correct range for area transition
+  if (availableYears_transition.length > 0) {
+    // Area transition slider
+    slider_transition.min = availableYears_transition[0];
+    slider_transition.max = availableYears_transition[availableYears_transition.length - 1];
+    slider_transition.step = availableYears_transition.length > 1 ? 
+      availableYears_transition[1] - availableYears_transition[0] : 1;
+    slider_transition.value = availableYears_transition[0];
+    yearOutput_transition.innerHTML = slider_transition.value;
+
+    // Percent transition slider
+    slider_transition_pct.min = availableYears_transition[0];
+    slider_transition_pct.max = availableYears_transition[availableYears_transition.length - 1];
+    slider_transition_pct.step = availableYears_transition.length > 1 ? 
+      availableYears_transition[1] - availableYears_transition[0] : 1;
+    slider_transition_pct.value = availableYears_transition[0];
+    yearOutput_transition_pct.innerHTML = slider_transition_pct.value;
+
+    // Add event listeners for area transitions
+    slider_transition.addEventListener("input", function () {
+      yearOutput_transition.innerHTML = slider_transition.value;
+      update_area_transition();
+    });
+
+    incrementButton_transition.addEventListener("click", function () {
+      let currentValue = slider_transition.value;
+      let currentIndex = availableYears_transition.indexOf(parseInt(currentValue));
+      if (currentIndex < availableYears_transition.length - 1) {
+        slider_transition.value = availableYears_transition[currentIndex + 1];
+        slider_transition.dispatchEvent(new Event('input'));
+      }
+    });
+
+    decrementButton_transition.addEventListener("click", function () {
+      let currentValue = slider_transition.value;
+      let currentIndex = availableYears_transition.indexOf(parseInt(currentValue));
+      if (currentIndex > 0) {
+        slider_transition.value = availableYears_transition[currentIndex - 1];
+        slider_transition.dispatchEvent(new Event('input'));
+      }
+    });
+
+    // Add event listeners for pct transitions
+    slider_transition_pct.addEventListener("input", function () {
+      yearOutput_transition_pct.innerHTML = slider_transition_pct.value;
+      update_pct_transition();
+    });
+
+    incrementButton_transition_pct.addEventListener("click", function () {
+      let currentValue = slider_transition_pct.value;
+      let currentIndex = availableYears_transition.indexOf(parseInt(currentValue));
+      if (currentIndex < availableYears_transition.length - 1) {
+        slider_transition_pct.value = availableYears_transition[currentIndex + 1];
+        slider_transition_pct.dispatchEvent(new Event('input'));
+      }
+    });
+
+    decrementButton_transition_pct.addEventListener("click", function () {
+      let currentValue = slider_transition_pct.value;
+      let currentIndex = availableYears_transition.indexOf(parseInt(currentValue));
+      if (currentIndex > 0) {
+        slider_transition_pct.value = availableYears_transition[currentIndex - 1];
+        slider_transition_pct.dispatchEvent(new Event('input'));
+      }
+    });
+
+    // Function to update area transition matrix
+    function update_area_transition() {
+      document.getElementById("area_year_to_year_area").innerHTML = 
+        data_area_transition.area[slider_transition.value];
+    }
+
+    // Function to update percent transition matrix
+    function update_pct_transition() {
+      document.getElementById("area_year_to_year_pct").innerHTML = 
+        data_area_transition.pct[slider_transition_pct.value];
+    }
+
+    // Initial update of the transition matrices
+    update_area_transition();
+    update_pct_transition();
+  }
 });
 

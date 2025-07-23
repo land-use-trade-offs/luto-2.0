@@ -65,6 +65,60 @@
       <!-- Chart:area_begin_end_pct -->
       <p>Area change (%) between start/end years</p>
       <div class="mat" id="area_begin_end_pct"></div>
+
+      <!-- Chart:area_year_to_year_area -->
+      <div class="selection" style="text-align: center">
+        <label
+          for="year_transition"
+          class="label"
+          style="
+            font-size: 1.2em;
+            color: rgb(51, 51, 51);
+            font-weight: bold;
+            fill: rgb(51, 51, 51);
+          "
+        >
+          Area transition (ha) between consecutive years for
+          <output id="yearOutput_transition">2010</output> (
+          <button id="decrement_transition">-</button>
+          <input
+            type="range"
+            id="year_transition"
+            step="1"
+            value="2010"
+            oninput="yearOutput_transition.value = year_transition.value"
+          />
+          <button id="increment_transition">+</button>)
+        </label>
+      </div>
+      <div class="mat" id="area_year_to_year_area"></div>
+
+      <!-- Chart:area_year_to_year_pct -->
+      <div class="selection" style="text-align: center">
+        <label
+          for="year_transition_pct"
+          class="label"
+          style="
+            font-size: 1.2em;
+            color: rgb(51, 51, 51);
+            font-weight: bold;
+            fill: rgb(51, 51, 51);
+          "
+        >
+          Area transition (%) between consecutive years for
+          <output id="yearOutput_transition_pct">2010</output> (
+          <button id="decrement_transition_pct">-</button>
+          <input
+            type="range"
+            id="year_transition_pct"
+            step="1"
+            value="2010"
+            oninput="yearOutput_transition_pct.value = year_transition_pct.value"
+          />
+          <button id="increment_transition_pct">+</button>)
+        </label>
+      </div>
+      <div class="mat" id="area_year_to_year_pct"></div>
     </div>
 
     <div id="data_container" style="display: none"></div>
