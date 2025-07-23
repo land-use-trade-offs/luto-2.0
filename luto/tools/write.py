@@ -95,7 +95,7 @@ def write_data(data: Data):
     write_settings(data.path)
 
     # Wrap write to a list of delayed jobs
-    jobs = [delayed(write_area_transition_start_end)(data, f'{data.path}/out_{years[-1]}'), years[-1]]
+    jobs = [delayed(write_area_transition_start_end)(data, f'{data.path}/out_{years[-1]}', years[-1])]
     for (yr, path_yr) in zip(years, paths):
         jobs += write_output_single_year(data, yr, path_yr)
 
