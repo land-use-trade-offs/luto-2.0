@@ -3663,11 +3663,25 @@ def save_report_data(raw_data_dir:str):
     with open(f'{raw_data_dir}/model_run_settings.txt', 'r', encoding='utf-8') as src_file:
         settings_dict = {i.split(':')[0].strip(): ''.join(i.split(':')[1:]).strip() for i in src_file.readlines()}
         settings_dict = [{'parameter': k, 'val': v} for k, v in settings_dict.items()]
+        
+    with open(f'{raw_data_dir}/RES_{settings.RESFACTOR}_mem_log.txt', 'r', encoding='utf-8') as src_file:
+        mem_logs = src_file.readlines()
+        mem_logs = [i.split('\t') for i in mem_logs]
+        mem_logs = [{'time': i[0], 'mem (GB)': i[1].strip()} for i in mem_logs]
+        mem_logs_df = pd.DataFrame(mem_logs)
+        mem_logs_df['time'] = pd.to_datetime(mem_logs_df['time'], format='%Y-%m-%d %H:%M:%S')
+        mem_logs_df['time'] = mem_logs_df['time'].astype('int64') // 10**6  # convert to milliseconds
+        mem_logs_df['mem (GB)'] = mem_logs_df['mem (GB)'].astype(float)
+        mem_logs_obj = [{
+            'name': f'Memory Usage (RES {settings.RESFACTOR})',
+            'data': mem_logs_df.values.tolist()
+        }]
 
     supporting = {
         'model_run_settings': settings_dict,
         'years': years,
         'colors': COLORS,
+        'mem_logs': mem_logs_obj,
         'RENAME_AM_NON_AG': RENAME_AM_NON_AG,
         'SPATIAL_MAP_DICT': SPATIAL_MAP_DICT
     }
