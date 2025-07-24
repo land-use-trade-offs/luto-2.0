@@ -505,9 +505,6 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
 """
 
 WATER_STRESS = 0.6                                      # Aqueduct limit catchments, 0.6 means the water yield in a region must be >= 60% of the historical water yield
-WATER_USE_SHARE_AG = 0.7                                # Ag share is 70% across all catchments, could be updated for each specific catchment based on actual data
-WATER_USE_SHARE_DOMESTIC  = 1 - WATER_USE_SHARE_AG      # Domestic share is 30% across all catchments, could be updated for each specific catchment based on actual data
-
 
 # Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water can cause infeasibility issues with water constraint in Pilbara
 LIVESTOCK_DRINKING_WATER = 1
