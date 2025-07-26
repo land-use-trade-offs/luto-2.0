@@ -33,6 +33,7 @@ from luto.tools.report.data_tools.helper_func import select_years
 from luto.tools.report.data_tools.parameters import (
     AG_LANDUSE,
     COLORS,
+    COLORS_RANK,
     COLORS_AM_NONAG,
     COLORS_COMMODITIES,
     COLORS_ECONOMY_TYPE,
@@ -44,6 +45,9 @@ from luto.tools.report.data_tools.parameters import (
     GHG_CATEGORY,
     GHG_NAMES,
     LANDUSE_ALL_RENAMED,
+    LU_CROPS,
+    LU_LVSTKS,
+    LU_UNALLOW,
     RENAME_AM_NON_AG,
     RENAME_NON_AG,
     SPATIAL_MAP_DICT
@@ -76,7 +80,31 @@ def save_report_data(raw_data_dir:str):
     files['Year'] = files['Year'].astype(int)
     files = files.query('Year.isin(@years)')
     
+    # Function to get rank color based on value
+    def get_rank_color(x):
+        if x == 0:
+            return COLORS_RANK[3]
+        elif x < 10:
+            return COLORS_RANK[0]
+        elif x < 20:
+            return COLORS_RANK[1]
+        else:
+            return COLORS_RANK[2]
+        
+    def get_rank_area_type(x:pd.Series) -> str:
+        if not x['Type'] is np.nan:
+            return 'Agricultural management'
 
+        if x['Land-use'] in LU_CROPS + LU_LVSTKS:
+            return 'Agricultural landuse'
+        elif x['Land-use'] in LU_UNALLOW:
+            return 'Unallocated land'
+        elif x['Land-use'] in RENAME_NON_AG.values():
+            return 'Non-agricultural landuse'
+        else:
+            return 'Unknown'
+        
+        
 
     ####################################################
     #                    1) Area Change                #
@@ -106,6 +134,56 @@ def save_report_data(raw_data_dir:str):
     lu_group = lu_group_raw.set_index(['Category', 'color_HEX'])\
         .apply(lambda x: x.str.split(', ').explode())\
         .reset_index()
+        
+    # -------------------- Area ranking --------------------
+    area_ranking_raw = pd.concat([ag_dvar_area, non_ag_dvar_area, am_dvar_area])\
+         .assign(Area_type=lambda x: x.apply(get_rank_area_type, axis=1))
+        
+    area_ranking_type = area_ranking_raw\
+        .query('Area_type != "Unallocated land"')\
+        .groupby(['Year', 'region', 'Area_type'])[['Area (ha)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'Area_type', 'Area (ha)'], ascending=[True, True, False])\
+        .assign(Rank=lambda x: x.groupby(['Year', 'Area_type']).cumcount() + 1)\
+        .assign(Percent=lambda x: x['Area (ha)'] / x.groupby(['Year', 'Area_type'])['Area (ha)'].transform('sum') * 100)\
+        .round({'Percent': 2, 'Area (ha)': 2})
+        
+    area_ranking_total = pd.concat([ag_dvar_area, non_ag_dvar_area, am_dvar_area])\
+        .assign(Area_type=lambda x: x.apply(get_rank_area_type, axis=1))\
+        .groupby(['Year', 'region'])[["Area (ha)"]]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'Area (ha)'], ascending=[True, False])\
+        .assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1)\
+        .assign(Area_type='Total')\
+        .assign(Percent=lambda x: x['Area (ha)'] / x.groupby(['Year'])['Area (ha)'].transform('sum') * 100)\
+        .round({'Percent': 2, 'Area (ha)': 2})
+
+    area_ranking = pd.concat([area_ranking_type, area_ranking_total], ignore_index=True)
+    area_ranking = area_ranking.set_index(['Year', 'region', 'Area_type'])\
+        .reindex(
+            index=pd.MultiIndex.from_product(
+                [years, area_ranking['region'].unique(), area_ranking['Area_type'].unique()],
+                names=['Year', 'region', 'Area_type']), fill_value=None )\
+        .reset_index()\
+        .assign(color=lambda x: x['Rank'].map(get_rank_color))
+        
+
+    out_dict = {}
+    for (region, area_type), df in area_ranking.groupby(['region', 'Area_type']):
+        if region not in out_dict:
+            out_dict[region] = {}
+        if area_type not in out_dict[region]:
+            out_dict[region][area_type] = {}
+
+        df = df.drop('region', axis=1)
+        out_dict[region][area_type]['Rank'] = df.set_index('Year')[['Rank']].replace({np.nan: None}).to_dict()
+        out_dict[region][area_type]['Percent'] = df.set_index('Year')[['Percent']].replace({np.nan: None}).to_dict()
+        out_dict[region][area_type]['color'] = df.set_index('Year')[['color']].replace({np.nan: None}).to_dict()
+
+    with open(f'{SAVE_DIR}/Area_ranking.json', 'w') as f:
+        json.dump(out_dict, f, indent=2)
         
 
     # -------------------- Area overview --------------------
@@ -776,6 +854,59 @@ def save_report_data(raw_data_dir:str):
         'Profit'
     ]
 
+    # -------------------- Economic ranking --------------------
+    # Apply similar logic as area ranking
+    revenue_df = pd.concat([revenue_ag_df, revenue_am_df, revenue_non_ag_df]
+        ).query('`Value ($)` >= 0'
+        ).groupby(['Year', 'region']
+        )[['Value ($)']].sum(numeric_only=True
+        ).reset_index(
+        ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
+        ).assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1
+        ).assign(Percent=lambda x: x['Value ($)'] / x.groupby(['Year'])['Value ($)'].transform('sum') * 100
+        ).assign(Source='Revenue'
+        ).round({'Value ($)': 2, 'Percent': 2})
+
+    cost_df = pd.concat([cost_ag_df, cost_am_df, cost_non_ag_df]
+        ).query('`Value ($)` < 0'
+        ).groupby(['Year', 'region']
+        )[['Value ($)']].sum(numeric_only=True
+        ).reset_index(
+        ).assign(**{'Value ($)': lambda x: abs(x['Value ($)'])}
+        ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
+        ).assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1
+        ).assign(Percent=lambda x: x['Value ($)'] / x.groupby('Year')['Value ($)'].transform('sum') * 100
+        ).assign(Source='Cost'
+        ).round({'Value ($)': 2, 'Percent': 2})
+ 
+
+
+
+    ranking_df = pd.concat([revenue_df, cost_df])
+    ranking_df = ranking_df.set_index(['region', 'Source', 'Year']
+        ).reindex(
+            index=pd.MultiIndex.from_product(
+                [ranking_df['region'].unique(), ranking_df['Source'].unique(), ranking_df['Year'].unique()],
+                names=['region', 'Source', 'Year']), fill_value=None
+        ).reset_index(
+        ).assign(color= lambda x: x['Rank'].map(get_rank_color))
+
+
+    out_dict = {}
+    for (region, source), df in ranking_df.groupby(['region', 'Source']):
+        if region not in out_dict:
+            out_dict[region] = {}
+        if not source in out_dict[region]:
+            out_dict[region][source] = {}
+        
+        df = df.drop(columns='region')
+        out_dict[region][source]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+        out_dict[region][source]['Percent'] = df.set_index('Year')['Percent'].replace({np.nan: None}).to_dict()
+        out_dict[region][source]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+
+    with open(f'{SAVE_DIR}/Economics_ranking.json', 'w') as f:
+        json.dump(out_dict, f, indent=2)
+        
 
     # -------------------- Economy overview --------------------
     economics_df_AUS = economics_df.groupby(['Year','Source']
@@ -1372,8 +1503,7 @@ def save_report_data(raw_data_dir:str):
             'Net emissions',
             'GHG emission limit'
         ]
-        
-        
+   
 
         # -------------------- GHG from individual emission sectors --------------------
         net_offland_AUS = GHG_off_land.groupby('Year')[['Value (t CO2e)']].sum(numeric_only=True).reset_index()
@@ -1405,8 +1535,7 @@ def save_report_data(raw_data_dir:str):
             'line'
         ]
 
-        
-        
+ 
         net_land_AUS_wide['name_order'] = net_land_AUS_wide['name'].apply(lambda x: order_GHG.index(x))
         net_land_AUS_wide = net_land_AUS_wide.sort_values('name_order').drop(columns=['name_order'])
         
@@ -1442,6 +1571,60 @@ def save_report_data(raw_data_dir:str):
             
             
             
+            
+        # -------------------- GHG ranking --------------------
+        # Apply similar logic as area ranking
+        GHG_rank_emission = GHG_land\
+            .query('`Value (t CO2e)`>= 0')\
+            .groupby(['Year', 'region'])\
+            .sum(numeric_only=True)\
+            .reset_index()\
+            .sort_values(['Year', 'Value (t CO2e)'], ascending=[True, False])\
+            .assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1)\
+            .assign(Percent=lambda x: x['Value (t CO2e)'] / x.groupby('Year')['Value (t CO2e)'].transform('sum') * 100)\
+            .assign(Type='GHG emissions')
+            
+        GHG_rank_sequestration = GHG_land\
+            .query('`Value (t CO2e)` < 0')\
+            .assign(**{'Value (t CO2e)': lambda x: abs(x['Value (t CO2e)'])})\
+            .groupby(['Year', 'region'])\
+            .sum(numeric_only=True)\
+            .reset_index()\
+            .sort_values(['Year', 'Value (t CO2e)'], ascending=[True, False])\
+            .assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1)\
+            .assign(Percent=lambda x: x['Value (t CO2e)'] / x.groupby('Year')['Value (t CO2e)'].transform('sum') * 100)\
+            .assign(Type='GHG sequestrations')
+
+        GHG_rank = pd.concat([GHG_rank_emission, GHG_rank_sequestration], axis=0)
+        GHG_rank = GHG_rank\
+            .reset_index(drop=True)\
+            .round({'Percent': 2, 'Value (t CO2e)':2})\
+            .assign(color=lambda x: x['Rank'].map(get_rank_color))\
+            .set_index(['region', 'Year', 'Type'])\
+            .reindex(
+                index=pd.MultiIndex.from_product(
+                    [GHG_rank['region'].unique(), GHG_rank['Year'].unique(), GHG_rank['Type'].unique()],
+                    names=['region', 'Year', 'Type']), fill_value=None
+            ).reset_index()\
+            .assign(color=lambda x: x['Rank'].map(get_rank_color))
+     
+
+        out_dict = {}
+        for (region, e_type), df in GHG_rank.groupby(['region', 'Type']):
+            if region not in out_dict:
+                out_dict[region] = {}
+            if e_type not in out_dict[region]:
+                out_dict[region][e_type] = {}
+
+            df = df.drop(columns='region')
+            out_dict[region][e_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+            out_dict[region][e_type]['Percent'] = df.set_index('Year')['Percent'].replace({np.nan: None}).to_dict()
+            out_dict[region][e_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+
+        with open(f'{SAVE_DIR}/GHG_ranking.json', 'w') as f:
+            json.dump(out_dict, f, indent=2)
+
+
 
         # -------------------- GHG emission for agricultural land-use --------------------
         GHG_ag = GHG_land.query('Type == "Agricultural land-use"') 
@@ -1686,7 +1869,6 @@ def save_report_data(raw_data_dir:str):
     )
 
 
-
     # -------------------- Water yield overview for Australia --------------------
     water_inside_LUTO_sum = water_net_yield_water_region\
         .groupby(['Year','Type'])[['Value (ML)']]\
@@ -1798,8 +1980,61 @@ def save_report_data(raw_data_dir:str):
         
         
         
+    # -------------------- Water yield ranking --------------------
+    # Apply similar logic as area ranking
+    water_ranking_type = water_net_yield_NRM_region\
+        .groupby(['Year', 'region_NRM', 'Type'])[['Value (ML)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'Type', 'Value (ML)'], ascending=[True, True, False])\
+        .assign(Rank=lambda x: x.groupby(['Year', 'Type']).cumcount() + 1)\
+        .assign(Percent=lambda x: x['Value (ML)'] / x.groupby(['Year', 'Type'])['Value (ML)'].transform('sum') * 100)
+        
+        
+    water_ranking_net = water_net_yield_NRM_region\
+        .groupby(['Year', 'region_NRM'])[['Value (ML)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'Value (ML)'], ascending=[True, False])\
+        .assign(Rank=lambda x: x.groupby('Year').cumcount() + 1)\
+        .assign(Percent=lambda x: x['Value (ML)'] / x.groupby('Year')['Value (ML)'].transform('sum') * 100)\
+        .assign(Type='Total')
+        
+    
+    water_ranking = pd.concat([water_ranking_type, water_ranking_net], axis=0)
+    water_ranking = water_ranking\
+        .set_index(['region_NRM', 'Year', 'Type'])\
+        .reindex(
+            index=pd.MultiIndex.from_product(
+                [water_ranking['region_NRM'].unique(), water_ranking['Year'].unique(), water_ranking['Type'].unique()],
+                names=['region_NRM', 'Year', 'Type']), fill_value=None)\
+        .reset_index()\
+        .assign(color=lambda x: x['Rank'].map(get_rank_color))\
+        .round({'Percent': 2, 'Value (ML)': 2})
+
+        
+        
+    out_dict = {}
+    for (region, w_type), df in water_ranking.groupby(['region_NRM', 'Type']):
+        if region not in out_dict:
+            out_dict[region] = {}
+        if w_type not in out_dict[region]:
+            out_dict[region][w_type] = {}
+
+        df = df.drop(columns='region_NRM')
+        out_dict[region][w_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+        out_dict[region][w_type]['Percent'] = df.set_index('Year')['Percent'].replace({np.nan: None}).to_dict()
+        out_dict[region][w_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+
+    with open(f'{SAVE_DIR}/Water_yield_ranking.json', 'w') as f:
+        json.dump(out_dict, f, indent=2)
+
+
+
     # -------------------- Water yield overview by NRM region --------------------
     group_cols = ['Landuse', 'Type']
+    out_dict = {region: [] for region in water_net_yield_NRM_region['region_NRM'].unique()}
+    out_dict['AUSTRALIA'] = water_yield_df_AUS.to_dict(orient='records')
     for idx, col in enumerate(group_cols):
 
         df_region = water_net_yield_NRM_region\
@@ -1817,7 +2052,7 @@ def save_report_data(raw_data_dir:str):
             df_region_wide['name_order'] = df_region_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
             df_region_wide = df_region_wide.sort_values('name_order').drop(columns=['name_order'])
         
-        out_dict = {}
+        
         for region, df in df_region_wide.groupby('region_NRM'):
             df = df.drop(['region_NRM'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
@@ -1949,6 +2184,61 @@ def save_report_data(raw_data_dir:str):
         
         
         
+    # ---------------- Biodiversity ranking  ----------------
+    # Apply similar logic as area ranking
+    bio_rank_type = bio_df\
+        .query('`Value (%)`>= 0')\
+        .groupby(['Year', 'region', 'Type'])\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'Type', 'Value (%)'], ascending=[True, True, False])\
+        .assign(Rank=lambda x: x.groupby(['Year', 'Type']).cumcount() + 1)\
+        .assign(Percent=lambda x: x['Value (%)'] / x.groupby(['Year', 'Type'])['Value (%)'].transform('sum') * 100)\
+        .assign(color=lambda x: x['Rank'].map(get_rank_color))\
+        .round({'Percent': 2, 'Area Weighted Score (ha)': 2})
+        
+    bio_rank_total = bio_df\
+        .query('`Value (%)`>= 0')\
+        .groupby(['Year', 'region'])\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'Value (%)'], ascending=[True, False])\
+        .assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1)\
+        .assign(Percent=lambda x: x['Value (%)'] / x.groupby(['Year'])['Value (%)'].transform('sum') * 100)\
+        .assign(color=lambda x: x['Rank'].map(get_rank_color))\
+        .assign(Type='Total')\
+        .round({'Percent': 2, 'Area Weighted Score (ha)': 2})
+
+
+    bio_rank = pd.concat([bio_rank_type, bio_rank_total])
+    bio_rank = bio_rank\
+        .set_index(['region', 'Year', 'Type'])\
+        .reindex(
+            index=pd.MultiIndex.from_product(
+                [bio_rank['region'].unique(), bio_rank['Year'].unique(), bio_rank['Type'].unique()],
+                names=['region', 'Year', 'Type']),fill_value=None)\
+        .reset_index()\
+        .assign(color=lambda x: x['Rank'].map(get_rank_color))
+
+            
+    out_dict = {}
+    for (region, b_type), df in bio_rank.groupby(['region', 'Type']):
+        if region not in out_dict:
+            out_dict[region] = {}
+        if b_type not in out_dict[region]:
+            out_dict[region][b_type] = {}
+
+        df = df.drop(columns='region')
+        out_dict[region][b_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+        out_dict[region][b_type]['Percent'] = df.set_index('Year')['Percent'].replace({np.nan: None}).to_dict()
+        out_dict[region][b_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+
+        
+    with open(f'{SAVE_DIR}/Biodiversity_ranking.json', 'w') as f:
+        json.dump(out_dict, f, indent=2)
+
+
+
     # ---------------- Biodiversity quality overview  ----------------
     group_cols = ['Type']
     for idx, col in enumerate(group_cols):
@@ -3664,7 +3954,7 @@ def save_report_data(raw_data_dir:str):
         settings_dict = {i.split(':')[0].strip(): ''.join(i.split(':')[1:]).strip() for i in src_file.readlines()}
         settings_dict = [{'parameter': k, 'val': v} for k, v in settings_dict.items()]
         
-    with open(f'{raw_data_dir}/RES_{settings.RESFACTOR}_mem_log.txt', 'r', encoding='utf-8') as src_file:
+    with open(f'{settings.OUTPUT_DIR}/RES_{settings.RESFACTOR}_mem_log.txt', 'r', encoding='utf-8') as src_file:
         mem_logs = src_file.readlines()
         mem_logs = [i.split('\t') for i in mem_logs]
         mem_logs = [{'time': i[0], 'mem (GB)': i[1].strip()} for i in mem_logs]

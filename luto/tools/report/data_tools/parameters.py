@@ -25,15 +25,34 @@ import luto.settings as settings
 YR_BASE = 2010
 
 # Define the commodity categories
-COMMODITIES_ON_LAND = ['Apples','Beef live export','Beef meat','Citrus','Cotton','Dairy','Grapes',
-                       'Hay','Nuts','Other non-cereal crops', 'Pears', 'Plantation fruit',
-                       'Rice', 'Sheep live export', 'Sheep meat', 'Sheep wool', 'Stone fruit', 'Sugar',
-                       'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
-                       'Vegetables','Winter cereals','Winter legumes','Winter oilseeds']
+COMMODITIES_ON_LAND = [
+    'Apples','Beef live export','Beef meat','Citrus','Cotton','Dairy','Grapes',
+    'Hay','Nuts','Other non-cereal crops', 'Pears', 'Plantation fruit',
+    'Rice', 'Sheep live export', 'Sheep meat', 'Sheep wool', 'Stone fruit', 'Sugar',
+    'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
+    'Vegetables','Winter cereals','Winter legumes','Winter oilseeds'
+]
 
 COMMODITIES_OFF_LAND = ['Aquaculture', 'Chicken', 'Eggs', 'Pork' ]
 
 COMMODITIES_ALL = COMMODITIES_ON_LAND + COMMODITIES_OFF_LAND
+
+
+LU_CROPS = [
+    'Apples','Citrus','Cotton','Grapes','Hay','Nuts','Other non-cereal crops',
+    'Pears','Plantation fruit','Rice','Stone fruit','Sugar','Summer cereals',
+    'Summer legumes','Summer oilseeds','Tropical stone fruit','Vegetables',
+    'Winter cereals','Winter legumes','Winter oilseeds'
+]
+
+LU_LVSTKS = [
+    'Beef - natural land','Dairy - natural land','Sheep - natural land',
+    'Beef - modified land','Dairy - modified land','Sheep - modified land'
+]
+
+LU_UNALLOW = ['Unallocated - modified land', 'Unallocated - natural land']
+
+
 
 
 # Define land use code for am and non-ag land uses
@@ -173,6 +192,13 @@ COLORS = [
     "#90ed7d",
     "#f7a35c",
     "#91e8e1",
+]
+
+COLORS_RANK = [
+    "#ff8f5e",
+    "#d5e5a3",
+    "#91e8e1",
+    "#e8eaed",
 ]
 
 pattern_path = {
