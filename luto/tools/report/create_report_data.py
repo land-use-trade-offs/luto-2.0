@@ -178,9 +178,9 @@ def save_report_data(raw_data_dir:str):
             out_dict[region][area_type] = {}
 
         df = df.drop('region', axis=1)
-        out_dict[region][area_type]['Rank'] = df.set_index('Year')[['Rank']].replace({np.nan: None}).to_dict()
-        out_dict[region][area_type]['Percent'] = df.set_index('Year')[['Percent']].replace({np.nan: None}).to_dict()
-        out_dict[region][area_type]['color'] = df.set_index('Year')[['color']].replace({np.nan: None}).to_dict()
+        out_dict[region][area_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+        out_dict[region][area_type]['Percent'] = df.set_index('Year')['Percent'].replace({np.nan: None}).to_dict()
+        out_dict[region][area_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
 
     with open(f'{SAVE_DIR}/Area_ranking.json', 'w') as f:
         json.dump(out_dict, f, indent=2)
