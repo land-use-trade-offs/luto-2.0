@@ -82,15 +82,15 @@ def save_report_data(raw_data_dir:str):
     
     # Function to get rank color based on value
     def get_rank_color(x):
-        if x == 0:
-            return COLORS_RANK[3]
-        elif x < 10:
-            return COLORS_RANK[0]
-        elif x < 20:
-            return COLORS_RANK[1]
+        if x is None or pd.isna(x):
+            return COLORS_RANK['N.A.']
+        elif x <= 10:
+            return COLORS_RANK['1-10']
+        elif x <= 20:
+            return COLORS_RANK['11-20']
         else:
-            return COLORS_RANK[2]
-        
+            return COLORS_RANK['>=21']
+
     def get_rank_area_type(x:pd.Series) -> str:
         if not x['Type'] is np.nan:
             return 'Agricultural Management'
@@ -854,8 +854,8 @@ def save_report_data(raw_data_dir:str):
         'Profit'
     ]
 
+
     # -------------------- Economic ranking --------------------
-    # Apply similar logic as area ranking
     revenue_df = pd.concat([revenue_ag_df, revenue_am_df, revenue_non_ag_df]
         ).query('`Value ($)` >= 0'
         ).groupby(['Year', 'region']
@@ -1573,7 +1573,6 @@ def save_report_data(raw_data_dir:str):
             
             
         # -------------------- GHG ranking --------------------
-        # Apply similar logic as area ranking
         GHG_rank_emission = GHG_land\
             .query('`Value (t CO2e)`>= 0')\
             .groupby(['Year', 'region'])\
@@ -1981,7 +1980,6 @@ def save_report_data(raw_data_dir:str):
         
         
     # -------------------- Water yield ranking --------------------
-    # Apply similar logic as area ranking
     water_ranking_type = water_net_yield_NRM_region\
         .groupby(['Year', 'region_NRM', 'Type'])[['Value (ML)']]\
         .sum(numeric_only=True)\
@@ -2184,8 +2182,7 @@ def save_report_data(raw_data_dir:str):
         
         
         
-    # ---------------- Biodiversity ranking  ----------------
-    # Apply similar logic as area ranking
+    # ---------------- Biodiversity ranking ----------------
     bio_rank_type = bio_df\
         .query('`Value (%)`>= 0')\
         .groupby(['Year', 'region', 'Type'])\
@@ -3971,6 +3968,7 @@ def save_report_data(raw_data_dir:str):
         'model_run_settings': settings_dict,
         'years': years,
         'colors': COLORS,
+        'colors_ranking': COLORS_RANK,
         'mem_logs': mem_logs_obj,
         'RENAME_AM_NON_AG': RENAME_AM_NON_AG,
         'SPATIAL_MAP_DICT': SPATIAL_MAP_DICT

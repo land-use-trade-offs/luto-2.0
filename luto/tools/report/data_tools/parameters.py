@@ -194,12 +194,12 @@ COLORS = [
     "#91e8e1",
 ]
 
-COLORS_RANK = [
-    "#ff8f5e",
-    "#d5e5a3",
-    "#91e8e1",
-    "#e8eaed",
-]
+COLORS_RANK = {
+    '1-10': "#ff8f5e",
+    '11-20': "#d5e5a3",
+    '>=21': "#91e8e1",
+    'N.A.': "#e8eaed",
+}
 
 pattern_path = {
     'path': 
