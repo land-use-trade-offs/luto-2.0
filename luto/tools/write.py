@@ -243,7 +243,7 @@ def write_files(data: Data, yr_cal, path):
         dst_ammap.write_band(1, create_2d_map(data, ag_man_dvar_argmax))
         dst_non_ag.write_band(1, create_2d_map(data, non_ag_dvar_argmax))
         
-    return f"Files written for year {yr_cal}"
+    return f"Decision variables (.npy) written for year {yr_cal}"
 
 
 def write_files_separate(data: Data, yr_cal, path):
@@ -586,7 +586,7 @@ def write_revenue_cost_ag_management(data: Data, yr_cal, path):
     revenue_am_df.to_csv(os.path.join(path, f'revenue_agricultural_management_{yr_cal}.csv'), index=False)
     cost_am_df.to_csv(os.path.join(path, f'cost_agricultural_management_{yr_cal}.csv'), index=False)
     
-    return f"Agricultural management revenue and cost written for year {yr_cal}"
+    return f"Agricultural Management revenue and cost written for year {yr_cal}"
 
 
 def write_revenue_cost_non_ag(data: Data, yr_cal, path):
@@ -780,7 +780,7 @@ def write_transition_cost_apply_ag_man(data: Data):
     # The agricultural management transition cost are all zeros, so skip the calculation here
     # am_cost = ag_transitions.get_agricultural_management_transition_matrices(data)
     
-    return "Agricultural management transition cost processing completed"
+    return "Agricultural Management transition cost processing completed"
 
 
 def write_transition_cost_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):

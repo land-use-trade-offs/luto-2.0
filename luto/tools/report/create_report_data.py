@@ -93,14 +93,14 @@ def save_report_data(raw_data_dir:str):
         
     def get_rank_area_type(x:pd.Series) -> str:
         if not x['Type'] is np.nan:
-            return 'Agricultural management'
+            return 'Agricultural Management'
 
         if x['Land-use'] in LU_CROPS + LU_LVSTKS:
-            return 'Agricultural landuse'
+            return 'Agricultural Landuse'
         elif x['Land-use'] in LU_UNALLOW:
             return 'Unallocated land'
         elif x['Land-use'] in RENAME_NON_AG.values():
-            return 'Non-agricultural landuse'
+            return 'Non-Agricultural Landuse'
         else:
             return 'Unknown'
         
@@ -113,19 +113,19 @@ def save_report_data(raw_data_dir:str):
     
     ag_dvar_dfs = area_dvar_paths.query('base_name == "area_agricultural_landuse"').reset_index(drop=True)
     ag_dvar_area = pd.concat([pd.read_csv(path) for path in ag_dvar_dfs['path']], ignore_index=True)
-    ag_dvar_area['Source'] = 'Agricultural landuse'
+    ag_dvar_area['Source'] = 'Agricultural Landuse'
     ag_dvar_area['Area (ha)'] = ag_dvar_area['Area (ha)'].round(2)
 
     non_ag_dvar_dfs = area_dvar_paths.query('base_name == "area_non_agricultural_landuse"').reset_index(drop=True)
     non_ag_dvar_area = pd.concat([pd.read_csv(path) for path in non_ag_dvar_dfs['path'] if not pd.read_csv(path).empty], ignore_index=True)
     non_ag_dvar_area['Land-use'] = non_ag_dvar_area['Land-use'].replace(RENAME_NON_AG)
-    non_ag_dvar_area['Source'] = 'Non-agricultural landuse'
+    non_ag_dvar_area['Source'] = 'Non-Agricultural Landuse'
     non_ag_dvar_area['Area (ha)'] = non_ag_dvar_area['Area (ha)'].round(2)
 
     am_dvar_dfs = area_dvar_paths.query('base_name == "area_agricultural_management"').reset_index(drop=True)
     am_dvar_area = pd.concat([pd.read_csv(path) for path in am_dvar_dfs['path'] if not pd.read_csv(path).empty], ignore_index=True)
     am_dvar_area = am_dvar_area.replace(RENAME_AM_NON_AG)
-    am_dvar_area['Source'] = 'Agricultural management'
+    am_dvar_area['Source'] = 'Agricultural Management'
     am_dvar_area['Area (ha)'] = am_dvar_area['Area (ha)'].round(2)
     
 
@@ -350,7 +350,7 @@ def save_report_data(raw_data_dir:str):
             json.dump(out_dict, f)
 
 
-    # -------------------- Area by Agricultural management Area (ha) Land use --------------------
+    # -------------------- Area by Agricultural Management Area (ha) Land use --------------------
     group_cols = ['Type', 'Water_supply', 'Land-use']
     
     for idx, col in enumerate(group_cols):
@@ -404,7 +404,7 @@ def save_report_data(raw_data_dir:str):
             json.dump(out_dict, f)
             
             
-    # -------------------- Area by Non-Agricultural landuse --------------------
+    # -------------------- Area by Non-Agricultural Landuse --------------------
     group_cols = ['Land-use']
     
     for idx, col in enumerate(group_cols):
@@ -785,11 +785,11 @@ def save_report_data(raw_data_dir:str):
     
     revenue_am_df = files.query('base_name == "revenue_agricultural_management"').reset_index(drop=True)
     revenue_am_df = pd.concat([pd.read_csv(path) for path in revenue_am_df['path']], ignore_index=True)
-    revenue_am_df = revenue_am_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural management (revenue)')
+    revenue_am_df = revenue_am_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural Management (revenue)')
     
     cost_am_df = files.query('base_name == "cost_agricultural_management"').reset_index(drop=True)
     cost_am_df = pd.concat([pd.read_csv(path) for path in cost_am_df['path']], ignore_index=True)
-    cost_am_df = cost_am_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural management (cost)')
+    cost_am_df = cost_am_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural Management (cost)')
     cost_am_df['Value ($)'] = cost_am_df['Value ($)'] * -1          # Convert cost to negative value
 
     revenue_non_ag_df = files.query('base_name == "revenue_non_ag"').reset_index(drop=True)
@@ -843,10 +843,10 @@ def save_report_data(raw_data_dir:str):
         
     order = [
         'Agricultural land-use (revenue)', 
-        'Agricultural management (revenue)', 
+        'Agricultural Management (revenue)', 
         'Non-agricultural land-use (revenue)',
         'Agricultural land-use (cost)', 
-        'Agricultural management (cost)', 
+        'Agricultural Management (cost)', 
         'Non-agricultural land-use (cost)',
         'Transition cost (Ag2Ag)',
         'Transition cost (Ag2Non-Ag)',
@@ -1771,7 +1771,7 @@ def save_report_data(raw_data_dir:str):
 
 
 
-        # -------------------- GHG reductions by Agricultural managements --------------------
+        # -------------------- GHG reductions by Agricultural Managements --------------------
         Ag_man_sequestration_long = GHG_land.query('Type == "Agricultural Management"').reset_index(drop=True)
         Ag_man_sequestration_long['Value (t CO2e)'] = Ag_man_sequestration_long['Value (t CO2e)'] * -1  # Convert from negative to positive
         group_cols = ['Land-use', 'Land-use type', 'Agricultural Management Type', 'Water_supply']
@@ -2026,7 +2026,7 @@ def save_report_data(raw_data_dir:str):
         out_dict[region][w_type]['Percent'] = df.set_index('Year')['Percent'].replace({np.nan: None}).to_dict()
         out_dict[region][w_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
 
-    with open(f'{SAVE_DIR}/Water_yield_ranking.json', 'w') as f:
+    with open(f'{SAVE_DIR}/Water_ranking.json', 'w') as f:
         json.dump(out_dict, f, indent=2)
 
 
@@ -2291,7 +2291,7 @@ def save_report_data(raw_data_dir:str):
     
     
     
-    # ---------------- Biodiversity quality by Agricultural landuse  ----------------
+    # ---------------- Biodiversity quality by Agricultural Landuse  ----------------
     bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
     group_cols = ['Landuse']
     for idx, col in enumerate(group_cols):
@@ -2519,7 +2519,7 @@ def save_report_data(raw_data_dir:str):
                 json.dump(out_dict, f)
 
 
-        # ---------------- (GBF2) Agricultural landuse  ----------------
+        # ---------------- (GBF2) Agricultural Landuse  ----------------
         bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
 
         group_cols = ['Landuse']
@@ -2757,7 +2757,7 @@ def save_report_data(raw_data_dir:str):
                 
                 
                 
-        # ---------------- (GBF3) Agricultural landuse  ----------------
+        # ---------------- (GBF3) Agricultural Landuse  ----------------
         bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
         
         group_cols = ['Landuse']
@@ -2814,7 +2814,7 @@ def save_report_data(raw_data_dir:str):
                 json.dump(out_dict, f)
 
 
-        # ---------------- (GBF3) Agricultural management  ----------------
+        # ---------------- (GBF3) Agricultural Management  ----------------
         bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
 
         group_cols = ['Landuse', 'Agri-Management']
@@ -3005,7 +3005,7 @@ def save_report_data(raw_data_dir:str):
                 
                 
                 
-        # ---------------- (GBF4 SNES) Agricultural landuse  ----------------
+        # ---------------- (GBF4 SNES) Agricultural Landuse  ----------------
         bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
         
         group_cols = ['Landuse']
@@ -3062,7 +3062,7 @@ def save_report_data(raw_data_dir:str):
                 json.dump(out_dict, f)
 
 
-        # ---------------- (GBF4 SNES) Agricultural management  ----------------
+        # ---------------- (GBF4 SNES) Agricultural Management  ----------------
         bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
 
         group_cols = ['Landuse', 'Agri-Management']
@@ -3252,7 +3252,7 @@ def save_report_data(raw_data_dir:str):
                 
                 
                 
-        # ---------------- (GBF4 ECNES) Agricultural landuse  ----------------
+        # ---------------- (GBF4 ECNES) Agricultural Landuse  ----------------
         bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
         
         group_cols = ['Landuse']
@@ -3309,7 +3309,7 @@ def save_report_data(raw_data_dir:str):
                 json.dump(out_dict, f)
 
 
-        # ---------------- (GBF4 ECNES) Agricultural management  ----------------
+        # ---------------- (GBF4 ECNES) Agricultural Management  ----------------
         bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
 
         group_cols = ['Landuse', 'Agri-Management']
@@ -3499,7 +3499,7 @@ def save_report_data(raw_data_dir:str):
                 
                 
                 
-        # ---------------- (GBF8 SPECIES) Agricultural landuse  ----------------
+        # ---------------- (GBF8 SPECIES) Agricultural Landuse  ----------------
         bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
         
         group_cols = ['Landuse']
@@ -3556,7 +3556,7 @@ def save_report_data(raw_data_dir:str):
                 json.dump(out_dict, f)
 
 
-        # ---------------- (GBF8 SPECIES) Agricultural management  ----------------
+        # ---------------- (GBF8 SPECIES) Agricultural Management  ----------------
         bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
 
         group_cols = ['Landuse', 'Agri-Management']
@@ -3741,7 +3741,7 @@ def save_report_data(raw_data_dir:str):
                 
                 
                 
-        # ---------------- (GBF8 GROUP) Agricultural landuse  ----------------
+        # ---------------- (GBF8 GROUP) Agricultural Landuse  ----------------
         bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
         
         group_cols = ['Landuse']
@@ -3798,7 +3798,7 @@ def save_report_data(raw_data_dir:str):
                 json.dump(out_dict, f)
 
 
-        # ---------------- (GBF8 GROUP) Agricultural management  ----------------
+        # ---------------- (GBF8 GROUP) Agricultural Management  ----------------
         bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
 
         group_cols = ['Landuse', 'Agri-Management']

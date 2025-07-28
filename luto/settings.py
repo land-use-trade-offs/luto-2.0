@@ -295,7 +295,7 @@ AF_FENCING_LENGTH_HA = 100 * no_belts_per_ha * 2 # Length of fencing required pe
 
 
 # ---------------------------------------------------------------------------- #
-# Agricultural management parameters
+# Agricultural Management parameters
 # ---------------------------------------------------------------------------- #
 
 

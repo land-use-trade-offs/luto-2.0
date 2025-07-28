@@ -529,7 +529,7 @@ class Data:
 
 
         ###############################################################
-        # Agricultural management options data.
+        # Agricultural Management options data.
         ###############################################################
         print("\tLoading agricultural management options' data...", flush=True)
 
