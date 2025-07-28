@@ -30,6 +30,31 @@ Documentation, including instructions on how to set up and run LUTO2, can be fou
 LUTO2 comes with a full diagram to illustrate its data preparation, workflow, and code logics. The diagram link can be found in this link.  
 *Replace with updated documentation currently in preparation when ready.*
 
+## Project Structure
+
+The LUTO2 codebase is organized into the following structure:
+
+```
+luto/                     # Main package directory
+├── economics/           # Economic models and calculations
+│   ├── agricultural/    # Agricultural economics modules
+│   ├── non_agricultural/ # Non-agricultural economics modules
+│   └── off_land_commodity/ # Off-land commodity economics
+├── solvers/             # Optimization solvers and algorithms
+├── tests/               # Unit and integration tests
+└── tools/               # Utility tools and scripts
+    ├── create_task_runs/ # Task execution scripts
+    ├── Manual_jupyter_books/ # Jupyter notebooks for manual processes
+    └── report/          # Reporting and visualization tools
+        ├── Assets/      # Static assets for reports
+        ├── data_tools/  # Data processing utilities for reports
+        └── map_tools/   # Mapping and spatial visualization tools
+
+input/                   # Input data directory
+output/                  # Simulation outputs directory
+docs/                    # Documentation files
+```
+
 ## Steps to Run LUTO2
 1. Clone the repository:
    ```sh
