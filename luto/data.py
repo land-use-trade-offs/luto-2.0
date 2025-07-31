@@ -403,7 +403,7 @@ class Data:
         self.LMMAP = self.LMMAP_NO_RESFACTOR[self.MASK]
         self.add_lmmap(self.YR_CAL_BASE, self.LMMAP)
 
-        # Initial (2010) agricutural management maps - no cells are used for alternative agricultural management options.
+        # Initial (2010) agricultural management maps - no cells are used for alternative agricultural management options.
         # Includes a separate AM map for each agricultural management option, because they can be stacked.
         self.AG_MAN_DESC = [am for am in settings.AG_MANAGEMENTS if settings.AG_MANAGEMENTS[am]]
         self.AG_MAN_LU_DESC = {am:settings.AG_MANAGEMENTS_TO_LAND_USES[am] for am in self.AG_MAN_DESC}

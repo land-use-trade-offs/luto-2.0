@@ -244,21 +244,26 @@ def create_task_runs(
 
 
 
-
-      
-def return_empty_df(json_dir_path, filename):
-    run_idx = re.compile(r'(Run_\d+)').findall(json_dir_path)[0]
-    print(f'{run_idx}: File missing - {filename}!')
-    return pd.DataFrame({'year': [], 'val': [], 'name': []})
-
 def return_zipped_df(json_dir_path, filename):
     with zipfile.ZipFile(os.path.join(json_dir_path), 'r') as zip_ref:
         with zip_ref.open(f'data/{filename}') as f:
-            return pd.json_normalize(json.load(f), 'data', ['name']).rename(columns={0: 'year', 1: 'val'})
+            return pd.concat([
+                pd.json_normalize(record, 'data', ['name'])\
+                    .rename(columns={0: 'year', 1: 'val'})\
+                    .assign(region=region)
+                for region,record in json.load(f).items()
+            ])
 
 def return_plain_df(json_dir_path, filename):
     with open(os.path.join(json_dir_path, filename), 'r') as f:
-        return pd.json_normalize(json.load(f), 'data', ['name']).rename(columns={0: 'year', 1: 'val'})
+        return pd.concat([
+            pd.json_normalize(record, 'data', ['name'])\
+                .rename(columns={0: 'year', 1: 'val'})\
+                .assign(region=region)
+            for region,record in json.load(f).items()
+        ])
+
+
 
 def load_json_data(json_dir_path, filename):
     if json_dir_path.endswith('.zip'):
@@ -269,17 +274,17 @@ def load_json_data(json_dir_path, filename):
 
 
 def process_area_all_lu(json_dir_path):
-    return load_json_data(json_dir_path, 'area_1_total_area_wide.json')
+    return load_json_data(json_dir_path, 'Area_overview_1_Land-use.json')
 
 def process_area_non_ag_lu(json_dir_path):
-    return load_json_data(json_dir_path, 'area_3_non_ag_lu_area_wide.json')
+    return load_json_data(json_dir_path, 'Area_NonAg_1_Land-use.json')
 
 def process_area_ag_man(json_dir_path):
-    return load_json_data(json_dir_path, 'area_4_am_total_area_wide.json')
+    return load_json_data(json_dir_path, 'Area_Am_3_Land-use.json')
 
 def process_economic_data(json_dir_path):
-    df = load_json_data(json_dir_path, 'economics_0_rev_cost_all_wide.json')
-    return df
+    return load_json_data(json_dir_path, 'Economics_overview.json')
+
 
 def process_transition_cost_data(json_dir_path):
     if json_dir_path.endswith('.zip'):
@@ -308,24 +313,24 @@ def process_transition_cost_data(json_dir_path):
 
 
 def process_production_quantity_data(json_dir_path):
-    return load_json_data(json_dir_path, 'production_5_6_demand_Production_commodity_from_LUTO.json')
+    return load_json_data(json_dir_path, 'Production_sum_1_Commodity.json')
 
 def process_production_deviation_data(json_dir_path):
-    df = load_json_data(json_dir_path, 'production_6_demand_achievement_commodity.json')
+    df = load_json_data(json_dir_path, 'Production_achive_percent.json')
     df['val'] = df['val'] - 100 # Achiment percent to deviation percent
     return df
 
 def process_GHG_deviation_data(json_dir_path):
-    df = load_json_data(json_dir_path, 'GHG_2_individual_emission_Mt.json')
-    df_target = df.query('name == "GHG emissions limit"')
+    df = load_json_data(json_dir_path, 'GHG_overview.json').query('region == "AUSTRALIA"')
+    df_target = df.query('name == "GHG emission limit"')
     df_actual = df.query('name == "Net emissions"')
-    df_deviation = df_target.merge(df_actual, on='year', suffixes=('_target', '_actual'))
+    df_deviation = df_target.merge(df_actual, on=['year','region'], suffixes=('_target', '_actual'))
     df_deviation['name'] = 'GHG deviation'
     df_deviation['val'] = df_deviation['val_actual'] - df_deviation['val_target']
     return df_deviation
 
 def process_bio_obj_data(json_dir_path):
-    return load_json_data(json_dir_path, 'biodiversity_priority_1_total_score_by_type.json')
+    return load_json_data(json_dir_path, 'BIO_GBF2_overview_1_Type.json')
 
 
 
@@ -335,20 +340,20 @@ def get_report_df(json_dir_path, run_paras):
     df_area_non_ag_lu = process_area_non_ag_lu(json_dir_path)
     df_area_ag_man = process_area_ag_man(json_dir_path)
     df_economy = process_economic_data(json_dir_path)
-    df_transition_cost = process_transition_cost_data(json_dir_path)
+    # df_transition_cost = process_transition_cost_data(json_dir_path)
     df_ghg_deviation = process_GHG_deviation_data(json_dir_path)
     df_demand_deviation = process_production_deviation_data(json_dir_path)
     df_bio_objective = process_bio_obj_data(json_dir_path)
 
     report_df = pd.concat([
-        df_area_all_lu[['year', 'name', 'val']].assign(Type='Area_all_lu_million_km2'),
-        df_area_non_ag_lu[['year', 'name', 'val']].assign(Type='Area_non_ag_lu_million_km2'),
-        df_area_ag_man[['year', 'name', 'val']].assign(Type='Area_ag_man_million_km2'),
-        df_economy[['year', 'name', 'val']].assign(Type='Economic_billion_AUD'),
-        df_transition_cost[['year', 'name', 'val']].assign(Type='Transition_cost_million_AUD'),
-        df_demand_deviation[['year', 'name', 'val']].assign(Type='Production_deviation_pct'),
-        df_ghg_deviation[['year', 'name', 'val']].assign(Type='GHG_Deviation_pct'),
-        df_bio_objective[['year', 'name', 'val']].assign(Type='Biodiversity_obj_score'),
+        df_area_all_lu[['year', 'name', 'region', 'val']].assign(Type='Area_all_lu_ha'),
+        df_area_non_ag_lu[['year', 'name', 'region', 'val']].assign(Type='Area_non_ag_lu_ha'),
+        df_area_ag_man[['year', 'name', 'region', 'val']].assign(Type='Area_ag_man_ha'),
+        df_economy[['year', 'name', 'region', 'val']].assign(Type='Economic_billion_AUD'),
+        # df_transition_cost[['year', 'name', 'region', 'val']].assign(Type='Transition_cost_AUD'),
+        df_demand_deviation[['year', 'name', 'region', 'val']].assign(Type='Production_deviation_pct'),
+        df_ghg_deviation[['year', 'name', 'region', 'val']].assign(Type='GHG_Deviation_pct'),
+        df_bio_objective[['year', 'name', 'region', 'val']].assign(Type='Biodiversity_obj_score'),
     ]).assign(**run_paras).reset_index(drop=True)
 
     return report_df
@@ -388,7 +393,10 @@ def process_task_root_dirs(task_root_dir, n_workers=10):
         
         
     # Concatenate the results, only keep the columns with more than 1 unique value
-    out_df = pd.concat(tqdm(Parallel(n_jobs=n_workers, return_as='generator')(tasks), total=len(tasks)), ignore_index=True)
+    out_df = pd.concat(
+        tqdm(Parallel(n_jobs=n_workers, return_as='generator')(tasks), total=len(tasks)), 
+        ignore_index=True
+    )
     
     return out_df
 

@@ -55,7 +55,7 @@ RAW_DATA = '../raw_data'
 # Scenario parameters.                                                                  #
 # ---------------------------------------------------------------------------- #
 
-# Climate change assumptions. Options include '126', '245', '360', '585'
+# Climate change assumptions. Options include '126', '245', '370', '585'
 SSP = '245'
 RCP = 'rcp' + SSP[1] + 'p' + SSP[2] # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 

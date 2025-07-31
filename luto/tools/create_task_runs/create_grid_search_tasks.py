@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250702_RES3_CUT_20_GBF2_1YR' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250731_RES3_RCP_GHG_CUT_SENSITIVITI' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -37,7 +37,7 @@ grid_search = {
     ###############################################################
     'MEM': ['64GB'],
     'NCPUS':[16],
-    'TIME': ['0:20:00'],
+    'TIME': ['6:00:00'],
     'QUEUE': ['normalsr'],
     
  
@@ -46,8 +46,8 @@ grid_search = {
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                         # 'maxprofit' or 'mincost'
     'RESFACTOR': [3],
-    'SIM_YEARS': [list(range(2010,2051,1))],                            # Years to run the model 
-    'WRITE_THREADS': [8],
+    'SIM_YEARS': [list(range(2020,2051,5))],                            # Years to run the model 
+    'WRITE_THREADS': [2],
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'KEEP_OUTPUTS': [True],                                             # If False, only keep report HTML
     
@@ -55,6 +55,11 @@ grid_search = {
     ###############################################################
     # Model run settings
     ###############################################################
+    
+    
+    # --------------- Scenarios ---------------
+    'SSP': ['245', '370'],                   #'126', '245', '370', '585'
+    
 
     # --------------- Target deviation weight ---------------
     'SOLVER_WEIGHT_DEMAND': [1], 
@@ -68,7 +73,7 @@ grid_search = {
        
     
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['low','medium'],                                 # 'off', 'low', 'medium', 'high'
+    'GHG_EMISSIONS_LIMITS': ['low','high'],                                 # 'off', 'low', 'medium', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],                                    # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                                          # True or False
@@ -83,10 +88,10 @@ grid_search = {
     # --------------- Biodiversity overall ---------------
     'HABITAT_CONDITION': ['USER_DEFINED'],                              # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
     'CONNECTIVITY_SOURCE': ['NCI'],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20],
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20, 30, 40, 50],  # Percentage of degraded areas to cut in GBF2 priority areas
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSITY_TARGET_GBF_2': ['off', 'medium','high'],                              # 'off', 'low', 'medium', 'high'
+    'BIODIVERSITY_TARGET_GBF_2': ['medium','high'],                     # 'off', 'low', 'medium', 'high'
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                   # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
@@ -131,9 +136,9 @@ if __name__ == '__main__':
     grid_search_param_df = get_grid_search_param_df(TASK_ROOT_DIR, grid_search)
     grid_search_settings_df = get_grid_search_settings_df(TASK_ROOT_DIR, default_settings_df, grid_search_param_df)
 
-    # # 1) Submit task to a single linux machine, and run simulations parallely
-    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
+    # 1) Submit task to a single linux machine, and run simulations parallely
+    # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='single', n_workers=min(len(grid_search_param_df), 100))
 
     # 2) Submit task to multiple linux computation nodes
-    # create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 200)
+    create_task_runs(TASK_ROOT_DIR, grid_search_settings_df, mode='cluster', max_concurrent_tasks = 200)
 
