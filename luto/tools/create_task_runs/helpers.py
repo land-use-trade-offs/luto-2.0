@@ -273,14 +273,14 @@ def load_json_data(json_dir_path, filename):
 
 
 
-def process_area_all_lu(json_dir_path):
-    return load_json_data(json_dir_path, 'Area_overview_1_Land-use.json')
+def process_area_category(json_dir_path):
+    return load_json_data(json_dir_path, 'Area_overview_2_Category.json')
 
 def process_area_non_ag_lu(json_dir_path):
     return load_json_data(json_dir_path, 'Area_NonAg_1_Land-use.json')
 
 def process_area_ag_man(json_dir_path):
-    return load_json_data(json_dir_path, 'Area_Am_3_Land-use.json')
+    return load_json_data(json_dir_path, 'Area_Am_1_Type.json')
 
 def process_economic_data(json_dir_path):
     return load_json_data(json_dir_path, 'Economics_overview.json')
@@ -320,6 +320,9 @@ def process_production_deviation_data(json_dir_path):
     df['val'] = df['val'] - 100 # Achiment percent to deviation percent
     return df
 
+def process_GHG_data(json_dir_path):
+    return load_json_data(json_dir_path, 'GHG_overview.json')
+
 def process_GHG_deviation_data(json_dir_path):
     df = load_json_data(json_dir_path, 'GHG_overview.json').query('region == "AUSTRALIA"')
     df_target = df.query('name == "GHG emission limit"')
@@ -336,22 +339,24 @@ def process_bio_obj_data(json_dir_path):
 
 def get_report_df(json_dir_path, run_paras):
     
-    df_area_all_lu = process_area_all_lu(json_dir_path)
+    df_area_all_lu = process_area_category(json_dir_path)
     df_area_non_ag_lu = process_area_non_ag_lu(json_dir_path)
     df_area_ag_man = process_area_ag_man(json_dir_path)
     df_economy = process_economic_data(json_dir_path)
     # df_transition_cost = process_transition_cost_data(json_dir_path)
+    df_ghg = process_GHG_data(json_dir_path)
     df_ghg_deviation = process_GHG_deviation_data(json_dir_path)
     df_demand_deviation = process_production_deviation_data(json_dir_path)
     df_bio_objective = process_bio_obj_data(json_dir_path)
 
     report_df = pd.concat([
-        df_area_all_lu[['year', 'name', 'region', 'val']].assign(Type='Area_all_lu_ha'),
+        df_area_all_lu[['year', 'name', 'region', 'val']].assign(Type='Area_broad_category_ha'),
         df_area_non_ag_lu[['year', 'name', 'region', 'val']].assign(Type='Area_non_ag_lu_ha'),
         df_area_ag_man[['year', 'name', 'region', 'val']].assign(Type='Area_ag_man_ha'),
-        df_economy[['year', 'name', 'region', 'val']].assign(Type='Economic_billion_AUD'),
+        df_economy[['year', 'name', 'region', 'val']].assign(Type='Economic_AUD'),
         # df_transition_cost[['year', 'name', 'region', 'val']].assign(Type='Transition_cost_AUD'),
         df_demand_deviation[['year', 'name', 'region', 'val']].assign(Type='Production_deviation_pct'),
+        df_ghg[['year', 'name', 'region', 'val']].assign(Type='GHG_emissions_tCO2e'),
         df_ghg_deviation[['year', 'name', 'region', 'val']].assign(Type='GHG_Deviation_pct'),
         df_bio_objective[['year', 'name', 'region', 'val']].assign(Type='Biodiversity_obj_score'),
     ]).assign(**run_paras).reset_index(drop=True)
