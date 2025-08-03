@@ -104,6 +104,22 @@ def save_report_data(raw_data_dir:str):
         else:
             return 'Unknown'
         
+    def format_with_suffix(x):
+            if pd.isna(x) or x == 0:
+                return "0"
+            suffixes = ['', 'K', 'M', 'B', 'T']
+            # Determine the appropriate suffix
+            magnitude = 0
+            while abs(x) >= 1000 and magnitude < len(suffixes)-1:
+                magnitude += 1
+                x /= 1000.0
+            # Format with 2 significant digits
+            if x < 10:
+                formatted = f"{x:.2f}"
+            else:
+                formatted = f"{int(round(x))}"
+            return f"{formatted} {suffixes[magnitude]}"
+        
         
 
     ####################################################
@@ -131,6 +147,7 @@ def save_report_data(raw_data_dir:str):
 
     lu_group_raw = pd.read_csv('luto/tools/report/Assets/lu_group.csv')
     colors_lu_category = lu_group_raw.set_index('Category')['color_HEX'].to_dict()
+    colors_lu_category.update({'Agri-Management': "#D5F100"})
     lu_group = lu_group_raw.set_index(['Category', 'color_HEX'])\
         .apply(lambda x: x.str.split(', ').explode())\
         .reset_index()
@@ -156,6 +173,7 @@ def save_report_data(raw_data_dir:str):
         .sort_values(['Year', 'Area_type', 'Area (ha)'], ascending=[True, True, False])\
         .assign(Rank='N.A.', Percent=100, region='AUSTRALIA')\
         .round({'Percent': 2, 'Area (ha)': 2})
+    
         
     area_ranking_total = pd.concat([ag_dvar_area, non_ag_dvar_area, am_dvar_area])\
         .assign(Area_type=lambda x: x.apply(get_rank_area_type, axis=1))\
@@ -195,9 +213,8 @@ def save_report_data(raw_data_dir:str):
 
         df = df.drop('region', axis=1)
         out_dict[region][area_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
-        out_dict[region][area_type]['Percent'] = df.set_index('Year')['Percent'].replace({np.nan: 0}).to_dict()
         out_dict[region][area_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
-        out_dict[region][area_type]['value'] = df.set_index('Year')['Area (ha)'].apply(lambda x: f"{x:.2e}" if pd.notna(x) else 0).to_dict()
+        out_dict[region][area_type]['value'] = df.set_index('Year')['Area (ha)'].apply( lambda x: format_with_suffix(x)).to_dict()
 
     with open(f'{SAVE_DIR}/Area_ranking.json', 'w') as f:
         json.dump(out_dict, f, indent=2)
@@ -208,11 +225,15 @@ def save_report_data(raw_data_dir:str):
     area_ag_nonag = area_ag_nonag.replace(RENAME_AM_NON_AG)    
     area_ag_nonag = area_ag_nonag.merge(lu_group, left_on='Land-use', right_on='Land-use', how='left')
     
+    area_all = pd.concat([
+        area_ag_nonag, 
+        am_dvar_area.assign(**{'Land-use':'Agri-Management', 'Category':'Agri-Management'})], ignore_index=True)
+
     group_cols = ['Land-use', 'Category']
     
     for idx, col in enumerate(group_cols):
 
-        df_AUS = area_ag_nonag\
+        df_AUS = area_all\
             .groupby(['Year', col])[['Area (ha)']]\
             .sum()\
             .reset_index()\
@@ -225,7 +246,7 @@ def save_report_data(raw_data_dir:str):
         df_AUS_wide['type'] = 'column'
         
         
-        df_region = area_ag_nonag\
+        df_region = area_all\
             .groupby(['Year', 'region', col])\
             .sum()\
             .reset_index()\
@@ -910,11 +931,27 @@ def save_report_data(raw_data_dir:str):
         ).reset_index(
         ).assign(**{'Value ($)': lambda x: abs(x['Value ($)'])}
         ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
-        ).assign(Rank='N.A.', Percent=100, Source='Cost', region='AUSTRALIA'
+        ).assign(Rank='N.A.',  Source='Cost', region='AUSTRALIA'
         ).round({'Value ($)': 2, 'Percent': 2})
- 
+        
+    profit_df_region = revenue_df_region.merge(
+        cost_df_region, on=['Year', 'region'], suffixes=('_revenue', '_cost')
+        ).assign(**{'Value ($)': lambda x: x['Value ($)_revenue'] - x['Value ($)_cost']}
+        ).drop(columns=['Value ($)_revenue', 'Value ($)_cost']
+        ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
+        ).assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1
+        ).assign(Percent=lambda x: x['Value ($)'] / x.groupby(['Year'])['Value ($)'].transform('sum') * 100
+        ).assign(Source='Total'
+        ).round({'Value ($)': 2, 'Percent': 2})
+    profit_df_AUS = revenue_df_AUS.merge(
+        cost_df_AUS, on=['Year'], suffixes=('_revenue', '_cost')
+        ).assign(**{'Value ($)': lambda x: x['Value ($)_revenue'] - x['Value ($)_cost']}
+        ).drop(columns=['Value ($)_revenue', 'Value ($)_cost']
+        ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
+        ).assign(Rank='N.A.', Source='Total', region='AUSTRALIA'
+        ).round({'Value ($)': 2, 'Percent': 2})
 
-    ranking_df = pd.concat([revenue_df_region, revenue_df_AUS, cost_df_region, cost_df_AUS])
+    ranking_df = pd.concat([revenue_df_region, revenue_df_AUS, cost_df_region, cost_df_AUS, profit_df_region, profit_df_AUS])
     ranking_df = ranking_df.set_index(['region', 'Source', 'Year']
         ).reindex(
             index=pd.MultiIndex.from_product(
@@ -934,9 +971,8 @@ def save_report_data(raw_data_dir:str):
         
         df = df.drop(columns='region')
         out_dict[region][source]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
-        out_dict[region][source]['Percent'] = df.set_index('Year')['Percent'].replace({np.nan: 0}).to_dict()
         out_dict[region][source]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
-        out_dict[region][source]['value'] = df.set_index('Year')['Value ($)'].apply(lambda x: f"{x:.2e}" if pd.notna(x) else 0).to_dict()
+        out_dict[region][source]['value'] = df.set_index('Year')['Value ($)'].apply( lambda x: format_with_suffix(x)).to_dict()
 
     with open(f'{SAVE_DIR}/Economics_ranking.json', 'w') as f:
         json.dump(out_dict, f, indent=2)
@@ -1643,12 +1679,27 @@ def save_report_data(raw_data_dir:str):
             .sort_values(['Year', 'Value (t CO2e)'], ascending=[True, False])\
             .assign(Rank='N.A.', Area_type='Total', Percent=100, region='AUSTRALIA')\
             .assign(Type='GHG sequestrations')
+            
+        GHG_rank_region_net = GHG_rank_emission_region\
+            .merge(GHG_rank_sequestration_region, on=['Year', 'region'], how='outer', suffixes=('_emission', '_sequestration'))\
+            .assign(**{'Value (t CO2e)_sequestration': lambda x: abs(x['Value (t CO2e)_sequestration'])})\
+            .assign(**{'Value (t CO2e)': lambda x: x['Value (t CO2e)_emission'] - x['Value (t CO2e)_sequestration']})\
+            .assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1)\
+            .assign(Type='Total')
+        GHG_rank_AUS_net = GHG_rank_emission_AUS\
+            .merge(GHG_rank_sequestration_AUS, on=['Year'], how='outer', suffixes=('_emission', '_sequestration'))\
+            .assign(**{'Value (t CO2e)_sequestration': lambda x: abs(x['Value (t CO2e)_sequestration'])})\
+            .assign(**{'Value (t CO2e)': lambda x: x['Value (t CO2e)_emission'] - x['Value (t CO2e)_sequestration']})\
+            .assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1)\
+            .assign(Type='Total', region='AUSTRALIA')
 
         GHG_rank = pd.concat([
             GHG_rank_emission_region, 
             GHG_rank_emission_AUS,
             GHG_rank_sequestration_region, 
-            GHG_rank_sequestration_AUS
+            GHG_rank_sequestration_AUS,
+            GHG_rank_region_net,
+            GHG_rank_AUS_net
             ], axis=0, ignore_index=True).reset_index(drop=True)
         GHG_rank = GHG_rank\
             .reset_index(drop=True)\
@@ -1672,12 +1723,13 @@ def save_report_data(raw_data_dir:str):
 
             df = df.drop(columns='region')
             out_dict[region][e_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
-            out_dict[region][e_type]['Percent'] = df.set_index('Year')['Percent'].replace({np.nan: 0}).to_dict()
             out_dict[region][e_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
-            out_dict[region][e_type]['value'] = df.set_index('Year')['Value (t CO2e)'].apply(lambda x: f"{x:.2e}" if pd.notna(x) else 0).to_dict()
+            out_dict[region][e_type]['value'] = df.set_index('Year')['Value (t CO2e)'].apply( lambda x: format_with_suffix(x)).to_dict()
 
         with open(f'{SAVE_DIR}/GHG_ranking.json', 'w') as f:
             json.dump(out_dict, f, indent=2)
+            
+            
 
 
 
@@ -2094,7 +2146,7 @@ def save_report_data(raw_data_dir:str):
         out_dict[region][w_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
         out_dict[region][w_type]['Percent'] = df.set_index('Year')['Percent'].replace({np.nan: 0}).to_dict()
         out_dict[region][w_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
-        out_dict[region][w_type]['value'] = df.set_index('Year')['Value (ML)'].apply(lambda x: f"{x:.2e}" if pd.notna(x) else 0).to_dict()
+        out_dict[region][w_type]['value'] = df.set_index('Year')['Value (ML)'].apply( lambda x: format_with_suffix(x)).to_dict()
 
     with open(f'{SAVE_DIR}/Water_ranking.json', 'w') as f:
         json.dump(out_dict, f, indent=2)
@@ -2320,7 +2372,7 @@ def save_report_data(raw_data_dir:str):
         out_dict[region][b_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
         out_dict[region][b_type]['Percent'] = df.set_index('Year')['Percent'].replace({np.nan: 0}).to_dict()
         out_dict[region][b_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
-        out_dict[region][b_type]['value'] = df.set_index('Year')['Area Weighted Score (ha)'].apply(lambda x: f"{x:.2e}" if pd.notna(x) else 0).to_dict()
+        out_dict[region][b_type]['value'] = df.set_index('Year')['Area Weighted Score (ha)'].apply( lambda x: format_with_suffix(x)).to_dict()
 
         
     with open(f'{SAVE_DIR}/Biodiversity_ranking.json', 'w') as f:
