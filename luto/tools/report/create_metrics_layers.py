@@ -95,6 +95,7 @@ def map2base64(data:Data, arr_lyr:xr.DataArray, attrs:dict) -> dict|None:
 def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str) -> dict:
         
         # Loop through each year
+        task = []
         for _,row in files_df.iterrows():
             
             # Keep the cell dimension as the only chunked dimension
@@ -115,17 +116,16 @@ def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str) -> dict:
             loop_sel = [dict(zip(loop_dims, val)) for val in dim_vals]
 
             # Parallel processing to convert each map to base64
-            task = []
             for sel in loop_sel:
                 arr_sel = xr_arr.sel(**sel)
                 task.append(
                     delayed(map2base64)(data, arr_sel, {'key':"_".join(sel.values()), 'year': _year})
                 )
-            results = Parallel(n_jobs=10)(task)
-            
 
         # Gather results and save to JSON
+        results = Parallel(n_jobs=-1)(task)
         results = [res for res in results if res is not None]
+        
         output = {}
         for attr, val in results:
             output.setdefault(attr['key'], {})
@@ -172,5 +172,11 @@ def save_report_layer(data:Data, raw_data_dir:str):
 
     area_ag = files_area.query(f'base_name.str.contains("agricultural_landuse")')
     get_map_obj(data, area_ag, f'{SAVE_DIR}/map_metrics/area_Ag.json')
+    
+    area_am = files_area.query(f'base_name.str.contains("agricultural_management")')
+    get_map_obj(data, area_am, f'{SAVE_DIR}/map_metrics/area_Am.json')
+    
+    area_nonag = files_area.query(f'base_name.str.contains("non_agricultural_landuse")')
+    get_map_obj(data, area_nonag, f'{SAVE_DIR}/map_metrics/area_NonAg.json')
 
 
