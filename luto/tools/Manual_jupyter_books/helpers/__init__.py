@@ -81,10 +81,10 @@ def arr_to_xr(data, arr:np.ndarray) -> xr.DataArray:
         np.place(arr_2d, data.NLUM_MASK, arr)
     else:
         geo_meta = data.GEO_META
-        map_resfactored = data.LUMAP_2D_RESFACTORED.copy().astype(np.float32)
+        arr_2d = data.LUMAP_2D_RESFACTORED.copy().astype(np.float32)
         np.place(
-            map_resfactored, 
-            (map_resfactored != data.MASK_LU_CODE) & (map_resfactored != data.NODATA), 
+            arr_2d, 
+            (arr_2d != data.MASK_LU_CODE) & (arr_2d != data.NODATA), 
             arr
         )                    
 
