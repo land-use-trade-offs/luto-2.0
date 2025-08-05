@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU General Public License along with
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
+
 import json
 import os
 import base64
@@ -27,9 +28,12 @@ import xarray as xr
 from io import BytesIO
 from PIL import Image
 from joblib import delayed, Parallel
+from tqdm.auto import tqdm
+from collections import defaultdict
 
 from luto import settings
 from luto.data import Data
+from luto.tools import start_memory_monitor, stop_memory_monitor
 from luto.tools.report.data_tools import get_all_files
 from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
 from luto.tools.report.map_tools import hex_color_to_numeric
@@ -55,7 +59,7 @@ def array_to_base64(arr_4band: np.ndarray, bbox: list) -> dict:
 
 
 
-def map2base64(data:Data, arr_lyr:xr.DataArray, attrs:dict) -> dict|None:
+def map2base64(data:Data, arr_lyr:xr.DataArray, attrs:tuple) -> dict|None:
 
         arr_lyr = arr_lyr.compute()
         
@@ -91,48 +95,53 @@ def map2base64(data:Data, arr_lyr:xr.DataArray, attrs:dict) -> dict|None:
         return attrs, array_to_base64(arr_4band, bbox)
     
     
+def tuple_dict_to_nested(flat_dict):
+            nested = {}
+            for key_tuple, value in flat_dict.items():
+                current = nested
+                for key in key_tuple[:-1]:
+                    current = current.setdefault(key, {})
+                current[key_tuple[-1]] = value
+            return nested
     
-def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str) -> dict:
+    
+    
+def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=-1) -> dict:
         
-        # Loop through each year
-        task = []
-        for _,row in files_df.iterrows():
-            
-            # Keep the cell dimension as the only chunked dimension
-            xr_arr = xr.open_dataarray(row.path)
-            chunk_size = {dim:1 for dim in xr_arr.dims if dim != 'cell'}
-            chunk_size.update({'cell': data.NCELLS})  
-            xr_arr = xr_arr.chunk(chunk_size)
-            _year = row['Year']
-            
-            # Permute the selections
-            loop_dims = set(xr_arr.dims) - set(['cell'])
-            
-            dim_vals = pd.MultiIndex.from_product(
-                [xr_arr[dim].values for dim in loop_dims],
-                names=loop_dims
-            ).to_list()
+    # Get Permute info
+    arr_eg = xr.load_dataarray(files_df.iloc[0]['path'])
+    loop_dims = set(arr_eg.dims) - set(['cell'])
+    
+    dim_vals = pd.MultiIndex.from_product(
+        [arr_eg[dim].values for dim in loop_dims],
+        names=loop_dims
+    ).to_list()
 
-            loop_sel = [dict(zip(loop_dims, val)) for val in dim_vals]
+    loop_sel = [dict(zip(loop_dims, val)) for val in dim_vals]
+    
+    # Loop through each year
+    task = []
+    for _,row in files_df.iterrows():
+        xr_arr = xr.open_dataarray(row.path)
+        chunk_size = {dim:1 for dim in xr_arr.dims if dim != 'cell'}
+        chunk_size.update({'cell': data.NCELLS})  
+        xr_arr = xr_arr.chunk(chunk_size)
+        _year = row['Year']
+        for sel in loop_sel:
+            arr_sel = xr_arr.sel(**sel)
+            task.append(
+                delayed(map2base64)(data, arr_sel, tuple(list(sel.values()) + [_year]))
+            )
 
-            # Parallel processing to convert each map to base64
-            for sel in loop_sel:
-                arr_sel = xr_arr.sel(**sel)
-                task.append(
-                    delayed(map2base64)(data, arr_sel, {'key':"_".join(sel.values()), 'year': _year})
-                )
-
-        # Gather results and save to JSON
-        results = Parallel(n_jobs=-1)(task)
-        results = [res for res in results if res is not None]
+    # Gather results and save to JSON
+    output = {}
+    for res in tqdm(Parallel(n_jobs=workers, return_as='generator')(task), total=len(task)):
+        if res is None:continue
+        attr, val = res
+        output[attr] = val
         
-        output = {}
-        for attr, val in results:
-            output.setdefault(attr['key'], {})
-            output[attr['key']][attr['year']] = val
-            
-        with open(save_path, 'w') as f:
-            json.dump(output, f, indent=2)
+    with open(save_path, 'w') as f:
+        json.dump(tuple_dict_to_nested(output), f, indent=2)
 
 
 
@@ -167,16 +176,130 @@ def save_report_layer(data:Data, raw_data_dir:str):
     ####################################################
     #                   1) Area Layer                  #
     ####################################################
-    
+
     files_area = files.query('base_name.str.contains("area")')
 
-    area_ag = files_area.query(f'base_name.str.contains("agricultural_landuse")')
+    area_ag = files_area.query('base_name == "xr_area_agricultural_landuse"')
     get_map_obj(data, area_ag, f'{SAVE_DIR}/map_metrics/area_Ag.json')
-    
-    area_am = files_area.query(f'base_name.str.contains("agricultural_management")')
+
+    area_am = files_area.query('base_name == "xr_area_agricultural_management"')
     get_map_obj(data, area_am, f'{SAVE_DIR}/map_metrics/area_Am.json')
-    
-    area_nonag = files_area.query(f'base_name.str.contains("non_agricultural_landuse")')
+
+    area_nonag = files_area.query('base_name == "xr_area_non_agricultural_landuse"')
     get_map_obj(data, area_nonag, f'{SAVE_DIR}/map_metrics/area_NonAg.json')
 
+    ####################################################
+    #                  2) Biodiversity                 #
+    ####################################################
 
+    files_bio = files.query('base_name.str.contains("biodiversity")')
+
+    # GBF2
+    bio_GBF2_ag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag"')
+    get_map_obj(data, bio_GBF2_ag, f'{SAVE_DIR}/map_metrics/bio_GBF2_Ag.json')
+
+    bio_GBF2_am = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag_management"')
+    get_map_obj(data, bio_GBF2_am, f'{SAVE_DIR}/map_metrics/bio_GBF2_Am.json')
+
+    bio_GBF2_nonag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_non_ag"')
+    get_map_obj(data, bio_GBF2_nonag, f'{SAVE_DIR}/map_metrics/bio_GBF2_NonAg.json')
+
+    # Overall priority
+    bio_overall_ag = files_bio.query('base_name == "xr_biodiversity_overall_priority_ag"')
+    get_map_obj(data, bio_overall_ag, f'{SAVE_DIR}/map_metrics/bio_overall_Ag.json')
+
+    bio_overall_am = files_bio.query('base_name == "xr_biodiversity_overall_priority_ag_management"')
+    get_map_obj(data, bio_overall_am, f'{SAVE_DIR}/map_metrics/bio_overall_Am.json')
+
+    bio_overall_nonag = files_bio.query('base_name == "xr_biodiversity_overall_priority_non_ag"')
+    get_map_obj(data, bio_overall_nonag, f'{SAVE_DIR}/map_metrics/bio_overall_NonAg.json')
+
+    ####################################################
+    #                    3) Cost                       #
+    ####################################################
+
+    files_cost = files.query('base_name.str.contains("cost")')
+
+    cost_ag = files_cost.query('base_name == "xr_cost_ag"')
+    get_map_obj(data, cost_ag, f'{SAVE_DIR}/map_metrics/cost_Ag.json')
+
+    cost_am = files_cost.query('base_name == "xr_cost_agricultural_management"')
+    get_map_obj(data, cost_am, f'{SAVE_DIR}/map_metrics/cost_Am.json')
+
+    cost_nonag = files_cost.query('base_name == "xr_cost_non_ag"')
+    get_map_obj(data, cost_nonag, f'{SAVE_DIR}/map_metrics/cost_NonAg.json')
+
+    cost_transition = files_cost.query('base_name == "xr_cost_transition_ag2ag"')
+    get_map_obj(data, cost_transition, f'{SAVE_DIR}/map_metrics/cost_transition.json')
+
+    ####################################################
+    #                    4) GHG                        #
+    ####################################################
+
+    files_ghg = files.query('base_name.str.contains("GHG")')
+
+    ghg_ag = files_ghg.query('base_name == "xr_GHG_ag"')
+    get_map_obj(data, ghg_ag, f'{SAVE_DIR}/map_metrics/GHG_Ag.json')
+
+    ghg_am = files_ghg.query('base_name == "xr_GHG_ag_management"')
+    get_map_obj(data, ghg_am, f'{SAVE_DIR}/map_metrics/GHG_Am.json')
+
+    ghg_nonag = files_ghg.query('base_name == "xr_GHG_non_ag"')
+    get_map_obj(data, ghg_nonag, f'{SAVE_DIR}/map_metrics/GHG_NonAg.json')
+
+    ####################################################
+    #                  5) Quantities                   #
+    ####################################################
+
+    files_quantities = files.query('base_name.str.contains("quantities")')
+
+    quantities_ag = files_quantities.query('base_name == "xr_quantities_agricultural"')
+    get_map_obj(data, quantities_ag, f'{SAVE_DIR}/map_metrics/quantities_Ag.json')
+
+    quantities_am = files_quantities.query('base_name == "xr_quantities_agricultural_management"')
+    get_map_obj(data, quantities_am, f'{SAVE_DIR}/map_metrics/quantities_Am.json')
+
+    quantities_nonag = files_quantities.query('base_name == "xr_quantities_non_agricultural"')
+    get_map_obj(data, quantities_nonag, f'{SAVE_DIR}/map_metrics/quantities_NonAg.json')
+
+    ####################################################
+    #                   6) Revenue                     #
+    ####################################################
+
+    files_revenue = files.query('base_name.str.contains("revenue")')
+
+    revenue_ag = files_revenue.query('base_name == "xr_revenue_ag"')
+    get_map_obj(data, revenue_ag, f'{SAVE_DIR}/map_metrics/revenue_Ag.json')
+
+    revenue_am = files_revenue.query('base_name == "xr_revenue_agricultural_management"')
+    get_map_obj(data, revenue_am, f'{SAVE_DIR}/map_metrics/revenue_Am.json')
+
+    revenue_nonag = files_revenue.query('base_name == "xr_revenue_non_ag"')
+    get_map_obj(data, revenue_nonag, f'{SAVE_DIR}/map_metrics/revenue_NonAg.json')
+
+    ####################################################
+    #                7) Transition Cost                #
+    ####################################################
+
+    files_transition = files.query('base_name.str.contains("transition")')
+
+    transition_cost = files_transition.query('base_name == "xr_transition_cost_ag2non_ag"')
+    get_map_obj(data, transition_cost, f'{SAVE_DIR}/map_metrics/transition_cost.json')
+
+    transition_ghg = files_transition.query('base_name == "xr_transition_GHG"')
+    get_map_obj(data, transition_ghg, f'{SAVE_DIR}/map_metrics/transition_GHG.json')
+
+    ####################################################
+    #                8) Water Yield                    #
+    ####################################################
+
+    files_water = files.query('base_name.str.contains("water_yield")')
+
+    water_ag = files_water.query('base_name == "xr_water_yield_ag"')
+    get_map_obj(data, water_ag, f'{SAVE_DIR}/map_metrics/water_yield_Ag.json')
+
+    water_am = files_water.query('base_name == "xr_water_yield_ag_management"')
+    get_map_obj(data, water_am, f'{SAVE_DIR}/map_metrics/water_yield_Am.json')
+
+    water_nonag = files_water.query('base_name == "xr_water_yield_non_ag"')
+    get_map_obj(data, water_nonag, f'{SAVE_DIR}/map_metrics/water_yield_NonAg.json')
