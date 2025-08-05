@@ -637,9 +637,8 @@ def log_memory_usage(output_dir=settings.OUTPUT_DIR, mode='a', interval=1, stop_
             
             # Write working set memory info (most accurate)
             wset_gb = wset_memory / (1024 * 1024 * 1024)
-            metric_type = "Working Set" if has_wset else "RSS (Working Set unavailable)"
             
-            file.write(f'{timestamp}\t{metric_type}: {wset_gb:.3f}\n')
+            file.write(f'{timestamp}\t{wset_gb:.3f}\n')
             file.flush()
             time.sleep(interval)
 

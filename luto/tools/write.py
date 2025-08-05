@@ -544,11 +544,11 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
         }).assign(Year=yr_cal)
         
     # Save to disk
-    ag_rev_jms.to_csv(os.path.join(path, f'revenue_agricultural_commodity_{yr_cal}.csv'), index=False)
-    ag_cost_jms.to_csv(os.path.join(path, f'cost_agricultural_commodity_{yr_cal}.csv'), index=False)
+    ag_rev_jms.to_csv(os.path.join(path, f'revenue_ag_{yr_cal}.csv'), index=False)
+    ag_cost_jms.to_csv(os.path.join(path, f'cost_ag_{yr_cal}.csv'), index=False)
     
-    save2nc(xr_ag_rev, os.path.join(path, f'xr_revenue_agricultural_commodity_{yr_cal}.nc'))
-    save2nc(xr_ag_cost, os.path.join(path, f'xr_cost_agricultural_commodity_{yr_cal}.nc'))
+    save2nc(xr_ag_rev, os.path.join(path, f'xr_revenue_ag_{yr_cal}.nc'))
+    save2nc(xr_ag_cost, os.path.join(path, f'xr_cost_ag_{yr_cal}.nc'))
 
     return f"Agricultural revenue and cost written for year {yr_cal}"
 
@@ -1086,7 +1086,8 @@ def write_ghg_separate(data: Data, yr_cal, path):
     ag_g_xr = xr.Dataset(ag_ghg.get_ghg_matrices(data, yr_idx, aggregate=False)
         ).rename({'dim_0':'cell'})
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
-        ).assign_coords(region=('cell', data.REGION_NRM_NAME))
+        ).assign_coords(region=('cell', data.REGION_NRM_NAME)
+        ).chunk({'cell': min(1024, data.NCELLS)})
 
     ghg_df = pd.DataFrame()
     
@@ -1180,7 +1181,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
     ghg_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_management_{yr_cal}.csv'), index=False)
     
     # Save xarray data to netCDF
-    save2nc(xr_ghg_ag_man, os.path.join(path, f'xr_GHG_emissions_ag_management_{yr_cal}.nc'))
+    save2nc(xr_ghg_ag_man, os.path.join(path, f'xr_GHG_ag_management_{yr_cal}.nc'))
 
 
     # -------------------------------------------------------------------#
