@@ -39,6 +39,7 @@ from luto import tools
 from luto.data import Data
 from luto.tools.spatializers import create_2d_map
 from luto.tools.compmap import lumap_crossmap, lmmap_crossmap, crossmap_irrstat, crossmap_amstat
+from luto.tools.report.create_metrics_layers import save_report_layer
 
 import luto.economics.agricultural.quantity as ag_quantity                      # ag_quantity has already been calculated and stored in <sim.prod_data>
 import luto.economics.agricultural.revenue as ag_revenue
@@ -115,6 +116,7 @@ def write_data(data: Data):
     TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
     save_report_data(data.path)
     data2html(data.path)
+    save_report_layer(data, data.path)
 
 
 

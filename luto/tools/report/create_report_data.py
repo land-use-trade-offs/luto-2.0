@@ -811,11 +811,11 @@ def save_report_data(raw_data_dir:str):
     ####################################################
     
     # -------------------- Get the revenue and cost data --------------------
-    revenue_ag_df = files.query('base_name == "revenue_agricultural_commodity"').reset_index(drop=True)
+    revenue_ag_df = files.query('base_name == "revenue_ag"').reset_index(drop=True)
     revenue_ag_df = pd.concat([pd.read_csv(path) for path in revenue_ag_df['path']], ignore_index=True)
     revenue_ag_df = revenue_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural land-use (revenue)')
     
-    cost_ag_df = files.query('base_name == "cost_agricultural_commodity"').reset_index(drop=True)
+    cost_ag_df = files.query('base_name == "cost_ag"').reset_index(drop=True)
     cost_ag_df = pd.concat([pd.read_csv(path) for path in cost_ag_df['path']], ignore_index=True)
     cost_ag_df = cost_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural land-use (cost)')
     cost_ag_df['Value ($)'] = cost_ag_df['Value ($)'] * -1          # Convert cost to negative value

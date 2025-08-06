@@ -144,6 +144,10 @@ def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=-1)
         attr, val = res
         output[attr] = val
         
+    if not os.path.exists(save_path):
+        os.makedirs
+        
+        
     with open(save_path, 'w') as f:
         json.dump(tuple_dict_to_nested(output), f, indent=2)
 
@@ -167,8 +171,8 @@ def save_report_layer(data:Data, raw_data_dir:str):
     years = sorted(settings.SIM_YEARS)
 
     # Create the directory if it does not exist
-    if not os.path.exists(SAVE_DIR):
-        os.makedirs(SAVE_DIR)
+    if not os.path.exists(f'{SAVE_DIR}/map_metrics'):
+        os.makedirs(f'{SAVE_DIR}/map_metrics', exist_ok=True)
 
     # Get all LUTO output files and store them in a dataframe
     files = get_all_files(raw_data_dir).query('category == "xarray_layer"')
