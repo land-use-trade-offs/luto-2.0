@@ -445,25 +445,25 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
 
     # Return aggregated dataframes
     ag_q_rc_df = ag_q_rc.groupby('region'
-        ).sum(
+        ).sum('cell'
         ).to_dataframe('Production (t/KL)'
         ).assign(Type='Agricultural'
         ).reset_index()
         
     non_ag_p_rc_df = non_ag_p_rc.groupby('region'
-        ).sum(
+        ).sum('cell'
         ).to_dataframe('Production (t/KL)'
         ).assign(Type='Non-Agricultural'
         ).reset_index()
         
     am_p_rc_df = am_p_rc.groupby('region'
-        ).sum('am'
+        ).sum('cell'
         ).to_dataframe('Production (t/KL)'
         ).assign(Type='Agricultural Management'
         ).reset_index()
     
     # Save the production dataframes to csv
-    quantity_df = pd.concat([ag_q_rc_df, non_ag_p_rc_df, am_p_rc_df], ignore_index=True)
+    quantity_df = pd.concat([ag_q_rc_df, non_ag_p_rc_df, am_p_rc_df], ignore_index=True).query('"Production (t/KL)" > 1e-2')
     quantity_df.to_csv(os.path.join(path, f'quantity_production_t_separate_{yr_cal}.csv'), index=False)
     
     save2nc(ag_q_rc, os.path.join(path, f'xr_quantities_agricultural_{yr_cal}.nc'))
@@ -1088,30 +1088,25 @@ def write_ghg_separate(data: Data, yr_cal, path):
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
         ).assign_coords(region=('cell', data.REGION_NRM_NAME)
         ).chunk({'cell': min(1024, data.NCELLS)})
-
-    ghg_df = pd.DataFrame()
-    
-    for ((GHG_source, lm, lu), da_var) in ag_g_xr.data_vars.items():
-        ghg_e = (da_var * ag_dvar_mrj.sel(lu=lu,lm=lm))
-        df = ghg_e.groupby('region'
-            ).sum('cell'
-            ).to_dataframe('Value (t CO2e)'
-            ).reset_index(
-            ).rename(columns={'lu':'Land-use', 'lm':'Water_supply'}
-            ).assign(Year=yr_cal, Type='Agricultural land-use', Source=GHG_source
-            ).replace({'dry':'Dryland', 'irr':'Irrigated'}
-            ).query('abs(`Value (t CO2e)`) > 1e-3') 
-                  
-        ghg_df = pd.concat([ghg_df, df])
-    
-    # Save table to disk
-    ghg_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_landuse_{yr_cal}.csv'), index=False)
-    
-    # Save xarray data to netCDF
+        
     mindex = pd.MultiIndex.from_tuples(ag_g_xr.data_vars.keys(), names=['GHG_source', 'lm', 'lu'])
     mindex_coords = xr.Coordinates.from_pandas_multiindex(mindex, 'variable')
     ag_g_xr = ag_g_xr.to_dataarray().assign_coords(mindex_coords).chunk({'cell': min(1024, data.NCELLS)})
-    save2nc(ag_g_xr.unstack() * ag_dvar_mrj, os.path.join(path, 'xr_GHG_ag.nc'))
+
+    ghg_e = ag_g_xr.unstack() * ag_dvar_mrj 
+    ghg_df = ghg_e.groupby('region'
+        ).sum('cell'
+        ).to_dataframe('Value (t CO2e)'
+        ).reset_index(
+        ).rename(columns={'lu':'Land-use', 'lm':'Water_supply', 'GHG_source':'Source'}
+        ).assign(Year=yr_cal, Type='Agricultural land-use',
+        ).replace({'dry':'Dryland', 'irr':'Irrigated'}
+        ).query('abs(`Value (t CO2e)`) > 1e-3') 
+    
+    # Save table to disk
+    ghg_df.to_csv(os.path.join(path, f'GHG_emissions_separate_agricultural_landuse_{yr_cal}.csv'), index=False)
+
+    save2nc(ghg_e, os.path.join(path, 'xr_GHG_ag.nc'))
 
 
     # -----------------------------------------------------------#

@@ -40,7 +40,7 @@ from luto.tools.report.map_tools import hex_color_to_numeric
 
 
 
-def array_to_base64(arr_4band: np.ndarray, bbox: list) -> dict:
+def array_to_base64(arr_4band: np.ndarray, bbox: list, min_max:list) -> dict:
 
     # Create PIL Image from RGBA array
     image = Image.fromarray(arr_4band, 'RGBA')
@@ -52,47 +52,51 @@ def array_to_base64(arr_4band: np.ndarray, bbox: list) -> dict:
     
     return {
         'img_str': 'data:image/png;base64,' + img_str,
-        'bbox': bbox,
-        'width': arr_4band.shape[1],
-        'height': arr_4band.shape[0]
+        'bounds': [
+            [bbox[1], bbox[0]],
+            [bbox[3], bbox[2]]
+        ],
+        'min_max': min_max
     }
 
 
 
 def map2base64(data:Data, arr_lyr:xr.DataArray, attrs:tuple) -> dict|None:
-
-        arr_lyr = arr_lyr.compute()
         
         # Skip if the layer is empty
         if arr_lyr.sum() == 0:
             return
+
+        # Normalize the layer
+        min_val = np.nanmin(arr_lyr.values)
+        max_val = np.nanmax(arr_lyr.values)
+        arr_lyr.values = (arr_lyr - min_val) / (max_val - min_val)
 
         # Convert the 1D array to a 2D array
         arr_lyr = arr_to_xr(data, arr_lyr)
         bbox = arr_lyr.rio.bounds()
         arr_lyr = arr_lyr.rio.reproject('EPSG:3857') # To Mercator with Nearest Neighbour
 
-        # Normalize the layer
-        positive_mask = (arr_lyr > 0).values
-        min_val = 0 if  arr_lyr.values[positive_mask].min() < 1e-3 else arr_lyr.values[positive_mask].min()
-        max_val = arr_lyr.values[positive_mask].max()
-        arr_lyr.values[positive_mask] = (arr_lyr.values[positive_mask] - min_val) / (max_val - min_val)
-        
         # Convert layer to integer; after this 0 is nodata, -100 is outside LUTO area
         arr_lyr.values *= 100
         arr_lyr = np.where(np.isnan(arr_lyr), 0, arr_lyr).astype('int32')
 
         # Convert the 1D array to a RGBA array
         color_dict = pd.read_csv('luto/tools/report/Assets/float_img_colors.csv')
+        if max_val == 0:
+            color_dict.loc[range(100), 'lu_color_HEX'] = color_dict.loc[range(100), 'lu_color_HEX'].values[::-1]
+            min_val, max_val = max_val, min_val
         color_dict['color_numeric'] = color_dict['lu_color_HEX'].apply(hex_color_to_numeric)
         color_dict = color_dict.set_index('lu_code')['color_numeric'].to_dict()
+        
+        color_dict[0] = (0,0,0,0)    # Nodata pixcels are trasparent
                     
         arr_4band = np.zeros((arr_lyr.shape[0], arr_lyr.shape[1], 4), dtype='uint8')
         for k, v in color_dict.items():
             arr_4band[arr_lyr == k] = v
 
         # Generate base64 and overlay info
-        return attrs, array_to_base64(arr_4band, bbox)
+        return attrs, array_to_base64(arr_4band, bbox, [float(max_val), float(min_val)])
     
     
 def tuple_dict_to_nested(flat_dict):
@@ -109,16 +113,16 @@ def tuple_dict_to_nested(flat_dict):
 def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=-1) -> dict:
         
     # Get Permute info
-    arr_eg = xr.load_dataarray(files_df.iloc[0]['path'])
-    loop_dims = set(arr_eg.dims) - set(['cell'])
-    
-    dim_vals = pd.MultiIndex.from_product(
-        [arr_eg[dim].values for dim in loop_dims],
-        names=loop_dims
-    ).to_list()
+    with xr.open_dataarray(files_df.iloc[0]['path']) as arr_eg:
+        loop_dims = set(arr_eg.dims) - set(['cell'])
+        
+        dim_vals = pd.MultiIndex.from_product(
+            [arr_eg[dim].values for dim in loop_dims],
+            names=loop_dims
+        ).to_list()
 
-    loop_sel = [dict(zip(loop_dims, val)) for val in dim_vals]
-    
+        loop_sel = [dict(zip(loop_dims, val)) for val in dim_vals]
+        
     # Loop through each year
     task = []
     for _,row in files_df.iterrows():
@@ -128,7 +132,7 @@ def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=-1)
         xr_arr = xr_arr.chunk(chunk_size)
         _year = row['Year']
         for sel in loop_sel:
-            arr_sel = xr_arr.sel(**sel)
+            arr_sel = xr_arr.sel(**sel)                        
             task.append(
                 delayed(map2base64)(data, arr_sel, tuple(list(sel.values()) + [_year]))
             )
@@ -229,8 +233,8 @@ def save_report_layer(data:Data, raw_data_dir:str):
     cost_nonag = files_cost.query('base_name == "xr_cost_non_ag"')
     get_map_obj(data, cost_nonag, f'{SAVE_DIR}/map_metrics/cost_NonAg.json')
 
-    cost_transition = files_cost.query('base_name == "xr_cost_transition_ag2ag"')
-    get_map_obj(data, cost_transition, f'{SAVE_DIR}/map_metrics/cost_transition.json')
+    # cost_transition = files_cost.query('base_name == "xr_cost_transition_ag2ag"')
+    # get_map_obj(data, cost_transition, f'{SAVE_DIR}/map_metrics/cost_transition.json')
 
     ####################################################
     #                    4) GHG                        #
@@ -281,13 +285,13 @@ def save_report_layer(data:Data, raw_data_dir:str):
     #                7) Transition Cost                #
     ####################################################
 
-    files_transition = files.query('base_name.str.contains("transition")')
+    # files_transition = files.query('base_name.str.contains("transition")')
 
-    transition_cost = files_transition.query('base_name == "xr_transition_cost_ag2non_ag"')
-    get_map_obj(data, transition_cost, f'{SAVE_DIR}/map_metrics/transition_cost.json')
+    # transition_cost = files_transition.query('base_name == "xr_transition_cost_ag2non_ag"')
+    # get_map_obj(data, transition_cost, f'{SAVE_DIR}/map_metrics/transition_cost.json')
 
-    transition_ghg = files_transition.query('base_name == "xr_transition_GHG"')
-    get_map_obj(data, transition_ghg, f'{SAVE_DIR}/map_metrics/transition_GHG.json')
+    # transition_ghg = files_transition.query('base_name == "xr_transition_GHG"')
+    # get_map_obj(data, transition_ghg, f'{SAVE_DIR}/map_metrics/transition_GHG.json')
 
     ####################################################
     #                8) Water Yield                    #
