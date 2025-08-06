@@ -613,19 +613,13 @@ def save_report_data(raw_data_dir:str):
         .query('base_name == "quantity_production_t_separate"')\
         .reset_index(drop=True)\
         .query('Year.isin(@years)')
-        
     quantity_LUTO = pd.concat(
             [pd.read_csv(path).assign(Year=Year) for Year,path in quantity_LUTO[['Year','path']].values.tolist()],
             ignore_index=True)\
         .assign(Commodity= lambda x: x['Commodity'].str.capitalize())\
         .replace({'Sheep lexp': 'Sheep live export', 'Beef lexp': 'Beef live export'})\
         .round({'`Production (t/KL)`': 2})
-        
-    for Year,path in quantity_LUTO[['Year','path']].values.tolist():
-        df = pd.read_csv(path).assign(Year=Year)
-        
-        
-        
+    
     DEMAND_DATA_long = get_demand_df()\
         .replace({'Beef lexp': 'Beef live export', 'Sheep lexp': 'Sheep live export'})\
         .set_index(['Commodity', 'Type', 'Year'])\
