@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250731_RES3_RCP_GHG_CUT_SENSITIVITI' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250807_RES1_HIGH_HIGH' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -35,18 +35,18 @@ grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['64GB'],
-    'NCPUS':[16],
-    'TIME': ['6:00:00'],
-    'QUEUE': ['normalsr'],
+    'MEM': ['1020GB'],
+    'NCPUS':[28],
+    'TIME': ['24:00:00'],
+    'QUEUE': ['hugemembw'],  # normalsr for CPU, hugemembw for memory intensive jobs
     
  
     ###############################################################
     # Working settings for the model run
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                         # 'maxprofit' or 'mincost'
-    'RESFACTOR': [3],
-    'SIM_YEARS': [list(range(2020,2051,5))],                            # Years to run the model 
+    'RESFACTOR': [1],
+    'SIM_YEARS': [2050],                            # Years to run the model 
     'WRITE_THREADS': [2],
     'WRITE_OUTPUT_GEOTIFFS': [True],
     'KEEP_OUTPUTS': [True],                                             # If False, only keep report HTML
@@ -58,7 +58,7 @@ grid_search = {
     
     
     # --------------- Scenarios ---------------
-    'SSP': ['245', '370'],                   #'126', '245', '370', '585'
+    'SSP': ['245'],                   #'126', '245', '370', '585'
     
 
     # --------------- Target deviation weight ---------------
@@ -73,7 +73,7 @@ grid_search = {
        
     
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['low','high'],                                 # 'off', 'low', 'medium', 'high'
+    'GHG_EMISSIONS_LIMITS': ['high'],                                 # 'off', 'low', 'medium', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],                                    # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                                          # True or False
@@ -88,10 +88,10 @@ grid_search = {
     # --------------- Biodiversity overall ---------------
     'HABITAT_CONDITION': ['USER_DEFINED'],                              # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
     'CONNECTIVITY_SOURCE': ['NCI'],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20, 30, 40, 50],  # Percentage of degraded areas to cut in GBF2 priority areas
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],  # Percentage of degraded areas to cut in GBF2 priority areas
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSITY_TARGET_GBF_2': ['medium','high'],                     # 'off', 'low', 'medium', 'high'
+    'BIODIVERSITY_TARGET_GBF_2': ['high'],                     # 'off', 'low', 'medium', 'high'
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                   # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------

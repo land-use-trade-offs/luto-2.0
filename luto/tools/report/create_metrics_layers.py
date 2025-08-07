@@ -126,10 +126,7 @@ def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=-1)
     # Loop through each year
     task = []
     for _,row in files_df.iterrows():
-        xr_arr = xr.open_dataarray(row.path)
-        chunk_size = {dim:1 for dim in xr_arr.dims if dim != 'cell'}
-        chunk_size.update({'cell': data.NCELLS})  
-        xr_arr = xr_arr.chunk(chunk_size)
+        xr_arr = xr.load_dataarray(row.path)
         _year = row['Year']
         for sel in loop_sel:
             arr_sel = xr_arr.sel(**sel)                        
