@@ -113,9 +113,9 @@ def write_data(data: Data):
         print(out)
 
     # Create the report HTML and png maps
-    TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
+    # TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
     save_report_data(data.path)
-    data2html(data.path)
+    # data2html(data.path)
     save_report_layer(data, data.path)
 
 
@@ -2097,7 +2097,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
 def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
     # Caculate the biodiversity scores for species, if user selected any species
     if (not settings.BIODIVERSITY_TARGET_GBF_8 == 'on') or (len(data.BIO_GBF8_SEL_SPECIES) == 0):
-        return
+        return "Biodiversity GBF8 species scores skipped (target is off)"
     
     print(f'Writing biodiversity GBF8 scores (SPECIES) for {yr_cal}')
     
