@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LUTO 2 Report</title>
+
+    <!-- Resources -->
+    <script src="lib/vue.global.prod_3.5.18.js"></script>
+    <script src="lib/vue-router.global_4.5.1.js"></script>
+    <script src="lib/tailwind_3.4.16.js"></script>
+    <script src="lib/Highcharts-12.3.0/highcharts.js"></script>
+    <script src="lib/Highcharts-12.3.0/accessibility.js"></script>
+    <script src="lib/Highcharts-12.3.0/data.js"></script>
+    <script src="lib/Highcharts-12.3.0/exporting.js"></script>
+    <script src="lib/Highcharts-12.3.0/offline-exporting.js"></script>
+    <script src="lib/Highcharts-12.3.0/export-data.js"></script>
+    <link rel="stylesheet" href="lib/element-plus_2.10.4.css" />
+    <script src="lib/element-plus_2.10.4.js"></script>
+
+    <link rel="stylesheet" href="lib/leaflet_1.9.4.css" />
+    <script src="lib/leaflet_1.9.4.js"></script>
+
+    <!-- Load icons.js -->
+    <script src="./resources/icons.js"></script>
+
+    <!-- Components -->
+    <script src="./components/helpers.js" defer></script>
+    <script src="./components/map_geojson.js" defer></script>
+    <script src="./components/sidebar.js" defer></script>
+    <script src="./components/chart_container.js" defer></script>
+    <script src="./components/ranking_cards.js" defer></script>
+    <script src="./components/filterable_dropdown.js" defer></script>
+    <script src="./components/regions_map.js" defer></script>
+    <script src="./services/DataService.js" defer></script>
+    <script src="./services/MapService.js" defer></script>
+
+    <!-- Views -->
+    <script src="./views/Home.js" defer></script>
+    <script src="./views/Area.js" defer></script>
+    <script src="./views/Economics.js" defer></script>
+    <script src="./views/GHG.js" defer></script>
+    <script src="./views/Water.js" defer></script>
+    <script src="./views/Production.js" defer></script>
+    <script src="./views/Settings.js" defer></script>
+    <script src="./views/NotFound.js" defer></script>
+    <script src="./views/Test.js" defer></script>
+
+    <!-- Routes -->
+    <script src="./routes/route.js" defer></script>
+
+    <!-- Main app -->
+    <script src="./index.js" defer></script>
+
+    <style>
+      body {
+        font-family: sans-serif;
+      }
+    </style>
+
+    <!-- Data (load on demand) -->
+  </head>
+
+  <body>
+    <div id="app"></div>
+  </body>
+</html>

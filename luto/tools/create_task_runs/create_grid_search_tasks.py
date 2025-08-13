@@ -48,8 +48,7 @@ grid_search = {
     'RESFACTOR': [1],
     'SIM_YEARS': [[2050]],                            # Years to run the model 
     'WRITE_THREADS': [2],
-    'WRITE_OUTPUT_GEOTIFFS': [True],
-    'KEEP_OUTPUTS': [True],                                             # If False, only keep report HTML
+    'WRITE_OUTPUT_GEOTIFFS': [False],                     # True or False, if True will write geotiffs for the output
     
  
     ###############################################################

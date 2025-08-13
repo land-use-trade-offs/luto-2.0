@@ -24,7 +24,8 @@ Writes model output and statistics to files.
 """
 
 
-import os, re
+import os
+import re
 import shutil
 import threading
 import numpy as np
@@ -38,10 +39,10 @@ from luto import settings
 from luto import tools
 from luto.data import Data
 from luto.tools.spatializers import create_2d_map
-from luto.tools.compmap import lumap_crossmap, lmmap_crossmap, crossmap_irrstat, crossmap_amstat
-from luto.tools.report.create_metrics_layers import save_report_layer
+from luto.tools.report.create_report_layers import save_report_layer
+from luto.tools.report.create_report_data import save_report_data
 
-import luto.economics.agricultural.quantity as ag_quantity                      # ag_quantity has already been calculated and stored in <sim.prod_data>
+import luto.economics.agricultural.quantity as ag_quantity                      
 import luto.economics.agricultural.revenue as ag_revenue
 import luto.economics.agricultural.cost as ag_cost
 import luto.economics.agricultural.transitions as ag_transitions
@@ -49,7 +50,7 @@ import luto.economics.agricultural.ghg as ag_ghg
 import luto.economics.agricultural.water as ag_water
 import luto.economics.agricultural.biodiversity as ag_biodiversity
 
-import luto.economics.non_agricultural.quantity as non_ag_quantity              # non_ag_quantity has already been calculated and stored in <sim.prod_data>
+import luto.economics.non_agricultural.quantity as non_ag_quantity              
 import luto.economics.non_agricultural.revenue as non_ag_revenue
 import luto.economics.non_agricultural.cost as non_ag_cost
 import luto.economics.non_agricultural.transitions as non_ag_transitions
@@ -57,10 +58,6 @@ import luto.economics.non_agricultural.ghg as non_ag_ghg
 import luto.economics.non_agricultural.water as non_ag_water
 import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
-from luto.settings import NON_AG_LAND_USES
-from luto.tools.report.create_report_data import save_report_data
-from luto.tools.report.create_html import data2html
-from luto.tools.report.create_static_maps import TIF2MAP
 
 
 # Global timestamp for the run
@@ -77,6 +74,7 @@ def write_outputs(data: Data):
     try:
         write_data(data)
         move_logs(data)
+        create_report(data)
     except Exception as e:
         print(f"An error occurred while writing outputs: {e}")
         raise e
@@ -112,12 +110,15 @@ def write_data(data: Data):
     for out in Parallel(n_jobs=num_jobs, return_as='generator')(jobs):
         print(out)
 
-    # Create the report HTML and png maps
-    # TIF2MAP(data.path) if settings.WRITE_OUTPUT_GEOTIFFS else None
-    save_report_data(data.path)
-    # data2html(data.path)
-    save_report_layer(data, data.path)
 
+
+def create_report(data: Data):
+    print('\nCreating report...\n')
+    shutil.copytree('luto/tools/report/VUE_modules', f"{data.path}/DATA_REPORT", dirs_exist_ok=True)
+    print('Creating chart data...')
+    save_report_data(data.path)
+    print('Creating report layers...')
+    save_report_layer(data, data.path)
 
 
 def move_logs(data: Data):
@@ -136,7 +137,7 @@ def move_logs(data: Data):
         except: pass
         
         
-def save2nc(in_xr:xr.DataArray, save_path:str, ):
+def save2nc(in_xr:xr.DataArray, save_path:str):
 
     encoding = {'data':{
         'dtype': 'float32',
@@ -151,12 +152,8 @@ def save2nc(in_xr:xr.DataArray, save_path:str, ):
 
     
 
-
-
 def write_output_single_year(data: Data, yr_cal, path_yr):
-    """Write outputs for simulation 'sim', calendar year, demands d_c, and path"""
-
-    years = sorted(list(data.lumaps.keys()))
+    """Wrap write tasks for a single year"""
 
     if not os.path.isdir(path_yr):
         os.mkdir(path_yr)
@@ -194,10 +191,8 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
 def get_settings(setting_path:str):
     with open(setting_path, 'r') as file:
         lines = file.readlines()
-        # Regex patterns that matches variable assignments from settings
         parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=")
         settings_order = [match[1].strip() for line in lines if (match := parameter_reg.match(line))]
-        
         settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
         settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
         
@@ -759,7 +754,7 @@ def write_transition_cost_to_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=N
     if yr_idx == 0:
         non_ag_transitions_cost_mat = {
             k:{'Transition cost':np.zeros(data.NCELLS).astype(np.float32)}
-            for k in NON_AG_LAND_USES.keys()
+            for k in settings.NON_AG_LAND_USES.keys()
         }
     else:
         non_ag_transitions_cost_mat = non_ag_transitions.get_transition_matrix_ag2nonag(
@@ -826,7 +821,7 @@ def write_transition_cost_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None
     if yr_idx == 0:
         non_ag_transitions_cost_mat = {
             k:{'Transition cost (Non-Ag2Ag)':np.zeros((data.NLMS, data.NCELLS, data.N_AG_LUS)).astype(np.float32)}
-            for k in NON_AG_LAND_USES.keys()
+            for k in settings.NON_AG_LAND_USES.keys()
         }
     else:
         non_ag_transitions_cost_mat = non_ag_transitions.get_transition_matrix_nonag2ag(
@@ -1023,12 +1018,30 @@ def write_crosstab(data: Data, yr_cal, path):
 
         lumap_pre = data.lumaps[yr_cal_sim_pre]
         lumap = data.lumaps[yr_cal]
-        ctlu, swlu = lumap_crossmap(data, lumap_pre, lumap)
-        ctlu['Year'] = yr_cal
-        swlu['Year'] = yr_cal
+        
+        crosstab = pd.crosstab(lumap_pre,  [lumap, data.REGION_NRM_NAME], values=data.REAL_AREA, aggfunc=lambda x:x.sum(), margins = False
+            ).unstack(
+            ).reset_index(
+            ).rename(
+                columns={
+                    'row_0': 'From land-use', 
+                    'NRM_NAME': 'region', 
+                    'col_0':'To land-use', 
+                    0: 'Area (ha)'
+                }
+            ).dropna(
+            ).replace({'From land-use': data.ALLLU2DESC, 'To land-use': data.ALLLU2DESC})
+            
+        switches = (crosstab.groupby('From land-use')['Area (ha)'].sum() - crosstab.groupby('To land-use')['Area (ha)'].sum()
+            ).reset_index(
+            ).rename(columns={'index':'Landuse'})
+        
+        
+        crosstab['Year'] = yr_cal
+        switches['Year'] = yr_cal
    
-        ctlu.to_csv(os.path.join(path, f'crosstab-lumap_{yr_cal}.csv'), index=False)
-        swlu.to_csv(os.path.join(path, f'switches-lumap_{yr_cal}.csv'), index=False)
+        crosstab.to_csv(os.path.join(path, f'crosstab-lumap_{yr_cal}.csv'), index=False)
+        switches.to_csv(os.path.join(path, f'switches-lumap_{yr_cal}.csv'), index=False)
 
     return f"Land-use cross-tabulation and switches written for year {yr_cal}"
 
