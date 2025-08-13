@@ -4286,10 +4286,3 @@ def save_report_data(raw_data_dir:str):
         json.dump(supporting, f, separators=(',', ':'))
         f.write(';\n')
     
-
-
-    #########################################################
-    # Report success info                     
-    #########################################################
-
-    print('Report data created successfully!\n')

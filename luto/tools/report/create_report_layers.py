@@ -24,18 +24,35 @@ import base64
 import numpy as np
 import pandas as pd
 import xarray as xr
+import rioxarray as rxr
 
 from io import BytesIO
 from PIL import Image
 from joblib import delayed, Parallel
 from tqdm.auto import tqdm
-from collections import defaultdict
 
 from luto import settings
 from luto.data import Data
 from luto.tools import start_memory_monitor, stop_memory_monitor
 from luto.tools.report.data_tools import get_all_files
 from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
+
+
+
+def tuple_dict_to_nested(flat_dict):
+            nested = {}
+            for key_tuple, value in flat_dict.items():
+                current = nested
+                for key in key_tuple[:-1]:
+                    current = current.setdefault(key, {})
+                current[key_tuple[-1]] = value
+            return nested
+        
+        
+def hex_color_to_numeric(hex:str) -> tuple:
+    hex = hex.lstrip('#')
+    return tuple(int(hex[i:i+2], 16) for i in (0, 2, 4, 6)) 
+
 
 def array_to_base64(arr_4band: np.ndarray, bbox: list, min_max:list) -> dict:
 
@@ -58,8 +75,11 @@ def array_to_base64(arr_4band: np.ndarray, bbox: list, min_max:list) -> dict:
 
 
 
-def map2base64(data:Data, arr_lyr:xr.DataArray, attrs:tuple) -> dict|None:
-        
+def map2base64(rxr_arr:xr.DataArray, arr_lyr:xr.DataArray, attrs:tuple) -> dict|None:
+
+        rxr_copy = rxr_arr.copy()
+        rxr_crs = rxr_copy.rio.crs
+
         # Skip if the layer is empty
         if arr_lyr.sum() == 0:
             return
@@ -70,13 +90,17 @@ def map2base64(data:Data, arr_lyr:xr.DataArray, attrs:tuple) -> dict|None:
         arr_lyr.values = (arr_lyr - min_val) / (max_val - min_val)
 
         # Convert the 1D array to a 2D array
-        arr_lyr = arr_to_xr(data, arr_lyr)
-        bbox = arr_lyr.rio.bounds()
-        arr_lyr = arr_lyr.rio.reproject('EPSG:3857') # To Mercator with Nearest Neighbour
+        np.place(rxr_copy.data, rxr_copy.data>=0, arr_lyr.data)  # Set negative values to NaN
+        rxr_copy = xr.where(rxr_copy<0, np.nan, rxr_copy)
+        rxr_copy = rxr_copy.rio.write_crs(rxr_crs)
+
+        # Get bounding box, then reproject to Mercator
+        bbox = rxr_copy.rio.bounds()
+        rxr_copy = rxr_copy.rio.reproject('EPSG:3857') # To Mercator with Nearest Neighbour
 
         # Convert layer to integer; after this 0 is nodata, -100 is outside LUTO area
-        arr_lyr.values *= 100
-        arr_lyr = np.where(np.isnan(arr_lyr), 0, arr_lyr).astype('int32')
+        rxr_copy.values *= 100
+        rxr_copy = np.where(np.isnan(rxr_copy), 0, rxr_copy).astype('int32')
 
         # Convert the 1D array to a RGBA array
         color_dict = pd.read_csv('luto/tools/report/VUE_modules/assets/float_img_colors.csv')
@@ -88,31 +112,24 @@ def map2base64(data:Data, arr_lyr:xr.DataArray, attrs:tuple) -> dict|None:
 
         color_dict[0] = (0,0,0,0)    # Nodata pixels are transparent
 
-        arr_4band = np.zeros((arr_lyr.shape[0], arr_lyr.shape[1], 4), dtype='uint8')
+        arr_4band = np.zeros((rxr_copy.shape[0], rxr_copy.shape[1], 4), dtype='uint8')
         for k, v in color_dict.items():
-            arr_4band[arr_lyr == k] = v
+            arr_4band[rxr_copy == k] = v
 
         # Generate base64 and overlay info
         return attrs, array_to_base64(arr_4band, bbox, [float(max_val), float(min_val)])
     
     
-def tuple_dict_to_nested(flat_dict):
-            nested = {}
-            for key_tuple, value in flat_dict.items():
-                current = nested
-                for key in key_tuple[:-1]:
-                    current = current.setdefault(key, {})
-                current[key_tuple[-1]] = value
-            return nested
-        
-def hex_color_to_numeric(hex:str) -> tuple:
-    hex = hex.lstrip('#')
-    return tuple(int(hex[i:i+2], 16) for i in (0, 2, 4, 6)) 
 
+def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=settings.WRITE_THREADS) -> dict:
 
-def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=-1) -> dict:
-        
-    # Get Permute info
+    # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
+    map_2D_xr = rxr.open_rasterio(f'{data.path}/out_{data.last_year}/lumap_{data.last_year}.tiff')\
+        .drop_vars('band')\
+        .squeeze()\
+        .chunk('auto')
+
+    # Get dim info
     with xr.open_dataarray(files_df.iloc[0]['path']) as arr_eg:
         loop_dims = set(arr_eg.dims) - set(['cell'])
         
@@ -131,21 +148,28 @@ def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=-1)
         for sel in loop_sel:
             arr_sel = xr_arr.sel(**sel)                        
             task.append(
-                delayed(map2base64)(data, arr_sel, tuple(list(sel.values()) + [_year]))
+                delayed(map2base64)(map_2D_xr, arr_sel, tuple(list(sel.values()) + [_year]))
             )
 
     # Gather results and save to JSON
     output = {}
-    for res in tqdm(Parallel(n_jobs=workers, return_as='generator')(task), total=len(task)):
+    for res in Parallel(n_jobs=workers, return_as='generator')(task):
         if res is None:continue
         attr, val = res
         output[attr] = val
+        
+    # To nested dict
+    output = tuple_dict_to_nested(output)
 
     if not os.path.exists(os.path.dirname(save_path)):
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
     with open(save_path, 'w') as f:
-        json.dump(tuple_dict_to_nested(output), f, separators=(',', ':'))
+        filename = os.path.basename(save_path).replace('.js', '')
+        f.write(f'window["{filename}"] = ')
+        json.dump(output, f, separators=(',', ':'))
+        f.write(';\n')
+
 
 
 
@@ -184,13 +208,13 @@ def save_report_layer(data:Data, raw_data_dir:str):
     files_area = files.query('base_name.str.contains("area")')
 
     area_ag = files_area.query('base_name == "xr_area_agricultural_landuse"')
-    get_map_obj(data, area_ag, f'{SAVE_DIR}/map_layers/area_Ag.json')
+    get_map_obj(data, area_ag, f'{SAVE_DIR}/map_layers/map_area_Ag.js')
 
     area_am = files_area.query('base_name == "xr_area_agricultural_management"')
-    get_map_obj(data, area_am, f'{SAVE_DIR}/map_layers/area_Am.json')
+    get_map_obj(data, area_am, f'{SAVE_DIR}/map_layers/map_area_Am.js')
 
     area_nonag = files_area.query('base_name == "xr_area_non_agricultural_landuse"')
-    get_map_obj(data, area_nonag, f'{SAVE_DIR}/map_layers/area_NonAg.json')
+    get_map_obj(data, area_nonag, f'{SAVE_DIR}/map_layers/map_area_NonAg.js')
 
     ####################################################
     #                  2) Biodiversity                 #
@@ -200,23 +224,23 @@ def save_report_layer(data:Data, raw_data_dir:str):
 
     # GBF2
     bio_GBF2_ag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag"')
-    get_map_obj(data, bio_GBF2_ag, f'{SAVE_DIR}/map_layers/bio_GBF2_Ag.json')
+    get_map_obj(data, bio_GBF2_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Ag.js')
 
     bio_GBF2_am = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag_management"')
-    get_map_obj(data, bio_GBF2_am, f'{SAVE_DIR}/map_layers/bio_GBF2_Am.json')
+    get_map_obj(data, bio_GBF2_am, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Am.js')
 
     bio_GBF2_nonag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_non_ag"')
-    get_map_obj(data, bio_GBF2_nonag, f'{SAVE_DIR}/map_layers/bio_GBF2_NonAg.json')
+    get_map_obj(data, bio_GBF2_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js')
 
     # Overall priority
     bio_overall_ag = files_bio.query('base_name == "xr_biodiversity_overall_priority_ag"')
-    get_map_obj(data, bio_overall_ag, f'{SAVE_DIR}/map_layers/bio_overall_Ag.json')
+    get_map_obj(data, bio_overall_ag, f'{SAVE_DIR}/map_layers/map_bio_overall_Ag.js')
 
     bio_overall_am = files_bio.query('base_name == "xr_biodiversity_overall_priority_ag_management"')
-    get_map_obj(data, bio_overall_am, f'{SAVE_DIR}/map_layers/bio_overall_Am.json')
+    get_map_obj(data, bio_overall_am, f'{SAVE_DIR}/map_layers/map_bio_overall_Am.js')
 
     bio_overall_nonag = files_bio.query('base_name == "xr_biodiversity_overall_priority_non_ag"')
-    get_map_obj(data, bio_overall_nonag, f'{SAVE_DIR}/map_layers/bio_overall_NonAg.json')
+    get_map_obj(data, bio_overall_nonag, f'{SAVE_DIR}/map_layers/map_bio_overall_NonAg.js')
 
     ####################################################
     #                    3) Cost                       #
@@ -225,16 +249,16 @@ def save_report_layer(data:Data, raw_data_dir:str):
     files_cost = files.query('base_name.str.contains("cost")')
 
     cost_ag = files_cost.query('base_name == "xr_cost_ag"')
-    get_map_obj(data, cost_ag, f'{SAVE_DIR}/map_layers/cost_Ag.json')
+    get_map_obj(data, cost_ag, f'{SAVE_DIR}/map_layers/map_cost_Ag.js')
 
     cost_am = files_cost.query('base_name == "xr_cost_agricultural_management"')
-    get_map_obj(data, cost_am, f'{SAVE_DIR}/map_layers/cost_Am.json')
+    get_map_obj(data, cost_am, f'{SAVE_DIR}/map_layers/map_cost_Am.js')
 
     cost_nonag = files_cost.query('base_name == "xr_cost_non_ag"')
-    get_map_obj(data, cost_nonag, f'{SAVE_DIR}/map_layers/cost_NonAg.json')
+    get_map_obj(data, cost_nonag, f'{SAVE_DIR}/map_layers/map_cost_NonAg.js')
 
     # cost_transition = files_cost.query('base_name == "xr_cost_transition_ag2ag"')
-    # get_map_obj(data, cost_transition, f'{SAVE_DIR}/map_layers/cost_transition.json')
+    # get_map_obj(data, cost_transition, f'{SAVE_DIR}/map_layers/map_cost_transition.js')
 
     ####################################################
     #                    4) GHG                        #
@@ -243,13 +267,13 @@ def save_report_layer(data:Data, raw_data_dir:str):
     files_ghg = files.query('base_name.str.contains("GHG")')
 
     ghg_ag = files_ghg.query('base_name == "xr_GHG_ag"')
-    get_map_obj(data, ghg_ag, f'{SAVE_DIR}/map_layers/GHG_Ag.json')
+    get_map_obj(data, ghg_ag, f'{SAVE_DIR}/map_layers/map_GHG_Ag.js')
 
     ghg_am = files_ghg.query('base_name == "xr_GHG_ag_management"')
-    get_map_obj(data, ghg_am, f'{SAVE_DIR}/map_layers/GHG_Am.json')
+    get_map_obj(data, ghg_am, f'{SAVE_DIR}/map_layers/map_GHG_Am.js')
 
     ghg_nonag = files_ghg.query('base_name == "xr_GHG_non_ag"')
-    get_map_obj(data, ghg_nonag, f'{SAVE_DIR}/map_layers/GHG_NonAg.json')
+    get_map_obj(data, ghg_nonag, f'{SAVE_DIR}/map_layers/map_GHG_NonAg.js')
 
     ####################################################
     #                  5) Quantities                   #
@@ -258,13 +282,13 @@ def save_report_layer(data:Data, raw_data_dir:str):
     files_quantities = files.query('base_name.str.contains("quantities")')
 
     quantities_ag = files_quantities.query('base_name == "xr_quantities_agricultural"')
-    get_map_obj(data, quantities_ag, f'{SAVE_DIR}/map_layers/quantities_Ag.json')
+    get_map_obj(data, quantities_ag, f'{SAVE_DIR}/map_layers/map_quantities_Ag.js')
 
     quantities_am = files_quantities.query('base_name == "xr_quantities_agricultural_management"')
-    get_map_obj(data, quantities_am, f'{SAVE_DIR}/map_layers/quantities_Am.json')
+    get_map_obj(data, quantities_am, f'{SAVE_DIR}/map_layers/map_quantities_Am.js')
 
     quantities_nonag = files_quantities.query('base_name == "xr_quantities_non_agricultural"')
-    get_map_obj(data, quantities_nonag, f'{SAVE_DIR}/map_layers/quantities_NonAg.json')
+    get_map_obj(data, quantities_nonag, f'{SAVE_DIR}/map_layers/map_quantities_NonAg.js')
 
     ####################################################
     #                   6) Revenue                     #
@@ -273,13 +297,13 @@ def save_report_layer(data:Data, raw_data_dir:str):
     files_revenue = files.query('base_name.str.contains("revenue")')
 
     revenue_ag = files_revenue.query('base_name == "xr_revenue_ag"')
-    get_map_obj(data, revenue_ag, f'{SAVE_DIR}/map_layers/revenue_Ag.json')
+    get_map_obj(data, revenue_ag, f'{SAVE_DIR}/map_layers/map_revenue_Ag.js')
 
     revenue_am = files_revenue.query('base_name == "xr_revenue_agricultural_management"')
-    get_map_obj(data, revenue_am, f'{SAVE_DIR}/map_layers/revenue_Am.json')
+    get_map_obj(data, revenue_am, f'{SAVE_DIR}/map_layers/map_revenue_Am.js')
 
     revenue_nonag = files_revenue.query('base_name == "xr_revenue_non_ag"')
-    get_map_obj(data, revenue_nonag, f'{SAVE_DIR}/map_layers/revenue_NonAg.json')
+    get_map_obj(data, revenue_nonag, f'{SAVE_DIR}/map_layers/map_revenue_NonAg.js')
 
     ####################################################
     #                7) Transition Cost                #
@@ -288,10 +312,10 @@ def save_report_layer(data:Data, raw_data_dir:str):
     # files_transition = files.query('base_name.str.contains("transition")')
 
     # transition_cost = files_transition.query('base_name == "xr_transition_cost_ag2non_ag"')
-    # get_map_obj(data, transition_cost, f'{SAVE_DIR}/map_layers/transition_cost.json')
+    # get_map_obj(data, transition_cost, f'{SAVE_DIR}/map_layers/map_transition_cost.js')
 
     # transition_ghg = files_transition.query('base_name == "xr_transition_GHG"')
-    # get_map_obj(data, transition_ghg, f'{SAVE_DIR}/map_layers/transition_GHG.json')
+    # get_map_obj(data, transition_ghg, f'{SAVE_DIR}/map_layers/map_transition_GHG.js')
 
     ####################################################
     #                8) Water Yield                    #
@@ -300,10 +324,10 @@ def save_report_layer(data:Data, raw_data_dir:str):
     files_water = files.query('base_name.str.contains("water_yield")')
 
     water_ag = files_water.query('base_name == "xr_water_yield_ag"')
-    get_map_obj(data, water_ag, f'{SAVE_DIR}/map_layers/water_yield_Ag.json')
+    get_map_obj(data, water_ag, f'{SAVE_DIR}/map_layers/map_water_yield_Ag.js')
 
     water_am = files_water.query('base_name == "xr_water_yield_ag_management"')
-    get_map_obj(data, water_am, f'{SAVE_DIR}/map_layers/water_yield_Am.json')
+    get_map_obj(data, water_am, f'{SAVE_DIR}/map_layers/map_water_yield_Am.js')
 
     water_nonag = files_water.query('base_name == "xr_water_yield_non_ag"')
-    get_map_obj(data, water_nonag, f'{SAVE_DIR}/map_layers/water_yield_NonAg.json')
+    get_map_obj(data, water_nonag, f'{SAVE_DIR}/map_layers/map_water_yield_NonAg.js')

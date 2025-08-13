@@ -38,6 +38,7 @@ from joblib import Parallel, delayed
 from luto import settings
 from luto import tools
 from luto.data import Data
+from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
 from luto.tools.spatializers import create_2d_map
 from luto.tools.report.create_report_layers import save_report_layer
 from luto.tools.report.create_report_data import save_report_data
@@ -117,8 +118,9 @@ def create_report(data: Data):
     shutil.copytree('luto/tools/report/VUE_modules', f"{data.path}/DATA_REPORT", dirs_exist_ok=True)
     print('Creating chart data...')
     save_report_data(data.path)
-    print('Creating report layers...')
+    print('Creating map data...\n')
     save_report_layer(data, data.path)
+    print('Report data created successfully!')
 
 
 def move_logs(data: Data):
@@ -206,7 +208,7 @@ def write_settings(path):
         f.writelines(f'{k}:{v}\n' for k, v in settings_dict.items())
         
     return "Settings written successfully"
-        
+
 
 
 def write_files(data: Data, yr_cal, path):
