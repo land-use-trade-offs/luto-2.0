@@ -75,10 +75,12 @@ def array_to_base64(arr_4band: np.ndarray, bbox: list, min_max:list) -> dict:
 
 
 
-def map2base64(rxr_arr:xr.DataArray, arr_lyr:xr.DataArray, attrs:tuple) -> dict|None:
+def map2base64(rxr_path:str, arr_lyr:xr.DataArray, attrs:tuple) -> dict|None:
 
-        rxr_copy = rxr_arr.copy()
-        rxr_crs = rxr_copy.rio.crs
+        # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
+        with xr.open_dataset(rxr_path) as rxr_ds:
+            rxr_arr = rxr_ds['__xarray_dataarray_variable__']
+            rxr_crs = rxr_ds['spatial_ref'].attrs['crs_wkt']
 
         # Skip if the layer is empty
         if arr_lyr.sum() == 0:
@@ -90,17 +92,17 @@ def map2base64(rxr_arr:xr.DataArray, arr_lyr:xr.DataArray, attrs:tuple) -> dict|
         arr_lyr.values = (arr_lyr - min_val) / (max_val - min_val)
 
         # Convert the 1D array to a 2D array
-        np.place(rxr_copy.data, rxr_copy.data>=0, arr_lyr.data)  # Set negative values to NaN
-        rxr_copy = xr.where(rxr_copy<0, np.nan, rxr_copy)
-        rxr_copy = rxr_copy.rio.write_crs(rxr_crs)
+        np.place(rxr_arr.data, rxr_arr.data>=0, arr_lyr.data)  # Set negative values to NaN
+        rxr_arr = xr.where(rxr_arr<0, np.nan, rxr_arr)
+        rxr_arr = rxr_arr.rio.write_crs(rxr_crs)
 
         # Get bounding box, then reproject to Mercator
-        bbox = rxr_copy.rio.bounds()
-        rxr_copy = rxr_copy.rio.reproject('EPSG:3857') # To Mercator with Nearest Neighbour
+        bbox = rxr_arr.rio.bounds()
+        rxr_arr = rxr_arr.rio.reproject('EPSG:3857') # To Mercator with Nearest Neighbour
 
         # Convert layer to integer; after this 0 is nodata, -100 is outside LUTO area
-        rxr_copy.values *= 100
-        rxr_copy = np.where(np.isnan(rxr_copy), 0, rxr_copy).astype('int32')
+        rxr_arr.values *= 100
+        rxr_arr = np.where(np.isnan(rxr_arr), 0, rxr_arr).astype('int32')
 
         # Convert the 1D array to a RGBA array
         color_dict = pd.read_csv('luto/tools/report/VUE_modules/assets/float_img_colors.csv')
@@ -112,9 +114,9 @@ def map2base64(rxr_arr:xr.DataArray, arr_lyr:xr.DataArray, attrs:tuple) -> dict|
 
         color_dict[0] = (0,0,0,0)    # Nodata pixels are transparent
 
-        arr_4band = np.zeros((rxr_copy.shape[0], rxr_copy.shape[1], 4), dtype='uint8')
+        arr_4band = np.zeros((rxr_arr.shape[0], rxr_arr.shape[1], 4), dtype='uint8')
         for k, v in color_dict.items():
-            arr_4band[rxr_copy == k] = v
+            arr_4band[rxr_arr == k] = v
 
         # Generate base64 and overlay info
         return attrs, array_to_base64(arr_4band, bbox, [float(max_val), float(min_val)])
@@ -124,11 +126,8 @@ def map2base64(rxr_arr:xr.DataArray, arr_lyr:xr.DataArray, attrs:tuple) -> dict|
 def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=settings.WRITE_THREADS) -> dict:
 
     # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
-    map_2D_xr = rxr.open_rasterio(f'{data.path}/out_{data.last_year}/lumap_{data.last_year}.tiff')\
-        .drop_vars('band')\
-        .squeeze()\
-        .chunk('auto')
-
+    template_xr = f'{data.path}/out_{data.last_year}/xr_lumap_{data.last_year}.nc'
+    
     # Get dim info
     with xr.open_dataarray(files_df.iloc[0]['path']) as arr_eg:
         loop_dims = set(arr_eg.dims) - set(['cell'])
@@ -148,7 +147,7 @@ def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=set
         for sel in loop_sel:
             arr_sel = xr_arr.sel(**sel)                        
             task.append(
-                delayed(map2base64)(map_2D_xr, arr_sel, tuple(list(sel.values()) + [_year]))
+                delayed(map2base64)(template_xr, arr_sel, tuple(list(sel.values()) + [_year]))
             )
 
     # Gather results and save to JSON
@@ -167,7 +166,7 @@ def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=set
     with open(save_path, 'w') as f:
         filename = os.path.basename(save_path).replace('.js', '')
         f.write(f'window["{filename}"] = ')
-        json.dump(output, f, separators=(',', ':'))
+        json.dump(output, f, separators=(',', ':'), indent=2)
         f.write(';\n')
 
 

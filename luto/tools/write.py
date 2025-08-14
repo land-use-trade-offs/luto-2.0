@@ -19,11 +19,6 @@
 
 
 
-"""
-Writes model output and statistics to files.
-"""
-
-
 import os
 import re
 import shutil
@@ -65,13 +60,10 @@ import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 timestamp = tools.write_timestamp()
           
 def write_outputs(data: Data):
-    """Write model outputs to file"""
-    
    # Start recording memory usage
     stop_event = threading.Event()
     memory_thread = threading.Thread(target=tools.log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1, stop_event))
     memory_thread.start()
-    
     try:
         write_data(data)
         move_logs(data)
@@ -88,43 +80,40 @@ def write_outputs(data: Data):
 
 @tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{timestamp}")
 def write_data(data: Data):
-
     years = [i for i in settings.SIM_YEARS if i<=data.last_year]
     data.set_path()
     paths = [f"{data.path}/out_{yr}" for yr in years]
     write_settings(data.path)
-
     # Wrap write to a list of delayed jobs
     jobs = [delayed(write_area_transition_start_end)(data, f'{data.path}/out_{years[-1]}', years[-1])]
     for (yr, path_yr) in zip(years, paths):
         jobs += write_output_single_year(data, yr, path_yr)
-
     # Filter out None values from the jobs list
     jobs = [job for job in jobs if job is not None]
-    
     # Parallel write the outputs for each year
     num_jobs = (
         min(len(jobs), settings.WRITE_THREADS) 
         if settings.PARALLEL_WRITE else 1
     )
-    
     for out in Parallel(n_jobs=num_jobs, return_as='generator')(jobs):
         print(out)
 
 
+def write_settings(path):
+    with open('luto/settings.py', 'r') as file:
+        lines = file.readlines()
+        parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=")
+        settings_order = [match[1].strip() for line in lines if (match := parameter_reg.match(line))]
+        settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
+        settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
+    with open(os.path.join(path, 'model_run_settings.txt'), 'w') as f:
+        f.writelines(f'{k}:{v}\n' for k, v in settings_dict.items())
+    return "Settings written successfully"
 
-def create_report(data: Data):
-    print('\nCreating report...\n')
-    shutil.copytree('luto/tools/report/VUE_modules', f"{data.path}/DATA_REPORT", dirs_exist_ok=True)
-    print('Creating chart data...')
-    save_report_data(data.path)
-    print('Creating map data...\n')
-    save_report_layer(data, data.path)
-    print('Report data created successfully!')
 
-
+@tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{timestamp}", mode='a')
 def move_logs(data: Data):
-    
+    print("Moving log files...\n")
     logs = [
         f"{settings.OUTPUT_DIR}/run_{timestamp}_stdout.log",
         f"{settings.OUTPUT_DIR}/run_{timestamp}_stderr.log",
@@ -133,26 +122,39 @@ def move_logs(data: Data):
         f'{settings.OUTPUT_DIR}/RES_{settings.RESFACTOR}_mem_log.txt',
         f'{settings.OUTPUT_DIR}/.timestamp'
     ]
-
     for log in logs:
         try: shutil.move(log, f"{data.path}/{os.path.basename(log)}")
         except: pass
-        
+
+
+@tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{timestamp}", mode='a')
+def create_report(data: Data):
+    print('Creating report...')
+    print(' --| Copying report template...')
+    shutil.copytree('luto/tools/report/VUE_modules', f"{data.path}/DATA_REPORT", dirs_exist_ok=True)
+    print(' --| Creating chart data...')
+    save_report_data(data.path)
+    print(' --| Creating map data...')
+    save_report_layer(data, data.path)
+    print(' --| Report created successfully!')
+
+
         
 def save2nc(in_xr:xr.DataArray, save_path:str):
-
     encoding = {'data':{
         'dtype': 'float32',
         'zlib': True,
         'complevel': 4,
         'chunksizes': [v[0] for k, v in in_xr.chunksizes.items()]
     }}
-    
     in_xr.name = 'data'
     in_xr = in_xr.drop_vars(set(in_xr.coords) - set(in_xr.dims))
     in_xr.astype('float32').to_netcdf(save_path, encoding=encoding, compute=True)
 
-    
+
+
+
+
 
 def write_output_single_year(data: Data, yr_cal, path_yr):
     """Wrap write tasks for a single year"""
@@ -190,82 +192,31 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
     return tasks
 
 
-def get_settings(setting_path:str):
-    with open(setting_path, 'r') as file:
-        lines = file.readlines()
-        parameter_reg = re.compile(r"^(\s*[A-Z].*?)\s*=")
-        settings_order = [match[1].strip() for line in lines if (match := parameter_reg.match(line))]
-        settings_dict = {i: getattr(settings, i) for i in dir(settings) if i.isupper()}
-        settings_dict = {i: settings_dict[i] for i in settings_order if i in settings_dict}
-        
-    return settings_dict
-
-
-
-def write_settings(path):
-    settings_dict = get_settings('luto/settings.py')
-    with open(os.path.join(path, 'model_run_settings.txt'), 'w') as f:
-        f.writelines(f'{k}:{v}\n' for k, v in settings_dict.items())
-        
-    return "Settings written successfully"
-
-
 
 def write_files(data: Data, yr_cal, path):
     """Writes numpy arrays and geotiffs to file"""
-
-    print(f'Writing numpy arrays and geotiff outputs for {yr_cal}')
-
-    # Save raw agricultural decision variables (float array).
-    ag_X_mrj_fname = f'ag_X_mrj_{yr_cal}.npy'
-    np.save(os.path.join(path, ag_X_mrj_fname), data.ag_dvars[yr_cal])
-
-    # Save raw non-agricultural decision variables (float array).
-    non_ag_X_rk_fname = f'non_ag_X_rk_{yr_cal}.npy'
-    np.save(os.path.join(path, non_ag_X_rk_fname), data.non_ag_dvars[yr_cal])
-
-    # Save raw agricultural management decision variables (float array).
-    for am in data.AG_MAN_DESC:
-        snake_case_am = tools.am_name_snake_case(am)
-        am_X_mrj_fname = f'ag_man_X_mrj_{snake_case_am}_{yr_cal}.npy'
-        np.save(os.path.join(path, am_X_mrj_fname), data.ag_man_dvars[yr_cal][am])
+    
+    # Write raw dvars
+    dvar_ag = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]).chunk({'cell': min(1024, data.NCELLS)})
+    dvar_non_ag = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]).chunk({'cell': min(1024, data.NCELLS)})
+    dvar_ag_man = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).chunk({'cell': min(1024, data.NCELLS)})
+    save2nc(dvar_ag, os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))
+    save2nc(dvar_non_ag, os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))
+    save2nc(dvar_ag_man, os.path.join(path, f'xr_dvar_ag_man_{yr_cal}.nc'))
 
     # Write out raw numpy arrays for land-use and land management
-    lumap_fname = f'lumap_{yr_cal}.npy'
-    lmmap_fname = f'lmmap_{yr_cal}.npy'
-    np.save(os.path.join(path, lumap_fname), data.lumaps[yr_cal])
-    np.save(os.path.join(path, lmmap_fname), data.lmmaps[yr_cal])
-
-    # Get the Agricultural Management applied to each pixel
-    ag_man_dvar = np.stack([np.einsum('mrj -> r', v) for _,v in data.ag_man_dvars[yr_cal].items()]).T   # (r, am)
-    ag_man_dvar_mask = ag_man_dvar.sum(1) > 0.01            # Meaning that they have at least 1% of agricultural management applied
-    ag_man_dvar = np.argmax(ag_man_dvar, axis=1) + 1        # Start from 1
-    ag_man_dvar_argmax = np.where(ag_man_dvar_mask, ag_man_dvar, 0).astype(np.float32)
-
-    # Get the non-agricultural landuse for each pixel
-    non_ag_dvar = data.non_ag_dvars[yr_cal]                 # (r, k)
-    non_ag_dvar_mask = non_ag_dvar.sum(1) > 0.01            # Meaning that they have at least 1% of non-agricultural landuse applied
-    non_ag_dvar = np.argmax(non_ag_dvar, axis=1) + settings.NON_AGRICULTURAL_LU_BASE_CODE    # Start from 100
-    non_ag_dvar_argmax = np.where(non_ag_dvar_mask, non_ag_dvar, 0).astype(np.float32)
-
-    with rasterio.open(os.path.join(path, f'lumap_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_lumap,\
-         rasterio.open(os.path.join(path, f'lmmap_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_lmmap,\
-         rasterio.open(os.path.join(path, f'ammap_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_ammap,\
-         rasterio.open(os.path.join(path, f'non_ag_{yr_cal}.tiff'), 'w+', **data.GEO_META) as dst_non_ag:
-             
-        dst_lumap.write_band(1, create_2d_map(data, data.lumaps[yr_cal]))
-        dst_lmmap.write_band(1, create_2d_map(data, data.lmmaps[yr_cal]))
-        dst_ammap.write_band(1, create_2d_map(data, ag_man_dvar_argmax))
-        dst_non_ag.write_band(1, create_2d_map(data, non_ag_dvar_argmax))
-        
-    return f"Decision variables (.npy) written for year {yr_cal}"
+    lumap_xr = arr_to_xr(data, data.lumaps[yr_cal]).chunk('auto')
+    lmmap_xr = arr_to_xr(data, data.lmmaps[yr_cal]).chunk('auto')
+    lumap_xr.to_netcdf(os.path.join(path, f'xr_lumap_{yr_cal}.nc'))
+    lmmap_xr.to_netcdf(os.path.join(path, f'xr_lmmap_{yr_cal}.nc'))
+    
+    return f"Decision variables written for year {yr_cal}"
 
 
 def write_files_separate(data: Data, yr_cal, path):
     '''Write raw decision variables to separate GeoTiffs'''
 
-    print(f'Write raw decision variables to separate GeoTiffs for {yr_cal}')
-
+    
     # Collapse the land management dimension (m -> [dry, irr])
     ag_dvar_rj = np.einsum('mrj -> rj', data.ag_dvars[yr_cal])    
     ag_dvar_rm = np.einsum('mrj -> rm', data.ag_dvars[yr_cal])    
@@ -310,8 +261,7 @@ def write_files_separate(data: Data, yr_cal, path):
 def write_quantity(data: Data, yr_cal, path):
     '''Write quantity comparison between base year and target year.'''
 
-    print(f'Writing quantity outputs for {yr_cal}')
-
+    
     simulated_year_list = sorted(list(data.lumaps.keys()))
     yr_idx = yr_cal - data.YR_CAL_BASE
     yr_idx_sim = sorted(list(data.lumaps.keys())).index(yr_cal)
@@ -345,11 +295,9 @@ def write_quantity(data: Data, yr_cal, path):
         df['Year'] = yr_cal
         df.to_csv(os.path.join(path, f'quantity_comparison_{yr_cal}.csv'), index=False)
 
-        # --------------------------------------------------------------------------------------------
-        # NOTE: non_ag_quantity is already calculated and stored in <data.prod_data>
-        # --------------------------------------------------------------------------------------------
-        
     return f"Quantity comparison written for year {yr_cal}"
+
+
         
 def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     """
@@ -476,8 +424,7 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
     """Calculate agricultural revenue. Takes a simulation object, a target calendar
        year (e.g., 2030), and an output path as input."""
 
-    print(f'Writing agricultural revenue_cost outputs for {yr_cal}')
-
+    
     yr_idx = yr_cal - data.YR_CAL_BASE
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]).chunk({'cell': min(1024, data.NCELLS)})
 
@@ -556,8 +503,7 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
 def write_revenue_cost_ag_management(data: Data, yr_cal, path):
     """Calculate agricultural management revenue and cost."""
 
-    print(f'Writing agricultural management revenue_cost outputs for {yr_cal}')
-
+    
     yr_idx = yr_cal - data.YR_CAL_BASE
 
     # Get the ag-man dvars
@@ -621,8 +567,7 @@ def write_revenue_cost_ag_management(data: Data, yr_cal, path):
 def write_revenue_cost_non_ag(data: Data, yr_cal, path):
     """Calculate non_agricultural cost. """
 
-    print(f'Writing non agricultural management cost outputs for {yr_cal}')
-    
+        
     yr_idx = yr_cal - data.YR_CAL_BASE
 
     non_ag_dvar = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
@@ -670,8 +615,7 @@ def write_revenue_cost_non_ag(data: Data, yr_cal, path):
 def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     """Calculate transition cost."""
 
-    print(f'Writing transition cost outputs for {yr_cal}')
-
+    
     simulated_year_list = sorted(list(data.lumaps.keys()))
     yr_idx = yr_cal - data.YR_CAL_BASE
 
@@ -732,8 +676,7 @@ def write_transition_cost_ag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
 def write_transition_cost_to_ag2nonag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     """Calculate transition cost."""
 
-    print(f'Writing transition cost outputs for {yr_cal}')
-
+    
     # Retrieve list of simulation years (e.g., [2010, 2050] for snapshot or [2010, 2011, 2012] for timeseries)
     simulated_year_list = sorted(list(data.lumaps.keys()))
     yr_idx = yr_cal - data.YR_CAL_BASE
@@ -807,8 +750,7 @@ def write_transition_cost_apply_ag_man(data: Data):
 def write_transition_cost_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None):
     """Calculate transition cost."""
 
-    print(f'Writing transition cost outputs for {yr_cal}')
-
+    
     simulated_year_list = sorted(list(data.lumaps.keys()))
     yr_idx = yr_cal - data.YR_CAL_BASE
 
@@ -889,8 +831,7 @@ def write_transition_cost_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None
 def write_dvar_area(data: Data, yr_cal, path):
 
     # Reprot the process
-    print(f'Writing area calculated from dvars for {yr_cal}')
-
+    
     # Get dvars
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
         ).assign_coords({'region': ('cell', data.REGION_NRM_NAME)}
@@ -947,8 +888,7 @@ def write_dvar_area(data: Data, yr_cal, path):
 
 def write_area_transition_start_end(data: Data, path, yr_cal_end):
 
-    print(f'Save transition matrix between start and end year\n')
-
+    
     # Get the end year
     yr_cal_start = data.YR_CAL_BASE
 
@@ -1008,8 +948,7 @@ def write_crosstab(data: Data, yr_cal, path):
 
     if yr_cal > data.YR_CAL_BASE:
 
-        print(f'Writing area transition outputs for {yr_cal}')
-
+    
         simulated_year_list = sorted(list(data.lumaps.keys()))
         yr_idx_sim = simulated_year_list.index(yr_cal)
         yr_cal_sim_pre = simulated_year_list[yr_idx_sim - 1]
@@ -1058,8 +997,7 @@ def write_ghg(data: Data, yr_cal, path):
     if settings.GHG_EMISSIONS_LIMITS == 'off':
         return
 
-    print(f'Writing GHG outputs for {yr_cal}')
-
+    
     yr_idx = yr_cal - data.YR_CAL_BASE
 
     # Get GHG emissions limits used as constraints in model
@@ -1090,8 +1028,7 @@ def write_ghg_separate(data: Data, yr_cal, path):
     if settings.GHG_EMISSIONS_LIMITS == 'off':
         return
 
-    print(f'Writing GHG emissions_Separate for {yr_cal}')
-
+    
     # Convert calendar year to year index.
     yr_idx = yr_cal - data.YR_CAL_BASE
 
@@ -1250,8 +1187,7 @@ def write_ghg_offland_commodity(data: Data, yr_cal, path):
     if settings.GHG_EMISSIONS_LIMITS == 'off':
         return
 
-    print(f'Writing offland commodity GHG emissions for {yr_cal}')
-
+    
     # Get the offland commodity data
     offland_ghg = data.OFF_LAND_GHG_EMISSION.query(f'YEAR == {yr_cal}').rename(columns={'YEAR':'Year'})
 
@@ -1266,8 +1202,7 @@ def write_ghg_offland_commodity(data: Data, yr_cal, path):
 def write_water(data: Data, yr_cal, path):
     """Calculate water yield totals. Takes a Data Object, a calendar year (e.g., 2030), and an output path as input."""
 
-    print(f'Writing water outputs for {yr_cal}')
-
+    
     yr_idx = yr_cal - data.YR_CAL_BASE
     region2code = {v: k for k, v in data.WATER_REGION_NAMES.items()}
 
@@ -1436,8 +1371,7 @@ def write_water(data: Data, yr_cal, path):
 
 def write_biodiversity_overall_quanlity_scores(data: Data, yr_cal, path):
     
-    print(f'Writing biodiversity priority scores for {yr_cal}')
-    
+        
     yr_idx_previouse = sorted(data.lumaps.keys()).index(yr_cal) - 1
     yr_cal_previouse = sorted(data.lumaps.keys())[yr_idx_previouse]
     yr_idx = yr_cal - data.YR_CAL_BASE
@@ -1523,8 +1457,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     if settings.BIODIVERSITY_TARGET_GBF_2 == 'off':
         return
 
-    print(f'Writing biodiversity GBF2 scores (PRIORITY) for {yr_cal}')
-    
+        
     # Unpack the ag managements and land uses
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
@@ -1639,8 +1572,7 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
     if settings.BIODIVERSITY_TARGET_GBF_3 == 'off':
         return "Biodiversity GBF3 scores skipped (target is off)"
     
-    print(f'Writing biodiversity GBF3 scores (VEGETATION) for {yr_cal}')
-    
+        
     # Unpack the agricultural management land-use
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
@@ -1757,8 +1689,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     if not settings.BIODIVERSITY_TARGET_GBF_4_SNES == "on":
         return "Biodiversity GBF4 SNES scores skipped (target is off)"
 
-    print(f"Writing species of national environmental significance scores (GBF4 SNES) for {yr_cal}")
-    
+        
     # Unpack the agricultural management land-use
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
@@ -1878,8 +1809,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     if not settings.BIODIVERSITY_TARGET_GBF_4_ECNES == "on":
         return "Biodiversity GBF4 ECNES scores skipped (target is off)"
     
-    print(f"Writing ecological communities of national environmental significance scores (GBF4 ECNES) for {yr_cal}")
-    
+        
     # Unpack the agricultural management land-use
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
@@ -1998,8 +1928,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
     if not settings.BIODIVERSITY_TARGET_GBF_8 == 'on':
         return "Biodiversity GBF8 groups scores skipped (target is off)"
 
-    print(f'Writing biodiversity GBF8 scores (GROUPS) for {yr_cal}')
-    
+        
     # Unpack the agricultural management land-use
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 
@@ -2114,8 +2043,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
     if (not settings.BIODIVERSITY_TARGET_GBF_8 == 'on') or (len(data.BIO_GBF8_SEL_SPECIES) == 0):
         return "Biodiversity GBF8 species scores skipped (target is off)"
     
-    print(f'Writing biodiversity GBF8 scores (SPECIES) for {yr_cal}')
-    
+        
     # Unpack the agricultural management land-use
     am_lu_unpack = [(am, l) for am, lus in data.AG_MAN_LU_DESC.items() for l in lus]
 

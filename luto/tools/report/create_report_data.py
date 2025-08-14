@@ -215,7 +215,7 @@ def save_report_data(raw_data_dir:str):
     filename = 'Area_ranking'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'))
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
         
 
@@ -280,7 +280,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'Area_overview_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
     
     
@@ -336,7 +336,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'Area_overview_3_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
             
     
@@ -392,7 +392,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'Area_Ag_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
 
 
@@ -449,7 +449,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'Area_Am_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
             
             
@@ -506,7 +506,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'Area_NonAg_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
             
             
@@ -564,7 +564,7 @@ def save_report_data(raw_data_dir:str):
     filename = 'Area_transition_start_end'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'))
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
         
         
@@ -618,7 +618,7 @@ def save_report_data(raw_data_dir:str):
     filename = 'Area_transition_year_to_year'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'))
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
         
         
@@ -749,7 +749,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'Production_sum_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
 
 
@@ -779,7 +779,7 @@ def save_report_data(raw_data_dir:str):
     filename = 'Production_achive_percent'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(quantity_diff_wide_AUS_data, f, separators=(',', ':'))
+        json.dump(quantity_diff_wide_AUS_data, f, separators=(',', ':'), indent=2)
         f.write(';\n')    
     
     
@@ -833,7 +833,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'Production_LUTO_{idx+1}_{_type.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
             
             
@@ -1011,7 +1011,7 @@ def save_report_data(raw_data_dir:str):
     filename = 'Economics_ranking'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'))
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
         
 
@@ -1071,7 +1071,7 @@ def save_report_data(raw_data_dir:str):
     filename = 'Economics_overview'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'))
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
         
  
@@ -1145,7 +1145,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'Economics_split_Ag_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
     
 
@@ -1215,7 +1215,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'Economics_split_AM_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
 
 
@@ -1278,7 +1278,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'Economics_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
 
 
@@ -1321,7 +1321,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'Economics_transition_split_ag2ag_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
       
 
@@ -1374,7 +1374,7 @@ def save_report_data(raw_data_dir:str):
     filename = 'Economics_transition_mat_ag2ag'
     with open(f'{SAVE_DIR}/{filename}.js', 'w', encoding='utf-8') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict_area, f, separators=(',', ':'))
+        json.dump(out_dict_area, f, separators=(',', ':'), indent=2)
         f.write(';\n')
 
 
@@ -1421,7 +1421,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'Economics_transition_split_Ag2NonAg_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
         
   
@@ -1473,7 +1473,7 @@ def save_report_data(raw_data_dir:str):
     filename = 'Economics_transition_mat_ag2nonag'
     with open(f'{SAVE_DIR}/{filename}.js', 'w', encoding='utf-8') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict_area, f, separators=(',', ':'))
+        json.dump(out_dict_area, f, separators=(',', ':'), indent=2)
         f.write(';\n')
     
     
@@ -1519,7 +1519,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'Economics_transition_split_NonAg2Ag_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
     
     
@@ -1572,7 +1572,7 @@ def save_report_data(raw_data_dir:str):
     filename = 'Economics_transition_mat_nonag2ag'
     with open(f'{SAVE_DIR}/{filename}.js', 'w', encoding='utf-8') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict_area, f, separators=(',', ':'))
+        json.dump(out_dict_area, f, separators=(',', ':'), indent=2)
         f.write(';\n')
 
 
@@ -1706,7 +1706,7 @@ def save_report_data(raw_data_dir:str):
         filename = 'GHG_overview'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(GHG_json, f, separators=(',', ':'))
+            json.dump(GHG_json, f, separators=(',', ':'), indent=2)
             f.write(';\n')
 
 
@@ -1797,7 +1797,7 @@ def save_report_data(raw_data_dir:str):
         filename = 'GHG_ranking'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
             
             
@@ -1877,7 +1877,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'GHG_split_Ag_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
 
      
@@ -1906,7 +1906,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'GHG_split_off_land_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
     
 
@@ -1953,7 +1953,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'GHG_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
 
 
@@ -2010,7 +2010,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'GHG_split_Am_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
 
         
@@ -2176,7 +2176,7 @@ def save_report_data(raw_data_dir:str):
     filename = 'Water_overview_by_watershed_region'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as outfile:
         outfile.write(f'window["{filename}"] = ')
-        json.dump(water_yield_region, outfile, separators=(',', ':'))
+        json.dump(water_yield_region, outfile, separators=(',', ':'), indent=2)
         outfile.write(';\n')
         
         
@@ -2245,7 +2245,7 @@ def save_report_data(raw_data_dir:str):
     filename = 'Water_ranking'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'))
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
 
 
@@ -2279,7 +2279,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'Water_overview_MRN_region_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
 
 
@@ -2316,7 +2316,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'Water_split_Ag_MRN_region_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
             
             
@@ -2356,7 +2356,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'Water_split_Am_MRN_region_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
             
             
@@ -2390,7 +2390,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'Water_split_NonAg_MRN_region_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
         
 
@@ -2487,7 +2487,7 @@ def save_report_data(raw_data_dir:str):
     filename = 'Biodiversity_ranking'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(out_dict, f, separators=(',', ':'))
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
 
 
@@ -2542,7 +2542,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'BIO_quality_overview_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
     
     
@@ -2598,7 +2598,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'BIO_quality_split_Ag_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
             
     # ---------------- Biodiversity quality by Agricultural Management  ----------------
@@ -2652,7 +2652,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'BIO_quality_split_Am_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
 
 
@@ -2707,7 +2707,7 @@ def save_report_data(raw_data_dir:str):
         filename = f'BIO_quality_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'))
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
             f.write(';\n')
     
     
@@ -2783,7 +2783,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF2_overview_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
 
 
@@ -2839,7 +2839,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF2_split_Ag_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
                 
         # ---------------- (GBF2) Agricultural Management  ----------------
@@ -2894,7 +2894,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF2_split_Am_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
                 
                 
@@ -2950,7 +2950,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF2_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
         
         
@@ -3032,7 +3032,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF3_overview_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
                 
                 
@@ -3093,7 +3093,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF3_split_Ag_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
 
 
@@ -3153,7 +3153,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF3_split_Am_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
 
 
@@ -3213,7 +3213,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF3_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
             
             
@@ -3292,7 +3292,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF4_SNES_overview_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
                 
                 
@@ -3353,7 +3353,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF4_SNES_split_Ag_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
 
 
@@ -3413,7 +3413,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF4_SNES_split_Am_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
 
         # ---------------- (GBF4 SNES) Non-agricultural management  ----------------
@@ -3472,7 +3472,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF4_SNES_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
             
             
@@ -3551,7 +3551,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF4_ECNES_overview_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
                 
                 
@@ -3612,7 +3612,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF4_ECNES_split_Ag_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
 
 
@@ -3672,7 +3672,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF4_ECNES_split_Am_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
 
         # ---------------- (GBF4 ECNES) Non-agricultural management  ----------------
@@ -3731,7 +3731,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF4_ECNES_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
         
         
@@ -3810,7 +3810,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF8_SPECIES_overview_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
                 
                 
@@ -3871,7 +3871,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF8_SPECIES_split_Ag_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
 
 
@@ -3931,7 +3931,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF8_SPECIES_split_Am_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
 
         # ---------------- (GBF8 SPECIES) Non-agricultural management  ----------------
@@ -3990,7 +3990,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF8_SPECIES_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
         
         
@@ -4064,7 +4064,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF8_GROUP_overview_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
                 
                 
@@ -4125,7 +4125,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF8_GROUP_split_Ag_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
 
 
@@ -4185,7 +4185,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF8_GROUP_split_Am_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
 
         # ---------------- (GBF8 GROUP) Non-agricultural management  ----------------
@@ -4244,7 +4244,7 @@ def save_report_data(raw_data_dir:str):
             filename = f'BIO_GBF8_GROUP_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
             with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
                 f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'))
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
                 f.write(';\n')
                 
   
@@ -4283,6 +4283,6 @@ def save_report_data(raw_data_dir:str):
     filename = 'Supporting_info'
     with open(f"{SAVE_DIR}/{filename}.js", 'w') as f:
         f.write(f'window["{filename}"] = ')
-        json.dump(supporting, f, separators=(',', ':'))
+        json.dump(supporting, f, separators=(',', ':'), indent=2)
         f.write(';\n')
     
