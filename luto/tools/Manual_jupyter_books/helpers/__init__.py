@@ -75,11 +75,21 @@ def arr_to_xr(data, arr:np.ndarray) -> xr.DataArray:
     full_res_raw = (arr.size == data.LUMAP_NO_RESFACTOR.size)
     
     # Get the geo metadata of the array
-    geo_meta = data.GEO_META_FULLRES if full_res_raw else data.GEO_META
-    
-    # Warp the 1D array to 2D
-    arr_2d = full_res_1d_raw_to_2d(data, arr) if full_res_raw else get_coarse2D_map(data, arr)
-    arr_2d = np.where(arr_2d == data.NODATA, np.nan, arr_2d)   # Mask the nodata values to nan
+    if full_res_raw:
+        geo_meta = data.GEO_META_FULLRES
+        arr_2d = np.full(data.NLUM_MASK.shape, data.NODATA).astype(np.float32) 
+        np.place(arr_2d, data.NLUM_MASK, arr)
+    else:
+        geo_meta = data.GEO_META
+        arr_2d = data.LUMAP_2D_RESFACTORED.copy().astype(np.float32)
+        np.place(
+            arr_2d, 
+            (arr_2d != data.MASK_LU_CODE) & (arr_2d != data.NODATA), 
+            arr
+        )                    
+
+    # Mask the nodata values to nan
+    arr_2d = np.where(arr_2d == data.NODATA, np.nan, arr_2d)   
 
     with rasterio.io.MemoryFile() as memfile:
         with memfile.open(**geo_meta) as dataset:

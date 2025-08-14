@@ -69,12 +69,12 @@ class SolverInputData:
     non_ag_q_crk: np.ndarray                                            # Non-agricultural yield matrix.
     non_ag_lb_rk: np.ndarray                                            # Non-agricultural lower bound matrices.
 
-    ag_man_g_mrj: dict                                                  # Agricultural management options' GHG emission effects.
-    ag_man_w_mrj: dict                                                  # Agricultural management options' water yield effects.
-    ag_man_b_mrj: dict                                                  # Agricultural management options' biodiversity effects.
-    ag_man_q_mrp: dict                                                  # Agricultural management options' quantity effects.
-    ag_man_limits: dict                                                 # Agricultural management options' adoption limits.
-    ag_man_lb_mrj: dict                                                 # Agricultural management options' lower bounds.
+    ag_man_g_mrj: dict                                                  # Agricultural Management options' GHG emission effects.
+    ag_man_w_mrj: dict                                                  # Agricultural Management options' water yield effects.
+    ag_man_b_mrj: dict                                                  # Agricultural Management options' biodiversity effects.
+    ag_man_q_mrp: dict                                                  # Agricultural Management options' quantity effects.
+    ag_man_limits: dict                                                 # Agricultural Management options' adoption limits.
+    ag_man_lb_mrj: dict                                                 # Agricultural Management options' lower bounds.
 
     water_region_indices: dict[int, np.ndarray]                         # Water region indices -> dict. Key: region.
     water_region_names: dict[int, str]                                  # Water yield for the BASE_YR based on historical water yield layers.
