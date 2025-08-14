@@ -96,6 +96,7 @@ def run(
             years.insert(0, data.YR_CAL_BASE)
         # Solve and write outputs
         solve_timeseries(data, years)
+        save_data_to_disk(data, f"{data.path}/Data_RES{settings.RESFACTOR}.gz")
         write_outputs(data)
     except Exception as e:
         print(f"An error occurred during the simulation: {e}")

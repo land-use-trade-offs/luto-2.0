@@ -28,11 +28,11 @@ from joblib import Parallel, delayed
 
 from luto.economics.off_land_commodity import get_demand_df
 from luto.tools.report.data_tools import get_all_files
-from luto.tools.report.data_tools.helper_func import select_years
 
 from luto.tools.report.data_tools.parameters import (
     AG_LANDUSE,
     COLORS,
+    COLORS_RANK,
     COLORS_AM_NONAG,
     COLORS_COMMODITIES,
     COLORS_ECONOMY_TYPE,
@@ -44,6 +44,9 @@ from luto.tools.report.data_tools.parameters import (
     GHG_CATEGORY,
     GHG_NAMES,
     LANDUSE_ALL_RENAMED,
+    LU_CROPS,
+    LU_LVSTKS,
+    LU_UNALLOW,
     RENAME_AM_NON_AG,
     RENAME_NON_AG,
     SPATIAL_MAP_DICT
@@ -62,10 +65,7 @@ def save_report_data(raw_data_dir:str):
     """
     # Set the save directory
     SAVE_DIR = f'{raw_data_dir}/DATA_REPORT/data'
-
-    # Select the years to reduce the column number to avoid cluttering in the multi-level axis graphing
     years = sorted(settings.SIM_YEARS)
-    years_select = select_years(years)
 
     # Create the directory if it does not exist
     if not os.path.exists(SAVE_DIR):
@@ -76,7 +76,47 @@ def save_report_data(raw_data_dir:str):
     files['Year'] = files['Year'].astype(int)
     files = files.query('Year.isin(@years)')
     
+    # Function to get rank color based on value
+    def get_rank_color(x):
+        if x in [None, np.nan, 'N.A.']:
+            return COLORS_RANK['N.A.']
+        elif x <= 10:
+            return COLORS_RANK['1-10']
+        elif x <= 20:
+            return COLORS_RANK['11-20']
+        else:
+            return COLORS_RANK['>=21']
 
+    def get_rank_area_type(x:pd.Series) -> str:
+        if not x['Type'] is np.nan:
+            return 'Agricultural Management'
+
+        if x['Land-use'] in LU_CROPS + LU_LVSTKS:
+            return 'Agricultural Landuse'
+        elif x['Land-use'] in LU_UNALLOW:
+            return 'Unallocated land'
+        elif x['Land-use'] in RENAME_NON_AG.values():
+            return 'Non-Agricultural Landuse'
+        else:
+            return 'Unknown'
+        
+    def format_with_suffix(x):
+            if pd.isna(x) or x == 0:
+                return "0"
+            suffixes = ['', 'K', 'M', 'B', 'T']
+            # Determine the appropriate suffix
+            magnitude = 0
+            while abs(x) >= 1000 and magnitude < len(suffixes)-1:
+                magnitude += 1
+                x /= 1000.0
+            # Format with 2 significant digits
+            if x < 10:
+                formatted = f"{x:.2f}"
+            else:
+                formatted = f"{int(round(x))}"
+            return f"{formatted} {suffixes[magnitude]}"
+        
+        
 
     ####################################################
     #                    1) Area Change                #
@@ -85,27 +125,98 @@ def save_report_data(raw_data_dir:str):
     
     ag_dvar_dfs = area_dvar_paths.query('base_name == "area_agricultural_landuse"').reset_index(drop=True)
     ag_dvar_area = pd.concat([pd.read_csv(path) for path in ag_dvar_dfs['path']], ignore_index=True)
-    ag_dvar_area['Source'] = 'Agricultural landuse'
+    ag_dvar_area['Source'] = 'Agricultural Landuse'
     ag_dvar_area['Area (ha)'] = ag_dvar_area['Area (ha)'].round(2)
 
     non_ag_dvar_dfs = area_dvar_paths.query('base_name == "area_non_agricultural_landuse"').reset_index(drop=True)
     non_ag_dvar_area = pd.concat([pd.read_csv(path) for path in non_ag_dvar_dfs['path'] if not pd.read_csv(path).empty], ignore_index=True)
     non_ag_dvar_area['Land-use'] = non_ag_dvar_area['Land-use'].replace(RENAME_NON_AG)
-    non_ag_dvar_area['Source'] = 'Non-agricultural landuse'
+    non_ag_dvar_area['Source'] = 'Non-Agricultural Landuse'
     non_ag_dvar_area['Area (ha)'] = non_ag_dvar_area['Area (ha)'].round(2)
 
     am_dvar_dfs = area_dvar_paths.query('base_name == "area_agricultural_management"').reset_index(drop=True)
     am_dvar_area = pd.concat([pd.read_csv(path) for path in am_dvar_dfs['path'] if not pd.read_csv(path).empty], ignore_index=True)
     am_dvar_area = am_dvar_area.replace(RENAME_AM_NON_AG)
-    am_dvar_area['Source'] = 'Agricultural management'
+    am_dvar_area['Source'] = 'Agricultural Management'
     am_dvar_area['Area (ha)'] = am_dvar_area['Area (ha)'].round(2)
     
 
-    lu_group_raw = pd.read_csv('luto/tools/report/Assets/lu_group.csv')
+    lu_group_raw = pd.read_csv('luto/tools/report/VUE_modules/assets/lu_group.csv')
     colors_lu_category = lu_group_raw.set_index('Category')['color_HEX'].to_dict()
+    colors_lu_category.update({'Agri-Management': "#D5F100"})
     lu_group = lu_group_raw.set_index(['Category', 'color_HEX'])\
         .apply(lambda x: x.str.split(', ').explode())\
         .reset_index()
+        
+    # -------------------- Area ranking --------------------
+    area_ranking_raw = pd.concat([ag_dvar_area, non_ag_dvar_area, am_dvar_area])\
+         .assign(Area_type=lambda x: x.apply(get_rank_area_type, axis=1))
+        
+    area_ranking_type_region = area_ranking_raw\
+        .query('Area_type != "Unallocated land"')\
+        .groupby(['Year', 'region', 'Area_type'])[['Area (ha)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'Area_type', 'Area (ha)'], ascending=[True, True, False])\
+        .assign(Rank=lambda x: x.groupby(['Year', 'Area_type']).cumcount() + 1)\
+        .assign(Percent=lambda x: x['Area (ha)'] / x.groupby(['Year', 'Area_type'])['Area (ha)'].transform('sum') * 100)\
+        .round({'Percent': 2, 'Area (ha)': 2})
+    area_ranking_type_AUS = area_ranking_raw\
+        .query('Area_type != "Unallocated land"')\
+        .groupby(['Year', 'Area_type'])[['Area (ha)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'Area_type', 'Area (ha)'], ascending=[True, True, False])\
+        .assign(Rank='N.A.', Percent=100, region='AUSTRALIA')\
+        .round({'Percent': 2, 'Area (ha)': 2})
+    
+        
+    area_ranking_total = pd.concat([ag_dvar_area, non_ag_dvar_area, am_dvar_area])\
+        .assign(Area_type=lambda x: x.apply(get_rank_area_type, axis=1))\
+        .groupby(['Year', 'region'])[["Area (ha)"]]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'Area (ha)'], ascending=[True, False])\
+        .assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1)\
+        .assign(Area_type='Total')\
+        .assign(Percent=lambda x: x['Area (ha)'] / x.groupby(['Year'])['Area (ha)'].transform('sum') * 100)\
+        .round({'Percent': 2, 'Area (ha)': 2})
+    area_ranking_AUS = pd.concat([ag_dvar_area, non_ag_dvar_area, am_dvar_area])\
+        .assign(Area_type=lambda x: x.apply(get_rank_area_type, axis=1))\
+        .groupby(['Year'])[["Area (ha)"]]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'Area (ha)'], ascending=[True, False])\
+        .assign(Rank='N.A.', Area_type='Total', Percent=100, region='AUSTRALIA')\
+        .round({'Percent': 2, 'Area (ha)': 2})
+
+    area_ranking = pd.concat([area_ranking_type_region, area_ranking_type_AUS, area_ranking_total, area_ranking_AUS], ignore_index=True)
+    area_ranking = area_ranking.set_index(['Year', 'region', 'Area_type'])\
+        .reindex(
+            index=pd.MultiIndex.from_product(
+                [years, area_ranking['region'].unique(), area_ranking['Area_type'].unique()],
+                names=['Year', 'region', 'Area_type']), fill_value=None )\
+        .reset_index()\
+        .assign(color=lambda x: x['Rank'].map(get_rank_color))
+        
+
+    out_dict = {}
+    for (region, area_type), df in area_ranking.groupby(['region', 'Area_type']):
+        if region not in out_dict:
+            out_dict[region] = {}
+        if area_type not in out_dict[region]:
+            out_dict[region][area_type] = {}
+
+        df = df.drop('region', axis=1)
+        out_dict[region][area_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+        out_dict[region][area_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+        out_dict[region][area_type]['value'] = df.set_index('Year')['Area (ha)'].apply( lambda x: format_with_suffix(x)).to_dict()
+
+    filename = 'Area_ranking'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
         
 
     # -------------------- Area overview --------------------
@@ -113,11 +224,15 @@ def save_report_data(raw_data_dir:str):
     area_ag_nonag = area_ag_nonag.replace(RENAME_AM_NON_AG)    
     area_ag_nonag = area_ag_nonag.merge(lu_group, left_on='Land-use', right_on='Land-use', how='left')
     
+    area_all = pd.concat([
+        area_ag_nonag, 
+        am_dvar_area.assign(**{'Land-use':'Agri-Management', 'Category':'Agri-Management'})], ignore_index=True)
+
     group_cols = ['Land-use', 'Category']
     
     for idx, col in enumerate(group_cols):
 
-        df_AUS = area_ag_nonag\
+        df_AUS = area_all\
             .groupby(['Year', col])[['Area (ha)']]\
             .sum()\
             .reset_index()\
@@ -130,7 +245,7 @@ def save_report_data(raw_data_dir:str):
         df_AUS_wide['type'] = 'column'
         
         
-        df_region = area_ag_nonag\
+        df_region = area_all\
             .groupby(['Year', 'region', col])\
             .sum()\
             .reset_index()\
@@ -162,8 +277,11 @@ def save_report_data(raw_data_dir:str):
             df = df.drop('region', axis=1)
             out_dict[region] = df.to_dict(orient='records')
 
-        with open(f'{SAVE_DIR}/Area_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'Area_overview_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
     
     
     area_df = pd.concat([ag_dvar_area, non_ag_dvar_area, am_dvar_area], ignore_index=True)
@@ -215,8 +333,11 @@ def save_report_data(raw_data_dir:str):
             df = df.drop('region', axis=1)
             out_dict[region] = df.to_dict(orient='records')
 
-        with open(f'{SAVE_DIR}/Area_overview_3_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'Area_overview_3_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
             
     
     # -------------------- Area by Agricultural land --------------------
@@ -268,11 +389,14 @@ def save_report_data(raw_data_dir:str):
             df = df.drop('region', axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        with open(f'{SAVE_DIR}/Area_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'Area_Ag_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
 
 
-    # -------------------- Area by Agricultural management Area (ha) Land use --------------------
+    # -------------------- Area by Agricultural Management Area (ha) Land use --------------------
     group_cols = ['Type', 'Water_supply', 'Land-use']
     
     for idx, col in enumerate(group_cols):
@@ -322,11 +446,14 @@ def save_report_data(raw_data_dir:str):
             df = df.drop('region', axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        with open(f'{SAVE_DIR}/Area_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'Area_Am_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
             
             
-    # -------------------- Area by Non-Agricultural landuse --------------------
+    # -------------------- Area by Non-Agricultural Landuse --------------------
     group_cols = ['Land-use']
     
     for idx, col in enumerate(group_cols):
@@ -376,8 +503,11 @@ def save_report_data(raw_data_dir:str):
             df = df.drop('region', axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        with open(f'{SAVE_DIR}/Area_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'Area_NonAg_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
             
             
 
@@ -431,8 +561,11 @@ def save_report_data(raw_data_dir:str):
         out_dict[region]['area'] = heat_area_html
         out_dict[region]['pct'] = heat_pct_html
 
-    with open(f'{SAVE_DIR}/Area_transition_start_end.json', 'w') as f:
-        json.dump(out_dict, f, indent=2)
+    filename = 'Area_transition_start_end'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
         
         
     # -------------------- Transition areas (year-to-year) --------------------
@@ -482,8 +615,11 @@ def save_report_data(raw_data_dir:str):
         out_dict[region]['area'][str(year)] = heat_area_html
         out_dict[region]['pct'][str(year)] = heat_pct_html
         
-    with open(f'{SAVE_DIR}/Area_transition_year_to_year.json', 'w') as f:
-        json.dump(out_dict, f, indent=2)
+    filename = 'Area_transition_year_to_year'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
         
         
 
@@ -503,8 +639,7 @@ def save_report_data(raw_data_dir:str):
         .assign(Commodity= lambda x: x['Commodity'].str.capitalize())\
         .replace({'Sheep lexp': 'Sheep live export', 'Beef lexp': 'Beef live export'})\
         .round({'`Production (t/KL)`': 2})
-        
-        
+    
     DEMAND_DATA_long = get_demand_df()\
         .replace({'Beef lexp': 'Beef live export', 'Sheep lexp': 'Sheep live export'})\
         .set_index(['Commodity', 'Type', 'Year'])\
@@ -519,10 +654,8 @@ def save_report_data(raw_data_dir:str):
 
     for idx, col in enumerate(group_cols):
 
-        if col == 'Type':
-            _df = DEMAND_DATA_long.query(f'Year.isin({years_select})')
-        else:
-            _df = DEMAND_DATA_long.query(f'Year.isin({years})')
+
+        _df = DEMAND_DATA_long.query(f'Year.isin({years})')
             
         df_AUS = _df\
             .groupby(['Year', col])[['Quantity (tonnes, KL)']]\
@@ -544,7 +677,11 @@ def save_report_data(raw_data_dir:str):
             df_AUS_wide['name_order'] = df_AUS_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
             df_AUS_wide = df_AUS_wide.sort_values('name_order').drop(columns=['name_order'])
  
-        df_AUS_wide.to_json(f'{SAVE_DIR}/Production_demand_{idx+1}_{col.replace(" ", "_")}.json', orient='records')
+        filename = f'Production_demand_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            df_AUS_wide.to_json(f, orient='records')
+            f.write(';\n')
 
 
     # -------------------- Production limit. --------------------
@@ -557,7 +694,11 @@ def save_report_data(raw_data_dir:str):
         .reset_index()
     demand_limit_wide.columns = ['name','data']
     demand_limit_wide['type'] = 'column'
-    demand_limit_wide.to_json(f'{SAVE_DIR}/Production_demand_4_Limit.json', orient='records')
+    filename = 'Production_demand_4_Limit'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        demand_limit_wide.to_json(f, orient='records')
+        f.write(';\n')
 
 
 
@@ -605,8 +746,11 @@ def save_report_data(raw_data_dir:str):
             df = df.drop('region', axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        with open(f'{SAVE_DIR}/Production_sum_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'Production_sum_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
 
 
 
@@ -632,8 +776,11 @@ def save_report_data(raw_data_dir:str):
     quantity_diff_wide_AUS_data = {
         'AUSTRALIA': quantity_diff_wide_AUS.to_dict(orient='records')
     }
-    with open(f'{SAVE_DIR}/Production_achive_percent.json', 'w') as f:
-        json.dump(quantity_diff_wide_AUS_data, f)    
+    filename = 'Production_achive_percent'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(quantity_diff_wide_AUS_data, f, separators=(',', ':'), indent=2)
+        f.write(';\n')    
     
     
     # -------------------- Commodity production for ag, non-ag, and agricultural management --------------------
@@ -683,8 +830,11 @@ def save_report_data(raw_data_dir:str):
                 df = df.drop('region', axis=1)
                 out_dict[region] = df.to_dict(orient='records')
                 
-            with open(f'{SAVE_DIR}/Production_LUTO_{idx+1}_{_type.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'Production_LUTO_{idx+1}_{_type.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
             
             
     
@@ -696,22 +846,22 @@ def save_report_data(raw_data_dir:str):
     ####################################################
     
     # -------------------- Get the revenue and cost data --------------------
-    revenue_ag_df = files.query('base_name == "revenue_agricultural_commodity"').reset_index(drop=True)
+    revenue_ag_df = files.query('base_name == "revenue_ag"').reset_index(drop=True)
     revenue_ag_df = pd.concat([pd.read_csv(path) for path in revenue_ag_df['path']], ignore_index=True)
     revenue_ag_df = revenue_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural land-use (revenue)')
     
-    cost_ag_df = files.query('base_name == "cost_agricultural_commodity"').reset_index(drop=True)
+    cost_ag_df = files.query('base_name == "cost_ag"').reset_index(drop=True)
     cost_ag_df = pd.concat([pd.read_csv(path) for path in cost_ag_df['path']], ignore_index=True)
     cost_ag_df = cost_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural land-use (cost)')
     cost_ag_df['Value ($)'] = cost_ag_df['Value ($)'] * -1          # Convert cost to negative value
     
     revenue_am_df = files.query('base_name == "revenue_agricultural_management"').reset_index(drop=True)
     revenue_am_df = pd.concat([pd.read_csv(path) for path in revenue_am_df['path']], ignore_index=True)
-    revenue_am_df = revenue_am_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural management (revenue)')
+    revenue_am_df = revenue_am_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural Management (revenue)')
     
     cost_am_df = files.query('base_name == "cost_agricultural_management"').reset_index(drop=True)
     cost_am_df = pd.concat([pd.read_csv(path) for path in cost_am_df['path']], ignore_index=True)
-    cost_am_df = cost_am_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural management (cost)')
+    cost_am_df = cost_am_df.replace(RENAME_AM_NON_AG).assign(Source='Agricultural Management (cost)')
     cost_am_df['Value ($)'] = cost_am_df['Value ($)'] * -1          # Convert cost to negative value
 
     revenue_non_ag_df = files.query('base_name == "revenue_non_ag"').reset_index(drop=True)
@@ -765,10 +915,10 @@ def save_report_data(raw_data_dir:str):
         
     order = [
         'Agricultural land-use (revenue)', 
-        'Agricultural management (revenue)', 
+        'Agricultural Management (revenue)', 
         'Non-agricultural land-use (revenue)',
         'Agricultural land-use (cost)', 
-        'Agricultural management (cost)', 
+        'Agricultural Management (cost)', 
         'Non-agricultural land-use (cost)',
         'Transition cost (Ag2Ag)',
         'Transition cost (Ag2Non-Ag)',
@@ -776,6 +926,94 @@ def save_report_data(raw_data_dir:str):
         'Profit'
     ]
 
+
+    # -------------------- Economic ranking --------------------
+    revenue_df_region = pd.concat([revenue_ag_df, revenue_am_df, revenue_non_ag_df]
+        ).query('`Value ($)` >= 0'
+        ).groupby(['Year', 'region']
+        )[['Value ($)']].sum(numeric_only=True
+        ).reset_index(
+        ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
+        ).assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1
+        ).assign(Percent=lambda x: x['Value ($)'] / x.groupby(['Year'])['Value ($)'].transform('sum') * 100
+        ).assign(Source='Revenue'
+        ).round({'Value ($)': 2, 'Percent': 2})
+    revenue_df_AUS = pd.concat([revenue_ag_df, revenue_am_df, revenue_non_ag_df]
+        ).query('`Value ($)` >= 0'
+        ).groupby(['Year']
+        )[['Value ($)']].sum(numeric_only=True
+        ).reset_index(
+        ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
+        ).assign(Rank='N.A.', Percent=100, Source='Revenue', region='AUSTRALIA'
+        ).round({'Value ($)': 2, 'Percent': 2})
+
+    cost_df_region = pd.concat([cost_ag_df, cost_am_df, cost_non_ag_df]
+        ).query('`Value ($)` < 0'
+        ).groupby(['Year', 'region']
+        )[['Value ($)']].sum(numeric_only=True
+        ).reset_index(
+        ).assign(**{'Value ($)': lambda x: abs(x['Value ($)'])}
+        ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
+        ).assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1
+        ).assign(Percent=lambda x: x['Value ($)'] / x.groupby('Year')['Value ($)'].transform('sum') * 100
+        ).assign(Source='Cost'
+        ).round({'Value ($)': 2, 'Percent': 2})
+    cost_df_AUS = pd.concat([cost_ag_df, cost_am_df, cost_non_ag_df]
+        ).query('`Value ($)` < 0'
+        ).groupby(['Year']
+        )[['Value ($)']].sum(numeric_only=True
+        ).reset_index(
+        ).assign(**{'Value ($)': lambda x: abs(x['Value ($)'])}
+        ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
+        ).assign(Rank='N.A.',  Source='Cost', region='AUSTRALIA'
+        ).round({'Value ($)': 2, 'Percent': 2})
+        
+    profit_df_region = revenue_df_region.merge(
+        cost_df_region, on=['Year', 'region'], suffixes=('_revenue', '_cost')
+        ).assign(**{'Value ($)': lambda x: x['Value ($)_revenue'] - x['Value ($)_cost']}
+        ).drop(columns=['Value ($)_revenue', 'Value ($)_cost']
+        ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
+        ).assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1
+        ).assign(Percent=lambda x: x['Value ($)'] / x.groupby(['Year'])['Value ($)'].transform('sum') * 100
+        ).assign(Source='Total'
+        ).round({'Value ($)': 2, 'Percent': 2})
+    profit_df_AUS = revenue_df_AUS.merge(
+        cost_df_AUS, on=['Year'], suffixes=('_revenue', '_cost')
+        ).assign(**{'Value ($)': lambda x: x['Value ($)_revenue'] - x['Value ($)_cost']}
+        ).drop(columns=['Value ($)_revenue', 'Value ($)_cost']
+        ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
+        ).assign(Rank='N.A.', Source='Total', region='AUSTRALIA'
+        ).round({'Value ($)': 2, 'Percent': 2})
+
+    ranking_df = pd.concat([revenue_df_region, revenue_df_AUS, cost_df_region, cost_df_AUS, profit_df_region, profit_df_AUS])
+    ranking_df = ranking_df.set_index(['region', 'Source', 'Year']
+        ).reindex(
+            index=pd.MultiIndex.from_product(
+                [ranking_df['region'].unique(), ranking_df['Source'].unique(), ranking_df['Year'].unique()],
+                names=['region', 'Source', 'Year']), fill_value=None
+        ).reset_index(
+        ).assign(color= lambda x: x['Rank'].map(get_rank_color))
+        
+
+
+    out_dict = {}
+    for (region, source), df in ranking_df.groupby(['region', 'Source']):
+        if region not in out_dict:
+            out_dict[region] = {}
+        if not source in out_dict[region]:
+            out_dict[region][source] = {}
+        
+        df = df.drop(columns='region')
+        out_dict[region][source]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+        out_dict[region][source]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+        out_dict[region][source]['value'] = df.set_index('Year')['Value ($)'].apply( lambda x: format_with_suffix(x)).to_dict()
+
+    filename = 'Economics_ranking'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+        
 
     # -------------------- Economy overview --------------------
     economics_df_AUS = economics_df.groupby(['Year','Source']
@@ -830,8 +1068,11 @@ def save_report_data(raw_data_dir:str):
         df.columns = ['name','data','type']
         out_dict[region] = df.to_dict(orient='records')
         
-    with open(f'{SAVE_DIR}/Economics_overview.json', 'w') as f:
-        json.dump(out_dict, f)
+    filename = 'Economics_overview'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
         
  
  
@@ -901,8 +1142,11 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region','Rev_Cost'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        with open(f'{SAVE_DIR}/Economics_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'Economics_split_Ag_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
     
 
 
@@ -968,8 +1212,11 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region','Rev_Cost'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        with open(f'{SAVE_DIR}/Economics_split_AM_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'Economics_split_AM_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
 
 
     # -------------------- Economics for non-agriculture --------------------
@@ -1028,8 +1275,11 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region','Rev_Cost'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
 
-        with open(f'{SAVE_DIR}/Economics_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'Economics_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
 
 
     # -------------------- Transition cost for Ag2Ag --------------------
@@ -1068,8 +1318,11 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        with open(f'{SAVE_DIR}/Economics_transition_split_ag2ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'Economics_transition_split_ag2ag_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
       
 
     # -------------------- Transition cost matrix for Ag2Ag --------------------
@@ -1118,8 +1371,11 @@ def save_report_data(raw_data_dir:str):
 
         out_dict_area[region][str(year)] = rf'{heat_area_html}'
 
-    with open(f'{SAVE_DIR}/Economics_transition_mat_ag2ag.json', 'w', encoding='utf-8') as f:
-        json.dump(out_dict_area, f, ensure_ascii=False, indent=2)
+    filename = 'Economics_transition_mat_ag2ag'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w', encoding='utf-8') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict_area, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
 
 
 
@@ -1162,8 +1418,11 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        with open(f'{SAVE_DIR}/Economics_transition_split_Ag2NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'Economics_transition_split_Ag2NonAg_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
         
   
     # -------------------- Transition cost matrix for Ag2Non-Ag --------------------
@@ -1211,8 +1470,11 @@ def save_report_data(raw_data_dir:str):
 
         out_dict_area[region][str(year)] = rf'{heat_area_html}'
 
-    with open(f'{SAVE_DIR}/Economics_transition_mat_ag2nonag.json', 'w', encoding='utf-8') as f:
-        json.dump(out_dict_area, f, ensure_ascii=False, indent=2)
+    filename = 'Economics_transition_mat_ag2nonag'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w', encoding='utf-8') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict_area, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
     
     
     
@@ -1254,8 +1516,11 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        with open(f'{SAVE_DIR}/Economics_transition_split_NonAg2Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'Economics_transition_split_NonAg2Ag_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
     
     
     
@@ -1304,8 +1569,11 @@ def save_report_data(raw_data_dir:str):
 
         out_dict_area[region][str(year)] = rf'{heat_area_html}'
 
-    with open(f'{SAVE_DIR}/Economics_transition_mat_nonag2ag.json', 'w', encoding='utf-8') as f:
-        json.dump(out_dict_area, f, ensure_ascii=False, indent=2)
+    filename = 'Economics_transition_mat_nonag2ag'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w', encoding='utf-8') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict_area, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
 
 
 
@@ -1354,9 +1622,10 @@ def save_report_data(raw_data_dir:str):
         GHG_land['Land-use type'] = GHG_land['Land-use'].apply(lu_group.set_index('Land-use')['Category'].to_dict().get)
         net_land = GHG_land.groupby('Year')[['Value (t CO2e)']].sum(numeric_only=True).reset_index()
 
-        GHG_limit = GHG_files.query('base_name == "GHG_emissions"').copy()
+
+        GHG_limit = GHG_files.query('base_name == "GHG_emissions"')
         GHG_limit = pd.concat([pd.read_csv(path) for path in GHG_limit['path']], ignore_index=True)
-        GHG_limit = GHG_limit.query('Variable == "GHG_EMISSIONS_LIMIT_TCO2e"')
+        GHG_limit = GHG_limit.query('Variable == "GHG_EMISSIONS_LIMIT_TCO2e"').copy()
         GHG_limit['Value (t CO2e)'] = GHG_limit['Emissions (t CO2e)']
         GHG_limit_wide = list(map(list,zip(GHG_limit['Year'],GHG_limit['Value (t CO2e)'])))
         
@@ -1371,8 +1640,7 @@ def save_report_data(raw_data_dir:str):
             'Net emissions',
             'GHG emission limit'
         ]
-        
-        
+   
 
         # -------------------- GHG from individual emission sectors --------------------
         net_offland_AUS = GHG_off_land.groupby('Year')[['Value (t CO2e)']].sum(numeric_only=True).reset_index()
@@ -1404,8 +1672,7 @@ def save_report_data(raw_data_dir:str):
             'line'
         ]
 
-        
-        
+ 
         net_land_AUS_wide['name_order'] = net_land_AUS_wide['name'].apply(lambda x: order_GHG.index(x))
         net_land_AUS_wide = net_land_AUS_wide.sort_values('name_order').drop(columns=['name_order'])
         
@@ -1436,11 +1703,106 @@ def save_report_data(raw_data_dir:str):
             
             
         GHG_json = {**GHG_AUS,  **GHG_region}
-        with open(f'{SAVE_DIR}/GHG_overview.json', 'w') as f:
-            json.dump(GHG_json, f)
+        filename = 'GHG_overview'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(GHG_json, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
+
+
+        # -------------------- GHG ranking --------------------
+        GHG_rank_emission_region = GHG_land\
+            .query('`Value (t CO2e)`>= 0')\
+            .groupby(['Year', 'region'])\
+            .sum(numeric_only=True)\
+            .reset_index()\
+            .sort_values(['Year', 'Value (t CO2e)'], ascending=[True, False])\
+            .assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1)\
+            .assign(Percent=lambda x: x['Value (t CO2e)'] / x.groupby('Year')['Value (t CO2e)'].transform('sum') * 100)\
+            .assign(Type='GHG emissions')
+        GHG_rank_emission_AUS = GHG_land\
+            .query('`Value (t CO2e)`>= 0')\
+            .groupby(['Year'])\
+            .sum(numeric_only=True)\
+            .reset_index()\
+            .sort_values(['Year', 'Value (t CO2e)'], ascending=[True, False])\
+            .assign(Rank='N.A.', Percent=100, Type='GHG emissions', region='AUSTRALIA')
+
+        GHG_rank_sequestration_region = GHG_land\
+            .query('`Value (t CO2e)` < 0')\
+            .assign(**{'Value (t CO2e)': lambda x: abs(x['Value (t CO2e)'])})\
+            .groupby(['Year', 'region'])\
+            .sum(numeric_only=True)\
+            .reset_index()\
+            .sort_values(['Year', 'Value (t CO2e)'], ascending=[True, False])\
+            .assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1)\
+            .assign(Percent=lambda x: x['Value (t CO2e)'] / x.groupby('Year')['Value (t CO2e)'].transform('sum') * 100)\
+            .assign(Type='GHG sequestrations')
+        GHG_rank_sequestration_AUS = GHG_land\
+            .query('`Value (t CO2e)` < 0')\
+            .assign(**{'Value (t CO2e)': lambda x: abs(x['Value (t CO2e)'])})\
+            .groupby(['Year'])\
+            .sum(numeric_only=True)\
+            .reset_index()\
+            .sort_values(['Year', 'Value (t CO2e)'], ascending=[True, False])\
+            .assign(Rank='N.A.', Area_type='Total', Percent=100, region='AUSTRALIA')\
+            .assign(Type='GHG sequestrations')
+            
+        GHG_rank_region_net = GHG_rank_emission_region\
+            .merge(GHG_rank_sequestration_region, on=['Year', 'region'], how='outer', suffixes=('_emission', '_sequestration'))\
+            .assign(**{'Value (t CO2e)_sequestration': lambda x: abs(x['Value (t CO2e)_sequestration'])})\
+            .assign(**{'Value (t CO2e)': lambda x: x['Value (t CO2e)_emission'] - x['Value (t CO2e)_sequestration']})\
+            .assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1)\
+            .assign(Type='Total')
+        GHG_rank_AUS_net = GHG_rank_emission_AUS\
+            .merge(GHG_rank_sequestration_AUS, on=['Year'], how='outer', suffixes=('_emission', '_sequestration'))\
+            .assign(**{'Value (t CO2e)_sequestration': lambda x: abs(x['Value (t CO2e)_sequestration'])})\
+            .assign(**{'Value (t CO2e)': lambda x: x['Value (t CO2e)_emission'] - x['Value (t CO2e)_sequestration']})\
+            .assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1)\
+            .assign(Type='Total', region='AUSTRALIA')
+
+        GHG_rank = pd.concat([
+            GHG_rank_emission_region, 
+            GHG_rank_emission_AUS,
+            GHG_rank_sequestration_region, 
+            GHG_rank_sequestration_AUS,
+            GHG_rank_region_net,
+            GHG_rank_AUS_net
+            ], axis=0, ignore_index=True).reset_index(drop=True)
+        GHG_rank = GHG_rank\
+            .reset_index(drop=True)\
+            .round({'Percent': 2, 'Value (t CO2e)':2})\
+            .assign(color=lambda x: x['Rank'].map(get_rank_color))\
+            .set_index(['region', 'Year', 'Type'])\
+            .reindex(
+                index=pd.MultiIndex.from_product(
+                    [GHG_rank['region'].unique(), GHG_rank['Year'].unique(), GHG_rank['Type'].unique()],
+                    names=['region', 'Year', 'Type']), fill_value=None
+            ).reset_index()\
+            .assign(color=lambda x: x['Rank'].map(get_rank_color))
+     
+
+        out_dict = {}
+        for (region, e_type), df in GHG_rank.groupby(['region', 'Type']):
+            if region not in out_dict:
+                out_dict[region] = {}
+            if e_type not in out_dict[region]:
+                out_dict[region][e_type] = {}
+
+            df = df.drop(columns='region')
+            out_dict[region][e_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+            out_dict[region][e_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+            out_dict[region][e_type]['value'] = df.set_index('Year')['Value (t CO2e)'].apply( lambda x: format_with_suffix(x)).to_dict()
+
+        filename = 'GHG_ranking'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
             
             
-            
+
+
 
         # -------------------- GHG emission for agricultural land-use --------------------
         GHG_ag = GHG_land.query('Type == "Agricultural land-use"') 
@@ -1512,8 +1874,11 @@ def save_report_data(raw_data_dir:str):
                 df = df.drop(['region'], axis=1)
                 out_dict[region] = df.to_dict(orient='records')
                 
-            with open(f'{SAVE_DIR}/GHG_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'GHG_split_Ag_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
 
      
             
@@ -1538,8 +1903,11 @@ def save_report_data(raw_data_dir:str):
                 df = df.drop(['region'], axis=1)
                 out_dict[region] = df.to_dict(orient='records')
                 
-            with open(f'{SAVE_DIR}/GHG_split_off_land_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'GHG_split_off_land_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
     
 
 
@@ -1582,12 +1950,15 @@ def save_report_data(raw_data_dir:str):
                 df = df.drop(['region'], axis=1)
                 out_dict[region] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/GHG_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'GHG_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
 
 
 
-        # -------------------- GHG reductions by Agricultural managements --------------------
+        # -------------------- GHG reductions by Agricultural Managements --------------------
         Ag_man_sequestration_long = GHG_land.query('Type == "Agricultural Management"').reset_index(drop=True)
         Ag_man_sequestration_long['Value (t CO2e)'] = Ag_man_sequestration_long['Value (t CO2e)'] * -1  # Convert from negative to positive
         group_cols = ['Land-use', 'Land-use type', 'Agricultural Management Type', 'Water_supply']
@@ -1636,8 +2007,11 @@ def save_report_data(raw_data_dir:str):
                 df = df.drop(['region'], axis=1)
                 out_dict[region] = df.to_dict(orient='records')
                 
-            with open(f'{SAVE_DIR}/GHG_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'GHG_split_Am_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
 
         
 
@@ -1683,7 +2057,6 @@ def save_report_data(raw_data_dir:str):
     water_net_yield = hist_and_public_wny_water_region[['Year','Region', 'Water Net Yield (ML)']].rename(
         columns={'Water Net Yield (ML)': 'Value (ML)'}
     )
-
 
 
     # -------------------- Water yield overview for Australia --------------------
@@ -1734,7 +2107,11 @@ def save_report_data(raw_data_dir:str):
     water_yield_df_AUS.loc[len(water_yield_df_AUS)] = ['Water Net Yield', water_net_yield_sum, 'line']
     water_yield_df_AUS.loc[len(water_yield_df_AUS)] = ['Water Limit', water_limit, 'line']
 
-    water_yield_df_AUS.to_json(f'{SAVE_DIR}/Water_overview_AUSTRALIA.json', orient='records')
+    filename = 'Water_overview_AUSTRALIA'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        water_yield_df_AUS.to_json(f, orient='records')
+        f.write(';\n')
     
 
     # -------------------- Water yield overview for Australia by landuse --------------------
@@ -1755,7 +2132,11 @@ def save_report_data(raw_data_dir:str):
         
     water_inside_LUTO_lu_sum_wide.columns = ['name','data']
     water_inside_LUTO_lu_sum_wide['type'] = 'column'
-    water_inside_LUTO_lu_sum_wide.to_json(f'{SAVE_DIR}/Water_overview_landuse.json', orient='records')
+    filename = 'Water_overview_landuse'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        water_inside_LUTO_lu_sum_wide.to_json(f, orient='records')
+        f.write(';\n')
 
 
     # -------------------- Water yield overview for Australia by watershed region --------------------
@@ -1792,13 +2173,87 @@ def save_report_data(raw_data_dir:str):
 
         water_yield_region[reg_name] = water_df.to_dict(orient='records')
 
-    with open(f'{SAVE_DIR}/Water_overview_by_watershed_region.json', 'w') as outfile:
-        json.dump(water_yield_region, outfile)
+    filename = 'Water_overview_by_watershed_region'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as outfile:
+        outfile.write(f'window["{filename}"] = ')
+        json.dump(water_yield_region, outfile, separators=(',', ':'), indent=2)
+        outfile.write(';\n')
         
         
         
+    # -------------------- Water yield ranking --------------------
+    water_ranking_type_region = water_net_yield_NRM_region\
+        .groupby(['Year', 'region_NRM', 'Type'])[['Value (ML)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'Type', 'Value (ML)'], ascending=[True, True, False])\
+        .assign(Rank=lambda x: x.groupby(['Year', 'Type']).cumcount() + 1)\
+        .assign(Percent=lambda x: x['Value (ML)'] / x.groupby(['Year', 'Type'])['Value (ML)'].transform('sum') * 100)
+    water_ranking_type_AUS = water_net_yield_NRM_region\
+        .groupby(['Year', 'Type'])[['Value (ML)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'Type', 'Value (ML)'], ascending=[True, True, False])\
+        .assign(Rank='N.A.', Percent=100, region_NRM='AUSTRALIA')
+        
+        
+    water_ranking_net_region = water_net_yield_NRM_region\
+        .groupby(['Year', 'region_NRM'])[['Value (ML)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'Value (ML)'], ascending=[True, False])\
+        .assign(Rank=lambda x: x.groupby('Year').cumcount() + 1)\
+        .assign(Percent=lambda x: x['Value (ML)'] / x.groupby('Year')['Value (ML)'].transform('sum') * 100)\
+        .assign(Type='Total')
+    water_ranking_net_AUS = water_net_yield_NRM_region\
+        .groupby(['Year'])[['Value (ML)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'Value (ML)'], ascending=[True, False])\
+        .assign(Rank='N.A.', Percent=100, Type='Total', region_NRM='AUSTRALIA')
+        
+    
+    water_ranking = pd.concat([
+        water_ranking_type_region, 
+        water_ranking_type_AUS, 
+        water_ranking_net_region, 
+        water_ranking_net_AUS], axis=0, ignore_index=True).reset_index(drop=True)
+    water_ranking = water_ranking\
+        .set_index(['region_NRM', 'Year', 'Type'])\
+        .reindex(
+            index=pd.MultiIndex.from_product(
+                [water_ranking['region_NRM'].unique(), water_ranking['Year'].unique(), water_ranking['Type'].unique()],
+                names=['region_NRM', 'Year', 'Type']), fill_value=None)\
+        .reset_index()\
+        .assign(color=lambda x: x['Rank'].map(get_rank_color))\
+        .round({'Percent': 2, 'Value (ML)': 2})
+
+ 
+    out_dict = {}
+    for (region, w_type), df in water_ranking.groupby(['region_NRM', 'Type']):
+        if region not in out_dict:
+            out_dict[region] = {}
+        if w_type not in out_dict[region]:
+            out_dict[region][w_type] = {}
+
+        df = df.drop(columns='region_NRM')
+        out_dict[region][w_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+        out_dict[region][w_type]['Percent'] = df.set_index('Year')['Percent'].replace({np.nan: 0}).to_dict()
+        out_dict[region][w_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+        out_dict[region][w_type]['value'] = df.set_index('Year')['Value (ML)'].apply( lambda x: format_with_suffix(x)).to_dict()
+
+    filename = 'Water_ranking'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+
+
+
     # -------------------- Water yield overview by NRM region --------------------
     group_cols = ['Landuse', 'Type']
+    out_dict = {region: [] for region in water_net_yield_NRM_region['region_NRM'].unique()}
+    out_dict['AUSTRALIA'] = water_yield_df_AUS.to_dict(orient='records')
     for idx, col in enumerate(group_cols):
 
         df_region = water_net_yield_NRM_region\
@@ -1816,13 +2271,16 @@ def save_report_data(raw_data_dir:str):
             df_region_wide['name_order'] = df_region_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
             df_region_wide = df_region_wide.sort_values('name_order').drop(columns=['name_order'])
         
-        out_dict = {}
+        
         for region, df in df_region_wide.groupby('region_NRM'):
             df = df.drop(['region_NRM'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        with open(f'{SAVE_DIR}/Water_overview_MRN_region_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'Water_overview_MRN_region_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
 
 
 
@@ -1855,8 +2313,11 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region_NRM'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        with open(f'{SAVE_DIR}/Water_split_Ag_MRN_region_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'Water_split_Ag_MRN_region_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
             
             
     # -------------------- Water yield for agricultural management by NRM region --------------------
@@ -1892,8 +2353,11 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region_NRM'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        with open(f'{SAVE_DIR}/Water_split_Am_MRN_region_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'Water_split_Am_MRN_region_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
             
             
     # -------------------- Water yield for non-agricultural landuse by NRM region --------------------
@@ -1923,8 +2387,11 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region_NRM'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        with open(f'{SAVE_DIR}/Water_split_NonAg_MRN_region_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'Water_split_NonAg_MRN_region_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
         
 
 
@@ -1948,6 +2415,83 @@ def save_report_data(raw_data_dir:str):
         
         
         
+    # ---------------- Biodiversity ranking ----------------
+    bio_rank_type_region = bio_df\
+        .query('`Value (%)`>= 0')\
+        .groupby(['Year', 'region', 'Type'])\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'Type', 'Value (%)'], ascending=[True, True, False])\
+        .assign(Rank=lambda x: x.groupby(['Year', 'Type']).cumcount() + 1)\
+        .assign(Percent=lambda x: x['Value (%)'] / x.groupby(['Year', 'Type'])['Value (%)'].transform('sum') * 100)\
+        .assign(color=lambda x: x['Rank'].map(get_rank_color))\
+        .round({'Percent': 2, 'Area Weighted Score (ha)': 2})
+    bio_rank_type_AUS = bio_df\
+        .query('`Value (%)`>= 0')\
+        .groupby(['Year', 'Type'])\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'Type', 'Value (%)'], ascending=[True, True, False])\
+        .assign(Rank='N.A.', Percent=100, region='AUSTRALIA')\
+        .round({'Percent': 2, 'Area Weighted Score (ha)': 2})
+        
+    bio_rank_total_region = bio_df\
+        .query('`Value (%)`>= 0')\
+        .groupby(['Year', 'region'])\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'Value (%)'], ascending=[True, False])\
+        .assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1)\
+        .assign(Percent=lambda x: x['Value (%)'] / x.groupby(['Year'])['Value (%)'].transform('sum') * 100)\
+        .assign(Type='Total')\
+        .round({'Percent': 2, 'Area Weighted Score (ha)': 2})
+    bio_rank_total_AUS = bio_df\
+        .query('`Value (%)`>= 0')\
+        .groupby(['Year'])\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'Value (%)'], ascending=[True, False])\
+        .assign(Rank='N.A.', Percent=100, Type='Total', region='AUSTRALIA')\
+        .round({'Percent': 2, 'Area Weighted Score (ha)': 2})
+
+
+    bio_rank = pd.concat([
+        bio_rank_type_region,
+        bio_rank_total_region,
+        bio_rank_type_AUS,
+        bio_rank_total_AUS], axis=0, ignore_index=True).reset_index(drop=True)
+    bio_rank = bio_rank\
+        .set_index(['region', 'Year', 'Type'])\
+        .reindex(
+            index=pd.MultiIndex.from_product(
+                [bio_rank['region'].unique(), bio_rank['Year'].unique(), bio_rank['Type'].unique()],
+                names=['region', 'Year', 'Type']),fill_value=None)\
+        .reset_index()\
+        .assign(color=lambda x: x['Rank'].map(get_rank_color))
+
+            
+    out_dict = {}
+    for (region, b_type), df in bio_rank.groupby(['region', 'Type']):
+        if region not in out_dict:
+            out_dict[region] = {}
+        if b_type not in out_dict[region]:
+            out_dict[region][b_type] = {}
+
+        df = df.drop(columns='region')
+        out_dict[region][b_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+        out_dict[region][b_type]['Percent'] = df.set_index('Year')['Percent'].replace({np.nan: 0}).to_dict()
+        out_dict[region][b_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+        out_dict[region][b_type]['value'] = df.set_index('Year')['Area Weighted Score (ha)'].apply( lambda x: format_with_suffix(x)).to_dict()
+
+        
+    filename = 'Biodiversity_ranking'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+
+
+
     # ---------------- Biodiversity quality overview  ----------------
     group_cols = ['Type']
     for idx, col in enumerate(group_cols):
@@ -1995,12 +2539,15 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
 
-        with open(f'{SAVE_DIR}/BIO_quality_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'BIO_quality_overview_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
     
     
     
-    # ---------------- Biodiversity quality by Agricultural landuse  ----------------
+    # ---------------- Biodiversity quality by Agricultural Landuse  ----------------
     bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
     group_cols = ['Landuse']
     for idx, col in enumerate(group_cols):
@@ -2048,8 +2595,11 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        with open(f'{SAVE_DIR}/BIO_quality_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'BIO_quality_split_Ag_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
             
     # ---------------- Biodiversity quality by Agricultural Management  ----------------
     bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
@@ -2099,8 +2649,11 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        with open(f'{SAVE_DIR}/BIO_quality_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'BIO_quality_split_Am_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
 
 
     # ---------------- Biodiversity quality by Non-Agricultural  ----------------
@@ -2151,8 +2704,11 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        with open(f'{SAVE_DIR}/BIO_quality_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-            json.dump(out_dict, f)
+        filename = f'BIO_quality_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
     
     
         
@@ -2224,11 +2780,14 @@ def save_report_data(raw_data_dir:str):
                 df = df.drop(['region'], axis=1)
                 out_dict[region] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF2_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF2_overview_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
 
 
-        # ---------------- (GBF2) Agricultural landuse  ----------------
+        # ---------------- (GBF2) Agricultural Landuse  ----------------
         bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
 
         group_cols = ['Landuse']
@@ -2277,8 +2836,11 @@ def save_report_data(raw_data_dir:str):
                 df = df.drop(['region'], axis=1)
                 out_dict[region] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF2_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF2_split_Ag_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
                 
         # ---------------- (GBF2) Agricultural Management  ----------------
         bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
@@ -2329,8 +2891,11 @@ def save_report_data(raw_data_dir:str):
                 df = df.drop(['region'], axis=1)
                 out_dict[region] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF2_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF2_split_Am_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
                 
                 
         # ---------------- (GBF2) Agricultural Management  ----------------
@@ -2382,8 +2947,11 @@ def save_report_data(raw_data_dir:str):
                 df = df.drop(['region'], axis=1)
                 out_dict[region] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF2_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF2_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
         
         
  
@@ -2461,12 +3029,15 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF3_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF3_overview_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
                 
                 
                 
-        # ---------------- (GBF3) Agricultural landuse  ----------------
+        # ---------------- (GBF3) Agricultural Landuse  ----------------
         bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
         
         group_cols = ['Landuse']
@@ -2519,11 +3090,14 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF3_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF3_split_Ag_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
 
 
-        # ---------------- (GBF3) Agricultural management  ----------------
+        # ---------------- (GBF3) Agricultural Management  ----------------
         bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
 
         group_cols = ['Landuse', 'Agri-Management']
@@ -2576,8 +3150,11 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF3_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF3_split_Am_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
 
 
         # ---------------- (GBF3) Non-agricultural management  ----------------
@@ -2633,8 +3210,11 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF3_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF3_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
             
             
             
@@ -2709,12 +3289,15 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF4_SNES_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF4_SNES_overview_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
                 
                 
                 
-        # ---------------- (GBF4 SNES) Agricultural landuse  ----------------
+        # ---------------- (GBF4 SNES) Agricultural Landuse  ----------------
         bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
         
         group_cols = ['Landuse']
@@ -2767,11 +3350,14 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF4_SNES_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF4_SNES_split_Ag_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
 
 
-        # ---------------- (GBF4 SNES) Agricultural management  ----------------
+        # ---------------- (GBF4 SNES) Agricultural Management  ----------------
         bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
 
         group_cols = ['Landuse', 'Agri-Management']
@@ -2824,8 +3410,11 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF4_SNES_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF4_SNES_split_Am_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
 
         # ---------------- (GBF4 SNES) Non-agricultural management  ----------------
         bio_df_nonag = bio_df.query('Type == "Non-Agricultural land-use"').copy()
@@ -2880,8 +3469,11 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF4_SNES_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF4_SNES_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
             
             
             
@@ -2956,12 +3548,15 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF4_ECNES_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF4_ECNES_overview_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
                 
                 
                 
-        # ---------------- (GBF4 ECNES) Agricultural landuse  ----------------
+        # ---------------- (GBF4 ECNES) Agricultural Landuse  ----------------
         bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
         
         group_cols = ['Landuse']
@@ -3014,11 +3609,14 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF4_ECNES_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF4_ECNES_split_Ag_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
 
 
-        # ---------------- (GBF4 ECNES) Agricultural management  ----------------
+        # ---------------- (GBF4 ECNES) Agricultural Management  ----------------
         bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
 
         group_cols = ['Landuse', 'Agri-Management']
@@ -3071,8 +3669,11 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF4_ECNES_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF4_ECNES_split_Am_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
 
         # ---------------- (GBF4 ECNES) Non-agricultural management  ----------------
         bio_df_nonag = bio_df.query('Type == "Non-Agricultural land-use"').copy()
@@ -3127,8 +3728,11 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF4_ECNES_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF4_ECNES_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
         
         
         
@@ -3203,12 +3807,15 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF8_SPECIES_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF8_SPECIES_overview_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
                 
                 
                 
-        # ---------------- (GBF8 SPECIES) Agricultural landuse  ----------------
+        # ---------------- (GBF8 SPECIES) Agricultural Landuse  ----------------
         bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
         
         group_cols = ['Landuse']
@@ -3261,11 +3868,14 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF8_SPECIES_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF8_SPECIES_split_Ag_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
 
 
-        # ---------------- (GBF8 SPECIES) Agricultural management  ----------------
+        # ---------------- (GBF8 SPECIES) Agricultural Management  ----------------
         bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
 
         group_cols = ['Landuse', 'Agri-Management']
@@ -3318,8 +3928,11 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF8_SPECIES_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF8_SPECIES_split_Am_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
 
         # ---------------- (GBF8 SPECIES) Non-agricultural management  ----------------
         bio_df_nonag = bio_df.query('Type == "Non-Agricultural land-use"').copy()
@@ -3374,8 +3987,11 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF8_SPECIES_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF8_SPECIES_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
         
         
         
@@ -3445,12 +4061,15 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF8_GROUP_overview_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF8_GROUP_overview_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
                 
                 
                 
-        # ---------------- (GBF8 GROUP) Agricultural landuse  ----------------
+        # ---------------- (GBF8 GROUP) Agricultural Landuse  ----------------
         bio_df_ag = bio_df.query('Type == "Agricultural Landuse"').copy()
         
         group_cols = ['Landuse']
@@ -3503,11 +4122,14 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF8_GROUP_split_Ag_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF8_GROUP_split_Ag_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
 
 
-        # ---------------- (GBF8 GROUP) Agricultural management  ----------------
+        # ---------------- (GBF8 GROUP) Agricultural Management  ----------------
         bio_df_am = bio_df.query('Type == "Agricultural Management"').copy()
 
         group_cols = ['Landuse', 'Agri-Management']
@@ -3560,8 +4182,11 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF8_GROUP_split_Am_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF8_GROUP_split_Am_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
 
         # ---------------- (GBF8 GROUP) Non-agricultural management  ----------------
         bio_df_nonag = bio_df.query('Type == "Non-Agricultural land-use"').copy()
@@ -3616,45 +4241,14 @@ def save_report_data(raw_data_dir:str):
                     df = df.drop(['region'], axis=1)
                     out_dict[region][species] = df.to_dict(orient='records')
 
-            with open(f'{SAVE_DIR}/BIO_GBF8_GROUP_split_NonAg_{idx+1}_{col.replace(" ", "_")}.json', 'w') as f:
-                json.dump(out_dict, f)
+            filename = f'BIO_GBF8_GROUP_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
+            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+                f.write(f'window["{filename}"] = ')
+                json.dump(out_dict, f, separators=(',', ':'), indent=2)
+                f.write(';\n')
                 
   
 
-    
-    
-    #########################################################
-    #                         7) Maps                       #
-    #########################################################
-    map_files = files.query('base_ext == ".html"')
-    map_save_dir = f"{SAVE_DIR}/Map_data/"
-    
-    # Create the directory to save map_html if it does not exist
-    if  not os.path.exists(map_save_dir):
-        os.makedirs(map_save_dir)
-
-    # Remove any existing map files in the save directory
-    if os.path.exists(map_save_dir):
-        for file in os.listdir(map_save_dir):
-            file_path = os.path.join(map_save_dir, file)
-            if os.path.isfile(file_path):
-                os.remove(file_path)
-
-    # Function to move a file from one location to another if the file exists
-    def move_html(path_from, path_to):
-        if os.path.exists(path_from):
-            shutil.move(path_from, path_to)
-
-    # Move the map files to the save directory
-    tasks = [
-        delayed(move_html)(row['path'], map_save_dir)
-        for _,row in map_files.iterrows()
-    ]
-    
-    worker = min(settings.WRITE_THREADS, len(tasks)) if len(tasks) > 0 else 1
-    
-    Parallel(n_jobs=worker)(tasks)
-    
     
     #########################################################
     # Supporting information               
@@ -3662,22 +4256,33 @@ def save_report_data(raw_data_dir:str):
     with open(f'{raw_data_dir}/model_run_settings.txt', 'r', encoding='utf-8') as src_file:
         settings_dict = {i.split(':')[0].strip(): ''.join(i.split(':')[1:]).strip() for i in src_file.readlines()}
         settings_dict = [{'parameter': k, 'val': v} for k, v in settings_dict.items()]
+        
+    with open(f'{raw_data_dir}/RES_{settings.RESFACTOR}_mem_log.txt', 'r', encoding='utf-8') as src_file:
+        mem_logs = src_file.readlines()
+        mem_logs = [i.split('\t') for i in mem_logs]
+        mem_logs = [{'time': i[0], 'mem (GB)': i[1].strip()} for i in mem_logs]
+        mem_logs_df = pd.DataFrame(mem_logs)
+        mem_logs_df['time'] = pd.to_datetime(mem_logs_df['time'], format='%Y-%m-%d %H:%M:%S')
+        mem_logs_df['time'] = mem_logs_df['time'].astype('int64') // 10**6  # convert to milliseconds
+        mem_logs_df['mem (GB)'] = mem_logs_df['mem (GB)'].astype(float)
+        mem_logs_obj = [{
+            'name': f'Memory Usage (RES {settings.RESFACTOR})',
+            'data': mem_logs_df.values.tolist()
+        }]
 
     supporting = {
         'model_run_settings': settings_dict,
         'years': years,
         'colors': COLORS,
+        'colors_ranking': COLORS_RANK,
+        'mem_logs': mem_logs_obj,
         'RENAME_AM_NON_AG': RENAME_AM_NON_AG,
         'SPATIAL_MAP_DICT': SPATIAL_MAP_DICT
     }
     
-    with open(f"{SAVE_DIR}/Supporting_info.json", 'w') as f:
-        json.dump(supporting, f, indent=2)
+    filename = 'Supporting_info'
+    with open(f"{SAVE_DIR}/{filename}.js", 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(supporting, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
     
-
-
-    #########################################################
-    # Report success info                     
-    #########################################################
-
-    print('Report data created successfully!\n')

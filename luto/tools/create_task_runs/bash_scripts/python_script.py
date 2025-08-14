@@ -29,40 +29,30 @@ import luto.settings as settings
 data = sim.load_data()
 sim.run(data=data)
 
-# Remove all files except the report directory if settings.KEEP_OUTPUTS is False
-'''
-KEEP_OUTPUTS is not originally defined in the settings, but will be added by `create_gridu_search_task.py`.
-'''
 
-if settings.KEEP_OUTPUTS:
-    
-    # Save the data object to disk
-    sim.save_data_to_disk(data, f"{data.path}/DATA_REPORT/Data_RES{settings.RESFACTOR}.gz")
- 
-else:
-    
-    report_dir = f"{data.path}/DATA_REPORT"
-    archive_path ='./DATA_REPORT.zip'
-    
-    data = None  # Clear the data object to free memory
-    sim = None   # Clear the simulation module to free memory
-    
-    # Zip the output directory, and remove the original directory
-    with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        for root, dirs, files in os.walk(report_dir):
-            for file in files:
-                abs_path = os.path.join(root, file)
-                rel_path = os.path.relpath(abs_path, start=report_dir)
-                zipf.write(abs_path, arcname=rel_path)
+# Set up report directory and archive path
+report_dir = f"{data.path}/DATA_REPORT"
+archive_path ='./DATA_REPORT.zip'
 
-    # Remove all files except the report directory
-    for item in os.listdir('.'):
-        if item != 'DATA_REPORT.zip':
-            try:
-                if os.path.isfile(item) or os.path.islink(item):
-                    os.unlink(item)  # Remove the file or link
-                elif os.path.isdir(item):
-                    shutil.rmtree(item)  # Remove the directory
-            except Exception as e:
-                print(f"Failed to delete {item}. Reason: {e}")
-                
+data = None  # Clear the data object to free memory
+sim = None   # Clear the simulation module to free memory
+
+# Zip the output directory, and remove the original directory
+with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+    for root, dirs, files in os.walk(report_dir):
+        for file in files:
+            abs_path = os.path.join(root, file)
+            rel_path = os.path.relpath(abs_path, start=report_dir)
+            zipf.write(abs_path, arcname=rel_path)
+
+# Remove all files except the report directory
+for item in os.listdir('.'):
+    if item != 'DATA_REPORT.zip':
+        try:
+            if os.path.isfile(item) or os.path.islink(item):
+                os.unlink(item)  # Remove the file or link
+            elif os.path.isdir(item):
+                shutil.rmtree(item)  # Remove the directory
+        except Exception as e:
+            print(f"Failed to delete {item}. Reason: {e}")
+            

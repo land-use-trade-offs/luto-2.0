@@ -25,15 +25,34 @@ import luto.settings as settings
 YR_BASE = 2010
 
 # Define the commodity categories
-COMMODITIES_ON_LAND = ['Apples','Beef live export','Beef meat','Citrus','Cotton','Dairy','Grapes',
-                       'Hay','Nuts','Other non-cereal crops', 'Pears', 'Plantation fruit',
-                       'Rice', 'Sheep live export', 'Sheep meat', 'Sheep wool', 'Stone fruit', 'Sugar',
-                       'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
-                       'Vegetables','Winter cereals','Winter legumes','Winter oilseeds']
+COMMODITIES_ON_LAND = [
+    'Apples','Beef live export','Beef meat','Citrus','Cotton','Dairy','Grapes',
+    'Hay','Nuts','Other non-cereal crops', 'Pears', 'Plantation fruit',
+    'Rice', 'Sheep live export', 'Sheep meat', 'Sheep wool', 'Stone fruit', 'Sugar',
+    'Summer cereals', 'Summer legumes', 'Summer oilseeds', 'Tropical stone fruit',
+    'Vegetables','Winter cereals','Winter legumes','Winter oilseeds'
+]
 
 COMMODITIES_OFF_LAND = ['Aquaculture', 'Chicken', 'Eggs', 'Pork' ]
 
 COMMODITIES_ALL = COMMODITIES_ON_LAND + COMMODITIES_OFF_LAND
+
+
+LU_CROPS = [
+    'Apples','Citrus','Cotton','Grapes','Hay','Nuts','Other non-cereal crops',
+    'Pears','Plantation fruit','Rice','Stone fruit','Sugar','Summer cereals',
+    'Summer legumes','Summer oilseeds','Tropical stone fruit','Vegetables',
+    'Winter cereals','Winter legumes','Winter oilseeds'
+]
+
+LU_LVSTKS = [
+    'Beef - natural land','Dairy - natural land','Sheep - natural land',
+    'Beef - modified land','Dairy - modified land','Sheep - modified land'
+]
+
+LU_UNALLOW = ['Unallocated - modified land', 'Unallocated - natural land']
+
+
 
 
 # Define land use code for am and non-ag land uses
@@ -111,7 +130,7 @@ NON_AG_LANDUSE_RAW = [i for i in NON_AG_LANDUSE_RAW if settings.NON_AG_LAND_USES
 
 # Merge the land uses
 LANDUSE_ALL_RAW = AG_LANDUSE + NON_AG_LANDUSE_RAW
-LANDUSE_ALL_RENAMED = AG_LANDUSE + list(RENAME_NON_AG.values())  + ['Outside LUTO study area']
+LANDUSE_ALL_RENAMED = AG_LANDUSE + list(RENAME_NON_AG.values())  + ['Outside LUTO study area'] + ['Agri-Management']
 
 
 
@@ -175,6 +194,13 @@ COLORS = [
     "#91e8e1",
 ]
 
+COLORS_RANK = {
+    '1-10': "#ff8f5e",
+    '11-20': "#d5e5a3",
+    '>=21': "#91e8e1",
+    'N.A.': "#e8eaed",
+}
+
 pattern_path = {
     'path': 
         {
@@ -188,6 +214,7 @@ pattern_path = {
 
 COLORS_LU = dict(zip(LANDUSE_ALL_RENAMED, cycle(COLORS)))
 COLORS_LU.update({'Outside LUTO study area': "#C7BFBF"})
+COLORS_LU.update({'Agri-Management': "#D5F100"})
 COLORS_LM = dict(zip(['Dryland', 'Irrigated'], ["#f7a35c", "#7cb5ec"]))
 COLORS_COMMODITIES = dict(zip(COMMODITIES_ALL, cycle(COLORS)))
 COLORS_AM_NONAG = dict(zip(RENAME_AM_NON_AG.values(), cycle(COLORS)))

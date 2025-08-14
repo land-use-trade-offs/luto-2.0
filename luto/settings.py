@@ -55,7 +55,7 @@ RAW_DATA = '../raw_data'
 # Scenario parameters.                                                                  #
 # ---------------------------------------------------------------------------- #
 
-# Climate change assumptions. Options include '126', '245', '360', '585'
+# Climate change assumptions. Options include '126', '245', '370', '585'
 SSP = '245'
 RCP = 'rcp' + SSP[1] + 'p' + SSP[2] # Representative Concentration Pathway string identifier e.g., 'rcp4p5'.
 
@@ -103,7 +103,7 @@ AMORTISATION_PERIOD = 30 # years
 RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
-SIM_YEARS = list(range(2010,2051,5)) # range(2020,2050)
+SIM_YEARS = list(range(2020,2051,5)) # range(2020,2050)
 
 
 # Define the objective function
@@ -142,7 +142,7 @@ the model sensitive to variations in input data.
 # ---------------------------------------------------------------------------- #
 # Geographical raster writing parameters
 # ---------------------------------------------------------------------------- #
-WRITE_OUTPUT_GEOTIFFS = True               # Write GeoTiffs to output directory: True or False
+WRITE_OUTPUT_GEOTIFFS = False               # Write GeoTiffs to output directory: True or False
 PARALLEL_WRITE = True                       # If to use parallel processing to write GeoTiffs: True or False
 WRITE_THREADS = min(32, os.cpu_count())     # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
@@ -295,7 +295,7 @@ AF_FENCING_LENGTH_HA = 100 * no_belts_per_ha * 2 # Length of fencing required pe
 
 
 # ---------------------------------------------------------------------------- #
-# Agricultural management parameters
+# Agricultural Management parameters
 # ---------------------------------------------------------------------------- #
 
 
@@ -505,9 +505,6 @@ WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Div
 """
 
 WATER_STRESS = 0.6                                      # Aqueduct limit catchments, 0.6 means the water yield in a region must be >= 60% of the historical water yield
-WATER_USE_SHARE_AG = 0.7                                # Ag share is 70% across all catchments, could be updated for each specific catchment based on actual data
-WATER_USE_SHARE_DOMESTIC  = 1 - WATER_USE_SHARE_AG      # Domestic share is 30% across all catchments, could be updated for each specific catchment based on actual data
-
 
 # Consider livestock drinking water (0 [off] or 1 [on]) ***** Livestock drinking water can cause infeasibility issues with water constraint in Pilbara
 LIVESTOCK_DRINKING_WATER = 1
@@ -638,7 +635,7 @@ GBF3_TARGETS_DICT = {
     'USER_DEFINED': None
 }
 
-BIODIVERSITY_TARGET_GBF_3  = 'medium'           # 'off', 'medium', 'high', or 'USER_DEFINED'
+BIODIVERSITY_TARGET_GBF_3  = 'off'           # 'off', 'medium', 'high', or 'USER_DEFINED'
 '''
 Target 3 of the Kunming-Montreal Global Biodiversity Framework:
 protect and manage 30% of the world's land, water, and coastal areas by 2030.
@@ -652,8 +649,8 @@ protect and manage 30% of the world's land, water, and coastal areas by 2030.
 
 
 # ------------------------------- Species parameters -------------------------------
-BIODIVERSITY_TARGET_GBF_4_SNES =  'on'           # 'on' or 'off'.
-BIODIVERSITY_TARGET_GBF_4_ECNES = 'on'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_4_SNES =  'off'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'           # 'on' or 'off'.
 
 '''
 Target 4 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
@@ -664,7 +661,7 @@ and manage human-wildlife interactions
 
 
 # -------------------------------- Climate change impacts on biodiversity -------------------------------
-BIODIVERSITY_TARGET_GBF_8 = 'on'           # 'on' or 'off'.
+BIODIVERSITY_TARGET_GBF_8 = 'off'           # 'on' or 'off'.
 '''
 Target 8 of the Kunming-Montreal Global Biodiversity Framework (GBF) aims to 
 reduce the impacts of climate change on biodiversity and ecosystems.

@@ -25,6 +25,8 @@ To plot neoLUTO spatial arrays.
 Based on code by: Brett Bryan (b.bryan@deakin.edu.au)
 Adaptation: Fjalar de Haan (f.dehaan@deakin.edu.au)
 Colour scheme by: Carla Archibald (c.archibald@deakin.edu.au)
+
+Flagged as deprecated by Jinzhu Wang (jinzhu.wang@deakin.edu.au) at 13 Aug 2025
 """
 
 

@@ -9,6 +9,7 @@
 
 luto/.ipynb_checkpoints/*
 pyproject.toml
+anthropic.yml
 
 # Virtual environments
 venv
