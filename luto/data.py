@@ -32,16 +32,17 @@ from luto import tools
 import luto.settings as settings
 import luto.economics.agricultural.quantity as ag_quantity
 import luto.economics.non_agricultural.quantity as non_ag_quantity
+import luto.economics.agricultural.water as ag_water
+from luto.tools.spatializers import upsample_array
 
-from math import ceil
 from collections import defaultdict
-from dataclasses import dataclass
 from typing import Any, Literal, Optional
 from affine import Affine
 from scipy.interpolate import interp1d
+from math import ceil
+from dataclasses import dataclass
 from scipy.ndimage import distance_transform_edt
 
-from luto.tools.spatializers import upsample_array
 
 
 def dict2matrix(d, fromlist, tolist):
@@ -101,10 +102,6 @@ class Data:
         """
         # Path for write module - overwrite when provided with a base and target year
         self.path = None
-        
-        # Read the timestamp of simulation, which is created by `luto.simulation.load_data`
-        with open(os.path.join(settings.OUTPUT_DIR, '.timestamp'), 'r') as f:
-            self.timestamp = f.read().strip()
 
         # Setup output containers
         self.lumaps = {}
@@ -945,10 +942,14 @@ class Data:
             rr_natural_land = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'water_yield_natural_land_2010_2100_rr_ml.h5'))
             rr_natural_land = rr_natural_land.loc[:, pd.IndexSlice[:, settings.SSP]]
             rr_natural_land.columns = rr_natural_land.columns.droplevel('ssp')
+            rr_outside_luto = rr_outside_luto.reindex(columns=sorted(rr_outside_luto.columns))
 
-            self.WATER_OUTSIDE_LUTO_RR = rr_outside_luto
-            self.WATER_OUTSIDE_LUTO_RR_HIST = water_yield_oustide_luto_hist.query('Region_Type == "River Region"').set_index('Region_ID')['Water Yield (ML)'].to_dict()
-            self.WATER_UNDER_NATURAL_LAND_RR = rr_natural_land
+            self.WATER_OUTSIDE_LUTO_BY_CCI = rr_outside_luto
+            self.WATER_OUTSIDE_LUTO_HIST = water_yield_oustide_luto_hist.query('Region_Type == "River Region"').set_index('Region_ID')['Water Yield (ML)'].to_dict()
+            
+            self.WATER_REGION_NAMES = self.RIVREG_DICT
+            self.WATER_REGION_HIST_LEVEL = self.RIVREG_HIST_LEVEL
+            self.WATER_REGION_ID = self.RIVREG_ID
 
         if settings.WATER_REGION_DEF == 'Drainage Division':
             dd_outside_luto = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'water_yield_outside_LUTO_study_area_2010_2100_dd_ml.h5'))
@@ -958,27 +959,18 @@ class Data:
             dd_natural_land = pd.read_hdf(os.path.join(settings.INPUT_DIR, 'water_yield_natural_land_2010_2100_dd_ml.h5'))
             dd_natural_land = dd_natural_land.loc[:, pd.IndexSlice[:, settings.SSP]]
             dd_natural_land.columns = dd_natural_land.columns.droplevel('ssp')
+            dd_natural_land = dd_natural_land.reindex(columns=sorted(dd_natural_land.columns))
 
-            self.WATER_OUTSIDE_LUTO_DD = dd_outside_luto
-            self.WATER_OUTSIDE_LUTO_DD_HIST = water_yield_oustide_luto_hist.query('Region_Type == "Drainage Division"').set_index('Region_ID')['Water Yield (ML)'].to_dict()
-            self.WATER_UNDER_NATURAL_LAND_DD = dd_natural_land
-        
-        
-        # Get historical yields of regions
-        if settings.WATER_REGION_DEF == 'River Region':
-            self.WATER_REGION_NAMES = self.RIVREG_DICT
-            self.WATER_REGION_HIST_LEVEL = self.RIVREG_HIST_LEVEL
-            self.WATER_REGION_ID = self.RIVREG_ID
+            self.WATER_OUTSIDE_LUTO_BY_CCI = dd_outside_luto
+            self.WATER_OUTSIDE_LUTO_HIST = water_yield_oustide_luto_hist.query('Region_Type == "Drainage Division"').set_index('Region_ID')['Water Yield (ML)'].to_dict()
             
-        elif settings.WATER_REGION_DEF == 'Drainage Division':
             self.WATER_REGION_NAMES = self.DRAINDIV_DICT
             self.WATER_REGION_HIST_LEVEL = self.DRAINDIV_HIST_LEVEL
             self.WATER_REGION_ID = self.DRAINDIV_ID
-            
+        
 
         # Get the water region index for each region
         self.WATER_REGION_INDEX_R = {k:(self.WATER_REGION_ID == k) for k in self.WATER_REGION_NAMES.keys()}
-
 
         # Place holder for Water Yield to avoid recalculating it every time.
         self.water_yield_regions_BASE_YR = None
@@ -986,10 +978,13 @@ class Data:
         # Water use for domestic and industrial sectors.
         water_use_domestic = pd.read_csv(os.path.join(settings.INPUT_DIR, "Water_Use_Domestic.csv")).query('REGION_TYPE == @settings.WATER_REGION_DEF')
         self.WATER_USE_DOMESTIC = water_use_domestic.set_index('REGION_ID')['DOMESTIC_INDUSTRIAL_WATER_USE_ML'].to_dict()
-        
-        
 
-        
+        # Water yield targets for each region
+        self.WATER_YIELD_TARGETS = ag_water.get_water_target_inside_LUTO_by_CCI(self)
+
+
+
+
         ###############################################################
         # Carbon sequestration by natural lands.
         ###############################################################
@@ -1893,28 +1888,6 @@ class Data:
         Safely save objective value for a given year to the Data object
         """
         self.obj_vals[yr] = obj_val
-
-    def set_path(self) -> str:
-        """Create a folder for storing outputs and return folder name."""
-
-        # Create path name
-        years = [i for i in settings.SIM_YEARS if i<=self.last_year]
-        self.path = f"{settings.OUTPUT_DIR}/{self.timestamp}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}"
-        
-        # Get all paths
-        paths = (
-            [self.path]
-            + [f"{self.path}/out_{yr}" for yr in years]
-            + [f"{self.path}/out_{yr}/lucc_separate" for yr in years[1:]]
-        )  # Skip creating lucc_separate for base year
-
-
-        # Create all paths
-        for p in paths:
-            if not os.path.exists(p):
-                os.mkdir(p)
-
-        return self.path
 
     def get_production(self) -> np.ndarray:
         """
