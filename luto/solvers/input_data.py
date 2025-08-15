@@ -678,7 +678,7 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
         limits['demand_rescale'] = limits['demand'] / resale_factors['Demand']
     
     if settings.WATER_LIMITS == 'on':
-        limits['water'] = ag_water.get_water_net_yield_limit_for_regions_inside_LUTO(data)
+        limits['water'] = data.WATER_YIELD_TARGETS
         limits['water_rescale'] = {k: v / resale_factors['Water'] for k, v in limits['water'].items()}
         
     if settings.GHG_EMISSIONS_LIMITS != 'off':
