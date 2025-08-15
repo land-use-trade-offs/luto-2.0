@@ -25,13 +25,25 @@ functions as a singleton class. It is intended to be the _only_ part of the
 model that has 'global' varying state.
 """
 
-
-import gzip
-import pickle
+import os
 import time
 import dill
+import gzip
+import pickle
 import threading
-import time
+
+from luto.tools import (
+    LogToFile,
+    log_memory_usage,
+    set_path,
+    write_timestamp,
+    read_timestamp
+)
+
+# Call write_timestamp here; this will be used as the global timestamp for data read, simulation, and reporting
+write_timestamp()
+set_path()
+
 
 from gurobipy import GRB
 from luto.data import Data
@@ -41,27 +53,25 @@ from luto.tools.write import write_outputs
 
 import luto.settings as settings
 
-from luto.tools import (
-    LogToFile,
-    log_memory_usage,
-    write_timestamp,
-    read_timestamp
-)
 
 
+# Get save path
+save_path = f'{read_timestamp()}_RF{settings.RESFACTOR}_{settings.SIM_YEARS[0]}-{settings.SIM_YEARS[-1]}'
 
-@LogToFile(f"{settings.OUTPUT_DIR}/run_{write_timestamp()}")
+
+@LogToFile(f"{settings.OUTPUT_DIR}/{save_path}/LUTO_RUN_")
 def load_data() -> Data:
     """
     Load the Data object containing all required data to run a LUTO simulation.
     """
     # Thread to log memory usage
     stop_event = threading.Event()
-    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'w',1, stop_event))
+    memory_thread = threading.Thread(target=log_memory_usage, args=(f"{settings.OUTPUT_DIR}/{save_path}", 'w',1, stop_event))
     memory_thread.start()
     
     try:
         data = Data()
+        data.timestamp = read_timestamp()
     except Exception as e:
         print(f"An error occurred while loading data: {e}")
         raise e
@@ -73,7 +83,7 @@ def load_data() -> Data:
     return data
 
 
-@LogToFile(f"{settings.OUTPUT_DIR}/run_{read_timestamp()}", 'a')
+@LogToFile(f"{settings.OUTPUT_DIR}/{save_path}/LUTO_RUN_")
 def run(
     data: Data, 
 ) -> None:
@@ -85,7 +95,7 @@ def run(
     
     # Start recording memory usage
     stop_event = threading.Event()
-    memory_thread = threading.Thread(target=log_memory_usage, args=(settings.OUTPUT_DIR, 'a',1, stop_event))
+    memory_thread = threading.Thread(target=log_memory_usage, args=(f"{settings.OUTPUT_DIR}/{save_path}", 'a',1, stop_event))
     memory_thread.start()
     
     try:
@@ -161,7 +171,6 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
         for data_type, prod_data in solution.prod_data.items():
             data.add_production_data(target_year, data_type, prod_data)
             
-        data.last_year = target_year
 
         print(f'Processing for {target_year} completed in {round(time.time() - start_time)} seconds\n\n' )
         
@@ -182,11 +191,14 @@ def save_data_to_disk(data: Data, path: str, compress_level=6) -> None:
         path: Path to save the Data object.
         compress_level: Compression level for gzip compression.
     """
+    print(f'Saving data to {path}...')
+
     # Save with gzip compression
     with gzip.open(path, 'wb', compresslevel=compress_level) as f:
         dill.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
     
-
+    
+@LogToFile(f"{settings.OUTPUT_DIR}/{save_path}/LUTO_RUN_", 'w')
 def load_data_from_disk(path: str) -> Data:
     """Load the Data object from disk.
     
@@ -199,15 +211,18 @@ def load_data_from_disk(path: str) -> Data:
     Returns
         Data: `Data` object.
     """
+    
+    print(f"Loading data from {path}...\n")
+    
     # Load the data object with gzip compression
     with gzip.open(path, 'rb') as f:
         data = dill.load(f)
-    
+        
     # Check if the resolution factor from the data object matches the settings.RESFACTOR
     if int(data.RESMULT ** 0.5) != settings.RESFACTOR:
         raise ValueError(f'Resolution factor from data loading ({int(data.RESMULT ** 0.5)}) does not match it of settings ({settings.RESFACTOR})!')
-
-    data.timestamp = write_timestamp()
     
+    data.timestamp = read_timestamp()
+
     return data
-  
+
