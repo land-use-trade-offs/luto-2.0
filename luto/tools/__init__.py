@@ -540,10 +540,23 @@ def plot_t_mat(t_mat:xr.DataArray):
                 rect = patches.Rectangle((j - 0.5, i - 0.5), 1, 1, hatch='////', fill=False, edgecolor='gray', linewidth=0.0)
                 ax.add_patch(rect)
 
+def set_path() -> str:
+        """Create a folder for storing outputs and return folder name."""
+        years = [i for i in settings.SIM_YEARS]
+        path = f"{settings.OUTPUT_DIR}/{read_timestamp()}_RF{settings.RESFACTOR}_{years[0]}-{years[-1]}"
+        paths = (
+            [path]
+            + [f"{path}/out_{yr}" for yr in years]
+            + [f"{path}/out_{yr}/lucc_separate" for yr in years[1:]]
+        )
 
+        for p in paths:
+            if not os.path.exists(p):
+                os.mkdir(p)
+  
 
 class LogToFile:
-    def __init__(self, log_path, mode:str='w'):
+    def __init__(self, log_path, mode:str='a'):
         self.log_path_stdout = f"{log_path}_stdout.log"
         self.log_path_stderr = f"{log_path}_stderr.log"
         self.mode = mode
