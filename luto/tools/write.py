@@ -55,25 +55,32 @@ import luto.economics.non_agricultural.water as non_ag_water
 import luto.economics.non_agricultural.biodiversity as non_ag_biodiversity
 
 
-# Get save path
-save_path = f'{tools.read_timestamp()}_RF{settings.RESFACTOR}_{settings.SIM_YEARS[0]}-{settings.SIM_YEARS[-1]}'
-
-@tools.LogToFile(f"{settings.OUTPUT_DIR}/{save_path}/LUTO_RUN_")          
 def write_outputs(data: Data):
-   # Start recording memory usage
-    stop_event = threading.Event()
-    memory_thread = threading.Thread(target=tools.log_memory_usage, args=(f"{settings.OUTPUT_DIR}/{save_path}", 'a',1, stop_event))
-    memory_thread.start()
-    try:
-        write_data(data)
-        create_report(data)
-    except Exception as e:
-        print(f"An error occurred while writing outputs: {e}")
-        raise e
-    finally:
-        # Ensure the memory logging thread is stopped
-        stop_event.set()
-        memory_thread.join()
+    """Write outputs using dynamic timestamp from read_timestamp."""
+    
+    # Generate path using read_timestamp each time this function is called
+    current_timestamp = tools.read_timestamp()
+    log_path = f"{settings.OUTPUT_DIR}/{current_timestamp}_RF{settings.RESFACTOR}_{settings.SIM_YEARS[0]}-{settings.SIM_YEARS[-1]}/LUTO_RUN_"
+    
+    # Apply the LogToFile decorator dynamically
+    @tools.LogToFile(log_path)
+    def _write_outputs():
+        # Start recording memory usage
+        stop_event = threading.Event()
+        memory_thread = threading.Thread(target=tools.log_memory_usage, args=(f"{settings.OUTPUT_DIR}/{current_timestamp}_RF{settings.RESFACTOR}_{settings.SIM_YEARS[0]}-{settings.SIM_YEARS[-1]}", 'a', 1, stop_event))
+        memory_thread.start()
+        try:
+            write_data(data)
+            create_report(data)
+        except Exception as e:
+            print(f"An error occurred while writing outputs: {e}")
+            raise e
+        finally:
+            # Ensure the memory logging thread is stopped
+            stop_event.set()
+            memory_thread.join()
+    
+    return _write_outputs()
 
 
 
@@ -109,16 +116,26 @@ def write_settings(path):
 
 
 
-@tools.LogToFile(f"{settings.OUTPUT_DIR}/write_{tools.read_timestamp()}", mode='a')
 def create_report(data: Data):
-    print('Creating report...')
-    print(' --| Copying report template...')
-    shutil.copytree('luto/tools/report/VUE_modules', f"{data.path}/DATA_REPORT", dirs_exist_ok=True)
-    print(' --| Creating chart data...')
-    save_report_data(data.path)
-    print(' --| Creating map data...')
-    save_report_layer(data, data.path)
-    print(' --| Report created successfully!')
+    """Create report using dynamic timestamp from read_timestamp."""
+    
+    # Generate path using read_timestamp each time this function is called
+    current_timestamp = tools.read_timestamp()
+    log_path = f"{settings.OUTPUT_DIR}/write_{current_timestamp}"
+    
+    # Apply the LogToFile decorator dynamically
+    @tools.LogToFile(log_path, mode='a')
+    def _create_report():
+        print('Creating report...')
+        print(' --| Copying report template...')
+        shutil.copytree('luto/tools/report/VUE_modules', f"{data.path}/DATA_REPORT", dirs_exist_ok=True)
+        print(' --| Creating chart data...')
+        save_report_data(data.path)
+        print(' --| Creating map data...')
+        save_report_layer(data, data.path)
+        print(' --| Report created successfully!')
+    
+    return _create_report()
 
 
         
