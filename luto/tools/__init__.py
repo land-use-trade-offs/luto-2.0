@@ -51,6 +51,7 @@ import luto.economics.non_agricultural.water as non_ag_water
 def write_timestamp():
     timestamp = datetime.now().strftime('%Y_%m_%d__%H_%M_%S')
     timestamp_path = os.path.join(settings.OUTPUT_DIR, '.timestamp')
+        
     with open(timestamp_path, 'w') as f: f.write(timestamp)
     return timestamp
 
@@ -564,7 +565,11 @@ class LogToFile:
     def __call__(self, func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            # Open files for writing here, ensuring they're only created upon function call
+            
+            if not (os.path.exists(self.log_path_stdout) or os.path.exists(self.log_path_stderr)):
+                os.makedirs(os.path.dirname(self.log_path_stdout), exist_ok=True)
+                os.makedirs(os.path.dirname(self.log_path_stderr), exist_ok=True)
+                
             with open(self.log_path_stdout, self.mode) as file_stdout, open(self.log_path_stderr, self.mode) as file_stderr:
                 original_stdout = sys.stdout
                 original_stderr = sys.stderr
