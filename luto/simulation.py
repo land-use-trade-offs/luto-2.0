@@ -32,6 +32,12 @@ import gzip
 import pickle
 import threading
 
+from gurobipy import GRB
+from luto import settings
+from luto.data import Data
+from luto.solvers.input_data import get_input_data
+from luto.solvers.solver import LutoSolver
+from luto.tools.write import write_outputs
 from luto.tools import (
     LogToFile,
     log_memory_usage,
@@ -40,82 +46,87 @@ from luto.tools import (
     read_timestamp
 )
 
-# Call write_timestamp here; this will be used as the global timestamp for data read, simulation, and reporting
-write_timestamp()
-set_path()
-
-
-from gurobipy import GRB
-from luto.data import Data
-from luto.solvers.input_data import get_input_data
-from luto.solvers.solver import LutoSolver
-from luto.tools.write import write_outputs
-
-import luto.settings as settings
 
 
 
-# Get save path
-save_path = f'{read_timestamp()}_RF{settings.RESFACTOR}_{settings.SIM_YEARS[0]}-{settings.SIM_YEARS[-1]}'
-
-
-@LogToFile(f"{settings.OUTPUT_DIR}/{save_path}/LUTO_RUN_")
 def load_data() -> Data:
     """
     Load the Data object containing all required data to run a LUTO simulation.
     """
-    # Thread to log memory usage
-    stop_event = threading.Event()
-    memory_thread = threading.Thread(target=log_memory_usage, args=(f"{settings.OUTPUT_DIR}/{save_path}", 'w',1, stop_event))
-    memory_thread.start()
     
-    try:
-        data = Data()
-        data.timestamp = read_timestamp()
-    except Exception as e:
-        print(f"An error occurred while loading data: {e}")
-        raise e
-    finally:
-        # Ensure the memory logging thread is stopped
-        stop_event.set()
-        memory_thread.join()
+    # Generate new timestamp each time and apply decorator dynamically
+    current_timestamp = write_timestamp()
+    save_dir = f"{settings.OUTPUT_DIR}/{current_timestamp}_RF{settings.RESFACTOR}_{settings.SIM_YEARS[0]}-{settings.SIM_YEARS[-1]}"
+    log_path = f"{save_dir}/LUTO_RUN_"
+    set_path()
+    
+    # Apply the LogToFile decorator dynamically
+    @LogToFile(log_path)
+    def _load_data():
+        # Thread to log memory usage
+        stop_event = threading.Event()
+        memory_thread = threading.Thread(target=log_memory_usage, args=(save_dir, 'w', 1, stop_event))
+        memory_thread.start()
+        
+        try:
+            data = Data()
+            data.timestamp = read_timestamp()
+            data.path = save_dir
+        except Exception as e:
+            print(f"An error occurred while loading data: {e}")
+            raise e
+        finally:
+            # Ensure the memory logging thread is stopped
+            stop_event.set()
+            memory_thread.join()
 
-    return data
+        return data
+    
+    return _load_data()
 
 
-@LogToFile(f"{settings.OUTPUT_DIR}/{save_path}/LUTO_RUN_")
 def run(
     data: Data, 
 ) -> None:
     """
     Run the simulation.
     """
-    # Get the years to run
-    years = sorted(settings.SIM_YEARS).copy()
     
-    # Start recording memory usage
-    stop_event = threading.Event()
-    memory_thread = threading.Thread(target=log_memory_usage, args=(f"{settings.OUTPUT_DIR}/{save_path}", 'a',1, stop_event))
-    memory_thread.start()
+    # Generate new timestamp each time and apply decorator dynamically
+    current_timestamp = read_timestamp()
+    save_dir = f"{settings.OUTPUT_DIR}/{current_timestamp}_RF{settings.RESFACTOR}_{settings.SIM_YEARS[0]}-{settings.SIM_YEARS[-1]}"
+    log_path = f"{save_dir}/LUTO_RUN_"
     
-    try:
-        print('\n')
-        print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]} at RES-{settings.RESFACTOR}, total {len(years)} runs!\n", flush=True)
-        # Insert the base year at the beginning of the years list if not already present
-        if data.YR_CAL_BASE not in years: 
-            years.insert(0, data.YR_CAL_BASE)
-        # Solve and write outputs
-        solve_timeseries(data, years)
-        save_data_to_disk(data, f"{data.path}/Data_RES{settings.RESFACTOR}.gz")
-        write_outputs(data)
-    except Exception as e:
-        print(f"An error occurred during the simulation: {e}")
-        raise e
-    finally:
-        # Ensure the memory logging thread is stopped
-        stop_event.set()
-        memory_thread.join()
+    # Apply the LogToFile decorator dynamically
+    @LogToFile(log_path)
+    def _run():
+        # Get the years to run
+        years = sorted(settings.SIM_YEARS).copy()
+        
+        # Start recording memory usage
+        stop_event = threading.Event()
+        memory_thread = threading.Thread(target=log_memory_usage, args=(save_dir, 'a', 1, stop_event))
+        memory_thread.start()
+        
+        try:
+            print('\n')
+            print(f"Running LUTO {settings.VERSION} between {years[0]} - {years[-1]} at RES-{settings.RESFACTOR}, total {len(years)} runs!\n", flush=True)
+            # Insert the base year at the beginning of the years list if not already present
+            if data.YR_CAL_BASE not in years: 
+                years.insert(0, data.YR_CAL_BASE)
+            # Solve and write outputs
+            solve_timeseries(data, years)
+            save_data_to_disk(data, f"{save_dir}/Data_RES{settings.RESFACTOR}.gz")
+            write_outputs(data)
+        except Exception as e:
+            print(f"An error occurred during the simulation: {e}")
+            raise e
+        finally:
+            # Ensure the memory logging thread is stopped
+            stop_event.set()
+            memory_thread.join()
     
+    return _run()
 
 
 def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
@@ -180,6 +191,8 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
             print(f'Warning: The results are still written to disk, but will not be optimal.')
             print('!' * 100)
             print('\n')
+            
+            data.last_year = target_year
             break
 
 
@@ -198,7 +211,6 @@ def save_data_to_disk(data: Data, path: str, compress_level=6) -> None:
         dill.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
     
     
-@LogToFile(f"{settings.OUTPUT_DIR}/{save_path}/LUTO_RUN_", 'w')
 def load_data_from_disk(path: str) -> Data:
     """Load the Data object from disk.
     
@@ -212,17 +224,29 @@ def load_data_from_disk(path: str) -> Data:
         Data: `Data` object.
     """
     
-    print(f"Loading data from {path}...\n")
+    # Generate new timestamp each time and apply decorator dynamically
+    current_timestamp = write_timestamp()
+    save_dir = f"{settings.OUTPUT_DIR}/{current_timestamp}_RF{settings.RESFACTOR}_{settings.SIM_YEARS[0]}-{settings.SIM_YEARS[-1]}"
+    log_path = f"{save_dir}/LUTO_RUN_"
     
-    # Load the data object with gzip compression
-    with gzip.open(path, 'rb') as f:
-        data = dill.load(f)
+    set_path()
+    
+    # Apply the LogToFile decorator dynamically
+    @LogToFile(log_path, 'w')
+    def _load_data():
+        print(f"Loading data from {path}...\n")
         
-    # Check if the resolution factor from the data object matches the settings.RESFACTOR
-    if int(data.RESMULT ** 0.5) != settings.RESFACTOR:
-        raise ValueError(f'Resolution factor from data loading ({int(data.RESMULT ** 0.5)}) does not match it of settings ({settings.RESFACTOR})!')
-    
-    data.timestamp = read_timestamp()
+        # Load the data object with gzip compression
+        with gzip.open(path, 'rb') as f:
+            data = dill.load(f)
+            data.timestamp = read_timestamp()
+            data.path = save_dir
 
-    return data
+        # Check if the resolution factor from the data object matches the settings.RESFACTOR
+        if int(data.RESMULT ** 0.5) != settings.RESFACTOR:
+            raise ValueError(f'Resolution factor from data loading ({int(data.RESMULT ** 0.5)}) does not match it of settings ({settings.RESFACTOR})!')
+        
+        return data
+    
+    return _load_data()
 
