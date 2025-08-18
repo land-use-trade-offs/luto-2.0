@@ -1,5 +1,8 @@
 # LUTO 2: The Land-Use Trade-Offs Model Version 2
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+
 ## Introduction
 The Land Use Trade-Offs model v2 (LUTO2) is an integrated land systems model designed to simulate the optimal spatial arrangement of land use and land management decisions over time in Australia. It aims to achieve climate and biodiversity targets without compromising economic growth, food production or water security. The model is implemented as a Python package, offering users the flexibility to run interactively or to execute batch processes through scripted automation.
 
@@ -36,6 +39,11 @@ The LUTO2 codebase is organized into the following structure:
 
 ```
 luto/                                # Main package directory
+├── data.py                          # Core data management and loading
+├── simulation.py                    # Main simulation engine
+├── settings.py                      # Configuration parameters
+├── dataprep.py                      # Data preprocessing utilities
+├── helpers.py                       # Utility functions
 ├── economics/                       # Economic models and calculations
 │   ├── agricultural/                # Agricultural economics modules
 │   ├── non_agricultural/            # Non-agricultural economics modules
@@ -43,49 +51,180 @@ luto/                                # Main package directory
 ├── solvers/                         # Optimization solvers and algorithms
 ├── tests/                           # Unit and integration tests
 └── tools/                           # Utility tools and scripts
-    ├── create_task_runs/            # Task execution scripts
-    ├── Manual_jupyter_books/        # Jupyter notebooks for creating the manual
-    └── report/                      # Reporting and visualization tools
-        ├── Assets/                  # Static assets for reports
-        ├── data_tools/              # Data processing utilities for reports
-        └── map_tools/               # Mapping and spatial visualization tools
+    ├── create_task_runs/            # Task execution and batch processing
+    ├── Manual_jupyter_books/        # Documentation notebooks
+    ├── report/                      # Reporting and visualization tools
+    │   ├── data_tools/              # Data processing for reports
+    │   └── map_tools/               # Spatial visualization utilities
+    ├── plotmap.py                   # Mapping utilities
+    ├── spatializers.py              # Spatial data processing
+    └── write.py                     # Output writing functions
 
-input/                               # Input data directory
+input/                               # Input data directory (requires separate download)
 output/                              # Simulation outputs directory
 docs/                                # Documentation files
 ```
 
-## Steps to Run LUTO2
-1. Clone the repository:
-   ```sh
-   git clone https://github.com/land-use-trade-offs/luto-2.0.git
-   ```
-2. Create a Conda environment and install dependencies:
-   ```sh
-   cd luto-2.0
-   conda env create luto/tools/create_task_runs/bash_scripts/conda_env.yml
-   conda activate luto
-   ```
+## Troubleshooting
 
-3. Run a basic simulation:
-   ```python
-   import luto.simulation as sim
-   data = sim.load_data()
-   sim.run(data=data)
-   ```
+### Common Issues
 
-4. After execution, an HTML report will be generated for easier visualization:
+**Memory Errors:**
+- Ensure you have at least 32 GB RAM available
+- Close other applications during simulation
+- Consider running smaller scenarios first
+
+**GUROBI License Issues:**
+- Verify your license file location
+- Check license expiration date
+- Ensure your license supports the required model size
+
+**Data Loading Errors:**
+- Verify all required input files are present in `/input/`
+- Check file permissions
+- Ensure sufficient disk space
+
+
+### Getting Help
+
+1. Check the documentation in `docs/luto2-overview.pdf`
+2. Review log files in `/output/<run_dir>/logs/`
+3. Contact the development team: **b.bryan@deakin.edu.au**
+4. Submit issues on GitHub: [github.com/land-use-trade-offs/luto-2.0](https://github.com/land-use-trade-offs/luto-2.0)
+
+## System Requirements
+
+**Minimum Requirements:**
+- Python 3.10 or higher
+- 16 GB RAM (32 GB recommended for large simulations)
+- 50 GB available disk space for input data and outputs
+- GUROBI optimization solver license (academic licenses available)
+
+**Supported Operating Systems:**
+- Windows 10/11
+- macOS 10.15+
+- Linux (Ubuntu 18.04+, CentOS 7+)
+
+## Installation and Setup
+
+### 1. Clone the Repository
+```bash
+git clone https://github.com/land-use-trade-offs/luto-2.0.git
+cd luto-2.0
+```
+
+### 2. Set Up Conda Environment
+```bash
+# Create and activate the LUTO environment
+conda env create -f luto/tools/create_task_runs/bash_scripts/conda_env.yml
+conda activate luto
+```
+
+### 3. Configure GUROBI Solver
+LUTO2 requires GUROBI for optimization. Follow these steps:
+```bash
+# 1) Set up your GUROBI license (academic license available at gurobi.com)
+# 2) Place your gurobi.lic file in the appropriate directory
+```
+
+### 4. Obtain Input Data
+The LUTO2 input database is approximately 40 GB and contains sensitive data. 
+Please contact **b.bryan@deakin.edu.au** to request access to the input dataset.
+
+## Running LUTO2
+
+### Basic Simulation
+```python
+import luto.simulation as sim
+
+# Load input data and settings
+data = sim.load_data()
+
+# Run simulation with default parameters
+results = sim.run(data=data)
+```
+
+### Advanced Configuration
+```python
+import luto.simulation as sim
+import luto.settings as settings
+
+# Customize simulation settings
+settings.RESFACTOR = 10                             # 10 makes the spatial resolution to ~10km. 
+settings.WRITE_OUTPUT_GEOTIFFS = False
+settings.SIM_YEARS = [2010, 2020, 2030, 2040, 2050]
+
+settings.WATER_LIMITS = 'on'                        # 'on' or 'off'. 
+settings.GHG_EMISSIONS_LIMITS = 'high'              # 'off', 'low', 'medium', or 'high'
+settings.BIODIVERSITY_TARGET_GBF_2 = 'high'         # 'off', 'low', 'medium', or 'high'
+settingsBIODIVERSITY_TARGET_GBF_3  = 'off'          # 'off', 'medium', 'high', or 'USER_DEFINED'   
+settings.BIODIVERSITY_TARGET_GBF_4_SNES =  'off'    # 'on' or 'off'.
+settings.BIODIVERSITY_TARGET_GBF_4_ECNES = 'off'    # 'on' or 'off'.
+settings.BIODIVERSITY_TARGET_GBF_8 = 'off'          # 'on' or 'off'.
+
+# Load data with custom parameters
+data = sim.load_data()
+
+# Run simulation
+sim.run(data=data)
+```
+
+### Viewing Results
+After execution, results are saved in the `/output/<timestamp>/` directory:
+
+1. **Interactive HTML Report:** 
    ```
    /output/<run_dir>/DATA_REPORT/REPORT_HTML/index.html
    ```
-   This report provides a structured overview of the results in an interactive format.
-   
-5. *Note:* LUTO2 requires a large spatio-temporal database located in the `/input` folder before simulation. This dataset can be obtained from **b.bryan@deakin.edu.au**.
+   This provides a comprehensive overview with interactive visualizations.
+
+2. **Spatial Outputs:** GeoTIFF files for mapping and spatial analysis
+3. **Data Tables:** CSV files with detailed numerical results
+4. **Logs:** Execution logs for debugging and performance analysis
+
+## Configuration
+
+LUTO2 behavior can be customized through the `luto.settings` module. Key parameters include:
+
+### Core Simulation Parameters
+- `SIM_YEARS`: Simulation time period (default: 2020-2050 in 5-year steps)
+- `SCENARIO`: Shared Socioeconomic Pathway (SSP1-SSP5)
+- `RCP`: Representative Concentration Pathway (e.g., 'rcp4p5')
+- `OBJECTIVE`: Optimization objective ('maxprofit' or 'mincost')
+
+### Environmental Constraints
+- `GHG_EMISSIONS_LIMITS`: Greenhouse gas emission targets ('off', 'low', 'medium', 'high')
+- `WATER_LIMITS`: Whether to enforce water yield constraints ('on' or 'off')
+- `BIODIVERSITY_TARGET_GBF_2`: Global Biodiversity Framework Target 2 ('off', 'low', 'medium', 'high')
+- `BIODIVERSITY_TARGET_GBF_3`: Conservation targets for vegetation types ('off', 'medium', 'high')
+
+### Land Use Options
+- `NON_AG_LAND_USES`: Enable/disable non-agricultural land uses (Environmental Plantings, Carbon Plantings, etc.)
+- `AG_MANAGEMENTS`: Enable/disable agricultural management practices (Precision Agriculture, Biochar, etc.)
+- `EXCLUDE_NO_GO_LU`: Whether to exclude certain land uses from specific areas
+
+### Economic Parameters
+- `CARBON_PRICES_FIELD`: Carbon pricing scenario ('Default', 'CONSTANT', etc.)
+- `AMORTISE_UPFRONT_COSTS`: Whether to amortize establishment costs
+- `DISCOUNT_RATE`: Discount rate for economic calculations (default: 7%)
+
+### Solver Configuration
+- `SOLVE_METHOD`: GUROBI algorithm selection (default: 2 for barrier method)
+- `THREADS`: Number of parallel threads for optimization
+- `FEASIBILITY_TOLERANCE`: Solver tolerance settings
+- `VERBOSE`: Control solver output verbosity
+
+### Output Control
+- `WRITE_OUTPUT_GEOTIFFS`: Generate spatial output files (True/False)
+- `PARALLEL_WRITE`: Use parallel processing for output generation
+- `RESFACTOR`: Spatial resolution factor (1 = full resolution, >1 = coarser)
+
+Refer to `luto/settings.py` for a complete list of configurable parameters and detailed descriptions.
 
 ## Copyright
-Copyright 2024 **Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., van Schoten, N., Hadjikakou, M., Sanson, J., Zyngier, R., Marcos-Martinez, R., Navarro, J., Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.**  
+Copyright 2025 **Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., van Schoten, N., Hadjikakou, M., Sanson, J., Zyngier, R., Marcos-Martinez, R., Navarro, J., Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R.**  
 
-Copyright 2021-2023 **Fjalar J. de Haan and Brett A. Bryan, Deakin University.** (see `CITATION.cff`).
+Copyright 2021-2024 **Fjalar J. de Haan and Brett A. Bryan, Deakin University.** (see `CITATION.cff`).
 
 ## License
 LUTO2 is free software: you can redistribute it and/or modify it under the terms of the **GNU General Public License** as published by the **Free Software Foundation**, either version 3 of the License, or (at your option) any later version.
@@ -95,5 +234,26 @@ This program is distributed in the hope that it will be useful, but **without an
 You should have received a copy of the **GNU General Public License** along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 ## Citation
-> Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., van Schoten, N., Hadjikakou, M., Sanson, J., Zyngier, R., Marcos-Martinez, R., Navarro, J., Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R. (2024). The Land-Use Trade-Offs Model Version 2 (LUTO2): an integrated land system model for Australia. Software Collection. https://github.com/land-use-trade-offs/luto-2.0
+> Bryan, B.A., Williams, N., Archibald, C.L., de Haan, F., Wang, J., van Schoten, N., Hadjikakou, M., Sanson, J., Zyngier, R., Marcos-Martinez, R., Navarro, J., Gao, L., Aghighi, H., Armstrong, T., Bohl, H., Jaffe, P., Khan, M.S., Moallemi, E.A., Nazari, A., Pan, X., Steyl, D., and Thiruvady, D.R. (2025). The Land-Use Trade-Offs Model Version 2 (LUTO2): an integrated land system model for Australia. Software Collection. https://github.com/land-use-trade-offs/luto-2.0
+
+## Contributing
+
+We welcome contributions to LUTO2! Please follow these guidelines:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+For major changes, please open an issue first to discuss proposed modifications.
+
+## Acknowledgments
+
+LUTO2 was developed through a collaboration between:
+- **Deakin University** - Centre for Integrative Ecology
+- **Climateworks Centre** - Land Use Futures program
+- **CSIRO** - Research contributions
+
+This work is supported by funding from various Australian research councils and industry partners. We acknowledge the traditional custodians of the lands on which this research was conducted.
 
