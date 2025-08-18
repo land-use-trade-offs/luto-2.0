@@ -781,14 +781,13 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     
 
     ag_g_mrj = get_ag_g_mrj(data, target_index)
-    ag_w_mrj = get_ag_w_mrj(data, target_index, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)                             # Calculate water net yield matrices based on historical water yield layers
+    ag_w_mrj = get_ag_w_mrj(data, target_index)                             
     ag_b_mrj = get_ag_b_mrj(data)
     ag_x_mrj = get_ag_x_mrj(data, base_year)
     ag_q_mrp = get_ag_q_mrp(data, target_index)
     ag_ghg_t_mrj = get_ag_ghg_t_mrj(data, base_year)
 
     non_ag_g_rk = get_non_ag_g_rk(data, ag_g_mrj, base_year)
-    non_ag_w_rk = get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)  # Calculate non-ag water yield matrices based on historical water yield layers
     non_ag_b_rk = get_non_ag_b_rk(data, ag_b_mrj, base_year)
     non_ag_x_rk = get_non_ag_x_rk(data, base_year)
     non_ag_q_crk = get_non_ag_q_crk(data, ag_q_mrp, base_year)
