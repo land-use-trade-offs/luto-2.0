@@ -103,6 +103,11 @@ class Data:
         # Path for write module - overwrite when provided with a base and target year
         self.path = None
 
+        # The latest simulation year; 
+        #   For simulation between 2010-2050, if the run stops at 2030, then it will be 2030
+        #   The last_year is updated in the solve_timeseries.simulation module
+        self.last_year = None
+
         # Setup output containers
         self.lumaps = {}
         self.lmmaps = {}
