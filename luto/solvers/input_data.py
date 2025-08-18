@@ -788,6 +788,7 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
     ag_ghg_t_mrj = get_ag_ghg_t_mrj(data, base_year)
 
     non_ag_g_rk = get_non_ag_g_rk(data, ag_g_mrj, base_year)
+    non_ag_w_rk = get_non_ag_w_rk(data, ag_w_mrj, base_year, target_year)
     non_ag_b_rk = get_non_ag_b_rk(data, ag_b_mrj, base_year)
     non_ag_x_rk = get_non_ag_x_rk(data, base_year)
     non_ag_q_crk = get_non_ag_q_crk(data, ag_q_mrp, base_year)
