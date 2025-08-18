@@ -24,18 +24,14 @@ import base64
 import numpy as np
 import pandas as pd
 import xarray as xr
-import rioxarray as rxr
 
 from io import BytesIO
 from PIL import Image
 from joblib import delayed, Parallel
-from tqdm.auto import tqdm
 
 from luto import settings
 from luto.data import Data
-from luto.tools import start_memory_monitor, stop_memory_monitor
 from luto.tools.report.data_tools import get_all_files
-from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
 
 
 
@@ -126,7 +122,7 @@ def map2base64(rxr_path:str, arr_lyr:xr.DataArray, attrs:tuple) -> dict|None:
 def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=settings.WRITE_THREADS) -> dict:
 
     # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
-    template_xr = f'{data.path}/out_{data.last_year}/xr_lumap_{data.last_year}.nc'
+    template_xr = f'{data.path}/out_{sorted(settings.SIM_YEARS)[0]}/xr_lumap_{sorted(settings.SIM_YEARS)[0]}.nc'
     
     # Get dim info
     with xr.open_dataarray(files_df.iloc[0]['path']) as arr_eg:
