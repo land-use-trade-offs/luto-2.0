@@ -535,21 +535,16 @@ def get_water_target_inside_LUTO_by_CCI(data):
         wreq_domestic = data.WATER_USE_DOMESTIC[reg_idx]    # positive values, indicating water requirements for domestic and industrial use
         CCI_extreme_stress = wny_extreme_delta[reg_idx]     # negative values, indicating water yield reductions by climate change
         
-        hist_level_inside_LUTO = (hist_level * settings.WATER_STRESS) - wny_outside_LUTO 
-        
-        wny_extreme_CCI = (
-            wny_inside_LUTO
-            - wreq_domestic                         # Domestic water use
-            + CCI_extreme_stress                    # Extreme climate change impact
-        )
-        
-        if wny_extreme_CCI < hist_level_inside_LUTO:
+        wny_extreme_CCI = wny_inside_LUTO + wny_outside_LUTO - wreq_domestic + CCI_extreme_stress
+        wny_hist_target = hist_level * settings.WATER_STRESS
+
+        if wny_extreme_CCI < wny_hist_target:
             print(
-                f"       Target relaxed to ({wny_extreme_CCI:10,.0f}ML) from ({hist_level_inside_LUTO:10,.0f}ML) for {data.WATER_REGION_NAMES[reg_idx]}."
+                f"       Watershed target relaxed to ({wny_extreme_CCI:10,.0f}ML) from ({wny_hist_target:10,.0f}ML) for {data.WATER_REGION_NAMES[reg_idx]}."
             )
-            wny_inside_LUTO_targets[reg_idx] = wny_extreme_CCI
+            wny_inside_LUTO_targets[reg_idx] = wny_extreme_CCI - wny_outside_LUTO
         else:
-            wny_inside_LUTO_targets[reg_idx] = hist_level_inside_LUTO
+            wny_inside_LUTO_targets[reg_idx] = wny_hist_target - wny_outside_LUTO
 
 
     return wny_inside_LUTO_targets
