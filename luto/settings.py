@@ -480,7 +480,7 @@ WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solve
 
 
 # Regionalisation to enforce water use limits by
-WATER_REGION_DEF = 'River Region'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
+WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
 """
     Water net yield targets: the value represents the proportion of the historical water yields
     that the net yield must exceed in a given year. Base year (2010) uses base year net yields as targets.

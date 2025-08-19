@@ -683,7 +683,7 @@ class LutoSolver:
             ind = self._input_data.water_region_indices[reg_idx]
             reg_name = self._input_data.water_region_names[reg_idx]
 
-            print(f"      |__ target is {w_limit_raw:15,.0f} ML for {reg_name}")
+            print(f"      |__ target (inside LUTO study area) is {w_limit_raw:15,.0f} ML for {reg_name}")
 
             self.water_nyiled_exprs[reg_idx] = self._get_water_net_yield_expr_for_region(ind)           # Water net yield inside LUTO study area
 
