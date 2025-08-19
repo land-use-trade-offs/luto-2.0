@@ -829,9 +829,9 @@ def get_input_data(data: Data, base_year: int, target_year: int) -> SolverInputD
         "Demand":        rescale_solver_input_data([ag_q_mrp, non_ag_q_crk, ag_man_q_mrp]),
         "Biodiversity":  rescale_solver_input_data([ag_b_mrj, non_ag_b_rk, ag_man_b_mrj]),
         "GHG":(
-          rescale_solver_input_data([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj])
-          if settings.GHG_EMISSIONS_LIMITS != 'off' 
-          else 1.0  
+            rescale_solver_input_data([ag_g_mrj, non_ag_g_rk, ag_man_g_mrj, ag_ghg_t_mrj])
+            if settings.GHG_EMISSIONS_LIMITS != 'off' 
+            else 1.0  
         ),        
         "Water":(
             rescale_solver_input_data([ag_w_mrj, non_ag_w_rk, ag_man_w_mrj])

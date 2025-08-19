@@ -454,13 +454,12 @@ def get_climate_change_impact_whole_region(data, yr_cal):
     yr_idx = yr_cal - data.YR_CAL_BASE
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.AG_L_MRJ).assign_coords(region_id=('cell', data.WATER_REGION_ID))
 
-    # Get water yield (WITHOUT climate change impact)
-    ag_w_mrj_no_CCI = get_water_net_yield_matrices(data, yr_idx, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
-    wny_outside_luto_study_area_no_CCI = np.array(list(data.WATER_OUTSIDE_LUTO_HIST.values()))
-
     # Get water yield change led by climate change
-    ag_w_mrj_CCI = get_water_net_yield_matrices(data, yr_idx) - ag_w_mrj_no_CCI
-    wny_outside_luto_study_area_CCI = np.array(list(data.WATER_OUTSIDE_LUTO_BY_CCI.loc[yr_cal].to_dict().values())) - wny_outside_luto_study_area_no_CCI
+    ag_w_mrj_CCI = get_water_net_yield_matrices(data, yr_idx) -  get_water_net_yield_matrices(data, 0)
+    wny_outside_luto_study_area_CCI = (
+        np.array(list(data.WATER_OUTSIDE_LUTO_BY_CCI.loc[yr_cal].to_dict().values())) 
+        - np.array(list(data.WATER_OUTSIDE_LUTO_BY_CCI.loc[data.YR_CAL_BASE].to_dict().values()))
+    )
 
     CCI_impact = (
             (ag_w_mrj_CCI * ag_dvar_mrj).groupby('region_id').sum(['cell','lm', 'lu']) 
@@ -500,7 +499,7 @@ def get_wny_inside_LUTO_by_CCI_for_base_yr(data):
     """
     wny_inside_mrj = get_water_net_yield_matrices(data, 0)
     wny_base_yr_inside_r = np.einsum('mrj,mrj->r', wny_inside_mrj, data.AG_L_MRJ)
-    wny_base_yr_inside_regions = {k:v for k,v in enumerate(np.bincount(data.WATER_REGION_ID, wny_base_yr_inside_r)) if v > 0}
+    wny_base_yr_inside_regions = {k:v for k,v in enumerate(np.bincount(data.WATER_REGION_ID, wny_base_yr_inside_r))}
 
     return wny_base_yr_inside_regions
 
@@ -529,38 +528,29 @@ def get_water_target_inside_LUTO_by_CCI(data):
     wreq_domestic = data.WATER_USE_DOMESTIC
     
     # Get inside LUTO targets based on historical level
-    wny_inside_LUTO_hist_level_targets = {}
-    for reg_idx, hist_level in data.WATER_REGION_HIST_LEVEL.items():
-        wny_outside_LUTO = wny_base_yr_outside_LUTO[reg_idx]
-        wreq_domestic = data.WATER_USE_DOMESTIC[reg_idx]
-        
-        wny_inside_LUTO_hist_level_targets[reg_idx] = (
-            hist_level * settings.WATER_STRESS      # Water net yield limit for the whole region
-            + wreq_domestic                         # Domestic water use
-            - wny_outside_LUTO                      # Water net yield from outside the LUTO study area
-        )
-
-    # Get inside LUTO targets considering extreme climate change impacts
     wny_inside_LUTO_targets = {}
-    for reg_idx, target_hist in wny_inside_LUTO_hist_level_targets.items():
+    for reg_idx, hist_level in data.WATER_REGION_HIST_LEVEL.items():
         wny_inside_LUTO = wny_base_yr_inside_LUTO[reg_idx]
         wny_outside_LUTO = wny_base_yr_outside_LUTO[reg_idx]
         wreq_domestic = data.WATER_USE_DOMESTIC[reg_idx]    # positive values, indicating water requirements for domestic and industrial use
         CCI_extreme_stress = wny_extreme_delta[reg_idx]     # negative values, indicating water yield reductions by climate change
         
-        target_CCI = wny_inside_LUTO + wny_outside_LUTO + CCI_extreme_stress - wreq_domestic
-        target_CCI = max(0, target_CCI)  # Ensure the target is non-negative
-
-        CCI_extreme_pct = CCI_extreme_stress / target_hist * 100
-
-        if target_CCI < target_hist:
-            formatted_percentage = f"{(target_CCI/target_hist*100):04.2f}%" if target_CCI != 0 else "    0%"
+        hist_level_inside_LUTO = (hist_level * settings.WATER_STRESS) - wny_outside_LUTO 
+        
+        wny_extreme_CCI = (
+            wny_inside_LUTO
+            - wreq_domestic                         # Domestic water use
+            + CCI_extreme_stress                    # Extreme climate change impact
+        )
+        
+        if wny_extreme_CCI < hist_level_inside_LUTO:
             print(
-                f"      Target relaxed to {formatted_percentage} of ({settings.WATER_STRESS} * pre-1750-level = {target_hist:10,.0f} ML) to handle extreme climate impact ({CCI_extreme_pct:04.2f}%) for {data.WATER_REGION_NAMES[reg_idx]}"
+                f"       Target relaxed to ({wny_extreme_CCI:10,.0f}ML) from ({hist_level_inside_LUTO:10,.0f}ML) for {data.WATER_REGION_NAMES[reg_idx]}."
             )
-            wny_inside_LUTO_targets[reg_idx] = target_CCI
+            wny_inside_LUTO_targets[reg_idx] = wny_extreme_CCI
         else:
-            wny_inside_LUTO_targets[reg_idx] = target_hist
+            wny_inside_LUTO_targets[reg_idx] = hist_level_inside_LUTO
+
 
     return wny_inside_LUTO_targets
 

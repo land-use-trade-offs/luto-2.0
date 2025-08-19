@@ -170,6 +170,8 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
         luto_solver = LutoSolver(input_data)
         luto_solver.formulate()
         solution = luto_solver.solve()
+        
+        data.last_year = target_year 
 
         data.add_lumap(target_year, solution.lumap)
         data.add_lmmap(target_year, solution.lmmap)
@@ -192,7 +194,6 @@ def solve_timeseries(data: Data, years_to_run: list[int]) -> None:
             print('!' * 100)
             print('\n')
             
-            data.last_year = target_year
             break
 
 

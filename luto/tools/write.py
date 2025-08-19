@@ -62,7 +62,6 @@ def write_outputs(data: Data):
     current_timestamp = tools.read_timestamp()
     log_path = f"{settings.OUTPUT_DIR}/{current_timestamp}_RF{settings.RESFACTOR}_{settings.SIM_YEARS[0]}-{settings.SIM_YEARS[-1]}/LUTO_RUN_"
     
-    # Apply the LogToFile decorator dynamically
     @tools.LogToFile(log_path)
     def _write_outputs():
         # Start recording memory usage
@@ -121,9 +120,9 @@ def create_report(data: Data):
     
     # Generate path using read_timestamp each time this function is called
     current_timestamp = tools.read_timestamp()
-    log_path = f"{settings.OUTPUT_DIR}/write_{current_timestamp}"
+    save_dir = f"{settings.OUTPUT_DIR}/{current_timestamp}_RF{settings.RESFACTOR}_{settings.SIM_YEARS[0]}-{settings.SIM_YEARS[-1]}"
+    log_path = f"{save_dir}/LUTO_RUN_"
     
-    # Apply the LogToFile decorator dynamically
     @tools.LogToFile(log_path, mode='a')
     def _create_report():
         print('Creating report...')
