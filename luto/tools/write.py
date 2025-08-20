@@ -1199,7 +1199,6 @@ def write_ghg_offland_commodity(data: Data, yr_cal, path):
 
 def write_water(data: Data, yr_cal, path):
     """Calculate water yield totals. Takes a Data Object, a calendar year (e.g., 2030), and an output path as input."""
-
     
     yr_idx = yr_cal - data.YR_CAL_BASE
     region2code = {v: k for k, v in data.WATER_REGION_NAMES.items()}
@@ -1215,13 +1214,11 @@ def write_water(data: Data, yr_cal, path):
         ).assign_coords(region_water=('cell', data.WATER_REGION_ID), region_NRM=('cell', data.REGION_NRM_NAME)
         ).chunk({'cell': min(1024, data.NCELLS)})
 
-
-
     # Get water target and domestic use
     w_limit_inside_luto = xr.DataArray(
         list(data.WATER_YIELD_TARGETS.values()),
         dims=['region_water'],
-        coords={'region_water': list(data.WATER_USE_DOMESTIC.keys())}
+        coords={'region_water': list(data.WATER_YIELD_TARGETS.keys())}
     )
     domestic_water_use = xr.DataArray(
         list(data.WATER_USE_DOMESTIC.values()), 
@@ -1229,8 +1226,10 @@ def write_water(data: Data, yr_cal, path):
         coords={'region_water': list(data.WATER_USE_DOMESTIC.keys())}
     )
  
-
-    # Get water yield (WITHOUT climate change impact)
+ 
+    # ------------------------------- Get water yield without CCI -----------------------------------
+    
+    # Get water yield matrix (WITHOUT climate change impact)
     ag_w_mrj_no_CCI = tools.ag_mrj_to_xr(
         data, 
         ag_water.get_water_net_yield_matrices(data, yr_idx, data.WATER_YIELD_HIST_DR, data.WATER_YIELD_HIST_SR)
@@ -1249,32 +1248,24 @@ def write_water(data: Data, yr_cal, path):
         coords={'region_water': list(data.WATER_REGION_INDEX_R.keys())},
     )
 
-    # Get water yield change led by climate change
-    ag_w_mrj_CCI = ag_water.get_water_net_yield_matrices(data, yr_idx) - ag_w_mrj_no_CCI
-    non_ag_w_rk_CCI = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj_CCI.values, data.lumaps[yr_cal], yr_idx) - non_ag_w_rk_no_CCI
-    wny_outside_luto_study_area_CCI = np.array(list(data.WATER_OUTSIDE_LUTO_BY_CCI.loc[yr_cal].to_dict().values())) - wny_outside_luto_study_area_no_CCI
-
-    # Calculate water net yield inside for the LUTO study region (WITHOUT climate change impact)
-    xr_ag_wny = ag_dvar_mrj * ag_w_mrj_no_CCI
-    xr_non_ag_wny = non_ag_dvar_rj * non_ag_w_rk_no_CCI
-    xr_am_wny = ag_man_w_mrj * am_dvar_mrj
-    save2nc(xr_ag_wny, os.path.join(path, f'xr_water_yield_ag_{yr_cal}.nc'))
-    save2nc(xr_non_ag_wny, os.path.join(path, f'xr_water_yield_non_ag_{yr_cal}.nc'))
-    save2nc(xr_am_wny, os.path.join(path, f'xr_water_yield_ag_management_{yr_cal}.nc'))
-
-    ag_wny = xr_ag_wny.groupby('region_water'
+    # Calculate water net yield inside LUTO study region (WITHOUT climate change impact)
+    xr_ag_wny_no_CCI = ag_dvar_mrj * ag_w_mrj_no_CCI
+    xr_non_ag_wny_no_CCI = non_ag_dvar_rj * non_ag_w_rk_no_CCI
+    xr_am_wny_no_CCI = ag_man_w_mrj * am_dvar_mrj
+    
+    ag_wny = xr_ag_wny_no_CCI.groupby('region_water'
         ).sum(['cell']
         ).to_dataframe('Water Net Yield (ML)'
         ).reset_index(
         ).assign(Type='Agricultural Landuse'
         ).replace({'region_water': data.WATER_REGION_NAMES})
-    non_ag_wny = xr_non_ag_wny.groupby('region_water'
+    non_ag_wny = xr_non_ag_wny_no_CCI.groupby('region_water'
         ).sum(['cell']
         ).to_dataframe('Water Net Yield (ML)'
         ).reset_index(
         ).assign(Type='Non-Agricultural Landuse'
         ).replace({'region_water': data.WATER_REGION_NAMES})
-    am_wny = xr_am_wny.groupby('region_water'
+    am_wny = xr_am_wny_no_CCI.groupby('region_water'
         ).sum(['cell']
         ).to_dataframe('Water Net Yield (ML)'
         ).reset_index(
@@ -1289,9 +1280,32 @@ def write_water(data: Data, yr_cal, path):
             'lm':'Water Supply'}
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
         ).dropna(axis=0, how='all')
-    wny_inside_luto.to_csv(os.path.join(path, f'water_yield_separate_{yr_cal}.csv'), index=False)
+        
+    wny_inside_luto.to_csv(os.path.join(path, f'water_yield_separate_watershed_{yr_cal}.csv'), index=False)
+    
+    
+    # ------------------------------- Get water yield change (delta) under CCI -----------------------------------
+    
+    # Get CCI matrix
+    ag_w_mrj_CCI = ag_water.get_water_net_yield_matrices(data, yr_idx) - ag_w_mrj_no_CCI
+    non_ag_w_rk_CCI = non_ag_water.get_w_net_yield_matrix(data, ag_w_mrj_CCI.values, data.lumaps[yr_cal], yr_idx) - non_ag_w_rk_no_CCI
+    wny_outside_luto_study_area_CCI = np.array(list(data.WATER_OUTSIDE_LUTO_BY_CCI.loc[yr_cal].to_dict().values())) - wny_outside_luto_study_area_no_CCI
+    
+    # Calculate water net yield (delta) under CCI
+    xr_ag_wny_CCI = ag_w_mrj_CCI * ag_dvar_mrj
+    xr_non_ag_wny_CCI = non_ag_w_rk_CCI * non_ag_dvar_rj
+    # xr_am_wny_CCI = ag_man_w_mrj * am_dvar_mrj # Ag man does not affected by CCI
+    
+    # Get the CCI impact (delta)
+    CCI_impact = (
+        xr_ag_wny_CCI.groupby('region_water').sum(['cell','lm', 'lu']) 
+        + xr_non_ag_wny_CCI.groupby('region_water').sum(['cell', 'lu'])
+        + wny_outside_luto_study_area_CCI
+    )
 
-    # Calculate the water net yield for each watershed regions
+    # ------------------------------- Organise water yield components -----------------------------------
+    
+    # Water net yield for watershed regions
     wny_inside_luto_sum = wny_inside_luto.groupby('Region')[['Water Net Yield (ML)']].sum()
     wny_inside_luto_sum = xr.DataArray(
         wny_inside_luto_sum['Water Net Yield (ML)'].values, 
@@ -1300,13 +1314,7 @@ def write_water(data: Data, yr_cal, path):
     )
     wny_watershed_sum = wny_inside_luto_sum + wny_outside_luto_study_area_no_CCI - domestic_water_use
     
-    CCI_impact = (
-        (ag_w_mrj_CCI * ag_dvar_mrj).groupby('region_water').sum(['cell','lm', 'lu']) 
-        + (non_ag_w_rk_CCI * non_ag_dvar_rj).groupby('region_water').sum(['cell', 'lu'])
-        + wny_outside_luto_study_area_CCI
-    )
-    
-    w_limit_inside = w_limit_inside_luto + wny_outside_luto_study_area_no_CCI - domestic_water_use
+    w_limit_region = w_limit_inside_luto + wny_outside_luto_study_area_no_CCI - domestic_water_use
 
     water_other_records = xr.Dataset(
             {   
@@ -1315,7 +1323,7 @@ def write_water(data: Data, yr_cal, path):
                 'Climate Change Impact (ML)': CCI_impact,
                 'Domestic Water Use (ML)': domestic_water_use,
                 'Water Net Yield (ML)': wny_watershed_sum,
-                'Water Yield Limit (ML)': w_limit_inside,
+                'Water Yield Limit (ML)': w_limit_region,
             },
         ).to_dataframe(
         ).reset_index(
@@ -1325,7 +1333,7 @@ def write_water(data: Data, yr_cal, path):
         
     water_other_records.to_csv(os.path.join(path, f'water_yield_limits_and_public_land_{yr_cal}.csv'), index=False)
     
-    # Calculate the water net yield for each NRM region
+    # Water yield for NRM region
     ag_wny = (ag_w_mrj_no_CCI * ag_dvar_mrj
         ).groupby('region_NRM'
         ).sum(['cell']
@@ -1358,7 +1366,19 @@ def write_water(data: Data, yr_cal, path):
         ).dropna(axis=0, how='all')
         
     wny_NRM.to_csv(os.path.join(path, f'water_yield_separate_NRM_{yr_cal}.csv'), index=False)
-            
+    
+    
+    if settings.WATER_CLIMATE_CHANGE_IMPACT == 'on':
+        save2nc(xr_ag_wny_no_CCI, os.path.join(path, f'xr_water_yield_ag_{yr_cal}.nc'))
+        save2nc(xr_non_ag_wny_no_CCI, os.path.join(path, f'xr_water_yield_non_ag_{yr_cal}.nc'))
+        save2nc(xr_am_wny_no_CCI, os.path.join(path, f'xr_water_yield_ag_management_{yr_cal}.nc'))
+    elif settings.WATER_CLIMATE_CHANGE_IMPACT == 'off':
+        save2nc(xr_ag_wny_no_CCI + xr_ag_wny_CCI, os.path.join(path, f'xr_water_yield_separate_{yr_cal}.nc'))
+        save2nc(xr_non_ag_wny_no_CCI + xr_non_ag_wny_CCI, os.path.join(path, f'xr_water_yield_non_ag_{yr_cal}.nc'))
+        save2nc(xr_am_wny_no_CCI, os.path.join(path, f'xr_water_yield_ag_management_{yr_cal}.nc')) # water yield of ag-man does not affected by CCI
+    else:
+        raise ValueError(f"Invalid setting for WATER_CLIMATE_CHANGE_IMPACT: {settings.WATER_CLIMATE_CHANGE_IMPACT}. Expected 'on' or 'off'.")
+
     return f"Water yield data written for year {yr_cal}"
 
 

@@ -2022,9 +2022,9 @@ def save_report_data(raw_data_dir:str):
     
     water_files = files.query('category == "water"').reset_index(drop=True)
 
-    water_net_yield_water_region = water_files.query('base_name == "water_yield_separate"')
-    water_net_yield_water_region = pd.concat([pd.read_csv(path) for path in water_net_yield_water_region['path']], ignore_index=True)
-    water_net_yield_water_region = water_net_yield_water_region\
+    water_net_yield_watershed = water_files.query('base_name == "water_yield_separate_watershed"')
+    water_net_yield_watershed = pd.concat([pd.read_csv(path) for path in water_net_yield_watershed['path']], ignore_index=True)
+    water_net_yield_watershed = water_net_yield_watershed\
         .replace(RENAME_AM_NON_AG)\
         .query('abs(`Water Net Yield (ML)`) > 1e-6')\
         .rename(columns={'Water Net Yield (ML)': 'Value (ML)'})
@@ -2060,7 +2060,7 @@ def save_report_data(raw_data_dir:str):
 
 
     # -------------------- Water yield overview for Australia --------------------
-    water_inside_LUTO_sum = water_net_yield_water_region\
+    water_inside_LUTO_sum = water_net_yield_watershed\
         .groupby(['Year','Type'])[['Value (ML)']]\
         .sum(numeric_only=True)\
         .round({'Value (ML)': 2})\
@@ -2115,7 +2115,7 @@ def save_report_data(raw_data_dir:str):
     
 
     # -------------------- Water yield overview for Australia by landuse --------------------
-    water_inside_LUTO_lu_sum = water_net_yield_water_region\
+    water_inside_LUTO_lu_sum = water_net_yield_watershed\
         .groupby(['Year','Landuse'])[['Value (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()\
