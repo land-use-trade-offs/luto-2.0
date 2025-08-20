@@ -785,7 +785,7 @@ def save_report_data(raw_data_dir:str):
     
     # -------------------- Commodity production for ag, non-ag, and agricultural management --------------------
     for idx, _type in enumerate(quantity_LUTO['Type'].unique()):
-        _df = quantity_LUTO.query(f'Type == "{_type}"').query('`Production (t/KL)` > 0').copy()
+        _df = quantity_LUTO.query(f'Type == "{_type}"').query('abs(`Production (t/KL)`) != 0').copy()
 
         group_cols = ['Commodity']
         for col in group_cols:
@@ -1331,7 +1331,7 @@ def save_report_data(raw_data_dir:str):
         .sum(numeric_only=True)\
         .reset_index()\
         .round({'Value ($)': 2})\
-        .query('abs(`Value ($)`) > 0')\
+        .query('abs(`Value ($)`) != 0')\
         .assign(region='AUSTRALIA')
 
     cost_transition_ag2ag_trans_mat_region_df = cost_transition_ag2ag_df\
@@ -1618,7 +1618,7 @@ def save_report_data(raw_data_dir:str):
                 'N2O': 'Nitrous Oxide (N2O)'
             })
    
-        GHG_land = pd.concat([GHG_ag, GHG_non_ag, GHG_ag_man, GHG_transition], axis=0).query('abs(`Value (t CO2e)`) > 0').reset_index(drop=True)
+        GHG_land = pd.concat([GHG_ag, GHG_non_ag, GHG_ag_man, GHG_transition], axis=0).query('abs(`Value (t CO2e)`) != 0').reset_index(drop=True)
         GHG_land['Land-use type'] = GHG_land['Land-use'].apply(lu_group.set_index('Land-use')['Category'].to_dict().get)
         net_land = GHG_land.groupby('Year')[['Value (t CO2e)']].sum(numeric_only=True).reset_index()
 
@@ -2026,7 +2026,7 @@ def save_report_data(raw_data_dir:str):
     water_net_yield_water_region = pd.concat([pd.read_csv(path) for path in water_net_yield_water_region['path']], ignore_index=True)
     water_net_yield_water_region = water_net_yield_water_region\
         .replace(RENAME_AM_NON_AG)\
-        .query('`Water Net Yield (ML)` > 0')\
+        .query('abs(`Water Net Yield (ML)`) != 0')\
         .rename(columns={'Water Net Yield (ML)': 'Value (ML)'})
 
 
@@ -2034,7 +2034,7 @@ def save_report_data(raw_data_dir:str):
     water_net_yield_NRM_region = pd.concat([pd.read_csv(path) for path in water_net_yield_NRM_region['path']], ignore_index=True)
     water_net_yield_NRM_region = water_net_yield_NRM_region\
         .replace(RENAME_AM_NON_AG)\
-        .query('`Water Net Yield (ML)` > 0')\
+        .query('abs(`Water Net Yield (ML)`) != 0')\
         .rename(columns={'Water Net Yield (ML)': 'Value (ML)'})
 
 
@@ -2410,7 +2410,7 @@ def save_report_data(raw_data_dir:str):
     bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])\
         .replace(RENAME_AM_NON_AG)\
         .rename(columns={'Contribution Relative to Base Year Level (%)': 'Value (%)'})\
-        .query('`Value (%)` > 1e-6')\
+        .query('abs(`Value (%)`) > 1e-6')\
         .round({'Value (%)': 6})
         
         
@@ -2510,7 +2510,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', col])\
             .sum()\
             .reset_index()\
-            .query('`Value (%)` > 0')
+            .query('abs(`Value (%)`) != 0')
         df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
@@ -2566,7 +2566,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', col])\
             .sum()\
             .reset_index()\
-            .query('`Value (%)` > 0')
+            .query('abs(`Value (%)`) != 0')
         df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
@@ -2620,7 +2620,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', col])\
             .sum()\
             .reset_index()\
-            .query('`Value (%)` > 0')
+            .query('abs(`Value (%)`) != 0')
         df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
@@ -2675,7 +2675,7 @@ def save_report_data(raw_data_dir:str):
             .groupby(['Year', 'region', col])\
             .sum()\
             .reset_index()\
-            .query('`Value (%)` > 0')
+            .query('abs(`Value (%)`) != 0')
         df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
             .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
             .reset_index()
@@ -2725,7 +2725,7 @@ def save_report_data(raw_data_dir:str):
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
-            .query('`Value (%)` > 1e-6')\
+            .query('abs(`Value (%)`) > 1e-6')\
             .round(6)
         
 
@@ -2751,7 +2751,7 @@ def save_report_data(raw_data_dir:str):
                 .groupby(['Year', 'region', col])\
                 .sum()\
                 .reset_index()\
-                .query('`Value (%)` > 0')
+                .query('abs(`Value (%)`) != 0')
             df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                 .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                 .reset_index()
@@ -2807,7 +2807,7 @@ def save_report_data(raw_data_dir:str):
                 .groupby(['Year', 'region', col])\
                 .sum()\
                 .reset_index()\
-                .query('`Value (%)` > 0')
+                .query('abs(`Value (%)`) != 0')
             df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                 .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                 .reset_index()
@@ -2862,7 +2862,7 @@ def save_report_data(raw_data_dir:str):
                 .groupby(['Year', 'region', col])\
                 .sum()\
                 .reset_index()\
-                .query('`Value (%)` > 0')
+                .query('abs(`Value (%)`) != 0')
             df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                 .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                 .reset_index()
@@ -2918,7 +2918,7 @@ def save_report_data(raw_data_dir:str):
                 .groupby(['Year', 'region', col])\
                 .sum()\
                 .reset_index()\
-                .query('`Value (%)` > 0')
+                .query('abs(`Value (%)`) != 0')
             df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                 .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                 .reset_index()
@@ -2971,7 +2971,7 @@ def save_report_data(raw_data_dir:str):
         bio_df = pd.concat([pd.read_csv(path, low_memory=False) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Vegetation Group': 'species'})\
-            .query('`Value (%)` > 1e-6')\
+            .query('abs(`Value (%)`) > 1e-6')\
             .round(6)
         
         
@@ -3002,7 +3002,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
@@ -3063,7 +3063,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
@@ -3123,7 +3123,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
@@ -3183,7 +3183,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
@@ -3233,7 +3233,7 @@ def save_report_data(raw_data_dir:str):
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
-            .query('`Value (%)` > 1e-6')\
+            .query('abs(`Value (%)`) > 1e-6')\
             .round(6)
         
         # ---------------- (GBF4 SNES) Overview  ----------------
@@ -3262,7 +3262,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
@@ -3323,7 +3323,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
@@ -3383,7 +3383,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
@@ -3442,7 +3442,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
@@ -3489,7 +3489,7 @@ def save_report_data(raw_data_dir:str):
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)'})\
-            .query('`Value (%)` > 1e-6')\
+            .query('abs(`Value (%)`) > 1e-6')\
             .round(6)
         
         
@@ -3521,7 +3521,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
@@ -3582,7 +3582,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
@@ -3642,7 +3642,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
@@ -3701,7 +3701,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
@@ -3749,7 +3749,7 @@ def save_report_data(raw_data_dir:str):
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Species':'species'})\
-            .query('`Value (%)` > 1e-6')\
+            .query('abs(`Value (%)`) > 1e-6')\
             .round(6)
         
         # ---------------- (GBF8 SPECIES) Overview  ----------------
@@ -3780,7 +3780,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
@@ -3841,7 +3841,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
@@ -3901,7 +3901,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
@@ -3960,7 +3960,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
@@ -4007,7 +4007,7 @@ def save_report_data(raw_data_dir:str):
         bio_df = pd.concat([pd.read_csv(path) for path in bio_paths['path']])
         bio_df = bio_df.replace(RENAME_AM_NON_AG)\
             .rename(columns={'Contribution Relative to Pre-1750 Level (%)': 'Value (%)', 'Group':'species'})\
-            .query('`Value (%)` > 1e-6')\
+            .query('abs(`Value (%)`) > 1e-6')\
             .round(6)
 
         # ---------------- (GBF8 GROUP) Overview  ----------------
@@ -4034,7 +4034,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
@@ -4095,7 +4095,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
@@ -4155,7 +4155,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
@@ -4214,7 +4214,7 @@ def save_report_data(raw_data_dir:str):
                     .groupby(['Year', 'region', col])\
                     .sum()\
                     .reset_index()\
-                    .query('`Value (%)` > 1e-6')
+                    .query('abs(`Value (%)`) > 1e-6')
                 df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (%)']]\
                     .apply(lambda x: x[['Year', 'Value (%)']].values.tolist())\
                     .reset_index()
