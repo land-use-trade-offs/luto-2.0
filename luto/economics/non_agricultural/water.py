@@ -18,14 +18,14 @@
 # LUTO2. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import luto.data as Data
 
 from typing import Optional
-from luto.settings import NON_AG_LAND_USES
 from luto import tools
 
 
-def get_w_net_yield_matrix_env_planting(
-    data, 
+def get_w_net_yield_env_planting(
+    data: Data, 
     yr_idx: int, 
     water_dr_yield: Optional[np.ndarray] = None,
     water_sr_yield: Optional[np.ndarray] = None
@@ -33,12 +33,9 @@ def get_w_net_yield_matrix_env_planting(
     """
     Get water yields vector of environmental plantings.
 
-    To get the water yields of environmental plantings, subtract the baseline 
-    water yields from the shallow-rooted water yields in the data. This represents
-    how much water would be used if modified (i.e., cleared) land area was reforested
-    with native pre-European vegetation communities (WATER_YIELD_HIST_NL). Pre-European 
-    communities include both deep-rooted (i.e., forests/woodlands) and shallow-rooted 
-    communities - natural vegetation is not all deep-rooted.
+    Environmental plantings refer to restoring land to its pre-European vegetation state. 
+    So we need to use the `get_water_nl_yield_for_yr_idx` to consider both deep-rooted and 
+    shallow-rooted water yields under the pre-European vegetation state.
 
     Returns
     -------
@@ -56,20 +53,16 @@ def get_w_net_yield_matrix_env_planting(
     return wyield
 
 
-def get_w_net_yield_matrix_carbon_plantings_block(
-    data, 
+def get_w_net_yield_carbon_plantings_block(
+    data: Data, 
     yr_idx: int, 
     water_dr_yield: Optional[np.ndarray] = None
     ) -> np.ndarray:
     """
     Get water yields vector of carbon plantings (block arrangement).
 
-    To get the water yields of carbon plantings, subtract the deep-rooted 
-    water yields from the shallow-rooted water yields in the data. This represents
-    how much water would be used if modified (i.e., cleared) land area was reforested
-    with wall-to-wall deep-rooted tree species (WATER_YIELD_HIST_DR). The assumption 
-    here is that plantations are all deep-rooted and hence use more water.
-    
+    Carbon plantings are pure deep-rooted systems.
+
     Returns
     -------
     1-D array, indexed by cell.
@@ -79,16 +72,13 @@ def get_w_net_yield_matrix_carbon_plantings_block(
     return wyield
 
 
-def get_w_net_yield_matrix_rip_planting(
-    data, 
+def get_w_net_yield_rip_planting(
+    data: Data, 
     yr_idx: int, 
     water_dr_yield: Optional[np.ndarray] = None
     ) -> np.ndarray:
     """
     Get water yields vector of riparian plantings.
-
-    To get the water yields of riparian plantings, subtract the deep-rooted
-    water yields from the shallow-rooted water yields in the data.
 
     Note: this is the same as for environmental plantings.
 
@@ -96,11 +86,11 @@ def get_w_net_yield_matrix_rip_planting(
     -------
     1-D array, indexed by cell.
     """
-    return get_w_net_yield_matrix_env_planting(data, yr_idx, water_dr_yield)
+    return get_w_net_yield_env_planting(data, yr_idx, water_dr_yield)
 
 
 def get_w_net_yield_agroforestry_base(
-    data, 
+    data: Data, 
     yr_idx: int, 
     water_dr_yield: Optional[np.ndarray] = None,
     water_sr_yield: Optional[np.ndarray] = None
@@ -108,20 +98,17 @@ def get_w_net_yield_agroforestry_base(
     """
     Get water yields vector of agroforestry.
 
-    To get the water yields of agroforestry, subtract the baseline
-    water yields from the shallow-rooted water yields in the data.
-
     Note: this is the same as for environmental plantings.
 
     Returns
     -------
     1-D array, indexed by cell.
     """
-    return get_w_net_yield_matrix_env_planting(data, yr_idx, water_dr_yield, water_sr_yield)
+    return get_w_net_yield_env_planting(data, yr_idx, water_dr_yield, water_sr_yield)
 
 
-def get_wreq_sheep_agroforestry(
-    data, 
+def get_w_net_yield_sheep_agroforestry(
+    data: Data, 
     ag_w_mrj: np.ndarray, 
     agroforestry_x_r: np.ndarray,
     yr_idx: int,
@@ -151,8 +138,8 @@ def get_wreq_sheep_agroforestry(
     return agroforestry_contr + sheep_contr
 
 
-def get_wreq_beef_agroforestry(
-    data, 
+def get_w_net_yield_beef_agroforestry(
+    data: Data, 
     ag_w_mrj: np.ndarray, 
     agroforestry_x_r: np.ndarray,
     yr_idx: int,
@@ -163,7 +150,7 @@ def get_wreq_beef_agroforestry(
     Parameters
     ------
     data object.
-    ag_w_mrj: agricultural wreq matrix.
+    ag_w_mrj: agricultural water yield matrix.
     agroforestry_x_r: Agroforestry exclude matrix.
 
     Returns
@@ -182,7 +169,7 @@ def get_wreq_beef_agroforestry(
     return agroforestry_contr + beef_contr
 
 
-def get_wreq_carbon_plantings_belt_base(data, yr_idx: int, water_dr_yield: Optional[np.ndarray] = None) -> np.ndarray:
+def get_w_net_yield_carbon_plantings_belt_base(data, yr_idx: int, water_dr_yield: Optional[np.ndarray] = None) -> np.ndarray:
     """
     Get water requirments vector of carbon plantings (belt arrangement).
 
@@ -192,11 +179,11 @@ def get_wreq_carbon_plantings_belt_base(data, yr_idx: int, water_dr_yield: Optio
     -------
     1-D array, indexed by cell.
     """
-    return get_w_net_yield_matrix_carbon_plantings_block(data, yr_idx, water_dr_yield)
+    return get_w_net_yield_carbon_plantings_block(data, yr_idx, water_dr_yield)
 
 
-def get_wreq_sheep_carbon_plantings_belt(
-    data, 
+def get_w_net_yield_sheep_carbon_plantings_belt(
+    data: Data, 
     ag_w_mrj: np.ndarray, 
     cp_belt_x_r: np.ndarray,
     yr_idx: int,
@@ -217,7 +204,7 @@ def get_wreq_sheep_carbon_plantings_belt(
 
     # Only use the dryland version of sheep
     sheep_w_net_yield = ag_w_mrj[0, :, sheep_j]
-    base_cp_w_net_yield = get_wreq_carbon_plantings_belt_base(data, yr_idx, water_dr_yield)
+    base_cp_w_net_yield = get_w_net_yield_carbon_plantings_belt_base(data, yr_idx, water_dr_yield)
 
     # Calculate contributions and return the sum
     cp_contr = base_cp_w_net_yield * cp_belt_x_r
@@ -225,8 +212,8 @@ def get_wreq_sheep_carbon_plantings_belt(
     return cp_contr + sheep_contr
 
 
-def get_wreq_beef_carbon_plantings_belt(
-    data, 
+def get_w_net_yield_beef_carbon_plantings_belt(
+    data: Data, 
     ag_w_mrj: np.ndarray, 
     cp_belt_x_r: np.ndarray,
     yr_idx: int,
@@ -247,7 +234,7 @@ def get_wreq_beef_carbon_plantings_belt(
 
     # Only use the dryland version of beef
     beef_w_net_yield = ag_w_mrj[0, :, beef_j]
-    base_cp_w_net_yield = get_wreq_carbon_plantings_belt_base(data, yr_idx, water_dr_yield)
+    base_cp_w_net_yield = get_w_net_yield_carbon_plantings_belt_base(data, yr_idx, water_dr_yield)
 
     # Calculate contributions and return the sum
     cp_contr = base_cp_w_net_yield * cp_belt_x_r
@@ -255,7 +242,7 @@ def get_wreq_beef_carbon_plantings_belt(
     return cp_contr + beef_contr
 
 
-def get_wreq_matrix_beccs(data, yr_idx: int, water_dr_yield: Optional[np.ndarray] = None) -> np.ndarray:
+def get_w_net_yield_beccs(data, yr_idx: int, water_dr_yield: Optional[np.ndarray] = None) -> np.ndarray:
     """
     Get water requirments vector of BECCS.
 
@@ -265,16 +252,16 @@ def get_wreq_matrix_beccs(data, yr_idx: int, water_dr_yield: Optional[np.ndarray
     -------
     1-D array, indexed by cell.
     """
-    return get_w_net_yield_matrix_carbon_plantings_block(data, yr_idx, water_dr_yield)
+    return get_w_net_yield_carbon_plantings_block(data, yr_idx, water_dr_yield)
 
 
-def get_wreq_matrix_destocked(data, ag_w_mrj):
+def get_w_net_yield_destocked(data, ag_w_mrj):
     unallocated_j = tools.get_unallocated_natural_land_code(data)
     return ag_w_mrj[0, :, unallocated_j]
 
 
 def get_w_net_yield_matrix(
-    data,
+    data: Data,
     ag_w_mrj: np.ndarray,
     lumap: np.ndarray,
     yr_idx: int,
@@ -299,15 +286,15 @@ def get_w_net_yield_matrix(
     cp_belt_x_r = tools.get_exclusions_carbon_plantings_belt_base(data, lumap)
 
     non_agr_yield_matrices = [
-        get_w_net_yield_matrix_env_planting(data, yr_idx, water_dr_yield, water_sr_yield)                     ,
-        get_w_net_yield_matrix_rip_planting(data, yr_idx, water_dr_yield)                                     ,
-        get_wreq_sheep_agroforestry(data, ag_w_mrj, agroforestry_x_r, yr_idx, water_dr_yield, water_sr_yield) ,
-        get_wreq_beef_agroforestry(data, ag_w_mrj, agroforestry_x_r, yr_idx, water_dr_yield, water_sr_yield)  ,
-        get_w_net_yield_matrix_carbon_plantings_block(data, yr_idx, water_dr_yield)                           ,
-        get_wreq_sheep_carbon_plantings_belt(data, ag_w_mrj, cp_belt_x_r, yr_idx, water_dr_yield)             ,
-        get_wreq_beef_carbon_plantings_belt(data, ag_w_mrj, cp_belt_x_r, yr_idx, water_dr_yield)              ,
-        get_wreq_matrix_beccs(data, yr_idx, water_dr_yield)                                                   ,
-        get_wreq_matrix_destocked(data, ag_w_mrj)                                                             
+        get_w_net_yield_env_planting(data, yr_idx, water_dr_yield, water_sr_yield)                     ,
+        get_w_net_yield_rip_planting(data, yr_idx, water_dr_yield)                                     ,
+        get_w_net_yield_sheep_agroforestry(data, ag_w_mrj, agroforestry_x_r, yr_idx, water_dr_yield, water_sr_yield) ,
+        get_w_net_yield_beef_agroforestry(data, ag_w_mrj, agroforestry_x_r, yr_idx, water_dr_yield, water_sr_yield)  ,
+        get_w_net_yield_carbon_plantings_block(data, yr_idx, water_dr_yield)                           ,
+        get_w_net_yield_sheep_carbon_plantings_belt(data, ag_w_mrj, cp_belt_x_r, yr_idx, water_dr_yield)             ,
+        get_w_net_yield_beef_carbon_plantings_belt(data, ag_w_mrj, cp_belt_x_r, yr_idx, water_dr_yield)              ,
+        get_w_net_yield_beccs(data, yr_idx, water_dr_yield)                                                   ,
+        get_w_net_yield_destocked(data, ag_w_mrj)                                                             
     ]
 
     # reshape each non-agricultural matrix to be indexed (r, k) and concatenate on the k indexing

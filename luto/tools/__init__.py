@@ -327,7 +327,7 @@ def get_ag_to_non_ag_water_delta_matrix(data, yr_idx, lumap, lmmap)->tuple[np.nd
     
     w_req_mrj = ag_water.get_wreq_matrices(data, yr_idx).astype(np.float32)     # <unit: ML/CELL>
     w_req_r = (w_req_mrj * l_mrj).sum(axis=0).sum(axis=1)
-    w_yield_r = non_ag_water.get_w_net_yield_matrix_env_planting(data, yr_idx)  # <unit: ML/CELL>
+    w_yield_r = non_ag_water.get_w_net_yield_env_planting(data, yr_idx)  # <unit: ML/CELL>
     w_delta_r = - (w_req_r + w_yield_r)
     
     w_license_cost_r = w_delta_r * data.WATER_LICENCE_PRICE * data.WATER_LICENSE_COST_MULTS[yr_cal] * settings.INCLUDE_WATER_LICENSE_COSTS     # <unit: $/CELL>

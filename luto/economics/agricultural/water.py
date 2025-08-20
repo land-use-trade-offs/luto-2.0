@@ -25,12 +25,11 @@ Pure functions to calculate water net yield by lm, lu and water limits.
 
 import numpy as np
 import pandas as pd
+import luto.settings as settings
 
 from typing import Optional
-import luto.settings as settings
 from luto import tools
 from luto.economics.agricultural.quantity import get_yield_pot, lvs_veg_types
-from luto.economics.non_agricultural.water import get_w_net_yield_matrix
 
 
 def get_wreq_matrices(data, yr_idx):

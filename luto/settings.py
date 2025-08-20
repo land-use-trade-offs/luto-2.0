@@ -473,14 +473,15 @@ The weight of the deviations from target in the objective function.
 
 
 # Water use yield and parameters *******************************
-WATER_LIMITS = 'on'     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
+WATER_LIMITS = 'on'                     # 'on' or 'off'. 'off' will turn off water net yield limit constraints in the solver.
+WATER_CLIMATE_CHANGE_IMPACT = 'on'      # 'on' or 'off'. 'off' will turn off climate change impact on water yields.
 
 WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solver (linear programming approach)
 # WATER_CONSTRAINT_TYPE = 'soft'  # Adds water usage as a type of slack variable in the solver (goal programming approach)
 
 
 # Regionalisation to enforce water use limits by
-WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
+WATER_REGION_DEF = 'River Region'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
 """
     Water net yield targets: the value represents the proportion of the historical water yields
     that the net yield must exceed in a given year. Base year (2010) uses base year net yields as targets.
