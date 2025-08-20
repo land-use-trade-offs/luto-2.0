@@ -2276,7 +2276,7 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region_NRM'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        filename = f'Water_overview_MRN_region_{idx+1}_{col.replace(" ", "_")}'
+        filename = f'Water_overview_NRM_region_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -2313,7 +2313,7 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region_NRM'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        filename = f'Water_split_Ag_MRN_region_{idx+1}_{col.replace(" ", "_")}'
+        filename = f'Water_split_Ag_NRM_region_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -2353,7 +2353,7 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region_NRM'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        filename = f'Water_split_Am_MRN_region_{idx+1}_{col.replace(" ", "_")}'
+        filename = f'Water_split_Am_NRM_region_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -2387,7 +2387,7 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region_NRM'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        filename = f'Water_split_NonAg_MRN_region_{idx+1}_{col.replace(" ", "_")}'
+        filename = f'Water_split_NonAg_NRM_region_{idx+1}_{col.replace(" ", "_")}'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)

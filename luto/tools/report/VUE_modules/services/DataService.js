@@ -314,22 +314,22 @@ window.DataService = {
     },
     'Water': {
       'Overview': {
-        'Landuse': 'data/Water_overview_MRN_region_1_Landuse.js',
-        'Type': 'data/Water_overview_MRN_region_2_Type.js'
+        'Landuse': 'data/Water_overview_NRM_region_1_Landuse.js',
+        'Type': 'data/Water_overview_NRM_region_2_Type.js'
       },
       'Ranking': 'data/Water_ranking.js',
       'Ag': {
-        'Landuse': 'data/Water_split_Ag_MRN_region_1_Landuse.js',
-        'Water Supply': 'data/Water_split_Ag_MRN_region_2_Water_Supply.js'
+        'Landuse': 'data/Water_split_Ag_NRM_region_1_Landuse.js',
+        'Water Supply': 'data/Water_split_Ag_NRM_region_2_Water_Supply.js'
 
       },
       'Ag Mgt': {
-        'Water Supply': 'data/Water_split_Am_MRN_region_1_Water_Supply.js',
-        'Landuse': 'data/Water_split_Am_MRN_region_2_Landuse.js',
-        'Agri-Management': 'data/Water_split_Am_MRN_region_3_Agri-Management.js'
+        'Water Supply': 'data/Water_split_Am_NRM_region_1_Water_Supply.js',
+        'Landuse': 'data/Water_split_Am_NRM_region_2_Landuse.js',
+        'Agri-Management': 'data/Water_split_Am_NRM_region_3_Agri-Management.js'
       },
       'Non-Ag': {
-        'Landuse': 'data/Water_split_NonAg_MRN_region_1_Landuse.js'
+        'Landuse': 'data/Water_split_NonAg_NRM_region_1_Landuse.js'
       }
     }
   }
