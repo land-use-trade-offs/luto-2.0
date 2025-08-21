@@ -17,9 +17,7 @@ window.DataService = {
         } catch (e) {
           return defaultValue;
         }
-      };
-
-      // Populate the rankingData based on the selected region
+      };      // Populate the rankingData based on the selected region
       const rankingData = {
         'Economics': {
           'Revenue': {

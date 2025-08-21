@@ -56,8 +56,6 @@ window.HomeView = {
         console.error(`Error loading dataset ${datasetName}:`, error);
       }
     };
-
-
     // Load scripts and data when the component is mounted
     onMounted(async () => {
       try {
@@ -125,8 +123,6 @@ window.HomeView = {
         selectYear.value = availableYears.value[newIndex];
       }
     );
-
-
     return {
       dataLoaded,
       availableYears,

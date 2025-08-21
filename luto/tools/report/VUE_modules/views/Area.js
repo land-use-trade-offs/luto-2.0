@@ -2,93 +2,40 @@ window.AreaView = {
   setup() {
     const { ref, onMounted, inject, computed, watch, nextTick } = Vue;
 
-    const selectRegion = inject('globalSelectedRegion');
-    const isDrawerOpen = ref(false);
-    const yearIndex = ref(0);
-
-    // Data selection and visualization state
-    const selectChartData = ref([]);
-    const mapPathName = ref({});
-    const mapSelectKey = ref([]);
-
     // Global selection state
     const selectYear = ref(2020);
+    const selectRegion = inject('globalSelectedRegion');
+    const yearIndex = ref(0);
 
-    // Category selection state
+    // Global variables
+    const availableYears = ref([]);
+    const availableCategories = ref(['Ag', 'Ag Mgt', 'Non-Ag']);
+    const dataLoaded = ref(false);
+    const isDrawerOpen = ref(false);
+
+    // Data selection and visualization state
+    const selectChartDataset = ref({});
+
+    // Base map selection state
+    const mapVarName = ref('');
+    const mapVarPath = ref([]);
+
+    // Data|Map service
+    const MapRegister = window.MapService.mapCategories['Area'];     // MapService was registered in the index.html
+    const getMapOptionsForLevel = window.MapService.getMapOptionsForLevel;
+
+    // Map selection state
     const selectMapCategory = ref('Ag');
     const selectMapAgMgt = ref('Environmental Plantings');
     const selectMapWater = ref('dry');
     const selectMapLanduse = ref('Beef - modified land');
 
-
     // Chart selection state
     const selectChartLevel = ref('Landuse');
     const selectChartItem = ref('Beef - modified land');
 
-    const availableYears = ref([]);
-    const availableCategories = ref(['Ag', 'Ag Mgt', 'Non-Ag']);
-
-
-    // Chart data
-    const dataLoaded = ref(false);
 
     // Centralized function to navigate nested data structure based on current selections
-    const selectMapData = (path = []) => {
-      // Start with the appropriate data object based on category
-      let dataSource;
-      if (selectMapCategory.value === 'Ag') {
-        dataSource = window.map_area_Ag;
-      } else if (selectMapCategory.value === 'Ag Mgt') {
-        dataSource = window.map_area_Am;
-      } else if (selectMapCategory.value === 'Non-Ag') {
-        dataSource = window.map_area_NonAg;
-      }
-
-      if (!dataSource) return null;
-
-      // Navigate through the nested structure using the provided path
-      for (const key of path) {
-        if (!dataSource || !dataSource[key]) return null;
-        dataSource = dataSource[key];
-      }
-
-      return dataSource;
-    };
-
-    // Get options for a specific level in the hierarchy
-    const getMapOptionsForLevel = (level) => {
-      if (level === 'agMgt') {
-        // Ag Mgt options only available in 'Ag Mgt' category
-        if (selectMapCategory.value !== 'Ag Mgt' || !window.map_area_Am) return [];
-        return Object.keys(window.map_area_Am);
-      }
-      if (level === 'water') {
-        // Water options depend on category and possibly ag mgt selection
-        if (selectMapCategory.value === 'Ag') {
-          return Object.keys(window.map_area_Ag || {});
-        } else if (selectMapCategory.value === 'Ag Mgt') {
-          const agMgtData = selectMapData([selectMapAgMgt.value]);
-          return agMgtData ? Object.keys(agMgtData) : [];
-        }
-        return [];
-      }
-      if (level === 'landuse') {
-        // Landuse options depend on category and previous selections
-        if (selectMapCategory.value === 'Ag') {
-          const waterData = selectMapData([selectMapWater.value]);
-          return waterData ? Object.keys(waterData) : [];
-        } else if (selectMapCategory.value === 'Ag Mgt') {
-          const waterData = selectMapData([selectMapAgMgt.value, selectMapWater.value]);
-          return waterData ? Object.keys(waterData) : [];
-        } else if (selectMapCategory.value === 'Non-Ag') {
-          return Object.keys(window.map_area_NonAg || {});
-        }
-        return [];
-      }
-
-      return [];
-    };
-
     const getChartOptionsForLevel = (level) => {
       if (level === 'ag') {
         // Ag options only available in 'Ag' category
@@ -130,7 +77,7 @@ window.AreaView = {
 
     const updateChartSeries = () => {
       const dsKey = getChartData();
-      selectChartData.value = {
+      selectChartDataset.value = {
         ...window.Chart_default_options,
         chart: { height: 500 },
         yAxis: {
@@ -142,10 +89,24 @@ window.AreaView = {
       };
     };
 
+    const updateMapOverlay = () => {
+      // Set map configuration based on category
+      if (selectMapCategory.value === 'Ag') {
+        mapVarName.value = MapRegister["Ag"]["name"];
+        mapVarPath.value = [selectMapLanduse.value, selectMapWater.value, selectYear.value];
+      } else if (selectMapCategory.value === 'Ag Mgt') {
+        mapVarName.value = MapRegister["Ag Mgt"]["name"];
+        mapVarPath.value = [selectMapAgMgt.value, selectMapLanduse.value, selectMapWater.value, selectYear.value];
+      } else if (selectMapCategory.value === 'Non-Ag') {
+        mapVarName.value = MapRegister["Non-Ag"]["name"];
+        mapVarPath.value = [selectMapLanduse.value, selectYear.value];
+      }
+    };
+
     // Computed properties using the centralized functions
-    const availableMapAgMgt = computed(() => getMapOptionsForLevel('agMgt'));
-    const availableMapWater = computed(() => getMapOptionsForLevel('water'));
-    const availableMapLanduse = computed(() => getMapOptionsForLevel('landuse'));
+    const availableMapAgMgt = computed(() => getMapOptionsForLevel(MapRegister, 'agMgt', selectMapCategory.value, selectMapAgMgt.value, selectMapLanduse.value));
+    const availableMapWater = computed(() => getMapOptionsForLevel(MapRegister, 'water', selectMapCategory.value, selectMapAgMgt.value, selectMapLanduse.value));
+    const availableMapLanduse = computed(() => getMapOptionsForLevel(MapRegister, 'landuse', selectMapCategory.value, selectMapAgMgt.value, selectMapLanduse.value));
 
     const availableChartAg = computed(() => getChartOptionsForLevel('ag'));
     const availableChartAgMgt = computed(() => getChartOptionsForLevel('agMgt'));
@@ -158,9 +119,11 @@ window.AreaView = {
       await loadScript("./data/chart_option/Chart_default_options.js", 'Chart_default_options');
       await loadScript("./data/Area_overview_2_Category.js", 'Area_overview_2_Category');
       await loadScript("./data/Area_overview_2_Category.js", 'Area_overview_2_Category');
-      await loadScript(`${window.MapService.mapCategories['Area']['Ag']}`, 'map_area_Ag');
-      await loadScript(`${window.MapService.mapCategories['Area']['Ag Mgt']}`, 'map_area_Am');
-      await loadScript(`${window.MapService.mapCategories['Area']['Non-Ag']}`, 'map_area_NonAg');
+
+      // Load map data for all categories
+      await loadScript(MapRegister['Ag']['path'], MapRegister['Ag']['name']);
+      await loadScript(MapRegister['Ag Mgt']['path'], MapRegister['Ag Mgt']['name']);
+      await loadScript(MapRegister['Non-Ag']['path'], MapRegister['Non-Ag']['name']);
 
       // Chart data
       await loadScript("./data/Area_Ag_1_Land-use.js", 'Area_Ag_1_Land-use');
@@ -174,21 +137,8 @@ window.AreaView = {
       availableYears.value = window.Supporting_info.years;
       availableCategories.value = Object.keys(window.MapService.mapCategories['Area']);
 
-      if (selectMapCategory.value === 'Ag') {
-        mapPathName.value = 'window.map_area_Ag';
-        mapSelectKey.value = [selectMapWater.value, selectMapLanduse.value, selectYear.value];
-      } else if (selectMapCategory.value === 'Ag Mgt') {
-        mapPathName.value = 'window.map_area_Am';
-        mapSelectKey.value = [selectMapAgMgt.value, selectMapWater.value, selectMapLanduse.value, selectYear.value];
-      } else if (selectMapCategory.value === 'Non-Ag') {
-        mapPathName.value = 'window.map_area_NonAg';
-        mapSelectKey.value = [selectMapLanduse.value, selectYear.value];
-      }
-
-      // Set the initial chart series based on current selections
+      updateMapOverlay();
       updateChartSeries();
-
-      console.log(getChartData());
 
       // Use nextTick to ensure the data is processed before rendering the UI components
       nextTick(() => {
@@ -206,33 +156,24 @@ window.AreaView = {
     watch([selectRegion, selectMapCategory, selectMapAgMgt, selectMapWater, selectMapLanduse, selectYear], () => {
       // Reset values if they're no longer valid options
       if (selectMapCategory.value === 'Ag Mgt') {
-        const validAgMgtOptions = getMapOptionsForLevel('agMgt');
+        const validAgMgtOptions = availableMapAgMgt.value;
         if (validAgMgtOptions.length > 0 && !validAgMgtOptions.includes(selectMapAgMgt.value)) {
           selectMapAgMgt.value = validAgMgtOptions[0];
         }
       }
 
-      const validWaterOptions = getMapOptionsForLevel('water');
+      const validWaterOptions = availableMapWater.value;
       if (validWaterOptions.length > 0 && !validWaterOptions.includes(selectMapWater.value)) {
         selectMapWater.value = validWaterOptions[0];
       }
 
-      const validLanduseOptions = getMapOptionsForLevel('landuse');
+      const validLanduseOptions = availableMapLanduse.value;
       if (validLanduseOptions.length > 0 && !validLanduseOptions.includes(selectMapLanduse.value)) {
         selectMapLanduse.value = validLanduseOptions[0];
       }
 
       // Set map configuration based on category
-      if (selectMapCategory.value === 'Ag') {
-        mapPathName.value = 'window.map_area_Ag';
-        mapSelectKey.value = [selectMapWater.value, selectMapLanduse.value, selectYear.value];
-      } else if (selectMapCategory.value === 'Ag Mgt') {
-        mapPathName.value = 'window.map_area_Am';
-        mapSelectKey.value = [selectMapAgMgt.value, selectMapWater.value, selectMapLanduse.value, selectYear.value];
-      } else if (selectMapCategory.value === 'Non-Ag') {
-        mapPathName.value = 'window.map_area_NonAg';
-        mapSelectKey.value = [selectMapLanduse.value, selectYear.value];
-      }
+      updateMapOverlay();
 
 
     });
@@ -265,7 +206,7 @@ window.AreaView = {
       selectChartItem,
 
       selectRegion,
-      selectChartData,
+      selectChartDataset,
 
       selectMapCategory,
       selectMapAgMgt,
@@ -273,8 +214,8 @@ window.AreaView = {
       selectMapLanduse,
       selectYear,
 
-      mapSelectKey,
-      mapPathName,
+      mapVarPath,
+      mapVarName,
     };
   },
   template: `
@@ -398,8 +339,8 @@ window.AreaView = {
       <div style="position: relative; width: 100%; height: 100%; overflow: hidden;">
         <!-- Map component takes full space -->
         <regions-map 
-          :mapPathName="mapPathName"
-          :mapKey="mapSelectKey"
+          :mapName="mapVarName"
+          :mapPath="mapVarPath"
           style="width: 100%; height: 100%;">
         </regions-map>
 
@@ -427,7 +368,7 @@ window.AreaView = {
             boxSizing: 'border-box'
           }">
           <chart-container 
-            :chartData="selectChartData" 
+            :chartData="selectChartDataset" 
             :draggable="true"
             :zoomable="true"
             style="width: 100%; height: 200px;">

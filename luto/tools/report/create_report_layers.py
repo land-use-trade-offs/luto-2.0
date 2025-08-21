@@ -36,13 +36,13 @@ from luto.tools.report.data_tools import get_all_files
 
 
 def tuple_dict_to_nested(flat_dict):
-            nested = {}
-            for key_tuple, value in flat_dict.items():
-                current = nested
-                for key in key_tuple[:-1]:
-                    current = current.setdefault(key, {})
-                current[key_tuple[-1]] = value
-            return nested
+    nested = {}
+    for key_tuple, value in flat_dict.items():
+        current = nested
+        for key in key_tuple[:-1]:
+            current = current.setdefault(key, {})
+        current[key_tuple[-1]] = value
+    return nested
         
         
 def hex_color_to_numeric(hex:str) -> tuple:
@@ -144,8 +144,8 @@ def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=set
             arr_sel = xr_arr.sel(**sel)                        
             task.append(
                 delayed(map2base64)(template_xr, arr_sel, tuple(list(sel.values()) + [_year]))
-            )
-
+            )    
+            
     # Gather results and save to JSON
     output = {}
     for res in Parallel(n_jobs=workers, return_as='generator')(task):

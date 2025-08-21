@@ -1,11 +1,11 @@
 window.RegionsMap = {
 
   props: {
-    mapPathName: {
+    mapName: {
       type: String,
       required: true
     },
-    mapKey: {
+    mapPath: {
       type: Array,
       required: true
     },
@@ -190,7 +190,7 @@ window.RegionsMap = {
 
         // Skip initial map data load - will be loaded by the watcher when props are populated
         // The watch handler will take care of loading map data when props are ready
-        
+
         // Update map if a region is already selected
         if (selectedRegion.value && selectedRegion.value !== 'AUSTRALIA') {
           updateMap();
@@ -201,47 +201,65 @@ window.RegionsMap = {
     });
 
     const loadMapData = async () => {
-      // Map data is already loaded in Area.js
-      if (!props.mapPathName || typeof props.mapPathName !== 'string') {
-        console.error('Invalid mapPathName:', props.mapPathName);
+      // Always remove existing overlays first
+      map.value.eachLayer((layer) => {
+        if (layer instanceof L.ImageOverlay) {
+          map.value.removeLayer(layer);
+        }
+      });
+
+      // Safe nested object access function
+      const getNestedValue = (obj, path) => {
+        let current = obj;
+        for (const key of path) {
+          if (current == null || typeof current !== 'object' || !(key in current)) {
+            return null;
+          }
+          current = current[key];
+        }
+        return current;
+      };
+
+      // Safely get the nested data
+      const data = getNestedValue(window[props.mapName], props.mapPath);
+
+      if (!data) {
+        console.warn(`Map data not found for path: [${props.mapPath.join(', ')}] in ${props.mapName}`);
+        // No overlay will be added - map shows base layer only
         return;
       }
-      const pathName = props.mapPathName.replace('window.', '');
-      mapData.value = props.mapKey.reduce((acc, key) => acc && acc[key], window[pathName]);
 
-      // Update the image overlay if map is already initialized
-      if (map.value && mapData.value && mapData.value.img_str && mapData.value.bounds) {
-        // Remove existing overlay if any
-        map.value.eachLayer((layer) => {
-          if (layer instanceof L.ImageOverlay) {
-            map.value.removeLayer(layer);
-          }
-        });
-
-        // Add new image overlay
-        const imageOverlay = L.imageOverlay(
-          mapData.value.img_str,
-          mapData.value.bounds,
-          {
-            className: 'crisp-image'
-          }
-        ).addTo(map.value);
-
-        // Apply CSS to disable image interpolation
-        setTimeout(() => {
-          const imgElement = imageOverlay.getElement();
-          if (imgElement) {
-            imgElement.style.imageRendering = 'pixelated';
-            imgElement.style.imageRendering = '-moz-crisp-edges';
-            imgElement.style.imageRendering = 'crisp-edges';
-          }
-        }, 100);
+      if (!data.img_str || !data.bounds) {
+        console.warn('Map data is missing required properties (img_str or bounds):', data);
+        // No overlay will be added - map shows base layer only
+        return;
       }
+
+      mapData.value = data;
+
+      // Add new image overlay only if data is valid
+      const imageOverlay = L.imageOverlay(
+        mapData.value.img_str,
+        mapData.value.bounds,
+        {
+          className: 'crisp-image'
+        }
+      ).addTo(map.value);
+
+      // Apply CSS to disable image interpolation
+      setTimeout(() => {
+        const imgElement = imageOverlay.getElement();
+        if (imgElement) {
+          imgElement.style.imageRendering = 'pixelated';
+          imgElement.style.imageRendering = '-moz-crisp-edges';
+          imgElement.style.imageRendering = 'crisp-edges';
+        }
+      }, 100);
     };
 
-    Vue.watch(() => [props.mapPathName, props.mapKey], async (newVal) => {
-      const [newMapPathName, newMapKey] = newVal;
-      if (newMapPathName && typeof newMapPathName === 'string' && newMapKey && Array.isArray(newMapKey) && newMapKey.length > 0) {
+    Vue.watch(() => [props.mapName, props.mapPath], async (newVal) => {
+      const [newmapName, newmapPath] = newVal;
+      if (newmapName && typeof newmapName === 'string' && newmapPath && Array.isArray(newmapPath) && newmapPath.length > 0) {
         await loadMapData();
       }
     }, { deep: true, immediate: true });

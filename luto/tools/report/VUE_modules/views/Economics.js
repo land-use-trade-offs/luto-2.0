@@ -9,105 +9,141 @@ window.EconomicsView = {
     // Data selection and visualization state
     const selectDataset = ref({});
     const selectChartLevel = ref('Overview');
-    const mapPathName = ref({});
-    const mapSelectKey = ref([]);
 
-    // Category selection state
-    const selectCategory = ref('Ag');
-    const selectEconomicsType = ref('Cost'); // New: Cost or Revenue selection
-    const selectAgMgt = ref('Environmental Plantings');
-    const selectWater = ref('dry');
-    const selectLanduse = ref('Beef - modified land');
-    const selectCostRevenueType = ref('Area cost'); // New: For Ag category, this holds the cost/revenue type
+    // Base map selection state
+    const mapVarName = ref('');
+    const mapVarPath = ref([]);
+
+    // Data|Map service
+    const MapRegister = window.MapService.mapCategories['Economics'];     // MapService was registered in the index.html
+
+    // Map selection state
+    const selectMapCategory = ref('Ag');
+    const selectMapEconomicsType = ref('Cost'); // New: Cost or Revenue selection
+    const selectMapAgMgt = ref('Asparagopsis taxiformis');
+    const selectMapWater = ref('dry');
+    const selectMapLanduse = ref('Beef - modified land');
+    const selectMapCostRevenueType = ref('Water cost'); // Default for cost, will be updated based on selection
     const selectYear = ref(2020);
 
     const availableYears = ref([]);
     const availableCategories = ref([]);
     const availableEconomicsTypes = ref(['Cost', 'Revenue']); // New: Available economics types
-    const availableCostRevenueTypes = ref([]); // New: Available cost/revenue types
 
     const dataLoaded = ref(false);
+    const isUpdating = ref(false); // Flag to prevent circular updates
 
-    // Centralized function to navigate nested data structure based on current selections
-    const getNestedData = (path = []) => {
-      // Start with the appropriate data object based on category and economics type
-      let dataSource;
-      const economicsTypeKey = selectEconomicsType.value.toLowerCase();
 
-      if (selectCategory.value === 'Ag') {
-        dataSource = economicsTypeKey === 'cost' ? window.map_cost_Ag : window.map_revenue_Ag;
-      } else if (selectCategory.value === 'Ag Mgt') {
-        dataSource = economicsTypeKey === 'cost' ? window.map_cost_Am : window.map_revenue_Am;
-      } else if (selectCategory.value === 'Non-Ag') {
-        dataSource = economicsTypeKey === 'cost' ? window.map_cost_NonAg : window.map_revenue_NonAg;
-      }
-
-      if (!dataSource) return null;
-
-      // Navigate through the nested structure using the provided path
-      for (const key of path) {
-        if (!dataSource || !dataSource[key]) return null;
-        dataSource = dataSource[key];
-      }
-
-      return dataSource;
-    };
-
-    // Get options for a specific level in the hierarchy
-    const getOptionsForLevel = (level) => {
-      const economicsTypeKey = selectEconomicsType.value.toLowerCase();
-      const mapDataKey = `map_${economicsTypeKey}_`;
-
-      if (level === 'costRevenueType') {
-        // Cost/Revenue Type options only available in 'Ag' category
-        if (selectCategory.value !== 'Ag') return [];
-        const waterData = getNestedData([selectWater.value]);
-        return waterData ? Object.keys(waterData) : [];
-      }
-
-      if (level === 'agMgt') {
-        // Ag Mgt options only available in 'Ag Mgt' category
-        if (selectCategory.value !== 'Ag Mgt') return [];
-        const mapDataSource = economicsTypeKey === 'cost' ? window.map_cost_Am : window.map_revenue_Am;
-        return mapDataSource ? Object.keys(mapDataSource) : [];
-      }
-
-      if (level === 'water') {
-        // Water options depend on category and possibly ag mgt selection
-        if (selectCategory.value === 'Ag') {
-          const mapDataSource = economicsTypeKey === 'cost' ? window.map_cost_Ag : window.map_revenue_Ag;
-          return mapDataSource ? Object.keys(mapDataSource) : [];
-        } else if (selectCategory.value === 'Ag Mgt') {
-          const agMgtData = getNestedData([selectAgMgt.value]);
-          return agMgtData ? Object.keys(agMgtData) : [];
-        }
+    // Computed properties based on actual data structures
+    const availableMapAgMgt = computed(() => {
+      try {
+        if (selectMapCategory.value !== 'Ag Mgt') return [];
+        const economicsTypeKey = selectMapEconomicsType.value.toLowerCase();
+        const dataSource = economicsTypeKey === 'cost' ? window.map_cost_Am : window.map_revenue_Am;
+        return dataSource ? Object.keys(dataSource) : [];
+      } catch (e) {
+        console.warn('Error in availableMapAgMgt:', e);
         return [];
       }
+    });
 
-      if (level === 'landuse') {
-        // Landuse options depend on category and previous selections
-        if (selectCategory.value === 'Ag') {
-          // For Ag, we need to navigate water -> cost/revenue type -> landuse
-          const costRevenueTypeData = getNestedData([selectWater.value, selectCostRevenueType.value]);
-          return costRevenueTypeData ? Object.keys(costRevenueTypeData) : [];
-        } else if (selectCategory.value === 'Ag Mgt') {
-          const waterData = getNestedData([selectAgMgt.value, selectWater.value]);
-          return waterData ? Object.keys(waterData) : [];
-        } else if (selectCategory.value === 'Non-Ag') {
-          const mapDataSource = economicsTypeKey === 'cost' ? window.map_cost_NonAg : window.map_revenue_NonAg;
-          return mapDataSource ? Object.keys(mapDataSource) : [];
+    const availableMapWater = computed(() => {
+      try {
+        const economicsTypeKey = selectMapEconomicsType.value.toLowerCase();
+
+        if (selectMapCategory.value === 'Ag') {
+          const dataSource = economicsTypeKey === 'cost' ? window.map_cost_Ag : window.map_revenue_Ag;
+          if (!dataSource) return [];
+
+          if (economicsTypeKey === 'cost') {
+            // For cost: Water cost > dry/irr
+            if (!dataSource[selectMapCostRevenueType.value]) return [];
+            return Object.keys(dataSource[selectMapCostRevenueType.value]);
+          } else {
+            // For revenue: Wool > Sheep - modified land > dry/irr
+            // Only check if we have a valid landuse selection
+            if (!dataSource[selectMapCostRevenueType.value]) return [];
+            const landuseOptions = Object.keys(dataSource[selectMapCostRevenueType.value]);
+            if (landuseOptions.length === 0) return [];
+
+            // Use current landuse if valid, otherwise use first available
+            const currentLanduse = landuseOptions.includes(selectMapLanduse.value) ? selectMapLanduse.value : landuseOptions[0];
+            if (!dataSource[selectMapCostRevenueType.value][currentLanduse]) return [];
+            return Object.keys(dataSource[selectMapCostRevenueType.value][currentLanduse]);
+          }
+        } else if (selectMapCategory.value === 'Ag Mgt') {
+          const dataSource = economicsTypeKey === 'cost' ? window.map_cost_Am : window.map_revenue_Am;
+          if (!dataSource || !dataSource[selectMapAgMgt.value]) return [];
+
+          // Get available landuse options first
+          const landuseOptions = Object.keys(dataSource[selectMapAgMgt.value]);
+          if (landuseOptions.length === 0) return [];
+
+          // Use current landuse if valid, otherwise use first available
+          const currentLanduse = landuseOptions.includes(selectMapLanduse.value) ? selectMapLanduse.value : landuseOptions[0];
+          if (!dataSource[selectMapAgMgt.value][currentLanduse]) return [];
+          return Object.keys(dataSource[selectMapAgMgt.value][currentLanduse]);
         }
+
+        return []; // Non-Ag doesn't have water options
+      } catch (e) {
+        console.warn('Error in availableMapWater:', e);
         return [];
       }
+    });
 
-      return [];
-    };
+    const availableMapLanduse = computed(() => {
+      try {
+        const economicsTypeKey = selectMapEconomicsType.value.toLowerCase();
 
-    // Computed properties using the centralized functions
-    const availableAgMgt = computed(() => getOptionsForLevel('agMgt'));
-    const availableWater = computed(() => getOptionsForLevel('water'));
-    const availableLanduse = computed(() => getOptionsForLevel('landuse'));
-    const availableCostRevenueType = computed(() => getOptionsForLevel('costRevenueType'));
+        if (selectMapCategory.value === 'Ag') {
+          const dataSource = economicsTypeKey === 'cost' ? window.map_cost_Ag : window.map_revenue_Ag;
+          if (!dataSource) return [];
+
+          if (economicsTypeKey === 'cost') {
+            // For cost: Water cost > dry/irr > landuse
+            if (!dataSource[selectMapCostRevenueType.value]) return [];
+
+            const waterOptions = Object.keys(dataSource[selectMapCostRevenueType.value]);
+            if (waterOptions.length === 0) return [];
+
+            // Use current water if valid, otherwise use first available
+            const currentWater = waterOptions.includes(selectMapWater.value) ? selectMapWater.value : waterOptions[0];
+            if (!dataSource[selectMapCostRevenueType.value][currentWater]) return [];
+            return Object.keys(dataSource[selectMapCostRevenueType.value][currentWater]);
+          } else {
+            // For revenue: Wool > landuse
+            if (!dataSource[selectMapCostRevenueType.value]) return [];
+            return Object.keys(dataSource[selectMapCostRevenueType.value]);
+          }
+        } else if (selectMapCategory.value === 'Ag Mgt') {
+          const dataSource = economicsTypeKey === 'cost' ? window.map_cost_Am : window.map_revenue_Am;
+          if (!dataSource || !dataSource[selectMapAgMgt.value]) return [];
+          return Object.keys(dataSource[selectMapAgMgt.value]);
+        } else if (selectMapCategory.value === 'Non-Ag') {
+          const dataSource = economicsTypeKey === 'cost' ? window.map_cost_NonAg : window.map_revenue_NonAg;
+          return dataSource ? Object.keys(dataSource) : [];
+        }
+
+        return [];
+      } catch (e) {
+        console.warn('Error in availableMapLanduse:', e);
+        return [];
+      }
+    });
+
+    // Cost/Revenue Type options (different for each economics type and category)
+    const availableCostRevenueType = computed(() => {
+      try {
+        if (selectMapCategory.value !== 'Ag') return [];
+        const economicsTypeKey = selectMapEconomicsType.value.toLowerCase();
+        const dataSource = economicsTypeKey === 'cost' ? window.map_cost_Ag : window.map_revenue_Ag;
+        return dataSource ? Object.keys(dataSource) : [];
+      } catch (e) {
+        console.warn('Error in availableCostRevenueType:', e);
+        return [];
+      }
+    });
 
     onMounted(async () => {
       await loadScript("./data/Supporting_info.js", 'Supporting_info');
@@ -130,19 +166,50 @@ window.EconomicsView = {
       // Load Economics Non-Ag split data
       await loadScript("./data/Economics_split_NonAg_1_Land-use.js", 'Economics_split_NonAg_1_Land-use');
 
-      // Load both cost and revenue data for all categories
-      await loadScript(`${window.MapService.mapCategories['Economics']['Cost']['Ag']}`, 'map_cost_Ag');
-      await loadScript(`${window.MapService.mapCategories['Economics']['Cost']['Ag Mgt']}`, 'map_cost_Am');
-      await loadScript(`${window.MapService.mapCategories['Economics']['Cost']['Non-Ag']}`, 'map_cost_NonAg');
-      await loadScript(`${window.MapService.mapCategories['Economics']['Revenue']['Ag']}`, 'map_revenue_Ag');
-      await loadScript(`${window.MapService.mapCategories['Economics']['Revenue']['Ag Mgt']}`, 'map_revenue_Am');
-      await loadScript(`${window.MapService.mapCategories['Economics']['Revenue']['Non-Ag']}`, 'map_revenue_NonAg');
+      // Load map data for all categories using MapService structure
+      await loadScript(MapRegister['Cost']['Ag']['path'], MapRegister['Cost']['Ag']['name']);
+      await loadScript(MapRegister['Cost']['Ag Mgt']['path'], MapRegister['Cost']['Ag Mgt']['name']);
+      await loadScript(MapRegister['Cost']['Non-Ag']['path'], MapRegister['Cost']['Non-Ag']['name']);
+      await loadScript(MapRegister['Revenue']['Ag']['path'], MapRegister['Revenue']['Ag']['name']);
+      await loadScript(MapRegister['Revenue']['Ag Mgt']['path'], MapRegister['Revenue']['Ag Mgt']['name']);
+      await loadScript(MapRegister['Revenue']['Non-Ag']['path'], MapRegister['Revenue']['Non-Ag']['name']);
 
       availableYears.value = window.Supporting_info.years;
-      availableCategories.value = Object.keys(window.MapService.mapCategories['Economics']['Cost']);
+      availableCategories.value = Object.keys(MapRegister['Cost']);
+
+      // Initialize defaults based on available data
+      nextTick(() => {
+        // Set appropriate cost/revenue type based on economics type
+        const validCostRevenueTypes = availableCostRevenueType.value || [];
+        if (validCostRevenueTypes.length > 0) {
+          if (selectMapEconomicsType.value === 'Cost') {
+            const waterCostOption = validCostRevenueTypes.find(opt => opt.includes('Water cost') || opt.includes('cost'));
+            selectMapCostRevenueType.value = waterCostOption || validCostRevenueTypes[0];
+          } else {
+            const woolOption = validCostRevenueTypes.find(opt => opt.includes('Wool'));
+            selectMapCostRevenueType.value = woolOption || validCostRevenueTypes[0];
+          }
+        }
+
+        // Set other defaults based on available options
+        const validAgMgtOptions = availableMapAgMgt.value || [];
+        if (validAgMgtOptions.length > 0 && !validAgMgtOptions.includes(selectMapAgMgt.value)) {
+          selectMapAgMgt.value = validAgMgtOptions[0];
+        }
+
+        const validWaterOptions = availableMapWater.value || [];
+        if (validWaterOptions.length > 0 && !validWaterOptions.includes(selectMapWater.value)) {
+          selectMapWater.value = validWaterOptions[0];
+        }
+
+        const validLanduseOptions = availableMapLanduse.value || [];
+        if (validLanduseOptions.length > 0 && !validLanduseOptions.includes(selectMapLanduse.value)) {
+          selectMapLanduse.value = validLanduseOptions[0];
+        }
+      });
 
       // Set map configuration based on category
-      updateMapConfiguration();
+      updateMapOverlay();
 
       // Update chart with initial data
       updateChartSeries();
@@ -154,60 +221,123 @@ window.EconomicsView = {
       });
     });
 
-    const updateMapConfiguration = () => {
-      const economicsTypeKey = selectEconomicsType.value.toLowerCase();
+    const updateMapOverlay = () => {
+      const economicsTypeKey = selectMapEconomicsType.value.toLowerCase();
 
-      if (selectCategory.value === 'Ag') {
-        mapPathName.value = `window.map_${economicsTypeKey}_Ag`;
-        mapSelectKey.value = [selectWater.value, selectCostRevenueType.value, selectLanduse.value, selectYear.value];
-      } else if (selectCategory.value === 'Ag Mgt') {
-        mapPathName.value = `window.map_${economicsTypeKey}_Am`;
-        mapSelectKey.value = [selectAgMgt.value, selectWater.value, selectLanduse.value, selectYear.value];
-      } else if (selectCategory.value === 'Non-Ag') {
-        mapPathName.value = `window.map_${economicsTypeKey}_NonAg`;
-        mapSelectKey.value = [selectLanduse.value, selectYear.value];
+      if (selectMapCategory.value === 'Ag') {
+        mapVarName.value = MapRegister[selectMapEconomicsType.value]["Ag"]["name"];
+
+        if (economicsTypeKey === 'cost') {
+          // Cost structure: Water cost > dry/irr > landuse > year
+          mapVarPath.value = [selectMapCostRevenueType.value, selectMapWater.value, selectMapLanduse.value, selectYear.value];
+        } else {
+          // Revenue structure: Wool > landuse > dry/irr > year
+          mapVarPath.value = [selectMapCostRevenueType.value, selectMapLanduse.value, selectMapWater.value, selectYear.value];
+        }
+      } else if (selectMapCategory.value === 'Ag Mgt') {
+        mapVarName.value = MapRegister[selectMapEconomicsType.value]["Ag Mgt"]["name"];
+        // Both cost and revenue: AgMgt > landuse > water > year
+        mapVarPath.value = [selectMapAgMgt.value, selectMapLanduse.value, selectMapWater.value, selectYear.value];
+      } else if (selectMapCategory.value === 'Non-Ag') {
+        mapVarName.value = MapRegister[selectMapEconomicsType.value]["Non-Ag"]["name"];
+        // Both cost and revenue: landuse > year
+        mapVarPath.value = [selectMapLanduse.value, selectYear.value];
       }
-
-      // Force a redraw by creating a new array reference
-      mapSelectKey.value = [...mapSelectKey.value];
     };
 
     const toggleDrawer = () => {
-      isDrawerOpen.value = !isDrawerOpen.value;
+      try {
+        isDrawerOpen.value = !isDrawerOpen.value;
+      } catch (e) {
+        console.warn('Error in toggleDrawer:', e);
+      }
     };
 
-    watch([selectCategory, selectEconomicsType, selectAgMgt, selectWater, selectCostRevenueType, selectLanduse, selectYear], () => {
-      // Reset values if they're no longer valid options
-      if (selectCategory.value === 'Ag Mgt') {
-        const validAgMgtOptions = getOptionsForLevel('agMgt');
-        if (validAgMgtOptions.length > 0 && !validAgMgtOptions.includes(selectAgMgt.value)) {
-          selectAgMgt.value = validAgMgtOptions[0];
+    // Watch for economics type changes to update default cost/revenue type
+    watch(selectMapEconomicsType, (newType) => {
+      try {
+        if (isUpdating.value) return; // Prevent circular updates
+
+        isUpdating.value = true;
+
+        if (selectMapCategory.value === 'Ag') {
+          const validOptions = availableCostRevenueType.value || [];
+          if (validOptions.length > 0) {
+            // Set appropriate default based on economics type
+            if (newType === 'Cost') {
+              const waterCostOption = validOptions.find(opt => opt.includes('Water cost') || opt.includes('cost'));
+              selectMapCostRevenueType.value = waterCostOption || validOptions[0];
+            } else if (newType === 'Revenue') {
+              const woolOption = validOptions.find(opt => opt.includes('Wool'));
+              selectMapCostRevenueType.value = woolOption || validOptions[0];
+            } else {
+              selectMapCostRevenueType.value = validOptions[0];
+            }
+          }
         }
-      }
 
-      if (selectCategory.value === 'Ag') {
-        const validCostRevenueTypeOptions = getOptionsForLevel('costRevenueType');
-        if (validCostRevenueTypeOptions.length > 0 && !validCostRevenueTypeOptions.includes(selectCostRevenueType.value)) {
-          selectCostRevenueType.value = validCostRevenueTypeOptions[0];
-        }
+        isUpdating.value = false;
+      } catch (e) {
+        console.warn('Error in economics type watcher:', e);
+        isUpdating.value = false;
       }
+    });
 
-      const validWaterOptions = getOptionsForLevel('water');
-      if (validWaterOptions.length > 0 && !validWaterOptions.includes(selectWater.value)) {
-        selectWater.value = validWaterOptions[0];
+    watch([selectRegion, selectMapCategory, selectMapEconomicsType, selectMapAgMgt, selectMapWater, selectMapCostRevenueType, selectMapLanduse, selectYear], () => {
+      try {
+        if (isUpdating.value) return; // Prevent circular updates
+
+        // Use nextTick to ensure all reactive updates are processed
+        nextTick(() => {
+          try {
+            isUpdating.value = true;
+
+            // Reset values if they're no longer valid options
+            if (selectMapCategory.value === 'Ag Mgt') {
+              const validAgMgtOptions = availableMapAgMgt.value || [];
+              if (validAgMgtOptions.length > 0 && !validAgMgtOptions.includes(selectMapAgMgt.value)) {
+                selectMapAgMgt.value = validAgMgtOptions[0];
+              }
+            }
+
+            if (selectMapCategory.value === 'Ag') {
+              const validCostRevenueTypeOptions = availableCostRevenueType.value || [];
+              if (validCostRevenueTypeOptions.length > 0 && !validCostRevenueTypeOptions.includes(selectMapCostRevenueType.value)) {
+                // Don't auto-change this here since it's handled by the economics type watcher
+                if (!validCostRevenueTypeOptions.includes(selectMapCostRevenueType.value)) {
+                  selectMapCostRevenueType.value = validCostRevenueTypeOptions[0];
+                }
+              }
+            }
+
+            const validWaterOptions = availableMapWater.value || [];
+            if (validWaterOptions.length > 0 && !validWaterOptions.includes(selectMapWater.value)) {
+              selectMapWater.value = validWaterOptions[0];
+            }
+
+            const validLanduseOptions = availableMapLanduse.value || [];
+            if (validLanduseOptions.length > 0 && !validLanduseOptions.includes(selectMapLanduse.value)) {
+              selectMapLanduse.value = validLanduseOptions[0];
+            }
+
+            // Update map configuration
+            updateMapOverlay();
+
+            isUpdating.value = false;
+          } catch (e) {
+            console.warn('Error in nextTick watch function:', e);
+            isUpdating.value = false;
+          }
+        });
+      } catch (e) {
+        console.warn('Error in watch function:', e);
+        isUpdating.value = false;
       }
-
-      const validLanduseOptions = getOptionsForLevel('landuse');
-      if (validLanduseOptions.length > 0 && !validLanduseOptions.includes(selectLanduse.value)) {
-        selectLanduse.value = validLanduseOptions[0];
-      }
-
-      // Update map configuration
-      updateMapConfiguration();
     });
 
     // Refresh chart when category/level/region change
-    watch([selectCategory, selectChartLevel, selectRegion, selectEconomicsType], () => {
+    watch([selectMapCategory, selectChartLevel, selectRegion, selectMapEconomicsType], () => {
+      if (isUpdating.value) return; // Prevent updates during state changes
       updateChartSeries();
     });
 
@@ -235,26 +365,31 @@ window.EconomicsView = {
           'Land-use': 'Economics_split_NonAg_1_Land-use',
         },
       };
-      return chartKeyMap[selectCategory.value]?.[selectChartLevel.value] || 'Economics_overview';
+      return chartKeyMap[selectMapCategory.value]?.[selectChartLevel.value] || 'Economics_overview';
     };
 
     const getChartOptionsForLevel = (level) => {
-      if (level === 'ag') {
-        // Ag options only available in 'Ag' category
-        if (selectCategory.value !== 'Ag' || !window.DataService) return [];
-        return Object.keys(window.DataService.ChartPaths['Economics']['Ag']);
+      try {
+        if (level === 'ag') {
+          // Ag options only available in 'Ag' category
+          if (selectMapCategory.value !== 'Ag' || !window.DataService) return [];
+          return Object.keys(window.DataService.ChartPaths['Economics']['Ag']) || [];
+        }
+        if (level === 'agMgt') {
+          // Ag Mgt options only available in 'Ag Mgt' category
+          if (selectMapCategory.value !== 'Ag Mgt' || !window.DataService) return [];
+          return Object.keys(window.DataService.ChartPaths['Economics']['Ag Mgt']) || [];
+        }
+        if (level === 'nonag') {
+          // Non-Ag options only available in 'Non-Ag' category
+          if (selectMapCategory.value !== 'Non-Ag' || !window.DataService) return [];
+          return Object.keys(window.DataService.ChartPaths['Economics']['Non-Ag']) || [];
+        }
+        return [];
+      } catch (e) {
+        console.warn('Error in getChartOptionsForLevel:', e);
+        return [];
       }
-      if (level === 'agMgt') {
-        // Ag Mgt options only available in 'Ag Mgt' category
-        if (selectCategory.value !== 'Ag Mgt' || !window.DataService) return [];
-        return Object.keys(window.DataService.ChartPaths['Economics']['Ag Mgt']);
-      }
-      if (level === 'nonag') {
-        // Non-Ag options only available in 'Non-Ag' category
-        if (selectCategory.value !== 'Non-Ag' || !window.DataService) return [];
-        return Object.keys(window.DataService.ChartPaths['Economics']['Non-Ag']);
-      }
-      return [];
     };
 
     const availableChartAg = computed(() => getChartOptionsForLevel('ag'));
@@ -262,17 +397,25 @@ window.EconomicsView = {
     const availableChartNonAg = computed(() => getChartOptionsForLevel('nonag'));
 
     const updateChartSeries = () => {
-      const dsKey = getChartData();
-      selectDataset.value = {
-        ...window.Chart_default_options,
-        chart: { height: 500 },
-        yAxis: {
-          title: {
-            text: "AUD",
+      try {
+        const dsKey = getChartData();
+        if (!window[dsKey] || !window[dsKey][selectRegion.value]) {
+          console.warn('Chart data not available for:', dsKey, selectRegion.value);
+          return;
+        }
+        selectDataset.value = {
+          ...window.Chart_default_options,
+          chart: { height: 500 },
+          yAxis: {
+            title: {
+              text: "AUD",
+            },
           },
-        },
-        series: window[dsKey][selectRegion.value],
-      };
+          series: window[dsKey][selectRegion.value],
+        };
+      } catch (e) {
+        console.warn('Error in updateChartSeries:', e);
+      }
     };
 
     return {
@@ -284,9 +427,9 @@ window.EconomicsView = {
       availableYears,
       availableCategories,
       availableEconomicsTypes,
-      availableAgMgt,
-      availableWater,
-      availableLanduse,
+      availableMapAgMgt,
+      availableMapWater,
+      availableMapLanduse,
       availableCostRevenueType,
 
       availableChartAg,
@@ -297,16 +440,16 @@ window.EconomicsView = {
       selectRegion,
       selectDataset,
 
-      selectCategory,
-      selectEconomicsType,
-      selectAgMgt,
-      selectWater,
-      selectCostRevenueType,
-      selectLanduse,
+      selectMapCategory,
+      selectMapEconomicsType,
+      selectMapAgMgt,
+      selectMapWater,
+      selectMapCostRevenueType,
+      selectMapLanduse,
       selectYear,
 
-      mapSelectKey,
-      mapPathName,
+      mapVarPath,
+      mapVarName,
     };
   },
   template: `
@@ -351,9 +494,9 @@ window.EconomicsView = {
           <div class="flex space-x-1">
             <span class="text-[0.8rem] mr-1 font-medium">Category:</span>
             <button v-for="(val, key) in availableCategories" :key="key"
-              @click="selectCategory = val"
+              @click="selectMapCategory = val"
               class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
-              :class="{'bg-sky-500 text-white': selectCategory === val}">
+              :class="{'bg-sky-500 text-white': selectMapCategory === val}">
               {{ val }}
             </button>
           </div>
@@ -364,26 +507,76 @@ window.EconomicsView = {
           <div class="flex space-x-1">
             <span class="text-[0.8rem] mr-1 font-medium">Type:</span>
             <button v-for="(val, key) in availableEconomicsTypes" :key="key"
-              @click="selectEconomicsType = val"
+              @click="selectMapEconomicsType = val"
               class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
-              :class="{'bg-sky-500 text-white': selectEconomicsType === val}">
+              :class="{'bg-sky-500 text-white': selectMapEconomicsType === val}">
               {{ val }}
             </button>
           </div>
         </div>
 
-        <!-- Ag Mgt options (only for Ag Mgt category when drawer is closed) -->
-        <div class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="!isDrawerOpen && availableAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-            <span class="text-[0.8rem] mr-1 font-medium">Ag Mgt:</span>
-            <button v-for="(val, key) in availableAgMgt" :key="key"
-              @click="selectAgMgt = val"
+        <!-- Cost/Revenue Type options (only for Ag category - first level) -->
+        <div 
+          v-if="dataLoaded && !isDrawerOpen && selectMapCategory === 'Ag' && availableCostRevenueType && availableCostRevenueType.length > 0" 
+          class="flex items-start border-t border-white/10 pt-1">
+          <div class="flex flex-wrap gap-1 max-w-[300px]">
+            <span class="text-[0.8rem] mr-1 font-medium">{{ selectMapEconomicsType }} Type:</span>
+            <button v-for="(val, key) in availableCostRevenueType" :key="key"
+              @click="selectMapCostRevenueType = val"
               class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectAgMgt === val}">
+              :class="{'bg-sky-500 text-white': selectMapCostRevenueType === val}">
               {{ val }}
             </button>
           </div>
-          <div v-else-if="isDrawerOpen && availableChartAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+        </div>
+
+        <!-- Ag Mgt options (only for Ag Mgt category - first level) -->
+        <div v-if="!isDrawerOpen && selectMapCategory === 'Ag Mgt' && availableMapAgMgt && availableMapAgMgt.length > 0" class="flex items-start border-t border-white/10 pt-1">
+          <div class="flex flex-wrap gap-1 max-w-[300px]">
+            <span class="text-[0.8rem] mr-1 font-medium">Ag Mgt:</span>
+            <button v-for="(val, key) in availableMapAgMgt" :key="key"
+              @click="selectMapAgMgt = val"
+              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+              :class="{'bg-sky-500 text-white': selectMapAgMgt === val}">
+              {{ val }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Landuse options - different positions based on category and economics type -->
+        <div class="flex items-start border-t border-white/10 pt-1">
+          <!-- For Revenue Ag: Landuse comes after Cost/Revenue Type -->
+          <div v-if="dataLoaded && !isDrawerOpen && selectMapCategory === 'Ag' && selectMapEconomicsType === 'Revenue' && availableMapLanduse && availableMapLanduse.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+            <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
+            <button v-for="(val, key) in availableMapLanduse" :key="key"
+              @click="selectMapLanduse = val"
+              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+              :class="{'bg-sky-500 text-white': selectMapLanduse === val}">
+              {{ val }}
+            </button>
+          </div>
+          <!-- For Ag Mgt: Landuse comes after Ag Mgt selection -->
+          <div v-else-if="dataLoaded && !isDrawerOpen && selectMapCategory === 'Ag Mgt' && availableMapLanduse && availableMapLanduse.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+            <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
+            <button v-for="(val, key) in availableMapLanduse" :key="key"
+              @click="selectMapLanduse = val"
+              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+              :class="{'bg-sky-500 text-white': selectMapLanduse === val}">
+              {{ val }}
+            </button>
+          </div>
+          <!-- For Non-Ag: Landuse is the first option -->
+          <div v-else-if="dataLoaded && !isDrawerOpen && selectMapCategory === 'Non-Ag' && availableMapLanduse && availableMapLanduse.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+            <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
+            <button v-for="(val, key) in availableMapLanduse" :key="key"
+              @click="selectMapLanduse = val"
+              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+              :class="{'bg-sky-500 text-white': selectMapLanduse === val}">
+              {{ val }}
+            </button>
+          </div>
+          <!-- Chart options for when drawer is open -->
+          <div v-else-if="isDrawerOpen && availableChartAgMgt && availableChartAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
             <span class="text-[0.8rem] mr-1 font-medium">Chart level:</span>
             <button v-for="(val, key) in availableChartAgMgt" :key="key"
               @click="selectChartLevel = val"
@@ -394,18 +587,40 @@ window.EconomicsView = {
           </div>
         </div>
 
-        <!-- Water options -->
+        <!-- Water options - comes at different positions based on structure -->
         <div class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="dataLoaded && !isDrawerOpen && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+          <!-- For Cost Ag: Water comes after Cost Type -->
+          <div v-if="dataLoaded && !isDrawerOpen && selectMapCategory === 'Ag' && selectMapEconomicsType === 'Cost' && availableMapWater && availableMapWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
             <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
-            <button v-for="(val, key) in availableWater" :key="key"
-              @click="selectWater = val"
+            <button v-for="(val, key) in availableMapWater" :key="key"
+              @click="selectMapWater = val"
               class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectWater === val}">
+              :class="{'bg-sky-500 text-white': selectMapWater === val}">
               {{ val }}
             </button>
           </div>
-          <div v-else-if="dataLoaded && isDrawerOpen && availableChartAg.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+          <!-- For Revenue Ag: Water comes after Landuse -->
+          <div v-else-if="dataLoaded && !isDrawerOpen && selectMapCategory === 'Ag' && selectMapEconomicsType === 'Revenue' && availableMapWater && availableMapWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+            <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
+            <button v-for="(val, key) in availableMapWater" :key="key"
+              @click="selectMapWater = val"
+              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+              :class="{'bg-sky-500 text-white': selectMapWater === val}">
+              {{ val }}
+            </button>
+          </div>
+          <!-- For Ag Mgt: Water comes after Landuse -->
+          <div v-else-if="dataLoaded && !isDrawerOpen && selectMapCategory === 'Ag Mgt' && availableMapWater && availableMapWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+            <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
+            <button v-for="(val, key) in availableMapWater" :key="key"
+              @click="selectMapWater = val"
+              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+              :class="{'bg-sky-500 text-white': selectMapWater === val}">
+              {{ val }}
+            </button>
+          </div>
+          <!-- Chart options for when drawer is open -->
+          <div v-else-if="dataLoaded && isDrawerOpen && availableChartAg && availableChartAg.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
             <span class="text-[0.8rem] mr-1 font-medium">Chart level:</span>
             <button v-for="(val, key) in availableChartAg" :key="key"
               @click="selectChartLevel = val"
@@ -416,33 +631,22 @@ window.EconomicsView = {
           </div>
         </div>
 
-        <!-- Cost/Revenue Type options (only for Ag category when drawer is closed) -->
-        <div 
-          v-if="dataLoaded && !isDrawerOpen && selectCategory === 'Ag' && availableCostRevenueType.length > 0" 
-          class="flex items-start border-t border-white/10 pt-1">
+        <!-- Landuse options for Cost Ag - comes last in the hierarchy -->
+        <div v-if="dataLoaded && !isDrawerOpen && selectMapCategory === 'Ag' && selectMapEconomicsType === 'Cost' && availableMapLanduse && availableMapLanduse.length > 0" class="flex items-start border-t border-white/10 pt-1">
           <div class="flex flex-wrap gap-1 max-w-[300px]">
-            <span class="text-[0.8rem] mr-1 font-medium">{{ selectEconomicsType }} Type:</span>
-            <button v-for="(val, key) in availableCostRevenueType" :key="key"
-              @click="selectCostRevenueType = val"
+            <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
+            <button v-for="(val, key) in availableMapLanduse" :key="key"
+              @click="selectMapLanduse = val"
               class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectCostRevenueType === val}">
+              :class="{'bg-sky-500 text-white': selectMapLanduse === val}">
               {{ val }}
             </button>
           </div>
         </div>
 
-        <!-- Landuse options -->
-        <div class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="dataLoaded && !isDrawerOpen && availableLanduse.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-            <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
-            <button v-for="(val, key) in availableLanduse" :key="key"
-              @click="selectLanduse = val"
-              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
-              :class="{'bg-sky-500 text-white': selectLanduse === val}">
-              {{ val }}
-            </button>
-          </div>
-          <div v-else-if="dataLoaded && isDrawerOpen && availableChartNonAg.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+        <!-- Chart options for Non-Ag when drawer is open -->
+        <div v-if="dataLoaded && isDrawerOpen && availableChartNonAg && availableChartNonAg.length > 0" class="flex items-start border-t border-white/10 pt-1">
+          <div class="flex flex-wrap gap-1 max-w-[300px]">
             <span class="text-[0.8rem] mr-1 font-medium">Chart level:</span>
             <button v-for="(val, key) in availableChartNonAg" :key="key"
               @click="selectChartLevel = val"
@@ -459,8 +663,8 @@ window.EconomicsView = {
       <div style="position: relative; width: 100%; height: 100%; overflow: hidden;">
         <!-- Map component takes full space -->
         <regions-map 
-          :mapPathName="mapPathName"
-          :mapKey="mapSelectKey"
+          :mapName="mapVarName"
+          :mapPath="mapVarPath"
           style="width: 100%; height: 100%;">
         </regions-map>
         
