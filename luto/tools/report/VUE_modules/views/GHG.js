@@ -16,7 +16,7 @@ window.GHGView = {
 
     // Data|Map service
     const MapRegister = window.MapService.mapCategories['GHG'];     // MapService was registered in the index.html
-    const getMapOptionsForLevel = window.MapService.getMapOptionsForLevel;
+    const dataConstructor = new window.DataConstructor();
 
     // Map selection state
     const selectMapCategory = ref('Ag');
@@ -30,49 +30,53 @@ window.GHGView = {
     const availableCategories = ref([]);
 
     const dataLoaded = ref(false);
-    const isUpdating = ref(false); // Flag to prevent circular updates
 
-    // We need special handlers for GHG data since it has a unique structure
+    // Function to load data for current category
+    const loadDataForCategory = (category) => {
+      if (!window[MapRegister[category]['name']]) return;
+      dataConstructor.loadData(window[MapRegister[category]['name']]);
+    };
+
+    // Computed properties using DataConstructor
     const availableGHGSource = computed(() => {
-      if (selectMapCategory.value !== 'Ag' || !window.map_GHG_Ag) return [];
-      return Object.keys(window.map_GHG_Ag || {});
+      if (selectMapCategory.value !== 'Ag') return [];
+      return dataConstructor.getAvailableKeysAtNextLevel({});
     });
 
     const availableAgMgt = computed(() => {
-      if (selectMapCategory.value !== 'Ag Mgt' || !window.map_GHG_Am) return [];
-      return Object.keys(window.map_GHG_Am || {});
+      if (selectMapCategory.value !== 'Ag Mgt') return [];
+      return dataConstructor.getAvailableKeysAtNextLevel({});
     });
 
     const availableWater = computed(() => {
-      if (selectMapCategory.value === 'Ag' && window.map_GHG_Ag) {
-        const ghgData = window.map_GHG_Ag[selectMapGHGSource.value];
-        if (ghgData && ghgData[selectMapLanduse.value]) {
-          return Object.keys(ghgData[selectMapLanduse.value]);
-        }
-      } else if (selectMapCategory.value === 'Ag Mgt' && window.map_GHG_Am) {
-        const amData = window.map_GHG_Am[selectMapAgMgt.value];
-        if (amData && amData[selectMapLanduse.value]) {
-          return Object.keys(amData[selectMapLanduse.value]);
-        }
+      // Non-Ag category has no water options
+      if (selectMapCategory.value === 'Non-Ag') {
+        return [];
       }
-      return [];
+
+      const fixedLevels = {};
+
+      if (selectMapCategory.value === 'Ag' && selectMapGHGSource.value && selectMapLanduse.value) {
+        fixedLevels.level_1 = selectMapGHGSource.value;
+        fixedLevels.level_2 = selectMapLanduse.value;
+      } else if (selectMapCategory.value === 'Ag Mgt' && selectMapAgMgt.value && selectMapLanduse.value) {
+        fixedLevels.level_1 = selectMapAgMgt.value;
+        fixedLevels.level_2 = selectMapLanduse.value;
+      }
+
+      return dataConstructor.getAvailableKeysAtNextLevel(fixedLevels);
     });
 
     const availableLanduse = computed(() => {
-      if (selectMapCategory.value === 'Ag' && window.map_GHG_Ag) {
-        const ghgData = window.map_GHG_Ag[selectMapGHGSource.value];
-        if (ghgData) {
-          return Object.keys(ghgData);
-        }
-      } else if (selectMapCategory.value === 'Ag Mgt' && window.map_GHG_Am) {
-        const amData = window.map_GHG_Am[selectMapAgMgt.value];
-        if (amData) {
-          return Object.keys(amData);
-        }
-      } else if (selectMapCategory.value === 'Non-Ag' && window.map_GHG_NonAg) {
-        return Object.keys(window.map_GHG_NonAg);
+      const fixedLevels = {};
+
+      if (selectMapCategory.value === 'Ag' && selectMapGHGSource.value) {
+        fixedLevels.level_1 = selectMapGHGSource.value;
+      } else if (selectMapCategory.value === 'Ag Mgt' && selectMapAgMgt.value) {
+        fixedLevels.level_1 = selectMapAgMgt.value;
       }
-      return [];
+
+      return dataConstructor.getAvailableKeysAtNextLevel(fixedLevels);
     });
     onMounted(async () => {
       await loadScript("./data/Supporting_info.js", 'Supporting_info');
@@ -106,184 +110,81 @@ window.GHGView = {
       availableYears.value = window.Supporting_info.years;
       availableCategories.value = Object.keys(window.MapService.mapCategories['GHG']);
 
-      // Initialize with first available options for each category
-      if (selectMapCategory.value === 'Ag' && window.map_GHG_Ag) {
-        const ghgSourceOptions = Object.keys(window.map_GHG_Ag);
-        if (ghgSourceOptions.length > 0 && !ghgSourceOptions.includes(selectMapGHGSource.value)) {
-          selectMapGHGSource.value = ghgSourceOptions[0];
-        }
+      // Load initial data for the default category
+      loadDataForCategory(selectMapCategory.value);
 
-        // Set landuse to first available for the current GHG source
-        const ghgData = window.map_GHG_Ag[selectMapGHGSource.value];
-        if (ghgData) {
-          const landuseOptions = Object.keys(ghgData);
-          if (landuseOptions.length > 0 && !landuseOptions.includes(selectMapLanduse.value)) {
-            selectMapLanduse.value = landuseOptions[0];
-          }
-
-          // Set water to first available for current GHG source and landuse
-          const waterData = ghgData[selectMapLanduse.value];
-          if (waterData) {
-            const waterOptions = Object.keys(waterData);
-            if (waterOptions.length > 0 && !waterOptions.includes(selectMapWater.value)) {
-              selectMapWater.value = waterOptions[0];
-            }
-          }
-        }
-      } else if (selectMapCategory.value === 'Ag Mgt' && window.map_GHG_Am) {
-        const agMgtOptions = Object.keys(window.map_GHG_Am);
-        if (agMgtOptions.length > 0 && !agMgtOptions.includes(selectMapAgMgt.value)) {
-          selectMapAgMgt.value = agMgtOptions[0];
-        }
-
-        // Set landuse to first available for the current Ag Mgt
-        const amData = window.map_GHG_Am[selectMapAgMgt.value];
-        if (amData) {
-          const landuseOptions = Object.keys(amData);
-          if (landuseOptions.length > 0 && !landuseOptions.includes(selectMapLanduse.value)) {
-            selectMapLanduse.value = landuseOptions[0];
-          }
-
-          // Set water to first available for current Ag Mgt and landuse
-          const waterData = amData[selectMapLanduse.value];
-          if (waterData) {
-            const waterOptions = Object.keys(waterData);
-            if (waterOptions.length > 0 && !waterOptions.includes(selectMapWater.value)) {
-              selectMapWater.value = waterOptions[0];
-            }
-          }
-        }
-      } else if (selectMapCategory.value === 'Non-Ag' && window.map_GHG_NonAg) {
-        const landuseOptions = Object.keys(window.map_GHG_NonAg);
-        if (landuseOptions.length > 0 && !landuseOptions.includes(selectMapLanduse.value)) {
-          selectMapLanduse.value = landuseOptions[0];
-        }
-      }
+      // Update chart and map after initial data load
+      updateChartSeries();
+      updateMapOverlay();
 
       // Use nextTick to ensure the data is processed before rendering the UI components
       nextTick(() => {
-        // Set dataLoaded to true after all data has been processed and the DOM has updated
-        nextTick(() => {
-          isUpdating.value = true; // Prevent watch triggers during initial setup
-
-          dataLoaded.value = true;
-
-          // Update chart and map after initial data load
-          try {
-            updateChartSeries();
-            updateMapOverlay();
-          } catch (error) {
-            console.error('Error during initial data setup:', error);
-          }
-
-          isUpdating.value = false; // Allow normal watch operations
-        });
+        dataLoaded.value = true;
       });
+    });
 
+    // Watch for category changes to reload data
+    watch(selectMapCategory, (newCategory) => {
+      loadDataForCategory(newCategory);
+    });
 
+    // Watch for changes to validate selections using DataConstructor
+    watch([selectMapCategory, selectMapGHGSource, selectMapAgMgt, selectMapWater, selectMapLanduse, selectYear], () => {
+      // Reset values if they're no longer valid options using DataConstructor
+      if (selectMapCategory.value === 'Ag') {
+        const validGHGSourceOptions = dataConstructor.getAvailableKeysAtNextLevel({});
+        if (validGHGSourceOptions.length > 0 && !validGHGSourceOptions.includes(selectMapGHGSource.value)) {
+          selectMapGHGSource.value = validGHGSourceOptions[0];
+        }
+      }
+
+      if (selectMapCategory.value === 'Ag Mgt') {
+        const validAgMgtOptions = dataConstructor.getAvailableKeysAtNextLevel({});
+        if (validAgMgtOptions.length > 0 && !validAgMgtOptions.includes(selectMapAgMgt.value)) {
+          selectMapAgMgt.value = validAgMgtOptions[0];
+        }
+      }
+
+      // Validate landuse options
+      const landuseFixedLevels = {};
+      if (selectMapCategory.value === 'Ag' && selectMapGHGSource.value) {
+        landuseFixedLevels.level_1 = selectMapGHGSource.value;
+      } else if (selectMapCategory.value === 'Ag Mgt' && selectMapAgMgt.value) {
+        landuseFixedLevels.level_1 = selectMapAgMgt.value;
+      }
+      const validLanduseOptions = dataConstructor.getAvailableKeysAtNextLevel(landuseFixedLevels);
+      if (validLanduseOptions.length > 0 && !validLanduseOptions.includes(selectMapLanduse.value)) {
+        selectMapLanduse.value = validLanduseOptions[0];
+      }
+
+      // Validate water options (only for Ag and Ag Mgt categories)
+      if (selectMapCategory.value !== 'Non-Ag') {
+        const waterFixedLevels = {};
+        if (selectMapCategory.value === 'Ag' && selectMapGHGSource.value && selectMapLanduse.value) {
+          waterFixedLevels.level_1 = selectMapGHGSource.value;
+          waterFixedLevels.level_2 = selectMapLanduse.value;
+        } else if (selectMapCategory.value === 'Ag Mgt' && selectMapAgMgt.value && selectMapLanduse.value) {
+          waterFixedLevels.level_1 = selectMapAgMgt.value;
+          waterFixedLevels.level_2 = selectMapLanduse.value;
+        }
+        const validWaterOptions = dataConstructor.getAvailableKeysAtNextLevel(waterFixedLevels);
+        if (validWaterOptions.length > 0 && !validWaterOptions.includes(selectMapWater.value)) {
+          selectMapWater.value = validWaterOptions[0];
+        }
+      }
+
+      // Set map configuration based on category
+      updateMapOverlay();
+    });
+
+    // Refresh chart when category/level/region change
+    watch([selectMapCategory, selectChartLevel, selectRegion], () => {
+      updateChartSeries();
     });
 
     const toggleDrawer = () => {
       isDrawerOpen.value = !isDrawerOpen.value;
     };
-
-    // Watch for drawer opening to update chart
-    watch(isDrawerOpen, (newValue) => {
-      if (isUpdating.value) return; // Prevent updates during state changes
-
-      if (newValue && dataLoaded.value) {
-        // Use nextTick to ensure DOM is updated before chart operations
-        nextTick(() => {
-          try {
-            updateChartSeries();
-          } catch (error) {
-            console.error('Error updating chart when drawer opens:', error);
-          }
-        });
-      }
-    });
-
-    watch([selectMapCategory, selectMapGHGSource, selectMapAgMgt, selectMapWater, selectMapLanduse, selectYear], () => {
-      try {
-        if (isUpdating.value || !dataLoaded.value) return; // Prevent circular updates
-
-        // Use nextTick to ensure all reactive updates are processed
-        nextTick(() => {
-          try {
-            isUpdating.value = true;
-
-            // Reset values if they're no longer valid options based on actual data structure
-            if (selectMapCategory.value === 'Ag' && window.map_GHG_Ag) {
-              const validGHGSourceOptions = Object.keys(window.map_GHG_Ag);
-              if (validGHGSourceOptions.length > 0 && !validGHGSourceOptions.includes(selectMapGHGSource.value)) {
-                selectMapGHGSource.value = validGHGSourceOptions[0];
-              }
-
-              const ghgData = window.map_GHG_Ag[selectMapGHGSource.value];
-              if (ghgData) {
-                const validLanduseOptions = Object.keys(ghgData);
-                if (validLanduseOptions.length > 0 && !validLanduseOptions.includes(selectMapLanduse.value)) {
-                  selectMapLanduse.value = validLanduseOptions[0];
-                }
-
-                const waterData = ghgData[selectMapLanduse.value];
-                if (waterData) {
-                  const validWaterOptions = Object.keys(waterData);
-                  if (validWaterOptions.length > 0 && !validWaterOptions.includes(selectMapWater.value)) {
-                    selectMapWater.value = validWaterOptions[0];
-                  }
-                }
-              }
-            } else if (selectMapCategory.value === 'Ag Mgt' && window.map_GHG_Am) {
-              const validAgMgtOptions = Object.keys(window.map_GHG_Am);
-              if (validAgMgtOptions.length > 0 && !validAgMgtOptions.includes(selectMapAgMgt.value)) {
-                selectMapAgMgt.value = validAgMgtOptions[0];
-              }
-
-              const amData = window.map_GHG_Am[selectMapAgMgt.value];
-              if (amData) {
-                const validLanduseOptions = Object.keys(amData);
-                if (validLanduseOptions.length > 0 && !validLanduseOptions.includes(selectMapLanduse.value)) {
-                  selectMapLanduse.value = validLanduseOptions[0];
-                }
-
-                const waterData = amData[selectMapLanduse.value];
-                if (waterData) {
-                  const validWaterOptions = Object.keys(waterData);
-                  if (validWaterOptions.length > 0 && !validWaterOptions.includes(selectMapWater.value)) {
-                    selectMapWater.value = validWaterOptions[0];
-                  }
-                }
-              }
-            } else if (selectMapCategory.value === 'Non-Ag' && window.map_GHG_NonAg) {
-              const validLanduseOptions = Object.keys(window.map_GHG_NonAg);
-              if (validLanduseOptions.length > 0 && !validLanduseOptions.includes(selectMapLanduse.value)) {
-                selectMapLanduse.value = validLanduseOptions[0];
-              }
-            }
-
-            // Update map configuration
-            updateMapOverlay();
-
-            isUpdating.value = false;
-          } catch (e) {
-            console.warn('Error in nextTick watch function:', e);
-            isUpdating.value = false;
-          }
-        });
-      } catch (e) {
-        console.warn('Error in watch function:', e);
-        isUpdating.value = false;
-      }
-    });
-
-    // Refresh chart when category/level/region change
-    watch([selectMapCategory, selectChartLevel, selectRegion], () => {
-      if (isUpdating.value) return; // Prevent updates during state changes
-      if (dataLoaded.value) {
-        updateChartSeries();
-      }
-    });
 
 
 

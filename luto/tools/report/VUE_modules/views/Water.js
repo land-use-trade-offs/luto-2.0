@@ -12,28 +12,62 @@ window.WaterView = {
     const isDrawerOpen = ref(false);
     const dataLoaded = ref(false);
 
-    // Data|Map service
+    // Data service
     const MapRegister = window.MapService.mapCategories['Water'];     // MapService was registered in the index.html
-    const getMapOptionsForLevel = window.MapService.getMapOptionsForLevel;
+    const dataConstructor = new window.DataConstructor();
 
-    // Chart selection state
-    const selectChartDataset = ref({});
-    const selectChartLevel = ref('Landuse');
-
-    // Map selection state
+    // Map 
     const selectMapCategory = ref('Ag');
     const selectMapAgMgt = ref('Environmental Plantings');
     const selectMapWater = ref('dry');
     const selectMapLanduse = ref('Beef - modified land');
 
-    // Base map selection state
     const mapVarName = ref('');
     const mapVarPath = ref([]);
 
-    // Computed properties using the centralized functions
-    const availableAgMgt = computed(() => window.MapService.getMapOptionsForLevel(MapRegister, 'agMgt', selectMapCategory.value, selectMapAgMgt.value, selectMapLanduse.value));
-    const availableWater = computed(() => window.MapService.getMapOptionsForLevel(MapRegister, 'water', selectMapCategory.value, selectMapAgMgt.value, selectMapLanduse.value));
-    const availableLanduse = computed(() => window.MapService.getMapOptionsForLevel(MapRegister, 'landuse', selectMapCategory.value, selectMapAgMgt.value, selectMapLanduse.value));
+    // Chart
+    const selectChartDataset = ref({});
+    const selectChartLevel = ref('Landuse');
+
+    // Function to load data for current category
+    const loadDataForCategory = (category) => {
+      if (!window[MapRegister[category]['name']]) return;
+      dataConstructor.loadData(window[MapRegister[category]['name']]);
+    };
+
+    // Computed properties using single DataConstructor
+    const availableMapAgMgt = computed(() => {
+      if (selectMapCategory.value !== 'Ag Mgt') return [];
+      return dataConstructor.getAvailableKeysAtNextLevel({});
+    });
+
+    const availableMapWater = computed(() => {
+      // Non-Ag category has no water options
+      if (selectMapCategory.value === 'Non-Ag') {
+        return [];
+      }
+
+      const fixedLevels = {};
+
+      if (selectMapCategory.value === 'Ag Mgt' && selectMapAgMgt.value) {
+        fixedLevels.level_1 = selectMapAgMgt.value;
+        if (selectMapLanduse.value) {
+          fixedLevels.level_2 = selectMapLanduse.value;
+        }
+      } else if (selectMapCategory.value === 'Ag' && selectMapLanduse.value) {
+        fixedLevels.level_1 = selectMapLanduse.value;
+      }
+      return dataConstructor.getAvailableKeysAtNextLevel(fixedLevels);
+    });
+
+    const availableMapLanduse = computed(() => {
+      const fixedLevels = {};
+
+      if (selectMapCategory.value === 'Ag Mgt' && selectMapAgMgt.value) {
+        fixedLevels.level_1 = selectMapAgMgt.value;
+      }
+      return dataConstructor.getAvailableKeysAtNextLevel(fixedLevels);
+    });
 
     const availableChartAg = computed(() => getChartOptionsForLevel('ag'));
     const availableChartAgMgt = computed(() => getChartOptionsForLevel('agMgt'));
@@ -144,6 +178,9 @@ window.WaterView = {
       await loadScript(MapRegister['Ag Mgt']['path'], MapRegister['Ag Mgt']['name']);
       await loadScript(MapRegister['Non-Ag']['path'], MapRegister['Non-Ag']['name']);
 
+      // Load initial data for the default category
+      loadDataForCategory(selectMapCategory.value);
+
       updateChartSeries();
       updateMapOverlay();
       nextTick(() => { dataLoaded.value = true; });
@@ -153,21 +190,43 @@ window.WaterView = {
       isDrawerOpen.value = !isDrawerOpen.value;
     };
 
+    // Watch for category changes to reload data
+    watch(selectMapCategory, (newCategory) => {
+      loadDataForCategory(newCategory);
+    });
+
     watch([selectMapCategory, selectMapAgMgt, selectMapWater, selectMapLanduse, selectYear], () => {
-      // Reset values if they're no longer valid options
+      // Reset values if they're no longer valid options using DataConstructor
       if (selectMapCategory.value === 'Ag Mgt') {
-        const validAgMgtOptions = getMapOptionsForLevel(MapRegister, 'agMgt', selectMapCategory.value, selectMapAgMgt.value, selectMapLanduse.value);
+        const validAgMgtOptions = dataConstructor.getAvailableKeysAtNextLevel({});
         if (validAgMgtOptions.length > 0 && !validAgMgtOptions.includes(selectMapAgMgt.value)) {
           selectMapAgMgt.value = validAgMgtOptions[0];
         }
       }
 
-      const validWaterOptions = getMapOptionsForLevel(MapRegister, 'water', selectMapCategory.value, selectMapAgMgt.value, selectMapLanduse.value);
-      if (validWaterOptions.length > 0 && !validWaterOptions.includes(selectMapWater.value)) {
-        selectMapWater.value = validWaterOptions[0];
+      // Validate water options (only for Ag and Ag Mgt categories)
+      if (selectMapCategory.value !== 'Non-Ag') {
+        const waterFixedLevels = {};
+        if (selectMapCategory.value === 'Ag Mgt' && selectMapAgMgt.value) {
+          waterFixedLevels.level_1 = selectMapAgMgt.value;
+          if (selectMapLanduse.value) {
+            waterFixedLevels.level_2 = selectMapLanduse.value;
+          }
+        } else if (selectMapCategory.value === 'Ag' && selectMapLanduse.value) {
+          waterFixedLevels.level_1 = selectMapLanduse.value;
+        }
+        const validWaterOptions = dataConstructor.getAvailableKeysAtNextLevel(waterFixedLevels);
+        if (validWaterOptions.length > 0 && !validWaterOptions.includes(selectMapWater.value)) {
+          selectMapWater.value = validWaterOptions[0];
+        }
       }
 
-      const validLanduseOptions = getMapOptionsForLevel(MapRegister, 'landuse', selectMapCategory.value, selectMapAgMgt.value, selectMapLanduse.value);
+      // Validate landuse options
+      const landuseFixedLevels = {};
+      if (selectMapCategory.value === 'Ag Mgt' && selectMapAgMgt.value) {
+        landuseFixedLevels.level_1 = selectMapAgMgt.value;
+      }
+      const validLanduseOptions = dataConstructor.getAvailableKeysAtNextLevel(landuseFixedLevels);
       if (validLanduseOptions.length > 0 && !validLanduseOptions.includes(selectMapLanduse.value)) {
         selectMapLanduse.value = validLanduseOptions[0];
       }
@@ -192,9 +251,9 @@ window.WaterView = {
 
       availableYears,
       availableCategories,
-      availableAgMgt,
-      availableWater,
-      availableLanduse,
+      availableMapAgMgt,
+      availableMapWater,
+      availableMapLanduse,
 
       availableChartAg,
       availableChartAgMgt,
@@ -266,9 +325,9 @@ window.WaterView = {
 
         <!-- Ag Mgt options (only for Ag Mgt category when drawer is closed) -->
         <div class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="!isDrawerOpen && availableAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+          <div v-if="!isDrawerOpen && availableMapAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
             <span class="text-[0.8rem] mr-1 font-medium">Ag Mgt:</span>
-            <button v-for="(val, key) in availableAgMgt" :key="key"
+            <button v-for="(val, key) in availableMapAgMgt" :key="key"
               @click="selectMapAgMgt = val"
               class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
               :class="{'bg-sky-500 text-white': selectMapAgMgt === val}">
@@ -288,9 +347,9 @@ window.WaterView = {
 
         <!-- Water options -->
         <div class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="dataLoaded && !isDrawerOpen && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+          <div v-if="dataLoaded && !isDrawerOpen && availableMapWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
             <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
-            <button v-for="(val, key) in availableWater" :key="key"
+            <button v-for="(val, key) in availableMapWater" :key="key"
               @click="selectMapWater = val"
               class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
               :class="{'bg-sky-500 text-white': selectMapWater === val}">
@@ -310,9 +369,9 @@ window.WaterView = {
 
         <!-- Landuse options -->
         <div class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="dataLoaded && !isDrawerOpen && availableLanduse.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+          <div v-if="dataLoaded && !isDrawerOpen && availableMapLanduse.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
             <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
-            <button v-for="(val, key) in availableLanduse" :key="key"
+            <button v-for="(val, key) in availableMapLanduse" :key="key"
               @click="selectMapLanduse = val"
               class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
               :class="{'bg-sky-500 text-white': selectMapLanduse === val}">

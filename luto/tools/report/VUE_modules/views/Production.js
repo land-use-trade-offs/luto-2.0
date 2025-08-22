@@ -22,6 +22,7 @@ window.ProductionView = {
 
     // Data|Map service
     const MapRegister = window.MapService.mapCategories['Production'];     // MapService was registered in the index.html
+    const dataConstructor = new window.DataConstructor();
 
     // Map selection state
     const selectMapCategory = ref('Ag');
@@ -31,42 +32,25 @@ window.ProductionView = {
     // Chart selection state
     const selectChartLevel = ref('Agricultural');
 
+    // Function to load data for current category
+    const loadDataForCategory = (category) => {
+      if (!window[MapRegister[category]['name']]) return;
+      dataConstructor.loadData(window[MapRegister[category]['name']]);
+    };
 
-    // Computed properties using the centralized functions
+    // Computed properties using DataConstructor
     const availableMapCommodities = computed(() => {
-      try {
-        if (selectMapCategory.value === 'Ag') {
-          const DataObj = window[MapRegister['Ag']['name']];
-          return Object.keys(DataObj || {});
-        }
-        else if (selectMapCategory.value === 'Ag Mgt') {
-          const DataObj = window[MapRegister['Ag Mgt']['name']];
-          return Object.keys(DataObj || {});
-        }
-        else if (selectMapCategory.value === 'Non-Ag') {
-          const DataObj = window[MapRegister['Non-Ag']['name']];
-          return Object.keys(DataObj || {});
-        }
-        return [];
-      } catch (error) {
-        console.warn('Error getting available map commodities:', error);
-        return [];
-      }
+      return dataConstructor.getAvailableKeysAtNextLevel({});
     });
 
     const availableMapAgMgt = computed(() => {
-      if (selectMapCategory.value === 'Ag Mgt') {
-        const agMgtData = window[MapRegister['Ag Mgt']['name']];
-        if (!agMgtData) return [];
+      if (selectMapCategory.value !== 'Ag Mgt') return [];
 
-        // Use the currently selected commodity to get Ag Mgt options
-        const currentCommodity = selectMapCommodity.value;
-        if (!currentCommodity || !agMgtData[currentCommodity]) return [];
-
-        const DataObj = agMgtData[currentCommodity];
-        return Object.keys(DataObj || {});
+      const fixedLevels = {};
+      if (selectMapCommodity.value) {
+        fixedLevels.level_1 = selectMapCommodity.value;
       }
-      return [];
+      return dataConstructor.getAvailableKeysAtNextLevel(fixedLevels);
     });
 
     const availableChartAg = computed(() => getChartOptionsForLevel('ag'));
@@ -139,10 +123,46 @@ window.ProductionView = {
       availableYears.value = window.Supporting_info.years;
       availableCategories.value = Object.keys(window.MapService.mapCategories['Production']);
 
-      nextTick(() => { dataLoaded.value = true; });
+      // Load initial data for the default category
+      loadDataForCategory(selectMapCategory.value);
+
       updateMapOverlay();
       updateChartSeries();
 
+      nextTick(() => { dataLoaded.value = true; });
+    });
+
+    // Watch for category changes to reload data
+    watch(selectMapCategory, (newCategory) => {
+      loadDataForCategory(newCategory);
+    });
+
+    // Watch for changes to validate selections using DataConstructor
+    watch([selectMapCategory, selectMapCommodity, selectMapAgMgt, selectYear], () => {
+      // Reset values if they're no longer valid options using DataConstructor
+      const validCommodityOptions = dataConstructor.getAvailableKeysAtNextLevel({});
+      if (validCommodityOptions.length > 0 && !validCommodityOptions.includes(selectMapCommodity.value)) {
+        selectMapCommodity.value = validCommodityOptions[0];
+      }
+
+      if (selectMapCategory.value === 'Ag Mgt') {
+        const agMgtFixedLevels = {};
+        if (selectMapCommodity.value) {
+          agMgtFixedLevels.level_1 = selectMapCommodity.value;
+        }
+        const validAgMgtOptions = dataConstructor.getAvailableKeysAtNextLevel(agMgtFixedLevels);
+        if (validAgMgtOptions.length > 0 && !validAgMgtOptions.includes(selectMapAgMgt.value)) {
+          selectMapAgMgt.value = validAgMgtOptions[0];
+        }
+      }
+
+      // Set map configuration based on category
+      updateMapOverlay();
+    });
+
+    // Refresh chart when category/level/region change
+    watch([selectMapCategory, selectChartLevel, selectRegion], () => {
+      updateChartSeries();
     });
 
     const toggleDrawer = () => {
@@ -175,52 +195,6 @@ window.ProductionView = {
         mapVarPath.value = [selectMapCommodity.value, selectYear.value] || [];
       }
     };
-
-    watch(selectMapCategory, () => {
-      nextTick(() => {
-        // Update commodity to the first available for the new category
-        const availableCommodities = availableMapCommodities.value;
-        if (availableCommodities.length > 0) {
-          selectMapCommodity.value = availableCommodities[0];
-        }
-
-        // Update Ag Mgt selection if needed
-        if (selectMapCategory.value === 'Ag Mgt') {
-          const availableAgMgt = availableMapAgMgt.value;
-          if (availableAgMgt.length > 0) {
-            selectMapAgMgt.value = availableAgMgt[0];
-          }
-        }
-
-        // Update map and chart
-        updateMapOverlay();
-        updateChartSeries();
-      });
-    });
-
-    // Watch for commodity changes in Ag Mgt category to update available Ag Mgt options
-    watch(selectMapCommodity, () => {
-      if (selectMapCategory.value === 'Ag Mgt') {
-        nextTick(() => {
-          const availableAgMgt = availableMapAgMgt.value;
-          if (availableAgMgt.length > 0) {
-            // Always set to the first available option for the new commodity
-            selectMapAgMgt.value = availableAgMgt[0];
-          }
-        });
-      }
-    });
-
-    // Refresh chart when chart level or region change (but not category, as that's handled above)
-    watch([selectChartLevel, selectRegion], () => {
-      updateMapOverlay();
-      updateChartSeries();
-    });
-
-    // Watch for commodity and AgMgt changes to update map
-    watch([selectMapCommodity, selectMapAgMgt, selectYear], () => {
-      updateMapOverlay();
-    });
 
     return {
       yearIndex,

@@ -21,8 +21,8 @@ window.AreaView = {
     const mapVarPath = ref([]);
 
     // Data|Map service
+    const dataConstructor = new window.DataConstructor();
     const MapRegister = window.MapService.mapCategories['Area'];     // MapService was registered in the index.html
-    const getMapOptionsForLevel = window.MapService.getMapOptionsForLevel;
 
     // Map selection state
     const selectMapCategory = ref('Ag');
@@ -103,10 +103,45 @@ window.AreaView = {
       }
     };
 
-    // Computed properties using the centralized functions
-    const availableMapAgMgt = computed(() => getMapOptionsForLevel(MapRegister, 'agMgt', selectMapCategory.value, selectMapAgMgt.value, selectMapLanduse.value));
-    const availableMapWater = computed(() => getMapOptionsForLevel(MapRegister, 'water', selectMapCategory.value, selectMapAgMgt.value, selectMapLanduse.value));
-    const availableMapLanduse = computed(() => getMapOptionsForLevel(MapRegister, 'landuse', selectMapCategory.value, selectMapAgMgt.value, selectMapLanduse.value));
+    // Function to load data for current category
+    const loadDataForCategory = (category) => {
+      if (!window[MapRegister[category]['name']]) return;
+      dataConstructor.loadData(window[MapRegister[category]['name']]);
+    };
+
+    // Computed properties using DataConstructor
+    const availableMapAgMgt = computed(() => {
+      if (selectMapCategory.value !== 'Ag Mgt') return [];
+      return dataConstructor.getAvailableKeysAtNextLevel({});
+    });
+
+    const availableMapWater = computed(() => {
+      // Non-Ag category has no water options
+      if (selectMapCategory.value === 'Non-Ag') {
+        return [];
+      }
+
+      const fixedLevels = {};
+
+      if (selectMapCategory.value === 'Ag Mgt' && selectMapAgMgt.value) {
+        fixedLevels.level_1 = selectMapAgMgt.value;
+        if (selectMapLanduse.value) {
+          fixedLevels.level_2 = selectMapLanduse.value;
+        }
+      } else if (selectMapCategory.value === 'Ag' && selectMapLanduse.value) {
+        fixedLevels.level_1 = selectMapLanduse.value;
+      }
+      return dataConstructor.getAvailableKeysAtNextLevel(fixedLevels);
+    });
+
+    const availableMapLanduse = computed(() => {
+      const fixedLevels = {};
+
+      if (selectMapCategory.value === 'Ag Mgt' && selectMapAgMgt.value) {
+        fixedLevels.level_1 = selectMapAgMgt.value;
+      }
+      return dataConstructor.getAvailableKeysAtNextLevel(fixedLevels);
+    });
 
     const availableChartAg = computed(() => getChartOptionsForLevel('ag'));
     const availableChartAgMgt = computed(() => getChartOptionsForLevel('agMgt'));
@@ -124,6 +159,9 @@ window.AreaView = {
       await loadScript(MapRegister['Ag']['path'], MapRegister['Ag']['name']);
       await loadScript(MapRegister['Ag Mgt']['path'], MapRegister['Ag Mgt']['name']);
       await loadScript(MapRegister['Non-Ag']['path'], MapRegister['Non-Ag']['name']);
+
+      // Load initial data for the default category
+      loadDataForCategory(selectMapCategory.value);
 
       // Chart data
       await loadScript("./data/Area_Ag_1_Land-use.js", 'Area_Ag_1_Land-use');
@@ -152,6 +190,11 @@ window.AreaView = {
     const toggleDrawer = () => {
       isDrawerOpen.value = !isDrawerOpen.value;
     };
+
+    // Watch for category changes to reload data
+    watch(selectMapCategory, (newCategory) => {
+      loadDataForCategory(newCategory);
+    });
 
     watch([selectRegion, selectMapCategory, selectMapAgMgt, selectMapWater, selectMapLanduse, selectYear], () => {
       // Reset values if they're no longer valid options

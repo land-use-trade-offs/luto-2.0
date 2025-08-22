@@ -48,42 +48,6 @@ window.MapService = {
       'Ag Mgt': { 'path': 'data/map_layers/map_water_yield_Am.js', 'name': 'map_water_yield_Am' },
       'Non-Ag': { 'path': 'data/map_layers/map_water_yield_NonAg.js', 'name': 'map_water_yield_NonAg' },
     }
-  },
-
-  getMapOptionsForLevel: (mapReg = {}, level = '', selCat, selAgMgt, selLanduse) => {
-
-    const DataObj = window[mapReg[selCat]['name']];
-
-    if (level === 'agMgt') {
-      // Only return agMgt options if the category is 'Ag Mgt'
-      if (selCat === 'Ag Mgt') {
-        return Object.keys(DataObj || {});
-      } else {
-        return []; // No agMgt options for other categories
-      }
-    }
-
-    if (level === 'water') {
-      if (selCat === 'Ag') {
-        return Object.keys(DataObj[selLanduse] || {});
-      } else if (selCat === 'Ag Mgt') {
-        return Object.keys(DataObj[selAgMgt, selLanduse] || {});
-      } else if (selCat === 'Non-Ag') {
-        return [];
-      }
-    }
-
-    if (level === 'landuse') {
-      if (selCat === 'Ag') {
-        return Object.keys(DataObj || {});
-      } else if (selCat === 'Ag Mgt') {
-        return Object.keys(DataObj[selAgMgt] || {});
-      } else if (selCat === 'Non-Ag') {
-        return Object.keys(DataObj || {});
-      }
-    }
-
-    return [];
   }
 }
 
