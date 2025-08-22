@@ -20,11 +20,9 @@
 import os
 import json
 import re
-import shutil
 import pandas as pd
 import numpy as np
 from luto import settings
-from joblib import Parallel, delayed
 
 from luto.economics.off_land_commodity import get_demand_df
 from luto.tools.report.data_tools import get_all_files
@@ -767,7 +765,7 @@ def save_report_data(raw_data_dir:str):
     quantity_diff_AUS = quantity_diff[mask_AUS].copy()
     quantity_diff_wide_AUS = quantity_diff_AUS\
         .groupby(['Commodity'])[['Year','Demand Achievement (%)']]\
-        .apply(lambda x: list(map(list,zip(x['Year'],x['Demand Achievement (%)']))))\
+        .apply(lambda x: list(map(list,zip(x['Year'], x['Demand Achievement (%)']))))\
         .reset_index()
         
     quantity_diff_wide_AUS['type'] = 'line'

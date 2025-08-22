@@ -40,7 +40,24 @@ window.ProductionView = {
 
     // Computed properties using DataConstructor
     const availableMapCommodities = computed(() => {
-      return dataConstructor.getAvailableKeysAtNextLevel({});
+      // Load and return commodities specific to the current category
+      if (selectMapCategory.value === 'Ag') {
+        if (window[MapRegister['Ag']['name']]) {
+          dataConstructor.loadData(window[MapRegister['Ag']['name']]);
+          return dataConstructor.getAvailableKeysAtNextLevel({});
+        }
+      } else if (selectMapCategory.value === 'Ag Mgt') {
+        if (window[MapRegister['Ag Mgt']['name']]) {
+          dataConstructor.loadData(window[MapRegister['Ag Mgt']['name']]);
+          return dataConstructor.getAvailableKeysAtNextLevel({});
+        }
+      } else if (selectMapCategory.value === 'Non-Ag') {
+        if (window[MapRegister['Non-Ag']['name']]) {
+          dataConstructor.loadData(window[MapRegister['Non-Ag']['name']]);
+          return dataConstructor.getAvailableKeysAtNextLevel({});
+        }
+      }
+      return [];
     });
 
     const availableMapAgMgt = computed(() => {

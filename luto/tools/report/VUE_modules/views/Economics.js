@@ -43,6 +43,16 @@ window.EconomicsView = {
     // Computed properties using DataConstructor
     const availableMapAgMgt = computed(() => {
       if (selectMapCategory.value !== 'Ag Mgt') return [];
+
+      // Load the correct dataset based on current economics type
+      const mapDataKey = MapRegister[selectMapEconomicsType.value]?.['Ag Mgt']?.['name'];
+      if (!mapDataKey || !window[mapDataKey]) {
+        return [];
+      }
+
+      // Load the specific data for current economics type and Ag Mgt category
+      dataConstructor.loadData(window[mapDataKey]);
+
       return dataConstructor.getAvailableKeysAtNextLevel({});
     });
 
@@ -51,6 +61,15 @@ window.EconomicsView = {
       if (selectMapCategory.value === 'Non-Ag') {
         return [];
       }
+
+      // Load the correct dataset based on current category and economics type
+      const mapDataKey = MapRegister[selectMapEconomicsType.value]?.[selectMapCategory.value]?.['name'];
+      if (!mapDataKey || !window[mapDataKey]) {
+        return [];
+      }
+
+      // Load the specific data for current category and economics type
+      dataConstructor.loadData(window[mapDataKey]);
 
       const fixedLevels = {};
 
@@ -84,6 +103,15 @@ window.EconomicsView = {
     });
 
     const availableMapLanduse = computed(() => {
+      // Load the correct dataset based on current category and economics type
+      const mapDataKey = MapRegister[selectMapEconomicsType.value]?.[selectMapCategory.value]?.['name'];
+      if (!mapDataKey || !window[mapDataKey]) {
+        return [];
+      }
+
+      // Load the specific data for current category and economics type
+      dataConstructor.loadData(window[mapDataKey]);
+
       const fixedLevels = {};
 
       if (selectMapCategory.value === 'Ag') {
@@ -107,6 +135,9 @@ window.EconomicsView = {
         if (selectMapAgMgt.value) {
           fixedLevels.level_1 = selectMapAgMgt.value;
         }
+      } else if (selectMapCategory.value === 'Non-Ag') {
+        // For Non-Ag: landuse is the first level, no fixed levels needed
+        // The dataConstructor should return available landuse options directly
       }
 
       return dataConstructor.getAvailableKeysAtNextLevel(fixedLevels);
@@ -114,11 +145,22 @@ window.EconomicsView = {
 
     // Cost/Revenue Type options (different for each economics type and category)
     const availableCostRevenueType = computed(() => {
+      // Only show Cost/Revenue Type options for 'Ag' category
       if (selectMapCategory.value !== 'Ag') return [];
-      return dataConstructor.getAvailableKeysAtNextLevel({});
-    });
 
-    onMounted(async () => {
+      // Load the correct dataset based on current economics type
+      const mapDataKey = MapRegister[selectMapEconomicsType.value]?.['Ag']?.['name'];
+      if (!mapDataKey || !window[mapDataKey]) {
+        return [];
+      }
+
+      // Load the specific data for current economics type and Ag category
+      dataConstructor.loadData(window[mapDataKey]);
+
+      // Get available options at the first level for the current category and economics type
+      const availableOptions = dataConstructor.getAvailableKeysAtNextLevel({});
+      return availableOptions || [];
+    }); onMounted(async () => {
       await loadScript("./data/Supporting_info.js", 'Supporting_info');
       await loadScript("./data/chart_option/Chart_default_options.js", 'Chart_default_options');
 
@@ -169,11 +211,11 @@ window.EconomicsView = {
     // Watch for category and economics type changes to reload data
     watch([selectMapCategory, selectMapEconomicsType], ([newCategory, newEconomicsType]) => {
       loadDataForCategory(newCategory, newEconomicsType);
-    });
-
-    // Watch for changes to validate selections using DataConstructor
+    });    // Watch for changes to validate selections using DataConstructor
     watch([selectMapCategory, selectMapEconomicsType, selectMapAgMgt, selectMapCostRevenueType, selectMapWater, selectMapLanduse, selectYear], () => {
       // Reset values if they're no longer valid options using DataConstructor
+
+      // Handle Ag Mgt category
       if (selectMapCategory.value === 'Ag Mgt') {
         const validAgMgtOptions = dataConstructor.getAvailableKeysAtNextLevel({});
         if (validAgMgtOptions.length > 0 && !validAgMgtOptions.includes(selectMapAgMgt.value)) {
@@ -181,10 +223,17 @@ window.EconomicsView = {
         }
       }
 
+      // Handle Ag category - validate Cost/Revenue Type
       if (selectMapCategory.value === 'Ag') {
         const validCostRevenueTypeOptions = dataConstructor.getAvailableKeysAtNextLevel({});
         if (validCostRevenueTypeOptions.length > 0 && !validCostRevenueTypeOptions.includes(selectMapCostRevenueType.value)) {
           selectMapCostRevenueType.value = validCostRevenueTypeOptions[0];
+        }
+      } else {
+        // Reset Cost/Revenue Type when not in Ag category
+        const firstLevelOptions = dataConstructor.getAvailableKeysAtNextLevel({});
+        if (firstLevelOptions.length > 0) {
+          selectMapCostRevenueType.value = firstLevelOptions[0];
         }
       }
 
@@ -221,7 +270,8 @@ window.EconomicsView = {
         }
       } else if (selectMapCategory.value === 'Ag Mgt' && selectMapAgMgt.value) {
         landuseFixedLevels.level_1 = selectMapAgMgt.value;
-      }
+      } // For Non-Ag, no fixed levels needed - landuse is the first level
+
       const validLanduseOptions = dataConstructor.getAvailableKeysAtNextLevel(landuseFixedLevels);
       if (validLanduseOptions.length > 0 && !validLanduseOptions.includes(selectMapLanduse.value)) {
         selectMapLanduse.value = validLanduseOptions[0];
