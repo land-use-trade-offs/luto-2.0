@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250807_RES1_HIGH_HIGH' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250825_RES3_HIGH_HIGH' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -35,20 +35,20 @@ grid_search = {
     ###############################################################
     # Task run settings for submitting the job to the cluster
     ###############################################################
-    'MEM': ['1020GB'],
-    'NCPUS':[28],
+    'MEM': ['96GB'],
+    'NCPUS':[24],
     'TIME': ['24:00:00'],
-    'QUEUE': ['hugemembw'],  # normalsr for CPU, hugemembw for memory intensive jobs
+    'QUEUE': ['normalsr'],                                              # normalsr for CPU, hugemembw for memory intensive jobs
     
  
     ###############################################################
     # Working settings for the model run
     ###############################################################
     'OBJECTIVE': ['maxprofit'],                                         # 'maxprofit' or 'mincost'
-    'RESFACTOR': [1],
-    'SIM_YEARS': [[2050]],                            # Years to run the model 
+    'RESFACTOR': [3],
+    'SIM_YEARS': [range(2020, 2050, 10)],                               # Years to run the model 
     'WRITE_THREADS': [2],
-    'WRITE_OUTPUT_GEOTIFFS': [False],                     # True or False, if True will write geotiffs for the output
+    'WRITE_OUTPUT_GEOTIFFS': [False],                                   # True or False, if True will write geotiffs for the output
     
  
     ###############################################################
@@ -72,13 +72,14 @@ grid_search = {
        
     
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['high'],                                 # 'off', 'low', 'medium', 'high'
+    'GHG_EMISSIONS_LIMITS': ['high'],                                   # 'off', 'low', 'medium', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
     'GHG_CONSTRAINT_TYPE': ['hard'],                                    # 'hard' or 'soft'
     'USE_GHG_SCOPE_1': [True],                                          # True or False
 
     
     # --------------- Water constraints ---------------
+    'WATER_REGION_DEF':['Drainage Division', 'River Region'],           # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
     'WATER_LIMITS': ['on'],                                             # 'on' or 'off'
     'WATER_CONSTRAINT_TYPE': ['hard'],                                  # 'hard' or 'soft'
     'WATER_PENALTY': [1e-5],
@@ -87,10 +88,10 @@ grid_search = {
     # --------------- Biodiversity overall ---------------
     'HABITAT_CONDITION': ['USER_DEFINED'],                              # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
     'CONNECTIVITY_SOURCE': ['NCI'],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],  # Percentage of degraded areas to cut in GBF2 priority areas
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],                # Percentage of degraded areas to cut in GBF2 priority areas
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSITY_TARGET_GBF_2': ['high'],                     # 'off', 'low', 'medium', 'high'
+    'BIODIVERSITY_TARGET_GBF_2': ['high'],                              # 'off', 'low', 'medium', 'high'
     'GBF2_CONSTRAINT_TYPE': ['hard'],                                   # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
