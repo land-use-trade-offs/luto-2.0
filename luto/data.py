@@ -930,10 +930,7 @@ class Data:
         self.water_yield_regions_BASE_YR = None
         
         # Water yield targets for each region
-        self.WATER_YIELD_TARGETS = ag_water.get_water_target_inside_LUTO_by_CCI(self)
-
-
-
+        self.WATER_YIELD_TARGETS, self.WATER_RELAXED_REGION_RAW_TARGETS = ag_water.get_water_target_inside_LUTO_by_CCI(self)
 
         ###############################################################
         # Carbon sequestration by natural lands.

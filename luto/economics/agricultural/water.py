@@ -528,6 +528,7 @@ def get_water_target_inside_LUTO_by_CCI(data):
     
     # Get inside LUTO targets based on historical level
     wny_inside_LUTO_targets = {}
+    wny_relaxed_region_raw_targets = {}
     for reg_idx, hist_level in data.WATER_REGION_HIST_LEVEL.items():
         wny_inside_LUTO = wny_base_yr_inside_LUTO[reg_idx]
         wny_outside_LUTO = wny_base_yr_outside_LUTO[reg_idx]
@@ -542,12 +543,11 @@ def get_water_target_inside_LUTO_by_CCI(data):
                 f"       target ({settings.WATER_REGION_DEF}) relaxed to ({wny_extreme_CCI:10,.0f} ML) from ({wny_hist_target:10,.0f} ML) for {data.WATER_REGION_NAMES[reg_idx]}."
             )
             wny_inside_LUTO_targets[reg_idx] = wny_extreme_CCI - wny_outside_LUTO
+            wny_relaxed_region_raw_targets[reg_idx] = wny_hist_target
         else:
             wny_inside_LUTO_targets[reg_idx] = wny_hist_target - wny_outside_LUTO
 
-
-    return wny_inside_LUTO_targets
-
+    return wny_inside_LUTO_targets, wny_relaxed_region_raw_targets
 
 
 """

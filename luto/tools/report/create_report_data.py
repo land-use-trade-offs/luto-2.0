@@ -2038,7 +2038,7 @@ def save_report_data(raw_data_dir:str):
 
     hist_and_public_wny_water_region = water_files.query('base_name == "water_yield_limits_and_public_land"')
     hist_and_public_wny_water_region = pd.concat([pd.read_csv(path) for path in hist_and_public_wny_water_region['path']], ignore_index=True)
- 
+
     water_outside_LUTO = hist_and_public_wny_water_region[['Year','Region', 'Water yield outside LUTO (ML)']].rename(
         columns={'Water yield outside LUTO (ML)': 'Value (ML)'}
     )
@@ -2055,6 +2055,11 @@ def save_report_data(raw_data_dir:str):
     water_net_yield = hist_and_public_wny_water_region[['Year','Region', 'Water Net Yield (ML)']].rename(
         columns={'Water Net Yield (ML)': 'Value (ML)'}
     )
+    
+
+    water_targets_before_relaxation = water_files.query('base_name == "water_yield_relaxed_region_raw"')
+    water_targets_before_relaxation = pd.concat([pd.read_csv(path) for path in water_targets_before_relaxation['path']], ignore_index=True)
+
 
 
     # -------------------- Water yield overview for Australia --------------------
@@ -2159,15 +2164,21 @@ def save_report_data(raw_data_dir:str):
         water_limit = water_yield_limit.query('Region == @reg_name').copy()
         water_limit_wide = water_limit[['Year','Value (ML)']].values.tolist()
 
-
         water_df = pd.DataFrame([
-            ['Water Yield Inside LUTO Study Area', water_inside_yield_wide, 'column', None],
-            ['Water Yield Outside LUTO Study Area', water_outside_yield_wide, 'column', None],
-            ['Climate Change Impact', water_CCI_wide, 'column', None],
-            ['Domestic Water Use', water_domestic_wide, 'column', None],
-            ['Water Net Yield', water_net_yield_sum_wide, 'line', None],
-            ['Water Limit', water_limit_wide, 'line', 'black']],  columns=['name','data','type','color']
+            ['Water Yield Inside LUTO Study Area', water_inside_yield_wide, 'column', None, None],
+            ['Water Yield Outside LUTO Study Area', water_outside_yield_wide, 'column', None, None],
+            ['Climate Change Impact', water_CCI_wide, 'column', None, None],
+            ['Domestic Water Use', water_domestic_wide, 'column', None, None],
+            ['Water Net Yield', water_net_yield_sum_wide, 'line', None, None],
+            ['Water Limit (model)', water_limit_wide, 'line', 'black', None],
+        ],
+            columns=['name','data','type','color','dashStyle']
         )
+        
+        # Add historical water limit if it exists for this region
+        if reg_name in water_targets_before_relaxation['Region Name'].values:
+            raw_targets = water_targets_before_relaxation.query('`Region Name` == @reg_name')[['Year','Target']].values.tolist()
+            water_df.loc[len(water_df)] = ['Water Limit (historical level)', raw_targets, 'line', '#2176cc', 'Dash']
 
         water_yield_region[reg_name] = water_df.to_dict(orient='records')
 
