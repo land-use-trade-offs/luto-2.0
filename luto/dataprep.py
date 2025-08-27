@@ -104,7 +104,6 @@ def create_new_dataset():
 
 
     # Copy data straight to LUTO input folder, no processing required
-
     shutil.copyfile(fdh_inpath + 'yieldincreases-bau2022.csv', outpath + 'yieldincreases_bau2022.csv')
     shutil.copyfile(nlum_inpath + 'NLUM_2010-11_mask.tif', outpath + 'NLUM_2010-11_mask.tif')
     shutil.copyfile(nlum_inpath + 'ag_landuses.csv', outpath + 'ag_landuses.csv')
@@ -282,8 +281,7 @@ def create_new_dataset():
     ag_landuses = pd.read_csv(outpath + 'ag_landuses.csv', header = None)[0].to_list()
 
     # Create a non-agricultural landuses file
-    # Do not sort the whole list alphabetically when adding new landuses to the model.
-    non_ag_landuses = ['Environmental Plantings', 'Riparian Plantings', 'Agroforestry', 'Carbon Plantings (Block)', 'Carbon Plantings (Belt)', 'BECCS']
+    non_ag_landuses = list(settings.NON_AG_LAND_USES.keys())
 
 
     ############### Create lumap -- 2010 land-use mapping.
