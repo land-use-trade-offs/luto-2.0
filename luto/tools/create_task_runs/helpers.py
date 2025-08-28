@@ -83,7 +83,7 @@ def get_grid_search_param_df(task_root_dir:str, grid_dict:dict) -> None:
     print(f'Grid search template has been created with {len(permutations_df)} permutations!')
     for k, v in grid_dict.items():
         if len(v) > 1:
-            print(f'    {k:<30} : {len(v)} values')
+            print(f'    {k:<50} : {len(v)} values')
     
     return permutations_df
     
