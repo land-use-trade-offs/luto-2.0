@@ -491,16 +491,22 @@ class Data:
 
         
         ##################### Regional adoption zones
-        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
             self.REGIONAL_ADOPTION_ZONES = None
             self.REGIONAL_ADOPTION_TARGETS = None
         else:
             self.REGIONAL_ADOPTION_ZONES = pd.read_hdf(
                 os.path.join(settings.INPUT_DIR, "regional_adoption_zones.h5"), where=self.MASK
             )[settings.REGIONAL_ADOPTION_ZONE].to_numpy()
-        
+
             regional_adoption_targets = pd.read_excel(os.path.join(settings.INPUT_DIR, "regional_adoption_zones.xlsx"), sheet_name=settings.REGIONAL_ADOPTION_ZONE)
-            
+
+            if (settings.REGIONAL_ADOPTION_CONSTRAINTS == 'NON_AG_UNIFORM') and (settings.REGIONAL_ADOPTION_NON_AG_UNIFORM is not None):
+                regional_adoption_targets.loc[
+                    regional_adoption_targets['TARGET_LANDUSE'].isin(settings.NON_AG_LAND_USES.keys()),
+                    ['ADOPTION_PERCENTAGE_2030', 'ADOPTION_PERCENTAGE_2050', 'ADOPTION_PERCENTAGE_2100']
+                ] = settings.REGIONAL_ADOPTION_NON_AG_UNIFORM
+
             self.REGIONAL_ADOPTION_TARGETS = regional_adoption_targets.iloc[
                 [idx for idx, row in regional_adoption_targets.iterrows() if
                     all([row['ADOPTION_PERCENTAGE_2030']>=0, 
