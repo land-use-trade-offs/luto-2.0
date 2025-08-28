@@ -500,6 +500,7 @@ class Data:
             )[settings.REGIONAL_ADOPTION_ZONE].to_numpy()
         
             regional_adoption_targets = pd.read_excel(os.path.join(settings.INPUT_DIR, "regional_adoption_zones.xlsx"), sheet_name=settings.REGIONAL_ADOPTION_ZONE)
+            
             self.REGIONAL_ADOPTION_TARGETS = regional_adoption_targets.iloc[
                 [idx for idx, row in regional_adoption_targets.iterrows() if
                     all([row['ADOPTION_PERCENTAGE_2030']>=0, 

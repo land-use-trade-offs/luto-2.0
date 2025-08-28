@@ -194,7 +194,7 @@ Land-use and vector file pairs to exclude land-use from being utilised in that a
 '''
 
 REGIONAL_ADOPTION_CONSTRAINTS = 'off'  # 'on' or 'off'
-REGIONAL_ADOPTION_ZONE = 'ABARES_AAGIS'   # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
+REGIONAL_ADOPTION_ZONE = 'LGA_CODE'   # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 '''
 The regional adoption zone is the spatial unit used to enforce regional adoption constraints.
 The options are:

@@ -27,7 +27,7 @@ from luto.tools.create_task_runs.helpers import (
 )
 
 # Define the root dir for the task runs
-TASK_ROOT_DIR = '../Custom_runs/20250825_RES3_HIGH_HIGH' # Do not include the trailing slash (/) in the end of the path
+TASK_ROOT_DIR = '../Custom_runs/20250828_RES3_NONAG_BELOW_5' # Do not include the trailing slash (/) in the end of the path
 
 
 # Set the grid search parameters
@@ -38,17 +38,17 @@ grid_search = {
     'MEM': ['96GB'],
     'NCPUS':[24],
     'TIME': ['24:00:00'],
-    'QUEUE': ['normalsr'],                                              # normalsr for CPU, hugemembw for memory intensive jobs
+    'QUEUE': ['normalsr'],                                                  # normalsr for CPU, hugemembw for memory intensive jobs
     
  
     ###############################################################
     # Working settings for the model run
     ###############################################################
-    'OBJECTIVE': ['maxprofit'],                                         # 'maxprofit' or 'mincost'
+    'OBJECTIVE': ['maxprofit'],                                             # 'maxprofit' or 'mincost'
     'RESFACTOR': [3],
-    'SIM_YEARS': [range(2020, 2050, 10)],                               # Years to run the model 
+    'SIM_YEARS': [range(2020, 2051, 5)],                                    # Years to run the model 
     'WRITE_THREADS': [2],
-    'WRITE_OUTPUT_GEOTIFFS': [False],                                   # True or False, if True will write geotiffs for the output
+    'WRITE_OUTPUT_GEOTIFFS': [False],                                       # True or False, if True will write geotiffs for the output
     
  
     ###############################################################
@@ -57,7 +57,7 @@ grid_search = {
     
     
     # --------------- Scenarios ---------------
-    'SSP': ['245'],                   #'126', '245', '370', '585'
+    'SSP': ['245'],                                                         #'126', '245', '370', '585'
     
 
     # --------------- Target deviation weight ---------------
@@ -67,61 +67,62 @@ grid_search = {
     'SOLVER_WEIGHT_GBF2': [1],
 
 
-    # --------------- Land use settings ---------------
-    'EXCLUDE_NO_GO_LU': [False],         # True or False
-       
-    
+    # --------------- Social license ---------------
+    'EXCLUDE_NO_GO_LU': [False],                                            # True or False
+    'REGIONAL_ADOPTION_CONSTRAINTS': ['on', 'off'],                         # 'on' or 'off'        
+    'REGIONAL_ADOPTION_ZONE': ['LGA_CODE'],                                 # One of 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
+
+
     # --------------- GHG settings ---------------
-    'GHG_EMISSIONS_LIMITS': ['high'],                                   # 'off', 'low', 'medium', 'high'
+    'GHG_EMISSIONS_LIMITS': ['low', 'high'],                                # 'off', 'low', 'medium', 'high'
     'CARBON_PRICES_FIELD': ['CONSTANT'],
-    'GHG_CONSTRAINT_TYPE': ['hard'],                                    # 'hard' or 'soft'
-    'USE_GHG_SCOPE_1': [True],                                          # True or False
+    'GHG_CONSTRAINT_TYPE': ['hard'],                                        # 'hard' or 'soft'
+    'USE_GHG_SCOPE_1': [True],                                              # True or False
 
     
     # --------------- Water constraints ---------------
-    'WATER_REGION_DEF':['Drainage Division', 'River Region'],           # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
-    'WATER_LIMITS': ['on'],                                             # 'on' or 'off'
-    'WATER_CONSTRAINT_TYPE': ['hard'],                                  # 'hard' or 'soft'
+    'WATER_REGION_DEF':['Drainage Division'],                               # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
+    'WATER_LIMITS': ['on'],                                                 # 'on' or 'off'
+    'WATER_CONSTRAINT_TYPE': ['hard'],                                      # 'hard' or 'soft'
     'WATER_PENALTY': [1e-5],
     'INCLUDE_WATER_LICENSE_COSTS': [1],
     
     # --------------- Biodiversity overall ---------------
-    'HABITAT_CONDITION': ['USER_DEFINED'],                              # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
+    'HABITAT_CONDITION': ['USER_DEFINED'],                                  # One of [10, 25, 50, 75, 90], or 'USER_DEFINED'              
     'CONNECTIVITY_SOURCE': ['NCI'],
-    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [40],                # Percentage of degraded areas to cut in GBF2 priority areas
+    'GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT': [20, 40],                # Percentage of degraded areas to cut in GBF2 priority areas
     
     # --------------- Biodiversity settings - GBF 2 ---------------
-    'BIODIVERSITY_TARGET_GBF_2': ['high'],                              # 'off', 'low', 'medium', 'high'
-    'GBF2_CONSTRAINT_TYPE': ['hard'],                                   # 'hard' or 'soft'
+    'BIODIVERSITY_TARGET_GBF_2': ['off', 'high'],                           # 'off', 'low', 'medium', 'high'
+    'GBF2_CONSTRAINT_TYPE': ['hard'],                                       # 'hard' or 'soft'
 
     # --------------- Biodiversity settings - GBF 3 ---------------
-    'BIODIVERSITY_TARGET_GBF_3': ['off'],                               # 'off', 'medium', 'high', 'USER_DEFINED'
+    'BIODIVERSITY_TARGET_GBF_3': ['off'],                                   # 'off', 'medium', 'high', 'USER_DEFINED'
     
     # --------------- Biodiversity settings - GBF 4 ---------------
-    'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],                          # 'on' or 'off'.
-    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off'],                         # 'on' or 'off'.
+    'BIODIVERSITY_TARGET_GBF_4_SNES': ['off'],                              # 'on' or 'off'.
+    'BIODIVERSITY_TARGET_GBF_4_ECNES': ['off'],                             # 'on' or 'off'.
 
     # --------------- Biodiversity settings - GBF 8 ---------------
-    'BIODIVERSITY_TARGET_GBF_8': ['off'],       # 'on' or 'off'
+    'BIODIVERSITY_TARGET_GBF_8': ['off'],                                   # 'on' or 'off'
 
- 
     ###############################################################
     # Scenario settings for the model run
     ###############################################################
-    'SOLVE_WEIGHT_ALPHA': [1],                                          # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
+    'SOLVE_WEIGHT_ALPHA': [1],                                              # between 0 and 1, if 1 will turn off biodiversity objective, if 0 will turn off profit objective
     'SOLVE_WEIGHT_BETA':  [0.5],         
     
     
     #-------------------- Diet BAU --------------------
-    'DIET_DOM': ['BAU',],            # 'BAU' or 'FLX'
-    'DIET_GLOB': ['BAU',],           # 'BAU' or 'FLX'
-    'WASTE': [1],                    # 1 or 0.5
-    'FEED_EFFICIENCY': ['BAU'],      # 'BAU' or 'High'
+    'DIET_DOM': ['BAU',],                                                   # 'BAU' or 'FLX'
+    'DIET_GLOB': ['BAU',],                                                  # 'BAU' or 'FLX'
+    'WASTE': [1],                                                           # 1 or 0.5
+    'FEED_EFFICIENCY': ['BAU'],                                             # 'BAU' or 'High'
     #---------------------Diet FLX --------------------
-    # 'DIET_DOM': ['FLX',],            # 'BAU' or 'FLX'
-    # 'DIET_GLOB': ['FLX',],           # 'BAU' or 'FLX'
-    # 'WASTE': [0.5],                    # 1 or 0.5
-    # 'FEED_EFFICIENCY': ['High'],      # 'BAU' or 'High'
+    # 'DIET_DOM': ['FLX',],                                                 # 'BAU' or 'FLX'
+    # 'DIET_GLOB': ['FLX',],                                                # 'BAU' or 'FLX'
+    # 'WASTE': [0.5],                                                       # 1 or 0.5
+    # 'FEED_EFFICIENCY': ['High'],                                          # 'BAU' or 'High'
 }
 
 
