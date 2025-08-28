@@ -42,3 +42,5 @@ gurobi.log
 *.tmp
 **/*.7z
 .vscode-upload.json
+CLAUDE.md
+.claude/settings.local.json
