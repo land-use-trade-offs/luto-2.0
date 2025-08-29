@@ -198,12 +198,6 @@ def write_files(data: Data, yr_cal, path):
     dvar_ag = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]).chunk({'cell': min(1024, data.NCELLS)})
     dvar_non_ag = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]).chunk({'cell': min(1024, data.NCELLS)})
     dvar_ag_man = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).chunk({'cell': min(1024, data.NCELLS)})
-    
-    # Expand dimension
-    dvar_ag = xr.concat([dvar_ag, dvar_ag.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    dvar_ag_man = xr.concat([dvar_ag_man, dvar_ag_man.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    dvar_ag_man = xr.concat([dvar_ag_man, dvar_ag_man.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-    
     save2nc(dvar_ag, os.path.join(path, f'xr_dvar_ag_{yr_cal}.nc'))
     save2nc(dvar_non_ag, os.path.join(path, f'xr_dvar_non_ag_{yr_cal}.nc'))
     save2nc(dvar_ag_man, os.path.join(path, f'xr_dvar_ag_man_{yr_cal}.nc'))
@@ -334,11 +328,6 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     non_ag_X_rk_xr = tools.non_ag_rk_to_xr(data, non_ag_X_rk).chunk({'cell': min(1024, data.NCELLS)})
     ag_man_X_mrj_xr = tools.am_mrj_to_xr(data, ag_man_X_mrj).chunk({'cell': min(1024, data.NCELLS)})
 
-    # Expand dimension
-    ag_X_mrj_xr = xr.concat([ag_X_mrj_xr, ag_X_mrj_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_man_X_mrj_xr = xr.concat([ag_man_X_mrj_xr, ag_man_X_mrj_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_man_X_mrj_xr = xr.concat([ag_man_X_mrj_xr, ag_man_X_mrj_xr.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-
     # Convert LU2PR and PR2CM to xr.DataArray 
     lu2pr_xr = xr.DataArray(
         data.LU2PR.astype(bool),
@@ -436,9 +425,6 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
     
     yr_idx = yr_cal - data.YR_CAL_BASE
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]).chunk({'cell': min(1024, data.NCELLS)})
-    
-    # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
 
     # Get agricultural revenue/cost for year in mrjs format
     ag_rev_df_rjms = ag_revenue.get_rev_matrices(data, yr_idx, aggregate=False)
@@ -522,10 +508,6 @@ def write_revenue_cost_ag_management(data: Data, yr_cal, path):
     am_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
         ).assign_coords(region = ('cell', data.REGION_NRM_NAME),
         ).chunk({'cell': min(1024, data.NCELLS)})
-    
-    # Expand dimension
-    am_dvar_mrj = xr.concat([am_dvar_mrj, am_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj = xr.concat([am_dvar_mrj, am_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
 
     # Get the revenue/cost matrices for each agricultural land-use
     ag_rev_mrj = ag_revenue.get_rev_matrices(data, yr_idx)
@@ -845,6 +827,8 @@ def write_transition_cost_nonag2ag(data: Data, yr_cal, path, yr_cal_sim_pre=None
 
 
 def write_dvar_area(data: Data, yr_cal, path):
+
+    # Reprot the process
     
     # Get dvars
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
@@ -856,11 +840,6 @@ def write_dvar_area(data: Data, yr_cal, path):
     am_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
         ).assign_coords({'region': ('cell', data.REGION_NRM_NAME)}
         ).chunk({'cell': min(1024, data.NCELLS)})
-        
-    # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj = xr.concat([am_dvar_mrj, am_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj = xr.concat([am_dvar_mrj, am_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
 
     # Calculate the real area in hectares
     real_area_r = xr.DataArray(data.REAL_AREA, dims=['cell'], coords={'cell': range(data.NCELLS)})
@@ -1061,9 +1040,6 @@ def write_ghg_separate(data: Data, yr_cal, path):
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
         ).assign_coords(region=('cell', data.REGION_NRM_NAME)
         ).chunk({'cell': min(1024, data.NCELLS)})
-    
-    # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
         
     mindex = pd.MultiIndex.from_tuples(ag_g_xr.data_vars.keys(), names=['GHG_source', 'lm', 'lu'])
     mindex_coords = xr.Coordinates.from_pandas_multiindex(mindex, 'variable')
@@ -1130,10 +1106,6 @@ def write_ghg_separate(data: Data, yr_cal, path):
     ag_man_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
         ).assign_coords(region=('cell', data.REGION_NRM_NAME)
         ).chunk({'cell': min(1024, data.NCELLS)})
-    
-    # Expand dimension
-    ag_man_dvar_mrj = xr.concat([ag_man_dvar_mrj, ag_man_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_man_dvar_mrj = xr.concat([ag_man_dvar_mrj, ag_man_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
         
     ag_man_g_mrj = tools.am_mrj_to_xr(
         data, 
@@ -1241,11 +1213,6 @@ def write_water(data: Data, yr_cal, path):
     am_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
         ).assign_coords(region_water=('cell', data.WATER_REGION_ID), region_NRM=('cell', data.REGION_NRM_NAME)
         ).chunk({'cell': min(1024, data.NCELLS)})
-    
-    # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj = xr.concat([am_dvar_mrj, am_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj = xr.concat([am_dvar_mrj, am_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
 
     # Get water target and domestic use
     w_limit_inside_luto = xr.DataArray(
@@ -1468,11 +1435,6 @@ def write_biodiversity_overall_quanlity_scores(data: Data, yr_cal, path):
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    
-    # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_mam_dvar_mrj = xr.concat([ag_mam_dvar_mrj, ag_mam_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_mam_dvar_mrj = xr.concat([ag_mam_dvar_mrj, ag_mam_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
 
 
     # Calculate the biodiversity scores
@@ -1544,14 +1506,7 @@ def write_biodiversity_GBF2_scores(data: Data, yr_cal, path):
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    am_dvar_mrj_temp = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
-    
-    # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj_temp = xr.concat([am_dvar_mrj_temp, am_dvar_mrj_temp.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj_temp = xr.concat([am_dvar_mrj_temp, am_dvar_mrj_temp.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-    
-    am_dvar_jri = am_dvar_mrj_temp.stack(idx=('am', 'lu'))
+    am_dvar_jri = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
     am_dvar_jri = am_dvar_jri.sel(idx=am_dvar_jri['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpack))
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
@@ -1666,14 +1621,7 @@ def write_biodiversity_GBF3_scores(data: Data, yr_cal: int, path) -> None:
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    am_dvar_mrj_temp = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
-    
-    # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj_temp = xr.concat([am_dvar_mrj_temp, am_dvar_mrj_temp.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj_temp = xr.concat([am_dvar_mrj_temp, am_dvar_mrj_temp.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-    
-    am_dvar_jri = am_dvar_mrj_temp.stack(idx=('am', 'lu'))
+    am_dvar_jri = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
     am_dvar_jri = am_dvar_jri.sel(idx=am_dvar_jri['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpack))
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
@@ -1790,14 +1738,7 @@ def write_biodiversity_GBF4_SNES_scores(data: Data, yr_cal: int, path) -> None:
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    am_dvar_mrj_temp = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
-    
-    # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj_temp = xr.concat([am_dvar_mrj_temp, am_dvar_mrj_temp.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj_temp = xr.concat([am_dvar_mrj_temp, am_dvar_mrj_temp.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-    
-    am_dvar_jri = am_dvar_mrj_temp.stack(idx=('am', 'lu'))
+    am_dvar_jri = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
     am_dvar_jri = am_dvar_jri.sel(idx=am_dvar_jri['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpack))
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
@@ -1917,14 +1858,7 @@ def write_biodiversity_GBF4_ECNES_scores(data: Data, yr_cal: int, path) -> None:
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    am_dvar_mrj_temp = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
-    
-    # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj_temp = xr.concat([am_dvar_mrj_temp, am_dvar_mrj_temp.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj_temp = xr.concat([am_dvar_mrj_temp, am_dvar_mrj_temp.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-    
-    am_dvar_jri = am_dvar_mrj_temp.stack(idx=('am', 'lu'))
+    am_dvar_jri = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
     am_dvar_jri = am_dvar_jri.sel(idx=am_dvar_jri['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpack))
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
@@ -2043,14 +1977,7 @@ def write_biodiversity_GBF8_scores_groups(data: Data, yr_cal, path):
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    am_dvar_mrj_temp = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
-    
-    # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj_temp = xr.concat([am_dvar_mrj_temp, am_dvar_mrj_temp.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj_temp = xr.concat([am_dvar_mrj_temp, am_dvar_mrj_temp.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-    
-    am_dvar_jri = am_dvar_mrj_temp.stack(idx=('am', 'lu'))
+    am_dvar_jri = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
     am_dvar_jri = am_dvar_jri.sel(idx=am_dvar_jri['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpack))
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
@@ -2165,14 +2092,7 @@ def write_biodiversity_GBF8_scores_species(data: Data, yr_cal, path):
     non_ag_dvar_rk = tools.non_ag_rk_to_xr(data, data.non_ag_dvars[yr_cal]
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
-    am_dvar_mrj_temp = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal])
-    
-    # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj_temp = xr.concat([am_dvar_mrj_temp, am_dvar_mrj_temp.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj_temp = xr.concat([am_dvar_mrj_temp, am_dvar_mrj_temp.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-    
-    am_dvar_jri = am_dvar_mrj_temp.stack(idx=('am', 'lu'))
+    am_dvar_jri = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]).stack(idx=('am', 'lu'))
     am_dvar_jri = am_dvar_jri.sel(idx=am_dvar_jri['idx'].isin(pd.MultiIndex.from_tuples(am_lu_unpack))
         ).chunk({'cell': min(1024, data.NCELLS)}
         ).assign_coords(region=('cell', data.REGION_NRM_NAME))
