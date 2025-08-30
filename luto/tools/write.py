@@ -1160,15 +1160,18 @@ def write_ghg_separate(data: Data, yr_cal, path):
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]
         ).assign_coords(region=('cell', data.REGION_NRM_NAME)
         ).chunk({'cell': min(1024, data.NCELLS)})
-    
-    # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-        
+
+
     mindex = pd.MultiIndex.from_tuples(ag_g_xr.data_vars.keys(), names=['GHG_source', 'lm', 'lu'])
     mindex_coords = xr.Coordinates.from_pandas_multiindex(mindex, 'variable')
-    ag_g_xr = ag_g_xr.to_dataarray().assign_coords(mindex_coords).chunk({'cell': min(1024, data.NCELLS)})
+    ag_g_rsmj = ag_g_xr.to_dataarray().assign_coords(mindex_coords).chunk({'cell': min(1024, data.NCELLS)}).unstack()
 
-    ghg_e = ag_g_xr.unstack() * ag_dvar_mrj 
+    # Expand dimension
+    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    ag_g_rsmj = xr.concat([ag_g_rsmj, ag_g_rsmj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    ag_g_rsmj = xr.concat([ag_g_rsmj, ag_g_rsmj.sum(dim='GHG_source', keepdims=True).assign_coords(GHG_source=['ALL'])], dim='GHG_source')
+
+    ghg_e = ag_g_rsmj * ag_dvar_mrj 
     
     # Regional level aggregation
     ghg_df_region = ghg_e.groupby('region'
@@ -1250,19 +1253,21 @@ def write_ghg_separate(data: Data, yr_cal, path):
     ag_man_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
         ).assign_coords(region=('cell', data.REGION_NRM_NAME)
         ).chunk({'cell': min(1024, data.NCELLS)})
-    
-    # Expand dimension
-    ag_man_dvar_mrj = xr.concat([ag_man_dvar_mrj, ag_man_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_man_dvar_mrj = xr.concat([ag_man_dvar_mrj, ag_man_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
-        
+
     ag_man_g_mrj = tools.am_mrj_to_xr(
         data, 
         ag_ghg.get_agricultural_management_ghg_matrices(data, yr_idx)
     )
 
+    # Expand dimension
+    ag_man_dvar_mrj = xr.concat([ag_man_dvar_mrj, ag_man_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    ag_man_dvar_mrj = xr.concat([ag_man_dvar_mrj, ag_man_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    ag_man_g_mrj = xr.concat([ag_man_g_mrj, ag_man_g_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    ag_man_g_mrj = xr.concat([ag_man_g_mrj, ag_man_g_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+
     # Calculate GHG emissions for agricultural management
     xr_ghg_ag_man = ag_man_dvar_mrj * ag_man_g_mrj
-    
+
     # Regional level aggregation
     ghg_df_region = xr_ghg_ag_man.groupby('region'
         ).sum('cell'

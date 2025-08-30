@@ -130,7 +130,7 @@ NON_AG_LANDUSE_RAW = [i for i in NON_AG_LANDUSE_RAW if settings.NON_AG_LAND_USES
 
 # Merge the land uses
 LANDUSE_ALL_RAW = AG_LANDUSE + NON_AG_LANDUSE_RAW
-LANDUSE_ALL_RENAMED = AG_LANDUSE + list(RENAME_NON_AG.values())  + ['Outside LUTO study area'] + ['Agri-Management']
+LANDUSE_ALL_RENAMED = ['Agri-Management'] + AG_LANDUSE + list(RENAME_NON_AG.values())  + ['Outside LUTO study area'] 
 
 
 
@@ -170,13 +170,15 @@ GHG_NAMES = {
     'TCO2E_AgTech EI': 'AgTech EI',
 }
 
-GHG_CATEGORY = {'Agricultural soils: Animal production, dung and urine': {"CH4":0.5,"CO2":0.5},
-                'Livestock Enteric Fermentation (biogenic)':{'CH4':1},
-                'Agricultural soils: Direct Soil Emissions (biogenic)':{"N2O":1},
-                
-                'Asparagopsis taxiformis':{'Asparagopsis taxiformis':1},
-                'Precision Agriculture':{'Precision Agriculture':1},
-                'Ecological Grazing':{'Ecological Grazing':1}}
+GHG_CATEGORY = {
+    'Agricultural soils: Animal production, dung and urine': {"CH4":0.5,"CO2":0.5},
+    'Livestock Enteric Fermentation (biogenic)':{'CH4':1},
+    'Agricultural soils: Direct Soil Emissions (biogenic)':{"N2O":1},
+    
+    'Asparagopsis taxiformis':{'Asparagopsis taxiformis':1},
+    'Precision Agriculture':{'Precision Agriculture':1},
+    'Ecological Grazing':{'Ecological Grazing':1}
+}
 
 
 

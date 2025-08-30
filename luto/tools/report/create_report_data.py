@@ -87,21 +87,21 @@ def save_report_data(raw_data_dir:str):
 
         
     def format_with_suffix(x):
-            if pd.isna(x) or x == 0:
-                return "0"
-            suffixes = ['', 'K', 'M', 'B', 'T']
-            # Determine the appropriate suffix
-            magnitude = 0
-            while abs(x) >= 1000 and magnitude < len(suffixes)-1:
-                magnitude += 1
-                x /= 1000.0
-            # Format with 2 significant digits
-            if x < 10:
-                formatted = f"{x:.2f}"
-            else:
-                formatted = f"{int(round(x))}"
-            return f"{formatted} {suffixes[magnitude]}"
-        
+        if pd.isna(x) or x == 0:
+            return "0"
+        suffixes = ['', 'K', 'M', 'B', 'T']
+        # Determine the appropriate suffix
+        magnitude = 0
+        while abs(x) >= 1000 and magnitude < len(suffixes)-1:
+            magnitude += 1
+            x /= 1000.0
+        # Format with 2 significant digits
+        if x < 10:
+            formatted = f"{x:.2f}"
+        else:
+            formatted = f"{int(round(x))}"
+        return f"{formatted} {suffixes[magnitude]}"
+    
         
 
     ####################################################
@@ -112,11 +112,13 @@ def save_report_data(raw_data_dir:str):
     ag_dvar_dfs = area_dvar_paths.query('base_name == "area_agricultural_landuse"').reset_index(drop=True)
     ag_dvar_area = pd.concat([pd.read_csv(path) for path in ag_dvar_dfs['path']], ignore_index=True)
     ag_dvar_area['Source'] = 'Agricultural Landuse'
+    ag_dvar_area['Category'] = ag_dvar_area['Land-use'].apply(lu_group.set_index('Land-use')['Category'].to_dict().get)
     ag_dvar_area['Area (ha)'] = ag_dvar_area['Area (ha)'].round(2)
 
     non_ag_dvar_dfs = area_dvar_paths.query('base_name == "area_non_agricultural_landuse"').reset_index(drop=True)
     non_ag_dvar_area = pd.concat([pd.read_csv(path) for path in non_ag_dvar_dfs['path'] if not pd.read_csv(path).empty], ignore_index=True)
     non_ag_dvar_area['Land-use'] = non_ag_dvar_area['Land-use'].replace(RENAME_NON_AG)
+    non_ag_dvar_area['Category'] = non_ag_dvar_area['Land-use'].apply(lu_group.set_index('Land-use')['Category'].to_dict().get)
     non_ag_dvar_area['Source'] = 'Non-Agricultural Landuse'
     non_ag_dvar_area['Water_supply'] = 'NA'
     non_ag_dvar_area['Area (ha)'] = non_ag_dvar_area['Area (ha)'].round(2)
@@ -183,8 +185,8 @@ def save_report_data(raw_data_dir:str):
     for idx, col in enumerate(group_cols):
  
         df_region = area_df\
-            .query('Water_supply.isin(["ALL", "NA"])')\
-            .groupby(['Year', 'region', col])\
+            .query('Water_supply != "ALL"')\
+            .groupby(['Year', 'region', col])[['Area (ha)']]\
             .sum()\
             .reset_index()\
             .round({'Area (ha)': 2})
@@ -198,14 +200,11 @@ def save_report_data(raw_data_dir:str):
             df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_LU[x])
             df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
             df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-        elif col == 'Water_supply':
-            df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_LM[x])
-        elif col.lower() == 'commodity':
-            df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_COMMODITIES[x])
-            df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
-            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
         elif col == 'Category':
             df_wide['color'] = df_wide['name'].apply(lambda x: colors_lu_category[x])
+        elif col == 'Source':
+            df_wide['name_order'] = df_wide['name'].apply(lambda x: ['Agricultural Management', 'Agricultural Landuse', 'Non-Agricultural Landuse'].index(x))
+            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
 
         out_dict = {}
         for region, df in df_wide.groupby('region'):
@@ -751,9 +750,16 @@ def save_report_data(raw_data_dir:str):
     
     
     # Overview: ag cost/revenue by type
-    economics_ag = pd.concat([revenue_ag_df, cost_ag_df]).round({'Value ($)': 2}).query('abs(`Value ($)`) > 1e-6')
+    economics_ag = pd.concat([revenue_ag_df, cost_ag_df])\
+        .query('Type != "ALL" and abs(`Value ($)`) > 1')\
+        .groupby(['region', 'Type', 'Water_supply','Year'])['Value ($)']\
+        .sum()\
+        .reset_index()\
+        .round({'Value ($)': 2})
+  
     
-    df_wide = economics_ag.groupby(['region', 'Type', 'Water_supply'])[['Year','Value ($)']]\
+    df_wide = economics_ag\
+        .groupby(['region', 'Type', 'Water_supply'])[['Year', 'Value ($)']]\
         .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
         .reset_index()
     df_wide.columns = ['region', 'name', 'water', 'data']
@@ -783,7 +789,11 @@ def save_report_data(raw_data_dir:str):
     economics_am = pd.concat([
             revenue_am_df.assign(Rev_Cost='Revenue'), 
             cost_am_df.assign(Rev_Cost='Cost'),]
-        ).round({'Value ($)': 2}).query('abs(`Value ($)`) > 1e-6')
+        ).query('`Management Type` != "ALL" and abs(`Value ($)`) > 1'
+        ).round({'Value ($)': 2}
+        ).groupby(['region', 'Management Type', 'Water_supply', 'Rev_Cost', 'Year'])[['Value ($)']
+        ].sum(
+        ).reset_index()
     
     df_wide = economics_am.groupby(['region', 'Management Type', 'Water_supply', 'Rev_Cost'])[[ 'Year', 'Value ($)']]\
         .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
@@ -811,6 +821,47 @@ def save_report_data(raw_data_dir:str):
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
+        
+        
+    # Overview: non-ag cost/revenue by type
+    economics_non_ag = pd.concat([
+            revenue_non_ag_df.assign(Rev_Cost='Revenue'), 
+            cost_non_ag_df.assign(Rev_Cost='Cost')]
+        ).query('abs(`Value ($)`) > 1'
+        ).round({'Value ($)': 2}
+        ).groupby(['region', 'Land-use', 'Rev_Cost', 'Year'])[['Value ($)']
+        ].sum(
+        ).reset_index()
+    
+    df_wide = economics_non_ag.groupby(['region', 'Land-use', 'Rev_Cost'])[['Year','Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+    df_wide.columns = ['region', 'name', 'Rev_Cost', 'data']
+    df_wide['type'] = 'column'
+    
+    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+    df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
+    df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
+    df_wide.loc[df_wide['name'].isin([
+        'Environmental plantings (mixed species)',
+        'Riparian buffer restoration (mixed species)',
+        'Carbon plantings (monoculture)',
+        'Destocked - natural land'
+        ]), 'linkedTo'] = None
+
+    
+    out_dict = {}
+    for region, df in df_wide.groupby('region'):
+        df = df.drop(['region','Rev_Cost'], axis=1)
+        out_dict[region] = df.to_dict(orient='records')
+
+    filename = f'Economics_overview_Non_Ag'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
  
  
  
@@ -821,56 +872,40 @@ def save_report_data(raw_data_dir:str):
 
     economics_ag = pd.concat([revenue_ag_df, cost_ag_df]
         ).round({'Value ($)': 2}
-        ).query('abs(`Value ($)`) > 1e-6'
+        ).query('abs(`Value ($)`) > 1'
         ).reset_index(drop=True)
 
-    group_cols = ['Land-use', 'Type', 'Water_supply']
+    df_wide = economics_ag\
+        .groupby(['region', 'Type', 'Water_supply', 'Rev_Cost', 'Land-use'])[['Year','Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()\
+        .round({'Value ($)': 2})
 
-    for idx, col in enumerate(group_cols):
+    df_wide.columns = ['region', '_type', 'water', 'Rev_Cost', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+    df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
+    df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
 
-        df_region = economics_ag\
-            .groupby(['Year', 'Rev_Cost', 'region', col])\
-            .sum()\
-            .reset_index()\
-            .round({'Value ($)': 2})
-        df_wide = df_region.groupby([col, 'region', 'Rev_Cost'])[['Year','Value ($)']]\
-            .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
-            .reset_index()
-        df_wide.columns = ['name', 'region','Rev_Cost', 'data']
-        df_wide['type'] = 'column'
+
+    out_dict = {}
+    for (region, _type, water), df in df_wide.groupby(['region', '_type', 'water']):
+        df = df.drop(['region', '_type', 'water', 'Rev_Cost'], axis=1)
+        if region not in out_dict:
+            out_dict[region] = {}
+        if _type not in out_dict[region]:
+            out_dict[region][_type] = {}
+        if water not in out_dict[region][_type]:
+            out_dict[region][_type][water] = {}
+        out_dict[region][_type][water] = df.to_dict(orient='records')
         
-        if col == "Land-use":
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
-            df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-            df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
-            df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
-        elif col == 'Water_supply':
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
-            df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
-            df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
-        elif col.lower() == 'commodity':
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
-            df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
-            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-            df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
-            df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
-        elif col == 'Type':
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_ECONOMY_TYPE[x['name']], axis=1)
-            df_wide['name_order'] = df_wide['name'].apply(lambda x: list(COLORS_ECONOMY_TYPE.keys()).index(x) if x in COLORS_ECONOMY_TYPE else -1)
-            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-
-
-        out_dict = {}
-        for region, df in df_wide.groupby('region'):
-            df = df.drop(['region','Rev_Cost'], axis=1)
-            out_dict[region] = df.to_dict(orient='records')
-            
-        filename = 'Economics_overview_Ag'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+    filename = 'Economics_Ag'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
     
 
 
@@ -880,397 +915,340 @@ def save_report_data(raw_data_dir:str):
 
     economics_am = pd.concat([revenue_am_df, cost_am_df]
         ).round({'Value ($)': 2}
-        ).query('abs(`Value ($)`) > 1e-6'
+        ).query('abs(`Value ($)`) > 1'
         ).reset_index(drop=True)
 
+    df_wide = economics_am\
+        .groupby(['region', 'Management Type', 'Water_supply', 'Land-use', 'Rev_Cost'])[['Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()\
+        .round({'Value ($)': 2})
+  
+    df_wide.columns = ['region', '_type', 'water', 'name', 'Rev_Cost', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+    df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
+    df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
+    df_wide.loc[df_wide['name'] == 'Early dry-season savanna burning', 'linkedTo'] = None
 
-    group_cols = ['Management Type', 'Water_supply', 'Land-use']
-
-    for idx, col in enumerate(group_cols):
-
-        df_region = economics_am\
-            .groupby(['Year', 'Rev_Cost', 'region', col])\
-            .sum()\
-            .reset_index()\
-            .round({'Value ($)': 2})
-        df_wide = df_region.groupby([col, 'region', 'Rev_Cost'])[['Year','Value ($)']]\
-            .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
-            .reset_index()
-        df_wide.columns = ['name', 'region','Rev_Cost', 'data']
-        df_wide['type'] = 'column'
+    
+    out_dict = {}
+    for (region,_type,water), df in df_wide.groupby(['region', '_type', 'water']):
+        df = df.drop(['region', '_type', 'water','Rev_Cost'], axis=1)
+        if region not in out_dict:
+            out_dict[region] = {}
+        if _type not in out_dict[region]:
+            out_dict[region][_type] = {}
+        if water not in out_dict[region][_type]:
+            out_dict[region][_type][water] = {}
+        out_dict[region][_type][water] = df.to_dict(orient='records')
         
-        if col == "Land-use":
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
-            df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-            df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
-            df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
-            df_wide.loc[df_wide['name'] == 'Unallocated - natural land', 'linkedTo'] = None
-        elif col == 'Water_supply':
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
-            df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
-            df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
-        elif col == 'Management Type':
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
-            df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
-            df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
-            df_wide.loc[df_wide['name'] == 'Early dry-season savanna burning', 'linkedTo'] = None
-        
-        
-        out_dict = {}
-        for region, df in df_wide.groupby('region'):
-            df = df.drop(['region','Rev_Cost'], axis=1)
-            out_dict[region] = df.to_dict(orient='records')
-            
-        filename = f'Economics_split_AM_{idx+1}_{col.replace(" ", "_")}'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+    filename = f'Economics_Am'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
 
 
     # -------------------- Economics for non-agriculture --------------------
-    revenue_non_ag_df = revenue_non_ag_df.assign(Rev_Cost='Revenue')
-    cost_non_ag_df = cost_non_ag_df.assign(Rev_Cost='Cost')
 
-    economics_non_ag = pd.concat([revenue_non_ag_df, cost_non_ag_df]
-        ).round({'Value ($)': 2}
-        ).query('abs(`Value ($)`) > 1e-6'
-        ).reset_index(drop=True)
+    # This is the same as the "Economics_overview_Non_Ag" 
 
 
-    group_cols = ['Land-use']
-
-    for idx, col in enumerate(group_cols):
-
-        df_region = economics_non_ag\
-            .groupby(['Year', 'Rev_Cost', 'region', col])\
-            .sum()\
-            .reset_index()\
-            .round({'Value ($)': 2})
-        df_wide = df_region.groupby([col, 'region', 'Rev_Cost'])[['Year','Value ($)']]\
-            .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
-            .reset_index()
-        df_wide.columns = ['name', 'region','Rev_Cost', 'data']
-        df_wide['type'] = 'column'
-        
-        df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
-        df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-        df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-        df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
-        df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
-        df_wide.loc[df_wide['name'].isin([
-            'Environmental plantings (mixed species)',
-            'Riparian buffer restoration (mixed species)',
-            'Carbon plantings (monoculture)',
-            'Destocked - natural land'
-            ]), 'linkedTo'] = None
-
-        
-        out_dict = {}
-        for region, df in df_wide.groupby('region'):
-            df = df.drop(['region','Rev_Cost'], axis=1)
-            out_dict[region] = df.to_dict(orient='records')
-
-        filename = f'Economics_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
 
 
-    # -------------------- Transition cost for Ag2Ag --------------------
-    cost_transition_ag2ag_df['Value ($)'] = cost_transition_ag2ag_df['Value ($)'] * -1  # Convert from negative to positive
-    group_cols = ['Type', 'From land-use', 'To land-use']
+    # # -------------------- Transition cost for Ag2Ag --------------------
+    # cost_transition_ag2ag_df['Value ($)'] = cost_transition_ag2ag_df['Value ($)'] * -1  # Convert from negative to positive
+    # group_cols = ['Type', 'From land-use', 'To land-use']
     
-    for idx, col in enumerate(group_cols):
-        df_AUS = cost_transition_ag2ag_df\
-            .groupby(['Year', col])[['Value ($)']]\
-            .sum()\
-            .reset_index()\
-            .round({'Value ($)': 2})
-        df_AUS_wide = df_AUS.groupby([col])[['Year','Value ($)']]\
-            .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
-            .reset_index()\
-            .assign(region='AUSTRALIA')
-        df_AUS_wide.columns = ['name', 'data','region']
-        df_AUS_wide['type'] = 'column'
+    # for idx, col in enumerate(group_cols):
+    #     df_AUS = cost_transition_ag2ag_df\
+    #         .groupby(['Year', col])[['Value ($)']]\
+    #         .sum()\
+    #         .reset_index()\
+    #         .round({'Value ($)': 2})
+    #     df_AUS_wide = df_AUS.groupby([col])[['Year','Value ($)']]\
+    #         .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+    #         .reset_index()\
+    #         .assign(region='AUSTRALIA')
+    #     df_AUS_wide.columns = ['name', 'data','region']
+    #     df_AUS_wide['type'] = 'column'
 
-        df_region = cost_transition_ag2ag_df\
-            .groupby(['Year', 'region', col])\
-            .sum()\
-            .reset_index()\
-            .round({'Value ($)': 2})
-        df_region_wide = df_region.groupby([col, 'region'])[['Year','Value ($)']]\
-            .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
-            .reset_index()
-        df_region_wide.columns = ['name', 'region', 'data']
-        df_region_wide['type'] = 'column'
+    #     df_region = cost_transition_ag2ag_df\
+    #         .groupby(['Year', 'region', col])\
+    #         .sum()\
+    #         .reset_index()\
+    #         .round({'Value ($)': 2})
+    #     df_region_wide = df_region.groupby([col, 'region'])[['Year','Value ($)']]\
+    #         .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+    #         .reset_index()
+    #     df_region_wide.columns = ['name', 'region', 'data']
+    #     df_region_wide['type'] = 'column'
         
         
-        df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+    #     df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
         
-        out_dict = {}
-        for region, df in df_wide.groupby('region'):
-            df = df.drop(['region'], axis=1)
-            out_dict[region] = df.to_dict(orient='records')
+    #     out_dict = {}
+    #     for region, df in df_wide.groupby('region'):
+    #         df = df.drop(['region'], axis=1)
+    #         out_dict[region] = df.to_dict(orient='records')
             
-        filename = f'Economics_transition_split_ag2ag_{idx+1}_{col.replace(" ", "_")}'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+    #     filename = f'Economics_transition_split_ag2ag_{idx+1}_{col.replace(" ", "_")}'
+    #     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+    #         f.write(f'window["{filename}"] = ')
+    #         json.dump(out_dict, f, separators=(',', ':'), indent=2)
+    #         f.write(';\n')
       
 
-    # -------------------- Transition cost matrix for Ag2Ag --------------------
-    cost_transition_ag2ag_trans_mat_AUS = cost_transition_ag2ag_df\
-        .groupby(['Year','From land-use', 'To land-use'])\
-        .sum(numeric_only=True)\
-        .reset_index()\
-        .round({'Value ($)': 2})\
-        .query('abs(`Value ($)`) > 1e-6')\
-        .assign(region='AUSTRALIA')
+    # # -------------------- Transition cost matrix for Ag2Ag --------------------
+    # cost_transition_ag2ag_trans_mat_AUS = cost_transition_ag2ag_df\
+    #     .groupby(['Year','From land-use', 'To land-use'])\
+    #     .sum(numeric_only=True)\
+    #     .reset_index()\
+    #     .round({'Value ($)': 2})\
+    #     .query('abs(`Value ($)`) > 1e-6')\
+    #     .assign(region='AUSTRALIA')
 
-    cost_transition_ag2ag_trans_mat_region_df = cost_transition_ag2ag_df\
-        .groupby(['Year','From land-use', 'To land-use', 'region'])\
-        .sum(numeric_only=True)\
-        .reset_index()\
-        .round({'Value ($)': 2})
+    # cost_transition_ag2ag_trans_mat_region_df = cost_transition_ag2ag_df\
+    #     .groupby(['Year','From land-use', 'To land-use', 'region'])\
+    #     .sum(numeric_only=True)\
+    #     .reset_index()\
+    #     .round({'Value ($)': 2})
         
         
-    cost_transition_ag2ag_trans_mat = pd.concat([
-        cost_transition_ag2ag_trans_mat_AUS,
-        cost_transition_ag2ag_trans_mat_region_df
-    ])
+    # cost_transition_ag2ag_trans_mat = pd.concat([
+    #     cost_transition_ag2ag_trans_mat_AUS,
+    #     cost_transition_ag2ag_trans_mat_region_df
+    # ])
 
 
-    out_dict_area = {}
-    for (region,year),df in cost_transition_ag2ag_trans_mat.groupby(['region', 'Year']):
+    # out_dict_area = {}
+    # for (region,year),df in cost_transition_ag2ag_trans_mat.groupby(['region', 'Year']):
         
-        out_dict_area.setdefault(region, {})
+    #     out_dict_area.setdefault(region, {})
         
-        transition_mat = df.pivot(index='From land-use', columns='To land-use', values='Value ($)')
-        transition_mat = transition_mat.reindex(index=AG_LANDUSE, columns=AG_LANDUSE)
-        transition_mat = transition_mat.fillna(0)
-        total_area_from = transition_mat.sum(axis=1).values.reshape(-1, 1)
+    #     transition_mat = df.pivot(index='From land-use', columns='To land-use', values='Value ($)')
+    #     transition_mat = transition_mat.reindex(index=AG_LANDUSE, columns=AG_LANDUSE)
+    #     transition_mat = transition_mat.fillna(0)
+    #     total_area_from = transition_mat.sum(axis=1).values.reshape(-1, 1)
         
-        transition_mat['SUM'] = transition_mat.sum(axis=1)
-        transition_mat.loc['SUM'] = transition_mat.sum(axis=0)
+    #     transition_mat['SUM'] = transition_mat.sum(axis=1)
+    #     transition_mat.loc['SUM'] = transition_mat.sum(axis=0)
 
-        heat_area = transition_mat.style.background_gradient(
-            cmap='Oranges',
-            axis=1,
-            subset=pd.IndexSlice[:transition_mat.index[-2], :transition_mat.columns[-2]]
-        ).format('{:,.0f}')
+    #     heat_area = transition_mat.style.background_gradient(
+    #         cmap='Oranges',
+    #         axis=1,
+    #         subset=pd.IndexSlice[:transition_mat.index[-2], :transition_mat.columns[-2]]
+    #     ).format('{:,.0f}')
 
-        heat_area_html = heat_area.to_html()
-        heat_area_html = re.sub(r'(?<!\d)0(?!\d)', '-', heat_area_html)
+    #     heat_area_html = heat_area.to_html()
+    #     heat_area_html = re.sub(r'(?<!\d)0(?!\d)', '-', heat_area_html)
 
-        out_dict_area[region][str(year)] = rf'{heat_area_html}'
+    #     out_dict_area[region][str(year)] = rf'{heat_area_html}'
 
-    filename = 'Economics_transition_mat_ag2ag'
-    with open(f'{SAVE_DIR}/{filename}.js', 'w', encoding='utf-8') as f:
-        f.write(f'window["{filename}"] = ')
-        json.dump(out_dict_area, f, separators=(',', ':'), indent=2)
-        f.write(';\n')
-
-
+    # filename = 'Economics_transition_mat_ag2ag'
+    # with open(f'{SAVE_DIR}/{filename}.js', 'w', encoding='utf-8') as f:
+    #     f.write(f'window["{filename}"] = ')
+    #     json.dump(out_dict_area, f, separators=(',', ':'), indent=2)
+    #     f.write(';\n')
 
 
 
 
-    # -------------------- Transition cost for Ag2Non-Ag --------------------
-    cost_transition_ag2non_ag_df['Value ($)'] = cost_transition_ag2non_ag_df['Value ($)'] * -1  # Convert from negative to positive
-    group_cols = ['Cost type', 'From land-use', 'To land-use']
+
+
+    # # -------------------- Transition cost for Ag2Non-Ag --------------------
+    # cost_transition_ag2non_ag_df['Value ($)'] = cost_transition_ag2non_ag_df['Value ($)'] * -1  # Convert from negative to positive
+    # group_cols = ['Cost type', 'From land-use', 'To land-use']
     
-    for idx, col in enumerate(group_cols):
-        df_AUS = cost_transition_ag2non_ag_df\
-            .groupby(['Year', col])[['Value ($)']]\
-            .sum()\
-            .reset_index()\
-            .round({'Value ($)': 2})
-        df_AUS_wide = df_AUS.groupby([col])[['Year','Value ($)']]\
-            .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
-            .reset_index()\
-            .assign(region='AUSTRALIA')
-        df_AUS_wide.columns = ['name', 'data','region']
-        df_AUS_wide['type'] = 'column'
+    # for idx, col in enumerate(group_cols):
+    #     df_AUS = cost_transition_ag2non_ag_df\
+    #         .groupby(['Year', col])[['Value ($)']]\
+    #         .sum()\
+    #         .reset_index()\
+    #         .round({'Value ($)': 2})
+    #     df_AUS_wide = df_AUS.groupby([col])[['Year','Value ($)']]\
+    #         .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+    #         .reset_index()\
+    #         .assign(region='AUSTRALIA')
+    #     df_AUS_wide.columns = ['name', 'data','region']
+    #     df_AUS_wide['type'] = 'column'
 
-        df_region = cost_transition_ag2non_ag_df\
-            .groupby(['Year', 'region', col])\
-            .sum()\
-            .reset_index()\
-            .round({'Value ($)': 2})
-        df_region_wide = df_region.groupby([col, 'region'])[['Year','Value ($)']]\
-            .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
-            .reset_index()
-        df_region_wide.columns = ['name', 'region', 'data']
-        df_region_wide['type'] = 'column'
+    #     df_region = cost_transition_ag2non_ag_df\
+    #         .groupby(['Year', 'region', col])\
+    #         .sum()\
+    #         .reset_index()\
+    #         .round({'Value ($)': 2})
+    #     df_region_wide = df_region.groupby([col, 'region'])[['Year','Value ($)']]\
+    #         .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+    #         .reset_index()
+    #     df_region_wide.columns = ['name', 'region', 'data']
+    #     df_region_wide['type'] = 'column'
         
         
-        df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+    #     df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
         
-        out_dict = {}
-        for region, df in df_wide.groupby('region'):
-            df = df.drop(['region'], axis=1)
-            out_dict[region] = df.to_dict(orient='records')
+    #     out_dict = {}
+    #     for region, df in df_wide.groupby('region'):
+    #         df = df.drop(['region'], axis=1)
+    #         out_dict[region] = df.to_dict(orient='records')
             
-        filename = f'Economics_transition_split_Ag2NonAg_{idx+1}_{col.replace(" ", "_")}'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+    #     filename = f'Economics_transition_split_Ag2NonAg_{idx+1}_{col.replace(" ", "_")}'
+    #     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+    #         f.write(f'window["{filename}"] = ')
+    #         json.dump(out_dict, f, separators=(',', ':'), indent=2)
+    #         f.write(';\n')
         
   
-    # -------------------- Transition cost matrix for Ag2Non-Ag --------------------
-    cost_transition_ag2nonag_trans_mat_AUS = cost_transition_ag2non_ag_df\
-        .groupby(['Year','From land-use', 'To land-use'])\
-        .sum(numeric_only=True)\
-        .reset_index()\
-        .round({'Value ($)': 2})\
-        .assign(region='AUSTRALIA')
+    # # -------------------- Transition cost matrix for Ag2Non-Ag --------------------
+    # cost_transition_ag2nonag_trans_mat_AUS = cost_transition_ag2non_ag_df\
+    #     .groupby(['Year','From land-use', 'To land-use'])\
+    #     .sum(numeric_only=True)\
+    #     .reset_index()\
+    #     .round({'Value ($)': 2})\
+    #     .assign(region='AUSTRALIA')
 
-    cost_transition_ag2nonag_trans_mat_region_df = cost_transition_ag2non_ag_df\
-        .groupby(['Year','From land-use', 'To land-use', 'region'])\
-        .sum(numeric_only=True)\
-        .reset_index()\
-        .round({'Value ($)': 2})
+    # cost_transition_ag2nonag_trans_mat_region_df = cost_transition_ag2non_ag_df\
+    #     .groupby(['Year','From land-use', 'To land-use', 'region'])\
+    #     .sum(numeric_only=True)\
+    #     .reset_index()\
+    #     .round({'Value ($)': 2})
         
         
-    cost_transition_ag2nonag_trans_mat = pd.concat([
-        cost_transition_ag2nonag_trans_mat_AUS,
-        cost_transition_ag2nonag_trans_mat_region_df
-    ])
+    # cost_transition_ag2nonag_trans_mat = pd.concat([
+    #     cost_transition_ag2nonag_trans_mat_AUS,
+    #     cost_transition_ag2nonag_trans_mat_region_df
+    # ])
 
 
-    out_dict_area = {}
-    for (region,year),df in cost_transition_ag2nonag_trans_mat.groupby(['region', 'Year']):
+    # out_dict_area = {}
+    # for (region,year),df in cost_transition_ag2nonag_trans_mat.groupby(['region', 'Year']):
         
-        out_dict_area.setdefault(region, {})
+    #     out_dict_area.setdefault(region, {})
         
-        transition_mat = df.pivot(index='From land-use', columns='To land-use', values='Value ($)')
-        transition_mat = transition_mat.reindex(index=AG_LANDUSE, columns=RENAME_NON_AG.values())
-        transition_mat = transition_mat.fillna(0)
-        total_area_from = transition_mat.sum(axis=1).values.reshape(-1, 1)
+    #     transition_mat = df.pivot(index='From land-use', columns='To land-use', values='Value ($)')
+    #     transition_mat = transition_mat.reindex(index=AG_LANDUSE, columns=RENAME_NON_AG.values())
+    #     transition_mat = transition_mat.fillna(0)
+    #     total_area_from = transition_mat.sum(axis=1).values.reshape(-1, 1)
         
-        transition_mat['SUM'] = transition_mat.sum(axis=1)
-        transition_mat.loc['SUM'] = transition_mat.sum(axis=0)
+    #     transition_mat['SUM'] = transition_mat.sum(axis=1)
+    #     transition_mat.loc['SUM'] = transition_mat.sum(axis=0)
 
-        heat_area = transition_mat.style.background_gradient(
-            cmap='Oranges',
-            axis=1,
-            subset=pd.IndexSlice[:transition_mat.index[-2], :transition_mat.columns[-2]]
-        ).format('{:,.0f}')
+    #     heat_area = transition_mat.style.background_gradient(
+    #         cmap='Oranges',
+    #         axis=1,
+    #         subset=pd.IndexSlice[:transition_mat.index[-2], :transition_mat.columns[-2]]
+    #     ).format('{:,.0f}')
 
-        heat_area_html = heat_area.to_html()
-        heat_area_html = re.sub(r'(?<!\d)0(?!\d)', '-', heat_area_html)
+    #     heat_area_html = heat_area.to_html()
+    #     heat_area_html = re.sub(r'(?<!\d)0(?!\d)', '-', heat_area_html)
 
-        out_dict_area[region][str(year)] = rf'{heat_area_html}'
+    #     out_dict_area[region][str(year)] = rf'{heat_area_html}'
 
-    filename = 'Economics_transition_mat_ag2nonag'
-    with open(f'{SAVE_DIR}/{filename}.js', 'w', encoding='utf-8') as f:
-        f.write(f'window["{filename}"] = ')
-        json.dump(out_dict_area, f, separators=(',', ':'), indent=2)
-        f.write(';\n')
+    # filename = 'Economics_transition_mat_ag2nonag'
+    # with open(f'{SAVE_DIR}/{filename}.js', 'w', encoding='utf-8') as f:
+    #     f.write(f'window["{filename}"] = ')
+    #     json.dump(out_dict_area, f, separators=(',', ':'), indent=2)
+    #     f.write(';\n')
     
     
     
     
 
-    # -------------------- Transition cost for Non-Ag to Ag --------------------
-    cost_transition_non_ag2ag_df['Value ($)'] = cost_transition_non_ag2ag_df['Value ($)'] * -1  # Convert from negative to positive
-    group_cols = ['Cost type', 'From land-use', 'To land-use']
+    # # -------------------- Transition cost for Non-Ag to Ag --------------------
+    # cost_transition_non_ag2ag_df['Value ($)'] = cost_transition_non_ag2ag_df['Value ($)'] * -1  # Convert from negative to positive
+    # group_cols = ['Cost type', 'From land-use', 'To land-use']
     
-    for idx, col in enumerate(group_cols):
-        df_AUS = cost_transition_non_ag2ag_df\
-            .groupby(['Year', col])[['Value ($)']]\
-            .sum()\
-            .reset_index()\
-            .round({'Value ($)': 2})
-        df_AUS_wide = df_AUS.groupby([col])[['Year','Value ($)']]\
-            .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
-            .reset_index()\
-            .assign(region='AUSTRALIA')
-        df_AUS_wide.columns = ['name', 'data','region']
-        df_AUS_wide['type'] = 'column'
+    # for idx, col in enumerate(group_cols):
+    #     df_AUS = cost_transition_non_ag2ag_df\
+    #         .groupby(['Year', col])[['Value ($)']]\
+    #         .sum()\
+    #         .reset_index()\
+    #         .round({'Value ($)': 2})
+    #     df_AUS_wide = df_AUS.groupby([col])[['Year','Value ($)']]\
+    #         .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+    #         .reset_index()\
+    #         .assign(region='AUSTRALIA')
+    #     df_AUS_wide.columns = ['name', 'data','region']
+    #     df_AUS_wide['type'] = 'column'
 
-        df_region = cost_transition_non_ag2ag_df\
-            .groupby(['Year', 'region', col])\
-            .sum()\
-            .reset_index()\
-            .round({'Value ($)': 2})
-        df_region_wide = df_region.groupby([col, 'region'])[['Year','Value ($)']]\
-            .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
-            .reset_index()
-        df_region_wide.columns = ['name', 'region', 'data']
-        df_region_wide['type'] = 'column'
+    #     df_region = cost_transition_non_ag2ag_df\
+    #         .groupby(['Year', 'region', col])\
+    #         .sum()\
+    #         .reset_index()\
+    #         .round({'Value ($)': 2})
+    #     df_region_wide = df_region.groupby([col, 'region'])[['Year','Value ($)']]\
+    #         .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+    #         .reset_index()
+    #     df_region_wide.columns = ['name', 'region', 'data']
+    #     df_region_wide['type'] = 'column'
         
         
-        df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+    #     df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
         
-        out_dict = {}
-        for region, df in df_wide.groupby('region'):
-            df = df.drop(['region'], axis=1)
-            out_dict[region] = df.to_dict(orient='records')
+    #     out_dict = {}
+    #     for region, df in df_wide.groupby('region'):
+    #         df = df.drop(['region'], axis=1)
+    #         out_dict[region] = df.to_dict(orient='records')
             
-        filename = f'Economics_transition_split_NonAg2Ag_{idx+1}_{col.replace(" ", "_")}'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+    #     filename = f'Economics_transition_split_NonAg2Ag_{idx+1}_{col.replace(" ", "_")}'
+    #     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+    #         f.write(f'window["{filename}"] = ')
+    #         json.dump(out_dict, f, separators=(',', ':'), indent=2)
+    #         f.write(';\n')
     
     
     
-    # -------------------- Transition cost matrix for Non-Ag to Ag --------------------
-    cost_transition_nonag2ag_trans_mat_AUS = cost_transition_non_ag2ag_df\
-        .groupby(['Year','From land-use', 'To land-use'])\
-        .sum(numeric_only=True)\
-        .reset_index()\
-        .round({'Value ($)': 2})\
-        .assign(region='AUSTRALIA')
+    # # -------------------- Transition cost matrix for Non-Ag to Ag --------------------
+    # cost_transition_nonag2ag_trans_mat_AUS = cost_transition_non_ag2ag_df\
+    #     .groupby(['Year','From land-use', 'To land-use'])\
+    #     .sum(numeric_only=True)\
+    #     .reset_index()\
+    #     .round({'Value ($)': 2})\
+    #     .assign(region='AUSTRALIA')
 
-    cost_transition_nonag2ag_trans_mat_region_df = cost_transition_non_ag2ag_df\
-        .groupby(['Year','From land-use', 'To land-use', 'region'])\
-        .sum(numeric_only=True)\
-        .reset_index()\
-        .round({'Value ($)': 2})
+    # cost_transition_nonag2ag_trans_mat_region_df = cost_transition_non_ag2ag_df\
+    #     .groupby(['Year','From land-use', 'To land-use', 'region'])\
+    #     .sum(numeric_only=True)\
+    #     .reset_index()\
+    #     .round({'Value ($)': 2})
         
         
-    cost_transition_nonag2ag_trans_mat = pd.concat([
-        cost_transition_nonag2ag_trans_mat_AUS,
-        cost_transition_nonag2ag_trans_mat_region_df
-    ])
+    # cost_transition_nonag2ag_trans_mat = pd.concat([
+    #     cost_transition_nonag2ag_trans_mat_AUS,
+    #     cost_transition_nonag2ag_trans_mat_region_df
+    # ])
 
 
-    out_dict_area = {}
-    for (region,year),df in cost_transition_nonag2ag_trans_mat.groupby(['region', 'Year']):
+    # out_dict_area = {}
+    # for (region,year),df in cost_transition_nonag2ag_trans_mat.groupby(['region', 'Year']):
         
-        out_dict_area.setdefault(region, {})
+    #     out_dict_area.setdefault(region, {})
         
-        transition_mat = df.pivot(index='From land-use', columns='To land-use', values='Value ($)')
-        transition_mat = transition_mat.reindex(index=RENAME_NON_AG.values(), columns=AG_LANDUSE)
-        transition_mat = transition_mat.fillna(0)
-        total_area_from = transition_mat.sum(axis=1).values.reshape(-1, 1)
+    #     transition_mat = df.pivot(index='From land-use', columns='To land-use', values='Value ($)')
+    #     transition_mat = transition_mat.reindex(index=RENAME_NON_AG.values(), columns=AG_LANDUSE)
+    #     transition_mat = transition_mat.fillna(0)
+    #     total_area_from = transition_mat.sum(axis=1).values.reshape(-1, 1)
         
-        transition_mat['SUM'] = transition_mat.sum(axis=1)
-        transition_mat.loc['SUM'] = transition_mat.sum(axis=0)
+    #     transition_mat['SUM'] = transition_mat.sum(axis=1)
+    #     transition_mat.loc['SUM'] = transition_mat.sum(axis=0)
 
-        heat_area = transition_mat.style.background_gradient(
-            cmap='Oranges',
-            axis=1,
-            subset=pd.IndexSlice[:transition_mat.index[-2], :transition_mat.columns[-2]]
-        ).format('{:,.0f}')
+    #     heat_area = transition_mat.style.background_gradient(
+    #         cmap='Oranges',
+    #         axis=1,
+    #         subset=pd.IndexSlice[:transition_mat.index[-2], :transition_mat.columns[-2]]
+    #     ).format('{:,.0f}')
 
-        heat_area_html = heat_area.to_html()
-        heat_area_html = re.sub(r'(?<!\d)0(?!\d)', '-', heat_area_html)
+    #     heat_area_html = heat_area.to_html()
+    #     heat_area_html = re.sub(r'(?<!\d)0(?!\d)', '-', heat_area_html)
 
-        out_dict_area[region][str(year)] = rf'{heat_area_html}'
+    #     out_dict_area[region][str(year)] = rf'{heat_area_html}'
 
-    filename = 'Economics_transition_mat_nonag2ag'
-    with open(f'{SAVE_DIR}/{filename}.js', 'w', encoding='utf-8') as f:
-        f.write(f'window["{filename}"] = ')
-        json.dump(out_dict_area, f, separators=(',', ':'), indent=2)
-        f.write(';\n')
+    # filename = 'Economics_transition_mat_nonag2ag'
+    # with open(f'{SAVE_DIR}/{filename}.js', 'w', encoding='utf-8') as f:
+    #     f.write(f'window["{filename}"] = ')
+    #     json.dump(out_dict_area, f, separators=(',', ':'), indent=2)
+    #     f.write(';\n')
 
 
 
@@ -1294,6 +1272,7 @@ def save_report_data(raw_data_dir:str):
         GHG_non_ag = GHG_files.query('base_name.str.contains("no_ag_reduction")').reset_index(drop=True)
         GHG_non_ag = pd.concat([pd.read_csv(path) for path in GHG_non_ag['path'] if not pd.read_csv(path).empty], ignore_index=True)
         GHG_non_ag = GHG_non_ag.replace(RENAME_AM_NON_AG).round({'Value (t CO2e)': 2})
+        GHG_non_ag['Water_supply'] = 'NA'
         
         GHG_ag_man = GHG_files.query('base_name.str.contains("agricultural_management")').reset_index(drop=True)
         GHG_ag_man = pd.concat([pd.read_csv(path) for path in GHG_ag_man['path'] if not pd.read_csv(path).empty], ignore_index=True)
@@ -1317,7 +1296,7 @@ def save_report_data(raw_data_dir:str):
    
         GHG_land = pd.concat([GHG_ag, GHG_non_ag, GHG_ag_man, GHG_transition], axis=0).query('abs(`Value (t CO2e)`) > 1e-6').reset_index(drop=True)
         GHG_land['Land-use type'] = GHG_land['Land-use'].apply(lu_group.set_index('Land-use')['Category'].to_dict().get)
-        net_land = GHG_land.groupby('Year')[['Value (t CO2e)']].sum(numeric_only=True).reset_index()
+        net_land = GHG_land.query('region == "AUSTRALIA" and Water_supply != "ALL"').groupby('Year')[['Value (t CO2e)']].sum(numeric_only=True).reset_index()
 
 
         GHG_limit = GHG_files.query('base_name == "GHG_emissions"')
@@ -1339,11 +1318,12 @@ def save_report_data(raw_data_dir:str):
         ]
    
 
-        # -------------------- GHG from individual emission sectors --------------------
+        # -------------------- GHG overview --------------------
         net_offland_AUS = GHG_off_land.groupby('Year')[['Value (t CO2e)']].sum(numeric_only=True).reset_index()
         net_offland_AUS_wide = net_offland_AUS[['Year','Value (t CO2e)']].values.tolist()
         
         net_land_AUS_wide = GHG_land\
+            .query('region == "AUSTRALIA" and Water_supply != "ALL"')\
             .groupby(['Year','Type'])[['Value (t CO2e)']]\
             .sum(numeric_only=True)\
             .reset_index()\
@@ -1369,14 +1349,13 @@ def save_report_data(raw_data_dir:str):
             'line'
         ]
 
- 
         net_land_AUS_wide['name_order'] = net_land_AUS_wide['name'].apply(lambda x: order_GHG.index(x))
         net_land_AUS_wide = net_land_AUS_wide.sort_values('name_order').drop(columns=['name_order'])
         
-        GHG_AUS = {'AUSTRALIA': json.loads(net_land_AUS_wide.to_json(orient='records'))}
+        GHG_AUS_overview = {'AUSTRALIA': json.loads(net_land_AUS_wide.to_json(orient='records'))}
         
         GHG_region = {}
-        for region,df in GHG_land.groupby('region'):
+        for region,df in GHG_land.query('region != "AUSTRALIA"').groupby('region'):
             df_reg = df\
                 .groupby(['Year','Type'])[['Value (t CO2e)']]\
                 .sum(numeric_only=True)\
@@ -1399,7 +1378,7 @@ def save_report_data(raw_data_dir:str):
             GHG_region[region] = json.loads(df_reg.to_json(orient='records'))
             
             
-        GHG_json = {**GHG_AUS,  **GHG_region}
+        GHG_json = {**GHG_AUS_overview,  **GHG_region}
         filename = 'GHG_overview'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
@@ -1409,22 +1388,13 @@ def save_report_data(raw_data_dir:str):
 
         # -------------------- GHG ranking --------------------
         GHG_rank_emission_region = GHG_land\
-            .query('abs(`Value (t CO2e)`) > 1e-6')\
+            .query('`Value (t CO2e)` > 0')\
             .groupby(['Year', 'region'])\
             .sum(numeric_only=True)\
             .reset_index()\
             .sort_values(['Year', 'Value (t CO2e)'], ascending=[True, False])\
-            .assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1)\
-            .assign(Percent=lambda x: x['Value (t CO2e)'] / x.groupby('Year')['Value (t CO2e)'].transform('sum') * 100)\
+            .assign(Rank=lambda x: x.groupby(['Year']).cumcount())\
             .assign(Type='GHG emissions')
-        GHG_rank_emission_AUS = GHG_land\
-            .query('abs(`Value (t CO2e)`) > 1e-6')\
-            .groupby(['Year'])\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .sort_values(['Year', 'Value (t CO2e)'], ascending=[True, False])\
-            .assign(Rank='N.A.', Percent=100, Type='GHG emissions', region='AUSTRALIA')
-
         GHG_rank_sequestration_region = GHG_land\
             .query('`Value (t CO2e)` < 0')\
             .assign(**{'Value (t CO2e)': lambda x: abs(x['Value (t CO2e)'])})\
@@ -1432,50 +1402,20 @@ def save_report_data(raw_data_dir:str):
             .sum(numeric_only=True)\
             .reset_index()\
             .sort_values(['Year', 'Value (t CO2e)'], ascending=[True, False])\
-            .assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1)\
-            .assign(Percent=lambda x: x['Value (t CO2e)'] / x.groupby('Year')['Value (t CO2e)'].transform('sum') * 100)\
+            .assign(Rank=lambda x: x.groupby(['Year']).cumcount())\
             .assign(Type='GHG sequestrations')
-        GHG_rank_sequestration_AUS = GHG_land\
-            .query('`Value (t CO2e)` < 0')\
-            .assign(**{'Value (t CO2e)': lambda x: abs(x['Value (t CO2e)'])})\
-            .groupby(['Year'])\
-            .sum(numeric_only=True)\
-            .reset_index()\
-            .sort_values(['Year', 'Value (t CO2e)'], ascending=[True, False])\
-            .assign(Rank='N.A.', Area_type='Total', Percent=100, region='AUSTRALIA')\
-            .assign(Type='GHG sequestrations')
-            
         GHG_rank_region_net = GHG_rank_emission_region\
             .merge(GHG_rank_sequestration_region, on=['Year', 'region'], how='outer', suffixes=('_emission', '_sequestration'))\
-            .assign(**{'Value (t CO2e)_sequestration': lambda x: abs(x['Value (t CO2e)_sequestration'])})\
             .assign(**{'Value (t CO2e)': lambda x: x['Value (t CO2e)_emission'] - x['Value (t CO2e)_sequestration']})\
-            .assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1)\
             .assign(Type='Total')
-        GHG_rank_AUS_net = GHG_rank_emission_AUS\
-            .merge(GHG_rank_sequestration_AUS, on=['Year'], how='outer', suffixes=('_emission', '_sequestration'))\
-            .assign(**{'Value (t CO2e)_sequestration': lambda x: abs(x['Value (t CO2e)_sequestration'])})\
-            .assign(**{'Value (t CO2e)': lambda x: x['Value (t CO2e)_emission'] - x['Value (t CO2e)_sequestration']})\
-            .assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1)\
-            .assign(Type='Total', region='AUSTRALIA')
+
 
         GHG_rank = pd.concat([
             GHG_rank_emission_region, 
-            GHG_rank_emission_AUS,
             GHG_rank_sequestration_region, 
-            GHG_rank_sequestration_AUS,
             GHG_rank_region_net,
-            GHG_rank_AUS_net
-            ], axis=0, ignore_index=True).reset_index(drop=True)
-        GHG_rank = GHG_rank\
-            .reset_index(drop=True)\
-            .round({'Percent': 2, 'Value (t CO2e)':2})\
-            .assign(color=lambda x: x['Rank'].map(get_rank_color))\
-            .set_index(['region', 'Year', 'Type'])\
-            .reindex(
-                index=pd.MultiIndex.from_product(
-                    [GHG_rank['region'].unique(), GHG_rank['Year'].unique(), GHG_rank['Type'].unique()],
-                    names=['region', 'Year', 'Type']), fill_value=None
-            ).reset_index()\
+            ], axis=0, ignore_index=True).reset_index(drop=True)\
+            .round({'Value (t CO2e)':2})\
             .assign(color=lambda x: x['Rank'].map(get_rank_color))
      
 
@@ -1501,7 +1441,7 @@ def save_report_data(raw_data_dir:str):
 
 
 
-        # -------------------- GHG emission for agricultural land-use --------------------
+        # -------------------- GHG by agricultural land-use --------------------
         GHG_ag = GHG_land.query('Type == "Agricultural land-use"') 
         GHG_CO2 = GHG_ag.query('~Source.isin(@GHG_CATEGORY.keys())').copy()
         GHG_CO2['GHG Category'] = 'CO2'
@@ -1520,156 +1460,107 @@ def save_report_data(raw_data_dir:str):
                 'N2O': 'Nitrous Oxide (N2O)', 
                 'CO2': 'Carbon Dioxide (CO2)'
             })
-            
-            
-        group_cols = ['GHG Category', 'Land-use', 'Land-use type', 'Source', 'Water_supply']
-        
-        for idx, col in enumerate(group_cols):
 
-            df_region = GHG_ag_emissions_long\
-                .groupby(['Year', 'region', col])\
-                .sum()\
-                .reset_index()\
-                .round({'Value (t CO2e)': 2})
-            df_wide = df_region.groupby([col, 'region'])[['Year','Value (t CO2e)']]\
-                .apply(lambda x: x[['Year', 'Value (t CO2e)']].values.tolist())\
-                .reset_index()
-            df_wide.columns = ['name', 'region', 'data']
-            df_wide['type'] = 'column'
-            
-            if col == "Land-use":
-                df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
-                df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-                df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-            elif col == 'Water_supply':
-                df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
-            elif col.lower() == 'commodity':
-                df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
-                df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
-                df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-            elif col == 'Agricultural Management Type':
-                df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
-            elif col == 'Source':
-                df_wide['color'] = df_wide.apply(lambda x: COLORS_GHG[x['name']], axis=1)
-            
-            
-            out_dict = {}
-            for region, df in df_wide.groupby('region'):
-                df = df.drop(['region'], axis=1)
-                out_dict[region] = df.to_dict(orient='records')
-                
-            filename = f'GHG_split_Ag_{idx+1}_{col.replace(" ", "_")}'
-            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-                f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'), indent=2)
-                f.write(';\n')
+        df_wide = GHG_ag_emissions_long\
+            .groupby(['region', 'Source', 'Water_supply', 'Land-use', 'Year'])[['Value (t CO2e)']]\
+            .sum()\
+            .reset_index()\
+            .round({'Value (t CO2e)': 2})
+        df_wide = df_wide.groupby(['region', 'Source', 'Water_supply', 'Land-use'])[['Year','Value (t CO2e)']]\
+            .apply(lambda x: x[['Year', 'Value (t CO2e)']].values.tolist())\
+            .reset_index()
+        df_wide.columns = ['region', 'source', 'water', 'name', 'data']
+        df_wide['type'] = 'column'
+        df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+        df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+        df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
 
-     
+        out_dict = {}
+        for (region, source, water), df in df_wide.groupby(['region', 'source', 'water']):
+            df = df.drop(['region', 'source', 'water'], axis=1)
+            if region not in out_dict:
+                out_dict[region] = {}
+            if source not in out_dict[region]:
+                out_dict[region][source] = {}
+            if water not in out_dict[region][source]:
+                out_dict[region][source][water] = {}
+            out_dict[region][source][water] = df.to_dict(orient='records')
             
-        # -------------------- GHG emission (off-land) by commodity --------------------
-        group_cols = ['Emission Type', 'Emission Source', 'Commodity']
-
-        for idx, col in enumerate(group_cols):
-            df_AUS = GHG_off_land\
-                .groupby(['Year', col])[['Value (t CO2e)']]\
-                .sum()\
-                .reset_index()\
-                .round({'Value (t CO2e)': 2})
-            df_AUS_wide = df_AUS.groupby([col])[['Year','Value (t CO2e)']]\
-                .apply(lambda x: x[['Year', 'Value (t CO2e)']].values.tolist())\
-                .reset_index()\
-                .assign(region='AUSTRALIA')
-            df_AUS_wide.columns = ['name', 'data','region']
-            df_AUS_wide['type'] = 'column'   
-            
-            out_dict = {}
-            for region, df in df_AUS_wide.groupby('region'):
-                df = df.drop(['region'], axis=1)
-                out_dict[region] = df.to_dict(orient='records')
-                
-            filename = f'GHG_split_off_land_{idx+1}_{col.replace(" ", "_")}'
-            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-                f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'), indent=2)
-                f.write(';\n')
-    
+        filename = 'GHG_Ag'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
 
 
-        # -------------------- GHG abatement by Non-Agricultural sector --------------------
+
+        # -------------------- GHG by Non-Agricultural --------------------
         Non_ag_reduction_long = GHG_land.query('Type == "Non-Agricultural land-use"').reset_index(drop=True)
-        Non_ag_reduction_long['Value (t CO2e)'] = Non_ag_reduction_long['Value (t CO2e)'] * -1  # Convert from negative to positive
-        group_cols = ['Land-use']
-        for idx, col in enumerate(group_cols):
+        Non_ag_reduction_long['Value (t CO2e)'] *= -1  # Convert from negative to positive
+        
+        df_region = Non_ag_reduction_long\
+            .groupby(['Year', 'region', 'Land-use'])[['Value (t CO2e)']]\
+            .sum()\
+            .reset_index()\
+            .round({'Value (t CO2e)': 2})
+        df_wide = df_region.groupby(['Land-use', 'region'])[['Year','Value (t CO2e)']]\
+            .apply(lambda x: x[['Year', 'Value (t CO2e)']].values.tolist())\
+            .reset_index()
+        df_wide.columns = ['name', 'region', 'data']
+        df_wide['type'] = 'column'
+        
+        df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+        df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+        df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+        
+        out_dict = {}
+        for region, df in df_wide.groupby('region'):
+            df = df.drop(['region'], axis=1)
+            out_dict[region] = df.to_dict(orient='records')
 
-            df_region = Non_ag_reduction_long\
-                .groupby(['Year', 'region', col])\
-                .sum()\
-                .reset_index()\
-                .round({'Value (t CO2e)': 2})
-            df_wide = df_region.groupby([col, 'region'])[['Year','Value (t CO2e)']]\
-                .apply(lambda x: x[['Year', 'Value (t CO2e)']].values.tolist())\
-                .reset_index()
-            df_wide.columns = ['name', 'region', 'data']
-            df_wide['type'] = 'column'
-            
-            df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
-            df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-            
-            out_dict = {}
-            for region, df in df_wide.groupby('region'):
-                df = df.drop(['region'], axis=1)
-                out_dict[region] = df.to_dict(orient='records')
-
-            filename = f'GHG_split_NonAg_{idx+1}_{col.replace(" ", "_")}'
-            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-                f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'), indent=2)
-                f.write(';\n')
+        filename = f'GHG_NonAg'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
 
 
 
-        # -------------------- GHG reductions by Agricultural Managements --------------------
+        # -------------------- GHG by Agricultural Managements --------------------
         Ag_man_sequestration_long = GHG_land.query('Type == "Agricultural Management"').reset_index(drop=True)
         Ag_man_sequestration_long['Value (t CO2e)'] = Ag_man_sequestration_long['Value (t CO2e)'] * -1  # Convert from negative to positive
         group_cols = ['Land-use', 'Land-use type', 'Agricultural Management Type', 'Water_supply']
-        for idx, col in enumerate(group_cols):
 
-            df_region = Ag_man_sequestration_long\
-                .groupby(['Year', 'region', col])\
-                .sum()\
-                .reset_index()\
-                .round({'Value (t CO2e)': 2})
-            df_wide = df_region.groupby([col, 'region'])[['Year','Value (t CO2e)']]\
-                .apply(lambda x: x[['Year', 'Value (t CO2e)']].values.tolist())\
-                .reset_index()
-            df_wide.columns = ['name', 'region', 'data']
-            df_wide['type'] = 'column'
+        df_region = Ag_man_sequestration_long\
+            .groupby(['region', 'Agricultural Management Type', 'Water_supply', 'Land-use', 'Year'])[['Value (t CO2e)']]\
+            .sum()\
+            .reset_index()\
+            .round({'Value (t CO2e)': 2})
+        df_wide = df_region.groupby(['region', 'Agricultural Management Type', 'Water_supply', 'Land-use'])[['Year','Value (t CO2e)']]\
+            .apply(lambda x: x[['Year', 'Value (t CO2e)']].values.tolist())\
+            .reset_index()
+        df_wide.columns = ['region', '_type', 'water', 'name', 'data']
+        df_wide['type'] = 'column'
+        df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+        df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+        df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+        out_dict = {}
+        for (region,_type,water), df in df_wide.groupby(['region', '_type', 'water']):
+            df = df.drop(['region', '_type', 'water'], axis=1)
+            if region not in out_dict:
+                out_dict[region] = {}
+            if _type not in out_dict[region]:
+                out_dict[region][_type] = {}
+            if water not in out_dict[region][_type]:
+                out_dict[region][_type][water] = {}
+            out_dict[region][_type][water] = df.to_dict(orient='records')
             
-            if col == "Land-use":
-                df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
-                df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-                df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-            elif col == 'Water_supply':
-                df_wide['color'] = df_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
-            elif col.lower() == 'commodity':
-                df_wide['color'] = df_wide.apply(lambda x: COLORS_COMMODITIES[x['name']], axis=1)
-                df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
-                df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-            elif col == 'Agricultural Management Type':
-                df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
-            
-            
-            out_dict = {}
-            for region, df in df_wide.groupby('region'):
-                df = df.drop(['region'], axis=1)
-                out_dict[region] = df.to_dict(orient='records')
-                
-            filename = f'GHG_split_Am_{idx+1}_{col.replace(" ", "_")}'
-            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-                f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'), indent=2)
-                f.write(';\n')
+        filename = 'GHG_Am'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
 
         
 
