@@ -978,20 +978,20 @@ def write_dvar_area(data: Data, yr_cal, path):
         ).to_dataframe('Area (ha)'
         ).reset_index(
         ).rename(columns={'lu': 'Land-use', 'lm':'Water_supply'}
-        ).assign(Year=yr_cal
+        ).assign(Year=yr_cal, region='AUSTRALIA'
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
         ).query('`Area (ha)` > 1e-6')
     df_non_ag_area_AUS = area_non_ag.sum(dim='cell'
         ).to_dataframe('Area (ha)'
         ).reset_index(
         ).rename(columns={'lu': 'Land-use'}
-        ).assign(Year=yr_cal
+        ).assign(Year=yr_cal, region='AUSTRALIA'
         ).query('`Area (ha)` > 1e-6')
     df_am_area_AUS = area_am.sum(dim='cell'
         ).to_dataframe('Area (ha)'
         ).reset_index(
         ).rename(columns={'lu': 'Land-use', 'lm':'Water_supply', 'am': 'Type'}
-        ).assign(Year=yr_cal
+        ).assign(Year=yr_cal, region='AUSTRALIA'
         ).replace({'dry':'Dryland', 'irr':'Irrigated'}
         ).query('`Area (ha)` > 1e-6')
                                  
