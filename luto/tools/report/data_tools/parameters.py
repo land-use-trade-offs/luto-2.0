@@ -217,14 +217,14 @@ COLORS_LU.update({'Outside LUTO study area': "#C7BFBF"})
 COLORS_LU.update({'Agri-Management': "#D5F100"})
 COLORS_LM = dict(zip(['Dryland', 'Irrigated'], ["#f7a35c", "#7cb5ec"]))
 COLORS_COMMODITIES = dict(zip(COMMODITIES_ALL, cycle(COLORS)))
-COLORS_AM_NONAG = dict(zip(RENAME_AM_NON_AG.values(), cycle(COLORS)))
+COLORS_AM_NONAG = dict(zip(list(RENAME_AM_NON_AG.values()) + ['ALL'], cycle(COLORS)))
 COLORS_GHG = dict(zip(GHG_NAMES.values(), cycle(COLORS)))
 
 COLORS_ECONOMY_TYPE = dict(zip(
     [
         'Live Exports', 'Meat', 'Milk', 'Wool', 'Crop', 'Area cost',
         'Fixed depreciation cost', 'Fixed labour cost', 'Fixed operating cost',
-        'Quantity cost', 'Water cost'
+        'Quantity cost', 'Water cost', 'ALL'
     ],
      cycle(COLORS)
 ))
