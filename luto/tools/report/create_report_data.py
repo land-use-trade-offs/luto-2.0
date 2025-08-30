@@ -495,33 +495,18 @@ def save_report_data(raw_data_dir:str):
     # -------------------- Sum of commodity production --------------------
     group_cols = ['Commodity', 'Type']
     for idx, col in enumerate(group_cols):
-
-        df_AUS = quantity_LUTO\
-            .groupby(['Year', col])[['Production (t/KL)']]\
-            .sum()\
-            .reset_index()\
-            .round({'Production (t/KL)': 2})
-        df_AUS_wide = df_AUS.groupby([col])[['Year','Production (t/KL)']]\
-            .apply(lambda x: x[['Year','Production (t/KL)']].values.tolist())\
-            .reset_index()\
-            .assign(region='AUSTRALIA')
-        df_AUS_wide.columns = ['name','data','region']
-        df_AUS_wide['type'] = 'column'
-        
         
         df_region = quantity_LUTO\
             .groupby(['Year', 'region', col])\
             .sum()\
             .reset_index()\
             .round({'Production (t/KL)': 2})
-        df_region_wide = df_region.groupby([col, 'region'])[['Year','Production (t/KL)']]\
+        df_wide = df_region.groupby([col, 'region'])[['Year','Production (t/KL)']]\
             .apply(lambda x: x[['Year','Production (t/KL)']].values.tolist())\
             .reset_index()
-        df_region_wide.columns = ['name', 'region','data']
-        df_region_wide['type'] = 'column'
+        df_wide.columns = ['name', 'region','data']
+        df_wide['type'] = 'column'
         
-        
-        df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
         if col == "Land-use":
             df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_LU[x])
             df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
@@ -579,33 +564,18 @@ def save_report_data(raw_data_dir:str):
 
         group_cols = ['Commodity']
         for col in group_cols:
-
-            df_AUS = _df\
-                .groupby(['Year', col])[['Production (t/KL)']]\
-                .sum()\
-                .reset_index()\
-                .round({'Production (t/KL)': 2})
-            df_AUS_wide = df_AUS.groupby([col])[['Year','Production (t/KL)']]\
-                .apply(lambda x: x[['Year','Production (t/KL)']].values.tolist())\
-                .reset_index()\
-                .assign(region='AUSTRALIA')
-            df_AUS_wide.columns = ['name','data','region']
-            df_AUS_wide['type'] = 'column'
-            
             
             df_region = _df\
                 .groupby(['Year', 'region', col])\
                 .sum()\
                 .reset_index()\
                 .round({'Production (t/KL)': 2})
-            df_region_wide = df_region.groupby([col, 'region'])[['Year','Production (t/KL)']]\
+            df_wide = df_region.groupby([col, 'region'])[['Year','Production (t/KL)']]\
                 .apply(lambda x: x[['Year','Production (t/KL)']].values.tolist())\
                 .reset_index()
-            df_region_wide.columns = ['name', 'region','data']
-            df_region_wide['type'] = 'column'
+            df_wide.columns = ['name', 'region','data']
+            df_wide['type'] = 'column'
             
-            
-            df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
             if col == "Land-use":
                 df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_LU[x])
                 df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
@@ -879,31 +849,17 @@ def save_report_data(raw_data_dir:str):
     group_cols = ['Land-use', 'Type', 'Water_supply']
 
     for idx, col in enumerate(group_cols):
-        df_AUS = economics_ag\
-            .groupby(['Year', 'Rev_Cost', col])[['Value ($)']]\
-            .sum()\
-            .reset_index()\
-            .round({'Value ($)': 2})
-        df_AUS_wide = df_AUS.groupby([col, 'Rev_Cost'])[['Year','Value ($)']]\
-            .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
-            .reset_index()\
-            .assign(region='AUSTRALIA')
-        df_AUS_wide.columns = ['name', 'Rev_Cost', 'data','region']
-        df_AUS_wide['type'] = 'column'
 
         df_region = economics_ag\
             .groupby(['Year', 'Rev_Cost', 'region', col])\
             .sum()\
             .reset_index()\
             .round({'Value ($)': 2})
-        df_region_wide = df_region.groupby([col, 'region', 'Rev_Cost'])[['Year','Value ($)']]\
+        df_wide = df_region.groupby([col, 'region', 'Rev_Cost'])[['Year','Value ($)']]\
             .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
             .reset_index()
-        df_region_wide.columns = ['name', 'region','Rev_Cost', 'data']
-        df_region_wide['type'] = 'column'
-        
-        
-        df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+        df_wide.columns = ['name', 'region','Rev_Cost', 'data']
+        df_wide['type'] = 'column'
         
         if col == "Land-use":
             df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
@@ -953,31 +909,17 @@ def save_report_data(raw_data_dir:str):
     group_cols = ['Management Type', 'Water_supply', 'Land-use']
 
     for idx, col in enumerate(group_cols):
-        df_AUS = economics_am\
-            .groupby(['Year', 'Rev_Cost', col])[['Value ($)']]\
-            .sum()\
-            .reset_index()\
-            .round({'Value ($)': 2})
-        df_AUS_wide = df_AUS.groupby([col, 'Rev_Cost'])[['Year','Value ($)']]\
-            .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
-            .reset_index()\
-            .assign(region='AUSTRALIA')
-        df_AUS_wide.columns = ['name', 'Rev_Cost', 'data','region']
-        df_AUS_wide['type'] = 'column'
 
         df_region = economics_am\
             .groupby(['Year', 'Rev_Cost', 'region', col])\
             .sum()\
             .reset_index()\
             .round({'Value ($)': 2})
-        df_region_wide = df_region.groupby([col, 'region', 'Rev_Cost'])[['Year','Value ($)']]\
+        df_wide = df_region.groupby([col, 'region', 'Rev_Cost'])[['Year','Value ($)']]\
             .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
             .reset_index()
-        df_region_wide.columns = ['name', 'region','Rev_Cost', 'data']
-        df_region_wide['type'] = 'column'
-        
-        
-        df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+        df_wide.columns = ['name', 'region','Rev_Cost', 'data']
+        df_wide['type'] = 'column'
         
         if col == "Land-use":
             df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
@@ -1022,30 +964,17 @@ def save_report_data(raw_data_dir:str):
     group_cols = ['Land-use']
 
     for idx, col in enumerate(group_cols):
-        df_AUS = economics_non_ag\
-            .groupby(['Year', 'Rev_Cost', col])[['Value ($)']]\
-            .sum()\
-            .reset_index()\
-            .round({'Value ($)': 2})
-        df_AUS_wide = df_AUS.groupby([col, 'Rev_Cost'])[['Year','Value ($)']]\
-            .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
-            .reset_index()\
-            .assign(region='AUSTRALIA')
-        df_AUS_wide.columns = ['name', 'Rev_Cost', 'data','region']
-        df_AUS_wide['type'] = 'column'
 
         df_region = economics_non_ag\
             .groupby(['Year', 'Rev_Cost', 'region', col])\
             .sum()\
             .reset_index()\
             .round({'Value ($)': 2})
-        df_region_wide = df_region.groupby([col, 'region', 'Rev_Cost'])[['Year','Value ($)']]\
+        df_wide = df_region.groupby([col, 'region', 'Rev_Cost'])[['Year','Value ($)']]\
             .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
             .reset_index()
-        df_region_wide.columns = ['name', 'region','Rev_Cost', 'data']
-        df_region_wide['type'] = 'column'
-        
-        df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+        df_wide.columns = ['name', 'region','Rev_Cost', 'data']
+        df_wide['type'] = 'column'
         
         df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
         df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
@@ -1618,30 +1547,17 @@ def save_report_data(raw_data_dir:str):
         group_cols = ['GHG Category', 'Land-use', 'Land-use type', 'Source', 'Water_supply']
         
         for idx, col in enumerate(group_cols):
-            df_AUS = GHG_ag_emissions_long\
-                .groupby(['Year', col])[['Value (t CO2e)']]\
-                .sum()\
-                .reset_index()
-            df_AUS_wide = df_AUS.groupby([col])[['Year','Value (t CO2e)']]\
-                .apply(lambda x: x[['Year', 'Value (t CO2e)']].values.tolist())\
-                .reset_index()\
-                .assign(region='AUSTRALIA')
-            df_AUS_wide.columns = ['name', 'data','region']
-            df_AUS_wide['type'] = 'column'
 
             df_region = GHG_ag_emissions_long\
                 .groupby(['Year', 'region', col])\
                 .sum()\
                 .reset_index()\
                 .round({'Value (t CO2e)': 2})
-            df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (t CO2e)']]\
+            df_wide = df_region.groupby([col, 'region'])[['Year','Value (t CO2e)']]\
                 .apply(lambda x: x[['Year', 'Value (t CO2e)']].values.tolist())\
                 .reset_index()
-            df_region_wide.columns = ['name', 'region', 'data']
-            df_region_wide['type'] = 'column'
-            
-            
-            df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+            df_wide.columns = ['name', 'region', 'data']
+            df_wide['type'] = 'column'
             
             if col == "Land-use":
                 df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
@@ -1706,30 +1622,17 @@ def save_report_data(raw_data_dir:str):
         Non_ag_reduction_long['Value (t CO2e)'] = Non_ag_reduction_long['Value (t CO2e)'] * -1  # Convert from negative to positive
         group_cols = ['Land-use']
         for idx, col in enumerate(group_cols):
-            df_AUS = Non_ag_reduction_long\
-                .groupby(['Year', col])[['Value (t CO2e)']]\
-                .sum()\
-                .reset_index()
-            df_AUS_wide = df_AUS.groupby([col])[['Year','Value (t CO2e)']]\
-                .apply(lambda x: x[['Year', 'Value (t CO2e)']].values.tolist())\
-                .reset_index()\
-                .assign(region='AUSTRALIA')
-            df_AUS_wide.columns = ['name', 'data','region']
-            df_AUS_wide['type'] = 'column'
 
             df_region = Non_ag_reduction_long\
                 .groupby(['Year', 'region', col])\
                 .sum()\
                 .reset_index()\
                 .round({'Value (t CO2e)': 2})
-            df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (t CO2e)']]\
+            df_wide = df_region.groupby([col, 'region'])[['Year','Value (t CO2e)']]\
                 .apply(lambda x: x[['Year', 'Value (t CO2e)']].values.tolist())\
                 .reset_index()
-            df_region_wide.columns = ['name', 'region', 'data']
-            df_region_wide['type'] = 'column'
-            
-            
-            df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+            df_wide.columns = ['name', 'region', 'data']
+            df_wide['type'] = 'column'
             
             df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
             df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
@@ -1753,30 +1656,17 @@ def save_report_data(raw_data_dir:str):
         Ag_man_sequestration_long['Value (t CO2e)'] = Ag_man_sequestration_long['Value (t CO2e)'] * -1  # Convert from negative to positive
         group_cols = ['Land-use', 'Land-use type', 'Agricultural Management Type', 'Water_supply']
         for idx, col in enumerate(group_cols):
-            df_AUS = Ag_man_sequestration_long\
-                .groupby(['Year', col])[['Value (t CO2e)']]\
-                .sum()\
-                .reset_index()
-            df_AUS_wide = df_AUS.groupby([col])[['Year','Value (t CO2e)']]\
-                .apply(lambda x: x[['Year', 'Value (t CO2e)']].values.tolist())\
-                .reset_index()\
-                .assign(region='AUSTRALIA')
-            df_AUS_wide.columns = ['name', 'data','region']
-            df_AUS_wide['type'] = 'column'
 
             df_region = Ag_man_sequestration_long\
                 .groupby(['Year', 'region', col])\
                 .sum()\
                 .reset_index()\
                 .round({'Value (t CO2e)': 2})
-            df_region_wide = df_region.groupby([col, 'region'])[['Year','Value (t CO2e)']]\
+            df_wide = df_region.groupby([col, 'region'])[['Year','Value (t CO2e)']]\
                 .apply(lambda x: x[['Year', 'Value (t CO2e)']].values.tolist())\
                 .reset_index()
-            df_region_wide.columns = ['name', 'region', 'data']
-            df_region_wide['type'] = 'column'
-            
-            
-            df_wide = pd.concat([df_AUS_wide, df_region_wide], axis=0, ignore_index=True)
+            df_wide.columns = ['name', 'region', 'data']
+            df_wide['type'] = 'column'
             
             if col == "Land-use":
                 df_wide['color'] = df_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
