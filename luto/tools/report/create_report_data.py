@@ -421,116 +421,103 @@ def save_report_data(raw_data_dir:str):
     
     quantity_LUTO = demand_files\
         .query('base_name == "quantity_production_t_separate"')\
-        .reset_index(drop=True)\
-        .query('Year.isin(@years)')
+        .reset_index(drop=True)
     quantity_LUTO = pd.concat(
             [pd.read_csv(path).assign(Year=Year) for Year,path in quantity_LUTO[['Year','path']].values.tolist()],
             ignore_index=True)\
         .assign(Commodity= lambda x: x['Commodity'].str.capitalize())\
         .replace({'Sheep lexp': 'Sheep live export', 'Beef lexp': 'Beef live export'})\
+        .query('Year.isin(@years) and abs(`Production (t/KL)`) > 1e-6')\
         .round({'`Production (t/KL)`': 2})
     
-    DEMAND_DATA_long = get_demand_df()\
-        .replace({'Beef lexp': 'Beef live export', 'Sheep lexp': 'Sheep live export'})\
-        .set_index(['Commodity', 'Type', 'Year'])\
-        .reindex(COMMODITIES_ALL, level=0)\
-        .reset_index()\
-        .replace(RENAME_AM_NON_AG)\
-        .assign(on_off_land=lambda x: np.where(x['Commodity'].isin(COMMODITIES_OFF_LAND), 'Off-land', 'On-land'))
+    # DEMAND_DATA_long = get_demand_df()\
+    #     .replace({'Beef lexp': 'Beef live export', 'Sheep lexp': 'Sheep live export'})\
+    #     .set_index(['Commodity', 'Type', 'Year'])\
+    #     .reindex(COMMODITIES_ALL, level=0)\
+    #     .reset_index()\
+    #     .replace(RENAME_AM_NON_AG)\
+    #     .assign(on_off_land=lambda x: np.where(x['Commodity'].isin(COMMODITIES_OFF_LAND), 'Off-land', 'On-land'))
     
 
-    # -------------------- Demand --------------------
-    group_cols = ['Type', 'on_off_land', 'Commodity']
+    # # -------------------- Demand --------------------
+    # group_cols = ['Type', 'on_off_land', 'Commodity']
 
-    for idx, col in enumerate(group_cols):
+    # for idx, col in enumerate(group_cols):
 
 
-        _df = DEMAND_DATA_long.query(f'Year.isin({years})')
+    #     _df = DEMAND_DATA_long.query(f'Year.isin({years})')
             
-        df_AUS = _df\
-            .groupby(['Year', col])[['Quantity (tonnes, KL)']]\
-            .sum()\
-            .reset_index()\
-            .round({'Quantity (tonnes, KL)': 2})
-        df_AUS_wide = df_AUS.groupby([col])[['Year','Quantity (tonnes, KL)']]\
-            .apply(lambda x: x[['Year','Quantity (tonnes, KL)']].values.tolist())\
-            .reset_index()
-        df_AUS_wide.columns = ['name','data']
-        df_AUS_wide['type'] = 'column'
+    #     df_AUS = _df\
+    #         .groupby(['Year', col])[['Quantity (tonnes, KL)']]\
+    #         .sum()\
+    #         .reset_index()\
+    #         .round({'Quantity (tonnes, KL)': 2})
+    #     df_AUS_wide = df_AUS.groupby([col])[['Year','Quantity (tonnes, KL)']]\
+    #         .apply(lambda x: x[['Year','Quantity (tonnes, KL)']].values.tolist())\
+    #         .reset_index()
+    #     df_AUS_wide.columns = ['name','data']
+    #     df_AUS_wide['type'] = 'column'
  
-        if col == "Land-use":
-            df_AUS_wide['color'] = df_AUS_wide['name'].apply(lambda x: COLORS_LU[x])
-            df_AUS_wide['name_order'] = df_AUS_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-            df_AUS_wide = df_AUS_wide.sort_values('name_order').drop(columns=['name_order'])
-        elif col.lower() == 'commodity':
-            df_AUS_wide['color'] = df_AUS_wide['name'].apply(lambda x: COLORS_COMMODITIES[x])
-            df_AUS_wide['name_order'] = df_AUS_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
-            df_AUS_wide = df_AUS_wide.sort_values('name_order').drop(columns=['name_order'])
+    #     if col == "Land-use":
+    #         df_AUS_wide['color'] = df_AUS_wide['name'].apply(lambda x: COLORS_LU[x])
+    #         df_AUS_wide['name_order'] = df_AUS_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    #         df_AUS_wide = df_AUS_wide.sort_values('name_order').drop(columns=['name_order'])
+    #     elif col.lower() == 'commodity':
+    #         df_AUS_wide['color'] = df_AUS_wide['name'].apply(lambda x: COLORS_COMMODITIES[x])
+    #         df_AUS_wide['name_order'] = df_AUS_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+    #         df_AUS_wide = df_AUS_wide.sort_values('name_order').drop(columns=['name_order'])
  
-        filename = f'Production_demand_{idx+1}_{col.replace(" ", "_")}'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            df_AUS_wide.to_json(f, orient='records')
-            f.write(';\n')
+    #     filename = f'Production_demand_{idx+1}_{col.replace(" ", "_")}'
+    #     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+    #         f.write(f'window["{filename}"] = ')
+    #         df_AUS_wide.to_json(f, orient='records', indent=2)
+    #         f.write(';\n')
 
 
-    # -------------------- Production limit. --------------------
-    demand_limit = DEMAND_DATA_long.query('Type == "Domestic" and on_off_land == "On-land" and Year.isin(@years)')
-    demand_limit_wide = demand_limit.groupby(['Commodity', 'Year'])[['Quantity (tonnes, KL)']]\
-        .sum()\
-        .reset_index()\
-        .groupby('Commodity')[['Year','Quantity (tonnes, KL)']]\
-        .apply(lambda x: x[['Year','Quantity (tonnes, KL)']].values.tolist())\
+    # # -------------------- Production limit. --------------------
+    # demand_limit = DEMAND_DATA_long.query('Type == "Domestic" and on_off_land == "On-land" and Year.isin(@years)')
+    # demand_limit_wide = demand_limit.groupby(['Commodity', 'Year'])[['Quantity (tonnes, KL)']]\
+    #     .sum()\
+    #     .reset_index()\
+    #     .groupby('Commodity')[['Year','Quantity (tonnes, KL)']]\
+    #     .apply(lambda x: x[['Year','Quantity (tonnes, KL)']].values.tolist())\
+    #     .reset_index()
+    # demand_limit_wide.columns = ['name','data']
+    # demand_limit_wide['type'] = 'column'
+    # filename = 'Production_demand_4_Limit'
+    # with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+    #     f.write(f'window["{filename}"] = ')
+    #     demand_limit_wide.to_json(f, orient='records', indent=2)
+    #     f.write(';\n')
+
+
+
+    # -------------------- Overview: sum of commodity production --------------------
+    df_wide = quantity_LUTO\
+        .groupby(['region', 'Commodity'])[['Year', 'Production (t/KL)']]\
+        .apply(lambda x: x[['Year','Production (t/KL)']].values.tolist())\
         .reset_index()
-    demand_limit_wide.columns = ['name','data']
-    demand_limit_wide['type'] = 'column'
-    filename = 'Production_demand_4_Limit'
+    df_wide.columns = ['region', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_COMMODITIES[x])
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for region, df in df_wide.groupby('region'):
+        df = df.drop('region', axis=1)
+        out_dict[region] = df.to_dict(orient='records')
+        
+    filename = f'Production_overview_sum'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
-        demand_limit_wide.to_json(f, orient='records')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
 
 
 
-    # -------------------- Sum of commodity production --------------------
-    group_cols = ['Commodity', 'Type']
-    for idx, col in enumerate(group_cols):
-        
-        df_region = quantity_LUTO\
-            .groupby(['Year', 'region', col])\
-            .sum()\
-            .reset_index()\
-            .round({'Production (t/KL)': 2})
-        df_wide = df_region.groupby([col, 'region'])[['Year','Production (t/KL)']]\
-            .apply(lambda x: x[['Year','Production (t/KL)']].values.tolist())\
-            .reset_index()
-        df_wide.columns = ['name', 'region','data']
-        df_wide['type'] = 'column'
-        
-        if col == "Land-use":
-            df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_LU[x])
-            df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-        elif col.lower() == 'commodity':
-            df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_COMMODITIES[x])
-            df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
-            df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
 
-        out_dict = {}
-        for region, df in df_wide.groupby('region'):
-            df = df.drop('region', axis=1)
-            out_dict[region] = df.to_dict(orient='records')
-            
-        filename = f'Production_sum_{idx+1}_{col.replace(" ", "_")}'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
-
-
-
-
-    # -------------------- Demand achievement in the final target year (%) --------------------
+    # -------------------- Overview: Australia production achievement (%) --------------------
     quantity_diff = demand_files.query('base_name == "quantity_comparison"').reset_index(drop=True)
     quantity_diff = pd.concat([pd.read_csv(path) for path in quantity_diff['path']], ignore_index=True)
     quantity_diff = quantity_diff.replace({'Sheep lexp': 'Sheep live export', 'Beef lexp': 'Beef live export'})
@@ -551,50 +538,40 @@ def save_report_data(raw_data_dir:str):
     quantity_diff_wide_AUS_data = {
         'AUSTRALIA': quantity_diff_wide_AUS.to_dict(orient='records')
     }
-    filename = 'Production_achive_percent'
+    filename = 'Production_overview_AUS_achive_percent'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
         json.dump(quantity_diff_wide_AUS_data, f, separators=(',', ':'), indent=2)
         f.write(';\n')    
     
     
+    
+    
     # -------------------- Commodity production for ag, non-ag, and agricultural management --------------------
     for idx, _type in enumerate(quantity_LUTO['Type'].unique()):
-        _df = quantity_LUTO.query(f'Type == "{_type}"').query('abs(`Production (t/KL)`) > 1e-6').copy()
+        
+        df_wide = quantity_LUTO\
+            .query(f'Type == "{_type}"')\
+            .groupby(['region', 'Commodity'])[['Year','Production (t/KL)']]\
+            .apply(lambda x: x[['Year','Production (t/KL)']].values.tolist())\
+            .reset_index()
 
-        group_cols = ['Commodity']
-        for col in group_cols:
-            
-            df_region = _df\
-                .groupby(['Year', 'region', col])\
-                .sum()\
-                .reset_index()\
-                .round({'Production (t/KL)': 2})
-            df_wide = df_region.groupby([col, 'region'])[['Year','Production (t/KL)']]\
-                .apply(lambda x: x[['Year','Production (t/KL)']].values.tolist())\
-                .reset_index()
-            df_wide.columns = ['name', 'region','data']
-            df_wide['type'] = 'column'
-            
-            if col == "Land-use":
-                df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_LU[x])
-                df_wide['name_order'] = df_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-                df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-            elif col.lower() == 'commodity':
-                df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_COMMODITIES[x])
-                df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
-                df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+        df_wide.columns = ['region', 'name', 'data']
+        df_wide['type'] = 'column'
+        df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_COMMODITIES[x])
+        df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+        df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
 
-            out_dict = {}
-            for region, df in df_wide.groupby('region'):
-                df = df.drop('region', axis=1)
-                out_dict[region] = df.to_dict(orient='records')
-                
-            filename = f'Production_LUTO_{idx+1}_{_type.replace(" ", "_")}'
-            with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-                f.write(f'window["{filename}"] = ')
-                json.dump(out_dict, f, separators=(',', ':'), indent=2)
-                f.write(';\n')
+        out_dict = {}
+        for region, df in df_wide.groupby('region'):
+            df = df.drop('region', axis=1)
+            out_dict[region] = df.to_dict(orient='records')
+            
+        filename = f'Production_{_type.replace(" ", "_")}'
+        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+            f.write(f'window["{filename}"] = ')
+            json.dump(out_dict, f, separators=(',', ':'), indent=2)
+            f.write(';\n')
             
             
     
@@ -627,35 +604,31 @@ def save_report_data(raw_data_dir:str):
     revenue_non_ag_df = files.query('base_name == "revenue_non_ag"').reset_index(drop=True)
     revenue_non_ag_df = pd.concat([pd.read_csv(path) for path in revenue_non_ag_df['path']], ignore_index=True)
     revenue_non_ag_df = revenue_non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Non-agricultural land-use (revenue)')
+    revenue_non_ag_df['Water_supply'] = 'NA'
 
     cost_non_ag_df = files.query('base_name == "cost_non_ag"').reset_index(drop=True)
     cost_non_ag_df = pd.concat([pd.read_csv(path) for path in cost_non_ag_df['path']], ignore_index=True)
     cost_non_ag_df = cost_non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Non-agricultural land-use (cost)')
     cost_non_ag_df['Value ($)'] = cost_non_ag_df['Value ($)'] * -1  # Convert cost to negative value
-    
-    net_ag_df = revenue_ag_df.groupby('Year')[['Value ($)']].sum().reset_index()
-    net_ag_df['Value ($)'] = net_ag_df['Value ($)'] + cost_ag_df.groupby('Year')[['Value ($)']].sum().reset_index()['Value ($)']
-    
-    net_am_df = revenue_am_df.groupby('Year')[['Value ($)']].sum().reset_index()
-    net_am_df['Value ($)'] = net_am_df['Value ($)'] + cost_am_df.groupby('Year')[['Value ($)']].sum().reset_index()['Value ($)']
-    
-    net_non_ag_df = revenue_non_ag_df.groupby('Year')[['Value ($)']].sum().reset_index()
-    net_non_ag_df['Value ($)'] = net_non_ag_df['Value ($)'] + cost_non_ag_df.groupby('Year')[['Value ($)']].sum().reset_index()['Value ($)']
+    cost_non_ag_df['Water_supply'] = 'NA'
     
     cost_transition_ag2ag_df = files.query('base_name == "cost_transition_ag2ag"').reset_index(drop=True)
     cost_transition_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_ag2ag_df = cost_transition_ag2ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Ag2Ag)')
     cost_transition_ag2ag_df['Value ($)'] = cost_transition_ag2ag_df['Cost ($)']  * -1          # Convert cost to negative value
+    cost_transition_ag2ag_df['Water_supply'] = 'NA'
 
     cost_transition_ag2non_ag_df = files.query('base_name == "cost_transition_ag2non_ag"').reset_index(drop=True)
     cost_transition_ag2non_ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_ag2non_ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_ag2non_ag_df = cost_transition_ag2non_ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Ag2Non-Ag)')
     cost_transition_ag2non_ag_df['Value ($)'] = cost_transition_ag2non_ag_df['Cost ($)'] * -1   # Convert cost to negative value
+    cost_transition_ag2non_ag_df['Water_supply'] = 'NA'
 
     cost_transition_non_ag2ag_df = files.query('base_name == "cost_transition_non_ag2_ag"').reset_index(drop=True)
     cost_transition_non_ag2ag_df = pd.concat([pd.read_csv(path) for path in cost_transition_non_ag2ag_df['path'] if not pd.read_csv(path).empty], ignore_index=True)
     cost_transition_non_ag2ag_df = cost_transition_non_ag2ag_df.replace(RENAME_AM_NON_AG).assign(Source='Transition cost (Non-Ag2Ag)').dropna(subset=['Cost ($)'])
     cost_transition_non_ag2ag_df['Value ($)'] = cost_transition_non_ag2ag_df['Cost ($)'] * -1   # Convert cost to negative value
+    cost_transition_non_ag2ag_df['Water_supply'] = 'NA'
 
     economics_df = pd.concat(
             [
@@ -688,73 +661,34 @@ def save_report_data(raw_data_dir:str):
 
 
     # -------------------- Economic ranking --------------------
-    revenue_df_region = pd.concat([revenue_ag_df, revenue_am_df, revenue_non_ag_df]
-        ).query('`Value ($)` >= 0'
+    revenue_df = pd.concat([revenue_ag_df, revenue_am_df, revenue_non_ag_df]
         ).groupby(['Year', 'region']
         )[['Value ($)']].sum(numeric_only=True
         ).reset_index(
         ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
-        ).assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1
-        ).assign(Percent=lambda x: x['Value ($)'] / x.groupby(['Year'])['Value ($)'].transform('sum') * 100
+        ).assign(Rank=lambda x: x.groupby(['Year']).cumcount()
         ).assign(Source='Revenue'
-        ).round({'Value ($)': 2, 'Percent': 2})
-    revenue_df_AUS = pd.concat([revenue_ag_df, revenue_am_df, revenue_non_ag_df]
-        ).query('`Value ($)` >= 0'
-        ).groupby(['Year']
-        )[['Value ($)']].sum(numeric_only=True
-        ).reset_index(
-        ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
-        ).assign(Rank='N.A.', Percent=100, Source='Revenue', region='AUSTRALIA'
-        ).round({'Value ($)': 2, 'Percent': 2})
-
-    cost_df_region = pd.concat([cost_ag_df, cost_am_df, cost_non_ag_df]
-        ).query('`Value ($)` < 0'
+        ).round({'Percent': 2})
+    cost_df = pd.concat([cost_ag_df, cost_am_df, cost_non_ag_df]
         ).groupby(['Year', 'region']
         )[['Value ($)']].sum(numeric_only=True
         ).reset_index(
         ).assign(**{'Value ($)': lambda x: abs(x['Value ($)'])}
         ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
-        ).assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1
-        ).assign(Percent=lambda x: x['Value ($)'] / x.groupby('Year')['Value ($)'].transform('sum') * 100
+        ).assign(Rank=lambda x: x.groupby(['Year']).cumcount()
         ).assign(Source='Cost'
-        ).round({'Value ($)': 2, 'Percent': 2})
-    cost_df_AUS = pd.concat([cost_ag_df, cost_am_df, cost_non_ag_df]
-        ).query('`Value ($)` < 0'
-        ).groupby(['Year']
-        )[['Value ($)']].sum(numeric_only=True
-        ).reset_index(
-        ).assign(**{'Value ($)': lambda x: abs(x['Value ($)'])}
-        ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
-        ).assign(Rank='N.A.',  Source='Cost', region='AUSTRALIA'
-        ).round({'Value ($)': 2, 'Percent': 2})
-        
-    profit_df_region = revenue_df_region.merge(
-        cost_df_region, on=['Year', 'region'], suffixes=('_revenue', '_cost')
+        ).round({ 'Percent': 2}) 
+    profit_df = revenue_df.merge(
+        cost_df, on=['Year', 'region'], suffixes=('_revenue', '_cost')
         ).assign(**{'Value ($)': lambda x: x['Value ($)_revenue'] - x['Value ($)_cost']}
         ).drop(columns=['Value ($)_revenue', 'Value ($)_cost']
         ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
-        ).assign(Rank=lambda x: x.groupby(['Year']).cumcount() + 1
-        ).assign(Percent=lambda x: x['Value ($)'] / x.groupby(['Year'])['Value ($)'].transform('sum') * 100
+        ).assign(Rank=lambda x: x.groupby(['Year']).cumcount()
         ).assign(Source='Total'
-        ).round({'Value ($)': 2, 'Percent': 2})
-    profit_df_AUS = revenue_df_AUS.merge(
-        cost_df_AUS, on=['Year'], suffixes=('_revenue', '_cost')
-        ).assign(**{'Value ($)': lambda x: x['Value ($)_revenue'] - x['Value ($)_cost']}
-        ).drop(columns=['Value ($)_revenue', 'Value ($)_cost']
-        ).sort_values(['Year', 'Value ($)'], ascending=[True, False]
-        ).assign(Rank='N.A.', Source='Total', region='AUSTRALIA'
-        ).round({'Value ($)': 2, 'Percent': 2})
+        ).round({'Value ($)': 2})
 
-    ranking_df = pd.concat([revenue_df_region, revenue_df_AUS, cost_df_region, cost_df_AUS, profit_df_region, profit_df_AUS])
-    ranking_df = ranking_df.set_index(['region', 'Source', 'Year']
-        ).reindex(
-            index=pd.MultiIndex.from_product(
-                [ranking_df['region'].unique(), ranking_df['Source'].unique(), ranking_df['Year'].unique()],
-                names=['region', 'Source', 'Year']), fill_value=None
-        ).reset_index(
-        ).assign(color= lambda x: x['Rank'].map(get_rank_color))
+    ranking_df = pd.concat([revenue_df, cost_df, profit_df]).assign(color= lambda x: x['Rank'].map(get_rank_color))
         
-
 
     out_dict = {}
     for (region, source), df in ranking_df.groupby(['region', 'Source']):
@@ -776,31 +710,13 @@ def save_report_data(raw_data_dir:str):
         
 
     # -------------------- Economy overview --------------------
-    economics_df_AUS = economics_df.groupby(['Year','Source']
-        ).sum(numeric_only=True
-        ).reset_index()
 
-    economics_df_AUS_wide = economics_df_AUS\
-        .groupby(['Source'])[['Year','Value ($)']]\
-        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
-        .reset_index()
-        
-    economics_df_AUS_wide.columns = ['name','data']
-    economics_df_AUS_wide['type'] = 'column'
-    economics_df_AUS_wide['region'] = 'AUSTRALIA'
-    economics_df_AUS_wide.loc[len(economics_df_AUS_wide)] = [
-        'Profit', 
-        economics_df_AUS.groupby('Year')['Value ($)'].sum().reset_index().values.tolist(), 
-        'line', 
-        'AUSTRALIA'
-    ]
-
-
-    rev_cost_net_region = economics_df.groupby(['Year','Source','region']
+    # Overview: sum of revenue, cost, and profit by region
+    rev_cost_net_region = economics_df.groupby(['region', 'Source', 'Year']
         )[['Value ($)']].sum(numeric_only=True
         ).reset_index()
         
-    rev_cost_net_wide_region = pd.DataFrame()
+    dfs = []
     for region, df in rev_cost_net_region.groupby('region'):
         df_col = df.groupby(['Source'])[['Year','Value ($)']]\
             .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
@@ -814,10 +730,9 @@ def save_report_data(raw_data_dir:str):
             'line',
         ]
         df_col['region'] = region
-        rev_cost_net_wide_region = pd.concat([rev_cost_net_wide_region, df_col])
+        dfs.append(df_col)
 
-
-    rev_cost_wide_json = pd.concat([economics_df_AUS_wide, rev_cost_net_wide_region], axis=0).reset_index(drop=True)
+    rev_cost_wide_json = pd.concat(dfs, ignore_index=True)
     rev_cost_wide_json['name_order'] = rev_cost_wide_json['name'].map({name: i for i, name in enumerate(order)})
     rev_cost_wide_json = rev_cost_wide_json.sort_values(['region', 'name_order']).drop(columns=['name_order']).reset_index(drop=True)
 
@@ -828,12 +743,75 @@ def save_report_data(raw_data_dir:str):
         df.columns = ['name','data','type']
         out_dict[region] = df.to_dict(orient='records')
         
-    filename = 'Economics_overview'
+    filename = 'Economics_overview_sum'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+    
+    
+    # Overview: ag cost/revenue by type
+    economics_ag = pd.concat([revenue_ag_df, cost_ag_df]).round({'Value ($)': 2}).query('abs(`Value ($)`) > 1e-6')
+    
+    df_wide = economics_ag.groupby(['region', 'Type', 'Water_supply'])[['Year','Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+    df_wide.columns = ['region', 'name', 'water', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide.apply(lambda x: COLORS_ECONOMY_TYPE[x['name']], axis=1)
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: list(COLORS_ECONOMY_TYPE.keys()).index(x) if x in COLORS_ECONOMY_TYPE else -1)
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+
+    out_dict = {}
+    for (region, water), df in df_wide.groupby(['region', 'water']):
+        df = df.drop(['region', 'water'], axis=1)
+        if region not in out_dict:
+            out_dict[region] = {}
+        if water not in out_dict[region]:
+            out_dict[region][water] = {}
+        out_dict[region][water] = df.to_dict(orient='records')
+        
+    filename = f'Economics_overview_Ag'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
         f.write(';\n')
         
+    
+    # Overview: ag-man cost/revenue by type
+    economics_am = pd.concat([
+            revenue_am_df.assign(Rev_Cost='Revenue'), 
+            cost_am_df.assign(Rev_Cost='Cost'),]
+        ).round({'Value ($)': 2}).query('abs(`Value ($)`) > 1e-6')
+    
+    df_wide = economics_am.groupby(['region', 'Management Type', 'Water_supply', 'Rev_Cost'])[[ 'Year', 'Value ($)']]\
+        .apply(lambda x: x[['Year', 'Value ($)']].values.tolist())\
+        .reset_index()
+        
+    df_wide.columns = ['region', 'name', 'water', 'Rev_Cost', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+    df_wide['id'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Revenue' else None, axis=1)
+    df_wide['linkedTo'] = df_wide.apply(lambda x: x['name'] if x['Rev_Cost'] == 'Cost' else None, axis=1)
+    df_wide.loc[df_wide['name'] == 'Early dry-season savanna burning', 'linkedTo'] = None
+
+
+    out_dict = {}
+    for (region, water), df in df_wide.groupby(['region', 'water']):
+        df = df.drop(['region', 'water', 'Rev_Cost'], axis=1)
+        if region not in out_dict:
+            out_dict[region] = {}
+        if water not in out_dict[region]:
+            out_dict[region][water] = {}
+        out_dict[region][water] = df.to_dict(orient='records')
+        
+    filename = f'Economics_overview_Am'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+ 
  
  
  
@@ -888,7 +866,7 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region','Rev_Cost'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        filename = f'Economics_split_Ag_{idx+1}_{col.replace(" ", "_")}'
+        filename = 'Economics_overview_Ag'
         with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
             f.write(f'window["{filename}"] = ')
             json.dump(out_dict, f, separators=(',', ':'), indent=2)
