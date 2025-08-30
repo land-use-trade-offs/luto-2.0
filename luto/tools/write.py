@@ -151,9 +151,6 @@ def save2nc(in_xr:xr.DataArray, save_path:str):
 
 
 
-
-
-
 def write_output_single_year(data: Data, yr_cal, path_yr):
     """Wrap write tasks for a single year"""
 
@@ -168,7 +165,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
         delayed(write_quantity)(data, yr_cal, path_yr),
         delayed(write_quantity_separate)(data, yr_cal, path_yr),
         delayed(write_revenue_cost_ag)(data, yr_cal, path_yr),
-        delayed(write_revenue_cost_ag_management)(data, yr_cal, path_yr),
+        delayed(write_revenue_cost_ag_man)(data, yr_cal, path_yr),
         delayed(write_revenue_cost_non_ag)(data, yr_cal, path_yr),
         delayed(write_transition_cost_ag2ag)(data, yr_cal, path_yr),
         delayed(write_transition_cost_to_ag2nonag)(data, yr_cal, path_yr),
@@ -453,46 +450,47 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
     
     yr_idx = yr_cal - data.YR_CAL_BASE
     ag_dvar_mrj = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]).chunk({'cell': min(1024, data.NCELLS)})
-    
-    # Expand dimension
-    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
 
     # Get agricultural revenue/cost for year in mrjs format
     ag_rev_df_rjms = ag_revenue.get_rev_matrices(data, yr_idx, aggregate=False)
     ag_cost_df_rjms = ag_cost.get_cost_matrices(data, yr_idx, aggregate=False)
-
-    # Expand the original df with zero values to convert it to a **mrjs** array
     ag_rev_rjms = ag_rev_df_rjms.reindex(columns=pd.MultiIndex.from_product(ag_rev_df_rjms.columns.levels), fill_value=0).values.reshape(-1, *ag_rev_df_rjms.columns.levshape)
     ag_cost_rjms = ag_cost_df_rjms.reindex(columns=pd.MultiIndex.from_product(ag_cost_df_rjms.columns.levels), fill_value=0).values.reshape(-1, *ag_cost_df_rjms.columns.levshape)
 
     # Convert the ag_rev_rjms and ag_cost_rjms to xarray DataArray, 
     # and assign region names to the cell dimension
     ag_rev_rjms = xr.DataArray(
-        ag_rev_rjms,
-        dims=['cell', 'lu', 'lm', 'source'],
-        coords={
-            'cell': range(data.NCELLS),
-            'lu': data.AGRICULTURAL_LANDUSES,
-            'lm': data.LANDMANS,
-            'source': ag_rev_df_rjms.columns.levels[2]
-        }
-    ).assign_coords(
-        region = ('cell', data.REGION_NRM_NAME),
-    )
-
+            ag_rev_rjms,
+            dims=['cell', 'lu', 'lm', 'source'],
+            coords={
+                'cell': range(data.NCELLS),
+                'lu': data.AGRICULTURAL_LANDUSES,
+                'lm': data.LANDMANS,
+                'source': ag_rev_df_rjms.columns.levels[2]
+            }
+        ).assign_coords(
+            region = ('cell', data.REGION_NRM_NAME),
+        )
     ag_cost_rjms = xr.DataArray(
-        ag_cost_rjms,
-        dims=['cell', 'lu', 'lm', 'source'],
-        coords={
-            'cell': range(data.NCELLS),
-            'lu': data.AGRICULTURAL_LANDUSES,
-            'lm': data.LANDMANS,
-            'source': ag_cost_df_rjms.columns.levels[2]
-        }
-    ).assign_coords(
-        region = ('cell', data.REGION_NRM_NAME),
-    )
+            ag_cost_rjms,
+            dims=['cell', 'lu', 'lm', 'source'],
+            coords={
+                'cell': range(data.NCELLS),
+                'lu': data.AGRICULTURAL_LANDUSES,
+                'lm': data.LANDMANS,
+                'source': ag_cost_df_rjms.columns.levels[2]
+            }
+        ).assign_coords(
+            region = ('cell', data.REGION_NRM_NAME),
+        )
 
+
+    # Expand dimension
+    ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    ag_rev_rjms = xr.concat([ag_rev_rjms, ag_rev_rjms.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    ag_rev_rjms = xr.concat([ag_rev_rjms, ag_rev_rjms.sum(dim='source', keepdims=True).assign_coords(source=['ALL'])], dim='source')
+    ag_cost_rjms = xr.concat([ag_cost_rjms, ag_cost_rjms.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    ag_cost_rjms = xr.concat([ag_cost_rjms, ag_cost_rjms.sum(dim='source', keepdims=True).assign_coords(source=['ALL'])], dim='source')
 
     # Multiply the ag_dvar_mrj with the ag_rev_mrj to get the ag_rev_jm
     xr_ag_rev = ag_dvar_mrj * ag_rev_rjms
@@ -551,7 +549,7 @@ def write_revenue_cost_ag(data: Data, yr_cal, path):
 
 
 
-def write_revenue_cost_ag_management(data: Data, yr_cal, path):
+def write_revenue_cost_ag_man(data: Data, yr_cal, path):
     """Calculate agricultural management revenue and cost."""
 
     
@@ -561,24 +559,22 @@ def write_revenue_cost_ag_management(data: Data, yr_cal, path):
     am_dvar_mrj = tools.am_mrj_to_xr(data, data.ag_man_dvars[yr_cal]
         ).assign_coords(region = ('cell', data.REGION_NRM_NAME),
         ).chunk({'cell': min(1024, data.NCELLS)})
-    
-    # Expand dimension
-    am_dvar_mrj = xr.concat([am_dvar_mrj, am_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    am_dvar_mrj = xr.concat([am_dvar_mrj, am_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
 
     # Get the revenue/cost matrices for each agricultural land-use
     ag_rev_mrj = ag_revenue.get_rev_matrices(data, yr_idx)
     ag_cost_mrj = ag_cost.get_cost_matrices(data, yr_idx)
+    am_revenue_mat = tools.am_mrj_to_xr(data, ag_revenue.get_agricultural_management_revenue_matrices(data, ag_rev_mrj, yr_idx))
+    am_cost_mat = tools.am_mrj_to_xr(data, ag_cost.get_agricultural_management_cost_matrices(data, ag_cost_mrj, yr_idx))
+    
+    # Expand dimension
+    am_dvar_mrj = xr.concat([am_dvar_mrj, am_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    am_dvar_mrj = xr.concat([am_dvar_mrj, am_dvar_mrj.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    am_revenue_mat = xr.concat([am_revenue_mat, am_revenue_mat.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    am_revenue_mat = xr.concat([am_revenue_mat, am_revenue_mat.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    am_cost_mat = xr.concat([am_cost_mat, am_cost_mat.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    am_cost_mat = xr.concat([am_cost_mat, am_cost_mat.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
 
-    am_revenue_mat = tools.am_mrj_to_xr(
-        data, 
-        ag_revenue.get_agricultural_management_revenue_matrices(data, ag_rev_mrj, yr_idx)
-    )
-    am_cost_mat = tools.am_mrj_to_xr(
-        data, 
-        ag_cost.get_agricultural_management_cost_matrices(data, ag_cost_mrj, yr_idx)
-    )
-
+    # Multiply the am_dvar_mrj with the am_revenue_mat to get the revenue and cost
     xr_revenue_am = am_dvar_mrj * am_revenue_mat
     xr_cost_am = am_dvar_mrj * am_cost_mat
     
