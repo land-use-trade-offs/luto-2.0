@@ -79,28 +79,28 @@ window.WaterView = {
       // Map the visible "Chart level" label to the loaded dataset key
       const chartKeyMap = {
         'Ag': {
-          'Landuse': 'Water_split_Ag_NRM_region_1_Landuse',
-          'Water Supply': 'Water_split_Ag_NRM_region_2_Water_Supply',
-          'Overview': 'Water_overview_NRM_region_1_Landuse',
-          'Type': 'Water_overview_NRM_region_2_Type',
-          'Ranking': 'Water_ranking',
+          'Landuse': 'Water_Ag_NRM',
+          'Water Supply': 'Water_Ag_NRM',
+          'Overview': 'Water_overview_watershed',
+          'Type': 'Water_overview_NRM_Type',
+          'Ranking': 'Water_ranking_NRM',
         },
         'Ag Mgt': {
-          'Water Supply': 'Water_split_Am_NRM_region_1_Water_Supply',
-          'Landuse': 'Water_split_Am_NRM_region_2_Landuse',
-          'Agri-Management': 'Water_split_Am_NRM_region_3_Agri-Management',
-          'Overview': 'Water_overview_NRM_region_1_Landuse',
-          'Type': 'Water_overview_NRM_region_2_Type',
-          'Ranking': 'Water_ranking',
+          'Water Supply': 'Water_Am_NRM',
+          'Landuse': 'Water_Am_NRM',
+          'Agri-Management': 'Water_Am_NRM',
+          'Overview': 'Water_overview_watershed',
+          'Type': 'Water_overview_NRM_Type',
+          'Ranking': 'Water_ranking_NRM',
         },
         'Non-Ag': {
-          'Landuse': 'Water_split_NonAg_NRM_region_1_Landuse',
-          'Overview': 'Water_overview_NRM_region_1_Landuse',
-          'Type': 'Water_overview_NRM_region_2_Type',
-          'Ranking': 'Water_ranking',
+          'Landuse': 'Water_NonAg_NRM',
+          'Overview': 'Water_overview_watershed',
+          'Type': 'Water_overview_NRM_Type',
+          'Ranking': 'Water_ranking_NRM',
         },
       };
-      return chartKeyMap[selectMapCategory.value]?.[selectChartLevel.value] || 'Water_overview_NRM_region_1_Landuse';
+      return chartKeyMap[selectMapCategory.value]?.[selectChartLevel.value] || 'Water_overview_watershed';
     };
 
     const getChartOptionsForLevel = (level) => {
@@ -157,18 +157,13 @@ window.WaterView = {
       await loadScript("./data/chart_option/Chart_default_options.js", 'Chart_default_options');
 
       // Load Water chart data files
-      await loadScript("./data/Water_ranking.js", 'Water_ranking');
-      await loadScript("./data/Water_overview_NRM_region_1_Landuse.js", 'Water_overview_NRM_region_1_Landuse');
-      await loadScript("./data/Water_overview_NRM_region_2_Type.js", 'Water_overview_NRM_region_2_Type');
+      await loadScript("./data/Water_ranking_NRM.js", 'Water_ranking_NRM');
+      await loadScript("./data/Water_overview_NRM_Type.js", 'Water_overview_NRM_Type');
 
-      await loadScript("./data/Water_split_Ag_NRM_region_1_Landuse.js", 'Water_split_Ag_NRM_region_1_Landuse');
-      await loadScript("./data/Water_split_Ag_NRM_region_2_Water_Supply.js", 'Water_split_Ag_NRM_region_2_Water_Supply');
-
-      await loadScript("./data/Water_split_Am_NRM_region_1_Water_Supply.js", 'Water_split_Am_NRM_region_1_Water_Supply');
-      await loadScript("./data/Water_split_Am_NRM_region_2_Landuse.js", 'Water_split_Am_NRM_region_2_Landuse');
-      await loadScript("./data/Water_split_Am_NRM_region_3_Agri-Management.js", 'Water_split_Am_NRM_region_3_Agri-Management');
-
-      await loadScript("./data/Water_split_NonAg_NRM_region_1_Landuse.js", 'Water_split_NonAg_NRM_region_1_Landuse');
+      await loadScript("./data/Water_Ag_NRM.js", 'Water_Ag_NRM');
+      await loadScript("./data/Water_Am_NRM.js", 'Water_Am_NRM');
+      await loadScript("./data/Water_NonAg_NRM.js", 'Water_NonAg_NRM');
+      await loadScript("./data/Water_overview_watershed.js", 'Water_overview_watershed');
 
       // Load map data for all categories
       availableYears.value = window.Supporting_info.years;

@@ -90,25 +90,25 @@ window.HomeView = {
       // Overview chart data
       const chartOverview_area = chartRegister['Area']['overview'];
       const chartOverview_economics = chartRegister['Economics']['overview'];
-      const chartOverview_economics_ag = chartRegister['Economics']['Ag']['Type'];
-      const chartOverview_economics_agMgt = chartRegister['Economics']['Ag Mgt']['Management Type'];
-      const chartOverview_economics_Nonag = chartRegister['Economics']['Non-Ag']['Land-use'];
+      const chartOverview_economics_ag = chartRegister['Economics']['Ag'];
+      const chartOverview_economics_agMgt = chartRegister['Economics']['Ag Mgt'];
+      const chartOverview_economics_Nonag = chartRegister['Economics']['Non-Ag'];
       const chartOverview_ghg = chartRegister['GHG']['overview'];
-      const chartOverview_ghg_ag = chartRegister['GHG']['Ag']['Land-use type'];
-      const chartOverview_ghg_agMgt = chartRegister['GHG']['Ag Mgt']['Management Type'];
-      const chartOverview_ghg_Nonag = chartRegister['GHG']['Non-Ag']['Land-use'];
+      const chartOverview_ghg_ag = chartRegister['GHG']['Ag'];
+      const chartOverview_ghg_agMgt = chartRegister['GHG']['Ag Mgt'];
+      const chartOverview_ghg_Nonag = chartRegister['GHG']['Non-Ag'];
       const chartOverview_water = chartRegister['Water']['NRM']['overview'];
-      const chartOverview_bio_GBF2 = chartRegister['Biodiversity']['GBF2']['overview']['Type'];
+      const chartOverview_bio_GBF2 = chartRegister['Biodiversity']['GBF2']['overview'];
       const rankingArea = chartRegister['Area']['ranking'];
       const rankingEconomics = chartRegister['Economics']['ranking'];
       const rankingGHG = chartRegister['GHG']['ranking'];
       const rankingWater = chartRegister['Water']['NRM']['ranking'];
-      const rankingBiodiversity = chartRegister['Biodiversity']['GBF2']['ranking'];
+      const rankingBiodiversity = chartRegister['Biodiversity']['ranking'];
 
       await loadScript(chartOverview_area['Source']['path'], chartOverview_area['Source']['name']);
       await loadScript(chartOverview_area['Category']['path'], chartOverview_area['Category']['name']);
       await loadScript(chartOverview_area['Land-use']['path'], chartOverview_area['Land-use']['name']);
-      await loadScript(chartOverview_economics['path'], chartOverview_economics['name']);
+      await loadScript(chartOverview_economics['sum']['path'], chartOverview_economics['sum']['name']);
       await loadScript(chartOverview_economics_ag['path'], chartOverview_economics_ag['name']);
       await loadScript(chartOverview_economics_agMgt['path'], chartOverview_economics_agMgt['name']);
       await loadScript(chartOverview_economics_Nonag['path'], chartOverview_economics_Nonag['name']);
@@ -116,7 +116,6 @@ window.HomeView = {
       await loadScript(chartOverview_ghg_ag['path'], chartOverview_ghg_ag['name']);
       await loadScript(chartOverview_ghg_agMgt['path'], chartOverview_ghg_agMgt['name']);
       await loadScript(chartOverview_ghg_Nonag['path'], chartOverview_ghg_Nonag['name']);
-      await loadScript(chartOverview_water['Landuse']['path'], chartOverview_water['Landuse']['name']);
       await loadScript(chartOverview_water['Type']['path'], chartOverview_water['Type']['name']);
       await loadScript(chartOverview_bio_GBF2['path'], chartOverview_bio_GBF2['name']);
       await loadScript(rankingArea['path'], rankingArea['name']);
@@ -133,7 +132,7 @@ window.HomeView = {
           'Land-use': window[chartOverview_area['Land-use']['name']],
         },
         'Economics': {
-          'Overview': window[chartOverview_economics['name']],
+          'Overview': window[chartOverview_economics['sum']['name']],
           'Ag': window[chartOverview_economics_ag['name']],
           'Ag Mgt': window[chartOverview_economics_agMgt['name']],
           'Non-Ag': window[chartOverview_economics_Nonag['name']],
@@ -145,7 +144,6 @@ window.HomeView = {
           'Non-Ag': window[chartOverview_ghg_Nonag['name']],
         },
         'Water': {
-          'Landuse': window[chartOverview_water['Landuse']['name']],
           'Type': window[chartOverview_water['Type']['name']],
         },
         'Biodiversity': {
