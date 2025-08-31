@@ -1,151 +1,235 @@
 window.HomeView = {
 
-  setup(props, { emit }) {
+  setup() {
 
     const { ref, onMounted, watch, computed, inject, nextTick } = Vue;
-    const loadScript = window.loadScript;
 
+    // Data service
+    const chartRegister = window.DataService.chartCategories;   // DataService has been registered in index.html      [DataService.js]
+    const loadScript = window.loadScript;                       // DataConstructor has been registered in index.html  [helpers.js]
 
-    // Define reactive variables
-    const dataLoaded = ref(false);
+    // Global variables
     const selectRegion = inject('globalSelectedRegion');
-    const selectDataType = inject('globalSelectedDataType');
-    const selectYear = ref(2020);
-    const yearIndex = ref(0);
+    const ChartData = ref({});
+    const rankingData = ref({});
+    const colorsRanking = ref({});
+
+    // Available selections
     const availableYears = ref([]);
-    const runScenario = ref({})
+    const availableChartCategories = ref([]);
+    const availableChartSubCategories = ref([]);
+    const availableUnit = {
+      'Area': 'Hectares',
+      'Economics': 'AUD',
+      'GHG': 'Mt CO2e',
+      'Water': 'ML',
+      'Biodiversity': 'Relative Percentage (Pre-1750 = 100%)',
+    };
+    const RankSubcategoriesRename = {
+      'Agricultural Landuse': 'Ag',
+      'Agricultural Management': 'Ag Mgt',
+      'Non-Agricultural Landuse': 'Non-Ag',
+      'Non-Agricultural land-use': 'Non-Ag',
+    };
+    const availableRankSubcategories = ref([]);
+
+    // Default selections
+    const yearIndex = ref(0);
+    const selectYear = ref(2020);
+    const selectChartCategory = ref('');
+    const selectChartSubCategory = ref('');
+    const selectRankingSubCategory = ref('');
+    const selectRankingColors = ref({});
+
 
     //  Reactive data
-    const chartOverview = ref({});
-    const colorsRanking = ref({});
-    const availableDatasets = ref({
-      'Economics_overview': { 'type': 'Economics', 'unit': 'AUD' },
-      'Area_overview_2_Category': { 'type': 'Area', 'unit': 'Hectares' },
-      'GHG_overview': { 'type': 'GHG', 'unit': 'Mt CO2e' },
-      'Water_overview_NRM_region_2_Type': { 'type': 'Water', 'unit': 'ML' },
-      'BIO_quality_overview_1_Type': { 'type': 'Biodiversity', 'unit': 'Weighted score (ha)' },
-    });
-    const selectDataset = ref('Area_overview_2_Category');
-    const DtypeSubCategories = computed(() => {
-      return window.DataService.getSubcategories(selectDataType.value);
-    });
-    const selectSubcategory = ref('');
-
-
-    // Functions
-    const changeDataset = async (datasetName) => {
-      try {
-        // Load the selected dataset script
-        await loadScript(`./data/${datasetName}.js`, datasetName);
-
-        // Directly update the chartOverview with the new dataset
-        chartOverview.value = {
+    const selectChartData = computed(() => {
+      if (window['Chart_default_options'] && selectChartCategory.value && selectChartSubCategory.value) {
+        return {
           ...window['Chart_default_options'],
           chart: {
-            height: 550,
+            height: 440,
           },
           yAxis: {
             title: {
-              text: availableDatasets.value[datasetName]['unit']
+              text: availableUnit[selectChartCategory.value]
             }
           },
-          series: window[datasetName][selectRegion.value],
+          series: ChartData.value[selectChartCategory.value][selectChartSubCategory.value][selectRegion.value],
           colors: window['Supporting_info'].colors,
         };
-      } catch (error) {
-        console.error(`Error loading dataset ${datasetName}:`, error);
-      }
-    };
-    // Load scripts and data when the component is mounted
-    onMounted(async () => {
-      try {
-
-        // Load required data
-        await loadScript("./data/Supporting_info.js", 'Supporting_info');
-        await loadScript("./data/chart_option/Chart_default_options.js", 'Chart_default_options');
-        await loadScript("./data/Biodiversity_ranking.js", 'Biodiversity_ranking');
-        await loadScript("./data/GHG_ranking.js", 'GHG_ranking');
-        await loadScript("./data/Water_ranking.js", 'Water_ranking');
-        await loadScript("./data/Area_ranking.js", 'Area_ranking');
-        await loadScript("./data/Economics_ranking.js", 'Economics_ranking');
-        await loadScript("./services/DataService.js", 'DataService');
-
-        // Set initial year to first available year
-        availableYears.value = window.Supporting_info.years;
-        selectYear.value = availableYears.value[0];
-        selectSubcategory.value = DtypeSubCategories.value[0];
-        colorsRanking.value = window.Supporting_info.colors_ranking;
-        runScenario.value = {
-          'SSP': window.Supporting_info.model_run_settings.filter(item => item.parameter === "SSP")[0]['val'],
-          'GHG': window.Supporting_info.model_run_settings.filter(item => item.parameter === "GHG_EMISSIONS_LIMITS")[0]['val'],
-          'BIO_CUT': window.Supporting_info.model_run_settings.filter(item => item.parameter === "GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT")[0]['val'],
-          'BIO_GBF2': window.Supporting_info.model_run_settings.filter(item => item.parameter === "BIODIVERSITY_TARGET_GBF_2")[0]['val'],
-          'BIO_GBF3': window.Supporting_info.model_run_settings.filter(item => item.parameter === "BIODIVERSITY_TARGET_GBF_3")[0]['val'],
-          'BIO_GBF4_SNES': window.Supporting_info.model_run_settings.filter(item => item.parameter === "BIODIVERSITY_TARGET_GBF_4_SNES")[0]['val'],
-          'BIO_GBF4_ECNES': window.Supporting_info.model_run_settings.filter(item => item.parameter === "BIODIVERSITY_TARGET_GBF_4_ECNES")[0]['val'],
-          'BIODIVERSITY_TARGET_GBF_8': window.Supporting_info.model_run_settings.filter(item => item.parameter === "BIODIVERSITY_TARGET_GBF_8")[0]['val'],
-        }
-
-
-        // RankingData component is now included in index.html
-
-        // Initialize the overview chart with the selected dataset
-        await changeDataset(selectDataset.value);
-
-        // Mark data as loaded and use nextTick to ensure UI updates
-        dataLoaded.value = true;
-        await nextTick();
-
-      } catch (error) {
-        console.error("Error loading dependencies:", error);
       }
     });
 
 
+    const runScenario = computed(() => {
+      return !window.Supporting_info ? {} : {
+        'SSP': window.Supporting_info.model_run_settings.filter(item => item.parameter === "SSP")[0]['val'],
+        'GHG': window.Supporting_info.model_run_settings.filter(item => item.parameter === "GHG_EMISSIONS_LIMITS")[0]['val'],
+        'BIO_CUT': window.Supporting_info.model_run_settings.filter(item => item.parameter === "GBF2_PRIORITY_DEGRADED_AREAS_PERCENTAGE_CUT")[0]['val'],
+        'BIO_GBF2': window.Supporting_info.model_run_settings.filter(item => item.parameter === "BIODIVERSITY_TARGET_GBF_2")[0]['val'],
+        'BIO_GBF3': window.Supporting_info.model_run_settings.filter(item => item.parameter === "BIODIVERSITY_TARGET_GBF_3")[0]['val'],
+        'BIO_GBF4_SNES': window.Supporting_info.model_run_settings.filter(item => item.parameter === "BIODIVERSITY_TARGET_GBF_4_SNES")[0]['val'],
+        'BIO_GBF4_ECNES': window.Supporting_info.model_run_settings.filter(item => item.parameter === "BIODIVERSITY_TARGET_GBF_4_ECNES")[0]['val'],
+        'BIODIVERSITY_TARGET_GBF_8': window.Supporting_info.model_run_settings.filter(item => item.parameter === "BIODIVERSITY_TARGET_GBF_8")[0]['val'],
+      };
+    });
 
-    // Watch for changes and then make reactive updates
-    watch(
-      selectDataset,
-      (newDataset) => {
-        selectDataType.value = availableDatasets.value[newDataset].type;
-        selectSubcategory.value = DtypeSubCategories.value[0];
-      }
-    );
-    watch(
-      [selectRegion, selectDataType],
-      (newValue, oldValue) => {
-        changeDataset(selectDataset.value);
-      }
-    );
-    watch(
-      yearIndex,
-      (newIndex) => {
-        selectYear.value = availableYears.value[newIndex];
-      }
-    );
+
+    // Process flag
+    const dataLoaded = ref(false);
+
+
+    onMounted(async () => {
+
+      // Load required data
+      await loadScript("./data/Supporting_info.js", 'Supporting_info');
+      await loadScript("./data/chart_option/Chart_default_options.js", 'Chart_default_options');
+      await loadScript("./data/geo/NRM_AUS.js", 'NRM_AUS');
+
+      // Overview chart data
+      const chartOverview_area = chartRegister['Area']['overview'];
+      const chartOverview_economics = chartRegister['Economics']['overview'];
+      const chartOverview_economics_ag = chartRegister['Economics']['Ag']['Type'];
+      const chartOverview_economics_agMgt = chartRegister['Economics']['Ag Mgt']['Management Type'];
+      const chartOverview_economics_Nonag = chartRegister['Economics']['Non-Ag']['Land-use'];
+      const chartOverview_ghg = chartRegister['GHG']['overview'];
+      const chartOverview_ghg_ag = chartRegister['GHG']['Ag']['Land-use type'];
+      const chartOverview_ghg_agMgt = chartRegister['GHG']['Ag Mgt']['Management Type'];
+      const chartOverview_ghg_Nonag = chartRegister['GHG']['Non-Ag']['Land-use'];
+      const chartOverview_water = chartRegister['Water']['NRM']['overview'];
+      const chartOverview_bio_GBF2 = chartRegister['Biodiversity']['GBF2']['overview']['Type'];
+      const rankingArea = chartRegister['Area']['ranking'];
+      const rankingEconomics = chartRegister['Economics']['ranking'];
+      const rankingGHG = chartRegister['GHG']['ranking'];
+      const rankingWater = chartRegister['Water']['NRM']['ranking'];
+      const rankingBiodiversity = chartRegister['Biodiversity']['GBF2']['ranking'];
+
+      await loadScript(chartOverview_area['Source']['path'], chartOverview_area['Source']['name']);
+      await loadScript(chartOverview_area['Category']['path'], chartOverview_area['Category']['name']);
+      await loadScript(chartOverview_area['Land-use']['path'], chartOverview_area['Land-use']['name']);
+      await loadScript(chartOverview_economics['path'], chartOverview_economics['name']);
+      await loadScript(chartOverview_economics_ag['path'], chartOverview_economics_ag['name']);
+      await loadScript(chartOverview_economics_agMgt['path'], chartOverview_economics_agMgt['name']);
+      await loadScript(chartOverview_economics_Nonag['path'], chartOverview_economics_Nonag['name']);
+      await loadScript(chartOverview_ghg['path'], chartOverview_ghg['name']);
+      await loadScript(chartOverview_ghg_ag['path'], chartOverview_ghg_ag['name']);
+      await loadScript(chartOverview_ghg_agMgt['path'], chartOverview_ghg_agMgt['name']);
+      await loadScript(chartOverview_ghg_Nonag['path'], chartOverview_ghg_Nonag['name']);
+      await loadScript(chartOverview_water['Landuse']['path'], chartOverview_water['Landuse']['name']);
+      await loadScript(chartOverview_water['Type']['path'], chartOverview_water['Type']['name']);
+      await loadScript(chartOverview_bio_GBF2['path'], chartOverview_bio_GBF2['name']);
+      await loadScript(rankingArea['path'], rankingArea['name']);
+      await loadScript(rankingEconomics['path'], rankingEconomics['name']);
+      await loadScript(rankingGHG['path'], rankingGHG['name']);
+      await loadScript(rankingWater['path'], rankingWater['name']);
+      await loadScript(rankingBiodiversity['path'], rankingBiodiversity['name']);
+
+
+      ChartData.value = {
+        'Area': {
+          'Source': window[chartOverview_area['Source']['name']],
+          'Category': window[chartOverview_area['Category']['name']],
+          'Land-use': window[chartOverview_area['Land-use']['name']],
+        },
+        'Economics': {
+          'Overview': window[chartOverview_economics['name']],
+          'Ag': window[chartOverview_economics_ag['name']],
+          'Ag Mgt': window[chartOverview_economics_agMgt['name']],
+          'Non-Ag': window[chartOverview_economics_Nonag['name']],
+        },
+        'GHG': {
+          'Overview': window[chartOverview_ghg['name']],
+          'Ag': window[chartOverview_ghg_ag['name']],
+          'Ag Mgt': window[chartOverview_ghg_agMgt['name']],
+          'Non-Ag': window[chartOverview_ghg_Nonag['name']],
+        },
+        'Water': {
+          'Landuse': window[chartOverview_water['Landuse']['name']],
+          'Type': window[chartOverview_water['Type']['name']],
+        },
+        'Biodiversity': {
+          'GBF2': window[chartOverview_bio_GBF2['name']],
+        },
+      };
+
+      rankingData.value = {
+        'Area': window[rankingArea['name']],
+        'Economics': window[rankingEconomics['name']],
+        'GHG': window[rankingGHG['name']],
+        'Water': window[rankingWater['name']],
+        'Biodiversity': window[rankingBiodiversity['name']],
+      };
+
+
+
+      //  Set initial values AFTER dataLoaded = true
+      availableYears.value = window['Supporting_info']['years'];
+      selectYear.value = availableYears.value[0];
+
+      availableChartCategories.value = Object.keys(ChartData.value);
+      selectChartCategory.value = availableChartCategories.value[0];
+
+      selectChartSubCategory.value = Object.keys(ChartData.value[selectChartCategory.value])[0];
+      selectRankingSubCategory.value = Object.keys(rankingData.value[selectChartCategory.value][selectRegion.value])[0];
+      colorsRanking.value = window.Supporting_info.colors_ranking;
+
+      await nextTick(() => {
+        dataLoaded.value = true;
+      });
+
+
+    });
+
+    watch(yearIndex, (newIndex) => {
+      selectYear.value = availableYears.value[newIndex];
+    });
+
+    watch(selectChartCategory, (newCategory) => {
+      availableChartSubCategories.value = Object.keys(ChartData.value[selectChartCategory.value])
+      availableRankSubcategories.value = Object.keys(rankingData.value[selectChartCategory.value][selectRegion.value]).filter(key => key !== "Total");
+      selectChartSubCategory.value = availableChartSubCategories.value[0];
+      selectRankingSubCategory.value = availableRankSubcategories.value[0];
+    });
+
+    watch([selectYear, selectRankingSubCategory], (newValues, oldValues) => {
+      const [newYear, newSubCategory] = newValues;
+      selectRankingColors.value = Object.fromEntries(
+        Object.entries(rankingData.value[selectChartCategory.value] || {}).map(([region, values]) => [
+          region,
+          values[newSubCategory]?.['color']?.[newYear] || {}
+        ])
+      );
+    });
+
     return {
-      dataLoaded,
-      availableYears,
-      availableDatasets,
-      DtypeSubCategories,
       yearIndex,
       runScenario,
+      dataLoaded,
 
-      selectRegion,
-      selectDataset,
-      selectDataType,
-      selectYear,
-      selectSubcategory,
-
-      chartOverview,
+      ChartData,
+      rankingData,
+      RankSubcategoriesRename,
       colorsRanking,
-      changeDataset,
+
+      availableYears,
+      availableChartCategories,
+      availableChartSubCategories,
+      availableRankSubcategories,
+
+      selectYear,
+      selectRegion,
+      selectChartCategory,
+      selectChartSubCategory,
+      selectRankingSubCategory,
+      selectChartData,
+      selectRankingColors,
     };
   },
 
   // This template is a fallback that will be replaced by the loaded template
   template: `
-    <div>
+    <div v-if="dataLoaded">
 
       <div class="flex flex-col">
 
@@ -153,93 +237,113 @@ window.HomeView = {
         <p class="text-[#505051] font-bold p-1 pt-8"> SSP - {{ runScenario.SSP }} | GHG - {{ runScenario.GHG }} | Biodiversity - {{ runScenario.BIO_GBF2 }}</p>
         <div class="mb-4 mr-4">
           <ranking-cards 
-            v-if="dataLoaded"
+            :rankingData="rankingData"
             :selectRegion="selectRegion"
             :selectYear="selectYear">
           </ranking-cards>
         </div>
 
+
         <!-- Title for map and chart -->
         <div class="flex items-center justify-between">
           <p class="text-[#505051] w-[500px] text font-bold p-1 pt-8">Map and Statistics</p>
-          <p class="flex-1 text-[#505051] font-bold ml-4 p-1 pt-8">{{ selectDataType }} overview for {{ selectRegion }}</p>
+          <p class="flex-1 text-[#505051] font-bold ml-4 p-1 pt-8">{{ selectChartCategory }} overview for {{ selectRegion }}</p>
         </div>
 
-        <div class="flex mr-4 gap-4 mb-4">
+        <!-- Container for Map and Chart -->
+        <div class="flex mr-4 gap-4 mb-4 flex-row">
 
-          <div class="flex flex-col rounded-[10px] bg-white shadow-md w-[500px]">
 
-            <!-- Buttons -->
+          <!-- Map, chart buttons, and year scroll -->
+          <div class="flex flex-col rounded-[10px] bg-white shadow-md w-[500px] h-[500px] relative">
+
+            <!-- Chart Primary Category Buttons -->
             <div class="flex items-center justify-between w-full">
-              <div class="text-[0.8rem] ml-2">
-                <p>Region: <strong>{{ selectRegion }}</strong></p>
-              </div>
-              <div class="flex items-center justify-end p-2">
-                <div class="flex space-x-1">
-                  <button v-for="(data, key) in availableDatasets" :key="key"
-                    @click="selectDataset = key"
-                    class="bg-[#e8eaed] text-[#1f1f1f] text-[0.8rem] px-1 py-1 rounded"
-                    :class="{'bg-sky-500 text-white': selectDataset === key}">
-                    {{ data.type }}
-                  </button>
-                </div>
+              <p class="text-[0.8rem] ml-2">Region: <strong>{{ selectRegion }}</strong></p>
+              <div class="flex items-center space-x-1 justify-end p-2">
+                <button v-for="(data, key) in availableChartCategories" :key="key"
+                  @click="selectChartCategory = data"
+                  class="bg-[#e8eaed] text-[#1f1f1f] text-[0.8rem] px-1 py-1 rounded"
+                  :class="{'bg-sky-500 text-white': selectChartCategory === data}">
+                  {{ data }}
+                </button>
               </div>
             </div>
 
-            <hr class="border-gray-300">
+            <!-- Horizontal Divider -->
+            <hr class="border-gray-300 z-[100]">
+
+            <!-- Ranking Subcategory Buttons -->
+            <div class="flex items-center space-x-1 justify-end absolute top-[55px] left-[220px] z-[100]">
+              <button v-for="(data, key) in availableRankSubcategories" :key="key"
+                @click="selectRankingSubCategory = data"
+                class="bg-[#e8eaed] text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded"
+                :class="{'bg-sky-500 text-white': selectRankingSubCategory === data}">
+                {{ RankSubcategoriesRename[data] || data }}
+              </button>
+            </div>
+
+            <!-- Year scroll -->
+            <div class="flex flex-col absolute top-[50px] left-[10px] w-[200px] z-[100]">
+              <p class="text-[0.8rem]">Year: <strong>{{ selectYear }}</strong></p>
+              <el-slider
+                v-if="availableYears.length > 0"
+                class="flex-1 max-w-[150px] pt-2 pl-2"
+                v-model="yearIndex"
+                size="small"
+                :show-tooltip="false"
+                :min="0"
+                :max="availableYears.length - 1"
+                :step="1"
+                :format-tooltip="index => availableYears[index]"
+                :marks="availableYears.reduce((acc, year, index) => ({ ...acc, [index]: year }), {})"
+                @input="(index) => { yearIndex = index; }"
+              />
+            </div>
 
             <!-- Map -->
-            <div class="relative">
-              <div class="absolute flex-col w-full top-1 left-2 right-2 pr-4 justify-between items-center z-10">
-                
-              <div class="flex flex-col">
-                <div class="flex items-center justify-between">
-                  <p class="text-[0.8rem]">Year: <strong>{{ selectYear }}</strong></p>
-                  <div class="flex space-x-1 mr-4">
-                    <button v-for="cat in DtypeSubCategories" :key="cat"
-                      @click="selectSubcategory = cat"
-                      class="bg-[#e8eaed] text-[#1f1f1f] text-[0.6rem] px-1 rounded"
-                      :class="{'bg-sky-500 text-white': selectSubcategory === cat}">
-                      {{ cat }}
-                    </button>
-                  </div>
-                </div>
+            <map-geojson 
+              class="absolute top-[50px] left-0 w-full z-[10]"
+              :height="'430px'"
+              :selectRankingColors="selectRankingColors">
+            </map-geojson>
 
-                <el-slider 
-                  v-if="availableYears.length > 0"
-                  class="flex-1 max-w-[150px] pt-2 pl-2" 
-                  v-model="yearIndex"
-                  size="small"
-                  :show-tooltip="false"
-                  :min="0" 
-                  :max="availableYears.length - 1"
-                  :step="1"
-                  :format-tooltip="index => availableYears[index]"
-                  :marks="availableYears.reduce((acc, year, index) => ({ ...acc, [index]: year }), {})"
-                  @input="(index) => { yearIndex = index; }"
-                />
-        
+            <!-- Legend -->
+            <div v-if="colorsRanking" class="absolute bottom-[20px] left-[35px] z-[100]">
+              <div class="font-bold text-sm mb-2 text-gray-600">Ranking</div>
+              <div class="flex flex-row items-center">
+                <div v-for="(color, label) in colorsRanking" :key="label" class="flex items-center mr-4 mb-1">
+                    <span class="inline-block w-[12px] h-[12px] mr-[3px]" :style="{ backgroundColor: color }"></span>
+                    <span class="text-sm text-gray-600">{{ label }}</span>
                 </div>
               </div>
-              <map-geojson 
-                v-if="dataLoaded"
-                :height="'530px'" 
-                :selectDataType="selectDataType" 
-                :selectYear="selectYear" 
-                :selectSubcategory="selectSubcategory"
-                :legendObj="colorsRanking"
-              />
             </div>
 
           </div>
 
-          <!-- Statistics Chart -->
-          <chart-container 
-          v-if="dataLoaded"
-          class="flex-1 rounded-[10px] bg-white shadow-md"
-          :chartData="chartOverview"></chart-container>
+
+          <div class="relative flex flex-1 rounded-[10px] bg-white shadow-md h-[500px]">
+
+            <!-- Chart subcategory buttons -->
+            <div class="absolute flex flex-row space-x-1 mr-4 top-[9px] left-[10px] z-10">
+              <button v-for="cat in availableChartSubCategories" :key="cat"
+                @click="selectChartSubCategory = cat"
+                class="bg-[#e8eaed] text-[#1f1f1f] text-[0.8rem] px-1 py-1 rounded"
+                :class="{'bg-sky-500 text-white': selectChartSubCategory === cat}">
+                {{ cat }}
+              </button>
+            </div>
+
+            <chart-container
+              class="w-full h-full pt-[50px]"
+              :chartData="selectChartData">
+            </chart-container>
+
+          </div>
+
 
         </div>
+
         
       </div>
     </div>

@@ -3,15 +3,17 @@ window.AreaView = {
     const { ref, onMounted, inject, computed, watch, nextTick } = Vue;
 
     // Global selection state
+    const yearIndex = ref(0);
     const selectYear = ref(2020);
     const selectRegion = inject('globalSelectedRegion');
-    const yearIndex = ref(0);
 
     // Global variables
     const availableYears = ref([]);
-    const availableCategories = ref(['Ag', 'Ag Mgt', 'Non-Ag']);
-    const dataLoaded = ref(false);
-    const isDrawerOpen = ref(false);
+    const availableMapCategories = ['Ag', 'Ag Mgt', 'Non-Ag']
+    const availableChartCategories = ref([])
+    const availableCategories = ref();
+
+
 
     // Data selection and visualization state
     const selectChartDataset = ref({});
@@ -22,7 +24,10 @@ window.AreaView = {
 
     // Data|Map service
     const dataConstructor = new window.DataConstructor();
-    const MapRegister = window.MapService.mapCategories['Area'];     // MapService was registered in the index.html
+    const chartRegister = window.DataService.chartCategories['Area'];   // DataService has been registered in index.html      [DataService.js]
+    const mapRegister = window.MapService.mapCategories['Area'];        // MapService was registered in the index.html
+    const loadScript = window.loadScript;                               // DataConstructor has been registered in index.html  [helpers.js]
+
 
     // Map selection state
     const selectMapCategory = ref('Ag');
@@ -33,6 +38,9 @@ window.AreaView = {
     // Chart selection state
     const selectChartLevel = ref('Landuse');
     const selectChartItem = ref('Beef - modified land');
+
+    const dataLoaded = ref(false);
+    const isDrawerOpen = ref(false);
 
 
     // Centralized function to navigate nested data structure based on current selections
@@ -92,21 +100,21 @@ window.AreaView = {
     const updateMapOverlay = () => {
       // Set map configuration based on category
       if (selectMapCategory.value === 'Ag') {
-        mapVarName.value = MapRegister["Ag"]["name"];
+        mapVarName.value = mapRegister["Ag"]["name"];
         mapVarPath.value = [selectMapLanduse.value, selectMapWater.value, selectYear.value];
       } else if (selectMapCategory.value === 'Ag Mgt') {
-        mapVarName.value = MapRegister["Ag Mgt"]["name"];
+        mapVarName.value = mapRegister["Ag Mgt"]["name"];
         mapVarPath.value = [selectMapAgMgt.value, selectMapLanduse.value, selectMapWater.value, selectYear.value];
       } else if (selectMapCategory.value === 'Non-Ag') {
-        mapVarName.value = MapRegister["Non-Ag"]["name"];
+        mapVarName.value = mapRegister["Non-Ag"]["name"];
         mapVarPath.value = [selectMapLanduse.value, selectYear.value];
       }
     };
 
     // Function to load data for current category
     const loadDataForCategory = (category) => {
-      if (!window[MapRegister[category]['name']]) return;
-      dataConstructor.loadData(window[MapRegister[category]['name']]);
+      if (!window[mapRegister[category]['name']]) return;
+      dataConstructor.loadData(window[mapRegister[category]['name']]);
     };
 
     // Computed properties using DataConstructor
@@ -156,9 +164,9 @@ window.AreaView = {
       await loadScript("./data/Area_overview_2_Category.js", 'Area_overview_2_Category');
 
       // Load map data for all categories
-      await loadScript(MapRegister['Ag']['path'], MapRegister['Ag']['name']);
-      await loadScript(MapRegister['Ag Mgt']['path'], MapRegister['Ag Mgt']['name']);
-      await loadScript(MapRegister['Non-Ag']['path'], MapRegister['Non-Ag']['name']);
+      await loadScript(mapRegister['Ag']['path'], mapRegister['Ag']['name']);
+      await loadScript(mapRegister['Ag Mgt']['path'], mapRegister['Ag Mgt']['name']);
+      await loadScript(mapRegister['Non-Ag']['path'], mapRegister['Non-Ag']['name']);
 
       // Load initial data for the default category
       loadDataForCategory(selectMapCategory.value);
@@ -191,6 +199,10 @@ window.AreaView = {
       isDrawerOpen.value = !isDrawerOpen.value;
     };
 
+    watch(yearIndex, (newIndex) => {
+      selectYear.value = availableYears.value[newIndex];
+    });
+
     // Watch for category changes to reload data
     watch(selectMapCategory, (newCategory) => {
       loadDataForCategory(newCategory);
@@ -217,7 +229,6 @@ window.AreaView = {
 
       // Set map configuration based on category
       updateMapOverlay();
-
 
     });
 

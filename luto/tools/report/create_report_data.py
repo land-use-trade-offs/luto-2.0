@@ -102,6 +102,14 @@ def save_report_data(raw_data_dir:str):
             formatted = f"{int(round(x))}"
         return f"{formatted} {suffixes[magnitude]}"
     
+    # Land-use group and colors
+    lu_group_raw = pd.read_csv('luto/tools/report/VUE_modules/assets/lu_group.csv')
+    colors_lu_category = lu_group_raw.set_index('Category')['color_HEX'].to_dict()
+    colors_lu_category.update({'Agri-Management': "#D5F100"})
+    lu_group = lu_group_raw.set_index(['Category', 'color_HEX'])\
+        .apply(lambda x: x.str.split(', ').explode())\
+        .reset_index()
+    
         
 
     ####################################################
@@ -130,14 +138,6 @@ def save_report_data(raw_data_dir:str):
     am_dvar_area['Area (ha)'] = am_dvar_area['Area (ha)'].round(2)
     
 
-    lu_group_raw = pd.read_csv('luto/tools/report/VUE_modules/assets/lu_group.csv')
-    colors_lu_category = lu_group_raw.set_index('Category')['color_HEX'].to_dict()
-    colors_lu_category.update({'Agri-Management': "#D5F100"})
-    lu_group = lu_group_raw.set_index(['Category', 'color_HEX'])\
-        .apply(lambda x: x.str.split(', ').explode())\
-        .reset_index()
-        
-        
     # -------------------- Area ranking --------------------
     area_ranking_total =pd.concat([ag_dvar_area, non_ag_dvar_area, am_dvar_area])\
         .query('Water_supply.isin(["ALL", "NA"])')\
@@ -1577,6 +1577,7 @@ def save_report_data(raw_data_dir:str):
         .replace(RENAME_AM_NON_AG)\
         .query('abs(`Water Net Yield (ML)`) > 1e-6')\
         .rename(columns={'Water Net Yield (ML)': 'Value (ML)'})
+    water_net_yield_watershed['Water Supply'] = water_net_yield_watershed['Water Supply'].replace(np.nan, 'NA')
 
 
     water_net_yield_NRM_region = water_files.query('base_name == "water_yield_separate_NRM"')
@@ -1585,6 +1586,31 @@ def save_report_data(raw_data_dir:str):
         .replace(RENAME_AM_NON_AG)\
         .query('abs(`Water Net Yield (ML)`) > 1e-6')\
         .rename(columns={'Water Net Yield (ML)': 'Value (ML)'})
+        
+    water_ag_AUS = water_net_yield_NRM_region\
+        .query('Type == "Agricultural Landuse"')\
+        .groupby(['Water Supply', 'Landuse', 'Year',])[['Value (ML)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .assign(region='AUSTRALIA')
+        
+    water_am_AUS = water_net_yield_NRM_region\
+        .query('Type == "Agricultural Management"')\
+        .groupby(['Agri-Management', 'Water Supply', 'Landuse', 'Year'])[['Value (ML)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .assign(region='AUSTRALIA')
+        
+    water_nonag_AUS = water_net_yield_NRM_region\
+        .query('Type == "Non-Agricultural Landuse"')\
+        .groupby(['Landuse', 'Year'])[['Value (ML)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .assign(
+            region='AUSTRALIA',
+            name_order=lambda x: x['Landuse'].apply(lambda y: LANDUSE_ALL_RENAMED.index(y)))\
+        .sort_values('name_order')\
+        .drop(columns=['name_order'])
 
 
     hist_and_public_wny_water_region = water_files.query('base_name == "water_yield_limits_and_public_land"')
@@ -1615,6 +1641,7 @@ def save_report_data(raw_data_dir:str):
 
     # -------------------- Water yield overview for Australia --------------------
     water_inside_LUTO_sum = water_net_yield_watershed\
+        .query('`Water Supply` != "ALL" and `Agri-Management` != "ALL"')\
         .groupby(['Year','Type'])[['Value (ML)']]\
         .sum(numeric_only=True)\
         .round({'Value (ML)': 2})\
@@ -1661,39 +1688,11 @@ def save_report_data(raw_data_dir:str):
     water_yield_df_AUS.loc[len(water_yield_df_AUS)] = ['Water Net Yield', water_net_yield_sum, 'line']
     water_yield_df_AUS.loc[len(water_yield_df_AUS)] = ['Water Limit', water_limit, 'line']
 
-    filename = 'Water_overview_AUSTRALIA'
-    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-        f.write(f'window["{filename}"] = ')
-        water_yield_df_AUS.to_json(f, orient='records')
-        f.write(';\n')
-    
+    water_yield_AUS = {
+        'AUSTRALIA': json.loads(water_yield_df_AUS.to_json(orient='records'))
+    }
 
-    # -------------------- Water yield overview for Australia by landuse --------------------
-    water_inside_LUTO_lu_sum = water_net_yield_watershed\
-        .groupby(['Year','Landuse'])[['Value (ML)']]\
-        .sum(numeric_only=True)\
-        .reset_index()\
-        .round({'Value (ML)': 2})\
-            
-    water_inside_LUTO_lu_sum_wide = water_inside_LUTO_lu_sum\
-        .groupby(['Landuse'])[['Year','Value (ML)']]\
-        .apply(lambda x: x[['Year','Value (ML)']].values.tolist())\
-        .reset_index()\
-        .set_index('Landuse')\
-        .reindex(LANDUSE_ALL_RENAMED)\
-        .reset_index()\
-        .round({'Value (ML)': 2})\
-        
-    water_inside_LUTO_lu_sum_wide.columns = ['name','data']
-    water_inside_LUTO_lu_sum_wide['type'] = 'column'
-    filename = 'Water_overview_landuse'
-    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-        f.write(f'window["{filename}"] = ')
-        water_inside_LUTO_lu_sum_wide.to_json(f, orient='records')
-        f.write(';\n')
-
-
-    # -------------------- Water yield overview for Australia by watershed region --------------------
+    # -------------------- Water yield overview for watershed region --------------------
     water_yield_region = {}
     for reg_name in water_net_yield['Region'].unique():
 
@@ -1732,52 +1731,58 @@ def save_report_data(raw_data_dir:str):
             water_df.loc[len(water_df)] = ['Water Limit (historical level)', raw_targets, 'line', '#2176cc', 'Dash']
 
         water_yield_region[reg_name] = water_df.to_dict(orient='records')
-
-    filename = 'Water_overview_by_watershed_region'
+        
+        
+    # Combine Australia and regions
+    water_yield_region = {**water_yield_AUS, **water_yield_region}
+    
+    
+    filename = 'Water_overview_watershed'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as outfile:
         outfile.write(f'window["{filename}"] = ')
         json.dump(water_yield_region, outfile, separators=(',', ':'), indent=2)
         outfile.write(';\n')
         
-        
-        
-    # -------------------- Water yield ranking --------------------
+   
+
+    # -------------------- Water yield ranking by NRM --------------------
     water_ranking_type_region = water_net_yield_NRM_region\
+        .query('`Water Supply` != "ALL" and `Agri-Management` != "ALL"')\
         .groupby(['Year', 'region_NRM', 'Type'])[['Value (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()\
-        .sort_values(['Year', 'Type', 'Value (ML)'], ascending=[True, True, False])\
-        .assign(Rank=lambda x: x.groupby(['Year', 'Type']).cumcount() + 1)\
-        .assign(Percent=lambda x: x['Value (ML)'] / x.groupby(['Year', 'Type'])['Value (ML)'].transform('sum') * 100)
+        .sort_values(['Year', 'Type', 'Value (ML)'], ascending=[True, True, False])
     water_ranking_type_AUS = water_net_yield_NRM_region\
         .groupby(['Year', 'Type'])[['Value (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()\
         .sort_values(['Year', 'Type', 'Value (ML)'], ascending=[True, True, False])\
-        .assign(Rank='N.A.', Percent=100, region_NRM='AUSTRALIA')
+        .assign(Rank=0,  region_NRM='AUSTRALIA')
         
         
     water_ranking_net_region = water_net_yield_NRM_region\
+        .query('`Water Supply` != "ALL" and `Agri-Management` != "ALL"')\
         .groupby(['Year', 'region_NRM'])[['Value (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()\
         .sort_values(['Year', 'Value (ML)'], ascending=[True, False])\
         .assign(Rank=lambda x: x.groupby('Year').cumcount() + 1)\
-        .assign(Percent=lambda x: x['Value (ML)'] / x.groupby('Year')['Value (ML)'].transform('sum') * 100)\
         .assign(Type='Total')
     water_ranking_net_AUS = water_net_yield_NRM_region\
+        .query('`Water Supply` != "ALL" and `Agri-Management` != "ALL"')\
         .groupby(['Year'])[['Value (ML)']]\
         .sum(numeric_only=True)\
         .reset_index()\
         .sort_values(['Year', 'Value (ML)'], ascending=[True, False])\
-        .assign(Rank='N.A.', Percent=100, Type='Total', region_NRM='AUSTRALIA')
+        .assign(Rank=0, Type='Total', region_NRM='AUSTRALIA')
         
     
     water_ranking = pd.concat([
         water_ranking_type_region, 
         water_ranking_type_AUS, 
         water_ranking_net_region, 
-        water_ranking_net_AUS], axis=0, ignore_index=True).reset_index(drop=True)
+        water_ranking_net_AUS
+        ], axis=0, ignore_index=True).reset_index(drop=True)
     water_ranking = water_ranking\
         .set_index(['region_NRM', 'Year', 'Type'])\
         .reindex(
@@ -1798,11 +1803,10 @@ def save_report_data(raw_data_dir:str):
 
         df = df.drop(columns='region_NRM')
         out_dict[region][w_type]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
-        out_dict[region][w_type]['Percent'] = df.set_index('Year')['Percent'].replace({np.nan: 0}).to_dict()
         out_dict[region][w_type]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
         out_dict[region][w_type]['value'] = df.set_index('Year')['Value (ML)'].apply( lambda x: format_with_suffix(x)).to_dict()
 
-    filename = 'Water_ranking'
+    filename = 'Water_ranking_NRM'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
@@ -1817,6 +1821,7 @@ def save_report_data(raw_data_dir:str):
     for idx, col in enumerate(group_cols):
 
         df_region = water_net_yield_NRM_region\
+            .query('`Water Supply` != "ALL" and `Agri-Management` != "ALL"')\
             .groupby(['Year', 'region_NRM', col])\
             .sum()\
             .reset_index()\
@@ -1836,122 +1841,108 @@ def save_report_data(raw_data_dir:str):
             df = df.drop(['region_NRM'], axis=1)
             out_dict[region] = df.to_dict(orient='records')
             
-        filename = f'Water_overview_NRM_region_{idx+1}_{col.replace(" ", "_")}'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+    filename = f'Water_overview_NRM_{col.replace(" ", "_")}'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
 
 
 
-    # -------------------- Water yield for agricultural landuse by NRM region --------------------
-    water_ag = water_net_yield_NRM_region.query('Type == "Agricultural Landuse"').copy()
-    group_cols = ['Landuse', 'Water Supply']
+    # -------------------- Water yield for Ag by NRM --------------------
+    water_ag = pd.concat([
+        water_ag_AUS,
+        water_net_yield_NRM_region.query('Type == "Agricultural Landuse"').rename(columns={'region_NRM': 'region'})
+        ], ignore_index=True)
     
-    for idx, col in enumerate(group_cols):
+    df_region_wide = water_ag.groupby(['region', 'Water Supply', 'Landuse'])[['Year','Value (ML)']]\
+        .apply(lambda x: x[['Year', 'Value (ML)']].values.tolist())\
+        .reset_index()
+  
+    df_region_wide.columns = ['region', 'water', 'name',  'data']
+    df_region_wide['type'] = 'column'
+    df_region_wide['color'] = df_region_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+    df_region_wide['name_order'] = df_region_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_region_wide = df_region_wide.sort_values('name_order').drop(columns=['name_order'])
 
-        df_region = water_ag\
-            .groupby(['Year', 'region_NRM', col])\
-            .sum()\
-            .reset_index()\
-            .round({'Value (ML)': 2})
-        df_region_wide = df_region.groupby([col, 'region_NRM'])[['Year','Value (ML)']]\
-            .apply(lambda x: x[['Year', 'Value (ML)']].values.tolist())\
-            .reset_index()
-        df_region_wide.columns = ['name', 'region_NRM', 'data']
-        df_region_wide['type'] = 'column'
+    out_dict = {}
+    for (region, water), df in df_region_wide.groupby(['region', 'water']):
+        df = df.drop(['region'], axis=1)
+        if region not in out_dict:
+            out_dict[region] = {}
+        if water not in out_dict[region]:
+            out_dict[region][water] = {}
+        out_dict[region][water] = df.to_dict(orient='records')
         
-        if col == 'Landuse':
-            df_region_wide['color'] = df_region_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
-            df_region_wide['name_order'] = df_region_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-            df_region_wide = df_region_wide.sort_values('name_order').drop(columns=['name_order'])
-        elif col == 'Water Supply':
-            df_region_wide['color'] = df_region_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
         
-        out_dict = {}
-        for region, df in df_region_wide.groupby('region_NRM'):
-            df = df.drop(['region_NRM'], axis=1)
-            out_dict[region] = df.to_dict(orient='records')
-            
-        filename = f'Water_split_Ag_NRM_region_{idx+1}_{col.replace(" ", "_")}'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
-            
-            
-    # -------------------- Water yield for agricultural management by NRM region --------------------
-    water_am = water_net_yield_NRM_region.query('Type == "Agricultural Management"').copy()
-    group_cols = ['Water Supply', 'Landuse', 'Agri-Management']
-    
-    for idx, col in enumerate(group_cols):
+    filename = f'Water_Ag_NRM'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+        
 
-        df_region = water_am\
-            .groupby(['Year', 'region_NRM', col])\
-            .sum()\
-            .reset_index()\
-            .round({'Value (ML)': 2})
-        df_region_wide = df_region.groupby([col, 'region_NRM'])[['Year','Value (ML)']]\
-            .apply(lambda x: x[['Year', 'Value (ML)']].values.tolist())\
-            .reset_index()
-        df_region_wide.columns = ['name', 'region_NRM', 'data']
-        df_region_wide['type'] = 'column'
         
-        if col == 'Landuse':
-            df_region_wide['color'] = df_region_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
-            df_region_wide['name_order'] = df_region_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-            df_region_wide = df_region_wide.sort_values('name_order').drop(columns=['name_order'])
-        elif col == 'Water Supply':
-            df_region_wide['color'] = df_region_wide.apply(lambda x: COLORS_LM[x['name']], axis=1)
-        elif col.lower() == 'Agri-Management':
-            df_region_wide['color'] = df_region_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
-            df_region_wide['name_order'] = df_region_wide['name'].apply(lambda x: RENAME_AM_NON_AG.index(x))
-            df_region_wide = df_region_wide.sort_values('name_order').drop(columns=['name_order'])
-        
-        out_dict = {}
-        for region, df in df_region_wide.groupby('region_NRM'):
-            df = df.drop(['region_NRM'], axis=1)
-            out_dict[region] = df.to_dict(orient='records')
             
-        filename = f'Water_split_Am_NRM_region_{idx+1}_{col.replace(" ", "_")}'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+    # -------------------- Water yield for Am by NRM region --------------------
+    water_am = pd.concat(
+        [water_am_AUS,
+         water_net_yield_NRM_region.query('Type == "Agricultural Management"').rename(columns={'region_NRM': 'region'})],
+        ignore_index=True
+    )
+
+    df_region_wide = water_am.groupby(['region', 'Agri-Management', 'Water Supply', 'Landuse'])[['Year','Value (ML)']]\
+        .apply(lambda x: x[['Year', 'Value (ML)']].values.tolist())\
+        .reset_index()
+    df_region_wide.columns = ['region', '_type', 'water', 'name',  'data']
+    df_region_wide['type'] = 'column'
+    df_region_wide['color'] = df_region_wide.apply(lambda x: COLORS_LU[x['name']], axis=1)
+    df_region_wide['name_order'] = df_region_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_region_wide = df_region_wide.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for (region,_type,water), df in df_region_wide.groupby(['region', '_type', 'water']):
+        df = df.drop(['region', '_type', 'water'], axis=1)
+        if region not in out_dict:
+            out_dict[region] = {}
+        if _type not in out_dict[region]:
+            out_dict[region][_type] = {}
+        if water not in out_dict[region][_type]:
+            out_dict[region][_type][water] = {}
+        out_dict[region][_type][water] = df.to_dict(orient='records')
+        
+    filename = f'Water_Am_NRM'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
             
             
     # -------------------- Water yield for non-agricultural landuse by NRM region --------------------
-    water_nonag = water_net_yield_NRM_region.query('Type == "Non-Agricultural Landuse"').copy()
-    group_cols = ['Landuse']
-    
-    for idx, col in enumerate(group_cols):
+    water_nonag = pd.concat([
+        water_nonag_AUS,
+        water_net_yield_NRM_region.query('Type == "Non-Agricultural Landuse"').rename(columns={'region_NRM': 'region'})
+        ], ignore_index=True)
 
-        df_region = water_nonag\
-            .groupby(['Year', 'region_NRM', col])\
-            .sum()\
-            .reset_index()\
-            .round({'Value (ML)': 2})
-        df_region_wide = df_region.groupby([col, 'region_NRM'])[['Year','Value (ML)']]\
-            .apply(lambda x: x[['Year', 'Value (ML)']].values.tolist())\
-            .reset_index()
-        df_region_wide.columns = ['name', 'region_NRM', 'data']
-        df_region_wide['type'] = 'column'
+    df_region_wide = water_nonag.groupby(['region', 'Landuse'])[['Year','Value (ML)']]\
+        .apply(lambda x: x[['Year', 'Value (ML)']].values.tolist())\
+        .reset_index()
+    df_region_wide.columns = ['region', 'name', 'data']
+    df_region_wide['type'] = 'column'
+    df_region_wide['color'] = df_region_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
+    df_region_wide['name_order'] = df_region_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
+    df_region_wide = df_region_wide.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for region, df in df_region_wide.groupby('region'):
+        df = df.drop(['region'], axis=1)
+        out_dict[region] = df.to_dict(orient='records')
         
-        if col == 'Landuse':
-            df_region_wide['color'] = df_region_wide.apply(lambda x: COLORS_AM_NONAG[x['name']], axis=1)
-            df_region_wide['name_order'] = df_region_wide['name'].apply(lambda x: LANDUSE_ALL_RENAMED.index(x))
-            df_region_wide = df_region_wide.sort_values('name_order').drop(columns=['name_order'])
-
-        out_dict = {}
-        for region, df in df_region_wide.groupby('region_NRM'):
-            df = df.drop(['region_NRM'], axis=1)
-            out_dict[region] = df.to_dict(orient='records')
-            
-        filename = f'Water_split_NonAg_NRM_region_{idx+1}_{col.replace(" ", "_")}'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+    filename = f'Water_NonAg_NRM'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
         
 
 

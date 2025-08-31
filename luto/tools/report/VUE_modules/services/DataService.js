@@ -1,335 +1,413 @@
-// Ranking Data Service
-// This service provides data about rankings for different regions and metrics
+// Chart Data Service
+// This service provides data about charts for different metrics and categories
 
 window.DataService = {
-  /**
-   * Get ranking data based on the selected region and year
-   * @param {String} selectRegion - The selected region (default: 'AUSTRALIA')
-   * @param {String} selectYear - The selected year (default: 2020)
-   * @returns {Object} The ranking data object
-   */
-  getRankingData(selectRegion = 'AUSTRALIA', selectYear = 2020) {
-    try {
-      // Helper function to safely access nested properties
-      const safeAccess = (obj, path, defaultValue = null) => {
-        try {
-          return path.reduce((acc, key) => acc && acc[key], obj);
-        } catch (e) {
-          return defaultValue;
+  chartCategories: {
+    Area: {
+      Ag: {
+        "Land-use": {
+          path: "data/Area_Ag_1_Land-use.js",
+          name: "Area_Ag_1_Land-use",
+        },
+        "Water supply": {
+          path: "data/Area_Ag_2_Water_supply.js",
+          name: "Area_Ag_2_Water_supply",
+        },
+      },
+      "Ag Mgt": {
+        Type: { path: "data/Area_Am_1_Type.js", name: "Area_Am_1_Type" },
+        "Water supply": {
+          path: "data/Area_Am_2_Water_supply.js",
+          name: "Area_Am_2_Water_supply",
+        },
+        "Land-use": {
+          path: "data/Area_Am_3_Land-use.js",
+          name: "Area_Am_3_Land-use",
+        },
+      },
+      "Non-Ag": {
+        "Land-use": {
+          path: "data/Area_NonAg_1_Land-use.js",
+          name: "Area_NonAg_1_Land-use",
+        },
+      },
+      ranking: {
+        path: "data/Area_ranking.js",
+        name: "Area_ranking",
+      },
+      overview: {
+        "Land-use": {
+          path: "data/Area_overview_1_Land-use.js",
+          name: "Area_overview_1_Land-use",
+        },
+        Category: {
+          path: "data/Area_overview_2_Category.js",
+          name: "Area_overview_2_Category",
+        },
+        Source: {
+          path: "data/Area_overview_3_Source.js",
+          name: "Area_overview_3_Source",
+        },
+      },
+      transition: {
+        "start end": {
+          path: "data/Area_transition_start_end.js",
+          name: "Area_transition_start_end",
+        },
+        "year to year": {
+          path: "data/Area_transition_year_to_year.js",
+          name: "Area_transition_year_to_year",
+        },
+      },
+    },
+    Production: {
+      Ag: {
+        path: "data/Production_LUTO_1_Agricultural.js",
+        name: "Production_LUTO_1_Agricultural",
+      },
+      "Ag Mgt": {
+        path: "data/Production_LUTO_3_Agricultural_Management.js",
+        name: "Production_LUTO_3_Agricultural_Management",
+      },
+      "Non-Ag": {
+        path: "data/Production_LUTO_2_Non-Agricultural.js",
+        name: "Production_LUTO_2_Non-Agricultural",
+      },
+      overview: {
+        path: "data/Production_achive_percent.js",
+        name: "Production_achive_percent",
+      },
+      sum: {
+        Commodity: {
+          path: "data/Production_sum_1_Commodity.js",
+          name: "Production_sum_1_Commodity",
+        },
+        Type: {
+          path: "data/Production_sum_2_Type.js",
+          name: "Production_sum_2_Type",
+        },
+      },
+      demand: {
+        Type: {
+          path: "data/Production_demand_1_Type.js",
+          name: "Production_demand_1_Type",
+        },
+        "on off land": {
+          path: "data/Production_demand_2_on_off_land.js",
+          name: "Production_demand_2_on_off_land",
+        },
+        Commodity: {
+          path: "data/Production_demand_3_Commodity.js",
+          name: "Production_demand_3_Commodity",
+        },
+        Limit: {
+          path: "data/Production_demand_4_Limit.js",
+          name: "Production_demand_4_Limit",
+        },
+      },
+    },
+    Economics: {
+      Ag: {
+        "Land-use": {
+          path: "data/Economics_split_Ag_1_Land-use.js",
+          name: "Economics_split_Ag_1_Land-use",
+        },
+        Type: {
+          path: "data/Economics_split_Ag_2_Type.js",
+          name: "Economics_split_Ag_2_Type",
+        },
+        "Water supply": {
+          path: "data/Economics_split_Ag_3_Water_supply.js",
+          name: "Economics_split_Ag_3_Water_supply",
+        },
+      },
+      "Ag Mgt": {
+        "Management Type": {
+          path: "data/Economics_split_AM_1_Management_Type.js",
+          name: "Economics_split_AM_1_Management_Type",
+        },
+        "Water supply": {
+          path: "data/Economics_split_AM_2_Water_supply.js",
+          name: "Economics_split_AM_2_Water_supply",
+        },
+        "Land-use": {
+          path: "data/Economics_split_AM_3_Land-use.js",
+          name: "Economics_split_AM_3_Land-use",
+        },
+      },
+      "Non-Ag": {
+        "Land-use": {
+          path: "data/Economics_split_NonAg_1_Land-use.js",
+          name: "Economics_split_NonAg_1_Land-use",
+        },
+      },
+      ranking: {
+        path: "data/Economics_ranking.js",
+        name: "Economics_ranking",
+      },
+      overview: {
+        path: "data/Economics_overview.js",
+        name: "Economics_overview",
+      },
+      transition: {
+        matrix: {
+          ag2ag: {
+            path: "data/Economics_transition_mat_ag2ag.js",
+            name: "Economics_transition_mat_ag2ag",
+          },
+          ag2nonag: {
+            path: "data/Economics_transition_mat_ag2nonag.js",
+            name: "Economics_transition_mat_ag2nonag",
+          },
+          nonag2ag: {
+            path: "data/Economics_transition_mat_nonag2ag.js",
+            name: "Economics_transition_mat_nonag2ag",
+          },
+        },
+        ag2ag: {
+          Type: {
+            path: "data/Economics_transition_split_ag2ag_1_Type.js",
+            name: "Economics_transition_split_ag2ag_1_Type",
+          },
+          "From land-use": {
+            path: "data/Economics_transition_split_ag2ag_2_From_land-use.js",
+            name: "Economics_transition_split_ag2ag_2_From_land-use",
+          },
+          "To land-use": {
+            path: "data/Economics_transition_split_ag2ag_3_To_land-use.js",
+            name: "Economics_transition_split_ag2ag_3_To_land-use",
+          },
+        },
+        ag2nonag: {
+          "Cost type": {
+            path: "data/Economics_transition_split_Ag2NonAg_1_Cost_type.js",
+            name: "Economics_transition_split_Ag2NonAg_1_Cost_type",
+          },
+          "From land-use": {
+            path: "data/Economics_transition_split_Ag2NonAg_2_From_land-use.js",
+            name: "Economics_transition_split_Ag2NonAg_2_From_land-use",
+          },
+          "To land-use": {
+            path: "data/Economics_transition_split_Ag2NonAg_3_To_land-use.js",
+            name: "Economics_transition_split_Ag2NonAg_3_To_land-use",
+          },
+        },
+        nonag2ag: {
+          "Cost type": {
+            path: "data/Economics_transition_split_NonAg2Ag_1_Cost_type.js",
+            name: "Economics_transition_split_NonAg2Ag_1_Cost_type",
+          },
+          "From land-use": {
+            path: "data/Economics_transition_split_NonAg2Ag_2_From_land-use.js",
+            name: "Economics_transition_split_NonAg2Ag_2_From_land-use",
+          },
+          "To land-use": {
+            path: "data/Economics_transition_split_NonAg2Ag_3_To_land-use.js",
+            name: "Economics_transition_split_NonAg2Ag_3_To_land-use",
+          },
+        },
+      },
+    },
+    GHG: {
+      Ag: {
+        "GHG Category": {
+          path: "data/GHG_split_Ag_1_GHG_Category.js",
+          name: "GHG_split_Ag_1_GHG_Category",
+        },
+        "Land-use": {
+          path: "data/GHG_split_Ag_2_Land-use.js",
+          name: "GHG_split_Ag_2_Land-use",
+        },
+        "Land-use type": {
+          path: "data/GHG_split_Ag_3_Land-use_type.js",
+          name: "GHG_split_Ag_3_Land-use_type",
+        },
+        Source: {
+          path: "data/GHG_split_Ag_4_Source.js",
+          name: "GHG_split_Ag_4_Source",
+        },
+        "Water supply": {
+          path: "data/GHG_split_Ag_5_Water_supply.js",
+          name: "GHG_split_Ag_5_Water_supply",
+        },
+      },
+      "Ag Mgt": {
+        "Land-use": {
+          path: "data/GHG_split_Am_1_Land-use.js",
+          name: "GHG_split_Am_1_Land-use",
+        },
+        "Land-use type": {
+          path: "data/GHG_split_Am_2_Land-use_type.js",
+          name: "GHG_split_Am_2_Land-use_type",
+        },
+        "Management Type": {
+          path: "data/GHG_split_Am_3_Agricultural_Management_Type.js",
+          name: "GHG_split_Am_3_Agricultural_Management_Type",
+        },
+        "Water supply": {
+          path: "data/GHG_split_Am_4_Water_supply.js",
+          name: "GHG_split_Am_4_Water_supply",
+        },
+      },
+      "Non-Ag": {
+        "Land-use": {
+          path: "data/GHG_split_NonAg_1_Land-use.js",
+          name: "GHG_split_NonAg_1_Land-use",
+        },
+      },
+      ranking: {
+        path: "data/GHG_ranking.js",
+        name: "GHG_ranking",
+      },
+      overview: {
+        path: "data/GHG_overview.js",
+        name: "GHG_overview",
+      },
+      "off land": {
+        "Emission Type": {
+          path: "data/GHG_split_off_land_1_Emission_Type.js",
+          name: "GHG_split_off_land_1_Emission_Type",
+        },
+        "Emission Source": {
+          path: "data/GHG_split_off_land_2_Emission_Source.js",
+          name: "GHG_split_off_land_2_Emission_Source",
+        },
+        Commodity: {
+          path: "data/GHG_split_off_land_3_Commodity.js",
+          name: "GHG_split_off_land_3_Commodity",
+        },
+      },
+    },
+    Water: {
+      NRM: {
+        Ag: {
+          Landuse: {
+            path: "data/Water_split_Ag_NRM_region_1_Landuse.js",
+            name: "Water_split_Ag_NRM_region_1_Landuse",
+          },
+          "Water Supply": {
+            path: "data/Water_split_Ag_NRM_region_2_Water_Supply.js",
+            name: "Water_split_Ag_NRM_region_2_Water_Supply",
+          },
+        },
+        "Ag Mgt": {
+          "Water Supply": {
+            path: "data/Water_split_Am_NRM_region_1_Water_Supply.js",
+            name: "Water_split_Am_NRM_region_1_Water_Supply",
+          },
+          Landuse: {
+            path: "data/Water_split_Am_NRM_region_2_Landuse.js",
+            name: "Water_split_Am_NRM_region_2_Landuse",
+          },
+          "Management Type": {
+            path: "data/Water_split_Am_NRM_region_3_Agri-Management.js",
+            name: "Water_split_Am_NRM_region_3_Agri-Management",
+          },
+        },
+        "Non-Ag": {
+          Landuse: {
+            path: "data/Water_split_NonAg_NRM_region_1_Landuse.js",
+            name: "Water_split_NonAg_NRM_region_1_Landuse",
+          },
+        },
+        overview: {
+          "Landuse": {
+            path: "data/Water_overview_NRM_region_1_Landuse.js",
+            name: "Water_overview_NRM_region_1_Landuse",
+          },
+          "Type": {
+            path: "data/Water_overview_NRM_region_2_Type.js",
+            name: "Water_overview_NRM_region_2_Type",
+          },
+        },
+        ranking: {
+          path: "data/Water_ranking.js",
+          name: "Water_ranking"
+        },
+      },
+      Watershed: {
+        overview: {
+          Australia: {
+            path: "data/Water_overview_AUSTRALIA.js",
+            name: "Water_overview_AUSTRALIA",
+          },
+          landuse: {
+            path: "data/Water_overview_landuse.js",
+            name: "Water_overview_landuse",
+          },
+          overview: {
+            path: "data/Water_overview_by_watershed_region.js",
+            name: "Water_overview_by_watershed_region",
+          },
+        },
+
+      },
+    },
+    Biodiversity: {
+      GBF2: {
+        Ag: {
+          Landuse: {
+            path: "data/BIO_GBF2_split_Ag_1_Landuse.js",
+            name: "BIO_GBF2_split_Ag_1_Landuse",
+          },
+        },
+        "Ag Mgt": {
+          Landuse: {
+            path: "data/BIO_GBF2_split_Am_1_Landuse.js",
+            name: "BIO_GBF2_split_Am_1_Landuse",
+          },
+          "Agri-Management": {
+            path: "data/BIO_GBF2_split_Am_2_Agri-Management.js",
+            name: "BIO_GBF2_split_Am_2_Agri-Management",
+          },
+        },
+        "Non-Ag": {
+          Landuse: {
+            path: "data/BIO_GBF2_split_NonAg_1_Landuse.js",
+            name: "BIO_GBF2_split_NonAg_1_Landuse",
+          },
+        },
+        overview: {
+          Type: {
+            path: "data/BIO_GBF2_overview_1_Type.js",
+            name: "BIO_GBF2_overview_1_Type",
+          },
+        },
+        ranking: {
+          path: "data/Biodiversity_ranking.js",
+          name: "Biodiversity_ranking",
+        },
+      },
+      quality: {
+        Ag: {
+          Landuse: {
+            path: "data/BIO_quality_split_Ag_1_Landuse.js",
+            name: "BIO_quality_split_Ag_1_Landuse",
+          },
+        },
+        "Ag Mgt": {
+          Landuse: {
+            path: "data/BIO_quality_split_Am_1_Landuse.js",
+            name: "BIO_quality_split_Am_1_Landuse",
+          },
+          "Agri-Management": {
+            path: "data/BIO_quality_split_Am_2_Agri-Management.js",
+            name: "BIO_quality_split_Am_2_Agri-Management",
+          },
+        },
+        "Non-Ag": {
+          Landuse: {
+            path: "data/BIO_quality_split_NonAg_1_Landuse.js",
+            name: "BIO_quality_split_NonAg_1_Landuse",
+          },
+        },
+        overview: {
+          Type: {
+            path: "data/BIO_quality_overview_1_Type.js",
+            name: "BIO_quality_overview_1_Type",
+          },
         }
-      };      // Populate the rankingData based on the selected region
-      const rankingData = {
-        'Economics': {
-          'Revenue': {
-            'Rank': safeAccess(window, ['Economics_ranking', selectRegion, 'Revenue', 'Rank', selectYear]),
-            'color': safeAccess(window, ['Economics_ranking', selectRegion, 'Revenue', 'color', selectYear]),
-            'value': safeAccess(window, ['Economics_ranking', selectRegion, 'Revenue', 'value', selectYear]),
-          },
-          'Cost': {
-            'Rank': safeAccess(window, ['Economics_ranking', selectRegion, 'Cost', 'Rank', selectYear]),
-            'color': safeAccess(window, ['Economics_ranking', selectRegion, 'Cost', 'color', selectYear]),
-            'value': safeAccess(window, ['Economics_ranking', selectRegion, 'Cost', 'value', selectYear]),
-          },
-          'Total': {
-            'Rank': safeAccess(window, ['Economics_ranking', selectRegion, 'Total', 'Rank', selectYear]),
-            'color': safeAccess(window, ['Economics_ranking', selectRegion, 'Total', 'color', selectYear]),
-            'value': safeAccess(window, ['Economics_ranking', selectRegion, 'Total', 'value', selectYear]),
-          },
-        },
-        'Area': {
-          'Ag': {
-            'Rank': safeAccess(window, ['Area_ranking', selectRegion, 'Agricultural Landuse', 'Rank', selectYear]),
-            'color': safeAccess(window, ['Area_ranking', selectRegion, 'Agricultural Landuse', 'color', selectYear]),
-            'value': safeAccess(window, ['Area_ranking', selectRegion, 'Agricultural Landuse', 'value', selectYear]),
-          },
-          'Am': {
-            'Rank': safeAccess(window, ['Area_ranking', selectRegion, 'Agricultural Management', 'Rank', selectYear]),
-            'color': safeAccess(window, ['Area_ranking', selectRegion, 'Agricultural Management', 'color', selectYear]),
-            'value': safeAccess(window, ['Area_ranking', selectRegion, 'Agricultural Management', 'value', selectYear]),
-          },
-          'NonAg': {
-            'Rank': safeAccess(window, ['Area_ranking', selectRegion, 'Non-Agricultural Landuse', 'Rank', selectYear]),
-            'color': safeAccess(window, ['Area_ranking', selectRegion, 'Non-Agricultural Landuse', 'color', selectYear]),
-            'value': safeAccess(window, ['Area_ranking', selectRegion, 'Non-Agricultural Landuse', 'value', selectYear]),
-          },
-          'Total': {
-            'Rank': safeAccess(window, ['Area_ranking', selectRegion, 'Total', 'Rank', selectYear]),
-            'color': safeAccess(window, ['Area_ranking', selectRegion, 'Total', 'color', selectYear]),
-            'value': safeAccess(window, ['Area_ranking', selectRegion, 'Total', 'value', selectYear]),
-          },
-        },
-        'GHG': {
-          'Emissions': {
-            'Rank': safeAccess(window, ['GHG_ranking', selectRegion, 'GHG emissions', 'Rank', selectYear]),
-            'color': safeAccess(window, ['GHG_ranking', selectRegion, 'GHG emissions', 'color', selectYear]),
-            'value': safeAccess(window, ['GHG_ranking', selectRegion, 'GHG emissions', 'value', selectYear]),
-          },
-          'Sequestration': {
-            'Rank': safeAccess(window, ['GHG_ranking', selectRegion, 'GHG sequestrations', 'Rank', selectYear]),
-            'color': safeAccess(window, ['GHG_ranking', selectRegion, 'GHG sequestrations', 'color', selectYear]),
-            'value': safeAccess(window, ['GHG_ranking', selectRegion, 'GHG sequestrations', 'value', selectYear]),
-          },
-          'Total': {
-            'Rank': safeAccess(window, ['GHG_ranking', selectRegion, 'Total', 'Rank', selectYear]),
-            'color': safeAccess(window, ['GHG_ranking', selectRegion, 'Total', 'color', selectYear]),
-            'value': safeAccess(window, ['GHG_ranking', selectRegion, 'Total', 'value', selectYear]),
-          },
-        },
-        'Water': {
-          'Ag': {
-            'Rank': safeAccess(window, ['Water_ranking', selectRegion, 'Agricultural Landuse', 'Rank', selectYear]),
-            'color': safeAccess(window, ['Water_ranking', selectRegion, 'Agricultural Landuse', 'color', selectYear]),
-            'value': safeAccess(window, ['Water_ranking', selectRegion, 'Agricultural Landuse', 'value', selectYear]),
-          },
-          'Am': {
-            'Rank': safeAccess(window, ['Water_ranking', selectRegion, 'Agricultural Management', 'Rank', selectYear]),
-            'color': safeAccess(window, ['Water_ranking', selectRegion, 'Agricultural Management', 'color', selectYear]),
-            'value': safeAccess(window, ['Water_ranking', selectRegion, 'Agricultural Management', 'value', selectYear]),
-          },
-          'NonAg': {
-            'Rank': safeAccess(window, ['Water_ranking', selectRegion, 'Non-Agricultural Landuse', 'Rank', selectYear]),
-            'color': safeAccess(window, ['Water_ranking', selectRegion, 'Non-Agricultural Landuse', 'color', selectYear]),
-            'value': safeAccess(window, ['Water_ranking', selectRegion, 'Non-Agricultural Landuse', 'value', selectYear]),
-          },
-          'Total': {
-            'Rank': safeAccess(window, ['Water_ranking', selectRegion, 'Total', 'Rank', selectYear]),
-            'color': safeAccess(window, ['Water_ranking', selectRegion, 'Total', 'color', selectYear]),
-            'value': safeAccess(window, ['Water_ranking', selectRegion, 'Total', 'value', selectYear]),
-          },
-        },
-        'Biodiversity': {
-          'Ag': {
-            'Rank': safeAccess(window, ['Biodiversity_ranking', selectRegion, 'Agricultural Landuse', 'Rank', selectYear]),
-            'color': safeAccess(window, ['Biodiversity_ranking', selectRegion, 'Agricultural Landuse', 'color', selectYear]),
-            'value': safeAccess(window, ['Biodiversity_ranking', selectRegion, 'Agricultural Landuse', 'value', selectYear]),
-          },
-          'Am': {
-            'Rank': safeAccess(window, ['Biodiversity_ranking', selectRegion, 'Agricultural Management', 'Rank', selectYear]),
-            'color': safeAccess(window, ['Biodiversity_ranking', selectRegion, 'Agricultural Management', 'color', selectYear]),
-            'value': safeAccess(window, ['Biodiversity_ranking', selectRegion, 'Agricultural Management', 'value', selectYear]),
-          },
-          'NonAg': {
-            'Rank': safeAccess(window, ['Biodiversity_ranking', selectRegion, 'Non-Agricultural land-use', 'Rank', selectYear]),
-            'color': safeAccess(window, ['Biodiversity_ranking', selectRegion, 'Non-Agricultural land-use', 'color', selectYear]),
-            'value': safeAccess(window, ['Biodiversity_ranking', selectRegion, 'Non-Agricultural land-use', 'value', selectYear]),
-          },
-          'Total': {
-            'Rank': safeAccess(window, ['Biodiversity_ranking', selectRegion, 'Total', 'Rank', selectYear]),
-            'color': safeAccess(window, ['Biodiversity_ranking', selectRegion, 'Total', 'color', selectYear]),
-            'value': safeAccess(window, ['Biodiversity_ranking', selectRegion, 'Total', 'value', selectYear]),
-          },
-        },
-      };
-
-      return rankingData;
-    } catch (error) {
-      console.error("Error loading ranking data:", error);
-      return {};
-    }
+      },
+    },
   },
-
-  /**
-   * Get subcategory keys for a given data type
-   * @param {String} dataType - The data type (Economics, Area, GHG, Water, Biodiversity)
-   * @returns {Array} Array of subcategory keys
-   */
-  getSubcategories(dataType) {
-    return this.SubcategoryMapping[dataType] ? Object.keys(this.SubcategoryMapping[dataType]) : [];
-  },
-
-  // Mapping between UI subcategory names and actual data structure keys
-  SubcategoryMapping: {
-    'Economics': {
-      'Revenue': 'Revenue',
-      'Cost': 'Cost',
-    },
-    'Area': {
-      'Ag': 'Agricultural Landuse',
-      'Ag Mgt': 'Agricultural Management',
-      'Non-Ag': 'Non-Agricultural Landuse',
-      'Total': 'Total'
-    },
-    'GHG': {
-      'Emissions': 'GHG emissions',
-      'Sequestration': 'GHG sequestrations',
-    },
-    'Water': {
-      'Ag': 'Agricultural Landuse',
-      'Ag Mgt': 'Agricultural Management',
-      'Non-Ag': 'Non-Agricultural Landuse',
-      'Total': 'Total'
-    },
-    'Biodiversity': {
-      'Ag': 'Agricultural Landuse',
-      'Ag Mgt': 'Agricultural Management',
-      'Non-Ag': 'Non-Agricultural land-use',
-      'Total': 'Total'
-    }
-  },
-
-  /**
-   * Maps a UI subcategory to the actual data structure key
-   * @param {String} dataType - The data type (Economics, Area, GHG, Water, Biodiversity)
-   * @param {String} subcategory - The UI subcategory (Ag, Am, NonAg, Total, etc.)
-   * @returns {String} The actual data structure key
-   */
-  mapSubcategory(dataType, subcategory) {
-    // Default to 'Total' if no subcategory provided
-    if (!subcategory) return 'Total';
-
-    // Get the mapping for this data type
-    const mapping = this.SubcategoryMapping[dataType];
-    if (!mapping) return subcategory;
-
-    // Return the mapped subcategory or the original if no mapping found
-    return mapping[subcategory] || subcategory;
-  },
-
-  ChartPaths: {
-    'Area': {
-      'Ag': {
-        'Landuse': 'data/Area_Ag_1_Land-use.js',
-        'Water': 'data/Area_Ag_2_Water_supply.js'
-      },
-      'Ag Mgt': {
-        'Mgt Type': 'data/Area_Am_1_Type.js',
-        'Water': 'data/Area_Am_2_Water_supply.js',
-        'Landuse': 'data/Area_Am_3_Land-use.js'
-      },
-      'Non-Ag': {
-        'Landuse': 'data/Area_NonAg_1_Land-use.js'
-      },
-      'Overview': {
-        'Landuse': 'data/Area_overview_1_Land-use.js',
-        'Category': 'data/Area_overview_2_Category.js',
-        'Source': 'data/Area_overview_3_Source.js'
-      },
-      'Ranking': 'data/Area_ranking.js',
-      'Transition': {
-        'Start-end': 'data/Area_transition_start_end.js',
-        'Year to Year': 'data/Area_transition_year_to_year.js'
-      }
-    },
-    'Biodiversity': {
-      'Overview': {
-        'Type': 'data/BIO_GBF2_overview_1_Type.js'
-      },
-      'Ag': {
-        'Landuse': 'data/BIO_GBF2_split_Ag_1_Landuse.js'
-      },
-      'Ag Mgt': {
-        'Landuse': 'data/BIO_GBF2_split_Am_1_Landuse.js',
-        'Agri-Management': 'data/BIO_GBF2_split_Am_2_Agri-Management.js'
-      },
-      'Non-Ag': {
-        'Landuse': 'data/BIO_GBF2_split_NonAg_1_Landuse.js'
-      },
-      'Ranking': 'data/Biodiversity_ranking.js'
-    },
-    'Economics': {
-      'Overview': 'data/Economics_overview.js',
-      'Ranking': 'data/Economics_ranking.js',
-      'Ag Mgt': {
-        'Management Type': 'data/Economics_split_AM_1_Management_Type.js',
-        'Water supply': 'data/Economics_split_AM_2_Water_supply.js',
-        'Landuse': 'data/Economics_split_AM_3_Land-use.js'
-      },
-      'Ag': {
-        'Landuse': 'data/Economics_split_Ag_1_Land-use.js',
-        'Type': 'data/Economics_split_Ag_2_Type.js',
-        'Water supply': 'data/Economics_split_Ag_3_Water_supply.js'
-      },
-      'Non-Ag': {
-        'Landuse': 'data/Economics_split_NonAg_1_Land-use.js'
-      },
-      'Transition': {
-        'Matrix': {
-          'Ag to Ag': 'data/Economics_transition_mat_ag2ag.js',
-          'Ag to Non-Ag': 'data/Economics_transition_mat_ag2nonag.js',
-          'Non-Ag to Ag': 'data/Economics_transition_mat_nonag2ag.js'
-        },
-        'Aggregated': {
-          'Ag to Non-Ag': {
-            'Cost type': 'data/Economics_transition_split_Ag2NonAg_1_Cost_type.js',
-            'From landuse': 'data/Economics_transition_split_Ag2NonAg_2_From_land-use.js',
-            'To landuse': 'data/Economics_transition_split_Ag2NonAg_3_To_land-use.js'
-          },
-          'Non-Ag to Ag': {
-            'Cost type': 'data/Economics_transition_split_NonAg2Ag_1_Cost_type.js',
-            'From landuse': 'data/Economics_transition_split_NonAg2Ag_2_From_land-use.js',
-            'To landuse': 'data/Economics_transition_split_NonAg2Ag_3_To_land-use.js'
-          },
-          'Ag to Ag': {
-            'Type': 'data/Economics_transition_split_ag2ag_1_Type.js',
-            'From landuse': 'data/Economics_transition_split_ag2ag_2_From_land-use.js',
-            'To landuse': 'data/Economics_transition_split_ag2ag_3_To_land-use.js'
-          }
-        }
-      }
-    },
-    'GHG': {
-      'Overview': 'data/GHG_overview.js',
-      'Ranking': 'data/GHG_ranking.js',
-      'Ag': {
-        'GHG Category': 'data/GHG_split_Ag_1_GHG_Category.js',
-        'Landuse': 'data/GHG_split_Ag_2_Land-use.js',
-        'Landuse type': 'data/GHG_split_Ag_3_Land-use_type.js',
-        'Source': 'data/GHG_split_Ag_4_Source.js',
-        'Water supply': 'data/GHG_split_Ag_5_Water_supply.js'
-      },
-      'Ag Mgt': {
-        'Landuse': 'data/GHG_split_Am_1_Land-use.js',
-        'Landuse type': 'data/GHG_split_Am_2_Land-use_type.js',
-        'Agricultural Management Type': 'data/GHG_split_Am_3_Agricultural_Management_Type.js',
-        'Water supply': 'data/GHG_split_Am_4_Water_supply.js'
-      },
-      'Non-Ag': {
-        'Landuse': 'data/GHG_split_NonAg_1_Land-use.js'
-      },
-      // Skip off land GHG because it is record of the whole Australia
-      // 'Off-land': {
-      //   'Emission Type': 'data/GHG_split_off_land_1_Emission_Type.js',
-      //   'Emission Source': 'data/GHG_split_off_land_2_Emission_Source.js',
-      //   'Commodity': 'data/GHG_split_off_land_3_Commodity.js'
-      // }
-    },
-    'Production': {
-      'Ag': 'data/Production_LUTO_1_Agricultural.js',
-      'Non-A': 'data/Production_LUTO_2_Non-Agricultural.js',
-      'Ag Mgt': 'data/Production_LUTO_3_Agricultural_Management.js',
-      'Overview': 'data/Production_achive_percent.js',
-      // Skip Demand because it is record of the whole Australia
-      // 'Demand': {
-      //   'Type': 'data/Production_demand_1_Type.js',
-      //   'On Off Land': 'data/Production_demand_2_on_off_land.js',
-      //   'Commodity': 'data/Production_demand_3_Commodity.js',
-      //   'Limit': 'data/Production_demand_4_Limit.js'
-      // },
-      'Sum': {
-        'Commodity': 'data/Production_sum_1_Commodity.js',
-        'Type': 'data/Production_sum_2_Type.js'
-      }
-    },
-    'Water': {
-      'Overview': {
-        'Landuse': 'data/Water_overview_NRM_region_1_Landuse.js',
-        'Type': 'data/Water_overview_NRM_region_2_Type.js'
-      },
-      'Ranking': 'data/Water_ranking.js',
-      'Ag': {
-        'Landuse': 'data/Water_split_Ag_NRM_region_1_Landuse.js',
-        'Water Supply': 'data/Water_split_Ag_NRM_region_2_Water_Supply.js'
-
-      },
-      'Ag Mgt': {
-        'Water Supply': 'data/Water_split_Am_NRM_region_1_Water_Supply.js',
-        'Landuse': 'data/Water_split_Am_NRM_region_2_Landuse.js',
-        'Agri-Management': 'data/Water_split_Am_NRM_region_3_Agri-Management.js'
-      },
-      'Non-Ag': {
-        'Landuse': 'data/Water_split_NonAg_NRM_region_1_Landuse.js'
-      }
-    }
-  }
-
 };

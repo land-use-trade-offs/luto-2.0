@@ -155,8 +155,25 @@ window.Highchart = {
       window.removeEventListener('mouseup', stopDrag);
     });
 
-    // Watch for changes in chart data
-    watch(() => props.chartData, (newValue) => { updateChart(ChartInstance.value, newValue); }, { deep: true });
+    // Watch for changes in chart data with infinite loop prevention
+    let isUpdating = false;
+    watch(() => props.chartData, (newValue) => { 
+      // Prevent infinite loops
+      if (isUpdating) {
+        return;
+      }
+      
+      isUpdating = true;
+      
+      try {
+        updateChart(ChartInstance.value, newValue);
+      } finally {
+        // Reset flag after a delay to ensure all reactive updates complete
+        setTimeout(() => {
+          isUpdating = false;
+        }, 100);
+      }
+    }, { deep: true });
 
     // Watch for sidebar collapsed state changes via inject
     watch(isCollapsed, () => {
