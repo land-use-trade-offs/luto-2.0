@@ -514,6 +514,19 @@ class Data:
                         row['ADOPTION_PERCENTAGE_2100']>=0])
                 ]
             ]
+            
+            # Check missing zones due to high resfactor
+            if len(self.REGIONAL_ADOPTION_TARGETS) > 0:
+                lost_zones = np.setdiff1d(
+                    self.REGIONAL_ADOPTION_TARGETS[settings.REGIONAL_ADOPTION_ZONE].unique(),
+                    np.unique(self.REGIONAL_ADOPTION_ZONES)
+                )
+                
+                if len(lost_zones) > 0:
+                    print(f" 	    WARNING: {len(lost_zones)} regional adoption zones have no cells due to (RES{settings.RESFACTOR}). Please check if this is expected.")
+                    self.REGIONAL_ADOPTION_TARGETS = self.REGIONAL_ADOPTION_TARGETS.query(f"{settings.REGIONAL_ADOPTION_ZONE} not in {list(lost_zones)}").reset_index(drop=True)
+                
+            
 
 
 
@@ -1585,7 +1598,7 @@ class Data:
         self.WATERSHED_DISAPPEARING = [self.WATER_REGION_NAMES[i] for i in set(self.WATER_REGION_NAMES.keys()) - set(valid_watershed_id)]
         
         if self.WATERSHED_DISAPPEARING:
-            print(f"    {len(self.WATERSHED_DISAPPEARING)} river regions are disappearing due to using high resolution factors.")
+            print(f"    WARNING! {len(self.WATERSHED_DISAPPEARING)} river regions are disappearing due to using high resolution factors.")
             [print(f"       - {list(i)}") for i in np.array_split(self.WATERSHED_DISAPPEARING, len(self.WATERSHED_DISAPPEARING)//3)]
             self.WATER_REGION_NAMES = {k: v for k, v in self.WATER_REGION_NAMES.items() if k in valid_watershed_id}
             self.WATER_REGION_HIST_LEVEL = {k: v for k, v in self.WATER_REGION_HIST_LEVEL.items() if k in valid_watershed_id}
@@ -1828,7 +1841,7 @@ class Data:
         - the adoption percentage.
         
         """
-        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
             return ()
         
         reg_adop_limits = []
@@ -1852,7 +1865,7 @@ class Data:
         - landuse name,
         - the adoption area (ha).
         """
-        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
             return ()
         
         reg_adop_limits = self.get_regional_adoption_percent_by_year(yr)

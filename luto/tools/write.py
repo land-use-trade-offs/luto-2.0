@@ -190,7 +190,6 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
 
 
 def write_files(data: Data, yr_cal, path):
-    """Writes numpy arrays and geotiffs to file"""
     
     # Write raw dvars
     dvar_ag = tools.ag_mrj_to_xr(data, data.ag_dvars[yr_cal]).chunk({'cell': min(1024, data.NCELLS)})
@@ -209,15 +208,13 @@ def write_files(data: Data, yr_cal, path):
     # Write out raw numpy arrays for land-use and land management
     lumap_xr = arr_to_xr(data, data.lumaps[yr_cal]).chunk('auto')
     lmmap_xr = arr_to_xr(data, data.lmmaps[yr_cal]).chunk('auto')
-    lumap_xr.to_netcdf(os.path.join(path, f'xr_lumap_{yr_cal}.nc'))
-    lmmap_xr.to_netcdf(os.path.join(path, f'xr_lmmap_{yr_cal}.nc'))
+    lumap_xr.to_netcdf(os.path.join(path, f'xr_map_lumap_{yr_cal}.nc'))
+    lmmap_xr.to_netcdf(os.path.join(path, f'xr_map_lmmap_{yr_cal}.nc'))
     
     return f"Decision variables written for year {yr_cal}"
 
 
 def write_files_separate(data: Data, yr_cal, path):
-    '''Write raw decision variables to separate GeoTiffs'''
-
     
     # Collapse the land management dimension (m -> [dry, irr])
     ag_dvar_rj = np.einsum('mrj -> rj', data.ag_dvars[yr_cal])    
@@ -261,8 +258,6 @@ def write_files_separate(data: Data, yr_cal, path):
 
 
 def write_quantity(data: Data, yr_cal, path):
-    '''Write quantity comparison between base year and target year.'''
-
     
     simulated_year_list = sorted(list(data.lumaps.keys()))
     yr_idx = yr_cal - data.YR_CAL_BASE

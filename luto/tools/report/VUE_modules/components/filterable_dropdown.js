@@ -30,7 +30,7 @@ window.FilterableDropdown = {
 
     // Use injected global region if no items prop provided (backwards compatibility)
     const globalSelectedRegion = inject('globalSelectedRegion', null);
-    
+
     onMounted(async () => {
       if (props.items && props.items.length > 0) {
         items.value = [...props.items];
@@ -38,7 +38,7 @@ window.FilterableDropdown = {
       } else {
         // Legacy behavior for regions
         await window.loadScript("./data/geo/NRM_AUS.js", 'NRM_AUS');
-        items.value = window.NRM_AUS.features.map(feature => feature.properties.NHT2NAME).sort();
+        items.value = window.NRM_AUS.features.map(feature => feature.properties.NRM_REGION).sort();
         selectedItem.value = globalSelectedRegion?.value || '';
       }
     });
@@ -86,10 +86,10 @@ window.FilterableDropdown = {
       this.selectedItem = item;
       this.isOpen = false;
       this.searchTerm = '';
-      
+
       // Emit change event for parent components
       this.$emit('change', item);
-      
+
       // Legacy support: update global region if available
       if (this.globalSelectedRegion) {
         this.globalSelectedRegion = item;

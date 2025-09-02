@@ -705,7 +705,7 @@ def get_limits(data: Data, yr_cal: int, resale_factors) -> dict[str, Any]:
         limits["GBF8"] = data.get_GBF8_target_inside_LUTO_by_yr(yr_cal)
         limits["GBF8_rescale"] = limits["GBF8"] / resale_factors['GBF8']
 
-    if settings.REGIONAL_ADOPTION_CONSTRAINTS == 'on':
+    if settings.REGIONAL_ADOPTION_CONSTRAINTS != 'off':
         ag_reg_adoption, non_ag_reg_adoption = ag_transition.get_regional_adoption_limits(data, yr_cal)
         limits["ag_regional_adoption"] = ag_reg_adoption
         limits["non_ag_regional_adoption"] = non_ag_reg_adoption

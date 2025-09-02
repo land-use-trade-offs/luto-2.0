@@ -423,7 +423,7 @@ def get_lower_bound_agricultural_management_matrices(data: Data, base_year) -> d
 
 
 def get_regional_adoption_limits(data: Data, yr_cal: int):
-    if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+    if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
         return None, None
     
     ag_reg_adoption_constrs = []

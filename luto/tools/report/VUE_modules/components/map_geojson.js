@@ -53,7 +53,7 @@ window.map_geojson = {
 
             // Get style function for each feature
             const getFeatureStyle = (feature) => {
-                const regionName = feature.properties.NHT2NAME;
+                const regionName = feature.properties.NRM_REGION;
                 let style = { ...defaultStyle };
 
                 if (props.selectRankingColors && props.selectRankingColors[regionName]) {
@@ -68,10 +68,10 @@ window.map_geojson = {
             geoJSONLayer.value = L.geoJSON(window['NRM_AUS'], {
                 style: getFeatureStyle,
                 onEachFeature: (feature, layer) => {
-                    layer.options.regionName = feature.properties.NHT2NAME;
+                    layer.options.regionName = feature.properties.NRM_REGION;
 
                     // Set initial style
-                    if (activeRegionName.value === feature.properties.NHT2NAME) {
+                    if (activeRegionName.value === feature.properties.NRM_REGION) {
                         layer.setStyle(highlightStyle);
                     }
 
@@ -95,7 +95,7 @@ window.map_geojson = {
                                 permanent: false,
                                 direction: "top",
                             });
-                            hoverTooltip.value.setContent(feature.properties.NHT2NAME);
+                            hoverTooltip.value.setContent(feature.properties.NRM_REGION);
                             hoverTooltip.value.setLatLng(e.latlng);
                             hoverTooltip.value.addTo(map);
                         },
@@ -145,7 +145,6 @@ window.map_geojson = {
                     });
                 },
             }).addTo(map);
-
 
             // Ensure map size is correct after initialization
             setTimeout(() => {

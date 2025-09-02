@@ -100,7 +100,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 3      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
 SIM_YEARS = list(range(2020,2051,5)) # range(2020,2050)
@@ -196,7 +196,7 @@ Land-use and vector file pairs to exclude land-use from being utilised in that a
 REGIONAL_ADOPTION_CONSTRAINTS = 'NON_AG_UNIFORM'    # 'off', 'on', 'NON_AG_UNIFORM'
 REGIONAL_ADOPTION_NON_AG_UNIFORM = 5                # None or numbers between 0-100 (both inclusive); Only work under 'NON_AG_UNIFORM'!
                                                     #   E.g., 5 means each non-ag land can not exceed 5% adoption in every region
-REGIONAL_ADOPTION_ZONE = 'LGA_CODE'                 # 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
+REGIONAL_ADOPTION_ZONE = 'NRM_CODE'                 # 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 '''
 The regional adoption zone is the spatial unit used to enforce regional adoption constraints.
 The options are:
@@ -483,7 +483,7 @@ WATER_CONSTRAINT_TYPE = 'hard'  # Adds water limits as a constraint in the solve
 
 
 # Regionalisation to enforce water use limits by
-WATER_REGION_DEF = 'River Region'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
+WATER_REGION_DEF = 'Drainage Division'         # 'River Region' or 'Drainage Division' Bureau of Meteorology GeoFabric definition
 """
     Water net yield targets: the value represents the proportion of the historical water yields
     that the net yield must exceed in a given year. Base year (2010) uses base year net yields as targets.

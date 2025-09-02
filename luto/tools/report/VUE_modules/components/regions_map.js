@@ -119,7 +119,7 @@ window.RegionsMap = {
     const addRegionLayer = () => {
       // Find the actual region feature from NRM_AUS data
       const regionLayer = window.NRM_AUS.features.find(feature =>
-        feature.properties.NHT2NAME === selectedRegion.value
+        feature.properties.NRM_REGION === selectedRegion.value
       );
 
       // Add the actual region polygon with initial opacity 0

@@ -1143,14 +1143,14 @@ class LutoSolver:
 
     def _add_regional_adoption_constraints(self) -> None:
 
-        if settings.REGIONAL_ADOPTION_CONSTRAINTS != "on":
+        if settings.REGIONAL_ADOPTION_CONSTRAINTS == "off":
             print("      |__ TURNING OFF constraints for regional adoption...")
             return
                 
         # Add adoption constraints for agricultural land uses
         reg_adopt_limits = self._input_data.limits["ag_regional_adoption"]
         for reg_id, j, lu_name, reg_ind, reg_area_limit in reg_adopt_limits:
-            print(f"       |__ Adding constraints for {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} >= {reg_area_limit:,.0f} HA...")
+            print(f"       |__ Adding constraints for {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} <= {reg_area_limit:,.0f} HA...")
             reg_expr = (
                   gp.quicksum(self._input_data.real_area[reg_ind] * self.X_ag_dry_vars_jr[j, reg_ind])
                 + gp.quicksum(self._input_data.real_area[reg_ind] * self.X_ag_irr_vars_jr[j, reg_ind])
@@ -1160,7 +1160,7 @@ class LutoSolver:
         # Add adoption constraints for non-agricultural land uses
         reg_adopt_limits = self._input_data.limits["non_ag_regional_adoption"]
         for reg_id, k, lu_name, reg_ind, reg_area_limit in reg_adopt_limits:
-            print(f"       |__ Adding constraints for {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} >= {reg_area_limit:,.0f} HA...")
+            print(f"       |__ Adding constraints for {lu_name} in {settings.REGIONAL_ADOPTION_ZONE} region {reg_id} <= {reg_area_limit:,.0f} HA...")
             reg_expr = gp.quicksum(self._input_data.real_area[reg_ind] * self.X_non_ag_vars_kr[k, reg_ind])
             self.regional_adoption_constrs.append(self.gurobi_model.addConstr(reg_expr <= reg_area_limit, name=f"reg_adopt_limit_non_ag_{lu_name}_{reg_id}"))
 
