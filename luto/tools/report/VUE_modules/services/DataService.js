@@ -150,16 +150,16 @@ window.DataService = {
     },
     Production: {
       Ag: {
-        path: "data/Production_Agricultural.js",
-        name: "Production_Agricultural",
+        path: "data/Production_Ag.js",
+        name: "Production_Ag",
       },
       "Ag Mgt": {
-        path: "data/Production_Agricultural_Management.js",
-        name: "Production_Agricultural_Management",
+        path: "data/Production_Am.js",
+        name: "Production_Am",
       },
       "Non-Ag": {
-        path: "data/Production_Non-Agricultural.js",
-        name: "Production_Non-Agricultural",
+        path: "data/Production_NonAg.js",
+        name: "Production_NonAg",
       },
       overview: {
         achieve: {

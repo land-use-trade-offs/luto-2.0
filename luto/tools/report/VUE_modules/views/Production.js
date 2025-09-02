@@ -23,64 +23,94 @@ window.ProductionView = {
       Biodiversity: "Relative Percentage (Pre-1750 = 100%)",
     };
 
-    // Available selections - Production has different structure than Area
+    // Available selections - Production now has Area-like structure
     const availableCategories = ["Ag", "Ag Mgt", "Non-Ag"];
-    const availableAgMgt = ref([]); // Only for Ag Mgt category
+    const availableAgMgt = ref([]);
+    const availableWater = ref([]);
+    const availableLanduse = ref([]);
 
-    // Map selection state - simpler than Area
+    // Map selection state - now like Area
     const selectCategory = ref("");
-    const selectAgMgt = ref(""); // Only used for Ag Mgt category
+    const selectAgMgt = ref("");
+    const selectWater = ref("");
+    const selectLanduse = ref("");
 
     // UI state
     const dataLoaded = ref(false);
     const isDrawerOpen = ref(false);
-    
-    // Production data structure is much simpler - check data readiness
     const mapReady = computed(() => {
-      if (!selectCategory.value) {
+      if (!selectCategory.value || !selectLanduse.value) {
         return false;
       }
-      // Ag Mgt needs AgMgt selection, others just need category
+      if (selectCategory.value === "Non-Ag") {
+        // Non-Ag: Landuse > Year (no Water level)
+        const dataName = mapRegister[selectCategory.value]?.["name"];
+        return dataName && window[dataName];
+      }
+      if (!selectWater.value) {
+        return false;
+      }
       if (selectCategory.value === "Ag Mgt" && !selectAgMgt.value) {
         return false;
       }
       const dataName = mapRegister[selectCategory.value]?.["name"];
       return dataName && window[dataName];
     });
-    
     const chartReady = computed(() => {
       if (!selectCategory.value || !selectRegion.value) {
+        return false;
+      }
+      if (selectCategory.value === "Non-Ag") {
+        // Non-Ag is simple: Region > [series]
+        const dataName = chartRegister[selectCategory.value]?.["name"];
+        return dataName && window[dataName] && window[dataName][selectRegion.value];
+      }
+      if (!selectWater.value) {
+        return false;
+      }
+      if (selectCategory.value === "Ag Mgt" && !selectAgMgt.value) {
         return false;
       }
       const dataName = chartRegister[selectCategory.value]?.["name"];
       return dataName && window[dataName] && window[dataName][selectRegion.value];
     });
 
-    // Reactive data - Production has simpler structure
+    // Reactive data - Production now follows Area pattern
     const mapData = computed(() => window[mapRegister[selectCategory.value]["name"]]);
     const chartData = computed(() => window[chartRegister[selectCategory.value]["name"]][selectRegion.value]);
-    
     const selectMapData = computed(() => {
       if (!mapReady.value) {
         return {};
       }
-      // Production data structure is simpler than Area
-      if (selectCategory.value === "Ag" || selectCategory.value === "Non-Ag") {
-        // Ag and Non-Ag: Year > {img_str, bounds, min_max}
-        return mapData.value[selectYear.value];
+      if (selectCategory.value === "Ag") {
+        // Ag: Water > Landuse > Year
+        return mapData.value[selectWater.value][selectLanduse.value][selectYear.value];
       }
       else if (selectCategory.value === "Ag Mgt") {
-        // Ag Mgt: AgMgt > Year > {img_str, bounds, min_max}
-        return mapData.value?.[selectAgMgt.value]?.[selectYear.value];
+        // Ag Mgt: AgMgt > Water > Landuse > Year
+        return mapData.value?.[selectAgMgt.value][selectWater.value][selectLanduse.value][selectYear.value];
+      }
+      else if (selectCategory.value === "Non-Ag") {
+        // Non-Ag: Landuse > Year (no Water level)
+        return mapData.value[selectLanduse.value][selectYear.value];
       }
     });
-    
     const selectChartData = computed(() => {
       if (!chartReady.value) {
         return {};
       }
-      // Production chart data is simple: Region > [series array]
-      const seriesData = chartData.value;
+      let seriesData;
+      if (selectCategory.value === "Ag") {
+        // Production_Ag: Region > Water > [series]
+        seriesData = chartData.value[selectWater.value];
+      }
+      else if (selectCategory.value === "Ag Mgt") {
+        // Production_Am: Region > AgMgt > Water > [series]
+        seriesData = chartData.value[selectAgMgt.value]?.[selectWater.value];
+      } else if (selectCategory.value === "Non-Ag") {
+        // Production_NonAg: Region > [series] (direct series array)
+        seriesData = chartData.value;
+      }
 
       return {
         ...window["Chart_default_options"],
@@ -127,16 +157,53 @@ window.ProductionView = {
       selectYear.value = availableYears.value[newIndex];
     });
 
-    // Production has simpler selection logic than Area
+    // Progressive selection chain watchers - now like Area
     watch(selectCategory, (newCategory) => {
-      // Only Ag Mgt has sub-levels
+      // Handle ALL downstream variables with cascading pattern
       if (newCategory === "Ag Mgt") {
         availableAgMgt.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]] || {});
         selectAgMgt.value = availableAgMgt.value[0] || '';
-      } else {
-        // Ag and Non-Ag have no sub-levels
+        availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value] || {});
+        selectWater.value = availableWater.value[0] || '';
+        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][selectWater.value] || {});
+        selectLanduse.value = availableLanduse.value[0] || '';
+      } else if (newCategory === "Ag") {
+        // Clear Ag Mgt data when switching to Ag
         availableAgMgt.value = [];
         selectAgMgt.value = '';
+        availableWater.value = Object.keys(window[mapRegister["Ag"]["name"]] || {});
+        selectWater.value = availableWater.value[0] || '';
+        availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][selectWater.value] || {});
+        selectLanduse.value = availableLanduse.value[0] || '';
+      } else if (newCategory === "Non-Ag") {
+        // Non-Ag has no Water level - clear both Ag Mgt and Water data
+        availableAgMgt.value = [];
+        selectAgMgt.value = '';
+        availableWater.value = [];
+        selectWater.value = '';
+        availableLanduse.value = Object.keys(window[mapRegister["Non-Ag"]["name"]] || {});
+        selectLanduse.value = availableLanduse.value[0] || '';
+      }
+    });
+
+    watch(selectAgMgt, (newAgMgt) => {
+      // Handle ALL downstream variables with cascading pattern
+      if (selectCategory.value === "Ag Mgt") {
+        availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt] || {});
+        selectWater.value = availableWater.value[0] || '';
+        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt][selectWater.value] || {});
+        selectLanduse.value = availableLanduse.value[0] || '';
+      }
+    });
+
+    watch(selectWater, (newWater) => {
+      // Handle downstream variables
+      if (selectCategory.value === "Ag") {
+        availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][newWater] || {});
+        selectLanduse.value = availableLanduse.value[0] || '';
+      } else if (selectCategory.value === "Ag Mgt") {
+        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][newWater] || {});
+        selectLanduse.value = availableLanduse.value[0] || '';
       }
     });
 
@@ -148,9 +215,13 @@ window.ProductionView = {
       availableYears,
       availableCategories,
       availableAgMgt,
+      availableWater,
+      availableLanduse,
 
       selectCategory,
       selectAgMgt,
+      selectWater,
+      selectLanduse,
 
       selectMapData,
       selectChartData,
@@ -204,8 +275,8 @@ window.ProductionView = {
         <!-- Ag Mgt options (only for Ag Mgt category) -->
         <div 
           class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="dataLoaded && availableAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
-            <span class="text-[0.8rem] mr-1 font-medium">Production Method:</span>
+          <div v-if="dataLoaded && selectCategory === 'Ag Mgt' && availableAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+            <span class="text-[0.8rem] mr-1 font-medium">Ag Mgt:</span>
             <button v-for="(val, key) in availableAgMgt" :key="key"
               @click="selectAgMgt = val"
               class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
@@ -215,6 +286,33 @@ window.ProductionView = {
           </div>
         </div>
 
+        <!-- Water options (for Ag and Ag Mgt) -->
+        <div 
+          class="flex items-start border-t border-white/10 pt-1">
+          <div v-if="dataLoaded && (selectCategory === 'Ag' || selectCategory === 'Ag Mgt') && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+            <span class="text-[0.8rem] mr-1 font-medium">Water:</span>
+            <button v-for="(val, key) in availableWater" :key="key"
+              @click="selectWater = val"
+              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+              :class="{'bg-sky-500 text-white': selectWater === val}">
+              {{ val }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Landuse options -->
+        <div 
+          class="flex items-start border-t border-white/10 pt-1">
+          <div v-if="dataLoaded" class="flex flex-wrap gap-1 max-w-[300px]">
+            <span class="text-[0.8rem] mr-1 font-medium">Landuse:</span>
+            <button v-for="(val, key) in availableLanduse" :key="key"
+              @click="selectLanduse = val"
+              class="bg-white text-[#1f1f1f] text-[0.6rem] px-1 py-1 rounded mb-1"
+              :class="{'bg-sky-500 text-white': selectLanduse === val}">
+              {{ val }}
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Map container with slide-out chart drawer -->
@@ -251,6 +349,7 @@ window.ProductionView = {
           }">
           <chart-container 
             :chartData="selectChartData" 
+            :selectedLanduse="selectLanduse"
             :draggable="true"
             :zoomable="true"
             style="width: 100%; height: 200px;">

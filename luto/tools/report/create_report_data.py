@@ -446,6 +446,14 @@ def save_report_data(raw_data_dir:str):
         .replace({'Sheep lexp': 'Sheep live export', 'Beef lexp': 'Beef live export'})\
         .query('Year.isin(@years) and abs(`Production (t/KL)`) > 1e-6')\
         .round({'`Production (t/KL)`': 2})
+    quantity_LUTO.loc[
+        quantity_LUTO['Type'] == 'Non-Agricultural',
+        'Water_supply'
+    ] = 'NA'
+    
+    
+
+    # # -------------------- Demand --------------------
     
     # DEMAND_DATA_long = get_demand_df()\
     #     .replace({'Beef lexp': 'Beef live export', 'Sheep lexp': 'Sheep live export'})\
@@ -455,8 +463,6 @@ def save_report_data(raw_data_dir:str):
     #     .replace(RENAME_AM_NON_AG)\
     #     .assign(on_off_land=lambda x: np.where(x['Commodity'].isin(COMMODITIES_OFF_LAND), 'Off-land', 'On-land'))
     
-
-    # # -------------------- Demand --------------------
     # group_cols = ['Type', 'on_off_land', 'Commodity']
 
     # for idx, col in enumerate(group_cols):
@@ -511,6 +517,7 @@ def save_report_data(raw_data_dir:str):
 
     # -------------------- Overview: sum of commodity production --------------------
     df_wide = quantity_LUTO\
+        .query('Water_supply != "ALL" and am != "ALL"')\
         .groupby(['region', 'Commodity'])[['Year', 'Production (t/KL)']]\
         .apply(lambda x: x[['Year','Production (t/KL)']].values.tolist())\
         .reset_index()
@@ -566,7 +573,66 @@ def save_report_data(raw_data_dir:str):
     
     # -------------------- Commodity production for ag --------------------
     df_wide = quantity_LUTO\
-        .query(f'Type == "{_type}"')\
+        .query(f'Type == "Agricultural"')\
+        .groupby(['region', 'Water_supply', 'Commodity'])[['Year','Production (t/KL)']]\
+        .apply(lambda x: x[['Year','Production (t/KL)']].values.tolist())\
+        .reset_index()
+
+    df_wide.columns = ['region', 'water', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_COMMODITIES[x])
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for (region, water), df in df_wide.groupby(['region', 'water']):
+        df = df.drop(['region', 'water'], axis=1)
+        if region not in out_dict:
+            out_dict[region] = {}
+        if water not in out_dict[region]:
+            out_dict[region][water] = {}
+        out_dict[region][water] = df.to_dict(orient='records')
+        
+    filename = f'Production_Ag'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+        
+    # -------------------- Commodity production for ag-man --------------------
+    df_wide = quantity_LUTO\
+        .query(f'Type == "Agricultural Management"')\
+        .groupby(['region', 'am', 'Water_supply', 'Commodity'])[['Year','Production (t/KL)']]\
+        .apply(lambda x: x[['Year','Production (t/KL)']].values.tolist())\
+        .reset_index()
+
+    df_wide.columns = ['region', '_type', 'water', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_COMMODITIES[x])
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for (region, _type, water), df in df_wide.groupby(['region', '_type', 'water']):
+        df = df.drop(['region', '_type', 'water'], axis=1)
+        if region not in out_dict:
+            out_dict[region] = {}
+        if _type not in out_dict[region]:
+            out_dict[region][_type] = {}
+        if water not in out_dict[region][_type]:
+            out_dict[region][_type][water] = {}
+        out_dict[region][_type][water] = df.to_dict(orient='records')
+        
+    filename = f'Production_Am'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+        
+        
+    # -------------------- Commodity production for non-ag --------------------
+    df_wide = quantity_LUTO\
+        .query(f'Type == "Non-Agricultural"')\
         .groupby(['region', 'Commodity'])[['Year','Production (t/KL)']]\
         .apply(lambda x: x[['Year','Production (t/KL)']].values.tolist())\
         .reset_index()
@@ -579,10 +645,10 @@ def save_report_data(raw_data_dir:str):
 
     out_dict = {}
     for region, df in df_wide.groupby('region'):
-        df = df.drop('region', axis=1)
+        df = df.drop(['region'], axis=1)
         out_dict[region] = df.to_dict(orient='records')
         
-    filename = f'Production_{_type.replace(" ", "_")}'
+    filename = f'Production_NonAg'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
         f.write(f'window["{filename}"] = ')
         json.dump(out_dict, f, separators=(',', ':'), indent=2)
