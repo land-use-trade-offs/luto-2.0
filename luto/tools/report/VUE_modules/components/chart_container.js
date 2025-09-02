@@ -4,6 +4,10 @@ window.Highchart = {
       type: Object,
       required: true,
     },
+    selectedLanduse: {
+      type: String,
+      default: 'ALL',
+    },
     draggable: {
       type: Boolean,
       default: false,
@@ -14,7 +18,7 @@ window.Highchart = {
     }
   },
   setup(props) {
-    const { ref, onMounted, onUnmounted, watch, inject } = Vue
+    const { ref, onMounted, onUnmounted, watch, inject, computed } = Vue
     const isCollapsed = inject('isCollapsed', ref(false))
 
     // Reactive state for loading status and datasets
@@ -27,16 +31,42 @@ window.Highchart = {
     const scale = ref(1);
     const zoomStep = 0.1;
 
+    // Apply landuse highlighting to chart data
+    const applyHighlighting = (chartData) => {
+      if (!props.selectedLanduse || props.selectedLanduse === 'ALL' || !chartData.series) {
+        return chartData;
+      }
+
+      const highlightedSeries = chartData.series.map(series => ({
+        ...series,
+        color: series.name === props.selectedLanduse
+          ? series.color
+          : (typeof Highcharts !== 'undefined' && Highcharts.color
+            ? Highcharts.color(series.color).setOpacity(0.3).get()
+            : series.color),
+        borderWidth: series.name === props.selectedLanduse ? 2 : 0,
+        borderColor: series.name === props.selectedLanduse ? '#1f2937' : 'transparent'
+      }));
+
+      return {
+        ...chartData,
+        series: highlightedSeries
+      };
+    };
+
     // Function to handle dataset loading and chart creation
     const createChart = () => {
       isLoading.value = true;
+
+      // Apply highlighting to chart data before creating chart
+      const processedChartData = applyHighlighting(props.chartData);
 
       // Create new chart with explicit responsive options
       ChartInstance.value = Highcharts.chart(
         chartElement.value,
         {
-          ...props.chartData,
-          chart: (props.chartData.chart || {}),
+          ...processedChartData,
+          chart: (processedChartData.chart || {}),
         }
       );
 
@@ -95,8 +125,11 @@ window.Highchart = {
     // Function to update the chart with new series data
     const updateChart = (chart, newChartData) => {
       try {
-        // Make a deep copy of the new chart data to avoid reference issues
-        const newData = JSON.parse(JSON.stringify(newChartData));
+        // Apply highlighting before updating
+        const processedData = applyHighlighting(newChartData);
+        
+        // Make a deep copy of the processed chart data to avoid reference issues
+        const newData = JSON.parse(JSON.stringify(processedData));
 
         // Update the chart configuration options first (except series)
         for (const key in newData) {
@@ -180,6 +213,13 @@ window.Highchart = {
       setTimeout(() => {
         createChart();
       }, 300); // Wait for sidebar animation to complete
+    });
+
+    // Watch for selectedLanduse changes to re-apply highlighting
+    watch(() => props.selectedLanduse, () => {
+      if (ChartInstance.value && props.chartData) {
+        updateChart(ChartInstance.value, props.chartData);
+      }
     });
 
     return {
