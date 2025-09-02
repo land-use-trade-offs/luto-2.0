@@ -11,6 +11,10 @@ luto/.ipynb_checkpoints/*
 pyproject.toml
 anthropic.yml
 
+# Report js files
+luto/tools/report/VUE_modules/data/*.js
+luto/tools/report/VUE_modules/data/map_layers
+
 # Virtual environments
 venv
 

@@ -32,17 +32,20 @@ from joblib import delayed, Parallel
 from luto import settings
 from luto.data import Data
 from luto.tools.report.data_tools import get_all_files
+from luto.tools.report.data_tools.parameters import RENAME_AM_NON_AG
 
 
 
 def tuple_dict_to_nested(flat_dict):
-    nested = {}
+    nested_dict = {}
     for key_tuple, value in flat_dict.items():
-        current = nested
+        current_level = nested_dict
         for key in key_tuple[:-1]:
-            current = current.setdefault(key, {})
-        current[key_tuple[-1]] = value
-    return nested
+            if key not in current_level:
+                current_level[key] = {}
+            current_level = current_level[key]
+        current_level[key_tuple[-1]] = value
+    return nested_dict
         
         
 def hex_color_to_numeric(hex:str) -> tuple:
@@ -80,7 +83,7 @@ def map2base64(rxr_path:str, arr_lyr:xr.DataArray, attrs:tuple) -> dict|None:
 
         # Skip if the layer is empty
         if arr_lyr.sum() == 0:
-            return
+            return 
 
         # Normalize the layer
         min_val = np.nanmin(arr_lyr.values)
@@ -140,10 +143,21 @@ def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=set
     for _,row in files_df.iterrows():
         xr_arr = xr.load_dataarray(row.path)
         _year = row['Year']
+        
         for sel in loop_sel:
-            arr_sel = xr_arr.sel(**sel)                        
+            arr_sel = xr_arr.sel(**sel) 
+            
+            # Rename keys; also serve as reordering the keys
+            sel_rename = {}
+            if 'am' in sel:
+                sel_rename['am'] = RENAME_AM_NON_AG.get(sel['am'], sel['am'])
+            if 'lm' in sel:
+                sel_rename['lm'] =  {'irr': 'Irrigated', 'dry': 'Dryland'}.get(sel['lm'], sel['lm'])
+            if 'lu' in sel:
+                sel_rename['lu'] = RENAME_AM_NON_AG.get(sel['lu'], sel['lu'])
+                
             task.append(
-                delayed(map2base64)(template_xr, arr_sel, tuple(list(sel.values()) + [_year]))
+                delayed(map2base64)(template_xr, arr_sel, tuple(list(sel_rename.values()) + [_year]))
             )    
             
     # Gather results and save to JSON

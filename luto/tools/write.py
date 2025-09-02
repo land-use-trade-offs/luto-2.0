@@ -34,6 +34,7 @@ from luto import settings
 from luto import tools
 from luto.data import Data
 from luto.tools.Manual_jupyter_books.helpers import arr_to_xr
+from luto.tools.report.data_tools.parameters import GHG_NAMES
 from luto.tools.spatializers import create_2d_map
 from luto.tools.report.create_report_layers import save_report_layer
 from luto.tools.report.create_report_data import save_report_data
@@ -1113,7 +1114,7 @@ def write_ghg(data: Data, yr_cal, path):
         and an output path as input."""
 
     if settings.GHG_EMISSIONS_LIMITS == 'off':
-        return
+        return 'GHG emissions calculation skipped as GHG_EMISSIONS_LIMITS is set to "off"'
 
     
     yr_idx = yr_cal - data.YR_CAL_BASE
@@ -1144,7 +1145,7 @@ def write_ghg(data: Data, yr_cal, path):
 def write_ghg_separate(data: Data, yr_cal, path):
 
     if settings.GHG_EMISSIONS_LIMITS == 'off':
-        return
+        return 'GHG emissions calculation skipped as GHG_EMISSIONS_LIMITS is set to "off"'
 
     
     # Convert calendar year to year index.
@@ -1165,7 +1166,8 @@ def write_ghg_separate(data: Data, yr_cal, path):
     mindex = pd.MultiIndex.from_tuples(ag_g_xr.data_vars.keys(), names=['GHG_source', 'lm', 'lu'])
     mindex_coords = xr.Coordinates.from_pandas_multiindex(mindex, 'variable')
     ag_g_rsmj = ag_g_xr.to_dataarray().assign_coords(mindex_coords).chunk({'cell': min(1024, data.NCELLS)}).unstack()
-
+    ag_g_rsmj['GHG_source'] = ag_g_rsmj['GHG_source'].to_series().replace(GHG_NAMES)
+    
     # Expand dimension
     ag_dvar_mrj = xr.concat([ag_dvar_mrj, ag_dvar_mrj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
     ag_g_rsmj = xr.concat([ag_g_rsmj, ag_g_rsmj.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')

@@ -1,20 +1,16 @@
 window.RegionsMap = {
 
   props: {
-    mapName: {
+    mapData: {
       type: String,
-      required: true
-    },
-    mapPath: {
-      type: Array,
       required: true
     },
   },
 
   setup(props) {
     const { ref, inject, onMounted, computed } = Vue;
-    const selectedRegion = inject('globalSelectedRegion');
     const globalMapViewpoint = inject('globalMapViewpoint');
+    const selectedRegion = inject('globalSelectedRegion');
 
     const map = ref(null);
     const boundingBox = ref(null);
@@ -23,11 +19,7 @@ window.RegionsMap = {
     const tileLayers = ref({});
     const baseMapOptions = ref(['OpenStreetMap', 'Satellite', 'None']);
 
-    const mapData = ref({});
 
-
-    // Function to get current bounding box for the selected region
-    const getCurrentRegion = computed(() => window.NRM_AUS_centroid_bbox[selectedRegion.value]);
 
     const initMap = () => {
       // Initialize the map with saved viewpoint
@@ -201,6 +193,7 @@ window.RegionsMap = {
     });
 
     const loadMapData = async () => {
+
       // Always remove existing overlays first
       map.value.eachLayer((layer) => {
         if (layer instanceof L.ImageOverlay) {
@@ -208,26 +201,7 @@ window.RegionsMap = {
         }
       });
 
-      // Safe nested object access function
-      const getNestedValue = (obj, path) => {
-        let current = obj;
-        for (const key of path) {
-          if (current == null || typeof current !== 'object' || !(key in current)) {
-            return null;
-          }
-          current = current[key];
-        }
-        return current;
-      };
-
-      // Safely get the nested data
-      const data = getNestedValue(window[props.mapName], props.mapPath);
-
-      if (!data) {
-        console.warn(`Map data not found for path: [${props.mapPath.join(', ')}] in ${props.mapName}`);
-        // No overlay will be added - map shows base layer only
-        return;
-      }
+      const data = props.mapData;
 
       if (!data.img_str || !data.bounds) {
         console.warn('Map data is missing required properties (img_str or bounds):', data);
@@ -235,12 +209,10 @@ window.RegionsMap = {
         return;
       }
 
-      mapData.value = data;
-
       // Add new image overlay only if data is valid
       const imageOverlay = L.imageOverlay(
-        mapData.value.img_str,
-        mapData.value.bounds,
+        data.img_str,
+        data.bounds,
         {
           className: 'crisp-image'
         }
@@ -257,12 +229,9 @@ window.RegionsMap = {
       }, 100);
     };
 
-    Vue.watch(() => [props.mapName, props.mapPath], async (newVal) => {
-      const [newmapName, newmapPath] = newVal;
-      if (newmapName && typeof newmapName === 'string' && newmapPath && Array.isArray(newmapPath) && newmapPath.length > 0) {
-        await loadMapData();
-      }
-    }, { deep: true, immediate: true });
+    Vue.watch(() => props.mapData, (newVal) => {
+      loadMapData();
+    });
 
     Vue.watch(selectedRegion, (newValue, oldValue) => {
       if (newValue && newValue !== 'AUSTRALIA') {
@@ -299,7 +268,6 @@ window.RegionsMap = {
 
     return {
       selectedRegion,
-      getCurrentRegion,
       updateMap,
       selectedBaseMap,
       changeBaseMap,

@@ -139,32 +139,49 @@ def save_report_data(raw_data_dir:str):
     
 
     # -------------------- Area ranking --------------------
-    area_ranking_total =pd.concat([ag_dvar_area, non_ag_dvar_area, am_dvar_area])\
+    area_ranking_raw = pd.concat([ag_dvar_area, non_ag_dvar_area, am_dvar_area])
+    
+    area_ranking_type = area_ranking_raw\
+        .groupby(['Year', 'region', 'Source'])[['Area (ha)']]\
+        .sum(numeric_only=True)\
+        .reset_index()\
+        .sort_values(['Year', 'Source', 'Area (ha)'], ascending=[True, True, False])\
+        .assign(Rank=lambda x: x.groupby(['Year', 'Source']).cumcount())\
+        .round({'Area (ha)': 2})
+         
+    area_ranking_total = area_ranking_raw\
         .query('Water_supply.isin(["ALL", "NA"])')\
         .groupby(['Year', 'region'])[["Area (ha)"]]\
         .sum(numeric_only=True)\
         .reset_index()\
         .sort_values(['Year', 'Area (ha)'], ascending=[True, False])\
-        .assign(Rank=lambda x: x.groupby(['Year']).cumcount())\
+        .assign(Rank=lambda x: x.groupby(['Year']).cumcount(), Source='Total')\
         .round({'Area (ha)': 2})
+        
+    area_ranking = pd.concat([area_ranking_type, area_ranking_total], ignore_index=True)
 
-    area_ranking_total = area_ranking_total.set_index(['Year', 'region'])\
+    area_ranking = area_ranking.set_index(['Year', 'region', 'Source'])\
         .reindex(
             index=pd.MultiIndex.from_product(
-                [years, area_ranking_total['region'].unique()],
-                names=['Year', 'region']), fill_value=None 
+                [years, area_ranking['region'].unique(), area_ranking['Source'].unique()],
+                names=['Year', 'region', 'source']), fill_value=None 
          )\
         .reset_index()\
         .assign(color=lambda x: x['Rank'].map(get_rank_color))
         
 
     out_dict = {}
-    for (region), df in area_ranking_total.groupby('region'):
-        df = df.drop('region', axis=1)
-        out_dict[region] = {}
-        out_dict[region]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
-        out_dict[region]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
-        out_dict[region]['value'] = df.set_index('Year')['Area (ha)'].apply( lambda x: format_with_suffix(x)).to_dict()
+    for (region, source), df in area_ranking.groupby(['region', 'source']):
+        df = df.drop(['region'], axis=1)
+        
+        if region not in out_dict:
+            out_dict[region] = {}
+        if source not in out_dict[region]:
+            out_dict[region][source] = {}
+
+        out_dict[region][source]['Rank'] = df.set_index('Year')['Rank'].replace({np.nan: None}).to_dict()
+        out_dict[region][source]['color'] = df.set_index('Year')['color'].replace({np.nan: None}).to_dict()
+        out_dict[region][source]['value'] = df.set_index('Year')['Area (ha)'].apply( lambda x: format_with_suffix(x)).to_dict()
 
     filename = 'Area_ranking'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
@@ -258,15 +275,16 @@ def save_report_data(raw_data_dir:str):
     df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
 
     out_dict = {}
-    for (region, water, _type), df in df_wide.groupby(['region', 'water', '_type']):
+    for (region, _type, water), df in df_wide.groupby(['region', '_type', 'water']):
         df = df.drop(['region', 'water', '_type'], axis=1)
         if region not in out_dict:
             out_dict[region] = {}
-        if water not in out_dict[region]:
-            out_dict[region][water] = {}
-        if _type not in out_dict[region][water]:
-            out_dict[region][water][_type] = []
-        out_dict[region][water][_type] = df.to_dict(orient='records')
+        if _type not in out_dict[region]:
+            out_dict[region][_type] = {}
+        if water not in out_dict[region][_type]:
+            out_dict[region][_type][water] = {}
+            
+        out_dict[region][_type][water] = df.to_dict(orient='records')
         
     filename = f'Area_Am'
     with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:

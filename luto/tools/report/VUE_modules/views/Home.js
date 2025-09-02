@@ -35,7 +35,7 @@ window.HomeView = {
 
     // Default selections
     const yearIndex = ref(0);
-    const selectYear = ref(2020);
+    const selectYear = ref(null);
     const selectChartCategory = ref('');
     const selectChartSubCategory = ref('');
     const selectRankingSubCategory = ref('');
