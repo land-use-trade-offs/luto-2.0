@@ -155,6 +155,8 @@ def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=set
                 sel_rename['lm'] =  {'irr': 'Irrigated', 'dry': 'Dryland'}.get(sel['lm'], sel['lm'])
             if 'lu' in sel:
                 sel_rename['lu'] = RENAME_AM_NON_AG.get(sel['lu'], sel['lu'])
+            if 'Commodity' in sel:
+                sel_rename['Commodity'] = sel['Commodity']
                 
             task.append(
                 delayed(map2base64)(template_xr, arr_sel, tuple(list(sel_rename.values()) + [_year]))

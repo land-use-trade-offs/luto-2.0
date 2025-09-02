@@ -1,10 +1,10 @@
-window.WaterView = {
+window.BiodiversityView = {
   setup() {
     const { ref, onMounted, inject, computed, watch, nextTick } = Vue;
 
-    // Data|Map service
-    const chartRegister = window.DataService.chartCategories["Water"];
-    const mapRegister = window.MapService.mapCategories["Water"];
+    // Data|Map service - Only use GBF2 data as requested
+    const chartRegister = window.DataService.chartCategories["Biodiversity"]["GBF2"];
+    const mapRegister = window.MapService.mapCategories["Biodiversity"]["GBF2"];
     const loadScript = window.loadScript;
 
     // Global selection state
@@ -38,7 +38,14 @@ window.WaterView = {
     const dataLoaded = ref(false);
     const isDrawerOpen = ref(false);
     const mapReady = computed(() => {
-      if (!selectCategory.value || !selectWater.value || !selectLanduse.value) {
+      if (!selectCategory.value || !selectLanduse.value) {
+        return false;
+      }
+      if (selectCategory.value === "Non-Ag") {
+        const dataName = mapRegister[selectCategory.value]?.["name"];
+        return dataName && window[dataName];
+      }
+      if (!selectWater.value) {
         return false;
       }
       if (selectCategory.value === "Ag Mgt" && !selectAgMgt.value) {
@@ -48,19 +55,26 @@ window.WaterView = {
       return dataName && window[dataName];
     });
     const chartReady = computed(() => {
-      if (!selectCategory.value || !selectRegion.value || !selectWater.value || !selectLanduse.value) {
+      if (!selectCategory.value || !selectRegion.value || !selectLanduse.value) {
+        return false;
+      }
+      if (selectCategory.value === "Non-Ag") {
+        const dataName = chartRegister[selectCategory.value]?.["name"];
+        return dataName && window[dataName] && window[dataName][selectRegion.value];
+      }
+      if (!selectWater.value) {
         return false;
       }
       if (selectCategory.value === "Ag Mgt" && !selectAgMgt.value) {
         return false;
       }
-      const dataName = chartRegister["NRM"][selectCategory.value]?.["name"];
+      const dataName = chartRegister[selectCategory.value]?.["name"];
       return dataName && window[dataName] && window[dataName][selectRegion.value];
     });
 
     // Reactive data
     const mapData = computed(() => window[mapRegister[selectCategory.value]["name"]]);
-    const chartData = computed(() => window[chartRegister["NRM"][selectCategory.value]["name"]][selectRegion.value]);
+    const chartData = computed(() => window[chartRegister[selectCategory.value]["name"]][selectRegion.value]);
     const selectMapData = computed(() => {
       if (!mapReady.value) {
         return {};
@@ -96,7 +110,7 @@ window.WaterView = {
         },
         yAxis: {
           title: {
-            text: availableUnit["Water"],
+            text: availableUnit["Biodiversity"],
           },
         },
         series: seriesData || [],
@@ -108,13 +122,13 @@ window.WaterView = {
       await loadScript("./data/Supporting_info.js", "Supporting_info");
       await loadScript("./data/chart_option/Chart_default_options.js", "Chart_default_options");
 
-      // Load data
+      // Load GBF2 data only (as requested - ignore quality data)
       await loadScript(mapRegister["Ag"]["path"], mapRegister["Ag"]["name"]);
       await loadScript(mapRegister["Ag Mgt"]["path"], mapRegister["Ag Mgt"]["name"]);
       await loadScript(mapRegister["Non-Ag"]["path"], mapRegister["Non-Ag"]["name"]);
-      await loadScript(chartRegister["NRM"]["Ag"]["path"], chartRegister["NRM"]["Ag"]["name"]);
-      await loadScript(chartRegister["NRM"]["Ag Mgt"]["path"], chartRegister["NRM"]["Ag Mgt"]["name"]);
-      await loadScript(chartRegister["NRM"]["Non-Ag"]["path"], chartRegister["NRM"]["Non-Ag"]["name"]);
+      await loadScript(chartRegister["Ag"]["path"], chartRegister["Ag"]["name"]);
+      await loadScript(chartRegister["Ag Mgt"]["Landuse"]["path"], chartRegister["Ag Mgt"]["Landuse"]["name"]);
+      await loadScript(chartRegister["Non-Ag"]["path"], chartRegister["Non-Ag"]["name"]);
 
       // Initial selections
       availableYears.value = window.Supporting_info.years;
@@ -260,7 +274,7 @@ window.WaterView = {
           </div>
         </div>
 
-        <!-- Water options -->
+        <!-- Water options (only for Ag and Ag Mgt) -->
         <div 
           class="flex items-start border-t border-white/10 pt-1">
           <div v-if="dataLoaded && availableWater.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">

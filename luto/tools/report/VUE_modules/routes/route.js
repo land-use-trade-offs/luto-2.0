@@ -8,8 +8,8 @@ const routes = [
   { path: "/economics", component: window.EconomicsView },
   { path: "/ghg", component: window.GHGView },
   { path: "/water", component: window.WaterView },
+  { path: "/biodiversity", component: window.BiodiversityView },
   { path: "/settings", component: window.SettingsView },
-  { path: "/test", component: window.Test },
   { path: "/:pathMatch(.*)*", component: window.NotFound },
 ];
 

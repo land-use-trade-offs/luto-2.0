@@ -323,14 +323,10 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
     lumap = data.lumaps[yr_cal]
 
     # Convert np.array to xr.DataArray; Chunk the data to reduce memory usage
-    ag_X_mrj_xr = tools.ag_mrj_to_xr(data, ag_X_mrj).chunk({'cell': min(1024, data.NCELLS)})
-    non_ag_X_rk_xr = tools.non_ag_rk_to_xr(data, non_ag_X_rk).chunk({'cell': min(1024, data.NCELLS)})
-    ag_man_X_mrj_xr = tools.am_mrj_to_xr(data, ag_man_X_mrj).chunk({'cell': min(1024, data.NCELLS)})
+    ag_X_mrj_xr = tools.ag_mrj_to_xr(data, ag_X_mrj).chunk({'cell': min(4096, data.NCELLS)})
+    non_ag_X_rk_xr = tools.non_ag_rk_to_xr(data, non_ag_X_rk).chunk({'cell': min(4096, data.NCELLS)})
+    ag_man_X_mrj_xr = tools.am_mrj_to_xr(data, ag_man_X_mrj).chunk({'cell': min(4096, data.NCELLS)})
 
-    # Expand dimension
-    ag_X_mrj_xr = xr.concat([ag_X_mrj_xr, ag_X_mrj_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_man_X_mrj_xr = xr.concat([ag_man_X_mrj_xr, ag_man_X_mrj_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
-    ag_man_X_mrj_xr = xr.concat([ag_man_X_mrj_xr, ag_man_X_mrj_xr.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
 
     # Convert LU2PR and PR2CM to xr.DataArray 
     lu2pr_xr = xr.DataArray(
@@ -387,45 +383,61 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
         region=('cell', data.REGION_NRM_NAME),
     )
 
+    # Expand dimension
+    ag_X_mrj_xr = xr.concat([ag_X_mrj_xr, ag_X_mrj_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    ag_man_X_mrj_xr = xr.concat([ag_man_X_mrj_xr, ag_man_X_mrj_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    ag_man_X_mrj_xr = xr.concat([ag_man_X_mrj_xr, ag_man_X_mrj_xr.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+    ag_q_mrp_xr = xr.concat([ag_q_mrp_xr, ag_q_mrp_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    ag_man_q_mrp_xr = xr.concat([ag_man_q_mrp_xr, ag_man_q_mrp_xr.sum(dim='lm', keepdims=True).assign_coords(lm=['ALL'])], dim='lm')
+    ag_man_q_mrp_xr = xr.concat([ag_man_q_mrp_xr, ag_man_q_mrp_xr.sum(dim='am', keepdims=True).assign_coords(am=['ALL'])], dim='am')
+
     # Calculate the commodity production 
-    ag_q_rc = (((ag_X_mrj_xr * lu2pr_xr).sum(dim=['lu']) * ag_q_mrp_xr).sum(dim=['lm']) * pr2cm_xr).sum(dim='product')
+    ag_q_rc = (((ag_X_mrj_xr * lu2pr_xr).sum(dim=['lu']) * ag_q_mrp_xr) * pr2cm_xr).sum(dim='product')
     non_ag_p_rc = (non_ag_X_rk_xr * non_ag_crk_xr).sum(dim=['lu'])
-    am_p_rc = (((ag_man_X_mrj_xr * lu2pr_xr).sum(['lu']) * ag_man_q_mrp_xr).sum(['lm']) * pr2cm_xr).sum('product')
+    am_p_rc = (((ag_man_X_mrj_xr * lu2pr_xr).sum(['lu']) * ag_man_q_mrp_xr) * pr2cm_xr).sum('product')
 
     # Regional level aggregation
     ag_q_rc_df_region = ag_q_rc.groupby('region'
         ).sum('cell'
         ).to_dataframe('Production (t/KL)'
+        ).reset_index(
         ).assign(Type='Agricultural'
-        ).reset_index()
-        
+        ).rename(columns={'lu': 'Land-use', 'lm':'Water_supply'}
+        ).assign(Year=yr_cal
+        ).replace({'dry':'Dryland', 'irr':'Irrigated'})
     non_ag_p_rc_df_region = non_ag_p_rc.groupby('region'
         ).sum('cell'
         ).to_dataframe('Production (t/KL)'
         ).assign(Type='Non-Agricultural'
         ).reset_index()
-        
     am_p_rc_df_region = am_p_rc.groupby('region'
         ).sum('cell'
         ).to_dataframe('Production (t/KL)'
+        ).reset_index(
         ).assign(Type='Agricultural Management'
-        ).reset_index()
+        ).rename(columns={'lu': 'Land-use', 'lm':'Water_supply'}
+        ).assign(Year=yr_cal
+        ).replace({'dry':'Dryland', 'irr':'Irrigated'})
     
     # Australia level aggregation
     ag_q_rc_df_AUS = ag_q_rc.sum('cell'
         ).to_dataframe('Production (t/KL)'
-        ).assign(Type='Agricultural', region='AUSTRALIA'
-        ).reset_index()
-        
+        ).reset_index(
+        ).assign(Type='Agricultural'
+        ).rename(columns={'lu': 'Land-use', 'lm':'Water_supply'}
+        ).assign(Year=yr_cal, region='AUSTRALIA'
+        ).replace({'dry':'Dryland', 'irr':'Irrigated'})
     non_ag_p_rc_df_AUS = non_ag_p_rc.sum('cell'
         ).to_dataframe('Production (t/KL)'
-        ).assign(Type='Non-Agricultural', region='AUSTRALIA'
+        ).assign(Type='Non-Agricultural'
         ).reset_index()
-        
     am_p_rc_df_AUS = am_p_rc.sum('cell'
         ).to_dataframe('Production (t/KL)'
-        ).assign(Type='Agricultural Management', region='AUSTRALIA'
-        ).reset_index()
+        ).reset_index(
+        ).assign(Type='Agricultural Management'
+        ).rename(columns={'lu': 'Land-use', 'lm':'Water_supply'}
+        ).assign(Year=yr_cal, region='AUSTRALIA'
+        ).replace({'dry':'Dryland', 'irr':'Irrigated'})
     
     # Save the production dataframes to csv
     quantity_df_AUS = pd.concat([ag_q_rc_df_AUS, non_ag_p_rc_df_AUS, am_p_rc_df_AUS], ignore_index=True).query('`Production (t/KL)` > 1e-2')

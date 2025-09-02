@@ -431,7 +431,7 @@ def save_report_data(raw_data_dir:str):
         
 
     ####################################################
-    #                   2) Demand                      #
+    #                   2) Production                  #
     ####################################################
     
     demand_files = files.query('category == "quantity"')
@@ -564,31 +564,29 @@ def save_report_data(raw_data_dir:str):
     
     
     
-    # -------------------- Commodity production for ag, non-ag, and agricultural management --------------------
-    for idx, _type in enumerate(quantity_LUTO['Type'].unique()):
+    # -------------------- Commodity production for ag --------------------
+    df_wide = quantity_LUTO\
+        .query(f'Type == "{_type}"')\
+        .groupby(['region', 'Commodity'])[['Year','Production (t/KL)']]\
+        .apply(lambda x: x[['Year','Production (t/KL)']].values.tolist())\
+        .reset_index()
+
+    df_wide.columns = ['region', 'name', 'data']
+    df_wide['type'] = 'column'
+    df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_COMMODITIES[x])
+    df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
+    df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
+
+    out_dict = {}
+    for region, df in df_wide.groupby('region'):
+        df = df.drop('region', axis=1)
+        out_dict[region] = df.to_dict(orient='records')
         
-        df_wide = quantity_LUTO\
-            .query(f'Type == "{_type}"')\
-            .groupby(['region', 'Commodity'])[['Year','Production (t/KL)']]\
-            .apply(lambda x: x[['Year','Production (t/KL)']].values.tolist())\
-            .reset_index()
-
-        df_wide.columns = ['region', 'name', 'data']
-        df_wide['type'] = 'column'
-        df_wide['color'] = df_wide['name'].apply(lambda x: COLORS_COMMODITIES[x])
-        df_wide['name_order'] = df_wide['name'].apply(lambda x: COMMODITIES_ALL.index(x))
-        df_wide = df_wide.sort_values('name_order').drop(columns=['name_order'])
-
-        out_dict = {}
-        for region, df in df_wide.groupby('region'):
-            df = df.drop('region', axis=1)
-            out_dict[region] = df.to_dict(orient='records')
-            
-        filename = f'Production_{_type.replace(" ", "_")}'
-        with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
-            f.write(f'window["{filename}"] = ')
-            json.dump(out_dict, f, separators=(',', ':'), indent=2)
-            f.write(';\n')
+    filename = f'Production_{_type.replace(" ", "_")}'
+    with open(f'{SAVE_DIR}/{filename}.js', 'w') as f:
+        f.write(f'window["{filename}"] = ')
+        json.dump(out_dict, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
             
             
     
