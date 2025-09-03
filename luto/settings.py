@@ -193,7 +193,7 @@ Land-use and vector file pairs to exclude land-use from being utilised in that a
 '''
 
 REGIONAL_ADOPTION_CONSTRAINTS = 'NON_AG_UNIFORM'    # 'off', 'on', 'NON_AG_UNIFORM'
-REGIONAL_ADOPTION_NON_AG_UNIFORM = 5                # None or numbers between 0-100 (both inclusive); Only work under 'NON_AG_UNIFORM'!
+REGIONAL_ADOPTION_NON_AG_UNIFORM = 15                # None or numbers between 0-100 (both inclusive); Only work under 'NON_AG_UNIFORM'!
                                                     #   E.g., 5 means each non-ag land can not exceed 5% adoption in every region
 REGIONAL_ADOPTION_ZONE = 'NRM_CODE'                 # 'ABARES_AAGIS', 'LGA_CODE', 'NRM_CODE', 'IBRA_ID', 'SLA_5DIGIT'
 '''

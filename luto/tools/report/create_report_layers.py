@@ -362,7 +362,7 @@ def save_report_layer(data:Data, raw_data_dir:str):
     
     save_path = f'{SAVE_DIR}/map_layers/map_dvar_mosaic.js'
     colors_legend= get_color_legend(data)
-    get_map_obj_interger(data, files, save_path, colors_legend)
+    get_map_obj_interger(files, save_path, colors_legend)
 
 
  
