@@ -429,7 +429,7 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
         ).replace({'dry':'Dryland', 'irr':'Irrigated'})
     non_ag_p_rc_df_AUS = non_ag_p_rc.sum('cell'
         ).to_dataframe('Production (t/KL)'
-        ).assign(Type='Non-Agricultural'
+        ).assign(Type='Non-Agricultural', region='AUSTRALIA'
         ).reset_index()
     am_p_rc_df_AUS = am_p_rc.sum('cell'
         ).to_dataframe('Production (t/KL)'

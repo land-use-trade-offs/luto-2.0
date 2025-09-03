@@ -125,7 +125,7 @@ def map2base64(rxr_path:str, arr_lyr:xr.DataArray, attrs:tuple) -> dict|None:
 def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=settings.WRITE_THREADS) -> dict:
 
     # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
-    template_xr = f'{data.path}/out_{sorted(settings.SIM_YEARS)[0]}/xr_lumap_{sorted(settings.SIM_YEARS)[0]}.nc'
+    template_xr = f'{data.path}/out_{sorted(settings.SIM_YEARS)[0]}/xr_map_lumap_{sorted(settings.SIM_YEARS)[0]}.nc'
     
     # Get dim info
     with xr.open_dataarray(files_df.iloc[0]['path']) as arr_eg:

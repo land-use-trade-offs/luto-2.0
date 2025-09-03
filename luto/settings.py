@@ -100,7 +100,7 @@ AMORTISATION_PERIOD = 30 # years
 # ---------------------------------------------------------------------------- #
 
 # Optionally coarse-grain spatial domain (faster runs useful for testing). E.g. RESFACTOR 5 selects the middle cell in every 5 x 5 cell block
-RESFACTOR = 13      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
+RESFACTOR = 3      # set to 1 to run at full spatial resolution, > 1 to run at reduced resolution.
 
 # The step size for the temporal domain (years)
 SIM_YEARS = list(range(2020,2051,5)) # range(2020,2050)
@@ -144,7 +144,7 @@ the model sensitive to variations in input data.
 # ---------------------------------------------------------------------------- #
 WRITE_OUTPUT_GEOTIFFS = False               # Write GeoTiffs to output directory: True or False
 PARALLEL_WRITE = True                       # If to use parallel processing to write GeoTiffs: True or False
-WRITE_THREADS = min(32, os.cpu_count())     # The Threads to use for map making, only work with PARALLEL_WRITE = True
+WRITE_THREADS = min(10, os.cpu_count())     # The Threads to use for map making, only work with PARALLEL_WRITE = True
 
 # ---------------------------------------------------------------------------- #
 # Gurobi parameters
