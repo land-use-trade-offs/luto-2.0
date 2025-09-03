@@ -56,7 +56,7 @@ def hex_color_to_numeric(hex: str) -> tuple:
 
 
 
-def get_color_legend() -> dict:
+def get_color_legend(data:Data) -> dict:
 
     color_csvs = {
         'lumap': 'luto/tools/report/VUE_modules/assets/lumap_colors_grouped.csv',
@@ -251,7 +251,7 @@ def get_map_obj_float(data:Data, files_df:pd.DataFrame, save_path:str, workers:i
         f.write(';\n')
         
 
-def get_map_obj_interger(data:Data, files_df:pd.DataFrame, save_path:str, colors_legend = get_color_legend(), workers:int=settings.WRITE_THREADS) -> dict:
+def get_map_obj_interger(files_df:pd.DataFrame, save_path:str, colors_legend, workers:int=settings.WRITE_THREADS) -> dict:
     
     map_mosaic_lumap = files_df.query('base_name == "xr_map_lumap"'
         ).assign(
@@ -361,7 +361,8 @@ def save_report_layer(data:Data, raw_data_dir:str):
     ####################################################
     
     save_path = f'{SAVE_DIR}/map_layers/map_dvar_mosaic.js'
-    get_map_obj_interger(data, files, save_path)
+    colors_legend= get_color_legend(data)
+    get_map_obj_interger(data, files, save_path, colors_legend)
 
 
  
