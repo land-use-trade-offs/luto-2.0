@@ -160,7 +160,7 @@ def write_output_single_year(data: Data, yr_cal, path_yr):
         
     tasks = [
         delayed(write_files)(data, yr_cal, path_yr),
-        delayed(write_files_separate)(data, yr_cal, path_yr) if settings.WRITE_OUTPUT_GEOTIFFS else None,
+        delayed(write_files_separate)(data, yr_cal, path_yr),
         delayed(write_dvar_area)(data, yr_cal, path_yr),
         delayed(write_crosstab)(data, yr_cal, path_yr),
         delayed(write_quantity)(data, yr_cal, path_yr),
@@ -222,37 +222,61 @@ def write_files_separate(data: Data, yr_cal, path):
     non_ag_rk = np.einsum('rk -> rk', data.non_ag_dvars[yr_cal])  
     ag_man_rj_dict = {am: np.einsum('mrj -> rj', ammap) for am, ammap in data.ag_man_dvars[yr_cal].items()}
 
-    # Get the desc2dvar table.
-    ag_dvar_map = pd.DataFrame({'Category': 'Ag_LU','lu_desc': data.AGRICULTURAL_LANDUSES,'dvar_idx': range(data.N_AG_LUS)}
-        ).assign(dvar=[ag_dvar_rj[:, j] for j in range(data.N_AG_LUS)]
-        ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
-    non_ag_dvar_map = pd.DataFrame({'Category': 'Non-Ag_LU','lu_desc': data.NON_AGRICULTURAL_LANDUSES,'dvar_idx': range(data.N_NON_AG_LUS)}
-        ).assign(dvar=[non_ag_rk[:, k] for k in range(data.N_NON_AG_LUS)]
-        ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
-    lm_dvar_map = pd.DataFrame({'Category': 'Land_Mgt','lu_desc': data.LANDMANS,'dvar_idx': range(data.NLMS)}
-        ).assign(dvar=[ag_dvar_rm[:, j] for j in range(data.NLMS)]
-        ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
-    ag_man_map = pd.concat([
-        pd.DataFrame({'Category': 'Ag_Mgt', 'lu_desc': am, 'dvar_idx': [0]}
-        ).assign(dvar=[np.einsum('rj -> r', am_dvar_rj)]
-        ).reindex(columns=['Category', 'lu_desc', 'dvar_idx', 'dvar'])
-        for am, am_dvar_rj in ag_man_rj_dict.items()
-    ])
+    # Get the spatial data
+    geo_meta = arr_to_xr(data, np.zeros(data.NCELLS, dtype=np.float32))
+    geo_crs = geo_meta['spatial_ref'].attrs['crs_wkt']
+    mask = np.isin(data.LUMAP_2D_RESFACTORED, [data.MASK_LU_CODE, data.NODATA], invert=True)[None,...]
 
-    # Export to GeoTiff
-    desc2dvar_df = pd.concat([ag_dvar_map, ag_man_map, non_ag_dvar_map, lm_dvar_map])
-    lucc_separate_dir = os.path.join(path, 'lucc_separate')
-    os.makedirs(lucc_separate_dir, exist_ok=True)
-    for _, row in desc2dvar_df.iterrows():
-        category = row['Category']
-        dvar_idx = row['dvar_idx']
-        desc = row['lu_desc']
-        dvar = create_2d_map(data, row['dvar'].astype(np.float32))
-        fname = f'{category}_{dvar_idx:02}_{desc}_{yr_cal}.tiff'
-        lucc_separate_path = os.path.join(lucc_separate_dir, fname)
-        
-        with rasterio.open(lucc_separate_path, 'w+', **data.GEO_META) as dst:
-            dst.write_band(1, dvar)
+    # Create xarray DataArrays for the maps
+    ag_dvar_map = xr.DataArray(
+        data=np.stack([arr_to_xr(data, arr) for arr in ag_dvar_rj.T]),
+        dims=['lu', 'y', 'x'],
+        coords={
+            'lu': data.AGRICULTURAL_LANDUSES, 
+            'y': geo_meta['y'],
+            'x': geo_meta['x']
+        }
+    ).where(mask).chunk('auto')
+    non_ag_dvar_map = xr.DataArray(
+        data=np.stack([arr_to_xr(data, arr) for arr in non_ag_rk.T]),
+        dims=['lu', 'y', 'x'],
+        coords={
+            'lu': data.NON_AGRICULTURAL_LANDUSES, 
+            'y': geo_meta['y'],
+            'x': geo_meta['x']}
+    ).where(mask).chunk('auto')
+    lm_dvar_map = xr.DataArray(
+        data=np.stack([arr_to_xr(data, arr) for arr in ag_dvar_rm.T]),
+        dims=['lm', 'y', 'x'],
+        coords={
+            'lm': data.LANDMANS, 
+            'y': geo_meta['y'],
+            'x': geo_meta['x']}
+    ).where(mask).chunk('auto')
+
+    am_maps = []
+    for am, am_dvar in ag_man_rj_dict.items():
+        am_map = arr_to_xr(data, am_dvar.sum(axis=1)
+            ).expand_dims('am'
+            ).assign_coords(am=[am]
+            ).transpose('am', 'y', 'x') 
+        am_maps.append(am_map)
+    am_maps = xr.concat(am_maps, dim='am').where(mask).chunk('auto')
+
+    # Create intergerized maps
+    ag_map_argmax = ag_dvar_map.argmax(dim='lu', skipna=False).where(mask[0])
+    non_ag_map_argmax = non_ag_dvar_map.argmax(dim='lu', skipna=False).where(mask[0]) + settings.NON_AGRICULTURAL_LU_BASE_CODE
+    am_argmax = am_maps.argmax(dim='am', skipna=False).where(mask[0])
+
+    # Save to disk
+    save2nc(ag_dvar_map, os.path.join(path, f'xr_map_ag_{yr_cal}.nc'))
+    save2nc(non_ag_dvar_map, os.path.join(path, f'xr_map_non_ag_{yr_cal}.nc'))
+    save2nc(lm_dvar_map, os.path.join(path, f'xr_map_lm_{yr_cal}.nc'))
+    save2nc(am_maps, os.path.join(path, f'xr_map_am_{yr_cal}.nc'))
+
+    ag_map_argmax.rio.write_crs(geo_crs).to_netcdf(os.path.join(path, f'xr_map_ag_argmax_{yr_cal}.nc'))
+    non_ag_map_argmax.rio.write_crs(geo_crs).to_netcdf(os.path.join(path, f'xr_map_non_ag_argmax_{yr_cal}.nc'))
+    am_argmax.rio.write_crs(geo_crs).to_netcdf(os.path.join(path, f'xr_map_am_argmax_{yr_cal}.nc'))
 
     return f"Separate files written for year {yr_cal}"
 
@@ -429,7 +453,7 @@ def write_quantity_separate(data: Data, yr_cal: int, path: str) -> np.ndarray:
         ).replace({'dry':'Dryland', 'irr':'Irrigated'})
     non_ag_p_rc_df_AUS = non_ag_p_rc.sum('cell'
         ).to_dataframe('Production (t/KL)'
-        ).assign(Type='Non-Agricultural'
+        ).assign(Type='Non-Agricultural', region='AUSTRALIA'
         ).reset_index()
     am_p_rc_df_AUS = am_p_rc.sum('cell'
         ).to_dataframe('Production (t/KL)'

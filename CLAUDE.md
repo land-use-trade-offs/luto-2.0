@@ -158,20 +158,41 @@ All reporting views follow the progressive selection pattern:
   - `Area_NonAg`: `Region → [series]` (simplified, no Water level)
 - **Map Data**: `Water → Landuse → Year → {img_str, bounds, min_max}`
 
-#### ECONOMICS MODULE (Special Case)
-- **Chart Data**:
-  - `Economics_Ag/Am`: `Region → Water → Landuse → [series]`
-  - **Dual Series Structure**: Cost (`id: null`) + Revenue (`id: name`) in same array
-- **Map Data**:
-  - `map_cost_*`: `Water → Landuse → Year → {map_data}`
-  - `map_revenue_*`: `Water → Landuse → Year → {map_data}`
-- **UI Pattern**: Cost/Revenue buttons affect MAP selection, charts always show both series
+#### ECONOMICS MODULE (Special Case - Complex Validation Required)
+- **Chart Data (SINGLE FILES containing BOTH Cost & Revenue)**:
+  - `Economics_Ag`: `Region → "ALL" → "ALL" → [mixed series array]` (aggregated, no Water/Landuse selection needed)
+  - `Economics_Am`: `Region → "ALL" → "ALL" → [mixed series array]` (aggregated, no AgMgt selection needed)
+  - `Economics_overview_Non_Ag`: `Region → [mixed series array]` (simplified)
+  - **Dual Series Structure**: Cost (`id: null`) + Revenue (`id: name`) mixed in same array
+  - **Chart Independence**: Cost/Revenue button does NOT affect chart data access - always shows both
+- **Map Data (SEPARATE FILES for Cost vs Revenue)**:
+  - `map_cost_Ag`: `Water → Landuse → Year → {img_str, bounds, min_max}`
+  - `map_cost_Am`: `AgMgt → Water → Landuse → Year → {img_str, bounds, min_max}`
+  - `map_cost_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (simplified)
+  - `map_revenue_Ag`: `Water → Landuse → Year → {img_str, bounds, min_max}` 
+  - `map_revenue_Am`: `AgMgt → Water → Landuse → Year → {img_str, bounds, min_max}`
+  - `map_revenue_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (simplified)
+- **Critical Implementation Details**:
+  - **Different AgMgt Categories**: Cost and Revenue have DIFFERENT AgMgt categories (MAP data only):
+    - **Cost AgMgt**: `"ALL"`, `"Agricultural technology (energy)"`, `"Agricultural technology (fertiliser)"`, `"Biochar (soil amendment)"`, `"Early dry-season savanna burning"`, `"Human-induced regeneration (Beef)"`, `"Human-induced regeneration (Sheep)"`, `"Methane reduction (livestock)"`
+    - **Revenue AgMgt**: `"ALL"`, `"Agricultural technology (energy)"`, `"Agricultural technology (fertiliser)"`, `"Biochar (soil amendment)"`, `"Human-induced regeneration (Beef)"`, `"Human-induced regeneration (Sheep)"`, `"Methane reduction (livestock)"` (missing `"Early dry-season savanna burning"`)
+  - **Chart vs Map Structure Mismatch**: Ag Mgt chart data is aggregated while map data uses AgMgt hierarchy
+  - **Validation Required**: Must validate AgMgt selection exists in current Cost/Revenue data (MAP only)
+  - **Combined Watcher**: Watch both `[selectCostRevenue, selectCategory]` with immediate: true
+  - **Selection Reset**: Reset AgMgt selection if it doesn't exist in new data structure
+  - **Safe Access**: Use optional chaining (`?.`) in selectMapData with fallback `|| {}`
+  - **Chart Access**: Both Ag and Ag Mgt charts use `chartData["ALL"]["ALL"]` (no selections needed)
+- **UI Pattern**: Cost/Revenue buttons affect MAP selection ONLY, charts ALWAYS show both cost & revenue series
 
 #### GHG MODULE
 - **Chart Data**:
-  - `GHG_Ag/Am`: `Region → Water → Landuse → [series]`
+  - `GHG_Ag`: `Region → "ALL" → Water → [series]` (no Landuse breakdown)
+  - `GHG_Am`: `Region → AgMgt → Water → [series]` (has AgMgt breakdown)
   - `GHG_NonAg`: `Region → [series]` (simplified)
-- **Map Data**: `Water → Landuse → Year → {map_data}`
+- **Map Data**: 
+  - `map_GHG_Ag`: `Water → Landuse → Year → {img_str, bounds, min_max}`
+  - `map_GHG_Am`: `AgMgt → Water → Landuse → Year → {img_str, bounds, min_max}` (AgMgt first, then Water)
+  - `map_GHG_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (simplified)
 
 #### PRODUCTION MODULE
 - **Chart Data**:
@@ -185,13 +206,25 @@ All reporting views follow the progressive selection pattern:
   - `Water_Ag_NRM`: `Region → Water → [series]` (water property included)
   - `Water_Am_NRM`: `Region → AgMgt → Water → [series]`
   - `Water_NonAg_NRM`: `Region → [series]` (simplified)
-- **Map Data**: `map_water_yield_*` follows standard pattern
+- **Map Data**: 
+  - `map_water_yield_Ag`: `Water → Landuse → Year → {img_str, bounds, min_max}`
+  - `map_water_yield_Am`: `AgMgt → Water → Landuse → Year → {img_str, bounds, min_max}` (AgMgt first, then Water)
+  - `map_water_yield_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (simplified)
 
 #### BIODIVERSITY MODULE
-- **Chart Data**: All biodiversity files use simplified `Region → [series]` structure
-  - `BIO_GBF2_split_*`: `Region → [series]`
-  - `BIO_quality_split_*`: `Region → [series]`
-- **Map Data**: `map_bio_*` follows standard pattern
+- **Chart Data**:
+  - `BIO_GBF2_overview_1_Type`: `Region → [series]` (simplified overview - Agricultural Landuse, Agricultural Management, Non-Agricultural land-use)
+  - `BIO_GBF2_split_Ag_1_Landuse`: `Region → [series]` (simplified, no Water/AgMgt levels)
+  - `BIO_GBF2_split_Am_1_Landuse`: `Region → [series]` (simplified, no Water/AgMgt levels) 
+  - `BIO_GBF2_split_Am_2_Agri-Management`: `Region → [series]` with AgMgt categories: `"ALL"`, `"Early dry-season savanna burning"`, `"Human-induced regeneration (Beef)"`, `"Human-induced regeneration (Sheep)"`
+  - `BIO_GBF2_split_NonAg_1_Landuse`: `Region → [series]` (simplified)
+  - `BIO_quality_overview_1_Type`: `Region → [series]` (simplified overview)
+  - `BIO_quality_split_*`: Similar structure to GBF2 files
+- **Map Data**: 
+  - `map_bio_GBF2_Ag`: `Water → Landuse → Year → {img_str, bounds, min_max}` (standard pattern)
+  - `map_bio_GBF2_Am`: `Water → Landuse → Year → {img_str, bounds, min_max}` (standard pattern)
+  - `map_bio_GBF2_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (simplified, no Water level)
+  - `map_bio_overall_*`: Similar structures for overview maps
 
 ### Key Patterns
 
@@ -218,7 +251,7 @@ All reporting views follow the progressive selection pattern:
 3. **Special Cases**:
    - Economics: Handle dual Cost/Revenue series in same array
    - NonAg: Handle simplified structures without Water/AgMgt levels
-   - Biodiversity: All use simplified Region → [series] structure
+   - Biodiversity: Mixed structures - most use simplified `Region → [series]`, but `BIO_*_Am_2_Agri-Management` files have AgMgt categories; map data follows standard patterns with some NonAg files simplified
 4. **UI Conditions**: Use proper `v-if` conditions based on category selections
 5. **Data Access**: Use optional chaining (`?.`) for safe property access
 

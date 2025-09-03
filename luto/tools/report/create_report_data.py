@@ -444,6 +444,7 @@ def save_report_data(raw_data_dir:str):
             ignore_index=True)\
         .assign(Commodity= lambda x: x['Commodity'].str.capitalize())\
         .replace({'Sheep lexp': 'Sheep live export', 'Beef lexp': 'Beef live export'})\
+        .replace(RENAME_AM_NON_AG)\
         .query('Year.isin(@years) and abs(`Production (t/KL)`) > 1e-6')\
         .round({'`Production (t/KL)`': 2})
     quantity_LUTO.loc[

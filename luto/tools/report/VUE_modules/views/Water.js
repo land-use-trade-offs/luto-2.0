@@ -38,7 +38,11 @@ window.WaterView = {
     const dataLoaded = ref(false);
     const isDrawerOpen = ref(false);
     const mapReady = computed(() => {
-      if (!selectCategory.value || !selectWater.value || !selectLanduse.value) {
+      if (!selectCategory.value || !selectLanduse.value) {
+        return false;
+      }
+      // Non-Ag doesn't require water selection
+      if (selectCategory.value !== "Non-Ag" && !selectWater.value) {
         return false;
       }
       if (selectCategory.value === "Ag Mgt" && !selectAgMgt.value) {
@@ -48,7 +52,15 @@ window.WaterView = {
       return dataName && window[dataName];
     });
     const chartReady = computed(() => {
-      if (!selectCategory.value || !selectRegion.value || !selectWater.value || !selectLanduse.value) {
+      if (!selectCategory.value || !selectRegion.value) {
+        return false;
+      }
+      // Water charts need water selection for Ag and Ag Mgt, but not for Non-Ag
+      if (selectCategory.value !== "Non-Ag" && !selectWater.value) {
+        return false;
+      }
+      // All water charts need landuse selection
+      if (!selectLanduse.value) {
         return false;
       }
       if (selectCategory.value === "Ag Mgt" && !selectAgMgt.value) {
@@ -69,7 +81,7 @@ window.WaterView = {
         return mapData.value[selectWater.value][selectLanduse.value][selectYear.value];
       }
       else if (selectCategory.value === "Ag Mgt") {
-        return mapData.value?.[selectAgMgt.value][selectLanduse.value][selectWater.value][selectYear.value];
+        return mapData.value?.[selectAgMgt.value]?.[selectWater.value]?.[selectLanduse.value]?.[selectYear.value];
       }
       else if (selectCategory.value === "Non-Ag") {
         return mapData.value[selectLanduse.value][selectYear.value];
@@ -136,14 +148,25 @@ window.WaterView = {
 
     // Progressive selection chain watchers
     watch(selectCategory, (newCategory) => {
+      // Reset AgMgt array when not in Ag Mgt category
+      if (newCategory !== "Ag Mgt") {
+        availableAgMgt.value = [];
+        selectAgMgt.value = "";
+      }
+
       // Handle ALL downstream variables with cascading pattern
       if (newCategory === "Ag Mgt") {
         availableAgMgt.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]] || {});
         selectAgMgt.value = availableAgMgt.value[0] || '';
-        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value] || {});
-        selectLanduse.value = availableLanduse.value[0] || '';
-        availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][selectLanduse.value] || {});
-        selectWater.value = availableWater.value[0] || '';
+        // Water map data structure: AgMgt → Water → Landuse → Year
+        if (selectAgMgt.value) {
+          availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value] || {});
+          selectWater.value = availableWater.value[0] || '';
+          if (selectWater.value) {
+            availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][selectWater.value] || {});
+            selectLanduse.value = availableLanduse.value[0] || '';
+          }
+        }
       } else if (newCategory === "Ag") {
         availableWater.value = Object.keys(window[mapRegister["Ag"]["name"]] || {});
         selectWater.value = availableWater.value[0] || '';
@@ -152,32 +175,38 @@ window.WaterView = {
       } else if (newCategory === "Non-Ag") {
         availableLanduse.value = Object.keys(window[mapRegister["Non-Ag"]["name"]] || {});
         selectLanduse.value = availableLanduse.value[0] || 'ALL';
+        // Clear water for Non-Ag since it doesn't use water
+        availableWater.value = [];
+        selectWater.value = '';
       }
     });
 
     watch(selectAgMgt, (newAgMgt) => {
       // Handle ALL downstream variables with cascading pattern
       if (selectCategory.value === "Ag Mgt") {
-        availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt] || {});
-        selectLanduse.value = availableLanduse.value[0] || '';
-        availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt][selectLanduse.value] || {});
+        // Water map data follows AgMgt → Water → Landuse pattern
+        availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt] || {});
         selectWater.value = availableWater.value[0] || '';
+        if (selectWater.value) {
+          availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][newAgMgt][selectWater.value] || {});
+          selectLanduse.value = availableLanduse.value[0] || '';
+        }
       }
     });
 
-    watch(selectLanduse, (newLanduse) => {
-      // Handle downstream variables for Ag Mgt
-      if (selectCategory.value === "Ag Mgt") {
-        availableWater.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value][newLanduse] || {});
-        selectWater.value = availableWater.value[0] || '';
-      }
-    });
+    // Note: selectLanduse watcher removed for Ag Mgt since landuse is downstream of water
 
     watch(selectWater, (newWater) => {
       // Handle ALL downstream variables
       if (selectCategory.value === "Ag") {
         availableLanduse.value = Object.keys(window[mapRegister["Ag"]["name"]][newWater] || {});
         selectLanduse.value = availableLanduse.value[0] || 'ALL';
+      } else if (selectCategory.value === "Ag Mgt") {
+        // For Ag Mgt, update landuse options when water changes
+        if (selectAgMgt.value) {
+          availableLanduse.value = Object.keys(window[mapRegister["Ag Mgt"]["name"]][selectAgMgt.value]?.[newWater] || {});
+          selectLanduse.value = availableLanduse.value[0] || '';
+        }
       }
     });
 
@@ -249,7 +278,7 @@ window.WaterView = {
         <!-- Ag Mgt options (only for Ag Mgt category) -->
         <div 
           class="flex items-start border-t border-white/10 pt-1">
-          <div v-if="dataLoaded && availableAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
+          <div v-if="dataLoaded && selectCategory === 'Ag Mgt' && availableAgMgt.length > 0" class="flex flex-wrap gap-1 max-w-[300px]">
             <span class="text-[0.8rem] mr-1 font-medium">Ag Mgt:</span>
             <button v-for="(val, key) in availableAgMgt" :key="key"
               @click="selectAgMgt = val"
