@@ -173,7 +173,9 @@ All reporting views follow the progressive selection pattern:
   - `map_revenue_Am`: `AgMgt → Water → Landuse → Year → {img_str, bounds, min_max}`
   - `map_revenue_NonAg`: `Landuse → Year → {img_str, bounds, min_max}` (simplified)
 - **Critical Implementation Details**:
-  - **Different AgMgt Categories**: Cost and Revenue have DIFFERENT AgMgt categories (MAP data only)
+  - **Different AgMgt Categories**: Cost and Revenue have DIFFERENT AgMgt categories (MAP data only):
+    - **Cost AgMgt**: `"ALL"`, `"Agricultural technology (energy)"`, `"Agricultural technology (fertiliser)"`, `"Biochar (soil amendment)"`, `"Early dry-season savanna burning"`, `"Human-induced regeneration (Beef)"`, `"Human-induced regeneration (Sheep)"`, `"Methane reduction (livestock)"`
+    - **Revenue AgMgt**: `"ALL"`, `"Agricultural technology (energy)"`, `"Agricultural technology (fertiliser)"`, `"Biochar (soil amendment)"`, `"Human-induced regeneration (Beef)"`, `"Human-induced regeneration (Sheep)"`, `"Methane reduction (livestock)"` (missing `"Early dry-season savanna burning"`)
   - **Chart vs Map Structure Mismatch**: Ag Mgt chart data is aggregated while map data uses AgMgt hierarchy
   - **Validation Required**: Must validate AgMgt selection exists in current Cost/Revenue data (MAP only)
   - **Combined Watcher**: Watch both `[selectCostRevenue, selectCategory]` with immediate: true

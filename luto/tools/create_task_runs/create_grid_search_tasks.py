@@ -48,7 +48,6 @@ grid_search = {
     'RESFACTOR': [3],
     'SIM_YEARS': [range(2020, 2051, 5)],                                    # Years to run the model 
     'WRITE_THREADS': [2],
-    'WRITE_OUTPUT_GEOTIFFS': [True],                                       # True or False, if True will write geotiffs for the output
     
  
     ###############################################################

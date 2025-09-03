@@ -1,6 +1,5 @@
 lu_code,lu_desc,lu_color_HEX
--1,Non-agricultural land,#666b65
--2,"Water Bodies, cites etc.",#ffffff
+-1,Non-agricultural land,#666b00
 0,Apples,#a63634
 3,Citrus,#e79029
 4,Cotton,#c3cada

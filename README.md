@@ -151,7 +151,6 @@ import luto.settings as settings
 
 # Customize simulation settings
 settings.RESFACTOR = 10                             # 10 makes the spatial resolution to ~10km. 
-settings.WRITE_OUTPUT_GEOTIFFS = False
 settings.SIM_YEARS = [2010, 2020, 2030, 2040, 2050]
 
 settings.WATER_LIMITS = 'on'                        # 'on' or 'off'. 
@@ -215,7 +214,6 @@ LUTO2 behavior can be customized through the `luto.settings` module. Key paramet
 - `VERBOSE`: Control solver output verbosity
 
 ### Output Control
-- `WRITE_OUTPUT_GEOTIFFS`: Generate spatial output files (True/False)
 - `PARALLEL_WRITE`: Use parallel processing for output generation
 - `RESFACTOR`: Spatial resolution factor (1 = full resolution, >1 = coarser)
 

@@ -48,11 +48,49 @@ def tuple_dict_to_nested(flat_dict):
     return nested_dict
         
         
-def hex_color_to_numeric(hex:str) -> tuple:
+def hex_color_to_numeric(hex: str) -> tuple:
     hex = hex.lstrip('#')
-    return tuple(int(hex[i:i+2], 16) for i in (0, 2, 4, 6)) 
+    if len(hex) == 6:
+        hex = hex + 'FF'  # Add full opacity if alpha is not provided
+    return tuple(int(hex[i:i+2], 16) for i in (0, 2, 4, 6))
 
 
+
+def get_color_legend() -> dict:
+
+    color_csvs = {
+        'lumap': 'luto/tools/report/VUE_modules/assets/lumap_colors_grouped.csv',
+        'lm': 'luto/tools/report/VUE_modules/assets/lm_colors.csv',
+        'ag': 'luto/tools/report/VUE_modules/assets/lumap_colors.csv',
+        'non_ag': 'luto/tools/report/VUE_modules/assets/non_ag_colors.csv',
+        'am': 'luto/tools/report/VUE_modules/assets/ammap_colors.csv',
+    }
+    
+    return {
+        'Land-use': {
+            'color_csv': color_csvs['lumap'], 
+            'legend': pd.read_csv(color_csvs['lumap']).query('lu_code in @data.AGLU2DESC').set_index('lu_desc')['lu_color_HEX'].to_dict()
+            },
+        'Water-supply': {
+            'color_csv': color_csvs['lm'],
+            'legend': pd.read_csv(color_csvs['lm']).set_index('lu_desc')['lu_color_HEX'].to_dict()
+            },
+        'Agricultural Land-use': {
+            'color_csv': color_csvs['ag'],
+            'legend': pd.read_csv(color_csvs['ag']).query('lu_code in @data.AGLU2DESC').set_index('lu_desc')['lu_color_HEX'].to_dict()
+            },
+        'Non-agricultural Land-use': {
+            'color_csv': color_csvs['non_ag'],
+            'legend': pd.read_csv(color_csvs['non_ag']).query('lu_code in @data.NONAGLU2DESC').set_index('lu_desc')['lu_color_HEX'].to_dict()
+            },
+        'Agricultural Management': {
+            'color_csv': color_csvs['am'],
+            'legend': pd.read_csv(color_csvs['am']).query('lu_desc in @data.AG_MAN_DESC').set_index('lu_code')['lu_color_HEX'].to_dict()
+        }
+    }
+
+
+   
 def array_to_base64(arr_4band: np.ndarray, bbox: list, min_max:list) -> dict:
 
     # Create PIL Image from RGBA array
@@ -74,7 +112,34 @@ def array_to_base64(arr_4band: np.ndarray, bbox: list, min_max:list) -> dict:
 
 
 
-def map2base64(rxr_path:str, arr_lyr:xr.DataArray, attrs:tuple) -> dict|None:
+def map2base64_interger(f:str, color_csv:str, attrs:tuple = ()) -> dict:
+    
+        with xr.open_dataset(f) as ds:
+            img = ds['__xarray_dataarray_variable__'].compute()
+            img_geo = ds['spatial_ref'].attrs['crs_wkt']
+
+        # Convert the 1D array to a RGBA array
+        color_csv = pd.read_csv(color_csv)
+        color_csv['color_numeric'] = color_csv['lu_color_HEX'].apply(hex_color_to_numeric)
+        color_dict = color_csv.set_index('lu_code')['color_numeric'].to_dict()
+        color_dict[-1] = (0,0,0,0)    # Nodata pixels are transparent
+ 
+        # Get the bounding box, then reproject to Mercator
+        img = img.rio.write_crs(img_geo)
+        bbox = img.rio.bounds()
+        img = img.rio.reproject('EPSG:3857') # To Mercator with Nearest Neighbour
+        img = np.nan_to_num(img, nan=-1).astype('int16')
+
+        # Convert to RGBA array
+        arr_4band = np.zeros((img.shape[0], img.shape[1], 4), dtype='uint8')
+        for k, v in color_dict.items():
+            arr_4band[img == k] = v
+
+        return attrs, array_to_base64(arr_4band, bbox, [])
+    
+    
+    
+def map2base64_float(rxr_path:str, arr_lyr:xr.DataArray, attrs:tuple) -> dict|None:
 
         # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
         with xr.open_dataset(rxr_path) as rxr_ds:
@@ -122,14 +187,14 @@ def map2base64(rxr_path:str, arr_lyr:xr.DataArray, attrs:tuple) -> dict|None:
     
     
 
-def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=settings.WRITE_THREADS) -> dict:
+def get_map_obj_float(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=settings.WRITE_THREADS) -> dict:
 
     # Get an template rio-xarray, it will be used to convert 1D array to its 2D map format
     template_xr = f'{data.path}/out_{sorted(settings.SIM_YEARS)[0]}/xr_map_lumap_{sorted(settings.SIM_YEARS)[0]}.nc'
     
     # Get dim info
     with xr.open_dataarray(files_df.iloc[0]['path']) as arr_eg:
-        loop_dims = set(arr_eg.dims) - set(['cell'])
+        loop_dims = set(arr_eg.dims) - set(['cell', 'y', 'x'])
         
         dim_vals = pd.MultiIndex.from_product(
             [arr_eg[dim].values for dim in loop_dims],
@@ -163,7 +228,7 @@ def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=set
                 }.get(commodity, commodity)
                 
             task.append(
-                delayed(map2base64)(template_xr, arr_sel, tuple(list(sel_rename.values()) + [_year]))
+                delayed(map2base64_float)(template_xr, arr_sel, tuple(list(sel_rename.values()) + [_year]))
             )    
             
     # Gather results and save to JSON
@@ -179,6 +244,81 @@ def get_map_obj(data:Data, files_df:pd.DataFrame, save_path:str, workers:int=set
     if not os.path.exists(os.path.dirname(save_path)):
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
+    with open(save_path, 'w') as f:
+        filename = os.path.basename(save_path).replace('.js', '')
+        f.write(f'window["{filename}"] = ')
+        json.dump(output, f, separators=(',', ':'), indent=2)
+        f.write(';\n')
+        
+
+def get_map_obj_interger(data:Data, files_df:pd.DataFrame, save_path:str, colors_legend = get_color_legend(), workers:int=settings.WRITE_THREADS) -> dict:
+    
+    map_mosaic_lumap = files_df.query('base_name == "xr_map_lumap"'
+        ).assign(
+            _type='Land-use', 
+            color_csv=colors_legend['Land-use']['color_csv'], 
+            legend_info=str(colors_legend['Land-use']['legend'])
+        )
+    map_mosaic_lmmap = files_df.query('base_name == "xr_map_lmmap"'
+        ).assign(
+            _type='Water-supply',
+            color_csv=colors_legend['Water-supply']['color_csv'],
+            legend_info=str(colors_legend['Water-supply']['legend'])
+        )
+    map_mosaic_ag = files_df.query('base_name == "xr_map_ag_argmax"'
+        ).assign(
+            _type='Agricultural Land-use',
+            color_csv=colors_legend['Agricultural Land-use']['color_csv'],
+            legend_info=str(colors_legend['Agricultural Land-use']['legend'])
+        )
+    map_mosaic_non_ag = files_df.query('base_name == "xr_map_non_ag_argmax"'
+        ).assign(
+            _type='Non-agricultural Land-use',
+            color_csv=colors_legend['Non-agricultural Land-use']['color_csv'],
+            legend_info=str(colors_legend['Non-agricultural Land-use']['legend'])
+        )
+    map_mosaic_am = files_df.query('base_name == "xr_map_am_argmax"'
+        ).assign(
+            _type='Agricultural Management',
+            color_csv=colors_legend['Agricultural Management']['color_csv'],
+            legend_info=str(colors_legend['Agricultural Management']['legend'])
+        )
+    map_mosaic = pd.concat([
+        map_mosaic_lumap,
+        map_mosaic_lmmap,
+        map_mosaic_ag,
+        map_mosaic_non_ag,
+        map_mosaic_am
+    ], ignore_index=True)
+
+    
+    task = []
+    for _, row in map_mosaic.iterrows():
+        task.append(
+            delayed(map2base64_interger)(
+                row['path'], 
+                row['color_csv'], 
+                (row['_type'], row['Year'], row['legend_info'])
+            )
+        )
+
+    output = {}
+    for res in Parallel(n_jobs=settings.WRITE_THREADS, return_as='generator')(task):
+        if res is None:continue
+        (_type, _year, legend), val = res
+        if _type not in output:
+            output[_type] = {}
+        if _year not in output[_type]:
+            output[_type][_year] = {}
+        output[_type][_year] = {
+            **val,
+            'legend': eval(legend)
+        }
+        
+    # Save to JSON
+    if not os.path.exists(os.path.dirname(save_path)):
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        
     with open(save_path, 'w') as f:
         filename = os.path.basename(save_path).replace('.js', '')
         f.write(f'window["{filename}"] = ')
@@ -217,132 +357,170 @@ def save_report_layer(data:Data, raw_data_dir:str):
     
     
     ####################################################
-    #                   1) Area Layer                  #
+    #                   1) Mosaic maps                 #
+    ####################################################
+    
+    save_path = f'{SAVE_DIR}/map_layers/map_dvar_mosaic.js'
+    get_map_obj_interger(data, files, save_path)
+
+
+ 
+    ####################################################
+    #                   2) Dvar Layer                  #
+    ####################################################
+    
+    dvar_ag = files.query('base_name == "xr_map_ag"')
+    get_map_obj_float(data, dvar_ag, f'{SAVE_DIR}/map_layers/map_dvar_Ag.js')
+    
+    dvar_am = files.query('base_name == "xr_map_am"')
+    get_map_obj_float(data, dvar_am, f'{SAVE_DIR}/map_layers/map_dvar_Am.js')
+    
+    dvar_nonag = files.query('base_name == "xr_map_non_ag"')
+    get_map_obj_float(data, dvar_nonag, f'{SAVE_DIR}/map_layers/map_dvar_NonAg.js')
+    
+    
+    
+    ####################################################
+    #                   3) Area Layer                  #
     ####################################################
 
     files_area = files.query('base_name.str.contains("area")')
 
     area_ag = files_area.query('base_name == "xr_area_agricultural_landuse"')
-    get_map_obj(data, area_ag, f'{SAVE_DIR}/map_layers/map_area_Ag.js')
+    get_map_obj_float(data, area_ag, f'{SAVE_DIR}/map_layers/map_area_Ag.js')
 
     area_am = files_area.query('base_name == "xr_area_agricultural_management"')
-    get_map_obj(data, area_am, f'{SAVE_DIR}/map_layers/map_area_Am.js')
+    get_map_obj_float(data, area_am, f'{SAVE_DIR}/map_layers/map_area_Am.js')
 
     area_nonag = files_area.query('base_name == "xr_area_non_agricultural_landuse"')
-    get_map_obj(data, area_nonag, f'{SAVE_DIR}/map_layers/map_area_NonAg.js')
+    get_map_obj_float(data, area_nonag, f'{SAVE_DIR}/map_layers/map_area_NonAg.js')
+
+
 
     ####################################################
-    #                  2) Biodiversity                 #
+    #                  4) Biodiversity                 #
     ####################################################
 
     files_bio = files.query('base_name.str.contains("biodiversity")')
 
     # GBF2
     bio_GBF2_ag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag"')
-    get_map_obj(data, bio_GBF2_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Ag.js')
+    get_map_obj_float(data, bio_GBF2_ag, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Ag.js')
 
     bio_GBF2_am = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_ag_management"')
-    get_map_obj(data, bio_GBF2_am, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Am.js')
+    get_map_obj_float(data, bio_GBF2_am, f'{SAVE_DIR}/map_layers/map_bio_GBF2_Am.js')
 
     bio_GBF2_nonag = files_bio.query('base_name == "xr_biodiversity_GBF2_priority_non_ag"')
-    get_map_obj(data, bio_GBF2_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js')
+    get_map_obj_float(data, bio_GBF2_nonag, f'{SAVE_DIR}/map_layers/map_bio_GBF2_NonAg.js')
 
     # Overall priority
     bio_overall_ag = files_bio.query('base_name == "xr_biodiversity_overall_priority_ag"')
-    get_map_obj(data, bio_overall_ag, f'{SAVE_DIR}/map_layers/map_bio_overall_Ag.js')
+    get_map_obj_float(data, bio_overall_ag, f'{SAVE_DIR}/map_layers/map_bio_overall_Ag.js')
 
     bio_overall_am = files_bio.query('base_name == "xr_biodiversity_overall_priority_ag_management"')
-    get_map_obj(data, bio_overall_am, f'{SAVE_DIR}/map_layers/map_bio_overall_Am.js')
+    get_map_obj_float(data, bio_overall_am, f'{SAVE_DIR}/map_layers/map_bio_overall_Am.js')
 
     bio_overall_nonag = files_bio.query('base_name == "xr_biodiversity_overall_priority_non_ag"')
-    get_map_obj(data, bio_overall_nonag, f'{SAVE_DIR}/map_layers/map_bio_overall_NonAg.js')
+    get_map_obj_float(data, bio_overall_nonag, f'{SAVE_DIR}/map_layers/map_bio_overall_NonAg.js')
+
+
 
     ####################################################
-    #                    3) Cost                       #
+    #                    5) Cost                       #
     ####################################################
 
     files_cost = files.query('base_name.str.contains("cost")')
 
     cost_ag = files_cost.query('base_name == "xr_cost_ag"')
-    get_map_obj(data, cost_ag, f'{SAVE_DIR}/map_layers/map_cost_Ag.js')
+    get_map_obj_float(data, cost_ag, f'{SAVE_DIR}/map_layers/map_cost_Ag.js')
 
     cost_am = files_cost.query('base_name == "xr_cost_agricultural_management"')
-    get_map_obj(data, cost_am, f'{SAVE_DIR}/map_layers/map_cost_Am.js')
+    get_map_obj_float(data, cost_am, f'{SAVE_DIR}/map_layers/map_cost_Am.js')
 
     cost_nonag = files_cost.query('base_name == "xr_cost_non_ag"')
-    get_map_obj(data, cost_nonag, f'{SAVE_DIR}/map_layers/map_cost_NonAg.js')
+    get_map_obj_float(data, cost_nonag, f'{SAVE_DIR}/map_layers/map_cost_NonAg.js')
 
     # cost_transition = files_cost.query('base_name == "xr_cost_transition_ag2ag"')
-    # get_map_obj(data, cost_transition, f'{SAVE_DIR}/map_layers/map_cost_transition.js')
+    # get_map_obj_float(data, cost_transition, f'{SAVE_DIR}/map_layers/map_cost_transition.js')
+
+
 
     ####################################################
-    #                    4) GHG                        #
+    #                    6) GHG                        #
     ####################################################
 
     files_ghg = files.query('base_name.str.contains("GHG")')
 
     ghg_ag = files_ghg.query('base_name == "xr_GHG_ag"')
-    get_map_obj(data, ghg_ag, f'{SAVE_DIR}/map_layers/map_GHG_Ag.js')
+    get_map_obj_float(data, ghg_ag, f'{SAVE_DIR}/map_layers/map_GHG_Ag.js')
 
     ghg_am = files_ghg.query('base_name == "xr_GHG_ag_management"')
-    get_map_obj(data, ghg_am, f'{SAVE_DIR}/map_layers/map_GHG_Am.js')
+    get_map_obj_float(data, ghg_am, f'{SAVE_DIR}/map_layers/map_GHG_Am.js')
 
     ghg_nonag = files_ghg.query('base_name == "xr_GHG_non_ag"')
-    get_map_obj(data, ghg_nonag, f'{SAVE_DIR}/map_layers/map_GHG_NonAg.js')
+    get_map_obj_float(data, ghg_nonag, f'{SAVE_DIR}/map_layers/map_GHG_NonAg.js')
+
+
 
     ####################################################
-    #                  5) Quantities                   #
+    #                  7) Quantities                   #
     ####################################################
 
     files_quantities = files.query('base_name.str.contains("quantities")')
 
     quantities_ag = files_quantities.query('base_name == "xr_quantities_agricultural"')
-    get_map_obj(data, quantities_ag, f'{SAVE_DIR}/map_layers/map_quantities_Ag.js')
+    get_map_obj_float(data, quantities_ag, f'{SAVE_DIR}/map_layers/map_quantities_Ag.js')
 
     quantities_am = files_quantities.query('base_name == "xr_quantities_agricultural_management"')
-    get_map_obj(data, quantities_am, f'{SAVE_DIR}/map_layers/map_quantities_Am.js')
+    get_map_obj_float(data, quantities_am, f'{SAVE_DIR}/map_layers/map_quantities_Am.js')
 
     quantities_nonag = files_quantities.query('base_name == "xr_quantities_non_agricultural"')
-    get_map_obj(data, quantities_nonag, f'{SAVE_DIR}/map_layers/map_quantities_NonAg.js')
+    get_map_obj_float(data, quantities_nonag, f'{SAVE_DIR}/map_layers/map_quantities_NonAg.js')
+
+
 
     ####################################################
-    #                   6) Revenue                     #
+    #                   8) Revenue                     #
     ####################################################
 
     files_revenue = files.query('base_name.str.contains("revenue")')
 
     revenue_ag = files_revenue.query('base_name == "xr_revenue_ag"')
-    get_map_obj(data, revenue_ag, f'{SAVE_DIR}/map_layers/map_revenue_Ag.js')
+    get_map_obj_float(data, revenue_ag, f'{SAVE_DIR}/map_layers/map_revenue_Ag.js')
 
     revenue_am = files_revenue.query('base_name == "xr_revenue_agricultural_management"')
-    get_map_obj(data, revenue_am, f'{SAVE_DIR}/map_layers/map_revenue_Am.js')
+    get_map_obj_float(data, revenue_am, f'{SAVE_DIR}/map_layers/map_revenue_Am.js')
 
     revenue_nonag = files_revenue.query('base_name == "xr_revenue_non_ag"')
-    get_map_obj(data, revenue_nonag, f'{SAVE_DIR}/map_layers/map_revenue_NonAg.js')
+    get_map_obj_float(data, revenue_nonag, f'{SAVE_DIR}/map_layers/map_revenue_NonAg.js')
+
+
 
     ####################################################
-    #                7) Transition Cost                #
+    #                9) Transition Cost                #
     ####################################################
 
     # files_transition = files.query('base_name.str.contains("transition")')
 
     # transition_cost = files_transition.query('base_name == "xr_transition_cost_ag2non_ag"')
-    # get_map_obj(data, transition_cost, f'{SAVE_DIR}/map_layers/map_transition_cost.js')
+    # get_map_obj_float(data, transition_cost, f'{SAVE_DIR}/map_layers/map_transition_cost.js')
 
     # transition_ghg = files_transition.query('base_name == "xr_transition_GHG"')
-    # get_map_obj(data, transition_ghg, f'{SAVE_DIR}/map_layers/map_transition_GHG.js')
+    # get_map_obj_float(data, transition_ghg, f'{SAVE_DIR}/map_layers/map_transition_GHG.js')
+
+
 
     ####################################################
-    #                8) Water Yield                    #
+    #               10) Water Yield                    #
     ####################################################
 
     files_water = files.query('base_name.str.contains("water_yield")')
 
     water_ag = files_water.query('base_name == "xr_water_yield_ag"')
-    get_map_obj(data, water_ag, f'{SAVE_DIR}/map_layers/map_water_yield_Ag.js')
+    get_map_obj_float(data, water_ag, f'{SAVE_DIR}/map_layers/map_water_yield_Ag.js')
 
     water_am = files_water.query('base_name == "xr_water_yield_ag_management"')
-    get_map_obj(data, water_am, f'{SAVE_DIR}/map_layers/map_water_yield_Am.js')
+    get_map_obj_float(data, water_am, f'{SAVE_DIR}/map_layers/map_water_yield_Am.js')
 
     water_nonag = files_water.query('base_name == "xr_water_yield_non_ag"')
-    get_map_obj(data, water_nonag, f'{SAVE_DIR}/map_layers/map_water_yield_NonAg.js')
+    get_map_obj_float(data, water_nonag, f'{SAVE_DIR}/map_layers/map_water_yield_NonAg.js')
